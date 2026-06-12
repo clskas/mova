@@ -1,21 +1,46 @@
 # MOVA RDC — Documentation
 
-Bienvenue dans la documentation technique de MOVA, plateforme de mobilité pour Kinshasa, RDC.
+Bienvenue dans la documentation technique de MOVA, plateforme de mobilité nationwide pour la RDC (26 provinces, Kinshasa par défaut).
 
 ## Quick Start
 
-```bash
-docker compose up -d postgres redis
-cd backend && npm install && npx prisma migrate dev && npm run start:dev
+```powershell
+Copy-Item config/services.env.example .env
+docker compose up -d --build
+npm run migrate:all
+npm run seed:rides
+.\scripts\smoke-gateway.ps1
 ```
 
-## Stack
+## Clients
 
-- **Mobile** : Flutter 3.x (flavors passenger/driver)
-- **Backend** : NestJS + Prisma + Socket.io
-- **Web** : Next.js 14 PWA
-- **Admin** : Next.js back-office
-- **DB** : PostgreSQL 16 + Redis 7
+| Client | Stack | Port dev | Variable API |
+|--------|-------|----------|--------------|
+| Mobile passager/chauffeur | Flutter 3.32+ | — | `API_URL` |
+| Web PWA | Next.js 14 | 3001 | `NEXT_PUBLIC_API_URL` |
+| Admin | Next.js 14 | 3002 | `NEXT_PUBLIC_API_URL` |
+
+```powershell
+# Web PWA
+cd web && npm install && npm run dev
+
+# Admin
+cd admin && npm install && npm run dev
+```
+
+## Stack backend
+
+- **Microservices** : 7 services NestJS + API Gateway (port 3000)
+- **DB** : PostgreSQL 16 (5 instances) + Redis 7
+- **CI/CD** : GitHub Actions → GHCR → Render
+
+## Vérification complète
+
+```powershell
+.\scripts\verify-all.ps1
+```
+
+Vérifie : health gateway, `flutter test`, `npm run build` (web + admin).
 
 ## Adaptations RDC
 
@@ -24,5 +49,9 @@ cd backend && npm install && npx prisma migrate dev && npm run start:dev
 | Devise | CDF (Franc congolais) |
 | Téléphone | +243 |
 | Mobile money | Orange Money, M-Pesa, Airtel Money |
-| Ville | Kinshasa |
+| Ville par défaut | Kinshasa |
 | Fuseau | Africa/Kinshasa |
+
+## Documentation utilisateur
+
+Voir [Manuel utilisateur](manuel-utilisateur.md) pour les guides passager, chauffeur et admin.

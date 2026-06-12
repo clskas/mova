@@ -142,7 +142,7 @@ npm install; npx prisma migrate dev; npm run start:dev
 
 
 
-### 4. Web PWA
+### 4. Web PWA (passager)
 
 
 
@@ -150,11 +150,25 @@ npm install; npx prisma migrate dev; npm run start:dev
 
 cd web
 
+Copy-Item .env.example .env.local
+
 npm install
 
 npm run dev
 
 ```
+
+
+
+Ouvrir [http://localhost:3001](http://localhost:3001). Services : taxi, livraison colis, repas, historique. PWA manifest + icônes `movaicone` dans `public/`.
+
+
+
+| Variable | Description |
+
+|----------|-------------|
+
+| `NEXT_PUBLIC_API_URL` | Passerelle API (défaut `http://localhost:3000`) |
 
 
 
@@ -166,11 +180,17 @@ npm run dev
 
 cd admin
 
+Copy-Item .env.example .env.local
+
 npm install
 
 npm run dev
 
 ```
+
+
+
+Ouvrir [http://localhost:3002](http://localhost:3002). Dashboard métriques, utilisateurs, KYC, litiges, livraisons/planifiées.
 
 
 
@@ -204,11 +224,39 @@ Voir [docs/architecture.md](docs/architecture.md) pour le détail.
 
 
 
+## Vérification complète
+
+
+
+```powershell
+
+.\scripts\verify-all.ps1
+
+```
+
+
+
+Vérifie : health gateway, `flutter test`, `npm run build` (web + admin). Options : `-SkipFlutter`, `-SkipBuild`, `-GatewayUrl`.
+
+
+
+## Documentation
+
+
+
+- **Manuel utilisateur** : `docs/manuel-utilisateur.md`
+
+- **MkDocs** : `mkdocs serve` (après `pip install mkdocs-material`)
+
+- Voir aussi `docs/architecture.md`, `docs/api.md`, `docs/cicd.md`
+
+
+
 ## Déploiement
 
 
 
-- **CI/CD**: GitHub Actions → GHCR (7 images) → Render
+- **CI/CD**: GitHub Actions → GHCR (7 images) → Render + build clients (web/admin)
 
 - **Blueprint**: `render.yaml`
 

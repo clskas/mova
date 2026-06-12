@@ -2,6 +2,8 @@ import { Body, Controller, Get, Param, Patch, Post, Query, Request, UseGuards } 
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CancelRideDto, CreateRideDto, EstimateRideDto, UpdateRideStatusDto } from './rides.dto';
+import { CancelScheduledRideDto, CreateScheduledRideDto } from './scheduled-rides.dto';
+import { ScheduledRidesService } from './scheduled-rides.service';
 import { RidesService } from './rides.service';
 
 @ApiTags('rides')
@@ -9,8 +11,11 @@ import { RidesService } from './rides.service';
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth()
 export class RidesController {
-  constructor(private ridesService: RidesService) {}
+  constructor(private ridesService: RidesService, private scheduledRidesService: ScheduledRidesService) {}
   @Post('estimate') @ApiOperation({ summary: 'Estimer tarif' }) estimate(@Body() dto: EstimateRideDto) { return this.ridesService.estimate(dto.pickupLat, dto.pickupLng, dto.dropoffLat, dto.dropoffLng, dto.vehicleType); }
+  @Post('scheduled') @ApiOperation({ summary: 'Créer réservation planifiée (J+7 max)' }) createScheduled(@Request() req: { user: { id: string } }, @Body() dto: CreateScheduledRideDto) { return this.scheduledRidesService.create(req.user.id, dto); }
+  @Get('scheduled') @ApiOperation({ summary: 'Liste réservations planifiées' }) listScheduled(@Request() req: { user: { id: string } }) { return this.scheduledRidesService.list(req.user.id); }
+  @Post('scheduled/:id/cancel') @ApiOperation({ summary: 'Annuler réservation planifiée' }) cancelScheduled(@Request() req: { user: { id: string } }, @Param('id') id: string, @Body() dto: CancelScheduledRideDto) { return this.scheduledRidesService.cancel(id, req.user.id, dto.reason); }
   @Post() @ApiOperation({ summary: 'Créer une course' }) create(@Request() req: { user: { id: string } }, @Body() dto: CreateRideDto) { return this.ridesService.createRide(req.user.id, dto); }
   @Get() @ApiOperation({ summary: 'Historique courses' }) list(@Request() req: { user: { id: string; role: string } }, @Query('role') role?: string) { return this.ridesService.getUserRides(req.user.id, (role === 'driver' ? 'driver' : 'passenger') as 'passenger' | 'driver'); }
   @Get(':id') @ApiOperation({ summary: 'Détail course' }) get(@Param('id') id: string) { return this.ridesService.getRide(id); }

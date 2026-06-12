@@ -36,11 +36,17 @@ flutter_launcher_icons:
   android: true
   ios: true
   image_path: assets/icon/movaicone.png
+  adaptive_icon_background: "#1A1A2E"
+  adaptive_icon_foreground: assets/icon/movaicone.png
   flavors:
     passenger:
       image_path: assets/icon/movaicone.png
+      adaptive_icon_background: "#1A1A2E"
+      adaptive_icon_foreground: assets/icon/movaicone.png
     driver:
       image_path: assets/icon/movaicone.png
+      adaptive_icon_background: "#1A1A2E"
+      adaptive_icon_foreground: assets/icon/movaicone.png
 
 flutter:
   uses-material-design: true

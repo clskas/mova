@@ -3,10 +3,14 @@ import '../../core/config/market_config.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../booking/booking_screen.dart';
+import '../carpool/carpool_screen.dart';
+import '../delivery/food_delivery_screen.dart';
+import '../delivery/parcel_delivery_screen.dart';
+import '../errands/errand_screen.dart';
+import '../rides/scheduled_ride_screen.dart';
 import '../wallet/wallet_screen.dart';
 import '../help/help_screen.dart';
 import '../history/history_screen.dart';
-import 'coming_soon_screen.dart';
 import 'service_card.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -23,17 +27,6 @@ class HomeScreen extends StatelessWidget {
     Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
   }
 
-  void _openComingSoon(
-    BuildContext context, {
-    required String serviceName,
-    String? description,
-  }) {
-    _open(
-      context,
-      ComingSoonScreen(serviceName: serviceName, description: description),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -42,11 +35,58 @@ class HomeScreen extends StatelessWidget {
       title: 'MOVA',
       actions: [
         IconButton(
+          icon: const Icon(Icons.account_balance_wallet_outlined),
+          tooltip: 'Wallet',
+          onPressed: () => _open(context, const WalletScreen()),
+        ),
+        IconButton(
+          icon: const Icon(Icons.history),
+          tooltip: 'Historique',
+          onPressed: () => _open(context, const HistoryScreen()),
+        ),
+        IconButton(
           icon: const Icon(Icons.help_outline),
           tooltip: 'Aide',
           onPressed: () => _open(context, const HelpScreen()),
         ),
       ],
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: 0,
+        onDestinationSelected: (index) {
+          switch (index) {
+            case 1:
+              _open(context, const HistoryScreen());
+            case 2:
+              _open(context, const WalletScreen());
+            case 3:
+              _open(context, const HelpScreen());
+          }
+        },
+        backgroundColor: MovaColors.white,
+        indicatorColor: MovaColors.violet.withValues(alpha: 0.15),
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.home_outlined),
+            selectedIcon: Icon(Icons.home, color: MovaColors.violet),
+            label: 'Accueil',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.history_outlined),
+            selectedIcon: Icon(Icons.history, color: MovaColors.violet),
+            label: 'Historique',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.account_balance_wallet_outlined),
+            selectedIcon: Icon(Icons.account_balance_wallet, color: MovaColors.violet),
+            label: 'Wallet',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.help_outline),
+            selectedIcon: Icon(Icons.help, color: MovaColors.violet),
+            label: 'Aide',
+          ),
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -144,13 +184,7 @@ class HomeScreen extends StatelessWidget {
                       iconColor: MovaColors.green,
                       title: 'Livraison colis',
                       subtitle: 'Envoyez un colis en toute sécurité',
-                      comingSoon: true,
-                      onTap: () => _openComingSoon(
-                        context,
-                        serviceName: 'Livraison colis',
-                        description:
-                            'Expédiez vos colis à Kinshasa et dans toute la RDC. Ce service sera disponible très bientôt.',
-                      ),
+                      onTap: () => _open(context, const ParcelDeliveryScreen()),
                     ),
                   ]),
                   const SizedBox(height: spacing),
@@ -177,22 +211,31 @@ class HomeScreen extends StatelessWidget {
                       iconColor: MovaColors.violet,
                       title: 'Réservation planifiée',
                       subtitle: 'Programmez votre trajet à l\'avance',
-                      comingSoon: true,
-                      onTap: () => _openComingSoon(
-                        context,
-                        serviceName: 'Réservation planifiée',
-                      ),
+                      onTap: () => _open(context, const ScheduledRideScreen()),
                     ),
                     ServiceCard(
                       icon: Icons.restaurant_outlined,
                       iconColor: MovaColors.green,
                       title: 'Livraison repas',
                       subtitle: 'Restaurants et plats locaux',
-                      comingSoon: true,
-                      onTap: () => _openComingSoon(
-                        context,
-                        serviceName: 'Livraison repas',
-                      ),
+                      onTap: () => _open(context, const FoodDeliveryScreen()),
+                    ),
+                  ]),
+                  const SizedBox(height: spacing),
+                  gridRow([
+                    ServiceCard(
+                      icon: Icons.shopping_bag_outlined,
+                      iconColor: MovaColors.orange,
+                      title: 'Courses & commissions',
+                      subtitle: 'Achats et courses pour vous',
+                      onTap: () => _open(context, const ErrandScreen()),
+                    ),
+                    ServiceCard(
+                      icon: Icons.people_outline,
+                      iconColor: MovaColors.midnight,
+                      title: 'Covoiturage',
+                      subtitle: 'Partagez un trajet, économisez',
+                      onTap: () => _open(context, const CarpoolScreen()),
                     ),
                   ]),
                 ],

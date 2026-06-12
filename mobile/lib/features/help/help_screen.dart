@@ -18,7 +18,7 @@ class HelpScreen extends StatelessWidget {
             title: const Text('Manuel utilisateur'),
             onTap: () => Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => const LegalScreen(title: 'Manuel', asset: 'assets/legal/cgu_fr.md')),
+              MaterialPageRoute(builder: (_) => const LegalScreen(title: 'Manuel', asset: 'assets/legal/manuel_fr.md')),
             ),
           ),
           ListTile(

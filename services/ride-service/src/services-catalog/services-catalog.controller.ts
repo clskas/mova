@@ -1,0 +1,15 @@
+import { Controller, Get } from '@nestjs/common';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ServicesCatalogService } from './services-catalog.service';
+
+@ApiTags('services')
+@Controller('services')
+export class ServicesCatalogController {
+  constructor(private catalog: ServicesCatalogService) {}
+
+  @Get()
+  @ApiOperation({ summary: 'Liste des services MOVA' })
+  list() {
+    return { services: this.catalog.list() };
+  }
+}

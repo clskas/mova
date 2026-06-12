@@ -10,6 +10,7 @@ theme:
       accent: amber
 nav:
   - Accueil: index.md
+  - Manuel utilisateur: manuel-utilisateur.md
   - Architecture: architecture.md
   - API: api.md
   - CI/CD: cicd.md

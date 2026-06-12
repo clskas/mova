@@ -21,4 +21,6 @@ export class AdminController {
   @Post('kyc/:id/review') @ApiOperation({ summary: 'Valider/rejeter KYC' }) reviewKyc(@Param('id') id: string, @Body() dto: ApproveKycDto) { return this.adminService.approveKyc(id, dto.approved, dto.notes); }
   @Get('incidents') @ApiOperation({ summary: 'Liste incidents' }) incidents() { return this.adminService.listIncidents(); }
   @Post('incidents/:id/resolve') @ApiOperation({ summary: 'Résoudre incident' }) resolve(@Param('id') id: string, @Body('status') status: string) { return this.adminService.resolveIncident(id, status ?? 'RESOLVED'); }
+  @Get('deliveries') @ApiOperation({ summary: 'Vue livraisons en cours' }) deliveries() { return this.adminService.listDeliveries(); }
+  @Get('scheduled-rides') @ApiOperation({ summary: 'Vue réservations planifiées' }) scheduledRides() { return this.adminService.listScheduledRides(); }
 }

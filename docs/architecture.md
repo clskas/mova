@@ -8,7 +8,7 @@ MOVA RDC is a **nationwide** ride-hailing platform for the Democratic Republic o
 |---------|------|----------|----------------|
 | api-gateway | 3000 | — | Routing, JWT validation, throttling, aggregated health |
 | auth-service | 3001 | postgres-auth | OTP auth, users, JWT issuance |
-| ride-service | 3002 | postgres-rides | Rides, geo, pricing, ratings, WebSocket `/tracking` |
+| ride-service | 3002 | postgres-rides | Rides, livraisons, réservations, covoiturage, courses, location, geo, pricing, ratings, WebSocket `/tracking` |
 | payment-service | 3003 | postgres-payments | Wallets, mobile money, ride payments |
 | driver-service | 3004 | postgres-drivers | Driver profiles, KYC, matching, incidents |
 | notification-service | 3005 | postgres-notifications | Push/in-app notifications |

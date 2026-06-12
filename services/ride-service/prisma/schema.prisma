@@ -24,6 +24,34 @@ enum RideStatus {
   CANCELLED
 }
 
+enum DeliveryType {
+  PARCEL
+  FOOD
+}
+
+enum WeightCategory {
+  DOCUMENTS
+  SMALL
+  MEDIUM
+  LARGE
+}
+
+enum DeliveryStatus {
+  PENDING
+  PICKED_UP
+  IN_TRANSIT
+  DELIVERED
+  CANCELLED
+}
+
+enum ScheduledRideStatus {
+  SCHEDULED
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
 model Commune {
   id        String   @id @default(uuid())
   name      String   @unique
@@ -124,4 +152,204 @@ model Rating {
 
   @@unique([rideId, fromUserId])
   @@map("ratings")
+}
+
+model Restaurant {
+  id        String   @id @default(uuid())
+  name      String
+  cuisine   String
+  address   String
+  lat       Float
+  lng       Float
+  rating    Float    @default(4.0)
+  imageUrl  String?
+  menuItems Json?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  deliveries Delivery[]
+
+  @@map("restaurants")
+}
+
+model Delivery {
+  id                String           @id @default(uuid())
+  userId            String
+  type              DeliveryType
+  status            DeliveryStatus   @default(PENDING)
+  pickupLat         Float?
+  pickupLng         Float?
+  pickupAddress     String?
+  dropoffLat        Float?
+  dropoffLng        Float?
+  dropoffAddress    String?
+  photoUrl          String?
+  weightCategory    WeightCategory?
+  restaurantId      String?
+  restaurant        Restaurant?      @relation(fields: [restaurantId], references: [id])
+  items             Json?
+  deliveryAddress   String?
+  deliveryLat       Float?
+  deliveryLng       Float?
+  driverId          String?
+  estimatedPriceCdf Int
+  finalPriceCdf     Int?
+  distanceKm        Float?
+  durationMin       Float?
+  pickedUpAt        DateTime?
+  deliveredAt       DateTime?
+  cancelledAt       DateTime?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  events DeliveryEvent[]
+
+  @@index([userId])
+  @@index([status])
+  @@map("deliveries")
+}
+
+model DeliveryEvent {
+  id         String   @id @default(uuid())
+  deliveryId String
+  delivery   Delivery @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+  event      String
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  @@index([deliveryId])
+  @@map("delivery_events")
+}
+
+model ScheduledRide {
+  id                String              @id @default(uuid())
+  passengerId       String
+  driverId          String?
+  status            ScheduledRideStatus @default(SCHEDULED)
+  vehicleType       VehicleType
+  scheduledAt       DateTime
+  pickupLat         Float
+  pickupLng         Float
+  pickupAddress     String?
+  dropoffLat        Float
+  dropoffLng        Float
+  dropoffAddress    String?
+  estimatedPriceCdf Int
+  distanceKm        Float?
+  durationMin       Float?
+  cancelledAt       DateTime?
+  cancelReason      String?
+  rideId            String?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  @@index([passengerId])
+  @@index([scheduledAt])
+  @@index([status])
+  @@map("scheduled_rides")
+}
+
+enum CarpoolStatus {
+  OPEN
+  MATCHED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum ErrandOrderStatus {
+  PENDING
+  ASSIGNED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum RentalInquiryStatus {
+  PENDING
+  CONTACTED
+  CLOSED
+}
+
+model CarpoolTrip {
+  id                String        @id @default(uuid())
+  driverId          String
+  status            CarpoolStatus @default(OPEN)
+  departureAt       DateTime
+  pickupLat         Float
+  pickupLng         Float
+  pickupAddress     String?
+  dropoffLat        Float
+  dropoffLng        Float
+  dropoffAddress    String?
+  seatsTotal        Int           @default(3)
+  seatsAvailable    Int
+  pricePerSeatCdf   Int
+  notes             String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  passengers CarpoolPassenger[]
+
+  @@index([driverId])
+  @@index([status])
+  @@index([departureAt])
+  @@map("carpool_trips")
+}
+
+model CarpoolPassenger {
+  id        String   @id @default(uuid())
+  tripId    String
+  trip      CarpoolTrip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  userId    String
+  seats     Int      @default(1)
+  createdAt DateTime @default(now())
+
+  @@unique([tripId, userId])
+  @@index([userId])
+  @@map("carpool_passengers")
+}
+
+model ErrandOrder {
+  id                String            @id @default(uuid())
+  userId            String
+  status            ErrandOrderStatus @default(PENDING)
+  description       String
+  pickupAddress     String
+  pickupLat         Float
+  pickupLng         Float
+  dropoffAddress    String
+  dropoffLat        Float
+  dropoffLng        Float
+  estimatedPriceCdf Int
+  distanceKm        Float?
+  durationMin       Float?
+  driverId          String?
+  completedAt       DateTime?
+  cancelledAt       DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@map("errand_orders")
+}
+
+model RentalInquiry {
+  id              String              @id @default(uuid())
+  userId          String
+  status          RentalInquiryStatus @default(PENDING)
+  vehicleType     String
+  startDate       DateTime
+  endDate         DateTime
+  pickupAddress   String?
+  contactPhone    String?
+  notes           String?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@map("rental_inquiries")
 }

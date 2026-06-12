@@ -53,3 +53,37 @@ export enum IncidentType {
   FRAUD = 'FRAUD',
   OTHER = 'OTHER',
 }
+
+export enum DeliveryType {
+  PARCEL = 'PARCEL',
+  FOOD = 'FOOD',
+}
+
+export enum WeightCategory {
+  DOCUMENTS = 'DOCUMENTS',
+  SMALL = 'SMALL',
+  MEDIUM = 'MEDIUM',
+  LARGE = 'LARGE',
+}
+
+export enum DeliveryStatus {
+  PENDING = 'PENDING',
+  PICKED_UP = 'PICKED_UP',
+  IN_TRANSIT = 'IN_TRANSIT',
+  DELIVERED = 'DELIVERED',
+  CANCELLED = 'CANCELLED',
+}
+
+export enum ScheduledRideStatus {
+  SCHEDULED = 'SCHEDULED',
+  CONFIRMED = 'CONFIRMED',
+  IN_PROGRESS = 'IN_PROGRESS',
+  COMPLETED = 'COMPLETED',
+  CANCELLED = 'CANCELLED',
+}
+
+export enum ServiceCategory {
+  TRANSPORT = 'transport',
+  DELIVERY = 'delivery',
+  OTHER = 'other',
+}

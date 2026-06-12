@@ -63,7 +63,9 @@ class _KycScreenState extends ConsumerState<KycScreen> {
 }
 
 class RideRequestScreen extends StatefulWidget {
-  const RideRequestScreen({super.key});
+  const RideRequestScreen({super.key, this.jobType = 'RIDE'});
+
+  final String jobType;
 
   @override
   State<RideRequestScreen> createState() => _RideRequestScreenState();
@@ -71,6 +73,33 @@ class RideRequestScreen extends StatefulWidget {
 
 class _RideRequestScreenState extends State<RideRequestScreen> {
   int _countdown = 30;
+
+  Map<String, String> get _jobInfo => switch (widget.jobType) {
+        'PARCEL' => {
+            'title': 'Livraison colis',
+            'subtitle': 'Gombe → Masina',
+            'price': '8 000 FC',
+            'distance': '5.1 km',
+          },
+        'FOOD' => {
+            'title': 'Livraison repas',
+            'subtitle': 'Chez Mamou → Bandal',
+            'price': '18 500 FC',
+            'distance': '4.0 km',
+          },
+        'SCHEDULED' => {
+            'title': 'Réservation planifiée',
+            'subtitle': 'Gombe → Aéroport N\'Djili',
+            'price': '25 000 FC',
+            'distance': '18 km',
+          },
+        _ => {
+            'title': 'Course immédiate',
+            'subtitle': 'Vers Limete',
+            'price': '8 500 FC',
+            'distance': '3.2 km',
+          },
+      };
 
   @override
   void initState() {
@@ -96,17 +125,43 @@ class _RideRequestScreenState extends State<RideRequestScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final info = _jobInfo;
     return MovaScreen(
-      title: 'Nouvelle course',
+      title: 'Nouvelle mission',
       child: Column(
         children: [
           MovaCard(
             child: Column(
               children: [
-                const Icon(Icons.person_pin_circle, size: 48, color: MovaColors.violet),
+                Icon(
+                  widget.jobType == 'PARCEL'
+                      ? Icons.inventory_2_outlined
+                      : widget.jobType == 'FOOD'
+                          ? Icons.restaurant_outlined
+                          : widget.jobType == 'SCHEDULED'
+                              ? Icons.event_available_outlined
+                              : Icons.person_pin_circle,
+                  size: 48,
+                  color: MovaColors.violet,
+                ),
                 const SizedBox(height: 12),
-                const Text('Course vers Limete', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                const Text('2 500 FC • 3.2 km'),
+                Text(
+                  info['title']!,
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  info['subtitle']!,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '${info['price']} • ${info['distance']}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
                 const SizedBox(height: 16),
                 Text('$_countdown s', style: const TextStyle(fontSize: 32, color: MovaColors.orange)),
               ],
@@ -161,17 +216,16 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
                   label: 'Retrait mobile money',
                   icon: Icons.account_balance,
                   onPressed: () async {
+                    final messenger = ScaffoldMessenger.of(context);
                     final api = ref.read(apiClientProvider);
                     await api.post('/wallet/withdraw', {
                       'amountCdf': 5000,
                       'provider': 'ORANGE_MONEY',
                       'phone': '+243812345678',
                     });
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Retrait en cours…')),
-                      );
-                    }
+                    messenger.showSnackBar(
+                      const SnackBar(content: Text('Retrait en cours…')),
+                    );
                   },
                 ),
               ],

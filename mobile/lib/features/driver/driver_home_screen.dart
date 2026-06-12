@@ -46,6 +46,24 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
   Widget build(BuildContext context) {
     return MovaScreen(
       title: 'MOVA Chauffeur',
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.account_balance_wallet_outlined),
+          tooltip: 'Revenus',
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const EarningsScreen()),
+          ),
+        ),
+        IconButton(
+          icon: const Icon(Icons.upload_file),
+          tooltip: 'KYC',
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const KycScreen()),
+          ),
+        ),
+      ],
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -97,6 +115,36 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
             onPressed: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const RideRequestScreen()),
+            ),
+          ),
+          const SizedBox(height: 8),
+          MovaButton(
+            label: 'Colis à livrer',
+            isSecondary: true,
+            icon: Icons.inventory_2_outlined,
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const RideRequestScreen(jobType: 'PARCEL')),
+            ),
+          ),
+          const SizedBox(height: 8),
+          MovaButton(
+            label: 'Repas à livrer',
+            isSecondary: true,
+            icon: Icons.restaurant_outlined,
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const RideRequestScreen(jobType: 'FOOD')),
+            ),
+          ),
+          const SizedBox(height: 8),
+          MovaButton(
+            label: 'Réservation planifiée',
+            isSecondary: true,
+            icon: Icons.event_available_outlined,
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const RideRequestScreen(jobType: 'SCHEDULED')),
             ),
           ),
           const SizedBox(height: 8),

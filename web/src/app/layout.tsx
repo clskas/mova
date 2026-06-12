@@ -6,7 +6,10 @@ export const metadata: Metadata = {
   description: "Réservez un taxi ou moto-taxi partout en RDC en CDF (Kinshasa par défaut)",
   manifest: "/manifest.json",
   appleWebApp: { capable: true, title: "MOVA" },
-  icons: { icon: "/icon-192.png", apple: "/icon-192.png" },
+  icons: {
+    icon: [{ url: "/favicon.png", sizes: "32x32", type: "image/png" }, { url: "/icon-192.png", sizes: "192x192", type: "image/png" }],
+    apple: "/icon-192.png",
+  },
 };
 
 export const viewport: Viewport = {

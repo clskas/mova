@@ -31,4 +31,6 @@ export class AdminService {
   resolveIncident(id: string, status: string) {
     return fetch(serviceUrl('driver', `/internal/incidents/${id}/resolve`), { method: 'POST', headers: { ...this.headers, 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) }).then((r) => r.json());
   }
+  listDeliveries() { return this.fetchJson('ride', '/internal/deliveries'); }
+  listScheduledRides() { return this.fetchJson('ride', '/internal/scheduled-rides'); }
 }

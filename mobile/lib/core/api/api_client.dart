@@ -11,6 +11,11 @@ final apiClientProvider = Provider((ref) => ApiClient());
 class ApiClient {
   ApiClient({http.Client? client}) : _client = client ?? http.Client();
 
+  /// Client API en mode démo (tests et hors-ligne immédiat).
+  ApiClient.mock({http.Client? client})
+      : _client = client ?? http.Client(),
+        _mockMode = true;
+
   final http.Client _client;
   String? _token;
   bool _mockMode = false;
@@ -40,6 +45,7 @@ class ApiClient {
       };
 
   Future<bool> checkHealth() async {
+    if (_mockMode) return false;
     try {
       final res = await _client
           .get(Uri.parse('${MarketConfig.gatewayBaseUrl}/health'))
@@ -73,6 +79,37 @@ class ApiClient {
     if (path.contains('/rides/history')) {
       return Success({'data': MockData.rideHistory()});
     }
+    if (path.contains('/services')) {
+      return Success({'data': MockData.services()});
+    }
+    if (path.contains('/deliveries/history')) {
+      return Success({'data': MockData.deliveryHistory()});
+    }
+    if (path.contains('/deliveries/restaurants')) {
+      return Success({'data': MockData.restaurants()});
+    }
+    if (path.contains('/deliveries/parcel/estimate')) {
+      return Success(MockData.parcelEstimate(body ?? {}));
+    }
+    if (path == '/deliveries/parcel' && method == 'POST') {
+      return Success({'delivery': MockData.createParcel(body ?? {})});
+    }
+    if (path.contains('/deliveries/parcel/') && method == 'GET') {
+      final id = path.split('/').last.split('?').first;
+      return Success({'delivery': MockData.parcelTracking(id)});
+    }
+    if (path == '/deliveries/food' && method == 'POST') {
+      return Success({'order': MockData.createFoodOrder(body ?? {})});
+    }
+    if (path.contains('/rides/scheduled/estimate')) {
+      return Success(MockData.scheduledRideEstimate(body ?? {}));
+    }
+    if (path == '/rides/scheduled' && method == 'POST') {
+      return Success({'ride': MockData.createScheduledRide(body ?? {})});
+    }
+    if (path.contains('/rides/scheduled')) {
+      return Success({'data': MockData.scheduledRides()});
+    }
     if (path == '/wallet') {
       return Success(MockData.wallet());
     }
@@ -85,6 +122,27 @@ class ApiClient {
         path.contains('/ratings') ||
         path.contains('/incidents')) {
       return const Success({'success': true});
+    }
+    if (path.contains('/deliveries/errand/estimate')) {
+      return Success(MockData.errandEstimate(body ?? {}));
+    }
+    if (path == '/deliveries/errand' && method == 'POST') {
+      return Success({'errand': MockData.createErrand(body ?? {})});
+    }
+    if (path.contains('/deliveries/errand/history')) {
+      return Success({'data': MockData.errandHistory()});
+    }
+    if (path.contains('/carpool/search') && method == 'POST') {
+      return Success({'data': MockData.carpoolRides()});
+    }
+    if (path.contains('/carpool/estimate')) {
+      return Success(MockData.carpoolEstimate(body ?? {}));
+    }
+    if (path == '/carpool/rides' && method == 'POST') {
+      return Success({'ride': MockData.createCarpoolRide(body ?? {})});
+    }
+    if (path.contains('/carpool/rides')) {
+      return Success({'data': MockData.carpoolRides()});
     }
     return null;
   }

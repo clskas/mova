@@ -1,5 +1,40 @@
 # Changelog
 
+## [1.3.0] — 2026-06-12
+
+### Added — Services MOVA complets (ride-service)
+- **Livraison colis** — estimation CDF, CRUD, suivi statuts (`PENDING` → `PICKED_UP` → `IN_TRANSIT` → `DELIVERED`)
+- **Réservation planifiée** — création jusqu'à J+7, liste, annulation
+- **Livraison repas** — 5 restaurants Kinshasa seed, menu, estimation et commande
+- **Courses & commissions** — formulaire liste, estimation, commande livreur
+- **Covoiturage** — création trajet, recherche stub, rejoindre trajet, partage prix
+- **Location véhicule** — demande de devis (stub inquiry)
+- **Catalogue services** — `GET /api/services` avec métadonnées FR et disponibilité
+- Modèles Prisma : `Delivery`, `ScheduledRide`, `Restaurant`, `CarpoolTrip`, `ErrandOrder`, `RentalInquiry`
+- Admin : `GET /api/admin/deliveries`, `GET /api/admin/scheduled-rides`
+
+### Added — Mobile Flutter (passager + chauffeur)
+- Écrans : livraison colis, suivi colis, réservation planifiée, livraison repas, courses & commissions, covoiturage
+- Historique multi-onglets : Trajets | Colis | Repas | Réservations | Courses
+- Grille d'accueil sans « Bientôt » pour les services implémentés
+- Intégration API gateway + repli mock_data
+- Tests overflow 320–428px et navigation services
+
+### Added — Web PWA & Admin
+- PWA passager : taxi, colis, repas, historique, sélection services
+- Admin : métriques live, utilisateurs, KYC, litiges, livraisons & planifiées
+- Manifest PWA + icônes movaicone
+
+### Added — Documentation & ops
+- `docs/manuel-utilisateur.md` — guide complet tous services
+- `docs/api.md` — endpoints livraisons, planifiées, covoiturage, courses, location
+- `scripts/verify-all.ps1` — vérification complète (docker, health, builds, tests)
+- `MORNING_BRIEF.md` — démarrage rapide overnight
+
+### Changed
+- Gateway proxy : `/api/deliveries`, `/api/services`, `/api/carpool`, `/api/errands`, `/api/rental`
+- Version monorepo `1.3.0`
+
 ## [1.2.0] — 2026-06-12
 
 ### Changed

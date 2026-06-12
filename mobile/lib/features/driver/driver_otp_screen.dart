@@ -64,6 +64,17 @@ class _DriverOtpScreenState extends ConsumerState<DriverOtpScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          Center(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Image.asset(
+                'assets/icon/movaicone.png',
+                width: 72,
+                height: 72,
+                fit: BoxFit.cover,
+              ),
+            ),
+          ),
           const SizedBox(height: 24),
           const Text('Espace chauffeur', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),

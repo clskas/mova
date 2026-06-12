@@ -35,7 +35,10 @@ export default function Home() {
   return (
     <div className="max-w-lg mx-auto min-h-screen flex flex-col">
       <header className="bg-[#1A1A2E] text-white p-4">
-        <h1 className="text-xl font-semibold text-center">MOVA — RDC</h1>
+        <h1 className="text-xl font-semibold text-center flex items-center justify-center gap-2">
+          <img src="/icon-192.png" alt="" width={28} height={28} className="rounded-md" />
+          MOVA — RDC
+        </h1>
         <p className="text-sm opacity-80 text-center flex items-center justify-center gap-1">
           <LocationIcon color="#6C63FF" size={14} />
           Kinshasa · Mobilité nationwide

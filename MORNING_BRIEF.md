@@ -23,12 +23,17 @@ docker compose up -d
 .\scripts\verify-all.ps1
 ```
 
+**Dev credentials:** OTP mock code **`123456`** (`MOCK_OTP=true` in Docker).
+
+**Mobile on LAN device:** point API to your machine — e.g. `http://192.168.1.64:3000` (set in `mobile` dart-define or `MarketConfig` / env before `flutter run`).
+
 | Client | URL / command |
 |--------|---------------|
 | API Gateway | http://localhost:3000/health |
 | Web PWA | `cd web; npm run dev` → http://localhost:3001 |
 | Admin | `cd admin; npm run dev` → http://localhost:3002 |
-| Mobile | `cd mobile; flutter run --flavor passenger` |
+| Mobile (passager) | `cd mobile; flutter run --flavor passenger -t lib/main_passenger.dart` |
+| Mobile (chauffeur) | `cd mobile; flutter run --flavor driver -t lib/main_driver.dart` |
 
 ## Tests
 
@@ -81,6 +86,17 @@ Generates: web PWA icons, admin favicon, Android splash, launcher foregrounds.
 - GitHub Actions: build 7 microservices → GHCR
 - Render: multi-service via `render.yaml`
 - Secrets: **never commit** `.env`, tokens, or credentials
+
+## Known production limitations
+
+- **OTP / SMS:** mock OTP in dev only; production needs Africa's Talking or Twilio integration
+- **Mobile money:** `MOCK_PAYMENTS=true` simulates Orange/M-Pesa/Airtel — real PSP credentials required for prod
+- **Covoiturage matching:** basic list/search stub; no real-time seat locking or payment split settlement
+- **Location véhicule:** inquiry stub only — no fleet inventory or booking engine
+- **Livraison express / Déménagement:** marked unavailable in `/api/services` (V3 roadmap)
+- **Docker rebuild:** `docker compose up --build` may fail on slow/npm registry network; use existing images or retry
+- **Admin auth:** JWT `ADMIN` role required; no SSO yet
+- **GPS / maps:** Kinshasa-centric seed data; nationwide expansion needs per-city communes + drivers
 
 ## If something fails
 

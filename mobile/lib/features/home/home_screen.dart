@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/config/market_config.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
+import '../../core/widgets/mova_service_icons.dart';
 import '../booking/booking_screen.dart';
 import '../carpool/carpool_screen.dart';
 import '../delivery/food_delivery_screen.dart';
@@ -32,7 +33,17 @@ class HomeScreen extends StatelessWidget {
     final theme = Theme.of(context);
 
     return MovaScreen(
-      title: 'MOVA',
+      titleWidget: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const MovaBrandIcon(size: 26),
+          const SizedBox(width: 8),
+          Text(
+            'MOVA',
+            style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+          ),
+        ],
+      ),
       actions: [
         IconButton(
           icon: const Icon(Icons.account_balance_wallet_outlined),
@@ -109,8 +120,7 @@ class HomeScreen extends StatelessWidget {
                     const SizedBox(height: 4),
                     Row(
                       children: [
-                        const Icon(
-                          Icons.location_on,
+                        MovaServiceIcon.location(
                           size: 16,
                           color: MovaColors.violet,
                         ),
@@ -173,14 +183,14 @@ class HomeScreen extends StatelessWidget {
                 children: [
                   gridRow([
                     ServiceCard(
-                      icon: Icons.local_taxi,
+                      icon: MovaServiceIcon.taxi(color: MovaColors.violet),
                       iconColor: MovaColors.violet,
                       title: 'Taxi / Moto-taxi',
                       subtitle: 'Course immédiate partout en ville',
                       onTap: () => _open(context, const BookingScreen()),
                     ),
                     ServiceCard(
-                      icon: Icons.inventory_2_outlined,
+                      icon: MovaServiceIcon.parcel(color: MovaColors.green),
                       iconColor: MovaColors.green,
                       title: 'Livraison colis',
                       subtitle: 'Envoyez un colis en toute sécurité',
@@ -190,14 +200,14 @@ class HomeScreen extends StatelessWidget {
                   const SizedBox(height: spacing),
                   gridRow([
                     ServiceCard(
-                      icon: Icons.account_balance_wallet_outlined,
+                      icon: MovaServiceIcon.wallet(color: MovaColors.midnight),
                       iconColor: MovaColors.midnight,
                       title: 'Wallet MOVA',
                       subtitle: 'Solde, recharge et paiements',
                       onTap: () => _open(context, const WalletScreen()),
                     ),
                     ServiceCard(
-                      icon: Icons.history,
+                      icon: MovaServiceIcon.history(color: MovaColors.orange),
                       iconColor: MovaColors.orange,
                       title: 'Historique',
                       subtitle: 'Vos courses et transactions',
@@ -207,14 +217,14 @@ class HomeScreen extends StatelessWidget {
                   const SizedBox(height: spacing),
                   gridRow([
                     ServiceCard(
-                      icon: Icons.event_available_outlined,
+                      icon: MovaServiceIcon.calendar(color: MovaColors.violet),
                       iconColor: MovaColors.violet,
                       title: 'Réservation planifiée',
                       subtitle: 'Programmez votre trajet à l\'avance',
                       onTap: () => _open(context, const ScheduledRideScreen()),
                     ),
                     ServiceCard(
-                      icon: Icons.restaurant_outlined,
+                      icon: MovaServiceIcon.food(color: MovaColors.green),
                       iconColor: MovaColors.green,
                       title: 'Livraison repas',
                       subtitle: 'Restaurants et plats locaux',
@@ -224,14 +234,14 @@ class HomeScreen extends StatelessWidget {
                   const SizedBox(height: spacing),
                   gridRow([
                     ServiceCard(
-                      icon: Icons.shopping_bag_outlined,
+                      icon: MovaServiceIcon.errand(color: MovaColors.orange),
                       iconColor: MovaColors.orange,
                       title: 'Courses & commissions',
                       subtitle: 'Achats et courses pour vous',
                       onTap: () => _open(context, const ErrandScreen()),
                     ),
                     ServiceCard(
-                      icon: Icons.people_outline,
+                      icon: MovaServiceIcon.carpool(color: MovaColors.midnight),
                       iconColor: MovaColors.midnight,
                       title: 'Covoiturage',
                       subtitle: 'Partagez un trajet, économisez',

@@ -44,5 +44,9 @@ Copy-Item "$root\web\public\favicon.png" "$root\web\public\favicon.ico" -Force
 Write-Host "Created web/public/favicon.ico"
 Copy-Item "$root\web\public\favicon.png" "$root\admin\src\app\icon.png" -Force
 Write-Host "Created admin/src/app/icon.png"
+$adminPublic = "$root\admin\public"
+if (-not (Test-Path $adminPublic)) { New-Item -ItemType Directory -Path $adminPublic -Force | Out-Null }
+Copy-Item "$root\web\public\icon-192.png" "$adminPublic\icon.png" -Force
+Write-Host "Created admin/public/icon.png"
 Resize-Icon "$root\mobile\android\app\src\main\res\drawable\splash_icon.png" 192
 Write-Host "Icon generation complete."

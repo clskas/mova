@@ -94,9 +94,12 @@ export default function AdminDashboard() {
   return (
     <div className="min-h-screen flex flex-col">
       <header className="bg-[#1A1A2E] text-white px-6 py-4 flex justify-between items-center">
-        <div>
+        <div className="flex items-center gap-3">
+          <img src="/icon.png" alt="" width={32} height={32} className="rounded-md" />
+          <div>
           <h1 className="text-xl font-semibold">MOVA Admin</h1>
           <p className="text-xs opacity-70">{m.city} · nationwide RDC</p>
+          </div>
         </div>
         {mock && <span className="text-xs bg-[#FF6B35] px-2 py-1 rounded">Mode démo</span>}
       </header>

@@ -14,7 +14,7 @@ class ServiceCard extends StatelessWidget {
     this.comingSoon = false,
   });
 
-  final IconData icon;
+  final Widget icon;
   final String title;
   final String subtitle;
   final Color iconColor;
@@ -37,7 +37,7 @@ class ServiceCard extends StatelessWidget {
               color: iconColor.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(icon, color: iconColor, size: 24),
+            child: icon,
           ),
           const SizedBox(height: 12),
           Row(

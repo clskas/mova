@@ -5,6 +5,7 @@ class MovaScreen extends StatelessWidget {
   const MovaScreen({
     super.key,
     this.title,
+    this.titleWidget,
     this.actions,
     this.floatingActionButton,
     this.bottomNavigationBar,
@@ -14,6 +15,7 @@ class MovaScreen extends StatelessWidget {
   });
 
   final String? title;
+  final Widget? titleWidget;
   final List<Widget>? actions;
   final Widget? floatingActionButton;
   final Widget? bottomNavigationBar;
@@ -24,8 +26,8 @@ class MovaScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: title != null
-          ? AppBar(title: Text(title!), actions: actions)
+      appBar: (title != null || titleWidget != null)
+          ? AppBar(title: titleWidget ?? Text(title!), actions: actions)
           : null,
       floatingActionButton: floatingActionButton,
       bottomNavigationBar: bottomNavigationBar,

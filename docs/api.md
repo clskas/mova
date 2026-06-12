@@ -125,31 +125,6 @@ Requires JWT with `role: ADMIN`.
 | GET | `/api/admin/deliveries` | Deliveries overview |
 | GET | `/api/admin/scheduled-rides` | Scheduled rides overview |
 
-## Covoiturage
-
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| POST | `/api/carpool` | JWT | Créer trajet covoiturage |
-| GET | `/api/carpool` | JWT | Rechercher trajets (stub matching) |
-| GET | `/api/carpool/mine` | JWT | Mes trajets |
-| POST | `/api/carpool/:id/join` | JWT | Rejoindre un trajet |
-
-## Courses & commissions
-
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| POST | `/api/errands/estimate` | JWT | Estimer course/commission (CDF) |
-| POST | `/api/errands` | JWT | Créer commande |
-| GET | `/api/errands` | JWT | Historique |
-| GET | `/api/errands/:id` | JWT | Détail |
-
-## Location véhicule
-
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| POST | `/api/rental/inquiry` | JWT | Demande de location (stub) |
-| GET | `/api/rental/inquiries` | JWT | Mes demandes |
-
 ## WebSocket
 
 Connect to ride-service: `ws://localhost:3002/tracking`

@@ -1,0 +1,44 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment
+        required: true
+        default: staging
+        type: choice
+        options:
+          - staging
+          - production
+
+jobs:
+  deploy-render:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Trigger Render deploy
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_SERVICE_IDS: ${{ secrets.RENDER_SERVICE_IDS }}
+        run: |
+          if [ -z "$RENDER_API_KEY" ]; then
+            echo "RENDER_API_KEY not set — skip remote deploy"
+            exit 0
+          fi
+          for id in $RENDER_SERVICE_IDS; do
+            echo "Deploying Render service $id"
+            curl -s -X POST "https://api.render.com/v1/services/${id}/deploys" \
+              -H "Authorization: Bearer ${RENDER_API_KEY}" \
+              -H "Content-Type: application/json" \
+              -d '{"clearCache": false}'
+          done
+      - name: Post-deploy smoke test
+        env:
+          GATEWAY_URL: ${{ vars.GATEWAY_URL }}
+        run: |
+          if [ -n "$GATEWAY_URL" ]; then
+            chmod +x scripts/smoke-test.sh
+            GATEWAY_URL="$GATEWAY_URL" ./scripts/smoke-test.sh
+          fi

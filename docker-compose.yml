@@ -1,0 +1,194 @@
+
+services:
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis_data:/data
+
+  postgres-auth:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: mova
+      POSTGRES_PASSWORD: mova
+      POSTGRES_DB: mova_auth
+    ports:
+      - '5437:5432'
+    volumes:
+      - pg_auth:/var/lib/postgresql/data
+
+  postgres-rides:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: mova
+      POSTGRES_PASSWORD: mova
+      POSTGRES_DB: mova_rides
+    ports:
+      - '5433:5432'
+    volumes:
+      - pg_rides:/var/lib/postgresql/data
+
+  postgres-payments:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: mova
+      POSTGRES_PASSWORD: mova
+      POSTGRES_DB: mova_payments
+    ports:
+      - '5434:5432'
+    volumes:
+      - pg_payments:/var/lib/postgresql/data
+
+  postgres-drivers:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: mova
+      POSTGRES_PASSWORD: mova
+      POSTGRES_DB: mova_drivers
+    ports:
+      - '5435:5432'
+    volumes:
+      - pg_drivers:/var/lib/postgresql/data
+
+  postgres-notifications:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: mova
+      POSTGRES_PASSWORD: mova
+      POSTGRES_DB: mova_notifications
+    ports:
+      - '5436:5432'
+    volumes:
+      - pg_notifications:/var/lib/postgresql/data
+
+  auth-service:
+    build:
+      context: .
+      dockerfile: docker/auth.Dockerfile
+    ports:
+      - '3001:3000'
+    environment:
+      DATABASE_URL: postgresql://mova:mova@postgres-auth:5432/mova_auth
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: dev_secret
+      MOCK_OTP: 'true'
+      PAYMENT_SERVICE_URL: http://payment-service:3000
+      DRIVER_SERVICE_URL: http://driver-service:3000
+      INTERNAL_API_KEY: mova-internal-dev
+      PORT: 3000
+    depends_on:
+      - postgres-auth
+      - redis
+      - payment-service
+      - driver-service
+
+  ride-service:
+    build:
+      context: .
+      dockerfile: docker/ride.Dockerfile
+    ports:
+      - '3002:3000'
+    environment:
+      DATABASE_URL: postgresql://mova:mova@postgres-rides:5432/mova_rides
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: dev_secret
+      DRIVER_SERVICE_URL: http://driver-service:3000
+      PORT: 3000
+    depends_on:
+      - postgres-rides
+      - redis
+
+  payment-service:
+    build:
+      context: .
+      dockerfile: docker/payment.Dockerfile
+    ports:
+      - '3003:3000'
+    environment:
+      DATABASE_URL: postgresql://mova:mova@postgres-payments:5432/mova_payments
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: dev_secret
+      MOCK_PAYMENTS: 'true'
+      RIDE_SERVICE_URL: http://ride-service:3000
+      INTERNAL_API_KEY: mova-internal-dev
+      PORT: 3000
+    depends_on:
+      - postgres-payments
+      - redis
+
+  driver-service:
+    build:
+      context: .
+      dockerfile: docker/driver.Dockerfile
+    ports:
+      - '3004:3000'
+    environment:
+      DATABASE_URL: postgresql://mova:mova@postgres-drivers:5432/mova_drivers
+      JWT_SECRET: dev_secret
+      RIDE_SERVICE_URL: http://ride-service:3000
+      PORT: 3000
+    depends_on:
+      - postgres-drivers
+
+  notification-service:
+    build:
+      context: .
+      dockerfile: docker/notification.Dockerfile
+    ports:
+      - '3005:3000'
+    environment:
+      DATABASE_URL: postgresql://mova:mova@postgres-notifications:5432/mova_notifications
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: dev_secret
+      PORT: 3000
+    depends_on:
+      - postgres-notifications
+      - redis
+
+  admin-service:
+    build:
+      context: .
+      dockerfile: docker/admin.Dockerfile
+    ports:
+      - '3006:3000'
+    environment:
+      JWT_SECRET: dev_secret
+      AUTH_SERVICE_URL: http://auth-service:3000
+      RIDE_SERVICE_URL: http://ride-service:3000
+      DRIVER_SERVICE_URL: http://driver-service:3000
+      INTERNAL_API_KEY: mova-internal-dev
+      PORT: 3000
+    depends_on:
+      - auth-service
+      - ride-service
+      - driver-service
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: docker/gateway.Dockerfile
+    ports:
+      - '3000:3000'
+    environment:
+      JWT_SECRET: dev_secret
+      AUTH_SERVICE_URL: http://auth-service:3000
+      RIDE_SERVICE_URL: http://ride-service:3000
+      PAYMENT_SERVICE_URL: http://payment-service:3000
+      DRIVER_SERVICE_URL: http://driver-service:3000
+      NOTIFICATION_SERVICE_URL: http://notification-service:3000
+      ADMIN_SERVICE_URL: http://admin-service:3000
+      PORT: 3000
+    depends_on:
+      - auth-service
+      - ride-service
+      - payment-service
+      - driver-service
+      - notification-service
+      - admin-service
+
+volumes:
+  redis_data:
+  pg_auth:
+  pg_rides:
+  pg_payments:
+  pg_drivers:
+  pg_notifications:

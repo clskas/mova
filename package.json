@@ -1,0 +1,21 @@
+{
+  "name": "mova-rdc",
+  "version": "1.2.0",
+  "private": true,
+  "description": "MOVA RDC — plateforme de mobilité microservices",
+  "workspaces": [
+    "packages/shared",
+    "services/*"
+  ],
+  "scripts": {
+    "build:shared": "npm run build --prefix packages/shared",
+    "build:services": "npm run build:shared && npm run build --prefix services/auth-service && npm run build --prefix services/ride-service && npm run build --prefix services/payment-service && npm run build --prefix services/driver-service && npm run build --prefix services/notification-service && npm run build --prefix services/admin-service && npm run build --prefix services/api-gateway",
+    "build:all": "npm run build:services",
+    "test:gateway": "npm test --prefix services/api-gateway && npm run test:e2e --prefix services/api-gateway",
+    "test:flutter": "cd mobile && flutter test",
+    "docker:up": "docker compose up -d --build",
+    "docker:down": "docker compose down",
+    "migrate:all": "npm run prisma:deploy --prefix services/auth-service && npm run prisma:deploy --prefix services/ride-service && npm run prisma:deploy --prefix services/payment-service && npm run prisma:deploy --prefix services/driver-service && npm run prisma:deploy --prefix services/notification-service",
+    "seed:rides": "npm run prisma:seed --prefix services/ride-service"
+  }
+}

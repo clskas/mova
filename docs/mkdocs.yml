@@ -1,0 +1,22 @@
+site_name: MOVA RDC Documentation
+site_description: Documentation technique MOVA — Plateforme de mobilité Kinshasa
+theme:
+  name: material
+  language: fr
+  palette:
+    primary: deep purple
+    accent: teal
+
+nav:
+  - Accueil: index.md
+  - Architecture: architecture.md
+  - API: api.md
+  - CI/CD: cicd.md
+  - Déploiement: deployment.md
+  - Manuel utilisateur: manuel-utilisateur.md
+
+markdown_extensions:
+  - admonition
+  - codehilite
+  - toc:
+      permalink: true

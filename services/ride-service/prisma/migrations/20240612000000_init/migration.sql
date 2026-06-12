@@ -1,0 +1,18 @@
+CREATE TYPE "VehicleType" AS ENUM ('MOTO_TAXI', 'STANDARD', 'COMFORT');
+CREATE TYPE "RideStatus" AS ENUM ('REQUESTED', 'SEARCHING', 'ACCEPTED', 'DRIVER_ARRIVED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED');
+CREATE TABLE "communes" ("id" TEXT NOT NULL, "name" TEXT NOT NULL, "city" TEXT NOT NULL DEFAULT 'Kinshasa', "lat" DOUBLE PRECISION NOT NULL, "lng" DOUBLE PRECISION NOT NULL, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, CONSTRAINT "communes_pkey" PRIMARY KEY ("id"));
+CREATE UNIQUE INDEX "communes_name_key" ON "communes"("name");
+CREATE TABLE "pricing_rules" ("id" TEXT NOT NULL, "vehicleType" "VehicleType" NOT NULL, "baseFareCdf" INTEGER NOT NULL, "perKmCdf" INTEGER NOT NULL, "perMinuteCdf" INTEGER NOT NULL, "minFareCdf" INTEGER NOT NULL, "peakMultiplier" DOUBLE PRECISION NOT NULL DEFAULT 1.0, "nightMultiplier" DOUBLE PRECISION NOT NULL DEFAULT 1.0, "isActive" BOOLEAN NOT NULL DEFAULT true, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL, CONSTRAINT "pricing_rules_pkey" PRIMARY KEY ("id"));
+CREATE UNIQUE INDEX "pricing_rules_vehicleType_key" ON "pricing_rules"("vehicleType");
+CREATE TABLE "cancellation_policies" ("id" TEXT NOT NULL, "vehicleType" "VehicleType" NOT NULL, "freeCancelMinutes" INTEGER NOT NULL DEFAULT 2, "passengerFeeCdf" INTEGER NOT NULL DEFAULT 0, "driverCompensationCdf" INTEGER NOT NULL DEFAULT 0, "noShowFeeCdf" INTEGER NOT NULL DEFAULT 2000, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, CONSTRAINT "cancellation_policies_pkey" PRIMARY KEY ("id"));
+CREATE UNIQUE INDEX "cancellation_policies_vehicleType_key" ON "cancellation_policies"("vehicleType");
+CREATE TABLE "rides" ("id" TEXT NOT NULL, "passengerId" TEXT NOT NULL, "driverId" TEXT, "vehicleId" TEXT, "status" "RideStatus" NOT NULL DEFAULT 'REQUESTED', "vehicleType" "VehicleType" NOT NULL, "pickupLat" DOUBLE PRECISION NOT NULL, "pickupLng" DOUBLE PRECISION NOT NULL, "pickupAddress" TEXT, "dropoffLat" DOUBLE PRECISION NOT NULL, "dropoffLng" DOUBLE PRECISION NOT NULL, "dropoffAddress" TEXT, "estimatedFareCdf" INTEGER, "finalFareCdf" INTEGER, "distanceKm" DOUBLE PRECISION, "durationMin" DOUBLE PRECISION, "acceptedAt" TIMESTAMP(3), "startedAt" TIMESTAMP(3), "completedAt" TIMESTAMP(3), "cancelledAt" TIMESTAMP(3), "cancelReason" TEXT, "cancelledBy" TEXT, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL, CONSTRAINT "rides_pkey" PRIMARY KEY ("id"));
+CREATE INDEX "rides_status_idx" ON "rides"("status");
+CREATE INDEX "rides_passengerId_idx" ON "rides"("passengerId");
+CREATE INDEX "rides_driverId_idx" ON "rides"("driverId");
+CREATE TABLE "ride_events" ("id" TEXT NOT NULL, "rideId" TEXT NOT NULL, "event" TEXT NOT NULL, "lat" DOUBLE PRECISION, "lng" DOUBLE PRECISION, "metadata" JSONB, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, CONSTRAINT "ride_events_pkey" PRIMARY KEY ("id"));
+CREATE INDEX "ride_events_rideId_idx" ON "ride_events"("rideId");
+ALTER TABLE "ride_events" ADD CONSTRAINT "ride_events_rideId_fkey" FOREIGN KEY ("rideId") REFERENCES "rides"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+CREATE TABLE "ratings" ("id" TEXT NOT NULL, "rideId" TEXT NOT NULL, "fromUserId" TEXT NOT NULL, "toUserId" TEXT NOT NULL, "score" INTEGER NOT NULL, "comment" TEXT, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, CONSTRAINT "ratings_pkey" PRIMARY KEY ("id"));
+CREATE UNIQUE INDEX "ratings_rideId_fromUserId_key" ON "ratings"("rideId", "fromUserId");
+ALTER TABLE "ratings" ADD CONSTRAINT "ratings_rideId_fkey" FOREIGN KEY ("rideId") REFERENCES "rides"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

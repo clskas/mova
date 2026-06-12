@@ -1,0 +1,55 @@
+export enum UserRole {
+  PASSENGER = 'PASSENGER',
+  DRIVER = 'DRIVER',
+  ADMIN = 'ADMIN',
+}
+
+export enum UserStatus {
+  ACTIVE = 'ACTIVE',
+  SUSPENDED = 'SUSPENDED',
+  PENDING_KYC = 'PENDING_KYC',
+}
+
+export enum VehicleType {
+  MOTO_TAXI = 'MOTO_TAXI',
+  STANDARD = 'STANDARD',
+  COMFORT = 'COMFORT',
+}
+
+export enum RideStatus {
+  REQUESTED = 'REQUESTED',
+  SEARCHING = 'SEARCHING',
+  ACCEPTED = 'ACCEPTED',
+  DRIVER_ARRIVED = 'DRIVER_ARRIVED',
+  IN_PROGRESS = 'IN_PROGRESS',
+  COMPLETED = 'COMPLETED',
+  CANCELLED = 'CANCELLED',
+}
+
+export enum PaymentMethod {
+  WALLET = 'WALLET',
+  ORANGE_MONEY = 'ORANGE_MONEY',
+  MPESA = 'MPESA',
+  AIRTEL_MONEY = 'AIRTEL_MONEY',
+  CASH = 'CASH',
+}
+
+export enum PaymentStatus {
+  PENDING = 'PENDING',
+  COMPLETED = 'COMPLETED',
+  FAILED = 'FAILED',
+  REFUNDED = 'REFUNDED',
+}
+
+export enum KycStatus {
+  PENDING = 'PENDING',
+  APPROVED = 'APPROVED',
+  REJECTED = 'REJECTED',
+}
+
+export enum IncidentType {
+  ACCIDENT = 'ACCIDENT',
+  HARASSMENT = 'HARASSMENT',
+  FRAUD = 'FRAUD',
+  OTHER = 'OTHER',
+}

@@ -1,0 +1,182 @@
+# Render Blueprint — MOVA RDC microservices
+# https://render.com/docs/blueprint-spec
+
+services:
+  - type: redis
+    name: mova-redis
+    plan: starter
+    maxmemoryPolicy: allkeys-lru
+
+  - type: web
+    name: mova-gateway
+    runtime: docker
+    dockerfilePath: ./docker/gateway.Dockerfile
+    dockerContext: .
+    plan: starter
+    healthCheckPath: /health
+    envVars:
+      - key: JWT_SECRET
+        generateValue: true
+      - key: AUTH_SERVICE_URL
+        fromService: { name: mova-auth, type: web, property: hostport }
+      - key: RIDE_SERVICE_URL
+        fromService: { name: mova-ride, type: web, property: hostport }
+      - key: PAYMENT_SERVICE_URL
+        fromService: { name: mova-payment, type: web, property: hostport }
+      - key: DRIVER_SERVICE_URL
+        fromService: { name: mova-driver, type: web, property: hostport }
+      - key: NOTIFICATION_SERVICE_URL
+        fromService: { name: mova-notification, type: web, property: hostport }
+      - key: ADMIN_SERVICE_URL
+        fromService: { name: mova-admin, type: web, property: hostport }
+
+  - type: web
+    name: mova-auth
+    runtime: docker
+    dockerfilePath: ./docker/auth.Dockerfile
+    dockerContext: .
+    plan: starter
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase: { name: mova-db-auth, property: connectionString }
+      - key: REDIS_URL
+        fromService: { name: mova-redis, type: redis, property: connectionString }
+      - key: JWT_SECRET
+        fromService: { name: mova-gateway, type: web, envVarKey: JWT_SECRET }
+      - key: MOCK_OTP
+        value: "false"
+      - fromGroup: mova-external-apis
+
+  - type: web
+    name: mova-ride
+    runtime: docker
+    dockerfilePath: ./docker/ride.Dockerfile
+    dockerContext: .
+    plan: starter
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase: { name: mova-db-rides, property: connectionString }
+      - key: REDIS_URL
+        fromService: { name: mova-redis, type: redis, property: connectionString }
+      - key: JWT_SECRET
+        fromService: { name: mova-gateway, type: web, envVarKey: JWT_SECRET }
+      - key: DRIVER_SERVICE_URL
+        fromService: { name: mova-driver, type: web, property: hostport }
+
+  - type: web
+    name: mova-payment
+    runtime: docker
+    dockerfilePath: ./docker/payment.Dockerfile
+    dockerContext: .
+    plan: starter
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase: { name: mova-db-payments, property: connectionString }
+      - key: REDIS_URL
+        fromService: { name: mova-redis, type: redis, property: connectionString }
+      - key: JWT_SECRET
+        fromService: { name: mova-gateway, type: web, envVarKey: JWT_SECRET }
+      - key: RIDE_SERVICE_URL
+        fromService: { name: mova-ride, type: web, property: hostport }
+      - key: MOCK_PAYMENTS
+        value: "false"
+
+  - type: web
+    name: mova-driver
+    runtime: docker
+    dockerfilePath: ./docker/driver.Dockerfile
+    dockerContext: .
+    plan: starter
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase: { name: mova-db-drivers, property: connectionString }
+      - key: JWT_SECRET
+        fromService: { name: mova-gateway, type: web, envVarKey: JWT_SECRET }
+      - key: RIDE_SERVICE_URL
+        fromService: { name: mova-ride, type: web, property: hostport }
+
+  - type: web
+    name: mova-notification
+    runtime: docker
+    dockerfilePath: ./docker/notification.Dockerfile
+    dockerContext: .
+    plan: starter
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase: { name: mova-db-notifications, property: connectionString }
+      - key: REDIS_URL
+        fromService: { name: mova-redis, type: redis, property: connectionString }
+      - key: JWT_SECRET
+        fromService: { name: mova-gateway, type: web, envVarKey: JWT_SECRET }
+
+  - type: web
+    name: mova-admin
+    runtime: docker
+    dockerfilePath: ./docker/admin.Dockerfile
+    dockerContext: .
+    plan: starter
+    healthCheckPath: /health
+    envVars:
+      - key: JWT_SECRET
+        fromService: { name: mova-gateway, type: web, envVarKey: JWT_SECRET }
+      - key: AUTH_SERVICE_URL
+        fromService: { name: mova-auth, type: web, property: hostport }
+      - key: RIDE_SERVICE_URL
+        fromService: { name: mova-ride, type: web, property: hostport }
+      - key: DRIVER_SERVICE_URL
+        fromService: { name: mova-driver, type: web, property: hostport }
+      - key: INTERNAL_API_KEY
+        generateValue: true
+
+  - type: web
+    name: mova-web
+    runtime: docker
+    dockerfilePath: ./docker/web.Dockerfile
+    dockerContext: .
+    plan: starter
+    envVars:
+      - key: NEXT_PUBLIC_API_URL
+        fromService: { name: mova-gateway, type: web, property: hostport }
+
+databases:
+  - name: mova-db-auth
+    plan: starter
+    databaseName: mova_auth
+    user: mova
+  - name: mova-db-rides
+    plan: starter
+    databaseName: mova_rides
+    user: mova
+  - name: mova-db-payments
+    plan: starter
+    databaseName: mova_payments
+    user: mova
+  - name: mova-db-drivers
+    plan: starter
+    databaseName: mova_drivers
+    user: mova
+  - name: mova-db-notifications
+    plan: starter
+    databaseName: mova_notifications
+    user: mova
+
+envVarGroups:
+  - name: mova-external-apis
+    envVars:
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: ORANGE_MONEY_API_KEY
+        sync: false
+      - key: MPESA_CONSUMER_KEY
+        sync: false
+      - key: AIRTEL_MONEY_CLIENT_ID
+        sync: false
+      - key: FCM_SERVER_KEY
+        sync: false

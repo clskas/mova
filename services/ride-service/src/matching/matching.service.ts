@@ -1,0 +1,37 @@
+import { Injectable } from '@nestjs/common';
+import { VehicleType } from '@prisma/client';
+import { INTERNAL_API_KEY, MARKET_RDC, serviceUrl } from '@mova/shared';
+
+export interface DriverCandidate {
+  driverId: string;
+  userId: string;
+  lat: number;
+  lng: number;
+  rating: number;
+  distanceKm: number;
+  score: number;
+  vehicleId?: string;
+}
+
+@Injectable()
+export class MatchingService {
+  async findDrivers(lat: number, lng: number, vehicleType: VehicleType, searchAttempt = 0): Promise<DriverCandidate[]> {
+    const url = serviceUrl('driver', `/internal/drivers/nearby?lat=${lat}&lng=${lng}&vehicleType=${vehicleType}&searchAttempt=${searchAttempt}`);
+    const res = await fetch(url, { headers: { 'x-internal-api-key': INTERNAL_API_KEY } });
+    if (!res.ok) return [];
+    return res.json();
+  }
+
+  getMatchingMeta(searchAttempt = 0) {
+    const radiusKm = Math.min(
+      MARKET_RDC.matching.initialRadiusKm + searchAttempt * MARKET_RDC.matching.radiusIncrementKm,
+      MARKET_RDC.matching.maxRadiusKm,
+    );
+    return {
+      radiusKm,
+      nextRadiusKm: Math.min(radiusKm + MARKET_RDC.matching.radiusIncrementKm, MARKET_RDC.matching.maxRadiusKm),
+      incrementIntervalSec: MARKET_RDC.matching.radiusIncrementIntervalSec,
+      maxRadiusKm: MARKET_RDC.matching.maxRadiusKm,
+    };
+  }
+}

@@ -1,0 +1,10 @@
+CREATE TYPE "VehicleType" AS ENUM ('MOTO_TAXI', 'STANDARD', 'COMFORT');
+CREATE TYPE "KycStatus" AS ENUM ('PENDING', 'APPROVED', 'REJECTED');
+CREATE TYPE "IncidentType" AS ENUM ('ACCIDENT', 'HARASSMENT', 'FRAUD', 'OTHER');
+CREATE TABLE "driver_profiles" ("id" TEXT NOT NULL, "userId" TEXT NOT NULL, "licenseNumber" TEXT, "isAvailable" BOOLEAN NOT NULL DEFAULT false, "currentLat" DOUBLE PRECISION, "currentLng" DOUBLE PRECISION, "ratingAvg" DOUBLE PRECISION NOT NULL DEFAULT 5.0, "totalRides" INTEGER NOT NULL DEFAULT 0, "kycStatus" "KycStatus" NOT NULL DEFAULT 'PENDING', "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL, CONSTRAINT "driver_profiles_pkey" PRIMARY KEY ("id"));
+CREATE UNIQUE INDEX "driver_profiles_userId_key" ON "driver_profiles"("userId");
+CREATE TABLE "vehicles" ("id" TEXT NOT NULL, "driverProfileId" TEXT NOT NULL, "type" "VehicleType" NOT NULL, "make" TEXT, "model" TEXT, "plateNumber" TEXT NOT NULL, "color" TEXT, "isActive" BOOLEAN NOT NULL DEFAULT true, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, CONSTRAINT "vehicles_pkey" PRIMARY KEY ("id"));
+ALTER TABLE "vehicles" ADD CONSTRAINT "vehicles_driverProfileId_fkey" FOREIGN KEY ("driverProfileId") REFERENCES "driver_profiles"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+CREATE TABLE "kyc_documents" ("id" TEXT NOT NULL, "userId" TEXT NOT NULL, "type" TEXT NOT NULL, "url" TEXT NOT NULL, "status" "KycStatus" NOT NULL DEFAULT 'PENDING', "notes" TEXT, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL, CONSTRAINT "kyc_documents_pkey" PRIMARY KEY ("id"));
+CREATE INDEX "kyc_documents_userId_idx" ON "kyc_documents"("userId");
+CREATE TABLE "incidents" ("id" TEXT NOT NULL, "userId" TEXT NOT NULL, "rideId" TEXT, "type" "IncidentType" NOT NULL, "description" TEXT NOT NULL, "status" TEXT NOT NULL DEFAULT 'OPEN', "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, CONSTRAINT "incidents_pkey" PRIMARY KEY ("id"));

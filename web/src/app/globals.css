@@ -1,0 +1,17 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #f5f4ff;
+  --foreground: #1a1a2e;
+  --mova-violet: #6c63ff;
+  --mova-green: #00d4a1;
+  --mova-orange: #ff6b35;
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+}

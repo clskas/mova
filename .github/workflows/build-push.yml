@@ -1,0 +1,59 @@
+name: Build and Push
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ${{ github.repository }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include:
+          - service: api-gateway
+            dockerfile: docker/gateway.Dockerfile
+            image: gateway
+          - service: auth-service
+            dockerfile: docker/auth.Dockerfile
+            image: auth
+          - service: ride-service
+            dockerfile: docker/ride.Dockerfile
+            image: ride
+          - service: payment-service
+            dockerfile: docker/payment.Dockerfile
+            image: payment
+          - service: driver-service
+            dockerfile: docker/driver.Dockerfile
+            image: driver
+          - service: notification-service
+            dockerfile: docker/notification.Dockerfile
+            image: notification
+          - service: admin-service
+            dockerfile: docker/admin.Dockerfile
+            image: admin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.image }}:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.image }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

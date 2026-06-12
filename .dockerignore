@@ -1,0 +1,12 @@
+**/node_modules
+**/dist
+**/.git
+mobile
+web
+admin
+backend/node_modules
+backend/dist
+*.docx
+files (1).zip
+_temp_cdc.docx
+**/*.tsbuildinfo

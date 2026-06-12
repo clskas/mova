@@ -1,0 +1,44 @@
+import { Logger } from '@nestjs/common';
+import { ConnectedSocket, MessageBody, OnGatewayConnection, OnGatewayDisconnect, SubscribeMessage, WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
+import { INTERNAL_API_KEY, serviceUrl } from '@mova/shared';
+import { Server, Socket } from 'socket.io';
+
+@WebSocketGateway({ cors: { origin: '*' }, namespace: '/tracking' })
+export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect {
+  @WebSocketServer() server: Server;
+  private readonly logger = new Logger(TrackingGateway.name);
+
+  handleConnection(client: Socket) { this.logger.log(`Client connected: ${client.id}`); client.emit('ping', { ts: Date.now() }); }
+  handleDisconnect(client: Socket) { this.logger.log(`Client disconnected: ${client.id}`); }
+
+  @SubscribeMessage('driver:location')
+  async handleDriverLocation(@ConnectedSocket() client: Socket, @MessageBody() data: { userId: string; lat: number; lng: number; rideId?: string }) {
+    if (data.userId) {
+      await fetch(serviceUrl('driver', '/drivers/location'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${client.handshake.auth?.token ?? ''}` },
+        body: JSON.stringify({ lat: data.lat, lng: data.lng }),
+      }).catch(() =>
+        fetch(serviceUrl('driver', `/internal/drivers/${data.userId}/location`), {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', 'x-internal-api-key': INTERNAL_API_KEY },
+          body: JSON.stringify({ lat: data.lat, lng: data.lng }),
+        }),
+      );
+    }
+    if (data.rideId) this.server.to(`ride:${data.rideId}`).emit('driver:location', { lat: data.lat, lng: data.lng, ts: Date.now() });
+    return { success: true };
+  }
+
+  @SubscribeMessage('ride:subscribe')
+  handleRideSubscribe(@ConnectedSocket() client: Socket, @MessageBody() data: { rideId: string }) {
+    client.join(`ride:${data.rideId}`);
+    return { subscribed: data.rideId };
+  }
+
+  @SubscribeMessage('ride:status')
+  handleRideStatus(@MessageBody() data: { rideId: string; status: string }) {
+    this.server.to(`ride:${data.rideId}`).emit('ride:status', data);
+    return { broadcast: true };
+  }
+}

@@ -1,0 +1,22 @@
+site_name: MOVA — Documentation technique
+site_description: Architecture, API et CI/CD de la plateforme MOVA RDC
+repo_url: https://github.com/mova-rdc/mova
+theme:
+  name: material
+  language: fr
+  palette:
+    - scheme: default
+      primary: deep purple
+      accent: amber
+nav:
+  - Accueil: index.md
+  - Architecture: architecture.md
+  - API: api.md
+  - CI/CD: cicd.md
+  - Déploiement: deployment.md
+docs_dir: docs
+markdown_extensions:
+  - admonition
+  - codehilite
+  - toc:
+      permalink: true

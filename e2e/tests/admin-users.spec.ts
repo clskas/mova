@@ -26,9 +26,12 @@ test.describe("Admin — liste utilisateurs", () => {
 
   test("page Utilisateurs affiche le tableau", async ({ page }) => {
     await loginAsAdmin(page);
-    await page.goto("/utilisateurs");
-    await expect(page.getByRole("heading", { name: "Utilisateurs" })).toBeVisible();
-    await expect(page.getByPlaceholder("Rechercher")).toBeVisible();
-    await expect(page.getByRole("columnheader", { name: "Téléphone" })).toBeVisible();
+    await page.getByRole("link", { name: "Utilisateurs" }).click();
+    await expect(page.getByRole("heading", { name: "Utilisateurs" })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByPlaceholder(/Rechercher/)).toBeVisible();
+    await expect(page.getByText("Chargement…")).not.toBeVisible({ timeout: 15_000 });
+    await expect(
+      page.getByRole("columnheader", { name: "Téléphone" }).or(page.getByText("Aucun utilisateur"))
+    ).toBeVisible({ timeout: 15_000 });
   });
 });

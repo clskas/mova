@@ -7,13 +7,6 @@ import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 
-const _vehicleOptions = [
-  ('ECONOMY', 'Économique', 'Citadine — à partir de 45 000 FC/j'),
-  ('SUV', 'SUV', 'Famille & terrain — à partir de 85 000 FC/j'),
-  ('PICKUP', 'Pick-up', 'Transport utilitaire — à partir de 95 000 FC/j'),
-  ('MINIBUS', 'Minibus', 'Groupe — à partir de 120 000 FC/j'),
-];
-
 class RentalScreen extends ConsumerStatefulWidget {
   const RentalScreen({super.key});
 
@@ -22,7 +15,8 @@ class RentalScreen extends ConsumerStatefulWidget {
 }
 
 class _RentalScreenState extends ConsumerState<RentalScreen> {
-  String _vehicleType = 'SUV';
+  List<Map<String, dynamic>> _vehicles = [];
+  String? _selectedVehicleId;
   DateTime _startDate = DateTime.now().add(const Duration(days: 1));
   DateTime _endDate = DateTime.now().add(const Duration(days: 3));
   final _pickupController = TextEditingController(text: 'Gombe, Kinshasa');
@@ -38,6 +32,7 @@ class _RentalScreenState extends ConsumerState<RentalScreen> {
   @override
   void initState() {
     super.initState();
+    _loadVehicles();
     _loadInquiries();
   }
 
@@ -57,14 +52,32 @@ class _RentalScreenState extends ConsumerState<RentalScreen> {
 
   int _rentalDays() => _endDate.difference(_startDate).inDays.clamp(1, 30);
 
-  Map<String, dynamic> _payload() => {
-        'vehicleType': _vehicleType,
+  Map<String, dynamic> _estimatePayload() => {
+        'vehicleId': _selectedVehicleId!,
         'startDate': DateTime(_startDate.year, _startDate.month, _startDate.day).toIso8601String(),
         'endDate': DateTime(_endDate.year, _endDate.month, _endDate.day).toIso8601String(),
+      };
+
+  Map<String, dynamic> _bookingPayload() => {
+        ..._estimatePayload(),
         'pickupAddress': _pickupController.text.trim(),
         'contactPhone': MarketConfig.normalizePhone(_phoneController.text.trim()),
         if (_notesController.text.trim().isNotEmpty) 'notes': _notesController.text.trim(),
       };
+
+  Future<void> _loadVehicles() async {
+    final api = ref.read(apiClientProvider);
+    await api.checkHealth();
+    final result = await api.get('/rental/vehicles');
+    if (!mounted) return;
+    if (result case Success(:final data)) {
+      final raw = data['data'] as List? ?? [];
+      setState(() {
+        _vehicles = raw.cast<Map<String, dynamic>>();
+        _selectedVehicleId ??= _vehicles.isNotEmpty ? _vehicles.first['id']?.toString() : null;
+      });
+    }
+  }
 
   Future<void> _loadInquiries() async {
     setState(() => _loadingList = true);
@@ -103,6 +116,9 @@ class _RentalScreenState extends ConsumerState<RentalScreen> {
   }
 
   String? _validate() {
+    if (_selectedVehicleId == null || _selectedVehicleId!.isEmpty) {
+      return 'Choisissez un véhicule disponible.';
+    }
     if (_pickupController.text.trim().isEmpty) {
       return 'Indiquez le lieu de prise en charge.';
     }
@@ -127,12 +143,12 @@ class _RentalScreenState extends ConsumerState<RentalScreen> {
       _validationError = null;
     });
     final api = ref.read(apiClientProvider);
-    final result = await api.post('/rental/estimate', _payload());
+    final result = await api.post('/rental/estimate', _estimatePayload());
     setState(() {
       _loading = false;
       switch (result) {
         case Success(:final data):
-          _estimatedTotal = data['estimatedTotalCdf'] as int?;
+          _estimatedTotal = data['estimatedPriceCdf'] as int? ?? data['estimatedTotalCdf'] as int?;
         case Failure(:final error):
           _error = error.message;
       }
@@ -155,7 +171,7 @@ class _RentalScreenState extends ConsumerState<RentalScreen> {
       _validationError = null;
     });
     final api = ref.read(apiClientProvider);
-    final result = await api.post('/rental/inquiries', _payload());
+    final result = await api.post('/rental/bookings', _bookingPayload());
     setState(() => _loading = false);
     switch (result) {
       case Success(:final data):
@@ -243,25 +259,30 @@ class _RentalScreenState extends ConsumerState<RentalScreen> {
             }),
             const Divider(height: 24),
           ],
-          Text('Type de véhicule', style: theme.textTheme.titleSmall),
+          Text('Véhicule disponible', style: theme.textTheme.titleSmall),
           const SizedBox(height: 8),
-          ..._vehicleOptions.map((v) {
-            return RadioListTile<String>(
-              title: Text(v.$2, maxLines: 1, overflow: TextOverflow.ellipsis),
-              subtitle: Text(
-                v.$3,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 12),
-              ),
-              value: v.$1,
-              groupValue: _vehicleType,
-              onChanged: (val) => setState(() {
-                _vehicleType = val!;
-                _estimatedTotal = null;
-              }),
-            );
-          }),
+          if (_vehicles.isEmpty)
+            const Text('Chargement du catalogue…', style: TextStyle(color: MovaColors.textSecondary))
+          else
+            ..._vehicles.map((v) {
+              final id = v['id']?.toString() ?? '';
+              final rate = v['dailyRateCdf'] as int? ?? 0;
+              return RadioListTile<String>(
+                title: Text(v['name']?.toString() ?? 'Véhicule', maxLines: 1, overflow: TextOverflow.ellipsis),
+                subtitle: Text(
+                  '${v['category'] ?? ''} · ${MarketConfig.formatCdf(rate)}/jour',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 12),
+                ),
+                value: id,
+                groupValue: _selectedVehicleId,
+                onChanged: (val) => setState(() {
+                  _selectedVehicleId = val;
+                  _estimatedTotal = null;
+                }),
+              );
+            }),
           const SizedBox(height: 8),
           Row(
             children: [

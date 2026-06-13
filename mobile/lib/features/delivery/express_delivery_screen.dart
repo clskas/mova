@@ -85,7 +85,7 @@ class _ExpressDeliveryScreenState extends ConsumerState<ExpressDeliveryScreen> {
     });
     final api = ref.read(apiClientProvider);
     await api.checkHealth();
-    final result = await api.post('/deliveries/express/estimate', _payload());
+    final result = await api.post('/express/estimate', _payload());
     if (!mounted) return;
     setState(() {
       _loading = false;
@@ -110,7 +110,7 @@ class _ExpressDeliveryScreenState extends ConsumerState<ExpressDeliveryScreen> {
       _validationError = null;
     });
     final api = ref.read(apiClientProvider);
-    final result = await api.post('/deliveries/express', _payload());
+    final result = await api.post('/express', _payload());
     if (!mounted) return;
     setState(() => _loading = false);
     switch (result) {

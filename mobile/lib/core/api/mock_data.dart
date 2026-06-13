@@ -416,6 +416,65 @@ abstract final class MockData {
         },
       ];
 
+  static List<Map<String, dynamic>> unifiedHistory() => [
+        {
+          'type': 'RIDE',
+          'id': 'ride-1',
+          'status': 'COMPLETED',
+          'title': 'Gombe → Bandal',
+          'priceCdf': 8500,
+          'createdAt': DateTime.now().subtract(const Duration(days: 1)).toIso8601String(),
+        },
+        ...errandHistory().map((e) => {
+              'type': 'ERRAND',
+              'id': e['id'],
+              'status': e['status'],
+              'title': e['deliveryAddress'],
+              'priceCdf': e['priceCdf'],
+              'createdAt': e['createdAt'],
+              'meta': {'items': e['items']},
+            }),
+        ...deliveryHistory().map((d) => {
+              'type': d['type'],
+              'id': d['id'],
+              'status': d['status'],
+              'title': d['type'] == 'FOOD'
+                  ? (d['restaurantName'] ?? 'Repas')
+                  : '${d['pickupAddress']} → ${d['dropoffAddress']}',
+              'priceCdf': d['priceCdf'],
+              'createdAt': d['createdAt'],
+              'meta': d,
+            }),
+        {
+          'type': 'SCHEDULED',
+          'id': 'sched-1',
+          'status': 'CONFIRMED',
+          'title': 'Limete → Kintambo',
+          'priceCdf': 12000,
+          'createdAt': DateTime.now().add(const Duration(days: 1)).toIso8601String(),
+          'meta': {'scheduledAt': DateTime.now().add(const Duration(days: 1)).toIso8601String()},
+        },
+      ];
+
+  static List<Map<String, dynamic>> rentalVehicles() => [
+        {
+          'id': '00000000-0000-4000-a000-000000000001',
+          'name': 'Toyota Corolla',
+          'category': 'ECONOMY',
+          'seats': 4,
+          'dailyRateCdf': 45000,
+          'depositCdf': 150000,
+        },
+        {
+          'id': '00000000-0000-4000-a000-000000000002',
+          'name': 'Toyota RAV4',
+          'category': 'SUV',
+          'seats': 5,
+          'dailyRateCdf': 85000,
+          'depositCdf': 250000,
+        },
+      ];
+
   static List<Map<String, dynamic>> carpoolRides() => [
         {
           'id': 'carpool-1',
@@ -479,7 +538,7 @@ abstract final class MockData {
       'SUV' => 85000,
       _ => 45000,
     };
-    return {'estimatedTotalCdf': daily * days, 'days': days, 'currency': 'CDF'};
+    return {'estimatedPriceCdf': daily * days, 'estimatedTotalCdf': daily * days, 'days': days, 'currency': 'CDF'};
   }
 
   static List<Map<String, dynamic>> rentalInquiries() => [

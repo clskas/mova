@@ -17,9 +17,7 @@ class HistoryScreen extends ConsumerStatefulWidget {
 class _HistoryScreenState extends ConsumerState<HistoryScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  List<dynamic> _deliveries = [];
-  List<dynamic> _scheduled = [];
-  List<dynamic> _errands = [];
+  List<dynamic> _history = [];
   bool _loading = true;
 
   @override
@@ -40,20 +38,12 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
     await api.loadToken();
     await api.checkHealth();
 
-    final deliveriesResult = await api.get('/deliveries/history');
-    final scheduledResult = await api.get('/rides/scheduled');
-    final errandsResult = await api.get('/deliveries/errand/history');
+    final historyResult = await api.get('/history?limit=50');
 
     setState(() {
       _loading = false;
-      if (deliveriesResult case Success(:final data)) {
-        _deliveries = data['data'] as List? ?? [];
-      }
-      if (scheduledResult case Success(:final data)) {
-        _scheduled = data['data'] as List? ?? [];
-      }
-      if (errandsResult case Success(:final data)) {
-        _errands = data['data'] as List? ?? [];
+      if (historyResult case Success(:final data)) {
+        _history = data['data'] as List? ?? [];
       }
     });
   }
@@ -66,6 +56,82 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
         'CANCELLED' => 'Annulé',
         _ => status ?? '',
       };
+
+  Widget _rideTile(Map<String, dynamic> item) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: MovaCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.local_taxi_outlined, size: 18, color: MovaColors.violet),
+                SizedBox(width: 6),
+                Text('Course taxi', style: TextStyle(fontWeight: FontWeight.w600)),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              item['title']?.toString() ?? '',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              MarketConfig.formatCdf(item['priceCdf'] as int? ?? 0),
+              style: const TextStyle(color: MovaColors.violet),
+            ),
+            Text(
+              _statusLabel(item['status']?.toString()),
+              style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _unifiedTile(Map<String, dynamic> item) {
+    final type = item['type']?.toString();
+    final meta = item['meta'] as Map<String, dynamic>? ?? {};
+    if (type == 'RIDE') return _rideTile(item);
+    if (type == 'PARCEL' || type == 'EXPRESS') {
+      return _parcelTile({
+        ...meta,
+        'pickupAddress': meta['pickupAddress'] ?? item['title'],
+        'dropoffAddress': meta['dropoffAddress'] ?? '',
+        'priceCdf': item['priceCdf'],
+        'status': item['status'],
+      });
+    }
+    if (type == 'FOOD') {
+      return _foodTile({
+        ...meta,
+        'restaurantName': meta['restaurantName'] ?? item['title'],
+        'deliveryAddress': meta['deliveryAddress'] ?? '',
+        'priceCdf': item['priceCdf'],
+        'status': item['status'],
+      });
+    }
+    if (type == 'SCHEDULED') {
+      return _scheduledTile({
+        'dropoffAddress': item['title'],
+        'scheduledAt': meta['scheduledAt'] ?? item['createdAt'],
+        'priceCdf': item['priceCdf'],
+        'status': item['status'],
+      });
+    }
+    if (type == 'ERRAND') {
+      return _errandTile({
+        'deliveryAddress': item['title'],
+        'items': meta['items'] ?? [],
+        'priceCdf': item['priceCdf'],
+        'status': item['status'],
+      });
+    }
+    return _rideTile(item);
+  }
 
   Widget _empty(String message) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 32),
@@ -244,8 +310,14 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
       );
     }
 
-    final parcels = _deliveries.where((d) => (d as Map)['type'] == 'PARCEL').toList();
-    final meals = _deliveries.where((d) => (d as Map)['type'] == 'FOOD').toList();
+    final rides = _history.where((d) => (d as Map)['type'] == 'RIDE').toList();
+    final errands = _history.where((d) => (d as Map)['type'] == 'ERRAND').toList();
+    final parcels = _history.where((d) {
+      final t = (d as Map)['type'];
+      return t == 'PARCEL' || t == 'EXPRESS';
+    }).toList();
+    final meals = _history.where((d) => (d as Map)['type'] == 'FOOD').toList();
+    final scheduled = _history.where((d) => (d as Map)['type'] == 'SCHEDULED').toList();
 
     return AnimatedBuilder(
       animation: _tabController,
@@ -254,22 +326,23 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
           case 1:
             if (parcels.isEmpty) return _empty('Aucun colis');
             return Column(
-              children: parcels.map((p) => _parcelTile(p as Map<String, dynamic>)).toList(),
+              children: parcels.map((p) => _unifiedTile(p as Map<String, dynamic>)).toList(),
             );
           case 2:
             if (meals.isEmpty) return _empty('Aucune commande repas');
             return Column(
-              children: meals.map((m) => _foodTile(m as Map<String, dynamic>)).toList(),
+              children: meals.map((m) => _unifiedTile(m as Map<String, dynamic>)).toList(),
             );
           case 3:
-            if (_scheduled.isEmpty) return _empty('Aucune réservation');
+            if (scheduled.isEmpty) return _empty('Aucune réservation');
             return Column(
-              children: _scheduled.map((s) => _scheduledTile(s as Map<String, dynamic>)).toList(),
+              children: scheduled.map((s) => _unifiedTile(s as Map<String, dynamic>)).toList(),
             );
           default:
-            if (_errands.isEmpty) return _empty('Aucune course');
+            final courses = [...rides, ...errands];
+            if (courses.isEmpty) return _empty('Aucune course');
             return Column(
-              children: _errands.map((e) => _errandTile(e as Map<String, dynamic>)).toList(),
+              children: courses.map((e) => _unifiedTile(e as Map<String, dynamic>)).toList(),
             );
         }
       },

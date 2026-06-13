@@ -140,10 +140,10 @@ class ApiClient {
     if (path.contains('/deliveries/parcel/estimate')) {
       return Success(MockData.parcelEstimate(body ?? {}));
     }
-    if (path.contains('/deliveries/express/estimate')) {
+    if (path.contains('/express/estimate') || path.contains('/deliveries/express/estimate')) {
       return Success(MockData.expressEstimate(body ?? {}));
     }
-    if (path.contains('/deliveries/express') && method == 'POST') {
+    if ((path == '/express' || path.contains('/deliveries/express')) && method == 'POST') {
       return Success({'delivery': MockData.createExpress(body ?? {})});
     }
     if (path.contains('/deliveries/parcel') && method == 'POST') {
@@ -173,8 +173,11 @@ class ApiClient {
     if (path == '/wallet') {
       return Success(MockData.wallet());
     }
-    if (path.contains('/wallet/topup')) {
+    if (path.contains('/wallet/top-up') || path.contains('/wallet/topup')) {
       return Success(MockData.walletTopUp(body ?? {}));
+    }
+    if (path == '/history' || path.startsWith('/history?')) {
+      return Success({'data': MockData.unifiedHistory(), 'currency': 'CDF', 'city': 'Kinshasa'});
     }
     if (path.contains('/drivers/earnings')) {
       return Success(MockData.earnings());
@@ -207,6 +210,12 @@ class ApiClient {
     }
     if (path.contains('/rental/estimate')) {
       return Success(MockData.rentalEstimate(body ?? {}));
+    }
+    if (path.contains('/rental/vehicles')) {
+      return Success({'data': MockData.rentalVehicles(), 'currency': 'CDF'});
+    }
+    if (path == '/rental/bookings' && method == 'POST') {
+      return Success(MockData.createRentalInquiry(body ?? {}));
     }
     if (path == '/rental/inquiries' && method == 'POST') {
       return Success(MockData.createRentalInquiry(body ?? {}));

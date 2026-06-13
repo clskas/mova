@@ -62,15 +62,23 @@ class _MovingScreenState extends ConsumerState<MovingScreen> {
     });
   }
 
+  int _volumeM3() => switch (_volume) {
+        'STUDIO' => 3,
+        'APARTMENT' => 10,
+        'HOUSE' => 22,
+        'OFFICE' => 15,
+        _ => 10,
+      };
+
   Map<String, dynamic> _payload() => {
-        'fromAddress': _fromController.text.trim(),
-        'fromLat': _fromLat,
-        'fromLng': _fromLng,
-        'toAddress': _toController.text.trim(),
-        'toLat': _toLat,
-        'toLng': _toLng,
-        'volumeCategory': _volume,
-        'items': _items,
+        'pickupAddress': _fromController.text.trim(),
+        'pickupLat': _fromLat,
+        'pickupLng': _fromLng,
+        'dropoffAddress': _toController.text.trim(),
+        'dropoffLat': _toLat,
+        'dropoffLng': _toLng,
+        'volumeM3': _volumeM3(),
+        if (_items.isNotEmpty) 'notes': _items.join(', '),
       };
 
   String? _validate() {

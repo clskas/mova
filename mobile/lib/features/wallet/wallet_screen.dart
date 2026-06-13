@@ -142,7 +142,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
   Future<void> _topUp(String provider, int amountCdf, String phone) async {
     setState(() => _topUpLoading = true);
     final api = ref.read(apiClientProvider);
-    final result = await api.post('/wallet/topup', {
+    final result = await api.post('/wallet/top-up', {
       'provider': provider,
       'amountCdf': amountCdf,
       'phone': MarketConfig.normalizePhone(phone),

@@ -44,7 +44,7 @@ export class DriversService {
         lng: driver.currentLng,
         rating: driver.ratingAvg,
         distanceKm,
-        score: this.computeScore(distanceKm, driver.ratingAvg),
+        score: this.computeScore(distanceKm, driver.ratingAvg, driver.totalRides),
         vehicleId: driver.vehicles[0]?.id,
       });
     }
@@ -95,11 +95,18 @@ export class DriversService {
     return this.prisma.driverProfile.count();
   }
 
-  private computeScore(distanceKm: number, rating: number): number {
+  private computeScore(distanceKm: number, rating: number, totalRides: number, acceptanceRate = 0.85): number {
     const w = MARKET_RDC.matching.scoreWeights;
-    const distanceScore = Math.max(0, 1 - distanceKm / 10);
+    const proximityScore = Math.max(0, 1 - distanceKm / MARKET_RDC.matching.maxRadiusKm);
     const ratingScore = rating / 5;
-    return w.distance * distanceScore + w.rating * ratingScore + w.acceptanceRate * 0.9 + w.waitTime * 1;
+    const acceptanceScore = Math.min(1, acceptanceRate);
+    const seniorityScore = Math.min(1, totalRides / 500);
+    return (
+      w.proximity * proximityScore +
+      w.rating * ratingScore +
+      w.acceptanceRate * acceptanceScore +
+      w.seniority * seniorityScore
+    );
   }
 
   private haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {

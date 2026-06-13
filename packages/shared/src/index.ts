@@ -1,4 +1,5 @@
 export * from './market-rdc.config';
+export * from './ride-contract';
 export * from './mova-error-codes';
 export * from './http-exception.filter';
 export * from './enums';

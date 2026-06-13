@@ -1,22 +1,29 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { VehicleType } from '@prisma/client';
-import { MARKET_RDC, MovaErrorCode, MovaHttpException } from '@mova/shared';
+import { buildFareBreakdown, FareBreakdown, MARKET_RDC, MovaErrorCode, MovaHttpException } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class PricingService {
   constructor(private prisma: PrismaService) {}
 
-  async estimateFare(vehicleType: VehicleType, distanceKm: number, durationMin: number) {
+  async estimateFare(vehicleType: VehicleType, distanceKm: number, durationMin: number): Promise<FareBreakdown> {
     const rule = await this.prisma.pricingRule.findUnique({ where: { vehicleType } });
     if (!rule) throw new MovaHttpException(MovaErrorCode.PRICING_NOT_CONFIGURED, HttpStatus.SERVICE_UNAVAILABLE);
     const multiplier = this.getSurchargeMultiplier();
-    const base = rule.baseFareCdf;
-    const distance = Math.ceil(distanceKm * rule.perKmCdf);
-    const duration = Math.ceil(durationMin * rule.perMinuteCdf);
-    const subtotal = base + distance + duration;
-    const total = Math.max(Math.ceil(subtotal * multiplier), rule.minFareCdf);
-    return { vehicleType, baseFareCdf: base, distanceFareCdf: distance, durationFareCdf: duration, surchargeMultiplier: multiplier, estimatedFareCdf: total, formatted: `${total.toLocaleString('fr-CD')} FC`, currency: MARKET_RDC.currency };
+    const baseFareCdf = rule.baseFareCdf;
+    const distanceFareCdf = Math.ceil(distanceKm * rule.perKmCdf);
+    const durationFareCdf = Math.ceil(durationMin * rule.perMinuteCdf);
+    return buildFareBreakdown(
+      vehicleType,
+      distanceKm,
+      durationMin,
+      baseFareCdf,
+      distanceFareCdf,
+      durationFareCdf,
+      multiplier,
+      rule.minFareCdf,
+    );
   }
 
   private getSurchargeMultiplier(): number {

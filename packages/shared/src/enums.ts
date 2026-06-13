@@ -14,6 +14,7 @@ export enum VehicleType {
   MOTO_TAXI = 'MOTO_TAXI',
   STANDARD = 'STANDARD',
   COMFORT = 'COMFORT',
+  VIP = 'VIP',
 }
 
 export enum RideStatus {

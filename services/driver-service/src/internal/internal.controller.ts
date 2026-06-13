@@ -25,6 +25,11 @@ export class InternalController {
   @Get('drivers/count') count() { return this.drivers.countDrivers().then((count) => ({ count })); }
   @Get('kyc/pending') pendingKyc() { return this.drivers.pendingKyc(); }
   @Post('kyc/:id/review') reviewKyc(@Param('id') id: string, @Body() dto: ReviewKycDto) { return this.drivers.approveKyc(id, dto.approved, dto.notes); }
+  @Get('drivers/:userId')
+  getDriver(@Param('userId') userId: string) {
+    return this.drivers.getProfile(userId);
+  }
+
   @Patch('drivers/:userId/rating') updateRating(@Param('userId') userId: string, @Body() dto: RatingDto) { return this.drivers.updateRating(userId, dto.ratingAvg); }
   @Patch('drivers/:userId/location') updateLocation(@Param('userId') userId: string, @Body() dto: { lat: number; lng: number }) { return this.drivers.updateLocation(userId, dto.lat, dto.lng); }
   @Get('incidents') listIncidents() { return this.incidents.list(); }

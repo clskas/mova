@@ -19,18 +19,222 @@ All routes are prefixed with `/api` except `/health`.
 |--------|------|------|-------------|
 | GET | `/api/services` | Public | Liste des services (taxi, colis, repas, etc.) |
 
-## Rides
+## Rides (Taxi / Moto-taxi Kinshasa)
+
+Catégories véhicule : `MOTO`, `STANDARD`, `CONFORT`, `VIP` (alias backend : `MOTO_TAXI`, `COMFORT`).
+
+Cycle de vie mobile : `REQUESTED` → `MATCHING` → `DRIVER_ASSIGNED` → `ARRIVING` → `IN_PROGRESS` → `COMPLETED`.
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| POST | `/api/rides/estimate` | JWT | Fare estimate (CDF) |
-| POST | `/api/rides` | JWT | Create ride (publishes `ride.created`) |
-| GET | `/api/rides` | JWT | Ride history |
-| GET | `/api/rides/:id` | JWT | Ride detail |
-| POST | `/api/rides/:id/search` | JWT | Search drivers |
-| POST | `/api/rides/:id/accept` | JWT | Driver accepts |
-| PATCH | `/api/rides/:id/status` | JWT | Update status |
-| POST | `/api/rides/:id/cancel` | JWT | Cancel ride |
+| POST | `/api/rides/estimate` | JWT | Estimation tarif CDF |
+| POST | `/api/rides` | JWT | Créer course (`REQUESTED`) |
+| GET | `/api/rides/history` | JWT | Historique passager/chauffeur |
+| GET | `/api/rides` | JWT | Alias historique |
+| GET | `/api/rides/:id` | JWT | Détail + chauffeur si assigné |
+| POST | `/api/rides/:id/search` | JWT | Matching (2 km + 1 km/30 s) |
+| POST | `/api/rides/:id/accept` | JWT | Accepter (chauffeur) |
+| PATCH | `/api/rides/:id/status` | JWT | Transition statut |
+| POST | `/api/rides/:id/cancel` | JWT | Annulation (PRD §4.4) |
+| POST | `/api/ratings` | JWT | Noter après course terminée |
+
+### POST `/api/rides/estimate`
+
+**Request**
+```json
+{
+  "pickupLat": -4.3217,
+  "pickupLng": 15.3125,
+  "dropoffLat": -4.3389,
+  "dropoffLng": 15.3264,
+  "vehicleType": "MOTO"
+}
+```
+
+**Response 200**
+```json
+{
+  "vehicleType": "MOTO",
+  "distanceKm": 2.15,
+  "etaMinutes": 5,
+  "baseFareCdf": 1500,
+  "distanceFareCdf": 1720,
+  "durationFareCdf": 500,
+  "surchargeCdf": 0,
+  "totalCdf": 3720,
+  "totalFormatted": "3 720 FC",
+  "estimatedFareCdf": 3720,
+  "estimatedPriceCdf": 3720,
+  "currency": "CDF",
+  "surchargeMultiplier": 1
+}
+```
+
+### POST `/api/rides`
+
+**Request**
+```json
+{
+  "pickupLat": -4.3217,
+  "pickupLng": 15.3125,
+  "pickupAddress": "Gombe, Kinshasa",
+  "dropoffLat": -4.3389,
+  "dropoffLng": 15.3264,
+  "dropoffAddress": "Limete, Kinshasa",
+  "vehicleType": "STANDARD"
+}
+```
+
+**Response 201**
+```json
+{
+  "id": "uuid",
+  "status": "REQUESTED",
+  "vehicleType": "STANDARD",
+  "pickupAddress": "Gombe, Kinshasa",
+  "dropoffAddress": "Limete, Kinshasa",
+  "totalCdf": 8500,
+  "totalFormatted": "8 500 FC",
+  "currency": "CDF",
+  "estimate": { "...": "voir /estimate" },
+  "nextStep": "POST /api/rides/:id/search"
+}
+```
+
+### POST `/api/rides/:id/search`
+
+**Response 200**
+```json
+{
+  "rideId": "uuid",
+  "status": "MATCHING",
+  "attempt": 1,
+  "radiusKm": 2,
+  "nextRadiusKm": 3,
+  "incrementIntervalSec": 30,
+  "maxRadiusKm": 10,
+  "driversFound": 2,
+  "matchingWeights": {
+    "proximity": 0.5,
+    "rating": 0.25,
+    "acceptanceRate": 0.15,
+    "seniority": 0.1
+  },
+  "drivers": [
+    {
+      "driverId": "uuid",
+      "userId": "uuid",
+      "lat": -4.322,
+      "lng": 15.313,
+      "rating": 4.8,
+      "distanceKm": 0.4,
+      "score": 0.912
+    }
+  ]
+}
+```
+
+### PATCH `/api/rides/:id/status`
+
+**Request** (statuts mobile acceptés)
+```json
+{ "status": "IN_PROGRESS" }
+```
+
+Valeurs : `MATCHING`, `DRIVER_ASSIGNED`, `ARRIVING`, `IN_PROGRESS`, `COMPLETED`.
+
+### POST `/api/rides/:id/cancel`
+
+**Request**
+```json
+{ "reason": "Changement de plan" }
+```
+
+**Response 200**
+```json
+{
+  "ride": { "status": "CANCELLED", "...": "..." },
+  "cancellationFeeCdf": 0,
+  "cancellationFeeFormatted": "0 FC",
+  "message": "Annulation gratuite dans les 3 premières minutes."
+}
+```
+
+Politique Kinshasa (seed) :
+
+| Catégorie | Gratuit | Frais passager |
+|-----------|---------|----------------|
+| MOTO | 2 min | 1 000 FC |
+| STANDARD | 3 min | 2 000 FC |
+| CONFORT | 5 min | 3 000 FC |
+| VIP | 5 min | 5 000 FC |
+
+### GET `/api/rides/history?role=passenger`
+
+**Response 200**
+```json
+[
+  {
+    "id": "uuid",
+    "status": "COMPLETED",
+    "vehicleType": "MOTO",
+    "pickupAddress": "Gombe, Kinshasa",
+    "dropoffAddress": "Limete, Kinshasa",
+    "priceCdf": 7500,
+    "totalCdf": 7500,
+    "distanceKm": 3.2,
+    "createdAt": "2026-06-13T10:00:00.000Z"
+  }
+]
+```
+
+### GET `/api/rides/:id`
+
+Inclut `driver` quand assigné :
+```json
+{
+  "id": "uuid",
+  "status": "DRIVER_ASSIGNED",
+  "driver": {
+    "userId": "uuid",
+    "rating": 4.9,
+    "totalRides": 842,
+    "lat": -4.322,
+    "lng": 15.313,
+    "vehicle": {
+      "type": "STANDARD",
+      "make": "Toyota",
+      "model": "Corolla",
+      "plate": "KIN-1234-AB",
+      "color": "Blanc"
+    }
+  }
+}
+```
+
+### POST `/api/ratings`
+
+**Request**
+```json
+{
+  "rideId": "uuid",
+  "toUserId": "driver-user-uuid",
+  "score": 5,
+  "comment": "Excellent chauffeur"
+}
+```
+
+### Erreurs (français)
+
+```json
+{
+  "statusCode": 404,
+  "code": "MOVA_RIDE_001",
+  "message": "Course introuvable."
+}
+```
+
+Codes courants : `MOVA_RIDE_003` (aucun chauffeur), `MOVA_RIDE_004` (course active), `MOVA_RIDE_010` (déjà noté), `MOVA_RIDE_011` (transition invalide).
 
 ## Réservations planifiées
 
@@ -83,7 +287,23 @@ All routes are prefixed with `/api` except `/health`.
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/api/geo/communes` | Public | Kinshasa communes |
+| GET | `/api/geo/communes` | Public | 22 communes Kinshasa |
+| GET | `/api/geo/autocomplete?q=` | Public | Autocomplétion (communes + Mapbox si token) |
+
+**GET `/api/geo/autocomplete?q=gom`**
+```json
+[
+  {
+    "source": "commune",
+    "label": "Gombe, Kinshasa",
+    "address": "Gombe, Kinshasa, RDC",
+    "lat": -4.3217,
+    "lng": 15.3125,
+    "commune": "Gombe",
+    "city": "Kinshasa"
+  }
+]
+```
 
 ## Payments
 

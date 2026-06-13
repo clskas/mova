@@ -12,6 +12,7 @@ enum VehicleType {
   MOTO_TAXI
   STANDARD
   COMFORT
+  VIP
 }
 
 enum RideStatus {

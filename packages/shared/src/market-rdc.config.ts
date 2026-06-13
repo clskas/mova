@@ -20,9 +20,10 @@ export const MARKET_RDC = {
   ] as const,
 
   vehicleTypes: [
-    { id: 'MOTO_TAXI', label: 'Moto-taxi', priority: 1 },
-    { id: 'STANDARD', label: 'Standard', priority: 2 },
-    { id: 'COMFORT', label: 'Confort', priority: 3 },
+    { id: 'MOTO_TAXI', label: 'Moto-taxi', mobileId: 'MOTO', priority: 1 },
+    { id: 'STANDARD', label: 'Standard', mobileId: 'STANDARD', priority: 2 },
+    { id: 'COMFORT', label: 'Confort', mobileId: 'CONFORT', priority: 3 },
+    { id: 'VIP', label: 'VIP', mobileId: 'VIP', priority: 4 },
   ] as const,
 
   defaultCoords: {
@@ -38,10 +39,10 @@ export const MARKET_RDC = {
     maxRadiusKm: 10,
     acceptTimeoutSec: 30,
     scoreWeights: {
-      distance: 0.4,
-      rating: 0.3,
-      acceptanceRate: 0.2,
-      waitTime: 0.1,
+      proximity: 0.5,
+      rating: 0.25,
+      acceptanceRate: 0.15,
+      seniority: 0.1,
     },
   },
 

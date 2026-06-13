@@ -14,18 +14,82 @@ import { RidesService } from './rides.service';
 @ApiBearerAuth()
 export class RidesController {
   constructor(private ridesService: RidesService, private scheduledRidesService: ScheduledRidesService) {}
-  @Post('estimate') @ApiOperation({ summary: 'Estimer tarif' }) estimate(@Body() dto: EstimateRideDto) { return this.ridesService.estimate(dto.pickupLat, dto.pickupLng, dto.dropoffLat, dto.dropoffLng, dto.vehicleType); }
-  @Post('scheduled/estimate') @ApiOperation({ summary: 'Estimer réservation planifiée (contrat mobile)' }) estimateScheduled(@Body() dto: MobileScheduledEstimateDto) {
+
+  @Post('estimate')
+  @ApiOperation({ summary: 'Estimer tarif (CDF, Kinshasa)' })
+  estimate(@Body() dto: EstimateRideDto) {
+    return this.ridesService.estimate(dto.pickupLat, dto.pickupLng, dto.dropoffLat, dto.dropoffLng, dto.vehicleType);
+  }
+
+  @Post('scheduled/estimate')
+  @ApiOperation({ summary: 'Estimer réservation planifiée (contrat mobile)' })
+  estimateScheduled(@Body() dto: MobileScheduledEstimateDto) {
     return this.scheduledRidesService.estimateMobile(dto.dropoffAddress, dto.vehicleType as VehicleType, dto.scheduledAt);
   }
-  @Post('scheduled') @ApiOperation({ summary: 'Créer réservation planifiée (J+7 max)' }) createScheduled(@Request() req: { user: { id: string } }, @Body() dto: CreateScheduledRideDto) { return this.scheduledRidesService.create(req.user.id, dto); }
-  @Get('scheduled') @ApiOperation({ summary: 'Liste réservations planifiées' }) listScheduled(@Request() req: { user: { id: string } }) { return this.scheduledRidesService.list(req.user.id); }
-  @Post('scheduled/:id/cancel') @ApiOperation({ summary: 'Annuler réservation planifiée' }) cancelScheduled(@Request() req: { user: { id: string } }, @Param('id') id: string, @Body() dto: CancelScheduledRideDto) { return this.scheduledRidesService.cancel(id, req.user.id, dto.reason); }
-  @Post() @ApiOperation({ summary: 'Créer une course' }) create(@Request() req: { user: { id: string } }, @Body() dto: CreateRideDto) { return this.ridesService.createRide(req.user.id, dto); }
-  @Get() @ApiOperation({ summary: 'Historique courses' }) list(@Request() req: { user: { id: string; role: string } }, @Query('role') role?: string) { return this.ridesService.getUserRides(req.user.id, (role === 'driver' ? 'driver' : 'passenger') as 'passenger' | 'driver'); }
-  @Get(':id') @ApiOperation({ summary: 'Détail course' }) get(@Param('id') id: string) { return this.ridesService.getRide(id); }
-  @Post(':id/search') @ApiOperation({ summary: 'Rechercher chauffeurs' }) search(@Request() req: { user: { id: string } }, @Param('id') id: string) { return this.ridesService.searchDrivers(id, req.user.id); }
-  @Post(':id/accept') @ApiOperation({ summary: 'Accepter course (chauffeur)' }) accept(@Request() req: { user: { id: string } }, @Param('id') id: string, @Body('vehicleId') vehicleId?: string) { return this.ridesService.acceptRide(id, req.user.id, vehicleId); }
-  @Patch(':id/status') @ApiOperation({ summary: 'Mettre à jour statut' }) status(@Request() req: { user: { id: string } }, @Param('id') id: string, @Body() dto: UpdateRideStatusDto) { return this.ridesService.updateStatus(id, dto.status, req.user.id); }
-  @Post(':id/cancel') @ApiOperation({ summary: 'Annuler course' }) cancel(@Request() req: { user: { id: string } }, @Param('id') id: string, @Body() dto: CancelRideDto) { return this.ridesService.cancelRide(id, req.user.id, dto.reason); }
+
+  @Post('scheduled')
+  @ApiOperation({ summary: 'Créer réservation planifiée (J+7 max)' })
+  createScheduled(@Request() req: { user: { id: string } }, @Body() dto: CreateScheduledRideDto) {
+    return this.scheduledRidesService.create(req.user.id, dto);
+  }
+
+  @Get('scheduled')
+  @ApiOperation({ summary: 'Liste réservations planifiées' })
+  listScheduled(@Request() req: { user: { id: string } }) {
+    return this.scheduledRidesService.list(req.user.id);
+  }
+
+  @Post('scheduled/:id/cancel')
+  @ApiOperation({ summary: 'Annuler réservation planifiée' })
+  cancelScheduled(@Request() req: { user: { id: string } }, @Param('id') id: string, @Body() dto: CancelScheduledRideDto) {
+    return this.scheduledRidesService.cancel(id, req.user.id, dto.reason);
+  }
+
+  @Get('history')
+  @ApiOperation({ summary: 'Historique courses passager/chauffeur' })
+  history(@Request() req: { user: { id: string } }, @Query('role') role?: string) {
+    return this.ridesService.getUserRides(req.user.id, role === 'driver' ? 'driver' : 'passenger');
+  }
+
+  @Post()
+  @ApiOperation({ summary: 'Créer une course (statut REQUESTED)' })
+  create(@Request() req: { user: { id: string } }, @Body() dto: CreateRideDto) {
+    return this.ridesService.createRide(req.user.id, dto);
+  }
+
+  @Get()
+  @ApiOperation({ summary: 'Historique courses (alias)' })
+  list(@Request() req: { user: { id: string } }, @Query('role') role?: string) {
+    return this.ridesService.getUserRides(req.user.id, role === 'driver' ? 'driver' : 'passenger');
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Détail course avec chauffeur si assigné' })
+  get(@Param('id') id: string) {
+    return this.ridesService.getRide(id);
+  }
+
+  @Post(':id/search')
+  @ApiOperation({ summary: 'Lancer matching chauffeurs (2 km + 1 km/30 s)' })
+  search(@Request() req: { user: { id: string } }, @Param('id') id: string) {
+    return this.ridesService.searchDrivers(id, req.user.id);
+  }
+
+  @Post(':id/accept')
+  @ApiOperation({ summary: 'Accepter course (chauffeur)' })
+  accept(@Request() req: { user: { id: string } }, @Param('id') id: string, @Body('vehicleId') vehicleId?: string) {
+    return this.ridesService.acceptRide(id, req.user.id, vehicleId);
+  }
+
+  @Patch(':id/status')
+  @ApiOperation({ summary: 'Mettre à jour statut (MATCHING, DRIVER_ASSIGNED, …)' })
+  status(@Request() req: { user: { id: string } }, @Param('id') id: string, @Body() dto: UpdateRideStatusDto) {
+    return this.ridesService.updateStatus(id, dto.status, req.user.id);
+  }
+
+  @Post(':id/cancel')
+  @ApiOperation({ summary: 'Annuler course (politique PRD §4.4)' })
+  cancel(@Request() req: { user: { id: string } }, @Param('id') id: string, @Body() dto: CancelRideDto) {
+    return this.ridesService.cancelRide(id, req.user.id, dto.reason);
+  }
 }

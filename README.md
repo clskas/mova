@@ -292,6 +292,18 @@ Vérifie : health gateway, `flutter test`, `npm run build` (web + admin). Option
 
 
 
+## Tests E2E (Playwright + Appium)
+
+Installation et exécution : voir [`docs/testing-e2e.md`](docs/testing-e2e.md).
+
+```powershell
+cd e2e && npm install && npm run playwright:install
+npm run test:e2e          # web + admin (skip si apps arrêtées)
+npm run test:mobile       # smoke Android (Appium + appareil)
+```
+
+
+
 ## Licence
 
 

@@ -85,7 +85,11 @@ async function main() {
     if (!matched) throw new Error("Aucun écran passager reconnu (OTP ou accueil services).");
     console.log("✓ Smoke test OK — app passager visible.");
   } finally {
-    await driver.deleteSession();
+    try {
+      await driver.deleteSession();
+    } catch (err) {
+      console.warn("⚠ Fermeture session Appium:", err.message ?? err);
+    }
   }
 }
 

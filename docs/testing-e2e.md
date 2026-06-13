@@ -9,7 +9,11 @@ e2e/
 ├── package.json           # Dépendances Playwright + Appium
 ├── playwright.config.ts   # Projets admin (3002) et web (3001)
 ├── tests/                 # Specs Playwright
-├── mobile/                # Smoke test Appium (Android)
+├── mobile/                # Tests Appium (Android)
+│   ├── run-smoke.mjs
+│   ├── run-taxi-flow.mjs
+│   ├── run-services-navigation.mjs
+│   └── helpers.mjs
 └── .env.example           # Variables d'environnement
 ```
 
@@ -126,8 +130,24 @@ flutter build apk --debug --flavor passenger -t lib/main_passenger.dart
 | `ANDROID_DEVICE` | `Android` | Nom adb (optionnel) |
 | `APK_PATH` | `../mobile/build/.../app-passenger-debug.apk` | Chemin APK |
 | `USE_INSTALLED_APP` | `true` | Lance l'app installée sans réinstaller l'APK |
+| `E2E_TEST_PHONE` | `+243812345678` | Numéro pour connexion OTP mock |
+| `E2E_MOCK_OTP` | `123456` | Code OTP (`MOCK_OTP=true` côté backend) |
+| `E2E_STEP_TIMEOUT_MS` | `30000` | Timeout par étape (ms) |
 
 Package Android passager : `cd.mova.mova.passenger`
+
+OTP mock : avec `MOCK_OTP=true` sur l'API gateway / auth-service, le code fixe est **`123456`** (voir `services/auth-service/src/auth/auth.service.ts` et `mobile/lib/core/api/mock_data.dart`).
+
+### Scénarios mobile
+
+| Script npm | Fichier | Description |
+|------------|---------|-------------|
+| `test:mobile:smoke` | `run-smoke.mjs` | Lance l'app, vérifie écran OTP ou accueil |
+| `test:mobile:taxi` | `run-taxi-flow.mjs` | OTP mock → accueil → Taxi → UI réservation → estimation (optionnelle, arrêt avant paiement) |
+| `test:mobile:nav` | `run-services-navigation.mjs` | Après login, ouvre chaque carte service et vérifie le titre d'écran |
+| `test:mobile:all` | les trois ci-dessus | Suite complète séquentielle |
+
+Les sélecteurs utilisent `descriptionContains` (content-desc Flutter). L'état « déjà connecté » est géré automatiquement (`noReset: true`).
 
 ### Exécuter le smoke test
 
@@ -138,7 +158,16 @@ npm run appium:start
 
 # Terminal 2 — test (app passager installée ou APK construit)
 cd e2e
-npm run test:mobile
+npm run test:mobile:smoke
+
+# Flux taxi (OTP → réservation)
+npm run test:mobile:taxi
+
+# Navigation tous les services
+npm run test:mobile:nav
+
+# Suite complète
+npm run test:mobile:all
 
 # Ou script PowerShell (vérifie adb + Appium)
 npm run test:mobile:ps1
@@ -177,4 +206,7 @@ Workflow stub : [`.github/workflows/e2e.yml`](../.github/workflows/e2e.yml)
 |--------|-------------|
 | `npm run test:e2e` | Playwright — tous projets |
 | `npm run test:e2e:ui` | Playwright UI mode |
-| `npm run test:mobile` | Appium smoke passager |
+| `npm run test:mobile` | Appium smoke passager (alias smoke) |
+| `npm run test:mobile:taxi` | Flux taxi E2E |
+| `npm run test:mobile:nav` | Navigation services |
+| `npm run test:mobile:all` | Tous scénarios mobile |

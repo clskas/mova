@@ -7,7 +7,7 @@ $root = Split-Path -Parent $PSScriptRoot
 $authDir = Join-Path $root "services\auth-service"
 
 if (-not $env:DATABASE_URL) {
-  $env:DATABASE_URL = "postgresql://mova:mova@localhost:5437/mova_auth"
+  $env:DATABASE_URL = if ($env:AUTH_DATABASE_URL) { $env:AUTH_DATABASE_URL } else { "postgresql://mova:mova@localhost:5437/mova_auth" }
 }
 
 Write-Host "Seeding admin user (+243900000001) in auth DB ($($env:DATABASE_URL -replace ':[^:@]+@', ':***@'))..."

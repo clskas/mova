@@ -7,7 +7,19 @@ import { WalletModule } from './wallet/wallet.module';
 import { PaymentsModule } from './payments/payments.module';
 import { InternalModule } from './internal/internal.module';
 import { AuthModule } from './auth/auth.module';
+import { SubscriptionsModule } from './subscriptions/subscriptions.module';
+
 @Module({
-  imports: [ConfigModule.forRoot({ isGlobal: true }), RedisModule, PrismaModule, HealthModule, AuthModule, WalletModule, PaymentsModule, InternalModule],
+  imports: [
+    ConfigModule.forRoot({ isGlobal: true }),
+    RedisModule,
+    PrismaModule,
+    HealthModule,
+    AuthModule,
+    WalletModule,
+    PaymentsModule,
+    SubscriptionsModule,
+    InternalModule,
+  ],
 })
 export class AppModule {}

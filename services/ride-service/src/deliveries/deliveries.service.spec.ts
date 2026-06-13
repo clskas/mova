@@ -15,7 +15,15 @@ describe('DeliveriesService', () => {
     restaurant: { findUnique: jest.fn(), findMany: jest.fn(), findFirst: jest.fn() },
   };
 
-  const service = new DeliveriesService(prisma as never, pricing);
+  const surcharges = {
+    get: jest.fn().mockImplementation((type: string) => {
+      if (type === 'DELIVERY_FOOD') return Promise.resolve({ baseFeeCdf: 3000, multiplier: 1.0 });
+      if (type === 'DELIVERY_EXPRESS') return Promise.resolve({ baseFeeCdf: 0, multiplier: 1.35 });
+      return Promise.resolve({ baseFeeCdf: 0, multiplier: 1.0 });
+    }),
+  };
+
+  const service = new DeliveriesService(prisma as never, pricing, surcharges as never);
 
   beforeEach(() => jest.clearAllMocks());
 

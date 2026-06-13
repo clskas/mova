@@ -3,10 +3,14 @@ import { InternalController } from './internal.controller';
 import { PaymentInfoService } from './payment-info.service';
 import { RidesModule } from '../rides/rides.module';
 import { DeliveriesModule } from '../deliveries/deliveries.module';
+import { GeoModule } from '../geo/geo.module';
+import { CarpoolModule } from '../carpool/carpool.module';
+import { MovingModule } from '../moving/moving.module';
+import { RentalModule } from '../rental/rental.module';
 import { PrismaModule } from '../prisma/prisma.module';
 
 @Module({
-  imports: [PrismaModule, RidesModule, DeliveriesModule],
+  imports: [PrismaModule, RidesModule, DeliveriesModule, GeoModule, CarpoolModule, MovingModule, RentalModule],
   controllers: [InternalController],
   providers: [PaymentInfoService],
   exports: [PaymentInfoService],

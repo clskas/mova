@@ -1,7 +1,11 @@
 export enum UserRole {
   PASSENGER = 'PASSENGER',
   DRIVER = 'DRIVER',
+  SUPER_ADMIN = 'SUPER_ADMIN',
   ADMIN = 'ADMIN',
+  SUPPORT = 'SUPPORT',
+  FINANCE = 'FINANCE',
+  CONTENT = 'CONTENT',
 }
 
 export enum UserStatus {

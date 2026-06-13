@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { setToken } from "@/lib/auth";
+import { decodeJwtPayload, setToken } from "@/lib/auth";
+import { defaultPathForRole, isAdminRole, normalizeAdminRole } from "@/lib/rbac";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
 const ADMIN_PHONE = process.env.NEXT_PUBLIC_ADMIN_PHONE ?? "+243900000001";
@@ -34,11 +35,12 @@ export default function LoginPage() {
       if (!verifyRes.ok || !data.accessToken) {
         throw new Error(data.error?.message ?? "Connexion refusée");
       }
-      if (data.user?.role !== "ADMIN") {
-        throw new Error("Ce compte n'a pas le rôle ADMIN. Exécutez scripts/seed-admin.ps1");
+      const role = normalizeAdminRole(data.user?.role);
+      if (!role) {
+        throw new Error("Ce compte n'a pas un rôle staff autorisé (ADMIN, SUPPORT, FINANCE, CONTENT).");
       }
       setToken(data.accessToken);
-      router.replace("/");
+      router.replace(defaultPathForRole(role));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur de connexion");
     } finally {
@@ -52,8 +54,13 @@ export default function LoginPage() {
       setError("Collez un JWT valide");
       return;
     }
+    const payload = decodeJwtPayload(trimmed);
+    if (!isAdminRole(typeof payload?.role === "string" ? payload.role : null)) {
+      setError("JWT sans rôle staff autorisé");
+      return;
+    }
     setToken(trimmed);
-    router.replace("/");
+    router.replace(defaultPathForRole(normalizeAdminRole(String(payload?.role))!));
   }
 
   return (

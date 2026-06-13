@@ -95,6 +95,45 @@ export class DriversService {
     return this.prisma.driverProfile.count();
   }
 
+  async listDriversAdmin(
+    skip = 0,
+    take = 50,
+    filters?: { kycStatus?: KycStatus; isAvailable?: boolean },
+  ) {
+    const where = {
+      ...(filters?.kycStatus ? { kycStatus: filters.kycStatus } : {}),
+      ...(filters?.isAvailable !== undefined ? { isAvailable: filters.isAvailable } : {}),
+    };
+    const [data, total] = await Promise.all([
+      this.prisma.driverProfile.findMany({
+        where,
+        skip,
+        take,
+        orderBy: { createdAt: 'desc' },
+        include: { vehicles: true },
+      }),
+      this.prisma.driverProfile.count({ where }),
+    ]);
+    return { data, total, skip, take };
+  }
+
+  async updateDriverAdmin(userId: string, data: { isAvailable?: boolean; active?: boolean }) {
+    const profile = await this.prisma.driverProfile.findUnique({ where: { userId } });
+    if (!profile) throw new MovaHttpException(MovaErrorCode.DRIVER_KYC_PENDING);
+    if (data.active !== undefined) return this.setDriverActive(userId, data.active);
+    if (data.isAvailable !== undefined) return this.setAvailability(userId, data.isAvailable);
+    return profile;
+  }
+
+  async setDriverActive(userId: string, active: boolean) {
+    const profile = await this.prisma.driverProfile.findUnique({ where: { userId } });
+    if (!profile) throw new MovaHttpException(MovaErrorCode.DRIVER_KYC_PENDING);
+    return this.prisma.driverProfile.update({
+      where: { userId },
+      data: { isAvailable: active && profile.kycStatus === KycStatus.APPROVED },
+    });
+  }
+
   private computeScore(distanceKm: number, rating: number, totalRides: number, acceptanceRate = 0.85): number {
     const w = MARKET_RDC.matching.scoreWeights;
     const proximityScore = Math.max(0, 1 - distanceKm / MARKET_RDC.matching.maxRadiusKm);

@@ -11,7 +11,11 @@ describe('MovingService', () => {
     movingRequest: { create: jest.fn(), findMany: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
   };
 
-  const service = new MovingService(prisma as never, pricing);
+  const surcharges = {
+    get: jest.fn().mockResolvedValue({ baseFeeCdf: 15000, multiplier: 1.5, perUnitCdf: 8000 }),
+  };
+
+  const service = new MovingService(prisma as never, pricing, surcharges as never);
 
   const dto = {
     volumeM3: 5,

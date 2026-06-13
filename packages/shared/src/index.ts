@@ -3,6 +3,7 @@ export * from './ride-contract';
 export * from './mova-error-codes';
 export * from './http-exception.filter';
 export * from './enums';
+export * from './admin-rbac';
 export * from './events';
 export * from './communes-seed';
 export * from './service-urls';

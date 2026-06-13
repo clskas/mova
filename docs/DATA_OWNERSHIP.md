@@ -16,27 +16,34 @@ Ce document clarifie **qui crée** chaque entité, **qui la gère** côté admin
 
 | Entity | Created by | Managed by Admin | CRUD location |
 |--------|------------|------------------|---------------|
-| **Users** | Self-registration via OTP (`auth-service`) | Lecture liste, rôle (futur) | **User:** `POST /api/auth/otp/*`, `GET /api/users/me` · **Admin:** `GET /api/admin/users` → `auth-service` `/internal/users` |
-| **Drivers** | User devient DRIVER + profil auto (`driver-service`) | Supervision KYC, disponibilité | **User/Driver:** `POST /api/auth/otp/verify` (role=DRIVER), `PATCH /api/drivers/*` · **Admin:** via KYC + métriques |
-| **KYC** | Driver upload (`driver-service`) | Approbation / rejet | **Driver:** `POST /api/drivers/kyc` · **Admin:** `GET /api/admin/kyc/pending`, `POST /api/admin/kyc/:id/review` |
-| **Rides (taxi)** | Passenger (`ride-service`) | Stats, litiges | **User:** `POST /api/rides`, `GET /api/rides`, `POST /api/rides/estimate` · **Admin:** métriques via `/internal/rides/stats` |
-| **Scheduled rides** | Passenger | Vue opérations | **User:** `POST /api/rides/scheduled`, `POST /api/rides/scheduled/estimate`, `GET /api/rides/scheduled` · **Admin:** `GET /api/admin/scheduled-rides` |
-| **Deliveries (parcel/food)** | Passenger | Vue livraisons actives | **User:** `POST /api/deliveries/parcel/*`, `POST /api/deliveries/food/*`, `GET /api/deliveries/history` · **Admin:** `GET /api/admin/deliveries` |
-| **Errands (courses & commissions)** | Passenger | (via commandes) | **User (mobile):** `POST /api/deliveries/errand/estimate`, `POST /api/deliveries/errand`, `GET /api/deliveries/errand/history` · **API canonique:** `POST /api/errands/*` · **Admin:** inclus dans métriques livraisons |
-| **Restaurants** | Seed / Admin | CRUD complet | **User:** `GET /api/deliveries/restaurants` · **Admin:** `GET/POST /api/admin/restaurants`, `POST /api/admin/restaurants/:id` → `ride-service` `/internal/restaurants` |
-| **Pricing rules** | Seed / Admin | Tarifs par type véhicule | **User:** utilisé implicitement dans estimates · **Admin:** `GET /api/admin/pricing-rules`, `POST /api/admin/pricing-rules/:vehicleType` |
-| **Communes** | Seed (`ride-service`) | Référentiel géo | **User:** `GET /api/geo/communes` · **Admin:** seed uniquement (pas de CRUD UI) |
+| **Users** | Self-registration via OTP (`auth-service`) | Liste, détail, rôle, statut, suspension | **User:** `POST /api/auth/otp/*`, `GET /api/users/me` · **Admin:** `GET/PATCH /api/admin/users`, `GET/PATCH /api/admin/users/:id` → `auth-service` `/internal/users` |
+| **Drivers** | User devient DRIVER + profil auto (`driver-service`) | Liste, détail, suspension/activation | **User/Driver:** `POST /api/auth/otp/verify` (role=DRIVER), `PATCH /api/drivers/*` · **Admin:** `GET /api/admin/drivers`, `GET /api/admin/drivers/:userId`, `PATCH /api/admin/drivers/:userId/status` |
+| **KYC** | Driver upload (`driver-service`) | Approbation / rejet + aperçu document | **Driver:** `POST /api/drivers/kyc` · **Admin:** `GET /api/admin/kyc/pending`, `POST /api/admin/kyc/:id/review` |
+| **Rides (taxi)** | Passenger (`ride-service`) | Liste, détail, annulation admin | **User:** `POST /api/rides`, `GET /api/rides`, `POST /api/rides/estimate` · **Admin:** `GET /api/admin/rides`, `GET /api/admin/rides/:id`, `POST /api/admin/rides/:id/cancel` |
+| **Scheduled rides** | Passenger | Liste, annulation admin | **User:** `POST /api/rides/scheduled`, … · **Admin:** `GET /api/admin/scheduled-rides`, `POST /api/admin/scheduled-rides/:id/cancel` |
+| **Deliveries (parcel/food/express/errand)** | Passenger | Liste, détail, mise à jour statut | **User:** `POST /api/deliveries/*` · **Admin:** `GET /api/admin/deliveries`, `GET /api/admin/deliveries/:id`, `PATCH /api/admin/deliveries/:id/status` |
+| **Errands (courses & commissions)** | Passenger | (via livraisons) | **User (mobile):** `POST /api/deliveries/errand/*` · **Admin:** filtre type `ERRAND` dans `/api/admin/deliveries` |
+| **Restaurants** | Seed / Admin | CRUD complet (UI admin) | **User:** `GET /api/deliveries/restaurants` · **Admin:** `GET/POST /api/admin/restaurants`, `PATCH /api/admin/restaurants/:id` |
+| **Pricing rules** | Seed / Admin (Finance, Contenu) | Tarifs courses taxi + livraisons | **Admin:** `GET/PATCH /api/admin/pricing-rules`, `GET/PATCH /api/admin/delivery-pricing-rules` → `ride-service` · **Propriétaire:** Finance (édition), Contenu (consultation) |
+| **Subscription plans** | Admin (Finance) | Plans MOVA Plus, abonnés | **Admin:** `GET/POST/PATCH /api/admin/subscription-plans`, `GET /api/admin/subscriptions` (backend à venir — mock UI) · **Propriétaire:** Finance |
+| **Communes** | Seed (`ride-service`) | Lecture seule (Paramètres admin) | **User:** `GET /api/geo/communes` · **Admin:** même endpoint (pas de CRUD UI) |
 | **Incidents / litiges** | User ou Driver | Résolution | **User:** `POST /api/incidents` · **Admin:** `GET /api/admin/incidents`, `POST /api/admin/incidents/:id/resolve` |
 | **Carpool** | Driver / Passenger | — | **User:** `GET/POST /api/carpool/rides`, `POST /api/carpool/estimate`, `POST /api/carpool/search` · **Canonique:** `/api/carpool` |
 | **Wallet / Payments** | Auto à l'inscription + transactions user | — | **User:** `GET /api/wallet`, `POST /api/payments/*` · **Admin:** revenus agrégés dans métriques |
 
 ---
 
-## Flux admin (authentification)
+## Flux admin (authentification & RBAC)
 
 1. Créer l'utilisateur admin : `scripts/seed-admin.ps1` (téléphone `+243900000001`, rôle `ADMIN`)
 2. Se connecter sur **admin/** → `/login` : OTP `123456` (dev, `MOCK_OTP=true`) ou coller un JWT
-3. Toutes les requêtes `/api/admin/*` envoient `Authorization: Bearer <JWT>` — le `admin-service` n'accepte que `role=ADMIN`
+3. Toutes les requêtes `/api/admin/*` envoient `Authorization: Bearer <JWT>`
+4. **RBAC console admin** (frontend) — rôle lu depuis JWT ou `GET /api/users/me` :
+   - `SUPER_ADMIN` / `ADMIN` : accès complet
+   - `SUPPORT` : utilisateurs/chauffeurs (lecture), KYC, litiges, courses/livraisons (lecture)
+   - `FINANCE` : métriques, portefeuille, tarifs, abonnements
+   - `CONTENT` : restaurants, tarifs (lecture/édition), communes
+5. Menu latéral et gardes de route masquent/redirigent les sections non autorisées
 
 ---
 
@@ -46,3 +53,12 @@ Ce document clarifie **qui crée** chaque entité, **qui la gère** côté admin
 - **Routes mobile legacy** : le mobile appelle `/api/deliveries/errand/*` ; le backend expose aussi `/api/errands/*` (contrat documenté)
 - **Données sensibles** : JWT, OTP, clés internes — jamais commitées ; utiliser `.env` / variables Docker
 - **Seed ride-service** : tarifs, communes et restaurants créés au démarrage (`SeedService`)
+
+## Propriété tarifs vs abonnements
+
+| Domaine | Équipe responsable | Données | Endpoints admin |
+|---------|-------------------|---------|-----------------|
+| **Tarifs courses & livraisons** | Finance (édition), Contenu (consultation) | `pricing_rules`, règles livraison par catégorie | `/api/admin/pricing-rules`, `/api/admin/delivery-pricing-rules` |
+| **Abonnements MOVA Plus** | Finance | Plans, prix mensuel CDF, avantages, abonnés actifs | `/api/admin/subscription-plans`, `/api/admin/subscriptions` |
+
+Les tarifs impactent directement les estimates (`ride-service`). Les abonnements sont un produit commercial distinct géré par Finance ; l'UI admin existe avec mock tant que le microservice abonnements n'est pas déployé.

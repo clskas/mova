@@ -81,6 +81,25 @@ npm run test:e2e:ui
 
 Les tests **ignorent** (`skip`) les specs si l'URL cible ne répond pas — pratique sans stack complète.
 
+### Specs admin (`admin-*.spec.ts`)
+
+| Fichier | Vérifie |
+|---------|---------|
+| `admin-login.spec.ts` | Page `/login` (MOVA Admin, bouton Se connecter) |
+| `admin-users.spec.ts` | Login OTP admin + onglet Utilisateurs |
+| `admin-restaurants.spec.ts` | Page `/restaurants` (formulaire + tableau) |
+
+Prérequis admin E2E :
+
+```powershell
+docker compose up -d
+npm run seed:admin-demo
+cd admin && npm run dev    # :3002
+cd e2e && npm run test:e2e:admin
+```
+
+Variables optionnelles : `ADMIN_PHONE`, `ADMIN_OTP`, `GATEWAY_URL` (voir `e2e/.env.example`).
+
 ---
 
 ## Appium (mobile Android)

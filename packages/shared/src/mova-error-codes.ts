@@ -3,6 +3,7 @@ export enum MovaErrorCode {
   AUTH_EXPIRED_OTP = 'MOVA_AUTH_002',
   AUTH_UNAUTHORIZED = 'MOVA_AUTH_003',
   AUTH_INVALID_PHONE = 'MOVA_AUTH_004',
+  AUTH_FORBIDDEN = 'MOVA_AUTH_005',
 
   RIDE_NOT_FOUND = 'MOVA_RIDE_001',
   RIDE_INVALID_STATUS = 'MOVA_RIDE_002',
@@ -45,6 +46,9 @@ export enum MovaErrorCode {
   VALIDATION_ERROR = 'MOVA_VAL_001',
   NOT_FOUND = 'MOVA_VAL_002',
   PRICING_NOT_CONFIGURED = 'MOVA_VAL_003',
+  PROMO_NOT_FOUND = 'MOVA_VAL_004',
+  PROMO_INVALID = 'MOVA_VAL_005',
+  SUBSCRIPTION_NOT_FOUND = 'MOVA_VAL_006',
   INTERNAL_ERROR = 'MOVA_INT_001',
 }
 
@@ -53,6 +57,7 @@ export const MOVA_ERROR_MESSAGES: Record<MovaErrorCode, string> = {
   [MovaErrorCode.AUTH_EXPIRED_OTP]: 'Code OTP expiré. Demandez un nouveau code.',
   [MovaErrorCode.AUTH_UNAUTHORIZED]: 'Non autorisé. Veuillez vous connecter.',
   [MovaErrorCode.AUTH_INVALID_PHONE]: 'Numéro de téléphone invalide. Format: +243XXXXXXXXX',
+  [MovaErrorCode.AUTH_FORBIDDEN]: 'Accès refusé. Permissions insuffisantes pour cette action.',
 
   [MovaErrorCode.RIDE_NOT_FOUND]: 'Course introuvable.',
   [MovaErrorCode.RIDE_INVALID_STATUS]: 'Statut de course invalide pour cette action.',
@@ -97,5 +102,8 @@ export const MOVA_ERROR_MESSAGES: Record<MovaErrorCode, string> = {
   [MovaErrorCode.VALIDATION_ERROR]: 'Données invalides.',
   [MovaErrorCode.NOT_FOUND]: 'Ressource introuvable.',
   [MovaErrorCode.PRICING_NOT_CONFIGURED]: 'Tarification non configurée. Contactez le support MOVA.',
+  [MovaErrorCode.PROMO_NOT_FOUND]: 'Code promo introuvable.',
+  [MovaErrorCode.PROMO_INVALID]: 'Code promo invalide ou expiré.',
+  [MovaErrorCode.SUBSCRIPTION_NOT_FOUND]: 'Abonnement introuvable.',
   [MovaErrorCode.INTERNAL_ERROR]: 'Une erreur interne est survenue.',
 };

@@ -1,8 +1,9 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { DeliveryStatus, DeliveryType, Prisma, VehicleType, WeightCategory } from '@prisma/client';
+import { DeliveryStatus, DeliveryType, Prisma, SurchargeType, VehicleType, WeightCategory } from '@prisma/client';
 import { MovaErrorCode, MovaHttpException, formatCdf } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { PricingService } from '../rides/pricing.service';
+import { SurchargeService } from '../rides/surcharge.service';
 import { CreateFoodDeliveryDto, CreateParcelDeliveryDto } from './deliveries.dto';
 import {
   assertKinshasaCoords,
@@ -26,11 +27,14 @@ const WEIGHT_KG_MULTIPLIERS: { maxKg: number; category: WeightCategory; multipli
 ];
 
 const FOOD_DELIVERY_BASE_CDF = 3000;
-const EXPRESS_MULTIPLIER = 1.35;
 
 @Injectable()
 export class DeliveriesService {
-  constructor(private prisma: PrismaService, private pricing: PricingService) {}
+  constructor(
+    private prisma: PrismaService,
+    private pricing: PricingService,
+    private surcharges: SurchargeService,
+  ) {}
 
   private validateParcelDto(dto: CreateParcelDeliveryDto) {
     assertKinshasaCoords(dto.pickupLat, dto.pickupLng);
@@ -119,11 +123,12 @@ export class DeliveriesService {
   async estimateFood(dto: CreateFoodDeliveryDto) {
     const restaurant = await this.prisma.restaurant.findUnique({ where: { id: dto.restaurantId } });
     if (!restaurant || !restaurant.isActive) throw new MovaHttpException(MovaErrorCode.RESTAURANT_NOT_FOUND, HttpStatus.NOT_FOUND);
+    const foodSurcharge = await this.surcharges.get(SurchargeType.DELIVERY_FOOD);
     const itemsSubtotal = dto.items.reduce((sum, item) => sum + item.quantity * item.unitPriceCdf, 0);
     const distanceKm = this.pricing.haversineKm(restaurant.lat, restaurant.lng, dto.deliveryLat, dto.deliveryLng);
     const durationMin = (distanceKm / 20) * 60;
     const fare = await this.pricing.estimateFare(VehicleType.MOTO_TAXI, distanceKm, durationMin);
-    const deliveryFeeCdf = Math.max(FOOD_DELIVERY_BASE_CDF, fare.estimatedFareCdf);
+    const deliveryFeeCdf = Math.max(foodSurcharge.baseFeeCdf || FOOD_DELIVERY_BASE_CDF, Math.ceil(fare.estimatedFareCdf * foodSurcharge.multiplier));
     const estimatedPriceCdf = itemsSubtotal + deliveryFeeCdf;
     return {
       restaurant: { id: restaurant.id, name: restaurant.name },
@@ -167,7 +172,8 @@ export class DeliveriesService {
 
   async estimateExpress(dto: CreateParcelDeliveryDto) {
     const parcel = await this.estimateParcel(dto);
-    const estimatedPriceCdf = Math.ceil(parcel.estimatedPriceCdf * EXPRESS_MULTIPLIER);
+    const express = await this.surcharges.get(SurchargeType.DELIVERY_EXPRESS);
+    const estimatedPriceCdf = Math.ceil(parcel.estimatedPriceCdf * express.multiplier + express.baseFeeCdf);
     return {
       ...parcel,
       type: 'EXPRESS',
@@ -318,5 +324,41 @@ export class DeliveriesService {
   async upsertRestaurant(id: string | null, data: Record<string, unknown>) {
     if (id) return this.prisma.restaurant.update({ where: { id }, data: data as never });
     return this.prisma.restaurant.create({ data: data as never });
+  }
+
+  async getDeliveryAdmin(id: string) {
+    const delivery = await this.prisma.delivery.findUnique({
+      where: { id },
+      include: { restaurant: true, events: { orderBy: { createdAt: 'asc' } } },
+    });
+    if (!delivery) throw new MovaHttpException(MovaErrorCode.DELIVERY_NOT_FOUND, HttpStatus.NOT_FOUND);
+    const formatted = formatParcelDelivery(delivery);
+    return {
+      id: delivery.id,
+      type: delivery.type,
+      status: delivery.status,
+      userId: delivery.userId,
+      pickupAddress: delivery.pickupAddress,
+      dropoffAddress: delivery.dropoffAddress ?? delivery.deliveryAddress,
+      restaurantName: delivery.restaurant?.name,
+      priceCdf: delivery.estimatedPriceCdf,
+      createdAt: delivery.createdAt.toISOString(),
+      events: delivery.events,
+      timeline: formatted.timeline,
+    };
+  }
+
+  async updateStatusAdmin(id: string, status: DeliveryStatus) {
+    return this.updateStatus(id, status, 'admin');
+  }
+
+  async deleteRestaurant(id: string) {
+    const restaurant = await this.prisma.restaurant.findUnique({ where: { id } });
+    if (!restaurant) throw new MovaHttpException(MovaErrorCode.RESTAURANT_NOT_FOUND, HttpStatus.NOT_FOUND);
+    return this.prisma.restaurant.update({ where: { id }, data: { isActive: false } });
+  }
+
+  async adminCancelDelivery(id: string, reason?: string) {
+    return this.updateStatusAdmin(id, DeliveryStatus.CANCELLED);
   }
 }

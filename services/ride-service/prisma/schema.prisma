@@ -409,3 +409,40 @@ model MovingRequest {
   @@index([status])
   @@map("moving_requests")
 }
+
+enum SurchargeType {
+  DELIVERY_PARCEL
+  DELIVERY_FOOD
+  DELIVERY_EXPRESS
+  MOVING
+}
+
+model ServiceSurcharge {
+  id          String        @id @default(uuid())
+  type        SurchargeType @unique
+  baseFeeCdf  Int           @default(0)
+  multiplier  Float         @default(1.0)
+  perUnitCdf  Int?
+  description String?
+  isActive    Boolean       @default(true)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@map("service_surcharges")
+}
+
+model PromoCode {
+  id              String    @id @default(uuid())
+  code            String    @unique
+  discountPercent Int?
+  discountCdf     Int?
+  maxUses         Int?
+  usedCount       Int       @default(0)
+  validFrom       DateTime  @default(now())
+  validUntil      DateTime?
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@map("promo_codes")
+}

@@ -136,4 +136,30 @@ export class RentalService {
     if (inquiry.userId !== userId) throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
     return inquiry;
   }
+
+  async listForAdmin(take = 50) {
+    const rows = await this.prisma.rentalInquiry.findMany({ orderBy: { createdAt: 'desc' }, take, include: { vehicle: true } });
+    return rows.map((r) => ({
+      id: r.id,
+      userId: r.userId,
+      status: r.status,
+      vehicleName: r.vehicle?.name ?? r.vehicleType,
+      startDate: r.startDate.toISOString(),
+      endDate: r.endDate.toISOString(),
+      priceCdf: r.estimatedPriceCdf,
+      createdAt: r.createdAt.toISOString(),
+    }));
+  }
+
+  async adminCancel(id: string) {
+    const inquiry = await this.prisma.rentalInquiry.findUnique({ where: { id } });
+    if (!inquiry) throw new MovaHttpException(MovaErrorCode.RENTAL_INQUIRY_NOT_FOUND, HttpStatus.NOT_FOUND);
+    return this.prisma.rentalInquiry.update({ where: { id }, data: { status: RentalInquiryStatus.CLOSED }, include: { vehicle: true } });
+  }
+
+  async adminUpdateStatus(id: string, status: RentalInquiryStatus) {
+    const inquiry = await this.prisma.rentalInquiry.findUnique({ where: { id } });
+    if (!inquiry) throw new MovaHttpException(MovaErrorCode.RENTAL_INQUIRY_NOT_FOUND, HttpStatus.NOT_FOUND);
+    return this.prisma.rentalInquiry.update({ where: { id }, data: { status }, include: { vehicle: true } });
+  }
 }

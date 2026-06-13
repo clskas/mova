@@ -91,6 +91,24 @@ export class ScheduledRidesService {
     }));
   }
 
+  async adminCancel(id: string, reason?: string) {
+    const ride = await this.prisma.scheduledRide.findUnique({ where: { id } });
+    if (!ride) throw new MovaHttpException(MovaErrorCode.SCHEDULED_RIDE_NOT_FOUND, HttpStatus.NOT_FOUND);
+    if (ride.status === ScheduledRideStatus.CANCELLED || ride.status === ScheduledRideStatus.COMPLETED) {
+      throw new MovaHttpException(MovaErrorCode.SCHEDULED_RIDE_INVALID_STATUS);
+    }
+    return this.prisma.scheduledRide.update({
+      where: { id },
+      data: { status: ScheduledRideStatus.CANCELLED, cancelledAt: new Date(), cancelReason: reason ?? 'Annulé par administrateur' },
+    });
+  }
+
+  async adminUpdateStatus(id: string, status: ScheduledRideStatus) {
+    const ride = await this.prisma.scheduledRide.findUnique({ where: { id } });
+    if (!ride) throw new MovaHttpException(MovaErrorCode.SCHEDULED_RIDE_NOT_FOUND, HttpStatus.NOT_FOUND);
+    return this.prisma.scheduledRide.update({ where: { id }, data: { status } });
+  }
+
   /** Compatibilité mobile: estimer sans coords pickup/dropoff explicites */
   async estimateMobile(dropoffAddress: string, vehicleType: VehicleType, scheduledAt: string) {
     const when = new Date(scheduledAt);

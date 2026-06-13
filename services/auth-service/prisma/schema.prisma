@@ -11,7 +11,11 @@ datasource db {
 enum UserRole {
   PASSENGER
   DRIVER
+  SUPER_ADMIN
   ADMIN
+  SUPPORT
+  FINANCE
+  CONTENT
 }
 
 enum UserStatus {

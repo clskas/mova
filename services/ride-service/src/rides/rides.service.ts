@@ -401,11 +401,76 @@ export class RidesService {
   }
 
   async getStats() {
-    const [rides, completed, revenue] = await Promise.all([
+    const now = new Date();
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const [rides, completed, revenue, todayRides, todayCompleted, activeRides, cancelled, todayRevenue] = await Promise.all([
       this.prisma.ride.count(),
       this.prisma.ride.count({ where: { status: RideStatus.COMPLETED } }),
       this.prisma.ride.aggregate({ where: { status: RideStatus.COMPLETED }, _sum: { finalFareCdf: true, estimatedFareCdf: true } }),
+      this.prisma.ride.count({ where: { createdAt: { gte: startOfDay } } }),
+      this.prisma.ride.count({ where: { status: RideStatus.COMPLETED, completedAt: { gte: startOfDay } } }),
+      this.prisma.ride.count({ where: { status: { in: ACTIVE_STATUSES } } }),
+      this.prisma.ride.count({ where: { status: RideStatus.CANCELLED } }),
+      this.prisma.ride.aggregate({ where: { status: RideStatus.COMPLETED, completedAt: { gte: startOfDay } }, _sum: { finalFareCdf: true, estimatedFareCdf: true } }),
     ]);
-    return { rides, completed, revenueCdf: (revenue._sum.finalFareCdf ?? 0) + (revenue._sum.estimatedFareCdf ?? 0) };
+    const revenueCdf = (revenue._sum.finalFareCdf ?? 0) + (revenue._sum.estimatedFareCdf ?? 0);
+    const todayRevenueCdf = (todayRevenue._sum.finalFareCdf ?? 0) + (todayRevenue._sum.estimatedFareCdf ?? 0);
+    return { rides, completed, revenueCdf, todayRides, todayCompleted, todayRevenueCdf, activeRides, cancelled };
+  }
+
+  async listForAdmin(opts: { status?: string; from?: string; to?: string; skip?: number; take?: number }) {
+    const where: { status?: RideStatus; createdAt?: { gte?: Date; lte?: Date } } = {};
+    if (opts.status) where.status = opts.status as RideStatus;
+    if (opts.from || opts.to) {
+      where.createdAt = {};
+      if (opts.from) where.createdAt.gte = new Date(opts.from);
+      if (opts.to) where.createdAt.lte = new Date(opts.to);
+    }
+    const rides = await this.prisma.ride.findMany({
+      where,
+      skip: opts.skip ?? 0,
+      take: opts.take ?? 50,
+      orderBy: { createdAt: 'desc' },
+    });
+    return rides.map((r) => ({
+      id: r.id,
+      passengerId: r.passengerId,
+      driverId: r.driverId,
+      status: r.status,
+      vehicleType: r.vehicleType,
+      pickupAddress: r.pickupAddress,
+      dropoffAddress: r.dropoffAddress,
+      priceCdf: r.finalFareCdf ?? r.estimatedFareCdf ?? 0,
+      createdAt: r.createdAt.toISOString(),
+    }));
+  }
+
+  async adminCancelRide(rideId: string, reason?: string) {
+    const ride = await this.prisma.ride.findUnique({ where: { id: rideId } });
+    if (!ride) throw new MovaHttpException(MovaErrorCode.RIDE_NOT_FOUND, HttpStatus.NOT_FOUND);
+    if (ride.status === RideStatus.COMPLETED || ride.status === RideStatus.CANCELLED) {
+      throw new MovaHttpException(MovaErrorCode.RIDE_INVALID_STATUS);
+    }
+    return this.prisma.ride.update({
+      where: { id: rideId },
+      data: {
+        status: RideStatus.CANCELLED,
+        cancelledAt: new Date(),
+        cancelledBy: 'admin',
+        cancelReason: reason ?? 'Annulé par administrateur',
+      },
+    });
+  }
+
+  async adminUpdateStatus(rideId: string, status: RideStatus, reason?: string) {
+    if (status === RideStatus.CANCELLED) return this.adminCancelRide(rideId, reason);
+    const ride = await this.prisma.ride.findUnique({ where: { id: rideId } });
+    if (!ride) throw new MovaHttpException(MovaErrorCode.RIDE_NOT_FOUND, HttpStatus.NOT_FOUND);
+    const updates: Record<string, unknown> = { status };
+    if (status === RideStatus.COMPLETED) updates.completedAt = new Date();
+    if (status === RideStatus.IN_PROGRESS) updates.startedAt = new Date();
+    const updated = await this.prisma.ride.update({ where: { id: rideId }, data: updates });
+    await this.prisma.rideEvent.create({ data: { rideId, event: status, metadata: { reason, by: 'ADMIN' } } });
+    return { ride: this.formatRideDetail(updated), message: 'Statut mis à jour par l\'administration.' };
   }
 }

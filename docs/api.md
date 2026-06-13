@@ -338,12 +338,28 @@ Requires JWT with `role: ADMIN`.
 |--------|------|-------------|
 | GET | `/api/admin/metrics` | Dashboard metrics |
 | GET | `/api/admin/users` | User list |
+| GET | `/api/admin/users/:id` | User detail |
+| PATCH | `/api/admin/users/:id` | Update user (role, phone, status) |
+| GET | `/api/admin/drivers` | Driver list |
+| GET | `/api/admin/drivers/:userId` | Driver detail |
+| PATCH | `/api/admin/drivers/:userId/status` | Activate/suspend driver |
 | GET | `/api/admin/kyc/pending` | Pending KYC |
 | POST | `/api/admin/kyc/:id/review` | Approve/reject KYC |
+| GET | `/api/admin/rides` | Ride list (filters: status, from, to) |
+| GET | `/api/admin/rides/:id` | Ride detail |
+| POST | `/api/admin/rides/:id/cancel` | Admin cancel ride |
 | GET | `/api/admin/incidents` | Incidents |
 | POST | `/api/admin/incidents/:id/resolve` | Resolve incident |
 | GET | `/api/admin/deliveries` | Deliveries overview |
+| GET | `/api/admin/deliveries/:id` | Delivery detail |
+| PATCH | `/api/admin/deliveries/:id/status` | Update delivery status |
 | GET | `/api/admin/scheduled-rides` | Scheduled rides overview |
+| POST | `/api/admin/scheduled-rides/:id/cancel` | Cancel scheduled ride |
+| GET | `/api/admin/restaurants` | Restaurant list |
+| POST | `/api/admin/restaurants` | Create restaurant |
+| PATCH | `/api/admin/restaurants/:id` | Update restaurant |
+| GET | `/api/admin/pricing-rules` | Pricing rules |
+| PATCH | `/api/admin/pricing-rules/:vehicleType` | Update pricing rule |
 
 ## WebSocket
 

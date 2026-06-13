@@ -1,5 +1,5 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { VehicleType } from '@prisma/client';
+import { SurchargeType, VehicleType } from '@prisma/client';
 import { KINSHASA_COMMUNES } from '@mova/shared';
 import { PrismaService } from './prisma.service';
 
@@ -30,6 +30,13 @@ const RENTAL_VEHICLES = [
   { name: 'Toyota Hiace', category: 'Minibus', seats: 14, dailyRateCdf: 120000, depositCdf: 200000 },
 ];
 
+const SERVICE_SURCHARGES = [
+  { type: SurchargeType.DELIVERY_PARCEL, baseFeeCdf: 0, multiplier: 1.0, description: 'Colis — multiplicateur poids appliqué au tarif course' },
+  { type: SurchargeType.DELIVERY_FOOD, baseFeeCdf: 3000, multiplier: 1.0, description: 'Livraison repas — frais de base CDF' },
+  { type: SurchargeType.DELIVERY_EXPRESS, baseFeeCdf: 0, multiplier: 1.35, description: 'Livraison express — majoration 35%' },
+  { type: SurchargeType.MOVING, baseFeeCdf: 15000, multiplier: 1.5, perUnitCdf: 8000, description: 'Déménagement — base + majoration course + CDF/m³' },
+];
+
 @Injectable()
 export class SeedService implements OnModuleInit {
   private readonly logger = new Logger(SeedService.name);
@@ -50,6 +57,9 @@ export class SeedService implements OnModuleInit {
     }
     for (const r of PRICING_RULES) {
       await this.prisma.pricingRule.upsert({ where: { vehicleType: r.vehicleType }, create: r, update: r });
+    }
+    for (const s of SERVICE_SURCHARGES) {
+      await this.prisma.serviceSurcharge.upsert({ where: { type: s.type }, create: s, update: s });
     }
     for (const p of CANCELLATION_POLICIES) {
       await this.prisma.cancellationPolicy.upsert({ where: { vehicleType: p.vehicleType }, create: p, update: p });

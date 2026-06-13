@@ -92,4 +92,28 @@ export class WalletService {
       formattedBalance: formatCdf(wallet.balanceCdf),
     };
   }
+
+  async listTransactionsAdmin(skip = 0, take = 50, userId?: string) {
+    const where = userId ? { wallet: { userId } } : {};
+    const [data, total] = await Promise.all([
+      this.prisma.walletTransaction.findMany({
+        where,
+        skip,
+        take,
+        orderBy: { createdAt: 'desc' },
+        include: { wallet: { select: { userId: true, balanceCdf: true } } },
+      }),
+      this.prisma.walletTransaction.count({ where }),
+    ]);
+    return { data, total, skip, take, currency: 'CDF' };
+  }
+
+  async adminAdjust(userId: string, amountCdf: number, type: 'CREDIT' | 'DEBIT', description: string) {
+    if (type === 'CREDIT') {
+      const wallet = await this.credit(userId, amountCdf, description, `admin_adjust_${Date.now()}`);
+      return { wallet, message: `Crédit manuel de ${formatCdf(amountCdf)} appliqué.` };
+    }
+    const wallet = await this.debit(userId, amountCdf, description, `admin_adjust_${Date.now()}`);
+    return { wallet, message: `Débit manuel de ${formatCdf(amountCdf)} appliqué.` };
+  }
 }

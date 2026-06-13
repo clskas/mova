@@ -1,4 +1,5 @@
-import { Injectable } from '@nestjs/common';
+import { HttpStatus, Injectable } from '@nestjs/common';
+import { MovaErrorCode, MovaHttpException } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -7,6 +8,12 @@ export class GeoService {
 
   getCommunes(city = 'Kinshasa') {
     return this.prisma.commune.findMany({ where: { city }, orderBy: { name: 'asc' } });
+  }
+
+  async updateCommune(id: string, data: Partial<{ name: string; lat: number; lng: number; city: string }>) {
+    const commune = await this.prisma.commune.findUnique({ where: { id } });
+    if (!commune) throw new MovaHttpException(MovaErrorCode.NOT_FOUND, HttpStatus.NOT_FOUND, 'Commune introuvable.');
+    return this.prisma.commune.update({ where: { id }, data });
   }
 
   async autocomplete(query: string, city = 'Kinshasa') {

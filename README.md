@@ -179,7 +179,7 @@ L'admin Next.js **n'est pas dans Docker** — il tourne en dev local sur le port
 ```powershell
 docker compose up -d
 npm run migrate:all
-npm run seed:admin-demo    # admin + utilisateurs/chauffeurs/KYC/livraisons démo
+npm run seed:admin-demo    # SUPER_ADMIN + données démo
 
 cd admin
 Copy-Item .env.example .env.local
@@ -192,11 +192,10 @@ Ouvrir [http://localhost:3002](http://localhost:3002).
 | Identifiant | Valeur |
 |-------------|--------|
 | Téléphone admin | `+243900000001` |
+| Rôle | `SUPER_ADMIN` |
 | OTP (dev) | `123456` (`MOCK_OTP=true`) |
 
-**Dashboard (5 onglets) :** métriques, utilisateurs (lecture), KYC (approuver/rejeter), litiges (résoudre), livraisons & planifiées (lecture).
-
-**Page `/restaurants` :** liste + création (CRUD API complet ; édition via API).
+**Pages admin (RBAC) :** tableau de bord, utilisateurs (CRUD), chauffeurs, KYC, courses, livraisons, restaurants (CRUD), tarifs, litiges, planifiées, abonnements, portefeuille, communes.
 
 | Variable | Description |
 |----------|-------------|

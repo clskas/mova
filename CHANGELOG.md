@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.4.0] — 2026-06-13
+
+### Added — Admin complet
+- **`scripts/seed-admin-demo.ps1`** — jeu de données démo cross-services (users, KYC, incidents, rides, livraisons, planifiées)
+- **`prisma/seed-demo.ts`** — auth, driver, ride services
+- **Admin RBAC** — 13 pages (`utilisateurs`, `restaurants`, `tarifs`, `kyc`, `litiges`, …) avec rôles SUPER_ADMIN / ADMIN / SUPPORT / FINANCE / CONTENT
+- **Playwright** — `admin-login` (OTP), `admin-users`, `admin-restaurants`
+- **npm scripts** — `seed:admin`, `seed:admin-demo`
+
+### Changed
+- `scripts/seed-admin.ps1` — DATABASE_URL par défaut documenté, renvoie vers seed-demo
+- `README.md` — guide admin complet (credentials, ports, CRUD status)
+- `MORNING_BRIEF.md` — v1.4.0 quick start admin
+- `admin/.env.example` — `NEXT_PUBLIC_ADMIN_PHONE`
+- Port ride-service Docker corrigé dans README (**3022**, admin UI reste **3002**)
+- Version monorepo `1.4.0`
+
 ## [1.3.0] — 2026-06-12
 
 ### Added — Services MOVA complets (ride-service)

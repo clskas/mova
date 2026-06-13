@@ -80,3 +80,49 @@ model WalletTransaction {
   @@index([walletId])
   @@map("wallet_transactions")
 }
+
+enum SubscriptionTarget {
+  PASSENGER
+  DRIVER
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELLED
+  EXPIRED
+}
+
+model SubscriptionPlan {
+  id                  String             @id @default(uuid())
+  code                String             @unique
+  name                String
+  target              SubscriptionTarget
+  monthlyPriceCdf     Int
+  feeReductionPercent Float              @default(0)
+  priorityMatching    Boolean            @default(false)
+  description         String?
+  isActive            Boolean            @default(true)
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  subscriptions UserSubscription[]
+
+  @@map("subscription_plans")
+}
+
+model UserSubscription {
+  id        String             @id @default(uuid())
+  userId    String
+  planId    String
+  plan      SubscriptionPlan   @relation(fields: [planId], references: [id])
+  status    SubscriptionStatus @default(ACTIVE)
+  startsAt  DateTime           @default(now())
+  endsAt    DateTime?
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  @@index([userId])
+  @@index([planId])
+  @@index([status])
+  @@map("user_subscriptions")
+}

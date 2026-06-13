@@ -1,17 +1,19 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { MovingRequestStatus, VehicleType } from '@prisma/client';
+import { MovingRequestStatus, SurchargeType, VehicleType } from '@prisma/client';
 import { MovaErrorCode, MovaHttpException, formatCdf } from '@mova/shared';
 import { assertKinshasaCoords, buildMovingTimeline } from '../deliveries/parcel.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { PricingService } from '../rides/pricing.service';
+import { SurchargeService } from '../rides/surcharge.service';
 import { CreateMovingDto, EstimateMovingDto } from './moving.dto';
-
-const MOVING_BASE_CDF = 15000;
-const MOVING_PER_M3_CDF = 8000;
 
 @Injectable()
 export class MovingService {
-  constructor(private prisma: PrismaService, private pricing: PricingService) {}
+  constructor(
+    private prisma: PrismaService,
+    private pricing: PricingService,
+    private surcharges: SurchargeService,
+  ) {}
 
   private validateCoords(dto: EstimateMovingDto) {
     assertKinshasaCoords(dto.pickupLat, dto.pickupLng);
@@ -20,11 +22,13 @@ export class MovingService {
 
   async estimate(dto: EstimateMovingDto) {
     this.validateCoords(dto);
+    const moving = await this.surcharges.get(SurchargeType.MOVING);
     const distanceKm = this.pricing.haversineKm(dto.pickupLat, dto.pickupLng, dto.dropoffLat, dto.dropoffLng);
     const durationMin = (distanceKm / 15) * 60;
     const fare = await this.pricing.estimateFare(VehicleType.STANDARD, distanceKm, durationMin);
-    const volumeFee = Math.ceil(dto.volumeM3 * MOVING_PER_M3_CDF);
-    const estimatedPriceCdf = Math.ceil(fare.estimatedFareCdf * 1.5 + MOVING_BASE_CDF + volumeFee);
+    const perM3 = moving.perUnitCdf ?? 8000;
+    const volumeFee = Math.ceil(dto.volumeM3 * perM3);
+    const estimatedPriceCdf = Math.ceil(fare.estimatedFareCdf * moving.multiplier + moving.baseFeeCdf + volumeFee);
     return {
       estimatedPriceCdf,
       formatted: formatCdf(estimatedPriceCdf),
@@ -32,7 +36,7 @@ export class MovingService {
       city: 'Kinshasa',
       volumeM3: dto.volumeM3,
       volumeFeeCdf: volumeFee,
-      baseFeeCdf: MOVING_BASE_CDF,
+      baseFeeCdf: moving.baseFeeCdf,
       distanceKm,
       durationMin,
     };
@@ -117,5 +121,37 @@ export class MovingService {
       where: { id },
       data: { status: MovingRequestStatus.CANCELLED, cancelledAt: new Date() },
     });
+  }
+
+  async listForAdmin(take = 50) {
+    const rows = await this.prisma.movingRequest.findMany({ orderBy: { createdAt: 'desc' }, take });
+    return rows.map((r) => ({
+      id: r.id,
+      userId: r.userId,
+      status: r.status,
+      volumeM3: r.volumeM3,
+      pickupAddress: r.pickupAddress,
+      dropoffAddress: r.dropoffAddress,
+      priceCdf: r.estimatedPriceCdf,
+      createdAt: r.createdAt.toISOString(),
+    }));
+  }
+
+  async adminCancel(id: string) {
+    const request = await this.prisma.movingRequest.findUnique({ where: { id } });
+    if (!request) throw new MovaHttpException(MovaErrorCode.MOVING_NOT_FOUND, HttpStatus.NOT_FOUND);
+    if (request.status === MovingRequestStatus.COMPLETED || request.status === MovingRequestStatus.CANCELLED) {
+      throw new MovaHttpException(MovaErrorCode.MOVING_INVALID_STATUS);
+    }
+    return this.prisma.movingRequest.update({ where: { id }, data: { status: MovingRequestStatus.CANCELLED, cancelledAt: new Date() } });
+  }
+
+  async adminUpdateStatus(id: string, status: MovingRequestStatus) {
+    const request = await this.prisma.movingRequest.findUnique({ where: { id } });
+    if (!request) throw new MovaHttpException(MovaErrorCode.MOVING_NOT_FOUND, HttpStatus.NOT_FOUND);
+    const updates: Record<string, unknown> = { status };
+    if (status === MovingRequestStatus.COMPLETED) updates.completedAt = new Date();
+    if (status === MovingRequestStatus.CANCELLED) updates.cancelledAt = new Date();
+    return this.prisma.movingRequest.update({ where: { id }, data: updates });
   }
 }

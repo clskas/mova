@@ -1,6 +1,6 @@
 {
   "name": "mova-rdc",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "private": true,
   "description": "MOVA RDC — plateforme de mobilité microservices",
   "workspaces": [
@@ -21,6 +21,8 @@
     "docker:up": "docker compose up -d --build",
     "docker:down": "docker compose down",
     "migrate:all": "npm run prisma:deploy --prefix services/auth-service && npm run prisma:deploy --prefix services/ride-service && npm run prisma:deploy --prefix services/payment-service && npm run prisma:deploy --prefix services/driver-service && npm run prisma:deploy --prefix services/notification-service",
-    "seed:rides": "npm run prisma:seed --prefix services/ride-service"
+    "seed:rides": "npm run prisma:seed --prefix services/ride-service",
+    "seed:admin": "powershell -ExecutionPolicy Bypass -File scripts/seed-admin.ps1",
+    "seed:admin-demo": "powershell -ExecutionPolicy Bypass -File scripts/seed-admin-demo.ps1"
   }
 }

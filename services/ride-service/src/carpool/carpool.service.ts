@@ -205,4 +205,33 @@ export class CarpoolService {
       include: { passengers: true },
     });
   }
+
+  async startTrip(tripId: string, userId: string) {
+    const trip = await this.prisma.carpoolTrip.findUnique({ where: { id: tripId } });
+    if (!trip) throw new MovaHttpException(MovaErrorCode.CARPOOL_NOT_FOUND, HttpStatus.NOT_FOUND);
+    if (trip.driverId !== userId) throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
+    if (trip.status !== CarpoolStatus.MATCHED && trip.status !== CarpoolStatus.OPEN) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Le trajet ne peut pas démarrer dans cet état.');
+    }
+    return this.prisma.carpoolTrip.update({
+      where: { id: tripId },
+      data: { status: CarpoolStatus.IN_PROGRESS },
+      include: { passengers: true },
+    });
+  }
+
+  async completeTrip(tripId: string, userId: string) {
+    const trip = await this.prisma.carpoolTrip.findUnique({ where: { id: tripId } });
+    if (!trip) throw new MovaHttpException(MovaErrorCode.CARPOOL_NOT_FOUND, HttpStatus.NOT_FOUND);
+    if (trip.driverId !== userId) throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
+    if (trip.status !== CarpoolStatus.IN_PROGRESS) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Le trajet doit être en cours pour être terminé.');
+    }
+    const updated = await this.prisma.carpoolTrip.update({
+      where: { id: tripId },
+      data: { status: CarpoolStatus.COMPLETED },
+      include: { passengers: true },
+    });
+    return { trip: updated, paymentReady: true };
+  }
 }

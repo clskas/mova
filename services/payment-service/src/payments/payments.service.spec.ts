@@ -16,6 +16,7 @@ import {
 describe('PaymentsService', () => {
   const prisma = {
     payment: { upsert: jest.fn().mockResolvedValue({ id: 'pay-1', rideId: 'ride-1' }) },
+    servicePayment: { upsert: jest.fn().mockResolvedValue({ id: 'spay-1', referenceType: 'DELIVERY', referenceId: 'del-1' }) },
   };
   const wallet = {
     debit: jest.fn().mockResolvedValue({ balanceCdf: 0 }),
@@ -51,7 +52,7 @@ describe('PaymentsService', () => {
   it('accepte WALLET sans numéro de téléphone (contrat mobile)', async () => {
     const result = await service.payRide('ride-1', 'user-1', PaymentMethod.WALLET, undefined, 8500);
     expect(result.success).toBe(true);
-    expect(wallet.debit).toHaveBeenCalledWith('user-1', 8500, expect.any(String));
+    expect(wallet.debit).toHaveBeenCalledWith('user-1', 8500, expect.any(String), 'RIDE:ride-1');
   });
 
   it('accepte CASH sans numéro de téléphone', async () => {
@@ -93,5 +94,40 @@ describe('PaymentsService', () => {
     await expect(service.payRide('ride-1', 'user-1', PaymentMethod.ORANGE_MONEY, undefined, 8500)).rejects.toBeInstanceOf(
       MovaHttpException,
     );
+  });
+
+  it('paie une livraison terminée via portefeuille', async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        userId: 'user-1',
+        amountCdf: 12000,
+        paymentReady: true,
+        referenceType: 'DELIVERY',
+        referenceId: 'del-1',
+      }),
+    });
+    const result = await service.payService('DELIVERY', 'del-1', 'user-1', PaymentMethod.WALLET, undefined, 12000);
+    expect(result.success).toBe(true);
+    expect(wallet.debit).toHaveBeenCalledWith('user-1', 12000, expect.any(String), 'DELIVERY:del-1');
+    expect(prisma.servicePayment.upsert).toHaveBeenCalled();
+  });
+
+  it('rejette le paiement service si non terminé', async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        userId: 'user-1',
+        amountCdf: 12000,
+        paymentReady: false,
+        referenceType: 'DELIVERY',
+        referenceId: 'del-1',
+      }),
+    });
+    await expect(service.payService('DELIVERY', 'del-1', 'user-1', PaymentMethod.CASH)).rejects.toMatchObject({
+      code: MovaErrorCode.VALIDATION_ERROR,
+    });
   });
 });

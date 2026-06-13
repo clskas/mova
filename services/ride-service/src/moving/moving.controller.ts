@@ -1,8 +1,13 @@
-import { Body, Controller, Get, Param, Post, Request, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Request, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { MovingRequestStatus } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CreateMovingDto, EstimateMovingDto } from './moving.dto';
 import { MovingService } from './moving.service';
+
+class UpdateMovingStatusDto {
+  status!: MovingRequestStatus;
+}
 
 @ApiTags('moving')
 @Controller('moving')
@@ -39,5 +44,11 @@ export class MovingController {
   @ApiOperation({ summary: 'Annuler déménagement' })
   cancel(@Request() req: { user: { id: string } }, @Param('id') id: string) {
     return this.movingService.cancel(id, req.user.id);
+  }
+
+  @Patch(':id/status')
+  @ApiOperation({ summary: 'Mettre à jour statut déménagement' })
+  status(@Request() req: { user: { id: string } }, @Param('id') id: string, @Body() dto: UpdateMovingStatusDto) {
+    return this.movingService.updateStatus(id, req.user.id, dto.status);
   }
 }

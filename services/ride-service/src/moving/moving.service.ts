@@ -1,7 +1,7 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { MovingRequestStatus, VehicleType } from '@prisma/client';
 import { MovaErrorCode, MovaHttpException, formatCdf } from '@mova/shared';
-import { assertKinshasaCoords } from '../deliveries/parcel.util';
+import { assertKinshasaCoords, buildMovingTimeline } from '../deliveries/parcel.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { PricingService } from '../rides/pricing.service';
 import { CreateMovingDto, EstimateMovingDto } from './moving.dto';
@@ -71,7 +71,41 @@ export class MovingService {
     const request = await this.prisma.movingRequest.findUnique({ where: { id } });
     if (!request) throw new MovaHttpException(MovaErrorCode.MOVING_NOT_FOUND, HttpStatus.NOT_FOUND);
     if (request.userId !== userId) throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
-    return request;
+    const timeline = buildMovingTimeline(request.status, request.completedAt);
+    return {
+      ...request,
+      timeline,
+      tracking: timeline,
+      paymentReady: request.status === MovingRequestStatus.COMPLETED,
+      priceCdf: request.estimatedPriceCdf,
+      formattedPrice: formatCdf(request.estimatedPriceCdf),
+      currency: 'CDF',
+      city: 'Kinshasa',
+    };
+  }
+
+  async updateStatus(id: string, userId: string, status: MovingRequestStatus) {
+    const request = await this.get(id, userId);
+    const allowed: Record<MovingRequestStatus, MovingRequestStatus[]> = {
+      [MovingRequestStatus.PENDING]: [MovingRequestStatus.ASSIGNED, MovingRequestStatus.CANCELLED],
+      [MovingRequestStatus.ASSIGNED]: [MovingRequestStatus.IN_PROGRESS, MovingRequestStatus.CANCELLED],
+      [MovingRequestStatus.IN_PROGRESS]: [MovingRequestStatus.COMPLETED],
+      [MovingRequestStatus.COMPLETED]: [],
+      [MovingRequestStatus.CANCELLED]: [],
+    };
+    if (!allowed[request.status]?.includes(status)) {
+      throw new MovaHttpException(MovaErrorCode.MOVING_INVALID_STATUS);
+    }
+    const updates: Record<string, unknown> = { status };
+    if (status === MovingRequestStatus.COMPLETED) updates.completedAt = new Date();
+    if (status === MovingRequestStatus.CANCELLED) updates.cancelledAt = new Date();
+    const updated = await this.prisma.movingRequest.update({ where: { id }, data: updates });
+    const timeline = buildMovingTimeline(updated.status, updated.completedAt);
+    return {
+      moving: updated,
+      timeline,
+      paymentReady: status === MovingRequestStatus.COMPLETED,
+    };
   }
 
   async cancel(id: string, userId: string) {

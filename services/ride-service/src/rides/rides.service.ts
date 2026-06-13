@@ -196,7 +196,8 @@ export class RidesService {
         driverId: ride.driverId,
       });
     }
-    return this.formatRideDetail(updated);
+    const detail = this.formatRideDetail(updated);
+    return { ...detail, paymentReady: detail.paymentReady };
   }
 
   async cancelRide(rideId: string, userId: string, reason?: string) {
@@ -248,12 +249,38 @@ export class RidesService {
     });
     if (!ride) throw new MovaHttpException(MovaErrorCode.RIDE_NOT_FOUND, HttpStatus.NOT_FOUND);
     const driver = ride.driverId ? await this.fetchDriverInfo(ride.driverId) : null;
+    const detail = this.formatRideDetail(ride);
+    const timeline = this.buildRideTimeline(ride.status, ride.events);
     return {
-      ...this.formatRideDetail(ride),
+      ...detail,
       events: ride.events.map((e) => ({ ...e, status: e.event })),
+      timeline,
+      tracking: timeline,
       ratings: ride.ratings,
       driver,
     };
+  }
+
+  private buildRideTimeline(status: RideStatus, events?: { event: string; createdAt: Date }[]) {
+    const steps = [
+      { key: RideStatus.REQUESTED, label: 'Course demandée' },
+      { key: RideStatus.SEARCHING, label: 'Recherche chauffeur' },
+      { key: RideStatus.ACCEPTED, label: 'Chauffeur assigné' },
+      { key: RideStatus.DRIVER_ARRIVED, label: 'Chauffeur arrivé' },
+      { key: RideStatus.IN_PROGRESS, label: 'Course en cours' },
+      { key: RideStatus.COMPLETED, label: 'Course terminée' },
+    ];
+    if (status === RideStatus.CANCELLED) return [{ label: 'Course annulée', done: true }];
+    const order = steps.map((s) => s.key);
+    const currentIdx = order.indexOf(status);
+    return steps.map((step, idx) => {
+      const event = events?.find((e) => e.event === step.key);
+      return {
+        label: step.label,
+        done: idx <= currentIdx,
+        ...(event ? { at: event.createdAt.toISOString() } : {}),
+      };
+    });
   }
 
   async getUserRides(userId: string, role: 'passenger' | 'driver') {
@@ -321,12 +348,13 @@ export class RidesService {
     updatedAt: Date;
   }) {
     const priceCdf = ride.finalFareCdf ?? ride.estimatedFareCdf ?? 0;
+    const mobileStatus = toMobileRideStatus(ride.status);
     return {
       id: ride.id,
       passengerId: ride.passengerId,
       driverId: ride.driverId,
       vehicleId: ride.vehicleId,
-      status: toMobileRideStatus(ride.status),
+      status: mobileStatus,
       internalStatus: ride.status,
       vehicleType: toMobileVehicleType(ride.vehicleType),
       pickupLat: ride.pickupLat,
@@ -343,6 +371,7 @@ export class RidesService {
       distanceKm: ride.distanceKm,
       etaMinutes: ride.durationMin ? Math.ceil(ride.durationMin) : null,
       currency: MARKET_RDC.currency,
+      paymentReady: mobileStatus === 'COMPLETED',
       acceptedAt: ride.acceptedAt,
       startedAt: ride.startedAt,
       completedAt: ride.completedAt,

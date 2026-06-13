@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@ne
 import { VehicleType } from '@prisma/client';
 import { InternalApiGuard } from '../common/internal-api.guard';
 import { DeliveriesService } from '../deliveries/deliveries.service';
+import { PaymentInfoService } from './payment-info.service';
 import { PricingAdminService } from '../rides/pricing-admin.service';
 import { ScheduledRidesService } from '../rides/scheduled-rides.service';
 import { RidesService } from '../rides/rides.service';
@@ -14,7 +15,13 @@ export class InternalController {
     private deliveries: DeliveriesService,
     private scheduledRides: ScheduledRidesService,
     private pricingAdmin: PricingAdminService,
+    private paymentInfo: PaymentInfoService,
   ) {}
+
+  @Get('services/:referenceType/:referenceId/payment-info')
+  getPaymentInfo(@Param('referenceType') referenceType: string, @Param('referenceId') referenceId: string) {
+    return this.paymentInfo.getPaymentInfo(referenceType, referenceId);
+  }
 
   @Get('rides/:id')
   getRide(@Param('id') id: string) {

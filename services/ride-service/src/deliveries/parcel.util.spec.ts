@@ -1,4 +1,4 @@
-import { DeliveryStatus } from '@prisma/client';
+import { DeliveryStatus, DeliveryType } from '@prisma/client';
 import { MovaHttpException } from '@mova/shared';
 import { assertKinshasaCoords, buildParcelTimeline, detectCommune } from './parcel.util';
 
@@ -12,9 +12,14 @@ describe('parcel.util', () => {
   });
 
   it('construit une timeline de suivi colis', () => {
-    const timeline = buildParcelTimeline({ status: DeliveryStatus.IN_TRANSIT });
+    const timeline = buildParcelTimeline({ status: DeliveryStatus.IN_TRANSIT, type: DeliveryType.PARCEL });
     expect(timeline).toHaveLength(4);
     expect(timeline[2].done).toBe(true);
     expect(timeline[3].done).toBe(false);
+  });
+
+  it('construit une timeline repas distincte', () => {
+    const timeline = buildParcelTimeline({ status: DeliveryStatus.PENDING, type: DeliveryType.FOOD });
+    expect(timeline[0].label).toContain('restaurant');
   });
 });

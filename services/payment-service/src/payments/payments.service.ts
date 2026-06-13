@@ -122,7 +122,7 @@ export class PaymentsService {
     const paymentPhone = this.resolvePaymentPhone(method, phone);
 
     if (method === PaymentMethod.WALLET) {
-      await this.walletService.debit(userId, amountCdf, `Paiement course ${rideId}`);
+      await this.walletService.debit(userId, amountCdf, `Paiement course ${rideId}`, `RIDE:${rideId}`);
       const payment = await this.prisma.payment.upsert({
         where: { rideId },
         create: { rideId, userId, amountCdf, method, status: PaymentStatus.COMPLETED, providerRef: `wallet_${rideId}` },
@@ -141,5 +141,92 @@ export class PaymentsService {
       return { success: true, payment, message: 'Paiement espèces enregistré' };
     }
     return this.processPayment(rideId, userId, amountCdf, method, paymentPhone);
+  }
+
+  private async fetchServicePaymentInfo(referenceType: string, referenceId: string) {
+    try {
+      const res = await fetch(
+        serviceUrl('ride', `/internal/services/${referenceType}/${referenceId}/payment-info`),
+        { headers: { 'x-internal-api-key': INTERNAL_API_KEY } },
+      );
+      if (res.status === 404) throw new MovaHttpException(MovaErrorCode.NOT_FOUND, HttpStatus.NOT_FOUND);
+      if (!res.ok) {
+        this.logger.warn(`fetchServicePaymentInfo ${referenceType}/${referenceId} failed: HTTP ${res.status}`);
+        throw new MovaHttpException(MovaErrorCode.NOT_FOUND, HttpStatus.BAD_GATEWAY);
+      }
+      return res.json() as Promise<{
+        userId: string;
+        amountCdf: number;
+        paymentReady: boolean;
+        referenceType: string;
+        referenceId: string;
+        title?: string;
+      }>;
+    } catch (e) {
+      if (e instanceof MovaHttpException) throw e;
+      this.logger.error(`fetchServicePaymentInfo ${referenceType}/${referenceId} unreachable`, e);
+      throw new MovaHttpException(MovaErrorCode.NOT_FOUND, HttpStatus.BAD_GATEWAY);
+    }
+  }
+
+  async payService(
+    referenceType: string,
+    referenceId: string,
+    userId: string,
+    method: PaymentMethod,
+    phone?: string,
+    amountOverride?: number,
+  ) {
+    const type = referenceType.toUpperCase();
+    if (type === 'RIDE') return this.payRide(referenceId, userId, method, phone, amountOverride);
+
+    const info = await this.fetchServicePaymentInfo(type, referenceId);
+    if (info.userId !== userId) throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
+    if (!info.paymentReady) throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Le service n\'est pas prêt pour le paiement.');
+    const amountCdf = amountOverride ?? info.amountCdf;
+    if (amountCdf <= 0) throw new MovaHttpException(MovaErrorCode.PAYMENT_FAILED);
+    const paymentPhone = this.resolvePaymentPhone(method, phone);
+    const refKey = `${type}:${referenceId}`;
+
+    if (method === PaymentMethod.WALLET) {
+      await this.walletService.debit(userId, amountCdf, `Paiement ${type} ${referenceId}`, refKey);
+      const payment = await this.prisma.servicePayment.upsert({
+        where: { referenceType_referenceId: { referenceType: type, referenceId } },
+        create: { referenceType: type, referenceId, userId, amountCdf, method, status: PaymentStatus.COMPLETED, providerRef: `wallet_${refKey}` },
+        update: { status: PaymentStatus.COMPLETED, method, amountCdf },
+      });
+      return { success: true, payment, message: 'Paiement portefeuille effectué', amountCdf, currency: 'CDF' };
+    }
+    if (method === PaymentMethod.CASH) {
+      const payment = await this.prisma.servicePayment.upsert({
+        where: { referenceType_referenceId: { referenceType: type, referenceId } },
+        create: { referenceType: type, referenceId, userId, amountCdf, method, status: PaymentStatus.COMPLETED, providerRef: `cash_${refKey}` },
+        update: { status: PaymentStatus.COMPLETED, method, amountCdf },
+      });
+      return { success: true, payment, message: 'Paiement espèces enregistré', amountCdf, currency: 'CDF' };
+    }
+
+    const provider = this.getProvider(method);
+    const result = await provider.initiatePayment(amountCdf, paymentPhone, refKey);
+    const payment = await this.prisma.servicePayment.upsert({
+      where: { referenceType_referenceId: { referenceType: type, referenceId } },
+      create: {
+        referenceType: type,
+        referenceId,
+        userId,
+        amountCdf,
+        method,
+        status: result.success ? PaymentStatus.COMPLETED : PaymentStatus.FAILED,
+        providerRef: result.providerRef,
+        failureReason: result.success ? null : result.message,
+      },
+      update: {
+        status: result.success ? PaymentStatus.COMPLETED : PaymentStatus.FAILED,
+        providerRef: result.providerRef,
+        failureReason: result.success ? null : result.message,
+      },
+    });
+    if (!result.success) throw new MovaHttpException(MovaErrorCode.PAYMENT_FAILED);
+    return { success: true, payment, message: result.message ?? 'Paiement effectué', amountCdf, currency: 'CDF' };
   }
 }

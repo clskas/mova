@@ -40,6 +40,18 @@ export class DeliveriesService {
     }
   }
 
+  uploadParcelPhoto(dto: { dataBase64: string; contentType?: string; filename?: string }) {
+    if (!dto.dataBase64?.trim()) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Photo requise.');
+    }
+    if (dto.dataBase64.length > 4 * 1024 * 1024) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Photo trop volumineuse (max 3 Mo).');
+    }
+    const contentType = dto.contentType ?? 'image/jpeg';
+    const photoUrl = `data:${contentType};base64,${dto.dataBase64}`;
+    return { url: photoUrl, photoUrl };
+  }
+
   private resolveWeightCategory(dto: CreateParcelDeliveryDto): WeightCategory {
     if (dto.weightKg != null) {
       const band = WEIGHT_KG_MULTIPLIERS.find((b) => dto.weightKg! <= b.maxKg);
@@ -161,7 +173,8 @@ export class DeliveriesService {
       include: { restaurant: true, events: true },
     });
     await this.prisma.deliveryEvent.create({ data: { deliveryId: delivery.id, event: 'ORDER_PLACED', metadata: { items: dto.items } as unknown as Prisma.InputJsonValue } });
-    return { delivery, estimate };
+    const withEvents = { ...delivery, events: [{ id: '1', deliveryId: delivery.id, event: 'ORDER_PLACED', metadata: null, createdAt: new Date() }] };
+    return { delivery: formatParcelDelivery(withEvents), estimate };
   }
 
   async estimateExpress(dto: CreateParcelDeliveryDto) {
@@ -230,6 +243,8 @@ export class DeliveriesService {
     return {
       delivery: formatted,
       tracking: formatted.timeline,
+      courierLocation: formatted.courierLocation,
+      paymentReady: formatted.paymentReady,
     };
   }
 
@@ -246,6 +261,16 @@ export class DeliveriesService {
         restaurantName: d.restaurant?.name,
       })),
     };
+  }
+
+  async getExpressHistory(userId: string) {
+    const rows = await this.prisma.delivery.findMany({
+      where: { userId, type: DeliveryType.EXPRESS },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+      include: { events: { orderBy: { createdAt: 'asc' } } },
+    });
+    return { data: rows.map((d) => formatParcelDelivery(d)) };
   }
 
   async listRestaurants() {
@@ -274,9 +299,10 @@ export class DeliveriesService {
     if (status === DeliveryStatus.PICKED_UP) updates.pickedUpAt = new Date();
     if (status === DeliveryStatus.DELIVERED) updates.deliveredAt = new Date();
     if (status === DeliveryStatus.CANCELLED) updates.cancelledAt = new Date();
-    const updated = await this.prisma.delivery.update({ where: { id }, data: updates, include: { events: { orderBy: { createdAt: 'asc' } } } });
+    const updated = await this.prisma.delivery.update({ where: { id }, data: updates, include: { events: { orderBy: { createdAt: 'asc' } }, restaurant: true } });
     await this.prisma.deliveryEvent.create({ data: { deliveryId: id, event: status, metadata: { updatedBy: userId } } });
-    return { delivery: formatParcelDelivery(updated) };
+    const formatted = formatParcelDelivery(updated);
+    return { delivery: formatted, paymentReady: status === DeliveryStatus.DELIVERED };
   }
 
   async listForAdmin(take = 50) {

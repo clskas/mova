@@ -8,11 +8,27 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
   @WebSocketServer() server: Server;
   private readonly logger = new Logger(TrackingGateway.name);
 
-  handleConnection(client: Socket) { this.logger.log(`Client connected: ${client.id}`); client.emit('ping', { ts: Date.now() }); }
-  handleDisconnect(client: Socket) { this.logger.log(`Client disconnected: ${client.id}`); }
+  handleConnection(client: Socket) {
+    this.logger.log(`Client connected: ${client.id}`);
+    client.emit('ping', { ts: Date.now() });
+  }
+
+  handleDisconnect(client: Socket) {
+    this.logger.log(`Client disconnected: ${client.id}`);
+  }
 
   @SubscribeMessage('driver:location')
   async handleDriverLocation(@ConnectedSocket() client: Socket, @MessageBody() data: { userId: string; lat: number; lng: number; rideId?: string }) {
+    return this.broadcastDriverLocation(client, data);
+  }
+
+  /** Alias mobile — même comportement que driver:location */
+  @SubscribeMessage('ride:location')
+  async handleRideLocation(@ConnectedSocket() client: Socket, @MessageBody() data: { userId: string; lat: number; lng: number; rideId?: string }) {
+    return this.broadcastDriverLocation(client, data);
+  }
+
+  private async broadcastDriverLocation(client: Socket, data: { userId: string; lat: number; lng: number; rideId?: string }) {
     if (data.userId) {
       await fetch(serviceUrl('driver', '/drivers/location'), {
         method: 'POST',
@@ -26,7 +42,11 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
         }),
       );
     }
-    if (data.rideId) this.server.to(`ride:${data.rideId}`).emit('driver:location', { lat: data.lat, lng: data.lng, ts: Date.now() });
+    const payload = { lat: data.lat, lng: data.lng, ts: Date.now() };
+    if (data.rideId) {
+      this.server.to(`ride:${data.rideId}`).emit('driver:location', payload);
+      this.server.to(`ride:${data.rideId}`).emit('ride:location', payload);
+    }
     return { success: true };
   }
 
@@ -34,6 +54,17 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
   handleRideSubscribe(@ConnectedSocket() client: Socket, @MessageBody() data: { rideId: string }) {
     client.join(`ride:${data.rideId}`);
     return { subscribed: data.rideId };
+  }
+
+  @SubscribeMessage('delivery:subscribe')
+  handleDeliverySubscribe(@ConnectedSocket() client: Socket, @MessageBody() data: { deliveryId: string; lat?: number; lng?: number }) {
+    client.join(`delivery:${data.deliveryId}`);
+    if (data.lat != null && data.lng != null) {
+      const payload = { lat: data.lat, lng: data.lng, ts: Date.now() };
+      client.emit('courier:location', payload);
+      this.server.to(`delivery:${data.deliveryId}`).emit('courier:location', payload);
+    }
+    return { subscribed: data.deliveryId, mode: 'mock' };
   }
 
   @SubscribeMessage('ride:status')

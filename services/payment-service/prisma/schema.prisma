@@ -38,6 +38,23 @@ model Payment {
   @@map("payments")
 }
 
+model ServicePayment {
+  id            String        @id @default(uuid())
+  referenceType String
+  referenceId   String
+  userId        String
+  amountCdf     Int
+  method        PaymentMethod
+  status        PaymentStatus @default(PENDING)
+  providerRef   String?
+  failureReason String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@unique([referenceType, referenceId])
+  @@map("service_payments")
+}
+
 model Wallet {
   id         String   @id @default(uuid())
   userId     String   @unique

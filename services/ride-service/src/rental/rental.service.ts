@@ -101,6 +101,35 @@ export class RentalService {
     });
   }
 
+  async listBookings(userId: string) {
+    const rows = await this.prisma.rentalInquiry.findMany({
+      where: { userId, vehicleId: { not: null } },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+      include: { vehicle: true },
+    });
+    return {
+      data: rows.map((r) => ({
+        ...r,
+        paymentReady: r.status === RentalInquiryStatus.CONFIRMED || r.status === RentalInquiryStatus.CONTACTED,
+        priceCdf: r.estimatedPriceCdf,
+        currency: 'CDF',
+      })),
+    };
+  }
+
+  async cancelBooking(id: string, userId: string) {
+    const inquiry = await this.get(id, userId);
+    if (inquiry.status === RentalInquiryStatus.CLOSED) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Cette réservation ne peut plus être annulée.');
+    }
+    return this.prisma.rentalInquiry.update({
+      where: { id },
+      data: { status: RentalInquiryStatus.CLOSED },
+      include: { vehicle: true },
+    });
+  }
+
   async get(id: string, userId: string) {
     const inquiry = await this.prisma.rentalInquiry.findUnique({ where: { id }, include: { vehicle: true } });
     if (!inquiry) throw new MovaHttpException(MovaErrorCode.RENTAL_INQUIRY_NOT_FOUND, HttpStatus.NOT_FOUND);

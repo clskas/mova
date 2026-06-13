@@ -87,4 +87,16 @@ export class CarpoolController {
   leave(@Request() req: { user: { id: string } }, @Param('id') id: string) {
     return this.carpoolService.leave(id, req.user.id);
   }
+
+  @Post(':id/start')
+  @ApiOperation({ summary: 'Démarrer trajet covoiturage (conducteur)' })
+  start(@Request() req: { user: { id: string } }, @Param('id') id: string) {
+    return this.carpoolService.startTrip(id, req.user.id);
+  }
+
+  @Post(':id/complete')
+  @ApiOperation({ summary: 'Terminer trajet covoiturage (conducteur, déclenche paiement)' })
+  complete(@Request() req: { user: { id: string } }, @Param('id') id: string) {
+    return this.carpoolService.completeTrip(id, req.user.id);
+  }
 }

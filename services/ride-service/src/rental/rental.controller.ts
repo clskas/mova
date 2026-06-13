@@ -29,6 +29,24 @@ export class RentalController {
     return this.rentalService.createBooking(req.user.id, dto);
   }
 
+  @Get('bookings')
+  @ApiOperation({ summary: 'Mes réservations véhicules' })
+  bookings(@Request() req: { user: { id: string } }) {
+    return this.rentalService.listBookings(req.user.id);
+  }
+
+  @Get('bookings/:id')
+  @ApiOperation({ summary: 'Détail réservation véhicule' })
+  getBooking(@Request() req: { user: { id: string } }, @Param('id') id: string) {
+    return this.rentalService.get(id, req.user.id);
+  }
+
+  @Post('bookings/:id/cancel')
+  @ApiOperation({ summary: 'Annuler réservation véhicule' })
+  cancelBooking(@Request() req: { user: { id: string } }, @Param('id') id: string) {
+    return this.rentalService.cancelBooking(id, req.user.id);
+  }
+
   @Post('inquiries')
   @ApiOperation({ summary: 'Soumettre demande de location véhicule' })
   create(@Request() req: { user: { id: string } }, @Body() dto: CreateRentalInquiryDto) {

@@ -12,7 +12,17 @@ export class HistoryService {
 
   async getUnifiedHistory(userId: string, type?: HistoryType, limit = 30) {
     const take = Math.min(Math.max(limit, 1), 100);
-    const items: { type: HistoryType; id: string; status: string; title: string; priceCdf: number; createdAt: string; meta?: Record<string, unknown> }[] = [];
+    const fetchPerType = type ? take : Math.min(take * 3, 100);
+    const items: {
+      type: HistoryType;
+      id: string;
+      status: string;
+      title: string;
+      priceCdf: number;
+      createdAt: string;
+      paymentReady?: boolean;
+      meta?: Record<string, unknown>;
+    }[] = [];
 
     const includeType = (t: HistoryType) => !type || type === t;
 
@@ -20,7 +30,7 @@ export class HistoryService {
       const rides = await this.prisma.ride.findMany({
         where: { passengerId: userId },
         orderBy: { createdAt: 'desc' },
-        take,
+        take: fetchPerType,
       });
       for (const r of rides) {
         const summary = toRideSummary(r);
@@ -31,7 +41,14 @@ export class HistoryService {
           title: `${r.pickupAddress ?? 'Départ'} → ${r.dropoffAddress ?? 'Arrivée'}`,
           priceCdf: r.finalFareCdf ?? r.estimatedFareCdf ?? summary.priceCdf ?? 0,
           createdAt: r.createdAt.toISOString(),
-          meta: { vehicleType: r.vehicleType, distanceKm: r.distanceKm },
+          paymentReady: r.status === 'COMPLETED',
+          meta: {
+            vehicleType: r.vehicleType,
+            distanceKm: r.distanceKm,
+            pickupAddress: r.pickupAddress,
+            dropoffAddress: r.dropoffAddress,
+            durationMin: r.durationMin,
+          },
         });
       }
     }
@@ -46,8 +63,8 @@ export class HistoryService {
         const deliveries = await this.prisma.delivery.findMany({
           where: { userId, type: { in: [...deliveryTypes] } },
           orderBy: { createdAt: 'desc' },
-          take,
-          include: { restaurant: { select: { name: true } }, events: { orderBy: { createdAt: 'asc' } } },
+          take: fetchPerType,
+          include: { restaurant: { select: { id: true, name: true } }, events: { orderBy: { createdAt: 'asc' } } },
         });
         for (const d of deliveries) {
           const formatted = formatParcelDelivery(d);
@@ -58,7 +75,14 @@ export class HistoryService {
             title: d.type === 'FOOD' ? (d.restaurant?.name ?? 'Repas') : (d.dropoffAddress ?? d.deliveryAddress ?? 'Livraison'),
             priceCdf: d.finalPriceCdf ?? d.estimatedPriceCdf,
             createdAt: d.createdAt.toISOString(),
-            meta: { pickupAddress: d.pickupAddress, dropoffAddress: d.dropoffAddress ?? d.deliveryAddress },
+            paymentReady: d.status === 'DELIVERED',
+            meta: {
+              pickupAddress: d.pickupAddress,
+              dropoffAddress: d.dropoffAddress ?? d.deliveryAddress,
+              photoUrl: d.photoUrl,
+              restaurantName: d.restaurant?.name,
+              timeline: formatted.timeline,
+            },
           });
         }
       }
@@ -68,7 +92,7 @@ export class HistoryService {
       const errands = await this.prisma.errandOrder.findMany({
         where: { userId },
         orderBy: { createdAt: 'desc' },
-        take,
+        take: fetchPerType,
       });
       for (const e of errands) {
         items.push({
@@ -78,7 +102,12 @@ export class HistoryService {
           title: e.description,
           priceCdf: e.estimatedPriceCdf,
           createdAt: e.createdAt.toISOString(),
-          meta: { dropoffAddress: e.dropoffAddress },
+          paymentReady: e.status === 'COMPLETED',
+          meta: {
+            dropoffAddress: e.dropoffAddress,
+            pickupAddress: e.pickupAddress,
+            distanceKm: e.distanceKm,
+          },
         });
       }
     }
@@ -87,7 +116,7 @@ export class HistoryService {
       const scheduled = await this.prisma.scheduledRide.findMany({
         where: { passengerId: userId, status: { not: ScheduledRideStatus.CANCELLED } },
         orderBy: { scheduledAt: 'desc' },
-        take,
+        take: fetchPerType,
       });
       for (const s of scheduled) {
         items.push({
@@ -107,7 +136,7 @@ export class HistoryService {
         where: { userId },
         include: { trip: true },
         orderBy: { createdAt: 'desc' },
-        take,
+        take: fetchPerType,
       });
       for (const p of asPassenger) {
         items.push({
@@ -123,7 +152,7 @@ export class HistoryService {
       const asDriver = await this.prisma.carpoolTrip.findMany({
         where: { driverId: userId },
         orderBy: { createdAt: 'desc' },
-        take,
+        take: fetchPerType,
       });
       for (const t of asDriver) {
         items.push({
@@ -142,7 +171,7 @@ export class HistoryService {
       const rentals = await this.prisma.rentalInquiry.findMany({
         where: { userId },
         orderBy: { createdAt: 'desc' },
-        take,
+        take: fetchPerType,
         include: { vehicle: { select: { name: true, category: true } } },
       });
       for (const r of rentals) {
@@ -162,7 +191,7 @@ export class HistoryService {
       const movings = await this.prisma.movingRequest.findMany({
         where: { userId },
         orderBy: { createdAt: 'desc' },
-        take,
+        take: fetchPerType,
       });
       for (const m of movings) {
         items.push({
@@ -172,7 +201,13 @@ export class HistoryService {
           title: `${m.pickupAddress} → ${m.dropoffAddress}`,
           priceCdf: m.estimatedPriceCdf,
           createdAt: m.createdAt.toISOString(),
-          meta: { volumeM3: m.volumeM3, distanceKm: m.distanceKm },
+          paymentReady: m.status === 'COMPLETED',
+          meta: {
+            volumeM3: m.volumeM3,
+            distanceKm: m.distanceKm,
+            pickupAddress: m.pickupAddress,
+            dropoffAddress: m.dropoffAddress,
+          },
         });
       }
     }

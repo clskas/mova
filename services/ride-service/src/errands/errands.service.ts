@@ -2,6 +2,7 @@ import { HttpStatus, Injectable } from '@nestjs/common';
 import { ErrandOrderStatus, VehicleType } from '@prisma/client';
 import { MovaErrorCode, MovaHttpException } from '@mova/shared';
 import { addressToCoords, DEFAULT_PICKUP } from '../common/address.util';
+import { buildErrandTimeline } from '../deliveries/parcel.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { PricingService } from '../rides/pricing.service';
 import { CreateErrandOrderDto } from './errands.dto';
@@ -122,7 +123,16 @@ export class ErrandsService {
     const order = await this.prisma.errandOrder.findUnique({ where: { id } });
     if (!order) throw new MovaHttpException(MovaErrorCode.ERRAND_NOT_FOUND, HttpStatus.NOT_FOUND);
     if (order.userId !== userId) throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
-    return order;
+    const timeline = buildErrandTimeline(order.status, order.completedAt);
+    return {
+      ...order,
+      timeline,
+      tracking: timeline,
+      paymentReady: order.status === ErrandOrderStatus.COMPLETED,
+      priceCdf: order.estimatedPriceCdf,
+      currency: 'CDF',
+      city: 'Kinshasa',
+    };
   }
 
   async cancel(id: string, userId: string) {
@@ -151,6 +161,12 @@ export class ErrandsService {
     const updates: Record<string, unknown> = { status };
     if (status === ErrandOrderStatus.COMPLETED) updates.completedAt = new Date();
     if (status === ErrandOrderStatus.CANCELLED) updates.cancelledAt = new Date();
-    return this.prisma.errandOrder.update({ where: { id }, data: updates });
+    const updated = await this.prisma.errandOrder.update({ where: { id }, data: updates });
+    const timeline = buildErrandTimeline(updated.status, updated.completedAt);
+    return {
+      order: updated,
+      timeline,
+      paymentReady: status === ErrandOrderStatus.COMPLETED,
+    };
   }
 }

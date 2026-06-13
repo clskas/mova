@@ -55,6 +55,12 @@ export class WalletController {
     return this.walletService.topUp(req.user.id, dto.amountCdf, dto.provider ?? 'MOCK');
   }
 
+  @Post('topup')
+  @ApiOperation({ summary: 'Alias recharge portefeuille' })
+  topUpAlias(@Request() req: { user: { id: string } }, @Body() dto: TopUpDto) {
+    return this.walletService.topUp(req.user.id, dto.amountCdf, dto.provider ?? 'MOCK');
+  }
+
   @Post('pay')
   @ApiOperation({ summary: 'Payer un service depuis le portefeuille' })
   pay(@Request() req: { user: { id: string } }, @Body() dto: PayFromWalletDto) {

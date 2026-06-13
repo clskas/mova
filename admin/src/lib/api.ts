@@ -252,7 +252,7 @@ function mockFor<T>(path: string, init?: RequestInit): T {
     return [
       { id: "1", phone: "+243812345678", role: "PASSENGER", status: "ACTIVE", firstName: "Marie", lastName: "K." },
       { id: "2", phone: "+243998765432", role: "DRIVER", status: "ACTIVE", firstName: "Jean", lastName: "M." },
-      { id: "3", phone: "+243900000001", role: "ADMIN", status: "ACTIVE", firstName: "Admin", lastName: "MOVA" },
+      { id: "3", phone: "+243900000001", role: "SUPER_ADMIN", status: "ACTIVE", firstName: "Admin", lastName: "MOVA" },
     ] as T;
   }
   if (path.match(/\/drivers\/[^/?]+/) && method === "GET") {
@@ -551,6 +551,10 @@ export async function saveRestaurant(data: Partial<Restaurant>, id?: string) {
     return apiFetch<Restaurant>(`/api/admin/restaurants/${id}`, { method: "PATCH", body: JSON.stringify(data) });
   }
   return apiFetch<Restaurant>("/api/admin/restaurants", { method: "POST", body: JSON.stringify(data) });
+}
+
+export async function deleteRestaurant(id: string) {
+  return apiFetch(`/api/admin/restaurants/${id}`, { method: "DELETE" });
 }
 
 export async function fetchCurrentUser(): Promise<AdminSessionUser> {

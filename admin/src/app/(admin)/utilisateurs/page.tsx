@@ -159,20 +159,21 @@ export default function UtilisateursPage() {
           <div className="space-y-4">
             <p className="text-xs text-gray-400">ID: {selected.id}</p>
             <div className="grid sm:grid-cols-2 gap-4">
-              <label><FieldLabel>Prénom</FieldLabel><TextInput value={editFirst} onChange={setEditFirst} /></label>
-              <label><FieldLabel>Nom</FieldLabel><TextInput value={editLast} onChange={setEditLast} /></label>
-              <label><FieldLabel>Téléphone</FieldLabel><TextInput value={editPhone} onChange={setEditPhone} /></label>
+              <label><FieldLabel>Prénom</FieldLabel><TextInput value={editFirst} onChange={setEditFirst} disabled={readOnly} /></label>
+              <label><FieldLabel>Nom</FieldLabel><TextInput value={editLast} onChange={setEditLast} disabled={readOnly} /></label>
+              <label><FieldLabel>Téléphone</FieldLabel><TextInput value={editPhone} onChange={setEditPhone} disabled={readOnly} /></label>
               <label>
                 <FieldLabel>Rôle</FieldLabel>
-                <SelectInput value={editRole} onChange={setEditRole} options={[
+                <SelectInput value={editRole} onChange={setEditRole} disabled={readOnly} options={[
                   { value: "PASSENGER", label: "Passager" },
                   { value: "DRIVER", label: "Chauffeur" },
                   { value: "ADMIN", label: "Admin" },
+                  { value: "SUPER_ADMIN", label: "Super admin" },
                 ]} />
               </label>
               <label>
                 <FieldLabel>Statut</FieldLabel>
-                <SelectInput value={editStatus} onChange={setEditStatus} options={[
+                <SelectInput value={editStatus} onChange={setEditStatus} disabled={readOnly} options={[
                   { value: "ACTIVE", label: "Actif" },
                   { value: "SUSPENDED", label: "Suspendu" },
                   { value: "PENDING_KYC", label: "KYC en attente" },

@@ -14,6 +14,12 @@ import {
   type AdminSection,
 } from "@/lib/rbac";
 
+function resolveStaffRole(meRole?: string | null, token?: string | null): AdminRole | null {
+  const fromMe = normalizeAdminRole(meRole);
+  const fromJwt = normalizeAdminRole(roleFromToken(token));
+  return fromMe ?? fromJwt;
+}
+
 type AdminContextValue = {
   user: AdminSessionUser | null;
   role: AdminRole | null;
@@ -42,7 +48,7 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
     const jwtRole = normalizeAdminRole(roleFromToken(token));
     try {
       const me = await fetchCurrentUser();
-      const role = normalizeAdminRole(me.role) ?? jwtRole;
+      const role = resolveStaffRole(me.role, token);
       if (!role) {
         setUser(null);
         return;

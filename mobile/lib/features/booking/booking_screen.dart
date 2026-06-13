@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 import '../../core/api/api_client.dart';
 import '../../core/location/location_service.dart';
-import '../../core/location/service_area_prefs.dart';
 import '../../core/config/market_config.dart';
 import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
@@ -105,8 +104,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
     }
     setState(() => _loadingSuggestions = true);
     final api = ref.read(apiClientProvider);
-    final city = ref.read(selectedServiceAreaProvider).name;
-    final result = await api.geoAutocomplete(query, city: city);
+    final result = await api.geoAutocomplete(query);
     if (!mounted) return;
     setState(() {
       _loadingSuggestions = false;

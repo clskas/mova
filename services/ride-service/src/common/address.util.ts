@@ -121,20 +121,39 @@ export function addressToCoordsForArea(
 
 export const DEFAULT_PICKUP = MARKET_RDC.defaultCoords;
 
+export type ServiceAreaPair = {
+  pickupArea: ServiceArea;
+  dropoffArea: ServiceArea;
+  isInterCity: boolean;
+};
+
+/** Valide départ et destination dans des zones MOVA (même ville ou inter-villes RDC). */
+export function assertServiceAreaPair(
+  pickupLat: number,
+  pickupLng: number,
+  dropoffLat: number,
+  dropoffLng: number,
+): ServiceAreaPair {
+  const pickupArea = assertServiceAreaCoords(pickupLat, pickupLng);
+  const dropoffArea = assertServiceAreaCoords(dropoffLat, dropoffLng);
+  return {
+    pickupArea,
+    dropoffArea,
+    isInterCity: pickupArea.id !== dropoffArea.id,
+  };
+}
+
+/** @deprecated Alias — utiliser assertServiceAreaPair */
 export function assertSameServiceArea(
   pickupLat: number,
   pickupLng: number,
   dropoffLat: number,
   dropoffLng: number,
 ): ServiceArea {
-  const pickupArea = assertServiceAreaCoords(pickupLat, pickupLng);
-  const dropoffArea = assertServiceAreaCoords(dropoffLat, dropoffLng);
-  if (pickupArea.id !== dropoffArea.id) {
-    throw new MovaHttpException(
-      MovaErrorCode.VALIDATION_ERROR,
-      undefined,
-      `Le départ et la destination doivent être dans la même ville (${pickupArea.name}).`,
-    );
-  }
-  return pickupArea;
+  return assertServiceAreaPair(pickupLat, pickupLng, dropoffLat, dropoffLng).pickupArea;
+}
+
+export function interCitySurchargeCdf(distanceKm: number): number {
+  const { baseSurchargeCdf, perKmSurchargeCdf } = MARKET_RDC.interCity;
+  return Math.ceil(baseSurchargeCdf + distanceKm * perKmSurchargeCdf);
 }

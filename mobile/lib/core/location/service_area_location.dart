@@ -91,18 +91,24 @@ class ServiceAreaLocation {
     String? areaId,
   }) {
     if (isInBounds(coords, areaId: areaId)) return coords;
+    if (isInBounds(coords)) return coords;
     if (address != null && address.trim().isNotEmpty) {
-      final fromAddress = districtFromAddress(address, areaId: areaId);
-      if (fromAddress != null) return fromAddress;
-      if (addressMentionsArea(address, areaId: areaId)) {
-        return coordsFromAddress(address, areaId: areaId);
+      final byName = ServiceAreas.byName(address);
+      final resolvedAreaId = areaId ?? byName?.id;
+      final fromDistrict = districtFromAddress(address, areaId: resolvedAreaId);
+      if (fromDistrict != null) return fromDistrict;
+      if (byName != null) {
+        return coordsFromAddress(address, areaId: byName.id);
+      }
+      if (addressMentionsArea(address, areaId: resolvedAreaId)) {
+        return coordsFromAddress(address, areaId: resolvedAreaId);
       }
     }
     return centerFor(areaId);
   }
 
   static String outOfAreaMessage() =>
-      'MOVA couvre ${ServiceAreas.coverageMessage()}. Choisissez une adresse dans une ville desservie.';
+      'MOVA couvre ${ServiceAreas.coverageMessage()}. Choisissez une adresse dans une ville desservie en RDC.';
 
   /// @deprecated Utiliser [districtFromAddress]
   static LatLng? communeFromAddress(String address, {String? areaId}) =>

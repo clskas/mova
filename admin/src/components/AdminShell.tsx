@@ -23,7 +23,7 @@ import {
 import { DemoBadge } from "@/components/ui";
 import { checkGatewayHealth } from "@/lib/api";
 import { clearToken, getToken } from "@/lib/auth";
-import { navForRole, ROLE_LABELS, roleBadgeClass, type NavItem } from "@/lib/rbac";
+import { navForRole, ROLE_LABELS, roleBadgeClass, canWriteSection, type NavItem } from "@/lib/rbac";
 
 const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   "/": MetricsIcon,
@@ -52,6 +52,7 @@ function ShellInner({ children }: { children: React.ReactNode }) {
   }, []);
 
   const nav: NavItem[] = role ? navForRole(role) : [];
+  const hasWriteAccess = role ? nav.some((item) => canWriteSection(role, item.section)) : false;
 
   return (
     <div className="min-h-screen flex">
@@ -104,6 +105,11 @@ function ShellInner({ children }: { children: React.ReactNode }) {
             {role && (
               <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${roleBadgeClass(role)}`}>
                 {ROLE_LABELS[role]}
+              </span>
+            )}
+            {role && !loading && (
+              <span className={`text-xs px-2.5 py-1 rounded-full hidden sm:inline ${hasWriteAccess ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-600"}`}>
+                {hasWriteAccess ? "CRUD actif" : "Lecture seule"}
               </span>
             )}
             {user?.firstName && (

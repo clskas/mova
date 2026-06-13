@@ -1,9 +1,8 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { MovingRequestStatus, SurchargeType, VehicleType } from '@prisma/client';
 import { MovaErrorCode, MovaHttpException, formatCdf } from '@mova/shared';
-import { assertServiceAreaCoords, buildMovingTimeline } from '../deliveries/parcel.util';
-import { assertSameServiceArea } from '../common/address.util';
-import { findServiceAreaByCoords, MARKET_RDC } from '@mova/shared';
+import { buildMovingTimeline } from '../deliveries/parcel.util';
+import { assertServiceAreaPair } from '../common/address.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { PricingService } from '../rides/pricing.service';
 import { SurchargeService } from '../rides/surcharge.service';
@@ -18,26 +17,32 @@ export class MovingService {
   ) {}
 
   private validateCoords(dto: EstimateMovingDto) {
-    assertServiceAreaCoords(dto.pickupLat, dto.pickupLng);
-    assertServiceAreaCoords(dto.dropoffLat, dto.dropoffLng);
-    assertSameServiceArea(dto.pickupLat, dto.pickupLng, dto.dropoffLat, dto.dropoffLng);
+    assertServiceAreaPair(dto.pickupLat, dto.pickupLng, dto.dropoffLat, dto.dropoffLng);
   }
 
   async estimate(dto: EstimateMovingDto) {
-    this.validateCoords(dto);
+    const { pickupArea, dropoffArea, isInterCity } = assertServiceAreaPair(
+      dto.pickupLat,
+      dto.pickupLng,
+      dto.dropoffLat,
+      dto.dropoffLng,
+    );
     const moving = await this.surcharges.get(SurchargeType.MOVING);
     const distanceKm = this.pricing.haversineKm(dto.pickupLat, dto.pickupLng, dto.dropoffLat, dto.dropoffLng);
     const durationMin = (distanceKm / 15) * 60;
-    const city = findServiceAreaByCoords(dto.pickupLat, dto.pickupLng)?.name ?? MARKET_RDC.defaultCity;
-    const fare = await this.pricing.estimateFare(VehicleType.STANDARD, distanceKm, durationMin, city);
+    const fare = await this.pricing.estimateFare(VehicleType.STANDARD, distanceKm, durationMin, pickupArea.name);
+    const withInterCity = this.pricing.withInterCitySurcharge(fare, isInterCity, distanceKm);
     const perM3 = moving.perUnitCdf ?? 8000;
     const volumeFee = Math.ceil(dto.volumeM3 * perM3);
-    const estimatedPriceCdf = Math.ceil(fare.estimatedFareCdf * moving.multiplier + moving.baseFeeCdf + volumeFee);
+    const estimatedPriceCdf = Math.ceil(withInterCity.estimatedFareCdf * moving.multiplier + moving.baseFeeCdf + volumeFee);
     return {
       estimatedPriceCdf,
       formatted: formatCdf(estimatedPriceCdf),
       currency: 'CDF',
-      city: 'Kinshasa',
+      city: pickupArea.name,
+      pickupCity: pickupArea.name,
+      dropoffCity: dropoffArea.name,
+      isInterCity,
       volumeM3: dto.volumeM3,
       volumeFeeCdf: volumeFee,
       baseFeeCdf: moving.baseFeeCdf,

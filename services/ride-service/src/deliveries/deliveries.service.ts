@@ -5,7 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { PricingService } from '../rides/pricing.service';
 import { SurchargeService } from '../rides/surcharge.service';
 import { CreateFoodDeliveryDto, CreateParcelDeliveryDto } from './deliveries.dto';
-import { assertServiceAreaCoords, assertSameServiceArea } from '../common/address.util';
+import { assertServiceAreaPair } from '../common/address.util';
 import {
   buildParcelTimeline,
   detectCommune,
@@ -37,9 +37,7 @@ export class DeliveriesService {
   ) {}
 
   private validateParcelDto(dto: CreateParcelDeliveryDto) {
-    assertServiceAreaCoords(dto.pickupLat, dto.pickupLng);
-    assertServiceAreaCoords(dto.dropoffLat, dto.dropoffLng);
-    assertSameServiceArea(dto.pickupLat, dto.pickupLng, dto.dropoffLat, dto.dropoffLng);
+    assertServiceAreaPair(dto.pickupLat, dto.pickupLng, dto.dropoffLat, dto.dropoffLng);
     if (!dto.pickupAddress?.trim() || !dto.dropoffAddress?.trim()) {
       throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Les adresses d\'enlèvement et de livraison sont obligatoires.');
     }
@@ -61,16 +59,23 @@ export class DeliveriesService {
 
   async estimateParcel(dto: CreateParcelDeliveryDto) {
     this.validateParcelDto(dto);
+    const { pickupArea, dropoffArea, isInterCity } = assertServiceAreaPair(
+      dto.pickupLat,
+      dto.pickupLng,
+      dto.dropoffLat,
+      dto.dropoffLng,
+    );
     const weightCategory = this.resolveWeightCategory(dto);
     const distanceKm = this.pricing.haversineKm(dto.pickupLat, dto.pickupLng, dto.dropoffLat, dto.dropoffLng);
     const durationMin = (distanceKm / 20) * 60;
-    const fare = await this.pricing.estimateFare(VehicleType.STANDARD, distanceKm, durationMin);
+    const fare = await this.pricing.estimateFare(VehicleType.STANDARD, distanceKm, durationMin, pickupArea.name);
+    const withInterCity = this.pricing.withInterCitySurcharge(fare, isInterCity, distanceKm);
     const multiplier = this.weightMultiplier(weightCategory, dto.weightKg);
-    const estimatedPriceCdf = Math.ceil(fare.estimatedFareCdf * multiplier);
+    const estimatedPriceCdf = Math.ceil(withInterCity.estimatedFareCdf * multiplier);
     const pickupCommune = detectCommune(dto.pickupLat, dto.pickupLng, dto.pickupAddress);
     const dropoffCommune = detectCommune(dto.dropoffLat, dto.dropoffLng, dto.dropoffAddress);
     return {
-      ...fare,
+      ...withInterCity,
       weightCategory,
       weightKg: dto.weightKg,
       weightMultiplier: multiplier,
@@ -79,14 +84,17 @@ export class DeliveriesService {
       formatted: formatCdf(estimatedPriceCdf),
       formattedPrice: formatCdf(estimatedPriceCdf),
       currency: 'CDF',
-      city: 'Kinshasa',
+      city: pickupArea.name,
+      pickupCity: pickupArea.name,
+      dropoffCity: dropoffArea.name,
+      isInterCity,
       pickupCommune,
       dropoffCommune,
       priceBreakdown: {
-        baseFareCdf: fare.baseFareCdf,
-        distanceFareCdf: fare.distanceFareCdf,
-        durationFareCdf: fare.durationFareCdf,
-        weightSurchargeCdf: Math.max(0, estimatedPriceCdf - fare.estimatedFareCdf),
+        baseFareCdf: withInterCity.baseFareCdf,
+        distanceFareCdf: withInterCity.distanceFareCdf,
+        durationFareCdf: withInterCity.durationFareCdf,
+        weightSurchargeCdf: Math.max(0, estimatedPriceCdf - withInterCity.estimatedFareCdf),
         totalCdf: estimatedPriceCdf,
       },
       distanceKm,

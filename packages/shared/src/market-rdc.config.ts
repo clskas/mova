@@ -53,6 +53,12 @@ export const MARKET_RDC = {
   ],
   nightHours: { start: 22, end: 5 },
 
+  /** Majoration livraison / course inter-villes (départ et arrivée dans des zones MOVA différentes). */
+  interCity: {
+    baseSurchargeCdf: 15_000,
+    perKmSurchargeCdf: 500,
+  },
+
   support: {
     whatsapp: '+243900000000',
     phone: '+243900000000',

@@ -1,7 +1,7 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { ScheduledRideStatus, VehicleType } from '@prisma/client';
-import { MovaErrorCode, MovaHttpException } from '@mova/shared';
-import { addressToCoords, assertServiceAreaCoords, assertServiceAreaDestination, assertSameServiceArea, DEFAULT_PICKUP } from '../common/address.util';
+import { MovaErrorCode, MovaHttpException, findServiceAreaByCoords, MARKET_RDC } from '@mova/shared';
+import { assertServiceAreaCoords, assertServiceAreaDestination, assertServiceAreaPair, addressToCoords, DEFAULT_PICKUP } from '../common/address.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { PricingService } from './pricing.service';
 import { CreateScheduledRideDto } from './scheduled-rides.dto';
@@ -40,8 +40,8 @@ export class ScheduledRidesService {
       dto.dropoffLat != null && dto.dropoffLng != null
         ? { lat: dto.dropoffLat, lng: dto.dropoffLng }
         : addressToCoords(dto.dropoffAddress);
-    assertSameServiceArea(pickup.lat, pickup.lng, dropoff.lat, dropoff.lng);
-    return { pickup, dropoff };
+    const { isInterCity } = assertServiceAreaPair(pickup.lat, pickup.lng, dropoff.lat, dropoff.lng);
+    return { pickup, dropoff, isInterCity };
   }
 
   private validateScheduledAt(scheduledAt: Date) {
@@ -55,7 +55,7 @@ export class ScheduledRidesService {
   async create(passengerId: string, dto: CreateScheduledRideDto) {
     const scheduledAt = new Date(dto.scheduledAt);
     this.validateScheduledAt(scheduledAt);
-    const { pickup, dropoff } = this.resolveScheduledCoords({
+    const { pickup, dropoff, isInterCity } = this.resolveScheduledCoords({
       pickupLat: dto.pickupLat,
       pickupLng: dto.pickupLng,
       dropoffLat: dto.dropoffLat,
@@ -64,7 +64,9 @@ export class ScheduledRidesService {
     });
     const distanceKm = this.pricing.haversineKm(pickup.lat, pickup.lng, dropoff.lat, dropoff.lng);
     const durationMin = (distanceKm / 25) * 60;
-    const estimate = await this.pricing.estimateFare(dto.vehicleType, distanceKm, durationMin);
+    const city = findServiceAreaByCoords(pickup.lat, pickup.lng)?.name ?? MARKET_RDC.defaultCity;
+    const fare = await this.pricing.estimateFare(dto.vehicleType, distanceKm, durationMin, city);
+    const estimate = this.pricing.withInterCitySurcharge(fare, isInterCity, distanceKm);
     const ride = await this.prisma.scheduledRide.create({
       data: {
         passengerId,
@@ -148,21 +150,24 @@ export class ScheduledRidesService {
     return this.prisma.scheduledRide.update({ where: { id }, data: { status } });
   }
 
-  /** Compatibilité mobile — coords pickup/dropoff optionnelles (validées Kinshasa). */
+  /** Compatibilité mobile — coords pickup/dropoff optionnelles (zones MOVA nationales). */
   async estimateMobile(dto: MobileScheduledEstimateDto) {
     const when = new Date(dto.scheduledAt);
     this.validateScheduledAt(when);
     const vehicleType = this.parseVehicleType(dto.vehicleType);
-    const { pickup, dropoff } = this.resolveScheduledCoords(dto);
+    const { pickup, dropoff, isInterCity } = this.resolveScheduledCoords(dto);
     const distanceKm = this.pricing.haversineKm(pickup.lat, pickup.lng, dropoff.lat, dropoff.lng);
     const durationMin = (distanceKm / 25) * 60;
-    const estimate = await this.pricing.estimateFare(vehicleType, distanceKm, durationMin);
+    const city = findServiceAreaByCoords(pickup.lat, pickup.lng)?.name ?? MARKET_RDC.defaultCity;
+    const fare = await this.pricing.estimateFare(vehicleType, distanceKm, durationMin, city);
+    const estimate = this.pricing.withInterCitySurcharge(fare, isInterCity, distanceKm);
     return {
       estimatedPriceCdf: estimate.estimatedFareCdf,
       formatted: estimate.formatted,
       currency: 'CDF',
       distanceKm,
       durationMin,
+      isInterCity,
     };
   }
 }

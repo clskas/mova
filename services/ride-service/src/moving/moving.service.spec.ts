@@ -4,7 +4,8 @@ import { PricingService } from '../rides/pricing.service';
 describe('MovingService', () => {
   const pricing = {
     haversineKm: jest.fn().mockReturnValue(10),
-    estimateFare: jest.fn().mockResolvedValue({ estimatedFareCdf: 12000 }),
+    estimateFare: jest.fn().mockResolvedValue({ estimatedFareCdf: 12000, totalCdf: 12000, surchargeCdf: 0 }),
+    withInterCitySurcharge: jest.fn().mockImplementation((fare) => fare),
   } as unknown as PricingService;
 
   const prisma = {

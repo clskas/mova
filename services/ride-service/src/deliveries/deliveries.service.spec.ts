@@ -5,8 +5,11 @@ import { MovaHttpException } from '@mova/shared';
 
 describe('DeliveriesService', () => {
   const pricing = {
-    haversineKm: jest.fn().mockReturnValue(5),
-    estimateFare: jest.fn().mockResolvedValue({ estimatedFareCdf: 10000, formatted: '10 000 FC' }),
+    haversineKm: jest.fn().mockReturnValue(1600),
+    estimateFare: jest.fn().mockResolvedValue({ estimatedFareCdf: 10000, formatted: '10 000 FC', totalCdf: 10000, surchargeCdf: 0 }),
+    withInterCitySurcharge: jest.fn().mockImplementation((fare, isInterCity) =>
+      isInterCity ? { ...fare, estimatedFareCdf: fare.estimatedFareCdf + 20000, totalCdf: fare.totalCdf + 20000 } : fare,
+    ),
   } as unknown as PricingService;
 
   const prisma = {
@@ -54,7 +57,25 @@ describe('DeliveriesService', () => {
     expect(result.estimatedPriceCdf).toBe(15000);
     expect(result.currency).toBe('CDF');
     expect(result.city).toBe('Kinshasa');
+    expect(result.isInterCity).toBe(false);
     expect(result.priceBreakdown).toBeDefined();
+  });
+
+  it('accepte et majore un colis inter-villes', async () => {
+    (pricing.haversineKm as jest.Mock).mockReturnValueOnce(1600);
+    const result = await service.estimateParcel({
+      pickupLat: -4.3217,
+      pickupLng: 15.3125,
+      pickupAddress: 'Gombe, Kinshasa',
+      dropoffLat: -11.6647,
+      dropoffLng: 27.4794,
+      dropoffAddress: 'Centre, Lubumbashi',
+      weightCategory: 'DOCUMENTS',
+    });
+    expect(result.isInterCity).toBe(true);
+    expect(result.pickupCity).toBe('Kinshasa');
+    expect(result.dropoffCity).toBe('Lubumbashi');
+    expect(result.estimatedPriceCdf).toBeGreaterThan(20000);
   });
 
   it('calcule le total repas = articles + frais livraison', async () => {

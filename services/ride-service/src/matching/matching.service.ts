@@ -15,6 +15,11 @@ export interface DriverCandidate {
 
 @Injectable()
 export class MatchingService {
+  /**
+   * Recherche chauffeurs autour du point de départ.
+   * Courses inter-villes : matching initial à la ville de départ ; le trajet longue distance
+   * est traité comme course planifiée / long-haul côté dispatch.
+   */
   async findDrivers(lat: number, lng: number, vehicleType: VehicleType, searchAttempt = 0): Promise<DriverCandidate[]> {
     const city = findServiceAreaByCoords(lat, lng)?.name ?? MARKET_RDC.defaultCity;
     const url = serviceUrl(

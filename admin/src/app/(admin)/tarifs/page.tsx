@@ -74,10 +74,10 @@ function EditableRow({
   return (
     <tr className="border-b">
       <td className="p-3 font-medium">{label}</td>
-      <td className="p-2"><TextInput value={base} onChange={setBase} type="number" className="!p-2" /></td>
-      <td className="p-2"><TextInput value={km} onChange={setKm} type="number" className="!p-2" /></td>
-      <td className="p-2"><TextInput value={min} onChange={setMin} type="number" className="!p-2" /></td>
-      <td className="p-2"><TextInput value={minFare} onChange={setMinFare} type="number" className="!p-2" /></td>
+      <td className="p-2"><TextInput value={base} onChange={setBase} type="number" className="!p-2" disabled={readOnly} /></td>
+      <td className="p-2"><TextInput value={km} onChange={setKm} type="number" className="!p-2" disabled={readOnly} /></td>
+      <td className="p-2"><TextInput value={min} onChange={setMin} type="number" className="!p-2" disabled={readOnly} /></td>
+      <td className="p-2"><TextInput value={minFare} onChange={setMinFare} type="number" className="!p-2" disabled={readOnly} /></td>
       <td className="p-3 text-gray-500 text-xs hidden md:table-cell">
         min {formatCdf(Number(minFare))}
       </td>

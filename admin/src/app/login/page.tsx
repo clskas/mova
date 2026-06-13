@@ -37,7 +37,7 @@ export default function LoginPage() {
       }
       const role = normalizeAdminRole(data.user?.role);
       if (!role) {
-        throw new Error("Ce compte n'a pas un rôle staff autorisé (ADMIN, SUPPORT, FINANCE, CONTENT).");
+        throw new Error("Ce compte n'a pas un rôle staff autorisé (SUPER_ADMIN, ADMIN, SUPPORT, FINANCE, CONTENT).");
       }
       setToken(data.accessToken);
       router.replace(defaultPathForRole(role));

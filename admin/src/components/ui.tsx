@@ -172,21 +172,22 @@ export function FieldLabel({ children }: { children: React.ReactNode }) {
   return <span className="block text-sm text-gray-600 mb-1">{children}</span>;
 }
 
-export function TextInput({ value, onChange, type = "text", placeholder, className = "" }: { value: string; onChange: (v: string) => void; type?: string; placeholder?: string; className?: string }) {
+export function TextInput({ value, onChange, type = "text", placeholder, className = "", disabled }: { value: string; onChange: (v: string) => void; type?: string; placeholder?: string; className?: string; disabled?: boolean }) {
   return (
     <input
       type={type}
-      className={`w-full rounded-xl border border-gray-200 p-3 text-sm ${className}`}
+      className={`w-full rounded-xl border border-gray-200 p-3 text-sm disabled:bg-gray-50 disabled:text-gray-500 ${className}`}
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
+      disabled={disabled}
     />
   );
 }
 
-export function SelectInput({ value, onChange, options }: { value: string; onChange: (v: string) => void; options: { value: string; label: string }[] }) {
+export function SelectInput({ value, onChange, options, disabled }: { value: string; onChange: (v: string) => void; options: { value: string; label: string }[]; disabled?: boolean }) {
   return (
-    <select className="w-full rounded-xl border border-gray-200 p-3 text-sm bg-white" value={value} onChange={(e) => onChange(e.target.value)}>
+    <select className="w-full rounded-xl border border-gray-200 p-3 text-sm bg-white disabled:bg-gray-50 disabled:text-gray-500" value={value} onChange={(e) => onChange(e.target.value)} disabled={disabled}>
       {options.map((o) => (
         <option key={o.value} value={o.value}>{o.label}</option>
       ))}

@@ -1,6 +1,15 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { VehicleType } from '@prisma/client';
-import { buildFareBreakdown, FareBreakdown, findServiceAreaByCoords, MARKET_RDC, MovaErrorCode, MovaHttpException } from '@mova/shared';
+import {
+  buildFareBreakdown,
+  FareBreakdown,
+  findServiceAreaByCoords,
+  formatCdf,
+  MARKET_RDC,
+  MovaErrorCode,
+  MovaHttpException,
+} from '@mova/shared';
+import { interCitySurchargeCdf } from '../common/address.util';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -58,5 +67,22 @@ export class PricingService {
     const dLng = ((lng2 - lng1) * Math.PI) / 180;
     const a = Math.sin(dLat / 2) ** 2 + Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+
+  /** Majoration inter-villes appliquée sur une estimation existante. */
+  withInterCitySurcharge(fare: FareBreakdown, isInterCity: boolean, distanceKm: number): FareBreakdown {
+    if (!isInterCity) return fare;
+    const interCityCdf = interCitySurchargeCdf(distanceKm);
+    const totalCdf = fare.totalCdf + interCityCdf;
+    const totalFormatted = formatCdf(totalCdf);
+    return {
+      ...fare,
+      surchargeCdf: fare.surchargeCdf + interCityCdf,
+      totalCdf,
+      totalFormatted,
+      formatted: totalFormatted,
+      estimatedFareCdf: totalCdf,
+      estimatedPriceCdf: totalCdf,
+    };
   }
 }

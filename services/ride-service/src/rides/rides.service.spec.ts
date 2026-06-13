@@ -33,6 +33,7 @@ describe('RidesService', () => {
       currency: 'CDF',
       surchargeMultiplier: 1,
     }),
+    withInterCitySurcharge: jest.fn().mockImplementation((fare) => fare),
   };
   const matching = {
     findDrivers: jest.fn().mockResolvedValue([]),

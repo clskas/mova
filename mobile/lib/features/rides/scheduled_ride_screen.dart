@@ -181,7 +181,7 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
             return null;
           }
         }
-        return 'MOVA ne couvre que Kinshasa. Choisissez une destination dans une commune de Kinshasa.';
+        return 'MOVA couvre les principales villes de RDC. Choisissez une destination dans une ville desservie.';
       }
       _dropoff = KinshasaLocation.ensureInKinshasa(
         resolved,
@@ -192,7 +192,7 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
       coords: _dropoff,
       fromSuggestion: _dropoffFromSuggestion,
     )) {
-      return 'MOVA ne couvre que Kinshasa. Choisissez une destination dans une commune de Kinshasa.';
+      return 'MOVA couvre les principales villes de RDC. Choisissez une destination dans une ville desservie.';
     }
     return null;
   }

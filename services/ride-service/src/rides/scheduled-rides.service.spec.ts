@@ -6,7 +6,8 @@ import { PricingService } from './pricing.service';
 describe('ScheduledRidesService', () => {
   const pricing = {
     haversineKm: jest.fn().mockReturnValue(3),
-    estimateFare: jest.fn().mockResolvedValue({ estimatedFareCdf: 8000 }),
+    estimateFare: jest.fn().mockResolvedValue({ estimatedFareCdf: 8000, totalCdf: 8000, formatted: '8 000 FC', surchargeCdf: 0 }),
+    withInterCitySurcharge: jest.fn().mockImplementation((fare) => fare),
   } as unknown as PricingService;
 
   const prisma = {
@@ -91,6 +92,26 @@ describe('ScheduledRidesService', () => {
         dropoffLng: 15.3125,
       }),
     ).rejects.toMatchObject({ response: { code: MovaErrorCode.VALIDATION_ERROR } });
+  });
+
+  it('estime une réservation inter-villes Kinshasa → Lubumbashi', async () => {
+    (pricing.haversineKm as jest.Mock).mockReturnValueOnce(1600);
+    (pricing.withInterCitySurcharge as jest.Mock).mockImplementationOnce((fare, isInterCity) =>
+      isInterCity ? { ...fare, estimatedFareCdf: 28000, formatted: '28 000 FC' } : fare,
+    );
+    const scheduledAt = new Date();
+    scheduledAt.setDate(scheduledAt.getDate() + 1);
+    const result = await service.estimateMobile({
+      dropoffAddress: 'Lubumbashi',
+      vehicleType: VehicleType.STANDARD,
+      scheduledAt: scheduledAt.toISOString(),
+      pickupLat: -4.3217,
+      pickupLng: 15.3125,
+      dropoffLat: -11.6647,
+      dropoffLng: 27.4794,
+    });
+    expect(result.isInterCity).toBe(true);
+    expect(result.estimatedPriceCdf).toBe(28000);
   });
 
   it('estime une réservation Kinshasa valide', async () => {

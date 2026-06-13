@@ -54,4 +54,11 @@ Vérifie : health gateway, `flutter test`, `npm run build` (web + admin).
 
 ## Documentation utilisateur
 
-Voir [Manuel utilisateur](manuel-utilisateur.md) pour les guides passager, chauffeur et admin.
+Manuel vivant (source de vérité pour l'aide in-app mobile) :
+
+- [Vue d'ensemble](user-manual/index.md)
+- [Passager](user-manual/passager.md)
+- [Chauffeur](user-manual/chauffeur.md)
+- [Admin](user-manual/admin.md)
+
+Lancer la doc : `mkdocs serve` (après `pip install mkdocs-material`).

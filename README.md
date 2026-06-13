@@ -20,7 +20,7 @@ Mova/
 
 │   ├── auth-service/   # Port 3001 — OTP, users, JWT
 
-│   ├── ride-service/   # Port 3002 — rides, geo, WebSocket GPS
+│   ├── ride-service/   # Port 3022 — rides, geo, WebSocket GPS
 
 │   ├── payment-service/# Port 3003 — wallet, mobile money
 
@@ -94,7 +94,7 @@ docker compose up -d --build
 
 npm run migrate:all
 
-npm run seed:rides
+npm run seed:admin-demo
 
 .\scripts\smoke-gateway.ps1
 
@@ -110,7 +110,7 @@ npm run seed:rides
 
 | Auth | http://localhost:3001/health | `/api/auth/*`, `/api/users/*` |
 
-| Ride | http://localhost:3002/health | `/api/rides/*`, `/api/geo/*`, `/api/ratings/*` |
+| Ride | http://localhost:3022/health | `/api/rides/*`, `/api/geo/*`, `/api/ratings/*` |
 
 | Payment | http://localhost:3003/health | `/api/payments/*`, `/api/wallet/*` |
 
@@ -172,25 +172,36 @@ Ouvrir [http://localhost:3001](http://localhost:3001). Services : taxi, livraiso
 
 
 
-### 5. Admin UI
+### 5. Admin UI (port 3002)
 
-
+L'admin Next.js **n'est pas dans Docker** — il tourne en dev local sur le port **3002** (évite le conflit avec ride-service `:3022`).
 
 ```powershell
+docker compose up -d
+npm run migrate:all
+npm run seed:admin-demo    # admin + utilisateurs/chauffeurs/KYC/livraisons démo
 
 cd admin
-
 Copy-Item .env.example .env.local
-
 npm install
-
 npm run dev
-
 ```
 
+Ouvrir [http://localhost:3002](http://localhost:3002).
 
+| Identifiant | Valeur |
+|-------------|--------|
+| Téléphone admin | `+243900000001` |
+| OTP (dev) | `123456` (`MOCK_OTP=true`) |
 
-Ouvrir [http://localhost:3002](http://localhost:3002). Dashboard métriques, utilisateurs, KYC, litiges, livraisons/planifiées.
+**Dashboard (5 onglets) :** métriques, utilisateurs (lecture), KYC (approuver/rejeter), litiges (résoudre), livraisons & planifiées (lecture).
+
+**Page `/restaurants` :** liste + création (CRUD API complet ; édition via API).
+
+| Variable | Description |
+|----------|-------------|
+| `NEXT_PUBLIC_API_URL` | Passerelle API (défaut `http://localhost:3000`) |
+| `NEXT_PUBLIC_ADMIN_PHONE` | Téléphone prérempli login (défaut `+243900000001`) |
 
 
 
@@ -242,13 +253,9 @@ Vérifie : health gateway, `flutter test`, `npm run build` (web + admin). Option
 
 ## Documentation
 
-
-
-- **Manuel utilisateur** : `docs/manuel-utilisateur.md`
-
-- **MkDocs** : `mkdocs serve` (après `pip install mkdocs-material`)
-
-- Voir aussi `docs/architecture.md`, `docs/api.md`, `docs/cicd.md`
+- **Manuel utilisateur (MkDocs)** : [`docs/user-manual/`](docs/user-manual/index.md) — passager, chauffeur, admin (source de vérité pour l'aide in-app mobile)
+- **MkDocs** : `mkdocs serve` (après `pip install mkdocs-material`) — nav complète dans `mkdocs.yml`
+- **Technique** : [`docs/architecture.md`](docs/architecture.md), [`docs/api.md`](docs/api.md), [`docs/cicd.md`](docs/cicd.md)
 
 
 

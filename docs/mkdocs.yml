@@ -9,11 +9,15 @@ theme:
 
 nav:
   - Accueil: index.md
+  - Manuel utilisateur:
+    - Vue d'ensemble: user-manual/index.md
+    - Passager: user-manual/passager.md
+    - Chauffeur: user-manual/chauffeur.md
+    - Admin: user-manual/admin.md
   - Architecture: architecture.md
   - API: api.md
   - CI/CD: cicd.md
   - Déploiement: deployment.md
-  - Manuel utilisateur: manuel-utilisateur.md
 
 markdown_extensions:
   - admonition

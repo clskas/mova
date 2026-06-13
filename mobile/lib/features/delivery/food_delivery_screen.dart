@@ -22,7 +22,12 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
   final _addressController = TextEditingController(text: 'Ma position, Kinshasa');
   bool _loading = true;
   bool _ordering = false;
+  int? _estimatedTotal;
   String? _error;
+  String? _validationError;
+
+  static const _deliveryLat = MarketConfig.defaultLat;
+  static const _deliveryLng = MarketConfig.defaultLng;
 
   @override
   void initState() {
@@ -36,9 +41,22 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
     super.dispose();
   }
 
+  List<Map<String, dynamic>> _menuItems(Map<String, dynamic> restaurant) {
+    return (restaurant['menuItems'] as List? ?? restaurant['items'] as List? ?? [])
+        .cast<Map<String, dynamic>>();
+  }
+
+  String _itemKey(Map<String, dynamic> item) => item['name']?.toString() ?? '';
+
+  int _itemPrice(Map<String, dynamic> item) =>
+      item['unitPriceCdf'] as int? ?? item['priceCdf'] as int? ?? 0;
+
   Future<void> _loadRestaurants() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     final api = ref.read(apiClientProvider);
-    await api.loadToken();
     await api.checkHealth();
     final result = await api.get('/deliveries/restaurants');
     setState(() {
@@ -53,64 +71,100 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
     });
   }
 
-  int get _cartTotal {
+  int get _cartSubtotal {
     if (_selectedRestaurant == null) return 0;
-    final items = _selectedRestaurant!['items'] as List? ?? [];
+    final items = _menuItems(_selectedRestaurant!);
     var total = 0;
     for (final entry in _cart.entries) {
-      final item = items.cast<Map<String, dynamic>>().firstWhere(
-            (i) => i['id'] == entry.key,
-            orElse: () => {},
-          );
-      total += (item['priceCdf'] as int? ?? 0) * entry.value;
+      final item = items.firstWhere(
+        (i) => _itemKey(i) == entry.key,
+        orElse: () => {},
+      );
+      total += _itemPrice(item) * entry.value;
     }
     return total;
   }
 
-  int get _deliveryFee =>
-      _selectedRestaurant?['deliveryMinCdf'] as int? ?? 3500;
-
-  List<Map<String, dynamic>> _cartItems() {
+  List<Map<String, dynamic>> _cartItemsForApi() {
     if (_selectedRestaurant == null) return [];
-    final items = _selectedRestaurant!['items'] as List? ?? [];
+    final items = _menuItems(_selectedRestaurant!);
     return _cart.entries.map((e) {
-      final item = items.cast<Map<String, dynamic>>().firstWhere(
-            (i) => i['id'] == e.key,
-          );
+      final item = items.firstWhere((i) => _itemKey(i) == e.key);
       return {
-        'id': e.key,
-        'name': item['name'],
-        'priceCdf': item['priceCdf'],
+        'name': _itemKey(item),
         'quantity': e.value,
+        'unitPriceCdf': _itemPrice(item),
       };
     }).toList();
   }
 
-  Future<void> _order() async {
-    if (_cart.isEmpty || _addressController.text.trim().isEmpty) return;
+  Map<String, dynamic> _orderPayload() => {
+        'restaurantId': _selectedRestaurant!['id'],
+        'deliveryAddress': _addressController.text.trim(),
+        'deliveryLat': _deliveryLat,
+        'deliveryLng': _deliveryLng,
+        'items': _cartItemsForApi(),
+      };
+
+  Future<void> _estimateOrder() async {
+    if (_cart.isEmpty) {
+      setState(() => _validationError = 'Ajoutez au moins un plat au panier.');
+      return;
+    }
+    if (_addressController.text.trim().isEmpty) {
+      setState(() => _validationError = 'Indiquez l\'adresse de livraison.');
+      return;
+    }
     setState(() {
       _ordering = true;
       _error = null;
+      _validationError = null;
     });
     final api = ref.read(apiClientProvider);
-    final result = await api.post('/deliveries/food', {
-      'restaurantId': _selectedRestaurant!['id'],
-      'restaurantName': _selectedRestaurant!['name'],
-      'deliveryAddress': _addressController.text.trim(),
-      'items': _cartItems(),
+    final result = await api.post('/deliveries/food/estimate', _orderPayload());
+    setState(() {
+      _ordering = false;
+      switch (result) {
+        case Success(:final data):
+          _estimatedTotal = data['estimatedPriceCdf'] as int?;
+        case Failure(:final error):
+          _error = error.message;
+      }
     });
+  }
+
+  Future<void> _order() async {
+    if (_cart.isEmpty) {
+      setState(() => _validationError = 'Ajoutez au moins un plat au panier.');
+      return;
+    }
+    if (_addressController.text.trim().isEmpty) {
+      setState(() => _validationError = 'Indiquez l\'adresse de livraison.');
+      return;
+    }
+    setState(() {
+      _ordering = true;
+      _error = null;
+      _validationError = null;
+    });
+    final api = ref.read(apiClientProvider);
+    final result = await api.post('/deliveries/food', _orderPayload());
     setState(() => _ordering = false);
     switch (result) {
       case Success(:final data):
         if (mounted) {
-          final order = data['order'] as Map<String, dynamic>?;
+          final delivery = data['delivery'] as Map<String, dynamic>? ??
+              data['order'] as Map<String, dynamic>?;
+          final total = delivery?['estimatedPriceCdf'] as int? ??
+              _estimatedTotal ??
+              _cartSubtotal + 3500;
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
               builder: (_) => FoodTrackingScreen(
-                orderId: order?['id']?.toString() ?? '',
+                orderId: delivery?['id']?.toString() ?? '',
                 restaurantName: _selectedRestaurant!['name']?.toString() ?? '',
-                totalCdf: order?['priceCdf'] as int? ?? _cartTotal + _deliveryFee,
+                totalCdf: total,
                 deliveryAddress: _addressController.text.trim(),
               ),
             ),
@@ -122,6 +176,17 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
   }
 
   Widget _buildRestaurantList() {
+    if (_restaurants.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 24),
+        child: Text(
+          'Aucun restaurant disponible pour le moment.',
+          style: TextStyle(color: MovaColors.textSecondary),
+          textAlign: TextAlign.center,
+        ),
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -137,6 +202,7 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
               onTap: () => setState(() {
                 _selectedRestaurant = r;
                 _cart.clear();
+                _estimatedTotal = null;
               }),
               child: Row(
                 children: [
@@ -168,13 +234,16 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        Text(
-                          'Livraison dès ${MarketConfig.formatCdf(r['deliveryMinCdf'] as int? ?? 3500)}',
-                          style: const TextStyle(
-                            color: MovaColors.violet,
-                            fontSize: 12,
+                        if (r['address'] != null)
+                          Text(
+                            r['address']?.toString() ?? '',
+                            style: const TextStyle(
+                              color: MovaColors.textSecondary,
+                              fontSize: 12,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                        ),
                       ],
                     ),
                   ),
@@ -190,7 +259,14 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
 
   Widget _buildMenu() {
     final restaurant = _selectedRestaurant!;
-    final items = (restaurant['items'] as List? ?? []).cast<Map<String, dynamic>>();
+    final items = _menuItems(restaurant);
+
+    if (items.isEmpty) {
+      return const Text(
+        'Menu indisponible pour ce restaurant.',
+        style: TextStyle(color: MovaColors.textSecondary),
+      );
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -202,6 +278,7 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
               onPressed: () => setState(() {
                 _selectedRestaurant = null;
                 _cart.clear();
+                _estimatedTotal = null;
               }),
             ),
             Expanded(
@@ -216,8 +293,8 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
         ),
         const SizedBox(height: 8),
         ...items.map((item) {
-          final id = item['id'] as String;
-          final qty = _cart[id] ?? 0;
+          final key = _itemKey(item);
+          final qty = _cart[key] ?? 0;
           return Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: MovaCard(
@@ -228,13 +305,13 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          item['name']?.toString() ?? '',
+                          key,
                           style: const TextStyle(fontWeight: FontWeight.w600),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
                         Text(
-                          MarketConfig.formatCdf(item['priceCdf'] as int? ?? 0),
+                          MarketConfig.formatCdf(_itemPrice(item)),
                           style: const TextStyle(color: MovaColors.violet),
                         ),
                       ],
@@ -245,17 +322,21 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
                     onPressed: qty > 0
                         ? () => setState(() {
                               if (qty <= 1) {
-                                _cart.remove(id);
+                                _cart.remove(key);
                               } else {
-                                _cart[id] = qty - 1;
+                                _cart[key] = qty - 1;
                               }
+                              _estimatedTotal = null;
                             })
                         : null,
                   ),
                   Text('$qty', style: const TextStyle(fontWeight: FontWeight.bold)),
                   IconButton(
                     icon: const Icon(Icons.add_circle_outline),
-                    onPressed: () => setState(() => _cart[id] = qty + 1),
+                    onPressed: () => setState(() {
+                      _cart[key] = qty + 1;
+                      _estimatedTotal = null;
+                    }),
                   ),
                 ],
               ),
@@ -270,6 +351,7 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
               labelText: 'Adresse de livraison',
               prefixIcon: Icon(Icons.delivery_dining),
             ),
+            onChanged: (_) => setState(() => _estimatedTotal = null),
           ),
           const SizedBox(height: 12),
           MovaCard(
@@ -279,41 +361,51 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const Text('Sous-total'),
-                    Text(MarketConfig.formatCdf(_cartTotal)),
+                    Text(MarketConfig.formatCdf(_cartSubtotal)),
                   ],
                 ),
-                const SizedBox(height: 4),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text('Livraison'),
-                    Text(MarketConfig.formatCdf(_deliveryFee)),
-                  ],
-                ),
-                const Divider(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text('Total', style: TextStyle(fontWeight: FontWeight.bold)),
-                    Text(
-                      MarketConfig.formatCdf(_cartTotal + _deliveryFee),
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: MovaColors.green,
+                if (_estimatedTotal != null) ...[
+                  const Divider(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Total estimé', style: TextStyle(fontWeight: FontWeight.bold)),
+                      Text(
+                        MarketConfig.formatCdf(_estimatedTotal!),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: MovaColors.green,
+                        ),
                       ),
-                    ),
-                  ],
-                ),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),
-          const SizedBox(height: 16),
-          MovaButton(
-            label: 'Commander',
-            isLoading: _ordering,
-            icon: Icons.shopping_bag_outlined,
-            onPressed: _order,
-          ),
+          if (_validationError != null) ...[
+            const SizedBox(height: 12),
+            MovaErrorBanner(message: _validationError!),
+          ],
+          if (_error != null) ...[
+            const SizedBox(height: 12),
+            MovaErrorBanner(message: _error!, onRetry: _estimateOrder),
+          ],
+          const SizedBox(height: 12),
+          if (_estimatedTotal == null)
+            MovaButton(
+              label: 'Estimer la commande',
+              isLoading: _ordering,
+              icon: Icons.calculate_outlined,
+              onPressed: _estimateOrder,
+            )
+          else
+            MovaButton(
+              label: 'Commander',
+              isLoading: _ordering,
+              icon: Icons.shopping_bag_outlined,
+              onPressed: _order,
+            ),
         ],
       ],
     );
@@ -328,7 +420,7 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
           : Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                if (_error != null) ...[
+                if (_error != null && _selectedRestaurant == null) ...[
                   MovaErrorBanner(message: _error!, onRetry: _loadRestaurants),
                   const SizedBox(height: 16),
                 ],

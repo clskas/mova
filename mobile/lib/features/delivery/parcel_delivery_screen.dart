@@ -1,5 +1,8 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../core/api/api_client.dart';
 import '../../core/config/market_config.dart';
 import '../../core/error/result.dart';
@@ -9,10 +12,10 @@ import '../../core/widgets/mova_widgets.dart';
 import 'parcel_tracking_screen.dart';
 
 const _weightCategories = [
-  ('LIGHT', 'Léger', '< 1 kg'),
+  ('DOCUMENTS', 'Documents', 'Enveloppe, dossier'),
+  ('SMALL', 'Petit colis', '< 1 kg'),
   ('MEDIUM', 'Moyen', '1 – 5 kg'),
-  ('HEAVY', 'Lourd', '5 – 15 kg'),
-  ('VERY_HEAVY', 'Très lourd', '> 15 kg'),
+  ('LARGE', 'Grand', '> 5 kg'),
 ];
 
 class ParcelDeliveryScreen extends ConsumerStatefulWidget {
@@ -25,11 +28,18 @@ class ParcelDeliveryScreen extends ConsumerStatefulWidget {
 class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
   final _pickupController = TextEditingController(text: 'Ma position, Kinshasa');
   final _dropoffController = TextEditingController();
-  String _weightCategory = 'LIGHT';
-  bool _hasPhoto = false;
+  final _picker = ImagePicker();
+  String _weightCategory = 'DOCUMENTS';
+  File? _photoFile;
   int? _estimatedPrice;
   bool _loading = false;
   String? _error;
+  String? _validationError;
+
+  static const _pickupLat = MarketConfig.defaultLat;
+  static const _pickupLng = MarketConfig.defaultLng;
+  static const _dropoffLat = MarketConfig.defaultLat - 0.03;
+  static const _dropoffLng = MarketConfig.defaultLng + 0.04;
 
   @override
   void dispose() {
@@ -38,20 +48,104 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
     super.dispose();
   }
 
-  Future<void> _estimate() async {
-    if (_dropoffController.text.trim().isEmpty) return;
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-    final api = ref.read(apiClientProvider);
-    await api.loadToken();
-    await api.checkHealth();
-    final result = await api.post('/deliveries/parcel/estimate', {
+  Map<String, dynamic> _parcelPayload({bool includePhoto = false}) {
+    final payload = {
       'pickupAddress': _pickupController.text.trim(),
       'dropoffAddress': _dropoffController.text.trim(),
       'weightCategory': _weightCategory,
+      'pickupLat': _pickupLat,
+      'pickupLng': _pickupLng,
+      'dropoffLat': _dropoffLat,
+      'dropoffLng': _dropoffLng,
+    };
+    if (includePhoto && _photoFile != null) {
+      // Stub local — upload Cloudinary non configuré côté mobile
+      payload['photoUrl'] = _photoFile!.path;
+    }
+    return payload;
+  }
+
+  String? _validate() {
+    if (_pickupController.text.trim().isEmpty) {
+      return 'Indiquez l\'adresse d\'enlèvement.';
+    }
+    if (_dropoffController.text.trim().isEmpty) {
+      return 'Indiquez l\'adresse de livraison.';
+    }
+    return null;
+  }
+
+  Future<void> _pickPhoto(ImageSource source) async {
+    try {
+      final picked = await _picker.pickImage(
+        source: source,
+        maxWidth: 1280,
+        imageQuality: 85,
+      );
+      if (picked != null) {
+        setState(() => _photoFile = File(picked.path));
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Impossible d\'accéder à la caméra ou à la galerie.')),
+        );
+      }
+    }
+  }
+
+  Future<void> _showPhotoOptions() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_camera_outlined),
+              title: const Text('Prendre une photo'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _pickPhoto(ImageSource.camera);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Choisir dans la galerie'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _pickPhoto(ImageSource.gallery);
+              },
+            ),
+            if (_photoFile != null)
+              ListTile(
+                leading: const Icon(Icons.delete_outline, color: MovaColors.orange),
+                title: const Text('Supprimer la photo'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  setState(() => _photoFile = null);
+                },
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _estimate() async {
+    final validation = _validate();
+    if (validation != null) {
+      setState(() => _validationError = validation);
+      return;
+    }
+    setState(() {
+      _loading = true;
+      _error = null;
+      _validationError = null;
     });
+    final api = ref.read(apiClientProvider);
+    await api.checkHealth();
+    final result = await api.post('/deliveries/parcel/estimate', _parcelPayload());
     setState(() {
       _loading = false;
       switch (result) {
@@ -64,21 +158,18 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
   }
 
   Future<void> _confirm() async {
+    final validation = _validate();
+    if (validation != null) {
+      setState(() => _validationError = validation);
+      return;
+    }
     setState(() {
       _loading = true;
       _error = null;
+      _validationError = null;
     });
     final api = ref.read(apiClientProvider);
-    final result = await api.post('/deliveries/parcel', {
-      'pickupAddress': _pickupController.text.trim(),
-      'dropoffAddress': _dropoffController.text.trim(),
-      'weightCategory': _weightCategory,
-      'hasPhoto': _hasPhoto,
-      'pickupLat': MarketConfig.defaultLat,
-      'pickupLng': MarketConfig.defaultLng,
-      'dropoffLat': MarketConfig.defaultLat - 0.03,
-      'dropoffLng': MarketConfig.defaultLng + 0.04,
-    });
+    final result = await api.post('/deliveries/parcel', _parcelPayload(includePhoto: true));
     setState(() => _loading = false);
     switch (result) {
       case Success(:final data):
@@ -113,6 +204,7 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
               labelText: 'Adresse d\'enlèvement',
               prefixIcon: Icon(Icons.upload_outlined),
             ),
+            onChanged: (_) => setState(() => _estimatedPrice = null),
           ),
           const SizedBox(height: 12),
           TextField(
@@ -143,14 +235,26 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
           }),
           const SizedBox(height: 8),
           OutlinedButton.icon(
-            onPressed: () => setState(() => _hasPhoto = !_hasPhoto),
-            icon: Icon(_hasPhoto ? Icons.check_circle : Icons.add_a_photo_outlined),
+            onPressed: _showPhotoOptions,
+            icon: Icon(_photoFile != null ? Icons.check_circle : Icons.add_a_photo_outlined),
             label: Text(
-              _hasPhoto ? 'Photo ajoutée (optionnel)' : 'Ajouter une photo (optionnel)',
+              _photoFile != null ? 'Photo ajoutée (optionnel)' : 'Ajouter une photo (optionnel)',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
           ),
+          if (_photoFile != null) ...[
+            const SizedBox(height: 12),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.file(
+                _photoFile!,
+                height: 120,
+                width: double.infinity,
+                fit: BoxFit.cover,
+              ),
+            ),
+          ],
           if (_estimatedPrice != null) ...[
             const SizedBox(height: 16),
             MovaCard(
@@ -170,6 +274,10 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
               ),
             ),
           ],
+          if (_validationError != null) ...[
+            const SizedBox(height: 16),
+            MovaErrorBanner(message: _validationError!),
+          ],
           if (_error != null) ...[
             const SizedBox(height: 16),
             MovaErrorBanner(message: _error!, onRetry: _estimate),
@@ -179,7 +287,9 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
             label: _estimatedPrice == null ? 'Estimer le prix' : 'Confirmer l\'envoi',
             isLoading: _loading,
             icon: _estimatedPrice == null ? Icons.calculate_outlined : Icons.local_shipping_outlined,
-            onPressed: _estimatedPrice == null ? _estimate : _confirm,
+            onPressed: _loading
+                ? null
+                : (_estimatedPrice == null ? _estimate : _confirm),
           ),
         ],
       ),

@@ -17,27 +17,57 @@ class BookingScreen extends ConsumerStatefulWidget {
 
 class _BookingScreenState extends ConsumerState<BookingScreen> {
   String _vehicleType = 'MOTO_TAXI';
-  String _destination = '';
+  final _destinationController = TextEditingController();
   int? _estimatedFare;
   bool _loading = false;
   String? _error;
+  String? _validationError;
+
+  static const _pickupLat = MarketConfig.defaultLat;
+  static const _pickupLng = MarketConfig.defaultLng;
+  static const _dropoffLat = MarketConfig.defaultLat - 0.03;
+  static const _dropoffLng = MarketConfig.defaultLng + 0.04;
+
+  @override
+  void dispose() {
+    _destinationController.dispose();
+    super.dispose();
+  }
+
+  Map<String, dynamic> _estimatePayload() => {
+        'pickupLat': _pickupLat,
+        'pickupLng': _pickupLng,
+        'dropoffLat': _dropoffLat,
+        'dropoffLng': _dropoffLng,
+        'vehicleType': _vehicleType,
+      };
+
+  String? _validateDestination() {
+    if (_destinationController.text.trim().isEmpty) {
+      return 'Indiquez votre destination.';
+    }
+    return null;
+  }
 
   Future<void> _estimate() async {
-    if (_destination.isEmpty) return;
-    setState(() { _loading = true; _error = null; });
+    final validation = _validateDestination();
+    if (validation != null) {
+      setState(() => _validationError = validation);
+      return;
+    }
+    setState(() {
+      _loading = true;
+      _error = null;
+      _validationError = null;
+    });
     final api = ref.read(apiClientProvider);
-    final result = await api.get(
-      '/rides/estimate?pickupLat=${MarketConfig.defaultLat}'
-      '&pickupLng=${MarketConfig.defaultLng}'
-      '&dropoffLat=${MarketConfig.defaultLat - 0.03}'
-      '&dropoffLng=${MarketConfig.defaultLng + 0.04}'
-      '&vehicleType=$_vehicleType',
-    );
+    await api.checkHealth();
+    final result = await api.post('/rides/estimate', _estimatePayload());
     setState(() {
       _loading = false;
       switch (result) {
         case Success(:final data):
-          _estimatedFare = (data['estimatedFareCdf'] ?? data['priceCdf']) as int?;
+          _estimatedFare = (data['estimatedFareCdf'] ?? data['estimatedPriceCdf']) as int?;
         case Failure(:final error):
           _error = error.message;
       }
@@ -45,16 +75,21 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   }
 
   Future<void> _confirmRide() async {
-    setState(() { _loading = true; _error = null; });
+    final validation = _validateDestination();
+    if (validation != null) {
+      setState(() => _validationError = validation);
+      return;
+    }
+    setState(() {
+      _loading = true;
+      _error = null;
+      _validationError = null;
+    });
     final api = ref.read(apiClientProvider);
     final result = await api.post('/rides', {
-      'pickupLat': MarketConfig.defaultLat,
-      'pickupLng': MarketConfig.defaultLng,
-      'dropoffLat': MarketConfig.defaultLat - 0.03,
-      'dropoffLng': MarketConfig.defaultLng + 0.04,
-      'vehicleType': _vehicleType,
+      ..._estimatePayload(),
       'pickupAddress': 'Ma position, Kinshasa',
-      'dropoffAddress': _destination,
+      'dropoffAddress': _destinationController.text.trim(),
     });
     setState(() => _loading = false);
     switch (result) {
@@ -81,12 +116,16 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           TextField(
+            controller: _destinationController,
             decoration: const InputDecoration(
               labelText: 'Destination',
               hintText: 'Ex: Gombe, Limete, Masina…',
               prefixIcon: Icon(Icons.place),
             ),
-            onChanged: (v) => _destination = v,
+            onChanged: (_) => setState(() {
+              _estimatedFare = null;
+              _validationError = null;
+            }),
           ),
           const SizedBox(height: 16),
           Text('Type de véhicule', style: Theme.of(context).textTheme.titleSmall),
@@ -96,8 +135,10 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                 value: v.id,
                 groupValue: _vehicleType,
                 onChanged: (val) {
-                  setState(() => _vehicleType = val!);
-                  _estimate();
+                  setState(() {
+                    _vehicleType = val!;
+                    _estimatedFare = null;
+                  });
                 },
               )),
           if (_estimatedFare != null) ...[
@@ -119,6 +160,10 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
               ),
             ),
           ],
+          if (_validationError != null) ...[
+            const SizedBox(height: 16),
+            MovaErrorBanner(message: _validationError!),
+          ],
           if (_error != null) ...[
             const SizedBox(height: 16),
             MovaErrorBanner(message: _error!, onRetry: _estimate),
@@ -127,7 +172,9 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
           MovaButton(
             label: _estimatedFare == null ? 'Estimer le prix' : 'Confirmer la course',
             isLoading: _loading,
-            onPressed: _estimatedFare == null ? _estimate : _confirmRide,
+            onPressed: _loading
+                ? null
+                : (_estimatedFare == null ? _estimate : _confirmRide),
           ),
         ],
       ),

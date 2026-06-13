@@ -22,10 +22,15 @@ abstract final class MockData {
     };
   }
 
-  static Map<String, dynamic> estimate() => {
+  static Map<String, dynamic> estimate([Map<String, dynamic>? body]) => {
         'distanceKm': 3.2,
         'durationMin': 12,
-        'estimatedFareCdf': 8500,
+        'estimatedFareCdf': body?['vehicleType'] == 'COMFORT'
+            ? 15000
+            : body?['vehicleType'] == 'MOTO_TAXI'
+                ? 6500
+                : 8500,
+        'estimatedPriceCdf': body?['vehicleType'] == 'COMFORT' ? 15000 : 8500,
         'priceCdf': 8500,
         'currency': 'CDF',
       };
@@ -82,11 +87,11 @@ abstract final class MockData {
       ];
 
   static Map<String, dynamic> parcelEstimate(Map<String, dynamic> body) {
-    final category = body['weightCategory']?.toString() ?? 'LIGHT';
+    final category = body['weightCategory']?.toString() ?? 'DOCUMENTS';
     final base = switch (category) {
-      'HEAVY' => 12000,
+      'LARGE' => 12000,
       'MEDIUM' => 8000,
-      'VERY_HEAVY' => 18000,
+      'SMALL' => 6000,
       _ => 5000,
     };
     return {'estimatedPriceCdf': base, 'currency': 'CDF'};
@@ -212,18 +217,34 @@ abstract final class MockData {
       ];
 
   static Map<String, dynamic> errandEstimate(Map<String, dynamic> body) {
-    final items = body['items'] as List? ?? [];
-    final base = 4000 + (items.length * 1500);
-    return {'estimatedPriceCdf': base, 'currency': 'CDF'};
+    final desc = body['description']?.toString() ?? '';
+    final base = 4000 + (desc.length > 20 ? 3000 : 1500);
+    return {'estimatedPriceCdf': base, 'currency': 'CDF', 'errandFeeCdf': 2500};
   }
 
   static Map<String, dynamic> createErrand(Map<String, dynamic> body) => {
         'id': 'errand-${DateTime.now().millisecondsSinceEpoch}',
-        'status': 'CONFIRMED',
+        'status': 'PENDING',
         'type': 'ERRAND',
         ...body,
+        'estimatedPriceCdf': errandEstimate(body)['estimatedPriceCdf'],
         'priceCdf': errandEstimate(body)['estimatedPriceCdf'],
       };
+
+  static Map<String, dynamic> foodEstimate(Map<String, dynamic> body) {
+    final items = body['items'] as List? ?? [];
+    final subtotal = items.fold<int>(0, (sum, item) {
+      final map = item as Map<String, dynamic>;
+      return sum +
+          ((map['unitPriceCdf'] as int? ?? 0) * (map['quantity'] as int? ?? 1));
+    });
+    return {
+      'estimatedPriceCdf': subtotal + 3500,
+      'itemsSubtotalCdf': subtotal,
+      'deliveryFeeCdf': 3500,
+      'currency': 'CDF',
+    };
+  }
 
   static List<Map<String, dynamic>> errandHistory() => [
         {
@@ -270,6 +291,8 @@ abstract final class MockData {
         'id': 'carpool-${DateTime.now().millisecondsSinceEpoch}',
         'status': 'OPEN',
         'type': 'CARPOOL',
+        'seatsAvailable': body['seatsTotal'] ?? body['seats'] ?? 3,
+        'pricePerSeatCdf': body['pricePerSeatCdf'] ?? 5000,
         ...body,
         'driverName': 'Vous',
       };

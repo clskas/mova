@@ -15,16 +15,24 @@ class ErrandScreen extends ConsumerStatefulWidget {
 }
 
 class _ErrandScreenState extends ConsumerState<ErrandScreen> {
-  final _addressController = TextEditingController(text: 'Ma position, Kinshasa');
+  final _pickupController = TextEditingController(text: 'Commerce / pharmacie, Gombe');
+  final _dropoffController = TextEditingController(text: 'Ma position, Kinshasa');
   final _itemController = TextEditingController();
   final List<String> _items = [];
   int? _estimatedPrice;
   bool _loading = false;
   String? _error;
+  String? _validationError;
+
+  static const _defaultDropoffLat = MarketConfig.defaultLat;
+  static const _defaultDropoffLng = MarketConfig.defaultLng;
+  static const _defaultPickupLat = MarketConfig.defaultLat + 0.02;
+  static const _defaultPickupLng = MarketConfig.defaultLng - 0.02;
 
   @override
   void dispose() {
-    _addressController.dispose();
+    _pickupController.dispose();
+    _dropoffController.dispose();
     _itemController.dispose();
     super.dispose();
   }
@@ -36,6 +44,7 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
       _items.add(text);
       _itemController.clear();
       _estimatedPrice = null;
+      _validationError = null;
     });
   }
 
@@ -46,19 +55,46 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
     });
   }
 
+  String _buildDescription() => _items.join(', ');
+
+  Map<String, dynamic> _errandPayload() => {
+        'description': _buildDescription(),
+        'pickupAddress': _pickupController.text.trim(),
+        'pickupLat': _defaultPickupLat,
+        'pickupLng': _defaultPickupLng,
+        'dropoffAddress': _dropoffController.text.trim(),
+        'dropoffLat': _defaultDropoffLat,
+        'dropoffLng': _defaultDropoffLng,
+      };
+
+  String? _validate() {
+    if (_items.isEmpty) return 'Ajoutez au moins un article à la liste.';
+    if (_pickupController.text.trim().isEmpty) {
+      return 'Indiquez l\'adresse du commerce ou point de retrait.';
+    }
+    if (_dropoffController.text.trim().isEmpty) {
+      return 'Indiquez l\'adresse de livraison.';
+    }
+    if (_buildDescription().length < 5) {
+      return 'Décrivez vos achats (minimum 5 caractères).';
+    }
+    return null;
+  }
+
   Future<void> _estimate() async {
-    if (_items.isEmpty || _addressController.text.trim().isEmpty) return;
+    final validation = _validate();
+    if (validation != null) {
+      setState(() => _validationError = validation);
+      return;
+    }
     setState(() {
       _loading = true;
       _error = null;
+      _validationError = null;
     });
     final api = ref.read(apiClientProvider);
-    await api.loadToken();
     await api.checkHealth();
-    final result = await api.post('/deliveries/errand/estimate', {
-      'deliveryAddress': _addressController.text.trim(),
-      'items': _items,
-    });
+    final result = await api.post('/errands/estimate', _errandPayload());
     setState(() {
       _loading = false;
       switch (result) {
@@ -71,31 +107,33 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
   }
 
   Future<void> _confirm() async {
+    final validation = _validate();
+    if (validation != null) {
+      setState(() => _validationError = validation);
+      return;
+    }
     setState(() {
       _loading = true;
       _error = null;
+      _validationError = null;
     });
     final api = ref.read(apiClientProvider);
-    final result = await api.post('/deliveries/errand', {
-      'deliveryAddress': _addressController.text.trim(),
-      'items': _items,
-      'deliveryLat': MarketConfig.defaultLat,
-      'deliveryLng': MarketConfig.defaultLng,
-    });
+    final result = await api.post('/errands', _errandPayload());
     setState(() => _loading = false);
     switch (result) {
       case Success(:final data):
         if (mounted) {
-          final errand = data['errand'] as Map<String, dynamic>?;
+          final order = data['order'] as Map<String, dynamic>? ??
+              data['errand'] as Map<String, dynamic>?;
           showDialog<void>(
             context: context,
             builder: (ctx) => AlertDialog(
               title: const Text('Course envoyée'),
               content: Text(
                 'Votre liste a été transmise à un livreur.\n'
-                'Réf. : ${errand?['id'] ?? ''}\n'
-                'Total : ${MarketConfig.formatCdf(errand?['priceCdf'] as int? ?? _estimatedPrice ?? 0)}',
-                maxLines: 5,
+                'Réf. : ${order?['id'] ?? ''}\n'
+                'Total : ${MarketConfig.formatCdf(order?['estimatedPriceCdf'] as int? ?? _estimatedPrice ?? 0)}',
+                maxLines: 6,
                 overflow: TextOverflow.ellipsis,
               ),
               actions: [
@@ -132,7 +170,17 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
           ),
           const SizedBox(height: 16),
           TextField(
-            controller: _addressController,
+            controller: _pickupController,
+            decoration: const InputDecoration(
+              labelText: 'Point de retrait (commerce)',
+              hintText: 'Ex: Pharmacie du coin, Marché…',
+              prefixIcon: Icon(Icons.store_outlined),
+            ),
+            onChanged: (_) => setState(() => _estimatedPrice = null),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _dropoffController,
             decoration: const InputDecoration(
               labelText: 'Adresse de livraison',
               prefixIcon: Icon(Icons.home_outlined),
@@ -197,7 +245,9 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('Estimation (service + achats approx.)'),
+                  const Expanded(
+                    child: Text('Estimation (service + trajet)'),
+                  ),
                   Text(
                     MarketConfig.formatCdf(_estimatedPrice!),
                     style: const TextStyle(
@@ -210,6 +260,10 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
               ),
             ),
           ],
+          if (_validationError != null) ...[
+            const SizedBox(height: 16),
+            MovaErrorBanner(message: _validationError!),
+          ],
           if (_error != null) ...[
             const SizedBox(height: 16),
             MovaErrorBanner(message: _error!, onRetry: _estimate),
@@ -219,7 +273,7 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
             label: _estimatedPrice == null ? 'Estimer le prix' : 'Envoyer au livreur',
             isLoading: _loading,
             icon: _estimatedPrice == null ? Icons.calculate_outlined : Icons.send_outlined,
-            onPressed: _items.isEmpty
+            onPressed: _loading
                 ? null
                 : (_estimatedPrice == null ? _estimate : _confirm),
           ),

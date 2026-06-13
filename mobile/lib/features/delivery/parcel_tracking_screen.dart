@@ -34,12 +34,12 @@ class _ParcelTrackingScreenState extends ConsumerState<ParcelTrackingScreen> {
     final api = ref.read(apiClientProvider);
     await api.loadToken();
     await api.checkHealth();
-    final result = await api.get('/deliveries/parcel/${widget.parcelId}');
+    final result = await api.get('/deliveries/${widget.parcelId}');
     setState(() {
       _loading = false;
       switch (result) {
         case Success(:final data):
-          _delivery = data['delivery'] as Map<String, dynamic>?;
+          _delivery = data['delivery'] as Map<String, dynamic>? ?? data;
         case Failure(:final error):
           _error = error.message;
       }

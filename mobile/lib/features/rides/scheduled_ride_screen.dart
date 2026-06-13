@@ -21,8 +21,14 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
   int? _estimatedPrice;
   bool _loading = false;
   bool _loadingUpcoming = true;
-  List<dynamic> _upcoming = [];
+  List<Map<String, dynamic>> _upcoming = [];
   String? _error;
+  String? _validationError;
+
+  static const _pickupLat = MarketConfig.defaultLat;
+  static const _pickupLng = MarketConfig.defaultLng;
+  static const _dropoffLat = MarketConfig.defaultLat - 0.03;
+  static const _dropoffLng = MarketConfig.defaultLng + 0.04;
 
   DateTime get _maxDate => DateTime.now().add(const Duration(days: 7));
 
@@ -34,6 +40,17 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
     return '$day/$month/${dt.year} à $hour:$minute';
   }
 
+  Map<String, dynamic> _ridePayload() => {
+        'pickupLat': _pickupLat,
+        'pickupLng': _pickupLng,
+        'dropoffLat': _dropoffLat,
+        'dropoffLng': _dropoffLng,
+        'pickupAddress': 'Ma position, Kinshasa',
+        'dropoffAddress': _destinationController.text.trim(),
+        'vehicleType': _vehicleType,
+        'scheduledAt': _scheduledAt.toIso8601String(),
+      };
+
   @override
   void initState() {
     super.initState();
@@ -41,13 +58,14 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
   }
 
   Future<void> _loadUpcoming() async {
+    setState(() => _loadingUpcoming = true);
     final api = ref.read(apiClientProvider);
-    await api.loadToken();
     await api.checkHealth();
     final result = await api.get('/rides/scheduled');
     if (result case Success(:final data)) {
+      final list = data['data'] as List? ?? (data is List ? data : null);
       setState(() {
-        _upcoming = data['data'] as List? ?? [];
+        _upcoming = (list ?? []).cast<Map<String, dynamic>>();
         _loadingUpcoming = false;
       });
     } else {
@@ -77,32 +95,51 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
     if (time == null || !mounted) return;
 
     final combined = DateTime(date.year, date.month, date.day, time.hour, time.minute);
-    if (combined.isBefore(DateTime.now())) return;
+    if (combined.isBefore(DateTime.now())) {
+      setState(() => _validationError = 'La date doit être dans le futur.');
+      return;
+    }
     setState(() {
       _scheduledAt = combined;
       _estimatedPrice = null;
+      _validationError = null;
     });
   }
 
+  String? _validate() {
+    if (_destinationController.text.trim().isEmpty) {
+      return 'Indiquez votre destination.';
+    }
+    if (_scheduledAt.isBefore(DateTime.now())) {
+      return 'La date de réservation doit être dans le futur.';
+    }
+    return null;
+  }
+
   Future<void> _estimate() async {
-    if (_destinationController.text.trim().isEmpty) return;
+    final validation = _validate();
+    if (validation != null) {
+      setState(() => _validationError = validation);
+      return;
+    }
     setState(() {
       _loading = true;
       _error = null;
+      _validationError = null;
     });
     final api = ref.read(apiClientProvider);
-    await api.loadToken();
-    await api.checkHealth();
-    final result = await api.post('/rides/scheduled/estimate', {
-      'dropoffAddress': _destinationController.text.trim(),
+    final result = await api.post('/rides/estimate', {
+      'pickupLat': _pickupLat,
+      'pickupLng': _pickupLng,
+      'dropoffLat': _dropoffLat,
+      'dropoffLng': _dropoffLng,
       'vehicleType': _vehicleType,
-      'scheduledAt': _scheduledAt.toIso8601String(),
     });
     setState(() {
       _loading = false;
       switch (result) {
         case Success(:final data):
-          _estimatedPrice = data['estimatedPriceCdf'] as int?;
+          _estimatedPrice = (data['estimatedFareCdf'] ?? data['estimatedPriceCdf']) as int?;
         case Failure(:final error):
           _error = error.message;
       }
@@ -110,26 +147,24 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
   }
 
   Future<void> _confirm() async {
+    final validation = _validate();
+    if (validation != null) {
+      setState(() => _validationError = validation);
+      return;
+    }
     setState(() {
       _loading = true;
       _error = null;
+      _validationError = null;
     });
     final api = ref.read(apiClientProvider);
-    final result = await api.post('/rides/scheduled', {
-      'pickupLat': MarketConfig.defaultLat,
-      'pickupLng': MarketConfig.defaultLng,
-      'dropoffLat': MarketConfig.defaultLat - 0.03,
-      'dropoffLng': MarketConfig.defaultLng + 0.04,
-      'pickupAddress': 'Ma position, Kinshasa',
-      'dropoffAddress': _destinationController.text.trim(),
-      'vehicleType': _vehicleType,
-      'scheduledAt': _scheduledAt.toIso8601String(),
-    });
+    final result = await api.post('/rides/scheduled', _ridePayload());
     setState(() => _loading = false);
     switch (result) {
       case Success(:final data):
         if (mounted) {
-          final ride = data['ride'] as Map<String, dynamic>?;
+          final ride = data['scheduledRide'] as Map<String, dynamic>? ??
+              data['ride'] as Map<String, dynamic>?;
           final when = _formatDateTime(_scheduledAt);
           await _loadUpcoming();
           if (!mounted) return;
@@ -148,7 +183,10 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
                 TextButton(
                   onPressed: () {
                     Navigator.pop(ctx);
-                    Navigator.pop(context);
+                    setState(() {
+                      _estimatedPrice = null;
+                      _destinationController.clear();
+                    });
                   },
                   child: const Text('OK'),
                 ),
@@ -179,8 +217,11 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
           else if (_upcoming.isNotEmpty) ...[
             Text('Réservations à venir', style: theme.textTheme.titleSmall),
             const SizedBox(height: 8),
-            ..._upcoming.map((ride) {
-              final map = ride as Map<String, dynamic>;
+            ..._upcoming.map((map) {
+              final scheduledRaw = map['scheduledAt']?.toString();
+              final scheduledLabel = scheduledRaw != null
+                  ? _formatDateTime(DateTime.parse(scheduledRaw))
+                  : '';
               return Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: MovaCard(
@@ -195,13 +236,13 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        map['scheduledAt']?.toString() ?? '',
+                        scheduledLabel,
                         style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                       ),
                       Text(
-                        MarketConfig.formatCdf(map['priceCdf'] as int? ?? 0),
+                        MarketConfig.formatCdf(
+                          map['estimatedPriceCdf'] as int? ?? map['priceCdf'] as int? ?? 0,
+                        ),
                         style: const TextStyle(color: MovaColors.violet),
                       ),
                     ],
@@ -212,6 +253,14 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
             const Divider(height: 32),
             Text('Nouvelle réservation', style: theme.textTheme.titleSmall),
             const SizedBox(height: 12),
+          ] else ...[
+            const Padding(
+              padding: EdgeInsets.only(bottom: 16),
+              child: Text(
+                'Aucune réservation à venir.',
+                style: TextStyle(color: MovaColors.textSecondary),
+              ),
+            ),
           ],
           MovaCard(
             onTap: _pickDateTime,
@@ -286,6 +335,10 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
               ),
             ),
           ],
+          if (_validationError != null) ...[
+            const SizedBox(height: 16),
+            MovaErrorBanner(message: _validationError!),
+          ],
           if (_error != null) ...[
             const SizedBox(height: 16),
             MovaErrorBanner(message: _error!, onRetry: _estimate),
@@ -295,7 +348,9 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
             label: _estimatedPrice == null ? 'Estimer le prix' : 'Confirmer la réservation',
             isLoading: _loading,
             icon: Icons.event_available_outlined,
-            onPressed: _estimatedPrice == null ? _estimate : _confirm,
+            onPressed: _loading
+                ? null
+                : (_estimatedPrice == null ? _estimate : _confirm),
           ),
         ],
       ),

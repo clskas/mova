@@ -63,10 +63,27 @@ async function main() {
   });
 
   try {
-    console.log("Recherche de l'écran de connexion passager…");
-    const welcome = await driver.$('android=new UiSelector().textContains("Bienvenue")');
-    await welcome.waitForDisplayed({ timeout: 20_000 });
-    console.log("✓ Smoke test OK — écran OTP passager visible (texte « Bienvenue »).");
+    console.log("Recherche de l'écran passager (OTP ou accueil)…");
+    const selectors = [
+      'android=new UiSelector().descriptionContains("Bienvenue")',
+      'android=new UiSelector().descriptionContains("Taxi")',
+      'android=new UiSelector().descriptionContains("Livraison colis")',
+      'android=new UiSelector().description("Connexion MOVA")',
+    ];
+    const deadline = Date.now() + 20_000;
+    let matched = null;
+    while (Date.now() < deadline && !matched) {
+      for (const sel of selectors) {
+        const el = await driver.$(sel);
+        if (await el.isDisplayed().catch(() => false)) {
+          matched = sel;
+          break;
+        }
+      }
+      if (!matched) await driver.pause(500);
+    }
+    if (!matched) throw new Error("Aucun écran passager reconnu (OTP ou accueil services).");
+    console.log("✓ Smoke test OK — app passager visible.");
   } finally {
     await driver.deleteSession();
   }

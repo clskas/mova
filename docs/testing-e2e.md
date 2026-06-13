@@ -91,10 +91,13 @@ Approche retenue : **Appium 2 + UiAutomator2** sur l'APK Flutter passager. Pas d
    - `ANDROID_HOME` → ex. `C:\Users\<vous>\AppData\Local\Android\Sdk`
    - Ajouter au `PATH` : `%ANDROID_HOME%\platform-tools` (adb)
 2. **Java JDK 11+** (`JAVA_HOME`)
-3. **Appareil physique** (ex. SM G981V) ou émulateur
+3. **Raccourci Windows** : `. .\e2e\scripts\setup-env.ps1` configure `ANDROID_HOME` et `JAVA_HOME` pour la session.
+4. **Appareil physique** (ex. SM G981V) ou émulateur
    - Débogage USB activé
    - `adb devices` liste l'appareil
-4. **APK passager** (debug) ou app déjà installée
+5. **APK passager** (debug) ou app déjà installée
+
+> Flutter expose les libellés via `content-desc` (accessibilité), pas `text` — les sélecteurs Appium utilisent `descriptionContains`.
 
 ### Installation Appium (une fois)
 

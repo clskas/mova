@@ -1,23 +1,19 @@
-import { KINSHASA_COMMUNES, MovaErrorCode, MovaHttpException, formatCdf } from '@mova/shared';
+import {
+  KINSHASA_BOUNDS,
+  KINSHASA_COMMUNES,
+  MovaErrorCode,
+  MovaHttpException,
+  formatCdf,
+  isKinshasaCoords,
+} from '@mova/shared';
 import { Delivery, DeliveryEvent, DeliveryStatus, DeliveryType } from '@prisma/client';
 
-/** Bounding box approximatif de Kinshasa (RDC). */
-export const KINSHASA_BOUNDS = {
-  minLat: -4.55,
-  maxLat: -4.0,
-  minLng: 15.15,
-  maxLng: 15.55,
-};
+export { KINSHASA_BOUNDS };
 
 const COMMUNE_NAMES = KINSHASA_COMMUNES.map((c) => c.name.toLowerCase());
 
 export function assertKinshasaCoords(lat: number, lng: number): void {
-  if (
-    lat < KINSHASA_BOUNDS.minLat ||
-    lat > KINSHASA_BOUNDS.maxLat ||
-    lng < KINSHASA_BOUNDS.minLng ||
-    lng > KINSHASA_BOUNDS.maxLng
-  ) {
+  if (!isKinshasaCoords(lat, lng)) {
     throw new MovaHttpException(
       MovaErrorCode.VALIDATION_ERROR,
       undefined,

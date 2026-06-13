@@ -8,6 +8,7 @@ import 'package:latlong2/latlong.dart';
 import '../../core/api/api_client.dart';
 import '../../core/config/market_config.dart';
 import '../../core/error/result.dart';
+import '../../core/location/kinshasa_location.dart';
 import '../../core/location/location_service.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
@@ -107,9 +108,12 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
         suggestion['address']?.toString() ??
         '';
     _dropoffController.text = label;
-    _dropoff = LatLng(
-      (suggestion['lat'] as num?)?.toDouble() ?? MarketConfig.defaultLat - 0.03,
-      (suggestion['lng'] as num?)?.toDouble() ?? MarketConfig.defaultLng + 0.04,
+    _dropoff = KinshasaLocation.ensureInKinshasa(
+      LatLng(
+        (suggestion['lat'] as num?)?.toDouble() ?? MarketConfig.defaultLat - 0.03,
+        (suggestion['lng'] as num?)?.toDouble() ?? MarketConfig.defaultLng + 0.04,
+      ),
+      address: label,
     );
     setState(() {
       _showSuggestions = false;
@@ -135,21 +139,57 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
     }
     setState(() {
       _loadingGps = false;
-      _pickup = result.position;
-      _pickupController.text = result.label;
+      _pickup = KinshasaLocation.ensureInKinshasa(
+        result.position,
+        address: result.label,
+      );
+      _pickupController.text = KinshasaLocation.isInBounds(result.position)
+          ? result.label
+          : 'Ma position, Kinshasa';
       _estimatedPrice = null;
     });
   }
 
+  Future<void> _resolveCoords() async {
+    _pickup = KinshasaLocation.ensureInKinshasa(
+      _pickup,
+      address: _pickupController.text,
+    );
+    if (_dropoff == null || !KinshasaLocation.isInBounds(_dropoff!)) {
+      var resolved = KinshasaLocation.coordsFromAddress(_dropoffController.text);
+      if (!KinshasaLocation.isInBounds(resolved)) {
+        final api = ref.read(apiClientProvider);
+        final result = await api.geoAutocomplete(_dropoffController.text.trim());
+        if (result case Success(:final data) when data.isNotEmpty) {
+          final s = data.first;
+          resolved = LatLng(
+            (s['lat'] as num?)?.toDouble() ?? MarketConfig.defaultLat,
+            (s['lng'] as num?)?.toDouble() ?? MarketConfig.defaultLng,
+          );
+        }
+      }
+      _dropoff = KinshasaLocation.ensureInKinshasa(
+        resolved,
+        address: _dropoffController.text,
+      );
+    } else {
+      _dropoff = KinshasaLocation.ensureInKinshasa(
+        _dropoff!,
+        address: _dropoffController.text,
+      );
+    }
+  }
+
   Map<String, dynamic> _parcelPayload({bool includePhoto = false}) {
+    final dropoff = _dropoff ?? KinshasaLocation.defaultDropoffOffset();
     final payload = {
       'pickupAddress': _pickupController.text.trim(),
       'dropoffAddress': _dropoffController.text.trim(),
       'weightCategory': _weightCategory,
       'pickupLat': _pickup.latitude,
       'pickupLng': _pickup.longitude,
-      'dropoffLat': _dropoff?.latitude ?? MarketConfig.defaultLat - 0.03,
-      'dropoffLng': _dropoff?.longitude ?? MarketConfig.defaultLng + 0.04,
+      'dropoffLat': dropoff.latitude,
+      'dropoffLng': dropoff.longitude,
     };
     if (includePhoto && _photoFile != null) {
       payload['photoUrl'] = _photoFile!.path;
@@ -238,6 +278,9 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
       _error = null;
       _validationError = null;
     });
+    await _resolveCoords();
+    if (!mounted) return;
+    setState(() {});
     final api = ref.read(apiClientProvider);
     await api.checkHealth();
     final result = await api.post('/deliveries/parcel/estimate', _parcelPayload());
@@ -266,6 +309,9 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
       _error = null;
       _validationError = null;
     });
+    await _resolveCoords();
+    if (!mounted) return;
+    setState(() {});
     final api = ref.read(apiClientProvider);
     String? photoUrl;
     if (_photoFile != null) {

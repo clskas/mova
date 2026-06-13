@@ -4,6 +4,7 @@ import 'package:latlong2/latlong.dart';
 import '../../core/api/api_client.dart';
 import '../../core/config/market_config.dart';
 import '../../core/error/result.dart';
+import '../../core/location/kinshasa_location.dart';
 import '../../core/location/location_service.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
@@ -30,9 +31,6 @@ class _ExpressDeliveryScreenState extends ConsumerState<ExpressDeliveryScreen> {
   String? _error;
   String? _validationError;
 
-  static const _dropoffLat = MarketConfig.defaultLat - 0.025;
-  static const _dropoffLng = MarketConfig.defaultLng + 0.035;
-
   @override
   void dispose() {
     _pickupController.dispose();
@@ -40,16 +38,49 @@ class _ExpressDeliveryScreenState extends ConsumerState<ExpressDeliveryScreen> {
     super.dispose();
   }
 
-  Map<String, dynamic> _payload() => {
-        'pickupLat': _pickup.latitude,
-        'pickupLng': _pickup.longitude,
-        'pickupAddress': _pickupController.text.trim(),
-        'dropoffLat': _dropoff?.latitude ?? _dropoffLat,
-        'dropoffLng': _dropoff?.longitude ?? _dropoffLng,
-        'dropoffAddress': _dropoffController.text.trim(),
-        'weightCategory': 'SMALL',
-        'express': true,
-      };
+  Future<void> _resolveCoords() async {
+    _pickup = KinshasaLocation.ensureInKinshasa(
+      _pickup,
+      address: _pickupController.text,
+    );
+    if (_dropoff == null || !KinshasaLocation.isInBounds(_dropoff!)) {
+      var resolved = KinshasaLocation.coordsFromAddress(_dropoffController.text);
+      if (!KinshasaLocation.isInBounds(resolved)) {
+        final api = ref.read(apiClientProvider);
+        final result = await api.geoAutocomplete(_dropoffController.text.trim());
+        if (result case Success(:final data) when data.isNotEmpty) {
+          final s = data.first;
+          resolved = LatLng(
+            (s['lat'] as num?)?.toDouble() ?? MarketConfig.defaultLat,
+            (s['lng'] as num?)?.toDouble() ?? MarketConfig.defaultLng,
+          );
+        }
+      }
+      _dropoff = KinshasaLocation.ensureInKinshasa(
+        resolved,
+        address: _dropoffController.text,
+      );
+    } else {
+      _dropoff = KinshasaLocation.ensureInKinshasa(
+        _dropoff!,
+        address: _dropoffController.text,
+      );
+    }
+  }
+
+  Map<String, dynamic> _payload() {
+    final dropoff = _dropoff ?? KinshasaLocation.defaultDropoffOffset();
+    return {
+      'pickupLat': _pickup.latitude,
+      'pickupLng': _pickup.longitude,
+      'pickupAddress': _pickupController.text.trim(),
+      'dropoffLat': dropoff.latitude,
+      'dropoffLng': dropoff.longitude,
+      'dropoffAddress': _dropoffController.text.trim(),
+      'weightCategory': 'SMALL',
+      'express': true,
+    };
+  }
 
   String? _validate() {
     if (_pickupController.text.trim().isEmpty) return 'Indiquez l\'adresse d\'enlèvement.';
@@ -64,8 +95,13 @@ class _ExpressDeliveryScreenState extends ConsumerState<ExpressDeliveryScreen> {
     setState(() {
       _loadingGps = false;
       if (result != null) {
-        _pickup = result.position;
-        _pickupController.text = result.label;
+        _pickup = KinshasaLocation.ensureInKinshasa(
+          result.position,
+          address: result.label,
+        );
+        _pickupController.text = KinshasaLocation.isInBounds(result.position)
+            ? result.label
+            : 'Ma position, Kinshasa';
         _estimatedPrice = null;
       }
     });
@@ -81,8 +117,10 @@ class _ExpressDeliveryScreenState extends ConsumerState<ExpressDeliveryScreen> {
       _loading = true;
       _error = null;
       _validationError = null;
-      _dropoff = LatLng(_dropoffLat, _dropoffLng);
     });
+    await _resolveCoords();
+    if (!mounted) return;
+    setState(() {});
     final api = ref.read(apiClientProvider);
     await api.checkHealth();
     final result = await api.post('/express/estimate', _payload());
@@ -109,6 +147,8 @@ class _ExpressDeliveryScreenState extends ConsumerState<ExpressDeliveryScreen> {
       _error = null;
       _validationError = null;
     });
+    await _resolveCoords();
+    if (!mounted) return;
     final api = ref.read(apiClientProvider);
     final result = await api.post('/express', _payload());
     if (!mounted) return;
@@ -183,7 +223,10 @@ class _ExpressDeliveryScreenState extends ConsumerState<ExpressDeliveryScreen> {
                       hintText: 'Ex: Gombe, Limete…',
                       prefixIcon: Icon(Icons.place_outlined),
                     ),
-                    onChanged: (_) => setState(() => _estimatedPrice = null),
+                    onChanged: (_) => setState(() {
+                      _estimatedPrice = null;
+                      _dropoff = null;
+                    }),
                   ),
                   const SizedBox(height: 12),
                   const MovaCard(

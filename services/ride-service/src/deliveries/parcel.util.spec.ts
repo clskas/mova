@@ -11,6 +11,10 @@ describe('parcel.util', () => {
     expect(() => assertKinshasaCoords(0, 0)).toThrow(MovaHttpException);
   });
 
+  it('accepte les communes périphériques (Maluku)', () => {
+    expect(() => assertKinshasaCoords(-4.0833, 15.5833)).not.toThrow();
+  });
+
   it('construit une timeline de suivi colis', () => {
     const timeline = buildParcelTimeline({ status: DeliveryStatus.IN_TRANSIT, type: DeliveryType.PARCEL });
     expect(timeline).toHaveLength(4);

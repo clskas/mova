@@ -1,11 +1,13 @@
-# Manuel utilisateur — MOVA Passager
+﻿<!-- Source: docs/user-manual/passager.md - run scripts/sync-user-manual.ps1 after edits -->
+
+# Manuel utilisateur â€” MOVA Passager
 
 **Version :** 1.0 — Juin 2026  
 **Marché :** République Démocratique du Congo (Kinshasa)
 
 ## Bienvenue sur MOVA
 
-MOVA est votre application de mobilité urbaine en RDC. Commandez un taxi ou moto-taxi, envoyez un colis, réservez un trajet à l'avance, commandez un repas, faites vos courses, partagez un covoiturage, louez un véhicule ou planifiez un déménagement — le tout en Francs congolais (CDF).
+MOVA est votre application de mobilité urbaine en RDC. Commandez un taxi ou moto-taxi, envoyez un colis, réservez un trajet à l'avance, commandez un repas, faites vos courses ou partagez un covoiturage — le tout en francs congolais (CDF).
 
 ## 1. Créer un compte
 
@@ -17,43 +19,28 @@ MOVA est votre application de mobilité urbaine en RDC. Commandez un taxi ou mot
 ## 2. Taxi / Moto-taxi
 
 1. Appuyez sur **Taxi / Moto-taxi**.
-2. Indiquez votre position (GPS ou saisie) et votre destination (ex : Gombe, Limete, Masina).
-3. Choisissez le type de véhicule : Moto-taxi, Standard, Confort ou VIP.
+2. Indiquez votre destination (ex : Gombe, Limete, Masina).
+3. Choisissez le type de véhicule : Moto-taxi, Standard ou Confort.
 4. Appuyez sur **Estimer le prix**, puis **Confirmer la course**.
 5. Suivez votre chauffeur en temps réel sur l'écran de suivi.
-6. Payez via mobile money, Wallet MOVA ou espèces.
 
 ## 3. Livraison colis
 
 1. Appuyez sur **Livraison colis**.
 2. Renseignez l'adresse d'enlèvement et de livraison.
-3. Sélectionnez la catégorie de poids.
-4. Ajoutez une photo et des instructions (optionnel).
+3. Sélectionnez la catégorie de poids (documents, petit, moyen, grand).
+4. Ajoutez une photo (optionnel).
 5. Estimez, confirmez, puis suivez votre colis.
 
-## 4. Wallet MOVA
-
-1. Ouvrez **Wallet MOVA** depuis l'accueil ou la navigation.
-2. Consultez votre solde en CDF.
-3. Rechargez via Orange Money, M-Pesa ou Airtel Money.
-4. Payez vos courses directement depuis le portefeuille.
-5. Consultez l'historique des transactions.
-
-## 5. Historique
-
-1. Ouvrez **Historique** depuis l'accueil ou la barre de navigation.
-2. Parcourez les onglets : Courses, Colis, Repas, Réservations, Courses & commissions.
-3. Appuyez sur une entrée pour voir le détail et le montant en CDF.
-
-## 6. Réservation planifiée
+## 4. Réservation planifiée
 
 1. Appuyez sur **Réservation planifiée**.
 2. Consultez vos réservations à venir en haut de l'écran.
 3. Choisissez date et heure (jusqu'à J+7).
 4. Indiquez la destination et le véhicule souhaité.
-5. Confirmez la réservation — un rappel vous sera envoyé.
+5. Confirmez la réservation.
 
-## 7. Livraison repas
+## 5. Livraison repas
 
 1. Appuyez sur **Livraison repas**.
 2. Choisissez un restaurant parmi la liste.
@@ -61,54 +48,52 @@ MOVA est votre application de mobilité urbaine en RDC. Commandez un taxi ou mot
 4. Indiquez l'adresse de livraison et commandez.
 5. Suivez la livraison en temps réel.
 
-## 8. Courses & commissions
+## 6. Courses & commissions
 
 1. Appuyez sur **Courses & commissions**.
-2. Listez vos articles à acheter (marché, pharmacie, supermarché).
-3. Indiquez le budget estimé et l'adresse de livraison.
+2. Listez vos articles à acheter ou la commission à effectuer.
+3. Indiquez l'adresse de livraison.
 4. Estimez le prix et envoyez la liste au livreur.
-5. Le livreur vous contacte si un article est indisponible.
 
-## 9. Covoiturage
+## 7. Covoiturage
 
 1. Appuyez sur **Covoiturage**.
 2. **Rechercher** : trouvez un trajet partagé et voyez le prix par passager.
 3. **Proposer** : publiez votre propre trajet avec répartition du coût.
-4. Confirmez votre place ou attendez des passagers.
 
-## 10. Location véhicule
-
-1. Appuyez sur **Location véhicule**.
-2. Choisissez la durée (heure, journée, semaine).
-3. Sélectionnez voiture, SUV ou minibus.
-4. Indiquez le lieu de prise en charge (ex. Gombe, Ngaliema).
-5. Confirmez et récupérez le véhicule au point convenu.
-
-## 11. Livraison express
+## 8. Livraison express
 
 1. Appuyez sur **Livraison express**.
-2. Indiquez enlèvement et livraison à Kinshasa.
-3. Décrivez le contenu (documents, clés, petit objet léger).
-4. Confirmez — livraison cible en moins de 45 minutes.
-5. Suivez le coursier en temps réel.
+2. Renseignez enlèvement et livraison pour un envoi urgent (moins de 45 min).
+3. Estimez le tarif, confirmez et suivez le livreur en temps réel.
 
-> Réservé aux petits colis. Pas de marchandises dangereuses ou illicites.
+## 9. Location véhicule
 
-## 12. Déménagement
+1. Appuyez sur **Location véhicule**.
+2. Choisissez le type (voiture, SUV, minibus) et la durée.
+3. Indiquez les dates et le lieu de prise en charge.
+4. Confirmez la réservation.
+
+## 10. Déménagement
 
 1. Appuyez sur **Déménagement**.
-2. Indiquez adresse de départ et d'arrivée (commune, avenue, repère).
-3. Estimez le volume (studio, F2, F3, bureau).
-4. Ajoutez options : manutention, étage sans ascenseur.
-5. Confirmez — un camion et une équipe vous sont affectés.
-6. Suivez les étapes : chargement, transit, déchargement.
+2. Décrivez le volume à transporter et les adresses de départ et d'arrivée.
+3. Sélectionnez camion et options de manutention si besoin.
+4. Estimez, confirmez et suivez l'intervention.
+
+## 11. Wallet MOVA
+
+Consultez votre solde, rechargez via Orange Money, M-Pesa ou Airtel Money, et payez vos courses directement depuis le portefeuille.
+
+## 12. Historique
+
+Retrouvez tous vos trajets, colis, commandes repas, réservations et courses dans l'onglet **Historique** (onglets : Trajets | Colis | Repas | Réservations | Courses).
 
 ## 13. Aide et support
 
 - **WhatsApp :** +243 900 000 000
 - **E-mail :** support@mova.cd
-- **Horaires :** Lun–Sam 8h–20h (Africa/Kinshasa)
-- Consultez les CGU et la politique de confidentialité dans **Centre d'aide MOVA**.
+- Consultez les CGU et la politique de confidentialité dans **Aide & Manuel**.
 
 ## Paiements acceptés
 
@@ -118,8 +103,7 @@ MOVA est votre application de mobilité urbaine en RDC. Commandez un taxi ou mot
 | M-Pesa (Vodacom) | CDF |
 | Airtel Money | CDF |
 | Portefeuille MOVA | CDF |
-| Espèces | CDF |
 
 ## Zone de service
 
-Lancement à **Kinshasa** (toutes communes). Extension progressive vers Lubumbashi, Goma, Bukavu et autres villes de RDC.
+Lancement à **Kinshasa**. Extension progressive vers Lubumbashi, Goma, Bukavu et autres villes de RDC.

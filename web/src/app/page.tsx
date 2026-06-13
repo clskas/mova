@@ -14,8 +14,10 @@ import { TaxiBooking } from "@/components/TaxiBooking";
 import { ParcelDelivery } from "@/components/ParcelDelivery";
 import { FoodOrder } from "@/components/FoodOrder";
 import { HistoryView } from "@/components/HistoryView";
+import { HelpView } from "@/components/HelpView";
+import { HelpIcon } from "@/components/ServiceIcons";
 
-type View = "home" | "taxi" | "parcel" | "food" | "history";
+type View = "home" | "taxi" | "parcel" | "food" | "history" | "help";
 
 function greeting(): string {
   const hour = new Date().getHours();
@@ -35,14 +37,27 @@ export default function Home() {
   return (
     <div className="max-w-lg mx-auto min-h-screen flex flex-col">
       <header className="bg-[#1A1A2E] text-white p-4">
-        <h1 className="text-xl font-semibold text-center flex items-center justify-center gap-2">
-          <img src="/icon-192.png" alt="" width={28} height={28} className="rounded-md" />
-          MOVA — RDC
-        </h1>
-        <p className="text-sm opacity-80 text-center flex items-center justify-center gap-1">
-          <LocationIcon color="#6C63FF" size={14} />
-          Kinshasa · Mobilité nationwide
-        </p>
+        <div className="flex items-center justify-between max-w-lg mx-auto">
+          <div className="w-10" />
+          <div>
+            <h1 className="text-xl font-semibold text-center flex items-center justify-center gap-2">
+              <img src="/icon-192.png" alt="" width={28} height={28} className="rounded-md" />
+              MOVA — RDC
+            </h1>
+            <p className="text-sm opacity-80 text-center flex items-center justify-center gap-1">
+              <LocationIcon color="#6C63FF" size={14} />
+              Kinshasa · Mobilité nationwide
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setView("help")}
+            className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/10"
+            aria-label="Aide"
+          >
+            <HelpIcon color="#FFFFFF" size={22} />
+          </button>
+        </div>
       </header>
 
       <main className="flex-1 p-4">
@@ -97,6 +112,7 @@ export default function Home() {
         {view === "parcel" && <ParcelDelivery onBack={() => setView("home")} mock={mock} />}
         {view === "food" && <FoodOrder onBack={() => setView("home")} mock={mock} />}
         {view === "history" && <HistoryView onBack={() => setView("home")} />}
+        {view === "help" && <HelpView onBack={() => setView("home")} />}
       </main>
     </div>
   );

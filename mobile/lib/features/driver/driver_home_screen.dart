@@ -6,6 +6,7 @@ import '../../core/widgets/mova_widgets.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/api/api_client.dart';
 import '../../core/error/result.dart';
+import '../help/driver_help_screen.dart';
 import 'kyc_screen.dart';
 
 class DriverHomeScreen extends ConsumerStatefulWidget {
@@ -53,6 +54,14 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
           onPressed: () => Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => const EarningsScreen()),
+          ),
+        ),
+        IconButton(
+          icon: const Icon(Icons.help_outline),
+          tooltip: 'Aide',
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const DriverHelpScreen()),
           ),
         ),
         IconButton(

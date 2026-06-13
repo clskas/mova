@@ -19,6 +19,9 @@ MOVA met en relation des utilisateurs passagers et des chauffeurs/livreurs indé
 - **Livraison repas** — commande auprès de restaurants partenaires
 - **Courses & commissions** — achats effectués par un livreur pour le compte du passager
 - **Covoiturage** — partage de trajets entre utilisateurs
+- **Location véhicule** — location de voiture, SUV ou minibus
+- **Livraison express** — envoi urgent de petits colis
+- **Déménagement** — transport et manutention avec camion
 - **Portefeuille MOVA** — solde, recharge et paiements
 - **Historique** — consultation des transactions passées
 

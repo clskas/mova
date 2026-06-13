@@ -8,13 +8,19 @@ export class GeoController {
   constructor(private geo: GeoService) {}
 
   @Get('communes')
-  @ApiOperation({ summary: 'Communes Kinshasa' })
+  @ApiOperation({ summary: 'Quartiers/communes par ville' })
   communes(@Query('city') city?: string) {
     return this.geo.getCommunes(city);
   }
 
+  @Get('service-areas')
+  @ApiOperation({ summary: 'Zones de service MOVA (villes RDC)' })
+  serviceAreas() {
+    return this.geo.listServiceAreas();
+  }
+
   @Get('autocomplete')
-  @ApiOperation({ summary: 'Autocomplétion adresses Kinshasa (communes + Mapbox stub)' })
+  @ApiOperation({ summary: 'Autocomplétion adresses par ville (communes + Mapbox)' })
   autocomplete(@Query('q') query?: string, @Query('city') city?: string) {
     return this.geo.autocomplete(query ?? '', city);
   }

@@ -1,41 +1,55 @@
 import {
+  findServiceAreaByCoords,
+  formatCdf,
+  getCommunesForArea,
+  getServiceArea,
+  isInServiceArea,
   KINSHASA_BOUNDS,
   KINSHASA_COMMUNES,
   MovaErrorCode,
   MovaHttpException,
-  formatCdf,
-  isKinshasaCoords,
+  serviceAreaOutOfBoundsMessage,
 } from '@mova/shared';
 import { Delivery, DeliveryEvent, DeliveryStatus, DeliveryType } from '@prisma/client';
 
 export { KINSHASA_BOUNDS };
 
-const COMMUNE_NAMES = KINSHASA_COMMUNES.map((c) => c.name.toLowerCase());
-
-export function assertKinshasaCoords(lat: number, lng: number): void {
-  if (!isKinshasaCoords(lat, lng)) {
+export function assertServiceAreaCoords(lat: number, lng: number, areaId?: string): void {
+  if (!isInServiceArea(lat, lng, areaId)) {
     throw new MovaHttpException(
       MovaErrorCode.VALIDATION_ERROR,
       undefined,
-      'Les coordonnées GPS doivent être situées à Kinshasa.',
+      serviceAreaOutOfBoundsMessage(),
     );
   }
 }
 
-export function detectCommune(lat: number, lng: number, address?: string): string | null {
+/** @deprecated Alias — utiliser assertServiceAreaCoords */
+export function assertKinshasaCoords(lat: number, lng: number): void {
+  assertServiceAreaCoords(lat, lng);
+}
+
+export function detectCommune(lat: number, lng: number, address?: string, areaId?: string): string | null {
+  const area = areaId ? getServiceArea(areaId) : findServiceAreaByCoords(lat, lng);
+  if (!area) return null;
+
+  const districts = area.id === 'kinshasa' ? KINSHASA_COMMUNES : (area.districts ?? getCommunesForArea(area.id));
+  const districtNames = districts.map((d) => d.name.toLowerCase());
+
   if (address) {
     const lower = address.toLowerCase();
-    for (const name of COMMUNE_NAMES) {
+    for (const name of districtNames) {
       if (lower.includes(name)) return name.charAt(0).toUpperCase() + name.slice(1);
     }
   }
-  let best: (typeof KINSHASA_COMMUNES)[number] | null = null;
+
+  let best: { name: string; lat: number; lng: number } | null = null;
   let bestDist = Infinity;
-  for (const commune of KINSHASA_COMMUNES) {
-    const d = (commune.lat - lat) ** 2 + (commune.lng - lng) ** 2;
+  for (const district of districts) {
+    const d = (district.lat - lat) ** 2 + (district.lng - lng) ** 2;
     if (d < bestDist) {
       bestDist = d;
-      best = commune;
+      best = district;
     }
   }
   return best?.name ?? null;
@@ -129,7 +143,7 @@ export function buildMovingTimeline(status: string, completedAt?: Date | null): 
   }));
 }
 
-/** Position mock coursier Kinshasa (interpolation selon statut) */
+/** Position mock coursier (interpolation selon statut) */
 export function mockCourierLocation(
   delivery: Pick<Delivery, 'status' | 'pickupLat' | 'pickupLng' | 'dropoffLat' | 'dropoffLng'>,
 ): { lat: number; lng: number; ts: number } | null {
@@ -155,6 +169,8 @@ export function formatParcelDelivery(
 ) {
   const priceCdf = delivery.finalPriceCdf ?? delivery.estimatedPriceCdf;
   const paymentReady = delivery.status === DeliveryStatus.DELIVERED;
+  const city =
+    findServiceAreaByCoords(delivery.pickupLat ?? 0, delivery.pickupLng ?? 0)?.name ?? 'Kinshasa';
   return {
     id: delivery.id,
     type: delivery.type,
@@ -174,7 +190,7 @@ export function formatParcelDelivery(
     priceCdf,
     formattedPrice: formatCdf(priceCdf),
     currency: 'CDF',
-    city: 'Kinshasa',
+    city,
     distanceKm: delivery.distanceKm,
     durationMin: delivery.durationMin,
     paymentReady,

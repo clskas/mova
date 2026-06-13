@@ -518,8 +518,9 @@ export function formatDate(iso?: string) {
   return new Date(iso).toLocaleString("fr-CD");
 }
 
-export async function fetchCommunes(): Promise<Commune[]> {
-  return apiFetch<Commune[]>("/api/geo/communes");
+export async function fetchCommunes(city = "Kinshasa"): Promise<Commune[]> {
+  const q = encodeURIComponent(city);
+  return apiFetch<Commune[]>(`/api/geo/communes?city=${q}`);
 }
 
 export async function updateUser(id: string, data: Partial<AdminUser>) {

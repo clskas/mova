@@ -1,8 +1,7 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { ScheduledRideStatus, VehicleType } from '@prisma/client';
 import { MovaErrorCode, MovaHttpException } from '@mova/shared';
-import { addressToCoords, assertKinshasaDestination, DEFAULT_PICKUP } from '../common/address.util';
-import { assertKinshasaCoords } from '../deliveries/parcel.util';
+import { addressToCoords, assertServiceAreaCoords, assertServiceAreaDestination, assertSameServiceArea, DEFAULT_PICKUP } from '../common/address.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { PricingService } from './pricing.service';
 import { CreateScheduledRideDto } from './scheduled-rides.dto';
@@ -32,8 +31,8 @@ export class ScheduledRidesService {
       lat: dto.pickupLat ?? DEFAULT_PICKUP.lat,
       lng: dto.pickupLng ?? DEFAULT_PICKUP.lng,
     };
-    assertKinshasaCoords(pickup.lat, pickup.lng);
-    assertKinshasaDestination(dto.dropoffAddress, {
+    assertServiceAreaCoords(pickup.lat, pickup.lng);
+    assertServiceAreaDestination(dto.dropoffAddress, {
       lat: dto.dropoffLat,
       lng: dto.dropoffLng,
     });
@@ -41,7 +40,7 @@ export class ScheduledRidesService {
       dto.dropoffLat != null && dto.dropoffLng != null
         ? { lat: dto.dropoffLat, lng: dto.dropoffLng }
         : addressToCoords(dto.dropoffAddress);
-    assertKinshasaCoords(dropoff.lat, dropoff.lng);
+    assertSameServiceArea(pickup.lat, pickup.lng, dropoff.lat, dropoff.lng);
     return { pickup, dropoff };
   }
 

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { VehicleType } from '@prisma/client';
-import { INTERNAL_API_KEY, MARKET_RDC, serviceUrl } from '@mova/shared';
+import { findServiceAreaByCoords, INTERNAL_API_KEY, MARKET_RDC, serviceUrl } from '@mova/shared';
 
 export interface DriverCandidate {
   driverId: string;
@@ -16,7 +16,11 @@ export interface DriverCandidate {
 @Injectable()
 export class MatchingService {
   async findDrivers(lat: number, lng: number, vehicleType: VehicleType, searchAttempt = 0): Promise<DriverCandidate[]> {
-    const url = serviceUrl('driver', `/internal/drivers/nearby?lat=${lat}&lng=${lng}&vehicleType=${vehicleType}&searchAttempt=${searchAttempt}`);
+    const city = findServiceAreaByCoords(lat, lng)?.name ?? MARKET_RDC.defaultCity;
+    const url = serviceUrl(
+      'driver',
+      `/internal/drivers/nearby?lat=${lat}&lng=${lng}&vehicleType=${vehicleType}&searchAttempt=${searchAttempt}&city=${encodeURIComponent(city)}`,
+    );
     const res = await fetch(url, { headers: { 'x-internal-api-key': INTERNAL_API_KEY } });
     if (!res.ok) return [];
     return res.json();

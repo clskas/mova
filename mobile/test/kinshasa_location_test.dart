@@ -1,9 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:mova/core/location/kinshasa_location.dart';
+import 'package:mova/core/location/service_areas.dart';
 
 void main() {
-  group('KinshasaLocation', () {
+  group('ServiceAreaLocation', () {
     test('default center is within bounds', () {
       expect(KinshasaLocation.isInBounds(KinshasaLocation.defaultCenter), isTrue);
     });
@@ -14,7 +15,7 @@ void main() {
       expect(KinshasaLocation.isInBounds(maluku!), isTrue);
     });
 
-    test('snaps GPS hors Kinshasa quand adresse mentionne Kinshasa', () {
+    test('snaps GPS hors zone quand adresse mentionne Kinshasa', () {
       const abroad = LatLng(37.42, -122.08);
       final snapped = KinshasaLocation.ensureInKinshasa(
         abroad,
@@ -29,15 +30,26 @@ void main() {
       expect(KinshasaLocation.isInBounds(limete), isTrue);
     });
 
-    test('Butembo is outside service area', () {
+    test('Butembo is in nationwide service area', () {
       expect(
         KinshasaLocation.destinationInServiceArea('Butembo'),
-        isFalse,
+        isTrue,
       );
       expect(
         KinshasaLocation.destinationInServiceArea('Gombe'),
         isTrue,
       );
+    });
+
+    test('Paris is outside service area', () {
+      expect(
+        KinshasaLocation.destinationInServiceArea('Paris, France'),
+        isFalse,
+      );
+    });
+
+    test('ServiceAreas lists 26+ cities', () {
+      expect(ServiceAreas.all.length, greaterThanOrEqualTo(26));
     });
   });
 }

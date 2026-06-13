@@ -7,6 +7,7 @@ export const MARKET_RDC = {
   phonePrefix: '+243',
   phoneRegex: /^\+243[0-9]{9}$/,
   defaultCity: 'Kinshasa',
+  defaultServiceAreaId: 'kinshasa',
   timezone: 'Africa/Kinshasa',
   locale: 'fr-CD',
   language: 'fr',

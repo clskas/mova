@@ -62,21 +62,22 @@ describe('ScheduledRidesService', () => {
     expect(prisma.scheduledRide.create).toHaveBeenCalled();
   });
 
-  it('refuse une estimation hors Kinshasa (Butembo)', async () => {
+  it('estime une réservation Butembo valide (zone nationale)', async () => {
     const scheduledAt = new Date();
     scheduledAt.setDate(scheduledAt.getDate() + 1);
-    await expect(
-      service.estimateMobile({
-        dropoffAddress: 'Butembo',
-        vehicleType: VehicleType.STANDARD,
-        scheduledAt: scheduledAt.toISOString(),
-        pickupLat: -4.32,
-        pickupLng: 15.31,
-      }),
-    ).rejects.toMatchObject({ response: { code: MovaErrorCode.VALIDATION_ERROR } });
+    const result = await service.estimateMobile({
+      dropoffAddress: 'Butembo',
+      vehicleType: VehicleType.STANDARD,
+      scheduledAt: scheduledAt.toISOString(),
+      pickupLat: 0.141,
+      pickupLng: 29.291,
+      dropoffLat: 0.145,
+      dropoffLng: 29.295,
+    });
+    expect(result.estimatedPriceCdf).toBe(8000);
   });
 
-  it('refuse des coords pickup hors Kinshasa', async () => {
+  it('refuse des coords pickup hors zones MOVA', async () => {
     const scheduledAt = new Date();
     scheduledAt.setDate(scheduledAt.getDate() + 1);
     await expect(
@@ -84,8 +85,8 @@ describe('ScheduledRidesService', () => {
         dropoffAddress: 'Gombe, Kinshasa',
         vehicleType: VehicleType.STANDARD,
         scheduledAt: scheduledAt.toISOString(),
-        pickupLat: 0.4956,
-        pickupLng: 29.4734,
+        pickupLat: 48.8566,
+        pickupLng: 2.3522,
         dropoffLat: -4.3217,
         dropoffLng: 15.3125,
       }),

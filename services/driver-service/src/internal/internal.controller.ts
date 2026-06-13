@@ -13,6 +13,7 @@ class NearbyQuery {
   @Type(() => Number) @IsNumber() lng: number;
   @IsString() vehicleType: VehicleType;
   @IsOptional() @Type(() => Number) @IsNumber() searchAttempt?: number;
+  @IsOptional() @IsString() city?: string;
 }
 class RatingDto { @IsNumber() ratingAvg: number; }
 class ReviewKycDto { approved: boolean; notes?: string; }
@@ -28,7 +29,7 @@ export class InternalController {
   constructor(private drivers: DriversService, private incidents: IncidentsService) {}
   @Post('profiles') createProfile(@Body() dto: CreateProfileDto) { return this.drivers.createProfile(dto.userId); }
   @Get('drivers/nearby') nearby(@Query() q: NearbyQuery) {
-    return this.drivers.findNearby(q.lat, q.lng, q.vehicleType as VehicleType, q.searchAttempt ?? 0);
+    return this.drivers.findNearby(q.lat, q.lng, q.vehicleType as VehicleType, q.searchAttempt ?? 0, q.city);
   }
   @Get('drivers/count') count() { return this.drivers.countDrivers().then((count) => ({ count })); }
   @Get('drivers') listDrivers(

@@ -1,6 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { SurchargeType, VehicleType } from '@prisma/client';
-import { KINSHASA_COMMUNES } from '@mova/shared';
+import { DRC_SERVICE_AREAS, getCommunesForArea, KINSHASA_COMMUNES, MARKET_RDC } from '@mova/shared';
 import { PrismaService } from './prisma.service';
 
 const PRICING_RULES = [
@@ -9,6 +9,8 @@ const PRICING_RULES = [
   { vehicleType: VehicleType.COMFORT, baseFareCdf: 5000, perKmCdf: 2500, perMinuteCdf: 300, minFareCdf: 8000, peakMultiplier: 1.4, nightMultiplier: 1.3 },
   { vehicleType: VehicleType.VIP, baseFareCdf: 8000, perKmCdf: 3500, perMinuteCdf: 400, minFareCdf: 12000, peakMultiplier: 1.5, nightMultiplier: 1.4 },
 ];
+
+const SEED_CITIES = ['Kinshasa', 'Lubumbashi', 'Goma'] as const;
 
 const CANCELLATION_POLICIES = [
   { vehicleType: VehicleType.MOTO_TAXI, freeCancelMinutes: 2, passengerFeeCdf: 1000, driverCompensationCdf: 500, noShowFeeCdf: 2000 },
@@ -21,6 +23,8 @@ const RESTAURANTS = [
   { name: 'Chez Flore', cuisine: 'Congolais', address: 'Avenue Batetela, Gombe, Kinshasa', lat: -4.3105, lng: 15.3032, rating: 4.6, imageUrl: 'https://cdn.mova.cd/restaurants/chez-flore.jpg', menuItems: [{ name: 'Poulet moambe', unitPriceCdf: 12000 }] },
   { name: 'Limoncello', cuisine: 'Italien', address: 'Boulevard du 30 Juin, Gombe, Kinshasa', lat: -4.3189, lng: 15.3098, rating: 4.5, imageUrl: 'https://cdn.mova.cd/restaurants/limoncello.jpg', menuItems: [{ name: 'Pizza Margherita', unitPriceCdf: 18000 }] },
   { name: 'Planet Hollybum', cuisine: 'Fast-food', address: 'Avenue de la Justice, Gombe, Kinshasa', lat: -4.3251, lng: 15.3124, rating: 4.2, imageUrl: 'https://cdn.mova.cd/restaurants/planet-hollybum.jpg', menuItems: [{ name: 'Burger classique', unitPriceCdf: 10000 }] },
+  { name: 'Le Roxy', cuisine: 'Grill', address: 'Avenue Likasi, Lubumbashi', lat: -11.664, lng: 27.48, rating: 4.3, imageUrl: 'https://cdn.mova.cd/restaurants/roxy.jpg', menuItems: [{ name: 'Brochettes', unitPriceCdf: 14000 }] },
+  { name: 'Cafe Goma', cuisine: 'Café', address: 'Avenue du Lac, Goma', lat: -1.678, lng: 29.218, rating: 4.4, imageUrl: 'https://cdn.mova.cd/restaurants/cafe-goma.jpg', menuItems: [{ name: 'Petit-déjeuner', unitPriceCdf: 8000 }] },
 ];
 
 const RENTAL_VEHICLES = [
@@ -53,11 +57,34 @@ export class SeedService implements OnModuleInit {
 
   async ensureSeedData() {
     for (const c of KINSHASA_COMMUNES) {
-      await this.prisma.commune.upsert({ where: { name: c.name }, create: { name: c.name, lat: c.lat, lng: c.lng }, update: { lat: c.lat, lng: c.lng } });
+      await this.prisma.commune.upsert({
+        where: { name_city: { name: c.name, city: MARKET_RDC.defaultCity } },
+        create: { name: c.name, city: MARKET_RDC.defaultCity, lat: c.lat, lng: c.lng },
+        update: { lat: c.lat, lng: c.lng },
+      });
     }
-    for (const r of PRICING_RULES) {
-      await this.prisma.pricingRule.upsert({ where: { vehicleType: r.vehicleType }, create: r, update: r });
+
+    for (const area of DRC_SERVICE_AREAS) {
+      if (area.id === 'kinshasa') continue;
+      for (const d of getCommunesForArea(area.id)) {
+        await this.prisma.commune.upsert({
+          where: { name_city: { name: d.name, city: area.name } },
+          create: { name: d.name, city: area.name, lat: d.lat, lng: d.lng },
+          update: { lat: d.lat, lng: d.lng },
+        });
+      }
     }
+
+    for (const city of SEED_CITIES) {
+      for (const r of PRICING_RULES) {
+        await this.prisma.pricingRule.upsert({
+          where: { vehicleType_city: { vehicleType: r.vehicleType, city } },
+          create: { ...r, city },
+          update: r,
+        });
+      }
+    }
+
     for (const s of SERVICE_SURCHARGES) {
       await this.prisma.serviceSurcharge.upsert({ where: { type: s.type }, create: s, update: s });
     }

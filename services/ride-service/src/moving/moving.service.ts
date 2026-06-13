@@ -1,7 +1,9 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { MovingRequestStatus, SurchargeType, VehicleType } from '@prisma/client';
 import { MovaErrorCode, MovaHttpException, formatCdf } from '@mova/shared';
-import { assertKinshasaCoords, buildMovingTimeline } from '../deliveries/parcel.util';
+import { assertServiceAreaCoords, buildMovingTimeline } from '../deliveries/parcel.util';
+import { assertSameServiceArea } from '../common/address.util';
+import { findServiceAreaByCoords, MARKET_RDC } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { PricingService } from '../rides/pricing.service';
 import { SurchargeService } from '../rides/surcharge.service';
@@ -16,8 +18,9 @@ export class MovingService {
   ) {}
 
   private validateCoords(dto: EstimateMovingDto) {
-    assertKinshasaCoords(dto.pickupLat, dto.pickupLng);
-    assertKinshasaCoords(dto.dropoffLat, dto.dropoffLng);
+    assertServiceAreaCoords(dto.pickupLat, dto.pickupLng);
+    assertServiceAreaCoords(dto.dropoffLat, dto.dropoffLng);
+    assertSameServiceArea(dto.pickupLat, dto.pickupLng, dto.dropoffLat, dto.dropoffLng);
   }
 
   async estimate(dto: EstimateMovingDto) {
@@ -25,7 +28,8 @@ export class MovingService {
     const moving = await this.surcharges.get(SurchargeType.MOVING);
     const distanceKm = this.pricing.haversineKm(dto.pickupLat, dto.pickupLng, dto.dropoffLat, dto.dropoffLng);
     const durationMin = (distanceKm / 15) * 60;
-    const fare = await this.pricing.estimateFare(VehicleType.STANDARD, distanceKm, durationMin);
+    const city = findServiceAreaByCoords(dto.pickupLat, dto.pickupLng)?.name ?? MARKET_RDC.defaultCity;
+    const fare = await this.pricing.estimateFare(VehicleType.STANDARD, distanceKm, durationMin, city);
     const perM3 = moving.perUnitCdf ?? 8000;
     const volumeFee = Math.ceil(dto.volumeM3 * perM3);
     const estimatedPriceCdf = Math.ceil(fare.estimatedFareCdf * moving.multiplier + moving.baseFeeCdf + volumeFee);

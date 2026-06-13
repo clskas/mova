@@ -364,11 +364,12 @@ class ApiClient {
     return const Failure(NetworkFailure());
   }
 
-  Future<Result<List<Map<String, dynamic>>>> geoAutocomplete(String query) async {
+  Future<Result<List<Map<String, dynamic>>>> geoAutocomplete(String query, {String? city}) async {
     if (query.trim().length < 2) return const Success([]);
     await ensureReady();
     final encoded = Uri.encodeQueryComponent(query.trim());
-    final mock = _mockFor('GET', '/geo/autocomplete?q=$encoded', null);
+    final cityParam = city != null ? '&city=${Uri.encodeQueryComponent(city)}' : '';
+    final mock = _mockFor('GET', '/geo/autocomplete?q=$encoded$cityParam', null);
     if (mock != null) {
       return switch (mock) {
         Success(:final data) => Success(
@@ -379,7 +380,7 @@ class ApiClient {
         Failure(:final error) => Failure(error),
       };
     }
-    final result = await get('/geo/autocomplete?q=$encoded');
+    final result = await get('/geo/autocomplete?q=$encoded$cityParam');
     return switch (result) {
       Success(:final data) => Success(
           List<Map<String, dynamic>>.from(

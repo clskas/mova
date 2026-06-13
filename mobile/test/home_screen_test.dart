@@ -48,7 +48,7 @@ void main() {
     expect(find.text('Livraison express'), findsOneWidget);
     expect(find.text('Location véhicule'), findsOneWidget);
     expect(find.text('Déménagement'), findsOneWidget);
-    expect(find.text('Kinshasa'), findsOneWidget);
+    expect(find.text('Kinshasa'), findsWidgets);
     expect(find.text('Bientôt'), findsNothing);
   });
 

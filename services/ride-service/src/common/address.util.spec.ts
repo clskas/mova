@@ -1,6 +1,11 @@
 import { MovaErrorCode } from '@mova/shared';
 import { MovaHttpException } from '@mova/shared';
-import { assertKinshasaDestination, isKinshasaAddress } from './address.util';
+import {
+  assertKinshasaDestination,
+  assertServiceAreaDestination,
+  isKinshasaAddress,
+  isServiceAreaAddress,
+} from './address.util';
 
 describe('address.util', () => {
   it('reconnaît une commune Kinshasa', () => {
@@ -8,15 +13,20 @@ describe('address.util', () => {
     expect(isKinshasaAddress('Aéroport, Kinshasa')).toBe(true);
   });
 
-  it('rejette une ville hors Kinshasa', () => {
-    expect(isKinshasaAddress('Butembo')).toBe(false);
-    expect(() => assertKinshasaDestination('Butembo')).toThrow(MovaHttpException);
+  it('reconnaît une ville desservie (Butembo)', () => {
+    expect(isServiceAreaAddress('Butembo')).toBe(true);
+    expect(() => assertServiceAreaDestination('Butembo')).not.toThrow();
+  });
+
+  it('rejette une adresse hors zones MOVA', () => {
+    expect(isKinshasaAddress('Paris, France')).toBe(false);
+    expect(() => assertKinshasaDestination('Paris, France')).toThrow(MovaHttpException);
     try {
-      assertKinshasaDestination('Butembo');
+      assertKinshasaDestination('Paris, France');
     } catch (e) {
       expect((e as MovaHttpException).getResponse()).toMatchObject({
         code: MovaErrorCode.VALIDATION_ERROR,
-        message: expect.stringContaining('Kinshasa'),
+        message: expect.stringContaining('MOVA couvre'),
       });
     }
   });
@@ -25,8 +35,14 @@ describe('address.util', () => {
     expect(() => assertKinshasaDestination('Aéroport', { lat: -4.4, lng: 15.4167 })).not.toThrow();
   });
 
-  it('rejette des coords hors Kinshasa', () => {
-    expect(() => assertKinshasaDestination('Ma position', { lat: 0.4956, lng: 29.4734 })).toThrow(
+  it('accepte des coords Lubumbashi', () => {
+    expect(() =>
+      assertServiceAreaDestination('Centre', { lat: -11.6647, lng: 27.4794 }),
+    ).not.toThrow();
+  });
+
+  it('rejette des coords hors zones MOVA', () => {
+    expect(() => assertKinshasaDestination('Ma position', { lat: 48.8566, lng: 2.3522 })).toThrow(
       MovaHttpException,
     );
   });

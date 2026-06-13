@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../../core/config/market_config.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_service_icons.dart';
+import '../../core/widgets/service_area_selector.dart';
 import '../booking/booking_screen.dart';
 import '../carpool/carpool_screen.dart';
 import '../delivery/food_delivery_screen.dart';
@@ -17,7 +20,7 @@ import '../help/help_screen.dart';
 import '../history/history_screen.dart';
 import 'service_card.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
   String _greeting() {
@@ -32,7 +35,7 @@ class HomeScreen extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
 
     return MovaScreen(
@@ -121,25 +124,7 @@ class HomeScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        MovaServiceIcon.location(
-                          size: 16,
-                          color: MovaColors.violet,
-                        ),
-                        const SizedBox(width: 4),
-                        Flexible(
-                          child: Text(
-                            MarketConfig.defaultCity,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: MovaColors.textSecondary,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+                    const ServiceAreaSelector(compact: true),
                   ],
                 ),
               ),

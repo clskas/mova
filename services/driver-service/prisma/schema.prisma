@@ -32,6 +32,7 @@ model DriverProfile {
   id            String    @id @default(uuid())
   userId        String    @unique
   licenseNumber String?
+  operatingCity String    @default("Kinshasa")
   isAvailable   Boolean   @default(false)
   currentLat    Float?
   currentLng    Float?

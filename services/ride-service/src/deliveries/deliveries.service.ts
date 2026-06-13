@@ -5,8 +5,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { PricingService } from '../rides/pricing.service';
 import { SurchargeService } from '../rides/surcharge.service';
 import { CreateFoodDeliveryDto, CreateParcelDeliveryDto } from './deliveries.dto';
+import { assertServiceAreaCoords, assertSameServiceArea } from '../common/address.util';
 import {
-  assertKinshasaCoords,
   buildParcelTimeline,
   detectCommune,
   formatParcelDelivery,
@@ -37,8 +37,9 @@ export class DeliveriesService {
   ) {}
 
   private validateParcelDto(dto: CreateParcelDeliveryDto) {
-    assertKinshasaCoords(dto.pickupLat, dto.pickupLng);
-    assertKinshasaCoords(dto.dropoffLat, dto.dropoffLng);
+    assertServiceAreaCoords(dto.pickupLat, dto.pickupLng);
+    assertServiceAreaCoords(dto.dropoffLat, dto.dropoffLng);
+    assertSameServiceArea(dto.pickupLat, dto.pickupLng, dto.dropoffLat, dto.dropoffLng);
     if (!dto.pickupAddress?.trim() || !dto.dropoffAddress?.trim()) {
       throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Les adresses d\'enlèvement et de livraison sont obligatoires.');
     }

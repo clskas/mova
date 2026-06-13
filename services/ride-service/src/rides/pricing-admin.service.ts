@@ -1,14 +1,17 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { SurchargeType, VehicleType } from '@prisma/client';
-import { MovaErrorCode, MovaHttpException } from '@mova/shared';
+import { MARKET_RDC, MovaErrorCode, MovaHttpException } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class PricingAdminService {
   constructor(private prisma: PrismaService) {}
 
-  listRules() {
-    return this.prisma.pricingRule.findMany({ orderBy: { vehicleType: 'asc' } });
+  listRules(city?: string) {
+    return this.prisma.pricingRule.findMany({
+      where: city ? { city } : undefined,
+      orderBy: [{ city: 'asc' }, { vehicleType: 'asc' }],
+    });
   }
 
   async createRule(
@@ -20,12 +23,15 @@ export class PricingAdminService {
       minFareCdf: number;
       peakMultiplier?: number;
       nightMultiplier?: number;
+      city?: string;
     },
   ) {
+    const city = data.city ?? MARKET_RDC.defaultCity;
     return this.prisma.pricingRule.upsert({
-      where: { vehicleType },
+      where: { vehicleType_city: { vehicleType, city } },
       create: {
         vehicleType,
+        city,
         baseFareCdf: data.baseFareCdf,
         perKmCdf: data.perKmCdf,
         perMinuteCdf: data.perMinuteCdf,
@@ -37,10 +43,15 @@ export class PricingAdminService {
     });
   }
 
-  async deleteRule(vehicleType: VehicleType) {
-    const existing = await this.prisma.pricingRule.findUnique({ where: { vehicleType } });
+  async deleteRule(vehicleType: VehicleType, city = MARKET_RDC.defaultCity) {
+    const existing = await this.prisma.pricingRule.findUnique({
+      where: { vehicleType_city: { vehicleType, city } },
+    });
     if (!existing) throw new MovaHttpException(MovaErrorCode.PRICING_NOT_CONFIGURED, HttpStatus.NOT_FOUND);
-    return this.prisma.pricingRule.update({ where: { vehicleType }, data: { isActive: false } });
+    return this.prisma.pricingRule.update({
+      where: { vehicleType_city: { vehicleType, city } },
+      data: { isActive: false },
+    });
   }
 
   async updateRule(
@@ -53,11 +64,18 @@ export class PricingAdminService {
       peakMultiplier: number;
       nightMultiplier: number;
       isActive: boolean;
+      city: string;
     }>,
   ) {
-    const existing = await this.prisma.pricingRule.findUnique({ where: { vehicleType } });
+    const city = data.city ?? MARKET_RDC.defaultCity;
+    const existing = await this.prisma.pricingRule.findUnique({
+      where: { vehicleType_city: { vehicleType, city } },
+    });
     if (!existing) throw new MovaHttpException(MovaErrorCode.PRICING_NOT_CONFIGURED, HttpStatus.NOT_FOUND);
-    return this.prisma.pricingRule.update({ where: { vehicleType }, data });
+    return this.prisma.pricingRule.update({
+      where: { vehicleType_city: { vehicleType, city } },
+      data,
+    });
   }
 
   listSurcharges() {

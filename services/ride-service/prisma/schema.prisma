@@ -56,18 +56,20 @@ enum ScheduledRideStatus {
 
 model Commune {
   id        String   @id @default(uuid())
-  name      String   @unique
+  name      String
   city      String   @default("Kinshasa")
   lat       Float
   lng       Float
   createdAt DateTime @default(now())
 
+  @@unique([name, city])
   @@map("communes")
 }
 
 model PricingRule {
   id              String      @id @default(uuid())
-  vehicleType     VehicleType @unique
+  vehicleType     VehicleType
+  city            String      @default("Kinshasa")
   baseFareCdf     Int
   perKmCdf        Int
   perMinuteCdf    Int
@@ -78,6 +80,7 @@ model PricingRule {
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 
+  @@unique([vehicleType, city])
   @@map("pricing_rules")
 }
 

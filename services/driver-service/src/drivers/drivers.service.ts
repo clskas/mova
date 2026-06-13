@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { KycStatus, VehicleType } from '@prisma/client';
-import { MARKET_RDC, MovaErrorCode, MovaHttpException, INTERNAL_API_KEY, serviceUrl } from '@mova/shared';
+import { findServiceAreaByCoords, MARKET_RDC, MovaErrorCode, MovaHttpException, INTERNAL_API_KEY, serviceUrl } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 
 export interface DriverCandidate {
@@ -23,13 +23,21 @@ export class DriversService {
     return this.prisma.driverProfile.upsert({ where: { userId }, create: { userId }, update: {} });
   }
 
-  async findNearby(lat: number, lng: number, vehicleType: VehicleType, searchAttempt = 0): Promise<DriverCandidate[]> {
+  async findNearby(lat: number, lng: number, vehicleType: VehicleType, searchAttempt = 0, city?: string): Promise<DriverCandidate[]> {
     const effectiveRadius = Math.min(
       MARKET_RDC.matching.initialRadiusKm + searchAttempt * MARKET_RDC.matching.radiusIncrementKm,
       MARKET_RDC.matching.maxRadiusKm,
     );
+    const operatingCity = city ?? findServiceAreaByCoords(lat, lng)?.name ?? MARKET_RDC.defaultCity;
     const drivers = await this.prisma.driverProfile.findMany({
-      where: { isAvailable: true, kycStatus: KycStatus.APPROVED, currentLat: { not: null }, currentLng: { not: null }, vehicles: { some: { type: vehicleType, isActive: true } } },
+      where: {
+        operatingCity,
+        isAvailable: true,
+        kycStatus: KycStatus.APPROVED,
+        currentLat: { not: null },
+        currentLng: { not: null },
+        vehicles: { some: { type: vehicleType, isActive: true } },
+      },
       include: { vehicles: { where: { type: vehicleType, isActive: true } } },
     });
     const candidates: DriverCandidate[] = [];

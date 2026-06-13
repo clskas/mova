@@ -1,14 +1,30 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { VehicleType } from '@prisma/client';
-import { buildFareBreakdown, FareBreakdown, MARKET_RDC, MovaErrorCode, MovaHttpException } from '@mova/shared';
+import { buildFareBreakdown, FareBreakdown, findServiceAreaByCoords, MARKET_RDC, MovaErrorCode, MovaHttpException } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class PricingService {
   constructor(private prisma: PrismaService) {}
 
-  async estimateFare(vehicleType: VehicleType, distanceKm: number, durationMin: number): Promise<FareBreakdown> {
-    const rule = await this.prisma.pricingRule.findUnique({ where: { vehicleType } });
+  resolveCity(pickupLat: number, pickupLng: number): string {
+    return findServiceAreaByCoords(pickupLat, pickupLng)?.name ?? MARKET_RDC.defaultCity;
+  }
+
+  async estimateFare(
+    vehicleType: VehicleType,
+    distanceKm: number,
+    durationMin: number,
+    city: string = MARKET_RDC.defaultCity,
+  ): Promise<FareBreakdown> {
+    let rule = await this.prisma.pricingRule.findUnique({
+      where: { vehicleType_city: { vehicleType, city } },
+    });
+    if (!rule) {
+      rule = await this.prisma.pricingRule.findUnique({
+        where: { vehicleType_city: { vehicleType, city: MARKET_RDC.defaultCity } },
+      });
+    }
     if (!rule) throw new MovaHttpException(MovaErrorCode.PRICING_NOT_CONFIGURED, HttpStatus.SERVICE_UNAVAILABLE);
     const multiplier = this.getSurchargeMultiplier();
     const baseFareCdf = rule.baseFareCdf;

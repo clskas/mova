@@ -18,6 +18,7 @@ import { RedisService } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { PricingService } from './pricing.service';
 import { MatchingService } from '../matching/matching.service';
+import { assertSameServiceArea, assertServiceAreaCoords } from '../common/address.util';
 
 const ACTIVE_STATUSES: RideStatus[] = [
   RideStatus.REQUESTED,
@@ -47,9 +48,10 @@ export class RidesService {
   ) {}
 
   async estimate(pickupLat: number, pickupLng: number, dropoffLat: number, dropoffLng: number, vehicleType: VehicleType) {
+    const area = assertSameServiceArea(pickupLat, pickupLng, dropoffLat, dropoffLng);
     const distanceKm = this.pricing.haversineKm(pickupLat, pickupLng, dropoffLat, dropoffLng);
     const etaMinutes = (distanceKm / 25) * 60;
-    return this.pricing.estimateFare(vehicleType, distanceKm, etaMinutes);
+    return this.pricing.estimateFare(vehicleType, distanceKm, etaMinutes, area.name);
   }
 
   async createRide(
@@ -68,6 +70,8 @@ export class RidesService {
       where: { passengerId, status: { in: ACTIVE_STATUSES } },
     });
     if (active) throw new MovaHttpException(MovaErrorCode.RIDE_ALREADY_ACTIVE);
+
+    assertSameServiceArea(data.pickupLat, data.pickupLng, data.dropoffLat, data.dropoffLng);
 
     const estimate = await this.estimate(data.pickupLat, data.pickupLng, data.dropoffLat, data.dropoffLng, data.vehicleType);
     const distanceKm = estimate.distanceKm;

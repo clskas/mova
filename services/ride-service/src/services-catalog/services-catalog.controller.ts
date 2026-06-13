@@ -10,6 +10,6 @@ export class ServicesCatalogController {
   @Get()
   @ApiOperation({ summary: 'Liste des services MOVA' })
   list() {
-    return { services: this.catalog.list() };
+    return { data: this.catalog.list() };
   }
 }

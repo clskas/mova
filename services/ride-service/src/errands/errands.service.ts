@@ -1,11 +1,13 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { ErrandOrderStatus, VehicleType } from '@prisma/client';
 import { MovaErrorCode, MovaHttpException } from '@mova/shared';
+import { addressToCoords, DEFAULT_PICKUP } from '../common/address.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { PricingService } from '../rides/pricing.service';
 import { CreateErrandOrderDto } from './errands.dto';
 
 const ERRAND_BASE_CDF = 2500;
+const ITEM_FEE_CDF = 1500;
 
 @Injectable()
 export class ErrandsService {
@@ -23,6 +25,25 @@ export class ErrandsService {
       durationMin,
       errandFeeCdf: ERRAND_BASE_CDF,
     };
+  }
+
+  /** Compatibilité mobile: { deliveryAddress, items[] } */
+  async estimateMobile(deliveryAddress: string, items: string[]) {
+    const dropoff = addressToCoords(deliveryAddress);
+    const description = items.length ? items.join(', ') : 'Course';
+    const dto: CreateErrandOrderDto = {
+      description,
+      pickupAddress: DEFAULT_PICKUP.label,
+      pickupLat: DEFAULT_PICKUP.lat,
+      pickupLng: DEFAULT_PICKUP.lng,
+      dropoffAddress: deliveryAddress,
+      dropoffLat: dropoff.lat,
+      dropoffLng: dropoff.lng,
+    };
+    const estimate = await this.estimate(dto);
+    const itemsFee = items.length * ITEM_FEE_CDF;
+    const estimatedPriceCdf = estimate.estimatedPriceCdf + itemsFee;
+    return { ...estimate, estimatedPriceCdf, itemsFeeCdf: itemsFee, currency: 'CDF' };
   }
 
   async create(userId: string, dto: CreateErrandOrderDto) {
@@ -46,12 +67,55 @@ export class ErrandsService {
     return { order, estimate };
   }
 
+  /** Compatibilité mobile: retourne { errand: { priceCdf, ... } } */
+  async createMobile(userId: string, deliveryAddress: string, items: string[], deliveryLat?: number, deliveryLng?: number) {
+    const dropoff = deliveryLat != null && deliveryLng != null ? { lat: deliveryLat, lng: deliveryLng } : addressToCoords(deliveryAddress);
+    const description = items.length ? items.join(', ') : 'Course';
+    const dto: CreateErrandOrderDto = {
+      description,
+      pickupAddress: DEFAULT_PICKUP.label,
+      pickupLat: DEFAULT_PICKUP.lat,
+      pickupLng: DEFAULT_PICKUP.lng,
+      dropoffAddress: deliveryAddress,
+      dropoffLat: dropoff.lat,
+      dropoffLng: dropoff.lng,
+    };
+    const { order, estimate } = await this.create(userId, dto);
+    const itemsFee = items.length * ITEM_FEE_CDF;
+    const priceCdf = estimate.estimatedPriceCdf + itemsFee;
+    return {
+      errand: {
+        id: order.id,
+        status: order.status,
+        type: 'ERRAND',
+        deliveryAddress,
+        items,
+        priceCdf,
+        estimatedPriceCdf: priceCdf,
+        createdAt: order.createdAt.toISOString(),
+      },
+    };
+  }
+
   async list(userId: string) {
     return this.prisma.errandOrder.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
       take: 50,
     });
+  }
+
+  async listMobile(userId: string) {
+    const rows = await this.list(userId);
+    return rows.map((o) => ({
+      id: o.id,
+      type: 'ERRAND',
+      deliveryAddress: o.dropoffAddress,
+      items: o.description.split(', ').filter(Boolean),
+      status: o.status,
+      priceCdf: o.estimatedPriceCdf,
+      createdAt: o.createdAt.toISOString(),
+    }));
   }
 
   async get(id: string, userId: string) {

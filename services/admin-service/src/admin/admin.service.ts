@@ -33,4 +33,15 @@ export class AdminService {
   }
   listDeliveries() { return this.fetchJson('ride', '/internal/deliveries'); }
   listScheduledRides() { return this.fetchJson('ride', '/internal/scheduled-rides'); }
+  listRestaurants() { return this.fetchJson('ride', '/internal/restaurants'); }
+  createRestaurant(body: Record<string, unknown>) {
+    return fetch(serviceUrl('ride', '/internal/restaurants'), { method: 'POST', headers: { ...this.headers, 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then((r) => r.json());
+  }
+  updateRestaurant(id: string, body: Record<string, unknown>) {
+    return fetch(serviceUrl('ride', `/internal/restaurants/${id}`), { method: 'PATCH', headers: { ...this.headers, 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then((r) => r.json());
+  }
+  listPricingRules() { return this.fetchJson('ride', '/internal/pricing-rules'); }
+  updatePricingRule(vehicleType: string, body: Record<string, unknown>) {
+    return fetch(serviceUrl('ride', `/internal/pricing-rules/${vehicleType}`), { method: 'PATCH', headers: { ...this.headers, 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then((r) => r.json());
+  }
 }

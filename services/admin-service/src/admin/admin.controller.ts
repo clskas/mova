@@ -23,4 +23,9 @@ export class AdminController {
   @Post('incidents/:id/resolve') @ApiOperation({ summary: 'Résoudre incident' }) resolve(@Param('id') id: string, @Body('status') status: string) { return this.adminService.resolveIncident(id, status ?? 'RESOLVED'); }
   @Get('deliveries') @ApiOperation({ summary: 'Vue livraisons en cours' }) deliveries() { return this.adminService.listDeliveries(); }
   @Get('scheduled-rides') @ApiOperation({ summary: 'Vue réservations planifiées' }) scheduledRides() { return this.adminService.listScheduledRides(); }
+  @Get('restaurants') @ApiOperation({ summary: 'Liste restaurants' }) restaurants() { return this.adminService.listRestaurants(); }
+  @Post('restaurants') @ApiOperation({ summary: 'Créer restaurant' }) createRestaurant(@Body() body: Record<string, unknown>) { return this.adminService.createRestaurant(body); }
+  @Post('restaurants/:id') @ApiOperation({ summary: 'Modifier restaurant' }) updateRestaurant(@Param('id') id: string, @Body() body: Record<string, unknown>) { return this.adminService.updateRestaurant(id, body); }
+  @Get('pricing-rules') @ApiOperation({ summary: 'Règles tarifaires' }) pricingRules() { return this.adminService.listPricingRules(); }
+  @Post('pricing-rules/:vehicleType') @ApiOperation({ summary: 'Modifier tarif véhicule' }) updatePricing(@Param('vehicleType') vehicleType: string, @Body() body: Record<string, unknown>) { return this.adminService.updatePricingRule(vehicleType, body); }
 }

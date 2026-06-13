@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   apiFetch,
   checkGatewayHealth,
+  formatUserName,
   normalizeMetrics,
   type AdminMetrics,
   type AdminUser,
@@ -12,6 +13,8 @@ import {
   type KycItem,
   type ScheduledOverview,
 } from "@/lib/api";
+import { AuthGate } from "@/components/AuthGate";
+import { clearToken, getToken } from "@/lib/auth";
 import {
   DeliveriesIcon,
   IncidentsIcon,
@@ -34,19 +37,24 @@ export default function AdminDashboard() {
   const [mock, setMock] = useState(false);
 
   const load = useCallback(async () => {
-    setMock(!(await checkGatewayHealth()));
+    const online = await checkGatewayHealth();
+    setMock(!online && !getToken());
 
-    if (tab === "metrics") setMetrics(await apiFetch<AdminMetrics>("/api/admin/metrics"));
-    if (tab === "users") setUsers(await apiFetch<AdminUser[]>("/api/admin/users"));
-    if (tab === "kyc") setKyc(await apiFetch<KycItem[]>("/api/admin/kyc/pending"));
-    if (tab === "incidents") setIncidents(await apiFetch<Incident[]>("/api/admin/incidents"));
-    if (tab === "operations") {
-      const [d, s] = await Promise.all([
-        apiFetch<DeliveryOverview[]>("/api/admin/deliveries"),
-        apiFetch<ScheduledOverview[]>("/api/admin/scheduled-rides"),
-      ]);
-      setDeliveries(Array.isArray(d) ? d : []);
-      setScheduled(Array.isArray(s) ? s : []);
+    try {
+      if (tab === "metrics") setMetrics(await apiFetch<AdminMetrics>("/api/admin/metrics"));
+      if (tab === "users") setUsers(await apiFetch<AdminUser[]>("/api/admin/users"));
+      if (tab === "kyc") setKyc(await apiFetch<KycItem[]>("/api/admin/kyc/pending"));
+      if (tab === "incidents") setIncidents(await apiFetch<Incident[]>("/api/admin/incidents"));
+      if (tab === "operations") {
+        const [d, s] = await Promise.all([
+          apiFetch<DeliveryOverview[]>("/api/admin/deliveries"),
+          apiFetch<ScheduledOverview[]>("/api/admin/scheduled-rides"),
+        ]);
+        setDeliveries(Array.isArray(d) ? d : []);
+        setScheduled(Array.isArray(s) ? s : []);
+      }
+    } catch {
+      if (!getToken()) setMock(true);
     }
   }, [tab]);
 
@@ -92,6 +100,7 @@ export default function AdminDashboard() {
   ];
 
   return (
+    <AuthGate>
     <div className="min-h-screen flex flex-col">
       <header className="bg-[#1A1A2E] text-white px-6 py-4 flex justify-between items-center">
         <div className="flex items-center gap-3">
@@ -101,7 +110,16 @@ export default function AdminDashboard() {
           <p className="text-xs opacity-70">{m.city} · nationwide RDC</p>
           </div>
         </div>
-        {mock && <span className="text-xs bg-[#FF6B35] px-2 py-1 rounded">Mode démo</span>}
+        <div className="flex items-center gap-3">
+          {mock && <span className="text-xs bg-[#FF6B35] px-2 py-1 rounded">Mode démo</span>}
+          <button
+            type="button"
+            onClick={() => { clearToken(); window.location.href = "/login"; }}
+            className="text-xs opacity-80 hover:opacity-100 underline"
+          >
+            Déconnexion
+          </button>
+        </div>
       </header>
 
       <nav className="flex gap-1 bg-white border-b px-4 overflow-x-auto">
@@ -162,7 +180,7 @@ export default function AdminDashboard() {
                     <tr><td colSpan={3} className="p-6 text-center text-gray-400">Aucun résultat</td></tr>
                   ) : filteredUsers.map((u) => (
                     <tr key={u.id} className="border-b">
-                      <td className="p-3">{u.name}</td>
+                      <td className="p-3">{formatUserName(u)}</td>
                       <td className="p-3">{u.phone}</td>
                       <td className="p-3">
                         <span className={`text-xs px-2 py-0.5 rounded ${u.role === "DRIVER" ? "bg-green-100 text-green-700" : "bg-violet-100 text-violet-700"}`}>
@@ -260,5 +278,6 @@ export default function AdminDashboard() {
         )}
       </main>
     </div>
+    </AuthGate>
   );
 }

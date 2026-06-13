@@ -1,6 +1,7 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { ScheduledRideStatus } from '@prisma/client';
+import { ScheduledRideStatus, VehicleType } from '@prisma/client';
 import { MovaErrorCode, MovaHttpException } from '@mova/shared';
+import { addressToCoords, DEFAULT_PICKUP } from '../common/address.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { PricingService } from './pricing.service';
 import { CreateScheduledRideDto } from './scheduled-rides.dto';
@@ -81,5 +82,22 @@ export class ScheduledRidesService {
       status: r.status,
       priceCdf: r.estimatedPriceCdf,
     }));
+  }
+
+  /** Compatibilité mobile: estimer sans coords pickup/dropoff explicites */
+  async estimateMobile(dropoffAddress: string, vehicleType: VehicleType, scheduledAt: string) {
+    const when = new Date(scheduledAt);
+    this.validateScheduledAt(when);
+    const dropoff = addressToCoords(dropoffAddress);
+    const distanceKm = this.pricing.haversineKm(DEFAULT_PICKUP.lat, DEFAULT_PICKUP.lng, dropoff.lat, dropoff.lng);
+    const durationMin = (distanceKm / 25) * 60;
+    const estimate = await this.pricing.estimateFare(vehicleType, distanceKm, durationMin);
+    return {
+      estimatedPriceCdf: estimate.estimatedFareCdf,
+      formatted: estimate.formatted,
+      currency: 'CDF',
+      distanceKm,
+      durationMin,
+    };
   }
 }

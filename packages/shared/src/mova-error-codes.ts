@@ -35,6 +35,8 @@ export enum MovaErrorCode {
   DRIVER_KYC_PENDING = 'MOVA_DRIVER_002',
 
   VALIDATION_ERROR = 'MOVA_VAL_001',
+  NOT_FOUND = 'MOVA_VAL_002',
+  PRICING_NOT_CONFIGURED = 'MOVA_VAL_003',
   INTERNAL_ERROR = 'MOVA_INT_001',
 }
 
@@ -76,5 +78,7 @@ export const MOVA_ERROR_MESSAGES: Record<MovaErrorCode, string> = {
   [MovaErrorCode.DRIVER_KYC_PENDING]: 'Votre dossier KYC est en cours de validation.',
 
   [MovaErrorCode.VALIDATION_ERROR]: 'Données invalides.',
+  [MovaErrorCode.NOT_FOUND]: 'Ressource introuvable.',
+  [MovaErrorCode.PRICING_NOT_CONFIGURED]: 'Tarification non configurée. Contactez le support MOVA.',
   [MovaErrorCode.INTERNAL_ERROR]: 'Une erreur interne est survenue. Veuillez réessayer.',
 };

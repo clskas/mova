@@ -86,7 +86,7 @@ services:
       context: .
       dockerfile: docker/ride.Dockerfile
     ports:
-      - '3002:3000'
+      - '3022:3000'
     environment:
       DATABASE_URL: postgresql://mova:mova@postgres-rides:5432/mova_rides
       REDIS_URL: redis://redis:6379

@@ -25,6 +25,24 @@ export class MovaHttpException extends HttpException {
   }
 }
 
+function isNestHttpException(exception: unknown): exception is HttpException {
+  return (
+    exception instanceof HttpException ||
+    (typeof exception === 'object' &&
+      exception !== null &&
+      'getStatus' in exception &&
+      typeof (exception as HttpException).getStatus === 'function')
+  );
+}
+
+function extractHttpMessage(body: string | object): string {
+  if (typeof body === 'string') return body;
+  const msg = (body as { message?: string | string[] }).message;
+  if (Array.isArray(msg)) return msg.join('. ');
+  if (typeof msg === 'string') return msg;
+  return 'Erreur de validation';
+}
+
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(HttpExceptionFilter.name);
@@ -44,18 +62,39 @@ export class HttpExceptionFilter implements ExceptionFilter {
       });
     }
 
-    if (exception instanceof HttpException) {
+    if (isNestHttpException(exception)) {
       const status = exception.getStatus();
       const body = exception.getResponse();
+      const message = extractHttpMessage(body);
+      const code =
+        status === HttpStatus.NOT_FOUND
+          ? MovaErrorCode.NOT_FOUND
+          : status === HttpStatus.UNAUTHORIZED
+            ? MovaErrorCode.AUTH_UNAUTHORIZED
+            : MovaErrorCode.VALIDATION_ERROR;
+      if (status >= 500) this.logger.error(`${code}: ${message}`, exception);
+      else this.logger.warn(`${code}: ${message}`);
       return response.status(status).json({
         success: false,
-        error: {
-          code: MovaErrorCode.VALIDATION_ERROR,
-          message:
-            typeof body === 'string'
-              ? body
-              : (body as { message?: string | string[] }).message ?? 'Erreur de validation',
-        },
+        error: { code, message },
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    if (exception instanceof Error) {
+      this.logger.error(exception.message, exception.stack);
+      const message =
+        exception.message.includes('Tarif non configuré') ||
+        exception.message.includes('non configuré')
+          ? MOVA_ERROR_MESSAGES[MovaErrorCode.PRICING_NOT_CONFIGURED]
+          : MOVA_ERROR_MESSAGES[MovaErrorCode.INTERNAL_ERROR];
+      const code =
+        message === MOVA_ERROR_MESSAGES[MovaErrorCode.PRICING_NOT_CONFIGURED]
+          ? MovaErrorCode.PRICING_NOT_CONFIGURED
+          : MovaErrorCode.INTERNAL_ERROR;
+      return response.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+        success: false,
+        error: { code, message },
         timestamp: new Date().toISOString(),
       });
     }

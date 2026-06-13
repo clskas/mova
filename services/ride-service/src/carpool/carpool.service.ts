@@ -1,6 +1,7 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { CarpoolStatus } from '@prisma/client';
+import { CarpoolStatus, VehicleType } from '@prisma/client';
 import { MovaErrorCode, MovaHttpException } from '@mova/shared';
+import { addressToCoords, DEFAULT_PICKUP } from '../common/address.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { PricingService } from '../rides/pricing.service';
 import { CreateCarpoolTripDto } from './carpool.dto';
@@ -10,6 +11,85 @@ const MATCH_RADIUS_KM = 5;
 @Injectable()
 export class CarpoolService {
   constructor(private prisma: PrismaService, private pricing: PricingService) {}
+
+  private formatTripForMobile(t: {
+    id: string;
+    pickupAddress: string | null;
+    dropoffAddress: string | null;
+    seatsAvailable: number;
+    pricePerSeatCdf: number;
+    seatsTotal: number;
+    driverId: string;
+  }) {
+    return {
+      id: t.id,
+      fromAddress: t.pickupAddress ?? 'Kinshasa',
+      toAddress: t.dropoffAddress ?? 'Kinshasa',
+      driverName: `Chauffeur ${t.driverId.slice(0, 6)}`,
+      availableSeats: t.seatsAvailable,
+      totalPriceCdf: t.pricePerSeatCdf * t.seatsTotal,
+      pricePerSeatCdf: t.pricePerSeatCdf,
+    };
+  }
+
+  async estimateMobile(fromAddress: string, toAddress: string, seats: number) {
+    const pickup = addressToCoords(fromAddress);
+    const dropoff = addressToCoords(toAddress);
+    const distanceKm = this.pricing.haversineKm(pickup.lat, pickup.lng, dropoff.lat, dropoff.lng);
+    const durationMin = (distanceKm / 30) * 60;
+    const fare = await this.pricing.estimateFare(VehicleType.STANDARD, distanceKm, durationMin);
+    const totalPriceCdf = Math.max(fare.estimatedFareCdf, 5000 * seats);
+    return {
+      totalPriceCdf,
+      pricePerSeatCdf: Math.ceil(totalPriceCdf / Math.max(seats, 1)),
+      currency: 'CDF',
+      distanceKm,
+      durationMin,
+    };
+  }
+
+  async createFromMobile(driverId: string, fromAddress: string, toAddress: string, seats: number, departureAt?: string) {
+    const pickup = addressToCoords(fromAddress);
+    const dropoff = addressToCoords(toAddress);
+    const estimate = await this.estimateMobile(fromAddress, toAddress, seats);
+    const when = departureAt ? new Date(departureAt) : new Date(Date.now() + 3600000);
+    const dto: CreateCarpoolTripDto = {
+      departureAt: when.toISOString(),
+      pickupLat: pickup.lat,
+      pickupLng: pickup.lng,
+      pickupAddress: fromAddress,
+      dropoffLat: dropoff.lat,
+      dropoffLng: dropoff.lng,
+      dropoffAddress: toAddress,
+      seatsTotal: seats,
+      pricePerSeatCdf: estimate.pricePerSeatCdf,
+    };
+    const { trip } = await this.create(driverId, dto);
+    return {
+      ride: {
+        id: trip.id,
+        status: trip.status,
+        type: 'CARPOOL',
+        fromAddress,
+        toAddress,
+        seats,
+        driverName: 'Vous',
+        totalPriceCdf: estimate.totalPriceCdf,
+      },
+    };
+  }
+
+  async listMobileRides() {
+    const { trips } = await this.list();
+    return { data: trips.map((t) => this.formatTripForMobile(t)) };
+  }
+
+  async searchMobile(fromAddress: string, toAddress: string) {
+    const pickup = addressToCoords(fromAddress);
+    const dropoff = addressToCoords(toAddress);
+    const { matches } = await this.list({ pickupLat: pickup.lat, pickupLng: pickup.lng, dropoffLat: dropoff.lat, dropoffLng: dropoff.lng });
+    return { data: matches.map((t) => this.formatTripForMobile(t)) };
+  }
 
   async create(driverId: string, dto: CreateCarpoolTripDto) {
     const departureAt = new Date(dto.departureAt);

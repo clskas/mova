@@ -1,6 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { HttpStatus, Injectable } from '@nestjs/common';
 import { VehicleType } from '@prisma/client';
-import { MARKET_RDC } from '@mova/shared';
+import { MARKET_RDC, MovaErrorCode, MovaHttpException } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -9,7 +9,7 @@ export class PricingService {
 
   async estimateFare(vehicleType: VehicleType, distanceKm: number, durationMin: number) {
     const rule = await this.prisma.pricingRule.findUnique({ where: { vehicleType } });
-    if (!rule) throw new Error(`Tarif non configuré pour ${vehicleType}`);
+    if (!rule) throw new MovaHttpException(MovaErrorCode.PRICING_NOT_CONFIGURED, HttpStatus.SERVICE_UNAVAILABLE);
     const multiplier = this.getSurchargeMultiplier();
     const base = rule.baseFareCdf;
     const distance = Math.ceil(distanceKm * rule.perKmCdf);

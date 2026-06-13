@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, Post, Query, Request, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { MobileCarpoolAddressDto, MobileCarpoolCreateDto, MobileCarpoolEstimateDto } from '../deliveries/deliveries-mobile.dto';
 import { CreateCarpoolTripDto, JoinCarpoolDto } from './carpool.dto';
 import { CarpoolService } from './carpool.service';
 
@@ -10,6 +11,30 @@ import { CarpoolService } from './carpool.service';
 @ApiBearerAuth()
 export class CarpoolController {
   constructor(private carpoolService: CarpoolService) {}
+
+  @Get('rides')
+  @ApiOperation({ summary: 'Lister trajets covoiturage (contrat mobile)' })
+  listRides() {
+    return this.carpoolService.listMobileRides();
+  }
+
+  @Post('rides')
+  @ApiOperation({ summary: 'Créer trajet covoiturage (contrat mobile)' })
+  createRide(@Request() req: { user: { id: string } }, @Body() dto: MobileCarpoolCreateDto) {
+    return this.carpoolService.createFromMobile(req.user.id, dto.fromAddress, dto.toAddress, dto.seats ?? 3, dto.departureAt);
+  }
+
+  @Post('search')
+  @ApiOperation({ summary: 'Rechercher trajets covoiturage (contrat mobile)' })
+  search(@Body() dto: MobileCarpoolAddressDto) {
+    return this.carpoolService.searchMobile(dto.fromAddress, dto.toAddress);
+  }
+
+  @Post('estimate')
+  @ApiOperation({ summary: 'Estimer covoiturage (contrat mobile)' })
+  estimate(@Body() dto: MobileCarpoolEstimateDto) {
+    return this.carpoolService.estimateMobile(dto.fromAddress, dto.toAddress, dto.seats ?? 3);
+  }
 
   @Post()
   @ApiOperation({ summary: 'Créer un trajet covoiturage' })

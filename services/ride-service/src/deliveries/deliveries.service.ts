@@ -174,4 +174,13 @@ export class DeliveriesService {
       createdAt: d.createdAt.toISOString(),
     }));
   }
+
+  async listRestaurantsAdmin() {
+    return this.prisma.restaurant.findMany({ orderBy: { name: 'asc' } });
+  }
+
+  async upsertRestaurant(id: string | null, data: Record<string, unknown>) {
+    if (id) return this.prisma.restaurant.update({ where: { id }, data: data as never });
+    return this.prisma.restaurant.create({ data: data as never });
+  }
 }

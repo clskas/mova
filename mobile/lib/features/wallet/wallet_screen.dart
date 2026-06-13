@@ -19,6 +19,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
   List<Map<String, dynamic>> _transactions = [];
   bool _loading = true;
   bool _topUpLoading = false;
+  bool _topUpSheetOpen = false;
   String? _error;
 
   @override
@@ -27,25 +28,48 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
     _loadWallet();
   }
 
+  void _applyWalletData({
+    required int balance,
+    required List<Map<String, dynamic>> transactions,
+    String? error,
+  }) {
+    _balance = balance;
+    _transactions = transactions;
+    _loading = false;
+    _error = error;
+    if (!_topUpSheetOpen && mounted) {
+      setState(() {});
+    }
+  }
+
   Future<void> _loadWallet() async {
-    setState(() {
+    if (!_topUpSheetOpen && mounted) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    } else {
       _loading = true;
       _error = null;
-    });
+    }
     final api = ref.read(apiClientProvider);
     await api.loadToken();
     final result = await api.get('/wallet');
-    setState(() {
-      _loading = false;
-      switch (result) {
-        case Success(:final data):
-          _balance = data['balanceCdf'] as int? ?? 0;
-          final raw = data['transactions'] as List? ?? [];
-          _transactions = raw.cast<Map<String, dynamic>>();
-        case Failure(:final error):
-          _error = error.message;
-      }
-    });
+    if (!mounted) return;
+    switch (result) {
+      case Success(:final data):
+        final raw = data['transactions'] as List? ?? [];
+        _applyWalletData(
+          balance: data['balanceCdf'] as int? ?? 0,
+          transactions: raw.cast<Map<String, dynamic>>(),
+        );
+      case Failure(:final error):
+        _applyWalletData(
+          balance: _balance,
+          transactions: _transactions,
+          error: error.message,
+        );
+    }
   }
 
   String _txLabel(Map<String, dynamic> tx) {
@@ -68,75 +92,25 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
   }
 
   Future<void> _showTopUpSheet(MobileMoneyProvider provider) async {
-    final amountController = TextEditingController(text: '10000');
-    final phoneController = TextEditingController(
-      text: await ref.read(apiClientProvider).loadUserPhone() ?? '+243812345678',
-    );
-
+    final initialPhone =
+        await ref.read(apiClientProvider).loadUserPhone() ?? '+243812345678';
     if (!mounted) return;
-    await showModalBottomSheet<void>(
+
+    setState(() => _topUpSheetOpen = true);
+    final confirmed = await showModalBottomSheet<({int amount, String phone})>(
       context: context,
       isScrollControlled: true,
-      builder: (ctx) {
-        return Padding(
-          padding: EdgeInsets.only(
-            left: 16,
-            right: 16,
-            top: 24,
-            bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                'Recharger via ${provider.name}',
-                style: Theme.of(ctx).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: amountController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Montant (FC)',
-                  prefixIcon: Icon(Icons.payments_outlined),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: phoneController,
-                keyboardType: TextInputType.phone,
-                decoration: const InputDecoration(
-                  labelText: 'Numéro mobile money',
-                  prefixIcon: Icon(Icons.phone_outlined),
-                ),
-              ),
-              const SizedBox(height: 20),
-              MovaButton(
-                label: 'Confirmer la recharge',
-                icon: Icons.check,
-                isLoading: _topUpLoading,
-                onPressed: _topUpLoading
-                    ? null
-                    : () async {
-                        final amount = int.tryParse(amountController.text.trim()) ?? 0;
-                        if (amount < 500) {
-                          ScaffoldMessenger.of(ctx).showSnackBar(
-                            const SnackBar(content: Text('Montant minimum : 500 FC')),
-                          );
-                          return;
-                        }
-                        Navigator.pop(ctx);
-                        await _topUp(provider.id, amount, phoneController.text.trim());
-                      },
-              ),
-            ],
-          ),
-        );
-      },
+      builder: (ctx) => _WalletTopUpSheet(
+        provider: provider,
+        initialPhone: initialPhone,
+      ),
     );
-    amountController.dispose();
-    phoneController.dispose();
+    if (!mounted) return;
+    setState(() => _topUpSheetOpen = false);
+
+    if (confirmed != null) {
+      await _topUp(provider.id, confirmed.amount, confirmed.phone);
+    }
   }
 
   Future<void> _topUp(String provider, int amountCdf, String phone) async {
@@ -303,6 +277,98 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                 ),
               );
             }),
+        ],
+      ),
+    );
+  }
+}
+
+class _WalletTopUpSheet extends StatefulWidget {
+  const _WalletTopUpSheet({
+    required this.provider,
+    required this.initialPhone,
+  });
+
+  final MobileMoneyProvider provider;
+  final String initialPhone;
+
+  @override
+  State<_WalletTopUpSheet> createState() => _WalletTopUpSheetState();
+}
+
+class _WalletTopUpSheetState extends State<_WalletTopUpSheet> {
+  late final TextEditingController _amountController;
+  late final TextEditingController _phoneController;
+
+  @override
+  void initState() {
+    super.initState();
+    _amountController = TextEditingController(text: '10000');
+    _phoneController = TextEditingController(text: widget.initialPhone);
+  }
+
+  @override
+  void dispose() {
+    _amountController.dispose();
+    _phoneController.dispose();
+    super.dispose();
+  }
+
+  void _confirm() {
+    final amount = int.tryParse(_amountController.text.trim()) ?? 0;
+    if (amount < 500) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Montant minimum : 500 FC')),
+      );
+      return;
+    }
+    Navigator.pop(
+      context,
+      (amount: amount, phone: _phoneController.text.trim()),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 16,
+        right: 16,
+        top: 24,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'Recharger via ${widget.provider.name}',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _amountController,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              labelText: 'Montant (FC)',
+              prefixIcon: Icon(Icons.payments_outlined),
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _phoneController,
+            keyboardType: TextInputType.phone,
+            decoration: const InputDecoration(
+              labelText: 'Numéro mobile money',
+              prefixIcon: Icon(Icons.phone_outlined),
+            ),
+          ),
+          const SizedBox(height: 20),
+          MovaButton(
+            label: 'Confirmer la recharge',
+            icon: Icons.check,
+            onPressed: _confirm,
+          ),
         ],
       ),
     );

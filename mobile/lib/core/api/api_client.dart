@@ -79,6 +79,33 @@ class ApiClient {
     if (path.contains('/rides/estimate')) {
       return Success(MockData.estimate(body ?? {}));
     }
+    if (path.contains('/geo/autocomplete')) {
+      final q = Uri.parse('http://x$path').queryParameters['q'] ??
+          path.split('q=').last.split('&').first;
+      return Success({'suggestions': MockData.geoAutocomplete(q)});
+    }
+    if (path.contains('/geo/communes')) {
+      return Success({'data': MockData.communes()});
+    }
+    if (RegExp(r'^/rides/[^/]+/search$').hasMatch(path) && method == 'POST') {
+      final id = path.split('/')[2];
+      return Success(MockData.searchDrivers(id));
+    }
+    if (RegExp(r'^/rides/[^/]+/cancel$').hasMatch(path) && method == 'POST') {
+      final id = path.split('/')[2];
+      return Success(MockData.cancelRide(id, reason: body?['reason']?.toString()));
+    }
+    if (RegExp(r'^/payments/rides/[^/]+$').hasMatch(path) && method == 'POST') {
+      final id = path.split('/').last;
+      return Success(MockData.payRide(id, body ?? {}));
+    }
+    if (RegExp(r'^/rides/[^/]+$').hasMatch(path) &&
+        method == 'GET' &&
+        path != '/rides/history' &&
+        !path.contains('scheduled')) {
+      final id = path.split('/').last.split('?').first;
+      return Success({'ride': MockData.rideDetail(id)});
+    }
     if (path == '/rides' && method == 'POST') {
       return Success({'ride': MockData.createRide(body ?? {})});
     }
@@ -251,6 +278,61 @@ class ApiClient {
       }
     }
     return const Failure(NetworkFailure());
+  }
+
+  Future<Result<List<Map<String, dynamic>>>> geoAutocomplete(String query) async {
+    if (query.trim().length < 2) return const Success([]);
+    await ensureReady();
+    final encoded = Uri.encodeQueryComponent(query.trim());
+    final mock = _mockFor('GET', '/geo/autocomplete?q=$encoded', null);
+    if (mock != null) {
+      return switch (mock) {
+        Success(:final data) => Success(
+            List<Map<String, dynamic>>.from(
+              data['suggestions'] as List? ?? data['data'] as List? ?? [],
+            ),
+          ),
+        Failure(:final error) => Failure(error),
+      };
+    }
+    final result = await get('/geo/autocomplete?q=$encoded');
+    return switch (result) {
+      Success(:final data) => Success(
+          List<Map<String, dynamic>>.from(
+            data['suggestions'] as List? ?? data['data'] as List? ?? [],
+          ),
+        ),
+      Failure() => Success(MockData.geoAutocomplete(query)),
+    };
+  }
+
+  Future<Result<Map<String, dynamic>>> getRide(String rideId) async {
+    final result = await get('/rides/$rideId');
+    return switch (result) {
+      Success(:final data) => Success(
+          data['ride'] as Map<String, dynamic>? ?? data,
+        ),
+      Failure(:final error) => Failure(error),
+    };
+  }
+
+  Future<Result<Map<String, dynamic>>> searchDrivers(String rideId) async {
+    return post('/rides/$rideId/search', {});
+  }
+
+  Future<Result<Map<String, dynamic>>> cancelRide(String rideId, {String? reason}) async {
+    return post('/rides/$rideId/cancel', {if (reason != null) 'reason': reason});
+  }
+
+  Future<Result<Map<String, dynamic>>> payRide(
+    String rideId, {
+    required String method,
+    required int amountCdf,
+  }) async {
+    return post('/payments/rides/$rideId', {
+      'method': method,
+      'amountCdf': amountCdf,
+    });
   }
 }
 

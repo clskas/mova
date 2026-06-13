@@ -1,0 +1,128 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/api/api_client.dart';
+import '../../core/config/market_config.dart';
+import '../../core/error/result.dart';
+import '../../core/theme/mova_colors.dart';
+import '../../core/widgets/mova_screen.dart';
+import '../../core/widgets/mova_widgets.dart';
+import '../rating/rating_screen.dart';
+
+const _paymentMethods = [
+  ('WALLET', 'Portefeuille MOVA', Icons.account_balance_wallet, MovaColors.violet),
+  ('ORANGE_MONEY', 'Orange Money', Icons.phone_android, MovaColors.orange),
+  ('MPESA', 'M-Pesa', Icons.phone_android, Color(0xFFE60000)),
+  ('AIRTEL_MONEY', 'Airtel Money', Icons.phone_android, Color(0xFFED1C24)),
+  ('CASH', 'Espèces', Icons.payments_outlined, MovaColors.green),
+];
+
+class PaymentScreen extends ConsumerStatefulWidget {
+  const PaymentScreen({
+    super.key,
+    required this.rideId,
+    required this.amountCdf,
+  });
+
+  final String rideId;
+  final int amountCdf;
+
+  @override
+  ConsumerState<PaymentScreen> createState() => _PaymentScreenState();
+}
+
+class _PaymentScreenState extends ConsumerState<PaymentScreen> {
+  String _method = 'WALLET';
+  bool _loading = false;
+  String? _error;
+
+  Future<void> _pay() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    final api = ref.read(apiClientProvider);
+    final result = await api.payRide(
+      widget.rideId,
+      method: _method,
+      amountCdf: widget.amountCdf,
+    );
+    if (!mounted) return;
+    setState(() => _loading = false);
+
+    switch (result) {
+      case Success():
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => RatingScreen(rideId: widget.rideId),
+          ),
+        );
+      case Failure(:final error):
+        setState(() => _error = error.message);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MovaScreen(
+      title: 'Paiement',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          MovaCard(
+            child: Column(
+              children: [
+                const Text('Montant à payer', style: TextStyle(color: MovaColors.textSecondary)),
+                const SizedBox(height: 8),
+                Text(
+                  MarketConfig.formatCdf(widget.amountCdf),
+                  style: const TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    color: MovaColors.green,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+          Text('Mode de paiement', style: Theme.of(context).textTheme.titleSmall),
+          const SizedBox(height: 8),
+          ..._paymentMethods.map((m) {
+            final (id, label, icon, color) = m;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: MovaCard(
+                onTap: () => setState(() => _method = id),
+                child: Row(
+                  children: [
+                    Icon(icon, color: color),
+                    const SizedBox(width: 12),
+                    Expanded(child: Text(label)),
+                    Radio<String>(
+                      value: id,
+                      groupValue: _method,
+                      onChanged: (v) => setState(() => _method = v!),
+                      activeColor: MovaColors.violet,
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }),
+          if (_error != null) ...[
+            const SizedBox(height: 12),
+            MovaErrorBanner(message: _error!, onRetry: _pay),
+          ],
+          const SizedBox(height: 24),
+          MovaButton(
+            label: 'Payer ${MarketConfig.formatCdf(widget.amountCdf)}',
+            isLoading: _loading,
+            icon: Icons.lock_outline,
+            onPressed: _loading ? null : _pay,
+          ),
+        ],
+      ),
+    );
+  }
+}

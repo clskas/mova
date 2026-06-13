@@ -39,6 +39,38 @@ class MarketConfig {
     VehicleTypeOption(id: 'MOTO_TAXI', label: 'Moto-taxi', icon: '🏍️'),
     VehicleTypeOption(id: 'STANDARD', label: 'Standard', icon: '🚗'),
     VehicleTypeOption(id: 'COMFORT', label: 'Confort', icon: '✨'),
+    VehicleTypeOption(id: 'VIP', label: 'VIP', icon: '👑'),
+  ];
+
+  /// VIP n'existe pas côté API — mappe vers COMFORT pour les appels backend.
+  static String apiVehicleType(String uiType) =>
+      uiType == 'VIP' ? 'COMFORT' : uiType;
+
+  static const kinshasaCommunes = [
+    'Bandalungwa',
+    'Barumbu',
+    'Bumbu',
+    'Gombe',
+    'Kalamu',
+    'Kasa-Vubu',
+    'Kimbanseke',
+    'Kinshasa',
+    'Kintambo',
+    'Kisenso',
+    'Lemba',
+    'Limete',
+    'Lingwala',
+    'Makala',
+    'Maluku',
+    'Masina',
+    'Matete',
+    'Mont-Ngafula',
+    'Ndjili',
+    'Ngaba',
+    'Ngaliema',
+    'Ngiri-Ngiri',
+    'Nsele',
+    'Selembao',
   ];
 
   static String formatCdf(int amount) {

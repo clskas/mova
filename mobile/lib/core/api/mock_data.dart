@@ -1,3 +1,5 @@
+import '../config/market_config.dart';
+
 abstract final class MockData {
   static Map<String, dynamic> otpRequest(String phone) => {
         'success': true,
@@ -22,24 +24,142 @@ abstract final class MockData {
     };
   }
 
-  static Map<String, dynamic> estimate([Map<String, dynamic>? body]) => {
-        'distanceKm': 3.2,
-        'durationMin': 12,
-        'estimatedFareCdf': body?['vehicleType'] == 'COMFORT'
-            ? 15000
-            : body?['vehicleType'] == 'MOTO_TAXI'
-                ? 6500
-                : 8500,
-        'estimatedPriceCdf': body?['vehicleType'] == 'COMFORT' ? 15000 : 8500,
-        'priceCdf': 8500,
-        'currency': 'CDF',
-      };
+  static Map<String, dynamic> estimate([Map<String, dynamic>? body]) {
+    final vehicleType = body?['vehicleType']?.toString() ?? 'MOTO_TAXI';
+    final distanceKm = 3.2;
+    final durationMin = 12.0;
+    final base = switch (vehicleType) {
+      'VIP' => 8000,
+      'COMFORT' => 5000,
+      'STANDARD' => 3000,
+      _ => 1500,
+    };
+    final distanceFare = switch (vehicleType) {
+      'VIP' => 9000,
+      'COMFORT' => 8000,
+      'STANDARD' => 4800,
+      _ => 2560,
+    };
+    final durationFare = switch (vehicleType) {
+      'VIP' => 3600,
+      'COMFORT' => 3600,
+      'STANDARD' => 2400,
+      _ => 1200,
+    };
+    final multiplier = _isPeakHour() ? 1.3 : 1.0;
+    final subtotal = ((base + distanceFare + durationFare) * multiplier).ceil();
+    final total = vehicleType == 'MOTO_TAXI' ? subtotal.clamp(2000, 999999) : subtotal;
+    return {
+      'distanceKm': distanceKm,
+      'durationMin': durationMin,
+      'vehicleType': vehicleType,
+      'baseFareCdf': base,
+      'distanceFareCdf': distanceFare,
+      'durationFareCdf': durationFare,
+      'surchargeMultiplier': multiplier,
+      'estimatedFareCdf': total,
+      'estimatedPriceCdf': total,
+      'priceCdf': total,
+      'currency': 'CDF',
+      'peakHourLabel': multiplier > 1.0 ? 'Heure de pointe' : null,
+      'formatted': '${total.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]} ')} FC',
+    };
+  }
+
+  static bool _isPeakHour() {
+    final hour = DateTime.now().hour;
+    return (hour >= 7 && hour < 9) || (hour >= 17 && hour < 19);
+  }
+
+  static List<Map<String, dynamic>> geoAutocomplete(String query) {
+    final q = query.toLowerCase().trim();
+    if (q.isEmpty) return [];
+    return MarketConfig.kinshasaCommunes
+        .where((c) => c.toLowerCase().contains(q))
+        .take(8)
+        .map((name) => {
+              'label': '$name, Kinshasa',
+              'address': '$name, Kinshasa',
+              'lat': MarketConfig.defaultLat - (name.hashCode % 100) / 10000,
+              'lng': MarketConfig.defaultLng + (name.hashCode % 100) / 10000,
+            })
+        .toList();
+  }
+
+  static List<Map<String, dynamic>> communes() =>
+      MarketConfig.kinshasaCommunes
+          .map((name) => {'name': name, 'city': 'Kinshasa'})
+          .toList();
 
   static Map<String, dynamic> createRide(Map<String, dynamic> body) => {
         'id': 'ride-mock-${DateTime.now().millisecondsSinceEpoch}',
         'status': 'SEARCHING',
         ...body,
-        'priceCdf': 8500,
+        'estimatedFareCdf': estimate(body)['estimatedFareCdf'],
+        'priceCdf': estimate(body)['estimatedFareCdf'],
+        'distanceKm': 3.2,
+        'durationMin': 12,
+      };
+
+  static Map<String, dynamic> searchDrivers(String rideId) => {
+        'rideId': rideId,
+        'attempt': 0,
+        'radiusKm': 3,
+        'driversFound': 2,
+        'drivers': [
+          {
+            'id': 'driver-mock-1',
+            'name': 'Jean Kabila',
+            'rating': 4.8,
+            'vehicleType': 'MOTO_TAXI',
+            'plateNumber': 'KIN-4521',
+            'distanceKm': 0.8,
+          },
+        ],
+      };
+
+  static Map<String, dynamic> rideDetail(String rideId) => {
+        'id': rideId,
+        'status': 'ACCEPTED',
+        'vehicleType': 'MOTO_TAXI',
+        'pickupAddress': 'Gombe, Kinshasa',
+        'dropoffAddress': 'Limete, Kinshasa',
+        'pickupLat': MarketConfig.defaultLat,
+        'pickupLng': MarketConfig.defaultLng,
+        'dropoffLat': MarketConfig.defaultLat - 0.03,
+        'dropoffLng': MarketConfig.defaultLng + 0.04,
+        'estimatedFareCdf': 8500,
+        'finalFareCdf': 8500,
+        'distanceKm': 3.2,
+        'durationMin': 12,
+        'driver': {
+          'id': 'driver-mock-1',
+          'name': 'Jean Kabila',
+          'rating': 4.8,
+          'phone': '+243812345678',
+          'vehicleType': 'Moto-taxi',
+          'plateNumber': 'KIN-4521',
+          'vehicleModel': 'Honda Ace',
+        },
+      };
+
+  static Map<String, dynamic> cancelRide(String rideId, {String? reason}) => {
+        'ride': {
+          'id': rideId,
+          'status': 'CANCELLED',
+          'cancelReason': reason,
+        },
+        'cancellationFeeCdf': 0,
+        'policyMessage':
+            'Annulation gratuite avant l\'arrivée du chauffeur. Frais de 2 000 FC après acceptation.',
+      };
+
+  static Map<String, dynamic> payRide(String rideId, Map<String, dynamic> body) => {
+        'success': true,
+        'rideId': rideId,
+        'method': body['method'] ?? 'WALLET',
+        'amountCdf': body['amountCdf'] ?? 8500,
+        'status': 'COMPLETED',
       };
 
   static List<Map<String, dynamic>> rideHistory() => [

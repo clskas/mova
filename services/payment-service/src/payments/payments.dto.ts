@@ -5,9 +5,10 @@ export class ProcessPaymentDto {
   @ApiProperty({ enum: PaymentMethod })
   @IsEnum(PaymentMethod)
   method: PaymentMethod;
-  @ApiProperty()
+  @ApiProperty({ required: false, description: 'Requis pour Orange Money, M-Pesa et Airtel Money' })
+  @IsOptional()
   @IsString()
-  phone: string;
+  phone?: string;
   @ApiProperty({ required: false })
   @IsOptional()
   @IsInt()

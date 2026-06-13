@@ -41,6 +41,7 @@ void main() {
     expect(find.text('Confort'), findsOneWidget);
     expect(find.text('VIP'), findsOneWidget);
     expect(find.text('Estimer le prix'), findsOneWidget);
+    expect(find.byTooltip('Ma position'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

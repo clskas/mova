@@ -16,6 +16,8 @@ const _paymentMethods = [
   ('CASH', 'Espèces', Icons.payments_outlined, MovaColors.green),
 ];
 
+const _mobileMoneyMethods = {'ORANGE_MONEY', 'MPESA', 'AIRTEL_MONEY'};
+
 class PaymentScreen extends ConsumerStatefulWidget {
   const PaymentScreen({
     super.key,
@@ -31,11 +33,42 @@ class PaymentScreen extends ConsumerStatefulWidget {
 }
 
 class _PaymentScreenState extends ConsumerState<PaymentScreen> {
+  final _phoneController = TextEditingController(text: '+243');
   String _method = 'WALLET';
   bool _loading = false;
   String? _error;
 
+  @override
+  void initState() {
+    super.initState();
+    _loadPhone();
+  }
+
+  @override
+  void dispose() {
+    _phoneController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadPhone() async {
+    final api = ref.read(apiClientProvider);
+    final phone = await api.loadUserPhone();
+    if (phone != null && mounted) {
+      setState(() => _phoneController.text = phone);
+    }
+  }
+
+  bool get _needsPhone => _mobileMoneyMethods.contains(_method);
+
   Future<void> _pay() async {
+    if (_needsPhone) {
+      final phone = MarketConfig.normalizePhone(_phoneController.text);
+      if (!MarketConfig.validatePhone(phone)) {
+        setState(() => _error = 'Numéro mobile money invalide (+243XXXXXXXXX).');
+        return;
+      }
+    }
+
     setState(() {
       _loading = true;
       _error = null;
@@ -45,6 +78,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       widget.rideId,
       method: _method,
       amountCdf: widget.amountCdf,
+      phone: _needsPhone ? MarketConfig.normalizePhone(_phoneController.text) : null,
     );
     if (!mounted) return;
     setState(() => _loading = false);
@@ -110,6 +144,18 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
               ),
             );
           }),
+          if (_needsPhone) ...[
+            const SizedBox(height: 8),
+            TextField(
+              controller: _phoneController,
+              keyboardType: TextInputType.phone,
+              decoration: const InputDecoration(
+                labelText: 'Numéro mobile money',
+                hintText: '+243XXXXXXXXX',
+                prefixIcon: Icon(Icons.phone),
+              ),
+            ),
+          ],
           if (_error != null) ...[
             const SizedBox(height: 12),
             MovaErrorBanner(message: _error!, onRetry: _pay),

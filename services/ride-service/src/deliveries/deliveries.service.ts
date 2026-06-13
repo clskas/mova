@@ -1,9 +1,15 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { DeliveryStatus, DeliveryType, Prisma, VehicleType, WeightCategory } from '@prisma/client';
-import { MovaErrorCode, MovaHttpException } from '@mova/shared';
+import { MovaErrorCode, MovaHttpException, formatCdf } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { PricingService } from '../rides/pricing.service';
 import { CreateFoodDeliveryDto, CreateParcelDeliveryDto } from './deliveries.dto';
+import {
+  assertKinshasaCoords,
+  buildParcelTimeline,
+  detectCommune,
+  formatParcelDelivery,
+} from './parcel.util';
 
 const WEIGHT_MULTIPLIERS: Record<WeightCategory, number> = {
   [WeightCategory.DOCUMENTS]: 1.0,
@@ -12,24 +18,71 @@ const WEIGHT_MULTIPLIERS: Record<WeightCategory, number> = {
   [WeightCategory.LARGE]: 1.5,
 };
 
+const WEIGHT_KG_MULTIPLIERS: { maxKg: number; category: WeightCategory; multiplier: number }[] = [
+  { maxKg: 0.5, category: WeightCategory.DOCUMENTS, multiplier: 1.0 },
+  { maxKg: 1, category: WeightCategory.SMALL, multiplier: 1.1 },
+  { maxKg: 5, category: WeightCategory.MEDIUM, multiplier: 1.25 },
+  { maxKg: 50, category: WeightCategory.LARGE, multiplier: 1.5 },
+];
+
 const FOOD_DELIVERY_BASE_CDF = 3000;
 
 @Injectable()
 export class DeliveriesService {
   constructor(private prisma: PrismaService, private pricing: PricingService) {}
 
+  private validateParcelDto(dto: CreateParcelDeliveryDto) {
+    assertKinshasaCoords(dto.pickupLat, dto.pickupLng);
+    assertKinshasaCoords(dto.dropoffLat, dto.dropoffLng);
+    if (!dto.pickupAddress?.trim() || !dto.dropoffAddress?.trim()) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Les adresses d\'enlèvement et de livraison sont obligatoires.');
+    }
+  }
+
+  private resolveWeightCategory(dto: CreateParcelDeliveryDto): WeightCategory {
+    if (dto.weightKg != null) {
+      const band = WEIGHT_KG_MULTIPLIERS.find((b) => dto.weightKg! <= b.maxKg);
+      return band?.category ?? WeightCategory.LARGE;
+    }
+    return dto.weightCategory;
+  }
+
+  private weightMultiplier(category: WeightCategory, weightKg?: number): number {
+    const base = WEIGHT_MULTIPLIERS[category];
+    if (weightKg != null && weightKg > 5) return base * 1.1;
+    return base;
+  }
+
   async estimateParcel(dto: CreateParcelDeliveryDto) {
+    this.validateParcelDto(dto);
+    const weightCategory = this.resolveWeightCategory(dto);
     const distanceKm = this.pricing.haversineKm(dto.pickupLat, dto.pickupLng, dto.dropoffLat, dto.dropoffLng);
     const durationMin = (distanceKm / 20) * 60;
     const fare = await this.pricing.estimateFare(VehicleType.STANDARD, distanceKm, durationMin);
-    const multiplier = WEIGHT_MULTIPLIERS[dto.weightCategory];
+    const multiplier = this.weightMultiplier(weightCategory, dto.weightKg);
     const estimatedPriceCdf = Math.ceil(fare.estimatedFareCdf * multiplier);
+    const pickupCommune = detectCommune(dto.pickupLat, dto.pickupLng, dto.pickupAddress);
+    const dropoffCommune = detectCommune(dto.dropoffLat, dto.dropoffLng, dto.dropoffAddress);
     return {
       ...fare,
-      weightCategory: dto.weightCategory,
+      weightCategory,
+      weightKg: dto.weightKg,
       weightMultiplier: multiplier,
       estimatedPriceCdf,
-      formatted: `${estimatedPriceCdf.toLocaleString('fr-CD')} FC`,
+      priceCdf: estimatedPriceCdf,
+      formatted: formatCdf(estimatedPriceCdf),
+      formattedPrice: formatCdf(estimatedPriceCdf),
+      currency: 'CDF',
+      city: 'Kinshasa',
+      pickupCommune,
+      dropoffCommune,
+      priceBreakdown: {
+        baseFareCdf: fare.baseFareCdf,
+        distanceFareCdf: fare.distanceFareCdf,
+        durationFareCdf: fare.durationFareCdf,
+        weightSurchargeCdf: Math.max(0, estimatedPriceCdf - fare.estimatedFareCdf),
+        totalCdf: estimatedPriceCdf,
+      },
       distanceKm,
       durationMin,
     };
@@ -37,6 +90,7 @@ export class DeliveriesService {
 
   async createParcel(userId: string, dto: CreateParcelDeliveryDto) {
     const estimate = await this.estimateParcel(dto);
+    const weightCategory = this.resolveWeightCategory(dto);
     const delivery = await this.prisma.delivery.create({
       data: {
         userId,
@@ -44,12 +98,12 @@ export class DeliveriesService {
         status: DeliveryStatus.PENDING,
         pickupLat: dto.pickupLat,
         pickupLng: dto.pickupLng,
-        pickupAddress: dto.pickupAddress,
+        pickupAddress: dto.pickupAddress.trim(),
         dropoffLat: dto.dropoffLat,
         dropoffLng: dto.dropoffLng,
-        dropoffAddress: dto.dropoffAddress,
+        dropoffAddress: dto.dropoffAddress.trim(),
         photoUrl: dto.photoUrl,
-        weightCategory: dto.weightCategory,
+        weightCategory,
         estimatedPriceCdf: estimate.estimatedPriceCdf,
         distanceKm: estimate.distanceKm,
         durationMin: estimate.durationMin,
@@ -57,7 +111,8 @@ export class DeliveriesService {
       include: { events: true },
     });
     await this.prisma.deliveryEvent.create({ data: { deliveryId: delivery.id, event: 'CREATED' } });
-    return { delivery, estimate };
+    const formatted = formatParcelDelivery({ ...delivery, events: [{ id: '1', deliveryId: delivery.id, event: 'CREATED', metadata: null, createdAt: new Date() }] });
+    return { delivery: formatted, estimate };
   }
 
   async estimateFood(dto: CreateFoodDeliveryDto) {
@@ -115,24 +170,35 @@ export class DeliveriesService {
     });
     if (!delivery) throw new MovaHttpException(MovaErrorCode.DELIVERY_NOT_FOUND, HttpStatus.NOT_FOUND);
     if (delivery.userId !== userId) throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
-    return delivery;
+    const formatted = formatParcelDelivery(delivery);
+    return {
+      delivery: formatted,
+      tracking: formatted.timeline,
+    };
   }
 
   async getHistory(userId: string) {
-    return this.prisma.delivery.findMany({
+    const rows = await this.prisma.delivery.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
       take: 50,
-      include: { restaurant: { select: { id: true, name: true, cuisine: true } } },
+      include: { restaurant: { select: { id: true, name: true, cuisine: true } }, events: { orderBy: { createdAt: 'asc' } } },
     });
+    return {
+      data: rows.map((d) => ({
+        ...formatParcelDelivery(d),
+        restaurantName: d.restaurant?.name,
+      })),
+    };
   }
 
   async listRestaurants() {
-    return this.prisma.restaurant.findMany({
+    const rows = await this.prisma.restaurant.findMany({
       where: { isActive: true },
       orderBy: { rating: 'desc' },
       select: { id: true, name: true, cuisine: true, address: true, lat: true, lng: true, rating: true, imageUrl: true, menuItems: true },
     });
+    return { data: rows };
   }
 
   async updateStatus(id: string, status: DeliveryStatus, userId: string) {
@@ -152,9 +218,9 @@ export class DeliveriesService {
     if (status === DeliveryStatus.PICKED_UP) updates.pickedUpAt = new Date();
     if (status === DeliveryStatus.DELIVERED) updates.deliveredAt = new Date();
     if (status === DeliveryStatus.CANCELLED) updates.cancelledAt = new Date();
-    const updated = await this.prisma.delivery.update({ where: { id }, data: updates });
+    const updated = await this.prisma.delivery.update({ where: { id }, data: updates, include: { events: { orderBy: { createdAt: 'asc' } } } });
     await this.prisma.deliveryEvent.create({ data: { deliveryId: id, event: status, metadata: { updatedBy: userId } } });
-    return updated;
+    return { delivery: formatParcelDelivery(updated) };
   }
 
   async listForAdmin(take = 50) {

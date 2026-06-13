@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 import '../../core/api/api_client.dart';
+import '../../core/location/location_service.dart';
 import '../../core/config/market_config.dart';
 import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
@@ -26,7 +27,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   final _destinationController = TextEditingController();
 
   String _vehicleType = 'MOTO_TAXI';
-  final LatLng _pickup = MovaRideMap.kinshasaDefault();
+  LatLng _pickup = MovaRideMap.kinshasaDefault();
   LatLng? _dropoff;
   Map<String, VehicleEstimate> _estimates = {};
   Map<String, dynamic>? _selectedEstimate;
@@ -35,6 +36,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   bool _loadingEstimate = false;
   bool _loadingConfirm = false;
   bool _loadingSuggestions = false;
+  bool _loadingGps = false;
   String? _error;
   String? _validationError;
   bool _showSuggestions = false;
@@ -62,6 +64,33 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
       _estimates = {};
       _dropoff = null;
     });
+  }
+
+  Future<void> _useMyLocation() async {
+    setState(() {
+      _loadingGps = true;
+      _validationError = null;
+    });
+    final result = await LocationService.getCurrentLocation();
+    if (!mounted) return;
+    if (result == null) {
+      setState(() {
+        _loadingGps = false;
+        _validationError =
+            'Impossible d\'obtenir votre position. Activez le GPS et autorisez la localisation.';
+      });
+      return;
+    }
+    setState(() {
+      _loadingGps = false;
+      _pickup = result.position;
+      _pickupController.text = result.label;
+      _selectedEstimate = null;
+      _estimates = {};
+    });
+    if (_destinationController.text.trim().isNotEmpty) {
+      await _fetchAllEstimates();
+    }
   }
 
   Future<void> _fetchSuggestions() async {
@@ -274,10 +303,24 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                 children: [
                   TextField(
                     controller: _pickupController,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'Départ',
                       hintText: 'Point de prise en charge',
-                      prefixIcon: Icon(Icons.my_location, color: MovaColors.green),
+                      prefixIcon: const Icon(Icons.my_location, color: MovaColors.green),
+                      suffixIcon: _loadingGps
+                          ? const Padding(
+                              padding: EdgeInsets.all(12),
+                              child: SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              ),
+                            )
+                          : IconButton(
+                              icon: const Icon(Icons.gps_fixed, color: MovaColors.violet),
+                              tooltip: 'Ma position',
+                              onPressed: _loadingGps ? null : _useMyLocation,
+                            ),
                     ),
                     onChanged: (_) => setState(() => _validationError = null),
                   ),

@@ -62,6 +62,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
         final token = data['accessToken'] as String?;
         if (token != null) {
           await api.saveToken(token);
+          await api.saveUserPhone(phone);
           if (mounted) {
             Navigator.of(context).pushReplacement(
               MaterialPageRoute(builder: (_) => const HomeScreen()),

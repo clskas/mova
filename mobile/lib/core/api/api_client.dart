@@ -39,6 +39,17 @@ class ApiClient {
     _token = null;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('auth_token');
+    await prefs.remove('user_phone');
+  }
+
+  Future<void> saveUserPhone(String phone) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('user_phone', MarketConfig.normalizePhone(phone));
+  }
+
+  Future<String?> loadUserPhone() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('user_phone');
   }
 
   Future<void> ensureReady() async {
@@ -328,10 +339,13 @@ class ApiClient {
     String rideId, {
     required String method,
     required int amountCdf,
+    String? phone,
   }) async {
+    final userPhone = phone ?? await loadUserPhone() ?? '+243812345678';
     return post('/payments/rides/$rideId', {
       'method': method,
       'amountCdf': amountCdf,
+      'phone': MarketConfig.normalizePhone(userPhone),
     });
   }
 }

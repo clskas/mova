@@ -49,5 +49,7 @@
 	<string>MOVA utilise la caméra pour photographier vos colis lors de l'envoi.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>MOVA accède à vos photos pour joindre une image au colis.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>MOVA utilise votre position pour définir le point de départ ou d'enlèvement.</string>
 </dict>
 </plist>

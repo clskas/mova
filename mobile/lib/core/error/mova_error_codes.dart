@@ -31,7 +31,7 @@ const movaErrorMessages = <String, String>{
   'MOVA_DRIVER_001': 'Chauffeur non disponible.',
   'MOVA_DRIVER_002': 'Votre dossier KYC est en cours de validation.',
   'MOVA_VAL_001': 'Données invalides. Vérifiez les champs obligatoires.',
-  'MOVA_INT_001': 'Une erreur interne est survenue. Veuillez réessayer.',
+  'MOVA_INT_001': 'Une erreur interne est survenue.',
 };
 
 MovaFailure failureFromApiResponse(int statusCode, Map<String, dynamic> body) {

@@ -28,8 +28,26 @@ const DOCKER_HOSTS: Record<keyof typeof SERVICE_PORTS, string> = {
   admin: 'http://admin-service:3000',
 };
 
+const LOCAL_HOSTS: Record<keyof typeof SERVICE_PORTS, string> = {
+  gateway: `http://localhost:${SERVICE_PORTS.gateway}`,
+  auth: `http://localhost:${SERVICE_PORTS.auth}`,
+  ride: `http://localhost:${SERVICE_PORTS.ride}`,
+  payment: `http://localhost:${SERVICE_PORTS.payment}`,
+  driver: `http://localhost:${SERVICE_PORTS.driver}`,
+  notification: `http://localhost:${SERVICE_PORTS.notification}`,
+  admin: `http://localhost:${SERVICE_PORTS.admin}`,
+};
+
+function defaultHost(service: keyof typeof SERVICE_PORTS): string {
+  if (process.env[ENV_KEYS[service]]) return process.env[ENV_KEYS[service]]!;
+  if (process.env.DOCKER === 'true' || process.env.KUBERNETES_SERVICE_HOST) {
+    return DOCKER_HOSTS[service];
+  }
+  return LOCAL_HOSTS[service];
+}
+
 export function serviceUrl(service: keyof typeof SERVICE_PORTS, path = ''): string {
-  const host = process.env[ENV_KEYS[service]] ?? DOCKER_HOSTS[service];
+  const host = defaultHost(service);
   const base = host.replace(/\/$/, '');
   if (!path) return base;
   return `${base}${path.startsWith('/') ? path : `/${path}`}`;

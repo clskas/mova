@@ -1,6 +1,7 @@
 import { DeliveriesService } from './deliveries.service';
 import { CreateParcelDeliveryDto } from './deliveries.dto';
 import { PricingService } from '../rides/pricing.service';
+import { MovaHttpException } from '@mova/shared';
 
 describe('DeliveriesService', () => {
   const pricing = {
@@ -18,7 +19,21 @@ describe('DeliveriesService', () => {
 
   beforeEach(() => jest.clearAllMocks());
 
-  it('applique le multiplicateur de poids pour colis', async () => {
+  it('rejette les coordonnées hors Kinshasa', async () => {
+    await expect(
+      service.estimateParcel({
+        pickupLat: 0,
+        pickupLng: 0,
+        pickupAddress: 'Test',
+        dropoffLat: -4.34,
+        dropoffLng: 15.32,
+        dropoffAddress: 'Kalamu',
+        weightCategory: 'DOCUMENTS',
+      }),
+    ).rejects.toBeInstanceOf(MovaHttpException);
+  });
+
+  it('enrichit l\'estimation colis (CDF, communes, breakdown)', async () => {
     const result = await service.estimateParcel({
       pickupLat: -4.32,
       pickupLng: 15.31,
@@ -29,7 +44,9 @@ describe('DeliveriesService', () => {
       weightCategory: 'LARGE' satisfies CreateParcelDeliveryDto['weightCategory'],
     });
     expect(result.estimatedPriceCdf).toBe(15000);
-    expect(result.weightMultiplier).toBe(1.5);
+    expect(result.currency).toBe('CDF');
+    expect(result.city).toBe('Kinshasa');
+    expect(result.priceBreakdown).toBeDefined();
   });
 
   it('calcule le total repas = articles + frais livraison', async () => {

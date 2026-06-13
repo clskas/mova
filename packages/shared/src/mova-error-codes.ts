@@ -31,6 +31,7 @@ export enum MovaErrorCode {
   PAYMENT_FAILED = 'MOVA_PAY_001',
   PAYMENT_INSUFFICIENT_BALANCE = 'MOVA_PAY_002',
   PAYMENT_INVALID_METHOD = 'MOVA_PAY_003',
+  PAYMENT_PHONE_REQUIRED = 'MOVA_PAY_004',
 
   USER_NOT_FOUND = 'MOVA_USER_001',
   DRIVER_NOT_AVAILABLE = 'MOVA_DRIVER_001',
@@ -76,6 +77,8 @@ export const MOVA_ERROR_MESSAGES: Record<MovaErrorCode, string> = {
   [MovaErrorCode.PAYMENT_FAILED]: 'Le paiement a échoué. Vérifiez votre solde.',
   [MovaErrorCode.PAYMENT_INSUFFICIENT_BALANCE]: 'Solde insuffisant dans votre portefeuille.',
   [MovaErrorCode.PAYMENT_INVALID_METHOD]: 'Méthode de paiement non supportée.',
+  [MovaErrorCode.PAYMENT_PHONE_REQUIRED]:
+    'Numéro Mobile Money requis. Format: +243XXXXXXXXX',
 
   [MovaErrorCode.USER_NOT_FOUND]: 'Utilisateur introuvable.',
   [MovaErrorCode.DRIVER_NOT_AVAILABLE]: 'Chauffeur non disponible.',
@@ -84,5 +87,5 @@ export const MOVA_ERROR_MESSAGES: Record<MovaErrorCode, string> = {
   [MovaErrorCode.VALIDATION_ERROR]: 'Données invalides.',
   [MovaErrorCode.NOT_FOUND]: 'Ressource introuvable.',
   [MovaErrorCode.PRICING_NOT_CONFIGURED]: 'Tarification non configurée. Contactez le support MOVA.',
-  [MovaErrorCode.INTERNAL_ERROR]: 'Une erreur interne est survenue. Veuillez réessayer.',
+  [MovaErrorCode.INTERNAL_ERROR]: 'Une erreur interne est survenue.',
 };

@@ -1,14 +1,18 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:latlong2/latlong.dart';
 import '../../core/api/api_client.dart';
 import '../../core/config/market_config.dart';
 import '../../core/error/result.dart';
+import '../../core/location/location_service.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
+import '../booking/widgets/mova_ride_map.dart';
 import 'parcel_tracking_screen.dart';
 
 const _weightCategories = [
@@ -29,23 +33,112 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
   final _pickupController = TextEditingController(text: 'Ma position, Kinshasa');
   final _dropoffController = TextEditingController();
   final _picker = ImagePicker();
+
   String _weightCategory = 'DOCUMENTS';
+  LatLng _pickup = MovaRideMap.kinshasaDefault();
+  LatLng? _dropoff;
   File? _photoFile;
   int? _estimatedPrice;
+  double? _distanceKm;
+  double? _durationMin;
+  List<Map<String, dynamic>> _suggestions = [];
+  Timer? _debounce;
   bool _loading = false;
+  bool _loadingGps = false;
+  bool _loadingSuggestions = false;
+  bool _showSuggestions = false;
   String? _error;
   String? _validationError;
 
-  static const _pickupLat = MarketConfig.defaultLat;
-  static const _pickupLng = MarketConfig.defaultLng;
-  static const _dropoffLat = MarketConfig.defaultLat - 0.03;
-  static const _dropoffLng = MarketConfig.defaultLng + 0.04;
+  @override
+  void initState() {
+    super.initState();
+    _dropoffController.addListener(_onDropoffChanged);
+  }
 
   @override
   void dispose() {
+    _debounce?.cancel();
+    _dropoffController.removeListener(_onDropoffChanged);
     _pickupController.dispose();
     _dropoffController.dispose();
     super.dispose();
+  }
+
+  void _onDropoffChanged() {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 350), _fetchSuggestions);
+    setState(() {
+      _estimatedPrice = null;
+      _distanceKm = null;
+      _durationMin = null;
+      _dropoff = null;
+    });
+  }
+
+  Future<void> _fetchSuggestions() async {
+    final query = _dropoffController.text.trim();
+    if (query.length < 2) {
+      setState(() {
+        _suggestions = [];
+        _showSuggestions = false;
+      });
+      return;
+    }
+    setState(() => _loadingSuggestions = true);
+    final api = ref.read(apiClientProvider);
+    final result = await api.geoAutocomplete(query);
+    if (!mounted) return;
+    setState(() {
+      _loadingSuggestions = false;
+      switch (result) {
+        case Success(:final data):
+          _suggestions = data;
+          _showSuggestions = data.isNotEmpty;
+        case Failure():
+          _suggestions = [];
+          _showSuggestions = false;
+      }
+    });
+  }
+
+  void _selectSuggestion(Map<String, dynamic> suggestion) {
+    final label = suggestion['label']?.toString() ??
+        suggestion['address']?.toString() ??
+        '';
+    _dropoffController.text = label;
+    _dropoff = LatLng(
+      (suggestion['lat'] as num?)?.toDouble() ?? MarketConfig.defaultLat - 0.03,
+      (suggestion['lng'] as num?)?.toDouble() ?? MarketConfig.defaultLng + 0.04,
+    );
+    setState(() {
+      _showSuggestions = false;
+      _suggestions = [];
+      _estimatedPrice = null;
+    });
+  }
+
+  Future<void> _useMyLocation() async {
+    setState(() {
+      _loadingGps = true;
+      _validationError = null;
+    });
+    final result = await LocationService.getCurrentLocation();
+    if (!mounted) return;
+    if (result == null) {
+      setState(() {
+        _loadingGps = false;
+        _validationError =
+            'Impossible d\'obtenir votre position. Activez le GPS et autorisez la localisation.';
+      });
+      return;
+    }
+    setState(() {
+      _loadingGps = false;
+      _pickup = result.position;
+      _pickupController.text = result.label;
+      _estimatedPrice = null;
+    });
   }
 
   Map<String, dynamic> _parcelPayload({bool includePhoto = false}) {
@@ -53,13 +146,12 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
       'pickupAddress': _pickupController.text.trim(),
       'dropoffAddress': _dropoffController.text.trim(),
       'weightCategory': _weightCategory,
-      'pickupLat': _pickupLat,
-      'pickupLng': _pickupLng,
-      'dropoffLat': _dropoffLat,
-      'dropoffLng': _dropoffLng,
+      'pickupLat': _pickup.latitude,
+      'pickupLng': _pickup.longitude,
+      'dropoffLat': _dropoff?.latitude ?? MarketConfig.defaultLat - 0.03,
+      'dropoffLng': _dropoff?.longitude ?? MarketConfig.defaultLng + 0.04,
     };
     if (includePhoto && _photoFile != null) {
-      // Stub local — upload Cloudinary non configuré côté mobile
       payload['photoUrl'] = _photoFile!.path;
     }
     return payload;
@@ -81,6 +173,7 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
         source: source,
         maxWidth: 1280,
         imageQuality: 85,
+        preferredCameraDevice: CameraDevice.rear,
       );
       if (picked != null) {
         setState(() => _photoFile = File(picked.path));
@@ -88,7 +181,9 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Impossible d\'accéder à la caméra ou à la galerie.')),
+          const SnackBar(
+            content: Text('Impossible d\'accéder à la caméra ou à la galerie.'),
+          ),
         );
       }
     }
@@ -146,11 +241,14 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
     final api = ref.read(apiClientProvider);
     await api.checkHealth();
     final result = await api.post('/deliveries/parcel/estimate', _parcelPayload());
+    if (!mounted) return;
     setState(() {
       _loading = false;
       switch (result) {
         case Success(:final data):
           _estimatedPrice = data['estimatedPriceCdf'] as int?;
+          _distanceKm = (data['distanceKm'] as num?)?.toDouble();
+          _durationMin = (data['durationMin'] as num?)?.toDouble();
         case Failure(:final error):
           _error = error.message;
       }
@@ -170,6 +268,7 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
     });
     final api = ref.read(apiClientProvider);
     final result = await api.post('/deliveries/parcel', _parcelPayload(includePhoto: true));
+    if (!mounted) return;
     setState(() => _loading = false);
     switch (result) {
       case Success(:final data):
@@ -195,101 +294,183 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
 
     return MovaScreen(
       title: 'Livraison colis',
+      scrollable: false,
+      padding: EdgeInsets.zero,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          TextField(
-            controller: _pickupController,
-            decoration: const InputDecoration(
-              labelText: 'Adresse d\'enlèvement',
-              prefixIcon: Icon(Icons.upload_outlined),
-            ),
-            onChanged: (_) => setState(() => _estimatedPrice = null),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _dropoffController,
-            decoration: const InputDecoration(
-              labelText: 'Adresse de livraison',
-              hintText: 'Ex: Limete, Masina…',
-              prefixIcon: Icon(Icons.place_outlined),
-            ),
-            onChanged: (_) => setState(() => _estimatedPrice = null),
-          ),
-          const SizedBox(height: 16),
-          Text('Catégorie de poids', style: theme.textTheme.titleSmall),
-          const SizedBox(height: 8),
-          ..._weightCategories.map((cat) {
-            return RadioListTile<String>(
-              title: Text(cat.$2),
-              subtitle: Text(cat.$3, style: const TextStyle(fontSize: 12)),
-              value: cat.$1,
-              groupValue: _weightCategory,
-              onChanged: (val) {
-                setState(() {
-                  _weightCategory = val!;
-                  _estimatedPrice = null;
-                });
-              },
-            );
-          }),
-          const SizedBox(height: 8),
-          OutlinedButton.icon(
-            onPressed: _showPhotoOptions,
-            icon: Icon(_photoFile != null ? Icons.check_circle : Icons.add_a_photo_outlined),
-            label: Text(
-              _photoFile != null ? 'Photo ajoutée (optionnel)' : 'Ajouter une photo (optionnel)',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          if (_photoFile != null) ...[
-            const SizedBox(height: 12),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Image.file(
-                _photoFile!,
-                height: 120,
-                width: double.infinity,
-                fit: BoxFit.cover,
-              ),
-            ),
-          ],
-          if (_estimatedPrice != null) ...[
-            const SizedBox(height: 16),
-            MovaCard(
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          MovaRideMap(pickup: _pickup, dropoff: _dropoff, height: 180),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Text('Estimation', style: TextStyle(fontSize: 16)),
-                  Text(
-                    MarketConfig.formatCdf(_estimatedPrice!),
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: MovaColors.green,
+                  TextField(
+                    controller: _pickupController,
+                    decoration: InputDecoration(
+                      labelText: 'Adresse d\'enlèvement',
+                      prefixIcon: const Icon(Icons.upload_outlined),
+                      suffixIcon: _loadingGps
+                          ? const Padding(
+                              padding: EdgeInsets.all(12),
+                              child: SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              ),
+                            )
+                          : IconButton(
+                              icon: const Icon(Icons.gps_fixed, color: MovaColors.violet),
+                              tooltip: 'Ma position',
+                              onPressed: _loadingGps ? null : _useMyLocation,
+                            ),
                     ),
+                    onChanged: (_) => setState(() => _estimatedPrice = null),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _dropoffController,
+                    decoration: InputDecoration(
+                      labelText: 'Adresse de livraison',
+                      hintText: 'Ex: Limete, Masina…',
+                      prefixIcon: const Icon(Icons.place_outlined),
+                      suffixIcon: _loadingSuggestions
+                          ? const Padding(
+                              padding: EdgeInsets.all(12),
+                              child: SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              ),
+                            )
+                          : null,
+                    ),
+                    onTap: () => setState(() => _showSuggestions = _suggestions.isNotEmpty),
+                  ),
+                  if (_showSuggestions && _suggestions.isNotEmpty)
+                    MovaCard(
+                      margin: const EdgeInsets.only(top: 4),
+                      padding: EdgeInsets.zero,
+                      child: Column(
+                        children: _suggestions.map((s) {
+                          final label =
+                              s['label']?.toString() ?? s['address']?.toString() ?? '';
+                          return ListTile(
+                            dense: true,
+                            leading: const Icon(Icons.location_on_outlined, size: 20),
+                            title: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
+                            onTap: () => _selectSuggestion(s),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  const SizedBox(height: 16),
+                  Text('Catégorie de poids', style: theme.textTheme.titleSmall),
+                  const SizedBox(height: 4),
+                  ..._weightCategories.map((cat) {
+                    return RadioListTile<String>(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(cat.$2),
+                      subtitle: Text(cat.$3, style: const TextStyle(fontSize: 12)),
+                      value: cat.$1,
+                      groupValue: _weightCategory,
+                      onChanged: (val) {
+                        setState(() {
+                          _weightCategory = val!;
+                          _estimatedPrice = null;
+                        });
+                      },
+                    );
+                  }),
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    onPressed: _showPhotoOptions,
+                    icon: Icon(
+                      _photoFile != null ? Icons.check_circle : Icons.add_a_photo_outlined,
+                    ),
+                    label: Text(
+                      _photoFile != null
+                          ? 'Photo ajoutée (optionnel)'
+                          : 'Ajouter une photo (optionnel)',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (_photoFile != null) ...[
+                    const SizedBox(height: 12),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.file(
+                        _photoFile!,
+                        height: 120,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                  ],
+                  if (_estimatedPrice != null) ...[
+                    const SizedBox(height: 16),
+                    MovaCard(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text('Estimation', style: TextStyle(fontSize: 16)),
+                              Text(
+                                MarketConfig.formatCdf(_estimatedPrice!),
+                                style: const TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                  color: MovaColors.green,
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (_distanceKm != null || _durationMin != null) ...[
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                if (_distanceKm != null) ...[
+                                  const Icon(Icons.straighten, size: 16, color: MovaColors.textSecondary),
+                                  const SizedBox(width: 4),
+                                  Text('${_distanceKm!.toStringAsFixed(1)} km'),
+                                  const SizedBox(width: 16),
+                                ],
+                                if (_durationMin != null) ...[
+                                  const Icon(Icons.schedule, size: 16, color: MovaColors.textSecondary),
+                                  const SizedBox(width: 4),
+                                  Text('${_durationMin!.ceil()} min'),
+                                ],
+                              ],
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                  if (_validationError != null) ...[
+                    const SizedBox(height: 16),
+                    MovaErrorBanner(message: _validationError!),
+                  ],
+                  if (_error != null) ...[
+                    const SizedBox(height: 16),
+                    MovaErrorBanner(message: _error!, onRetry: _estimate),
+                  ],
+                  const SizedBox(height: 24),
+                  MovaButton(
+                    label: _estimatedPrice == null ? 'Estimer le prix' : 'Confirmer l\'envoi',
+                    isLoading: _loading,
+                    icon: _estimatedPrice == null
+                        ? Icons.calculate_outlined
+                        : Icons.local_shipping_outlined,
+                    onPressed: _loading ? null : (_estimatedPrice == null ? _estimate : _confirm),
                   ),
                 ],
               ),
             ),
-          ],
-          if (_validationError != null) ...[
-            const SizedBox(height: 16),
-            MovaErrorBanner(message: _validationError!),
-          ],
-          if (_error != null) ...[
-            const SizedBox(height: 16),
-            MovaErrorBanner(message: _error!, onRetry: _estimate),
-          ],
-          const SizedBox(height: 24),
-          MovaButton(
-            label: _estimatedPrice == null ? 'Estimer le prix' : 'Confirmer l\'envoi',
-            isLoading: _loading,
-            icon: _estimatedPrice == null ? Icons.calculate_outlined : Icons.local_shipping_outlined,
-            onPressed: _loading
-                ? null
-                : (_estimatedPrice == null ? _estimate : _confirm),
           ),
         ],
       ),

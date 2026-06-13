@@ -88,6 +88,12 @@ class KinshasaLocation {
     );
   }
 
+  static bool destinationInServiceArea(String address, {LatLng? coords, bool fromSuggestion = false}) {
+    if (addressMentionsKinshasa(address) || communeFromAddress(address) != null) return true;
+    if (fromSuggestion && coords != null && isInBounds(coords)) return true;
+    return false;
+  }
+
   /// Garde des coords valides Kinshasa ; snap via adresse ou centre Gombe.
   static LatLng ensureInKinshasa(LatLng coords, {String? address}) {
     if (isInBounds(coords)) return coords;

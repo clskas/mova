@@ -29,4 +29,8 @@ export class MobileScheduledEstimateDto {
   @ApiProperty() @IsString() dropoffAddress!: string;
   @ApiProperty() @IsString() scheduledAt!: string;
   @ApiProperty({ default: 'STANDARD' }) vehicleType!: string;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() pickupLat?: number;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() pickupLng?: number;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() dropoffLat?: number;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() dropoffLng?: number;
 }

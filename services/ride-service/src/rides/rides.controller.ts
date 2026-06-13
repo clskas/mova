@@ -24,7 +24,7 @@ export class RidesController {
   @Post('scheduled/estimate')
   @ApiOperation({ summary: 'Estimer réservation planifiée (contrat mobile)' })
   estimateScheduled(@Body() dto: MobileScheduledEstimateDto) {
-    return this.scheduledRidesService.estimateMobile(dto.dropoffAddress, dto.vehicleType as VehicleType, dto.scheduledAt);
+    return this.scheduledRidesService.estimateMobile(dto);
   }
 
   @Post('scheduled')

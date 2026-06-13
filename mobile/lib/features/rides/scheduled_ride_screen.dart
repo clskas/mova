@@ -6,6 +6,7 @@ import 'package:latlong2/latlong.dart';
 import '../../core/api/api_client.dart';
 import '../../core/config/market_config.dart';
 import '../../core/error/result.dart';
+import '../../core/location/kinshasa_location.dart';
 import '../../core/location/location_service.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
@@ -24,6 +25,7 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
   String _vehicleType = 'STANDARD';
   LatLng _pickup = LatLng(MarketConfig.defaultLat, MarketConfig.defaultLng);
   LatLng? _dropoff;
+  bool _dropoffFromSuggestion = false;
   List<Map<String, dynamic>> _suggestions = [];
   int? _estimatedPrice;
   bool _loading = false;
@@ -46,16 +48,21 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
     return '$day/$month/${dt.year} à $hour:$minute';
   }
 
-  Map<String, dynamic> _ridePayload() => {
-        'pickupLat': _pickup.latitude,
-        'pickupLng': _pickup.longitude,
-        'dropoffLat': _dropoff?.latitude ?? MarketConfig.defaultLat - 0.03,
-        'dropoffLng': _dropoff?.longitude ?? MarketConfig.defaultLng + 0.04,
-        'pickupAddress': 'Ma position, Kinshasa',
-        'dropoffAddress': _destinationController.text.trim(),
-        'vehicleType': MarketConfig.apiVehicleType(_vehicleType),
-        'scheduledAt': _scheduledAt.toIso8601String(),
-      };
+  Map<String, dynamic> _ridePayload() {
+    final dropoff = _dropoff ?? KinshasaLocation.defaultDropoffOffset();
+    return {
+      'pickupLat': _pickup.latitude,
+      'pickupLng': _pickup.longitude,
+      'dropoffLat': dropoff.latitude,
+      'dropoffLng': dropoff.longitude,
+      'pickupAddress': 'Ma position, Kinshasa',
+      'dropoffAddress': _destinationController.text.trim(),
+      'vehicleType': MarketConfig.apiVehicleType(_vehicleType),
+      'scheduledAt': _scheduledAt.toIso8601String(),
+    };
+  }
+
+  Map<String, dynamic> _estimatePayload() => _ridePayload();
 
   @override
   void initState() {
@@ -79,6 +86,7 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
     setState(() {
       _estimatedPrice = null;
       _dropoff = null;
+      _dropoffFromSuggestion = false;
     });
   }
 
@@ -113,14 +121,18 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
         suggestion['address']?.toString() ??
         '';
     _destinationController.text = label;
-    _dropoff = LatLng(
-      (suggestion['lat'] as num?)?.toDouble() ?? MarketConfig.defaultLat - 0.03,
-      (suggestion['lng'] as num?)?.toDouble() ?? MarketConfig.defaultLng + 0.04,
+    _dropoff = KinshasaLocation.ensureInKinshasa(
+      LatLng(
+        (suggestion['lat'] as num?)?.toDouble() ?? MarketConfig.defaultLat - 0.03,
+        (suggestion['lng'] as num?)?.toDouble() ?? MarketConfig.defaultLng + 0.04,
+      ),
+      address: label,
     );
     setState(() {
       _showSuggestions = false;
       _suggestions = [];
       _estimatedPrice = null;
+      _dropoffFromSuggestion = true;
     });
   }
 
@@ -131,10 +143,58 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
     setState(() {
       _loadingGps = false;
       if (result != null) {
-        _pickup = result.position;
+        _pickup = KinshasaLocation.ensureInKinshasa(
+          result.position,
+          address: result.label,
+        );
         _estimatedPrice = null;
+      } else if (!silent) {
+        _validationError =
+            'Impossible d\'obtenir votre position. Activez le GPS et autorisez la localisation.';
       }
     });
+  }
+
+  Future<String?> _resolveCoords() async {
+    _pickup = KinshasaLocation.ensureInKinshasa(
+      _pickup,
+      address: 'Ma position, Kinshasa',
+    );
+    if (_dropoff == null || !KinshasaLocation.isInBounds(_dropoff!)) {
+      var resolved = KinshasaLocation.coordsFromAddress(_destinationController.text);
+      if (!KinshasaLocation.destinationInServiceArea(
+        _destinationController.text,
+        coords: resolved,
+        fromSuggestion: _dropoffFromSuggestion,
+      )) {
+        final api = ref.read(apiClientProvider);
+        final result = await api.geoAutocomplete(_destinationController.text.trim());
+        if (result case Success(:final data) when data.isNotEmpty) {
+          final s = data.first;
+          resolved = LatLng(
+            (s['lat'] as num?)?.toDouble() ?? MarketConfig.defaultLat,
+            (s['lng'] as num?)?.toDouble() ?? MarketConfig.defaultLng,
+          );
+          if (KinshasaLocation.isInBounds(resolved)) {
+            _dropoff = resolved;
+            _dropoffFromSuggestion = true;
+            return null;
+          }
+        }
+        return 'MOVA ne couvre que Kinshasa. Choisissez une destination dans une commune de Kinshasa.';
+      }
+      _dropoff = KinshasaLocation.ensureInKinshasa(
+        resolved,
+        address: _destinationController.text,
+      );
+    } else if (!KinshasaLocation.destinationInServiceArea(
+      _destinationController.text,
+      coords: _dropoff,
+      fromSuggestion: _dropoffFromSuggestion,
+    )) {
+      return 'MOVA ne couvre que Kinshasa. Choisissez une destination dans une commune de Kinshasa.';
+    }
+    return null;
   }
 
   Future<void> _loadUpcoming() async {
@@ -221,12 +281,18 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
       _error = null;
       _validationError = null;
     });
+    final coordError = await _resolveCoords();
+    if (!mounted) return;
+    if (coordError != null) {
+      setState(() {
+        _loading = false;
+        _validationError = coordError;
+      });
+      return;
+    }
     final api = ref.read(apiClientProvider);
-    final result = await api.post('/rides/scheduled/estimate', {
-      'dropoffAddress': _destinationController.text.trim(),
-      'vehicleType': MarketConfig.apiVehicleType(_vehicleType),
-      'scheduledAt': _scheduledAt.toIso8601String(),
-    });
+    await api.checkHealth();
+    final result = await api.post('/rides/scheduled/estimate', _estimatePayload());
     setState(() {
       _loading = false;
       switch (result) {
@@ -249,6 +315,15 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
       _error = null;
       _validationError = null;
     });
+    final coordError = await _resolveCoords();
+    if (!mounted) return;
+    if (coordError != null) {
+      setState(() {
+        _loading = false;
+        _validationError = coordError;
+      });
+      return;
+    }
     final api = ref.read(apiClientProvider);
     final result = await api.post('/rides/scheduled', _ridePayload());
     setState(() => _loading = false);
@@ -401,7 +476,7 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
                 child: Text(
                   _loadingGps
                       ? 'Localisation…'
-                      : 'Départ : ${_pickup.latitude.toStringAsFixed(4)}, ${_pickup.longitude.toStringAsFixed(4)}',
+                      : 'Départ : Ma position, Kinshasa',
                   style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
                 ),
               ),

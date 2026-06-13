@@ -28,5 +28,16 @@ void main() {
       expect(limete.latitude, closeTo(-4.3389, 0.001));
       expect(KinshasaLocation.isInBounds(limete), isTrue);
     });
+
+    test('Butembo is outside service area', () {
+      expect(
+        KinshasaLocation.destinationInServiceArea('Butembo'),
+        isFalse,
+      );
+      expect(
+        KinshasaLocation.destinationInServiceArea('Gombe'),
+        isTrue,
+      );
+    });
   });
 }

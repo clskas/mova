@@ -1,16 +1,49 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { ScheduledRideStatus, VehicleType } from '@prisma/client';
 import { MovaErrorCode, MovaHttpException } from '@mova/shared';
-import { addressToCoords, DEFAULT_PICKUP } from '../common/address.util';
+import { addressToCoords, assertKinshasaDestination, DEFAULT_PICKUP } from '../common/address.util';
+import { assertKinshasaCoords } from '../deliveries/parcel.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { PricingService } from './pricing.service';
 import { CreateScheduledRideDto } from './scheduled-rides.dto';
+import { MobileScheduledEstimateDto } from '../deliveries/deliveries-mobile.dto';
 
 const MAX_SCHEDULE_DAYS = 7;
 
 @Injectable()
 export class ScheduledRidesService {
   constructor(private prisma: PrismaService, private pricing: PricingService) {}
+
+  private parseVehicleType(value: string): VehicleType {
+    if (!Object.values(VehicleType).includes(value as VehicleType)) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Type de véhicule invalide.');
+    }
+    return value as VehicleType;
+  }
+
+  private resolveScheduledCoords(dto: {
+    pickupLat?: number;
+    pickupLng?: number;
+    dropoffLat?: number;
+    dropoffLng?: number;
+    dropoffAddress: string;
+  }) {
+    const pickup = {
+      lat: dto.pickupLat ?? DEFAULT_PICKUP.lat,
+      lng: dto.pickupLng ?? DEFAULT_PICKUP.lng,
+    };
+    assertKinshasaCoords(pickup.lat, pickup.lng);
+    assertKinshasaDestination(dto.dropoffAddress, {
+      lat: dto.dropoffLat,
+      lng: dto.dropoffLng,
+    });
+    const dropoff =
+      dto.dropoffLat != null && dto.dropoffLng != null
+        ? { lat: dto.dropoffLat, lng: dto.dropoffLng }
+        : addressToCoords(dto.dropoffAddress);
+    assertKinshasaCoords(dropoff.lat, dropoff.lng);
+    return { pickup, dropoff };
+  }
 
   private validateScheduledAt(scheduledAt: Date) {
     const now = new Date();
@@ -23,7 +56,14 @@ export class ScheduledRidesService {
   async create(passengerId: string, dto: CreateScheduledRideDto) {
     const scheduledAt = new Date(dto.scheduledAt);
     this.validateScheduledAt(scheduledAt);
-    const distanceKm = this.pricing.haversineKm(dto.pickupLat, dto.pickupLng, dto.dropoffLat, dto.dropoffLng);
+    const { pickup, dropoff } = this.resolveScheduledCoords({
+      pickupLat: dto.pickupLat,
+      pickupLng: dto.pickupLng,
+      dropoffLat: dto.dropoffLat,
+      dropoffLng: dto.dropoffLng,
+      dropoffAddress: dto.dropoffAddress ?? '',
+    });
+    const distanceKm = this.pricing.haversineKm(pickup.lat, pickup.lng, dropoff.lat, dropoff.lng);
     const durationMin = (distanceKm / 25) * 60;
     const estimate = await this.pricing.estimateFare(dto.vehicleType, distanceKm, durationMin);
     const ride = await this.prisma.scheduledRide.create({
@@ -32,11 +72,11 @@ export class ScheduledRidesService {
         status: ScheduledRideStatus.SCHEDULED,
         vehicleType: dto.vehicleType,
         scheduledAt,
-        pickupLat: dto.pickupLat,
-        pickupLng: dto.pickupLng,
+        pickupLat: pickup.lat,
+        pickupLng: pickup.lng,
         pickupAddress: dto.pickupAddress,
-        dropoffLat: dto.dropoffLat,
-        dropoffLng: dto.dropoffLng,
+        dropoffLat: dropoff.lat,
+        dropoffLng: dropoff.lng,
         dropoffAddress: dto.dropoffAddress,
         estimatedPriceCdf: estimate.estimatedFareCdf,
         distanceKm,
@@ -109,12 +149,13 @@ export class ScheduledRidesService {
     return this.prisma.scheduledRide.update({ where: { id }, data: { status } });
   }
 
-  /** Compatibilité mobile: estimer sans coords pickup/dropoff explicites */
-  async estimateMobile(dropoffAddress: string, vehicleType: VehicleType, scheduledAt: string) {
-    const when = new Date(scheduledAt);
+  /** Compatibilité mobile — coords pickup/dropoff optionnelles (validées Kinshasa). */
+  async estimateMobile(dto: MobileScheduledEstimateDto) {
+    const when = new Date(dto.scheduledAt);
     this.validateScheduledAt(when);
-    const dropoff = addressToCoords(dropoffAddress);
-    const distanceKm = this.pricing.haversineKm(DEFAULT_PICKUP.lat, DEFAULT_PICKUP.lng, dropoff.lat, dropoff.lng);
+    const vehicleType = this.parseVehicleType(dto.vehicleType);
+    const { pickup, dropoff } = this.resolveScheduledCoords(dto);
+    const distanceKm = this.pricing.haversineKm(pickup.lat, pickup.lng, dropoff.lat, dropoff.lng);
     const durationMin = (distanceKm / 25) * 60;
     const estimate = await this.pricing.estimateFare(vehicleType, distanceKm, durationMin);
     return {

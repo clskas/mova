@@ -1,5 +1,5 @@
-import { WeightCategory } from '@prisma/client';
 import { DeliveriesService } from './deliveries.service';
+import { CreateParcelDeliveryDto } from './deliveries.dto';
 import { PricingService } from '../rides/pricing.service';
 
 describe('DeliveriesService', () => {
@@ -26,7 +26,7 @@ describe('DeliveriesService', () => {
       dropoffLat: -4.34,
       dropoffLng: 15.32,
       dropoffAddress: 'Kalamu',
-      weightCategory: WeightCategory.LARGE,
+      weightCategory: 'LARGE' satisfies CreateParcelDeliveryDto['weightCategory'],
     });
     expect(result.estimatedPriceCdf).toBe(15000);
     expect(result.weightMultiplier).toBe(1.5);

@@ -50,6 +50,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
   Timer? _etaTimer;
   Timer? _pollTimer;
   Timer? _mockTimer;
+  RideSocket? _socket;
   int _mockStep = 0;
 
   @override
@@ -66,7 +67,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
     _etaTimer?.cancel();
     _pollTimer?.cancel();
     _mockTimer?.cancel();
-    ref.read(rideSocketProvider).dispose();
+    _socket?.dispose();
     super.dispose();
   }
 
@@ -172,7 +173,9 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
       return;
     }
     final token = await api.authToken();
+    if (!mounted) return;
     final socket = ref.read(rideSocketProvider);
+    _socket = socket;
     socket.connect(
       rideId: widget.rideId,
       token: token,

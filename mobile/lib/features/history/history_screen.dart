@@ -40,6 +40,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
 
     final historyResult = await api.get('/history?limit=50');
 
+    if (!mounted) return;
     setState(() {
       _loading = false;
       if (historyResult case Success(:final data)) {

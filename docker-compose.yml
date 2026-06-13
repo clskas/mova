@@ -65,7 +65,7 @@ services:
       context: .
       dockerfile: docker/auth.Dockerfile
     ports:
-      - '3001:3000'
+      - '3011:3000'
     environment:
       DATABASE_URL: postgresql://mova:mova@postgres-auth:5432/mova_auth
       REDIS_URL: redis://redis:6379

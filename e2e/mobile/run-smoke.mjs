@@ -17,7 +17,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const host = process.env.APPIUM_HOST ?? "127.0.0.1";
 const port = Number(process.env.APPIUM_PORT ?? "4723");
 const useInstalled = (process.env.USE_INSTALLED_APP ?? "true").toLowerCase() === "true";
-const apkEnv = process.env.APK_PATH ?? "../mobile/build/app/outputs/flutter-apk/app-passenger-debug.apk";
+const apkEnv = process.env.APK_PATH ?? "../../mobile/build/app/outputs/flutter-apk/app-passenger-debug.apk";
 const apkPath = resolve(__dirname, apkEnv);
 
 const PASSENGER_PACKAGE = "cd.mova.mova.passenger";

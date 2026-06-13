@@ -15,6 +15,9 @@ import { MatchingModule } from './matching/matching.module';
 import { WebsocketModule } from './websocket/websocket.module';
 import { InternalModule } from './internal/internal.module';
 import { AuthModule } from './auth/auth.module';
+import { HistoryModule } from './history/history.module';
+import { MovingModule } from './moving/moving.module';
+import { ExpressModule } from './express/express.module';
 
-@Module({ imports: [ConfigModule.forRoot({ isGlobal: true }), RedisModule, PrismaModule, HealthModule, AuthModule, RidesModule, DeliveriesModule, ServicesCatalogModule, CarpoolModule, ErrandsModule, RentalModule, GeoModule, RatingsModule, MatchingModule, WebsocketModule, InternalModule] })
+@Module({ imports: [ConfigModule.forRoot({ isGlobal: true }), RedisModule, PrismaModule, HealthModule, AuthModule, RidesModule, DeliveriesModule, ServicesCatalogModule, CarpoolModule, ErrandsModule, RentalModule, GeoModule, RatingsModule, MatchingModule, WebsocketModule, InternalModule, HistoryModule, MovingModule, ExpressModule] })
 export class AppModule {}

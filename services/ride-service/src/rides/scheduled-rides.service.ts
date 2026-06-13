@@ -54,6 +54,13 @@ export class ScheduledRidesService {
     });
   }
 
+  async get(id: string, passengerId: string) {
+    const ride = await this.prisma.scheduledRide.findUnique({ where: { id } });
+    if (!ride) throw new MovaHttpException(MovaErrorCode.SCHEDULED_RIDE_NOT_FOUND, HttpStatus.NOT_FOUND);
+    if (ride.passengerId !== passengerId) throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
+    return ride;
+  }
+
   async cancel(id: string, passengerId: string, reason?: string) {
     const ride = await this.prisma.scheduledRide.findUnique({ where: { id } });
     if (!ride) throw new MovaHttpException(MovaErrorCode.SCHEDULED_RIDE_NOT_FOUND, HttpStatus.NOT_FOUND);

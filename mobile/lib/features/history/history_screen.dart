@@ -17,17 +17,15 @@ class HistoryScreen extends ConsumerStatefulWidget {
 class _HistoryScreenState extends ConsumerState<HistoryScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  List<dynamic> _rides = [];
   List<dynamic> _deliveries = [];
   List<dynamic> _scheduled = [];
   List<dynamic> _errands = [];
   bool _loading = true;
-  bool _cached = false;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 5, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     _load();
   }
 
@@ -42,17 +40,12 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
     await api.loadToken();
     await api.checkHealth();
 
-    final ridesResult = await api.get('/rides/history?role=passenger');
     final deliveriesResult = await api.get('/deliveries/history');
     final scheduledResult = await api.get('/rides/scheduled');
     final errandsResult = await api.get('/deliveries/errand/history');
 
     setState(() {
       _loading = false;
-      if (ridesResult case Success(:final data)) {
-        _rides = data['data'] as List? ?? data['rides'] as List? ?? [];
-        _cached = data['cached'] == true;
-      }
       if (deliveriesResult case Success(:final data)) {
         _deliveries = data['data'] as List? ?? [];
       }
@@ -80,34 +73,6 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
           child: Text(message, style: const TextStyle(color: MovaColors.textSecondary)),
         ),
       );
-
-  Widget _rideTile(Map<String, dynamic> ride) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: MovaCard(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '${ride['pickupAddress'] ?? 'Départ'} → ${ride['dropoffAddress'] ?? 'Arrivée'}',
-              style: const TextStyle(fontWeight: FontWeight.w600),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              MarketConfig.formatCdf(ride['priceCdf'] as int? ?? 0),
-              style: const TextStyle(color: MovaColors.violet),
-            ),
-            Text(
-              _statusLabel(ride['status']?.toString()),
-              style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   Widget _parcelTile(Map<String, dynamic> item) {
     return Padding(
@@ -301,15 +266,10 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
             return Column(
               children: _scheduled.map((s) => _scheduledTile(s as Map<String, dynamic>)).toList(),
             );
-          case 4:
+          default:
             if (_errands.isEmpty) return _empty('Aucune course');
             return Column(
               children: _errands.map((e) => _errandTile(e as Map<String, dynamic>)).toList(),
-            );
-          default:
-            if (_rides.isEmpty) return _empty('Aucun trajet');
-            return Column(
-              children: _rides.map((r) => _rideTile(r as Map<String, dynamic>)).toList(),
             );
         }
       },
@@ -323,15 +283,6 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (_cached)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Text(
-                'Données en cache (hors-ligne)',
-                style: TextStyle(color: MovaColors.orange.withValues(alpha: 0.9)),
-                textAlign: TextAlign.center,
-              ),
-            ),
           TabBar(
             controller: _tabController,
             isScrollable: true,
@@ -339,11 +290,10 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
             labelColor: MovaColors.violet,
             unselectedLabelColor: MovaColors.textSecondary,
             tabs: const [
-              Tab(text: 'Trajets'),
+              Tab(text: 'Courses'),
               Tab(text: 'Colis'),
               Tab(text: 'Repas'),
               Tab(text: 'Réservations'),
-              Tab(text: 'Courses'),
             ],
           ),
           const SizedBox(height: 12),

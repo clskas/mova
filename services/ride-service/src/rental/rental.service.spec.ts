@@ -3,6 +3,7 @@ import { RentalService } from './rental.service';
 describe('RentalService', () => {
   const prisma = {
     rentalInquiry: { create: jest.fn(), findMany: jest.fn(), findUnique: jest.fn() },
+    rentalVehicle: { findMany: jest.fn(), findUnique: jest.fn() },
   };
 
   const service = new RentalService(prisma as never);
@@ -25,5 +26,28 @@ describe('RentalService', () => {
     });
     expect(result.inquiry.status).toBe('PENDING');
     expect(result.message).toContain('24h');
+  });
+
+  it('estime une location depuis le catalogue', async () => {
+    const start = new Date();
+    start.setDate(start.getDate() + 1);
+    const end = new Date();
+    end.setDate(end.getDate() + 3);
+    prisma.rentalVehicle.findUnique.mockResolvedValue({
+      id: 'v1',
+      name: 'Toyota RAV4',
+      category: 'SUV',
+      seats: 5,
+      dailyRateCdf: 75000,
+      depositCdf: 150000,
+      isActive: true,
+    });
+    const result = await service.estimate({
+      vehicleId: 'v1',
+      startDate: start.toISOString(),
+      endDate: end.toISOString(),
+    });
+    expect(result.days).toBe(2);
+    expect(result.estimatedPriceCdf).toBe(75000 * 2 + 150000);
   });
 });

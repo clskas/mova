@@ -28,6 +28,7 @@ enum RideStatus {
 enum DeliveryType {
   PARCEL
   FOOD
+  EXPRESS
 }
 
 enum WeightCategory {
@@ -269,8 +270,17 @@ enum ErrandOrderStatus {
 
 enum RentalInquiryStatus {
   PENDING
+  CONFIRMED
   CONTACTED
   CLOSED
+}
+
+enum MovingRequestStatus {
+  PENDING
+  ASSIGNED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
 }
 
 model CarpoolTrip {
@@ -337,20 +347,65 @@ model ErrandOrder {
   @@map("errand_orders")
 }
 
+model RentalVehicle {
+  id            String   @id @default(uuid())
+  name          String
+  category      String
+  seats         Int
+  dailyRateCdf  Int
+  depositCdf    Int      @default(50000)
+  imageUrl      String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  bookings RentalInquiry[]
+
+  @@map("rental_vehicles")
+}
+
 model RentalInquiry {
-  id              String              @id @default(uuid())
-  userId          String
-  status          RentalInquiryStatus @default(PENDING)
-  vehicleType     String
-  startDate       DateTime
-  endDate         DateTime
-  pickupAddress   String?
-  contactPhone    String?
-  notes           String?
-  createdAt       DateTime            @default(now())
-  updatedAt       DateTime            @updatedAt
+  id                String              @id @default(uuid())
+  userId            String
+  status            RentalInquiryStatus @default(PENDING)
+  vehicleId         String?
+  vehicle           RentalVehicle?      @relation(fields: [vehicleId], references: [id])
+  vehicleType       String
+  startDate         DateTime
+  endDate           DateTime
+  pickupAddress     String?
+  contactPhone      String?
+  notes             String?
+  estimatedPriceCdf Int?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
 
   @@index([userId])
   @@index([status])
   @@map("rental_inquiries")
+}
+
+model MovingRequest {
+  id                String              @id @default(uuid())
+  userId            String
+  status            MovingRequestStatus @default(PENDING)
+  volumeM3          Float
+  pickupLat         Float
+  pickupLng         Float
+  pickupAddress     String
+  dropoffLat        Float
+  dropoffLng        Float
+  dropoffAddress    String
+  estimatedPriceCdf Int
+  distanceKm        Float?
+  durationMin       Float?
+  driverId          String?
+  completedAt       DateTime?
+  cancelledAt       DateTime?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@map("moving_requests")
 }

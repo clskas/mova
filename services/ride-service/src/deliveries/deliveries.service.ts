@@ -26,6 +26,7 @@ const WEIGHT_KG_MULTIPLIERS: { maxKg: number; category: WeightCategory; multipli
 ];
 
 const FOOD_DELIVERY_BASE_CDF = 3000;
+const EXPRESS_MULTIPLIER = 1.35;
 
 @Injectable()
 export class DeliveriesService {
@@ -161,6 +162,61 @@ export class DeliveriesService {
     });
     await this.prisma.deliveryEvent.create({ data: { deliveryId: delivery.id, event: 'ORDER_PLACED', metadata: { items: dto.items } as unknown as Prisma.InputJsonValue } });
     return { delivery, estimate };
+  }
+
+  async estimateExpress(dto: CreateParcelDeliveryDto) {
+    const parcel = await this.estimateParcel(dto);
+    const estimatedPriceCdf = Math.ceil(parcel.estimatedPriceCdf * EXPRESS_MULTIPLIER);
+    return {
+      ...parcel,
+      type: 'EXPRESS',
+      estimatedPriceCdf,
+      priceCdf: estimatedPriceCdf,
+      formatted: formatCdf(estimatedPriceCdf),
+      formattedPrice: formatCdf(estimatedPriceCdf),
+      expressSurchargeCdf: estimatedPriceCdf - parcel.estimatedPriceCdf,
+      etaMin: Math.max(15, Math.ceil((parcel.durationMin ?? 30) * 0.6)),
+    };
+  }
+
+  async createExpress(userId: string, dto: CreateParcelDeliveryDto) {
+    const estimate = await this.estimateExpress(dto);
+    const weightCategory = this.resolveWeightCategory(dto);
+    const delivery = await this.prisma.delivery.create({
+      data: {
+        userId,
+        type: DeliveryType.EXPRESS,
+        status: DeliveryStatus.PENDING,
+        pickupLat: dto.pickupLat,
+        pickupLng: dto.pickupLng,
+        pickupAddress: dto.pickupAddress.trim(),
+        dropoffLat: dto.dropoffLat,
+        dropoffLng: dto.dropoffLng,
+        dropoffAddress: dto.dropoffAddress.trim(),
+        photoUrl: dto.photoUrl,
+        weightCategory,
+        estimatedPriceCdf: estimate.estimatedPriceCdf,
+        distanceKm: estimate.distanceKm,
+        durationMin: estimate.durationMin,
+      },
+      include: { events: true },
+    });
+    await this.prisma.deliveryEvent.create({ data: { deliveryId: delivery.id, event: 'EXPRESS_CREATED' } });
+    const formatted = formatParcelDelivery({ ...delivery, events: [{ id: '1', deliveryId: delivery.id, event: 'EXPRESS_CREATED', metadata: null, createdAt: new Date() }] });
+    return { delivery: formatted, estimate };
+  }
+
+  async cancelDelivery(id: string, userId: string) {
+    return this.updateStatus(id, DeliveryStatus.CANCELLED, userId);
+  }
+
+  async getRestaurant(id: string) {
+    const restaurant = await this.prisma.restaurant.findUnique({ where: { id } });
+    if (!restaurant || !restaurant.isActive) throw new MovaHttpException(MovaErrorCode.RESTAURANT_NOT_FOUND, HttpStatus.NOT_FOUND);
+    return {
+      ...restaurant,
+      menu: restaurant.menuItems ?? [],
+    };
   }
 
   async getDelivery(id: string, userId: string) {

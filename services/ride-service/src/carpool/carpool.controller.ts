@@ -64,9 +64,27 @@ export class CarpoolController {
     return this.carpoolService.myTrips(req.user.id);
   }
 
+  @Get(':id')
+  @ApiOperation({ summary: 'Détail trajet covoiturage' })
+  get(@Param('id') id: string) {
+    return this.carpoolService.get(id);
+  }
+
   @Post(':id/join')
   @ApiOperation({ summary: 'Rejoindre un trajet covoiturage' })
   join(@Request() req: { user: { id: string } }, @Param('id') id: string, @Body() dto: JoinCarpoolDto) {
     return this.carpoolService.join(id, req.user.id, dto.seats);
+  }
+
+  @Post(':id/cancel')
+  @ApiOperation({ summary: 'Annuler trajet covoiturage (conducteur)' })
+  cancel(@Request() req: { user: { id: string } }, @Param('id') id: string) {
+    return this.carpoolService.cancel(id, req.user.id);
+  }
+
+  @Post(':id/leave')
+  @ApiOperation({ summary: 'Quitter trajet covoiturage (passager)' })
+  leave(@Request() req: { user: { id: string } }, @Param('id') id: string) {
+    return this.carpoolService.leave(id, req.user.id);
   }
 }

@@ -39,6 +39,12 @@ export class RidesController {
     return this.scheduledRidesService.list(req.user.id);
   }
 
+  @Get('scheduled/:id')
+  @ApiOperation({ summary: 'Détail réservation planifiée' })
+  getScheduled(@Request() req: { user: { id: string } }, @Param('id') id: string) {
+    return this.scheduledRidesService.get(id, req.user.id);
+  }
+
   @Post('scheduled/:id/cancel')
   @ApiOperation({ summary: 'Annuler réservation planifiée' })
   cancelScheduled(@Request() req: { user: { id: string } }, @Param('id') id: string, @Body() dto: CancelScheduledRideDto) {

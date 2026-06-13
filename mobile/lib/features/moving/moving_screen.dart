@@ -7,30 +7,40 @@ import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 
-class ErrandScreen extends ConsumerStatefulWidget {
-  const ErrandScreen({super.key});
+const _volumeOptions = [
+  ('STUDIO', 'Studio / chambre', '1–5 m³'),
+  ('APARTMENT', 'Appartement', '5–15 m³'),
+  ('HOUSE', 'Maison', '15–30 m³'),
+  ('OFFICE', 'Bureau', 'Sur devis'),
+];
+
+class MovingScreen extends ConsumerStatefulWidget {
+  const MovingScreen({super.key});
 
   @override
-  ConsumerState<ErrandScreen> createState() => _ErrandScreenState();
+  ConsumerState<MovingScreen> createState() => _MovingScreenState();
 }
 
-class _ErrandScreenState extends ConsumerState<ErrandScreen> {
-  final _pickupController = TextEditingController(text: 'Commerce / pharmacie, Gombe');
-  final _dropoffController = TextEditingController(text: 'Ma position, Kinshasa');
+class _MovingScreenState extends ConsumerState<MovingScreen> {
+  final _fromController = TextEditingController(text: 'Bandal, Kinshasa');
+  final _toController = TextEditingController();
   final _itemController = TextEditingController();
+  String _volume = 'APARTMENT';
   final List<String> _items = [];
   int? _estimatedPrice;
   bool _loading = false;
   String? _error;
   String? _validationError;
 
-  static const _defaultDropoffLat = MarketConfig.defaultLat;
-  static const _defaultDropoffLng = MarketConfig.defaultLng;
+  static const _fromLat = MarketConfig.defaultLat + 0.01;
+  static const _fromLng = MarketConfig.defaultLng - 0.01;
+  static const _toLat = MarketConfig.defaultLat - 0.04;
+  static const _toLng = MarketConfig.defaultLng + 0.05;
 
   @override
   void dispose() {
-    _pickupController.dispose();
-    _dropoffController.dispose();
+    _fromController.dispose();
+    _toController.dispose();
     _itemController.dispose();
     super.dispose();
   }
@@ -42,7 +52,6 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
       _items.add(text);
       _itemController.clear();
       _estimatedPrice = null;
-      _validationError = null;
     });
   }
 
@@ -53,26 +62,21 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
     });
   }
 
-  String _buildDescription() => _items.join(', ');
-
-  Map<String, dynamic> _errandPayload() => {
-        'deliveryAddress': _dropoffController.text.trim(),
-        'deliveryLat': _defaultDropoffLat,
-        'deliveryLng': _defaultDropoffLng,
+  Map<String, dynamic> _payload() => {
+        'fromAddress': _fromController.text.trim(),
+        'fromLat': _fromLat,
+        'fromLng': _fromLng,
+        'toAddress': _toController.text.trim(),
+        'toLat': _toLat,
+        'toLng': _toLng,
+        'volumeCategory': _volume,
         'items': _items,
       };
 
   String? _validate() {
-    if (_items.isEmpty) return 'Ajoutez au moins un article à la liste.';
-    if (_pickupController.text.trim().isEmpty) {
-      return 'Indiquez l\'adresse du commerce ou point de retrait.';
-    }
-    if (_dropoffController.text.trim().isEmpty) {
-      return 'Indiquez l\'adresse de livraison.';
-    }
-    if (_buildDescription().length < 5) {
-      return 'Décrivez vos achats (minimum 5 caractères).';
-    }
+    if (_fromController.text.trim().isEmpty) return 'Indiquez l\'adresse de départ.';
+    if (_toController.text.trim().length < 3) return 'Indiquez l\'adresse d\'arrivée.';
+    if (_items.isEmpty) return 'Listez au moins un meuble ou carton.';
     return null;
   }
 
@@ -89,7 +93,7 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
     });
     final api = ref.read(apiClientProvider);
     await api.checkHealth();
-    final result = await api.post('/deliveries/errand/estimate', _errandPayload());
+    final result = await api.post('/moving/estimate', _payload());
     setState(() {
       _loading = false;
       switch (result) {
@@ -101,7 +105,7 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
     });
   }
 
-  Future<void> _confirm() async {
+  Future<void> _request() async {
     final validation = _validate();
     if (validation != null) {
       setState(() => _validationError = validation);
@@ -113,21 +117,20 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
       _validationError = null;
     });
     final api = ref.read(apiClientProvider);
-    final result = await api.post('/deliveries/errand', _errandPayload());
+    final result = await api.post('/moving', _payload());
     setState(() => _loading = false);
     switch (result) {
       case Success(:final data):
         if (mounted) {
-          final order = data['errand'] as Map<String, dynamic>? ??
-              data['order'] as Map<String, dynamic>?;
+          final request = data['request'] as Map<String, dynamic>? ?? data;
           showDialog<void>(
             context: context,
             builder: (ctx) => AlertDialog(
-              title: const Text('Course envoyée'),
+              title: const Text('Demande envoyée'),
               content: Text(
-                'Votre liste a été transmise à un livreur.\n'
-                'Réf. : ${order?['id'] ?? ''}\n'
-                'Total : ${MarketConfig.formatCdf(order?['estimatedPriceCdf'] as int? ?? _estimatedPrice ?? 0)}',
+                'Notre équipe déménagement vous rappelle sous 2 h.\n'
+                    'Réf. : ${request['id'] ?? ''}\n'
+                    'Estimation : ${MarketConfig.formatCdf(_estimatedPrice ?? request['estimatedPriceCdf'] as int? ?? 0)}',
                 maxLines: 6,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -153,37 +156,52 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
     final theme = Theme.of(context);
 
     return MovaScreen(
-      title: 'Courses & commissions',
+      title: 'Déménagement',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'Listez vos achats — un livreur s\'en charge pour vous.',
+            'Décrivez votre déménagement — camion + manutention.',
             style: theme.textTheme.bodyMedium?.copyWith(color: MovaColors.textSecondary),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 16),
           TextField(
-            controller: _pickupController,
+            controller: _fromController,
             decoration: const InputDecoration(
-              labelText: 'Point de retrait (commerce)',
-              hintText: 'Ex: Pharmacie du coin, Marché…',
-              prefixIcon: Icon(Icons.store_outlined),
+              labelText: 'Adresse de départ',
+              prefixIcon: Icon(Icons.home_outlined),
             ),
             onChanged: (_) => setState(() => _estimatedPrice = null),
           ),
           const SizedBox(height: 12),
           TextField(
-            controller: _dropoffController,
+            controller: _toController,
             decoration: const InputDecoration(
-              labelText: 'Adresse de livraison',
-              prefixIcon: Icon(Icons.home_outlined),
+              labelText: 'Adresse d\'arrivée',
+              hintText: 'Ex: Ngaliema, Gombe…',
+              prefixIcon: Icon(Icons.place_outlined),
             ),
             onChanged: (_) => setState(() => _estimatedPrice = null),
           ),
           const SizedBox(height: 16),
-          Text('Liste de courses', style: theme.textTheme.titleSmall),
+          Text('Volume estimé', style: theme.textTheme.titleSmall),
+          const SizedBox(height: 8),
+          ..._volumeOptions.map((v) {
+            return RadioListTile<String>(
+              title: Text(v.$2),
+              subtitle: Text(v.$3, style: const TextStyle(fontSize: 12)),
+              value: v.$1,
+              groupValue: _volume,
+              onChanged: (val) => setState(() {
+                _volume = val!;
+                _estimatedPrice = null;
+              }),
+            );
+          }),
+          const SizedBox(height: 8),
+          Text('Meubles / cartons', style: theme.textTheme.titleSmall),
           const SizedBox(height: 8),
           Row(
             children: [
@@ -191,7 +209,7 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
                 child: TextField(
                   controller: _itemController,
                   decoration: const InputDecoration(
-                    hintText: 'Ex: Riz 5 kg, Pain, Savon…',
+                    hintText: 'Ex: Canapé, Cartons x10…',
                     isDense: true,
                   ),
                   onSubmitted: (_) => _addItem(),
@@ -203,46 +221,35 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
               ),
             ],
           ),
-          if (_items.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              child: Text(
-                'Ajoutez au moins un article',
-                style: theme.textTheme.bodySmall?.copyWith(color: MovaColors.textSecondary),
-              ),
-            )
-          else
-            ...List.generate(_items.length, (i) {
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: MovaCard(
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          _items[i],
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
+          ...List.generate(_items.length, (i) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: MovaCard(
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        _items[i],
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      IconButton(
-                        icon: const Icon(Icons.close, size: 20),
-                        onPressed: () => _removeItem(i),
-                      ),
-                    ],
-                  ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 20),
+                      onPressed: () => _removeItem(i),
+                    ),
+                  ],
                 ),
-              );
-            }),
+              ),
+            );
+          }),
           if (_estimatedPrice != null) ...[
             const SizedBox(height: 16),
             MovaCard(
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Expanded(
-                    child: Text('Estimation (service + trajet)'),
-                  ),
+                  const Expanded(child: Text('Estimation (camion + équipe)')),
                   Text(
                     MarketConfig.formatCdf(_estimatedPrice!),
                     style: const TextStyle(
@@ -265,12 +272,10 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
           ],
           const SizedBox(height: 24),
           MovaButton(
-            label: _estimatedPrice == null ? 'Estimer le prix' : 'Envoyer au livreur',
+            label: _estimatedPrice == null ? 'Estimer le déménagement' : 'Demander un devis',
             isLoading: _loading,
-            icon: _estimatedPrice == null ? Icons.calculate_outlined : Icons.send_outlined,
-            onPressed: _loading
-                ? null
-                : (_estimatedPrice == null ? _estimate : _confirm),
+            icon: _estimatedPrice == null ? Icons.calculate_outlined : Icons.local_shipping_outlined,
+            onPressed: _loading ? null : (_estimatedPrice == null ? _estimate : _request),
           ),
         ],
       ),

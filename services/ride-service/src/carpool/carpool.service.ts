@@ -165,4 +165,44 @@ export class CarpoolService {
     });
     return { asDriver, asPassenger };
   }
+
+  async get(id: string) {
+    const trip = await this.prisma.carpoolTrip.findUnique({
+      where: { id },
+      include: { passengers: { select: { id: true, userId: true, seats: true, createdAt: true } } },
+    });
+    if (!trip) throw new MovaHttpException(MovaErrorCode.CARPOOL_NOT_FOUND, HttpStatus.NOT_FOUND);
+    return { trip: this.formatTripForMobile(trip), raw: trip };
+  }
+
+  async cancel(tripId: string, userId: string) {
+    const trip = await this.prisma.carpoolTrip.findUnique({ where: { id: tripId } });
+    if (!trip) throw new MovaHttpException(MovaErrorCode.CARPOOL_NOT_FOUND, HttpStatus.NOT_FOUND);
+    if (trip.driverId !== userId) throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
+    if (trip.status === CarpoolStatus.COMPLETED || trip.status === CarpoolStatus.CANCELLED) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR);
+    }
+    return this.prisma.carpoolTrip.update({
+      where: { id: tripId },
+      data: { status: CarpoolStatus.CANCELLED, seatsAvailable: 0 },
+    });
+  }
+
+  async leave(tripId: string, userId: string) {
+    const passenger = await this.prisma.carpoolPassenger.findFirst({ where: { tripId, userId } });
+    if (!passenger) throw new MovaHttpException(MovaErrorCode.CARPOOL_NOT_FOUND, HttpStatus.NOT_FOUND);
+    const trip = await this.prisma.carpoolTrip.findUnique({ where: { id: tripId } });
+    if (!trip || trip.status === CarpoolStatus.CANCELLED || trip.status === CarpoolStatus.COMPLETED) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR);
+    }
+    await this.prisma.carpoolPassenger.delete({ where: { id: passenger.id } });
+    return this.prisma.carpoolTrip.update({
+      where: { id: tripId },
+      data: {
+        seatsAvailable: trip.seatsAvailable + passenger.seats,
+        status: CarpoolStatus.OPEN,
+      },
+      include: { passengers: true },
+    });
+  }
 }

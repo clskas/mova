@@ -140,8 +140,23 @@ class ApiClient {
     if (path.contains('/deliveries/parcel/estimate')) {
       return Success(MockData.parcelEstimate(body ?? {}));
     }
+    if (path.contains('/deliveries/express/estimate')) {
+      return Success(MockData.expressEstimate(body ?? {}));
+    }
+    if (path.contains('/deliveries/express') && method == 'POST') {
+      return Success({'delivery': MockData.createExpress(body ?? {})});
+    }
     if (path.contains('/deliveries/parcel') && method == 'POST') {
       return Success({'delivery': MockData.createParcel(body ?? {})});
+    }
+    if (path.contains('/deliveries/errand/estimate')) {
+      return Success(MockData.mobileErrandEstimate(body ?? {}));
+    }
+    if (path == '/deliveries/errand' && method == 'POST') {
+      return Success(MockData.createMobileErrand(body ?? {}));
+    }
+    if (path.contains('/deliveries/errand/history')) {
+      return Success({'data': MockData.errandHistory()});
     }
     if (path == '/deliveries/food' && method == 'POST') {
       return Success({'delivery': MockData.createFoodOrder(body ?? {}), 'order': MockData.createFoodOrder(body ?? {})});
@@ -157,6 +172,9 @@ class ApiClient {
     }
     if (path == '/wallet') {
       return Success(MockData.wallet());
+    }
+    if (path.contains('/wallet/topup')) {
+      return Success(MockData.walletTopUp(body ?? {}));
     }
     if (path.contains('/drivers/earnings')) {
       return Success(MockData.earnings());
@@ -186,6 +204,21 @@ class ApiClient {
     }
     if (path.contains('/carpool/') && path.endsWith('/join')) {
       return const Success({'success': true});
+    }
+    if (path.contains('/rental/estimate')) {
+      return Success(MockData.rentalEstimate(body ?? {}));
+    }
+    if (path == '/rental/inquiries' && method == 'POST') {
+      return Success(MockData.createRentalInquiry(body ?? {}));
+    }
+    if (path.contains('/rental/inquiries')) {
+      return Success({'data': MockData.rentalInquiries(), 'inquiries': MockData.rentalInquiries()});
+    }
+    if (path.contains('/moving/estimate')) {
+      return Success(MockData.movingEstimate(body ?? {}));
+    }
+    if (path == '/moving' && method == 'POST') {
+      return Success(MockData.createMovingRequest(body ?? {}));
     }
     return null;
   }

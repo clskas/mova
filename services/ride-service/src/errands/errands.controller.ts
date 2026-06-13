@@ -1,8 +1,13 @@
-import { Body, Controller, Get, Param, Post, Request, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Request, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ErrandOrderStatus } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CreateErrandOrderDto } from './errands.dto';
 import { ErrandsService } from './errands.service';
+
+class UpdateErrandStatusDto {
+  status!: ErrandOrderStatus;
+}
 
 @ApiTags('errands')
 @Controller('errands')
@@ -33,5 +38,17 @@ export class ErrandsController {
   @ApiOperation({ summary: 'Détail commande courses' })
   get(@Request() req: { user: { id: string } }, @Param('id') id: string) {
     return this.errandsService.get(id, req.user.id);
+  }
+
+  @Post(':id/cancel')
+  @ApiOperation({ summary: 'Annuler commande courses' })
+  cancel(@Request() req: { user: { id: string } }, @Param('id') id: string) {
+    return this.errandsService.cancel(id, req.user.id);
+  }
+
+  @Patch(':id/status')
+  @ApiOperation({ summary: 'Mettre à jour statut commande courses' })
+  status(@Request() req: { user: { id: string } }, @Param('id') id: string, @Body() dto: UpdateErrandStatusDto) {
+    return this.errandsService.updateStatus(id, req.user.id, dto.status);
   }
 }

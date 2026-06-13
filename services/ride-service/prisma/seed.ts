@@ -86,6 +86,12 @@ const CANCELLATION_POLICIES = [
   { vehicleType: VehicleType.COMFORT, freeCancelMinutes: 5, passengerFeeCdf: 3000, driverCompensationCdf: 1500, noShowFeeCdf: 8000 },
   { vehicleType: VehicleType.VIP, freeCancelMinutes: 5, passengerFeeCdf: 5000, driverCompensationCdf: 2500, noShowFeeCdf: 10000 },
 ];
+const RENTAL_VEHICLES = [
+  { name: 'Toyota Corolla', category: 'Berline', seats: 5, dailyRateCdf: 45000, depositCdf: 100000 },
+  { name: 'Toyota RAV4', category: 'SUV', seats: 5, dailyRateCdf: 75000, depositCdf: 150000 },
+  { name: 'Honda CB125', category: 'Moto', seats: 2, dailyRateCdf: 15000, depositCdf: 50000 },
+  { name: 'Toyota Hiace', category: 'Minibus', seats: 14, dailyRateCdf: 120000, depositCdf: 200000 },
+];
 async function main() {
   for (const c of KINSHASA_COMMUNES) {
     await prisma.commune.upsert({ where: { name: c.name }, create: { name: c.name, lat: c.lat, lng: c.lng }, update: { lat: c.lat, lng: c.lng } });
@@ -103,6 +109,11 @@ async function main() {
     } else {
       await prisma.restaurant.create({ data: r });
     }
+  }
+  for (const v of RENTAL_VEHICLES) {
+    const existing = await prisma.rentalVehicle.findFirst({ where: { name: v.name } });
+    if (existing) await prisma.rentalVehicle.update({ where: { id: existing.id }, data: v });
+    else await prisma.rentalVehicle.create({ data: v });
   }
   console.log('Ride service seed complete');
 }

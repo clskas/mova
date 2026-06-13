@@ -124,4 +124,33 @@ export class ErrandsService {
     if (order.userId !== userId) throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
     return order;
   }
+
+  async cancel(id: string, userId: string) {
+    const order = await this.get(id, userId);
+    if (order.status === ErrandOrderStatus.COMPLETED || order.status === ErrandOrderStatus.CANCELLED) {
+      throw new MovaHttpException(MovaErrorCode.ERRAND_INVALID_STATUS);
+    }
+    return this.prisma.errandOrder.update({
+      where: { id },
+      data: { status: ErrandOrderStatus.CANCELLED, cancelledAt: new Date() },
+    });
+  }
+
+  async updateStatus(id: string, userId: string, status: ErrandOrderStatus) {
+    const order = await this.get(id, userId);
+    const allowed: Record<ErrandOrderStatus, ErrandOrderStatus[]> = {
+      [ErrandOrderStatus.PENDING]: [ErrandOrderStatus.ASSIGNED, ErrandOrderStatus.CANCELLED],
+      [ErrandOrderStatus.ASSIGNED]: [ErrandOrderStatus.IN_PROGRESS, ErrandOrderStatus.CANCELLED],
+      [ErrandOrderStatus.IN_PROGRESS]: [ErrandOrderStatus.COMPLETED],
+      [ErrandOrderStatus.COMPLETED]: [],
+      [ErrandOrderStatus.CANCELLED]: [],
+    };
+    if (!allowed[order.status]?.includes(status)) {
+      throw new MovaHttpException(MovaErrorCode.ERRAND_INVALID_STATUS);
+    }
+    const updates: Record<string, unknown> = { status };
+    if (status === ErrandOrderStatus.COMPLETED) updates.completedAt = new Date();
+    if (status === ErrandOrderStatus.CANCELLED) updates.cancelledAt = new Date();
+    return this.prisma.errandOrder.update({ where: { id }, data: updates });
+  }
 }

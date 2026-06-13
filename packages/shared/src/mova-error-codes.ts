@@ -25,8 +25,13 @@ export enum MovaErrorCode {
   CARPOOL_ALREADY_JOINED = 'MOVA_CAR_003',
 
   ERRAND_NOT_FOUND = 'MOVA_ERR_001',
+  ERRAND_INVALID_STATUS = 'MOVA_ERR_002',
 
   RENTAL_INQUIRY_NOT_FOUND = 'MOVA_REN_001',
+  RENTAL_VEHICLE_NOT_FOUND = 'MOVA_REN_002',
+
+  MOVING_NOT_FOUND = 'MOVA_MOV_001',
+  MOVING_INVALID_STATUS = 'MOVA_MOV_002',
 
   PAYMENT_FAILED = 'MOVA_PAY_001',
   PAYMENT_INSUFFICIENT_BALANCE = 'MOVA_PAY_002',
@@ -71,8 +76,13 @@ export const MOVA_ERROR_MESSAGES: Record<MovaErrorCode, string> = {
   [MovaErrorCode.CARPOOL_ALREADY_JOINED]: 'Vous avez déjà rejoint ce trajet.',
 
   [MovaErrorCode.ERRAND_NOT_FOUND]: 'Commande de course introuvable.',
+  [MovaErrorCode.ERRAND_INVALID_STATUS]: 'Statut de commande invalide pour cette action.',
 
   [MovaErrorCode.RENTAL_INQUIRY_NOT_FOUND]: 'Demande de location introuvable.',
+  [MovaErrorCode.RENTAL_VEHICLE_NOT_FOUND]: 'Véhicule de location introuvable.',
+
+  [MovaErrorCode.MOVING_NOT_FOUND]: 'Demande de déménagement introuvable.',
+  [MovaErrorCode.MOVING_INVALID_STATUS]: 'Statut de déménagement invalide pour cette action.',
 
   [MovaErrorCode.PAYMENT_FAILED]: 'Le paiement a échoué. Vérifiez votre solde.',
   [MovaErrorCode.PAYMENT_INSUFFICIENT_BALANCE]: 'Solde insuffisant dans votre portefeuille.',

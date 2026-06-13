@@ -184,7 +184,42 @@ abstract final class MockData {
   static Map<String, dynamic> wallet() => {
         'balanceCdf': 45000,
         'currency': 'CDF',
+        'transactions': walletTransactions(),
       };
+
+  static List<Map<String, dynamic>> walletTransactions() => [
+        {
+          'id': 'tx-1',
+          'type': 'CREDIT',
+          'amountCdf': 20000,
+          'description': 'Recharge Orange Money',
+          'createdAt': DateTime.now().subtract(const Duration(days: 1)).toIso8601String(),
+        },
+        {
+          'id': 'tx-2',
+          'type': 'DEBIT',
+          'amountCdf': -8500,
+          'description': 'Paiement course ride-1',
+          'createdAt': DateTime.now().subtract(const Duration(days: 2)).toIso8601String(),
+        },
+        {
+          'id': 'tx-3',
+          'type': 'CREDIT',
+          'amountCdf': 33500,
+          'description': 'Recharge M-Pesa',
+          'createdAt': DateTime.now().subtract(const Duration(days: 5)).toIso8601String(),
+        },
+      ];
+
+  static Map<String, dynamic> walletTopUp(Map<String, dynamic> body) {
+    final amount = body['amountCdf'] as int? ?? 0;
+    return {
+      'success': true,
+      'message': 'Recharge de $amount FC en cours (${body['provider'] ?? 'MOBILE_MONEY'})',
+      'amountCdf': amount,
+      'balanceCdf': 45000 + amount,
+    };
+  }
 
   static Map<String, dynamic> earnings() => {
         'todayCdf': 28500,
@@ -204,6 +239,9 @@ abstract final class MockData {
         {'id': 'FOOD', 'name': 'Livraison repas', 'enabled': true},
         {'id': 'ERRANDS', 'name': 'Courses & commissions', 'enabled': true},
         {'id': 'CARPOOL', 'name': 'Covoiturage', 'enabled': true},
+        {'id': 'EXPRESS', 'name': 'Livraison express', 'enabled': true},
+        {'id': 'RENTAL', 'name': 'Location véhicule', 'enabled': true},
+        {'id': 'MOVING', 'name': 'Déménagement', 'enabled': true},
       ];
 
   static Map<String, dynamic> parcelEstimate(Map<String, dynamic> body) {
@@ -416,4 +454,104 @@ abstract final class MockData {
         ...body,
         'driverName': 'Vous',
       };
+
+  static Map<String, dynamic> expressEstimate(Map<String, dynamic> body) => {
+        'estimatedPriceCdf': 7500,
+        'currency': 'CDF',
+        'etaMin': 35,
+      };
+
+  static Map<String, dynamic> createExpress(Map<String, dynamic> body) => {
+        'id': 'express-${DateTime.now().millisecondsSinceEpoch}',
+        'status': 'CONFIRMED',
+        'type': 'PARCEL',
+        ...body,
+        'priceCdf': 7500,
+      };
+
+  static Map<String, dynamic> rentalEstimate(Map<String, dynamic> body) {
+    final start = DateTime.parse(body['startDate']?.toString() ?? DateTime.now().toIso8601String());
+    final end = DateTime.parse(body['endDate']?.toString() ?? start.add(const Duration(days: 1)).toIso8601String());
+    final days = end.difference(start).inDays.clamp(1, 30);
+    final daily = switch (body['vehicleType']?.toString()) {
+      'MINIBUS' => 120000,
+      'PICKUP' => 95000,
+      'SUV' => 85000,
+      _ => 45000,
+    };
+    return {'estimatedTotalCdf': daily * days, 'days': days, 'currency': 'CDF'};
+  }
+
+  static List<Map<String, dynamic>> rentalInquiries() => [
+        {
+          'id': 'rental-1',
+          'vehicleType': 'SUV',
+          'status': 'PENDING',
+          'startDate': DateTime.now().add(const Duration(days: 3)).toIso8601String(),
+          'endDate': DateTime.now().add(const Duration(days: 5)).toIso8601String(),
+          'pickupAddress': 'Gombe, Kinshasa',
+        },
+      ];
+
+  static Map<String, dynamic> createRentalInquiry(Map<String, dynamic> body) {
+    final estimate = rentalEstimate(body);
+    return {
+      'inquiry': {
+        'id': 'rental-${DateTime.now().millisecondsSinceEpoch}',
+        'status': 'PENDING',
+        ...body,
+        'estimatedTotalCdf': estimate['estimatedTotalCdf'],
+      },
+      'message': 'Demande enregistrée. Un conseiller MOVA vous contactera sous 24h.',
+    };
+  }
+
+  static Map<String, dynamic> movingEstimate(Map<String, dynamic> body) {
+    final base = switch (body['volumeCategory']?.toString()) {
+      'HOUSE' => 350000,
+      'OFFICE' => 450000,
+      'STUDIO' => 120000,
+      _ => 220000,
+    };
+    final items = (body['items'] as List? ?? []).length;
+    return {'estimatedPriceCdf': base + (items * 5000), 'currency': 'CDF'};
+  }
+
+  static Map<String, dynamic> createMovingRequest(Map<String, dynamic> body) {
+    final estimate = movingEstimate(body);
+    return {
+      'request': {
+        'id': 'moving-${DateTime.now().millisecondsSinceEpoch}',
+        'status': 'PENDING',
+        ...body,
+        'estimatedPriceCdf': estimate['estimatedPriceCdf'],
+      },
+      'message': 'Demande de déménagement enregistrée.',
+    };
+  }
+
+  static Map<String, dynamic> mobileErrandEstimate(Map<String, dynamic> body) {
+    final items = body['items'] as List? ?? [];
+    final base = errandEstimate({'description': items.join(', ')})['estimatedPriceCdf'] as int;
+    return {
+      'estimatedPriceCdf': base + (items.length * 1500),
+      'currency': 'CDF',
+    };
+  }
+
+  static Map<String, dynamic> createMobileErrand(Map<String, dynamic> body) {
+    final items = body['items'] as List? ?? [];
+    final price = mobileErrandEstimate(body)['estimatedPriceCdf'] as int;
+    return {
+      'errand': {
+        'id': 'errand-${DateTime.now().millisecondsSinceEpoch}',
+        'status': 'PENDING',
+        'type': 'ERRAND',
+        'deliveryAddress': body['deliveryAddress'],
+        'items': items,
+        'priceCdf': price,
+        'estimatedPriceCdf': price,
+      },
+    };
+  }
 }

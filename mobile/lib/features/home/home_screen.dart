@@ -9,6 +9,9 @@ import '../delivery/food_delivery_screen.dart';
 import '../delivery/parcel_delivery_screen.dart';
 import '../errands/errand_screen.dart';
 import '../rides/scheduled_ride_screen.dart';
+import '../delivery/express_delivery_screen.dart';
+import '../moving/moving_screen.dart';
+import '../rental/rental_screen.dart';
 import '../wallet/wallet_screen.dart';
 import '../help/help_screen.dart';
 import '../history/history_screen.dart';
@@ -246,6 +249,33 @@ class HomeScreen extends StatelessWidget {
                       title: 'Covoiturage',
                       subtitle: 'Partagez un trajet, économisez',
                       onTap: () => _open(context, const CarpoolScreen()),
+                    ),
+                  ]),
+                  const SizedBox(height: spacing),
+                  gridRow([
+                    ServiceCard(
+                      icon: const Icon(Icons.bolt_outlined, color: MovaColors.orange, size: 28),
+                      iconColor: MovaColors.orange,
+                      title: 'Livraison express',
+                      subtitle: 'Envoi urgent en moins de 45 min',
+                      onTap: () => _open(context, const ExpressDeliveryScreen()),
+                    ),
+                    ServiceCard(
+                      icon: const Icon(Icons.directions_car_outlined, color: MovaColors.violet, size: 28),
+                      iconColor: MovaColors.violet,
+                      title: 'Location véhicule',
+                      subtitle: 'Voiture, SUV ou minibus',
+                      onTap: () => _open(context, const RentalScreen()),
+                    ),
+                  ]),
+                  const SizedBox(height: spacing),
+                  gridRow([
+                    ServiceCard(
+                      icon: const Icon(Icons.local_shipping_outlined, color: MovaColors.midnight, size: 28),
+                      iconColor: MovaColors.midnight,
+                      title: 'Déménagement',
+                      subtitle: 'Camion et manutention',
+                      onTap: () => _open(context, const MovingScreen()),
                     ),
                   ]),
                 ],

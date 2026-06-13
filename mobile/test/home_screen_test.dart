@@ -45,6 +45,9 @@ void main() {
     expect(find.text('Livraison repas'), findsOneWidget);
     expect(find.text('Courses & commissions'), findsOneWidget);
     expect(find.text('Covoiturage'), findsOneWidget);
+    expect(find.text('Livraison express'), findsOneWidget);
+    expect(find.text('Location véhicule'), findsOneWidget);
+    expect(find.text('Déménagement'), findsOneWidget);
     expect(find.text('Kinshasa'), findsOneWidget);
     expect(find.text('Bientôt'), findsNothing);
   });

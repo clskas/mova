@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Param, Post, Request, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { CreateRentalInquiryDto } from './rental.dto';
+import { CreateRentalBookingDto, CreateRentalInquiryDto, RentalEstimateDto } from './rental.dto';
 import { RentalService } from './rental.service';
 
 @ApiTags('rental')
@@ -10,6 +10,24 @@ import { RentalService } from './rental.service';
 @ApiBearerAuth()
 export class RentalController {
   constructor(private rentalService: RentalService) {}
+
+  @Get('vehicles')
+  @ApiOperation({ summary: 'Catalogue véhicules location Kinshasa' })
+  vehicles() {
+    return this.rentalService.listVehicles();
+  }
+
+  @Post('estimate')
+  @ApiOperation({ summary: 'Estimer location véhicule (CDF)' })
+  estimate(@Body() dto: RentalEstimateDto) {
+    return this.rentalService.estimate(dto);
+  }
+
+  @Post('bookings')
+  @ApiOperation({ summary: 'Réserver un véhicule du catalogue' })
+  booking(@Request() req: { user: { id: string } }, @Body() dto: CreateRentalBookingDto) {
+    return this.rentalService.createBooking(req.user.id, dto);
+  }
 
   @Post('inquiries')
   @ApiOperation({ summary: 'Soumettre demande de location véhicule' })

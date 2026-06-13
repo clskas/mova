@@ -31,6 +31,12 @@ export class DeliveriesController {
     return { data: await this.errandsService.listMobile(req.user.id) };
   }
 
+  @Get('restaurants/:id')
+  @ApiOperation({ summary: 'Détail restaurant et menu' })
+  restaurant(@Param('id') id: string) {
+    return this.deliveriesService.getRestaurant(id);
+  }
+
   @Post('parcel/estimate')
   @ApiOperation({ summary: 'Estimer livraison colis (CDF)' })
   estimateParcel(@Body() dto: CreateParcelDeliveryDto) {
@@ -65,6 +71,12 @@ export class DeliveriesController {
   @ApiOperation({ summary: 'Historique livraisons' })
   history(@Request() req: { user: { id: string } }) {
     return this.deliveriesService.getHistory(req.user.id);
+  }
+
+  @Post(':id/cancel')
+  @ApiOperation({ summary: 'Annuler livraison' })
+  cancel(@Request() req: { user: { id: string } }, @Param('id') id: string) {
+    return this.deliveriesService.cancelDelivery(id, req.user.id);
   }
 
   @Get(':id')

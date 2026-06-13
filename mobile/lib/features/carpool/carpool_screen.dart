@@ -6,6 +6,7 @@ import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
+import 'carpool_join_confirmation_screen.dart';
 
 class CarpoolScreen extends ConsumerStatefulWidget {
   const CarpoolScreen({super.key});
@@ -175,20 +176,20 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
       _validationError = null;
     });
     final api = ref.read(apiClientProvider);
-    final result = await api.post('/rides/estimate', {
-      'pickupLat': _pickupLat,
-      'pickupLng': _pickupLng,
-      'dropoffLat': _dropoffLat,
-      'dropoffLng': _dropoffLng,
-      'vehicleType': 'STANDARD',
+    final result = await api.post('/carpool/estimate', {
+      'fromAddress': _fromController.text.trim(),
+      'toAddress': _toController.text.trim(),
+      'seats': seats,
     });
     setState(() {
       _loading = false;
       switch (result) {
         case Success(:final data):
-          final fare = (data['estimatedFareCdf'] ?? data['estimatedPriceCdf']) as int? ?? 15000;
+          final fare = data['totalPriceCdf'] as int? ??
+              (data['estimatedFareCdf'] ?? data['estimatedPriceCdf']) as int? ??
+              15000;
           _totalPrice = fare;
-          _pricePerSeat = _splitPrice(fare, seats);
+          _pricePerSeat = data['pricePerSeatCdf'] as int? ?? _splitPrice(fare, seats);
         case Failure(:final error):
           _error = error.message;
       }
@@ -262,19 +263,32 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
     }
   }
 
-  Future<void> _joinRide(String tripId, String driverName) async {
+  Future<void> _joinRide(Map<String, dynamic> ride) async {
+    final id = ride['id']?.toString() ?? '';
+    final driver = ride['driverName']?.toString() ?? 'Conducteur';
+    final perSeat = ride['pricePerSeatCdf'] as int? ?? 0;
     setState(() {
       _loading = true;
       _error = null;
     });
     final api = ref.read(apiClientProvider);
-    final result = await api.post('/carpool/$tripId/join', {'seats': 1});
+    final result = await api.post('/carpool/$id/join', {'seats': 1});
     setState(() => _loading = false);
     switch (result) {
       case Success():
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Demande envoyée à $driverName')),
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => CarpoolJoinConfirmationScreen(
+                tripId: id,
+                fromAddress: ride['fromAddress']?.toString() ?? '',
+                toAddress: ride['toAddress']?.toString() ?? '',
+                driverName: driver,
+                pricePerSeatCdf: perSeat,
+                departureAt: ride['departureAt']?.toString(),
+              ),
+            ),
           );
           _loadRides();
         }
@@ -332,7 +346,7 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
                   ),
                 ),
                 ElevatedButton(
-                  onPressed: id.isEmpty ? null : () => _joinRide(id, driver),
+                  onPressed: id.isEmpty ? null : () => _joinRide(ride),
                   child: const Text('Rejoindre'),
                 ),
               ],

@@ -1,18 +1,10 @@
 import { Body, Controller, Get, Param, Patch, Post, Request, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { IsOptional, IsString } from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ErrandsService } from '../errands/errands.service';
 import { CreateFoodDeliveryDto, CreateParcelDeliveryDto, UpdateDeliveryStatusDto } from './deliveries.dto';
 import { MobileErrandCreateDto, MobileErrandEstimateDto } from './deliveries-mobile.dto';
 import { DeliveriesService } from './deliveries.service';
-
-class ParcelPhotoUploadDto {
-  @ApiProperty() @IsString() dataBase64!: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() contentType?: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() filename?: string;
-}
 
 @ApiTags('deliveries')
 @Controller('deliveries')
@@ -55,12 +47,6 @@ export class DeliveriesController {
   @ApiOperation({ summary: 'Estimer livraison colis (CDF)' })
   estimateParcel(@Body() dto: CreateParcelDeliveryDto) {
     return this.deliveriesService.estimateParcel(dto);
-  }
-
-  @Post('parcel/photo')
-  @ApiOperation({ summary: 'Upload photo colis (base64) — retourne photoUrl' })
-  uploadParcelPhoto(@Body() dto: ParcelPhotoUploadDto) {
-    return this.deliveriesService.uploadParcelPhoto(dto);
   }
 
   @Post('parcel')

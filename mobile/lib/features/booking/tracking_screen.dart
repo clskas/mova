@@ -44,9 +44,11 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
   LatLng? _driverPos;
   int _etaMinutes = 8;
   bool _loading = true;
+  bool _waitingDriver = false;
   bool _mock = false;
   String? _error;
   Timer? _etaTimer;
+  Timer? _pollTimer;
   Timer? _mockTimer;
   int _mockStep = 0;
 
@@ -55,7 +57,6 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadRide();
-      _connectSocket();
       _startEtaCountdown();
     });
   }
@@ -63,6 +64,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
   @override
   void dispose() {
     _etaTimer?.cancel();
+    _pollTimer?.cancel();
     _mockTimer?.cancel();
     ref.read(rideSocketProvider).dispose();
     super.dispose();
@@ -76,30 +78,46 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
     });
   }
 
+  Map<String, dynamic>? _normalizeDriver(Map<String, dynamic>? raw) {
+    if (raw == null) return null;
+    final vehicle = raw['vehicle'] as Map<String, dynamic>?;
+    return {
+      'name': raw['name']?.toString() ??
+          'Chauffeur ${raw['userId']?.toString().substring(0, 6) ?? ''}',
+      'rating': (raw['rating'] as num?)?.toDouble() ?? 4.5,
+      'phone': raw['phone']?.toString() ?? '',
+      'vehicleType': raw['vehicleType']?.toString() ?? vehicle?['type']?.toString() ?? 'Moto-taxi',
+      'plateNumber': raw['plateNumber']?.toString() ?? vehicle?['plate']?.toString() ?? '—',
+      'vehicleModel': raw['vehicleModel']?.toString() ??
+          '${vehicle?['make'] ?? ''} ${vehicle?['model'] ?? ''}'.trim(),
+    };
+  }
+
   Future<void> _loadRide() async {
     setState(() {
       _loading = true;
       _error = null;
     });
     final api = ref.read(apiClientProvider);
+    await api.checkHealth();
     final result = await api.getRide(widget.rideId);
     if (!mounted) return;
     setState(() {
       _loading = false;
       switch (result) {
         case Success(:final data):
-          _applyRideData(data);
+          _applyRideData(data, api);
         case Failure(:final error):
           _error = error.message;
-          _applyMockDriver();
+          if (api.isMockMode) _applyMockDriver();
       }
     });
   }
 
-  void _applyRideData(Map<String, dynamic> data) {
+  void _applyRideData(Map<String, dynamic> data, ApiClient api) {
     _ride = data;
     _status = data['status']?.toString() ?? 'ACCEPTED';
-    _driver = data['driver'] as Map<String, dynamic>?;
+    _driver = _normalizeDriver(data['driver'] as Map<String, dynamic>?);
     _pickup = LatLng(
       (data['pickupLat'] as num?)?.toDouble() ?? MarketConfig.defaultLat,
       (data['pickupLng'] as num?)?.toDouble() ?? MarketConfig.defaultLng,
@@ -109,14 +127,30 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
     if (dLat != null && dLng != null) {
       _dropoff = LatLng(dLat.toDouble(), dLng.toDouble());
     }
-    _driverPos = LatLng(
-      _pickup.latitude + 0.008,
-      _pickup.longitude + 0.005,
-    );
-    if (_driver == null) _applyMockDriver();
+    final driverLat = (data['driver']?['lat'] as num?)?.toDouble();
+    final driverLng = (data['driver']?['lng'] as num?)?.toDouble();
+    if (driverLat != null && driverLng != null) {
+      _driverPos = LatLng(driverLat, driverLng);
+    } else if (_driver != null) {
+      _driverPos = LatLng(_pickup.latitude + 0.008, _pickup.longitude + 0.005);
+    }
+
+    if (api.rideHasDriver(data)) {
+      _waitingDriver = false;
+      _pollTimer?.cancel();
+      _connectSocket();
+      if (api.isMockMode && _driver == null) _applyMockDriver();
+    } else if (!api.isMockMode) {
+      _waitingDriver = true;
+      _pollTimer ??= Timer.periodic(const Duration(seconds: 3), (_) => _loadRide());
+    } else {
+      _applyMockDriver();
+      _connectSocket();
+    }
   }
 
   void _applyMockDriver() {
+    _mock = true;
     _driver ??= {
       'name': 'Jean Kabila',
       'rating': 4.8,
@@ -127,21 +161,32 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
     };
     _driverPos ??= LatLng(_pickup.latitude + 0.008, _pickup.longitude + 0.005);
     _dropoff ??= LatLng(MarketConfig.defaultLat - 0.03, MarketConfig.defaultLng + 0.04);
+    _startMockSimulation();
   }
 
-  void _connectSocket() {
+  Future<void> _connectSocket() async {
+    final api = ref.read(apiClientProvider);
+    if (api.isMockMode) {
+      setState(() => _mock = true);
+      _startMockSimulation();
+      return;
+    }
+    final token = await api.authToken();
     final socket = ref.read(rideSocketProvider);
     socket.connect(
       rideId: widget.rideId,
+      token: token,
       onConnected: () {
         if (mounted) setState(() => _mock = false);
       },
       onDisconnected: () {
         if (!mounted) return;
-        setState(() {
-          _mock = socket.mockMode;
-          if (_mock) _startMockSimulation();
-        });
+        if (socket.mockMode && ref.read(apiClientProvider).isMockMode) {
+          setState(() {
+            _mock = true;
+            _startMockSimulation();
+          });
+        }
       },
       onLocation: (payload) {
         final lat = payload['lat'] as num?;
@@ -150,17 +195,24 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
           setState(() => _driverPos = LatLng(lat.toDouble(), lng.toDouble()));
         }
       },
+      onStatus: (payload) {
+        final status = payload['status']?.toString();
+        if (status != null && mounted) {
+          setState(() => _status = status);
+          if (status == 'COMPLETED') _goToPayment();
+        }
+      },
     );
   }
 
   void _startMockSimulation() {
-    _mockTimer?.cancel();
+    if (_mockTimer?.isActive == true) return;
     _mockTimer = Timer.periodic(const Duration(seconds: 4), (_) {
       if (!mounted) return;
       setState(() {
         _mockStep = (_mockStep + 1) % 4;
         _status = _statusSteps[_mockStep].$1;
-        if (_driverPos != null && _pickup != _driverPos) {
+        if (_driverPos != null) {
           _driverPos = LatLng(
             _driverPos!.latitude - 0.002,
             _driverPos!.longitude - 0.001,
@@ -188,6 +240,14 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
 
   Future<void> _callDriver() async {
     final phone = _driver?['phone']?.toString() ?? '+243812345678';
+    if (phone.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Numéro chauffeur indisponible')),
+        );
+      }
+      return;
+    }
     final uri = Uri.parse('tel:$phone');
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri);
@@ -211,6 +271,30 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_waitingDriver && !_loading) {
+      return MovaScreen(
+        title: 'Suivi de course',
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const CircularProgressIndicator(color: MovaColors.violet),
+            const SizedBox(height: 16),
+            const Text(
+              'En attente d\'assignation du chauffeur…',
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            MovaButton(
+              label: 'Actualiser',
+              isSecondary: true,
+              icon: Icons.refresh,
+              onPressed: _loadRide,
+            ),
+          ],
+        ),
+      );
+    }
+
     final currentStep = _stepIndex(_status);
     final driverName = _driver?['name']?.toString() ?? 'Chauffeur';
     final rating = (_driver?['rating'] as num?)?.toDouble() ?? 4.8;

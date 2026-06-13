@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io' show File;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -23,6 +24,11 @@ class ApiClient {
 
   bool get isMockMode => _mockMode;
   bool get hasToken => _token != null && _token!.isNotEmpty;
+
+  Future<String?> authToken() async {
+    await ensureReady();
+    return _token;
+  }
 
   Future<void> loadToken() async {
     final prefs = await SharedPreferences.getInstance();
@@ -140,6 +146,12 @@ class ApiClient {
     if (path.contains('/deliveries/parcel/estimate')) {
       return Success(MockData.parcelEstimate(body ?? {}));
     }
+    if (path.contains('/uploads/parcel-photo') && method == 'POST') {
+      return Success({'photoUrl': 'mock://parcel-photo', 'cloudinaryMockUrl': 'mock://cloudinary'});
+    }
+    if (path.contains('/deliveries/parcel/photo') && method == 'POST') {
+      return Success({'url': 'mock://parcel-photo', 'photoUrl': 'mock://parcel-photo'});
+    }
     if (path.contains('/express/estimate') || path.contains('/deliveries/express/estimate')) {
       return Success(MockData.expressEstimate(body ?? {}));
     }
@@ -166,6 +178,12 @@ class ApiClient {
     }
     if (path == '/rides/scheduled' && method == 'POST') {
       return Success({'scheduledRide': MockData.createScheduledRide(body ?? {}), 'ride': MockData.createScheduledRide(body ?? {})});
+    }
+    if (path.contains('/rides/scheduled/estimate')) {
+      return Success(MockData.scheduledEstimate(body ?? {}));
+    }
+    if (RegExp(r'^/rides/scheduled/[^/]+/cancel$').hasMatch(path) && method == 'POST') {
+      return const Success({'success': true, 'status': 'CANCELLED'});
     }
     if (path.contains('/rides/scheduled')) {
       return Success({'data': MockData.scheduledRides()});
@@ -196,8 +214,15 @@ class ApiClient {
       final errand = MockData.createErrand(body ?? {});
       return Success({'order': errand, 'errand': errand});
     }
+    if (RegExp(r'^/errands/[^/]+$').hasMatch(path) && method == 'GET') {
+      final id = path.split('/').last;
+      return Success({'order': MockData.errandDetail(id), 'errand': MockData.errandDetail(id)});
+    }
     if (path.contains('/errands')) {
       return Success({'data': MockData.errandHistory()});
+    }
+    if (path.contains('/carpool/estimate')) {
+      return Success(MockData.carpoolEstimate(body ?? {}));
     }
     if (path.contains('/carpool') && method == 'GET') {
       return Success({'trips': MockData.carpoolRides(), 'matches': MockData.carpoolRides(), 'data': MockData.carpoolRides()});
@@ -228,6 +253,10 @@ class ApiClient {
     }
     if (path == '/moving' && method == 'POST') {
       return Success(MockData.createMovingRequest(body ?? {}));
+    }
+    if (RegExp(r'^/moving/[^/]+$').hasMatch(path) && method == 'GET') {
+      final id = path.split('/').last;
+      return Success({'moving': MockData.movingDetail(id)});
     }
     return null;
   }
@@ -279,9 +308,10 @@ class ApiClient {
         return Failure(ServerFailure('Erreur serveur (${response.statusCode}).'));
       } catch (e) {
         if (i == retries - 1) {
-          _mockMode = true;
-          final fallback = _mockFor('POST', path, body);
-          if (fallback != null) return fallback;
+          if (_mockMode) {
+            final fallback = _mockFor('POST', path, body);
+            if (fallback != null) return fallback;
+          }
           return const Failure(NetworkFailure());
         }
         await Future.delayed(Duration(seconds: i + 1));
@@ -316,15 +346,16 @@ class ApiClient {
         return Failure(ServerFailure('Erreur serveur (${response.statusCode}).'));
       } catch (e) {
         if (i == retries - 1) {
-          _mockMode = true;
-          if (path.contains('/rides/history')) {
-            final cached = await RideHistoryCache.load();
-            if (cached.isNotEmpty) {
-              return Success({'data': cached, 'cached': true});
+          if (_mockMode) {
+            if (path.contains('/rides/history')) {
+              final cached = await RideHistoryCache.load();
+              if (cached.isNotEmpty) {
+                return Success({'data': cached, 'cached': true});
+              }
             }
+            final fallback = _mockFor('GET', path, null);
+            if (fallback != null) return fallback;
           }
-          final fallback = _mockFor('GET', path, null);
-          if (fallback != null) return fallback;
           return const Failure(NetworkFailure());
         }
         await Future.delayed(Duration(seconds: i + 1));
@@ -389,6 +420,47 @@ class ApiClient {
       'amountCdf': amountCdf,
       'phone': MarketConfig.normalizePhone(userPhone),
     });
+  }
+
+  /// Upload photo colis (base64) — retourne l'URL à passer à `photoUrl`.
+  Future<Result<String>> uploadParcelPhoto(File file) async {
+    await ensureReady();
+    final bytes = await file.readAsBytes();
+    if (bytes.length > 3 * 1024 * 1024) {
+      return const Failure(ServerFailure('Photo trop volumineuse (max 3 Mo).'));
+    }
+    final mock = _mockFor('POST', '/deliveries/parcel/photo', {});
+    if (mock != null) {
+      return switch (mock) {
+        Success(:final data) => Success(
+            data['photoUrl']?.toString() ?? data['url']?.toString() ?? 'mock://photo',
+          ),
+        Failure(:final error) => Failure(error),
+      };
+    }
+    final result = await post('/uploads/parcel-photo', {
+      'imageBase64': base64Encode(bytes),
+      'mimeType': 'image/jpeg',
+    });
+    return switch (result) {
+      Success(:final data) => Success(
+          data['photoUrl']?.toString() ??
+              data['cloudinaryMockUrl']?.toString() ??
+              data['url']?.toString() ??
+              '',
+        ),
+      Failure(:final error) => Failure(error),
+    };
+  }
+
+  bool rideHasDriver(Map<String, dynamic> ride) {
+    if (ride['driverId'] != null) return true;
+    if (ride['driver'] != null) return true;
+    final status = ride['status']?.toString() ?? '';
+    return status == 'ACCEPTED' ||
+        status == 'DRIVER_ARRIVED' ||
+        status == 'IN_PROGRESS' ||
+        status == 'COMPLETED';
   }
 }
 

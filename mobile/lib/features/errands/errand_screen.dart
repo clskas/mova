@@ -3,9 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/api/api_client.dart';
 import '../../core/config/market_config.dart';
 import '../../core/error/result.dart';
+import '../../core/location/location_service.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
+import 'errand_tracking_screen.dart';
 
 class ErrandScreen extends ConsumerStatefulWidget {
   const ErrandScreen({super.key});
@@ -21,11 +23,11 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
   final List<String> _items = [];
   int? _estimatedPrice;
   bool _loading = false;
+  bool _loadingGps = false;
+  double? _deliveryLat;
+  double? _deliveryLng;
   String? _error;
   String? _validationError;
-
-  static const _defaultDropoffLat = MarketConfig.defaultLat;
-  static const _defaultDropoffLng = MarketConfig.defaultLng;
 
   @override
   void dispose() {
@@ -55,10 +57,25 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
 
   String _buildDescription() => _items.join(', ');
 
+  Future<void> _useMyLocation() async {
+    setState(() => _loadingGps = true);
+    final result = await LocationService.getCurrentLocation();
+    if (!mounted) return;
+    setState(() {
+      _loadingGps = false;
+      if (result != null) {
+        _dropoffController.text = result.label;
+        _deliveryLat = result.position.latitude;
+        _deliveryLng = result.position.longitude;
+        _estimatedPrice = null;
+      }
+    });
+  }
+
   Map<String, dynamic> _errandPayload() => {
         'deliveryAddress': _dropoffController.text.trim(),
-        'deliveryLat': _defaultDropoffLat,
-        'deliveryLng': _defaultDropoffLng,
+        'deliveryLat': _deliveryLat ?? MarketConfig.defaultLat,
+        'deliveryLng': _deliveryLng ?? MarketConfig.defaultLng,
         'items': _items,
       };
 
@@ -120,26 +137,15 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
         if (mounted) {
           final order = data['errand'] as Map<String, dynamic>? ??
               data['order'] as Map<String, dynamic>?;
-          showDialog<void>(
-            context: context,
-            builder: (ctx) => AlertDialog(
-              title: const Text('Course envoyée'),
-              content: Text(
-                'Votre liste a été transmise à un livreur.\n'
-                'Réf. : ${order?['id'] ?? ''}\n'
-                'Total : ${MarketConfig.formatCdf(order?['estimatedPriceCdf'] as int? ?? _estimatedPrice ?? 0)}',
-                maxLines: 6,
-                overflow: TextOverflow.ellipsis,
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ErrandTrackingScreen(
+                errandId: order?['id']?.toString() ?? '',
+                deliveryAddress: _dropoffController.text.trim(),
+                items: List<String>.from(_items),
+                totalCdf: order?['estimatedPriceCdf'] as int? ?? _estimatedPrice ?? 0,
               ),
-              actions: [
-                TextButton(
-                  onPressed: () {
-                    Navigator.pop(ctx);
-                    Navigator.pop(context);
-                  },
-                  child: const Text('OK'),
-                ),
-              ],
             ),
           );
         }
@@ -176,11 +182,29 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
           const SizedBox(height: 12),
           TextField(
             controller: _dropoffController,
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               labelText: 'Adresse de livraison',
-              prefixIcon: Icon(Icons.home_outlined),
+              prefixIcon: const Icon(Icons.home_outlined),
+              suffixIcon: _loadingGps
+                  ? const Padding(
+                      padding: EdgeInsets.all(12),
+                      child: SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    )
+                  : IconButton(
+                      icon: const Icon(Icons.gps_fixed, color: MovaColors.violet),
+                      tooltip: 'Ma position',
+                      onPressed: _loadingGps ? null : _useMyLocation,
+                    ),
             ),
-            onChanged: (_) => setState(() => _estimatedPrice = null),
+            onChanged: (_) => setState(() {
+              _estimatedPrice = null;
+              _deliveryLat = null;
+              _deliveryLng = null;
+            }),
           ),
           const SizedBox(height: 16),
           Text('Liste de courses', style: theme.textTheme.titleSmall),

@@ -40,18 +40,6 @@ export class DeliveriesService {
     }
   }
 
-  uploadParcelPhoto(dto: { dataBase64: string; contentType?: string; filename?: string }) {
-    if (!dto.dataBase64?.trim()) {
-      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Photo requise.');
-    }
-    if (dto.dataBase64.length > 4 * 1024 * 1024) {
-      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Photo trop volumineuse (max 3 Mo).');
-    }
-    const contentType = dto.contentType ?? 'image/jpeg';
-    const photoUrl = `data:${contentType};base64,${dto.dataBase64}`;
-    return { url: photoUrl, photoUrl };
-  }
-
   private resolveWeightCategory(dto: CreateParcelDeliveryDto): WeightCategory {
     if (dto.weightKg != null) {
       const band = WEIGHT_KG_MULTIPLIERS.find((b) => dto.weightKg! <= b.maxKg);

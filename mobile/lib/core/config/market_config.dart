@@ -27,7 +27,12 @@ class MarketConfig {
     return apiBaseUrl;
   }
 
-  static String get wsUrl => gatewayBaseUrl;
+  /// WebSocket GPS (ride-service namespace `/tracking`). Définir via `--dart-define=WS_URL=...`
+  /// Ex. émulateur Android : `http://10.0.2.2:3002`
+  static const wsUrl = String.fromEnvironment(
+    'WS_URL',
+    defaultValue: 'http://10.0.2.2:3002',
+  );
 
   static const mobileMoneyProviders = [
     MobileMoneyProvider(id: 'ORANGE_MONEY', name: 'Orange Money', color: 0xFFFF6600),

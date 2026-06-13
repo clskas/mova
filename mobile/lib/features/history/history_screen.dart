@@ -52,8 +52,12 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
         'COMPLETED' => 'Terminé',
         'DELIVERED' => 'Livré',
         'CONFIRMED' => 'Confirmé',
+        'SCHEDULED' => 'Planifié',
         'IN_TRANSIT' => 'En transit',
         'CANCELLED' => 'Annulé',
+        'ACCEPTED' => 'Accepté',
+        'IN_PROGRESS' => 'En cours',
+        'PENDING' => 'En attente',
         _ => status ?? '',
       };
 

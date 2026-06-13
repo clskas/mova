@@ -350,9 +350,12 @@ abstract final class MockData {
   }
 
   static Map<String, dynamic> scheduledRideEstimate(Map<String, dynamic> body) => {
-        'estimatedPriceCdf': body['vehicleType'] == 'COMFORT' ? 15000 : 9500,
+        'estimatedPriceCdf': estimate({'vehicleType': body['vehicleType'] ?? 'STANDARD'})['estimatedFareCdf'],
         'currency': 'CDF',
       };
+
+  static Map<String, dynamic> scheduledEstimate(Map<String, dynamic> body) =>
+      scheduledRideEstimate(body);
 
   static Map<String, dynamic> createScheduledRide(Map<String, dynamic> body) => {
         'id': 'sched-${DateTime.now().millisecondsSinceEpoch}',
@@ -387,6 +390,20 @@ abstract final class MockData {
         ...body,
         'estimatedPriceCdf': errandEstimate(body)['estimatedPriceCdf'],
         'priceCdf': errandEstimate(body)['estimatedPriceCdf'],
+      };
+
+  static Map<String, dynamic> errandDetail(String id) => {
+        'id': id,
+        'status': 'IN_PROGRESS',
+        'description': 'Riz, Pain, Savon',
+        'dropoffAddress': 'Ma position, Kinshasa',
+        'estimatedPriceCdf': 8500,
+        'timeline': [
+          {'label': 'Commande reçue', 'done': true},
+          {'label': 'Achats en cours', 'done': true},
+          {'label': 'Livreur en route', 'done': false},
+          {'label': 'Livré', 'done': false},
+        ],
       };
 
   static Map<String, dynamic> foodEstimate(Map<String, dynamic> body) {
@@ -578,16 +595,34 @@ abstract final class MockData {
 
   static Map<String, dynamic> createMovingRequest(Map<String, dynamic> body) {
     final estimate = movingEstimate(body);
+    final id = 'moving-${DateTime.now().millisecondsSinceEpoch}';
+    final request = {
+      'id': id,
+      'status': 'PENDING',
+      ...body,
+      'estimatedPriceCdf': estimate['estimatedPriceCdf'],
+    };
     return {
-      'request': {
-        'id': 'moving-${DateTime.now().millisecondsSinceEpoch}',
-        'status': 'PENDING',
-        ...body,
-        'estimatedPriceCdf': estimate['estimatedPriceCdf'],
-      },
+      'request': request,
+      'moving': request,
       'message': 'Demande de déménagement enregistrée.',
     };
   }
+
+  static Map<String, dynamic> movingDetail(String id) => {
+        'id': id,
+        'status': 'PENDING',
+        'pickupAddress': 'Bandal, Kinshasa',
+        'dropoffAddress': 'Gombe, Kinshasa',
+        'volumeM3': 10,
+        'estimatedPriceCdf': 220000,
+        'timeline': [
+          {'label': 'Demande enregistrée', 'done': true},
+          {'label': 'Devis confirmé', 'done': false},
+          {'label': 'Équipe en route', 'done': false},
+          {'label': 'Déménagement terminé', 'done': false},
+        ],
+      };
 
   static Map<String, dynamic> mobileErrandEstimate(Map<String, dynamic> body) {
     final items = body['items'] as List? ?? [];

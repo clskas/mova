@@ -6,6 +6,7 @@ import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
+import 'moving_tracking_screen.dart';
 
 const _volumeOptions = [
   ('STUDIO', 'Studio / chambre', '1–5 m³'),
@@ -130,27 +131,18 @@ class _MovingScreenState extends ConsumerState<MovingScreen> {
     switch (result) {
       case Success(:final data):
         if (mounted) {
-          final request = data['request'] as Map<String, dynamic>? ?? data;
-          showDialog<void>(
-            context: context,
-            builder: (ctx) => AlertDialog(
-              title: const Text('Demande envoyée'),
-              content: Text(
-                'Notre équipe déménagement vous rappelle sous 2 h.\n'
-                    'Réf. : ${request['id'] ?? ''}\n'
-                    'Estimation : ${MarketConfig.formatCdf(_estimatedPrice ?? request['estimatedPriceCdf'] as int? ?? 0)}',
-                maxLines: 6,
-                overflow: TextOverflow.ellipsis,
+          final request = data['request'] as Map<String, dynamic>? ??
+              data['moving'] as Map<String, dynamic>? ??
+              data;
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => MovingTrackingScreen(
+                movingId: request['id']?.toString() ?? '',
+                fromAddress: _fromController.text.trim(),
+                toAddress: _toController.text.trim(),
+                estimatedPrice: _estimatedPrice ?? request['estimatedPriceCdf'] as int? ?? 0,
               ),
-              actions: [
-                TextButton(
-                  onPressed: () {
-                    Navigator.pop(ctx);
-                    Navigator.pop(context);
-                  },
-                  child: const Text('OK'),
-                ),
-              ],
             ),
           );
         }

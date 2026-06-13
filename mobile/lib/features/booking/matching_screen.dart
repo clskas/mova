@@ -34,6 +34,7 @@ class _MatchingScreenState extends ConsumerState<MatchingScreen>
   bool _cancelling = false;
   String? _error;
   int _attempt = 0;
+  Timer? _pollTimer;
 
   @override
   void initState() {
@@ -47,6 +48,7 @@ class _MatchingScreenState extends ConsumerState<MatchingScreen>
 
   @override
   void dispose() {
+    _pollTimer?.cancel();
     _pulseController.dispose();
     super.dispose();
   }
@@ -57,6 +59,7 @@ class _MatchingScreenState extends ConsumerState<MatchingScreen>
       _error = null;
     });
     final api = ref.read(apiClientProvider);
+    await api.checkHealth();
     final result = await api.searchDrivers(widget.rideId);
     if (!mounted) return;
 
@@ -64,26 +67,59 @@ class _MatchingScreenState extends ConsumerState<MatchingScreen>
       case Success(:final data):
         setState(() {
           _attempt = (data['attempt'] as num?)?.toInt() ?? 0;
-          _searching = false;
         });
-        await Future<void>.delayed(const Duration(seconds: 1));
-        if (mounted) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (_) => TrackingScreen(
-                rideId: widget.rideId,
-                estimatedFareCdf: widget.estimatedFareCdf,
-              ),
-            ),
-          );
+        if (api.isMockMode) {
+          await Future<void>.delayed(const Duration(seconds: 1));
+          if (mounted) _goToTracking();
+          return;
         }
+        _startPollingForDriver();
       case Failure(:final error):
         setState(() {
           _searching = false;
           _error = error.message;
         });
     }
+  }
+
+  void _startPollingForDriver() {
+    _pollTimer?.cancel();
+    _pollTimer = Timer.periodic(const Duration(seconds: 3), (_) => _pollRide());
+    _pollRide();
+  }
+
+  Future<void> _pollRide() async {
+    final api = ref.read(apiClientProvider);
+    final result = await api.getRide(widget.rideId);
+    if (!mounted) return;
+    switch (result) {
+      case Success(:final data):
+        if (api.rideHasDriver(data)) {
+          _pollTimer?.cancel();
+          setState(() => _searching = false);
+          _goToTracking();
+        } else if ((data['status']?.toString() ?? '') == 'CANCELLED') {
+          _pollTimer?.cancel();
+          setState(() {
+            _searching = false;
+            _error = 'Course annulée.';
+          });
+        }
+      case Failure():
+        break;
+    }
+  }
+
+  void _goToTracking() {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => TrackingScreen(
+          rideId: widget.rideId,
+          estimatedFareCdf: widget.estimatedFareCdf,
+        ),
+      ),
+    );
   }
 
   Future<void> _cancel() async {
@@ -107,6 +143,7 @@ class _MatchingScreenState extends ConsumerState<MatchingScreen>
     if (confirm != true || !mounted) return;
 
     setState(() => _cancelling = true);
+    _pollTimer?.cancel();
     final api = ref.read(apiClientProvider);
     await api.cancelRide(widget.rideId, reason: 'Annulé par le passager');
     if (!mounted) return;
@@ -118,7 +155,7 @@ class _MatchingScreenState extends ConsumerState<MatchingScreen>
   Widget build(BuildContext context) {
     return MovaScreen(
       title: 'Recherche',
-  scrollable: false,
+      scrollable: false,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -159,7 +196,7 @@ class _MatchingScreenState extends ConsumerState<MatchingScreen>
           if (_attempt > 0) ...[
             const SizedBox(height: 8),
             Text(
-              'Tentative ${_attempt + 1}',
+              'Tentative $_attempt',
               textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 13, color: MovaColors.textSecondary),
             ),

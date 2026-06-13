@@ -151,6 +151,10 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
     setState(() => _topUpLoading = false);
     switch (result) {
       case Success(:final data):
+        final newBalance = data['balanceCdf'] as int?;
+        if (newBalance != null) {
+          setState(() => _balance = newBalance);
+        }
         await _loadWallet();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(

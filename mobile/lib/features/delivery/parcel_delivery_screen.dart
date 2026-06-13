@@ -267,7 +267,24 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
       _validationError = null;
     });
     final api = ref.read(apiClientProvider);
-    final result = await api.post('/deliveries/parcel', _parcelPayload(includePhoto: true));
+    String? photoUrl;
+    if (_photoFile != null) {
+      final upload = await api.uploadParcelPhoto(_photoFile!);
+      switch (upload) {
+        case Success(:final data):
+          photoUrl = data;
+        case Failure(:final error):
+          if (!mounted) return;
+          setState(() {
+            _loading = false;
+            _error = error.message;
+          });
+          return;
+      }
+    }
+    final payload = _parcelPayload();
+    if (photoUrl != null) payload['photoUrl'] = photoUrl;
+    final result = await api.post('/deliveries/parcel', payload);
     if (!mounted) return;
     setState(() => _loading = false);
     switch (result) {

@@ -9,26 +9,26 @@ import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 
-class FoodTrackingScreen extends ConsumerStatefulWidget {
-  const FoodTrackingScreen({
+class MovingTrackingScreen extends ConsumerStatefulWidget {
+  const MovingTrackingScreen({
     super.key,
-    required this.orderId,
-    required this.restaurantName,
-    required this.totalCdf,
-    this.deliveryAddress,
+    required this.movingId,
+    required this.fromAddress,
+    required this.toAddress,
+    required this.estimatedPrice,
   });
 
-  final String orderId;
-  final String restaurantName;
-  final int totalCdf;
-  final String? deliveryAddress;
+  final String movingId;
+  final String fromAddress;
+  final String toAddress;
+  final int estimatedPrice;
 
   @override
-  ConsumerState<FoodTrackingScreen> createState() => _FoodTrackingScreenState();
+  ConsumerState<MovingTrackingScreen> createState() => _MovingTrackingScreenState();
 }
 
-class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
-  Map<String, dynamic>? _delivery;
+class _MovingTrackingScreenState extends ConsumerState<MovingTrackingScreen> {
+  Map<String, dynamic>? _request;
   bool _loading = true;
   String? _error;
   Timer? _pollTimer;
@@ -37,7 +37,7 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
   void initState() {
     super.initState();
     _load();
-    _pollTimer = Timer.periodic(const Duration(seconds: 5), (_) => _load(silent: true));
+    _pollTimer = Timer.periodic(const Duration(seconds: 8), (_) => _load(silent: true));
   }
 
   @override
@@ -47,7 +47,6 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
   }
 
   Future<void> _load({bool silent = false}) async {
-    if (widget.orderId.isEmpty) return;
     if (!silent) {
       setState(() {
         _loading = true;
@@ -55,13 +54,13 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
       });
     }
     final api = ref.read(apiClientProvider);
-    final result = await api.get('/deliveries/${widget.orderId}');
+    final result = await api.get('/moving/${widget.movingId}');
     if (!mounted) return;
     setState(() {
       _loading = silent ? _loading : false;
       switch (result) {
         case Success(:final data):
-          _delivery = data['delivery'] as Map<String, dynamic>? ?? data;
+          _request = data['moving'] as Map<String, dynamic>? ?? data['request'] as Map<String, dynamic>? ?? data;
           _error = null;
         case Failure(:final error):
           if (!silent) _error = error.message;
@@ -70,40 +69,26 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
   }
 
   List<Map<String, dynamic>> get _timeline {
-    final raw = _delivery?['timeline'] as List? ?? _delivery?['tracking'] as List?;
+    final raw = _request?['timeline'] as List?;
     if (raw != null && raw.isNotEmpty) return raw.cast<Map<String, dynamic>>();
     return const [
-      {'label': 'Commande confirmée', 'done': true},
-      {'label': 'Préparation en cuisine', 'done': false},
-      {'label': 'Livreur en route', 'done': false},
-      {'label': 'Livré', 'done': false},
+      {'label': 'Demande enregistrée', 'done': true},
+      {'label': 'Devis confirmé', 'done': false},
+      {'label': 'Équipe en route', 'done': false},
+      {'label': 'Déménagement terminé', 'done': false},
     ];
-  }
-
-  int get _totalCdf =>
-      _delivery?['estimatedPriceCdf'] as int? ??
-      _delivery?['priceCdf'] as int? ??
-      widget.totalCdf;
-
-  String get _statusLabel {
-    final status = _delivery?['status']?.toString();
-    return switch (status) {
-      'DELIVERED' => 'Livré',
-      'IN_TRANSIT' => 'En livraison',
-      'PICKED_UP' => 'Livreur en route',
-      'PENDING' => 'Confirmée',
-      _ => 'En cours de livraison',
-    };
   }
 
   @override
   Widget build(BuildContext context) {
+    final price = _request?['estimatedPriceCdf'] as int? ?? widget.estimatedPrice;
+
     return MovaScreen(
-      title: 'Suivi commande',
+      title: 'Suivi déménagement',
       actions: [
         IconButton(icon: const Icon(Icons.refresh), onPressed: () => _load()),
       ],
-      child: _loading && _delivery == null
+      child: _loading && _request == null
           ? const Center(child: CircularProgressIndicator())
           : Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -117,38 +102,26 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        widget.restaurantName,
+                        'Déménagement #${widget.movingId}',
                         style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Commande #${widget.orderId}',
-                        style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
-                        maxLines: 1,
+                        '${widget.fromAddress} → ${widget.toAddress}',
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      if (widget.deliveryAddress != null) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          widget.deliveryAddress!,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
                       const SizedBox(height: 8),
                       Text(
-                        MarketConfig.formatCdf(_totalCdf),
+                        MarketConfig.formatCdf(price),
                         style: const TextStyle(
                           color: MovaColors.green,
                           fontWeight: FontWeight.bold,
                           fontSize: 18,
                         ),
                       ),
-                      const SizedBox(height: 4),
                       Text(
-                        _statusLabel,
+                        _request?['status']?.toString() ?? 'PENDING',
                         style: const TextStyle(color: MovaColors.violet, fontWeight: FontWeight.w600),
                       ),
                     ],
@@ -162,7 +135,6 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 12),
                     child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Icon(
                           done ? Icons.check_circle : Icons.radio_button_unchecked,
@@ -170,17 +142,7 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
                           size: 22,
                         ),
                         const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            step['label']?.toString() ?? '',
-                            style: TextStyle(
-                              fontWeight: done ? FontWeight.w600 : FontWeight.normal,
-                              color: done ? MovaColors.midnight : MovaColors.textSecondary,
-                            ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
+                        Expanded(child: Text(step['label']?.toString() ?? '')),
                       ],
                     ),
                   );

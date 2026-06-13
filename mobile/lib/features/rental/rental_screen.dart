@@ -70,13 +70,13 @@ class _RentalScreenState extends ConsumerState<RentalScreen> {
     await api.checkHealth();
     final result = await api.get('/rental/vehicles');
     if (!mounted) return;
-    if (result case Success(:final data)) {
-      final raw = data['data'] as List? ?? [];
-      setState(() {
+    setState(() {
+      if (result case Success(:final data)) {
+        final raw = data['data'] as List? ?? [];
         _vehicles = raw.cast<Map<String, dynamic>>();
         _selectedVehicleId ??= _vehicles.isNotEmpty ? _vehicles.first['id']?.toString() : null;
-      });
-    }
+      }
+    });
   }
 
   Future<void> _loadInquiries() async {
@@ -262,7 +262,7 @@ class _RentalScreenState extends ConsumerState<RentalScreen> {
           Text('Véhicule disponible', style: theme.textTheme.titleSmall),
           const SizedBox(height: 8),
           if (_vehicles.isEmpty)
-            const Text('Chargement du catalogue…', style: TextStyle(color: MovaColors.textSecondary))
+            const Text('Aucun véhicule disponible.', style: TextStyle(color: MovaColors.textSecondary))
           else
             ..._vehicles.map((v) {
               final id = v['id']?.toString() ?? '';

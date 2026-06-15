@@ -1,5 +1,19 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 import { requireReachable } from "./helpers";
+
+async function ensureWebHome(page: Page) {
+  const homeHeading = page.getByRole("heading", { name: /MOVA — RDC/i });
+  if (await homeHeading.isVisible().catch(() => false)) return;
+
+  const loginHeading = page.getByRole("heading", { name: /MOVA — Connexion/i });
+  await expect(loginHeading).toBeVisible({ timeout: 15_000 });
+
+  await page.getByPlaceholder("+243812345678").fill("+243812345678");
+  await page.getByRole("button", { name: "Recevoir le code" }).click();
+  await page.getByPlaceholder("Code à 6 chiffres").fill("123456");
+  await page.getByRole("button", { name: "Se connecter" }).click();
+  await expect(homeHeading).toBeVisible({ timeout: 15_000 });
+}
 
 test.describe("Web passager — accueil", () => {
   test.beforeEach(async ({ request, baseURL }) => {
@@ -12,6 +26,7 @@ test.describe("Web passager — accueil", () => {
 
   test("affiche MOVA — RDC sur la page d'accueil", async ({ page }) => {
     await page.goto("/");
+    await ensureWebHome(page);
     await expect(page.getByRole("heading", { name: /MOVA — RDC/i })).toBeVisible();
   });
 });

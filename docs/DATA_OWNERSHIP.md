@@ -24,7 +24,7 @@ Ce document clarifie **qui crée** chaque entité, **qui la gère** côté admin
 | **Deliveries (parcel/food/express/errand)** | Passenger | Liste, détail, mise à jour statut | **User:** `POST /api/deliveries/*` · **Admin:** `GET /api/admin/deliveries`, `GET /api/admin/deliveries/:id`, `PATCH /api/admin/deliveries/:id/status` |
 | **Errands (courses & commissions)** | Passenger | (via livraisons) | **User (mobile):** `POST /api/deliveries/errand/*` · **Admin:** filtre type `ERRAND` dans `/api/admin/deliveries` |
 | **Restaurants** | Seed / Admin | CRUD complet (UI admin) | **User:** `GET /api/deliveries/restaurants` · **Admin:** `GET/POST /api/admin/restaurants`, `PATCH /api/admin/restaurants/:id` |
-| **Pricing rules** | Seed / Admin (Finance, Contenu) | Tarifs courses taxi + livraisons | **Admin:** `GET/PATCH /api/admin/pricing-rules`, `GET/PATCH /api/admin/delivery-pricing-rules` → `ride-service` · **Propriétaire:** Finance (édition), Contenu (consultation) |
+| **Pricing rules** | Seed / Admin (Finance, Contenu) | Tarifs courses taxi + livraisons | **Admin:** `GET/PATCH /api/admin/pricing-rules?city=`, `GET/PATCH /api/admin/delivery-pricing-rules` → `ride-service` (`pricing_rules`, `service_surcharges`) · **Propriétaire:** Finance (édition), Contenu (consultation) |
 | **Subscription plans** | Admin (Finance) | Plans MOVA Plus, abonnés | **Admin:** `GET/POST/PATCH /api/admin/subscription-plans`, `GET /api/admin/subscriptions` (backend à venir — mock UI) · **Propriétaire:** Finance |
 | **Communes** | Seed (`ride-service`) | Lecture seule (Paramètres admin) | **User:** `GET /api/geo/communes` · **Admin:** même endpoint (pas de CRUD UI) |
 | **Incidents / litiges** | User ou Driver | Résolution | **User:** `POST /api/incidents` · **Admin:** `GET /api/admin/incidents`, `POST /api/admin/incidents/:id/resolve` |
@@ -58,7 +58,7 @@ Ce document clarifie **qui crée** chaque entité, **qui la gère** côté admin
 
 | Domaine | Équipe responsable | Données | Endpoints admin |
 |---------|-------------------|---------|-----------------|
-| **Tarifs courses & livraisons** | Finance (édition), Contenu (consultation) | `pricing_rules`, règles livraison par catégorie | `/api/admin/pricing-rules`, `/api/admin/delivery-pricing-rules` |
+| **Tarifs courses & livraisons** | Finance (édition), Contenu (consultation) | `pricing_rules` (par ville), `service_surcharges` (PARCEL/FOOD/EXPRESS) | `/api/admin/pricing-rules?city=`, `/api/admin/delivery-pricing-rules` |
 | **Abonnements MOVA Plus** | Finance | Plans, prix mensuel CDF, avantages, abonnés actifs | `/api/admin/subscription-plans`, `/api/admin/subscriptions` |
 
 Les tarifs impactent directement les estimates (`ride-service`). Les abonnements sont un produit commercial distinct géré par Finance ; l'UI admin existe avec mock tant que le microservice abonnements n'est pas déployé.

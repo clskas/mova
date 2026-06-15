@@ -358,8 +358,10 @@ Requires JWT with `role: ADMIN`.
 | GET | `/api/admin/restaurants` | Restaurant list |
 | POST | `/api/admin/restaurants` | Create restaurant |
 | PATCH | `/api/admin/restaurants/:id` | Update restaurant |
-| GET | `/api/admin/pricing-rules` | Pricing rules |
-| PATCH | `/api/admin/pricing-rules/:vehicleType` | Update pricing rule |
+| GET | `/api/admin/pricing-rules?city=` | Pricing rules (filter by city) |
+| PATCH | `/api/admin/pricing-rules/:vehicleType` | Update pricing rule (body must include `city`) |
+| GET | `/api/admin/delivery-pricing-rules` | Delivery surcharges (PARCEL/FOOD/EXPRESS) |
+| PATCH | `/api/admin/delivery-pricing-rules/:category` | Update delivery surcharge |
 
 ## WebSocket
 

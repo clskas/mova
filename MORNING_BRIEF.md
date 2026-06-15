@@ -70,4 +70,60 @@ cd e2e && npm run test:e2e:admin
 
 ---
 
+## Commencer à enregistrer les données
+
+### 1. Backend prêt
+
+```powershell
+cd c:\Users\Administrator\Mova
+docker compose up -d
+npm run migrate:all
+curl http://localhost:3000/health   # ou .\scripts\verify-all.ps1
+```
+
+### 2. Base vide ou démo ?
+
+| Option | Commande | Résultat |
+|--------|----------|----------|
+| **A — DB vide** | `migrate:all` seulement | Schémas OK ; catalogues ride-service (communes, tarifs, restaurants) au boot ; pas d’utilisateurs ni courses |
+| **B — Démo admin** | `npm run seed:admin-demo` | SUPER_ADMIN + passagers, chauffeurs/KYC, incidents, courses, livraisons, planifiées (voir tableau ci-dessus) |
+
+### 3. Admin + persistance
+
+**http://localhost:3002/login** — `+243900000001` / OTP `123456` (`MOCK_OTP=true`).
+
+Les données créées via API ou admin **persistent en PostgreSQL** : utilisateurs, KYC, restaurants, tarifs, courses, livraisons, portefeuille. Relancer Docker ne les efface pas (volumes). Détail CRUD : `docs/DATA_OWNERSHIP.md`.
+
+### 4. Mobile — `API_URL`
+
+| Cible | `API_URL` |
+|-------|-----------|
+| Android émulateur | `http://10.0.2.2:3000/api` |
+| iOS / appareil physique | `http://<IP-LAN>:3000/api` |
+
+```powershell
+flutter run --flavor passenger -t lib/main_passenger.dart --dart-define=API_URL=http://10.0.2.2:3000/api
+```
+
+### 5. Encore simulé (dev)
+
+| Mock | Comportement |
+|------|--------------|
+| `MOCK_OTP=true` | OTP fixe **123456** |
+| `MOCK_PAYMENTS=true` | Mobile money simulé (succès auto) |
+| App chauffeur | Course entrante + suivi GPS **simulés** (pas de dispatch réel) |
+
+### 6. Maturité honnête (éval. juin 2026)
+
+| Surface | Note | Commentaire |
+|---------|------|-------------|
+| Mobile passager | 7–8/10 | Parcours course/livraison branchés API |
+| Admin | 8/10 | CRUD + RBAC solides |
+| Mobile chauffeur | 4/10 | UI OK, missions/dispatch mock |
+| Web PWA | 5/10 | Partiel vs mobile |
+
+**Production nationale** → [docs/PRODUCTION_DEPLOYMENT.md](docs/PRODUCTION_DEPLOYMENT.md) (`MOCK_OTP=false`, `MOCK_PAYMENTS=false`, migrations, domaines, stores).
+
+---
+
 *Run `npm run seed:admin-demo` if dashboard sections are empty.*

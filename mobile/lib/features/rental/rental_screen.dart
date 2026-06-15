@@ -143,6 +143,7 @@ class _RentalScreenState extends ConsumerState<RentalScreen> {
       _validationError = null;
     });
     final api = ref.read(apiClientProvider);
+    await api.checkHealth();
     final result = await api.post('/rental/estimate', _estimatePayload());
     setState(() {
       _loading = false;
@@ -171,6 +172,7 @@ class _RentalScreenState extends ConsumerState<RentalScreen> {
       _validationError = null;
     });
     final api = ref.read(apiClientProvider);
+    await api.checkHealth();
     final result = await api.post('/rental/bookings', _bookingPayload());
     setState(() => _loading = false);
     switch (result) {
@@ -270,7 +272,7 @@ class _RentalScreenState extends ConsumerState<RentalScreen> {
               return RadioListTile<String>(
                 title: Text(v['name']?.toString() ?? 'Véhicule', maxLines: 1, overflow: TextOverflow.ellipsis),
                 subtitle: Text(
-                  '${v['category'] ?? ''} · ${MarketConfig.formatCdf(rate)}/jour',
+                  '${v['category'] ?? ''} · ${v['make'] ?? ''} ${v['model'] ?? ''} · ${MarketConfig.formatCdf(rate)}/jour',
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(fontSize: 12),

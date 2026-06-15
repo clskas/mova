@@ -61,6 +61,7 @@ class _ErrandTrackingScreenState extends ConsumerState<ErrandTrackingScreen> {
       });
     }
     final api = ref.read(apiClientProvider);
+    await api.checkHealth();
     final result = await api.get('/errands/${widget.errandId}');
     if (!mounted) return;
     setState(() {
@@ -161,6 +162,26 @@ class _ErrandTrackingScreenState extends ConsumerState<ErrandTrackingScreen> {
                     ),
                   );
                 }),
+                if (_order?['status']?.toString() == 'COMPLETED' ||
+                    _order?['status']?.toString() == 'DELIVERED') ...[
+                  const SizedBox(height: 16),
+                  MovaCard(
+                    child: Row(
+                      children: [
+                        const Icon(Icons.verified_outlined, color: MovaColors.green),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            _order?['deliveryProofUrl'] != null
+                                ? 'Preuve de livraison enregistrée'
+                                : 'Livraison confirmée',
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 24),
                 MovaButton(
                   label: 'Retour à l\'accueil',

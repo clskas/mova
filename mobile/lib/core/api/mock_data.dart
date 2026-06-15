@@ -226,9 +226,31 @@ abstract final class MockData {
         'weekCdf': 142000,
         'monthCdf': 580000,
         'totalCdf': 1250000,
-        'ridesToday': 8,
-        'ridesWeek': 42,
+        'rideCount': 42,
       };
+
+  static Map<String, dynamic> driverProfile() => {
+        'userId': 'mock-driver',
+        'kycStatus': 'APPROVED',
+        'isAvailable': false,
+        'ratingAvg': 4.8,
+        'totalRides': 120,
+        'vehicles': [
+          {'id': 'veh-mock-1', 'type': 'STANDARD', 'make': 'Toyota', 'model': 'Corolla', 'plateNumber': 'KIN-1234', 'isActive': true},
+        ],
+      };
+
+  static List<Map<String, dynamic>> driverOffers() => [
+        {
+          'id': 'mock-offer-1',
+          'pickupAddress': 'Gombe, Kinshasa',
+          'dropoffAddress': 'Limete',
+          'estimatedFareCdf': 8500,
+          'distanceKm': 3.2,
+          'vehicleType': 'STANDARD',
+          'status': 'MATCHING',
+        },
+      ];
 
   static List<Map<String, dynamic>> services() => [
         {'id': 'TAXI', 'name': 'Taxi / Moto-taxi', 'enabled': true},

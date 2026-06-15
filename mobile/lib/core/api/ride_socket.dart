@@ -58,4 +58,18 @@ class RideSocket {
     _socket?.dispose();
     _socket = null;
   }
+
+  void emitDriverLocation({
+    required String userId,
+    required double lat,
+    required double lng,
+    String? rideId,
+  }) {
+    _socket?.emit('driver:location', {
+      'userId': userId,
+      'lat': lat,
+      'lng': lng,
+      if (rideId != null) 'rideId': rideId,
+    });
+  }
 }

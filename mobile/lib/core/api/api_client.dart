@@ -67,6 +67,7 @@ class ApiClient {
         if (_token != null && _token!.isNotEmpty) 'Authorization': 'Bearer $_token',
       };
 
+  /// Vérifie la santé de la passerelle. Active le mode mock uniquement si `/health` échoue.
   Future<bool> checkHealth() async {
     if (_mockMode) return false;
     try {
@@ -116,9 +117,13 @@ class ApiClient {
       final id = path.split('/').last;
       return Success(MockData.payRide(id, body ?? {}));
     }
+    if (path == '/rides/offers' && method == 'GET') {
+      return Success({'offers': MockData.driverOffers()});
+    }
     if (RegExp(r'^/rides/[^/]+$').hasMatch(path) &&
         method == 'GET' &&
         path != '/rides/history' &&
+        path != '/rides/offers' &&
         !path.contains('scheduled')) {
       final id = path.split('/').last.split('?').first;
       return Success({'ride': MockData.rideDetail(id)});
@@ -200,8 +205,26 @@ class ApiClient {
     if (path.contains('/drivers/earnings')) {
       return Success(MockData.earnings());
     }
+    if (RegExp(r'^/rides/offers$').hasMatch(path) && method == 'GET') {
+      return Success({'offers': MockData.driverOffers()});
+    }
+    if (RegExp(r'^/rides/[^/]+/accept$').hasMatch(path) && method == 'POST') {
+      final id = path.split('/')[2];
+      return Success({'ride': MockData.rideDetail(id), 'id': id, 'status': 'DRIVER_ASSIGNED'});
+    }
+    if (RegExp(r'^/rides/[^/]+/reject$').hasMatch(path) && method == 'POST') {
+      return const Success({'success': true});
+    }
+    if (RegExp(r'^/rides/[^/]+/status$').hasMatch(path) && method == 'PATCH') {
+      final id = path.split('/')[2];
+      return Success({'ride': MockData.rideDetail(id), 'status': body?['status']});
+    }
+    if (path.contains('/drivers/profile') && method == 'GET') {
+      return Success(MockData.driverProfile());
+    }
     if (path.contains('/drivers/availability') ||
         path.contains('/drivers/kyc') ||
+        path.contains('/drivers/location') ||
         path.contains('/wallet/withdraw') ||
         path.contains('/ratings') ||
         path.contains('/incidents')) {
@@ -320,6 +343,47 @@ class ApiClient {
     return const Failure(NetworkFailure());
   }
 
+  Future<Result<Map<String, dynamic>>> patch(
+    String path,
+    Map<String, dynamic> body, {
+    int retries = 3,
+  }) async {
+    await ensureReady();
+    final mock = _mockFor('PATCH', path, body);
+    if (mock != null) return mock;
+
+    for (var i = 0; i < retries; i++) {
+      try {
+        final response = await _client
+            .patch(
+              Uri.parse('${MarketConfig.apiBaseUrl}$path'),
+              headers: _headers,
+              body: jsonEncode(body),
+            )
+            .timeout(const Duration(seconds: 30));
+
+        final data = _decodeBody(response.body);
+        if (response.statusCode >= 200 && response.statusCode < 300) {
+          return Success(_normalizeSuccess(data));
+        }
+        if (data is Map<String, dynamic>) {
+          return _failureFromResponse(response.statusCode, data);
+        }
+        return Failure(ServerFailure('Erreur serveur (${response.statusCode}).'));
+      } catch (e) {
+        if (i == retries - 1) {
+          if (_mockMode) {
+            final fallback = _mockFor('PATCH', path, body);
+            if (fallback != null) return fallback;
+          }
+          return const Failure(NetworkFailure());
+        }
+        await Future.delayed(Duration(seconds: i + 1));
+      }
+    }
+    return const Failure(NetworkFailure());
+  }
+
   Future<Result<dynamic>> get(String path, {int retries = 3}) async {
     await ensureReady();
     final mock = _mockFor('GET', path, null);
@@ -407,6 +471,48 @@ class ApiClient {
 
   Future<Result<Map<String, dynamic>>> cancelRide(String rideId, {String? reason}) async {
     return post('/rides/$rideId/cancel', {if (reason != null) 'reason': reason});
+  }
+
+  Future<Result<List<Map<String, dynamic>>>> getDriverOffers() async {
+    final result = await get('/rides/offers');
+    return switch (result) {
+      Success(:final data) => Success(
+          List<Map<String, dynamic>>.from(data['offers'] as List? ?? []),
+        ),
+      Failure(:final error) => Failure(error),
+    };
+  }
+
+  Future<Result<Map<String, dynamic>>> acceptRide(String rideId, {String? vehicleId}) async {
+    final result = await post('/rides/$rideId/accept', {if (vehicleId != null) 'vehicleId': vehicleId});
+    return switch (result) {
+      Success(:final data) => Success(data['ride'] as Map<String, dynamic>? ?? data),
+      Failure(:final error) => Failure(error),
+    };
+  }
+
+  Future<Result<Map<String, dynamic>>> rejectRide(String rideId) async {
+    return post('/rides/$rideId/reject', {});
+  }
+
+  Future<Result<Map<String, dynamic>>> updateRideStatus(String rideId, String status) async {
+    final result = await patch('/rides/$rideId/status', {'status': status});
+    return switch (result) {
+      Success(:final data) => Success(data['ride'] as Map<String, dynamic>? ?? data),
+      Failure(:final error) => Failure(error),
+    };
+  }
+
+  Future<Result<Map<String, dynamic>>> updateDriverLocation(double lat, double lng) async {
+    return post('/drivers/location', {'lat': lat, 'lng': lng});
+  }
+
+  Future<Result<Map<String, dynamic>>> getDriverProfile() async {
+    final result = await get('/drivers/profile');
+    return switch (result) {
+      Success(:final data) => Success(data['profile'] as Map<String, dynamic>? ?? data),
+      Failure(:final error) => Failure(error),
+    };
   }
 
   Future<Result<Map<String, dynamic>>> payRide(

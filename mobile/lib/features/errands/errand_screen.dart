@@ -21,6 +21,7 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
   final _dropoffController = TextEditingController(text: 'Ma position');
   final _itemController = TextEditingController();
   final List<String> _items = [];
+  final _budgetController = TextEditingController();
   int? _estimatedPrice;
   bool _loading = false;
   bool _loadingGps = false;
@@ -34,6 +35,7 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
     _pickupController.dispose();
     _dropoffController.dispose();
     _itemController.dispose();
+    _budgetController.dispose();
     super.dispose();
   }
 
@@ -72,12 +74,19 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
     });
   }
 
-  Map<String, dynamic> _errandPayload() => {
-        'deliveryAddress': _dropoffController.text.trim(),
-        'deliveryLat': _deliveryLat ?? MarketConfig.defaultLat,
-        'deliveryLng': _deliveryLng ?? MarketConfig.defaultLng,
-        'items': _items,
-      };
+  Map<String, dynamic> _errandPayload() {
+    final items = List<String>.from(_items);
+    final budget = int.tryParse(_budgetController.text.trim());
+    if (budget != null && budget > 0) {
+      items.insert(0, 'Budget max: ${MarketConfig.formatCdf(budget)}');
+    }
+    return {
+      'deliveryAddress': _dropoffController.text.trim(),
+      'deliveryLat': _deliveryLat ?? MarketConfig.defaultLat,
+      'deliveryLng': _deliveryLng ?? MarketConfig.defaultLng,
+      'items': items,
+    };
+  }
 
   String? _validate() {
     if (_items.isEmpty) return 'Ajoutez au moins un article à la liste.';
@@ -130,6 +139,7 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
       _validationError = null;
     });
     final api = ref.read(apiClientProvider);
+    await api.checkHealth();
     final result = await api.post('/deliveries/errand', _errandPayload());
     setState(() => _loading = false);
     switch (result) {
@@ -205,6 +215,17 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
               _deliveryLat = null;
               _deliveryLng = null;
             }),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _budgetController,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              labelText: 'Budget achats max (FC, optionnel)',
+              hintText: 'Ex: 50000',
+              prefixIcon: Icon(Icons.account_balance_wallet_outlined),
+            ),
+            onChanged: (_) => setState(() => _estimatedPrice = null),
           ),
           const SizedBox(height: 16),
           Text('Liste de courses', style: theme.textTheme.titleSmall),

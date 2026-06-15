@@ -1,5 +1,8 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../core/api/api_client.dart';
 import '../../core/config/market_config.dart';
 import '../../core/error/result.dart';
@@ -27,7 +30,11 @@ class _MovingScreenState extends ConsumerState<MovingScreen> {
   final _toController = TextEditingController();
   final _itemController = TextEditingController();
   String _volume = 'APARTMENT';
+  int _rooms = 2;
   final List<String> _items = [];
+  final List<String> _photoUrls = [];
+  final _picker = ImagePicker();
+  bool _uploadingPhoto = false;
   int? _estimatedPrice;
   bool _loading = false;
   String? _error;
@@ -63,25 +70,49 @@ class _MovingScreenState extends ConsumerState<MovingScreen> {
     });
   }
 
-  int _volumeM3() => switch (_volume) {
-        'STUDIO' => 3,
-        'APARTMENT' => 10,
-        'HOUSE' => 22,
-        'OFFICE' => 15,
-        _ => 10,
-      };
+  int _volumeM3() {
+    final base = switch (_volume) {
+      'STUDIO' => 3,
+      'APARTMENT' => 10,
+      'HOUSE' => 22,
+      'OFFICE' => 15,
+      _ => 10,
+    };
+    return (base + (_rooms - 1) * 2).clamp(1, 50);
+  }
 
-  Map<String, dynamic> _payload() => {
-        'pickupAddress': _fromController.text.trim(),
-        'pickupLat': _fromLat,
-        'pickupLng': _fromLng,
-        'dropoffAddress': _toController.text.trim(),
-        'dropoffLat': _toLat,
-        'dropoffLng': _toLng,
-        'volumeM3': _volumeM3(),
-        if (_items.isNotEmpty) 'notes': _items.join(', '),
-      };
+  Future<void> _addPhoto() async {
+    final file = await _picker.pickImage(source: ImageSource.camera, imageQuality: 75);
+    if (file == null) return;
+    setState(() => _uploadingPhoto = true);
+    final api = ref.read(apiClientProvider);
+    await api.checkHealth();
+    final result = await api.uploadParcelPhoto(File(file.path));
+    if (!mounted) return;
+    setState(() => _uploadingPhoto = false);
+    if (result case Success(:final data)) {
+      setState(() => _photoUrls.add(data));
+    }
+  }
 
+  Map<String, dynamic> _payload() {
+    final notes = <String>[
+      if (_items.isNotEmpty) _items.join(', '),
+      'Pièces: $_rooms',
+      if (_photoUrls.isNotEmpty) 'Photos: ${_photoUrls.join(', ')}',
+    ].join(' | ');
+    return {
+      'pickupAddress': notes.isNotEmpty
+          ? '${_fromController.text.trim()} ($notes)'
+          : _fromController.text.trim(),
+      'pickupLat': _fromLat,
+      'pickupLng': _fromLng,
+      'dropoffAddress': _toController.text.trim(),
+      'dropoffLat': _toLat,
+      'dropoffLng': _toLng,
+      'volumeM3': _volumeM3(),
+    };
+  }
   String? _validate() {
     if (_fromController.text.trim().isEmpty) return 'Indiquez l\'adresse de départ.';
     if (_toController.text.trim().length < 3) return 'Indiquez l\'adresse d\'arrivée.';
@@ -186,8 +217,24 @@ class _MovingScreenState extends ConsumerState<MovingScreen> {
             onChanged: (_) => setState(() => _estimatedPrice = null),
           ),
           const SizedBox(height: 16),
-          Text('Volume estimé', style: theme.textTheme.titleSmall),
+          Text('Nombre de pièces', style: theme.textTheme.titleSmall),
+          Slider(
+            value: _rooms.toDouble(),
+            min: 1,
+            max: 8,
+            divisions: 7,
+            label: '$_rooms',
+            onChanged: (v) => setState(() {
+              _rooms = v.round();
+              _estimatedPrice = null;
+            }),
+          ),
+          Text(
+            'Volume estimé : ${_volumeM3()} m³',
+            style: theme.textTheme.bodySmall?.copyWith(color: MovaColors.textSecondary),
+          ),
           const SizedBox(height: 8),
+          Text('Volume / type de logement', style: theme.textTheme.titleSmall),          const SizedBox(height: 8),
           ..._volumeOptions.map((v) {
             return RadioListTile<String>(
               title: Text(v.$2),
@@ -200,9 +247,28 @@ class _MovingScreenState extends ConsumerState<MovingScreen> {
               }),
             );
           }),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: Text('Photos inventaire (${_photoUrls.length})', style: theme.textTheme.titleSmall),
+              ),
+              TextButton.icon(
+                onPressed: _uploadingPhoto ? null : _addPhoto,
+                icon: _uploadingPhoto
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.camera_alt_outlined),
+                label: const Text('Ajouter'),
+              ),
+            ],
+          ),
+          if (_photoUrls.isNotEmpty)
+            Text(
+              '${_photoUrls.length} photo(s) jointe(s) à la demande',
+              style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
+            ),
           const SizedBox(height: 8),
-          Text('Meubles / cartons', style: theme.textTheme.titleSmall),
-          const SizedBox(height: 8),
+          Text('Meubles / cartons', style: theme.textTheme.titleSmall),          const SizedBox(height: 8),
           Row(
             children: [
               Expanded(

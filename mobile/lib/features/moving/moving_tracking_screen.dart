@@ -54,6 +54,7 @@ class _MovingTrackingScreenState extends ConsumerState<MovingTrackingScreen> {
       });
     }
     final api = ref.read(apiClientProvider);
+    await api.checkHealth();
     final result = await api.get('/moving/${widget.movingId}');
     if (!mounted) return;
     setState(() {
@@ -71,12 +72,22 @@ class _MovingTrackingScreenState extends ConsumerState<MovingTrackingScreen> {
   List<Map<String, dynamic>> get _timeline {
     final raw = _request?['timeline'] as List?;
     if (raw != null && raw.isNotEmpty) return raw.cast<Map<String, dynamic>>();
-    return const [
-      {'label': 'Demande enregistrée', 'done': true},
-      {'label': 'Devis confirmé', 'done': false},
-      {'label': 'Équipe en route', 'done': false},
-      {'label': 'Déménagement terminé', 'done': false},
+    final status = _request?['status']?.toString() ?? 'PENDING';
+    final step = switch (status) {
+      'COMPLETED' => 3,
+      'IN_PROGRESS' => 2,
+      'ASSIGNED' => 1,
+      _ => 0,
+    };
+    const labels = [
+      'Demande enregistrée',
+      'Devis confirmé',
+      'Équipe en route',
+      'Déménagement terminé',
     ];
+    return labels.asMap().entries.map((e) {
+      return {'label': e.value, 'done': e.key <= step};
+    }).toList();
   }
 
   @override

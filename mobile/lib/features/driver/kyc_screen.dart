@@ -1,11 +1,13 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/api/api_client.dart';
 import '../../core/error/result.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 class KycScreen extends ConsumerStatefulWidget {
   const KycScreen({super.key});
@@ -15,20 +17,47 @@ class KycScreen extends ConsumerStatefulWidget {
 }
 
 class _KycScreenState extends ConsumerState<KycScreen> {
-  bool _loading = false;
+  final _picker = ImagePicker();
+  String? _uploadingType;
+  String? _error;
 
-  Future<void> _upload(String type) async {
-    setState(() => _loading = true);
-    final api = ref.read(apiClientProvider);
-    await api.post('/drivers/kyc', {
-      'type': type,
-      'url': 'https://placeholder.mova.cd/kyc/$type.jpg',
+  static const _docs = [
+    ('permis_de_conduire', 'Permis de conduire'),
+    ('carte_grise', 'Carte grise'),
+    ('photo_identite', 'Photo identité'),
+  ];
+
+  Future<void> _upload(String type, String label) async {
+    final file = await _picker.pickImage(source: ImageSource.camera, imageQuality: 80);
+    if (file == null) return;
+
+    setState(() {
+      _uploadingType = type;
+      _error = null;
     });
-    setState(() => _loading = false);
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Document $type envoyé pour validation')),
-      );
+    final api = ref.read(apiClientProvider);
+    await api.checkHealth();
+    final upload = await api.uploadParcelPhoto(File(file.path));
+    if (!mounted) return;
+    switch (upload) {
+      case Success(:final data):
+        final url = data;
+        final result = await api.post('/drivers/kyc', {'type': type, 'url': url});
+        setState(() => _uploadingType = null);
+        if (!mounted) return;
+        switch (result) {
+          case Success():
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('$label envoyé pour validation')),
+            );
+          case Failure(:final error):
+            setState(() => _error = error.message);
+        }
+      case Failure(:final error):
+        setState(() {
+          _uploadingType = null;
+          _error = error.message;
+        });
     }
   }
 
@@ -40,137 +69,26 @@ class _KycScreenState extends ConsumerState<KycScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const Text(
-            'Téléversez vos documents pour validation',
+            'Photographiez vos documents pour validation',
             style: TextStyle(color: MovaColors.textSecondary),
           ),
+          if (_error != null) ...[
+            const SizedBox(height: 12),
+            MovaErrorBanner(message: _error!),
+          ],
           const SizedBox(height: 24),
-          ...['Permis de conduire', 'Carte grise', 'Photo identité'].map(
+          ..._docs.map(
             (doc) => Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: MovaButton(
-                label: 'Uploader — $doc',
+                label: 'Photographier — ${doc.$2}',
                 isSecondary: true,
-                isLoading: _loading,
+                isLoading: _uploadingType == doc.$1,
                 icon: Icons.camera_alt,
-                onPressed: () => _upload(doc.toLowerCase().replaceAll(' ', '_')),
+                onPressed: _uploadingType != null ? null : () => _upload(doc.$1, doc.$2),
               ),
             ),
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class RideRequestScreen extends StatefulWidget {
-  const RideRequestScreen({super.key, this.jobType = 'RIDE'});
-
-  final String jobType;
-
-  @override
-  State<RideRequestScreen> createState() => _RideRequestScreenState();
-}
-
-class _RideRequestScreenState extends State<RideRequestScreen> {
-  int _countdown = 30;
-
-  Map<String, String> get _jobInfo => switch (widget.jobType) {
-        'PARCEL' => {
-            'title': 'Livraison colis',
-            'subtitle': 'Gombe → Masina',
-            'price': '8 000 FC',
-            'distance': '5.1 km',
-          },
-        'FOOD' => {
-            'title': 'Livraison repas',
-            'subtitle': 'Chez Mamou → Bandal',
-            'price': '18 500 FC',
-            'distance': '4.0 km',
-          },
-        'SCHEDULED' => {
-            'title': 'Réservation planifiée',
-            'subtitle': 'Gombe → Aéroport N\'Djili',
-            'price': '25 000 FC',
-            'distance': '18 km',
-          },
-        _ => {
-            'title': 'Course immédiate',
-            'subtitle': 'Vers Limete',
-            'price': '8 500 FC',
-            'distance': '3.2 km',
-          },
-      };
-
-  @override
-  void initState() {
-    super.initState();
-    _startCountdown();
-  }
-
-  void _startCountdown() {
-    Future.doWhile(() async {
-      await Future.delayed(const Duration(seconds: 1));
-      if (!mounted) return false;
-      setState(() => _countdown--);
-      return _countdown > 0;
-    });
-  }
-
-  Future<void> _openNavigation() async {
-    const url = 'https://www.google.com/maps/dir/?api=1&destination=-4.35,15.35';
-    if (await canLaunchUrl(Uri.parse(url))) {
-      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final info = _jobInfo;
-    return MovaScreen(
-      title: 'Nouvelle mission',
-      child: Column(
-        children: [
-          MovaCard(
-            child: Column(
-              children: [
-                Icon(
-                  widget.jobType == 'PARCEL'
-                      ? Icons.inventory_2_outlined
-                      : widget.jobType == 'FOOD'
-                          ? Icons.restaurant_outlined
-                          : widget.jobType == 'SCHEDULED'
-                              ? Icons.event_available_outlined
-                              : Icons.person_pin_circle,
-                  size: 48,
-                  color: MovaColors.violet,
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  info['title']!,
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Text(
-                  info['subtitle']!,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  '${info['price']} • ${info['distance']}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 16),
-                Text('$_countdown s', style: const TextStyle(fontSize: 32, color: MovaColors.orange)),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-          MovaButton(label: 'Accepter', icon: Icons.check, onPressed: _openNavigation),
-          const SizedBox(height: 8),
-          MovaButton(label: 'Refuser', isSecondary: true, icon: Icons.close, onPressed: () => Navigator.pop(context)),
         ],
       ),
     );
@@ -186,6 +104,8 @@ class EarningsScreen extends ConsumerStatefulWidget {
 
 class _EarningsScreenState extends ConsumerState<EarningsScreen> {
   Map<String, dynamic>? _data;
+  final _amountController = TextEditingController(text: '5000');
+  String? _error;
 
   @override
   void initState() {
@@ -193,10 +113,41 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
     _load();
   }
 
+  @override
+  void dispose() {
+    _amountController.dispose();
+    super.dispose();
+  }
+
   Future<void> _load() async {
     final api = ref.read(apiClientProvider);
+    await api.checkHealth();
     final result = await api.get('/drivers/earnings');
     if (result case Success(:final data)) setState(() => _data = data);
+  }
+
+  Future<void> _withdraw() async {
+    final amount = int.tryParse(_amountController.text.trim());
+    if (amount == null || amount < 1000) {
+      setState(() => _error = 'Montant minimum : 1 000 FC');
+      return;
+    }
+    final api = ref.read(apiClientProvider);
+    final phone = await api.loadUserPhone() ?? '+243812345678';
+    final result = await api.post('/wallet/withdraw', {
+      'amountCdf': amount,
+      'provider': 'ORANGE_MONEY',
+      'phone': phone,
+    });
+    if (!mounted) return;
+    switch (result) {
+      case Success():
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Retrait en cours…')),
+        );
+      case Failure(:final error):
+        setState(() => _error = error.message);
+    }
   }
 
   @override
@@ -211,22 +162,26 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
                 _earningsRow('Cette semaine', _data!['weekCdf']),
                 _earningsRow('Ce mois', _data!['monthCdf']),
                 _earningsRow('Total', _data!['totalCdf']),
+                if (_data!['rideCount'] != null)
+                  _earningsRow('Courses', _data!['rideCount']),
                 const SizedBox(height: 24),
+                TextField(
+                  controller: _amountController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Montant retrait (FC)',
+                    prefixIcon: Icon(Icons.payments_outlined),
+                  ),
+                ),
+                if (_error != null) ...[
+                  const SizedBox(height: 12),
+                  MovaErrorBanner(message: _error!),
+                ],
+                const SizedBox(height: 16),
                 MovaButton(
                   label: 'Retrait mobile money',
                   icon: Icons.account_balance,
-                  onPressed: () async {
-                    final messenger = ScaffoldMessenger.of(context);
-                    final api = ref.read(apiClientProvider);
-                    await api.post('/wallet/withdraw', {
-                      'amountCdf': 5000,
-                      'provider': 'ORANGE_MONEY',
-                      'phone': '+243812345678',
-                    });
-                    messenger.showSnackBar(
-                      const SnackBar(content: Text('Retrait en cours…')),
-                    );
-                  },
+                  onPressed: _withdraw,
                 ),
               ],
             ),
@@ -260,18 +215,28 @@ class IncidentScreen extends ConsumerStatefulWidget {
 class _IncidentScreenState extends ConsumerState<IncidentScreen> {
   final _descController = TextEditingController();
   String _type = 'OTHER';
+  bool _loading = false;
 
   Future<void> _submit() async {
+    setState(() => _loading = true);
     final api = ref.read(apiClientProvider);
-    await api.post('/incidents', {
+    await api.checkHealth();
+    final result = await api.post('/incidents', {
       'type': _type,
       'description': _descController.text,
     });
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Incident signalé')),
-      );
-      Navigator.pop(context);
+    if (!mounted) return;
+    setState(() => _loading = false);
+    switch (result) {
+      case Success():
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Incident signalé')),
+        );
+        Navigator.pop(context);
+      case Failure(:final error):
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error.message)),
+        );
     }
   }
 
@@ -299,7 +264,7 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
             decoration: const InputDecoration(labelText: 'Description'),
           ),
           const SizedBox(height: 24),
-          MovaButton(label: 'Envoyer', onPressed: _submit),
+          MovaButton(label: 'Envoyer', isLoading: _loading, onPressed: _submit),
         ],
       ),
     );

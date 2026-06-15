@@ -65,17 +65,17 @@ void main() {
     expect(find.text('Catégorie de poids'), findsOneWidget);
 
     await tester.pageBack();
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
 
+    final scheduledCard = find.text("Programmez votre trajet à l'avance");
     await tester.scrollUntilVisible(
-      find.text('Réservation planifiée').first,
+      scheduledCard.first,
       120,
       scrollable: find.byType(Scrollable).first,
     );
-    await tester.tap(find.text('Réservation planifiée').first);
-    await tester.pump();
-    await tester.pumpAndSettle(const Duration(seconds: 2));
+    await tester.ensureVisible(scheduledCard.first);
+    await tester.tap(scheduledCard.first);
+    await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
       find.text('Maximum J+7').first,
       120,

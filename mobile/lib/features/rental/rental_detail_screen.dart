@@ -31,7 +31,6 @@ class RentalDetailScreen extends ConsumerStatefulWidget {
 
 class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
   Map<String, dynamic>? _vehicle;
-  Map<String, dynamic>? _options;
   Map<String, dynamic>? _quote;
   DateTime _startDate = DateTime.now().add(const Duration(days: 1));
   DateTime _endDate = DateTime.now().add(const Duration(days: 3));
@@ -86,7 +85,6 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
       switch (result) {
         case Success(:final data):
           _vehicle = data['vehicle'] as Map<String, dynamic>? ?? data;
-          _options = data['options'] as Map<String, dynamic>?;
           _error = null;
         case Failure(:final error):
           _error = error.message;

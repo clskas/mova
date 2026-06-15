@@ -3,27 +3,62 @@ import 'dart:io' show File;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import '../cache/profile_cache.dart';
+import '../cache/unified_history_cache.dart';
+import '../cache/wallet_cache.dart';
 import '../config/market_config.dart';
 import '../error/mova_error_codes.dart';
 import '../error/result.dart';
+import '../offline/connectivity_service.dart';
+import '../offline/sync_queue.dart';
 import 'mock_data.dart';
 
-final apiClientProvider = Provider((ref) => ApiClient());
+final apiClientProvider = Provider((ref) {
+  return ApiClient(
+    connectivity: ref.watch(connectivityServiceProvider),
+    syncQueue: ref.watch(syncQueueProvider),
+  );
+});
 
 class ApiClient {
-  ApiClient({http.Client? client}) : _client = client ?? http.Client();
+  ApiClient({
+    http.Client? client,
+    ConnectivityService? connectivity,
+    SyncQueue? syncQueue,
+  })  : _client = client ?? http.Client(),
+        _connectivity = connectivity,
+        _syncQueue = syncQueue;
 
-  /// Client API en mode démo (tests et hors-ligne immédiat).
+  /// Client API en mode démo (tests uniquement — pas de file hors ligne).
   ApiClient.mock({http.Client? client})
       : _client = client ?? http.Client(),
+        _connectivity = null,
+        _syncQueue = null,
         _mockMode = true;
 
   final http.Client _client;
+  final ConnectivityService? _connectivity;
+  final SyncQueue? _syncQueue;
   String? _token;
   bool _mockMode = false;
 
   bool get isMockMode => _mockMode;
   bool get hasToken => _token != null && _token!.isNotEmpty;
+
+  /// Réseau + passerelle OK — prêt à synchroniser la file.
+  bool get canSync {
+    if (_mockMode) return false;
+    final connectivity = _connectivity;
+    if (connectivity == null) return true;
+    return connectivity.isOnline;
+  }
+
+  bool get _isOffline {
+    if (_mockMode) return false;
+    final connectivity = _connectivity;
+    if (connectivity == null) return false;
+    return connectivity.isOffline;
+  }
 
   Future<String?> authToken() async {
     await ensureReady();
@@ -67,18 +102,86 @@ class ApiClient {
         if (_token != null && _token!.isNotEmpty) 'Authorization': 'Bearer $_token',
       };
 
-  /// Vérifie la santé de la passerelle. Active le mode mock uniquement si `/health` échoue.
+  /// Vérifie la santé de la passerelle. Ne bascule plus en mode mock automatique.
   Future<bool> checkHealth() async {
     if (_mockMode) return false;
+    if (_connectivity != null && !_connectivity!.hasNetwork) {
+      _connectivity!.setGatewayUp(false);
+      return false;
+    }
     try {
       final res = await _client
           .get(Uri.parse('${MarketConfig.gatewayBaseUrl}/health'))
           .timeout(const Duration(seconds: 3));
-      _mockMode = res.statusCode != 200;
-      return !_mockMode;
+      final ok = res.statusCode == 200;
+      _connectivity?.setGatewayUp(ok);
+      return ok;
     } catch (_) {
-      _mockMode = true;
+      _connectivity?.setGatewayUp(false);
       return false;
+    }
+  }
+
+  Future<Map<String, dynamic>?> _readCacheForGet(String path) async {
+    if (path.startsWith('/history')) {
+      final snapshot = await UnifiedHistoryCache.load();
+      if (snapshot.isEmpty) return null;
+      return {
+        'data': snapshot.data,
+        if (snapshot.currency != null) 'currency': snapshot.currency,
+        if (snapshot.city != null) 'city': snapshot.city,
+        'cached': true,
+        'syncedAt': snapshot.syncedAt?.toIso8601String(),
+      };
+    }
+    if (path == '/wallet') {
+      final snapshot = await WalletCache.load();
+      if (snapshot.isEmpty) return null;
+      return {
+        'balanceCdf': snapshot.balanceCdf,
+        'transactions': snapshot.transactions,
+        'cached': true,
+        'syncedAt': snapshot.syncedAt?.toIso8601String(),
+      };
+    }
+    if (path.contains('/drivers/profile')) {
+      final snapshot = await ProfileCache.load();
+      if (snapshot.isEmpty) return null;
+      return {
+        'profile': snapshot.profile,
+        'cached': true,
+        'syncedAt': snapshot.syncedAt?.toIso8601String(),
+      };
+    }
+    if (path.contains('/rides/history') || path == '/rides') {
+      final snapshot = await UnifiedHistoryCache.load();
+      if (snapshot.isEmpty) {
+        final legacy = await RideHistoryCache.load();
+        if (legacy.isEmpty) return null;
+        return {'data': legacy, 'cached': true};
+      }
+      return {'data': snapshot.data, 'cached': true};
+    }
+    return null;
+  }
+
+  Future<void> _persistCacheForGet(String path, Map<String, dynamic> data) async {
+    if (path.startsWith('/history')) {
+      await UnifiedHistoryCache.save(data);
+      return;
+    }
+    if (path == '/wallet') {
+      await WalletCache.save(data);
+      return;
+    }
+    if (path.contains('/drivers/profile')) {
+      await ProfileCache.save(data);
+      return;
+    }
+    if (path.contains('/rides/history') || path == '/rides') {
+      final list = data['rides'] as List? ?? data['data'] as List? ?? [];
+      await RideHistoryCache.save(list);
+      await UnifiedHistoryCache.save({'data': list});
     }
   }
 
@@ -331,8 +434,28 @@ class ApiClient {
     String path,
     Map<String, dynamic> body, {
     int retries = 3,
+    bool skipOffline = false,
   }) async {
     await ensureReady();
+
+    // Hors ligne : file de sync pour les créations (pas de mock pour les écritures).
+    if (!skipOffline && _isOffline && !_mockMode) {
+      if (SyncQueue.shouldQueue('POST', path) && _syncQueue != null) {
+        final pendingId = await _syncQueue!.enqueue(
+          method: 'POST',
+          path: path,
+          body: body,
+        );
+        _connectivity?.setPendingSyncCount(_syncQueue!.pendingCount);
+        return Success(
+          SyncQueue.optimisticResponse(path, body, pendingId),
+        );
+      }
+      return const Failure(
+        NetworkFailure('Action impossible hors ligne.'),
+      );
+    }
+
     final mock = _mockFor('POST', path, body);
     if (mock != null) return mock;
 
@@ -372,8 +495,27 @@ class ApiClient {
     String path,
     Map<String, dynamic> body, {
     int retries = 3,
+    bool skipOffline = false,
   }) async {
     await ensureReady();
+
+    if (!skipOffline && _isOffline && !_mockMode) {
+      if (SyncQueue.shouldQueue('PATCH', path) && _syncQueue != null) {
+        final pendingId = await _syncQueue!.enqueue(
+          method: 'PATCH',
+          path: path,
+          body: body,
+        );
+        _connectivity?.setPendingSyncCount(_syncQueue!.pendingCount);
+        return Success(
+          SyncQueue.optimisticResponse(path, body, pendingId),
+        );
+      }
+      return const Failure(
+        NetworkFailure('Action impossible hors ligne.'),
+      );
+    }
+
     final mock = _mockFor('PATCH', path, body);
     if (mock != null) return mock;
 
@@ -411,6 +553,16 @@ class ApiClient {
 
   Future<Result<dynamic>> get(String path, {int retries = 3}) async {
     await ensureReady();
+
+    // Hors ligne : cache local d'abord, mock uniquement en mode démo explicite.
+    if (_isOffline && !_mockMode) {
+      final cached = await _readCacheForGet(path);
+      if (cached != null) return Success(cached);
+      return const Failure(
+        OfflineFailure('Données non disponibles hors ligne.'),
+      );
+    }
+
     final mock = _mockFor('GET', path, null);
     if (mock != null) return mock;
 
@@ -422,12 +574,9 @@ class ApiClient {
 
         final data = _decodeBody(response.body);
         if (response.statusCode >= 200 && response.statusCode < 300) {
-          if (path.contains('/rides/history') || (path == '/rides')) {
-            await RideHistoryCache.save(
-              data is List ? data : (data['rides'] as List? ?? data['data'] as List? ?? []),
-            );
-          }
-          return Success(_normalizeSuccess(data));
+          final normalized = _normalizeSuccess(data);
+          await _persistCacheForGet(path, normalized);
+          return Success(normalized);
         }
         if (data is Map<String, dynamic>) {
           return _failureFromResponse(response.statusCode, data);
@@ -436,14 +585,13 @@ class ApiClient {
       } catch (e) {
         if (i == retries - 1) {
           if (_mockMode) {
-            if (path.contains('/rides/history')) {
-              final cached = await RideHistoryCache.load();
-              if (cached.isNotEmpty) {
-                return Success({'data': cached, 'cached': true});
-              }
-            }
+            final cached = await _readCacheForGet(path);
+            if (cached != null) return Success(cached);
             final fallback = _mockFor('GET', path, null);
             if (fallback != null) return fallback;
+          } else {
+            final cached = await _readCacheForGet(path);
+            if (cached != null) return Success(cached);
           }
           return const Failure(NetworkFailure());
         }

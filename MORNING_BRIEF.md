@@ -89,6 +89,27 @@ cd e2e && npm run test:e2e:admin
 cd mobile && flutter test
 ```
 
+## Tester le mode hors ligne
+
+```powershell
+# 1. Lancer l'app passager sur appareil ou émulateur
+cd mobile
+flutter run --flavor passenger -t lib/main_passenger.dart --dart-define=API_URL=http://192.168.1.64:3000/api
+
+# 2. Se connecter une fois en ligne pour remplir le cache (historique, wallet)
+
+# 3. Couper le réseau (mode avion) OU arrêter la passerelle :
+docker compose stop gateway
+
+# 4. Vérifier :
+#    - Bannière « Pas de réseau » ou « Serveur indisponible — mode hors ligne »
+#    - Historique affiché avec « Dernière synchro : … »
+#    - Création de course → message « Enregistré hors ligne… » + badge file de sync
+
+# 5. Rétablir réseau + passerelle → la file se vide automatiquement
+docker compose start gateway
+```
+
 ## Mobile APK
 
 ```powershell

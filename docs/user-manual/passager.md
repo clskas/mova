@@ -108,4 +108,13 @@ Lancement à **Kinshasa**. Extension progressive vers Lubumbashi, Goma, Bukavu e
 
 ## Mode hors-ligne
 
-Si la passerelle est indisponible, l'application affiche des données de démonstration et conserve l'historique en cache local.
+L'application fonctionne en **mode hors ligne réel** (pas seulement démo) :
+
+- **Pas de réseau** : bannière orange « Pas de réseau ».
+- **Serveur indisponible** : bannière « Serveur indisponible — mode hors ligne ».
+- **Historique** : affiché depuis le cache local avec la date de dernière synchronisation.
+- **Portefeuille** : solde et transactions récents conservés localement.
+- **Créations hors ligne** (course, colis, recharge, etc.) : enregistrées dans une file et synchronisées automatiquement à la reconnexion. Un message confirme « Enregistré hors ligne, synchronisation à la reconnexion ».
+- **Indicateur** : « X actions en attente de synchronisation » lorsque la file n'est pas vide.
+
+Le mode démo (données fictives) n'est utilisé que dans les tests automatiques, pas en production hors ligne.

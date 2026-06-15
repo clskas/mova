@@ -5,7 +5,9 @@ import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import '../../core/api/api_client.dart';
+import '../../core/cache/wallet_cache.dart';
 import '../../core/error/result.dart';
+import '../../core/widgets/offline_shell.dart';
 
 class WalletScreen extends ConsumerStatefulWidget {
   const WalletScreen({super.key});
@@ -21,6 +23,8 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
   bool _topUpLoading = false;
   bool _topUpSheetOpen = false;
   String? _error;
+  DateTime? _lastSync;
+  bool _fromCache = false;
 
   @override
   void initState() {
@@ -52,6 +56,18 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
       _loading = true;
       _error = null;
     }
+
+    final cached = await WalletCache.load();
+    if (!cached.isEmpty && mounted && !_topUpSheetOpen) {
+      setState(() {
+        _balance = cached.balanceCdf;
+        _transactions = cached.transactions;
+        _lastSync = cached.syncedAt;
+        _fromCache = true;
+        _loading = false;
+      });
+    }
+
     final api = ref.read(apiClientProvider);
     await api.loadToken();
     await api.checkHealth();
@@ -64,6 +80,13 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
           balance: data['balanceCdf'] as int? ?? 0,
           transactions: raw.cast<Map<String, dynamic>>(),
         );
+        _fromCache = data['cached'] == true;
+        final syncedRaw = data['syncedAt']?.toString();
+        _lastSync = syncedRaw != null
+            ? DateTime.tryParse(syncedRaw)
+            : (_fromCache ? _lastSync : DateTime.now());
+        if (!_fromCache) _lastSync = DateTime.now();
+        if (!_topUpSheetOpen && mounted) setState(() {});
       case Failure(:final error):
         _applyWalletData(
           balance: _balance,
@@ -127,6 +150,19 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
     setState(() => _topUpLoading = false);
     switch (result) {
       case Success(:final data):
+        if (data['offline'] == true) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  data['message']?.toString() ??
+                      'Enregistré hors ligne, synchronisation à la reconnexion',
+                ),
+              ),
+            );
+          }
+          return;
+        }
         final newBalance = data['balanceCdf'] as int?;
         if (newBalance != null) {
           setState(() => _balance = newBalance);
@@ -178,6 +214,16 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                     color: MovaColors.green,
                   ),
                 ),
+                if (_lastSync != null) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    formatLastSync(_lastSync),
+                    style: TextStyle(
+                      color: _fromCache ? MovaColors.orange : MovaColors.textSecondary,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),

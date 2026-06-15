@@ -34,6 +34,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
       return;
     }
     final api = ref.read(apiClientProvider);
+    await api.checkHealth();
     final result = await api.post('/auth/otp/request', {'phone': phone});
     setState(() {
       _loading = false;
@@ -50,6 +51,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
   Future<void> _verifyOtp() async {
     setState(() { _loading = true; _error = null; });
     final api = ref.read(apiClientProvider);
+    await api.checkHealth();
     final phone = MarketConfig.normalizePhone(_phoneController.text);
     final result = await api.post('/auth/otp/verify', {
       'phone': phone,

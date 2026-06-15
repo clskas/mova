@@ -39,23 +39,65 @@ export function HistoryView({ onBack, mock = false }: Props) {
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [scheduled, setScheduled] = useState<Scheduled[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fromCache, setFromCache] = useState(false);
+  const [lastSync, setLastSync] = useState<string | null>(null);
 
   useEffect(() => {
-    async function load() {
-      const [ridesData, deliveriesData, scheduledData] = await Promise.all([
-        apiFetch<Ride[] | { data?: Ride[] }>("/api/rides/history?role=passenger", undefined, { useMock: mock }),
-        apiFetch<{ data?: Delivery[] }>("/api/deliveries/history", undefined, { useMock: mock }),
-        apiFetch<{ data?: Scheduled[] }>("/api/rides/scheduled", undefined, { useMock: mock }),
-      ]);
-
-      const rideList = Array.isArray(ridesData) ? ridesData : ridesData.data ?? [];
-      setRides(rideList);
-      setDeliveries(deliveriesData.data ?? []);
-      setScheduled(scheduledData.data ?? []);
-
+    function loadCache() {
       try {
-        localStorage.setItem("mova_history", JSON.stringify({ rides: rideList, deliveries: deliveriesData.data }));
-      } catch { /* ignore */ }
+        const raw = localStorage.getItem("mova_history");
+        if (!raw) return false;
+        const parsed = JSON.parse(raw) as {
+          rides?: Ride[];
+          deliveries?: Delivery[];
+          scheduled?: Scheduled[];
+          syncedAt?: string;
+        };
+        if (parsed.rides) setRides(parsed.rides);
+        if (parsed.deliveries) setDeliveries(parsed.deliveries);
+        if (parsed.scheduled) setScheduled(parsed.scheduled);
+        if (parsed.syncedAt) setLastSync(parsed.syncedAt);
+        setFromCache(true);
+        setLoading(false);
+        return true;
+      } catch {
+        return false;
+      }
+    }
+
+    loadCache();
+
+    async function load() {
+      try {
+        const [ridesData, deliveriesData, scheduledData] = await Promise.all([
+          apiFetch<Ride[] | { data?: Ride[] }>("/api/rides/history?role=passenger", undefined, { useMock: mock }),
+          apiFetch<{ data?: Delivery[] }>("/api/deliveries/history", undefined, { useMock: mock }),
+          apiFetch<{ data?: Scheduled[] }>("/api/rides/scheduled", undefined, { useMock: mock }),
+        ]);
+
+        const rideList = Array.isArray(ridesData) ? ridesData : ridesData.data ?? [];
+        setRides(rideList);
+        setDeliveries(deliveriesData.data ?? []);
+        setScheduled(scheduledData.data ?? []);
+        setFromCache(false);
+        const syncedAt = new Date().toISOString();
+        setLastSync(syncedAt);
+
+        try {
+          localStorage.setItem(
+            "mova_history",
+            JSON.stringify({
+              rides: rideList,
+              deliveries: deliveriesData.data ?? [],
+              scheduled: scheduledData.data ?? [],
+              syncedAt,
+            }),
+          );
+        } catch { /* ignore */ }
+      } catch {
+        if (!loadCache()) setLoading(false);
+        return;
+      }
 
       setLoading(false);
     }
@@ -72,6 +114,12 @@ export function HistoryView({ onBack, mock = false }: Props) {
     <div className="space-y-4">
       <button onClick={onBack} className="text-sm text-[#6C63FF]">← Accueil</button>
       <h2 className="text-lg font-semibold">Historique</h2>
+      {fromCache && (
+        <p className="text-xs text-[#FF6B35] bg-orange-50 rounded-lg py-2 px-3">
+          Serveur indisponible — données en cache
+          {lastSync ? ` · Dernière synchro : ${new Date(lastSync).toLocaleString("fr-CD")}` : ""}
+        </p>
+      )}
 
       <nav className="flex border-b bg-white rounded-t-xl overflow-hidden">
         {tabs.map((t) => (

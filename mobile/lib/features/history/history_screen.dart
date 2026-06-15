@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/api/api_client.dart';
+import '../../core/cache/unified_history_cache.dart';
 import '../../core/config/market_config.dart';
 import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
+import '../../core/widgets/offline_shell.dart';
 
 class HistoryScreen extends ConsumerStatefulWidget {
   const HistoryScreen({super.key});
@@ -19,6 +21,8 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
   late TabController _tabController;
   List<dynamic> _history = [];
   bool _loading = true;
+  bool _fromCache = false;
+  DateTime? _lastSync;
 
   @override
   void initState() {
@@ -34,6 +38,16 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
   }
 
   Future<void> _load() async {
+    final cached = await UnifiedHistoryCache.load();
+    if (cached.data.isNotEmpty && mounted) {
+      setState(() {
+        _history = cached.data;
+        _lastSync = cached.syncedAt;
+        _fromCache = true;
+        _loading = false;
+      });
+    }
+
     final api = ref.read(apiClientProvider);
     await api.loadToken();
     await api.checkHealth();
@@ -45,6 +59,12 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
       _loading = false;
       if (historyResult case Success(:final data)) {
         _history = data['data'] as List? ?? [];
+        _fromCache = data['cached'] == true;
+        final syncedRaw = data['syncedAt']?.toString();
+        _lastSync = syncedRaw != null
+            ? DateTime.tryParse(syncedRaw)
+            : (_fromCache ? _lastSync : DateTime.now());
+        if (!_fromCache) _lastSync = DateTime.now();
       }
     });
   }
@@ -375,6 +395,17 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
             ],
           ),
           const SizedBox(height: 12),
+          if (_lastSync != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(
+                formatLastSync(_lastSync),
+                style: TextStyle(
+                  color: _fromCache ? MovaColors.orange : MovaColors.textSecondary,
+                  fontSize: 12,
+                ),
+              ),
+            ),
           _tabContent(),
         ],
       ),

@@ -26,6 +26,7 @@ class _DriverOtpScreenState extends ConsumerState<DriverOtpScreen> {
     setState(() { _loading = true; _error = null; });
     final phone = MarketConfig.normalizePhone(_phoneController.text);
     final api = ref.read(apiClientProvider);
+    await api.checkHealth();
     final result = await api.post('/auth/otp/request', {'phone': phone});
     setState(() {
       _loading = false;
@@ -37,6 +38,7 @@ class _DriverOtpScreenState extends ConsumerState<DriverOtpScreen> {
   Future<void> _verifyOtp() async {
     setState(() { _loading = true; });
     final api = ref.read(apiClientProvider);
+    await api.checkHealth();
     final phone = MarketConfig.normalizePhone(_phoneController.text);
     final result = await api.post('/auth/otp/verify', {
       'phone': phone,

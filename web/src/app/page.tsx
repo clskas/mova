@@ -89,9 +89,9 @@ function HomeContent() {
       </header>
 
       <main className="flex-1 p-4">
-        {mock && view === "home" && (
+        {mock && (
           <p className="text-center text-sm text-[#FF6B35] bg-orange-50 rounded-lg py-2 mb-4">
-            Mode démo — passerelle indisponible
+            Serveur indisponible — mode hors ligne
           </p>
         )}
 

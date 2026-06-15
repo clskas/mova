@@ -107,4 +107,19 @@ describe('RidesService', () => {
     expect(result.status).toBe('MATCHING');
     expect(result.driversFound).toBe(1);
   });
+
+  it('records driver rejection without changing ride status', async () => {
+    prisma.ride.findUnique.mockResolvedValue({
+      id: 'ride-1',
+      status: RideStatus.SEARCHING,
+    });
+
+    const result = await service.rejectRide('ride-1', 'driver-1');
+    expect(prisma.rideEvent.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ rideId: 'ride-1', event: 'DRIVER_REJECTED' }),
+      }),
+    );
+    expect(result.success).toBe(true);
+  });
 });

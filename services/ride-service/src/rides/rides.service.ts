@@ -168,6 +168,68 @@ export class RidesService {
     return this.formatRideDetail(updated);
   }
 
+  async rejectRide(rideId: string, driverUserId: string) {
+    const ride = await this.prisma.ride.findUnique({ where: { id: rideId } });
+    if (!ride) throw new MovaHttpException(MovaErrorCode.RIDE_NOT_FOUND, HttpStatus.NOT_FOUND);
+    if (ride.status !== RideStatus.SEARCHING) {
+      throw new MovaHttpException(MovaErrorCode.RIDE_INVALID_STATUS);
+    }
+    await this.prisma.rideEvent.create({
+      data: { rideId, event: 'DRIVER_REJECTED', metadata: { driverUserId } },
+    });
+    return { success: true, rideId };
+  }
+
+  async getDriverOffers(driverUserId: string) {
+    const profile = await this.fetchDriverProfile(driverUserId);
+    if (!profile?.isAvailable || profile.kycStatus !== 'APPROVED') {
+      return { offers: [] as Record<string, unknown>[] };
+    }
+    if (profile.currentLat == null || profile.currentLng == null) {
+      return { offers: [] as Record<string, unknown>[] };
+    }
+    const vehicleTypes = (profile.vehicles ?? [])
+      .filter((v: { isActive?: boolean }) => v.isActive !== false)
+      .map((v: { type: VehicleType }) => v.type);
+    if (vehicleTypes.length === 0) {
+      return { offers: [] as Record<string, unknown>[] };
+    }
+
+    const rides = await this.prisma.ride.findMany({
+      where: { status: RideStatus.SEARCHING, vehicleType: { in: vehicleTypes } },
+      orderBy: { createdAt: 'desc' },
+      take: 30,
+    });
+
+    const radiusKm = MARKET_RDC.matching.maxRadiusKm;
+    const offers = rides
+      .map((ride) => {
+        const distanceKm = this.pricing.haversineKm(
+          profile.currentLat,
+          profile.currentLng,
+          ride.pickupLat,
+          ride.pickupLng,
+        );
+        return { ...this.formatRideDetail(ride), distanceKm: Math.round(distanceKm * 100) / 100 };
+      })
+      .filter((o) => o.distanceKm <= radiusKm)
+      .sort((a, b) => a.distanceKm - b.distanceKm);
+
+    return { offers };
+  }
+
+  private async fetchDriverProfile(userId: string) {
+    try {
+      const res = await fetch(serviceUrl('driver', `/internal/drivers/${userId}`), {
+        headers: { 'x-internal-api-key': INTERNAL_API_KEY },
+      });
+      if (!res.ok) return null;
+      return res.json();
+    } catch {
+      return null;
+    }
+  }
+
   async updateStatus(rideId: string, statusInput: string, userId: string) {
     const ride = await this.prisma.ride.findUnique({ where: { id: rideId } });
     if (!ride) throw new MovaHttpException(MovaErrorCode.RIDE_NOT_FOUND, HttpStatus.NOT_FOUND);

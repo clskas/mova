@@ -51,6 +51,12 @@ export class RidesController {
     return this.scheduledRidesService.cancel(id, req.user.id, dto.reason);
   }
 
+  @Get('offers')
+  @ApiOperation({ summary: 'Courses disponibles pour le chauffeur (statut SEARCHING)' })
+  offers(@Request() req: { user: { id: string } }) {
+    return this.ridesService.getDriverOffers(req.user.id);
+  }
+
   @Get('history')
   @ApiOperation({ summary: 'Historique courses passager/chauffeur' })
   history(@Request() req: { user: { id: string } }, @Query('role') role?: string) {
@@ -85,6 +91,12 @@ export class RidesController {
   @ApiOperation({ summary: 'Accepter course (chauffeur)' })
   accept(@Request() req: { user: { id: string } }, @Param('id') id: string, @Body('vehicleId') vehicleId?: string) {
     return this.ridesService.acceptRide(id, req.user.id, vehicleId);
+  }
+
+  @Post(':id/reject')
+  @ApiOperation({ summary: 'Refuser course (chauffeur)' })
+  reject(@Request() req: { user: { id: string } }, @Param('id') id: string) {
+    return this.ridesService.rejectRide(id, req.user.id);
   }
 
   @Patch(':id/status')

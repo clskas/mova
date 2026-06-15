@@ -15,6 +15,7 @@ import {
 } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '@mova/shared';
+import { SmsService } from './sms.providers';
 
 @Injectable()
 export class AuthService {
@@ -24,6 +25,7 @@ export class AuthService {
     private jwt: JwtService,
     private config: ConfigService,
     private redis: RedisService,
+    private sms: SmsService,
   ) {}
 
   async requestOtp(phone: string) {
@@ -31,9 +33,23 @@ export class AuthService {
     if (!validatePhoneRdc(normalized)) {
       throw new MovaHttpException(MovaErrorCode.AUTH_INVALID_PHONE, HttpStatus.BAD_REQUEST);
     }
-    const code = this.config.get('MOCK_OTP') === 'true' ? '123456' : crypto.randomInt(100000, 999999).toString();
+    const isMock = this.config.get('MOCK_OTP') === 'true';
+    const code = isMock ? '123456' : crypto.randomInt(100000, 999999).toString();
     await this.prisma.otpCode.create({ data: { phone: normalized, code, expiresAt: new Date(Date.now() + 10 * 60 * 1000) } });
-    return { success: true, message: 'Code OTP envoyé', phone: normalized, ...(this.config.get('MOCK_OTP') === 'true' ? { mockCode: code } : {}) };
+
+    if (!isMock) {
+      const smsResult = await this.sms.sendOtp(normalized, code);
+      if (!smsResult.success) {
+        throw new MovaHttpException(
+          MovaErrorCode.VALIDATION_ERROR,
+          HttpStatus.SERVICE_UNAVAILABLE,
+          smsResult.message ?? 'Impossible d\'envoyer le code OTP par SMS.',
+        );
+      }
+      return { success: true, message: smsResult.message ?? 'Code OTP envoyé', phone: normalized };
+    }
+
+    return { success: true, message: 'Code OTP envoyé', phone: normalized, mockCode: code };
   }
 
   private async provisionUser(userId: string, role: UserRole) {

@@ -70,6 +70,7 @@ services:
       DATABASE_URL: postgresql://mova:mova@postgres-auth:5432/mova_auth
       REDIS_URL: redis://redis:6379
       JWT_SECRET: dev_secret
+      # Dev local : OTP fixe 123456. Production : MOCK_OTP=false + Twilio (voir config/external-apis.env.example)
       MOCK_OTP: 'true'
       PAYMENT_SERVICE_URL: http://payment-service:3000
       DRIVER_SERVICE_URL: http://driver-service:3000
@@ -107,6 +108,7 @@ services:
       DATABASE_URL: postgresql://mova:mova@postgres-payments:5432/mova_payments
       REDIS_URL: redis://redis:6379
       JWT_SECRET: dev_secret
+      # Dev local : paiements simulés. Production : MOCK_PAYMENTS=false + clés Orange/M-Pesa/Airtel
       MOCK_PAYMENTS: 'true'
       RIDE_SERVICE_URL: http://ride-service:3000
       INTERNAL_API_KEY: mova-internal-dev

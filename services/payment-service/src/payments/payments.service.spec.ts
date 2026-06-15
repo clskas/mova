@@ -30,9 +30,9 @@ describe('PaymentsService', () => {
     wallet as unknown as WalletService,
     redis as unknown as RedisService,
     new MockPaymentProvider(config),
-    new OrangeMoneyProvider(),
-    new MpesaProvider(),
-    new AirtelMoneyProvider(),
+    new OrangeMoneyProvider(config),
+    new MpesaProvider(config),
+    new AirtelMoneyProvider(config),
   );
 
   beforeEach(() => {

@@ -19,6 +19,8 @@ describe('PricingService', () => {
       perKmCdf: 800,
       perMinuteCdf: 100,
       minFareCdf: 2000,
+      peakMultiplier: 1.3,
+      nightMultiplier: 1.2,
     });
   });
 
@@ -36,5 +38,22 @@ describe('PricingService', () => {
     const km = service.haversineKm(-4.3217, 15.3125, -4.3389, 15.3264);
     expect(km).toBeGreaterThan(0);
     expect(km).toBeLessThan(5);
+  });
+
+  it('applique les multiplicateurs pointe/nuit depuis la règle DB', async () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2026-06-15T08:00:00')); // heure de pointe
+    (prisma.pricingRule.findUnique as jest.Mock).mockResolvedValue({
+      vehicleType: VehicleType.STANDARD,
+      baseFareCdf: 3000,
+      perKmCdf: 1500,
+      perMinuteCdf: 200,
+      minFareCdf: 5000,
+      peakMultiplier: 1.4,
+      nightMultiplier: 1.25,
+    });
+    const fare = await service.estimateFare(VehicleType.STANDARD, 2, 10);
+    expect(fare.surchargeMultiplier).toBe(1.4);
+    jest.useRealTimers();
   });
 });

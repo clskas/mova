@@ -34,4 +34,18 @@ describe('PricingAdminService', () => {
     const result = await service.createPromoCode({ code: 'mova10', discountPercent: 10 });
     expect(result.code).toBe('MOVA10');
   });
+
+  it('liste les majorations livraison', async () => {
+    prisma.serviceSurcharge.findMany.mockResolvedValue([
+      { type: SurchargeType.DELIVERY_FOOD, baseFeeCdf: 3000, multiplier: 1.0, perUnitCdf: null, description: 'Repas', isActive: true },
+      { type: SurchargeType.MOVING, baseFeeCdf: 15000, multiplier: 1.5, perUnitCdf: 8000, description: 'Déménagement', isActive: true },
+    ]);
+    const rules = await service.listDeliveryPricingRules();
+    expect(rules).toHaveLength(1);
+    expect(rules[0].category).toBe('FOOD');
+  });
+
+  it('rejette une catégorie livraison invalide', async () => {
+    await expect(service.updateDeliveryPricingRule('INVALID', { baseFeeCdf: 100 })).rejects.toBeInstanceOf(MovaHttpException);
+  });
 });

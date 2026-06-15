@@ -1,7 +1,19 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { SurchargeType, VehicleType } from '@prisma/client';
-import { MARKET_RDC, MovaErrorCode, MovaHttpException } from '@mova/shared';
+import { MovaErrorCode, MovaHttpException } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
+
+const DELIVERY_CATEGORY_TO_TYPE: Record<string, SurchargeType> = {
+  PARCEL: SurchargeType.DELIVERY_PARCEL,
+  FOOD: SurchargeType.DELIVERY_FOOD,
+  EXPRESS: SurchargeType.DELIVERY_EXPRESS,
+};
+
+const DELIVERY_TYPE_TO_CATEGORY: Partial<Record<SurchargeType, string>> = {
+  [SurchargeType.DELIVERY_PARCEL]: 'PARCEL',
+  [SurchargeType.DELIVERY_FOOD]: 'FOOD',
+  [SurchargeType.DELIVERY_EXPRESS]: 'EXPRESS',
+};
 
 @Injectable()
 export class PricingAdminService {
@@ -103,6 +115,31 @@ export class PricingAdminService {
   ) {
     await this.getSurcharge(type);
     return this.prisma.serviceSurcharge.update({ where: { type }, data });
+  }
+
+  async listDeliveryPricingRules() {
+    const rows = await this.listSurcharges();
+    return rows
+      .filter((r) => DELIVERY_TYPE_TO_CATEGORY[r.type])
+      .map((r) => ({
+        category: DELIVERY_TYPE_TO_CATEGORY[r.type]!,
+        baseFeeCdf: r.baseFeeCdf,
+        multiplier: r.multiplier,
+        perUnitCdf: r.perUnitCdf,
+        description: r.description,
+        isActive: r.isActive,
+      }));
+  }
+
+  async updateDeliveryPricingRule(
+    category: string,
+    data: Partial<{ baseFeeCdf: number; multiplier: number; perUnitCdf: number | null; description: string; isActive: boolean }>,
+  ) {
+    const type = DELIVERY_CATEGORY_TO_TYPE[category.toUpperCase()];
+    if (!type) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, HttpStatus.BAD_REQUEST, 'Catégorie de livraison invalide.');
+    }
+    return this.updateSurcharge(type, data);
   }
 
   listPromoCodes() {

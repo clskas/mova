@@ -134,8 +134,8 @@ export class InternalController {
   }
 
   @Get('pricing-rules')
-  listPricing() {
-    return this.pricingAdmin.listRules();
+  listPricing(@Query('city') city?: string) {
+    return this.pricingAdmin.listRules(city);
   }
 
   @Post('pricing-rules/:vehicleType')
@@ -161,6 +161,16 @@ export class InternalController {
   @Patch('surcharges/:type')
   updateSurcharge(@Param('type') type: SurchargeType, @Body() body: Record<string, unknown>) {
     return this.pricingAdmin.updateSurcharge(type, body);
+  }
+
+  @Get('delivery-pricing-rules')
+  listDeliveryPricing() {
+    return this.pricingAdmin.listDeliveryPricingRules();
+  }
+
+  @Patch('delivery-pricing-rules/:category')
+  updateDeliveryPricing(@Param('category') category: string, @Body() body: Record<string, unknown>) {
+    return this.pricingAdmin.updateDeliveryPricingRule(category, body);
   }
 
   @Get('promo-codes')

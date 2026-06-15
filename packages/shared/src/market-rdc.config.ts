@@ -54,6 +54,13 @@ export const MARKET_RDC = {
   ],
   nightHours: { start: 22, end: 5 },
 
+  /** Majorations heures de pointe / nuit — repli si `pricing_rules` non renseignées. */
+  pricing: {
+    defaultPeakMultiplier: 1.3,
+    defaultNightMultiplier: 1.2,
+    combinedPeakNightMultiplier: 1.5,
+  },
+
   /** Majoration livraison / course inter-villes (départ et arrivée dans des zones MOVA différentes). */
   interCity: {
     baseSurchargeCdf: 15_000,

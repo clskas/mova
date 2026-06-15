@@ -38,7 +38,7 @@ export class PricingService {
       });
     }
     if (!rule) throw new MovaHttpException(MovaErrorCode.PRICING_NOT_CONFIGURED, HttpStatus.SERVICE_UNAVAILABLE);
-    const multiplier = this.getSurchargeMultiplier();
+    const multiplier = this.getSurchargeMultiplier(rule);
     const baseFareCdf = rule.baseFareCdf;
     const distanceFareCdf = Math.ceil(distanceKm * rule.perKmCdf);
     const durationFareCdf = Math.ceil(durationMin * rule.perMinuteCdf);
@@ -54,13 +54,19 @@ export class PricingService {
     );
   }
 
-  private getSurchargeMultiplier(): number {
+  private getSurchargeMultiplier(rule: { peakMultiplier: number; nightMultiplier: number }): number {
     const hour = new Date().getHours();
     const isPeak = MARKET_RDC.peakHours.some((p) => hour >= p.start && hour < p.end);
     const isNight = hour >= MARKET_RDC.nightHours.start || hour < MARKET_RDC.nightHours.end;
-    if (isPeak && isNight) return 1.5;
-    if (isPeak) return 1.3;
-    if (isNight) return 1.2;
+    const { defaultPeakMultiplier, defaultNightMultiplier, combinedPeakNightMultiplier } = MARKET_RDC.pricing;
+    const peakMult = rule.peakMultiplier > 1 ? rule.peakMultiplier : defaultPeakMultiplier;
+    const nightMult = rule.nightMultiplier > 1 ? rule.nightMultiplier : defaultNightMultiplier;
+    if (isPeak && isNight) {
+      if (rule.peakMultiplier <= 1 && rule.nightMultiplier <= 1) return combinedPeakNightMultiplier;
+      return Math.round(peakMult * nightMult * 100) / 100;
+    }
+    if (isPeak) return peakMult;
+    if (isNight) return nightMult;
     return 1.0;
   }
 

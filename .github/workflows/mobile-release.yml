@@ -1,0 +1,248 @@
+name: Mobile Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_run:
+    workflows: ['Smoke Tests Production']
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      upload_to_stores:
+        description: Publier sur Play Store (internal) / TestFlight
+        required: false
+        type: boolean
+        default: false
+      build_ios:
+        description: Construire IPA (macOS + certificats Apple requis)
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  FLUTTER_VERSION: stable
+  PROD_API_URL: ${{ secrets.PROD_API_URL || 'https://api.mova.cd/api' }}
+  PROD_WS_URL: ${{ secrets.PROD_WS_URL || 'https://api.mova.cd' }}
+
+jobs:
+  build-android:
+    name: Build Android (AAB)
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      startsWith(github.ref, 'refs/tags/v') ||
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success')
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Setup Android signing
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > mobile/android/app/upload-keystore.jks
+            cat > mobile/android/key.properties <<EOF
+          storePassword=${ANDROID_KEYSTORE_PASSWORD}
+          keyPassword=${ANDROID_KEY_PASSWORD}
+          keyAlias=${ANDROID_KEY_ALIAS}
+          storeFile=app/upload-keystore.jks
+          EOF
+            echo "Keystore release configuré"
+          else
+            echo "::notice::ANDROID_KEYSTORE_BASE64 absent — build signé avec clé debug (non publiable sur Play Store)"
+          fi
+
+      - name: Install dependencies
+        working-directory: mobile
+        run: flutter pub get
+
+      - name: Build passenger AAB
+        working-directory: mobile
+        run: |
+          flutter build appbundle --release \
+            --flavor passenger \
+            -t lib/main_passenger.dart \
+            --dart-define=API_URL=${{ env.PROD_API_URL }} \
+            --dart-define=WS_URL=${{ env.PROD_WS_URL }}
+
+      - name: Build driver AAB
+        working-directory: mobile
+        run: |
+          flutter build appbundle --release \
+            --flavor driver \
+            -t lib/main_driver.dart \
+            --dart-define=API_URL=${{ env.PROD_API_URL }} \
+            --dart-define=WS_URL=${{ env.PROD_WS_URL }}
+
+      - name: Upload passenger AAB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mova-passenger-aab
+          path: mobile/build/app/outputs/bundle/passengerRelease/app-passenger-release.aab
+          retention-days: 30
+
+      - name: Upload driver AAB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mova-driver-aab
+          path: mobile/build/app/outputs/bundle/driverRelease/app-driver-release.aab
+          retention-days: 30
+
+  upload-android:
+    name: Upload Play Store (internal)
+    needs: build-android
+    if: >
+      startsWith(github.ref, 'refs/tags/v') ||
+      (github.event_name == 'workflow_dispatch' && inputs.upload_to_stores == true)
+    runs-on: ubuntu-latest
+    environment: production-mobile
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.2'
+          bundler-cache: true
+          working-directory: mobile/android
+
+      - name: Download passenger AAB
+        uses: actions/download-artifact@v4
+        with:
+          name: mova-passenger-aab
+          path: mobile/build/app/outputs/bundle/passengerRelease/
+
+      - name: Download driver AAB
+        uses: actions/download-artifact@v4
+        with:
+          name: mova-driver-aab
+          path: mobile/build/app/outputs/bundle/driverRelease/
+
+      - name: Upload to Play Console internal track
+        working-directory: mobile/android
+        env:
+          PLAY_STORE_JSON_KEY: ${{ secrets.PLAY_STORE_JSON_KEY }}
+        run: |
+          if [ -z "$PLAY_STORE_JSON_KEY" ]; then
+            echo "::notice::PLAY_STORE_JSON_KEY non configuré — publication Play Store ignorée. Les artefacts AAB restent disponibles dans l'onglet Actions."
+            exit 0
+          fi
+          echo "$PLAY_STORE_JSON_KEY" | base64 -d > /tmp/play-store-key.json
+          export PLAY_STORE_JSON_KEY_PATH=/tmp/play-store-key.json
+          bundle exec fastlane deploy_internal
+
+  build-ios:
+    name: Build iOS (IPA)
+    if: >
+      startsWith(github.ref, 'refs/tags/v') ||
+      (github.event_name == 'workflow_dispatch' && inputs.build_ios == true)
+    runs-on: macos-latest
+    timeout-minutes: 60
+    outputs:
+      ipa_built: ${{ steps.build_ipa.outcome == 'success' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check iOS credentials
+        id: ios_creds
+        run: |
+          if [ -z "${{ secrets.MATCH_PASSWORD }}" ] || [ -z "${{ secrets.APP_STORE_CONNECT_API_KEY }}" ]; then
+            echo "::notice::Certificats iOS non configurés — voir docs/cicd.md"
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: subosito/flutter-action@v2
+        if: steps.ios_creds.outputs.available == 'true'
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install CocoaPods
+        if: steps.ios_creds.outputs.available == 'true'
+        working-directory: mobile/ios
+        run: pod install
+
+      - name: Import signing certificates (match)
+        if: steps.ios_creds.outputs.available == 'true'
+        env:
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+          MATCH_GIT_BASIC_AUTHORIZATION: ${{ secrets.MATCH_GIT_BASIC_AUTHORIZATION }}
+        run: |
+          cd mobile/ios
+          bundle install
+          bundle exec fastlane match appstore --readonly
+
+      - name: Build passenger IPA
+        id: build_ipa
+        if: steps.ios_creds.outputs.available == 'true'
+        working-directory: mobile
+        run: |
+          flutter build ipa --release \
+            -t lib/main_passenger.dart \
+            --dart-define=API_URL=${{ env.PROD_API_URL }} \
+            --dart-define=WS_URL=${{ env.PROD_WS_URL }}
+
+      - name: Upload IPA artifact
+        if: steps.ios_creds.outputs.available == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: mova-passenger-ipa
+          path: mobile/build/ios/ipa/*.ipa
+          retention-days: 30
+
+  upload-ios:
+    name: Upload TestFlight
+    needs: build-ios
+    if: >
+      needs.build-ios.outputs.ipa_built == 'true' &&
+      (startsWith(github.ref, 'refs/tags/v') ||
+       (github.event_name == 'workflow_dispatch' && inputs.upload_to_stores == true))
+    runs-on: macos-latest
+    environment: production-mobile
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.2'
+          bundler-cache: true
+          working-directory: mobile/ios
+
+      - name: Download IPA
+        uses: actions/download-artifact@v4
+        with:
+          name: mova-passenger-ipa
+          path: mobile/build/ios/ipa/
+
+      - name: Upload to TestFlight
+        working-directory: mobile/ios
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+        run: |
+          if [ -z "$APP_STORE_CONNECT_API_KEY" ]; then
+            echo "::notice::APP_STORE_CONNECT_API_KEY non configuré — publication TestFlight ignorée."
+            exit 0
+          fi
+          bundle exec fastlane beta

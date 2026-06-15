@@ -1,0 +1,5 @@
+git_url(ENV["MATCH_GIT_URL"] || "https://github.com/YOUR_ORG/mova-ios-certificates")
+storage_mode("git")
+type("appstore")
+app_identifier(["cd.mova.mova"])
+username(ENV["APPLE_ID"])

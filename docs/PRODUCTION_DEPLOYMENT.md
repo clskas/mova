@@ -210,6 +210,25 @@ Render provisionne **TLS automatique** (Let’s Encrypt) une fois le domaine per
 
 ## 7. Builds App Store & Play Store
 
+### 7.0 CI/CD automatisé
+
+Le workflow `mobile-release.yml` enchaîne après smoke-prod sur `main` :
+
+| Étape | Automatique | Condition |
+|-------|-------------|-----------|
+| Build AAB passager + chauffeur | Oui | Smoke prod vert sur `main` |
+| Artefacts GitHub (AAB) | Oui | Idem |
+| Upload Play Store internal | Sur tag `v*` ou manuel | Secrets `PLAY_STORE_JSON_KEY` + keystore |
+| Build IPA + TestFlight | Sur tag `v*` ou manuel | Runner macOS + certificats Apple |
+
+Configurer les secrets listés dans [cicd.md](./cicd.md#secrets-github) et l'environnement GitHub `production-mobile` (approbation avant upload stores).
+
+Build local équivalent :
+
+```powershell
+.\scripts\build-mobile-release.ps1
+```
+
 ### 7.1 Préparation
 
 - Version : incrémenter dans `mobile/pubspec.yaml`
@@ -220,24 +239,39 @@ Render provisionne **TLS automatique** (Let’s Encrypt) une fois le domaine per
 
 ### 7.2 Android
 
+**CI (recommandé)** : déclenché automatiquement après smoke-prod ou via tag `v*`.
+
+**Manuel** :
+
 ```bash
 cd mobile
-flutter build appbundle --release \
-  --dart-define=API_URL=https://api.mova.cd/api \
-  --dart-define=WS_URL=https://api.mova.cd
+source scripts/set-prod-env.sh
+flutter build appbundle --release --flavor passenger -t lib/main_passenger.dart $MOVA_DART_DEFINES
+flutter build appbundle --release --flavor driver -t lib/main_driver.dart $MOVA_DART_DEFINES
 ```
 
-Uploader `build/app/outputs/bundle/release/app-release.aab` sur Google Play Console.
+Packages : `cd.mova.mova.passenger`, `cd.mova.mova.driver`.
+
+Fastlane (upload internal) : `cd mobile/android && bundle exec fastlane deploy_internal`
+
+Signature : copier `android/key.properties.example` → `key.properties` + keystore (voir [cicd.md](./cicd.md)).
 
 ### 7.3 iOS
 
+> **Prérequis** : runner macOS (GitHub Actions `macos-latest`), certificats via fastlane match, clé API App Store Connect. Sans ces secrets, seul Android est entièrement automatisé en CI.
+
+**CI** : job `build-ios` sur tag `v*` ; lane `beta` → TestFlight.
+
+**Manuel** :
+
 ```bash
-flutter build ipa --release \
-  --dart-define=API_URL=https://api.mova.cd/api \
-  --dart-define=WS_URL=https://api.mova.cd
+cd mobile
+source scripts/set-prod-env.sh
+flutter build ipa --release -t lib/main_passenger.dart $MOVA_DART_DEFINES
+cd ios && bundle exec fastlane beta
 ```
 
-Soumettre via Xcode / Transporter vers App Store Connect.
+Bundle ID actuel : `cd.mova.mova` (passager). L'app chauffeur iOS nécessite un schéma Xcode dédié.
 
 ### 7.4 Review stores
 
@@ -396,7 +430,10 @@ Les migrations sont **forward-only**. En cas de migration problématique :
 - [ ] Web `app.mova.cd` pointe vers `NEXT_PUBLIC_API_URL` prod
 - [ ] Admin `admin.mova.cd` opérationnel
 - [ ] APK/AAB + IPA soumis aux stores
-- [ ] Builds mobile avec `API_URL` production
+- [ ] Builds mobile avec `API_URL` production (`PROD_API_URL` / `PROD_WS_URL` secrets GitHub)
+- [ ] Keystore Android + `PLAY_STORE_JSON_KEY` configurés
+- [ ] Apps créées sur Play Console (`cd.mova.mova.passenger`, `cd.mova.mova.driver`)
+- [ ] Certificats iOS + App Store Connect API (TestFlight)
 
 ### Validation
 - [ ] Smoke tests gateway OK

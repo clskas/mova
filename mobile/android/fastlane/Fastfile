@@ -1,0 +1,58 @@
+# Fastlane — publication Google Play (tracks internal / production)
+
+default_platform(:android)
+
+PASSENGER_PACKAGE = "cd.mova.mova.passenger"
+DRIVER_PACKAGE = "cd.mova.mova.driver"
+
+def play_json_key
+  ENV.fetch("PLAY_STORE_JSON_KEY_PATH", "/tmp/play-store-key.json")
+end
+
+platform :android do
+  desc "Publie l'AAB passager sur la piste internal testing"
+  lane :deploy_internal_passenger do |options|
+    aab = options[:aab] || File.expand_path(
+      "../../build/app/outputs/bundle/passengerRelease/app-passenger-release.aab",
+      __dir__
+    )
+    UI.user_error!("AAB passager introuvable : #{aab}") unless File.exist?(aab)
+
+    upload_to_play_store(
+      package_name: PASSENGER_PACKAGE,
+      aab: aab,
+      track: "internal",
+      json_key: play_json_key,
+      skip_upload_apk: true,
+      skip_upload_metadata: true,
+      skip_upload_images: true,
+      skip_upload_screenshots: true
+    )
+  end
+
+  desc "Publie l'AAB chauffeur sur la piste internal testing"
+  lane :deploy_internal_driver do |options|
+    aab = options[:aab] || File.expand_path(
+      "../../build/app/outputs/bundle/driverRelease/app-driver-release.aab",
+      __dir__
+    )
+    UI.user_error!("AAB chauffeur introuvable : #{aab}") unless File.exist?(aab)
+
+    upload_to_play_store(
+      package_name: DRIVER_PACKAGE,
+      aab: aab,
+      track: "internal",
+      json_key: play_json_key,
+      skip_upload_apk: true,
+      skip_upload_metadata: true,
+      skip_upload_images: true,
+      skip_upload_screenshots: true
+    )
+  end
+
+  desc "Publie passager + chauffeur sur internal testing"
+  lane :deploy_internal do
+    deploy_internal_passenger
+    deploy_internal_driver
+  end
+end

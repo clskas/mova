@@ -1,0 +1,2 @@
+app_identifier("cd.mova.mova")
+apple_id(ENV["APPLE_ID"]) # optionnel — compte développeur Apple

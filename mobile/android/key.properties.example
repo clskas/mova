@@ -1,0 +1,10 @@
+# Copier vers key.properties (ne jamais committer).
+# Générer le keystore :
+#   keytool -genkey -v -keystore upload-keystore.jks -keyalg RSA -keysize 2048 -validity 10000 -alias mova-upload
+#
+# En CI : secrets ANDROID_KEYSTORE_BASE64 (fichier .jks encodé base64) + mots de passe ci-dessous.
+
+storePassword=CHANGE_ME
+keyPassword=CHANGE_ME
+keyAlias=mova-upload
+storeFile=app/upload-keystore.jks

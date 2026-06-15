@@ -211,11 +211,40 @@ npm run test:mobile
 
 ## CI (GitHub Actions)
 
-Workflow stub : [`.github/workflows/e2e.yml`](../.github/workflows/e2e.yml)
+La régression Playwright est intégrée au workflow principal [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) (job `regression`). Elle s'exécute sur chaque PR et push vers `main` / `develop`, **avant** build-push et déploiement auto sur `main`.
 
-- Déclenché manuellement (`workflow_dispatch`) pour ne pas bloquer la CI existante
-- Installe Playwright et exécute les specs (avec skip si apps non démarrées)
-- Les tests mobile Appium ne tournent pas en CI par défaut (appareil physique requis)
+### Ce qui tourne en CI
+
+| Couche | Job CI | Détail |
+|--------|--------|--------|
+| Playwright admin | `regression` | login OTP, utilisateurs, restaurants |
+| Playwright web | `regression` | smoke page d'accueil |
+| Gateway health | `regression` | `GET /health` |
+| Flutter | `mobile` | `flutter test` (unit + widget, 35+ tests) |
+| Appium Android | — | **Non** (émulateur requis) — voir section mobile ci-dessous |
+
+Stack CI : `docker compose` (microservices, `MOCK_OTP=true`) + admin/web Next.js. OTP mock : **`123456`**.
+
+Workflow manuel complémentaire : [`.github/workflows/e2e.yml`](../.github/workflows/e2e.yml) (`workflow_dispatch`).
+
+Voir aussi [docs/cicd.md](cicd.md) pour la chaîne `CI → build-push → deploy → smoke-prod`.
+
+### Lancer la régression localement
+
+```powershell
+docker compose up -d
+npm run seed:admin-demo
+cd admin; npm run dev          # :3002
+cd e2e; npm run test:e2e:admin
+```
+
+Avec échec si la stack est absente (comportement CI) :
+
+```powershell
+$env:E2E_REQUIRE_STACK = "true"
+npm run test:e2e:admin
+npm run test:e2e:web
+```
 
 ---
 

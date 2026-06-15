@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { isReachable } from "./helpers";
+import { requireGateway, requireReachable } from "./helpers";
 
 const ADMIN_PHONE = process.env.ADMIN_PHONE ?? "+243900000001";
 const GATEWAY_URL = process.env.GATEWAY_URL ?? "http://localhost:3000";
@@ -13,15 +13,12 @@ async function loginAsAdmin(page: import("@playwright/test").Page) {
 
 test.describe("Admin — liste utilisateurs", () => {
   test.beforeEach(async ({ request, baseURL }) => {
-    if (!baseURL || !(await isReachable(request, baseURL))) {
-      test.skip(true, `Admin indisponible sur ${baseURL ?? "?"}. Lancez: cd admin && npm run dev`);
-    }
-    try {
-      const health = await request.get(`${GATEWAY_URL}/health`, { timeout: 5_000 });
-      if (!health.ok()) test.skip(true, `Gateway indisponible sur ${GATEWAY_URL}`);
-    } catch {
-      test.skip(true, `Gateway indisponible sur ${GATEWAY_URL}`);
-    }
+    await requireReachable(
+      request,
+      baseURL ?? "",
+      `Admin indisponible sur ${baseURL ?? "?"}. Lancez: cd admin && npm run dev`,
+    );
+    await requireGateway(request, GATEWAY_URL);
   });
 
   test("page Utilisateurs affiche le tableau", async ({ page }) => {

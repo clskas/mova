@@ -1,58 +1,51 @@
-# E2E tests (Playwright + Appium stub)
-# Déclenchement manuel — ne bloque pas la CI principale (ci.yml)
+# E2E tests (Playwright + Appium)
+# Manual full regression — same specs as ci.yml job `regression`
 
 name: E2E
 
 on:
   workflow_dispatch:
-  # Décommenter pour lancer sur main après mise en place des serveurs en CI :
-  # push:
-  #   branches: [main]
 
 jobs:
   playwright:
     name: Playwright (web + admin)
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-          cache: npm
-          cache-dependency-path: e2e/package-lock.json
 
-      - name: Install e2e dependencies
-        working-directory: e2e
-        run: npm ci
+      - name: Start regression stack
+        run: |
+          chmod +x scripts/regression-ci.sh scripts/regression-ci-teardown.sh
+          ./scripts/regression-ci.sh
 
-      - name: Install Playwright browsers
-        working-directory: e2e
-        run: npx playwright install --with-deps chromium
-
-      - name: Run Playwright tests
-        working-directory: e2e
-        run: npm run test:e2e
-        env:
-          ADMIN_BASE_URL: http://localhost:3002
-          WEB_BASE_URL: http://localhost:3001
-          GATEWAY_URL: http://localhost:3000
-        # Note: les tests skip si les apps ne tournent pas.
-        # Pour CI complète, ajouter des steps build + start (admin/web) avant ce step.
-
-  appium-android:
-    name: Appium Android (stub)
-    runs-on: ubuntu-latest
-    if: false # Activer quand émulateur + APK sont configurés en CI
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-      - name: Install e2e + Appium drivers
+      - name: Install Playwright
         working-directory: e2e
         run: |
           npm ci
-          npm run appium:install-drivers
-      - name: Run mobile smoke (placeholder)
-        run: echo "Configurer émulateur Android + flutter build apk en CI"
+          npx playwright install --with-deps chromium
+
+      - name: Run Playwright tests
+        working-directory: e2e
+        env:
+          CI: true
+          E2E_REQUIRE_STACK: true
+          ADMIN_BASE_URL: http://localhost:3002
+          WEB_BASE_URL: http://localhost:3001
+          GATEWAY_URL: http://localhost:3000
+        run: npm run test:e2e
+
+      - name: Teardown regression stack
+        if: always()
+        run: ./scripts/regression-ci-teardown.sh
+
+  appium-android:
+    name: Appium Android (skipped)
+    runs-on: ubuntu-latest
+    if: false
+    steps:
+      - run: echo "Appium nécessite émulateur Android + APK — non exécuté en CI. Voir docs/testing-e2e.md"

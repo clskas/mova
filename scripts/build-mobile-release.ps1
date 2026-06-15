@@ -1,6 +1,7 @@
 # Build local des AAB passager + chauffeur (parité CI mobile-release).
 # Usage : .\scripts\build-mobile-release.ps1
 #         .\scripts\build-mobile-release.ps1 -ApiUrl "https://api.mova.cd/api" -WsUrl "https://api.mova.cd"
+# Dev LAN (appareil physique) : .\scripts\build-mobile-debug.ps1
 
 param(
     [string]$ApiUrl = "https://api.mova.cd/api",

@@ -101,12 +101,32 @@ cd e2e && npm run test:e2e:admin
 cd mobile && flutter test
 ```
 
+## Mobile — appareil physique (LAN)
+
+Machine dev LAN : **192.168.1.64** · Appareil test : **SM G981V** (`R3CN70C59KF`, `adb devices`).
+
+| Variable | Appareil physique | Émulateur Android |
+|----------|-------------------|-------------------|
+| `API_URL` | `http://192.168.1.64:3000/api` | `http://10.0.2.2:3000/api` |
+| `WS_URL` | `http://192.168.1.64:3000` | `http://10.0.2.2:3000` |
+
+```powershell
+cd mobile
+flutter run --flavor passenger -t lib/main_passenger.dart `
+  --dart-define=API_URL=http://192.168.1.64:3000/api `
+  --dart-define=WS_URL=http://192.168.1.64:3000
+```
+
+APK debug local : `.\scripts\build-mobile-debug.ps1` (défaut LAN ci-dessus).
+
 ## Tester le mode hors ligne
 
 ```powershell
 # 1. Lancer l'app passager sur appareil ou émulateur
 cd mobile
-flutter run --flavor passenger -t lib/main_passenger.dart --dart-define=API_URL=http://192.168.1.64:3000/api
+flutter run --flavor passenger -t lib/main_passenger.dart `
+  --dart-define=API_URL=http://192.168.1.64:3000/api `
+  --dart-define=WS_URL=http://192.168.1.64:3000
 
 # 2. Se connecter une fois en ligne pour remplir le cache (historique, wallet)
 
@@ -126,8 +146,13 @@ docker compose start gateway
 
 ```powershell
 cd mobile
-flutter build apk --flavor passenger -t lib/main_passenger.dart --dart-define=API_URL=http://192.168.1.64:3000/api
-flutter build apk --flavor driver -t lib/main_driver.dart --dart-define=API_URL=http://192.168.1.64:3000/api
+# ou : .\scripts\build-mobile-debug.ps1
+flutter build apk --debug --flavor passenger -t lib/main_passenger.dart `
+  --dart-define=API_URL=http://192.168.1.64:3000/api `
+  --dart-define=WS_URL=http://192.168.1.64:3000
+flutter build apk --debug --flavor driver -t lib/main_driver.dart `
+  --dart-define=API_URL=http://192.168.1.64:3000/api `
+  --dart-define=WS_URL=http://192.168.1.64:3000
 ```
 
 ---

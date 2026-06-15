@@ -1,6 +1,9 @@
 /**
  * Helpers partagés pour les tests Appium mobile MOVA.
  * Flutter expose les libellés via content-desc (accessibilité).
+ *
+ * Appareil physique : l'APK doit cibler la passerelle LAN (ex. 192.168.1.64:3000).
+ * Voir scripts/build-mobile-debug.ps1 — les tests Appium n'injectent pas API_URL.
  */
 import { remote } from "webdriverio";
 import { existsSync } from "node:fs";

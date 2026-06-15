@@ -206,18 +206,23 @@ Ouvrir [http://localhost:3002](http://localhost:3002).
 
 ### 6. Mobile Flutter
 
-
+Émulateur Android : `10.0.2.2` pointe vers la machine hôte. **Appareil physique** (SM G981V) : IP LAN **`192.168.1.64`**.
 
 ```powershell
-
 cd mobile
-
 flutter pub get
 
+# Émulateur (défauts si non surchargés)
 flutter run --flavor passenger -t lib/main_passenger.dart
-
 flutter run --flavor driver -t lib/main_driver.dart
 
+# Appareil physique — passerelle sur 192.168.1.64
+flutter run --flavor passenger -t lib/main_passenger.dart `
+  --dart-define=API_URL=http://192.168.1.64:3000/api `
+  --dart-define=WS_URL=http://192.168.1.64:3000
+
+# APK debug LAN
+..\scripts\build-mobile-debug.ps1
 ```
 
 

@@ -6,6 +6,10 @@
  *   2. Appareil Android connecté (adb devices) OU émulateur
  *   3. APK construit OU app déjà installée (USE_INSTALLED_APP=true)
  *   4. Serveur Appium: npm run appium:start (autre terminal)
+ *
+ * Appareil physique (SM G981V R3CN70C59KF) : construire l'APK avec l'IP LAN
+ * de la machine dev — API http://192.168.1.64:3000/api, WS http://192.168.1.64:3000
+ * (voir scripts/build-mobile-debug.ps1 ou docs/testing-e2e.md).
  */
 import { remote } from "webdriverio";
 import { existsSync } from "node:fs";

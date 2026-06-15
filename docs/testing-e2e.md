@@ -115,9 +115,10 @@ Approche retenue : **Appium 2 + UiAutomator2** sur l'APK Flutter passager. Pas d
    - Ajouter au `PATH` : `%ANDROID_HOME%\platform-tools` (adb)
 2. **Java JDK 11+** (`JAVA_HOME`)
 3. **Raccourci Windows** : `. .\e2e\scripts\setup-env.ps1` configure `ANDROID_HOME` et `JAVA_HOME` pour la session.
-4. **Appareil physique** (ex. SM G981V) ou émulateur
+4. **Appareil physique** (ex. SM G981V `R3CN70C59KF`) ou émulateur
    - Débogage USB activé
    - `adb devices` liste l'appareil
+   - **LAN** : machine dev `192.168.1.64` — l'APK doit être compilé avec cette IP (pas `localhost` ni `10.0.2.2`)
 5. **APK passager** (debug) ou app déjà installée
 
 > Flutter expose les libellés via `content-desc` (accessibilité), pas `text` — les sélecteurs Appium utilisent `descriptionContains`.
@@ -134,9 +135,15 @@ npm run appium:doctor
 ### Construire l'APK passager (si besoin)
 
 ```powershell
+# Depuis la racine — défaut LAN 192.168.1.64 (appareil physique SM G981V)
+.\scripts\build-mobile-debug.ps1
+
+# Ou manuellement (émulateur : remplacer par 10.0.2.2)
 cd mobile
 flutter pub get
-flutter build apk --debug --flavor passenger -t lib/main_passenger.dart
+flutter build apk --debug --flavor passenger -t lib/main_passenger.dart `
+  --dart-define=API_URL=http://192.168.1.64:3000/api `
+  --dart-define=WS_URL=http://192.168.1.64:3000
 # Sortie: build/app/outputs/flutter-apk/app-passenger-debug.apk
 ```
 
@@ -152,6 +159,7 @@ flutter build apk --debug --flavor passenger -t lib/main_passenger.dart
 | `E2E_TEST_PHONE` | `+243812345678` | Numéro pour connexion OTP mock |
 | `E2E_MOCK_OTP` | `123456` | Code OTP (`MOCK_OTP=true` côté backend) |
 | `E2E_STEP_TIMEOUT_MS` | `30000` | Timeout par étape (ms) |
+| *(build APK)* | `API_URL` / `WS_URL` | Appareil LAN : `http://192.168.1.64:3000/api` et `http://192.168.1.64:3000` |
 
 Package Android passager : `cd.mova.mova.passenger`
 

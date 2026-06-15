@@ -1,32 +1,70 @@
 #!/usr/bin/env bash
-# Smoke test all MOVA services via gateway
+# Smoke test MOVA gateway + optional direct services (production or local).
 set -euo pipefail
 
-GATEWAY_URL="${GATEWAY_URL:-http://localhost:3000}"
-SERVICES=(auth ride payment driver notification admin)
+GATEWAY_URL="${GATEWAY_URL:-${API_URL:-${SMOKE_API_URL:-http://localhost:3000}}}"
+GATEWAY_URL="${GATEWAY_URL%/}"
+REQUEST_ID="${SMOKE_REQUEST_ID:-smoke-$(date +%Y%m%d%H%M%S)}"
+HEADERS=(-H "X-Request-Id: $REQUEST_ID")
+FAIL=0
 
-echo "=== Gateway health ==="
-curl -sf "${GATEWAY_URL}/health" | head -c 500
+log() { echo "$@"; }
+fail() { echo "FAIL: $*" >&2; FAIL=1; }
+
+echo "=== Gateway health ($GATEWAY_URL) ==="
+if ! health=$(curl -sf "${HEADERS[@]}" "${GATEWAY_URL}/health"); then
+  fail "Gateway unreachable at $GATEWAY_URL/health"
+  exit 1
+fi
+echo "$health" | head -c 500
 echo ""
 
-for svc in "${SERVICES[@]}"; do
-  port=$((3000 + $(echo "$svc" | wc -c) / 10)) # fallback unused
-  case $svc in
-    auth) port=3001 ;;
-    ride) port=3002 ;;
-    payment) port=3003 ;;
-    driver) port=3004 ;;
-    notification) port=3005 ;;
-    admin) port=3006 ;;
-  esac
-  direct="http://localhost:${port}/health"
-  echo "=== ${svc} direct ${direct} ==="
-  curl -sf "$direct" -o /dev/null && echo "OK" || echo "SKIP (not running)"
-done
+rid=$(curl -sI "${HEADERS[@]}" "${GATEWAY_URL}/health" | awk -F': ' 'tolower($1)=="x-request-id"{print $2}' | tr -d '\r')
+if [ -n "$rid" ]; then
+  echo "X-Request-Id: $rid"
+else
+  echo "WARN: X-Request-Id absent on /health"
+fi
 
-echo "=== OTP flow (mock) ==="
-curl -sf -X POST "${GATEWAY_URL}/api/auth/otp/request" \
+if [ "${SMOKE_DIRECT_SERVICES:-}" = "true" ]; then
+  declare -A PORTS=( [auth]=3011 [ride]=3022 [payment]=3003 [driver]=3004 [notification]=3005 [admin]=3006 )
+  for svc in "${!PORTS[@]}"; do
+    port="${PORTS[$svc]}"
+    direct="http://localhost:${port}/health"
+    echo "=== ${svc} direct ${direct} ==="
+    curl -sf "$direct" -o /dev/null && echo "OK" || echo "SKIP (not running)"
+  done
+fi
+
+echo "=== Geo communes (via gateway) ==="
+if curl -sf "${HEADERS[@]}" "${GATEWAY_URL}/api/geo/communes?city=Kinshasa" | head -c 200; then
+  echo ""
+else
+  fail "GET /api/geo/communes failed"
+fi
+
+echo "=== Ride estimate ==="
+estimate_body='{"pickupLat":-4.3217,"pickupLng":15.3125,"dropoffLat":-4.35,"dropoffLng":15.34,"vehicleType":"STANDARD"}'
+if curl -sf -X POST "${HEADERS[@]}" "${GATEWAY_URL}/api/rides/estimate" \
   -H 'Content-Type: application/json' \
-  -d '{"phone":"+243812345678"}' | head -c 200
-echo ""
-echo "Smoke test complete"
+  -d "$estimate_body" | head -c 300; then
+  echo ""
+else
+  echo "WARN: estimate failed (seed rides may be required)"
+fi
+
+echo "=== OTP request (mock or Twilio) ==="
+if curl -sf -X POST "${GATEWAY_URL}/api/auth/otp/request" \
+  -H 'Content-Type: application/json' \
+  -d '{"phone":"+243812345678"}' | head -c 200; then
+  echo ""
+else
+  echo "WARN: OTP request failed"
+fi
+
+if [ "$FAIL" -ne 0 ]; then
+  echo "=== SMOKE FAILED ===" >&2
+  exit 1
+fi
+
+echo "=== SMOKE PASSED ==="

@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main, develop]
 
+permissions:
+  contents: read
+  security-events: write
+
 jobs:
   shared:
     runs-on: ubuntu-latest
@@ -82,3 +86,102 @@ jobs:
         run: |
           cd ${{ matrix.client }}
           npm run lint
+
+  regression:
+    name: Playwright regression
+    runs-on: ubuntu-latest
+    needs: [clients, services]
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Start regression stack (Docker + admin/web)
+        run: |
+          chmod +x scripts/regression-ci.sh scripts/regression-ci-teardown.sh
+          ./scripts/regression-ci.sh
+
+      - name: Install Playwright
+        working-directory: e2e
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Run Playwright regression (admin + web + health)
+        working-directory: e2e
+        env:
+          CI: true
+          E2E_REQUIRE_STACK: true
+          ADMIN_BASE_URL: http://localhost:3002
+          WEB_BASE_URL: http://localhost:3001
+          GATEWAY_URL: http://localhost:3000
+          ADMIN_PHONE: "+243900000001"
+        run: |
+          npm run test:e2e:admin
+          npm run test:e2e:web
+
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: e2e/playwright-report/
+          retention-days: 7
+
+      - name: Teardown regression stack
+        if: always()
+        run: ./scripts/regression-ci-teardown.sh
+
+  mobile:
+    runs-on: ubuntu-latest
+    needs: shared
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Flutter test
+        working-directory: mobile
+        run: flutter test
+
+  smoke-scripts:
+    runs-on: ubuntu-latest
+    needs: shared
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Lightweight smoke (no Docker)
+        run: |
+          chmod +x scripts/smoke-ci.sh
+          ./scripts/smoke-ci.sh
+
+  security-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: npm audit (shared + gateway)
+        run: |
+          cd packages/shared && npm ci && npm audit --audit-level=high || true
+          cd ../../services/api-gateway && npm install && npm audit --audit-level=high || true
+
+  codeql:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+      - uses: github/codeql-action/analyze@v3

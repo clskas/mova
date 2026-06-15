@@ -1,12 +1,16 @@
 name: Deploy
 
 on:
+  workflow_run:
+    workflows: ['Build and Push']
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
     inputs:
       environment:
         description: Target environment
         required: true
-        default: staging
+        default: production
         type: choice
         options:
           - staging
@@ -14,31 +18,83 @@ on:
 
 jobs:
   deploy-render:
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'main')
     runs-on: ubuntu-latest
-    environment: ${{ inputs.environment }}
+    environment: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'production' }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Backup databases before deploy
+        env:
+          DATABASE_URL_AUTH: ${{ secrets.DATABASE_URL_AUTH }}
+          DATABASE_URL_RIDES: ${{ secrets.DATABASE_URL_RIDES }}
+          DATABASE_URL_PAYMENTS: ${{ secrets.DATABASE_URL_PAYMENTS }}
+          DATABASE_URL_DRIVERS: ${{ secrets.DATABASE_URL_DRIVERS }}
+          DATABASE_URL_NOTIFICATIONS: ${{ secrets.DATABASE_URL_NOTIFICATIONS }}
+          BACKUP_RETENTION_DAYS: '14'
+        run: |
+          chmod +x scripts/backup-db.sh
+          if [ -z "$DATABASE_URL_AUTH" ] && [ -z "$DATABASE_URL_RIDES" ]; then
+            echo "DATABASE_URL_* secrets not set — skip pg_dump (configure secrets for prod backups)"
+          else
+            ./scripts/backup-db.sh
+          fi
+
+      - name: Upload DB backup artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: db-backups-${{ github.event.workflow_run.head_sha || github.sha }}
+          path: backups/
+          retention-days: 14
+          if-no-files-found: ignore
+
       - name: Trigger Render deploy
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
           RENDER_SERVICE_IDS: ${{ secrets.RENDER_SERVICE_IDS }}
         run: |
-          if [ -z "$RENDER_API_KEY" ]; then
-            echo "RENDER_API_KEY not set — skip remote deploy"
+          if [ -z "$RENDER_API_KEY" ] || [ -z "$RENDER_SERVICE_IDS" ]; then
+            echo "::warning::RENDER_API_KEY or RENDER_SERVICE_IDS not set — skip remote deploy"
             exit 0
           fi
           for id in $RENDER_SERVICE_IDS; do
             echo "Deploying Render service $id"
-            curl -s -X POST "https://api.render.com/v1/services/${id}/deploys" \
+            curl -sf -X POST "https://api.render.com/v1/services/${id}/deploys" \
               -H "Authorization: Bearer ${RENDER_API_KEY}" \
               -H "Content-Type: application/json" \
               -d '{"clearCache": false}'
           done
-      - name: Post-deploy smoke test
+
+      - name: Wait for Render deploy (gateway)
         env:
-          GATEWAY_URL: ${{ vars.GATEWAY_URL }}
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          GATEWAY_RENDER_SERVICE_ID: ${{ secrets.GATEWAY_RENDER_SERVICE_ID }}
         run: |
-          if [ -n "$GATEWAY_URL" ]; then
-            chmod +x scripts/smoke-test.sh
-            GATEWAY_URL="$GATEWAY_URL" ./scripts/smoke-test.sh
+          if [ -z "$RENDER_API_KEY" ] || [ -z "$GATEWAY_RENDER_SERVICE_ID" ]; then
+            echo "RENDER_API_KEY or GATEWAY_RENDER_SERVICE_ID not set — skip wait"
+            sleep 30
+            exit 0
           fi
+          for i in $(seq 1 30); do
+            status=$(curl -sf -H "Authorization: Bearer $RENDER_API_KEY" \
+              "https://api.render.com/v1/services/${GATEWAY_RENDER_SERVICE_ID}/deploys?limit=1" \
+              | jq -r '.[0].deploy.status // "unknown"')
+            echo "Gateway deploy status: $status (attempt $i)"
+            if [ "$status" = "live" ]; then exit 0; fi
+            if [ "$status" = "build_failed" ] || [ "$status" = "update_failed" ]; then
+              echo "Deploy failed on Render"
+              exit 1
+            fi
+            sleep 20
+          done
+          echo "Timeout waiting for Render deploy"

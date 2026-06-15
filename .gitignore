@@ -51,6 +51,7 @@ npm-debug.log*
 # Database
 *.db
 *.sqlite
+backups/
 
 # Docker
 .docker/

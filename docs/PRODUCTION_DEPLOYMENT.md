@@ -285,12 +285,26 @@ Réponse attendue : `status: "ok"`, `coverage: "RDC"`.
 
 ### 9.4 Sauvegardes DB
 
+**Avant chaque migration ou déploiement**, une sauvegarde `pg_dump` est exécutée automatiquement :
+
+| Contexte | Mécanisme |
+|----------|-----------|
+| Local Docker | `npm run backup:db` ou `.\scripts\backup-db.ps1` |
+| Migrations locales | `npm run migrate:all` (backup puis Prisma) |
+| Conteneurs Docker / Render | `migrate-with-backup.sh` au démarrage de chaque service Prisma |
+| CI deploy (`deploy.yml`) | `backup-db.sh` + artefact GitHub (14 jours) |
+
 ```bash
 chmod +x scripts/backup-db.sh
 ./scripts/backup-db.sh
+# Fichiers : backups/mova_<service>_YYYYMMDD_HHMMSS.sql.gz
 ```
 
-Activer les **sauvegardes automatiques** Render sur chaque base PostgreSQL.
+**Rétention** : 14 jours en local (`BACKUP_RETENTION_DAYS`) et sur les artefacts CI.
+
+Activer en complément les **sauvegardes automatiques Render** sur chaque base PostgreSQL.
+
+Détail pipeline : [cicd.md](./cicd.md).
 
 ---
 

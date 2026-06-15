@@ -1,18 +1,37 @@
 name: Smoke Tests Production
 
 on:
+  workflow_run:
+    workflows: [Deploy]
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
-  workflow_call:
+    inputs:
+      gateway_url:
+        description: Gateway URL override
+        required: false
+        type: string
 
 jobs:
   smoke:
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - name: Run smoke tests
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Run production smoke tests
         env:
-          API_URL: ${{ secrets.SMOKE_API_URL || 'http://localhost:3000' }}
+          GATEWAY_URL: ${{ inputs.gateway_url || secrets.SMOKE_API_URL || vars.GATEWAY_URL }}
         run: |
+          if [ -z "$GATEWAY_URL" ]; then
+            echo "::error::SMOKE_API_URL secret or GATEWAY_URL variable required"
+            exit 1
+          fi
           chmod +x scripts/smoke-test.sh
-          scripts/smoke-test.sh || echo "Smoke tests require running API"
+          echo "Testing $GATEWAY_URL"
+          ./scripts/smoke-test.sh

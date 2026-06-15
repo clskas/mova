@@ -81,6 +81,18 @@ AIRTEL_MONEY_CLIENT_ID=...
 
 Détail : [docs/PRODUCTION_DEPLOYMENT.md](docs/PRODUCTION_DEPLOYMENT.md)
 
+## CI/CD (automatisé)
+
+Push sur `main` : **CI** → **build images GHCR** → **backup DB + deploy Render** → **smoke production**.
+
+```powershell
+npm run backup:db:win      # sauvegarde locale
+npm run migrate:all:docker # backup + migrations
+npm run smoke:all          # smoke local
+```
+
+Secrets GitHub requis : `RENDER_API_KEY`, `RENDER_SERVICE_IDS`, `DATABASE_URL_*`, `SMOKE_API_URL`. Détail : [docs/cicd.md](docs/cicd.md).
+
 ## Tests
 
 ```powershell

@@ -66,12 +66,13 @@ services:
       dockerfile: docker/auth.Dockerfile
     ports:
       - '3011:3000'
+    env_file:
+      - config/external-apis.env
     environment:
       DATABASE_URL: postgresql://mova:mova@postgres-auth:5432/mova_auth
       REDIS_URL: redis://redis:6379
       JWT_SECRET: dev_secret
-      # Dev local : OTP fixe 123456. Production : MOCK_OTP=false + Twilio (voir config/external-apis.env.example)
-      MOCK_OTP: 'true'
+      # MOCK_OTP + Twilio : config/external-apis.env (gitignored). Sans ce fichier → copier depuis external-apis.env.example
       PAYMENT_SERVICE_URL: http://payment-service:3000
       DRIVER_SERVICE_URL: http://driver-service:3000
       INTERNAL_API_KEY: mova-internal-dev

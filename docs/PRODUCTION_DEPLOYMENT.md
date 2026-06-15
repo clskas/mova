@@ -403,6 +403,7 @@ Les migrations sont **forward-only**. En cas de migration problématique :
 | Ressource | Lien |
 |-----------|------|
 | Déploiement local / staging | [deployment.md](./deployment.md) |
+| Intégration IA (cas d’usage) | [AI_INTEGRATION.md](./AI_INTEGRATION.md) |
 | API | [api.md](./api.md) |
 | CI/CD | [cicd.md](./cicd.md) |
 | Tests E2E | [testing-e2e.md](./testing-e2e.md) |

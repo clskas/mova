@@ -105,12 +105,19 @@ cd mobile && flutter test
 
 Machine dev LAN : **192.168.1.64** · Appareil test : **SM G981V** (`R3CN70C59KF`, `adb devices`).
 
+> **Ne jamais** `flutter run` seul — flavors obligatoires (`passenger` / `driver` + `-t lib/main_*.dart`). Sinon : erreur Gradle *« failed to produce an .apk file »*.
+
 | Variable | Appareil physique | Émulateur Android |
 |----------|-------------------|-------------------|
 | `API_URL` | `http://192.168.1.64:3000/api` | `http://10.0.2.2:3000/api` |
 | `WS_URL` | `http://192.168.1.64:3000` | `http://10.0.2.2:3000` |
 
 ```powershell
+# Scripts racine (recommandé)
+.\scripts\run-mobile-passenger.ps1
+.\scripts\run-mobile-driver.ps1
+
+# Ou manuellement
 cd mobile
 flutter run --flavor passenger -t lib/main_passenger.dart `
   --dart-define=API_URL=http://192.168.1.64:3000/api `

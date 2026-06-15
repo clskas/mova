@@ -27,22 +27,39 @@ Mode mock/hors-ligne activé automatiquement si la passerelle est indisponible.
 
 ## Lancer l'app
 
+> **Important :** ne jamais lancer `flutter run` seul. Ce projet utilise des **flavors** (`passenger`, `driver`) : sans `--flavor` et `-t`, Gradle ne produit pas l'APK attendu et Flutter échoue avec *« Gradle build failed to produce an .apk file »*.
+
+Depuis la racine du repo (recommandé) :
+
+```powershell
+.\scripts\run-mobile-passenger.ps1   # passager, LAN 192.168.1.64
+.\scripts\run-mobile-driver.ps1      # chauffeur, LAN 192.168.1.64
+```
+
+Ou manuellement dans `mobile/` :
+
 ```powershell
 cd mobile
 flutter pub get
 dart run flutter_launcher_icons
 
-# Passager (émulateur — défauts Flutter si non surchargés)
-flutter run --flavor passenger -t lib/main_passenger.dart
+# Passager (émulateur)
+flutter run --flavor passenger -t lib/main_passenger.dart `
+  --dart-define=API_URL=http://10.0.2.2:3000/api `
+  --dart-define=WS_URL=http://10.0.2.2:3000
 
-# Chauffeur
-flutter run --flavor driver -t lib/main_driver.dart
+# Chauffeur (émulateur)
+flutter run --flavor driver -t lib/main_driver.dart `
+  --dart-define=API_URL=http://10.0.2.2:3000/api `
+  --dart-define=WS_URL=http://10.0.2.2:3000
 
 # Appareil physique SM G981V (passerelle sur 192.168.1.64)
 flutter run --flavor passenger -t lib/main_passenger.dart `
   --dart-define=API_URL=http://192.168.1.64:3000/api `
   --dart-define=WS_URL=http://192.168.1.64:3000
 ```
+
+VS Code / Cursor : configurations **MOVA Passager/Chauffeur** dans `.vscode/launch.json`.
 
 APK debug LAN : `..\scripts\build-mobile-debug.ps1` depuis la racine du repo.
 

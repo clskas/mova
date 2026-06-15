@@ -520,7 +520,41 @@ export function formatDate(iso?: string) {
 
 export async function fetchCommunes(city = "Kinshasa"): Promise<Commune[]> {
   const q = encodeURIComponent(city);
-  return apiFetch<Commune[]>(`/api/geo/communes?city=${q}`);
+  return apiFetch<Commune[]>(`/api/admin/communes?city=${q}`);
+}
+
+export async function updateCommune(id: string, data: Partial<Commune>) {
+  return apiFetch<Commune>(`/api/admin/communes/${id}`, { method: "PATCH", body: JSON.stringify(data) });
+}
+
+export type RentalInquiry = {
+  id: string;
+  userId?: string;
+  vehicleType?: string;
+  status?: string;
+  startDate?: string;
+  endDate?: string;
+  estimatedPriceCdf?: number;
+  pickupAddress?: string;
+  contactPhone?: string;
+  createdAt?: string;
+};
+
+export async function fetchRentalInquiries(): Promise<RentalInquiry[]> {
+  const data = await apiFetch<RentalInquiry[] | { data?: RentalInquiry[] }>("/api/admin/rental-inquiries");
+  return Array.isArray(data) ? data : data.data ?? [];
+}
+
+export async function updateRentalInquiryStatus(id: string, status: string) {
+  return apiFetch(`/api/admin/rental-inquiries/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) });
+}
+
+export async function cancelRentalInquiry(id: string) {
+  return apiFetch(`/api/admin/rental-inquiries/${id}/cancel`, { method: "POST", body: JSON.stringify({}) });
+}
+
+export async function deleteSubscriptionPlan(id: string) {
+  return apiFetch(`/api/admin/subscription-plans/${id}`, { method: "DELETE" });
 }
 
 export async function updateUser(id: string, data: Partial<AdminUser>) {

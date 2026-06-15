@@ -167,8 +167,11 @@ export default function UtilisateursPage() {
                 <SelectInput value={editRole} onChange={setEditRole} disabled={readOnly} options={[
                   { value: "PASSENGER", label: "Passager" },
                   { value: "DRIVER", label: "Chauffeur" },
-                  { value: "ADMIN", label: "Admin" },
+                  { value: "ADMIN", label: "Administrateur" },
                   { value: "SUPER_ADMIN", label: "Super admin" },
+                  { value: "SUPPORT", label: "Support" },
+                  { value: "FINANCE", label: "Finance" },
+                  { value: "CONTENT", label: "Contenu" },
                 ]} />
               </label>
               <label>

@@ -14,7 +14,8 @@ export type AdminSection =
   | "planifiees"
   | "abonnements"
   | "portefeuille"
-  | "parametres";
+  | "parametres"
+  | "locations";
 
 export const ADMIN_ROLES: AdminRole[] = ["SUPER_ADMIN", "ADMIN", "SUPPORT", "FINANCE", "CONTENT"];
 
@@ -40,24 +41,25 @@ const ALL_SECTIONS: AdminSection[] = [
   "abonnements",
   "portefeuille",
   "parametres",
+  "locations",
 ];
 
 /** Sections visibles dans le menu par rôle. */
 const ROLE_SECTIONS: Record<AdminRole, AdminSection[]> = {
   SUPER_ADMIN: ALL_SECTIONS,
   ADMIN: ALL_SECTIONS,
-  SUPPORT: ["utilisateurs", "chauffeurs", "kyc", "litiges", "courses", "livraisons", "planifiees"],
+  SUPPORT: ["utilisateurs", "chauffeurs", "kyc", "litiges", "courses", "livraisons", "planifiees", "locations"],
   FINANCE: ["dashboard", "portefeuille", "tarifs", "abonnements"],
-  CONTENT: ["restaurants", "tarifs", "parametres"],
+  CONTENT: ["restaurants", "tarifs", "parametres", "locations"],
 };
 
 /** Sections où l'utilisateur peut modifier des données. */
 const ROLE_WRITE: Record<AdminRole, AdminSection[]> = {
   SUPER_ADMIN: ALL_SECTIONS,
   ADMIN: ALL_SECTIONS,
-  SUPPORT: ["kyc", "litiges", "livraisons", "planifiees"],
+  SUPPORT: ["kyc", "litiges", "livraisons", "planifiees", "locations"],
   FINANCE: ["tarifs", "abonnements", "portefeuille"],
-  CONTENT: ["restaurants", "tarifs", "parametres"],
+  CONTENT: ["restaurants", "tarifs", "parametres", "locations"],
 };
 
 export type NavItem = {
@@ -80,6 +82,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/litiges", label: "Litiges", section: "litiges" },
   { href: "/planifiees", label: "Planifiées", section: "planifiees" },
   { href: "/parametres", label: "Communes", section: "parametres" },
+  { href: "/locations", label: "Locations", section: "locations" },
 ];
 
 export function normalizeAdminRole(role?: string | null): AdminRole | null {

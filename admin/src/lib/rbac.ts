@@ -55,7 +55,7 @@ const ROLE_SECTIONS: Record<AdminRole, AdminSection[]> = {
 const ROLE_WRITE: Record<AdminRole, AdminSection[]> = {
   SUPER_ADMIN: ALL_SECTIONS,
   ADMIN: ALL_SECTIONS,
-  SUPPORT: ["kyc", "litiges"],
+  SUPPORT: ["kyc", "litiges", "livraisons", "planifiees"],
   FINANCE: ["tarifs", "abonnements", "portefeuille"],
   CONTENT: ["restaurants", "tarifs", "parametres"],
 };

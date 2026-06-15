@@ -83,6 +83,31 @@ void main() {
     expect(find.text('Estimer le prix'), findsOneWidget);
   });
 
+  testWidgets('BookingScreen navigates to MatchingScreen after confirm', (tester) async {
+    tester.view.physicalSize = const Size(400, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+
+    await tester.pumpWidget(_testApp(const BookingScreen()));
+    await tester.pump();
+
+    await tester.enterText(find.byType(TextField).last, 'Gombe');
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    await tester.tap(find.text('Estimer le prix'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    await tester.tap(find.text('Confirmer la course'));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 2));
+
+    expect(find.text('Recherche'), findsOneWidget);
+    expect(find.text("Recherche d'un chauffeur…"), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('BookingScreen renders without overflow on narrow widths', (tester) async {
     for (final width in [320.0, 360.0, 390.0]) {
       tester.view.physicalSize = Size(width, 900);

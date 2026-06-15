@@ -628,6 +628,14 @@ class ApiClient {
     };
   }
 
+  Future<Result<Map<String, dynamic>>> createRide(Map<String, dynamic> body) async {
+    final result = await post('/rides', body);
+    return switch (result) {
+      Success(:final data) => Success(data['ride'] as Map<String, dynamic>? ?? data),
+      Failure(:final error) => Failure(error),
+    };
+  }
+
   Future<Result<Map<String, dynamic>>> getRide(String rideId) async {
     final result = await get('/rides/$rideId');
     return switch (result) {

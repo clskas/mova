@@ -236,7 +236,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
     });
 
     final api = ref.read(apiClientProvider);
-    final result = await api.post('/rides', {
+    final result = await api.createRide({
       ..._estimatePayload(_vehicleType),
       'vehicleType': MarketConfig.apiVehicleType(_vehicleType),
       'pickupAddress': _pickupController.text.trim(),
@@ -248,13 +248,13 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
 
     switch (result) {
       case Success(:final data):
-        final ride = data['ride'] as Map<String, dynamic>?;
-        if (ride != null) {
+        final rideId = data['id'] as String?;
+        if (rideId != null) {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
               builder: (_) => MatchingScreen(
-                rideId: ride['id'] as String,
+                rideId: rideId,
                 pickupAddress: _pickupController.text.trim(),
                 dropoffAddress: _destinationController.text.trim(),
                 estimatedFareCdf: (_selectedEstimate?['estimatedFareCdf'] ??

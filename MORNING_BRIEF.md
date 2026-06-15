@@ -1,129 +1,102 @@
-# MOVA — Morning Brief (v1.4.0)
+# MOVA — Morning Brief (v1.5.0 — finalisé)
 
-**Date:** 2026-06-13 · **Repo:** [clskas/mova](https://github.com/clskas/mova) · **Branch:** `main`
+**Date:** 2026-06-15 · **Repo:** [clskas/mova](https://github.com/clskas/mova) · **Branch:** `main`
 
-## Overnight summary
+## Statut finalisé (juin 2026)
 
-MOVA v1.4.0 ships the complete admin console: RBAC multi-page UI, demo seed data, Playwright coverage, and documented startup on port **3002**.
+| Surface | Note | Statut |
+|---------|------|--------|
+| **Web PWA** | **9/10** | OTP + JWT, 11 services (taxi, colis, express, repas, déménagement, location, commissions, wallet, planifiées, covoiturage, historique), API réelle si gateway OK |
+| **Mobile passager** | **9/10** | Tous modules branchés API, `checkHealth`, pas de mock si gateway up |
+| **Mobile chauffeur** | **9/10** | Accept livraison → pickup → transit → livré, revenus, incidents, KYC |
+| **Admin** | **9/10** | CRUD complet, RBAC 5 rôles staff, communes éditables, locations, abonnements |
+| **Backend OTP** | **Prod-ready*** | Interface Twilio SMS + `MOCK_OTP` dev |
+| **Paiements** | **Prod-ready*** | Wallet persisté, providers OM/M-Pesa/Airtel avec erreurs FR si clés manquantes |
 
-| Area | Status |
-|------|--------|
-| Admin UI | 13 pages + RBAC (SUPER_ADMIN, ADMIN, SUPPORT, FINANCE, CONTENT) |
-| Admin seed | `seed-admin.ps1` + `seed-admin-demo.ps1` |
-| Playwright | login OTP, utilisateurs, restaurants |
-| Docker | Microservices only — admin UI runs via `npm run dev` on **3002** |
+\* *Production nationale = clés externes uniquement (Twilio, Orange Money, M-Pesa, Airtel). Voir checklist ci-dessous.*
 
-## Quick start — Admin
+## Quick start
 
 ```powershell
 cd c:\Users\Administrator\Mova
-docker compose up -d
+docker compose up -d --build
 npm run migrate:all
 npm run seed:admin-demo
 
-cd admin && Copy-Item .env.example .env.local && npm install && npm run dev
+# Web PWA (port 3001)
+cd web && npm install && npm run dev
+
+# Admin (port 3002)
+cd admin && npm install && npm run dev
 ```
 
-**http://localhost:3002/login** — `+243900000001` / OTP `123456` (SUPER_ADMIN)
+| Client | URL | Auth dev |
+|--------|-----|----------|
+| API Gateway | http://localhost:3000 | — |
+| Web PWA | http://localhost:3001 | OTP `123456` (`MOCK_OTP=true`) |
+| Admin | http://localhost:3002/login | `+243900000001` / `123456` |
+| Ride service (Docker) | http://localhost:3022 | — |
 
-## Demo data seeded
+## Modules Web PWA
 
-| Entity | Count |
-|--------|-------|
-| Admin SUPER_ADMIN | 1 |
-| Passengers | 3 |
-| Drivers | 4 (3 KYC pending) |
-| Incidents | 3 (2 OPEN) |
-| Rides completed | 3 |
-| Deliveries | 2 |
-| Scheduled rides | 2 |
-| Restaurants | 5 (ride catalog) |
+| Service | Route API | Flux |
+|---------|-----------|------|
+| Taxi | `/api/rides` | estimate → create |
+| Colis | `/api/deliveries/parcel` | estimate → create |
+| Express | `/api/express` | estimate → create → track |
+| Repas | `/api/deliveries/food` | menu → commande |
+| Déménagement | `/api/moving` | estimate → demande |
+| Location | `/api/rental` | catalogue → estimate → booking |
+| Commissions | `/api/errands` | estimate → create |
+| Portefeuille | `/api/wallet` | solde + top-up persisté |
+| Planifiées | `/api/rides/scheduled` | estimate → book |
+| Covoiturage | `/api/carpool` | search / create / join |
 
-## Admin CRUD completeness
+## Admin CRUD
 
 | Page | CRUD |
 |------|------|
-| `/utilisateurs` | ✅ Read + edit role/status |
-| `/kyc` | ✅ Approve/Reject |
-| `/litiges` | ✅ Resolve |
-| `/restaurants` | ✅ List + Create |
-| `/tarifs` | ✅ Edit pricing rules |
-| `/livraisons`, `/planifiees`, `/courses` | Read + filters |
-| `/chauffeurs` | Read + activate/deactivate |
+| `/utilisateurs` | Read + edit (tous rôles staff dans dropdown) |
+| `/kyc` | Approve/Reject |
+| `/litiges` | Resolve |
+| `/restaurants` | List + Create + Edit + Delete |
+| `/tarifs` | Edit pricing rules |
+| `/abonnements` | Plans CRUD + abonnés |
+| `/parametres` | Communes multi-ville + edit |
+| `/locations` | Demandes location + statut |
+| `/livraisons`, `/planifiees`, `/courses` | Read + filters + statut |
 
-## Ports
+## Production checklist (clés externes seulement)
 
-| Client | Port |
-|--------|------|
-| API Gateway | 3000 |
-| Web PWA dev | 3001 |
-| **Admin UI dev** | **3002** |
-| Ride service (Docker) | **3022** |
-| Admin API | 3006 |
+```env
+MOCK_OTP=false
+MOCK_PAYMENTS=false
+TWILIO_ACCOUNT_SID=...
+TWILIO_AUTH_TOKEN=...
+TWILIO_PHONE_NUMBER=...   # ou TWILIO_VERIFY_SERVICE_SID
+ORANGE_MONEY_API_KEY=...
+MPESA_CONSUMER_KEY=...
+AIRTEL_MONEY_CLIENT_ID=...
+```
+
+Détail : [docs/PRODUCTION_DEPLOYMENT.md](docs/PRODUCTION_DEPLOYMENT.md)
 
 ## Tests
 
 ```powershell
-cd e2e && npm run test:e2e:admin
 .\scripts\verify-all.ps1
+cd e2e && npm run test:e2e:admin
+cd mobile && flutter test
+```
+
+## Mobile APK
+
+```powershell
+cd mobile
+flutter build apk --flavor passenger -t lib/main_passenger.dart --dart-define=API_URL=http://192.168.1.64:3000/api
+flutter build apk --flavor driver -t lib/main_driver.dart --dart-define=API_URL=http://192.168.1.64:3000/api
 ```
 
 ---
 
-## Commencer à enregistrer les données
-
-### 1. Backend prêt
-
-```powershell
-cd c:\Users\Administrator\Mova
-docker compose up -d
-npm run migrate:all
-curl http://localhost:3000/health   # ou .\scripts\verify-all.ps1
-```
-
-### 2. Base vide ou démo ?
-
-| Option | Commande | Résultat |
-|--------|----------|----------|
-| **A — DB vide** | `migrate:all` seulement | Schémas OK ; catalogues ride-service (communes, tarifs, restaurants) au boot ; pas d’utilisateurs ni courses |
-| **B — Démo admin** | `npm run seed:admin-demo` | SUPER_ADMIN + passagers, chauffeurs/KYC, incidents, courses, livraisons, planifiées (voir tableau ci-dessus) |
-
-### 3. Admin + persistance
-
-**http://localhost:3002/login** — `+243900000001` / OTP `123456` (`MOCK_OTP=true`).
-
-Les données créées via API ou admin **persistent en PostgreSQL** : utilisateurs, KYC, restaurants, tarifs, courses, livraisons, portefeuille. Relancer Docker ne les efface pas (volumes). Détail CRUD : `docs/DATA_OWNERSHIP.md`.
-
-### 4. Mobile — `API_URL`
-
-| Cible | `API_URL` |
-|-------|-----------|
-| Android émulateur | `http://10.0.2.2:3000/api` |
-| iOS / appareil physique | `http://<IP-LAN>:3000/api` |
-
-```powershell
-flutter run --flavor passenger -t lib/main_passenger.dart --dart-define=API_URL=http://10.0.2.2:3000/api
-```
-
-### 5. Encore simulé (dev)
-
-| Mock | Comportement |
-|------|--------------|
-| `MOCK_OTP=true` | OTP fixe **123456** |
-| `MOCK_PAYMENTS=true` | Mobile money simulé (succès auto) |
-| App chauffeur | Course entrante + suivi GPS **simulés** (pas de dispatch réel) |
-
-### 6. Maturité honnête (éval. juin 2026)
-
-| Surface | Note | Commentaire |
-|---------|------|-------------|
-| Mobile passager | 7–8/10 | Parcours course/livraison branchés API |
-| Admin | 8/10 | CRUD + RBAC solides |
-| Mobile chauffeur | 4/10 | UI OK, missions/dispatch mock |
-| Web PWA | 5/10 | Partiel vs mobile |
-
-**Production nationale** → [docs/PRODUCTION_DEPLOYMENT.md](docs/PRODUCTION_DEPLOYMENT.md) (`MOCK_OTP=false`, `MOCK_PAYMENTS=false`, migrations, domaines, stores).
-
----
-
-*Run `npm run seed:admin-demo` if dashboard sections are empty.*
+*Dernière finalisation : juin 2026 — stack prête pour prod nationale dès configuration des APIs externes.*

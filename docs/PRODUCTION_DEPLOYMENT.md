@@ -99,6 +99,28 @@ MOCK_PAYMENTS=false
 | `FCM_SERVER_KEY` | Push notifications |
 | `MAPBOX_ACCESS_TOKEN` | Autocomplétion adresses (optionnel, recommandé) |
 
+### 3.3.1 OTP — comportement production
+
+| `MOCK_OTP` | Comportement |
+|------------|--------------|
+| `true` (dev/staging) | Code fixe **123456**, pas d'SMS réel |
+| `false` (prod) | Code aléatoire 6 chiffres, envoi via **Twilio** (`auth-service/src/auth/sms.providers.ts`) |
+
+Variables Twilio requises en prod : `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, et `TWILIO_PHONE_NUMBER` **ou** `TWILIO_VERIFY_SERVICE_SID`.
+
+Si Twilio n'est pas configuré avec `MOCK_OTP=false`, l'API renvoie une erreur HTTP 503 en français (*« Service SMS non configuré »*).
+
+### 3.3.2 Paiements — comportement production
+
+| `MOCK_PAYMENTS` | Comportement |
+|-----------------|--------------|
+| `true` (dev) | Mobile money simulé, succès immédiat |
+| `false` (prod) | Providers Orange Money / M-Pesa / Airtel Money |
+
+Le **portefeuille MOVA** (`POST /api/wallet/top-up`, `POST /api/payments/rides/:id`) persiste toujours en PostgreSQL, mock ou réel.
+
+Sans clés provider (`ORANGE_MONEY_*`, `MPESA_*`, `AIRTEL_MONEY_*`), l'API renvoie un message d'erreur explicite listant les variables manquantes (voir `config/external-apis.env.example`).
+
 ### 3.4 URLs inter-services (Render les injecte via `fromService`)
 
 - `AUTH_SERVICE_URL`, `RIDE_SERVICE_URL`, `PAYMENT_SERVICE_URL`, etc.

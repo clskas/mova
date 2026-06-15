@@ -20,15 +20,27 @@ export class CarpoolService {
     pricePerSeatCdf: number;
     seatsTotal: number;
     driverId: string;
+    departureAt?: Date;
+    passengers?: { id: string; userId: string; seats: number }[];
   }) {
+    const passengers = t.passengers ?? [];
     return {
       id: t.id,
       fromAddress: t.pickupAddress ?? 'Kinshasa',
       toAddress: t.dropoffAddress ?? 'Kinshasa',
-      driverName: `Chauffeur ${t.driverId.slice(0, 6)}`,
-      availableSeats: t.seatsAvailable,
-      totalPriceCdf: t.pricePerSeatCdf * t.seatsTotal,
-      pricePerSeatCdf: t.pricePerSeatCdf,
+      driverName: `Chauffeur ${(t.driverId ?? 'unknown').slice(0, 6)}`,
+      availableSeats: t.seatsAvailable ?? 0,
+      seatsTotal: t.seatsTotal ?? t.seatsAvailable ?? 1,
+      totalPriceCdf: (t.pricePerSeatCdf ?? 0) * (t.seatsTotal ?? t.seatsAvailable ?? 1),
+      pricePerSeatCdf: t.pricePerSeatCdf ?? 0,
+      departureAt: t.departureAt?.toISOString(),
+      passengerCount: passengers.length,
+      passengers: passengers.map((p) => ({
+        id: p.id,
+        userId: p.userId,
+        seats: p.seats,
+        label: `Passager ${p.userId.slice(0, 6)}`,
+      })),
     };
   }
 
@@ -66,6 +78,7 @@ export class CarpoolService {
     };
     const { trip } = await this.create(driverId, dto);
     return {
+      trip: this.formatTripForMobile({ ...trip, passengers: [] }),
       ride: {
         id: trip.id,
         status: trip.status,
@@ -75,6 +88,7 @@ export class CarpoolService {
         seats,
         driverName: 'Vous',
         totalPriceCdf: estimate.totalPriceCdf,
+        departureAt: trip.departureAt.toISOString(),
       },
     };
   }
@@ -147,7 +161,11 @@ export class CarpoolService {
       data: { seatsAvailable, status },
       include: { passengers: true },
     });
-    return { trip: updated, passenger };
+    return {
+      trip: this.formatTripForMobile(updated),
+      passenger,
+      success: true,
+    };
   }
 
   async myTrips(userId: string) {

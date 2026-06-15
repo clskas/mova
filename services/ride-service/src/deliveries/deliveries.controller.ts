@@ -67,6 +67,18 @@ export class DeliveriesController {
     return this.deliveriesService.createFood(req.user.id, dto);
   }
 
+  @Get('offers')
+  @ApiOperation({ summary: 'Offres livraison pour chauffeur/coursier' })
+  offers(@Request() req: { user: { id: string } }) {
+    return this.deliveriesService.getDriverOffers(req.user.id);
+  }
+
+  @Post(':id/accept')
+  @ApiOperation({ summary: 'Accepter une livraison (chauffeur/coursier)' })
+  accept(@Request() req: { user: { id: string } }, @Param('id') id: string) {
+    return this.deliveriesService.acceptDelivery(id, req.user.id);
+  }
+
   @Get('restaurants')
   @ApiOperation({ summary: 'Liste restaurants Kinshasa' })
   restaurants() {

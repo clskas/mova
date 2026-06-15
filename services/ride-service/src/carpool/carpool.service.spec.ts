@@ -40,6 +40,6 @@ describe('CarpoolService', () => {
     prisma.carpoolPassenger.create.mockResolvedValue({ id: 'p1', tripId: 't1', userId: 'user-2', seats: 2 });
     prisma.carpoolTrip.update.mockResolvedValue({ id: 't1', seatsAvailable: 1, status: CarpoolStatus.OPEN, passengers: [] });
     const result = await service.join('t1', 'user-2', 2);
-    expect(result.trip.seatsAvailable).toBe(1);
+    expect(result.trip.availableSeats).toBe(1);
   });
 });

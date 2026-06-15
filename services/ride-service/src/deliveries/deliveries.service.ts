@@ -1,6 +1,6 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { DeliveryStatus, DeliveryType, Prisma, SurchargeType, VehicleType, WeightCategory } from '@prisma/client';
-import { MovaErrorCode, MovaHttpException, formatCdf } from '@mova/shared';
+import { INTERNAL_API_KEY, MARKET_RDC, MovaErrorCode, MovaHttpException, formatCdf, serviceUrl } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { PricingService } from '../rides/pricing.service';
 import { SurchargeService } from '../rides/surcharge.service';
@@ -283,6 +283,85 @@ export class DeliveriesService {
       select: { id: true, name: true, cuisine: true, address: true, lat: true, lng: true, rating: true, imageUrl: true, menuItems: true },
     });
     return { data: rows };
+  }
+
+  private async fetchDriverProfile(userId: string) {
+    try {
+      const res = await fetch(serviceUrl('driver', `/internal/drivers/${userId}`), {
+        headers: { 'x-internal-api-key': INTERNAL_API_KEY },
+      });
+      if (!res.ok) return null;
+      return (await res.json()) as {
+        isAvailable?: boolean;
+        kycStatus?: string;
+        currentLat?: number | null;
+        currentLng?: number | null;
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  async getDriverOffers(driverUserId: string) {
+    const profile = await this.fetchDriverProfile(driverUserId);
+    if (!profile?.isAvailable || profile.kycStatus !== 'APPROVED') {
+      return { offers: [] as Record<string, unknown>[] };
+    }
+    if (profile.currentLat == null || profile.currentLng == null) {
+      return { offers: [] as Record<string, unknown>[] };
+    }
+
+    const deliveries = await this.prisma.delivery.findMany({
+      where: {
+        status: DeliveryStatus.PENDING,
+        driverId: null,
+        type: { in: [DeliveryType.PARCEL, DeliveryType.FOOD, DeliveryType.EXPRESS] },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 30,
+      include: { restaurant: { select: { id: true, name: true, cuisine: true } } },
+    });
+
+    const radiusKm = MARKET_RDC.matching.maxRadiusKm;
+    const offers = deliveries
+      .map((d) => {
+        const pickupLat = d.pickupLat ?? d.deliveryLat ?? 0;
+        const pickupLng = d.pickupLng ?? d.deliveryLng ?? 0;
+        const distanceKm = this.pricing.haversineKm(profile.currentLat!, profile.currentLng!, pickupLat, pickupLng);
+        const formatted = formatParcelDelivery(d as Parameters<typeof formatParcelDelivery>[0]);
+        return {
+          ...formatted,
+          offerType: 'DELIVERY',
+          type: d.type,
+          restaurantName: d.restaurant?.name,
+          distanceKm: Math.round(distanceKm * 100) / 100,
+        };
+      })
+      .filter((o) => o.distanceKm <= radiusKm)
+      .sort((a, b) => a.distanceKm - b.distanceKm);
+
+    return { offers };
+  }
+
+  async acceptDelivery(deliveryId: string, driverUserId: string) {
+    const delivery = await this.prisma.delivery.findUnique({ where: { id: deliveryId } });
+    if (!delivery) throw new MovaHttpException(MovaErrorCode.DELIVERY_NOT_FOUND, HttpStatus.NOT_FOUND);
+    if (delivery.status !== DeliveryStatus.PENDING) {
+      throw new MovaHttpException(MovaErrorCode.DELIVERY_INVALID_STATUS);
+    }
+    if (delivery.driverId) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Livraison déjà assignée.');
+    }
+    const updated = await this.prisma.delivery.update({
+      where: { id: deliveryId },
+      data: { driverId: driverUserId, status: DeliveryStatus.PICKED_UP, pickedUpAt: new Date() },
+      include: { restaurant: true, events: { orderBy: { createdAt: 'asc' } } },
+    });
+    await this.prisma.deliveryEvent.create({
+      data: { deliveryId, event: 'ASSIGNED', metadata: { driverUserId } },
+    });
+    const formatted = formatParcelDelivery(updated);
+    return { delivery: formatted, success: true };
   }
 
   async updateStatus(id: string, status: DeliveryStatus, userId: string) {

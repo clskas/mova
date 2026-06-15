@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { KycStatus, VehicleType } from '@prisma/client';
-import { MovaErrorCode, MovaHttpException, INTERNAL_API_KEY, resolveCityFromCoords, serviceUrl } from '@mova/shared';
+import { MovaErrorCode, MovaHttpException, INTERNAL_API_KEY, resolveCityFromCoords, serviceUrl, MARKET_RDC } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 
 export interface DriverCandidate {

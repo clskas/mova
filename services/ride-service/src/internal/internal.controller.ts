@@ -149,8 +149,8 @@ export class InternalController {
   }
 
   @Delete('pricing-rules/:vehicleType')
-  deletePricing(@Param('vehicleType') vehicleType: VehicleType) {
-    return this.pricingAdmin.deleteRule(vehicleType);
+  deletePricing(@Param('vehicleType') vehicleType: VehicleType, @Query('city') city: string) {
+    return this.pricingAdmin.deleteRule(vehicleType, city);
   }
 
   @Get('surcharges')

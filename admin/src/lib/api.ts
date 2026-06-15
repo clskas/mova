@@ -117,6 +117,7 @@ export type Restaurant = {
 export type PricingRule = {
   id?: string;
   vehicleType: string;
+  city?: string;
   baseFareCdf: number;
   perKmCdf: number;
   perMinuteCdf: number;
@@ -127,14 +128,49 @@ export type PricingRule = {
 };
 
 export type DeliveryPricingRule = {
-  id?: string;
   category: string;
-  baseFareCdf: number;
-  perKmCdf: number;
-  perMinuteCdf: number;
-  minFareCdf: number;
+  baseFeeCdf: number;
+  multiplier: number;
+  perUnitCdf?: number | null;
+  description?: string | null;
   isActive?: boolean;
 };
+
+/** Villes MOVA couvertes (aligné DRC_SERVICE_AREAS / seed ride-service). */
+export const MOVA_CITIES = [
+  "Kinshasa",
+  "Lubumbashi",
+  "Goma",
+  "Bukavu",
+  "Kisangani",
+  "Mbuji-Mayi",
+  "Kananga",
+  "Matadi",
+  "Boma",
+  "Kolwezi",
+  "Likasi",
+  "Tshikapa",
+  "Mbandaka",
+  "Kindu",
+  "Bunia",
+  "Butembo",
+  "Beni",
+  "Uvira",
+  "Kalemie",
+  "Kamina",
+  "Gbadolite",
+  "Gemena",
+  "Boende",
+  "Lisala",
+  "Isiro",
+  "Buta",
+  "Inongo",
+  "Bandundu",
+  "Kikwit",
+  "Kenge",
+  "Kabinda",
+  "Lusambo",
+] as const;
 
 export type SubscriptionPlan = {
   id: string;
@@ -397,9 +433,9 @@ function mockFor<T>(path: string, init?: RequestInit): T {
   }
   if (path.includes("/delivery-pricing-rules")) {
     return [
-      { category: "PARCEL", baseFareCdf: 1500, perKmCdf: 600, perMinuteCdf: 80, minFareCdf: 2500, isActive: true },
-      { category: "FOOD", baseFareCdf: 1200, perKmCdf: 550, perMinuteCdf: 70, minFareCdf: 2200, isActive: true },
-      { category: "EXPRESS", baseFareCdf: 2000, perKmCdf: 750, perMinuteCdf: 100, minFareCdf: 3500, isActive: true },
+      { category: "PARCEL", baseFeeCdf: 0, multiplier: 1.0, description: "Colis — tarif course Standard + poids", isActive: true },
+      { category: "FOOD", baseFeeCdf: 3000, multiplier: 1.0, description: "Livraison repas — frais de base CDF", isActive: true },
+      { category: "EXPRESS", baseFeeCdf: 0, multiplier: 1.35, description: "Livraison express — majoration 35%", isActive: true },
     ] as T;
   }
   if (path.includes("/subscription-plans") && method === "POST") {
@@ -467,10 +503,10 @@ function mockFor<T>(path: string, init?: RequestInit): T {
   }
   if (path.includes("/pricing-rules")) {
     return [
-      { vehicleType: "MOTO_TAXI", baseFareCdf: 1000, perKmCdf: 500, perMinuteCdf: 100, minFareCdf: 2000, isActive: true },
-      { vehicleType: "STANDARD", baseFareCdf: 2000, perKmCdf: 800, perMinuteCdf: 150, minFareCdf: 3500, isActive: true },
-      { vehicleType: "COMFORT", baseFareCdf: 3000, perKmCdf: 1000, perMinuteCdf: 200, minFareCdf: 5000, isActive: true },
-      { vehicleType: "VIP", baseFareCdf: 5000, perKmCdf: 1500, perMinuteCdf: 300, minFareCdf: 8000, isActive: true },
+      { vehicleType: "MOTO_TAXI", city: "Kinshasa", baseFareCdf: 1500, perKmCdf: 800, perMinuteCdf: 100, minFareCdf: 2000, peakMultiplier: 1.3, nightMultiplier: 1.2, isActive: true },
+      { vehicleType: "STANDARD", city: "Kinshasa", baseFareCdf: 3000, perKmCdf: 1500, perMinuteCdf: 200, minFareCdf: 5000, peakMultiplier: 1.3, nightMultiplier: 1.2, isActive: true },
+      { vehicleType: "COMFORT", city: "Kinshasa", baseFareCdf: 5000, perKmCdf: 2500, perMinuteCdf: 300, minFareCdf: 8000, peakMultiplier: 1.4, nightMultiplier: 1.3, isActive: true },
+      { vehicleType: "VIP", city: "Kinshasa", baseFareCdf: 8000, perKmCdf: 3500, perMinuteCdf: 400, minFareCdf: 12000, peakMultiplier: 1.5, nightMultiplier: 1.4, isActive: true },
     ] as T;
   }
   if (path.includes("/incidents") && method === "POST") {
@@ -595,8 +631,9 @@ export async function fetchCurrentUser(): Promise<AdminSessionUser> {
   return apiFetch<AdminSessionUser>("/api/users/me");
 }
 
-export async function fetchPricingRules(): Promise<PricingRule[]> {
-  return apiFetch<PricingRule[]>("/api/admin/pricing-rules");
+export async function fetchPricingRules(city?: string): Promise<PricingRule[]> {
+  const q = city ? `?city=${encodeURIComponent(city)}` : "";
+  return apiFetch<PricingRule[]>(`/api/admin/pricing-rules${q}`);
 }
 
 export async function updatePricingRule(vehicleType: string, data: Partial<PricingRule>) {

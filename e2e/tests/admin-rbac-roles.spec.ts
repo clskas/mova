@@ -56,12 +56,12 @@ test.describe("Admin — RBAC par rôle staff", () => {
       await expect(page.getByText(label, { exact: true })).toBeVisible();
 
       for (const item of MENU_BY_ROLE[role]) {
-        await expect(page.getByRole("link", { name: item })).toBeVisible();
+        await expect(page.getByRole("link", { name: item, exact: true })).toBeVisible();
       }
 
       if (role === "SUPPORT") {
         for (const hidden of HIDDEN_FOR_SUPPORT) {
-          await expect(page.getByRole("link", { name: hidden })).toHaveCount(0);
+          await expect(page.getByRole("link", { name: hidden, exact: true })).toHaveCount(0);
         }
       }
     });
@@ -76,7 +76,7 @@ test.describe("Admin — RBAC par rôle staff", () => {
 
   test("SUPPORT — utilisateurs lecture seule, pas de menu Tarifs", async ({ page }) => {
     await loginAs(page, "+243900000003");
-    await expect(page.getByRole("link", { name: "Tarifs" })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Tarifs", exact: true })).toHaveCount(0);
     await page.goto("/utilisateurs");
     await expect(page.getByText("Consultation des comptes (lecture seule)")).toBeVisible();
     await expect(page.getByRole("button", { name: "Enregistrer" })).toHaveCount(0);

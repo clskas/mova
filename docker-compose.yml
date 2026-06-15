@@ -64,6 +64,9 @@ services:
       REDIS_URL: redis://redis:6379
       JWT_SECRET: dev_secret
       DRIVER_SERVICE_URL: http://driver-service:3000
+      AUTH_SERVICE_URL: http://auth-service:3000
+      INTERNAL_API_KEY: mova-internal-dev
+      DOCKER: 'true'
       PORT: 3000
     depends_on:
       postgres:

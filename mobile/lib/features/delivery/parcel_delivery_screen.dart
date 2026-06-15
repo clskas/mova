@@ -24,7 +24,16 @@ const _weightCategories = [
 ];
 
 class ParcelDeliveryScreen extends ConsumerStatefulWidget {
-  const ParcelDeliveryScreen({super.key});
+  const ParcelDeliveryScreen({
+    super.key,
+    this.initialPickupAddress,
+    this.initialDropoffAddress,
+    this.initialWeightCategory,
+  });
+
+  final String? initialPickupAddress;
+  final String? initialDropoffAddress;
+  final String? initialWeightCategory;
 
   @override
   ConsumerState<ParcelDeliveryScreen> createState() => _ParcelDeliveryScreenState();
@@ -54,6 +63,15 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
   @override
   void initState() {
     super.initState();
+    if (widget.initialPickupAddress != null) {
+      _pickupController.text = widget.initialPickupAddress!;
+    }
+    if (widget.initialDropoffAddress != null) {
+      _dropoffController.text = widget.initialDropoffAddress!;
+    }
+    if (widget.initialWeightCategory != null) {
+      _weightCategory = widget.initialWeightCategory!;
+    }
     _dropoffController.addListener(_onDropoffChanged);
   }
 

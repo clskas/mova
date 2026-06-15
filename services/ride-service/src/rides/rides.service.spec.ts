@@ -155,21 +155,90 @@ describe('RidesService', () => {
       ratings: [],
     });
     pricing.haversineKm.mockReturnValue(1.2);
-    global.fetch = jest.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        userId: 'driver-1',
-        ratingAvg: 4.8,
-        totalRides: 10,
-        currentLat: -4.325,
-        currentLng: 15.315,
-        vehicles: [{ id: 'v1', type: 'MOTO_TAXI', make: 'Honda', model: 'Ace', plateNumber: 'KIN-1', color: 'red' }],
-      }),
+    global.fetch = jest.fn().mockImplementation((url: string) => {
+      if (url.includes('/internal/users/')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ firstName: 'Jean', lastName: 'Kabila', phone: '+243900000020' }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          userId: 'driver-1',
+          ratingAvg: 4.8,
+          totalRides: 10,
+          currentLat: -4.325,
+          currentLng: 15.315,
+          vehicles: [{ id: 'v1', type: 'MOTO_TAXI', make: 'Honda', model: 'Ace', plateNumber: 'KIN-1', color: 'red' }],
+        }),
+      });
     }) as never;
 
     const result = await service.getRide('ride-1');
     expect(result.etaMinutes).toBeGreaterThanOrEqual(1);
     expect(result.driverDistanceKm).toBeGreaterThan(0);
     expect(result.driver).not.toBeNull();
+    expect(result.driver?.name).toBe('Jean Kabila');
+    expect(result.driver?.plateNumber).toBe('KIN-1');
+  });
+
+  it('cancels ride for passenger with reason', async () => {
+    prisma.ride.findUnique.mockResolvedValue({
+      id: 'ride-1',
+      passengerId: 'p1',
+      driverId: null,
+      status: RideStatus.SEARCHING,
+      vehicleType: VehicleType.MOTO_TAXI,
+      acceptedAt: null,
+      pickupLat: -4.32,
+      pickupLng: 15.31,
+      dropoffLat: -4.34,
+      dropoffLng: 15.33,
+      pickupAddress: 'Gombe',
+      dropoffAddress: 'Limete',
+      estimatedFareCdf: 6200,
+      finalFareCdf: null,
+      distanceKm: 4.5,
+      durationMin: 11,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    prisma.cancellationPolicy.findUnique.mockResolvedValue({
+      vehicleType: VehicleType.MOTO_TAXI,
+      freeCancelMinutes: 5,
+      passengerFeeCdf: 2000,
+    });
+    prisma.ride.update.mockResolvedValue({
+      id: 'ride-1',
+      passengerId: 'p1',
+      driverId: null,
+      vehicleId: null,
+      status: RideStatus.CANCELLED,
+      vehicleType: VehicleType.MOTO_TAXI,
+      pickupLat: -4.32,
+      pickupLng: 15.31,
+      dropoffLat: -4.34,
+      dropoffLng: 15.33,
+      pickupAddress: 'Gombe',
+      dropoffAddress: 'Limete',
+      estimatedFareCdf: 6200,
+      finalFareCdf: null,
+      distanceKm: 4.5,
+      durationMin: 11,
+      cancelledAt: new Date(),
+      cancelReason: 'Trop long',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const result = await service.cancelRide('ride-1', 'p1', 'Trop long');
+    expect(prisma.ride.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: RideStatus.CANCELLED, cancelReason: 'Trop long' }),
+      }),
+    );
+    expect(result.ride.status).toBe('CANCELLED');
+    expect(tracking.broadcastRideStatus).toHaveBeenCalledWith('ride-1', 'CANCELLED');
   });
 });

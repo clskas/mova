@@ -81,8 +81,13 @@ export class DeliveriesController {
 
   @Get('restaurants')
   @ApiOperation({ summary: 'Liste restaurants Kinshasa' })
-  restaurants() {
-    return this.deliveriesService.listRestaurants();
+  restaurants(@Query('deliveryLat') deliveryLat?: string, @Query('deliveryLng') deliveryLng?: string) {
+    const lat = deliveryLat != null ? Number(deliveryLat) : undefined;
+    const lng = deliveryLng != null ? Number(deliveryLng) : undefined;
+    return this.deliveriesService.listRestaurants(
+      lat != null && !Number.isNaN(lat) ? lat : undefined,
+      lng != null && !Number.isNaN(lng) ? lng : undefined,
+    );
   }
 
   @Get('history')

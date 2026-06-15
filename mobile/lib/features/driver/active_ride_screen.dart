@@ -132,6 +132,16 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
     }
   }
 
+  Future<void> _openPickup() async {
+    final lat = _ride['pickupLat'] as num?;
+    final lng = _ride['pickupLng'] as num?;
+    if (lat == null || lng == null) return;
+    final url = 'https://www.google.com/maps/dir/?api=1&destination=$lat,$lng';
+    if (await canLaunchUrl(Uri.parse(url))) {
+      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    }
+  }
+
   Future<void> _openDropoff() async {
     final lat = _ride['dropoffLat'] as num?;
     final lng = _ride['dropoffLng'] as num?;
@@ -161,6 +171,7 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
     final fare = _ride['priceCdf'] as int? ?? _ride['estimatedFareCdf'] as int? ?? 0;
     final nextLabel = _nextActionLabel();
     final nextStatus = _nextStatus();
+    final headingToPickup = _status == 'DRIVER_ASSIGNED' || _status == 'ACCEPTED';
 
     return MovaScreen(
       title: 'Course en cours',
@@ -170,18 +181,56 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (headingToPickup)
+            Container(
+              decoration: BoxDecoration(
+                color: MovaColors.violet.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: MovaColors.violet.withValues(alpha: 0.2)),
+              ),
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.navigation, color: MovaColors.violet),
+                      SizedBox(width: 8),
+                      Text('Rendez-vous passager', style: TextStyle(fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _ride['pickupAddress']?.toString() ?? 'Point de prise en charge',
+                    style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 12),
+                  MovaButton(
+                    label: 'Navigation vers le passager',
+                    icon: Icons.directions,
+                    onPressed: _openPickup,
+                  ),
+                ],
+              ),
+            ),
+          if (headingToPickup) const SizedBox(height: 12),
           MovaCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                if (!headingToPickup)
+                  Text(
+                    _ride['pickupAddress']?.toString() ?? 'Départ',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 Text(
-                  _ride['pickupAddress']?.toString() ?? 'Départ',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Text(
-                  '→ ${_ride['dropoffAddress']?.toString() ?? 'Arrivée'}',
+                  headingToPickup
+                      ? 'Destination : ${_ride['dropoffAddress']?.toString() ?? 'Arrivée'}'
+                      : '→ ${_ride['dropoffAddress']?.toString() ?? 'Arrivée'}',
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -203,12 +252,14 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
             MovaErrorBanner(message: _error!),
           ],
           const SizedBox(height: 16),
-          MovaButton(
-            label: 'Navigation destination',
-            isSecondary: true,
-            icon: Icons.navigation_outlined,
-            onPressed: _openDropoff,
-          ),
+          if (!headingToPickup)
+            MovaButton(
+              label: 'Navigation destination',
+              isSecondary: true,
+              icon: Icons.navigation_outlined,
+              onPressed: _openDropoff,
+            ),
+          if (!headingToPickup) const SizedBox(height: 12),
           if (nextLabel != null && nextStatus != null) ...[
             const SizedBox(height: 12),
             MovaButton(

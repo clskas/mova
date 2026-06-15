@@ -7,7 +7,6 @@ import '../../core/api/api_client.dart';
 import '../../core/config/market_config.dart';
 import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
-import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import 'active_ride_screen.dart';
 
@@ -110,66 +109,173 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
     final distance = widget.offer['distanceKm'] as num?;
     final pickup = widget.offer['pickupAddress']?.toString() ?? 'Point de départ';
     final dropoff = widget.offer['dropoffAddress']?.toString() ?? 'Destination';
+    final vehicleType = widget.offer['vehicleType']?.toString() ?? 'Moto-taxi';
+    final progress = _countdown / 30.0;
 
-    return MovaScreen(
-      title: 'Nouvelle course',
-      child: Column(
-        children: [
-          MovaCard(
-            child: Column(
-              children: [
-                const Icon(Icons.local_taxi, size: 48, color: MovaColors.violet),
-                const SizedBox(height: 12),
-                Text(
-                  pickup,
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '→ $dropoff',
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  '${MarketConfig.formatCdf(fare)}${distance != null ? ' • ${distance.toStringAsFixed(1)} km' : ''}',
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 16),
-                Text('$_countdown s', style: const TextStyle(fontSize: 32, color: MovaColors.orange)),
-              ],
+    return Scaffold(
+      backgroundColor: MovaColors.midnight,
+      body: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white70),
+                    onPressed: _loading ? null : _reject,
+                  ),
+                  const Expanded(
+                    child: Text(
+                      'Nouvelle course',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                  const SizedBox(width: 48),
+                ],
+              ),
             ),
-          ),
-          if (_error != null) ...[
-            const SizedBox(height: 12),
-            MovaErrorBanner(message: _error!),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        SizedBox(
+                          width: 120,
+                          height: 120,
+                          child: CircularProgressIndicator(
+                            value: progress,
+                            strokeWidth: 6,
+                            color: MovaColors.orange,
+                            backgroundColor: Colors.white12,
+                          ),
+                        ),
+                        Text(
+                          '$_countdown',
+                          style: const TextStyle(
+                            color: MovaColors.orange,
+                            fontSize: 36,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 32),
+                    Text(
+                      MarketConfig.formatCdf(fare),
+                      style: const TextStyle(
+                        color: MovaColors.green,
+                        fontSize: 42,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    if (distance != null)
+                      Text(
+                        '${distance.toStringAsFixed(1)} km · $vehicleType',
+                        style: const TextStyle(color: Colors.white70, fontSize: 15),
+                      ),
+                    const SizedBox(height: 32),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Icon(Icons.trip_origin, color: MovaColors.green, size: 20),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  pickup,
+                                  style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.only(left: 9, top: 4, bottom: 4),
+                            child: Container(width: 2, height: 24, color: Colors.white24),
+                          ),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Icon(Icons.location_on, color: MovaColors.violet, size: 20),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  dropoff,
+                                  style: const TextStyle(color: Colors.white70, fontSize: 15),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (_error != null) ...[
+                      const SizedBox(height: 16),
+                      MovaErrorBanner(message: _error!),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+              child: Column(
+                children: [
+                  SizedBox(
+                    width: double.infinity,
+                    child: MovaButton(
+                      label: 'Accepter la course',
+                      icon: Icons.check_circle_outline,
+                      isLoading: _loading,
+                      onPressed: _loading ? null : _accept,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: MovaButton(
+                          label: 'Navigation',
+                          isSecondary: true,
+                          icon: Icons.navigation_outlined,
+                          onPressed: _openNavigation,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: MovaButton(
+                          label: 'Refuser',
+                          isSecondary: true,
+                          icon: Icons.close,
+                          isLoading: _loading,
+                          onPressed: _loading ? null : _reject,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
           ],
-          const SizedBox(height: 24),
-          MovaButton(
-            label: 'Accepter',
-            icon: Icons.check,
-            isLoading: _loading,
-            onPressed: _loading ? null : _accept,
-          ),
-          const SizedBox(height: 8),
-          MovaButton(
-            label: 'Navigation',
-            isSecondary: true,
-            icon: Icons.navigation_outlined,
-            onPressed: _openNavigation,
-          ),
-          const SizedBox(height: 8),
-          MovaButton(
-            label: 'Refuser',
-            isSecondary: true,
-            icon: Icons.close,
-            onPressed: _loading ? null : _reject,
-          ),
-        ],
+        ),
       ),
     );
   }

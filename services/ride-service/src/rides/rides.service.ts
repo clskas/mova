@@ -379,21 +379,36 @@ export class RidesService {
 
   private buildRideTimeline(status: RideStatus, events?: { event: string; createdAt: Date }[]) {
     const steps = [
-      { key: RideStatus.REQUESTED, label: 'Course demandée' },
-      { key: RideStatus.SEARCHING, label: 'Recherche chauffeur' },
+      { key: RideStatus.SEARCHING, label: 'Recherche' },
       { key: RideStatus.ACCEPTED, label: 'Chauffeur assigné' },
-      { key: RideStatus.DRIVER_ARRIVED, label: 'Chauffeur arrivé' },
-      { key: RideStatus.IN_PROGRESS, label: 'Course en cours' },
-      { key: RideStatus.COMPLETED, label: 'Course terminée' },
+      { key: RideStatus.ACCEPTED, label: 'En route' },
+      { key: RideStatus.DRIVER_ARRIVED, label: 'Arrivé' },
+      { key: RideStatus.IN_PROGRESS, label: 'En course' },
+      { key: RideStatus.COMPLETED, label: 'Terminé' },
     ];
     if (status === RideStatus.CANCELLED) return [{ label: 'Course annulée', done: true }];
-    const order = steps.map((s) => s.key);
-    const currentIdx = order.indexOf(status);
+    const statusOrder: RideStatus[] = [
+      RideStatus.REQUESTED,
+      RideStatus.SEARCHING,
+      RideStatus.ACCEPTED,
+      RideStatus.DRIVER_ARRIVED,
+      RideStatus.IN_PROGRESS,
+      RideStatus.COMPLETED,
+    ];
+    const currentIdx = statusOrder.indexOf(status);
+    const enRouteIdx = statusOrder.indexOf(RideStatus.ACCEPTED);
     return steps.map((step, idx) => {
       const event = events?.find((e) => e.event === step.key);
+      let done = false;
+      if (idx === 0) done = currentIdx >= statusOrder.indexOf(RideStatus.SEARCHING);
+      else if (idx === 1) done = currentIdx >= enRouteIdx;
+      else if (idx === 2) done = currentIdx > enRouteIdx || (currentIdx === enRouteIdx && status === RideStatus.ACCEPTED);
+      else if (idx === 3) done = currentIdx >= statusOrder.indexOf(RideStatus.DRIVER_ARRIVED);
+      else if (idx === 4) done = currentIdx >= statusOrder.indexOf(RideStatus.IN_PROGRESS);
+      else done = currentIdx >= statusOrder.indexOf(RideStatus.COMPLETED);
       return {
         label: step.label,
-        done: idx <= currentIdx,
+        done,
         ...(event ? { at: event.createdAt.toISOString() } : {}),
       };
     });
@@ -432,6 +447,20 @@ export class RidesService {
     return { etaMinutes, driverDistanceKm };
   }
 
+  private async fetchUserBrief(userId: string): Promise<{ name?: string; phone?: string } | null> {
+    try {
+      const res = await fetch(serviceUrl('auth', `/internal/users/${userId}`), {
+        headers: { 'x-internal-api-key': INTERNAL_API_KEY },
+      });
+      if (!res.ok) return null;
+      const user = (await res.json()) as { firstName?: string; lastName?: string; phone?: string };
+      const name = [user.firstName, user.lastName].filter(Boolean).join(' ').trim();
+      return { name: name || undefined, phone: user.phone };
+    } catch {
+      return null;
+    }
+  }
+
   private async fetchDriverInfo(userId: string) {
     try {
       const res = await fetch(serviceUrl('driver', `/internal/drivers/${userId}`), {
@@ -439,17 +468,24 @@ export class RidesService {
       });
       if (!res.ok) return null;
       const profile = await res.json();
+      const user = await this.fetchUserBrief(userId);
       const vehicle = profile.vehicles?.[0];
+      const vehicleType = vehicle ? toMobileVehicleType(vehicle.type) : undefined;
       return {
         userId: profile.userId,
+        name: user?.name ?? `Chauffeur ${userId.slice(0, 6)}`,
+        phone: user?.phone ?? '',
         rating: profile.ratingAvg,
         totalRides: profile.totalRides,
         lat: profile.currentLat,
         lng: profile.currentLng,
+        plateNumber: vehicle?.plateNumber,
+        vehicleType,
+        vehicleModel: vehicle ? `${vehicle.make ?? ''} ${vehicle.model ?? ''}`.trim() : undefined,
         vehicle: vehicle
           ? {
               id: vehicle.id,
-              type: toMobileVehicleType(vehicle.type),
+              type: vehicleType,
               make: vehicle.make,
               model: vehicle.model,
               plate: vehicle.plateNumber,

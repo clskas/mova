@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -15,11 +16,13 @@ import '../../core/widgets/mova_widgets.dart';
 import 'payment_screen.dart';
 import 'widgets/mova_ride_map.dart';
 
-const _statusSteps = [
-  ('ACCEPTED', 'Assigné'),
-  ('ACCEPTED', 'En route'),
-  ('DRIVER_ARRIVED', 'Arrivé'),
-  ('IN_PROGRESS', 'En course'),
+const _fallbackTimeline = [
+  {'label': 'Recherche', 'done': false},
+  {'label': 'Chauffeur assigné', 'done': false},
+  {'label': 'En route', 'done': false},
+  {'label': 'Arrivé', 'done': false},
+  {'label': 'En course', 'done': false},
+  {'label': 'Terminé', 'done': false},
 ];
 
 class TrackingScreen extends ConsumerStatefulWidget {
@@ -46,6 +49,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
   int _etaMinutes = 5;
   bool _loading = true;
   bool _waitingDriver = false;
+  bool _cancelling = false;
   bool _mock = false;
   String? _error;
   Timer? _pollTimer;
@@ -65,6 +69,17 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
     _mockTimer?.cancel();
     _socket?.dispose();
     super.dispose();
+  }
+
+  List<Map<String, dynamic>> get _timelineSteps {
+    final raw = _ride?['timeline'] as List? ?? _ride?['tracking'] as List?;
+    if (raw != null && raw.isNotEmpty) return raw.cast<Map<String, dynamic>>();
+    return _fallbackTimeline;
+  }
+
+  bool get _canCancel {
+    const cancellable = {'REQUESTED', 'SEARCHING', 'ACCEPTED', 'DRIVER_ARRIVED'};
+    return cancellable.contains(_status);
   }
 
   void _updateEtaFromRide(Map<String, dynamic> data) {
@@ -110,6 +125,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
     if (raw == null) return null;
     final vehicle = raw['vehicle'] as Map<String, dynamic>?;
     return {
+      'userId': raw['userId']?.toString(),
       'name': raw['name']?.toString() ??
           'Chauffeur ${raw['userId']?.toString().substring(0, 6) ?? ''}',
       'rating': (raw['rating'] as num?)?.toDouble() ?? 4.5,
@@ -235,6 +251,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
         if (status != null && mounted) {
           setState(() => _status = status);
           if (status == 'COMPLETED') _goToPayment();
+          if (status == 'CANCELLED') Navigator.pop(context);
         }
       },
     );
@@ -242,18 +259,21 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
 
   void _startMockSimulation() {
     if (_mockTimer?.isActive == true) return;
+    const mockStatuses = ['ACCEPTED', 'ACCEPTED', 'DRIVER_ARRIVED', 'IN_PROGRESS'];
     _mockTimer = Timer.periodic(const Duration(seconds: 4), (_) {
       if (!mounted) return;
       setState(() {
-        _mockStep = (_mockStep + 1) % 4;
-        _status = _statusSteps[_mockStep].$1;
+        _mockStep = (_mockStep + 1).clamp(0, mockStatuses.length);
+        if (_mockStep < mockStatuses.length) {
+          _status = mockStatuses[_mockStep];
+        }
         if (_driverPos != null) {
           _driverPos = LatLng(
             _driverPos!.latitude - 0.002,
             _driverPos!.longitude - 0.001,
           );
         }
-        if (_mockStep == 3) {
+        if (_mockStep >= mockStatuses.length - 1) {
           _mockTimer?.cancel();
           _goToPayment();
         }
@@ -293,15 +313,58 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
     }
   }
 
-  void _shareTrip() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Lien de partage de trajet (bientôt disponible)')),
-    );
+  Future<void> _shareTrip() async {
+    final pickup = _ride?['pickupAddress']?.toString() ?? 'Départ';
+    final dropoff = _ride?['dropoffAddress']?.toString() ?? 'Arrivée';
+    final driverName = _driver?['name']?.toString() ?? 'mon chauffeur';
+    final text =
+        'Je suis en course MOVA avec $driverName ($pickup → $dropoff). '
+        'Suivi en direct : https://mova.cd/suivi/${widget.rideId}';
+    await Clipboard.setData(ClipboardData(text: text));
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Lien de suivi copié dans le presse-papiers')),
+      );
+    }
   }
 
-  int _stepIndex(String status) {
-    final idx = _statusSteps.indexWhere((s) => s.$1 == status);
-    return idx >= 0 ? idx : 0;
+  Future<void> _cancelRide() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Annuler la course ?'),
+        content: const Text(
+          'Annulation gratuite avant l\'arrivée du chauffeur. '
+          'Des frais peuvent s\'appliquer après acceptation.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Non')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Oui, annuler'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true || !mounted) return;
+
+    setState(() => _cancelling = true);
+    _pollTimer?.cancel();
+    _socket?.dispose();
+    final api = ref.read(apiClientProvider);
+    final result = await api.cancelRide(widget.rideId, reason: 'Annulé par le passager');
+    if (!mounted) return;
+    setState(() => _cancelling = false);
+    switch (result) {
+      case Success(:final data):
+        final fee = data['cancellationFeeFormatted']?.toString();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(data['message']?.toString() ?? 'Course annulée${fee != null ? ' — $fee' : ''}')),
+        );
+        Navigator.pop(context);
+      case Failure(:final error):
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
+    }
   }
 
   @override
@@ -325,12 +388,21 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
               icon: Icons.refresh,
               onPressed: _loadRide,
             ),
+            if (_canCancel) ...[
+              const SizedBox(height: 12),
+              MovaButton(
+                label: 'Annuler la course',
+                isSecondary: true,
+                icon: Icons.cancel_outlined,
+                isLoading: _cancelling,
+                onPressed: _cancelling ? null : _cancelRide,
+              ),
+            ],
           ],
         ),
       );
     }
 
-    final currentStep = _stepIndex(_status);
     final driverName = _driver?['name']?.toString() ?? 'Chauffeur';
     final rating = (_driver?['rating'] as num?)?.toDouble() ?? 4.8;
     final plate = _driver?['plateNumber']?.toString() ?? '—';
@@ -462,10 +534,12 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
                             const SizedBox(height: 16),
                             Text('Statut', style: Theme.of(context).textTheme.titleSmall),
                             const SizedBox(height: 8),
-                            ...List.generate(_statusSteps.length, (i) {
-                              final (code, label) = _statusSteps[i];
-                              final done = i <= currentStep;
-                              final active = i == currentStep;
+                            ..._timelineSteps.map((step) {
+                              final label = step['label']?.toString() ?? '';
+                              final done = step['done'] == true;
+                              final active = !done &&
+                                  _timelineSteps.indexOf(step) ==
+                                      _timelineSteps.indexWhere((s) => s['done'] != true);
                               return Padding(
                                 padding: const EdgeInsets.only(bottom: 8),
                                 child: Row(
@@ -496,11 +570,21 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
                               );
                             }),
                             const SizedBox(height: 16),
-                            if (_mock || _status == 'COMPLETED' || currentStep >= 3)
+                            if (_canCancel)
+                              MovaButton(
+                                label: 'Annuler la course',
+                                isSecondary: true,
+                                icon: Icons.cancel_outlined,
+                                isLoading: _cancelling,
+                                onPressed: _cancelling ? null : _cancelRide,
+                              ),
+                            if (_mock || _status == 'COMPLETED') ...[
+                              const SizedBox(height: 8),
                               MovaButton(
                                 label: 'Terminer et payer',
                                 onPressed: _goToPayment,
                               ),
+                            ],
                           ],
                         ),
                       ),

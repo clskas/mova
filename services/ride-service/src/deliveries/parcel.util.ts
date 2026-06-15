@@ -12,6 +12,7 @@ import {
   serviceAreaOutOfBoundsMessage,
 } from '@mova/shared';
 import { Delivery, DeliveryEvent, DeliveryStatus, DeliveryType } from '@prisma/client';
+import { computeDriverEta } from '../matching/eta.util';
 
 export { KINSHASA_BOUNDS };
 
@@ -64,10 +65,10 @@ const PARCEL_TIMELINE: { status: DeliveryStatus; label: string }[] = [
 ];
 
 const FOOD_TIMELINE: { status: DeliveryStatus; label: string }[] = [
-  { status: DeliveryStatus.PENDING, label: 'Commande passée au restaurant' },
-  { status: DeliveryStatus.PICKED_UP, label: 'Repas récupéré' },
-  { status: DeliveryStatus.IN_TRANSIT, label: 'Livreur en route' },
-  { status: DeliveryStatus.DELIVERED, label: 'Repas livré' },
+  { status: DeliveryStatus.PENDING, label: 'Confirmé' },
+  { status: DeliveryStatus.PICKED_UP, label: 'Préparation' },
+  { status: DeliveryStatus.IN_TRANSIT, label: 'En route' },
+  { status: DeliveryStatus.DELIVERED, label: 'Livré' },
 ];
 
 const EXPRESS_TIMELINE: { status: DeliveryStatus; label: string }[] = [
@@ -144,6 +145,20 @@ export function buildMovingTimeline(status: string, completedAt?: Date | null): 
   }));
 }
 
+/** Code PIN 4 chiffres pour confirmation de livraison (Glovo-style). */
+export function generateDeliveryPin(): string {
+  return String(Math.floor(1000 + Math.random() * 9000));
+}
+
+export function computeDeliveryEtaMinutes(
+  courierLat: number,
+  courierLng: number,
+  dropoffLat: number,
+  dropoffLng: number,
+): number {
+  return computeDriverEta(courierLat, courierLng, dropoffLat, dropoffLng).etaMinutes;
+}
+
 /** Position mock coursier (interpolation selon statut) */
 export function mockCourierLocation(
   delivery: Pick<Delivery, 'status' | 'pickupLat' | 'pickupLng' | 'dropoffLat' | 'dropoffLng'>,
@@ -165,12 +180,40 @@ export function mockCourierLocation(
   };
 }
 
+export type CourierProfile = {
+  userId: string;
+  name?: string;
+  rating?: number;
+  phone?: string;
+  lat?: number | null;
+  lng?: number | null;
+};
+
 export function formatParcelDelivery(
   delivery: Delivery & { events?: DeliveryEvent[]; restaurant?: { id: string; name: string; cuisine?: string | null } | null },
+  courier?: CourierProfile | null,
 ) {
   const priceCdf = delivery.finalPriceCdf ?? delivery.estimatedPriceCdf;
   const paymentReady = delivery.status === DeliveryStatus.DELIVERED;
   const city = resolveCityFromCoords(delivery.pickupLat ?? 0, delivery.pickupLng ?? 0);
+  const dropLat = delivery.dropoffLat ?? delivery.deliveryLat;
+  const dropLng = delivery.dropoffLng ?? delivery.deliveryLng;
+  const courierLoc =
+    courier?.lat != null && courier?.lng != null
+      ? { lat: courier.lat, lng: courier.lng, ts: Date.now() }
+      : mockCourierLocation(delivery);
+  let etaMinutes: number | null = null;
+  if (
+    courierLoc &&
+    dropLat != null &&
+    dropLng != null &&
+    delivery.status !== DeliveryStatus.DELIVERED &&
+    delivery.status !== DeliveryStatus.CANCELLED
+  ) {
+    etaMinutes = computeDeliveryEtaMinutes(courierLoc.lat, courierLoc.lng, dropLat, dropLng);
+  } else if (delivery.durationMin != null && delivery.status === DeliveryStatus.PENDING) {
+    etaMinutes = Math.max(15, Math.ceil(delivery.durationMin + 10));
+  }
   return {
     id: delivery.id,
     type: delivery.type,
@@ -196,7 +239,17 @@ export function formatParcelDelivery(
     paymentReady,
     restaurant: delivery.restaurant ? { id: delivery.restaurant.id, name: delivery.restaurant.name, cuisine: delivery.restaurant.cuisine } : undefined,
     createdAt: delivery.createdAt.toISOString(),
+    deliveryPin: delivery.deliveryPin ?? null,
+    etaMinutes,
     timeline: buildParcelTimeline(delivery, delivery.events),
-    courierLocation: mockCourierLocation(delivery),
+    courierLocation: courierLoc,
+    courier: courier
+      ? {
+          userId: courier.userId,
+          name: courier.name ?? `Livreur ${courier.userId.slice(0, 6)}`,
+          rating: courier.rating ?? 4.5,
+          phone: courier.phone ?? '',
+        }
+      : null,
   };
 }

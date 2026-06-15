@@ -198,6 +198,7 @@ model Delivery {
   deliveryLat       Float?
   deliveryLng       Float?
   driverId          String?
+  deliveryPin       String?
   estimatedPriceCdf Int
   finalPriceCdf     Int?
   distanceKm        Float?
@@ -297,19 +298,44 @@ model CarpoolTrip {
   dropoffLat        Float
   dropoffLng        Float
   dropoffAddress    String?
+  fromCity          String?
+  toCity            String?
+  meetingPoint      String?
   seatsTotal        Int           @default(3)
   seatsAvailable    Int
   pricePerSeatCdf   Int
   notes             String?
+  ladiesOnly        Boolean       @default(false)
+  instantBooking    Boolean       @default(true)
+  vehicleInfo       String?
+  distanceKm        Float?
+  durationMin       Float?
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
 
   passengers CarpoolPassenger[]
+  ratings    CarpoolRating[]
 
   @@index([driverId])
   @@index([status])
   @@index([departureAt])
+  @@index([fromCity, toCity])
   @@map("carpool_trips")
+}
+
+model CarpoolRating {
+  id         String      @id @default(uuid())
+  tripId     String
+  trip       CarpoolTrip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  fromUserId String
+  toUserId   String
+  score      Int
+  comment    String?
+  createdAt  DateTime    @default(now())
+
+  @@unique([tripId, fromUserId])
+  @@index([toUserId])
+  @@map("carpool_ratings")
 }
 
 model CarpoolPassenger {

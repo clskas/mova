@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/api/api_client.dart';
+import '../../core/config/market_config.dart';
 import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
@@ -238,7 +239,21 @@ class _MatchingScreenState extends ConsumerState<MatchingScreen>
               style: const TextStyle(fontSize: 13, color: MovaColors.textSecondary),
             ),
           ],
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
+          MovaCard(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.lock_outline, color: MovaColors.green),
+                const SizedBox(width: 8),
+                Text(
+                  'Tarif estimé : ${MarketConfig.formatCdf(widget.estimatedFareCdf)}',
+                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
           if (_searching)
             const LinearProgressIndicator(color: MovaColors.violet)
           else

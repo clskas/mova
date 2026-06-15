@@ -79,8 +79,14 @@ export class HistoryService {
             meta: {
               pickupAddress: d.pickupAddress,
               dropoffAddress: d.dropoffAddress ?? d.deliveryAddress,
+              deliveryAddress: d.deliveryAddress,
               photoUrl: d.photoUrl,
               restaurantName: d.restaurant?.name,
+              restaurantId: d.restaurantId,
+              items: d.items,
+              weightCategory: d.weightCategory,
+              deliveryLat: d.deliveryLat,
+              deliveryLng: d.deliveryLng,
               timeline: formatted.timeline,
             },
           });

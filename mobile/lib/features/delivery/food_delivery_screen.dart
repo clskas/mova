@@ -3,13 +3,23 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/api/api_client.dart';
 import '../../core/config/market_config.dart';
 import '../../core/error/result.dart';
+import '../../core/geo/geo_utils.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import 'food_tracking_screen.dart';
 
 class FoodDeliveryScreen extends ConsumerStatefulWidget {
-  const FoodDeliveryScreen({super.key});
+  const FoodDeliveryScreen({
+    super.key,
+    this.initialRestaurantId,
+    this.initialItems,
+    this.initialDeliveryAddress,
+  });
+
+  final String? initialRestaurantId;
+  final List<Map<String, dynamic>>? initialItems;
+  final String? initialDeliveryAddress;
 
   @override
   ConsumerState<FoodDeliveryScreen> createState() => _FoodDeliveryScreenState();
@@ -32,6 +42,9 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
   @override
   void initState() {
     super.initState();
+    if (widget.initialDeliveryAddress != null) {
+      _addressController.text = widget.initialDeliveryAddress!;
+    }
     _loadRestaurants();
   }
 
@@ -58,17 +71,54 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
     });
     final api = ref.read(apiClientProvider);
     await api.checkHealth();
-    final result = await api.get('/deliveries/restaurants');
+    final result = await api.get(
+      '/deliveries/restaurants?deliveryLat=$_deliveryLat&deliveryLng=$_deliveryLng',
+    );
     setState(() {
       _loading = false;
       switch (result) {
         case Success(:final data):
           _restaurants = (data['data'] as List? ?? [])
               .cast<Map<String, dynamic>>();
+          _applyInitialReorder();
         case Failure(:final error):
           _error = error.message;
       }
     });
+  }
+
+  void _applyInitialReorder() {
+    if (widget.initialRestaurantId == null) return;
+    final restaurant = _restaurants.cast<Map<String, dynamic>?>().firstWhere(
+          (r) => r?['id']?.toString() == widget.initialRestaurantId,
+          orElse: () => null,
+        );
+    if (restaurant == null) return;
+    _selectedRestaurant = restaurant;
+    _cart.clear();
+    for (final item in widget.initialItems ?? []) {
+      final name = item['name']?.toString();
+      final qty = item['quantity'] as int? ?? 1;
+      if (name != null && name.isNotEmpty) _cart[name] = qty;
+    }
+  }
+
+  int _deliveryEtaMin(Map<String, dynamic> restaurant) {
+    final apiEta = (restaurant['deliveryEtaMin'] as num?)?.toInt();
+    if (apiEta != null && apiEta > 0) return apiEta;
+    final lat = (restaurant['lat'] as num?)?.toDouble();
+    final lng = (restaurant['lng'] as num?)?.toDouble();
+    if (lat == null || lng == null) return 35;
+    return GeoUtils.driverEtaMinutes(lat, lng, _deliveryLat, _deliveryLng) + 15;
+  }
+
+  Widget _restaurantPlaceholder() {
+    return Container(
+      width: 72,
+      height: 72,
+      color: MovaColors.green.withValues(alpha: 0.12),
+      child: const Icon(Icons.restaurant, color: MovaColors.green),
+    );
   }
 
   int get _cartSubtotal {
@@ -206,13 +256,17 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
               }),
               child: Row(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: MovaColors.green.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(Icons.restaurant, color: MovaColors.green),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: r['imageUrl'] != null
+                        ? Image.network(
+                            r['imageUrl'].toString(),
+                            width: 72,
+                            height: 72,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => _restaurantPlaceholder(),
+                          )
+                        : _restaurantPlaceholder(),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -221,29 +275,40 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
                       children: [
                         Text(
                           r['name']?.toString() ?? '',
-                          style: const TextStyle(fontWeight: FontWeight.w600),
+                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
+                        ),
+                        Row(
+                          children: [
+                            const Icon(Icons.star, color: Colors.amber, size: 14),
+                            const SizedBox(width: 4),
+                            Text(
+                              '${r['rating']}',
+                              style: const TextStyle(fontSize: 13),
+                            ),
+                            const SizedBox(width: 8),
+                            const Icon(Icons.schedule, size: 14, color: MovaColors.textSecondary),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Livraison ~${_deliveryEtaMin(r)} min',
+                              style: const TextStyle(
+                                color: MovaColors.violet,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
                         ),
                         Text(
-                          '${r['cuisine']} · ⭐ ${r['rating']}',
+                          r['cuisine']?.toString() ?? '',
                           style: const TextStyle(
                             color: MovaColors.textSecondary,
-                            fontSize: 13,
+                            fontSize: 12,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        if (r['address'] != null)
-                          Text(
-                            r['address']?.toString() ?? '',
-                            style: const TextStyle(
-                              color: MovaColors.textSecondary,
-                              fontSize: 12,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
                       ],
                     ),
                   ),

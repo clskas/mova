@@ -7,6 +7,8 @@ import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
+import '../delivery/food_delivery_screen.dart';
+import '../delivery/parcel_delivery_screen.dart';
 import '../../core/widgets/offline_shell.dart';
 
 class HistoryScreen extends ConsumerStatefulWidget {
@@ -128,7 +130,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
         'dropoffAddress': meta['dropoffAddress'] ?? '',
         'priceCdf': item['priceCdf'],
         'status': item['status'],
-      });
+      }, meta: meta);
     }
     if (type == 'FOOD') {
       return _foodTile({
@@ -137,7 +139,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
         'deliveryAddress': meta['deliveryAddress'] ?? '',
         'priceCdf': item['priceCdf'],
         'status': item['status'],
-      });
+      }, meta: meta);
     }
     if (type == 'SCHEDULED') {
       return _scheduledTile({
@@ -165,7 +167,8 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
         ),
       );
 
-  Widget _parcelTile(Map<String, dynamic> item) {
+  Widget _parcelTile(Map<String, dynamic> item, {Map<String, dynamic>? meta}) {
+    final m = meta ?? item;
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: MovaCard(
@@ -181,7 +184,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
             ),
             const SizedBox(height: 4),
             Text(
-              '${item['pickupAddress'] ?? 'Enlèvement'} → ${item['dropoffAddress'] ?? 'Livraison'}',
+              '${item['pickupAddress'] ?? m['pickupAddress'] ?? 'Enlèvement'} → ${item['dropoffAddress'] ?? m['dropoffAddress'] ?? 'Livraison'}',
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
@@ -194,13 +197,34 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
               _statusLabel(item['status']?.toString()),
               style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
             ),
+            if ((item['status']?.toString() ?? '') == 'DELIVERED') ...[
+              const SizedBox(height: 8),
+              MovaButton(
+                label: 'Commander à nouveau',
+                isSecondary: true,
+                icon: Icons.replay,
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ParcelDeliveryScreen(
+                        initialPickupAddress: m['pickupAddress']?.toString(),
+                        initialDropoffAddress: m['dropoffAddress']?.toString(),
+                        initialWeightCategory: m['weightCategory']?.toString(),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ],
           ],
         ),
       ),
     );
   }
 
-  Widget _foodTile(Map<String, dynamic> item) {
+  Widget _foodTile(Map<String, dynamic> item, {Map<String, dynamic>? meta}) {
+    final m = meta ?? item;
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: MovaCard(
@@ -236,6 +260,27 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
               _statusLabel(item['status']?.toString()),
               style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
             ),
+            if ((item['status']?.toString() ?? '') == 'DELIVERED') ...[
+              const SizedBox(height: 8),
+              MovaButton(
+                label: 'Commander à nouveau',
+                isSecondary: true,
+                icon: Icons.replay,
+                onPressed: () {
+                  final items = (m['items'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => FoodDeliveryScreen(
+                        initialRestaurantId: m['restaurantId']?.toString(),
+                        initialItems: items,
+                        initialDeliveryAddress: m['deliveryAddress']?.toString(),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ],
           ],
         ),
       ),

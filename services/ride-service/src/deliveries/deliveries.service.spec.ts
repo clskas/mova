@@ -96,4 +96,32 @@ describe('DeliveriesService', () => {
     expect(result.itemsSubtotalCdf).toBe(10000);
     expect(result.estimatedPriceCdf).toBeGreaterThan(10000);
   });
+
+  it('createParcel assigns a 4-digit delivery pin', async () => {
+    prisma.delivery.create.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({
+      ...data,
+      id: 'del-1',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      events: [],
+    }));
+    prisma.deliveryEvent.create.mockResolvedValue({});
+    const dto = {
+      pickupLat: -4.32,
+      pickupLng: 15.31,
+      pickupAddress: 'Gombe',
+      dropoffLat: -4.34,
+      dropoffLng: 15.32,
+      dropoffAddress: 'Kalamu',
+      weightCategory: 'DOCUMENTS' as const,
+    };
+    await service.createParcel('u1', dto);
+    expect(prisma.delivery.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          deliveryPin: expect.stringMatching(/^\d{4}$/),
+        }),
+      }),
+    );
+  });
 });

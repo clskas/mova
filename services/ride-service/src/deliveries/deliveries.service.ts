@@ -10,6 +10,7 @@ import {
   buildParcelTimeline,
   detectCommune,
   formatParcelDelivery,
+  generateDeliveryPin,
 } from './parcel.util';
 
 const WEIGHT_MULTIPLIERS: Record<WeightCategory, number> = {
@@ -110,6 +111,7 @@ export class DeliveriesService {
         userId,
         type: DeliveryType.PARCEL,
         status: DeliveryStatus.PENDING,
+        deliveryPin: generateDeliveryPin(),
         pickupLat: dto.pickupLat,
         pickupLng: dto.pickupLng,
         pickupAddress: dto.pickupAddress.trim(),
@@ -160,6 +162,7 @@ export class DeliveriesService {
         userId,
         type: DeliveryType.FOOD,
         status: DeliveryStatus.PENDING,
+        deliveryPin: generateDeliveryPin(),
         restaurantId: dto.restaurantId,
         items: dto.items as unknown as Prisma.InputJsonValue,
         deliveryAddress: dto.deliveryAddress,
@@ -203,6 +206,7 @@ export class DeliveriesService {
         userId,
         type: DeliveryType.EXPRESS,
         status: DeliveryStatus.PENDING,
+        deliveryPin: generateDeliveryPin(),
         pickupLat: dto.pickupLat,
         pickupLng: dto.pickupLng,
         pickupAddress: dto.pickupAddress.trim(),
@@ -244,12 +248,44 @@ export class DeliveriesService {
     if (delivery.userId !== userId && delivery.driverId !== userId) {
       throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
     }
-    const formatted = formatParcelDelivery(delivery);
+    const courier = delivery.driverId ? await this.fetchCourierProfile(delivery.driverId) : null;
+    const formatted = formatParcelDelivery(delivery, courier);
     return {
       delivery: formatted,
       tracking: formatted.timeline,
       courierLocation: formatted.courierLocation,
+      courier: formatted.courier,
+      etaMinutes: formatted.etaMinutes,
+      deliveryPin: formatted.deliveryPin,
       paymentReady: formatted.paymentReady,
+    };
+  }
+
+  private async fetchUserBrief(userId: string): Promise<{ name?: string; phone?: string } | null> {
+    try {
+      const res = await fetch(serviceUrl('auth', `/internal/users/${userId}`), {
+        headers: { 'x-internal-api-key': INTERNAL_API_KEY },
+      });
+      if (!res.ok) return null;
+      const user = (await res.json()) as { firstName?: string; lastName?: string; phone?: string };
+      const name = [user.firstName, user.lastName].filter(Boolean).join(' ').trim();
+      return { name: name || undefined, phone: user.phone };
+    } catch {
+      return null;
+    }
+  }
+
+  private async fetchCourierProfile(userId: string) {
+    const profile = await this.fetchDriverProfile(userId);
+    if (!profile) return null;
+    const user = await this.fetchUserBrief(userId);
+    return {
+      userId,
+      name: user?.name ?? `Livreur ${userId.slice(0, 6)}`,
+      phone: user?.phone ?? '',
+      rating: (profile as { ratingAvg?: number }).ratingAvg ?? 4.5,
+      lat: profile.currentLat,
+      lng: profile.currentLng,
     };
   }
 
@@ -279,13 +315,22 @@ export class DeliveriesService {
     return { data: rows.map((d) => formatParcelDelivery(d)) };
   }
 
-  async listRestaurants() {
+  async listRestaurants(deliveryLat?: number, deliveryLng?: number) {
     const rows = await this.prisma.restaurant.findMany({
       where: { isActive: true },
       orderBy: { rating: 'desc' },
       select: { id: true, name: true, cuisine: true, address: true, lat: true, lng: true, rating: true, imageUrl: true, menuItems: true },
     });
-    return { data: rows };
+    const data = rows.map((r) => {
+      let deliveryEtaMin: number | null = null;
+      if (deliveryLat != null && deliveryLng != null) {
+        const distanceKm = this.pricing.haversineKm(r.lat, r.lng, deliveryLat, deliveryLng);
+        const travelMin = Math.ceil((distanceKm / 20) * 60);
+        deliveryEtaMin = Math.max(20, travelMin + 15);
+      }
+      return { ...r, deliveryEtaMin };
+    });
+    return { data };
   }
 
   private async fetchDriverProfile(userId: string) {
@@ -299,6 +344,7 @@ export class DeliveriesService {
         kycStatus?: string;
         currentLat?: number | null;
         currentLng?: number | null;
+        ratingAvg?: number;
       };
     } catch {
       return null;

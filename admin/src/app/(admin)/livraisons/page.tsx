@@ -4,9 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { apiFetch, formatCdf, updateDeliveryStatus, type DeliveryOverview } from "@/lib/api";
 import { useAdmin } from "@/components/AdminProvider";
 import {
-  BtnDanger,
   Card,
-  ConfirmDialog,
   EmptyState,
   ErrorBanner,
   FieldLabel,

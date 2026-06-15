@@ -124,7 +124,7 @@ export function FoodOrder({ onBack, mock }: Props) {
             <div className="flex-1 min-w-0">
               <p className="font-semibold truncate">{r.name}</p>
               <p className="text-xs text-gray-500">{r.cuisine} · ⭐ {r.rating}</p>
-              <p className="text-xs text-[#6C63FF]">Livraison dès {formatCdf(r.deliveryMinCdf)}</p>
+              <p className="text-xs text-[#6C63FF]">Livraison dès {formatCdf(r.deliveryMinCdf ?? 3500)}</p>
             </div>
           </button>
         ))}

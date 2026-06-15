@@ -13,7 +13,7 @@ done
 
 echo "=== Shared package quick test ==="
 cd packages/shared
-npm ci --silent
+npm ci --no-workspaces --silent
 npm run build --silent
 npm test --silent
 

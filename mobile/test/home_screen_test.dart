@@ -75,7 +75,12 @@ void main() {
     );
     await tester.tap(find.text('Réservation planifiée').first);
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle(const Duration(seconds: 2));
+    await tester.scrollUntilVisible(
+      find.text('Maximum J+7').first,
+      120,
+      scrollable: find.byType(Scrollable).first,
+    );
     expect(find.text('Maximum J+7'), findsOneWidget);
 
     await tester.pageBack();

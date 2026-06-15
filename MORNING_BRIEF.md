@@ -34,7 +34,7 @@ cd admin && npm install && npm run dev
 |--------|-----|----------|
 | API Gateway | http://localhost:3000 | — |
 | Web PWA | http://localhost:3001 | OTP `123456` (`MOCK_OTP=true`) |
-| Admin | http://localhost:3002/login | `+243900000001` / `123456` |
+| Admin | http://localhost:3002/login | Staff `+243900000001`–`005` / OTP `123456` — voir [docs/RBAC_TESTING.md](docs/RBAC_TESTING.md) |
 | Ride service (Docker) | http://localhost:3022 | — |
 
 ## Modules Web PWA

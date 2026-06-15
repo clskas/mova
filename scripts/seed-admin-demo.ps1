@@ -23,9 +23,12 @@ foreach ($svc in @("auth-service", "driver-service", "ride-service")) {
 }
 
 Write-Host ""
-Write-Host "[1/5] Admin user (+243900000001, SUPER_ADMIN)..." -ForegroundColor Yellow
+Write-Host "[1/5] Staff roles (+243900000001-005)..." -ForegroundColor Yellow
 $env:DATABASE_URL = $env:AUTH_DATABASE_URL
-& "$PSScriptRoot\seed-admin.ps1"
+Push-Location (Join-Path $root "services\auth-service")
+try {
+  npx ts-node prisma/seed-staff-roles.ts
+} finally { Pop-Location }
 
 Write-Host ""
 Write-Host "[2/5] Grant ride DB schema (host access)..." -ForegroundColor Yellow
@@ -55,7 +58,9 @@ Get-Content $sqlFile | docker exec -i $postgresContainer psql -U mova -d mova_ri
 
 Write-Host ""
 Write-Host "=== Demo seed complete ===" -ForegroundColor Green
-Write-Host 'Admin login:  phone +243900000001  OTP 123456  (role SUPER_ADMIN)'
+Write-Host 'Staff logins: +243900000001 SUPER_ADMIN, +243900000002 ADMIN, +243900000003 SUPPORT'
+Write-Host '              +243900000004 FINANCE, +243900000005 CONTENT  — OTP 123456'
 Write-Host 'Demo users:   3 passengers (+243900000010-012), 4 drivers (+243900000020-023)'
+Write-Host 'RBAC guide:   docs/RBAC_TESTING.md'
 Write-Host 'Dashboard:    3 KYC pending, 2 open incidents, 3 rides, 2 deliveries, 2 scheduled'
 Write-Host 'Start admin:  cd admin; npm run dev on port 3002'

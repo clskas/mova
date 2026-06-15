@@ -35,11 +35,11 @@ for i in $(seq 1 90); do
   sleep 5
 done
 
-echo "=== Seed admin user (+243900000001) ==="
+echo "=== Seed staff roles (+243900000001-005) ==="
 export DATABASE_URL="postgresql://mova:mova@localhost:54320/mova_auth"
 cd "$ROOT/services/auth-service"
 npm ci --silent
-npx ts-node prisma/seed.ts
+npx ts-node prisma/seed-staff-roles.ts
 
 echo "=== Build and start admin (:3002) + web (:3001) ==="
 cd "$ROOT/admin"

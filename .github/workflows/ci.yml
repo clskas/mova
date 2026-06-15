@@ -20,7 +20,7 @@ jobs:
           node-version: '22'
           cache: npm
           cache-dependency-path: packages/shared/package-lock.json
-      - run: npm ci
+      - run: npm ci --no-workspaces
         working-directory: packages/shared
       - run: npm run build
         working-directory: packages/shared
@@ -47,7 +47,7 @@ jobs:
           node-version: '22'
       - name: Build shared package
         run: |
-          cd packages/shared && npm ci && npm run build
+          cd packages/shared && npm ci --no-workspaces && npm run build
       - name: Install and build ${{ matrix.service }}
         run: |
           cd services/${{ matrix.service }}
@@ -170,7 +170,7 @@ jobs:
           node-version: '22'
       - name: npm audit (shared + gateway)
         run: |
-          cd packages/shared && npm ci && npm audit --audit-level=high || true
+          cd packages/shared && npm ci --no-workspaces && npm audit --audit-level=high || true
           cd ../../services/api-gateway && npm install && npm audit --audit-level=high || true
 
   codeql:

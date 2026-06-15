@@ -242,8 +242,8 @@ export class AdminController {
   @Get('pricing-rules')
   @RequirePermissions(AdminPermission.PRICING_READ)
   @ApiOperation({ summary: 'Règles tarifaires véhicules' })
-  pricingRules() {
-    return this.adminService.listPricingRules();
+  pricingRules(@Query('city') city?: string) {
+    return this.adminService.listPricingRules(city);
   }
 
   @Post('pricing-rules/:vehicleType')
@@ -263,8 +263,22 @@ export class AdminController {
   @Delete('pricing-rules/:vehicleType')
   @RequirePermissions(AdminPermission.PRICING_WRITE)
   @ApiOperation({ summary: 'Désactiver règle tarifaire' })
-  deletePricing(@Param('vehicleType') vehicleType: string) {
-    return this.adminService.deletePricingRule(vehicleType);
+  deletePricing(@Param('vehicleType') vehicleType: string, @Query('city') city: string) {
+    return this.adminService.deletePricingRule(vehicleType, city);
+  }
+
+  @Get('delivery-pricing-rules')
+  @RequirePermissions(AdminPermission.PRICING_READ)
+  @ApiOperation({ summary: 'Majorations livraison par catégorie' })
+  deliveryPricingRules() {
+    return this.adminService.listDeliveryPricingRules();
+  }
+
+  @Patch('delivery-pricing-rules/:category')
+  @RequirePermissions(AdminPermission.PRICING_WRITE)
+  @ApiOperation({ summary: 'Modifier majoration livraison' })
+  updateDeliveryPricing(@Param('category') category: string, @Body() body: Record<string, unknown>) {
+    return this.adminService.updateDeliveryPricingRule(category, body);
   }
 
   @Get('communes')

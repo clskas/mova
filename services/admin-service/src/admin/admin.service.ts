@@ -179,8 +179,9 @@ export class AdminService {
     return this.proxy('ride', `/internal/restaurants/${id}`, { method: 'DELETE' });
   }
 
-  listPricingRules() {
-    return this.fetchJson('ride', '/internal/pricing-rules');
+  listPricingRules(city?: string) {
+    const q = city ? `?city=${encodeURIComponent(city)}` : '';
+    return this.fetchJson('ride', `/internal/pricing-rules${q}`);
   }
   createPricingRule(vehicleType: string, body: Record<string, unknown>) {
     return this.proxy('ride', `/internal/pricing-rules/${vehicleType}`, { method: 'POST', body: JSON.stringify(body) });
@@ -188,8 +189,16 @@ export class AdminService {
   updatePricingRule(vehicleType: string, body: Record<string, unknown>) {
     return this.proxy('ride', `/internal/pricing-rules/${vehicleType}`, { method: 'PATCH', body: JSON.stringify(body) });
   }
-  deletePricingRule(vehicleType: string) {
-    return this.proxy('ride', `/internal/pricing-rules/${vehicleType}`, { method: 'DELETE' });
+  deletePricingRule(vehicleType: string, city: string) {
+    const q = city ? `?city=${encodeURIComponent(city)}` : '';
+    return this.proxy('ride', `/internal/pricing-rules/${vehicleType}${q}`, { method: 'DELETE' });
+  }
+
+  listDeliveryPricingRules() {
+    return this.fetchJson('ride', '/internal/delivery-pricing-rules');
+  }
+  updateDeliveryPricingRule(category: string, body: Record<string, unknown>) {
+    return this.proxy('ride', `/internal/delivery-pricing-rules/${category}`, { method: 'PATCH', body: JSON.stringify(body) });
   }
 
   listCommunes(city?: string) {

@@ -22,6 +22,12 @@ class MovaRideMap extends StatefulWidget {
   final double height;
   final IconData driverIcon;
 
+  static LatLng mapDefaultCenter() =>
+      LatLng(MarketConfig.mapCenterLat, MarketConfig.mapCenterLng);
+
+  /// @deprecated Utiliser [mapDefaultCenter]
+  static LatLng kinshasaDefault() => mapDefaultCenter();
+
   @override
   State<MovaRideMap> createState() => _MovaRideMapState();
 }
@@ -138,12 +144,6 @@ class _MovaRideMapState extends State<MovaRideMap> {
       ),
     );
   }
-
-  static LatLng mapDefaultCenter() =>
-      LatLng(MarketConfig.mapCenterLat, MarketConfig.mapCenterLng);
-
-  /// @deprecated Utiliser [mapDefaultCenter]
-  static LatLng kinshasaDefault() => mapDefaultCenter();
 }
 
 class _PinIcon extends StatelessWidget {

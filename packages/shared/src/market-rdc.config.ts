@@ -67,6 +67,26 @@ export const MARKET_RDC = {
     perKmSurchargeCdf: 500,
   },
 
+  /** Location véhicule — assurance, options et remises. */
+  rental: {
+    weeklyDiscountPct: 10,
+    defaultWeeklyDiscountPct: 10,
+    insuranceTiers: {
+      BASIC: { label: 'Basique', surchargePct: 0 },
+      STANDARD: { label: 'Standard', surchargePct: 12 },
+      PREMIUM: { label: 'Premium', surchargePct: 25 },
+    },
+    addOns: {
+      childSeat: { label: 'Siège enfant', priceCdf: 5_000 },
+      gps: { label: 'GPS', priceCdf: 8_000 },
+      extraDriver: { label: 'Conducteur supplémentaire', priceCdf: 15_000 },
+    },
+    limitedMileageFeeCdf: 15_000,
+    limitedMileageKmPerDay: 100,
+    cancellationPolicyDefault:
+      'Annulation gratuite jusqu\'à 24 h avant la prise en charge. Au-delà, 50 % du montant location retenu.',
+  },
+
   support: {
     whatsapp: '+243900000000',
     phone: '+243900000000',

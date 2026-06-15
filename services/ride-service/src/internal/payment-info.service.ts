@@ -106,7 +106,7 @@ export class PaymentInfoService {
       referenceType: 'RENTAL',
       referenceId: bookingId,
       userId: inquiry.userId,
-      amountCdf: inquiry.estimatedPriceCdf ?? 0,
+      amountCdf: inquiry.totalCdf ?? inquiry.estimatedPriceCdf ?? 0,
       status: inquiry.status,
       paymentReady: ready,
       title: inquiry.vehicle?.name ?? inquiry.vehicleType,

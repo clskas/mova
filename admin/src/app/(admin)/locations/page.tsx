@@ -21,7 +21,7 @@ import {
   StatusBadge,
 } from "@/components/ui";
 
-const STATUSES = ["PENDING", "CONFIRMED", "ACTIVE", "COMPLETED", "CANCELLED"];
+const STATUSES = ['PENDING', 'CONFIRMED', 'CONTACTED', 'IN_PROGRESS', 'RETURNED', 'CLOSED'];
 
 export default function LocationsPage() {
   const { canWrite } = useAdmin();
@@ -93,11 +93,16 @@ export default function LocationsPage() {
             <tbody>
               {rows.map((r) => (
                 <tr key={r.id} className="border-b hover:bg-gray-50">
-                  <td className="p-3 font-medium">{r.vehicleType ?? r.id.slice(0, 8)}</td>
+                  <td className="p-3 font-medium">{r.vehicleName ?? r.vehicleType ?? r.id.slice(0, 8)}</td>
                   <td className="p-3 text-gray-600">
                     {formatDate(r.startDate)} → {formatDate(r.endDate)}
+                    {(r as { pickupCity?: string; returnCity?: string }).pickupCity && (
+                      <span className="block text-xs">
+                        {(r as { pickupCity?: string }).pickupCity} → {(r as { returnCity?: string }).returnCity}
+                      </span>
+                    )}
                   </td>
-                  <td className="p-3">{formatCdf(r.estimatedPriceCdf)}</td>
+                  <td className="p-3">{formatCdf(r.estimatedPriceCdf ?? (r as { priceCdf?: number }).priceCdf ?? 0)}</td>
                   <td className="p-3"><StatusBadge status={r.status ?? "PENDING"} /></td>
                   <td className="p-3 text-gray-500">{formatDate(r.createdAt)}</td>
                   <td className="p-3">
@@ -109,7 +114,7 @@ export default function LocationsPage() {
                           disabled={saving === r.id}
                           options={STATUSES.map((s) => ({ value: s, label: s }))}
                         />
-                        {r.status !== "CANCELLED" && (
+                        {r.status !== 'CLOSED' && (
                           <BtnDanger onClick={() => cancel(r.id)} disabled={saving === r.id}>Annuler</BtnDanger>
                         )}
                       </div>

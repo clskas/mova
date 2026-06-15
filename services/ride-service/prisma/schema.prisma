@@ -276,6 +276,8 @@ enum RentalInquiryStatus {
   PENDING
   CONFIRMED
   CONTACTED
+  IN_PROGRESS
+  RETURNED
   CLOSED
 }
 
@@ -377,19 +379,34 @@ model ErrandOrder {
 }
 
 model RentalVehicle {
-  id            String   @id @default(uuid())
-  name          String
-  category      String
-  seats         Int
-  dailyRateCdf  Int
-  depositCdf    Int      @default(50000)
-  imageUrl      String?
-  isActive      Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id                   String   @id @default(uuid())
+  name                 String
+  make                 String?
+  model                String?
+  year                 Int?
+  category             String
+  transmission         String   @default("MANUAL")
+  city                 String   @default("Kinshasa")
+  seats                Int
+  dailyRateCdf         Int
+  depositCdf           Int      @default(50000)
+  weeklyDiscountPct    Int      @default(10)
+  rating               Float    @default(4.5)
+  ownerName            String?
+  ownerBadge           String?
+  ownerContactPhone    String?
+  features             Json?
+  cancellationPolicy   String?
+  mileageUnlimited     Boolean  @default(true)
+  limitedMileageFeeCdf Int      @default(15000)
+  imageUrl             String?
+  isActive             Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 
   bookings RentalInquiry[]
 
+  @@index([city, category, isActive])
   @@map("rental_vehicles")
 }
 
@@ -403,9 +420,16 @@ model RentalInquiry {
   startDate         DateTime
   endDate           DateTime
   pickupAddress     String?
+  pickupCity        String?
+  returnCity        String?
+  rentalPeriod      String              @default("DAILY")
+  mileageType       String              @default("UNLIMITED")
+  insuranceTier     String              @default("BASIC")
+  addOns            Json?
   contactPhone      String?
   notes             String?
   estimatedPriceCdf Int?
+  totalCdf          Int?
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
 

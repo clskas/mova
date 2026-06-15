@@ -1,7 +1,13 @@
-import { Body, Controller, Get, Param, Post, Request, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, Request, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { CreateRentalBookingDto, CreateRentalInquiryDto, RentalEstimateDto } from './rental.dto';
+import {
+  CreateRentalBookingDto,
+  CreateRentalInquiryDto,
+  RentalEstimateDto,
+  RentalQuoteDto,
+  RentalVehicleQueryDto,
+} from './rental.dto';
 import { RentalService } from './rental.service';
 
 @ApiTags('rental')
@@ -12,13 +18,25 @@ export class RentalController {
   constructor(private rentalService: RentalService) {}
 
   @Get('vehicles')
-  @ApiOperation({ summary: 'Catalogue véhicules location (toutes zones MOVA)' })
-  vehicles() {
-    return this.rentalService.listVehicles();
+  @ApiOperation({ summary: 'Catalogue véhicules avec filtres et tri' })
+  vehicles(@Query() query: RentalVehicleQueryDto) {
+    return this.rentalService.listVehicles(query);
+  }
+
+  @Get('vehicles/:id')
+  @ApiOperation({ summary: 'Détail véhicule et options location' })
+  vehicle(@Param('id') id: string) {
+    return this.rentalService.getVehicle(id);
+  }
+
+  @Post('quote')
+  @ApiOperation({ summary: 'Devis location complet (assurance, options, inter-ville)' })
+  quote(@Body() dto: RentalQuoteDto) {
+    return this.rentalService.quote(dto);
   }
 
   @Post('estimate')
-  @ApiOperation({ summary: 'Estimer location véhicule (CDF)' })
+  @ApiOperation({ summary: 'Estimer location véhicule (alias quote)' })
   estimate(@Body() dto: RentalEstimateDto) {
     return this.rentalService.estimate(dto);
   }
@@ -60,7 +78,7 @@ export class RentalController {
   }
 
   @Get('inquiries/:id')
-  @ApiOperation({ summary: 'Détail demande de location' })
+  @ApiOperation({ summary: 'Détail demande avec timeline statut' })
   get(@Request() req: { user: { id: string } }, @Param('id') id: string) {
     return this.rentalService.get(id, req.user.id);
   }

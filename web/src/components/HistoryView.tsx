@@ -23,7 +23,7 @@ type Scheduled = {
   status?: string;
 };
 
-type Props = { onBack: () => void };
+type Props = { onBack: () => void; mock?: boolean };
 
 const STATUS_LABELS: Record<string, string> = {
   COMPLETED: "Terminé",
@@ -33,7 +33,7 @@ const STATUS_LABELS: Record<string, string> = {
   CANCELLED: "Annulé",
 };
 
-export function HistoryView({ onBack }: Props) {
+export function HistoryView({ onBack, mock = false }: Props) {
   const [tab, setTab] = useState<"rides" | "deliveries" | "scheduled">("rides");
   const [rides, setRides] = useState<Ride[]>([]);
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
@@ -43,9 +43,9 @@ export function HistoryView({ onBack }: Props) {
   useEffect(() => {
     async function load() {
       const [ridesData, deliveriesData, scheduledData] = await Promise.all([
-        apiFetch<Ride[] | { data?: Ride[] }>("/api/rides/history?role=passenger"),
-        apiFetch<{ data?: Delivery[] }>("/api/deliveries/history"),
-        apiFetch<{ data?: Scheduled[] }>("/api/rides/scheduled"),
+        apiFetch<Ride[] | { data?: Ride[] }>("/api/rides/history?role=passenger", undefined, { useMock: mock }),
+        apiFetch<{ data?: Delivery[] }>("/api/deliveries/history", undefined, { useMock: mock }),
+        apiFetch<{ data?: Scheduled[] }>("/api/rides/scheduled", undefined, { useMock: mock }),
       ]);
 
       const rideList = Array.isArray(ridesData) ? ridesData : ridesData.data ?? [];
@@ -60,7 +60,7 @@ export function HistoryView({ onBack }: Props) {
       setLoading(false);
     }
     load();
-  }, []);
+  }, [mock]);
 
   const tabs = [
     { id: "rides" as const, label: "Courses" },

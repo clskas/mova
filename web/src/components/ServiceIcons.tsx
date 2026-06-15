@@ -111,3 +111,33 @@ export function HelpIcon(props: IconProps) {
     </Svg>
   );
 }
+
+export function ExpressIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M13 2L3 14h8l-1 8 10-12h-8l1-8z" />
+    </Svg>
+  );
+}
+
+export function MovingIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <rect x="2" y="8" width="15" height="10" rx="1" />
+      <path d="M17 11h3l2 4v3h-5v-7z" />
+      <circle cx="7" cy="18" r="1.5" fill={props.color ?? defaults.color} stroke="none" />
+      <circle cx="18" cy="18" r="1.5" fill={props.color ?? defaults.color} stroke="none" />
+    </Svg>
+  );
+}
+
+export function RentalIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M5 17h14M7 17l-1-5h12l-1 5" />
+      <path d="M7 12l2-5h6l2 5" />
+      <circle cx="8" cy="17" r="1.5" fill={props.color ?? defaults.color} stroke="none" />
+      <circle cx="16" cy="17" r="1.5" fill={props.color ?? defaults.color} stroke="none" />
+    </Svg>
+  );
+}

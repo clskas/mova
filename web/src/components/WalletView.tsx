@@ -21,7 +21,7 @@ export function WalletView({ onBack, mock }: Props) {
     setLoading(true);
     setError(null);
     try {
-      const data = await apiFetch<WalletData>("/api/wallet");
+      const data = await apiFetch<WalletData>("/api/wallet", undefined, { useMock: mock });
       setWallet(data);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur de chargement");
@@ -32,7 +32,7 @@ export function WalletView({ onBack, mock }: Props) {
 
   useEffect(() => {
     load();
-  }, []);
+  }, [mock]);
 
   async function topUp() {
     const value = parseInt(amount, 10);
@@ -45,8 +45,8 @@ export function WalletView({ onBack, mock }: Props) {
     try {
       const res = await apiFetch<{ balanceCdf?: number; message?: string }>("/api/wallet/top-up", {
         method: "POST",
-        body: JSON.stringify({ provider: "MOCK", amountCdf: value, phone: "+243812345678" }),
-      });
+        body: JSON.stringify({ provider: mock ? "MOCK" : "ORANGE_MONEY", amountCdf: value, phone: "+243812345678" }),
+      }, { useMock: mock });
       if (res.balanceCdf != null) {
         setWallet((w) => ({ ...w, balanceCdf: res.balanceCdf }));
       }

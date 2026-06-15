@@ -44,11 +44,11 @@ export function FoodOrder({ onBack, mock }: Props) {
   const [total, setTotal] = useState(0);
 
   useEffect(() => {
-    apiFetch<{ data?: Record<string, unknown>[] }>("/api/deliveries/restaurants").then((res) => {
+    apiFetch<{ data?: Record<string, unknown>[] }>("/api/deliveries/restaurants", undefined, { useMock: mock }).then((res) => {
       setRestaurants((res.data ?? []).map(normalizeRestaurant));
       setLoading(false);
-    });
-  }, []);
+    }).catch(() => setLoading(false));
+  }, [mock]);
 
   const cartTotal = selected
     ? Object.entries(cart).reduce((sum, [id, qty]) => {
@@ -85,7 +85,7 @@ export function FoodOrder({ onBack, mock }: Props) {
         deliveryLng: 15.3125,
         items,
       }),
-    });
+    }, { useMock: mock });
     setTotal(res.delivery?.estimatedPriceCdf ?? res.order?.priceCdf ?? cartTotal + deliveryFee);
     setConfirmed(true);
     setOrdering(false);

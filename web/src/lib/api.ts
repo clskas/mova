@@ -1,17 +1,47 @@
 /** Passerelle API unique (microservices). Toutes les routes passent par `/api/...`. */
+import { authHeaders } from './auth';
+
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000';
 
-export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+export type ApiFetchOptions = {
+  /** Utiliser les données mock uniquement si la passerelle est indisponible */
+  useMock?: boolean;
+};
+
+export class ApiError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message);
+  }
+}
+
+export async function apiFetch<T>(
+  path: string,
+  init?: RequestInit,
+  options?: ApiFetchOptions,
+): Promise<T> {
   const url = path.startsWith('http') ? path : `${API_BASE}${path}`;
+  const useMock = options?.useMock ?? false;
+
   try {
     const res = await fetch(url, {
       ...init,
-      headers: { 'Content-Type': 'application/json', ...init?.headers },
+      headers: { 'Content-Type': 'application/json', ...authHeaders(), ...init?.headers },
     });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (!res.ok) {
+      let message = `HTTP ${res.status}`;
+      try {
+        const body = await res.json();
+        message = body.error?.message ?? body.message ?? message;
+      } catch {
+        /* ignore */
+      }
+      if (useMock) return mockFor<T>(path, init);
+      throw new ApiError(message, res.status);
+    }
     return (await res.json()) as T;
-  } catch {
-    return mockFor<T>(path, init);
+  } catch (e) {
+    if (useMock) return mockFor<T>(path, init);
+    throw e instanceof ApiError ? e : new ApiError('Réseau indisponible', 0);
   }
 }
 
@@ -27,6 +57,16 @@ export async function checkGatewayHealth(): Promise<boolean> {
 function mockFor<T>(path: string, init?: RequestInit): T {
   const method = init?.method ?? 'GET';
 
+  if (path.includes('/auth/otp/request')) {
+    return { success: true, message: 'Code OTP envoyé', mockCode: '123456' } as T;
+  }
+  if (path.includes('/auth/otp/verify')) {
+    return {
+      success: true,
+      accessToken: 'mock-web-token',
+      user: { id: 'mock-user', phone: '+243812345678', role: 'PASSENGER' },
+    } as T;
+  }
   if (path.includes('/rides/history')) {
     return [
       { id: '1', pickupAddress: 'Gombe', dropoffAddress: 'Limete', priceCdf: 7500, status: 'COMPLETED' },
@@ -55,6 +95,47 @@ function mockFor<T>(path: string, init?: RequestInit): T {
         priceCdf: 5000,
       },
     } as T;
+  }
+  if (path.includes('/express/estimate') && method === 'POST') {
+    return { estimatedPriceCdf: 7500, currency: 'CDF', expressSurchargeCdf: 2000 } as T;
+  }
+  if (path === '/api/express' || (path.endsWith('/express') && method === 'POST')) {
+    const body = init?.body ? JSON.parse(init.body as string) : {};
+    return {
+      delivery: {
+        id: `express-${Date.now()}`,
+        status: 'PENDING',
+        type: 'EXPRESS',
+        ...body,
+        estimatedPriceCdf: 7500,
+      },
+    } as T;
+  }
+  if (path.includes('/moving/estimate') && method === 'POST') {
+    return { estimatedPriceCdf: 45000, currency: 'CDF', volumeM3: 10 } as T;
+  }
+  if (path.includes('/moving') && method === 'POST') {
+    return { moving: { id: `moving-${Date.now()}`, status: 'PENDING' } } as T;
+  }
+  if (path.includes('/rental/vehicles')) {
+    return {
+      data: [
+        { id: 'v1', name: 'Toyota Corolla', category: 'STANDARD', pricePerDayCdf: 85000 },
+        { id: 'v2', name: 'Suzuki Swift', category: 'ECONOMY', pricePerDayCdf: 65000 },
+      ],
+    } as T;
+  }
+  if (path.includes('/rental/estimate') && method === 'POST') {
+    return { totalPriceCdf: 170000, pricePerDayCdf: 85000, days: 2 } as T;
+  }
+  if (path.includes('/rental/bookings') && method === 'POST') {
+    return { booking: { id: `rental-${Date.now()}`, status: 'PENDING' } } as T;
+  }
+  if (path.includes('/errands/estimate') && method === 'POST') {
+    return { estimatedPriceCdf: 6000, currency: 'CDF' } as T;
+  }
+  if (path.includes('/errands') && method === 'POST') {
+    return { order: { id: `errand-${Date.now()}`, status: 'PENDING' } } as T;
   }
   if (path.includes('/deliveries/restaurants')) {
     return {
@@ -103,14 +184,6 @@ function mockFor<T>(path: string, init?: RequestInit): T {
           dropoffAddress: 'Masina',
           status: 'DELIVERED',
           priceCdf: 8000,
-        },
-        {
-          id: 'food-1',
-          type: 'FOOD',
-          restaurantName: 'Chez Mamou',
-          deliveryAddress: 'Bandal',
-          status: 'DELIVERED',
-          priceCdf: 18500,
         },
       ],
     } as T;

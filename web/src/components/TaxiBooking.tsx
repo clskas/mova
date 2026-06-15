@@ -22,7 +22,7 @@ export function TaxiBooking({ onBack, mock }: Props) {
     if (!destination) return;
     setLoading(true);
     const q = `pickupLat=-4.3217&pickupLng=15.3125&dropoffLat=-4.35&dropoffLng=15.35&vehicleType=${vehicleType}`;
-    const data = await apiFetch<{ priceCdf?: number; estimatedFareCdf?: number }>(`/api/rides/estimate?${q}`);
+    const data = await apiFetch<{ priceCdf?: number; estimatedFareCdf?: number }>(`/api/rides/estimate?${q}`, undefined, { useMock: mock });
     setEstimate(data.priceCdf ?? data.estimatedFareCdf ?? 8500);
     setLoading(false);
   }
@@ -40,7 +40,7 @@ export function TaxiBooking({ onBack, mock }: Props) {
         dropoffLng: 15.35,
         vehicleType,
       }),
-    });
+    }, { useMock: mock });
     setConfirmed(true);
     setLoading(false);
   }

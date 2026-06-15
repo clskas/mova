@@ -2,20 +2,29 @@
 
 import { useEffect, useState } from "react";
 import { checkGatewayHealth } from "@/lib/api";
+import { OtpGate } from "@/components/OtpGate";
 import { ServiceCard } from "@/components/ServiceCard";
 import {
   CalendarIcon,
   CarpoolIcon,
+  ErrandIcon,
+  ExpressIcon,
   FoodIcon,
   HistoryIcon,
   LocationIcon,
+  MovingIcon,
   ParcelIcon,
+  RentalIcon,
   TaxiIcon,
   WalletIcon,
 } from "@/components/ServiceIcons";
 import { TaxiBooking } from "@/components/TaxiBooking";
 import { ParcelDelivery } from "@/components/ParcelDelivery";
+import { ExpressDelivery } from "@/components/ExpressDelivery";
 import { FoodOrder } from "@/components/FoodOrder";
+import { MovingView } from "@/components/MovingView";
+import { RentalView } from "@/components/RentalView";
+import { ErrandsView } from "@/components/ErrandsView";
 import { HistoryView } from "@/components/HistoryView";
 import { HelpView } from "@/components/HelpView";
 import { WalletView } from "@/components/WalletView";
@@ -23,7 +32,20 @@ import { ScheduledRidesView } from "@/components/ScheduledRidesView";
 import { CarpoolView } from "@/components/CarpoolView";
 import { HelpIcon } from "@/components/ServiceIcons";
 
-type View = "home" | "taxi" | "parcel" | "food" | "history" | "help" | "wallet" | "scheduled" | "carpool";
+type View =
+  | "home"
+  | "taxi"
+  | "parcel"
+  | "express"
+  | "food"
+  | "moving"
+  | "rental"
+  | "errands"
+  | "history"
+  | "help"
+  | "wallet"
+  | "scheduled"
+  | "carpool";
 
 function greeting(): string {
   const hour = new Date().getHours();
@@ -32,7 +54,7 @@ function greeting(): string {
   return "Bonsoir";
 }
 
-export default function Home() {
+function HomeContent() {
   const [view, setView] = useState<View>("home");
   const [mock, setMock] = useState(false);
 
@@ -82,68 +104,42 @@ export default function Home() {
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              <ServiceCard
-                icon={<TaxiIcon color="#6C63FF" />}
-                title="Taxi / Moto-taxi"
-                subtitle="Course immédiate partout en ville"
-                color="#6C63FF"
-                onClick={() => setView("taxi")}
-              />
-              <ServiceCard
-                icon={<ParcelIcon color="#00D4A1" />}
-                title="Livraison colis"
-                subtitle="Envoyez un colis en toute sécurité"
-                color="#00D4A1"
-                onClick={() => setView("parcel")}
-              />
-              <ServiceCard
-                icon={<FoodIcon color="#00D4A1" />}
-                title="Livraison repas"
-                subtitle="Restaurants et plats locaux"
-                color="#00D4A1"
-                onClick={() => setView("food")}
-              />
-              <ServiceCard
-                icon={<WalletIcon color="#6C63FF" />}
-                title="Portefeuille"
-                subtitle="Solde et recharges"
-                color="#6C63FF"
-                onClick={() => setView("wallet")}
-              />
-              <ServiceCard
-                icon={<CalendarIcon color="#FF6B35" />}
-                title="Course planifiée"
-                subtitle="Réserver à l'avance"
-                color="#FF6B35"
-                onClick={() => setView("scheduled")}
-              />
-              <ServiceCard
-                icon={<CarpoolIcon color="#6C63FF" />}
-                title="Covoiturage"
-                subtitle="Partager un trajet"
-                color="#6C63FF"
-                onClick={() => setView("carpool")}
-              />
-              <ServiceCard
-                icon={<HistoryIcon color="#FF6B35" />}
-                title="Historique"
-                subtitle="Vos courses et livraisons"
-                color="#FF6B35"
-                onClick={() => setView("history")}
-              />
+              <ServiceCard icon={<TaxiIcon color="#6C63FF" />} title="Taxi / Moto-taxi" subtitle="Course immédiate" color="#6C63FF" onClick={() => setView("taxi")} />
+              <ServiceCard icon={<ParcelIcon color="#00D4A1" />} title="Livraison colis" subtitle="Envoi sécurisé" color="#00D4A1" onClick={() => setView("parcel")} />
+              <ServiceCard icon={<ExpressIcon color="#FF6B35" />} title="Express" subtitle="Livraison prioritaire" color="#FF6B35" onClick={() => setView("express")} />
+              <ServiceCard icon={<FoodIcon color="#00D4A1" />} title="Repas" subtitle="Restaurants locaux" color="#00D4A1" onClick={() => setView("food")} />
+              <ServiceCard icon={<MovingIcon color="#6C63FF" />} title="Déménagement" subtitle="Volume & devis" color="#6C63FF" onClick={() => setView("moving")} />
+              <ServiceCard icon={<RentalIcon color="#6C63FF" />} title="Location" subtitle="Véhicules avec chauffeur" color="#6C63FF" onClick={() => setView("rental")} />
+              <ServiceCard icon={<ErrandIcon color="#00D4A1" />} title="Commissions" subtitle="Courses & achats" color="#00D4A1" onClick={() => setView("errands")} />
+              <ServiceCard icon={<WalletIcon color="#6C63FF" />} title="Portefeuille" subtitle="Solde et recharges" color="#6C63FF" onClick={() => setView("wallet")} />
+              <ServiceCard icon={<CalendarIcon color="#FF6B35" />} title="Planifiée" subtitle="Réserver à l'avance" color="#FF6B35" onClick={() => setView("scheduled")} />
+              <ServiceCard icon={<CarpoolIcon color="#6C63FF" />} title="Covoiturage" subtitle="Partager un trajet" color="#6C63FF" onClick={() => setView("carpool")} />
+              <ServiceCard icon={<HistoryIcon color="#FF6B35" />} title="Historique" subtitle="Vos activités" color="#FF6B35" onClick={() => setView("history")} />
             </div>
           </div>
         )}
 
         {view === "taxi" && <TaxiBooking onBack={() => setView("home")} mock={mock} />}
         {view === "parcel" && <ParcelDelivery onBack={() => setView("home")} mock={mock} />}
+        {view === "express" && <ExpressDelivery onBack={() => setView("home")} mock={mock} />}
         {view === "food" && <FoodOrder onBack={() => setView("home")} mock={mock} />}
+        {view === "moving" && <MovingView onBack={() => setView("home")} mock={mock} />}
+        {view === "rental" && <RentalView onBack={() => setView("home")} mock={mock} />}
+        {view === "errands" && <ErrandsView onBack={() => setView("home")} mock={mock} />}
         {view === "wallet" && <WalletView onBack={() => setView("home")} mock={mock} />}
         {view === "scheduled" && <ScheduledRidesView onBack={() => setView("home")} mock={mock} />}
         {view === "carpool" && <CarpoolView onBack={() => setView("home")} mock={mock} />}
-        {view === "history" && <HistoryView onBack={() => setView("home")} />}
+        {view === "history" && <HistoryView onBack={() => setView("home")} mock={mock} />}
         {view === "help" && <HelpView onBack={() => setView("home")} />}
       </main>
     </div>
+  );
+}
+
+export default function Home() {
+  return (
+    <OtpGate>
+      <HomeContent />
+    </OtpGate>
   );
 }

@@ -51,6 +51,8 @@ export function CarpoolView({ onBack, mock }: Props) {
     try {
       const res = await apiFetch<{ matches?: CarpoolTrip[]; trips?: CarpoolTrip[]; data?: CarpoolTrip[] }>(
         `/api/carpool?pickupLat=${pickupLat}&pickupLng=${pickupLng}&dropoffLat=${dropoffLat}&dropoffLng=${dropoffLng}`,
+        undefined,
+        { useMock: mock },
       );
       const raw = res.matches ?? res.trips ?? res.data ?? [];
       setTrips(raw.map(normalizeTrip));
@@ -74,7 +76,7 @@ export function CarpoolView({ onBack, mock }: Props) {
       await apiFetch(`/api/carpool/${id}/join`, {
         method: "POST",
         body: JSON.stringify({ seats: 1 }),
-      });
+      }, { useMock: mock });
       await loadTrips();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Impossible de rejoindre");
@@ -93,7 +95,7 @@ export function CarpoolView({ onBack, mock }: Props) {
       const data = await apiFetch<{ totalPriceCdf?: number; pricePerSeatCdf?: number }>("/api/carpool/estimate", {
         method: "POST",
         body: JSON.stringify({ fromAddress: from, toAddress: to, seats: seatCount }),
-      });
+      }, { useMock: mock });
       setEstimate({ total: data.totalPriceCdf ?? 15000, perSeat: data.pricePerSeatCdf });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Estimation impossible");
@@ -121,7 +123,7 @@ export function CarpoolView({ onBack, mock }: Props) {
           seatsTotal: seatCount,
           pricePerSeatCdf: estimate.perSeat,
         }),
-      });
+      }, { useMock: mock });
       setEstimate(null);
       setTab("search");
       await loadTrips();

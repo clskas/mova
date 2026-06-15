@@ -27,7 +27,7 @@ export function ScheduledRidesView({ onBack, mock }: Props) {
   async function loadUpcoming() {
     setLoading(true);
     try {
-      const res = await apiFetch<{ data?: ScheduledRide[] }>("/api/rides/scheduled");
+      const res = await apiFetch<{ data?: ScheduledRide[] }>("/api/rides/scheduled", undefined, { useMock: mock });
       setRides(res.data ?? []);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur");
@@ -59,7 +59,7 @@ export function ScheduledRidesView({ onBack, mock }: Props) {
           vehicleType: "STANDARD",
           scheduledAt: new Date(scheduledAt).toISOString(),
         }),
-      });
+      }, { useMock: mock });
       setEstimate(data.estimatedPriceCdf ?? 9500);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Estimation impossible");
@@ -84,7 +84,7 @@ export function ScheduledRidesView({ onBack, mock }: Props) {
           vehicleType: "STANDARD",
           scheduledAt: new Date(scheduledAt).toISOString(),
         }),
-      });
+      }, { useMock: mock });
       setDestination("");
       setEstimate(null);
       await loadUpcoming();

@@ -26,7 +26,7 @@ export function ParcelDelivery({ onBack, mock }: Props) {
     const data = await apiFetch<{ estimatedPriceCdf?: number }>("/api/deliveries/parcel/estimate", {
       method: "POST",
       body: JSON.stringify({ pickupAddress: pickup, dropoffAddress: dropoff, weightCategory }),
-    });
+    }, { useMock: mock });
     setEstimate(data.estimatedPriceCdf ?? 5000);
     setLoading(false);
   }
@@ -44,7 +44,7 @@ export function ParcelDelivery({ onBack, mock }: Props) {
         dropoffLat: -4.35,
         dropoffLng: 15.35,
       }),
-    });
+    }, { useMock: mock });
     setConfirmed(true);
     setLoading(false);
   }

@@ -65,13 +65,13 @@ class _DeliveryOfferScreenState extends ConsumerState<DeliveryOfferScreen> {
     if (!mounted) return;
     setState(() => _loading = false);
     switch (result) {
-      case Success():
+      case Success(:final data):
         _timer?.cancel();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Livraison acceptée')),
           );
-          Navigator.pop(context, true);
+          Navigator.pop(context, result.data);
         }
       case Failure(:final error):
         setState(() => _error = error.message);

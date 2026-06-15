@@ -11,6 +11,7 @@ import '../../core/theme/mova_colors.dart';
 import '../../core/api/api_client.dart';
 import '../../core/error/result.dart';
 import '../help/driver_help_screen.dart';
+import 'active_delivery_screen.dart';
 import 'active_ride_screen.dart';
 import 'kyc_screen.dart';
 import 'ride_offer_screen.dart';
@@ -29,6 +30,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
   Map<String, dynamic>? _earnings;
   Map<String, dynamic>? _profile;
   Map<String, dynamic>? _activeRide;
+  Map<String, dynamic>? _activeDelivery;
   String? _availabilityError;
   String? _vehicleId;
   Timer? _offerPollTimer;
@@ -53,7 +55,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
     final api = ref.read(apiClientProvider);
     await api.loadToken();
     await api.checkHealth();
-    await Future.wait([_loadProfile(), _loadEarnings(), _loadActiveRide()]);
+    await Future.wait([_loadProfile(), _loadEarnings(), _loadActiveRide(), _loadActiveDelivery()]);
     if (mounted) {
       setState(() => _bootstrapping = false);
       if (_available) _startPolling();
@@ -102,6 +104,24 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
     }
   }
 
+  Future<void> _loadActiveDelivery() async {
+    final api = ref.read(apiClientProvider);
+    final result = await api.get('/deliveries/history?role=driver');
+    if (!mounted) return;
+    if (result case Success(:final data)) {
+      final deliveries = (data['data'] as List? ?? []).cast<Map<String, dynamic>>();
+      final active = deliveries.where((d) {
+        final s = d['status']?.toString() ?? '';
+        return s == 'PICKED_UP' || s == 'IN_TRANSIT';
+      }).toList();
+      if (active.isNotEmpty) {
+        setState(() => _activeDelivery = active.first);
+      } else {
+        setState(() => _activeDelivery = null);
+      }
+    }
+  }
+
   Future<void> _pushLocation() async {
     if (!await Geolocator.isLocationServiceEnabled()) return;
     var permission = await Geolocator.checkPermission();
@@ -138,7 +158,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
   }
 
   Future<void> _pollOffers() async {
-    if (!_available || _activeRide != null || _showingOffer || !mounted) return;
+    if (!_available || _activeRide != null || _activeDelivery != null || _showingOffer || !mounted) return;
     final api = ref.read(apiClientProvider);
 
     final rideResult = await api.getDriverOffers();
@@ -168,13 +188,21 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
         final id = offer['id']?.toString() ?? '';
         if (id.isEmpty || _dismissedOffers.contains('delivery:$id')) continue;
         _showingOffer = true;
-        final accepted = await Navigator.push<bool>(
+        final accepted = await Navigator.push<Map<String, dynamic>?>(
           context,
           MaterialPageRoute(builder: (_) => DeliveryOfferScreen(offer: offer)),
         );
         _dismissedOffers.add('delivery:$id');
         _showingOffer = false;
-        if (accepted == true) return;
+        if (accepted != null && mounted) {
+          setState(() => _activeDelivery = accepted);
+          await Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => ActiveDeliveryScreen(delivery: accepted)),
+          );
+          await _loadActiveDelivery();
+          return;
+        }
         break;
       }
     }
@@ -354,8 +382,37 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
               ),
             ),
           ],
+          if (_activeDelivery != null) ...[
+            const SizedBox(height: 16),
+            MovaCard(
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => ActiveDeliveryScreen(delivery: _activeDelivery!)),
+              ).then((_) => _loadActiveDelivery()),
+              child: Row(
+                children: [
+                  const Icon(Icons.delivery_dining, color: MovaColors.green),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Livraison active', style: TextStyle(fontWeight: FontWeight.bold)),
+                        Text(
+                          _activeDelivery!['pickupAddress']?.toString() ?? '',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 16),
-          if (_available && _activeRide == null)
+          if (_available && _activeRide == null && _activeDelivery == null)
             const Padding(
               padding: EdgeInsets.only(bottom: 12),
               child: Text(

@@ -241,7 +241,9 @@ export class DeliveriesService {
       include: { restaurant: true, events: { orderBy: { createdAt: 'asc' } } },
     });
     if (!delivery) throw new MovaHttpException(MovaErrorCode.DELIVERY_NOT_FOUND, HttpStatus.NOT_FOUND);
-    if (delivery.userId !== userId) throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
+    if (delivery.userId !== userId && delivery.driverId !== userId) {
+      throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
+    }
     const formatted = formatParcelDelivery(delivery);
     return {
       delivery: formatted,
@@ -251,9 +253,10 @@ export class DeliveriesService {
     };
   }
 
-  async getHistory(userId: string) {
+  async getHistory(userId: string, role?: string) {
+    const where = role === 'driver' ? { driverId: userId } : { userId };
     const rows = await this.prisma.delivery.findMany({
-      where: { userId },
+      where,
       orderBy: { createdAt: 'desc' },
       take: 50,
       include: { restaurant: { select: { id: true, name: true, cuisine: true } }, events: { orderBy: { createdAt: 'asc' } } },
@@ -367,6 +370,9 @@ export class DeliveriesService {
   async updateStatus(id: string, status: DeliveryStatus, userId: string) {
     const delivery = await this.prisma.delivery.findUnique({ where: { id } });
     if (!delivery) throw new MovaHttpException(MovaErrorCode.DELIVERY_NOT_FOUND, HttpStatus.NOT_FOUND);
+    if (delivery.userId !== userId && delivery.driverId !== userId) {
+      throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
+    }
     const allowed: Record<DeliveryStatus, DeliveryStatus[]> = {
       [DeliveryStatus.PENDING]: [DeliveryStatus.PICKED_UP, DeliveryStatus.CANCELLED],
       [DeliveryStatus.PICKED_UP]: [DeliveryStatus.IN_TRANSIT, DeliveryStatus.CANCELLED],

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Request, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, Request, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ErrandsService } from '../errands/errands.service';
@@ -86,9 +86,9 @@ export class DeliveriesController {
   }
 
   @Get('history')
-  @ApiOperation({ summary: 'Historique livraisons' })
-  history(@Request() req: { user: { id: string } }) {
-    return this.deliveriesService.getHistory(req.user.id);
+  @ApiOperation({ summary: 'Historique livraisons (passager ou chauffeur via ?role=driver)' })
+  history(@Request() req: { user: { id: string } }, @Query('role') role?: string) {
+    return this.deliveriesService.getHistory(req.user.id, role);
   }
 
   @Post(':id/cancel')

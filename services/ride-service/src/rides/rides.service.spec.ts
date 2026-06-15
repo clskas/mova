@@ -38,10 +38,12 @@ describe('RidesService', () => {
   const matching = {
     findDrivers: jest.fn().mockResolvedValue([]),
     getMatchingMeta: jest.fn().mockReturnValue({ radiusKm: 2, nextRadiusKm: 3, incrementIntervalSec: 30, maxRadiusKm: 10 }),
+    computeRadiusKm: jest.fn().mockReturnValue(10),
   };
   const redis = { publish: jest.fn() };
+  const tracking = { broadcastRideStatus: jest.fn() };
 
-  const service = new RidesService(prisma as never, pricing as never, matching as never, redis as never);
+  const service = new RidesService(prisma as never, pricing as never, matching as never, redis as never, tracking as never);
 
   beforeEach(() => jest.clearAllMocks());
 
@@ -106,6 +108,7 @@ describe('RidesService', () => {
     );
     expect(result.status).toBe('MATCHING');
     expect(result.driversFound).toBe(1);
+    expect(tracking.broadcastRideStatus).toHaveBeenCalledWith('ride-1', 'MATCHING');
   });
 
   it('records driver rejection without changing ride status', async () => {
@@ -121,5 +124,52 @@ describe('RidesService', () => {
       }),
     );
     expect(result.success).toBe(true);
+  });
+
+  it('includes driver ETA in ride detail when chauffeur assigned', async () => {
+    prisma.ride.findUnique.mockResolvedValue({
+      id: 'ride-1',
+      passengerId: 'p1',
+      driverId: 'driver-1',
+      vehicleId: 'v1',
+      status: RideStatus.ACCEPTED,
+      vehicleType: VehicleType.MOTO_TAXI,
+      pickupLat: -4.32,
+      pickupLng: 15.31,
+      dropoffLat: -4.34,
+      dropoffLng: 15.33,
+      pickupAddress: 'Gombe',
+      dropoffAddress: 'Limete',
+      estimatedFareCdf: 6200,
+      finalFareCdf: null,
+      distanceKm: 4.5,
+      durationMin: 11,
+      acceptedAt: new Date(),
+      startedAt: null,
+      completedAt: null,
+      cancelledAt: null,
+      cancelReason: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      events: [],
+      ratings: [],
+    });
+    pricing.haversineKm.mockReturnValue(1.2);
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        userId: 'driver-1',
+        ratingAvg: 4.8,
+        totalRides: 10,
+        currentLat: -4.325,
+        currentLng: 15.315,
+        vehicles: [{ id: 'v1', type: 'MOTO_TAXI', make: 'Honda', model: 'Ace', plateNumber: 'KIN-1', color: 'red' }],
+      }),
+    }) as never;
+
+    const result = await service.getRide('ride-1');
+    expect(result.etaMinutes).toBeGreaterThanOrEqual(1);
+    expect(result.driverDistanceKm).toBeGreaterThan(0);
+    expect(result.driver).not.toBeNull();
   });
 });

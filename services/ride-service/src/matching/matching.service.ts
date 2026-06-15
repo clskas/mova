@@ -31,11 +31,15 @@ export class MatchingService {
     return res.json();
   }
 
-  getMatchingMeta(searchAttempt = 0) {
-    const radiusKm = Math.min(
+  computeRadiusKm(searchAttempt = 0): number {
+    return Math.min(
       MARKET_RDC.matching.initialRadiusKm + searchAttempt * MARKET_RDC.matching.radiusIncrementKm,
       MARKET_RDC.matching.maxRadiusKm,
     );
+  }
+
+  getMatchingMeta(searchAttempt = 0) {
+    const radiusKm = this.computeRadiusKm(searchAttempt);
     return {
       radiusKm,
       nextRadiusKm: Math.min(radiusKm + MARKET_RDC.matching.radiusIncrementKm, MARKET_RDC.matching.maxRadiusKm),

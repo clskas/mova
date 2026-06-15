@@ -8,6 +8,7 @@ import '../../core/api/api_client.dart';
 import '../../core/api/ride_socket.dart';
 import '../../core/config/market_config.dart';
 import '../../core/error/result.dart';
+import '../../core/geo/geo_utils.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
@@ -42,12 +43,11 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
   LatLng _pickup = MovaRideMap.mapDefaultCenter();
   LatLng? _dropoff;
   LatLng? _driverPos;
-  int _etaMinutes = 8;
+  int _etaMinutes = 5;
   bool _loading = true;
   bool _waitingDriver = false;
   bool _mock = false;
   String? _error;
-  Timer? _etaTimer;
   Timer? _pollTimer;
   Timer? _mockTimer;
   RideSocket? _socket;
@@ -56,27 +56,54 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadRide();
-      _startEtaCountdown();
-    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadRide());
   }
 
   @override
   void dispose() {
-    _etaTimer?.cancel();
     _pollTimer?.cancel();
     _mockTimer?.cancel();
     _socket?.dispose();
     super.dispose();
   }
 
-  void _startEtaCountdown() {
-    _etaTimer = Timer.periodic(const Duration(seconds: 30), (_) {
-      if (mounted && _etaMinutes > 1) {
-        setState(() => _etaMinutes -= 1);
+  void _updateEtaFromRide(Map<String, dynamic> data) {
+    final apiEta = (data['etaMinutes'] as num?)?.toInt();
+    if (apiEta != null && apiEta > 0) {
+      _etaMinutes = apiEta;
+      return;
+    }
+    final driverLat = (data['driver']?['lat'] as num?)?.toDouble();
+    final driverLng = (data['driver']?['lng'] as num?)?.toDouble();
+    if (driverLat != null && driverLng != null) {
+      final status = data['status']?.toString() ?? '';
+      final inProgress = status == 'IN_PROGRESS';
+      final targetLat = (inProgress ? data['dropoffLat'] : data['pickupLat']) as num?;
+      final targetLng = (inProgress ? data['dropoffLng'] : data['pickupLng']) as num?;
+      if (targetLat != null && targetLng != null) {
+        _etaMinutes = GeoUtils.driverEtaMinutes(
+          driverLat,
+          driverLng,
+          targetLat.toDouble(),
+          targetLng.toDouble(),
+        );
       }
-    });
+    }
+  }
+
+  void _updateEtaFromDriverPosition(LatLng driverPos) {
+    if (_ride == null) return;
+    final status = _status;
+    final inProgress = status == 'IN_PROGRESS';
+    final targetLat = (inProgress ? _ride!['dropoffLat'] : _ride!['pickupLat']) as num?;
+    final targetLng = (inProgress ? _ride!['dropoffLng'] : _ride!['pickupLng']) as num?;
+    if (targetLat == null || targetLng == null) return;
+    _etaMinutes = GeoUtils.driverEtaMinutes(
+      driverPos.latitude,
+      driverPos.longitude,
+      targetLat.toDouble(),
+      targetLng.toDouble(),
+    );
   }
 
   Map<String, dynamic>? _normalizeDriver(Map<String, dynamic>? raw) {
@@ -135,6 +162,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
     } else if (_driver != null) {
       _driverPos = LatLng(_pickup.latitude + 0.008, _pickup.longitude + 0.005);
     }
+    _updateEtaFromRide(data);
 
     if (api.rideHasDriver(data)) {
       _waitingDriver = false;
@@ -195,7 +223,11 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
         final lat = payload['lat'] as num?;
         final lng = payload['lng'] as num?;
         if (lat != null && lng != null && mounted) {
-          setState(() => _driverPos = LatLng(lat.toDouble(), lng.toDouble()));
+          final pos = LatLng(lat.toDouble(), lng.toDouble());
+          setState(() {
+            _driverPos = pos;
+            _updateEtaFromDriverPosition(pos);
+          });
         }
       },
       onStatus: (payload) {

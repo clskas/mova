@@ -75,9 +75,21 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
   }
 
   Future<void> _reject() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     final api = ref.read(apiClientProvider);
-    await api.rejectRide(_rideId);
-    if (mounted) Navigator.pop(context);
+    final result = await api.rejectRide(_rideId);
+    if (!mounted) return;
+    setState(() => _loading = false);
+    switch (result) {
+      case Success():
+        _timer?.cancel();
+        Navigator.pop(context);
+      case Failure(:final error):
+        setState(() => _error = error.message);
+    }
   }
 
   Future<void> _openNavigation() async {

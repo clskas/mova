@@ -34,7 +34,10 @@ class _MatchingScreenState extends ConsumerState<MatchingScreen>
   bool _cancelling = false;
   String? _error;
   int _attempt = 0;
+  double? _radiusKm;
+  DateTime? _lastSearchAt;
   Timer? _pollTimer;
+  Timer? _rescanTimer;
 
   @override
   void initState() {
@@ -49,6 +52,7 @@ class _MatchingScreenState extends ConsumerState<MatchingScreen>
   @override
   void dispose() {
     _pollTimer?.cancel();
+    _rescanTimer?.cancel();
     _pulseController.dispose();
     super.dispose();
   }
@@ -67,6 +71,8 @@ class _MatchingScreenState extends ConsumerState<MatchingScreen>
       case Success(:final data):
         setState(() {
           _attempt = (data['attempt'] as num?)?.toInt() ?? 0;
+          _radiusKm = (data['radiusKm'] as num?)?.toDouble();
+          _lastSearchAt = DateTime.now();
         });
         if (api.isMockMode) {
           await Future<void>.delayed(const Duration(seconds: 1));
@@ -74,6 +80,7 @@ class _MatchingScreenState extends ConsumerState<MatchingScreen>
           return;
         }
         _startPollingForDriver();
+        _scheduleRescan();
       case Failure(:final error):
         setState(() {
           _searching = false;
@@ -86,6 +93,28 @@ class _MatchingScreenState extends ConsumerState<MatchingScreen>
     _pollTimer?.cancel();
     _pollTimer = Timer.periodic(const Duration(seconds: 3), (_) => _pollRide());
     _pollRide();
+  }
+
+  void _scheduleRescan() {
+    _rescanTimer?.cancel();
+    _rescanTimer = Timer.periodic(const Duration(seconds: 30), (_) => _maybeRescan());
+  }
+
+  Future<void> _maybeRescan() async {
+    if (!_searching || _lastSearchAt == null) return;
+    final elapsed = DateTime.now().difference(_lastSearchAt!);
+    if (elapsed.inSeconds < 30) return;
+    final api = ref.read(apiClientProvider);
+    final rideResult = await api.getRide(widget.rideId);
+    if (!mounted) return;
+    if (rideResult case Success(:final data)) {
+      final status = data['status']?.toString() ?? '';
+      if (status == 'MATCHING' || status == 'SEARCHING' || status == 'REQUESTED') {
+        if (!api.rideHasDriver(data)) {
+          await _search();
+        }
+      }
+    }
   }
 
   Future<void> _pollRide() async {
@@ -197,6 +226,14 @@ class _MatchingScreenState extends ConsumerState<MatchingScreen>
             const SizedBox(height: 8),
             Text(
               'Tentative $_attempt',
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 13, color: MovaColors.textSecondary),
+            ),
+          ],
+          if (_radiusKm != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              'Rayon de recherche : ${_radiusKm!.toStringAsFixed(0)} km',
               textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 13, color: MovaColors.textSecondary),
             ),

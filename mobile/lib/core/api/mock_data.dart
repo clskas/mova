@@ -103,8 +103,11 @@ abstract final class MockData {
 
   static Map<String, dynamic> searchDrivers(String rideId) => {
         'rideId': rideId,
-        'attempt': 0,
-        'radiusKm': 3,
+        'attempt': 1,
+        'radiusKm': 2,
+        'nextRadiusKm': 3,
+        'incrementIntervalSec': 30,
+        'maxRadiusKm': 10,
         'driversFound': 2,
         'drivers': [
           {
@@ -132,11 +135,15 @@ abstract final class MockData {
         'finalFareCdf': 8500,
         'distanceKm': 3.2,
         'durationMin': 12,
+        'etaMinutes': 5,
+        'driverDistanceKm': 1.2,
         'driver': {
           'id': 'driver-mock-1',
           'name': 'Jean Kabila',
           'rating': 4.8,
           'phone': '+243812345678',
+          'lat': MarketConfig.defaultLat + 0.008,
+          'lng': MarketConfig.defaultLng + 0.005,
           'vehicleType': 'Moto-taxi',
           'plateNumber': 'KIN-4521',
           'vehicleModel': 'Honda Ace',

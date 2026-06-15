@@ -69,7 +69,11 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
 
   @SubscribeMessage('ride:status')
   handleRideStatus(@MessageBody() data: { rideId: string; status: string }) {
-    this.server.to(`ride:${data.rideId}`).emit('ride:status', data);
+    this.broadcastRideStatus(data.rideId, data.status);
     return { broadcast: true };
+  }
+
+  broadcastRideStatus(rideId: string, status: string) {
+    this.server.to(`ride:${rideId}`).emit('ride:status', { rideId, status });
   }
 }

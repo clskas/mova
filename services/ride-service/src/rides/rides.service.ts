@@ -18,6 +18,8 @@ import { RedisService } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { PricingService } from './pricing.service';
 import { MatchingService } from '../matching/matching.service';
+import { computeDriverEta } from '../matching/eta.util';
+import { TrackingGateway } from '../websocket/tracking.gateway';
 import { assertServiceAreaPair, assertServiceAreaCoords } from '../common/address.util';
 
 const ACTIVE_STATUSES: RideStatus[] = [
@@ -45,7 +47,12 @@ export class RidesService {
     private pricing: PricingService,
     private matching: MatchingService,
     private redis: RedisService,
+    private tracking: TrackingGateway,
   ) {}
+
+  private emitStatusChange(rideId: string, status: RideStatus) {
+    this.tracking.broadcastRideStatus(rideId, toMobileRideStatus(status));
+  }
 
   async estimate(pickupLat: number, pickupLng: number, dropoffLat: number, dropoffLng: number, vehicleType: VehicleType) {
     const { pickupArea, isInterCity } = assertServiceAreaPair(pickupLat, pickupLng, dropoffLat, dropoffLng);
@@ -121,23 +128,42 @@ export class RidesService {
       throw new MovaHttpException(MovaErrorCode.RIDE_INVALID_STATUS);
     }
 
-    if (ride.status === RideStatus.REQUESTED) {
-      await this.prisma.ride.update({ where: { id: rideId }, data: { status: RideStatus.SEARCHING } });
-      await this.prisma.rideEvent.create({ data: { rideId, event: RideStatus.SEARCHING } });
-    }
-
-    const attempts = await this.prisma.rideEvent.count({ where: { rideId, event: 'SEARCH_ATTEMPT' } });
-    const drivers = await this.matching.findDrivers(ride.pickupLat, ride.pickupLng, ride.vehicleType, attempts);
-    await this.prisma.rideEvent.create({
-      data: { rideId, event: 'SEARCH_ATTEMPT', metadata: { attempt: attempts + 1, driversFound: drivers.length } },
-    });
-    const meta = this.matching.getMatchingMeta(attempts);
-    if (drivers.length === 0 && meta.radiusKm >= MARKET_RDC.matching.maxRadiusKm) {
+    const result = await this.runSearchAttempt(ride);
+    if (result.driversFound === 0 && result.radiusKm >= MARKET_RDC.matching.maxRadiusKm) {
       throw new MovaHttpException(MovaErrorCode.RIDE_NO_DRIVERS);
     }
+    return result;
+  }
+
+  /** Recherche automatique (scheduler) — n'échoue pas si aucun chauffeur au rayon max. */
+  async autoSearchDrivers(rideId: string) {
+    const ride = await this.prisma.ride.findUnique({ where: { id: rideId } });
+    if (!ride || ride.status !== RideStatus.SEARCHING) return null;
+    return this.runSearchAttempt(ride);
+  }
+
+  private async runSearchAttempt(ride: {
+    id: string;
+    status: RideStatus;
+    pickupLat: number;
+    pickupLng: number;
+    vehicleType: VehicleType;
+  }) {
+    if (ride.status === RideStatus.REQUESTED) {
+      await this.prisma.ride.update({ where: { id: ride.id }, data: { status: RideStatus.SEARCHING } });
+      await this.prisma.rideEvent.create({ data: { rideId: ride.id, event: RideStatus.SEARCHING } });
+      this.emitStatusChange(ride.id, RideStatus.SEARCHING);
+    }
+
+    const attempts = await this.prisma.rideEvent.count({ where: { rideId: ride.id, event: 'SEARCH_ATTEMPT' } });
+    const drivers = await this.matching.findDrivers(ride.pickupLat, ride.pickupLng, ride.vehicleType, attempts);
+    await this.prisma.rideEvent.create({
+      data: { rideId: ride.id, event: 'SEARCH_ATTEMPT', metadata: { attempt: attempts + 1, driversFound: drivers.length } },
+    });
+    const meta = this.matching.getMatchingMeta(attempts);
 
     return {
-      rideId,
+      rideId: ride.id,
       status: toMobileRideStatus(RideStatus.SEARCHING),
       attempt: attempts + 1,
       driversFound: drivers.length,
@@ -165,6 +191,7 @@ export class RidesService {
       data: { driverId: driverUserId, vehicleId, status: RideStatus.ACCEPTED, acceptedAt: new Date() },
     });
     await this.prisma.rideEvent.create({ data: { rideId, event: RideStatus.ACCEPTED } });
+    this.emitStatusChange(rideId, RideStatus.ACCEPTED);
     return this.formatRideDetail(updated);
   }
 
@@ -199,20 +226,34 @@ export class RidesService {
       where: { status: RideStatus.SEARCHING, vehicleType: { in: vehicleTypes } },
       orderBy: { createdAt: 'desc' },
       take: 30,
+      include: { events: { where: { event: { in: ['SEARCH_ATTEMPT', 'DRIVER_REJECTED'] } } } },
     });
 
-    const radiusKm = MARKET_RDC.matching.maxRadiusKm;
     const offers = rides
+      .filter((ride) => {
+        const rejected = ride.events.some(
+          (e) => e.event === 'DRIVER_REJECTED' && (e.metadata as { driverUserId?: string })?.driverUserId === driverUserId,
+        );
+        return !rejected;
+      })
       .map((ride) => {
+        const attempts = ride.events.filter((e) => e.event === 'SEARCH_ATTEMPT').length;
+        const radiusKm = this.matching.computeRadiusKm(attempts > 0 ? attempts - 1 : 0);
         const distanceKm = this.pricing.haversineKm(
           profile.currentLat,
           profile.currentLng,
           ride.pickupLat,
           ride.pickupLng,
         );
-        return { ...this.formatRideDetail(ride), distanceKm: Math.round(distanceKm * 100) / 100 };
+        return {
+          ...this.formatRideDetail(ride),
+          distanceKm: Math.round(distanceKm * 100) / 100,
+          searchRadiusKm: radiusKm,
+          _withinRadius: distanceKm <= radiusKm,
+        };
       })
-      .filter((o) => o.distanceKm <= radiusKm)
+      .filter((o) => o._withinRadius)
+      .map(({ _withinRadius: _, ...offer }) => offer)
       .sort((a, b) => a.distanceKm - b.distanceKm);
 
     return { offers };
@@ -260,6 +301,7 @@ export class RidesService {
 
     const updated = await this.prisma.ride.update({ where: { id: rideId }, data: updates });
     await this.prisma.rideEvent.create({ data: { rideId, event: status } });
+    this.emitStatusChange(rideId, status);
     if (status === RideStatus.COMPLETED) {
       await this.redis.publish(MOVA_EVENTS.RIDE_COMPLETED, {
         rideId,
@@ -304,6 +346,7 @@ export class RidesService {
       },
     });
     await this.prisma.rideEvent.create({ data: { rideId, event: RideStatus.CANCELLED, metadata: { feeCdf, reason } } });
+    this.emitStatusChange(rideId, RideStatus.CANCELLED);
 
     return {
       ride: this.formatRideDetail(updated),
@@ -321,9 +364,11 @@ export class RidesService {
     if (!ride) throw new MovaHttpException(MovaErrorCode.RIDE_NOT_FOUND, HttpStatus.NOT_FOUND);
     const driver = ride.driverId ? await this.fetchDriverInfo(ride.driverId) : null;
     const detail = this.formatRideDetail(ride);
+    const trackingEta = this.computeTrackingEta(ride, driver);
     const timeline = this.buildRideTimeline(ride.status, ride.events);
     return {
       ...detail,
+      ...trackingEta,
       events: ride.events.map((e) => ({ ...e, status: e.event })),
       timeline,
       tracking: timeline,
@@ -361,6 +406,30 @@ export class RidesService {
       take: 50,
     });
     return rides.map(toRideSummary);
+  }
+
+  private computeTrackingEta(
+    ride: {
+      status: RideStatus;
+      pickupLat: number;
+      pickupLng: number;
+      dropoffLat: number;
+      dropoffLng: number;
+      driverId: string | null;
+      durationMin: number | null;
+    },
+    driver: { lat?: number | null; lng?: number | null } | null,
+  ): { etaMinutes: number | null; driverDistanceKm: number | null } {
+    const activeStatuses: RideStatus[] = [RideStatus.ACCEPTED, RideStatus.DRIVER_ARRIVED, RideStatus.IN_PROGRESS];
+    if (!ride.driverId || !driver?.lat || !driver?.lng || !activeStatuses.includes(ride.status)) {
+      return { etaMinutes: null, driverDistanceKm: null };
+    }
+    const target =
+      ride.status === RideStatus.IN_PROGRESS
+        ? { lat: ride.dropoffLat, lng: ride.dropoffLng }
+        : { lat: ride.pickupLat, lng: ride.pickupLng };
+    const { etaMinutes, driverDistanceKm } = computeDriverEta(driver.lat, driver.lng, target.lat, target.lng);
+    return { etaMinutes, driverDistanceKm };
   }
 
   private async fetchDriverInfo(userId: string) {
@@ -420,6 +489,7 @@ export class RidesService {
   }) {
     const priceCdf = ride.finalFareCdf ?? ride.estimatedFareCdf ?? 0;
     const mobileStatus = toMobileRideStatus(ride.status);
+    const tripEtaMinutes = ride.durationMin ? Math.ceil(ride.durationMin) : null;
     return {
       id: ride.id,
       passengerId: ride.passengerId,
@@ -440,7 +510,8 @@ export class RidesService {
       totalCdf: priceCdf,
       totalFormatted: formatCdf(priceCdf),
       distanceKm: ride.distanceKm,
-      etaMinutes: ride.durationMin ? Math.ceil(ride.durationMin) : null,
+      etaMinutes: tripEtaMinutes,
+      tripEtaMinutes,
       currency: MARKET_RDC.currency,
       paymentReady: mobileStatus === 'COMPLETED',
       acceptedAt: ride.acceptedAt,

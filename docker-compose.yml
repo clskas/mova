@@ -89,6 +89,8 @@ services:
       dockerfile: docker/ride.Dockerfile
     ports:
       - '3022:3000'
+    env_file:
+      - config/external-apis.env
     environment:
       DATABASE_URL: postgresql://mova:mova@postgres-rides:5432/mova_rides
       REDIS_URL: redis://redis:6379

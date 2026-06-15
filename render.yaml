@@ -64,6 +64,7 @@ services:
         fromService: { name: mova-gateway, type: web, envVarKey: JWT_SECRET }
       - key: DRIVER_SERVICE_URL
         fromService: { name: mova-driver, type: web, property: hostport }
+      - fromGroup: mova-external-apis
 
   - type: web
     name: mova-payment
@@ -168,9 +169,15 @@ databases:
 envVarGroups:
   - name: mova-external-apis
     envVars:
+      - key: MAPBOX_ACCESS_TOKEN
+        sync: false
+      - key: MAPBOX_STYLE_URL
+        value: mapbox://styles/mova/midnight-violet
       - key: TWILIO_ACCOUNT_SID
         sync: false
       - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_PHONE_NUMBER
         sync: false
       - key: ORANGE_MONEY_API_KEY
         sync: false

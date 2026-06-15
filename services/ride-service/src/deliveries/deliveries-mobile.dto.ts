@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsArray, IsNumber, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsArray, IsBoolean, IsNumber, IsOptional, IsString, MinLength } from 'class-validator';
 
 /** Contrat mobile — courses & commissions via /deliveries/errand/* */
 export class MobileErrandEstimateDto {
@@ -23,6 +23,12 @@ export class MobileCarpoolEstimateDto extends MobileCarpoolAddressDto {
 
 export class MobileCarpoolCreateDto extends MobileCarpoolEstimateDto {
   @ApiPropertyOptional() @IsOptional() @IsString() departureAt?: string;
+  @ApiPropertyOptional() @IsOptional() pricePerSeatCdf?: number;
+  @ApiPropertyOptional() @IsOptional() @IsString() meetingPoint?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() notes?: string;
+  @ApiPropertyOptional() @IsOptional() ladiesOnly?: boolean;
+  @ApiPropertyOptional() @IsOptional() instantBooking?: boolean;
+  @ApiPropertyOptional() @IsOptional() @IsString() vehicleInfo?: string;
 }
 
 export class MobileScheduledEstimateDto {

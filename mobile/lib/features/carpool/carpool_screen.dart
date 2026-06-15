@@ -6,6 +6,7 @@ import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
+import 'carpool_detail_screen.dart';
 import 'carpool_join_confirmation_screen.dart';
 
 class CarpoolScreen extends ConsumerStatefulWidget {
@@ -19,27 +20,34 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   List<Map<String, dynamic>> _rides = [];
-  final _fromController = TextEditingController(text: 'Ma position');
-  final _toController = TextEditingController();
+  List<Map<String, dynamic>> _myDriverTrips = [];
+  List<Map<String, dynamic>> _myPassengerTrips = [];
+  final _fromController = TextEditingController(text: 'Gombe, Kinshasa');
+  final _toController = TextEditingController(text: 'Limete, Kinshasa');
   final _seatsController = TextEditingController(text: '3');
+  final _priceController = TextEditingController();
+  final _meetingPointController = TextEditingController();
+  final _notesController = TextEditingController();
   DateTime _departureAt = DateTime.now().add(const Duration(hours: 3));
+  DateTime _searchDate = DateTime.now();
+  String _sortBy = 'departure';
   int? _pricePerSeat;
   int? _totalPrice;
+  double? _distanceKm;
+  bool _ladiesOnly = false;
+  bool _instantBooking = true;
   bool _loading = false;
   bool _loadingList = true;
+  bool _loadingMine = false;
   String? _error;
   String? _validationError;
-
-  static const _pickupLat = MarketConfig.defaultLat;
-  static const _pickupLng = MarketConfig.defaultLng;
-  static const _dropoffLat = MarketConfig.defaultLat - 0.05;
-  static const _dropoffLng = MarketConfig.defaultLng + 0.06;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-    _loadRides();
+    _tabController = TabController(length: 3, vsync: this);
+    _search();
+    _loadMyTrips();
   }
 
   @override
@@ -48,6 +56,9 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
     _fromController.dispose();
     _toController.dispose();
     _seatsController.dispose();
+    _priceController.dispose();
+    _meetingPointController.dispose();
+    _notesController.dispose();
     super.dispose();
   }
 
@@ -59,64 +70,30 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
     return '$day/$month/${dt.year} à $hour:$minute';
   }
 
-  List<Map<String, dynamic>> _parseTrips(Map<String, dynamic> data) {
-    final raw = data['matches'] as List? ??
-        data['trips'] as List? ??
-        data['data'] as List? ??
-        [];
-    return raw.cast<Map<String, dynamic>>();
+  String _formatDate(DateTime dt) {
+    final day = dt.day.toString().padLeft(2, '0');
+    final month = dt.month.toString().padLeft(2, '0');
+    return '$day/$month/${dt.year}';
   }
 
   Map<String, dynamic> _normalizeTrip(Map<String, dynamic> ride) {
     final seats = ride['seatsAvailable'] as int? ??
         ride['availableSeats'] as int? ??
         ride['seatsTotal'] as int? ??
-        ride['seats'] as int? ??
         1;
     final perSeat = ride['pricePerSeatCdf'] as int? ??
-        (ride['totalPriceCdf'] != null
-            ? _splitPrice(ride['totalPriceCdf'] as int, seats)
-            : null);
-    final total = ride['totalPriceCdf'] as int? ??
-        (perSeat != null ? perSeat * seats : 0);
+        (ride['totalPriceCdf'] != null ? _splitPrice(ride['totalPriceCdf'] as int, seats) : null);
     final passengers = (ride['passengers'] as List? ?? []).cast<Map<String, dynamic>>();
     return {
       ...ride,
       'fromAddress': ride['pickupAddress'] ?? ride['fromAddress'] ?? '',
       'toAddress': ride['dropoffAddress'] ?? ride['toAddress'] ?? '',
       'availableSeats': seats,
-      'totalPriceCdf': total,
-      'pricePerSeatCdf': perSeat ?? _splitPrice(total, seats),
+      'pricePerSeatCdf': perSeat ?? 0,
       'driverName': ride['driverName']?.toString() ?? 'Conducteur',
       'passengerCount': ride['passengerCount'] as int? ?? passengers.length,
       'passengers': passengers,
-      'departureAt': ride['departureAt']?.toString(),
     };
-  }
-
-  String _formatDeparture(String? raw) {
-    if (raw == null || raw.isEmpty) return '';
-    try {
-      return _formatDateTime(DateTime.parse(raw));
-    } catch (_) {
-      return raw;
-    }
-  }
-
-  Future<void> _loadRides() async {
-    setState(() => _loadingList = true);
-    final api = ref.read(apiClientProvider);
-    await api.checkHealth();
-    final result = await api.get(
-      '/carpool?pickupLat=$_pickupLat&pickupLng=$_pickupLng'
-      '&dropoffLat=$_dropoffLat&dropoffLng=$_dropoffLng',
-    );
-    setState(() {
-      _loadingList = false;
-      if (result case Success(:final data)) {
-        _rides = _parseTrips(data).map(_normalizeTrip).toList();
-      }
-    });
   }
 
   int _splitPrice(int total, int seats) {
@@ -131,22 +108,42 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
     }
     setState(() {
       _loading = true;
+      _loadingList = true;
       _error = null;
       _validationError = null;
     });
     final api = ref.read(apiClientProvider);
+    final dateStr = DateTime(_searchDate.year, _searchDate.month, _searchDate.day).toIso8601String();
     final result = await api.get(
-      '/carpool?pickupLat=$_pickupLat&pickupLng=$_pickupLng'
-      '&dropoffLat=$_dropoffLat&dropoffLng=$_dropoffLng',
+      '/carpool/search?from=${Uri.encodeComponent(_fromController.text.trim())}'
+      '&to=${Uri.encodeComponent(_toController.text.trim())}'
+      '&date=$dateStr&sort=$_sortBy',
     );
     setState(() {
       _loading = false;
+      _loadingList = false;
       switch (result) {
         case Success(:final data):
-          _rides = _parseTrips(data).map(_normalizeTrip).toList();
-          _tabController.index = 0;
+          final raw = data['data'] as List? ?? data['matches'] as List? ?? data['trips'] as List? ?? [];
+          _rides = raw.cast<Map<String, dynamic>>().map(_normalizeTrip).toList();
         case Failure(:final error):
           _error = error.message;
+      }
+    });
+  }
+
+  Future<void> _loadMyTrips() async {
+    setState(() => _loadingMine = true);
+    final api = ref.read(apiClientProvider);
+    final result = await api.get('/carpool/mine');
+    setState(() {
+      _loadingMine = false;
+      if (result case Success(:final data)) {
+        _myDriverTrips = (data['asDriver'] as List? ?? []).cast<Map<String, dynamic>>();
+        _myPassengerTrips = (data['asPassenger'] as List? ?? [])
+            .cast<Map<String, dynamic>>()
+            .map((b) => _normalizeTrip(b['trip'] as Map<String, dynamic>? ?? b))
+            .toList();
       }
     });
   }
@@ -156,7 +153,7 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
       context: context,
       initialDate: _departureAt,
       firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 7)),
+      lastDate: DateTime.now().add(const Duration(days: 30)),
     );
     if (date == null || !mounted) return;
     final time = await showTimePicker(
@@ -171,6 +168,19 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
       _pricePerSeat = null;
       _totalPrice = null;
     });
+  }
+
+  Future<void> _pickSearchDate() async {
+    final date = await showDatePicker(
+      context: context,
+      initialDate: _searchDate,
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 30)),
+    );
+    if (date != null && mounted) {
+      setState(() => _searchDate = date);
+      _search();
+    }
   }
 
   Future<void> _estimateCreate() async {
@@ -198,11 +208,11 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
       _loading = false;
       switch (result) {
         case Success(:final data):
-          final fare = data['totalPriceCdf'] as int? ??
-              (data['estimatedFareCdf'] ?? data['estimatedPriceCdf']) as int? ??
-              15000;
+          final fare = data['totalPriceCdf'] as int? ?? 15000;
           _totalPrice = fare;
+          _distanceKm = (data['distanceKm'] as num?)?.toDouble();
           _pricePerSeat = data['pricePerSeatCdf'] as int? ?? _splitPrice(fare, seats);
+          _priceController.text = _pricePerSeat.toString();
         case Failure(:final error):
           _error = error.message;
       }
@@ -219,8 +229,10 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
       setState(() => _validationError = 'Nombre de places : entre 1 et 6.');
       return;
     }
-    if (_pricePerSeat == null || _pricePerSeat! < 500) {
-      setState(() => _validationError = 'Estimez le prix avant de publier.');
+    final customPrice = int.tryParse(_priceController.text.trim());
+    final price = customPrice ?? _pricePerSeat;
+    if (price == null || price < 500) {
+      setState(() => _validationError = 'Indiquez un prix par place (min. 500 CDF).');
       return;
     }
     if (_departureAt.isBefore(DateTime.now())) {
@@ -233,23 +245,21 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
       _validationError = null;
     });
     final api = ref.read(apiClientProvider);
-    final result = await api.post('/carpool', {
+    final result = await api.post('/carpool/rides', {
+      'fromAddress': _fromController.text.trim(),
+      'toAddress': _toController.text.trim(),
+      'seats': seats,
       'departureAt': _departureAt.toIso8601String(),
-      'pickupLat': _pickupLat,
-      'pickupLng': _pickupLng,
-      'pickupAddress': _fromController.text.trim(),
-      'dropoffLat': _dropoffLat,
-      'dropoffLng': _dropoffLng,
-      'dropoffAddress': _toController.text.trim(),
-      'seatsTotal': seats,
-      'pricePerSeatCdf': _pricePerSeat,
+      'pricePerSeatCdf': price,
+      if (_meetingPointController.text.trim().isNotEmpty) 'meetingPoint': _meetingPointController.text.trim(),
+      if (_notesController.text.trim().isNotEmpty) 'notes': _notesController.text.trim(),
+      'ladiesOnly': _ladiesOnly,
+      'instantBooking': _instantBooking,
     });
     setState(() => _loading = false);
     switch (result) {
-      case Success(:final data):
+      case Success():
         if (mounted) {
-          final trip = data['trip'] as Map<String, dynamic>? ??
-              data['ride'] as Map<String, dynamic>?;
           showDialog<void>(
             context: context,
             builder: (ctx) => AlertDialog(
@@ -257,19 +267,16 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
               content: Text(
                 'Votre covoiturage est en ligne.\n'
                 'Départ : ${_formatDateTime(_departureAt)}\n'
-                'Prix par passager : ${MarketConfig.formatCdf(_pricePerSeat ?? 0)}\n'
-                'Réf. : ${trip?['id'] ?? ''}',
-                maxLines: 6,
-                overflow: TextOverflow.ellipsis,
+                'Prix par place : ${MarketConfig.formatCdf(price)}',
               ),
               actions: [
                 TextButton(
                   onPressed: () {
                     Navigator.pop(ctx);
-                    _loadRides();
-                    _tabController.index = 0;
+                    _loadMyTrips();
+                    _tabController.index = 2;
                   },
-                  child: const Text('OK'),
+                  child: const Text('Voir mes trajets'),
                 ),
               ],
             ),
@@ -280,7 +287,7 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
     }
   }
 
-  Future<void> _joinRide(Map<String, dynamic> ride) async {
+  Future<void> _bookRide(Map<String, dynamic> ride, {int seats = 1}) async {
     final id = ride['id']?.toString() ?? '';
     final driver = ride['driverName']?.toString() ?? 'Conducteur';
     final perSeat = ride['pricePerSeatCdf'] as int? ?? 0;
@@ -289,7 +296,7 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
       _error = null;
     });
     final api = ref.read(apiClientProvider);
-    final result = await api.post('/carpool/$id/join', {'seats': 1});
+    final result = await api.post('/carpool/$id/book', {'seats': seats});
     setState(() => _loading = false);
     switch (result) {
       case Success():
@@ -307,66 +314,97 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
               ),
             ),
           );
-          _loadRides();
+          _search();
+          _loadMyTrips();
         }
       case Failure(:final error):
         setState(() => _error = error.message);
     }
   }
 
+  void _openDetail(Map<String, dynamic> ride) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CarpoolDetailScreen(
+          tripId: ride['id']?.toString() ?? '',
+          initialTrip: ride,
+        ),
+      ),
+    );
+  }
+
   Widget _rideCard(Map<String, dynamic> ride) {
-    final total = ride['totalPriceCdf'] as int? ?? 0;
+    final perSeat = ride['pricePerSeatCdf'] as int? ?? 0;
     final seats = ride['availableSeats'] as int? ?? 1;
-    final perSeat = ride['pricePerSeatCdf'] as int? ?? _splitPrice(total, seats);
     final driver = ride['driverName']?.toString() ?? 'Conducteur';
-    final id = ride['id']?.toString() ?? '';
-    final passengerCount = ride['passengerCount'] as int? ?? 0;
+    final rating = ride['driverRating']?.toString() ?? '4.5';
+    final kyc = ride['kycVerified'] == true;
+    final eta = ride['etaLabel']?.toString() ?? '';
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: 10),
       child: MovaCard(
+        onTap: () => _openDetail(ride),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              '${ride['fromAddress']} → ${ride['toAddress']}',
-              style: const TextStyle(fontWeight: FontWeight.w600),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '${ride['fromCity'] ?? ride['fromAddress']} → ${ride['toCity'] ?? ride['toAddress']}',
+                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                Text(
+                  MarketConfig.formatCdf(perSeat),
+                  style: const TextStyle(fontWeight: FontWeight.bold, color: MovaColors.green, fontSize: 16),
+                ),
+              ],
             ),
-            const SizedBox(height: 4),
-            Text(
-              '$driver · $seats place${seats > 1 ? 's' : ''}'
-              '${passengerCount > 0 ? ' · $passengerCount passager${passengerCount > 1 ? 's' : ''}' : ''}',
-              style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
+            if (eta.isNotEmpty)
+              Text(eta, style: const TextStyle(color: MovaColors.textSecondary, fontSize: 12)),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '$driver · ★ $rating · $seats pl.',
+                    style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
+                  ),
+                ),
+                if (kyc)
+                  const Icon(Icons.verified_user, size: 16, color: MovaColors.green),
+              ],
             ),
             if (ride['departureAt'] != null)
               Text(
                 'Départ : ${_formatDeparture(ride['departureAt']?.toString())}',
-                style: const TextStyle(color: MovaColors.textSecondary, fontSize: 12),
+                style: const TextStyle(fontSize: 12, color: MovaColors.textSecondary),
               ),
-            const SizedBox(height: 8),
+            if (ride['ladiesOnly'] == true)
+              const Padding(
+                padding: EdgeInsets.only(top: 4),
+                child: Text('Femmes uniquement', style: TextStyle(fontSize: 11, color: MovaColors.violet)),
+              ),
+            const SizedBox(height: 10),
             Row(
               children: [
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '${MarketConfig.formatCdf(perSeat)} / pers.',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: MovaColors.green,
-                        ),
-                      ),
-                    ],
+                  child: OutlinedButton(
+                    onPressed: () => _openDetail(ride),
+                    child: const Text('Détails', overflow: TextOverflow.ellipsis),
                   ),
                 ),
-                ElevatedButton(
-                  onPressed: id.isEmpty ? null : () => _joinRide(ride),
-                  child: const Text('Rejoindre'),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () => _bookRide(ride),
+                    child: const Text('Réserver', overflow: TextOverflow.ellipsis),
+                  ),
                 ),
               ],
             ),
@@ -376,6 +414,15 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
     );
   }
 
+  String _formatDeparture(String? raw) {
+    if (raw == null || raw.isEmpty) return '';
+    try {
+      return _formatDateTime(DateTime.parse(raw));
+    } catch (_) {
+      return raw;
+    }
+  }
+
   Widget _searchTab() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -383,34 +430,60 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
         TextField(
           controller: _fromController,
           decoration: const InputDecoration(
-            labelText: 'Départ',
+            labelText: 'Ville de départ',
             prefixIcon: Icon(Icons.trip_origin),
+            hintText: 'Ex: Kinshasa, Gombe',
           ),
         ),
         const SizedBox(height: 12),
         TextField(
           controller: _toController,
           decoration: const InputDecoration(
-            labelText: 'Destination',
+            labelText: 'Ville de destination',
             hintText: 'Ex: Limete, Masina…',
             prefixIcon: Icon(Icons.place_outlined),
           ),
         ),
-        const SizedBox(height: 16),
-        MovaButton(
-          label: 'Rechercher',
-          isLoading: _loading,
-          icon: Icons.search,
-          onPressed: _search,
+        const SizedBox(height: 12),
+        MovaCard(
+          onTap: _pickSearchDate,
+          child: Row(
+            children: [
+              const Icon(Icons.calendar_today, color: MovaColors.violet, size: 20),
+              const SizedBox(width: 12),
+              Expanded(child: Text('Date : ${_formatDate(_searchDate)}')),
+              const Icon(Icons.chevron_right),
+            ],
+          ),
         ),
+        const SizedBox(height: 12),
+        DropdownButtonFormField<String>(
+          value: _sortBy,
+          isExpanded: true,
+          decoration: const InputDecoration(labelText: 'Trier par'),
+          items: const [
+            DropdownMenuItem(value: 'departure', child: Text('Départ')),
+            DropdownMenuItem(value: 'price', child: Text('Prix')),
+            DropdownMenuItem(value: 'rating', child: Text('Note')),
+          ],
+          onChanged: (v) {
+            if (v != null) {
+              setState(() => _sortBy = v);
+              _search();
+            }
+          },
+        ),
+        const SizedBox(height: 16),
+        MovaButton(label: 'Rechercher', isLoading: _loading, icon: Icons.search, onPressed: _search),
         const SizedBox(height: 20),
-        Text('Trajets disponibles', style: Theme.of(context).textTheme.titleSmall),
+        Text('${ _rides.length } trajet${_rides.length > 1 ? 's' : ''} trouvé${_rides.length > 1 ? 's' : ''}',
+            style: Theme.of(context).textTheme.titleSmall),
         const SizedBox(height: 8),
         if (_loadingList)
           const Center(child: CircularProgressIndicator())
         else if (_rides.isEmpty)
           const Text(
-            'Aucun trajet trouvé. Essayez une autre destination.',
+            'Aucun trajet pour cette date. Essayez une autre destination ou publiez le vôtre.',
             style: TextStyle(color: MovaColors.textSecondary),
           )
         else
@@ -420,8 +493,6 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
   }
 
   Widget _createTab() {
-    final seats = int.tryParse(_seatsController.text.trim()) ?? 3;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -435,11 +506,8 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Date et heure de départ', style: Theme.of(context).textTheme.titleSmall),
-                    Text(
-                      _formatDateTime(_departureAt),
-                      style: const TextStyle(color: MovaColors.textSecondary),
-                    ),
+                    Text('Date et heure', style: Theme.of(context).textTheme.titleSmall),
+                    Text(_formatDateTime(_departureAt), style: const TextStyle(color: MovaColors.textSecondary)),
                   ],
                 ),
               ),
@@ -450,18 +518,12 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
         const SizedBox(height: 12),
         TextField(
           controller: _fromController,
-          decoration: const InputDecoration(
-            labelText: 'Départ',
-            prefixIcon: Icon(Icons.trip_origin),
-          ),
+          decoration: const InputDecoration(labelText: 'Ville de départ', prefixIcon: Icon(Icons.trip_origin)),
         ),
         const SizedBox(height: 12),
         TextField(
           controller: _toController,
-          decoration: const InputDecoration(
-            labelText: 'Destination',
-            prefixIcon: Icon(Icons.place_outlined),
-          ),
+          decoration: const InputDecoration(labelText: 'Destination', prefixIcon: Icon(Icons.place_outlined)),
           onChanged: (_) => setState(() {
             _pricePerSeat = null;
             _totalPrice = null;
@@ -469,71 +531,109 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
         ),
         const SizedBox(height: 12),
         TextField(
+          controller: _meetingPointController,
+          decoration: const InputDecoration(
+            labelText: 'Point de rendez-vous (optionnel)',
+            prefixIcon: Icon(Icons.location_on_outlined),
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextField(
           controller: _seatsController,
           keyboardType: TextInputType.number,
-          decoration: const InputDecoration(
-            labelText: 'Places disponibles',
-            prefixIcon: Icon(Icons.event_seat_outlined),
-          ),
-          onChanged: (_) => setState(() {
-            if (_totalPrice != null) {
-              _pricePerSeat = _splitPrice(_totalPrice!, int.tryParse(_seatsController.text.trim()) ?? 3);
-            }
-          }),
+          decoration: const InputDecoration(labelText: 'Places disponibles (1-6)', prefixIcon: Icon(Icons.event_seat_outlined)),
         ),
-        if (_pricePerSeat != null) ...[
-          const SizedBox(height: 16),
-          MovaCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (_totalPrice != null)
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Prix total estimé'),
-                      Text(
-                        MarketConfig.formatCdf(_totalPrice!),
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                    ],
-                  ),
-                const Divider(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('Part par passager ($seats)'),
-                    Text(
-                      MarketConfig.formatCdf(_pricePerSeat!),
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: MovaColors.green,
-                        fontSize: 18,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _priceController,
+          keyboardType: TextInputType.number,
+          decoration: InputDecoration(
+            labelText: 'Prix par place (CDF)',
+            prefixIcon: const Icon(Icons.payments_outlined),
+            helperText: _totalPrice != null ? 'Estimation totale : ${MarketConfig.formatCdf(_totalPrice!)}' : null,
           ),
-        ],
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _notesController,
+          decoration: const InputDecoration(
+            labelText: 'Notes (ex: 2 bagages max)',
+            prefixIcon: Icon(Icons.notes_outlined),
+          ),
+        ),
+        const SizedBox(height: 8),
+        SwitchListTile(
+          title: const Text('Femmes uniquement'),
+          value: _ladiesOnly,
+          onChanged: (v) => setState(() => _ladiesOnly = v),
+        ),
+        SwitchListTile(
+          title: const Text('Réservation instantanée'),
+          subtitle: const Text('Les passagers peuvent réserver sans validation'),
+          value: _instantBooking,
+          onChanged: (v) => setState(() => _instantBooking = v),
+        ),
+        if (_distanceKm != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text('Distance estimée : ${_distanceKm!.toStringAsFixed(1)} km',
+                style: const TextStyle(color: MovaColors.textSecondary, fontSize: 12)),
+          ),
         if (_validationError != null) ...[
-          const SizedBox(height: 16),
+          const SizedBox(height: 8),
           MovaErrorBanner(message: _validationError!),
         ],
         if (_error != null) ...[
-          const SizedBox(height: 16),
+          const SizedBox(height: 8),
           MovaErrorBanner(message: _error!, onRetry: _estimateCreate),
         ],
-        const SizedBox(height: 24),
+        const SizedBox(height: 16),
         MovaButton(
-          label: _pricePerSeat == null ? 'Estimer le prix' : 'Publier le trajet',
+          label: _priceController.text.isEmpty ? 'Estimer le prix' : 'Publier le trajet',
           isLoading: _loading,
-          icon: _pricePerSeat == null ? Icons.calculate_outlined : Icons.publish_outlined,
+          icon: _priceController.text.isEmpty ? Icons.calculate_outlined : Icons.publish_outlined,
           onPressed: _loading
               ? null
-              : (_pricePerSeat == null ? _estimateCreate : _createRide),
+              : (_priceController.text.isEmpty ? _estimateCreate : _createRide),
         ),
+      ],
+    );
+  }
+
+  Widget _myTripsTab() {
+    if (_loadingMine) return const Center(child: CircularProgressIndicator());
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text('En tant que conducteur', style: Theme.of(context).textTheme.titleSmall),
+        const SizedBox(height: 8),
+        if (_myDriverTrips.isEmpty)
+          const Text('Aucun trajet publié.', style: TextStyle(color: MovaColors.textSecondary))
+        else
+          ..._myDriverTrips.map((t) {
+            final trip = _normalizeTrip(t);
+            return ListTile(
+              title: Text('${trip['fromAddress']} → ${trip['toAddress']}'),
+              subtitle: Text('${trip['timelineStep'] ?? trip['status']} · ${trip['passengerCount']} passager(s)'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => _openDetail(trip),
+            );
+          }),
+        const SizedBox(height: 20),
+        Text('En tant que passager', style: Theme.of(context).textTheme.titleSmall),
+        const SizedBox(height: 8),
+        if (_myPassengerTrips.isEmpty)
+          const Text('Aucune réservation.', style: TextStyle(color: MovaColors.textSecondary))
+        else
+          ..._myPassengerTrips.map((t) {
+            final trip = _normalizeTrip(t);
+            return ListTile(
+              title: Text('${trip['fromAddress']} → ${trip['toAddress']}'),
+              subtitle: Text('${trip['driverName']} · ${MarketConfig.formatCdf(trip['pricePerSeatCdf'] as int? ?? 0)}'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => _openDetail(trip),
+            );
+          }),
       ],
     );
   }
@@ -552,14 +652,23 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
             unselectedLabelColor: MovaColors.textSecondary,
             tabs: const [
               Tab(text: 'Rechercher'),
-              Tab(text: 'Proposer'),
+              Tab(text: 'Publier'),
+              Tab(text: 'Mes trajets'),
             ],
           ),
           const SizedBox(height: 16),
           AnimatedBuilder(
             animation: _tabController,
-            builder: (context, _) =>
-                _tabController.index == 0 ? _searchTab() : _createTab(),
+            builder: (context, _) {
+              switch (_tabController.index) {
+                case 1:
+                  return _createTab();
+                case 2:
+                  return _myTripsTab();
+                default:
+                  return _searchTab();
+              }
+            },
           ),
         ],
       ),

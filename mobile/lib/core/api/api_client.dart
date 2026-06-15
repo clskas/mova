@@ -356,14 +356,40 @@ class ApiClient {
     if (path.contains('/carpool/estimate')) {
       return Success(MockData.carpoolEstimate(body ?? {}));
     }
-    if (path.contains('/carpool') && method == 'GET') {
+    if (path.contains('/carpool/search') && method == 'GET') {
+      return Success({'data': MockData.carpoolRides(), 'count': MockData.carpoolRides().length});
+    }
+    if (path == '/carpool/mine' && method == 'GET') {
+      return Success({
+        'asDriver': [MockData.createCarpoolRide({'driverName': 'Vous'})],
+        'asPassenger': [
+          {'bookingId': 'b1', 'seats': 1, 'trip': MockData.carpoolRides().first},
+        ],
+      });
+    }
+    if (path == '/carpool' && method == 'GET') {
       return Success({'trips': MockData.carpoolRides(), 'matches': MockData.carpoolRides(), 'data': MockData.carpoolRides()});
+    }
+    if (path == '/carpool/rides' && method == 'POST') {
+      return Success({'trip': MockData.createCarpoolRide(body ?? {}), 'ride': MockData.createCarpoolRide(body ?? {})});
     }
     if (path == '/carpool' && method == 'POST') {
       return Success({'trip': MockData.createCarpoolRide(body ?? {}), 'ride': MockData.createCarpoolRide(body ?? {})});
     }
-    if (path.contains('/carpool/') && path.endsWith('/join')) {
-      return const Success({'success': true});
+    if (path.contains('/carpool/') && (path.endsWith('/join') || path.endsWith('/book'))) {
+      return Success({
+        'success': true,
+        'confirmation': {
+          'tripId': path.split('/')[2],
+          'seats': body?['seats'] ?? 1,
+          'totalCdf': 3000,
+          'driverName': 'Paul M.',
+          'contactPhone': '+243 *** 123',
+        },
+      });
+    }
+    if (path.contains('/carpool/') && path.endsWith('/cancel') && method == 'POST') {
+      return const Success({'cancelled': true});
     }
     if (RegExp(r'^/carpool/[^/]+$').hasMatch(path) && method == 'GET') {
       final id = path.split('/').last;
@@ -384,8 +410,12 @@ class ApiClient {
       final id = path.split('/')[2];
       return Success({'delivery': MockData.parcelTracking(id), 'success': true});
     }
-    if (path.contains('/rental/estimate')) {
+    if (path.contains('/rental/quote') || path.contains('/rental/estimate')) {
       return Success(MockData.rentalEstimate(body ?? {}));
+    }
+    if (RegExp(r'^/rental/vehicles/[^/]+$').hasMatch(path) && method == 'GET') {
+      final id = path.split('/').last;
+      return Success(MockData.rentalVehicleDetail(id));
     }
     if (path.contains('/rental/vehicles')) {
       return Success({'data': MockData.rentalVehicles(), 'currency': 'CDF'});

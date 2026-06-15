@@ -2,7 +2,7 @@ import { Body, Controller, Get, Param, Post, Query, Request, UseGuards } from '@
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { MobileCarpoolAddressDto, MobileCarpoolCreateDto, MobileCarpoolEstimateDto } from '../deliveries/deliveries-mobile.dto';
-import { CreateCarpoolTripDto, JoinCarpoolDto } from './carpool.dto';
+import { BookCarpoolDto, CarpoolSearchQueryDto, CreateCarpoolTripDto, JoinCarpoolDto, RateCarpoolDto } from './carpool.dto';
 import { CarpoolService } from './carpool.service';
 
 @ApiTags('carpool')
@@ -21,13 +21,38 @@ export class CarpoolController {
   @Post('rides')
   @ApiOperation({ summary: 'Créer trajet covoiturage (contrat mobile)' })
   createRide(@Request() req: { user: { id: string } }, @Body() dto: MobileCarpoolCreateDto) {
-    return this.carpoolService.createFromMobile(req.user.id, dto.fromAddress, dto.toAddress, dto.seats ?? 3, dto.departureAt);
+    return this.carpoolService.createFromMobile(
+      req.user.id,
+      dto.fromAddress,
+      dto.toAddress,
+      dto.seats ?? 3,
+      dto.departureAt,
+      {
+        pricePerSeatCdf: dto.pricePerSeatCdf,
+        meetingPoint: dto.meetingPoint,
+        notes: dto.notes,
+        ladiesOnly: dto.ladiesOnly,
+        instantBooking: dto.instantBooking,
+        vehicleInfo: dto.vehicleInfo,
+      },
+    );
+  }
+
+  @Get('search')
+  @ApiOperation({ summary: 'Rechercher trajets par ville et date' })
+  searchGet(@Query() query: CarpoolSearchQueryDto) {
+    return this.carpoolService.search({
+      from: query.from,
+      to: query.to,
+      date: query.date,
+      sort: query.sort,
+    });
   }
 
   @Post('search')
   @ApiOperation({ summary: 'Rechercher trajets covoiturage (contrat mobile)' })
-  search(@Body() dto: MobileCarpoolAddressDto) {
-    return this.carpoolService.searchMobile(dto.fromAddress, dto.toAddress);
+  searchPost(@Body() dto: MobileCarpoolAddressDto & { date?: string; sort?: 'price' | 'departure' | 'rating' }) {
+    return this.carpoolService.searchMobile(dto.fromAddress, dto.toAddress, dto.date, dto.sort);
   }
 
   @Post('estimate')
@@ -70,6 +95,12 @@ export class CarpoolController {
     return this.carpoolService.get(id);
   }
 
+  @Post(':id/book')
+  @ApiOperation({ summary: 'Réserver des places sur un trajet' })
+  book(@Request() req: { user: { id: string } }, @Param('id') id: string, @Body() dto: BookCarpoolDto) {
+    return this.carpoolService.book(id, req.user.id, dto.seats);
+  }
+
   @Post(':id/join')
   @ApiOperation({ summary: 'Rejoindre un trajet covoiturage' })
   join(@Request() req: { user: { id: string } }, @Param('id') id: string, @Body() dto: JoinCarpoolDto) {
@@ -77,15 +108,21 @@ export class CarpoolController {
   }
 
   @Post(':id/cancel')
-  @ApiOperation({ summary: 'Annuler trajet covoiturage (conducteur)' })
+  @ApiOperation({ summary: 'Annuler trajet (conducteur) ou réservation (passager)' })
   cancel(@Request() req: { user: { id: string } }, @Param('id') id: string) {
-    return this.carpoolService.cancel(id, req.user.id);
+    return this.carpoolService.cancelTripOrBooking(id, req.user.id);
   }
 
   @Post(':id/leave')
   @ApiOperation({ summary: 'Quitter trajet covoiturage (passager)' })
   leave(@Request() req: { user: { id: string } }, @Param('id') id: string) {
     return this.carpoolService.leave(id, req.user.id);
+  }
+
+  @Post(':id/rate')
+  @ApiOperation({ summary: 'Noter le conducteur après trajet' })
+  rate(@Request() req: { user: { id: string } }, @Param('id') id: string, @Body() dto: RateCarpoolDto) {
+    return this.carpoolService.rateTrip(id, req.user.id, dto.score, dto.comment);
   }
 
   @Post(':id/start')

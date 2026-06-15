@@ -530,18 +530,64 @@ abstract final class MockData {
         {
           'id': '00000000-0000-4000-a000-000000000001',
           'name': 'Toyota Corolla',
+          'make': 'Toyota',
+          'model': 'Corolla',
+          'year': 2021,
           'category': 'ECONOMY',
-          'seats': 4,
+          'categoryLabel': 'Économique',
+          'transmission': 'MANUAL',
+          'transmissionLabel': 'Manuelle',
+          'city': 'Kinshasa',
+          'seats': 5,
           'dailyRateCdf': 45000,
           'depositCdf': 150000,
+          'rating': 4.6,
+          'ownerName': 'Jean K.',
+          'ownerBadge': 'PRO',
+          'features': ['Climatisation', 'Bluetooth'],
+          'imageUrl': 'https://placehold.co/600x400/6C63FF/white?text=Corolla',
+          'cancellationPolicy': 'Annulation gratuite 24 h avant prise en charge.',
         },
         {
           'id': '00000000-0000-4000-a000-000000000002',
           'name': 'Toyota RAV4',
+          'make': 'Toyota',
+          'model': 'RAV4',
+          'year': 2022,
           'category': 'SUV',
+          'categoryLabel': 'SUV',
+          'transmission': 'AUTO',
+          'transmissionLabel': 'Automatique',
+          'city': 'Kinshasa',
           'seats': 5,
           'dailyRateCdf': 85000,
           'depositCdf': 250000,
+          'rating': 4.8,
+          'ownerName': 'Marie L.',
+          'ownerBadge': 'SUPER_HOST',
+          'features': ['Climatisation', 'GPS', '4x4'],
+          'imageUrl': 'https://placehold.co/600x400/6C63FF/white?text=RAV4',
+          'cancellationPolicy': 'Annulation gratuite 48 h avant prise en charge.',
+        },
+        {
+          'id': '00000000-0000-4000-a000-000000000003',
+          'name': 'Mercedes Classe C',
+          'make': 'Mercedes',
+          'model': 'Classe C',
+          'year': 2023,
+          'category': 'PREMIUM',
+          'categoryLabel': 'Premium',
+          'transmission': 'AUTO',
+          'transmissionLabel': 'Automatique',
+          'city': 'Kinshasa',
+          'seats': 5,
+          'dailyRateCdf': 120000,
+          'depositCdf': 250000,
+          'rating': 4.9,
+          'ownerName': 'MOVA Fleet',
+          'ownerBadge': 'PRO',
+          'features': ['Climatisation', 'GPS', 'Cuir'],
+          'imageUrl': 'https://placehold.co/600x400/6C63FF/white?text=Mercedes',
         },
       ];
 
@@ -550,12 +596,25 @@ abstract final class MockData {
           'id': 'carpool-1',
           'fromAddress': 'Gombe, Kinshasa',
           'toAddress': 'Limete, Kinshasa',
+          'fromCity': 'Kinshasa',
+          'toCity': 'Kinshasa',
+          'pickupLat': -4.3217,
+          'pickupLng': 15.3125,
+          'dropoffLat': -4.3580,
+          'dropoffLng': 15.3510,
           'driverName': 'Paul M.',
+          'driverRating': 4.8,
+          'kycVerified': true,
           'availableSeats': 2,
           'pricePerSeatCdf': 3000,
           'totalPriceCdf': 12000,
+          'distanceKm': 5.2,
+          'durationMin': 18,
+          'etaLabel': '~18 min · 5.2 km',
           'departureAt': DateTime.now().add(const Duration(hours: 4)).toIso8601String(),
           'passengerCount': 1,
+          'timelineStep': 'Places réservées',
+          'contactPhone': '+243 *** 123',
           'passengers': [
             {'id': 'p1', 'userId': 'user-abc', 'seats': 1, 'label': 'Passager abc'},
           ],
@@ -564,12 +623,24 @@ abstract final class MockData {
           'id': 'carpool-2',
           'fromAddress': 'Kinshasa Centre',
           'toAddress': 'Aéroport N\'Djili',
+          'fromCity': 'Kinshasa',
+          'toCity': 'Kinshasa',
+          'pickupLat': -4.3250,
+          'pickupLng': 15.3222,
+          'dropoffLat': -4.3857,
+          'dropoffLng': 15.4446,
           'driverName': 'Grace K.',
+          'driverRating': 4.6,
+          'kycVerified': true,
           'availableSeats': 3,
           'pricePerSeatCdf': 15000,
           'totalPriceCdf': 45000,
+          'distanceKm': 18.4,
+          'durationMin': 37,
+          'etaLabel': '~37 min · 18.4 km',
           'departureAt': DateTime.now().add(const Duration(days: 1)).toIso8601String(),
           'passengerCount': 0,
+          'timelineStep': 'Publié',
           'passengers': [],
         },
       ];
@@ -581,6 +652,10 @@ abstract final class MockData {
       'totalPriceCdf': total,
       'pricePerSeatCdf': (total / seats).ceil(),
       'currency': 'CDF',
+      'distanceKm': 8.5,
+      'durationMin': 22,
+      'fromCity': 'Kinshasa',
+      'toCity': 'Kinshasa',
     };
   }
 
@@ -612,13 +687,76 @@ abstract final class MockData {
     final start = DateTime.parse(body['startDate']?.toString() ?? DateTime.now().toIso8601String());
     final end = DateTime.parse(body['endDate']?.toString() ?? start.add(const Duration(days: 1)).toIso8601String());
     final days = end.difference(start).inDays.clamp(1, 30);
-    final daily = switch (body['vehicleType']?.toString()) {
-      'MINIBUS' => 120000,
-      'PICKUP' => 95000,
-      'SUV' => 85000,
-      _ => 45000,
+    final vehicleId = body['vehicleId']?.toString();
+    final vehicle = rentalVehicles().firstWhere(
+      (v) => v['id'] == vehicleId,
+      orElse: () => rentalVehicles().first,
+    );
+    var daily = vehicle['dailyRateCdf'] as int? ?? 45000;
+    var rentalFee = daily * days;
+    var weeklyDiscount = 0;
+    if (body['rentalPeriod'] == 'WEEKLY' && days >= 7) {
+      weeklyDiscount = (rentalFee * 0.1).round();
+      rentalFee -= weeklyDiscount;
+    }
+    var insuranceFee = 0;
+    final tier = body['insuranceTier']?.toString() ?? 'BASIC';
+    if (tier == 'STANDARD') insuranceFee = (rentalFee * 0.12).round();
+    if (tier == 'PREMIUM') insuranceFee = (rentalFee * 0.25).round();
+    var addOnsFee = 0;
+    final addOns = body['addOns'] as Map<String, dynamic>? ?? {};
+    if (addOns['childSeat'] == true) addOnsFee += 5000;
+    if (addOns['gps'] == true) addOnsFee += 8000;
+    if (addOns['extraDriver'] == true) addOnsFee += 15000;
+    var interCityFee = 0;
+    final pickup = body['pickupCity']?.toString().toLowerCase();
+    final ret = body['returnCity']?.toString().toLowerCase();
+    if (pickup != null && ret != null && pickup != ret) interCityFee = 15000;
+    var mileageFee = body['mileageType'] == 'LIMITED' ? 15000 : 0;
+    final deposit = vehicle['depositCdf'] as int? ?? 150000;
+    final subtotal = rentalFee + insuranceFee + addOnsFee + interCityFee + mileageFee;
+    final total = subtotal + deposit;
+    return {
+      'days': days,
+      'rentalFeeCdf': rentalFee,
+      'depositCdf': deposit,
+      'estimatedPriceCdf': total,
+      'totalCdf': total,
+      'breakdown': {
+        'rentalFeeCdf': rentalFee,
+        'weeklyDiscountCdf': weeklyDiscount,
+        'insuranceFeeCdf': insuranceFee,
+        'addOnsFeeCdf': addOnsFee,
+        'interCityFeeCdf': interCityFee,
+        'mileageFeeCdf': mileageFee,
+        'depositCdf': deposit,
+        'subtotalCdf': subtotal,
+      },
+      'currency': 'CDF',
     };
-    return {'estimatedPriceCdf': daily * days, 'estimatedTotalCdf': daily * days, 'days': days, 'currency': 'CDF'};
+  }
+
+  static Map<String, dynamic> rentalVehicleDetail(String id) {
+    final vehicle = rentalVehicles().firstWhere(
+      (v) => v['id'] == id,
+      orElse: () => rentalVehicles().first,
+    );
+    return {
+      'vehicle': vehicle,
+      'options': {
+        'insuranceTiers': {
+          'BASIC': {'label': 'Basique', 'surchargePct': 0},
+          'STANDARD': {'label': 'Standard', 'surchargePct': 12},
+          'PREMIUM': {'label': 'Premium', 'surchargePct': 25},
+        },
+        'addOns': {
+          'childSeat': {'label': 'Siège enfant', 'priceCdf': 5000},
+          'gps': {'label': 'GPS', 'priceCdf': 8000},
+          'extraDriver': {'label': 'Conducteur supplémentaire', 'priceCdf': 15000},
+        },
+      },
+      'currency': 'CDF',
+    };
   }
 
   static List<Map<String, dynamic>> rentalInquiries() => [
@@ -629,6 +767,16 @@ abstract final class MockData {
           'startDate': DateTime.now().add(const Duration(days: 3)).toIso8601String(),
           'endDate': DateTime.now().add(const Duration(days: 5)).toIso8601String(),
           'pickupAddress': 'Gombe, Kinshasa',
+          'pickupCity': 'Kinshasa',
+          'returnCity': 'Kinshasa',
+          'totalCdf': 320000,
+          'timeline': [
+            {'status': 'PENDING', 'label': 'Demande', 'completed': true, 'current': true},
+            {'status': 'CONFIRMED', 'label': 'Confirmée', 'completed': false, 'current': false},
+            {'status': 'IN_PROGRESS', 'label': 'En cours', 'completed': false, 'current': false},
+            {'status': 'RETURNED', 'label': 'Retournée', 'completed': false, 'current': false},
+          ],
+          'vehicle': rentalVehicles()[1],
         },
       ];
 
@@ -639,7 +787,8 @@ abstract final class MockData {
         'id': 'rental-${DateTime.now().millisecondsSinceEpoch}',
         'status': 'PENDING',
         ...body,
-        'estimatedTotalCdf': estimate['estimatedTotalCdf'],
+        'estimatedTotalCdf': estimate['totalCdf'],
+        'totalCdf': estimate['totalCdf'],
       },
       'message': 'Demande enregistrée. Un conseiller MOVA vous contactera sous 24h.',
     };

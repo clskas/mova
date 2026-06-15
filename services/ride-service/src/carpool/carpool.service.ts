@@ -1,6 +1,12 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { CarpoolStatus, VehicleType } from '@prisma/client';
-import { MovaErrorCode, MovaHttpException } from '@mova/shared';
+import {
+  INTERNAL_API_KEY,
+  MovaErrorCode,
+  MovaHttpException,
+  findServiceAreaByName,
+  serviceUrl,
+} from '@mova/shared';
 import { addressToCoords, DEFAULT_PICKUP } from '../common/address.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { PricingService } from '../rides/pricing.service';
@@ -8,32 +14,134 @@ import { CreateCarpoolTripDto } from './carpool.dto';
 
 const MATCH_RADIUS_KM = 5;
 
+type TripRow = {
+  id: string;
+  pickupAddress: string | null;
+  dropoffAddress: string | null;
+  pickupLat: number;
+  pickupLng: number;
+  dropoffLat: number;
+  dropoffLng: number;
+  seatsAvailable: number;
+  pricePerSeatCdf: number;
+  seatsTotal: number;
+  driverId: string;
+  status: CarpoolStatus;
+  departureAt: Date;
+  fromCity?: string | null;
+  toCity?: string | null;
+  meetingPoint?: string | null;
+  notes?: string | null;
+  ladiesOnly?: boolean;
+  instantBooking?: boolean;
+  vehicleInfo?: string | null;
+  distanceKm?: number | null;
+  durationMin?: number | null;
+  passengers?: { id: string; userId: string; seats: number }[];
+};
+
 @Injectable()
 export class CarpoolService {
   constructor(private prisma: PrismaService, private pricing: PricingService) {}
 
-  private formatTripForMobile(t: {
-    id: string;
-    pickupAddress: string | null;
-    dropoffAddress: string | null;
-    seatsAvailable: number;
-    pricePerSeatCdf: number;
-    seatsTotal: number;
-    driverId: string;
-    departureAt?: Date;
-    passengers?: { id: string; userId: string; seats: number }[];
-  }) {
+  private maskPhone(phone?: string): string {
+    if (!phone || phone.length < 6) return '+243 *** ***';
+    return `${phone.slice(0, 4)} *** ${phone.slice(-3)}`;
+  }
+
+  private async fetchUserBrief(userId: string): Promise<{ name?: string; phone?: string } | null> {
+    try {
+      const res = await fetch(serviceUrl('auth', `/internal/users/${userId}`), {
+        headers: { 'x-internal-api-key': INTERNAL_API_KEY },
+      });
+      if (!res.ok) return null;
+      const user = (await res.json()) as { firstName?: string; lastName?: string; phone?: string };
+      const name = [user.firstName, user.lastName].filter(Boolean).join(' ').trim();
+      return { name: name || undefined, phone: user.phone };
+    } catch {
+      return null;
+    }
+  }
+
+  private async fetchDriverProfile(userId: string) {
+    try {
+      const res = await fetch(serviceUrl('driver', `/internal/drivers/${userId}`), {
+        headers: { 'x-internal-api-key': INTERNAL_API_KEY },
+      });
+      if (!res.ok) return null;
+      return (await res.json()) as {
+        kycStatus?: string;
+        ratingAvg?: number;
+        vehicleMake?: string;
+        vehicleModel?: string;
+        vehiclePlate?: string;
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  private async driverRatingAvg(driverId: string): Promise<number> {
+    const agg = await this.prisma.carpoolRating.aggregate({
+      where: { toUserId: driverId },
+      _avg: { score: true },
+    });
+    if (agg._avg.score != null) return Math.round(agg._avg.score * 10) / 10;
+    const profile = await this.fetchDriverProfile(driverId);
+    return profile?.ratingAvg ?? 4.5;
+  }
+
+  private resolveCity(address: string): string {
+    const area = findServiceAreaByName(address);
+    return area?.name ?? address.split(',')[0]?.trim() ?? 'Kinshasa';
+  }
+
+  private timelineStep(status: CarpoolStatus, passengerCount: number): string {
+    if (status === CarpoolStatus.CANCELLED) return 'Annulé';
+    if (status === CarpoolStatus.COMPLETED) return 'Terminé';
+    if (status === CarpoolStatus.IN_PROGRESS) return 'En route';
+    if (passengerCount > 0 || status === CarpoolStatus.MATCHED) return 'Places réservées';
+    return 'Publié';
+  }
+
+  private async formatTripForMobile(t: TripRow, driverMeta?: { name?: string; phone?: string; rating?: number; kycVerified?: boolean }) {
     const passengers = t.passengers ?? [];
+    const distanceKm = t.distanceKm ?? this.pricing.haversineKm(t.pickupLat, t.pickupLng, t.dropoffLat, t.dropoffLng);
+    const durationMin = t.durationMin ?? Math.ceil((distanceKm / 30) * 60);
+    const rating = driverMeta?.rating ?? (await this.driverRatingAvg(t.driverId));
+    const profile = driverMeta?.kycVerified != null ? null : await this.fetchDriverProfile(t.driverId);
+    const kycVerified = driverMeta?.kycVerified ?? profile?.kycStatus === 'APPROVED';
+    const driverName = driverMeta?.name ?? `Conducteur ${(t.driverId ?? 'unknown').slice(0, 6)}`;
+    const contactPhone = this.maskPhone(driverMeta?.phone);
+
     return {
       id: t.id,
-      fromAddress: t.pickupAddress ?? 'Kinshasa',
-      toAddress: t.dropoffAddress ?? 'Kinshasa',
-      driverName: `Chauffeur ${(t.driverId ?? 'unknown').slice(0, 6)}`,
+      status: t.status,
+      fromAddress: t.pickupAddress ?? t.fromCity ?? 'Kinshasa',
+      toAddress: t.dropoffAddress ?? t.toCity ?? 'Kinshasa',
+      fromCity: t.fromCity ?? this.resolveCity(t.pickupAddress ?? ''),
+      toCity: t.toCity ?? this.resolveCity(t.dropoffAddress ?? ''),
+      pickupLat: t.pickupLat,
+      pickupLng: t.pickupLng,
+      dropoffLat: t.dropoffLat,
+      dropoffLng: t.dropoffLng,
+      driverId: t.driverId,
+      driverName,
+      driverRating: rating,
+      kycVerified,
       availableSeats: t.seatsAvailable ?? 0,
       seatsTotal: t.seatsTotal ?? t.seatsAvailable ?? 1,
       totalPriceCdf: (t.pricePerSeatCdf ?? 0) * (t.seatsTotal ?? t.seatsAvailable ?? 1),
       pricePerSeatCdf: t.pricePerSeatCdf ?? 0,
       departureAt: t.departureAt?.toISOString(),
+      distanceKm: Math.round(distanceKm * 10) / 10,
+      durationMin,
+      etaLabel: `~${durationMin} min · ${Math.round(distanceKm * 10) / 10} km`,
+      meetingPoint: t.meetingPoint,
+      notes: t.notes,
+      ladiesOnly: t.ladiesOnly ?? false,
+      instantBooking: t.instantBooking ?? true,
+      vehicleInfo: t.vehicleInfo,
       passengerCount: passengers.length,
       passengers: passengers.map((p) => ({
         id: p.id,
@@ -41,6 +149,9 @@ export class CarpoolService {
         seats: p.seats,
         label: `Passager ${p.userId.slice(0, 6)}`,
       })),
+      timelineStep: this.timelineStep(t.status, passengers.length),
+      contactPhone,
+      contactAction: 'Contacter le conducteur',
     };
   }
 
@@ -48,19 +159,35 @@ export class CarpoolService {
     const pickup = addressToCoords(fromAddress);
     const dropoff = addressToCoords(toAddress);
     const distanceKm = this.pricing.haversineKm(pickup.lat, pickup.lng, dropoff.lat, dropoff.lng);
-    const durationMin = (distanceKm / 30) * 60;
+    const durationMin = Math.ceil((distanceKm / 30) * 60);
     const fare = await this.pricing.estimateFare(VehicleType.STANDARD, distanceKm, durationMin);
     const totalPriceCdf = Math.max(fare.estimatedFareCdf, 5000 * seats);
     return {
       totalPriceCdf,
       pricePerSeatCdf: Math.ceil(totalPriceCdf / Math.max(seats, 1)),
       currency: 'CDF',
-      distanceKm,
+      distanceKm: Math.round(distanceKm * 10) / 10,
       durationMin,
+      fromCity: this.resolveCity(fromAddress),
+      toCity: this.resolveCity(toAddress),
     };
   }
 
-  async createFromMobile(driverId: string, fromAddress: string, toAddress: string, seats: number, departureAt?: string) {
+  async createFromMobile(
+    driverId: string,
+    fromAddress: string,
+    toAddress: string,
+    seats: number,
+    departureAt?: string,
+    opts?: {
+      pricePerSeatCdf?: number;
+      meetingPoint?: string;
+      notes?: string;
+      ladiesOnly?: boolean;
+      instantBooking?: boolean;
+      vehicleInfo?: string;
+    },
+  ) {
     const pickup = addressToCoords(fromAddress);
     const dropoff = addressToCoords(toAddress);
     const estimate = await this.estimateMobile(fromAddress, toAddress, seats);
@@ -73,12 +200,20 @@ export class CarpoolService {
       dropoffLat: dropoff.lat,
       dropoffLng: dropoff.lng,
       dropoffAddress: toAddress,
+      fromCity: estimate.fromCity,
+      toCity: estimate.toCity,
       seatsTotal: seats,
-      pricePerSeatCdf: estimate.pricePerSeatCdf,
+      pricePerSeatCdf: opts?.pricePerSeatCdf ?? estimate.pricePerSeatCdf,
+      meetingPoint: opts?.meetingPoint,
+      notes: opts?.notes,
+      ladiesOnly: opts?.ladiesOnly,
+      instantBooking: opts?.instantBooking,
+      vehicleInfo: opts?.vehicleInfo,
     };
     const { trip } = await this.create(driverId, dto);
+    const user = await this.fetchUserBrief(driverId);
     return {
-      trip: this.formatTripForMobile({ ...trip, passengers: [] }),
+      trip: await this.formatTripForMobile({ ...trip, passengers: [] }, { name: user?.name ?? 'Vous', phone: user?.phone }),
       ride: {
         id: trip.id,
         status: trip.status,
@@ -86,7 +221,7 @@ export class CarpoolService {
         fromAddress,
         toAddress,
         seats,
-        driverName: 'Vous',
+        driverName: user?.name ?? 'Vous',
         totalPriceCdf: estimate.totalPriceCdf,
         departureAt: trip.departureAt.toISOString(),
       },
@@ -95,20 +230,89 @@ export class CarpoolService {
 
   async listMobileRides() {
     const { trips } = await this.list();
-    return { data: trips.map((t) => this.formatTripForMobile(t)) };
+    const data = await Promise.all(trips.map((t) => this.formatTripForMobile(t)));
+    return { data };
   }
 
-  async searchMobile(fromAddress: string, toAddress: string) {
-    const pickup = addressToCoords(fromAddress);
-    const dropoff = addressToCoords(toAddress);
-    const { matches } = await this.list({ pickupLat: pickup.lat, pickupLng: pickup.lng, dropoffLat: dropoff.lat, dropoffLng: dropoff.lng });
-    return { data: matches.map((t) => this.formatTripForMobile(t)) };
+  async searchMobile(fromAddress: string, toAddress: string, date?: string, sort?: 'price' | 'departure' | 'rating') {
+    const result = await this.search({ from: fromAddress, to: toAddress, date, sort });
+    return { data: result.data };
+  }
+
+  async search(query: { from?: string; to?: string; date?: string; sort?: 'price' | 'departure' | 'rating' }) {
+    const fromCity = query.from?.trim();
+    const toCity = query.to?.trim();
+    let dateStart: Date | undefined;
+    let dateEnd: Date | undefined;
+    if (query.date) {
+      const d = new Date(query.date);
+      dateStart = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+      dateEnd = new Date(dateStart);
+      dateEnd.setDate(dateEnd.getDate() + 1);
+    }
+
+    const trips = await this.prisma.carpoolTrip.findMany({
+      where: {
+        status: CarpoolStatus.OPEN,
+        seatsAvailable: { gt: 0 },
+        departureAt: dateStart && dateEnd
+          ? { gte: dateStart, lt: dateEnd, gt: new Date() }
+          : { gt: new Date() },
+      },
+      orderBy: query.sort === 'price' ? { pricePerSeatCdf: 'asc' } : { departureAt: 'asc' },
+      take: 100,
+      include: { passengers: { select: { id: true, userId: true, seats: true } } },
+    });
+
+    let filtered = trips;
+    if (fromCity) {
+      const lower = fromCity.toLowerCase();
+      filtered = filtered.filter(
+        (t) =>
+          t.fromCity?.toLowerCase().includes(lower) ||
+          t.pickupAddress?.toLowerCase().includes(lower),
+      );
+    }
+    if (toCity) {
+      const lower = toCity.toLowerCase();
+      filtered = filtered.filter(
+        (t) =>
+          t.toCity?.toLowerCase().includes(lower) ||
+          t.dropoffAddress?.toLowerCase().includes(lower),
+      );
+    }
+
+    if (query.from && query.to) {
+      const pickup = addressToCoords(query.from);
+      const dropoff = addressToCoords(query.to);
+      filtered = filtered.filter((t) => {
+        const pickupDist = this.pricing.haversineKm(pickup.lat, pickup.lng, t.pickupLat, t.pickupLng);
+        const dropoffDist = this.pricing.haversineKm(dropoff.lat, dropoff.lng, t.dropoffLat, t.dropoffLng);
+        return pickupDist <= MATCH_RADIUS_KM * 3 && dropoffDist <= MATCH_RADIUS_KM * 3;
+      });
+    }
+
+    let formatted = await Promise.all(filtered.slice(0, 50).map((t) => this.formatTripForMobile(t)));
+
+    if (query.sort === 'rating') {
+      formatted.sort((a, b) => (b.driverRating as number) - (a.driverRating as number));
+    }
+
+    return { data: formatted, count: formatted.length };
   }
 
   async create(driverId: string, dto: CreateCarpoolTripDto) {
     const departureAt = new Date(dto.departureAt);
     if (departureAt <= new Date()) throw new MovaHttpException(MovaErrorCode.SCHEDULED_RIDE_PAST);
     const distanceKm = this.pricing.haversineKm(dto.pickupLat, dto.pickupLng, dto.dropoffLat, dto.dropoffLng);
+    const durationMin = Math.ceil((distanceKm / 30) * 60);
+    let vehicleInfo = dto.vehicleInfo;
+    if (!vehicleInfo) {
+      const profile = await this.fetchDriverProfile(driverId);
+      if (profile?.vehicleMake || profile?.vehicleModel) {
+        vehicleInfo = [profile.vehicleMake, profile.vehicleModel, profile.vehiclePlate].filter(Boolean).join(' · ');
+      }
+    }
     const trip = await this.prisma.carpoolTrip.create({
       data: {
         driverId,
@@ -120,11 +324,20 @@ export class CarpoolService {
         dropoffLat: dto.dropoffLat,
         dropoffLng: dto.dropoffLng,
         dropoffAddress: dto.dropoffAddress,
+        fromCity: dto.fromCity ?? (dto.pickupAddress ? this.resolveCity(dto.pickupAddress) : undefined),
+        toCity: dto.toCity ?? (dto.dropoffAddress ? this.resolveCity(dto.dropoffAddress) : undefined),
+        meetingPoint: dto.meetingPoint,
         seatsTotal: dto.seatsTotal,
         seatsAvailable: dto.seatsTotal,
         pricePerSeatCdf: dto.pricePerSeatCdf,
         notes: dto.notes,
+        ladiesOnly: dto.ladiesOnly ?? false,
+        instantBooking: dto.instantBooking ?? true,
+        vehicleInfo,
+        distanceKm,
+        durationMin,
       },
+      include: { passengers: true },
     });
     return { trip, distanceKm };
   }
@@ -147,9 +360,18 @@ export class CarpoolService {
     return { trips, matches };
   }
 
+  async book(tripId: string, userId: string, seats: number) {
+    return this.join(tripId, userId, seats);
+  }
+
   async join(tripId: string, userId: string, seats: number) {
     const trip = await this.prisma.carpoolTrip.findUnique({ where: { id: tripId }, include: { passengers: true } });
-    if (!trip || trip.status !== CarpoolStatus.OPEN) throw new MovaHttpException(MovaErrorCode.CARPOOL_NOT_FOUND, HttpStatus.NOT_FOUND);
+    if (!trip || trip.status === CarpoolStatus.CANCELLED || trip.status === CarpoolStatus.COMPLETED) {
+      throw new MovaHttpException(MovaErrorCode.CARPOOL_NOT_FOUND, HttpStatus.NOT_FOUND);
+    }
+    if (trip.status !== CarpoolStatus.OPEN && trip.status !== CarpoolStatus.MATCHED) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Ce trajet n\'accepte plus de réservations.');
+    }
     if (trip.driverId === userId) throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR);
     if (trip.passengers.some((p) => p.userId === userId)) throw new MovaHttpException(MovaErrorCode.CARPOOL_ALREADY_JOINED);
     if (trip.seatsAvailable < seats) throw new MovaHttpException(MovaErrorCode.CARPOOL_NO_SEATS);
@@ -161,10 +383,26 @@ export class CarpoolService {
       data: { seatsAvailable, status },
       include: { passengers: true },
     });
+    const driverUser = await this.fetchUserBrief(trip.driverId);
+    const driverProfile = await this.fetchDriverProfile(trip.driverId);
+    const formatted = await this.formatTripForMobile(updated, {
+      name: driverUser?.name,
+      phone: driverUser?.phone,
+      rating: driverProfile?.ratingAvg,
+      kycVerified: driverProfile?.kycStatus === 'APPROVED',
+    });
     return {
-      trip: this.formatTripForMobile(updated),
+      trip: formatted,
       passenger,
       success: true,
+      confirmation: {
+        tripId,
+        seats,
+        totalCdf: trip.pricePerSeatCdf * seats,
+        driverName: formatted.driverName,
+        contactPhone: formatted.contactPhone,
+        departureAt: trip.departureAt.toISOString(),
+      },
     };
   }
 
@@ -181,7 +419,15 @@ export class CarpoolService {
       orderBy: { createdAt: 'desc' },
       take: 20,
     });
-    return { asDriver, asPassenger };
+    const driverTrips = await Promise.all(asDriver.map((t) => this.formatTripForMobile(t)));
+    const passengerTrips = await Promise.all(
+      asPassenger.map(async (p) => ({
+        bookingId: p.id,
+        seats: p.seats,
+        trip: await this.formatTripForMobile(p.trip),
+      })),
+    );
+    return { asDriver: driverTrips, asPassenger: passengerTrips };
   }
 
   async get(id: string) {
@@ -190,7 +436,26 @@ export class CarpoolService {
       include: { passengers: { select: { id: true, userId: true, seats: true, createdAt: true } } },
     });
     if (!trip) throw new MovaHttpException(MovaErrorCode.CARPOOL_NOT_FOUND, HttpStatus.NOT_FOUND);
-    return { trip: this.formatTripForMobile(trip), raw: trip };
+    const driverUser = await this.fetchUserBrief(trip.driverId);
+    const driverProfile = await this.fetchDriverProfile(trip.driverId);
+    return {
+      trip: await this.formatTripForMobile(trip, {
+        name: driverUser?.name,
+        phone: driverUser?.phone,
+        rating: driverProfile?.ratingAvg,
+        kycVerified: driverProfile?.kycStatus === 'APPROVED',
+      }),
+      raw: trip,
+    };
+  }
+
+  async cancelTripOrBooking(tripId: string, userId: string) {
+    const trip = await this.prisma.carpoolTrip.findUnique({ where: { id: tripId }, include: { passengers: true } });
+    if (!trip) throw new MovaHttpException(MovaErrorCode.CARPOOL_NOT_FOUND, HttpStatus.NOT_FOUND);
+    if (trip.driverId === userId) return this.cancel(tripId, userId);
+    const passenger = trip.passengers.find((p) => p.userId === userId);
+    if (passenger) return this.leave(tripId, userId);
+    throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
   }
 
   async cancel(tripId: string, userId: string) {
@@ -199,6 +464,9 @@ export class CarpoolService {
     if (trip.driverId !== userId) throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
     if (trip.status === CarpoolStatus.COMPLETED || trip.status === CarpoolStatus.CANCELLED) {
       throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR);
+    }
+    if (trip.departureAt <= new Date()) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Impossible d\'annuler après le départ.');
     }
     return this.prisma.carpoolTrip.update({
       where: { id: tripId },
@@ -213,8 +481,11 @@ export class CarpoolService {
     if (!trip || trip.status === CarpoolStatus.CANCELLED || trip.status === CarpoolStatus.COMPLETED) {
       throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR);
     }
+    if (trip.departureAt <= new Date()) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Impossible d\'annuler après le départ.');
+    }
     await this.prisma.carpoolPassenger.delete({ where: { id: passenger.id } });
-    return this.prisma.carpoolTrip.update({
+    const updated = await this.prisma.carpoolTrip.update({
       where: { id: tripId },
       data: {
         seatsAvailable: trip.seatsAvailable + passenger.seats,
@@ -222,6 +493,22 @@ export class CarpoolService {
       },
       include: { passengers: true },
     });
+    return { trip: await this.formatTripForMobile(updated), cancelled: true };
+  }
+
+  async rateTrip(tripId: string, fromUserId: string, score: number, comment?: string) {
+    const trip = await this.prisma.carpoolTrip.findUnique({ where: { id: tripId }, include: { passengers: true } });
+    if (!trip || trip.status !== CarpoolStatus.COMPLETED) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Évaluation disponible après trajet terminé.');
+    }
+    const isPassenger = trip.passengers.some((p) => p.userId === fromUserId);
+    if (!isPassenger) throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
+    const rating = await this.prisma.carpoolRating.upsert({
+      where: { tripId_fromUserId: { tripId, fromUserId } },
+      create: { tripId, fromUserId, toUserId: trip.driverId, score, comment },
+      update: { score, comment },
+    });
+    return { rating, driverRating: await this.driverRatingAvg(trip.driverId) };
   }
 
   async startTrip(tripId: string, userId: string) {
@@ -264,6 +551,8 @@ export class CarpoolService {
       driverId: t.driverId,
       fromAddress: t.pickupAddress,
       toAddress: t.dropoffAddress,
+      fromCity: t.fromCity,
+      toCity: t.toCity,
       status: t.status,
       seatsAvailable: t.seatsAvailable,
       passengerCount: t.passengers.length,
@@ -288,3 +577,5 @@ export class CarpoolService {
     return this.prisma.carpoolTrip.update({ where: { id: tripId }, data: { status }, include: { passengers: true } });
   }
 }
+
+export { DEFAULT_PICKUP };

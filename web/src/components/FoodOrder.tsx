@@ -4,14 +4,32 @@ import { useEffect, useState } from "react";
 import { apiFetch, formatCdf } from "@/lib/api";
 
 type MenuItem = { id: string; name: string; priceCdf: number };
+type ApiMenuItem = { id?: string; name: string; priceCdf?: number; unitPriceCdf?: number };
 type Restaurant = {
   id: string;
   name: string;
   cuisine: string;
   rating: number;
-  deliveryMinCdf: number;
+  deliveryMinCdf?: number;
   items: MenuItem[];
 };
+
+function normalizeRestaurant(raw: Record<string, unknown>): Restaurant {
+  const menuRaw = (raw.menuItems as ApiMenuItem[] | undefined) ?? (raw.items as ApiMenuItem[] | undefined) ?? [];
+  const items = menuRaw.map((item, index) => ({
+    id: item.id ?? item.name ?? `item-${index}`,
+    name: item.name,
+    priceCdf: item.priceCdf ?? item.unitPriceCdf ?? 0,
+  }));
+  return {
+    id: String(raw.id ?? ""),
+    name: String(raw.name ?? ""),
+    cuisine: String(raw.cuisine ?? ""),
+    rating: Number(raw.rating ?? 4.5),
+    deliveryMinCdf: Number(raw.deliveryMinCdf ?? 3500),
+    items,
+  };
+}
 
 type Props = { onBack: () => void; mock: boolean };
 
@@ -26,8 +44,8 @@ export function FoodOrder({ onBack, mock }: Props) {
   const [total, setTotal] = useState(0);
 
   useEffect(() => {
-    apiFetch<{ data?: Restaurant[] }>("/api/deliveries/restaurants").then((res) => {
-      setRestaurants(res.data ?? []);
+    apiFetch<{ data?: Record<string, unknown>[] }>("/api/deliveries/restaurants").then((res) => {
+      setRestaurants((res.data ?? []).map(normalizeRestaurant));
       setLoading(false);
     });
   }, []);
@@ -56,18 +74,19 @@ export function FoodOrder({ onBack, mock }: Props) {
     setOrdering(true);
     const items = Object.entries(cart).map(([id, quantity]) => {
       const item = selected.items.find((i) => i.id === id)!;
-      return { id, name: item.name, priceCdf: item.priceCdf, quantity };
+      return { name: item.name, unitPriceCdf: item.priceCdf, quantity };
     });
-    const res = await apiFetch<{ order?: { priceCdf?: number } }>("/api/deliveries/food", {
+    const res = await apiFetch<{ delivery?: { estimatedPriceCdf?: number }; order?: { priceCdf?: number } }>("/api/deliveries/food", {
       method: "POST",
       body: JSON.stringify({
         restaurantId: selected.id,
-        restaurantName: selected.name,
         deliveryAddress: address,
+        deliveryLat: -4.3217,
+        deliveryLng: 15.3125,
         items,
       }),
     });
-    setTotal(res.order?.priceCdf ?? cartTotal + deliveryFee);
+    setTotal(res.delivery?.estimatedPriceCdf ?? res.order?.priceCdf ?? cartTotal + deliveryFee);
     setConfirmed(true);
     setOrdering(false);
   }

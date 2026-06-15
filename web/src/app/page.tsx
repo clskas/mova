@@ -4,20 +4,26 @@ import { useEffect, useState } from "react";
 import { checkGatewayHealth } from "@/lib/api";
 import { ServiceCard } from "@/components/ServiceCard";
 import {
+  CalendarIcon,
+  CarpoolIcon,
   FoodIcon,
   HistoryIcon,
   LocationIcon,
   ParcelIcon,
   TaxiIcon,
+  WalletIcon,
 } from "@/components/ServiceIcons";
 import { TaxiBooking } from "@/components/TaxiBooking";
 import { ParcelDelivery } from "@/components/ParcelDelivery";
 import { FoodOrder } from "@/components/FoodOrder";
 import { HistoryView } from "@/components/HistoryView";
 import { HelpView } from "@/components/HelpView";
+import { WalletView } from "@/components/WalletView";
+import { ScheduledRidesView } from "@/components/ScheduledRidesView";
+import { CarpoolView } from "@/components/CarpoolView";
 import { HelpIcon } from "@/components/ServiceIcons";
 
-type View = "home" | "taxi" | "parcel" | "food" | "history" | "help";
+type View = "home" | "taxi" | "parcel" | "food" | "history" | "help" | "wallet" | "scheduled" | "carpool";
 
 function greeting(): string {
   const hour = new Date().getHours();
@@ -98,6 +104,27 @@ export default function Home() {
                 onClick={() => setView("food")}
               />
               <ServiceCard
+                icon={<WalletIcon color="#6C63FF" />}
+                title="Portefeuille"
+                subtitle="Solde et recharges"
+                color="#6C63FF"
+                onClick={() => setView("wallet")}
+              />
+              <ServiceCard
+                icon={<CalendarIcon color="#FF6B35" />}
+                title="Course planifiée"
+                subtitle="Réserver à l'avance"
+                color="#FF6B35"
+                onClick={() => setView("scheduled")}
+              />
+              <ServiceCard
+                icon={<CarpoolIcon color="#6C63FF" />}
+                title="Covoiturage"
+                subtitle="Partager un trajet"
+                color="#6C63FF"
+                onClick={() => setView("carpool")}
+              />
+              <ServiceCard
                 icon={<HistoryIcon color="#FF6B35" />}
                 title="Historique"
                 subtitle="Vos courses et livraisons"
@@ -111,6 +138,9 @@ export default function Home() {
         {view === "taxi" && <TaxiBooking onBack={() => setView("home")} mock={mock} />}
         {view === "parcel" && <ParcelDelivery onBack={() => setView("home")} mock={mock} />}
         {view === "food" && <FoodOrder onBack={() => setView("home")} mock={mock} />}
+        {view === "wallet" && <WalletView onBack={() => setView("home")} mock={mock} />}
+        {view === "scheduled" && <ScheduledRidesView onBack={() => setView("home")} mock={mock} />}
+        {view === "carpool" && <CarpoolView onBack={() => setView("home")} mock={mock} />}
         {view === "history" && <HistoryView onBack={() => setView("home")} />}
         {view === "help" && <HelpView onBack={() => setView("home")} />}
       </main>

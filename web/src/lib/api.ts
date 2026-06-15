@@ -115,6 +115,54 @@ function mockFor<T>(path: string, init?: RequestInit): T {
       ],
     } as T;
   }
+  if (path.includes('/wallet/top-up') || path.includes('/wallet/topup')) {
+    const body = init?.body ? JSON.parse(init.body as string) : {};
+    const amount = body.amountCdf ?? 10000;
+    return { success: true, balanceCdf: 50000 + amount, message: `Recharge de ${amount} FC` } as T;
+  }
+  if (path.includes('/wallet')) {
+    return {
+      balanceCdf: 50000,
+      transactions: [
+        { type: 'CREDIT', amountCdf: 10000, description: 'Recharge Orange Money', createdAt: new Date().toISOString() },
+        { type: 'DEBIT', amountCdf: -3500, description: 'Course taxi', createdAt: new Date(Date.now() - 86400000).toISOString() },
+      ],
+    } as T;
+  }
+  if (path.includes('/carpool/estimate') && method === 'POST') {
+    const body = init?.body ? JSON.parse(init.body as string) : {};
+    const seats = body.seats ?? 3;
+    const total = 15000;
+    return { totalPriceCdf: total, pricePerSeatCdf: Math.ceil(total / seats) } as T;
+  }
+  if (path.includes('/carpool') && method === 'POST') {
+    return { trip: { id: `carpool-${Date.now()}`, status: 'OPEN' } } as T;
+  }
+  if (path.includes('/carpool/') && path.endsWith('/join') && method === 'POST') {
+    return { success: true } as T;
+  }
+  if (path.includes('/carpool')) {
+    return {
+      matches: [
+        {
+          id: 'carpool-1',
+          fromAddress: 'Gombe',
+          toAddress: 'Limete',
+          driverName: 'Jean M.',
+          availableSeats: 2,
+          pricePerSeatCdf: 2500,
+          departureAt: new Date(Date.now() + 86400000).toISOString(),
+          passengerCount: 1,
+        },
+      ],
+    } as T;
+  }
+  if (path.includes('/rides/scheduled/estimate') && method === 'POST') {
+    return { estimatedPriceCdf: 9500 } as T;
+  }
+  if (path.includes('/rides/scheduled') && method === 'POST') {
+    return { scheduledRide: { id: `sched-${Date.now()}`, status: 'SCHEDULED' } } as T;
+  }
   if (path.includes('/rides/scheduled')) {
     return {
       data: [

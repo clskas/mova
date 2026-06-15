@@ -6,13 +6,13 @@ import 'service_areas.dart';
 class ServiceAreaLocation {
   ServiceAreaLocation._();
 
-  static ServiceArea areaFor(String areaId) =>
-      ServiceAreas.byId(areaId) ?? ServiceAreas.defaultArea;
+  static ServiceArea areaFor(String? areaId) =>
+      (areaId != null ? ServiceAreas.byId(areaId) : null) ?? ServiceAreas.fallbackArea;
 
-  static LatLng get defaultCenter => ServiceAreas.defaultArea.center;
+  static LatLng get defaultCenter => ServiceAreas.fallbackArea.center;
 
   static LatLng centerFor([String? areaId]) {
-    final area = areaId != null ? areaFor(areaId) : ServiceAreas.defaultArea;
+    final area = areaId != null ? areaFor(areaId) : ServiceAreas.fallbackArea;
     return area.center;
   }
 
@@ -35,29 +35,27 @@ class ServiceAreaLocation {
           .any((name) => lower.contains(name.toLowerCase()));
     }
     return ServiceAreas.byName(address) != null ||
-        ServiceAreas.defaultArea.districts.keys
-            .any((name) => lower.contains(name.toLowerCase())) ||
-        lower.contains('kinshasa');
+        ServiceAreas.all.any((area) => area.districts.keys
+            .any((name) => lower.contains(name.toLowerCase())));
   }
 
   static LatLng? districtFromAddress(String address, {String? areaId}) {
     final lower = address.toLowerCase();
     final area = areaId != null ? areaFor(areaId) : ServiceAreas.byName(address);
-    final districts = area?.districts ?? ServiceAreas.defaultArea.districts;
+    final districts = area?.districts ?? const <String, LatLng>{};
     for (final entry in districts.entries) {
       if (lower.contains(entry.key.toLowerCase())) return entry.value;
     }
     if (area != null && lower.contains(area.name.toLowerCase())) {
       return area.center;
     }
-    if (lower.contains('kinshasa')) return ServiceAreas.defaultArea.center;
     return null;
   }
 
   static LatLng coordsFromAddress(String address, {String? areaId}) {
     final fromDistrict = districtFromAddress(address, areaId: areaId);
     if (fromDistrict != null) return fromDistrict;
-    final area = areaId != null ? areaFor(areaId) : ServiceAreas.defaultArea;
+    final area = areaId != null ? areaFor(areaId) : ServiceAreas.fallbackArea;
     var hash = 0;
     for (final code in address.runes) {
       hash = (hash + code) % 1000;

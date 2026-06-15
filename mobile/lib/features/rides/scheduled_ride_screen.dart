@@ -6,7 +6,7 @@ import 'package:latlong2/latlong.dart';
 import '../../core/api/api_client.dart';
 import '../../core/config/market_config.dart';
 import '../../core/error/result.dart';
-import '../../core/location/kinshasa_location.dart';
+import '../../core/location/service_area_location.dart';
 import '../../core/location/location_service.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
@@ -49,13 +49,13 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
   }
 
   Map<String, dynamic> _ridePayload() {
-    final dropoff = _dropoff ?? KinshasaLocation.defaultDropoffOffset();
+    final dropoff = _dropoff ?? ServiceAreaLocation.defaultDropoffOffset();
     return {
       'pickupLat': _pickup.latitude,
       'pickupLng': _pickup.longitude,
       'dropoffLat': dropoff.latitude,
       'dropoffLng': dropoff.longitude,
-      'pickupAddress': 'Ma position, Kinshasa',
+      'pickupAddress': 'Ma position',
       'dropoffAddress': _destinationController.text.trim(),
       'vehicleType': MarketConfig.apiVehicleType(_vehicleType),
       'scheduledAt': _scheduledAt.toIso8601String(),
@@ -121,7 +121,7 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
         suggestion['address']?.toString() ??
         '';
     _destinationController.text = label;
-    _dropoff = KinshasaLocation.ensureInKinshasa(
+    _dropoff = ServiceAreaLocation.ensureInServiceArea(
       LatLng(
         (suggestion['lat'] as num?)?.toDouble() ?? MarketConfig.defaultLat - 0.03,
         (suggestion['lng'] as num?)?.toDouble() ?? MarketConfig.defaultLng + 0.04,
@@ -143,7 +143,7 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
     setState(() {
       _loadingGps = false;
       if (result != null) {
-        _pickup = KinshasaLocation.ensureInKinshasa(
+        _pickup = ServiceAreaLocation.ensureInServiceArea(
           result.position,
           address: result.label,
         );
@@ -156,13 +156,13 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
   }
 
   Future<String?> _resolveCoords() async {
-    _pickup = KinshasaLocation.ensureInKinshasa(
+    _pickup = ServiceAreaLocation.ensureInServiceArea(
       _pickup,
-      address: 'Ma position, Kinshasa',
+      address: 'Ma position',
     );
-    if (_dropoff == null || !KinshasaLocation.isInBounds(_dropoff!)) {
-      var resolved = KinshasaLocation.coordsFromAddress(_destinationController.text);
-      if (!KinshasaLocation.destinationInServiceArea(
+    if (_dropoff == null || !ServiceAreaLocation.isInBounds(_dropoff!)) {
+      var resolved = ServiceAreaLocation.coordsFromAddress(_destinationController.text);
+      if (!ServiceAreaLocation.destinationInServiceArea(
         _destinationController.text,
         coords: resolved,
         fromSuggestion: _dropoffFromSuggestion,
@@ -175,7 +175,7 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
             (s['lat'] as num?)?.toDouble() ?? MarketConfig.defaultLat,
             (s['lng'] as num?)?.toDouble() ?? MarketConfig.defaultLng,
           );
-          if (KinshasaLocation.isInBounds(resolved)) {
+          if (ServiceAreaLocation.isInBounds(resolved)) {
             _dropoff = resolved;
             _dropoffFromSuggestion = true;
             return null;
@@ -183,11 +183,11 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
         }
         return 'MOVA couvre les principales villes de RDC. Choisissez une destination dans une ville desservie.';
       }
-      _dropoff = KinshasaLocation.ensureInKinshasa(
+      _dropoff = ServiceAreaLocation.ensureInServiceArea(
         resolved,
         address: _destinationController.text,
       );
-    } else if (!KinshasaLocation.destinationInServiceArea(
+    } else if (!ServiceAreaLocation.destinationInServiceArea(
       _destinationController.text,
       coords: _dropoff,
       fromSuggestion: _dropoffFromSuggestion,
@@ -476,7 +476,7 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
                 child: Text(
                   _loadingGps
                       ? 'Localisation…'
-                      : 'Départ : Ma position, Kinshasa',
+                      : 'Départ : Ma position',
                   style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
                 ),
               ),

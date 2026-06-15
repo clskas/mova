@@ -22,7 +22,7 @@ class DriverHelpScreen extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const Text(
-            'Ressources pour les chauffeurs et livreurs MOVA à Kinshasa.',
+            'Ressources pour les chauffeurs et livreurs MOVA en RDC.',
             style: TextStyle(color: MovaColors.textSecondary, height: 1.4),
           ),
           const SizedBox(height: 16),

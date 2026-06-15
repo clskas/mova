@@ -13,7 +13,7 @@ const FAQ = [
   },
   {
     q: "Dans quelles zones MOVA est-il disponible ?",
-    a: "Lancement à Kinshasa. Extension progressive vers d'autres villes de RDC.",
+    a: "MOVA couvre 32 zones de service à travers la RDC. Choisissez votre ville ou laissez le GPS détecter la zone la plus proche.",
   },
   {
     q: "Comment contacter le support ?",
@@ -43,7 +43,7 @@ export function HelpView({ onBack }: Props) {
         <h2 className="text-lg font-bold">Centre d&apos;aide MOVA</h2>
       </div>
       <p className="text-sm text-gray-500">
-        Documentation et support — Kinshasa, RDC
+        Documentation et support — RDC
       </p>
 
       <section className="bg-[#F5F4FF] rounded-xl p-4 space-y-2">

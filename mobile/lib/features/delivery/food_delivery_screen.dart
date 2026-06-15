@@ -19,7 +19,7 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
   List<Map<String, dynamic>> _restaurants = [];
   Map<String, dynamic>? _selectedRestaurant;
   final Map<String, int> _cart = {};
-  final _addressController = TextEditingController(text: 'Ma position, Kinshasa');
+  final _addressController = TextEditingController(text: 'Ma position');
   bool _loading = true;
   bool _ordering = false;
   int? _estimatedTotal;

@@ -26,7 +26,10 @@ export class PricingAdminService {
       city?: string;
     },
   ) {
-    const city = data.city ?? MARKET_RDC.defaultCity;
+    if (!data.city) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, HttpStatus.BAD_REQUEST, 'Ville requise.');
+    }
+    const city = data.city;
     return this.prisma.pricingRule.upsert({
       where: { vehicleType_city: { vehicleType, city } },
       create: {
@@ -43,7 +46,10 @@ export class PricingAdminService {
     });
   }
 
-  async deleteRule(vehicleType: VehicleType, city = MARKET_RDC.defaultCity) {
+  async deleteRule(vehicleType: VehicleType, city: string) {
+    if (!city) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, HttpStatus.BAD_REQUEST, 'Ville requise.');
+    }
     const existing = await this.prisma.pricingRule.findUnique({
       where: { vehicleType_city: { vehicleType, city } },
     });
@@ -67,7 +73,10 @@ export class PricingAdminService {
       city: string;
     }>,
   ) {
-    const city = data.city ?? MARKET_RDC.defaultCity;
+    if (!data.city) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, HttpStatus.BAD_REQUEST, 'Ville requise.');
+    }
+    const city = data.city;
     const existing = await this.prisma.pricingRule.findUnique({
       where: { vehicleType_city: { vehicleType, city } },
     });

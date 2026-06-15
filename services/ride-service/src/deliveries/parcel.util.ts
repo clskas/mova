@@ -8,6 +8,7 @@ import {
   KINSHASA_COMMUNES,
   MovaErrorCode,
   MovaHttpException,
+  resolveCityFromCoords,
   serviceAreaOutOfBoundsMessage,
 } from '@mova/shared';
 import { Delivery, DeliveryEvent, DeliveryStatus, DeliveryType } from '@prisma/client';
@@ -169,8 +170,7 @@ export function formatParcelDelivery(
 ) {
   const priceCdf = delivery.finalPriceCdf ?? delivery.estimatedPriceCdf;
   const paymentReady = delivery.status === DeliveryStatus.DELIVERED;
-  const city =
-    findServiceAreaByCoords(delivery.pickupLat ?? 0, delivery.pickupLng ?? 0)?.name ?? 'Kinshasa';
+  const city = resolveCityFromCoords(delivery.pickupLat ?? 0, delivery.pickupLng ?? 0);
   return {
     id: delivery.id,
     type: delivery.type,

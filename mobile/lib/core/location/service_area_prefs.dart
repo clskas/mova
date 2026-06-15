@@ -10,11 +10,11 @@ class ServiceAreaPrefs {
 
   final SharedPreferences _prefs;
 
-  String get selectedAreaId =>
-      _prefs.getString(_prefKey) ?? ServiceAreas.defaultAreaId;
+  String? get selectedAreaId => _prefs.getString(_prefKey);
 
   ServiceArea get selectedArea =>
-      ServiceAreas.byId(selectedAreaId) ?? ServiceAreas.defaultArea;
+      (selectedAreaId != null ? ServiceAreas.byId(selectedAreaId!) : null) ??
+      ServiceAreas.fallbackArea;
 
   Future<void> setSelectedAreaId(String areaId) async {
     await _prefs.setString(_prefKey, areaId);
@@ -30,6 +30,6 @@ final selectedServiceAreaProvider = Provider<ServiceArea>((ref) {
   final prefsAsync = ref.watch(serviceAreaPrefsProvider);
   return prefsAsync.maybeWhen(
     data: (prefs) => prefs.selectedArea,
-    orElse: () => ServiceAreas.defaultArea,
+    orElse: () => ServiceAreas.fallbackArea,
   );
 });

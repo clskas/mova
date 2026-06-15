@@ -91,8 +91,11 @@ class MovaRideMap extends StatelessWidget {
     );
   }
 
-  static LatLng kinshasaDefault() =>
-      LatLng(MarketConfig.defaultLat, MarketConfig.defaultLng);
+  static LatLng mapDefaultCenter() =>
+      LatLng(MarketConfig.mapCenterLat, MarketConfig.mapCenterLng);
+
+  /// @deprecated Utiliser [mapDefaultCenter]
+  static LatLng kinshasaDefault() => mapDefaultCenter();
 }
 
 class _PinIcon extends StatelessWidget {

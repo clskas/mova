@@ -8,6 +8,6 @@ export class HealthController {
   async health() {
     let dbOk = false;
     try { await this.prisma.$queryRaw`SELECT 1`; dbOk = true; } catch { dbOk = false; }
-    return { status: dbOk ? 'ok' : 'degraded', service: 'payment-service', version: '1.0.0', market: MARKET_RDC.country, city: MARKET_RDC.defaultCity, timestamp: new Date().toISOString(), database: dbOk ? 'connected' : 'disconnected' };
+    return { status: dbOk ? 'ok' : 'degraded', service: 'payment-service', version: '1.0.0', market: MARKET_RDC.country, city: MARKET_RDC.coverageLabel, timestamp: new Date().toISOString(), database: dbOk ? 'connected' : 'disconnected' };
   }
 }

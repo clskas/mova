@@ -74,7 +74,7 @@ abstract final class MockData {
   static List<Map<String, dynamic>> geoAutocomplete(String query) {
     final q = query.toLowerCase().trim();
     if (q.isEmpty) return [];
-    return MarketConfig.kinshasaCommunes
+    return MarketConfig.kinshasaDistricts
         .where((c) => c.toLowerCase().contains(q))
         .take(8)
         .map((name) => {
@@ -87,7 +87,7 @@ abstract final class MockData {
   }
 
   static List<Map<String, dynamic>> communes() =>
-      MarketConfig.kinshasaCommunes
+      MarketConfig.kinshasaDistricts
           .map((name) => {'name': name, 'city': 'Kinshasa'})
           .toList();
 

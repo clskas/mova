@@ -24,6 +24,6 @@ export class HealthController {
       }),
     );
     const allOk = checks.every((c) => c.status === 'ok');
-    return { status: allOk ? 'ok' : 'degraded', service: 'api-gateway', version: '1.0.0', market: MARKET_RDC.country, city: MARKET_RDC.defaultCity, timestamp: new Date().toISOString(), services: checks };
+    return { status: allOk ? 'ok' : 'degraded', service: 'api-gateway', version: '1.0.0', market: MARKET_RDC.country, city: MARKET_RDC.coverageLabel, timestamp: new Date().toISOString(), services: checks };
   }
 }

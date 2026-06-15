@@ -39,7 +39,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
   Map<String, dynamic>? _ride;
   Map<String, dynamic>? _driver;
   String _status = 'ACCEPTED';
-  LatLng _pickup = MovaRideMap.kinshasaDefault();
+  LatLng _pickup = MovaRideMap.mapDefaultCenter();
   LatLng? _dropoff;
   LatLng? _driverPos;
   int _etaMinutes = 8;

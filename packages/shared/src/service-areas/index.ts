@@ -1,6 +1,7 @@
 import { KINSHASA_COMMUNES } from '../communes-seed';
 import {
   DEFAULT_SERVICE_AREA_ID,
+  RDC_MAP_CENTER,
   DRC_SERVICE_AREAS,
   KINSHASA_BOUNDS,
   type ServiceArea,
@@ -10,6 +11,7 @@ import {
 
 export {
   DEFAULT_SERVICE_AREA_ID,
+  RDC_MAP_CENTER,
   DRC_SERVICE_AREAS,
   KINSHASA_BOUNDS,
   type ServiceArea,
@@ -81,6 +83,16 @@ export function findNearestServiceArea(lat: number, lng: number): ServiceArea {
     }
   }
   return best;
+}
+
+/** Zone la plus proche du centre carte RDC — fallback quand GPS indisponible. */
+export function fallbackServiceArea(): ServiceArea {
+  return findNearestServiceArea(RDC_MAP_CENTER.lat, RDC_MAP_CENTER.lng);
+}
+
+/** Résout le nom de ville à partir des coordonnées GPS. */
+export function resolveCityFromCoords(lat: number, lng: number): string {
+  return findServiceAreaByCoords(lat, lng)?.name ?? findNearestServiceArea(lat, lng).name;
 }
 
 export function getCommunesForArea(areaId: string): ServiceAreaDistrict[] {

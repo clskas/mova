@@ -36,8 +36,7 @@ class ServiceArea {
 class ServiceAreas {
   ServiceAreas._();
 
-  static const defaultAreaId = 'kinshasa';
-
+  /// Quartiers Kinshasa — données géographiques uniquement, pas de privilège par défaut.
   static const _kinshasaDistricts = <String, LatLng>{
     'Gombe': LatLng(-4.3217, 15.3125),
     'Limete': LatLng(-4.3389, 15.3264),
@@ -133,8 +132,13 @@ class ServiceAreas {
     _box('lusambo', 'Lusambo', 'Sankuru', -4.975, 23.4436, radius: 0.08),
   ];
 
-  static ServiceArea get defaultArea =>
-      all.firstWhere((a) => a.id == defaultAreaId);
+  static ServiceArea get fallbackArea => nearest(const LatLng(
+        MarketConfig.mapCenterLat,
+        MarketConfig.mapCenterLng,
+      ));
+
+  /// @deprecated Utiliser [fallbackArea] — conservé pour compatibilité interne.
+  static ServiceArea get defaultArea => fallbackArea;
 
   static ServiceArea? byId(String id) {
     for (final area in all) {
@@ -175,7 +179,7 @@ class ServiceAreas {
         best = area;
       }
     }
-    return best ?? defaultArea;
+    return best ?? fallbackArea;
   }
 
   static String coverageMessage({int max = 8}) {

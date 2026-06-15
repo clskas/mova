@@ -1,6 +1,6 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { ScheduledRideStatus, VehicleType } from '@prisma/client';
-import { MovaErrorCode, MovaHttpException, findServiceAreaByCoords, MARKET_RDC } from '@mova/shared';
+import { MovaErrorCode, MovaHttpException, resolveCityFromCoords } from '@mova/shared';
 import { assertServiceAreaCoords, assertServiceAreaDestination, assertServiceAreaPair, addressToCoords, DEFAULT_PICKUP } from '../common/address.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { PricingService } from './pricing.service';
@@ -64,7 +64,7 @@ export class ScheduledRidesService {
     });
     const distanceKm = this.pricing.haversineKm(pickup.lat, pickup.lng, dropoff.lat, dropoff.lng);
     const durationMin = (distanceKm / 25) * 60;
-    const city = findServiceAreaByCoords(pickup.lat, pickup.lng)?.name ?? MARKET_RDC.defaultCity;
+    const city = resolveCityFromCoords(pickup.lat, pickup.lng);
     const fare = await this.pricing.estimateFare(dto.vehicleType, distanceKm, durationMin, city);
     const estimate = this.pricing.withInterCitySurcharge(fare, isInterCity, distanceKm);
     const ride = await this.prisma.scheduledRide.create({
@@ -158,7 +158,7 @@ export class ScheduledRidesService {
     const { pickup, dropoff, isInterCity } = this.resolveScheduledCoords(dto);
     const distanceKm = this.pricing.haversineKm(pickup.lat, pickup.lng, dropoff.lat, dropoff.lng);
     const durationMin = (distanceKm / 25) * 60;
-    const city = findServiceAreaByCoords(pickup.lat, pickup.lng)?.name ?? MARKET_RDC.defaultCity;
+    const city = resolveCityFromCoords(pickup.lat, pickup.lng);
     const fare = await this.pricing.estimateFare(vehicleType, distanceKm, durationMin, city);
     const estimate = this.pricing.withInterCitySurcharge(fare, isInterCity, distanceKm);
     return {

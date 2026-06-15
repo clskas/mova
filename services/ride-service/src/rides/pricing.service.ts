@@ -8,6 +8,7 @@ import {
   MARKET_RDC,
   MovaErrorCode,
   MovaHttpException,
+  resolveCityFromCoords,
 } from '@mova/shared';
 import { interCitySurchargeCdf } from '../common/address.util';
 import { PrismaService } from '../prisma/prisma.service';
@@ -17,21 +18,23 @@ export class PricingService {
   constructor(private prisma: PrismaService) {}
 
   resolveCity(pickupLat: number, pickupLng: number): string {
-    return findServiceAreaByCoords(pickupLat, pickupLng)?.name ?? MARKET_RDC.defaultCity;
+    return resolveCityFromCoords(pickupLat, pickupLng);
   }
 
   async estimateFare(
     vehicleType: VehicleType,
     distanceKm: number,
     durationMin: number,
-    city: string = MARKET_RDC.defaultCity,
+    city?: string,
   ): Promise<FareBreakdown> {
+    const resolvedCity = city ?? resolveCityFromCoords(MARKET_RDC.mapCenter.lat, MARKET_RDC.mapCenter.lng);
     let rule = await this.prisma.pricingRule.findUnique({
-      where: { vehicleType_city: { vehicleType, city } },
+      where: { vehicleType_city: { vehicleType, city: resolvedCity } },
     });
     if (!rule) {
-      rule = await this.prisma.pricingRule.findUnique({
-        where: { vehicleType_city: { vehicleType, city: MARKET_RDC.defaultCity } },
+      rule = await this.prisma.pricingRule.findFirst({
+        where: { vehicleType },
+        orderBy: { city: 'asc' },
       });
     }
     if (!rule) throw new MovaHttpException(MovaErrorCode.PRICING_NOT_CONFIGURED, HttpStatus.SERVICE_UNAVAILABLE);

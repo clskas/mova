@@ -8,7 +8,7 @@ import 'package:latlong2/latlong.dart';
 import '../../core/api/api_client.dart';
 import '../../core/config/market_config.dart';
 import '../../core/error/result.dart';
-import '../../core/location/kinshasa_location.dart';
+import '../../core/location/service_area_location.dart';
 import '../../core/location/location_service.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
@@ -31,12 +31,12 @@ class ParcelDeliveryScreen extends ConsumerStatefulWidget {
 }
 
 class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
-  final _pickupController = TextEditingController(text: 'Ma position, Kinshasa');
+  final _pickupController = TextEditingController(text: 'Ma position');
   final _dropoffController = TextEditingController();
   final _picker = ImagePicker();
 
   String _weightCategory = 'DOCUMENTS';
-  LatLng _pickup = MovaRideMap.kinshasaDefault();
+  LatLng _pickup = MovaRideMap.mapDefaultCenter();
   LatLng? _dropoff;
   File? _photoFile;
   int? _estimatedPrice;
@@ -108,7 +108,7 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
         suggestion['address']?.toString() ??
         '';
     _dropoffController.text = label;
-    _dropoff = KinshasaLocation.ensureInKinshasa(
+    _dropoff = ServiceAreaLocation.ensureInServiceArea(
       LatLng(
         (suggestion['lat'] as num?)?.toDouble() ?? MarketConfig.defaultLat - 0.03,
         (suggestion['lng'] as num?)?.toDouble() ?? MarketConfig.defaultLng + 0.04,
@@ -139,25 +139,25 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
     }
     setState(() {
       _loadingGps = false;
-      _pickup = KinshasaLocation.ensureInKinshasa(
+      _pickup = ServiceAreaLocation.ensureInServiceArea(
         result.position,
         address: result.label,
       );
-      _pickupController.text = KinshasaLocation.isInBounds(result.position)
+      _pickupController.text = ServiceAreaLocation.isInBounds(result.position)
           ? result.label
-          : 'Ma position, Kinshasa';
+          : 'Ma position';
       _estimatedPrice = null;
     });
   }
 
   Future<void> _resolveCoords() async {
-    _pickup = KinshasaLocation.ensureInKinshasa(
+    _pickup = ServiceAreaLocation.ensureInServiceArea(
       _pickup,
       address: _pickupController.text,
     );
-    if (_dropoff == null || !KinshasaLocation.isInBounds(_dropoff!)) {
-      var resolved = KinshasaLocation.coordsFromAddress(_dropoffController.text);
-      if (!KinshasaLocation.isInBounds(resolved)) {
+    if (_dropoff == null || !ServiceAreaLocation.isInBounds(_dropoff!)) {
+      var resolved = ServiceAreaLocation.coordsFromAddress(_dropoffController.text);
+      if (!ServiceAreaLocation.isInBounds(resolved)) {
         final api = ref.read(apiClientProvider);
         final result = await api.geoAutocomplete(_dropoffController.text.trim());
         if (result case Success(:final data) when data.isNotEmpty) {
@@ -168,12 +168,12 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
           );
         }
       }
-      _dropoff = KinshasaLocation.ensureInKinshasa(
+      _dropoff = ServiceAreaLocation.ensureInServiceArea(
         resolved,
         address: _dropoffController.text,
       );
     } else {
-      _dropoff = KinshasaLocation.ensureInKinshasa(
+      _dropoff = ServiceAreaLocation.ensureInServiceArea(
         _dropoff!,
         address: _dropoffController.text,
       );
@@ -181,7 +181,7 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
   }
 
   Map<String, dynamic> _parcelPayload({bool includePhoto = false}) {
-    final dropoff = _dropoff ?? KinshasaLocation.defaultDropoffOffset();
+    final dropoff = _dropoff ?? ServiceAreaLocation.defaultDropoffOffset();
     final payload = {
       'pickupAddress': _pickupController.text.trim(),
       'dropoffAddress': _dropoffController.text.trim(),

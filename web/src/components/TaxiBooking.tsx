@@ -32,7 +32,7 @@ export function TaxiBooking({ onBack, mock }: Props) {
     await apiFetch("/api/rides", {
       method: "POST",
       body: JSON.stringify({
-        pickupAddress: "Ma position, Kinshasa",
+        pickupAddress: "Ma position",
         dropoffAddress: destination,
         pickupLat: -4.3217,
         pickupLng: 15.3125,

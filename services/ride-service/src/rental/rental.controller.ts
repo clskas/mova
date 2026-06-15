@@ -12,7 +12,7 @@ export class RentalController {
   constructor(private rentalService: RentalService) {}
 
   @Get('vehicles')
-  @ApiOperation({ summary: 'Catalogue véhicules location Kinshasa' })
+  @ApiOperation({ summary: 'Catalogue véhicules location (toutes zones MOVA)' })
   vehicles() {
     return this.rentalService.listVehicles();
   }

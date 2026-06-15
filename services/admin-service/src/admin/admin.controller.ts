@@ -269,7 +269,7 @@ export class AdminController {
 
   @Get('communes')
   @RequirePermissions(AdminPermission.PRICING_READ)
-  @ApiOperation({ summary: 'Communes Kinshasa' })
+  @ApiOperation({ summary: 'Quartiers/communes par ville' })
   communes(@Query('city') city?: string) {
     return this.adminService.listCommunes(city);
   }

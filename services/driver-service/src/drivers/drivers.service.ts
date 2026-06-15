@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { KycStatus, VehicleType } from '@prisma/client';
-import { findServiceAreaByCoords, MARKET_RDC, MovaErrorCode, MovaHttpException, INTERNAL_API_KEY, serviceUrl } from '@mova/shared';
+import { MovaErrorCode, MovaHttpException, INTERNAL_API_KEY, resolveCityFromCoords, serviceUrl } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 
 export interface DriverCandidate {
@@ -28,7 +28,7 @@ export class DriversService {
       MARKET_RDC.matching.initialRadiusKm + searchAttempt * MARKET_RDC.matching.radiusIncrementKm,
       MARKET_RDC.matching.maxRadiusKm,
     );
-    const operatingCity = city ?? findServiceAreaByCoords(lat, lng)?.name ?? MARKET_RDC.defaultCity;
+    const operatingCity = city ?? resolveCityFromCoords(lat, lng);
     const drivers = await this.prisma.driverProfile.findMany({
       where: {
         operatingCity,

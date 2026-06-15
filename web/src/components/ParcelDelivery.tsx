@@ -13,7 +13,7 @@ const WEIGHT_CATEGORIES = [
 type Props = { onBack: () => void; mock: boolean };
 
 export function ParcelDelivery({ onBack, mock }: Props) {
-  const [pickup, setPickup] = useState("Ma position, Kinshasa");
+  const [pickup, setPickup] = useState("Ma position");
   const [dropoff, setDropoff] = useState("");
   const [weightCategory, setWeightCategory] = useState("LIGHT");
   const [estimate, setEstimate] = useState<number | null>(null);

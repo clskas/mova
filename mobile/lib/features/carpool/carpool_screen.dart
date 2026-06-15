@@ -19,7 +19,7 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   List<Map<String, dynamic>> _rides = [];
-  final _fromController = TextEditingController(text: 'Gombe, Kinshasa');
+  final _fromController = TextEditingController(text: 'Ma position');
   final _toController = TextEditingController();
   final _seatsController = TextEditingController(text: '3');
   DateTime _departureAt = DateTime.now().add(const Duration(hours: 3));

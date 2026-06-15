@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { VehicleType } from '@prisma/client';
-import { findServiceAreaByCoords, INTERNAL_API_KEY, MARKET_RDC, serviceUrl } from '@mova/shared';
+import { INTERNAL_API_KEY, MARKET_RDC, resolveCityFromCoords, serviceUrl } from '@mova/shared';
 
 export interface DriverCandidate {
   driverId: string;
@@ -21,7 +21,7 @@ export class MatchingService {
    * est traité comme course planifiée / long-haul côté dispatch.
    */
   async findDrivers(lat: number, lng: number, vehicleType: VehicleType, searchAttempt = 0): Promise<DriverCandidate[]> {
-    const city = findServiceAreaByCoords(lat, lng)?.name ?? MARKET_RDC.defaultCity;
+    const city = resolveCityFromCoords(lat, lng);
     const url = serviceUrl(
       'driver',
       `/internal/drivers/nearby?lat=${lat}&lng=${lng}&vehicleType=${vehicleType}&searchAttempt=${searchAttempt}&city=${encodeURIComponent(city)}`,

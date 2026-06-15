@@ -1,6 +1,8 @@
 import {
+  DRC_SERVICE_AREAS,
   findServiceAreaByCoords,
   findServiceAreaByName,
+  fallbackServiceArea,
   getServiceArea,
   isInServiceArea,
   MARKET_RDC,
@@ -25,8 +27,10 @@ export function isServiceAreaAddress(address: string, areaId?: string): boolean 
     return districtNamesForArea(area).some((name) => lower.includes(name));
   }
   if (findServiceAreaByName(address)) return true;
-  for (const area of getCommunesForArea('kinshasa')) {
-    if (lower.includes(area.name.toLowerCase())) return true;
+  for (const area of DRC_SERVICE_AREAS) {
+    for (const district of getCommunesForArea(area.id)) {
+      if (lower.includes(district.name.toLowerCase())) return true;
+    }
   }
   return false;
 }
@@ -75,7 +79,7 @@ export function assertServiceAreaDestination(
   if (isServiceAreaAddress(address, areaId)) {
     const area = areaId ? getServiceArea(areaId) : findServiceAreaByName(address);
     if (area) return area;
-    return getServiceArea(MARKET_RDC.defaultServiceAreaId)!;
+    return fallbackServiceArea();
   }
   throw new MovaHttpException(
     MovaErrorCode.VALIDATION_ERROR,
@@ -93,15 +97,15 @@ export function assertKinshasaDestination(
 }
 
 /** Stub géocodage — dérive des coords à partir de l'adresse texte et de la zone. */
-export function addressToCoords(address: string, areaId = MARKET_RDC.defaultServiceAreaId): { lat: number; lng: number } {
-  return addressToCoordsForArea(address, areaId);
+export function addressToCoords(address: string, areaId?: string): { lat: number; lng: number } {
+  return addressToCoordsForArea(address, areaId ?? fallbackServiceArea().id);
 }
 
 export function addressToCoordsForArea(
   address: string,
-  areaId = MARKET_RDC.defaultServiceAreaId,
+  areaId?: string,
 ): { lat: number; lng: number } {
-  const area = getServiceArea(areaId) ?? getServiceArea(MARKET_RDC.defaultServiceAreaId)!;
+  const area = getServiceArea(areaId ?? '') ?? fallbackServiceArea();
   const lower = address.toLowerCase();
   for (const district of getCommunesForArea(area.id)) {
     if (lower.includes(district.name.toLowerCase())) {
@@ -119,7 +123,7 @@ export function addressToCoordsForArea(
   };
 }
 
-export const DEFAULT_PICKUP = MARKET_RDC.defaultCoords;
+export const DEFAULT_PICKUP = MARKET_RDC.mapCenter;
 
 export type ServiceAreaPair = {
   pickupArea: ServiceArea;

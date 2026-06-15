@@ -18,7 +18,7 @@ class ErrandScreen extends ConsumerStatefulWidget {
 
 class _ErrandScreenState extends ConsumerState<ErrandScreen> {
   final _pickupController = TextEditingController(text: 'Commerce / pharmacie, Gombe');
-  final _dropoffController = TextEditingController(text: 'Ma position, Kinshasa');
+  final _dropoffController = TextEditingController(text: 'Ma position');
   final _itemController = TextEditingController();
   final List<String> _items = [];
   int? _estimatedPrice;

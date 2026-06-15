@@ -6,8 +6,8 @@ export const MARKET_RDC = {
   currencyLocale: 'fr-CD',
   phonePrefix: '+243',
   phoneRegex: /^\+243[0-9]{9}$/,
-  defaultCity: 'Kinshasa',
-  defaultServiceAreaId: 'kinshasa',
+  /** Couverture nationale — aucune ville privilégiée par défaut. */
+  coverageLabel: 'RDC',
   timezone: 'Africa/Kinshasa',
   locale: 'fr-CD',
   language: 'fr',
@@ -27,10 +27,11 @@ export const MARKET_RDC = {
     { id: 'VIP', label: 'VIP', mobileId: 'VIP', priority: 4 },
   ] as const,
 
-  defaultCoords: {
-    lat: -4.3217,
-    lng: 15.3125,
-    label: 'Gombe, Kinshasa',
+  /** Centre carte RDC — fallback technique uniquement (pas de ville imposée). */
+  mapCenter: {
+    lat: -2.88,
+    lng: 23.66,
+    label: 'Ma position',
   },
 
   matching: {

@@ -33,7 +33,7 @@ class ManualScreen extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'Guide pas à pas — ${MarketConfig.defaultCity}, ${MarketConfig.currency}',
+            'Guide pas à pas — ${MarketConfig.coverageLabel}, ${MarketConfig.currency}',
             style: theme.textTheme.bodyMedium?.copyWith(color: MovaColors.textSecondary),
           ),
           const SizedBox(height: 12),

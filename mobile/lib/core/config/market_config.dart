@@ -1,15 +1,20 @@
-/// Configuration marché RDC — couverture nationale, Kinshasa par défaut.
+/// Configuration marché RDC — couverture nationale (32 zones MOVA).
 class MarketConfig {
   static const country = 'CD';
   static const currency = 'CDF';
   static const currencySymbol = 'FC';
   static const phonePrefix = '+243';
-  static const defaultCity = 'Kinshasa';
+  static const coverageLabel = 'RDC';
   static const timezone = 'Africa/Kinshasa';
   static const locale = 'fr_CD';
 
-  static const defaultLat = -4.3217;
-  static const defaultLng = 15.3125;
+  /// Centre carte RDC — fallback technique uniquement (pas de ville imposée).
+  static const mapCenterLat = -2.88;
+  static const mapCenterLng = 23.66;
+
+  /// Alias technique — centre carte RDC (pas Kinshasa).
+  static const defaultLat = mapCenterLat;
+  static const defaultLng = mapCenterLng;
 
   /// Passerelle API unique (microservices). Définir via `--dart-define=API_URL=...`
   /// Ex. émulateur Android : `http://10.0.2.2:3000/api`, appareil/simulateur iOS : `http://localhost:3000/api`
@@ -51,7 +56,7 @@ class MarketConfig {
   static String apiVehicleType(String uiType) =>
       uiType == 'VIP' ? 'COMFORT' : uiType;
 
-  static const kinshasaCommunes = [
+  static const kinshasaDistricts = [
     'Bandalungwa',
     'Barumbu',
     'Bumbu',

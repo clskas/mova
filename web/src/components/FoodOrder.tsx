@@ -19,7 +19,7 @@ export function FoodOrder({ onBack, mock }: Props) {
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [selected, setSelected] = useState<Restaurant | null>(null);
   const [cart, setCart] = useState<Record<string, number>>({});
-  const [address, setAddress] = useState("Ma position, Kinshasa");
+  const [address, setAddress] = useState("Ma position");
   const [loading, setLoading] = useState(true);
   const [ordering, setOrdering] = useState(false);
   const [confirmed, setConfirmed] = useState(false);

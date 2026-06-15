@@ -1,7 +1,7 @@
 import { HealthController } from './health.controller';
 
 jest.mock('@mova/shared', () => ({
-  MARKET_RDC: { country: 'CD', defaultCity: 'Kinshasa' },
+  MARKET_RDC: { country: 'CD', coverageLabel: 'RDC' },
   SERVICE_PORTS: {
     auth: 3001,
     ride: 3002,

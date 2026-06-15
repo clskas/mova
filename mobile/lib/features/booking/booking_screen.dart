@@ -22,12 +22,11 @@ class BookingScreen extends ConsumerStatefulWidget {
 }
 
 class _BookingScreenState extends ConsumerState<BookingScreen> {
-  final _pickupController =
-      TextEditingController(text: 'Ma position, ${MarketConfig.defaultCity}');
+  final _pickupController = TextEditingController(text: 'Ma position');
   final _destinationController = TextEditingController();
 
   String _vehicleType = 'MOTO_TAXI';
-  LatLng _pickup = MovaRideMap.kinshasaDefault();
+  LatLng _pickup = MovaRideMap.mapDefaultCenter();
   LatLng? _dropoff;
   Map<String, VehicleEstimate> _estimates = {};
   Map<String, dynamic>? _selectedEstimate;

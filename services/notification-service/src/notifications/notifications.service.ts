@@ -26,7 +26,7 @@ export class NotificationsService implements OnModuleInit {
   }
 
   async onRideCreated(payload: RideCreatedPayload) {
-    await this.create(payload.passengerId, 'Course créée', 'Recherche de chauffeur en cours à Kinshasa', 'RIDE_CREATED', payload);
+    await this.create(payload.passengerId, 'Course créée', 'Recherche de chauffeur en cours dans votre zone MOVA', 'RIDE_CREATED', payload);
     this.logger.log(`ride.created notification for ${payload.rideId}`);
   }
 

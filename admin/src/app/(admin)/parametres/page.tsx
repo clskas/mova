@@ -13,7 +13,7 @@ const SERVICE_AREAS = [
 
 export default function ParametresPage() {
   const [communes, setCommunes] = useState<Commune[]>([]);
-  const [city, setCity] = useState("Kinshasa");
+  const [city, setCity] = useState(SERVICE_AREAS[0]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -42,7 +42,7 @@ export default function ParametresPage() {
         <p className="text-sm">{SERVICE_AREAS.join(" · ")}</p>
       </Card>
       <div className="mb-4 flex flex-wrap gap-2">
-        {["Kinshasa", "Lubumbashi", "Goma"].map((c) => (
+        {SERVICE_AREAS.slice(0, 8).map((c) => (
           <button
             key={c}
             type="button"

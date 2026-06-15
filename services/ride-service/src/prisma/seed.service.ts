@@ -1,6 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { SurchargeType, VehicleType } from '@prisma/client';
-import { DRC_SERVICE_AREAS, getCommunesForArea, KINSHASA_COMMUNES, MARKET_RDC } from '@mova/shared';
+import { DRC_SERVICE_AREAS, getCommunesForArea, KINSHASA_COMMUNES } from '@mova/shared';
 import { PrismaService } from './prisma.service';
 
 const PRICING_RULES = [
@@ -10,7 +10,7 @@ const PRICING_RULES = [
   { vehicleType: VehicleType.VIP, baseFareCdf: 8000, perKmCdf: 3500, perMinuteCdf: 400, minFareCdf: 12000, peakMultiplier: 1.5, nightMultiplier: 1.4 },
 ];
 
-const SEED_CITIES = ['Kinshasa', 'Lubumbashi', 'Goma'] as const;
+const SEED_CITIES = DRC_SERVICE_AREAS.map((a) => a.name);
 
 const CANCELLATION_POLICIES = [
   { vehicleType: VehicleType.MOTO_TAXI, freeCancelMinutes: 2, passengerFeeCdf: 1000, driverCompensationCdf: 500, noShowFeeCdf: 2000 },
@@ -58,8 +58,8 @@ export class SeedService implements OnModuleInit {
   async ensureSeedData() {
     for (const c of KINSHASA_COMMUNES) {
       await this.prisma.commune.upsert({
-        where: { name_city: { name: c.name, city: MARKET_RDC.defaultCity } },
-        create: { name: c.name, city: MARKET_RDC.defaultCity, lat: c.lat, lng: c.lng },
+        where: { name_city: { name: c.name, city: 'Kinshasa' } },
+        create: { name: c.name, city: 'Kinshasa', lat: c.lat, lng: c.lng },
         update: { lat: c.lat, lng: c.lng },
       });
     }

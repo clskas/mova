@@ -110,6 +110,10 @@ export const DRC_SERVICE_AREAS: ServiceArea[] = [
   area('lusambo', 'Lusambo', 'Sankuru', -4.975, 23.4436, 0.08),
 ];
 
+/** Centre carte RDC — utilisé uniquement comme fallback technique (pas de ville privilégiée). */
+export const RDC_MAP_CENTER = { lat: -2.88, lng: 23.66 };
+
+/** @deprecated Utiliser findNearestServiceArea — conservé pour compatibilité imports. */
 export const DEFAULT_SERVICE_AREA_ID = 'kinshasa';
 
 export const KINSHASA_BOUNDS = kinshasaBounds();

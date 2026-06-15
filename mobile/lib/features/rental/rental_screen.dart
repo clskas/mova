@@ -19,7 +19,7 @@ class _RentalScreenState extends ConsumerState<RentalScreen> {
   String? _selectedVehicleId;
   DateTime _startDate = DateTime.now().add(const Duration(days: 1));
   DateTime _endDate = DateTime.now().add(const Duration(days: 3));
-  final _pickupController = TextEditingController(text: 'Gombe, Kinshasa');
+  final _pickupController = TextEditingController(text: 'Ma position');
   final _phoneController = TextEditingController(text: '+243812345678');
   final _notesController = TextEditingController();
   List<Map<String, dynamic>> _inquiries = [];

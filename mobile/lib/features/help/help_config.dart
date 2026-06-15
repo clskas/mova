@@ -7,7 +7,7 @@ class HelpConfig {
   static const privacyEmail = 'privacy@mova.cd';
   static const whatsAppUrl = 'https://wa.me/243900000000';
   static const supportHours = 'Lun–Sam 8h–20h (Africa/Kinshasa)';
-  static const supportAddress = 'Kinshasa, République Démocratique du Congo';
+  static const supportAddress = 'République Démocratique du Congo';
 }
 
 class FaqItem {
@@ -41,7 +41,7 @@ const kFaqItems = <FaqItem>[
   FaqItem(
     question: 'Le prix affiché est-il définitif ?',
     answer:
-        'Non, c\'est une estimation. Le montant final peut varier selon la distance réelle, le trafic de Kinshasa, les embouteillages ou les suppléments (nuit, pluie, etc.).',
+        'Non, c\'est une estimation. Le montant final peut varier selon la distance réelle, le trafic, les embouteillages ou les suppléments (nuit, pluie, inter-villes, etc.).',
   ),
   FaqItem(
     question: 'Comment annuler une course ou une livraison ?',
@@ -56,7 +56,7 @@ const kFaqItems = <FaqItem>[
   FaqItem(
     question: 'Dans quelles zones MOVA est-il disponible ?',
     answer:
-        'Lancement à Kinshasa (toutes communes). Extension progressive vers Lubumbashi, Goma, Bukavu et d\'autres villes de RDC.',
+        'MOVA est disponible dans 32 zones de service à travers la RDC (capitales provinciales et grandes villes). Choisissez votre ville sur l\'écran d\'accueil ou laissez le GPS détecter la zone la plus proche.',
   ),
   FaqItem(
     question: 'Comment suivre mon chauffeur ou livreur ?',
@@ -81,7 +81,7 @@ const kFaqItems = <FaqItem>[
   FaqItem(
     question: 'La livraison express, c\'est quoi ?',
     answer:
-        'Envoi urgent de petits colis en moins de 45 minutes à Kinshasa. Idéal pour documents, clés ou petits objets légers.',
+        'Envoi urgent de petits colis en moins de 45 minutes dans les zones MOVA. Idéal pour documents, clés ou petits objets légers.',
   ),
   FaqItem(
     question: 'Comment fonctionne le covoiturage ?',
@@ -159,7 +159,7 @@ const kManualChapters = <ManualChapter>[
       'Appuyez sur Estimer le prix puis Confirmer la course.',
       'Suivez le chauffeur en temps réel et payez à l\'arrivée ou via Wallet.',
     ],
-    tip: 'En heure de pointe à Kinshasa, prévoyez un délai supplémentaire.',
+    tip: 'En heure de pointe, prévoyez un délai supplémentaire.',
   ),
   ManualChapter(
     id: 'parcel',
@@ -213,7 +213,7 @@ const kManualChapters = <ManualChapter>[
     icon: '🍽️',
     steps: [
       'Appuyez sur Livraison repas.',
-      'Choisissez un restaurant partenaire à Kinshasa.',
+      'Choisissez un restaurant partenaire dans votre ville.',
       'Ajoutez des plats au panier.',
       'Indiquez l\'adresse de livraison et validez.',
       'Suivez la livraison en temps réel.',
@@ -261,7 +261,7 @@ const kManualChapters = <ManualChapter>[
     icon: '⚡',
     steps: [
       'Appuyez sur Livraison express.',
-      'Indiquez enlèvement et livraison (Kinshasa).',
+      'Indiquez enlèvement et livraison dans une zone MOVA.',
       'Décrivez le contenu (documents, clés, petit objet).',
       'Confirmez — livraison cible en moins de 45 minutes.',
       'Suivez le coursier en temps réel.',

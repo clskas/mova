@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/api/api_client.dart';
 import '../../core/config/market_config.dart';
+import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 
-class CarpoolJoinConfirmationScreen extends StatelessWidget {
+class CarpoolJoinConfirmationScreen extends ConsumerStatefulWidget {
   const CarpoolJoinConfirmationScreen({
     super.key,
     required this.tripId,
@@ -23,7 +26,60 @@ class CarpoolJoinConfirmationScreen extends StatelessWidget {
   final String? departureAt;
 
   @override
+  ConsumerState<CarpoolJoinConfirmationScreen> createState() =>
+      _CarpoolJoinConfirmationScreenState();
+}
+
+class _CarpoolJoinConfirmationScreenState extends ConsumerState<CarpoolJoinConfirmationScreen> {
+  List<Map<String, dynamic>> _passengers = [];
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTrip();
+  }
+
+  String _formatDeparture(String? raw) {
+    if (raw == null || raw.isEmpty) return '';
+    try {
+      final dt = DateTime.parse(raw);
+      final day = dt.day.toString().padLeft(2, '0');
+      final month = dt.month.toString().padLeft(2, '0');
+      final hour = dt.hour.toString().padLeft(2, '0');
+      final minute = dt.minute.toString().padLeft(2, '0');
+      return '$day/$month/${dt.year} à $hour:$minute';
+    } catch (_) {
+      return raw;
+    }
+  }
+
+  Future<void> _loadTrip() async {
+    if (widget.tripId.isEmpty) {
+      setState(() => _loading = false);
+      return;
+    }
+    final api = ref.read(apiClientProvider);
+    final result = await api.get('/carpool/${widget.tripId}');
+    if (!mounted) return;
+    setState(() {
+      _loading = false;
+      switch (result) {
+        case Success(:final data):
+          final trip = data['trip'] as Map<String, dynamic>? ?? data;
+          _passengers = (trip['passengers'] as List? ?? []).cast<Map<String, dynamic>>();
+          _error = null;
+        case Failure(:final error):
+          _error = error.message;
+      }
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final departure = _formatDeparture(widget.departureAt);
+
     return MovaScreen(
       title: 'Réservation confirmée',
       child: Column(
@@ -42,17 +98,17 @@ class CarpoolJoinConfirmationScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '$fromAddress → $toAddress',
+                  '${widget.fromAddress} → ${widget.toAddress}',
                   style: const TextStyle(fontWeight: FontWeight.w600),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 8),
-                Text('Conducteur : $driverName'),
-                if (departureAt != null) Text('Départ : $departureAt'),
+                Text('Conducteur : ${widget.driverName}'),
+                if (departure.isNotEmpty) Text('Départ : $departure'),
                 const SizedBox(height: 8),
                 Text(
-                  MarketConfig.formatCdf(pricePerSeatCdf),
+                  MarketConfig.formatCdf(widget.pricePerSeatCdf),
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     color: MovaColors.green,
@@ -60,12 +116,47 @@ class CarpoolJoinConfirmationScreen extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  'Réf. $tripId',
+                  'Réf. ${widget.tripId}',
                   style: const TextStyle(color: MovaColors.textSecondary, fontSize: 12),
                 ),
               ],
             ),
           ),
+          if (_error != null) ...[
+            const SizedBox(height: 16),
+            MovaErrorBanner(message: _error!, onRetry: _loadTrip),
+          ],
+          const SizedBox(height: 20),
+          Text('Passagers', style: Theme.of(context).textTheme.titleSmall),
+          const SizedBox(height: 8),
+          if (_loading)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (_passengers.isEmpty)
+            const Text(
+              'Vous êtes le premier passager inscrit.',
+              style: TextStyle(color: MovaColors.textSecondary),
+            )
+          else
+            ..._passengers.map((p) {
+              final label = p['label']?.toString() ?? 'Passager ${p['userId']?.toString().substring(0, 6) ?? ''}';
+              final seats = p['seats'] as int? ?? 1;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: MovaCard(
+                  child: Row(
+                    children: [
+                      const Icon(Icons.person_outline, color: MovaColors.violet),
+                      const SizedBox(width: 12),
+                      Expanded(child: Text(label)),
+                      Text('$seats place${seats > 1 ? 's' : ''}'),
+                    ],
+                  ),
+                ),
+              );
+            }),
           const SizedBox(height: 24),
           MovaButton(
             label: 'Retour à l\'accueil',

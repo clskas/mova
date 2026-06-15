@@ -14,6 +14,7 @@ import '../help/driver_help_screen.dart';
 import 'active_ride_screen.dart';
 import 'kyc_screen.dart';
 import 'ride_offer_screen.dart';
+import 'delivery_offer_screen.dart';
 
 class DriverHomeScreen extends ConsumerStatefulWidget {
   const DriverHomeScreen({super.key});
@@ -139,13 +140,13 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
   Future<void> _pollOffers() async {
     if (!_available || _activeRide != null || _showingOffer || !mounted) return;
     final api = ref.read(apiClientProvider);
-    final result = await api.getDriverOffers();
+
+    final rideResult = await api.getDriverOffers();
     if (!mounted || _showingOffer) return;
-    if (result case Success(:final data)) {
-      final offers = data;
-      for (final offer in offers) {
+    if (rideResult case Success(:final data)) {
+      for (final offer in data) {
         final id = offer['id']?.toString() ?? '';
-        if (id.isEmpty || _dismissedOffers.contains(id)) continue;
+        if (id.isEmpty || _dismissedOffers.contains('ride:$id')) continue;
         _showingOffer = true;
         await Navigator.push(
           context,
@@ -153,9 +154,27 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
             builder: (_) => RideOfferScreen(offer: offer, vehicleId: _vehicleId),
           ),
         );
-        _dismissedOffers.add(id);
+        _dismissedOffers.add('ride:$id');
         _showingOffer = false;
         await _loadActiveRide();
+        return;
+      }
+    }
+
+    final deliveryResult = await api.getDeliveryOffers();
+    if (!mounted || _showingOffer) return;
+    if (deliveryResult case Success(:final data)) {
+      for (final offer in data) {
+        final id = offer['id']?.toString() ?? '';
+        if (id.isEmpty || _dismissedOffers.contains('delivery:$id')) continue;
+        _showingOffer = true;
+        final accepted = await Navigator.push<bool>(
+          context,
+          MaterialPageRoute(builder: (_) => DeliveryOfferScreen(offer: offer)),
+        );
+        _dismissedOffers.add('delivery:$id');
+        _showingOffer = false;
+        if (accepted == true) return;
         break;
       }
     }

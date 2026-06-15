@@ -79,6 +79,7 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
             : null);
     final total = ride['totalPriceCdf'] as int? ??
         (perSeat != null ? perSeat * seats : 0);
+    final passengers = (ride['passengers'] as List? ?? []).cast<Map<String, dynamic>>();
     return {
       ...ride,
       'fromAddress': ride['pickupAddress'] ?? ride['fromAddress'] ?? '',
@@ -87,7 +88,19 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
       'totalPriceCdf': total,
       'pricePerSeatCdf': perSeat ?? _splitPrice(total, seats),
       'driverName': ride['driverName']?.toString() ?? 'Conducteur',
+      'passengerCount': ride['passengerCount'] as int? ?? passengers.length,
+      'passengers': passengers,
+      'departureAt': ride['departureAt']?.toString(),
     };
+  }
+
+  String _formatDeparture(String? raw) {
+    if (raw == null || raw.isEmpty) return '';
+    try {
+      return _formatDateTime(DateTime.parse(raw));
+    } catch (_) {
+      return raw;
+    }
   }
 
   Future<void> _loadRides() async {
@@ -210,6 +223,10 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
       setState(() => _validationError = 'Estimez le prix avant de publier.');
       return;
     }
+    if (_departureAt.isBefore(DateTime.now())) {
+      setState(() => _validationError = 'La date de départ doit être dans le futur.');
+      return;
+    }
     setState(() {
       _loading = true;
       _error = null;
@@ -303,6 +320,7 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
     final perSeat = ride['pricePerSeatCdf'] as int? ?? _splitPrice(total, seats);
     final driver = ride['driverName']?.toString() ?? 'Conducteur';
     final id = ride['id']?.toString() ?? '';
+    final passengerCount = ride['passengerCount'] as int? ?? 0;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
@@ -318,14 +336,15 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
             ),
             const SizedBox(height: 4),
             Text(
-              '$driver · $seats place${seats > 1 ? 's' : ''}',
+              '$driver · $seats place${seats > 1 ? 's' : ''}'
+              '${passengerCount > 0 ? ' · $passengerCount passager${passengerCount > 1 ? 's' : ''}' : ''}',
               style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
-              maxLines: 1,
+              maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
             if (ride['departureAt'] != null)
               Text(
-                'Départ : ${ride['departureAt']}',
+                'Départ : ${_formatDeparture(ride['departureAt']?.toString())}',
                 style: const TextStyle(color: MovaColors.textSecondary, fontSize: 12),
               ),
             const SizedBox(height: 8),

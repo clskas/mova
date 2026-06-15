@@ -137,11 +137,17 @@ class ApiClient {
     if (path.contains('/services')) {
       return Success({'data': MockData.services()});
     }
+    if (path == '/deliveries/offers' && method == 'GET') {
+      return Success({'offers': MockData.deliveryOffers()});
+    }
     if (path.contains('/deliveries/history') ||
         (path.startsWith('/deliveries/') && method == 'GET' && !path.contains('restaurants'))) {
       final id = path.split('/').last.split('?').first;
-      if (id != 'history' && id != 'restaurants') {
+      if (id != 'history' && id != 'restaurants' && id != 'offers') {
         return Success({'delivery': MockData.parcelTracking(id)});
+      }
+      if (id == 'offers') {
+        return Success({'offers': MockData.deliveryOffers()});
       }
       return Success({'data': MockData.deliveryHistory()});
     }
@@ -255,6 +261,25 @@ class ApiClient {
     }
     if (path.contains('/carpool/') && path.endsWith('/join')) {
       return const Success({'success': true});
+    }
+    if (RegExp(r'^/carpool/[^/]+$').hasMatch(path) && method == 'GET') {
+      final id = path.split('/').last;
+      final trip = MockData.carpoolRides().firstWhere(
+        (t) => t['id'] == id,
+        orElse: () => MockData.createCarpoolRide({'id': id}),
+      );
+      return Success({
+        'trip': {
+          ...trip,
+          'passengers': [
+            {'id': 'p1', 'userId': 'user-demo', 'seats': 1, 'label': 'Passager demo'},
+          ],
+        },
+      });
+    }
+    if (RegExp(r'^/deliveries/[^/]+/accept$').hasMatch(path) && method == 'POST') {
+      final id = path.split('/')[2];
+      return Success({'delivery': MockData.parcelTracking(id), 'success': true});
     }
     if (path.contains('/rental/estimate')) {
       return Success(MockData.rentalEstimate(body ?? {}));
@@ -479,6 +504,24 @@ class ApiClient {
       Success(:final data) => Success(
           List<Map<String, dynamic>>.from(data['offers'] as List? ?? []),
         ),
+      Failure(:final error) => Failure(error),
+    };
+  }
+
+  Future<Result<List<Map<String, dynamic>>>> getDeliveryOffers() async {
+    final result = await get('/deliveries/offers');
+    return switch (result) {
+      Success(:final data) => Success(
+          List<Map<String, dynamic>>.from(data['offers'] as List? ?? []),
+        ),
+      Failure(:final error) => Failure(error),
+    };
+  }
+
+  Future<Result<Map<String, dynamic>>> acceptDelivery(String deliveryId) async {
+    final result = await post('/deliveries/$deliveryId/accept', {});
+    return switch (result) {
+      Success(:final data) => Success(data['delivery'] as Map<String, dynamic>? ?? data),
       Failure(:final error) => Failure(error),
     };
   }

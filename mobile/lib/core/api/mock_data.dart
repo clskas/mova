@@ -252,6 +252,30 @@ abstract final class MockData {
         },
       ];
 
+  static List<Map<String, dynamic>> deliveryOffers() => [
+        {
+          'id': 'mock-delivery-1',
+          'offerType': 'DELIVERY',
+          'type': 'FOOD',
+          'restaurantName': 'Chez Mamou',
+          'pickupAddress': 'Gombe',
+          'dropoffAddress': 'Bandal',
+          'estimatedPriceCdf': 18500,
+          'distanceKm': 2.1,
+          'status': 'PENDING',
+        },
+        {
+          'id': 'mock-delivery-2',
+          'offerType': 'DELIVERY',
+          'type': 'PARCEL',
+          'pickupAddress': 'Limete',
+          'dropoffAddress': 'Masina',
+          'estimatedPriceCdf': 8000,
+          'distanceKm': 4.5,
+          'status': 'PENDING',
+        },
+      ];
+
   static List<Map<String, dynamic>> services() => [
         {'id': 'TAXI', 'name': 'Taxi / Moto-taxi', 'enabled': true},
         {'id': 'PARCEL', 'name': 'Livraison colis', 'enabled': true},
@@ -521,7 +545,13 @@ abstract final class MockData {
           'toAddress': 'Limete, Kinshasa',
           'driverName': 'Paul M.',
           'availableSeats': 2,
+          'pricePerSeatCdf': 3000,
           'totalPriceCdf': 12000,
+          'departureAt': DateTime.now().add(const Duration(hours: 4)).toIso8601String(),
+          'passengerCount': 1,
+          'passengers': [
+            {'id': 'p1', 'userId': 'user-abc', 'seats': 1, 'label': 'Passager abc'},
+          ],
         },
         {
           'id': 'carpool-2',
@@ -529,7 +559,11 @@ abstract final class MockData {
           'toAddress': 'Aéroport N\'Djili',
           'driverName': 'Grace K.',
           'availableSeats': 3,
+          'pricePerSeatCdf': 15000,
           'totalPriceCdf': 45000,
+          'departureAt': DateTime.now().add(const Duration(days: 1)).toIso8601String(),
+          'passengerCount': 0,
+          'passengers': [],
         },
       ];
 

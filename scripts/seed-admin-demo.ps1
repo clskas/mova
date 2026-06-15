@@ -1,13 +1,16 @@
 # Seed full admin demo dataset for MOVA dev dashboards
 # Usage: .\scripts\seed-admin-demo.ps1
-# Requires: Docker Postgres on localhost (ports 5433-5437) or DATABASE_URL env vars
+# Requires: Docker Postgres on localhost:5432 or DATABASE_URL env vars
 
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 
-$env:AUTH_DATABASE_URL = if ($env:AUTH_DATABASE_URL) { $env:AUTH_DATABASE_URL } else { "postgresql://mova:mova@localhost:5437/mova_auth" }
-$env:DRIVER_DATABASE_URL = if ($env:DRIVER_DATABASE_URL) { $env:DRIVER_DATABASE_URL } else { "postgresql://mova:mova@localhost:5435/mova_drivers" }
-$env:RIDE_DATABASE_URL = if ($env:RIDE_DATABASE_URL) { $env:RIDE_DATABASE_URL } else { "postgresql://mova:mova@localhost:5433/mova_rides" }
+$pgHost = if ($env:POSTGRES_HOST) { $env:POSTGRES_HOST } else { "localhost:54320" }
+$base = "postgresql://mova:mova@${pgHost}"
+$env:AUTH_DATABASE_URL = if ($env:AUTH_DATABASE_URL) { $env:AUTH_DATABASE_URL } else { "$base/mova_auth" }
+$env:DRIVER_DATABASE_URL = if ($env:DRIVER_DATABASE_URL) { $env:DRIVER_DATABASE_URL } else { "$base/mova_drivers" }
+$env:RIDE_DATABASE_URL = if ($env:RIDE_DATABASE_URL) { $env:RIDE_DATABASE_URL } else { "$base/mova_rides" }
+$postgresContainer = if ($env:POSTGRES_CONTAINER) { $env:POSTGRES_CONTAINER } else { "mova-postgres-1" }
 
 Write-Host "=== MOVA Admin Demo Seed ===" -ForegroundColor Cyan
 
@@ -26,7 +29,7 @@ $env:DATABASE_URL = $env:AUTH_DATABASE_URL
 
 Write-Host ""
 Write-Host "[2/5] Grant ride DB schema (host access)..." -ForegroundColor Yellow
-docker exec mova-postgres-rides-1 psql -U mova -d mova_rides -c "GRANT ALL ON SCHEMA public TO mova; GRANT ALL ON ALL TABLES IN SCHEMA public TO mova;" 2>$null | Out-Null
+docker exec $postgresContainer psql -U mova -d mova_rides -c "GRANT ALL ON SCHEMA public TO mova; GRANT ALL ON ALL TABLES IN SCHEMA public TO mova;" 2>$null | Out-Null
 
 Write-Host ""
 Write-Host "[3/5] Ride catalog (auto-seeded in ride-service container)..." -ForegroundColor Yellow
@@ -48,7 +51,7 @@ try {
 Write-Host ""
 Write-Host "[5/5] Demo rides, deliveries, scheduled rides (SQL via Docker)..." -ForegroundColor Yellow
 $sqlFile = Join-Path $PSScriptRoot "seed-ride-demo.sql"
-Get-Content $sqlFile | docker exec -i mova-postgres-rides-1 psql -U mova -d mova_rides -q 2>$null
+Get-Content $sqlFile | docker exec -i $postgresContainer psql -U mova -d mova_rides -q 2>$null
 
 Write-Host ""
 Write-Host "=== Demo seed complete ===" -ForegroundColor Green

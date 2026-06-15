@@ -10,3 +10,4 @@ export * from './service-areas';
 export * from './kinshasa-bounds';
 export * from './service-urls';
 export * from './redis.module';
+export * from './request-id.middleware';

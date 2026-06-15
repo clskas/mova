@@ -7,6 +7,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Response } from 'express';
+import { REQUEST_ID_HEADER, RequestWithId } from './request-id.middleware';
 import { MovaErrorCode, MOVA_ERROR_MESSAGES } from './mova-error-codes';
 
 export class MovaHttpException extends HttpException {
@@ -47,14 +48,22 @@ function extractHttpMessage(body: string | object): string {
 export class HttpExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(HttpExceptionFilter.name);
 
+  private requestTag(host: ArgumentsHost): string {
+    const req = host.switchToHttp().getRequest<RequestWithId>();
+    const id = req.requestId ?? req.headers[REQUEST_ID_HEADER];
+    const raw = Array.isArray(id) ? id[0] : id;
+    return raw ? `[${raw}] ` : '';
+  }
+
   catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
+    const tag = this.requestTag(host);
 
     if (exception instanceof MovaHttpException) {
       const status = exception.getStatus();
       const body = exception.getResponse() as { code: string; message: string };
-      this.logger.warn(`${body.code}: ${body.message}`);
+      this.logger.warn(`${tag}${body.code}: ${body.message}`);
       return response.status(status).json({
         success: false,
         error: body,
@@ -72,8 +81,8 @@ export class HttpExceptionFilter implements ExceptionFilter {
           : status === HttpStatus.UNAUTHORIZED
             ? MovaErrorCode.AUTH_UNAUTHORIZED
             : MovaErrorCode.VALIDATION_ERROR;
-      if (status >= 500) this.logger.error(`${code}: ${message}`, exception);
-      else this.logger.warn(`${code}: ${message}`);
+      if (status >= 500) this.logger.error(`${tag}${code}: ${message}`, exception);
+      else this.logger.warn(`${tag}${code}: ${message}`);
       return response.status(status).json({
         success: false,
         error: { code, message },
@@ -82,7 +91,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     }
 
     if (exception instanceof Error) {
-      this.logger.error(exception.message, exception.stack);
+      this.logger.error(`${tag}${exception.message}`, exception.stack);
       const message =
         exception.message.includes('Tarif non configuré') ||
         exception.message.includes('non configuré')
@@ -99,7 +108,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
       });
     }
 
-    this.logger.error('Unhandled exception', exception);
+    this.logger.error(`${tag}Unhandled exception`, exception);
     return response.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
       success: false,
       error: {

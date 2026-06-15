@@ -1,6 +1,6 @@
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule, RequestMethod } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { RedisModule } from '@mova/shared';
+import { RedisModule, RequestIdMiddleware } from '@mova/shared';
 import { PrismaModule } from './prisma/prisma.module';
 import { HealthModule } from './health/health.module';
 import { RidesModule } from './rides/rides.module';
@@ -21,4 +21,8 @@ import { ExpressModule } from './express/express.module';
 import { UploadsModule } from './uploads/uploads.module';
 
 @Module({ imports: [ConfigModule.forRoot({ isGlobal: true }), RedisModule, PrismaModule, HealthModule, AuthModule, RidesModule, DeliveriesModule, ServicesCatalogModule, CarpoolModule, ErrandsModule, RentalModule, GeoModule, RatingsModule, MatchingModule, WebsocketModule, InternalModule, HistoryModule, MovingModule, ExpressModule, UploadsModule] })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(RequestIdMiddleware).forRoutes({ path: '*', method: RequestMethod.ALL });
+  }
+}

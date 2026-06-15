@@ -2,7 +2,7 @@ import { Injectable, NestMiddleware } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import { Request, Response, NextFunction } from 'express';
-import { SERVICE_PORTS } from '@mova/shared';
+import { SERVICE_PORTS, REQUEST_ID_HEADER } from '@mova/shared';
 
 const ROUTES: Record<string, keyof typeof SERVICE_PORTS> = {
   '/api/auth': 'auth',
@@ -42,7 +42,23 @@ export class ProxyMiddleware implements NestMiddleware {
     };
     for (const svc of Object.values(ROUTES)) {
       const target = this.config.get(envMap[svc]) ?? `http://localhost:${SERVICE_PORTS[svc]}`;
-      this.proxies.set(svc, createProxyMiddleware({ target, changeOrigin: true, pathRewrite: (path) => path }));
+      this.proxies.set(
+        svc,
+        createProxyMiddleware({
+          target,
+          changeOrigin: true,
+          pathRewrite: (path) => path,
+          on: {
+            proxyReq: (proxyReq, req) => {
+              const incoming = (req as Request).headers[REQUEST_ID_HEADER];
+              if (incoming) {
+                const value = Array.isArray(incoming) ? incoming[0] : incoming;
+                proxyReq.setHeader('X-Request-Id', value);
+              }
+            },
+          },
+        }),
+      );
     }
   }
 

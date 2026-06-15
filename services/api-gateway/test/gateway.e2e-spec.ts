@@ -31,4 +31,25 @@ describe('ApiGateway (e2e)', () => {
       expect(res.body.services).toBeDefined();
     });
   });
+
+  it('/health (GET) sets X-Request-Id', () => {
+    return request(app.getHttpServer())
+      .get('/health')
+      .set('X-Request-Id', 'test-correlation-id')
+      .expect(200)
+      .expect((res) => {
+        expect(res.headers['x-request-id']).toBe('test-correlation-id');
+      });
+  });
+
+  it('/health (GET) generates X-Request-Id when missing', () => {
+    return request(app.getHttpServer())
+      .get('/health')
+      .expect(200)
+      .expect((res) => {
+        expect(res.headers['x-request-id']).toMatch(
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+        );
+      });
+  });
 });

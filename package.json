@@ -21,6 +21,8 @@
     "docker:up": "docker compose up -d --build",
     "docker:down": "docker compose down",
     "migrate:all": "npm run prisma:deploy --prefix services/auth-service && npm run prisma:deploy --prefix services/ride-service && npm run prisma:deploy --prefix services/payment-service && npm run prisma:deploy --prefix services/driver-service && npm run prisma:deploy --prefix services/notification-service",
+    "migrate:all:docker": "powershell -ExecutionPolicy Bypass -File scripts/migrate-all.ps1",
+    "smoke:all": "powershell -ExecutionPolicy Bypass -File scripts/smoke-all.ps1",
     "seed:rides": "npm run prisma:seed --prefix services/ride-service",
     "seed:admin": "powershell -ExecutionPolicy Bypass -File scripts/seed-admin.ps1",
     "seed:admin-demo": "powershell -ExecutionPolicy Bypass -File scripts/seed-admin-demo.ps1"

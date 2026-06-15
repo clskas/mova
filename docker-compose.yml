@@ -5,60 +5,24 @@ services:
     volumes:
       - redis_data:/data
 
-  postgres-auth:
+  # Instance Postgres unique — 5 bases logiques (voir docker/postgres/init-databases.sql)
+  postgres:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: mova
       POSTGRES_PASSWORD: mova
       POSTGRES_DB: mova_auth
     ports:
-      - '5437:5432'
+      # Host 54320 si 5432 déjà pris (Postgres local). Services Docker utilisent postgres:5432.
+      - '54320:5432'
     volumes:
-      - pg_auth:/var/lib/postgresql/data
-
-  postgres-rides:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_USER: mova
-      POSTGRES_PASSWORD: mova
-      POSTGRES_DB: mova_rides
-    ports:
-      - '5433:5432'
-    volumes:
-      - pg_rides:/var/lib/postgresql/data
-
-  postgres-payments:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_USER: mova
-      POSTGRES_PASSWORD: mova
-      POSTGRES_DB: mova_payments
-    ports:
-      - '5434:5432'
-    volumes:
-      - pg_payments:/var/lib/postgresql/data
-
-  postgres-drivers:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_USER: mova
-      POSTGRES_PASSWORD: mova
-      POSTGRES_DB: mova_drivers
-    ports:
-      - '5435:5432'
-    volumes:
-      - pg_drivers:/var/lib/postgresql/data
-
-  postgres-notifications:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_USER: mova
-      POSTGRES_PASSWORD: mova
-      POSTGRES_DB: mova_notifications
-    ports:
-      - '5436:5432'
-    volumes:
-      - pg_notifications:/var/lib/postgresql/data
+      - pg_data:/var/lib/postgresql/data
+      - ./docker/postgres/init-databases.sql:/docker-entrypoint-initdb.d/02-init-databases.sql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U mova -d mova_auth']
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   auth-service:
     build:
@@ -69,7 +33,7 @@ services:
     env_file:
       - config/external-apis.env
     environment:
-      DATABASE_URL: postgresql://mova:mova@postgres-auth:5432/mova_auth
+      DATABASE_URL: postgresql://mova:mova@postgres:5432/mova_auth
       REDIS_URL: redis://redis:6379
       JWT_SECRET: dev_secret
       # MOCK_OTP + Twilio : config/external-apis.env (gitignored). Sans ce fichier → copier depuis external-apis.env.example
@@ -78,10 +42,14 @@ services:
       INTERNAL_API_KEY: mova-internal-dev
       PORT: 3000
     depends_on:
-      - postgres-auth
-      - redis
-      - payment-service
-      - driver-service
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      payment-service:
+        condition: service_started
+      driver-service:
+        condition: service_started
 
   ride-service:
     build:
@@ -92,14 +60,16 @@ services:
     env_file:
       - config/external-apis.env
     environment:
-      DATABASE_URL: postgresql://mova:mova@postgres-rides:5432/mova_rides
+      DATABASE_URL: postgresql://mova:mova@postgres:5432/mova_rides
       REDIS_URL: redis://redis:6379
       JWT_SECRET: dev_secret
       DRIVER_SERVICE_URL: http://driver-service:3000
       PORT: 3000
     depends_on:
-      - postgres-rides
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
 
   payment-service:
     build:
@@ -108,7 +78,7 @@ services:
     ports:
       - '3003:3000'
     environment:
-      DATABASE_URL: postgresql://mova:mova@postgres-payments:5432/mova_payments
+      DATABASE_URL: postgresql://mova:mova@postgres:5432/mova_payments
       REDIS_URL: redis://redis:6379
       JWT_SECRET: dev_secret
       # Dev local : paiements simulés. Production : MOCK_PAYMENTS=false + clés Orange/M-Pesa/Airtel
@@ -117,8 +87,10 @@ services:
       INTERNAL_API_KEY: mova-internal-dev
       PORT: 3000
     depends_on:
-      - postgres-payments
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
 
   driver-service:
     build:
@@ -127,12 +99,13 @@ services:
     ports:
       - '3004:3000'
     environment:
-      DATABASE_URL: postgresql://mova:mova@postgres-drivers:5432/mova_drivers
+      DATABASE_URL: postgresql://mova:mova@postgres:5432/mova_drivers
       JWT_SECRET: dev_secret
       RIDE_SERVICE_URL: http://ride-service:3000
       PORT: 3000
     depends_on:
-      - postgres-drivers
+      postgres:
+        condition: service_healthy
 
   notification-service:
     build:
@@ -141,13 +114,15 @@ services:
     ports:
       - '3005:3000'
     environment:
-      DATABASE_URL: postgresql://mova:mova@postgres-notifications:5432/mova_notifications
+      DATABASE_URL: postgresql://mova:mova@postgres:5432/mova_notifications
       REDIS_URL: redis://redis:6379
       JWT_SECRET: dev_secret
       PORT: 3000
     depends_on:
-      - postgres-notifications
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
 
   admin-service:
     build:
@@ -192,8 +167,4 @@ services:
 
 volumes:
   redis_data:
-  pg_auth:
-  pg_rides:
-  pg_payments:
-  pg_drivers:
-  pg_notifications:
+  pg_data:

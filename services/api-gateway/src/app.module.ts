@@ -2,6 +2,7 @@ import { MiddlewareConsumer, Module, NestModule, RequestMethod } from '@nestjs/c
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { RequestIdMiddleware } from '@mova/shared';
 import { AuthModule } from './auth/auth.module';
 import { HealthModule } from './health/health.module';
 import { ProxyMiddleware } from './proxy/proxy.middleware';
@@ -21,6 +22,7 @@ import { JwtAuthGuard } from './auth/jwt-auth.guard';
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
+    consumer.apply(RequestIdMiddleware).forRoutes({ path: '*', method: RequestMethod.ALL });
     consumer.apply(ProxyMiddleware).forRoutes({ path: 'api/*', method: RequestMethod.ALL });
   }
 }

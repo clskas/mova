@@ -145,6 +145,8 @@ services:
         fromService: { name: mova-gateway, type: web, property: hostport }
 
 databases:
+  # Production Render : 5 Postgres managés (isolation facturation/plan).
+  # Alternative documentée : un cluster Neon avec les mêmes databaseName — voir docs/MICROSERVICES_STRATEGY.md
   - name: mova-db-auth
     plan: starter
     databaseName: mova_auth

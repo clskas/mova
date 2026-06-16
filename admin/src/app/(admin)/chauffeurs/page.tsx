@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { apiFetch, setDriverStatus, type AdminDriver } from "@/lib/api";
+import { apiFetch, fetchDrivers, setDriverStatus, type AdminDriver } from "@/lib/api";
 import { useAdmin } from "@/components/AdminProvider";
 import {
   BtnDanger,
@@ -33,7 +33,7 @@ export default function ChauffeursPage() {
     setLoading(true);
     setError(null);
     try {
-      const data = await apiFetch<AdminDriver[]>("/api/admin/drivers");
+      const data = await fetchDrivers();
       setDrivers(Array.isArray(data) ? data : []);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur de chargement");

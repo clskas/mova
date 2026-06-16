@@ -81,6 +81,7 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
       items.insert(0, 'Budget max: ${MarketConfig.formatCdf(budget)}');
     }
     return {
+      'pickupAddress': _pickupController.text.trim(),
       'deliveryAddress': _dropoffController.text.trim(),
       'deliveryLat': _deliveryLat ?? MarketConfig.defaultLat,
       'deliveryLng': _deliveryLng ?? MarketConfig.defaultLng,

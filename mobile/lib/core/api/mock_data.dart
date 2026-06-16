@@ -169,6 +169,15 @@ abstract final class MockData {
         'status': 'COMPLETED',
       };
 
+  static Map<String, dynamic> payService(String refType, String refId, Map<String, dynamic> body) => {
+        'success': true,
+        'referenceType': refType,
+        'referenceId': refId,
+        'method': body['method'] ?? 'WALLET',
+        'amountCdf': body['amountCdf'] ?? 8500,
+        'status': 'COMPLETED',
+      };
+
   static List<Map<String, dynamic>> rideHistory() => [
         {
           'id': 'ride-1',
@@ -385,6 +394,28 @@ abstract final class MockData {
             {'id': 'item-7', 'name': 'Frites + soda', 'priceCdf': 4500},
           ],
         },
+        {
+          'id': 'rest-4',
+          'name': 'Chez Flore',
+          'cuisine': 'Congolais',
+          'rating': 4.6,
+          'deliveryMinCdf': 3500,
+          'items': [
+            {'id': 'item-8', 'name': 'Poulet moambe', 'priceCdf': 12000},
+            {'id': 'item-9', 'name': 'Chikwangue', 'priceCdf': 5000},
+          ],
+        },
+        {
+          'id': 'rest-5',
+          'name': 'Limoncello',
+          'cuisine': 'Italien',
+          'rating': 4.5,
+          'deliveryMinCdf': 4000,
+          'items': [
+            {'id': 'item-10', 'name': 'Pizza Margherita', 'priceCdf': 18000},
+            {'id': 'item-11', 'name': 'Pasta carbonara', 'priceCdf': 16000},
+          ],
+        },
       ];
 
   static Map<String, dynamic> createFoodOrder(Map<String, dynamic> body) {
@@ -429,6 +460,14 @@ abstract final class MockData {
           'priceCdf': 25000,
         },
       ];
+
+  static Map<String, dynamic> createScheduledInquiry(Map<String, dynamic> body) => {
+        'id': 'inq-${DateTime.now().millisecondsSinceEpoch}',
+        'status': 'PENDING',
+        'reference': 'MOVA-${DateTime.now().millisecondsSinceEpoch % 1000000}',
+        ...body,
+        'createdAt': DateTime.now().toIso8601String(),
+      };
 
   static Map<String, dynamic> errandEstimate(Map<String, dynamic> body) {
     final desc = body['description']?.toString() ?? '';
@@ -793,6 +832,63 @@ abstract final class MockData {
       'message': 'Demande enregistrée. Un conseiller MOVA vous contactera sous 24h.',
     };
   }
+
+  static Map<String, dynamic> createRentalBooking(Map<String, dynamic> body) {
+    final estimate = rentalEstimate(body);
+    final vehicleId = body['vehicleId']?.toString();
+    final vehicle = rentalVehicles().firstWhere(
+      (v) => v['id'] == vehicleId,
+      orElse: () => rentalVehicles().first,
+    );
+    final id = 'booking-${DateTime.now().millisecondsSinceEpoch}';
+    final inquiry = {
+      'id': id,
+      'status': 'PENDING',
+      'vehicleId': vehicleId,
+      'vehicleType': vehicle['category'],
+      'startDate': body['startDate'],
+      'endDate': body['endDate'],
+      'pickupCity': body['pickupCity'],
+      'returnCity': body['returnCity'],
+      'pickupAddress': body['pickupAddress'],
+      'totalCdf': estimate['totalCdf'],
+      'estimatedPriceCdf': estimate['totalCdf'],
+      'vehicle': vehicle,
+      'timeline': [
+        {'status': 'PENDING', 'label': 'Demande', 'completed': true, 'current': true},
+        {'status': 'CONFIRMED', 'label': 'Confirmée', 'completed': false, 'current': false},
+        {'status': 'IN_PROGRESS', 'label': 'En cours', 'completed': false, 'current': false},
+        {'status': 'RETURNED', 'label': 'Retournée', 'completed': false, 'current': false},
+      ],
+    };
+    return {
+      'inquiry': inquiry,
+      'booking': inquiry,
+      'quote': estimate,
+      'message': 'Réservation enregistrée. Vous serez contacté après validation.',
+    };
+  }
+
+  static List<Map<String, dynamic>> rentalBookings() => [
+        {
+          'id': 'booking-1',
+          'vehicleType': 'SUV',
+          'status': 'PENDING',
+          'startDate': DateTime.now().add(const Duration(days: 3)).toIso8601String(),
+          'endDate': DateTime.now().add(const Duration(days: 5)).toIso8601String(),
+          'pickupAddress': 'Gombe, Kinshasa',
+          'pickupCity': 'Kinshasa',
+          'returnCity': 'Kinshasa',
+          'totalCdf': 320000,
+          'timeline': [
+            {'status': 'PENDING', 'label': 'Demande', 'completed': true, 'current': true},
+            {'status': 'CONFIRMED', 'label': 'Confirmée', 'completed': false, 'current': false},
+            {'status': 'IN_PROGRESS', 'label': 'En cours', 'completed': false, 'current': false},
+            {'status': 'RETURNED', 'label': 'Retournée', 'completed': false, 'current': false},
+          ],
+          'vehicle': rentalVehicles()[1],
+        },
+      ];
 
   static Map<String, dynamic> movingEstimate(Map<String, dynamic> body) {
     final base = switch (body['volumeCategory']?.toString()) {

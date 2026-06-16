@@ -12,6 +12,7 @@ class ServiceCard extends StatelessWidget {
     this.iconColor = MovaColors.violet,
     this.onTap,
     this.comingSoon = false,
+    this.live = false,
   });
 
   final Widget icon;
@@ -20,6 +21,7 @@ class ServiceCard extends StatelessWidget {
   final Color iconColor;
   final VoidCallback? onTap;
   final bool comingSoon;
+  final bool live;
 
   @override
   Widget build(BuildContext context) {
@@ -54,7 +56,24 @@ class ServiceCard extends StatelessWidget {
                   ),
                 ),
               ),
-              if (comingSoon) ...[
+              if (live) ...[
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: MovaColors.green.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Text(
+                    'Live',
+                    style: TextStyle(
+                      color: MovaColors.green,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ] else if (comingSoon) ...[
                 const SizedBox(width: 6),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
@@ -63,7 +82,7 @@ class ServiceCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Text(
-                    'Bientôt',
+                    'Demande',
                     style: TextStyle(
                       color: MovaColors.orange,
                       fontSize: 10,

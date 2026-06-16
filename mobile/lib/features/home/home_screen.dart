@@ -8,11 +8,8 @@ import '../../core/widgets/mova_service_icons.dart';
 import '../../core/widgets/service_area_selector.dart';
 import '../booking/booking_screen.dart';
 import '../carpool/carpool_screen.dart';
-import '../delivery/food_delivery_screen.dart';
-import '../delivery/parcel_delivery_screen.dart';
-import '../errands/errand_screen.dart';
+import '../delivery/delivery_hub_screen.dart';
 import '../rides/scheduled_ride_screen.dart';
-import '../delivery/express_delivery_screen.dart';
 import '../moving/moving_screen.dart';
 import '../rental/rental_screen.dart';
 import '../wallet/wallet_screen.dart';
@@ -180,9 +177,9 @@ class HomeScreen extends ConsumerWidget {
                     ServiceCard(
                       icon: MovaServiceIcon.parcel(color: MovaColors.green),
                       iconColor: MovaColors.green,
-                      title: 'Livraison colis',
-                      subtitle: 'Envoyez un colis en toute sécurité',
-                      onTap: () => _open(context, const ParcelDeliveryScreen()),
+                      title: 'Livraisons',
+                      subtitle: 'Repas, colis, express et plus',
+                      onTap: () => _open(context, const DeliveryHubScreen()),
                     ),
                   ]),
                   const SizedBox(height: spacing),
@@ -212,23 +209,6 @@ class HomeScreen extends ConsumerWidget {
                       onTap: () => _open(context, const ScheduledRideScreen()),
                     ),
                     ServiceCard(
-                      icon: MovaServiceIcon.food(color: MovaColors.green),
-                      iconColor: MovaColors.green,
-                      title: 'Livraison repas',
-                      subtitle: 'Restaurants et plats locaux',
-                      onTap: () => _open(context, const FoodDeliveryScreen()),
-                    ),
-                  ]),
-                  const SizedBox(height: spacing),
-                  gridRow([
-                    ServiceCard(
-                      icon: MovaServiceIcon.errand(color: MovaColors.orange),
-                      iconColor: MovaColors.orange,
-                      title: 'Courses & commissions',
-                      subtitle: 'Achats et courses pour vous',
-                      onTap: () => _open(context, const ErrandScreen()),
-                    ),
-                    ServiceCard(
                       icon: MovaServiceIcon.carpool(color: MovaColors.midnight),
                       iconColor: MovaColors.midnight,
                       title: 'Covoiturage',
@@ -239,22 +219,12 @@ class HomeScreen extends ConsumerWidget {
                   const SizedBox(height: spacing),
                   gridRow([
                     ServiceCard(
-                      icon: const Icon(Icons.bolt_outlined, color: MovaColors.orange, size: 28),
-                      iconColor: MovaColors.orange,
-                      title: 'Livraison express',
-                      subtitle: 'Envoi urgent en moins de 45 min',
-                      onTap: () => _open(context, const ExpressDeliveryScreen()),
-                    ),
-                    ServiceCard(
                       icon: const Icon(Icons.directions_car_outlined, color: MovaColors.violet, size: 28),
                       iconColor: MovaColors.violet,
                       title: 'Location véhicule',
                       subtitle: 'Voiture, SUV ou minibus',
                       onTap: () => _open(context, const RentalScreen()),
                     ),
-                  ]),
-                  const SizedBox(height: spacing),
-                  gridRow([
                     ServiceCard(
                       icon: const Icon(Icons.local_shipping_outlined, color: MovaColors.midnight, size: 28),
                       iconColor: MovaColors.midnight,

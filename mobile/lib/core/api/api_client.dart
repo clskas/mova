@@ -220,6 +220,18 @@ class ApiClient {
       final id = path.split('/').last;
       return Success(MockData.payRide(id, body ?? {}));
     }
+    if (RegExp(r'^/payments/services/[^/]+/[^/]+$').hasMatch(path) && method == 'POST') {
+      final parts = path.split('/');
+      final refType = parts[3];
+      final refId = parts[4];
+      return Success(MockData.payService(refType, refId, body ?? {}));
+    }
+    if (RegExp(r'^/deliveries/[^/]+/cancel$').hasMatch(path) && method == 'POST') {
+      return const Success({'success': true, 'status': 'CANCELLED'});
+    }
+    if (RegExp(r'^/errands/[^/]+/cancel$').hasMatch(path) && method == 'POST') {
+      return const Success({'success': true, 'status': 'CANCELLED'});
+    }
     if (path == '/rides/offers' && method == 'GET') {
       return Success({'offers': MockData.driverOffers()});
     }
@@ -292,6 +304,9 @@ class ApiClient {
     }
     if (path == '/rides/scheduled' && method == 'POST') {
       return Success({'scheduledRide': MockData.createScheduledRide(body ?? {}), 'ride': MockData.createScheduledRide(body ?? {})});
+    }
+    if (path == '/rides/scheduled-inquiries' && method == 'POST') {
+      return Success({'inquiry': MockData.createScheduledInquiry(body ?? {})});
     }
     if (path.contains('/rides/scheduled/estimate')) {
       return Success(MockData.scheduledEstimate(body ?? {}));
@@ -391,6 +406,31 @@ class ApiClient {
     if (path.contains('/carpool/') && path.endsWith('/cancel') && method == 'POST') {
       return const Success({'cancelled': true});
     }
+    if (path.contains('/carpool/') && path.endsWith('/start') && method == 'POST') {
+      return Success({
+        'trip': {
+          ...MockData.createCarpoolRide({'id': path.split('/')[2]}),
+          'status': 'IN_PROGRESS',
+          'timelineStep': 'En route',
+        },
+      });
+    }
+    if (path.contains('/carpool/') && path.endsWith('/complete') && method == 'POST') {
+      return Success({
+        'trip': {
+          ...MockData.createCarpoolRide({'id': path.split('/')[2]}),
+          'status': 'COMPLETED',
+          'timelineStep': 'Terminé',
+        },
+        'paymentReady': true,
+      });
+    }
+    if (path.contains('/carpool/') && path.endsWith('/rate') && method == 'POST') {
+      return Success({
+        'rating': {'score': body?['score'] ?? 5, 'comment': body?['comment']},
+        'driverRating': 4.8,
+      });
+    }
     if (RegExp(r'^/carpool/[^/]+$').hasMatch(path) && method == 'GET') {
       final id = path.split('/').last;
       final trip = MockData.carpoolRides().firstWhere(
@@ -421,7 +461,21 @@ class ApiClient {
       return Success({'data': MockData.rentalVehicles(), 'currency': 'CDF'});
     }
     if (path == '/rental/bookings' && method == 'POST') {
-      return Success(MockData.createRentalInquiry(body ?? {}));
+      return Success(MockData.createRentalBooking(body ?? {}));
+    }
+    if (path == '/rental/bookings' && method == 'GET') {
+      return Success({'data': MockData.rentalBookings()});
+    }
+    if (RegExp(r'^/rental/bookings/[^/]+$').hasMatch(path) && method == 'GET') {
+      final id = path.split('/').last;
+      final booking = MockData.rentalBookings().firstWhere(
+        (b) => b['id'] == id,
+        orElse: () => MockData.createRentalBooking({'id': id})['inquiry'] as Map<String, dynamic>,
+      );
+      return Success({'inquiry': booking, 'booking': booking});
+    }
+    if (path.contains('/rental/bookings/') && path.endsWith('/cancel') && method == 'POST') {
+      return Success({'status': 'CLOSED', 'cancelled': true});
     }
     if (path == '/rental/inquiries' && method == 'POST') {
       return Success(MockData.createRentalInquiry(body ?? {}));
@@ -764,6 +818,29 @@ class ApiClient {
       'amountCdf': amountCdf,
       'phone': MarketConfig.normalizePhone(userPhone),
     });
+  }
+
+  Future<Result<Map<String, dynamic>>> payService(
+    String referenceType,
+    String referenceId, {
+    required String method,
+    required int amountCdf,
+    String? phone,
+  }) async {
+    final userPhone = phone ?? await loadUserPhone() ?? '+243812345678';
+    return post('/payments/services/$referenceType/$referenceId', {
+      'method': method,
+      'amountCdf': amountCdf,
+      'phone': MarketConfig.normalizePhone(userPhone),
+    });
+  }
+
+  Future<Result<Map<String, dynamic>>> cancelDelivery(String deliveryId) async {
+    return post('/deliveries/$deliveryId/cancel', {});
+  }
+
+  Future<Result<Map<String, dynamic>>> cancelErrand(String errandId) async {
+    return post('/errands/$errandId/cancel', {});
   }
 
   /// Upload photo colis (base64) — retourne l'URL à passer à `photoUrl`.

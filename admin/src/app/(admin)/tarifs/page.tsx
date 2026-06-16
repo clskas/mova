@@ -2,22 +2,36 @@
 
 import { useCallback, useEffect, useState } from "react";
 import {
+  createPricingRule,
+  createPromoCode,
+  deactivatePromoCode,
+  deletePricingRule,
   fetchDeliveryPricingRules,
   fetchPricingRules,
+  fetchPromoCodes,
+  fetchSurcharges,
   formatCdf,
   MOVA_CITIES,
   updateDeliveryPricingRule,
   updatePricingRule,
+  updatePromoCode,
+  updateSurcharge,
   type DeliveryPricingRule,
   type PricingRule,
+  type PromoCode,
+  type ServiceSurcharge,
 } from "@/lib/api";
 import { useAdmin } from "@/components/AdminProvider";
 import {
+  BtnDanger,
   BtnPrimary,
   Card,
   ErrorBanner,
+  FieldLabel,
   LoadingState,
+  Modal,
   PageHeader,
+  SelectInput,
   TextInput,
 } from "@/components/ui";
 
@@ -34,17 +48,23 @@ const DELIVERY_LABELS: Record<string, string> = {
   EXPRESS: "Express",
 };
 
+const SURCHARGE_LABELS: Record<string, string> = {
+  MOVING: "Déménagement",
+};
+
 function VehicleRow({
   label,
   rule,
   city,
   onSave,
+  onDelete,
   readOnly,
 }: {
   label: string;
   rule: PricingRule;
   city: string;
   onSave: (data: Partial<PricingRule>) => Promise<void>;
+  onDelete?: () => Promise<void>;
   readOnly?: boolean;
 }) {
   const [base, setBase] = useState(String(rule.baseFareCdf));
@@ -95,7 +115,12 @@ function VehicleRow({
       </td>
       <td className="p-3">
         {!readOnly && (
-          <BtnPrimary onClick={save} disabled={saving}>{saving ? "…" : "Enregistrer"}</BtnPrimary>
+          <div className="flex gap-2 flex-wrap">
+            <BtnPrimary onClick={save} disabled={saving}>{saving ? "…" : "Enregistrer"}</BtnPrimary>
+            {onDelete && (
+              <BtnDanger onClick={() => onDelete()}>Supprimer</BtnDanger>
+            )}
+          </div>
         )}
       </td>
     </tr>
@@ -149,28 +174,196 @@ function DeliveryRow({
   );
 }
 
+function SurchargeRow({
+  label,
+  rule,
+  onSave,
+  readOnly,
+  showPerUnit,
+}: {
+  label: string;
+  rule: ServiceSurcharge;
+  onSave: (data: Partial<ServiceSurcharge>) => Promise<void>;
+  readOnly?: boolean;
+  showPerUnit?: boolean;
+}) {
+  const [baseFee, setBaseFee] = useState(String(rule.baseFeeCdf));
+  const [multiplier, setMultiplier] = useState(String(rule.multiplier));
+  const [perUnit, setPerUnit] = useState(String(rule.perUnitCdf ?? ""));
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setBaseFee(String(rule.baseFeeCdf));
+    setMultiplier(String(rule.multiplier));
+    setPerUnit(String(rule.perUnitCdf ?? ""));
+  }, [rule]);
+
+  async function save() {
+    setSaving(true);
+    try {
+      await onSave({
+        baseFeeCdf: Number(baseFee),
+        multiplier: Number(multiplier),
+        ...(showPerUnit ? { perUnitCdf: perUnit.trim() ? Number(perUnit) : null } : {}),
+      });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <tr className="border-b">
+      <td className="p-3 font-medium">{label}</td>
+      <td className="p-2"><TextInput value={baseFee} onChange={setBaseFee} type="number" className="!p-2" disabled={readOnly} /></td>
+      <td className="p-2"><TextInput value={multiplier} onChange={setMultiplier} type="number" className="!p-2" disabled={readOnly} /></td>
+      {showPerUnit && (
+        <td className="p-2"><TextInput value={perUnit} onChange={setPerUnit} type="number" className="!p-2" disabled={readOnly} placeholder="CDF/m³" /></td>
+      )}
+      <td className="p-3 text-gray-500 text-xs hidden md:table-cell max-w-xs">{rule.description ?? "—"}</td>
+      <td className="p-3">
+        {!readOnly && (
+          <BtnPrimary onClick={save} disabled={saving}>{saving ? "…" : "Enregistrer"}</BtnPrimary>
+        )}
+      </td>
+    </tr>
+  );
+}
+
 export default function TarifsPage() {
   const { canWrite } = useAdmin();
   const readOnly = !canWrite("tarifs");
   const [city, setCity] = useState<string>(MOVA_CITIES[0]);
   const [vehicleRules, setVehicleRules] = useState<PricingRule[]>([]);
   const [deliveryRules, setDeliveryRules] = useState<DeliveryPricingRule[]>([]);
+  const [otherSurcharges, setOtherSurcharges] = useState<ServiceSurcharge[]>([]);
+  const [promos, setPromos] = useState<PromoCode[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [newVehicleType, setNewVehicleType] = useState("STANDARD");
+  const [creating, setCreating] = useState(false);
+  const [promoModal, setPromoModal] = useState<"create" | PromoCode | null>(null);
+  const [promoCode, setPromoCode] = useState("");
+  const [promoPercent, setPromoPercent] = useState("");
+  const [promoCdf, setPromoCdf] = useState("");
+  const [promoMaxUses, setPromoMaxUses] = useState("");
+  const [promoValidUntil, setPromoValidUntil] = useState("");
+  const [promoSaving, setPromoSaving] = useState(false);
+
+  const existingTypes = new Set(vehicleRules.map((r) => r.vehicleType));
+  const missingTypes = Object.keys(VEHICLE_LABELS).filter((t) => !existingTypes.has(t));
+
+  async function handleCreate() {
+    setCreating(true);
+    setError(null);
+    try {
+      await createPricingRule(newVehicleType, {
+        city,
+        baseFareCdf: 2000,
+        perKmCdf: 1500,
+        perMinuteCdf: 200,
+        minFareCdf: 3000,
+        peakMultiplier: 1.3,
+        nightMultiplier: 1.2,
+      });
+      setCreateOpen(false);
+      load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Échec création");
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  async function handleDelete(vehicleType: string) {
+    if (!confirm(`Supprimer le tarif ${VEHICLE_LABELS[vehicleType] ?? vehicleType} pour ${city} ?`)) return;
+    setError(null);
+    try {
+      await deletePricingRule(vehicleType, city);
+      load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Échec suppression");
+    }
+  }
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [v, d] = await Promise.all([fetchPricingRules(city), fetchDeliveryPricingRules()]);
+      const [v, d, s, p] = await Promise.all([
+        fetchPricingRules(city),
+        fetchDeliveryPricingRules(),
+        fetchSurcharges(),
+        fetchPromoCodes(),
+      ]);
       setVehicleRules(Array.isArray(v) ? v : []);
       setDeliveryRules(Array.isArray(d) ? d : []);
+      setOtherSurcharges((Array.isArray(s) ? s : []).filter((x) => x.type === "MOVING"));
+      setPromos(Array.isArray(p) ? p : []);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur de chargement");
     } finally {
       setLoading(false);
     }
   }, [city]);
+
+  function openPromoCreate() {
+    setPromoCode("");
+    setPromoPercent("");
+    setPromoCdf("");
+    setPromoMaxUses("");
+    setPromoValidUntil("");
+    setPromoModal("create");
+  }
+
+  function openPromoEdit(p: PromoCode) {
+    setPromoCode(p.code);
+    setPromoPercent(p.discountPercent != null ? String(p.discountPercent) : "");
+    setPromoCdf(p.discountCdf != null ? String(p.discountCdf) : "");
+    setPromoMaxUses(p.maxUses != null ? String(p.maxUses) : "");
+    setPromoValidUntil(p.validUntil ? p.validUntil.slice(0, 10) : "");
+    setPromoModal(p);
+  }
+
+  async function savePromo() {
+    setPromoSaving(true);
+    setError(null);
+    try {
+      const payload = {
+        code: promoCode.trim(),
+        discountPercent: promoPercent.trim() ? Number(promoPercent) : undefined,
+        discountCdf: promoCdf.trim() ? Number(promoCdf) : undefined,
+        maxUses: promoMaxUses.trim() ? Number(promoMaxUses) : undefined,
+        validUntil: promoValidUntil.trim() ? new Date(promoValidUntil).toISOString() : undefined,
+      };
+      if (promoModal === "create") {
+        await createPromoCode(payload);
+      } else if (promoModal) {
+        await updatePromoCode(promoModal.id, {
+          discountPercent: payload.discountPercent,
+          discountCdf: payload.discountCdf,
+          maxUses: payload.maxUses,
+          validUntil: payload.validUntil ?? null,
+        });
+      }
+      setPromoModal(null);
+      load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Échec enregistrement promo");
+    } finally {
+      setPromoSaving(false);
+    }
+  }
+
+  async function deactivatePromo(id: string) {
+    if (!confirm("Désactiver ce code promo ?")) return;
+    try {
+      await deactivatePromoCode(id);
+      load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Échec désactivation");
+    }
+  }
 
   useEffect(() => { load(); }, [load]);
 
@@ -199,6 +392,11 @@ export default function TarifsPage() {
             <option key={c} value={c}>{c}</option>
           ))}
         </select>
+        {!readOnly && missingTypes.length > 0 && (
+          <BtnPrimary onClick={() => { setNewVehicleType(missingTypes[0]); setCreateOpen(true); }}>
+            Ajouter un type
+          </BtnPrimary>
+        )}
       </div>
 
       {loading ? (
@@ -235,6 +433,7 @@ export default function TarifsPage() {
                         city={city}
                         readOnly={readOnly}
                         onSave={(data) => updatePricingRule(r.vehicleType, data).then(load)}
+                        onDelete={() => handleDelete(r.vehicleType)}
                       />
                     ))
                   )}
@@ -273,8 +472,140 @@ export default function TarifsPage() {
               </table>
             </Card>
           </section>
+
+          {otherSurcharges.length > 0 && (
+            <section>
+              <h2 className="font-semibold text-[#1A1A2E] mb-1">Majorations déménagement</h2>
+              <p className="text-sm text-gray-500 mb-3">Frais de base, multiplicateur et tarif au m³ pour les courses déménagement.</p>
+              <Card className="overflow-x-auto">
+                <table className="w-full text-sm min-w-[520px]">
+                  <thead>
+                    <tr className="border-b text-left text-gray-500">
+                      <th className="p-3">Service</th>
+                      <th className="p-3">Frais de base (CDF)</th>
+                      <th className="p-3">Multiplicateur</th>
+                      <th className="p-3">Par m³ (CDF)</th>
+                      <th className="p-3 hidden md:table-cell">Description</th>
+                      <th className="p-3"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {otherSurcharges.map((r) => (
+                      <SurchargeRow
+                        key={r.type}
+                        label={SURCHARGE_LABELS[r.type] ?? r.type}
+                        rule={r}
+                        showPerUnit
+                        readOnly={readOnly}
+                        onSave={(data) => updateSurcharge(r.type, data).then(load)}
+                      />
+                    ))}
+                  </tbody>
+                </table>
+              </Card>
+            </section>
+          )}
+
+          <section>
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h2 className="font-semibold text-[#1A1A2E]">Codes promo</h2>
+                <p className="text-sm text-gray-500">Réduction en % ou montant fixe CDF ; désactivation sans suppression.</p>
+              </div>
+              {!readOnly && <BtnPrimary onClick={openPromoCreate}>Nouveau code</BtnPrimary>}
+            </div>
+            <Card className="overflow-x-auto">
+              <table className="w-full text-sm min-w-[640px]">
+                <thead>
+                  <tr className="border-b text-left text-gray-500">
+                    <th className="p-3">Code</th>
+                    <th className="p-3">Réduction</th>
+                    <th className="p-3">Utilisations</th>
+                    <th className="p-3">Expire</th>
+                    <th className="p-3">Statut</th>
+                    <th className="p-3"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {promos.length === 0 ? (
+                    <tr><td colSpan={6} className="p-6 text-center text-gray-400">Aucun code promo</td></tr>
+                  ) : promos.map((p) => (
+                    <tr key={p.id} className="border-b">
+                      <td className="p-3 font-mono font-medium">{p.code}</td>
+                      <td className="p-3">
+                        {p.discountPercent != null ? `${p.discountPercent} %` : p.discountCdf != null ? formatCdf(p.discountCdf) : "—"}
+                      </td>
+                      <td className="p-3">{p.usedCount ?? 0}{p.maxUses != null ? ` / ${p.maxUses}` : ""}</td>
+                      <td className="p-3">{p.validUntil ? new Date(p.validUntil).toLocaleDateString("fr-FR") : "—"}</td>
+                      <td className="p-3">
+                        <span className={p.isActive ? "text-green-600" : "text-gray-400"}>{p.isActive ? "Actif" : "Inactif"}</span>
+                      </td>
+                      <td className="p-3 flex gap-2">
+                        {!readOnly && (
+                          <>
+                            <BtnPrimary onClick={() => openPromoEdit(p)}>Modifier</BtnPrimary>
+                            {p.isActive && <BtnDanger onClick={() => deactivatePromo(p.id)}>Désactiver</BtnDanger>}
+                          </>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </Card>
+          </section>
         </>
       )}
+
+      <Modal open={createOpen} onClose={() => setCreateOpen(false)} title={`Nouveau tarif — ${city}`}>
+        <div className="space-y-4">
+          <label>
+            <FieldLabel>Type de véhicule</FieldLabel>
+            <SelectInput
+              value={newVehicleType}
+              onChange={setNewVehicleType}
+              options={missingTypes.map((t) => ({ value: t, label: VEHICLE_LABELS[t] ?? t }))}
+            />
+          </label>
+          <p className="text-sm text-gray-500">Des valeurs par défaut seront créées ; vous pourrez les modifier ensuite.</p>
+          <div className="flex gap-2">
+            <BtnPrimary onClick={handleCreate} disabled={creating}>{creating ? "Création…" : "Créer"}</BtnPrimary>
+            <BtnDanger onClick={() => setCreateOpen(false)}>Annuler</BtnDanger>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal open={promoModal !== null} onClose={() => setPromoModal(null)} title={promoModal === "create" ? "Nouveau code promo" : "Modifier code promo"}>
+        <div className="space-y-4">
+          <label>
+            <FieldLabel>Code</FieldLabel>
+            <TextInput value={promoCode} onChange={setPromoCode} disabled={promoModal !== "create" || readOnly} placeholder="MOVA2025" />
+          </label>
+          <div className="grid grid-cols-2 gap-3">
+            <label>
+              <FieldLabel>Réduction (%)</FieldLabel>
+              <TextInput value={promoPercent} onChange={setPromoPercent} type="number" disabled={readOnly} placeholder="10" />
+            </label>
+            <label>
+              <FieldLabel>Montant fixe (CDF)</FieldLabel>
+              <TextInput value={promoCdf} onChange={setPromoCdf} type="number" disabled={readOnly} placeholder="5000" />
+            </label>
+          </div>
+          <p className="text-xs text-gray-500">Indiquez % ou montant fixe (pas les deux obligatoires).</p>
+          <label>
+            <FieldLabel>Utilisations max</FieldLabel>
+            <TextInput value={promoMaxUses} onChange={setPromoMaxUses} type="number" disabled={readOnly} placeholder="Illimité" />
+          </label>
+          <label>
+            <FieldLabel>Date d&apos;expiration</FieldLabel>
+            <TextInput value={promoValidUntil} onChange={setPromoValidUntil} type="date" disabled={readOnly} />
+          </label>
+          <div className="flex gap-2">
+            {!readOnly && <BtnPrimary onClick={savePromo} disabled={promoSaving}>{promoSaving ? "Enregistrement…" : "Enregistrer"}</BtnPrimary>}
+            <BtnDanger onClick={() => setPromoModal(null)}>Fermer</BtnDanger>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

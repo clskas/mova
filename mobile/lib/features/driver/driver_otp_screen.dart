@@ -78,9 +78,19 @@ class _DriverOtpScreenState extends ConsumerState<DriverOtpScreen> {
             ),
           ),
           const SizedBox(height: 24),
-          const Text('Espace chauffeur', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+          const Text(
+            'Espace chauffeur',
+            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
           const SizedBox(height: 8),
-          Text('Connectez-vous avec votre numéro +243', style: TextStyle(color: MovaColors.textSecondary)),
+          const Text(
+            'Connectez-vous avec votre numéro +243',
+            style: TextStyle(color: MovaColors.textSecondary),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
           const SizedBox(height: 32),
           TextField(
             controller: _phoneController,

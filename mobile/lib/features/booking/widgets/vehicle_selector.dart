@@ -38,7 +38,11 @@ class VehicleSelector extends StatelessWidget {
           final option = MarketConfig.vehicleTypes[index];
           final estimate = estimates[option.id];
           final isSelected = selected == option.id;
-          final isMoto = option.id == 'MOTO_TAXI';
+          final accentColor = switch (option.id) {
+            'MOTO_TAXI' => MovaColors.green,
+            'VIP' => MovaColors.orange,
+            _ => MovaColors.violet,
+          };
 
           return SizedBox(
             width: 108,
@@ -53,9 +57,7 @@ class VehicleSelector extends StatelessWidget {
                     color: Theme.of(context).cardColor,
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
-                      color: isSelected
-                          ? (isMoto ? MovaColors.green : MovaColors.violet)
-                          : Colors.grey.shade200,
+                      color: isSelected ? accentColor : Colors.grey.shade200,
                       width: isSelected ? 2 : 1,
                     ),
                     boxShadow: [
@@ -96,7 +98,7 @@ class VehicleSelector extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
-                          color: isMoto ? MovaColors.green : MovaColors.violet,
+                          color: accentColor,
                         ),
                       )
                     else

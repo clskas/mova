@@ -2,7 +2,7 @@ import { Body, Controller, Get, Param, Patch, Post, Query, Request, UseGuards } 
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ErrandsService } from '../errands/errands.service';
-import { CreateFoodDeliveryDto, CreateParcelDeliveryDto, UpdateDeliveryStatusDto } from './deliveries.dto';
+import { CreateFoodDeliveryDto, CreateFoodMultiDeliveryDto, CreateParcelDeliveryDto, RateDeliveryDto, UpdateDeliveryStatusDto, ValidatePromoDto } from './deliveries.dto';
 import { MobileErrandCreateDto, MobileErrandEstimateDto } from './deliveries-mobile.dto';
 import { DeliveriesService } from './deliveries.service';
 
@@ -22,19 +22,51 @@ export class DeliveriesController {
   @Post('errand/estimate')
   @ApiOperation({ summary: 'Estimer course/commission (contrat mobile)' })
   estimateErrand(@Body() dto: MobileErrandEstimateDto) {
-    return this.errandsService.estimateMobile(dto.deliveryAddress, dto.items ?? []);
+    return this.errandsService.estimateMobile(dto.deliveryAddress, dto.items ?? [], dto.pickupAddress);
   }
 
   @Post('errand')
   @ApiOperation({ summary: 'Créer commande courses/commissions (contrat mobile)' })
   createErrand(@Request() req: { user: { id: string } }, @Body() dto: MobileErrandCreateDto) {
-    return this.errandsService.createMobile(req.user.id, dto.deliveryAddress, dto.items ?? [], dto.deliveryLat, dto.deliveryLng);
+    return this.errandsService.createMobile(
+      req.user.id,
+      dto.deliveryAddress,
+      dto.items ?? [],
+      dto.deliveryLat,
+      dto.deliveryLng,
+      dto.pickupAddress,
+    );
   }
 
   @Get('errand/history')
   @ApiOperation({ summary: 'Historique courses/commissions (contrat mobile)' })
   async errandHistory(@Request() req: { user: { id: string } }) {
     return { data: await this.errandsService.listMobile(req.user.id) };
+  }
+
+  @Get('restaurants')
+  @ApiOperation({ summary: 'Liste restaurants Kinshasa' })
+  restaurants(
+    @Query('deliveryLat') deliveryLat?: string,
+    @Query('deliveryLng') deliveryLng?: string,
+    @Query('cuisine') cuisine?: string,
+    @Query('maxEtaMin') maxEtaMin?: string,
+    @Query('maxPriceCdf') maxPriceCdf?: string,
+    @Query('maxDistanceKm') maxDistanceKm?: string,
+  ) {
+    const lat = deliveryLat != null ? Number(deliveryLat) : undefined;
+    const lng = deliveryLng != null ? Number(deliveryLng) : undefined;
+    const eta = maxEtaMin != null ? Number(maxEtaMin) : undefined;
+    const price = maxPriceCdf != null ? Number(maxPriceCdf) : undefined;
+    const distance = maxDistanceKm != null ? Number(maxDistanceKm) : undefined;
+    return this.deliveriesService.listRestaurants(
+      lat != null && !Number.isNaN(lat) ? lat : undefined,
+      lng != null && !Number.isNaN(lng) ? lng : undefined,
+      cuisine,
+      eta != null && !Number.isNaN(eta) ? eta : undefined,
+      price != null && !Number.isNaN(price) ? price : undefined,
+      distance != null && !Number.isNaN(distance) ? distance : undefined,
+    );
   }
 
   @Get('restaurants/:id')
@@ -61,10 +93,28 @@ export class DeliveriesController {
     return this.deliveriesService.estimateFood(dto);
   }
 
+  @Post('food/multi/estimate')
+  @ApiOperation({ summary: 'Estimer commande repas multi-restaurants (CDF)' })
+  estimateFoodMulti(@Body() dto: CreateFoodMultiDeliveryDto) {
+    return this.deliveriesService.estimateFoodMulti(dto);
+  }
+
+  @Post('promo/validate')
+  @ApiOperation({ summary: 'Valider un code promo livraison repas' })
+  validatePromo(@Body() dto: ValidatePromoDto) {
+    return this.deliveriesService.validatePromoCode(dto.code);
+  }
+
   @Post('food')
   @ApiOperation({ summary: 'Commander livraison repas' })
   createFood(@Request() req: { user: { id: string } }, @Body() dto: CreateFoodDeliveryDto) {
     return this.deliveriesService.createFood(req.user.id, dto);
+  }
+
+  @Post('food/multi')
+  @ApiOperation({ summary: 'Commander livraison repas multi-restaurants' })
+  createFoodMulti(@Request() req: { user: { id: string } }, @Body() dto: CreateFoodMultiDeliveryDto) {
+    return this.deliveriesService.createFoodMulti(req.user.id, dto);
   }
 
   @Get('offers')
@@ -77,17 +127,6 @@ export class DeliveriesController {
   @ApiOperation({ summary: 'Accepter une livraison (chauffeur/coursier)' })
   accept(@Request() req: { user: { id: string } }, @Param('id') id: string) {
     return this.deliveriesService.acceptDelivery(id, req.user.id);
-  }
-
-  @Get('restaurants')
-  @ApiOperation({ summary: 'Liste restaurants Kinshasa' })
-  restaurants(@Query('deliveryLat') deliveryLat?: string, @Query('deliveryLng') deliveryLng?: string) {
-    const lat = deliveryLat != null ? Number(deliveryLat) : undefined;
-    const lng = deliveryLng != null ? Number(deliveryLng) : undefined;
-    return this.deliveriesService.listRestaurants(
-      lat != null && !Number.isNaN(lat) ? lat : undefined,
-      lng != null && !Number.isNaN(lng) ? lng : undefined,
-    );
   }
 
   @Get('history')
@@ -112,5 +151,11 @@ export class DeliveriesController {
   @ApiOperation({ summary: 'Mettre à jour statut livraison' })
   status(@Request() req: { user: { id: string } }, @Param('id') id: string, @Body() dto: UpdateDeliveryStatusDto) {
     return this.deliveriesService.updateStatus(id, dto.status, req.user.id);
+  }
+
+  @Post(':id/rate')
+  @ApiOperation({ summary: 'Noter restaurant et livreur après livraison repas' })
+  rate(@Request() req: { user: { id: string } }, @Param('id') id: string, @Body() dto: RateDeliveryDto) {
+    return this.deliveriesService.rateDelivery(id, req.user.id, dto);
   }
 }

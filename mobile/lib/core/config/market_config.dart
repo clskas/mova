@@ -52,9 +52,17 @@ class MarketConfig {
     VehicleTypeOption(id: 'VIP', label: 'VIP', icon: '👑'),
   ];
 
-  /// VIP n'existe pas côté API — mappe vers COMFORT pour les appels backend.
-  static String apiVehicleType(String uiType) =>
-      uiType == 'VIP' ? 'COMFORT' : uiType;
+  /// Alias UI / contrat mobile → enum Prisma ride-service (`MOTO_TAXI`, `COMFORT`, …).
+  static String apiVehicleType(String uiType) {
+    switch (uiType.toUpperCase()) {
+      case 'MOTO':
+        return 'MOTO_TAXI';
+      case 'CONFORT':
+        return 'COMFORT';
+      default:
+        return uiType;
+    }
+  }
 
   static const kinshasaDistricts = [
     'Bandalungwa',

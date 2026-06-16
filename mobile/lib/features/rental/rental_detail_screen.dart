@@ -6,6 +6,7 @@ import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
+import 'rental_booking_detail_screen.dart';
 
 class RentalDetailScreen extends ConsumerStatefulWidget {
   const RentalDetailScreen({
@@ -144,28 +145,31 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
       'contactPhone': MarketConfig.normalizePhone(_phoneController.text.trim()),
       if (_notesController.text.trim().isNotEmpty) 'notes': _notesController.text.trim(),
     };
-    final result = await api.post('/rental/inquiries', payload);
+    final result = await api.post('/rental/bookings', payload);
     if (!mounted) return;
     setState(() => _submitting = false);
     switch (result) {
       case Success(:final data):
-        showDialog<void>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: const Text('Demande enregistrée'),
-            content: Text(
-              data['message']?.toString() ??
-                  'Votre demande a été transmise. Réf. ${data['inquiry']?['id'] ?? ''}',
+        final inquiry = data['inquiry'] as Map<String, dynamic>? ?? data['booking'] as Map<String, dynamic>?;
+        final bookingId = inquiry?['id']?.toString() ?? '';
+        if (!mounted) return;
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => RentalBookingDetailScreen(
+              bookingId: bookingId,
+              initialBooking: {
+                ...?inquiry,
+                if (data['quote'] != null) 'totalCdf': (data['quote'] as Map)['totalCdf'],
+                'timeline': inquiry?['timeline'] ??
+                    [
+                      {'label': 'Demande', 'completed': true, 'current': true},
+                      {'label': 'Confirmée', 'completed': false, 'current': false},
+                      {'label': 'En cours', 'completed': false, 'current': false},
+                      {'label': 'Retournée', 'completed': false, 'current': false},
+                    ],
+              },
             ),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  Navigator.pop(context, true);
-                },
-                child: const Text('OK'),
-              ),
-            ],
           ),
         );
       case Failure(:final error):
@@ -216,6 +220,26 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: MovaColors.violet.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.date_range, size: 18, color: MovaColors.violet),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Location longue durée (jours/semaines) — pas une course VTC à la demande.',
+                    style: TextStyle(fontSize: 12, color: MovaColors.violet),
+                  ),
+                ),
+              ],
+            ),
+          ),
           if (imageUrl != null)
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
@@ -479,7 +503,7 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
             ],
             const SizedBox(height: 16),
             MovaButton(
-              label: _step == 2 ? 'Confirmer la demande' : 'Obtenir le devis',
+              label: _step == 2 ? 'Réserver maintenant' : 'Obtenir le devis',
               isLoading: _submitting,
               icon: _step == 2 ? Icons.check_circle_outline : Icons.receipt_long_outlined,
               onPressed: _submitting ? null : (_step == 2 ? _confirm : _fetchQuote),

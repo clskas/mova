@@ -39,7 +39,7 @@ export class PromoService {
     return Math.max(0, priceCdf - discount);
   }
 
-  async redeem(code: string) {
+  async peek(code: string) {
     const promo = await this.prisma.promoCode.findUnique({ where: { code: code.trim().toUpperCase() } });
     if (!promo || !promo.isActive) throw new MovaHttpException(MovaErrorCode.PROMO_NOT_FOUND, HttpStatus.NOT_FOUND);
     if (promo.validUntil && promo.validUntil < new Date()) {
@@ -48,6 +48,11 @@ export class PromoService {
     if (promo.maxUses != null && promo.usedCount >= promo.maxUses) {
       throw new MovaHttpException(MovaErrorCode.PROMO_INVALID, HttpStatus.BAD_REQUEST);
     }
+    return promo;
+  }
+
+  async redeem(code: string) {
+    const promo = await this.peek(code);
     await this.prisma.promoCode.update({ where: { id: promo.id }, data: { usedCount: { increment: 1 } } });
     return promo;
   }

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { apiFetch, type KycItem } from "@/lib/api";
+import { authHeaders } from "@/lib/auth";
 import { useAdmin } from "@/components/AdminProvider";
 import {
   BtnDanger,
@@ -14,12 +15,21 @@ import {
   StatusBadge,
 } from "@/components/ui";
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
+
+function resolveDocumentUrl(url?: string | null): string | null {
+  if (!url) return null;
+  if (url.startsWith("http://") || url.startsWith("https://")) return url;
+  return `${API_BASE}${url.startsWith("/") ? url : `/${url}`}`;
+}
+
 export default function KycPage() {
   const { canWrite } = useAdmin();
   const [items, setItems] = useState<KycItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState<KycItem | null>(null);
+  const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -35,6 +45,31 @@ export default function KycPage() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    if (!preview?.url) {
+      setPreviewBlobUrl(null);
+      return;
+    }
+    const full = resolveDocumentUrl(preview.url);
+    if (!full) return;
+    let objectUrl: string | null = null;
+    let cancelled = false;
+    fetch(full, { headers: authHeaders() })
+      .then((res) => (res.ok ? res.blob() : Promise.reject(new Error("HTTP " + res.status))))
+      .then((blob) => {
+        if (cancelled) return;
+        objectUrl = URL.createObjectURL(blob);
+        setPreviewBlobUrl(objectUrl);
+      })
+      .catch(() => {
+        if (!cancelled) setPreviewBlobUrl(full);
+      });
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [preview]);
 
   async function review(id: string, approved: boolean) {
     try {
@@ -88,7 +123,7 @@ export default function KycPage() {
           <div className="bg-white rounded-2xl p-4 max-w-2xl w-full max-h-[90vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
             <p className="font-medium mb-3">{preview.type} — {preview.userId}</p>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={preview.url} alt="Document KYC" className="w-full rounded-lg border" />
+            <img src={previewBlobUrl ?? resolveDocumentUrl(preview.url) ?? preview.url} alt="Document KYC" className="w-full rounded-lg border" />
             <button type="button" onClick={() => setPreview(null)} className="mt-4 text-sm text-gray-500 underline">Fermer</button>
           </div>
         </div>

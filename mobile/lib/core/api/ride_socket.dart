@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:math' as math;
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 import '../config/market_config.dart';
@@ -7,7 +10,18 @@ final rideSocketProvider = Provider((ref) => RideSocket());
 /// WebSocket GPS via ride-service (`/tracking` namespace).
 class RideSocket {
   io.Socket? _socket;
-  bool mockMode = false;
+  String? _rideId;
+  String? _token;
+  bool isConnected = false;
+  bool connectionFailed = false;
+  Timer? _reconnectTimer;
+  int _reconnectAttempt = 0;
+  static const _maxReconnectAttempts = 6;
+
+  void Function(Map<String, dynamic> payload)? _onLocation;
+  void Function(Map<String, dynamic> payload)? _onStatus;
+  void Function()? _onConnected;
+  void Function()? _onDisconnected;
 
   void connect({
     required String rideId,
@@ -16,47 +30,103 @@ class RideSocket {
     void Function(Map<String, dynamic> payload)? onStatus,
     void Function()? onConnected,
     void Function()? onDisconnected,
+    bool forceReconnect = false,
   }) {
-    dispose();
+    _rideId = rideId;
+    _token = token;
+    _onLocation = onLocation;
+    _onStatus = onStatus;
+    _onConnected = onConnected;
+    _onDisconnected = onDisconnected;
+
+    if (!forceReconnect && _socket?.connected == true && _rideId == rideId) {
+      _socket?.emit('ride:subscribe', {'rideId': rideId});
+      isConnected = true;
+      connectionFailed = false;
+      onConnected?.call();
+      return;
+    }
+
+    _reconnectAttempt = 0;
+    connectionFailed = false;
+    _openSocket();
+  }
+
+  void _openSocket() {
+    _reconnectTimer?.cancel();
+    _socket?.dispose();
+    _socket = null;
+    isConnected = false;
+
     try {
       _socket = io.io(
         '${MarketConfig.wsUrl}/tracking',
         io.OptionBuilder()
             .setTransports(['websocket'])
             .disableAutoConnect()
-            .setAuth({if (token != null && token.isNotEmpty) 'token': token})
+            .enableReconnection()
+            .setReconnectionAttempts(_maxReconnectAttempts)
+            .setReconnectionDelay(2000)
+            .setReconnectionDelayMax(10000)
+            .setAuth({if (_token != null && _token!.isNotEmpty) 'token': _token})
             .build(),
       );
       _socket!
         ..onConnect((_) {
-          mockMode = false;
-          onConnected?.call();
-          _socket?.emit('ride:subscribe', {'rideId': rideId});
-        })
-        ..onDisconnect((_) => onDisconnected?.call())
-        ..on('driver:location', (data) {
-          if (data is Map) {
-            onLocation?.call(Map<String, dynamic>.from(data));
+          isConnected = true;
+          connectionFailed = false;
+          _reconnectAttempt = 0;
+          if (_rideId != null) {
+            _socket?.emit('ride:subscribe', {'rideId': _rideId});
           }
+          _onConnected?.call();
         })
+        ..onDisconnect((_) {
+          isConnected = false;
+          _onDisconnected?.call();
+        })
+        ..on('driver:location', _handleLocation)
+        ..on('ride:location', _handleLocation)
         ..on('ride:status', (data) {
           if (data is Map) {
-            onStatus?.call(Map<String, dynamic>.from(data));
+            _onStatus?.call(Map<String, dynamic>.from(data));
           }
         })
-        ..onConnectError((_) {
-          mockMode = true;
-          onDisconnected?.call();
-        })
+        ..onConnectError((_) => _scheduleReconnect())
         ..connect();
     } catch (_) {
-      mockMode = true;
+      _scheduleReconnect();
     }
   }
 
+  void _handleLocation(dynamic data) {
+    if (data is Map) {
+      _onLocation?.call(Map<String, dynamic>.from(data));
+    }
+  }
+
+  void _scheduleReconnect() {
+    isConnected = false;
+    if (_reconnectAttempt >= _maxReconnectAttempts) {
+      connectionFailed = true;
+      _onDisconnected?.call();
+      return;
+    }
+    _reconnectTimer?.cancel();
+    final delaySec = math.min(30, math.pow(2, _reconnectAttempt).toInt());
+    _reconnectAttempt++;
+    _reconnectTimer = Timer(Duration(seconds: delaySec), _openSocket);
+  }
+
   void dispose() {
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
     _socket?.dispose();
     _socket = null;
+    _rideId = null;
+    isConnected = false;
+    connectionFailed = false;
+    _reconnectAttempt = 0;
   }
 
   void emitDriverLocation({
@@ -65,6 +135,7 @@ class RideSocket {
     required double lng,
     String? rideId,
   }) {
+    if (!isConnected) return;
     _socket?.emit('driver:location', {
       'userId': userId,
       'lat': lat,

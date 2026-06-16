@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { apiFetch, formatCdf } from "@/lib/api";
 
-type Vehicle = { id: string; name: string; category?: string; pricePerDayCdf?: number };
+type Vehicle = { id: string; name: string; category?: string; pricePerDayCdf?: number; dailyRateCdf?: number };
 
 type Props = { onBack: () => void; mock: boolean };
 
@@ -18,15 +18,21 @@ export function RentalView({ onBack, mock }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState(false);
 
+  const [loadError, setLoadError] = useState<string | null>(null);
+
   useEffect(() => {
+    setLoadError(null);
     apiFetch<{ data?: Vehicle[] }>("/api/rental/vehicles", undefined, { useMock: mock })
       .then((data) => {
         const list = data.data ?? [];
         setVehicles(list);
         if (list.length > 0) setSelectedId(list[0].id);
+        if (list.length === 0) setLoadError("Aucun véhicule disponible pour le moment.");
       })
-      .catch((e) => setError(e instanceof Error ? e.message : "Erreur catalogue"));
+      .catch((e) => setLoadError(e instanceof Error ? e.message : "Erreur catalogue"));
   }, [mock]);
+
+  const pricePerDay = (v: Vehicle) => v.dailyRateCdf ?? v.pricePerDayCdf ?? 0;
 
   const startDate = new Date();
   startDate.setDate(startDate.getDate() + 1);
@@ -90,14 +96,15 @@ export function RentalView({ onBack, mock }: Props) {
       <button type="button" onClick={onBack} className="text-sm text-[#6C63FF]">← Accueil</button>
       <h2 className="text-lg font-semibold">Location véhicule</h2>
       {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg py-2 px-3">{error}</p>}
-      {vehicles.length === 0 ? (
+      {loadError && <p className="text-sm text-amber-700 bg-amber-50 rounded-lg py-2 px-3">{loadError}</p>}
+      {vehicles.length === 0 && !loadError ? (
         <p className="text-sm text-gray-500">Chargement du catalogue…</p>
       ) : (
         vehicles.map((v) => (
           <label key={v.id} className="flex items-center gap-3 bg-white rounded-xl p-3 shadow-sm cursor-pointer">
             <input type="radio" name="vehicle" checked={selectedId === v.id} onChange={() => { setSelectedId(v.id); setEstimate(null); }} />
             <span className="flex-1 font-medium">{v.name}</span>
-            <span className="text-sm text-[#6C63FF]">{formatCdf(v.pricePerDayCdf ?? 0)}/j</span>
+            <span className="text-sm text-[#6C63FF]">{formatCdf(pricePerDay(v))}/j</span>
           </label>
         ))
       )}

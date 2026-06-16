@@ -54,6 +54,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
   String? _error;
   Timer? _pollTimer;
   Timer? _mockTimer;
+  Timer? _trackingPollTimer;
   RideSocket? _socket;
   int _mockStep = 0;
 
@@ -67,6 +68,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
   void dispose() {
     _pollTimer?.cancel();
     _mockTimer?.cancel();
+    _trackingPollTimer?.cancel();
     _socket?.dispose();
     super.dispose();
   }
@@ -175,8 +177,6 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
     final driverLng = (data['driver']?['lng'] as num?)?.toDouble();
     if (driverLat != null && driverLng != null) {
       _driverPos = LatLng(driverLat, driverLng);
-    } else if (_driver != null) {
-      _driverPos = LatLng(_pickup.latitude + 0.008, _pickup.longitude + 0.005);
     }
     _updateEtaFromRide(data);
 
@@ -195,6 +195,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
   }
 
   void _applyMockDriver() {
+    if (!ref.read(apiClientProvider).isMockMode) return;
     _mock = true;
     _driver ??= {
       'name': 'Jean Kabila',
@@ -207,6 +208,36 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
     _driverPos ??= LatLng(_pickup.latitude + 0.008, _pickup.longitude + 0.005);
     _dropoff ??= LatLng(MarketConfig.defaultLat - 0.03, MarketConfig.defaultLng + 0.04);
     _startMockSimulation();
+  }
+
+  void _startTrackingPoll() {
+    if (_trackingPollTimer?.isActive == true) return;
+    _trackingPollTimer = Timer.periodic(const Duration(seconds: 8), (_) async {
+      if (!mounted || _mock) return;
+      final api = ref.read(apiClientProvider);
+      if (api.isMockMode) return;
+      final result = await api.getRide(widget.rideId);
+      if (!mounted) return;
+      if (result case Success(:final data)) {
+        setState(() {
+          _ride = data;
+          _status = data['status']?.toString() ?? _status;
+          _driver ??= _normalizeDriver(data['driver'] as Map<String, dynamic>?);
+          final driverLat = (data['driver']?['lat'] as num?)?.toDouble();
+          final driverLng = (data['driver']?['lng'] as num?)?.toDouble();
+          if (driverLat != null && driverLng != null) {
+            _driverPos = LatLng(driverLat, driverLng);
+            _updateEtaFromDriverPosition(_driverPos!);
+          }
+          _updateEtaFromRide(data);
+        });
+      }
+    });
+  }
+
+  void _stopTrackingPoll() {
+    _trackingPollTimer?.cancel();
+    _trackingPollTimer = null;
   }
 
   Future<void> _connectSocket() async {
@@ -224,15 +255,22 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
       rideId: widget.rideId,
       token: token,
       onConnected: () {
-        if (mounted) setState(() => _mock = false);
+        if (!mounted) return;
+        _mockTimer?.cancel();
+        _stopTrackingPoll();
+        setState(() => _mock = false);
       },
       onDisconnected: () {
         if (!mounted) return;
-        if (socket.mockMode && ref.read(apiClientProvider).isMockMode) {
+        if (api.isMockMode) {
           setState(() {
             _mock = true;
             _startMockSimulation();
           });
+          return;
+        }
+        if (socket.connectionFailed) {
+          _startTrackingPoll();
         }
       },
       onLocation: (payload) {
@@ -258,6 +296,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
   }
 
   void _startMockSimulation() {
+    if (!ref.read(apiClientProvider).isMockMode) return;
     if (_mockTimer?.isActive == true) return;
     const mockStatuses = ['ACCEPTED', 'ACCEPTED', 'DRIVER_ARRIVED', 'IN_PROGRESS'];
     _mockTimer = Timer.periodic(const Duration(seconds: 4), (_) {
@@ -350,6 +389,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
 
     setState(() => _cancelling = true);
     _pollTimer?.cancel();
+    _trackingPollTimer?.cancel();
     _socket?.dispose();
     final api = ref.read(apiClientProvider);
     final result = await api.cancelRide(widget.rideId, reason: 'Annulé par le passager');

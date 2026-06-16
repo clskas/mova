@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { apiFetch, formatDate, type Incident } from "@/lib/api";
+import { apiFetch, formatDate, resolveIncident, type Incident } from "@/lib/api";
 import { useAdmin } from "@/components/AdminProvider";
 import {
   BtnPrimary,
@@ -36,10 +36,7 @@ export default function LitigesPage() {
 
   async function resolve(id: string) {
     try {
-      await apiFetch(`/api/admin/incidents/${id}/resolve`, {
-        method: "POST",
-        body: JSON.stringify({ status: "RESOLVED" }),
-      });
+      await resolveIncident(id, "RESOLVED");
       load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Échec résolution");

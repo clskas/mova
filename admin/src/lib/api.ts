@@ -4,6 +4,8 @@ import type { AdminRole } from "./rbac";
 import { isAdminRole, normalizeAdminRole } from "./rbac";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
+/** Mock API fallback only when explicitly enabled (dev demos without backend). */
+const USE_API_MOCK = process.env.NEXT_PUBLIC_USE_API_MOCK === "true";
 
 export type AdminMetrics = {
   users?: number;
@@ -136,6 +138,27 @@ export type DeliveryPricingRule = {
   isActive?: boolean;
 };
 
+export type ServiceSurcharge = {
+  id: string;
+  type: string;
+  baseFeeCdf: number;
+  multiplier: number;
+  perUnitCdf?: number | null;
+  description?: string | null;
+  isActive?: boolean;
+};
+
+export type PromoCode = {
+  id: string;
+  code: string;
+  discountPercent?: number | null;
+  discountCdf?: number | null;
+  maxUses?: number | null;
+  usedCount?: number;
+  validUntil?: string | null;
+  isActive?: boolean;
+};
+
 /** Villes MOVA couvertes (aligné DRC_SERVICE_AREAS / seed ride-service). */
 export const MOVA_CITIES = [
   "Kinshasa",
@@ -232,14 +255,14 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
     },
   });
   if (!res.ok) {
-    if (hasToken) {
-      let message = `HTTP ${res.status}`;
-      try {
-        const body = await res.json();
-        message = body.error?.message ?? body.message ?? message;
-      } catch {
-        /* ignore */
-      }
+    let message = `HTTP ${res.status}`;
+    try {
+      const body = await res.json();
+      message = body.error?.message ?? body.message ?? message;
+    } catch {
+      /* ignore */
+    }
+    if (hasToken || !USE_API_MOCK) {
       throw new ApiError(message, res.status);
     }
     return mockFor<T>(path, init);
@@ -518,7 +541,7 @@ function mockFor<T>(path: string, init?: RequestInit): T {
       { id: "inc-2", userId: "2", type: "OTHER", description: "Retard chauffeur", status: "RESOLVED", createdAt: new Date().toISOString() },
     ] as T;
   }
-  if (path.includes("/geo/communes")) {
+  if (path.includes("/geo/communes") || path.includes("/admin/communes")) {
     return [
       { id: "c1", name: "Gombe", city: "Kinshasa", lat: -4.3217, lng: 15.3125 },
       { id: "c2", name: "Limete", city: "Kinshasa", lat: -4.331, lng: 15.313 },
@@ -559,19 +582,49 @@ export async function fetchCommunes(city = "Kinshasa"): Promise<Commune[]> {
   return apiFetch<Commune[]>(`/api/admin/communes?city=${q}`);
 }
 
+export async function createCommune(data: { name: string; city: string; lat: number; lng: number }) {
+  return apiFetch<Commune>("/api/admin/communes", { method: "POST", body: JSON.stringify(data) });
+}
+
+export async function deleteCommune(id: string) {
+  return apiFetch(`/api/admin/communes/${id}`, { method: "DELETE" });
+}
+
 export async function updateCommune(id: string, data: Partial<Commune>) {
   return apiFetch<Commune>(`/api/admin/communes/${id}`, { method: "PATCH", body: JSON.stringify(data) });
 }
 
+export type WalletTransaction = {
+  id: string;
+  amountCdf: number;
+  type: string;
+  description?: string;
+  reference?: string | null;
+  createdAt?: string;
+  wallet?: { userId: string; balanceCdf?: number };
+};
+
+export type WalletTransactionsPage = {
+  data: WalletTransaction[];
+  total: number;
+  skip: number;
+  take: number;
+  currency?: string;
+};
+
 export type RentalInquiry = {
   id: string;
   userId?: string;
+  vehicleName?: string;
   vehicleType?: string;
   status?: string;
   startDate?: string;
   endDate?: string;
   estimatedPriceCdf?: number;
+  priceCdf?: number;
   pickupAddress?: string;
+  pickupCity?: string;
+  returnCity?: string;
   contactPhone?: string;
   createdAt?: string;
 };
@@ -590,11 +643,50 @@ export async function cancelRentalInquiry(id: string) {
 }
 
 export async function deleteSubscriptionPlan(id: string) {
-  return apiFetch(`/api/admin/subscription-plans/${id}`, { method: "DELETE" });
+  return updateSubscriptionPlan(id, { isActive: false });
+}
+
+export async function deactivateUser(id: string) {
+  return apiFetch<AdminUser>(`/api/admin/users/${id}`, { method: "DELETE" });
+}
+
+export async function fetchUser(id: string) {
+  return apiFetch<AdminUser>(`/api/admin/users/${id}`);
+}
+
+export async function fetchRide(id: string) {
+  return apiFetch<RideOverview>(`/api/admin/rides/${id}`);
+}
+
+export async function fetchDelivery(id: string) {
+  return apiFetch<DeliveryOverview>(`/api/admin/deliveries/${id}`);
+}
+
+export async function deletePricingRule(vehicleType: string, city?: string) {
+  const q = city ? `?city=${encodeURIComponent(city)}` : "";
+  return apiFetch(`/api/admin/pricing-rules/${vehicleType}${q}`, { method: "DELETE" });
+}
+
+export async function fetchWalletTransactions(userId?: string, skip = 0, take = 50): Promise<WalletTransactionsPage> {
+  const params = new URLSearchParams({ skip: String(skip), take: String(take) });
+  if (userId) params.set("userId", userId);
+  return apiFetch<WalletTransactionsPage>(`/api/admin/wallet/transactions?${params}`);
+}
+
+export async function adjustWallet(
+  userId: string,
+  data: { amountCdf: number; type: "CREDIT" | "DEBIT"; description: string },
+) {
+  return apiFetch(`/api/admin/wallet/${userId}/adjust`, { method: "POST", body: JSON.stringify(data) });
 }
 
 export async function updateUser(id: string, data: Partial<AdminUser>) {
   return apiFetch<AdminUser>(`/api/admin/users/${id}`, { method: "PATCH", body: JSON.stringify(data) });
+}
+
+export async function fetchDrivers(): Promise<AdminDriver[]> {
+  const data = await apiFetch<AdminDriver[] | { data?: AdminDriver[] }>("/api/admin/drivers");
+  return Array.isArray(data) ? data : data.data ?? [];
 }
 
 export async function setDriverStatus(userId: string, active: boolean, suspendUser?: boolean) {
@@ -608,12 +700,28 @@ export async function cancelRide(id: string, reason?: string) {
   return apiFetch(`/api/admin/rides/${id}/cancel`, { method: "POST", body: JSON.stringify({ reason }) });
 }
 
+export async function updateRideStatus(id: string, status: string, reason?: string) {
+  return apiFetch(`/api/admin/rides/${id}/status`, { method: "PATCH", body: JSON.stringify({ status, reason }) });
+}
+
 export async function cancelScheduledRide(id: string, reason?: string) {
   return apiFetch(`/api/admin/scheduled-rides/${id}/cancel`, { method: "POST", body: JSON.stringify({ reason }) });
 }
 
+export async function updateScheduledRideStatus(id: string, status: string) {
+  return apiFetch(`/api/admin/scheduled-rides/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) });
+}
+
 export async function updateDeliveryStatus(id: string, status: string) {
   return apiFetch(`/api/admin/deliveries/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) });
+}
+
+export async function cancelDelivery(id: string, reason?: string) {
+  return apiFetch(`/api/admin/deliveries/${id}/cancel`, { method: "POST", body: JSON.stringify({ reason }) });
+}
+
+export async function resolveIncident(id: string, status = "RESOLVED") {
+  return apiFetch(`/api/admin/incidents/${id}/resolve`, { method: "POST", body: JSON.stringify({ status }) });
 }
 
 export async function saveRestaurant(data: Partial<Restaurant>, id?: string) {
@@ -655,20 +763,110 @@ export async function updateDeliveryPricingRule(category: string, data: Partial<
   });
 }
 
+export async function fetchSurcharges(): Promise<ServiceSurcharge[]> {
+  const raw = await apiFetch<ServiceSurcharge[]>("/api/admin/surcharges");
+  return Array.isArray(raw) ? raw : [];
+}
+
+export async function updateSurcharge(type: string, data: Partial<ServiceSurcharge>) {
+  return apiFetch<ServiceSurcharge>(`/api/admin/surcharges/${type}`, { method: "PATCH", body: JSON.stringify(data) });
+}
+
+export async function fetchPromoCodes(): Promise<PromoCode[]> {
+  const raw = await apiFetch<PromoCode[]>("/api/admin/promo-codes");
+  return Array.isArray(raw) ? raw : [];
+}
+
+export async function createPromoCode(data: {
+  code: string;
+  discountPercent?: number;
+  discountCdf?: number;
+  maxUses?: number;
+  validUntil?: string;
+}) {
+  return apiFetch<PromoCode>("/api/admin/promo-codes", { method: "POST", body: JSON.stringify(data) });
+}
+
+export async function updatePromoCode(id: string, data: Partial<PromoCode>) {
+  return apiFetch<PromoCode>(`/api/admin/promo-codes/${id}`, { method: "PATCH", body: JSON.stringify(data) });
+}
+
+export async function deactivatePromoCode(id: string) {
+  return updatePromoCode(id, { isActive: false });
+}
+
 export async function fetchSubscriptionPlans(): Promise<SubscriptionPlan[]> {
-  return apiFetch<SubscriptionPlan[]>("/api/admin/subscription-plans");
+  const raw = await apiFetch<Record<string, unknown>[]>("/api/admin/subscription-plans");
+  return (Array.isArray(raw) ? raw : []).map(normalizeSubscriptionPlan);
 }
 
 export async function createSubscriptionPlan(data: Partial<SubscriptionPlan>) {
-  return apiFetch<SubscriptionPlan>("/api/admin/subscription-plans", { method: "POST", body: JSON.stringify(data) });
+  const slug = (data.name ?? "PLUS").replace(/\s+/g, "_").toUpperCase().replace(/[^A-Z0-9_]/g, "");
+  const payload = {
+    code: `MOVA_${slug}_${Date.now()}`,
+    name: data.name,
+    target: "PASSENGER",
+    monthlyPriceCdf: data.priceCdfPerMonth ?? 0,
+    description: data.benefits?.join(" · ") ?? "",
+    feeReductionPercent: 0,
+    priorityMatching: false,
+  };
+  const created = await apiFetch<Record<string, unknown>>("/api/admin/subscription-plans", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+  return normalizeSubscriptionPlan(created);
 }
 
 export async function updateSubscriptionPlan(id: string, data: Partial<SubscriptionPlan>) {
-  return apiFetch<SubscriptionPlan>(`/api/admin/subscription-plans/${id}`, { method: "PATCH", body: JSON.stringify(data) });
+  const payload: Record<string, unknown> = {};
+  if (data.name !== undefined) payload.name = data.name;
+  if (data.priceCdfPerMonth !== undefined) payload.monthlyPriceCdf = data.priceCdfPerMonth;
+  if (data.benefits !== undefined) payload.description = data.benefits.join(" · ");
+  if (data.isActive !== undefined) payload.isActive = data.isActive;
+  const updated = await apiFetch<Record<string, unknown>>(`/api/admin/subscription-plans/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+  return normalizeSubscriptionPlan(updated);
 }
 
 export async function fetchSubscriptions(): Promise<SubscriptionRecord[]> {
-  return apiFetch<SubscriptionRecord[]>("/api/admin/subscriptions");
+  const raw = await apiFetch<Record<string, unknown>[]>("/api/admin/subscriptions");
+  return (Array.isArray(raw) ? raw : []).map(normalizeSubscriptionRecord);
+}
+
+function normalizeSubscriptionPlan(raw: Record<string, unknown>): SubscriptionPlan {
+  const benefits: string[] = [];
+  const fee = Number(raw.feeReductionPercent ?? 0);
+  if (fee > 0) benefits.push(`${fee} % de réduction sur les frais`);
+  if (raw.priorityMatching === true) benefits.push("Priorité de matching");
+  const desc = raw.description as string | undefined;
+  if (desc?.trim()) benefits.push(desc.trim());
+  const fromArray = raw.benefits as string[] | undefined;
+  if (fromArray?.length) benefits.push(...fromArray);
+
+  return {
+    id: String(raw.id ?? ""),
+    name: String(raw.name ?? ""),
+    priceCdfPerMonth: Number(raw.priceCdfPerMonth ?? raw.monthlyPriceCdf ?? 0),
+    benefits: benefits.length ? benefits : ["Aucun avantage renseigné"],
+    isActive: raw.isActive !== false,
+    subscriberCount: raw.subscriberCount as number | undefined,
+  };
+}
+
+function normalizeSubscriptionRecord(raw: Record<string, unknown>): SubscriptionRecord {
+  const plan = raw.plan as Record<string, unknown> | undefined;
+  return {
+    id: String(raw.id ?? ""),
+    userId: String(raw.userId ?? ""),
+    planId: String(raw.planId ?? ""),
+    planName: (raw.planName as string | undefined) ?? (plan?.name as string | undefined),
+    status: String(raw.status ?? ""),
+    startedAt: (raw.startedAt as string | undefined) ?? (raw.startsAt as string | undefined),
+    expiresAt: (raw.expiresAt as string | undefined) ?? (raw.endsAt as string | undefined),
+  };
 }
 
 export async function fetchWalletOverview(): Promise<WalletOverview> {

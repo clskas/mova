@@ -1,6 +1,6 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { ScheduledRideStatus, VehicleType } from '@prisma/client';
-import { MovaErrorCode, MovaHttpException, resolveCityFromCoords } from '@mova/shared';
+import { MovaErrorCode, MovaHttpException, normalizeVehicleType, resolveCityFromCoords } from '@mova/shared';
 import { assertServiceAreaCoords, assertServiceAreaDestination, assertServiceAreaPair, addressToCoords, DEFAULT_PICKUP } from '../common/address.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { PricingService } from './pricing.service';
@@ -14,10 +14,11 @@ export class ScheduledRidesService {
   constructor(private prisma: PrismaService, private pricing: PricingService) {}
 
   private parseVehicleType(value: string): VehicleType {
-    if (!Object.values(VehicleType).includes(value as VehicleType)) {
+    try {
+      return normalizeVehicleType(value) as VehicleType;
+    } catch {
       throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Type de véhicule invalide.');
     }
-    return value as VehicleType;
   }
 
   private resolveScheduledCoords(dto: {
@@ -65,13 +66,14 @@ export class ScheduledRidesService {
     const distanceKm = this.pricing.haversineKm(pickup.lat, pickup.lng, dropoff.lat, dropoff.lng);
     const durationMin = (distanceKm / 25) * 60;
     const city = resolveCityFromCoords(pickup.lat, pickup.lng);
-    const fare = await this.pricing.estimateFare(dto.vehicleType, distanceKm, durationMin, city);
+    const vehicleType = this.parseVehicleType(String(dto.vehicleType));
+    const fare = await this.pricing.estimateFare(vehicleType, distanceKm, durationMin, city);
     const estimate = this.pricing.withInterCitySurcharge(fare, isInterCity, distanceKm);
     const ride = await this.prisma.scheduledRide.create({
       data: {
         passengerId,
         status: ScheduledRideStatus.SCHEDULED,
-        vehicleType: dto.vehicleType,
+        vehicleType,
         scheduledAt,
         pickupLat: pickup.lat,
         pickupLng: pickup.lng,

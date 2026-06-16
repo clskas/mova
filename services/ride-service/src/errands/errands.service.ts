@@ -28,15 +28,25 @@ export class ErrandsService {
     };
   }
 
-  /** Compatibilité mobile: { deliveryAddress, items[] } */
-  async estimateMobile(deliveryAddress: string, items: string[]) {
+  private resolvePickup(pickupAddress?: string) {
+    const label = pickupAddress?.trim();
+    if (label) {
+      const coords = addressToCoords(label);
+      return { label, lat: coords.lat, lng: coords.lng };
+    }
+    return { label: DEFAULT_PICKUP.label, lat: DEFAULT_PICKUP.lat, lng: DEFAULT_PICKUP.lng };
+  }
+
+  /** Compatibilité mobile: { deliveryAddress, items[], pickupAddress? } */
+  async estimateMobile(deliveryAddress: string, items: string[], pickupAddress?: string) {
+    const pickup = this.resolvePickup(pickupAddress);
     const dropoff = addressToCoords(deliveryAddress);
     const description = items.length ? items.join(', ') : 'Course';
     const dto: CreateErrandOrderDto = {
       description,
-      pickupAddress: DEFAULT_PICKUP.label,
-      pickupLat: DEFAULT_PICKUP.lat,
-      pickupLng: DEFAULT_PICKUP.lng,
+      pickupAddress: pickup.label,
+      pickupLat: pickup.lat,
+      pickupLng: pickup.lng,
       dropoffAddress: deliveryAddress,
       dropoffLat: dropoff.lat,
       dropoffLng: dropoff.lng,
@@ -69,14 +79,22 @@ export class ErrandsService {
   }
 
   /** Compatibilité mobile: retourne { errand: { priceCdf, ... } } */
-  async createMobile(userId: string, deliveryAddress: string, items: string[], deliveryLat?: number, deliveryLng?: number) {
+  async createMobile(
+    userId: string,
+    deliveryAddress: string,
+    items: string[],
+    deliveryLat?: number,
+    deliveryLng?: number,
+    pickupAddress?: string,
+  ) {
+    const pickup = this.resolvePickup(pickupAddress);
     const dropoff = deliveryLat != null && deliveryLng != null ? { lat: deliveryLat, lng: deliveryLng } : addressToCoords(deliveryAddress);
     const description = items.length ? items.join(', ') : 'Course';
     const dto: CreateErrandOrderDto = {
       description,
-      pickupAddress: DEFAULT_PICKUP.label,
-      pickupLat: DEFAULT_PICKUP.lat,
-      pickupLng: DEFAULT_PICKUP.lng,
+      pickupAddress: pickup.label,
+      pickupLat: pickup.lat,
+      pickupLng: pickup.lng,
       dropoffAddress: deliveryAddress,
       dropoffLat: dropoff.lat,
       dropoffLng: dropoff.lng,

@@ -193,9 +193,19 @@ export class InternalController {
     return this.geo.getCommunes(city);
   }
 
+  @Post('communes')
+  createCommune(@Body() body: { name: string; city: string; lat: number; lng: number }) {
+    return this.geo.createCommune(body);
+  }
+
   @Patch('communes/:id')
   updateCommune(@Param('id') id: string, @Body() body: Record<string, unknown>) {
     return this.geo.updateCommune(id, body);
+  }
+
+  @Delete('communes/:id')
+  deleteCommune(@Param('id') id: string) {
+    return this.geo.deleteCommune(id);
   }
 
   @Get('carpool')

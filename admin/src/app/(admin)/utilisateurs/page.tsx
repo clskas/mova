@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   apiFetch,
+  deactivateUser as deactivateUserApi,
   formatUserName,
   updateUser,
   type AdminUser,
@@ -101,7 +102,7 @@ export default function UtilisateursPage() {
     if (!deactivateTarget) return;
     setSaving(true);
     try {
-      await updateUser(deactivateTarget.id, { status: "SUSPENDED" });
+      await deactivateUserApi(deactivateTarget.id);
       setDeactivateTarget(null);
       setSelected(null);
       load();

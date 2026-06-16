@@ -3,11 +3,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../core/api/api_client.dart';
 import '../../core/api/ride_socket.dart';
 import '../../core/config/market_config.dart';
 import '../../core/error/result.dart';
+import '../../core/geo/maps_launcher.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
@@ -27,6 +27,8 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
   String? _error;
   Timer? _locationTimer;
   String? _userId;
+  double? _currentLat;
+  double? _currentLng;
 
   String get _rideId => _ride['id']?.toString() ?? '';
   String get _status => _ride['status']?.toString() ?? 'DRIVER_ASSIGNED';
@@ -52,7 +54,20 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
       _userId = data['userId']?.toString();
     }
     await _refreshRide();
+    await _connectTrackingSocket();
     _startLocationUpdates();
+  }
+
+  Future<void> _connectTrackingSocket() async {
+    final api = ref.read(apiClientProvider);
+    if (api.isMockMode) return;
+    final token = await api.authToken();
+    if (!mounted) return;
+    final socket = ref.read(rideSocketProvider);
+    socket.connect(
+      rideId: _rideId,
+      token: token,
+    );
   }
 
   Future<void> _refreshRide() async {
@@ -80,23 +95,15 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
       return;
     }
     final pos = await Geolocator.getCurrentPosition();
+    _currentLat = pos.latitude;
+    _currentLng = pos.longitude;
     final api = ref.read(apiClientProvider);
     await api.updateDriverLocation(pos.latitude, pos.longitude);
 
-    final token = await api.authToken();
     final socket = ref.read(rideSocketProvider);
-    socket.connect(
-      rideId: _rideId,
-      token: token,
-      onConnected: () {
-        socket.emitDriverLocation(
-          userId: _userId ?? '',
-          lat: pos.latitude,
-          lng: pos.longitude,
-          rideId: _rideId,
-        );
-      },
-    );
+    if (!socket.isConnected && !api.isMockMode) {
+      await _connectTrackingSocket();
+    }
     socket.emitDriverLocation(
       userId: _userId ?? '',
       lat: pos.latitude,
@@ -105,7 +112,35 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
     );
   }
 
-  Future<void> _advanceStatus(String nextStatus, {String? buttonLabel}) async {
+  Future<void> _openNavigation({required bool toPickup}) async {
+    final lat = (toPickup ? _ride['pickupLat'] : _ride['dropoffLat']) as num?;
+    final lng = (toPickup ? _ride['pickupLng'] : _ride['dropoffLng']) as num?;
+    if (lat == null || lng == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Coordonnées GPS indisponibles pour la navigation')),
+        );
+      }
+      return;
+    }
+    final opened = await MapsLauncher.openDirections(
+      destinationLat: lat.toDouble(),
+      destinationLng: lng.toDouble(),
+      originLat: _currentLat,
+      originLng: _currentLng,
+    );
+    if (!opened && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Impossible d\'ouvrir Google Maps')),
+      );
+    }
+  }
+
+  Future<void> _openPickup() => _openNavigation(toPickup: true);
+
+  Future<void> _openDropoff() => _openNavigation(toPickup: false);
+
+  Future<void> _advanceStatus(String nextStatus) async {
     setState(() {
       _loading = true;
       _error = null;
@@ -129,26 +164,6 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
         }
       case Failure(:final error):
         setState(() => _error = error.message);
-    }
-  }
-
-  Future<void> _openPickup() async {
-    final lat = _ride['pickupLat'] as num?;
-    final lng = _ride['pickupLng'] as num?;
-    if (lat == null || lng == null) return;
-    final url = 'https://www.google.com/maps/dir/?api=1&destination=$lat,$lng';
-    if (await canLaunchUrl(Uri.parse(url))) {
-      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-    }
-  }
-
-  Future<void> _openDropoff() async {
-    final lat = _ride['dropoffLat'] as num?;
-    final lng = _ride['dropoffLng'] as num?;
-    if (lat == null || lng == null) return;
-    final url = 'https://www.google.com/maps/dir/?api=1&destination=$lat,$lng';
-    if (await canLaunchUrl(Uri.parse(url))) {
-      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
     }
   }
 
@@ -192,11 +207,18 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Row(
+                  Row(
                     children: [
-                      Icon(Icons.navigation, color: MovaColors.violet),
-                      SizedBox(width: 8),
-                      Text('Rendez-vous passager', style: TextStyle(fontWeight: FontWeight.bold)),
+                      const Icon(Icons.navigation, color: MovaColors.violet),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Rendez-vous passager',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 8),

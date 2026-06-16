@@ -5,7 +5,9 @@ import '../../core/api/api_client.dart';
 import '../../core/config/market_config.dart';
 import '../../core/error/result.dart';
 import '../../core/location/service_area_location.dart';
+import '../../core/location/destination_coords.dart';
 import '../../core/location/location_service.dart';
+import '../../core/widgets/destination_coord_panel.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
@@ -25,6 +27,7 @@ class _ExpressDeliveryScreenState extends ConsumerState<ExpressDeliveryScreen> {
   final _dropoffController = TextEditingController();
   LatLng _pickup = MovaRideMap.mapDefaultCenter();
   LatLng? _dropoff;
+  bool _dropoffFromManualCoords = false;
   int? _estimatedPrice;
   bool _loading = false;
   bool _loadingGps = false;
@@ -38,11 +41,38 @@ class _ExpressDeliveryScreenState extends ConsumerState<ExpressDeliveryScreen> {
     super.dispose();
   }
 
+  void _setDropoffFromCoords(LatLng coords, String label) {
+    _dropoff = ServiceAreaLocation.ensureInServiceArea(coords, address: label);
+    _dropoffController.text = label;
+    setState(() {
+      _estimatedPrice = null;
+      _dropoffFromManualCoords = true;
+    });
+  }
+
+  void _onMapDropoffTap(LatLng raw) {
+    final coords = ServiceAreaLocation.ensureInServiceArea(raw);
+    if (!ServiceAreaLocation.isInBounds(coords)) {
+      setState(() => _validationError = ServiceAreaLocation.outOfAreaMessage());
+      return;
+    }
+    _setDropoffFromCoords(coords, 'Point sélectionné sur la carte');
+  }
+
   Future<void> _resolveCoords() async {
     _pickup = ServiceAreaLocation.ensureInServiceArea(
       _pickup,
       address: _pickupController.text,
     );
+    if (_dropoffFromManualCoords && _dropoff != null && ServiceAreaLocation.isInBounds(_dropoff!)) {
+      return;
+    }
+    final fromTextCoords = DestinationCoords.parseText(_dropoffController.text);
+    if (fromTextCoords != null && ServiceAreaLocation.isInBounds(fromTextCoords)) {
+      _dropoff = fromTextCoords;
+      _dropoffFromManualCoords = true;
+      return;
+    }
     if (_dropoff == null || !ServiceAreaLocation.isInBounds(_dropoff!)) {
       var resolved = ServiceAreaLocation.coordsFromAddress(_dropoffController.text);
       if (!ServiceAreaLocation.isInBounds(resolved)) {
@@ -180,7 +210,13 @@ class _ExpressDeliveryScreenState extends ConsumerState<ExpressDeliveryScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          MovaRideMap(pickup: _pickup, dropoff: _dropoff, height: 160),
+          MovaRideMap(
+            pickup: _pickup,
+            dropoff: _dropoff,
+            height: 160,
+            onDropoffTap: _onMapDropoffTap,
+            dropoffEditable: true,
+          ),
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(16),
@@ -226,7 +262,13 @@ class _ExpressDeliveryScreenState extends ConsumerState<ExpressDeliveryScreen> {
                     onChanged: (_) => setState(() {
                       _estimatedPrice = null;
                       _dropoff = null;
+                      _dropoffFromManualCoords = false;
                     }),
+                  ),
+                  DestinationCoordPanel(
+                    initialLat: _dropoff?.latitude,
+                    initialLng: _dropoff?.longitude,
+                    onApply: _setDropoffFromCoords,
                   ),
                   const SizedBox(height: 12),
                   const MovaCard(
@@ -248,15 +290,19 @@ class _ExpressDeliveryScreenState extends ConsumerState<ExpressDeliveryScreen> {
                     const SizedBox(height: 16),
                     MovaCard(
                       child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text('Tarif express'),
-                          Text(
-                            MarketConfig.formatCdf(_estimatedPrice!),
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: MovaColors.green,
+                          const Expanded(child: Text('Tarif express')),
+                          Flexible(
+                            child: Text(
+                              MarketConfig.formatCdf(_estimatedPrice!),
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: MovaColors.green,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.end,
                             ),
                           ),
                         ],

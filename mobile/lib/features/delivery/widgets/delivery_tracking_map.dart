@@ -77,9 +77,14 @@ class DeliveryTrackingMap extends StatelessWidget {
                       children: [
                         const Icon(Icons.schedule, color: MovaColors.violet, size: 20),
                         const SizedBox(width: 6),
-                        Text(
-                          'Livraison ~$etaMinutes min',
-                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        Flexible(
+                          child: Text(
+                            'Livraison ~$etaMinutes min',
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.center,
+                          ),
                         ),
                       ],
                     ),
@@ -130,7 +135,12 @@ class DeliveryTrackingMap extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(courierName!, style: const TextStyle(fontWeight: FontWeight.w600)),
+                      Text(
+                        courierName!,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                       if (courierRating != null)
                         Row(
                           children: [

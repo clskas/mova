@@ -50,6 +50,11 @@ export class InternalController {
     return this.wallet.createWallet(dto.userId);
   }
 
+  @Get('wallets/overview')
+  overview() {
+    return this.wallet.overview();
+  }
+
   @Get('wallets/:userId')
   getWallet(@Param('userId') userId: string) {
     return this.wallet.getWallet(userId);

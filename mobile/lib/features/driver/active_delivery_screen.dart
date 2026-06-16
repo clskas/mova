@@ -109,11 +109,51 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(_typeLabel, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                Text(
+                  _typeLabel,
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
                 const SizedBox(height: 8),
-                Text('${_delivery['pickupAddress'] ?? '—'} → ${_delivery['dropoffAddress'] ?? _delivery['deliveryAddress'] ?? '—'}'),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.trip_origin, color: MovaColors.green, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _delivery['pickupAddress']?.toString() ?? '—',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.location_on, color: MovaColors.violet, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _delivery['dropoffAddress']?.toString() ??
+                            _delivery['deliveryAddress']?.toString() ??
+                            '—',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 8),
-                Text(MarketConfig.formatCdf(price), style: const TextStyle(color: MovaColors.green, fontWeight: FontWeight.bold)),
+                Text(
+                  MarketConfig.formatCdf(price),
+                  style: const TextStyle(color: MovaColors.green, fontWeight: FontWeight.bold),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
                 const SizedBox(height: 4),
                 Text('Statut : $_status', style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13)),
               ],

@@ -1,5 +1,5 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { MOVA_EVENTS, PaymentCompletedPayload, RideCreatedPayload } from '@mova/shared';
+import { MOVA_EVENTS, DeliveryCreatedPayload, DeliveryStatusUpdatedPayload, PaymentCompletedPayload, RideCreatedPayload } from '@mova/shared';
 import { RedisService } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -9,12 +9,19 @@ export class NotificationsService implements OnModuleInit {
   constructor(private prisma: PrismaService, private redis: RedisService) {}
 
   onModuleInit() {
-    this.redis.sub.subscribe(MOVA_EVENTS.RIDE_CREATED, MOVA_EVENTS.PAYMENT_COMPLETED);
+    this.redis.sub.subscribe(
+      MOVA_EVENTS.RIDE_CREATED,
+      MOVA_EVENTS.PAYMENT_COMPLETED,
+      MOVA_EVENTS.DELIVERY_CREATED,
+      MOVA_EVENTS.DELIVERY_STATUS_UPDATED,
+    );
     this.redis.sub.on('message', async (channel, message) => {
       try {
         const data = JSON.parse(message);
         if (channel === MOVA_EVENTS.RIDE_CREATED) await this.onRideCreated(data as RideCreatedPayload);
         if (channel === MOVA_EVENTS.PAYMENT_COMPLETED) await this.onPaymentCompleted(data as PaymentCompletedPayload);
+        if (channel === MOVA_EVENTS.DELIVERY_CREATED) await this.onDeliveryCreated(data as DeliveryCreatedPayload);
+        if (channel === MOVA_EVENTS.DELIVERY_STATUS_UPDATED) await this.onDeliveryStatusUpdated(data as DeliveryStatusUpdatedPayload);
       } catch (e) {
         this.logger.error('Event handler error', e);
       }
@@ -33,6 +40,36 @@ export class NotificationsService implements OnModuleInit {
   async onPaymentCompleted(payload: PaymentCompletedPayload) {
     await this.create(payload.userId, 'Paiement confirmé', `Paiement de ${payload.amountCdf} FC effectué`, 'PAYMENT_COMPLETED', payload);
     this.logger.log(`payment.completed notification for ride ${payload.rideId}`);
+  }
+
+  async onDeliveryCreated(payload: DeliveryCreatedPayload) {
+    const label = payload.restaurantName ? ` chez ${payload.restaurantName}` : '';
+    await this.create(
+      payload.userId,
+      'Commande confirmée',
+      `Votre commande${label} est enregistrée. Suivi en temps réel dans l'app.`,
+      'DELIVERY_CREATED',
+      payload,
+    );
+  }
+
+  async onDeliveryStatusUpdated(payload: DeliveryStatusUpdatedPayload) {
+    const body = this.deliveryStatusMessage(payload);
+    if (!body) return;
+    await this.create(payload.userId, 'Mise à jour commande', body, 'DELIVERY_STATUS', payload);
+  }
+
+  private deliveryStatusMessage(payload: DeliveryStatusUpdatedPayload): string | null {
+    if (payload.type !== 'FOOD') return null;
+    return (
+      {
+        PENDING: 'Commande confirmée — le restaurant prépare votre repas.',
+        PICKED_UP: 'Votre commande est en préparation.',
+        IN_TRANSIT: 'Le livreur est en route vers vous.',
+        DELIVERED: 'Commande livrée. Bon appétit !',
+        CANCELLED: 'Votre commande a été annulée.',
+      }[payload.status] ?? null
+    );
   }
 
   list(userId: string) { return this.prisma.notification.findMany({ where: { userId }, orderBy: { createdAt: 'desc' }, take: 50 }); }

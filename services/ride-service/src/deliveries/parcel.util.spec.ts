@@ -3,6 +3,8 @@ import {
   buildParcelTimeline,
   computeDeliveryEtaMinutes,
   generateDeliveryPin,
+  mockCourierLocation,
+  resolveCourierLocation,
 } from './parcel.util';
 
 describe('parcel.util', () => {
@@ -19,6 +21,33 @@ describe('parcel.util', () => {
     const eta = computeDeliveryEtaMinutes(-4.32, 15.31, -4.33, 15.32);
     expect(eta).toBeGreaterThanOrEqual(1);
     expect(eta).toBeLessThan(30);
+  });
+
+  it('resolveCourierLocation prefers driver GPS over mock', () => {
+    const delivery = {
+      status: DeliveryStatus.IN_TRANSIT,
+      driverId: 'driver-1',
+      pickupLat: -4.32,
+      pickupLng: 15.31,
+      dropoffLat: -4.33,
+      dropoffLng: 15.32,
+    };
+    const withGps = resolveCourierLocation(delivery, { userId: 'driver-1', lat: -4.325, lng: 15.315 });
+    expect(withGps).toEqual({ lat: -4.325, lng: 15.315, ts: expect.any(Number) });
+
+    const noGps = resolveCourierLocation(delivery, { userId: 'driver-1', lat: null, lng: null });
+    expect(noGps).toEqual({ lat: -4.32, lng: 15.31, ts: expect.any(Number) });
+
+    const unassigned = resolveCourierLocation({ ...delivery, driverId: null }, null);
+    expect(unassigned).toEqual(
+      mockCourierLocation({
+        status: delivery.status,
+        pickupLat: delivery.pickupLat,
+        pickupLng: delivery.pickupLng,
+        dropoffLat: delivery.dropoffLat,
+        dropoffLng: delivery.dropoffLng,
+      }),
+    );
   });
 
   it('buildParcelTimeline uses Glovo-style food labels', () => {

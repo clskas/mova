@@ -18,6 +18,11 @@ Widget _testApp(Widget home) {
   );
 }
 
+Future<void> _tapBack(WidgetTester tester) async {
+  await tester.tap(find.byTooltip('Back').first);
+  await tester.pumpAndSettle();
+}
+
 void main() {
   final widths = [320.0, 360.0, 375.0, 390.0, 428.0];
 
@@ -37,15 +42,18 @@ void main() {
 
     expect(find.text('La mobilité, simplement.'), findsOneWidget);
     expect(find.text('Taxi / Moto-taxi'), findsOneWidget);
-    expect(find.text('Livraison colis'), findsOneWidget);
+    expect(find.text('Livraisons'), findsOneWidget);
+    expect(find.text('Repas, colis, express et plus'), findsOneWidget);
     expect(find.text('Wallet MOVA'), findsOneWidget);
     expect(find.text('Historique'), findsNWidgets(2));
     expect(find.byType(NavigationBar), findsOneWidget);
     expect(find.text('Réservation planifiée'), findsOneWidget);
-    expect(find.text('Livraison repas'), findsOneWidget);
-    expect(find.text('Courses & commissions'), findsOneWidget);
+    expect(find.text('Programmez votre trajet à l\'avance'), findsOneWidget);
+    expect(find.text('Livraison colis'), findsNothing);
+    expect(find.text('Livraison repas'), findsNothing);
+    expect(find.text('Courses & commissions'), findsNothing);
     expect(find.text('Covoiturage'), findsOneWidget);
-    expect(find.text('Livraison express'), findsOneWidget);
+    expect(find.text('Livraison express'), findsNothing);
     expect(find.text('Location véhicule'), findsOneWidget);
     expect(find.text('Déménagement'), findsOneWidget);
     expect(find.text('Choisir votre ville'), findsNothing);
@@ -59,15 +67,20 @@ void main() {
 
     await tester.pumpWidget(_testApp(const HomeScreen()));
 
+    await tester.tap(find.text('Livraisons').first);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Choisissez votre type de livraison'), findsOneWidget);
+
     await tester.tap(find.text('Livraison colis').first);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.text('Catégorie de poids'), findsOneWidget);
 
-    await tester.pageBack();
-    await tester.pumpAndSettle();
+    await _tapBack(tester);
+    await _tapBack(tester);
 
-    final scheduledCard = find.text("Programmez votre trajet à l'avance");
+    final scheduledCard = find.text('Programmez votre trajet à l\'avance');
     await tester.scrollUntilVisible(
       scheduledCard.first,
       120,
@@ -76,22 +89,26 @@ void main() {
     await tester.ensureVisible(scheduledCard.first);
     await tester.tap(scheduledCard.first);
     await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 500));
+    final j7Hint = find.text('Réservation possible jusqu\'à J+7 · Rappel la veille (J-1)');
     await tester.scrollUntilVisible(
-      find.text('Maximum J+7').first,
+      j7Hint.first,
+      200,
+      scrollable: find.byType(Scrollable).last,
+    );
+    expect(j7Hint, findsOneWidget);
+
+    await _tapBack(tester);
+
+    await tester.scrollUntilVisible(
+      find.text('Livraisons').first,
       120,
       scrollable: find.byType(Scrollable).first,
     );
-    expect(find.text('Maximum J+7'), findsOneWidget);
-
-    await tester.pageBack();
+    await tester.tap(find.text('Livraisons').first);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 
-    await tester.scrollUntilVisible(
-      find.text('Livraison repas').first,
-      120,
-      scrollable: find.byType(Scrollable).first,
-    );
     await tester.tap(find.text('Livraison repas').first);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));

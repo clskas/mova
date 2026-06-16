@@ -28,10 +28,111 @@ const RESTAURANTS = [
 ];
 
 const RENTAL_VEHICLES = [
-  { name: 'Toyota Corolla', category: 'Berline', seats: 5, dailyRateCdf: 45000, depositCdf: 100000 },
-  { name: 'Toyota RAV4', category: 'SUV', seats: 5, dailyRateCdf: 75000, depositCdf: 150000 },
-  { name: 'Honda CB125', category: 'Moto', seats: 2, dailyRateCdf: 15000, depositCdf: 50000 },
-  { name: 'Toyota Hiace', category: 'Minibus', seats: 14, dailyRateCdf: 120000, depositCdf: 200000 },
+  {
+    name: 'Toyota Corolla',
+    make: 'Toyota',
+    model: 'Corolla',
+    year: 2021,
+    category: 'ECONOMY',
+    transmission: 'MANUAL',
+    city: 'Kinshasa',
+    seats: 5,
+    dailyRateCdf: 45000,
+    depositCdf: 100000,
+    weeklyDiscountPct: 10,
+    rating: 4.6,
+    ownerName: 'Jean K.',
+    ownerBadge: 'PRO',
+    ownerContactPhone: '+243812345678',
+    features: ['Climatisation', 'Bluetooth'],
+    cancellationPolicy: 'Annulation gratuite 24 h avant prise en charge.',
+    mileageUnlimited: true,
+    limitedMileageFeeCdf: 15000,
+  },
+  {
+    name: 'Toyota RAV4',
+    make: 'Toyota',
+    model: 'RAV4',
+    year: 2022,
+    category: 'SUV',
+    transmission: 'AUTO',
+    city: 'Kinshasa',
+    seats: 5,
+    dailyRateCdf: 75000,
+    depositCdf: 150000,
+    weeklyDiscountPct: 12,
+    rating: 4.8,
+    ownerName: 'Marie L.',
+    ownerBadge: 'SUPER_HOST',
+    ownerContactPhone: '+243898765432',
+    features: ['Climatisation', 'GPS', '4x4'],
+    cancellationPolicy: 'Annulation gratuite 48 h avant prise en charge.',
+    mileageUnlimited: true,
+    limitedMileageFeeCdf: 20000,
+  },
+  {
+    name: 'Mercedes Classe C',
+    make: 'Mercedes',
+    model: 'Classe C',
+    year: 2023,
+    category: 'PREMIUM',
+    transmission: 'AUTO',
+    city: 'Kinshasa',
+    seats: 5,
+    dailyRateCdf: 120000,
+    depositCdf: 250000,
+    weeklyDiscountPct: 15,
+    rating: 4.9,
+    ownerName: 'MOVA Fleet',
+    ownerBadge: 'PRO',
+    ownerContactPhone: '+243900000000',
+    features: ['Climatisation', 'GPS', 'Cuir', 'Toit ouvrant'],
+    cancellationPolicy: 'Annulation gratuite 72 h avant prise en charge.',
+    mileageUnlimited: false,
+    limitedMileageFeeCdf: 25000,
+  },
+  {
+    name: 'Honda CB125',
+    make: 'Honda',
+    model: 'CB125',
+    year: 2020,
+    category: 'ECONOMY',
+    transmission: 'MANUAL',
+    city: 'Kinshasa',
+    seats: 2,
+    dailyRateCdf: 15000,
+    depositCdf: 50000,
+    weeklyDiscountPct: 5,
+    rating: 4.4,
+    ownerName: 'Paul M.',
+    ownerBadge: null,
+    ownerContactPhone: '+243811122233',
+    features: ['Casque inclus'],
+    cancellationPolicy: 'Annulation gratuite 24 h avant prise en charge.',
+    mileageUnlimited: true,
+    limitedMileageFeeCdf: 8000,
+  },
+  {
+    name: 'Toyota Hiace',
+    make: 'Toyota',
+    model: 'Hiace',
+    year: 2019,
+    category: 'SUV',
+    transmission: 'MANUAL',
+    city: 'Lubumbashi',
+    seats: 14,
+    dailyRateCdf: 120000,
+    depositCdf: 200000,
+    weeklyDiscountPct: 10,
+    rating: 4.5,
+    ownerName: 'Transport Kasaï',
+    ownerBadge: 'PRO',
+    ownerContactPhone: '+243855566677',
+    features: ['Climatisation', 'GPS'],
+    cancellationPolicy: 'Annulation gratuite 24 h avant prise en charge.',
+    mileageUnlimited: true,
+    limitedMileageFeeCdf: 30000,
+  },
 ];
 
 const SERVICE_SURCHARGES = [
@@ -55,52 +156,93 @@ export class SeedService implements OnModuleInit {
     }
   }
 
+  private async seedSection(label: string, fn: () => Promise<void>) {
+    try {
+      await fn();
+    } catch (err) {
+      this.logger.warn(`Seed section "${label}" failed`, err);
+    }
+  }
+
   async ensureSeedData() {
-    for (const c of KINSHASA_COMMUNES) {
-      await this.prisma.commune.upsert({
-        where: { name_city: { name: c.name, city: 'Kinshasa' } },
-        create: { name: c.name, city: 'Kinshasa', lat: c.lat, lng: c.lng },
-        update: { lat: c.lat, lng: c.lng },
-      });
-    }
-
-    for (const area of DRC_SERVICE_AREAS) {
-      if (area.id === 'kinshasa') continue;
-      for (const d of getCommunesForArea(area.id)) {
+    await this.seedSection('communes', async () => {
+      for (const c of KINSHASA_COMMUNES) {
         await this.prisma.commune.upsert({
-          where: { name_city: { name: d.name, city: area.name } },
-          create: { name: d.name, city: area.name, lat: d.lat, lng: d.lng },
-          update: { lat: d.lat, lng: d.lng },
+          where: { name_city: { name: c.name, city: 'Kinshasa' } },
+          create: { name: c.name, city: 'Kinshasa', lat: c.lat, lng: c.lng },
+          update: { lat: c.lat, lng: c.lng },
         });
       }
-    }
 
-    for (const city of SEED_CITIES) {
-      for (const r of PRICING_RULES) {
-        await this.prisma.pricingRule.upsert({
-          where: { vehicleType_city: { vehicleType: r.vehicleType, city } },
-          create: { ...r, city },
-          update: r,
+      for (const area of DRC_SERVICE_AREAS) {
+        if (area.id === 'kinshasa') continue;
+        for (const d of getCommunesForArea(area.id)) {
+          await this.prisma.commune.upsert({
+            where: { name_city: { name: d.name, city: area.name } },
+            create: { name: d.name, city: area.name, lat: d.lat, lng: d.lng },
+            update: { lat: d.lat, lng: d.lng },
+          });
+        }
+      }
+    });
+
+    await this.seedSection('pricing', async () => {
+      for (const city of SEED_CITIES) {
+        for (const r of PRICING_RULES) {
+          await this.prisma.pricingRule.upsert({
+            where: { vehicleType_city: { vehicleType: r.vehicleType, city } },
+            create: { ...r, city },
+            update: r,
+          });
+        }
+      }
+    });
+
+    await this.seedSection('surcharges', async () => {
+      for (const s of SERVICE_SURCHARGES) {
+        await this.prisma.serviceSurcharge.upsert({ where: { type: s.type }, create: s, update: s });
+      }
+      for (const p of CANCELLATION_POLICIES) {
+        await this.prisma.cancellationPolicy.upsert({ where: { vehicleType: p.vehicleType }, create: p, update: p });
+      }
+    });
+
+    await this.seedSection('catalog', async () => {
+      for (const r of RESTAURANTS) {
+        const existing = await this.prisma.restaurant.findFirst({ where: { name: r.name } });
+        if (existing) await this.prisma.restaurant.update({ where: { id: existing.id }, data: r });
+        else await this.prisma.restaurant.create({ data: r });
+      }
+      for (const v of RENTAL_VEHICLES) {
+        const existing = await this.prisma.rentalVehicle.findFirst({ where: { name: v.name } });
+        if (existing) await this.prisma.rentalVehicle.update({ where: { id: existing.id }, data: v });
+        else await this.prisma.rentalVehicle.create({ data: v });
+      }
+      const demoVehicle = await this.prisma.rentalVehicle.findFirst({ where: { isActive: true } });
+      const inquiryCount = await this.prisma.rentalInquiry.count();
+      if (demoVehicle && inquiryCount === 0) {
+        const start = new Date();
+        start.setDate(start.getDate() + 1);
+        const end = new Date(start);
+        end.setDate(end.getDate() + 2);
+        await this.prisma.rentalInquiry.create({
+          data: {
+            userId: 'demo-passenger-rental',
+            vehicleId: demoVehicle.id,
+            vehicleType: demoVehicle.category,
+            startDate: start,
+            endDate: end,
+            pickupAddress: 'Gombe, Kinshasa',
+            pickupCity: 'Kinshasa',
+            contactPhone: '+243900000010',
+            estimatedPriceCdf: demoVehicle.dailyRateCdf * 2,
+            totalCdf: demoVehicle.dailyRateCdf * 2,
+            status: 'PENDING',
+          },
         });
       }
-    }
+    });
 
-    for (const s of SERVICE_SURCHARGES) {
-      await this.prisma.serviceSurcharge.upsert({ where: { type: s.type }, create: s, update: s });
-    }
-    for (const p of CANCELLATION_POLICIES) {
-      await this.prisma.cancellationPolicy.upsert({ where: { vehicleType: p.vehicleType }, create: p, update: p });
-    }
-    for (const r of RESTAURANTS) {
-      const existing = await this.prisma.restaurant.findFirst({ where: { name: r.name } });
-      if (existing) await this.prisma.restaurant.update({ where: { id: existing.id }, data: r });
-      else await this.prisma.restaurant.create({ data: r });
-    }
-    for (const v of RENTAL_VEHICLES) {
-      const existing = await this.prisma.rentalVehicle.findFirst({ where: { name: v.name } });
-      if (existing) await this.prisma.rentalVehicle.update({ where: { id: existing.id }, data: v });
-      else await this.prisma.rentalVehicle.create({ data: v });
-    }
     this.logger.log('Ride service seed data ensured');
   }
 }

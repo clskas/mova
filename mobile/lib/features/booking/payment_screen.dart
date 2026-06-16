@@ -21,11 +21,19 @@ const _mobileMoneyMethods = {'ORANGE_MONEY', 'MPESA', 'AIRTEL_MONEY'};
 class PaymentScreen extends ConsumerStatefulWidget {
   const PaymentScreen({
     super.key,
-    required this.rideId,
+    this.rideId,
+    this.serviceType,
+    this.serviceId,
     required this.amountCdf,
-  });
+  }) : assert(rideId != null || (serviceType != null && serviceId != null));
 
-  final String rideId;
+  /// Course taxi — utilise POST /payments/rides/:id
+  final String? rideId;
+
+  /// Livraison, course, etc. — utilise POST /payments/services/:type/:id
+  final String? serviceType;
+  final String? serviceId;
+
   final int amountCdf;
 
   @override
@@ -74,23 +82,41 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       _error = null;
     });
     final api = ref.read(apiClientProvider);
-    final result = await api.payRide(
-      widget.rideId,
-      method: _method,
-      amountCdf: widget.amountCdf,
-      phone: _needsPhone ? MarketConfig.normalizePhone(_phoneController.text) : null,
-    );
+    final Result<Map<String, dynamic>> result;
+    if (widget.rideId != null) {
+      result = await api.payRide(
+        widget.rideId!,
+        method: _method,
+        amountCdf: widget.amountCdf,
+        phone: _needsPhone ? MarketConfig.normalizePhone(_phoneController.text) : null,
+      );
+    } else {
+      result = await api.payService(
+        widget.serviceType!,
+        widget.serviceId!,
+        method: _method,
+        amountCdf: widget.amountCdf,
+        phone: _needsPhone ? MarketConfig.normalizePhone(_phoneController.text) : null,
+      );
+    }
     if (!mounted) return;
     setState(() => _loading = false);
 
     switch (result) {
       case Success():
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (_) => RatingScreen(rideId: widget.rideId),
-          ),
-        );
+        if (widget.rideId != null) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => RatingScreen(rideId: widget.rideId!),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Paiement effectué avec succès')),
+          );
+          Navigator.of(context).popUntil((r) => r.isFirst);
+        }
       case Failure(:final error):
         setState(() => _error = error.message);
     }

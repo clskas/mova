@@ -9,6 +9,9 @@ import '../../core/error/result.dart';
 import '../../core/location/service_area_location.dart';
 import '../../core/location/location_service.dart';
 import '../../core/theme/mova_colors.dart';
+import '../booking/widgets/mova_ride_map.dart';
+import '../../core/location/destination_coords.dart';
+import '../../core/widgets/destination_coord_panel.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 
@@ -22,10 +25,11 @@ class ScheduledRideScreen extends ConsumerStatefulWidget {
 class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
   final _destinationController = TextEditingController();
   DateTime _scheduledAt = DateTime.now().add(const Duration(hours: 2));
-  String _vehicleType = 'STANDARD';
+  String _vehicleType = 'MOTO_TAXI';
   LatLng _pickup = LatLng(MarketConfig.defaultLat, MarketConfig.defaultLng);
   LatLng? _dropoff;
   bool _dropoffFromSuggestion = false;
+  bool _dropoffFromManualCoords = false;
   List<Map<String, dynamic>> _suggestions = [];
   int? _estimatedPrice;
   bool _loading = false;
@@ -37,6 +41,18 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
   String? _error;
   String? _validationError;
   Timer? _debounce;
+
+  String _vehicleLabel(String id) {
+    for (final v in MarketConfig.vehicleTypes) {
+      if (v.id == id) return v.label;
+    }
+    return id;
+  }
+
+  String _shortRef(String? id) {
+    if (id == null || id.isEmpty) return '—';
+    return id.length <= 8 ? id.toUpperCase() : id.substring(0, 8).toUpperCase();
+  }
 
   DateTime get _maxDate => DateTime.now().add(const Duration(days: 7));
 
@@ -87,6 +103,7 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
       _estimatedPrice = null;
       _dropoff = null;
       _dropoffFromSuggestion = false;
+      _dropoffFromManualCoords = false;
     });
   }
 
@@ -133,7 +150,30 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
       _suggestions = [];
       _estimatedPrice = null;
       _dropoffFromSuggestion = true;
+      _dropoffFromManualCoords = false;
     });
+  }
+
+  void _setDropoffFromCoords(LatLng coords, String label) {
+    _dropoff = ServiceAreaLocation.ensureInServiceArea(coords, address: label);
+    _destinationController.text = label;
+    setState(() {
+      _showSuggestions = false;
+      _suggestions = [];
+      _estimatedPrice = null;
+      _dropoffFromSuggestion = false;
+      _dropoffFromManualCoords = true;
+    });
+  }
+
+  void _onMapDropoffTap(LatLng raw) {
+    final coords = ServiceAreaLocation.ensureInServiceArea(raw);
+    if (!ServiceAreaLocation.isInBounds(coords)) {
+      setState(() => _validationError =
+          'MOVA couvre les principales villes de RDC. Choisissez une destination dans une ville desservie.');
+      return;
+    }
+    _setDropoffFromCoords(coords, 'Point sélectionné sur la carte');
   }
 
   Future<void> _useMyLocation({bool silent = false}) async {
@@ -160,6 +200,16 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
       _pickup,
       address: 'Ma position',
     );
+    if (_dropoffFromManualCoords && _dropoff != null && ServiceAreaLocation.isInBounds(_dropoff!)) {
+      return null;
+    }
+    final fromTextCoords = DestinationCoords.parseText(_destinationController.text);
+    if (fromTextCoords != null && ServiceAreaLocation.isInBounds(fromTextCoords)) {
+      _dropoff = fromTextCoords;
+      _dropoffFromManualCoords = true;
+      _dropoffFromSuggestion = false;
+      return null;
+    }
     if (_dropoff == null || !ServiceAreaLocation.isInBounds(_dropoff!)) {
       var resolved = ServiceAreaLocation.coordsFromAddress(_destinationController.text);
       if (!ServiceAreaLocation.destinationInServiceArea(
@@ -340,10 +390,16 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
             builder: (ctx) => AlertDialog(
               title: const Text('Réservation confirmée'),
               content: Text(
-                'Votre trajet vers ${_destinationController.text.trim()} '
-                'est programmé pour le $when.\n'
-                'Réf. : ${ride?['id'] ?? ''}',
-                maxLines: 5,
+                'Votre transport MOVA est réservé.\n\n'
+                'Référence : ${_shortRef(ride?['id']?.toString())}\n'
+                'Date et heure : $when\n'
+                'Départ : Ma position\n'
+                'Destination : ${_destinationController.text.trim()}\n'
+                'Véhicule : ${_vehicleLabel(_vehicleType)}'
+                '${_estimatedPrice != null ? '\nTarif estimé : ${MarketConfig.formatCdf(_estimatedPrice!)}' : ''}\n\n'
+                'Vous recevrez un rappel la veille (J-1) et avant le départ. '
+                'Consultez « Mes réservations » pour modifier ou annuler.',
+                maxLines: 12,
                 overflow: TextOverflow.ellipsis,
               ),
               actions: [
@@ -372,17 +428,31 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
     final formattedDate = _formatDateTime(_scheduledAt);
 
     return MovaScreen(
-      title: 'Réservation planifiée',
+      title: 'Transport MOVA',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          Text(
+            'Réserver un transport à l\'avance',
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: MovaColors.midnight,
+            ),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Programmez un taxi ou moto-taxi jusqu\'à 7 jours à l\'avance. '
+            'Une référence vous est attribuée après confirmation.',
+            style: TextStyle(color: MovaColors.textSecondary, height: 1.3),
+          ),
+          const SizedBox(height: 16),
           if (_loadingUpcoming)
             const Padding(
               padding: EdgeInsets.only(bottom: 16),
               child: Center(child: CircularProgressIndicator()),
             )
           else if (_upcoming.isNotEmpty) ...[
-            Text('Réservations à venir', style: theme.textTheme.titleSmall),
+            Text('Mes réservations transport', style: theme.textTheme.titleSmall),
             const SizedBox(height: 8),
             ..._upcoming.map((map) {
               final id = map['id']?.toString() ?? '';
@@ -390,12 +460,23 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
               final scheduledLabel = scheduledRaw != null
                   ? _formatDateTime(DateTime.parse(scheduledRaw))
                   : '';
+              final ref = _shortRef(id);
               return Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: MovaCard(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      Text(
+                        'Réf. $ref',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: MovaColors.violet,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
                       Text(
                         map['dropoffAddress']?.toString() ?? 'Destination',
                         style: const TextStyle(fontWeight: FontWeight.w600),
@@ -428,13 +509,13 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
               );
             }),
             const Divider(height: 32),
-            Text('Nouvelle réservation', style: theme.textTheme.titleSmall),
+            Text('Nouvelle réservation transport', style: theme.textTheme.titleSmall),
             const SizedBox(height: 12),
           ] else ...[
             const Padding(
               padding: EdgeInsets.only(bottom: 16),
               child: Text(
-                'Aucune réservation à venir.',
+                'Aucune réservation transport à venir.',
                 style: TextStyle(color: MovaColors.textSecondary),
               ),
             ),
@@ -449,7 +530,7 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Date et heure', style: theme.textTheme.titleSmall),
+                      Text('Date et heure de réservation', style: theme.textTheme.titleSmall),
                       const SizedBox(height: 4),
                       Text(
                         formattedDate,
@@ -466,10 +547,18 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
           ),
           const SizedBox(height: 12),
           Text(
-            'Maximum J+7',
+            'Réservation possible jusqu\'à J+7 · Rappel la veille (J-1)',
             style: theme.textTheme.bodySmall?.copyWith(color: MovaColors.textSecondary),
           ),
           const SizedBox(height: 16),
+          MovaRideMap(
+            pickup: _pickup,
+            dropoff: _dropoff,
+            onDropoffTap: _onMapDropoffTap,
+            dropoffEditable: true,
+            height: 180,
+          ),
+          const SizedBox(height: 12),
           Row(
             children: [
               Expanded(
@@ -521,6 +610,11 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
                 }).toList(),
               ),
             ),
+          DestinationCoordPanel(
+            initialLat: _dropoff?.latitude,
+            initialLng: _dropoff?.longitude,
+            onApply: _setDropoffFromCoords,
+          ),
           const SizedBox(height: 16),
           Text('Type de véhicule', style: theme.textTheme.titleSmall),
           const SizedBox(height: 8),
@@ -564,7 +658,7 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
           ],
           const SizedBox(height: 24),
           MovaButton(
-            label: _estimatedPrice == null ? 'Estimer le prix' : 'Confirmer la réservation',
+            label: _estimatedPrice == null ? 'Estimer le tarif' : 'Confirmer la réservation',
             isLoading: _loading,
             icon: Icons.event_available_outlined,
             onPressed: _loading

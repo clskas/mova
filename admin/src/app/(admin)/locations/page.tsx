@@ -96,13 +96,13 @@ export default function LocationsPage() {
                   <td className="p-3 font-medium">{r.vehicleName ?? r.vehicleType ?? r.id.slice(0, 8)}</td>
                   <td className="p-3 text-gray-600">
                     {formatDate(r.startDate)} → {formatDate(r.endDate)}
-                    {(r as { pickupCity?: string; returnCity?: string }).pickupCity && (
+                    {r.pickupCity && (
                       <span className="block text-xs">
-                        {(r as { pickupCity?: string }).pickupCity} → {(r as { returnCity?: string }).returnCity}
+                        {r.pickupCity} → {r.returnCity}
                       </span>
                     )}
                   </td>
-                  <td className="p-3">{formatCdf(r.estimatedPriceCdf ?? (r as { priceCdf?: number }).priceCdf ?? 0)}</td>
+                  <td className="p-3">{formatCdf(r.estimatedPriceCdf ?? r.priceCdf ?? 0)}</td>
                   <td className="p-3"><StatusBadge status={r.status ?? "PENDING"} /></td>
                   <td className="p-3 text-gray-500">{formatDate(r.createdAt)}</td>
                   <td className="p-3">

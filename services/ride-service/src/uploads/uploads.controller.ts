@@ -1,6 +1,9 @@
-import { Body, Controller, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, NotFoundException, Param, Post, Res, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiProperty, ApiTags } from '@nestjs/swagger';
 import { IsOptional, IsString } from 'class-validator';
+import type { Response } from 'express';
+import { existsSync } from 'fs';
+import { join } from 'path';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { UploadsService } from './uploads.service';
 
@@ -26,5 +29,17 @@ export class UploadsController {
   @ApiOperation({ summary: 'Téléverser photo colis (mock Cloudinary + stockage local)' })
   uploadParcelPhoto(@Body() dto: UploadParcelPhotoDto) {
     return this.uploadsService.uploadParcelPhoto(dto.imageBase64, dto.mimeType);
+  }
+
+  @Get('parcels/:filename')
+  @ApiOperation({ summary: 'Télécharger une photo colis / KYC stockée localement' })
+  serveParcelPhoto(@Param('filename') filename: string, @Res() res: Response) {
+    const safe = filename.replace(/[^a-zA-Z0-9._-]/g, '');
+    const filePath = join(process.cwd(), 'uploads', 'parcels', safe);
+    if (!existsSync(filePath)) throw new NotFoundException('Fichier introuvable');
+    const ext = safe.split('.').pop()?.toLowerCase();
+    const mime = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
+    res.setHeader('Content-Type', mime);
+    res.sendFile(filePath);
   }
 }

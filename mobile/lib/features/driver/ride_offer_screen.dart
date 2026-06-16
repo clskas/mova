@@ -137,7 +137,7 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
               ),
             ),
             Expanded(
-              child: Padding(
+              child: SingleChildScrollView(
                 padding: const EdgeInsets.all(24),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -173,12 +173,31 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
                         fontSize: 42,
                         fontWeight: FontWeight.bold,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
                     ),
-                    if (distance != null)
-                      Text(
-                        '${distance.toStringAsFixed(1)} km · $vehicleType',
-                        style: const TextStyle(color: Colors.white70, fontSize: 15),
+                    if (distance != null) ...[
+                      const SizedBox(height: 4),
+                      Wrap(
+                        alignment: WrapAlignment.center,
+                        spacing: 4,
+                        runSpacing: 4,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          Text(
+                            '${distance.toStringAsFixed(1)} km',
+                            style: const TextStyle(color: Colors.white70, fontSize: 15),
+                          ),
+                          Text(
+                            '· $vehicleType',
+                            style: const TextStyle(color: Colors.white70, fontSize: 15),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
                       ),
+                    ],
                     const SizedBox(height: 32),
                     Container(
                       width: double.infinity,

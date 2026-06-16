@@ -246,9 +246,14 @@ class _MatchingScreenState extends ConsumerState<MatchingScreen>
               children: [
                 const Icon(Icons.lock_outline, color: MovaColors.green),
                 const SizedBox(width: 8),
-                Text(
-                  'Tarif estimé : ${MarketConfig.formatCdf(widget.estimatedFareCdf)}',
-                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+                Flexible(
+                  child: Text(
+                    'Tarif estimé : ${MarketConfig.formatCdf(widget.estimatedFareCdf)}',
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+                  ),
                 ),
               ],
             ),

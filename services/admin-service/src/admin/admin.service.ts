@@ -207,6 +207,12 @@ export class AdminService {
   updateCommune(id: string, body: Record<string, unknown>) {
     return this.proxy('ride', `/internal/communes/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
   }
+  createCommune(body: Record<string, unknown>) {
+    return this.proxy('ride', '/internal/communes', { method: 'POST', body: JSON.stringify(body) });
+  }
+  deleteCommune(id: string) {
+    return this.proxy('ride', `/internal/communes/${id}`, { method: 'DELETE' });
+  }
 
   listCarpool(take = 50) {
     return this.fetchJson('ride', `/internal/carpool?take=${take}`);
@@ -242,6 +248,9 @@ export class AdminService {
     const params = new URLSearchParams({ skip: String(skip), take: String(take) });
     if (userId) params.set('userId', userId);
     return this.fetchJson('payment', `/internal/transactions?${params}`);
+  }
+  getWalletOverview() {
+    return this.fetchJson('payment', '/internal/wallets/overview');
   }
   getWallet(userId: string) {
     return this.fetchJson('payment', `/internal/wallets/${userId}`);

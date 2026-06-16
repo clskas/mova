@@ -8,16 +8,21 @@ import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import '../booking/widgets/mova_ride_map.dart';
+import 'carpool_contact.dart';
+
+enum CarpoolViewerRole { guest, driver, passenger }
 
 class CarpoolDetailScreen extends ConsumerStatefulWidget {
   const CarpoolDetailScreen({
     super.key,
     required this.tripId,
     this.initialTrip,
+    this.viewerRole = CarpoolViewerRole.guest,
   });
 
   final String tripId;
   final Map<String, dynamic>? initialTrip;
+  final CarpoolViewerRole viewerRole;
 
   @override
   ConsumerState<CarpoolDetailScreen> createState() => _CarpoolDetailScreenState();
@@ -26,8 +31,12 @@ class CarpoolDetailScreen extends ConsumerStatefulWidget {
 class _CarpoolDetailScreenState extends ConsumerState<CarpoolDetailScreen> {
   Map<String, dynamic>? _trip;
   bool _loading = true;
+  bool _actionLoading = false;
   String? _error;
   int _bookSeats = 1;
+  int _rateScore = 5;
+  final _rateCommentController = TextEditingController();
+  bool _rated = false;
 
   static const _timelineSteps = ['Publié', 'Places réservées', 'En route', 'Terminé'];
 
@@ -39,6 +48,12 @@ class _CarpoolDetailScreenState extends ConsumerState<CarpoolDetailScreen> {
       _loading = false;
     }
     _loadTrip();
+  }
+
+  @override
+  void dispose() {
+    _rateCommentController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadTrip() async {
@@ -61,17 +76,38 @@ class _CarpoolDetailScreenState extends ConsumerState<CarpoolDetailScreen> {
     });
   }
 
+  bool get _isDriver => widget.viewerRole == CarpoolViewerRole.driver;
+
+  bool get _isPassenger => widget.viewerRole == CarpoolViewerRole.passenger;
+
+  String? get _status => _trip?['status']?.toString();
+
+  bool get _canStart {
+    final s = _status?.toUpperCase();
+    return _isDriver && (s == 'OPEN' || s == 'MATCHED');
+  }
+
+  bool get _canComplete {
+    final s = _status?.toUpperCase();
+    return _isDriver && s == 'IN_PROGRESS';
+  }
+
+  bool get _canRate {
+    final s = _status?.toUpperCase();
+    return _isPassenger && s == 'COMPLETED' && !_rated;
+  }
+
   int _timelineIndex(String? step) {
     final idx = _timelineSteps.indexOf(step ?? '');
     return idx >= 0 ? idx : 0;
   }
 
   Future<void> _book() async {
-    setState(() => _loading = true);
+    setState(() => _actionLoading = true);
     final api = ref.read(apiClientProvider);
     final result = await api.post('/carpool/${widget.tripId}/book', {'seats': _bookSeats});
     if (!mounted) return;
-    setState(() => _loading = false);
+    setState(() => _actionLoading = false);
     switch (result) {
       case Success():
         ScaffoldMessenger.of(context).showSnackBar(
@@ -83,14 +119,71 @@ class _CarpoolDetailScreenState extends ConsumerState<CarpoolDetailScreen> {
     }
   }
 
-  Future<void> _cancel() async {
+  Future<void> _startTrip() async {
+    setState(() => _actionLoading = true);
     final api = ref.read(apiClientProvider);
-    final result = await api.post('/carpool/${widget.tripId}/cancel', {});
+    final result = await api.post('/carpool/${widget.tripId}/start', {});
     if (!mounted) return;
+    setState(() => _actionLoading = false);
     switch (result) {
       case Success():
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Annulation effectuée')),
+          const SnackBar(content: Text('Trajet démarré')),
+        );
+        _loadTrip();
+      case Failure(:final error):
+        setState(() => _error = error.message);
+    }
+  }
+
+  Future<void> _completeTrip() async {
+    setState(() => _actionLoading = true);
+    final api = ref.read(apiClientProvider);
+    final result = await api.post('/carpool/${widget.tripId}/complete', {});
+    if (!mounted) return;
+    setState(() => _actionLoading = false);
+    switch (result) {
+      case Success():
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Trajet terminé — paiement en cours')),
+        );
+        _loadTrip();
+      case Failure(:final error):
+        setState(() => _error = error.message);
+    }
+  }
+
+  Future<void> _rateTrip() async {
+    setState(() => _actionLoading = true);
+    final api = ref.read(apiClientProvider);
+    final result = await api.post('/carpool/${widget.tripId}/rate', {
+      'score': _rateScore,
+      if (_rateCommentController.text.trim().isNotEmpty)
+        'comment': _rateCommentController.text.trim(),
+    });
+    if (!mounted) return;
+    setState(() => _actionLoading = false);
+    switch (result) {
+      case Success():
+        setState(() => _rated = true);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Merci pour votre évaluation')),
+        );
+      case Failure(:final error):
+        setState(() => _error = error.message);
+    }
+  }
+
+  Future<void> _cancel() async {
+    setState(() => _actionLoading = true);
+    final api = ref.read(apiClientProvider);
+    final result = await api.post('/carpool/${widget.tripId}/cancel', {});
+    if (!mounted) return;
+    setState(() => _actionLoading = false);
+    switch (result) {
+      case Success():
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(_isDriver ? 'Trajet annulé' : 'Réservation annulée')),
         );
         Navigator.pop(context);
       case Failure(:final error):
@@ -99,21 +192,7 @@ class _CarpoolDetailScreenState extends ConsumerState<CarpoolDetailScreen> {
   }
 
   void _contactDriver() {
-    final phone = _trip?['contactPhone']?.toString() ?? '+243 *** ***';
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Contacter le conducteur'),
-        content: Text(
-          'Messagerie in-app bientôt disponible.\n\n'
-          'Téléphone masqué : $phone\n\n'
-          'Le numéro complet sera partagé après confirmation.',
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Fermer')),
-        ],
-      ),
-    );
+    showCarpoolContact(context, contactPhone: _trip?['contactPhone']?.toString());
   }
 
   @override
@@ -126,14 +205,42 @@ class _CarpoolDetailScreenState extends ConsumerState<CarpoolDetailScreen> {
     final currentStep = _timelineIndex(trip?['timelineStep']?.toString());
     final seatsLeft = trip?['availableSeats'] as int? ?? 0;
     final kyc = trip?['kycVerified'] == true;
+    final showBook = !_isDriver && !_isPassenger && seatsLeft > 0;
 
     return MovaScreen(
-      title: 'Détail du trajet',
+      title: _isDriver ? 'Mon trajet' : 'Détail du trajet',
       child: _loading && trip == null
           ? const Center(child: CircularProgressIndicator())
           : Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                if (_isDriver || _isPassenger)
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: MovaColors.violet.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          _isDriver ? Icons.directions_car : Icons.event_seat,
+                          size: 18,
+                          color: MovaColors.violet,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _isDriver
+                                ? 'Covoiturage planifié — pas une course VTC instantanée.'
+                                : 'Vous êtes passager sur ce trajet partagé.',
+                            style: const TextStyle(fontSize: 12, color: MovaColors.violet),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 if (trip != null)
                   MovaRideMap(
                     pickup: LatLng(pickupLat, pickupLng),
@@ -234,8 +341,74 @@ class _CarpoolDetailScreenState extends ConsumerState<CarpoolDetailScreen> {
                       ),
                     ),
                   ],
+                  if (_isDriver && (_canStart || _canComplete)) ...[
+                    const SizedBox(height: 16),
+                    Text('Actions conducteur', style: Theme.of(context).textTheme.titleSmall),
+                    const SizedBox(height: 8),
+                    if (_canStart)
+                      MovaButton(
+                        label: 'Démarrer le trajet',
+                        icon: Icons.play_arrow,
+                        isLoading: _actionLoading,
+                        onPressed: _startTrip,
+                      ),
+                    if (_canComplete) ...[
+                      if (_canStart) const SizedBox(height: 8),
+                      MovaButton(
+                        label: 'Terminer le trajet',
+                        icon: Icons.flag,
+                        isLoading: _actionLoading,
+                        onPressed: _completeTrip,
+                      ),
+                    ],
+                  ],
+                  if (_canRate) ...[
+                    const SizedBox(height: 16),
+                    Text('Évaluer le conducteur', style: Theme.of(context).textTheme.titleSmall),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: List.generate(5, (i) {
+                        final star = i + 1;
+                        return IconButton(
+                          icon: Icon(
+                            star <= _rateScore ? Icons.star : Icons.star_border,
+                            color: Colors.amber,
+                            size: 36,
+                          ),
+                          onPressed: () => setState(() => _rateScore = star),
+                        );
+                      }),
+                    ),
+                    TextField(
+                      controller: _rateCommentController,
+                      maxLines: 2,
+                      decoration: const InputDecoration(
+                        labelText: 'Commentaire (optionnel)',
+                        hintText: 'Comment s\'est passé le trajet ?',
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    MovaButton(
+                      label: 'Envoyer l\'évaluation',
+                      icon: Icons.rate_review_outlined,
+                      isLoading: _actionLoading,
+                      onPressed: _rateTrip,
+                    ),
+                  ],
+                  if (_rated)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 16),
+                      child: Row(
+                        children: [
+                          Icon(Icons.check_circle, color: MovaColors.green, size: 20),
+                          SizedBox(width: 8),
+                          Text('Évaluation envoyée', style: TextStyle(color: MovaColors.green)),
+                        ],
+                      ),
+                    ),
                   const SizedBox(height: 16),
-                  if (seatsLeft > 0) ...[
+                  if (showBook) ...[
                     Row(
                       children: [
                         const Text('Places :'),
@@ -250,15 +423,30 @@ class _CarpoolDetailScreenState extends ConsumerState<CarpoolDetailScreen> {
                         ),
                       ],
                     ),
-                    MovaButton(label: 'Réserver', icon: Icons.event_seat, isLoading: _loading, onPressed: _book),
+                    MovaButton(
+                      label: 'Réserver',
+                      icon: Icons.event_seat,
+                      isLoading: _actionLoading,
+                      onPressed: _book,
+                    ),
                   ],
-                  const SizedBox(height: 8),
-                  OutlinedButton.icon(
-                    onPressed: _contactDriver,
-                    icon: const Icon(Icons.phone_outlined),
-                    label: const Text('Contacter le conducteur'),
-                  ),
-                  TextButton(onPressed: _cancel, child: const Text('Annuler ma réservation')),
+                  if (!_isDriver) ...[
+                    const SizedBox(height: 8),
+                    OutlinedButton.icon(
+                      onPressed: _contactDriver,
+                      icon: const Icon(Icons.phone_outlined),
+                      label: Text(
+                        trip['contactPhone'] != null
+                            ? 'Appeler · ${trip['contactPhone']}'
+                            : 'Contacter le conducteur',
+                      ),
+                    ),
+                  ],
+                  if (_isDriver || _isPassenger)
+                    TextButton(
+                      onPressed: _actionLoading ? null : _cancel,
+                      child: Text(_isDriver ? 'Annuler le trajet' : 'Annuler ma réservation'),
+                    ),
                 ],
                 if (_error != null) ...[
                   const SizedBox(height: 16),

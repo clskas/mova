@@ -8,6 +8,7 @@ import '../../core/config/market_config.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import '../../core/theme/mova_colors.dart';
+import '../../core/cache/profile_cache.dart';
 import '../../core/api/api_client.dart';
 import '../../core/error/result.dart';
 import '../help/driver_help_screen.dart';
@@ -35,6 +36,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
   String? _vehicleId;
   Timer? _offerPollTimer;
   Timer? _locationTimer;
+  Timer? _profilePollTimer;
   final Set<String> _dismissedOffers = {};
   bool _showingOffer = false;
 
@@ -48,6 +50,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
   void dispose() {
     _offerPollTimer?.cancel();
     _locationTimer?.cancel();
+    _profilePollTimer?.cancel();
     super.dispose();
   }
 
@@ -62,7 +65,8 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
     }
   }
 
-  Future<void> _loadProfile() async {
+  Future<void> _loadProfile({bool clearCache = false}) async {
+    if (clearCache) await ProfileCache.clear();
     final api = ref.read(apiClientProvider);
     final result = await api.getDriverProfile();
     if (!mounted) return;
@@ -76,8 +80,28 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
         _profile = data;
         _available = data['isAvailable'] == true;
         _vehicleId = activeVehicle['id']?.toString();
+        _availabilityError = null;
+      });
+      _syncProfilePoll(data['kycStatus']?.toString());
+    }
+  }
+
+  void _syncProfilePoll(String? kycStatus) {
+    _profilePollTimer?.cancel();
+    if (kycStatus == 'PENDING') {
+      _profilePollTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+        if (mounted) _loadProfile(clearCache: true);
       });
     }
+  }
+
+  Future<void> _refreshAll() async {
+    await Future.wait([
+      _loadProfile(clearCache: true),
+      _loadEarnings(),
+      _loadActiveRide(),
+      _loadActiveDelivery(),
+    ]);
   }
 
   Future<void> _loadEarnings() async {
@@ -265,13 +289,20 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
         IconButton(
           icon: const Icon(Icons.upload_file),
           tooltip: 'KYC',
-          onPressed: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const KycScreen()),
-          ),
+          onPressed: () async {
+            await Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const KycScreen()),
+            );
+            if (mounted) await _loadProfile(clearCache: true);
+          },
         ),
       ],
-      child: Column(
+      child: RefreshIndicator(
+        onRefresh: _refreshAll,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (mockBanner)
@@ -308,23 +339,34 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Disponibilité'),
-                    Text(
-                      _available ? 'En ligne' : 'Hors ligne',
-                      style: TextStyle(
-                        color: _available ? MovaColors.green : MovaColors.textSecondary,
-                        fontWeight: FontWeight.bold,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Disponibilité'),
+                      Text(
+                        _available ? 'En ligne' : 'Hors ligne',
+                        style: TextStyle(
+                          color: _available ? MovaColors.green : MovaColors.textSecondary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
                 Switch(
                   value: _available,
                   activeColor: MovaColors.green,
-                  onChanged: _kycStatus == 'APPROVED' ? _toggleAvailability : null,
+                  onChanged: (value) {
+                    if (value && _kycStatus != 'APPROVED') {
+                      setState(() => _availabilityError =
+                          'Documents KYC approuvés requis pour passer en ligne.');
+                      return;
+                    }
+                    _toggleAvailability(value);
+                  },
                 ),
               ],
             ),
@@ -343,11 +385,15 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
                   Text(
                     MarketConfig.formatCdf(_earnings!['todayCdf'] as int? ?? 0),
                     style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: MovaColors.green),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   if (_earnings!['rideCount'] != null)
                     Text(
                       '${_earnings!['rideCount']} courses terminées',
                       style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                 ],
               ),
@@ -460,10 +506,13 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
             label: 'Documents KYC',
             isSecondary: true,
             icon: Icons.upload_file,
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const KycScreen()),
-            ),
+            onPressed: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const KycScreen()),
+              );
+              if (mounted) await _loadProfile(clearCache: true);
+            },
           ),
           const SizedBox(height: 8),
           MovaButton(
@@ -476,6 +525,8 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
             ),
           ),
         ],
+          ),
+        ),
       ),
     );
   }

@@ -4,6 +4,8 @@ export const MOVA_EVENTS = {
   RIDE_COMPLETED: 'ride.completed',
   PAYMENT_COMPLETED: 'payment.completed',
   DRIVER_RATING_UPDATED: 'driver.rating.updated',
+  DELIVERY_CREATED: 'delivery.created',
+  DELIVERY_STATUS_UPDATED: 'delivery.status.updated',
 } as const;
 
 export type MovaEventName = (typeof MOVA_EVENTS)[keyof typeof MOVA_EVENTS];
@@ -26,4 +28,20 @@ export interface PaymentCompletedPayload {
   userId: string;
   amountCdf: number;
   method: string;
+}
+
+export interface DeliveryCreatedPayload {
+  deliveryId: string;
+  userId: string;
+  type: string;
+  restaurantName?: string;
+  estimatedPriceCdf?: number;
+}
+
+export interface DeliveryStatusUpdatedPayload {
+  deliveryId: string;
+  userId: string;
+  type: string;
+  status: string;
+  restaurantName?: string;
 }

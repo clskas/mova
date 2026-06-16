@@ -6,6 +6,7 @@ import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
+import 'carpool_contact.dart';
 
 class CarpoolJoinConfirmationScreen extends ConsumerStatefulWidget {
   const CarpoolJoinConfirmationScreen({
@@ -32,6 +33,7 @@ class CarpoolJoinConfirmationScreen extends ConsumerStatefulWidget {
 
 class _CarpoolJoinConfirmationScreenState extends ConsumerState<CarpoolJoinConfirmationScreen> {
   List<Map<String, dynamic>> _passengers = [];
+  String? _contactPhone;
   bool _loading = true;
   String? _error;
 
@@ -69,6 +71,7 @@ class _CarpoolJoinConfirmationScreenState extends ConsumerState<CarpoolJoinConfi
         case Success(:final data):
           final trip = data['trip'] as Map<String, dynamic>? ?? data;
           _passengers = (trip['passengers'] as List? ?? []).cast<Map<String, dynamic>>();
+          _contactPhone = trip['contactPhone']?.toString();
           _error = null;
         case Failure(:final error):
           _error = error.message;
@@ -157,7 +160,15 @@ class _CarpoolJoinConfirmationScreenState extends ConsumerState<CarpoolJoinConfi
                 ),
               );
             }),
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
+          OutlinedButton.icon(
+            onPressed: () => showCarpoolContact(context, contactPhone: _contactPhone),
+            icon: const Icon(Icons.phone_outlined),
+            label: Text(
+              _contactPhone != null ? 'Contacter · $_contactPhone' : 'Contacter le conducteur',
+            ),
+          ),
+          const SizedBox(height: 12),
           MovaButton(
             label: 'Retour à l\'accueil',
             icon: Icons.home_outlined,

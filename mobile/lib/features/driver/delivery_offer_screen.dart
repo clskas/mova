@@ -94,17 +94,50 @@ class _DeliveryOfferScreenState extends ConsumerState<DeliveryOfferScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(_typeLabel, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                Text(
+                  _typeLabel,
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
                 if (widget.offer['restaurantName'] != null)
                   Text(
                     widget.offer['restaurantName']?.toString() ?? '',
                     style: const TextStyle(color: MovaColors.textSecondary),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 const SizedBox(height: 12),
-                Text(
-                  '${widget.offer['pickupAddress'] ?? '—'} → ${widget.offer['dropoffAddress'] ?? widget.offer['deliveryAddress'] ?? '—'}',
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.trip_origin, color: MovaColors.green, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        widget.offer['pickupAddress']?.toString() ?? '—',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.location_on, color: MovaColors.violet, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        widget.offer['dropoffAddress']?.toString() ??
+                            widget.offer['deliveryAddress']?.toString() ??
+                            '—',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 12),
                 Text(
@@ -114,6 +147,8 @@ class _DeliveryOfferScreenState extends ConsumerState<DeliveryOfferScreen> {
                     color: MovaColors.green,
                     fontSize: 22,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 if (distance != null)
                   Text(
@@ -133,7 +168,7 @@ class _DeliveryOfferScreenState extends ConsumerState<DeliveryOfferScreen> {
             const SizedBox(height: 16),
             MovaErrorBanner(message: _error!),
           ],
-          const Spacer(),
+          const SizedBox(height: 24),
           MovaButton(
             label: 'Accepter la livraison',
             isLoading: _loading,

@@ -90,8 +90,23 @@ export class DriversService {
   }
 
   async approveKyc(documentId: string, approved: boolean, notes?: string) {
-    const doc = await this.prisma.kycDocument.update({ where: { id: documentId }, data: { status: approved ? KycStatus.APPROVED : KycStatus.REJECTED, notes } });
-    if (approved) await this.prisma.driverProfile.update({ where: { userId: doc.userId }, data: { kycStatus: KycStatus.APPROVED } });
+    const doc = await this.prisma.kycDocument.update({
+      where: { id: documentId },
+      data: { status: approved ? KycStatus.APPROVED : KycStatus.REJECTED, notes },
+    });
+    if (approved) {
+      await this.prisma.driverProfile.upsert({
+        where: { userId: doc.userId },
+        create: { userId: doc.userId, kycStatus: KycStatus.APPROVED },
+        update: { kycStatus: KycStatus.APPROVED },
+      });
+    } else {
+      await this.prisma.driverProfile.upsert({
+        where: { userId: doc.userId },
+        create: { userId: doc.userId, kycStatus: KycStatus.REJECTED },
+        update: { kycStatus: KycStatus.REJECTED },
+      });
+    }
     return doc;
   }
 

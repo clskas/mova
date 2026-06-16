@@ -114,6 +114,21 @@ describe('ScheduledRidesService', () => {
     expect(result.estimatedPriceCdf).toBe(28000);
   });
 
+  it('estime avec alias mobile MOTO / CONFORT', async () => {
+    const scheduledAt = new Date();
+    scheduledAt.setDate(scheduledAt.getDate() + 1);
+    const result = await service.estimateMobile({
+      dropoffAddress: 'Gombe, Kinshasa',
+      vehicleType: 'MOTO',
+      scheduledAt: scheduledAt.toISOString(),
+      pickupLat: -4.32,
+      pickupLng: 15.31,
+      dropoffLat: -4.3217,
+      dropoffLng: 15.3125,
+    });
+    expect(result.estimatedPriceCdf).toBe(8000);
+  });
+
   it('estime une réservation Kinshasa valide', async () => {
     const scheduledAt = new Date();
     scheduledAt.setDate(scheduledAt.getDate() + 1);

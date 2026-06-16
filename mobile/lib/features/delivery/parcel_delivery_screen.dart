@@ -9,7 +9,9 @@ import '../../core/api/api_client.dart';
 import '../../core/config/market_config.dart';
 import '../../core/error/result.dart';
 import '../../core/location/service_area_location.dart';
+import '../../core/location/destination_coords.dart';
 import '../../core/location/location_service.dart';
+import '../../core/widgets/destination_coord_panel.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
@@ -47,6 +49,7 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
   String _weightCategory = 'DOCUMENTS';
   LatLng _pickup = MovaRideMap.mapDefaultCenter();
   LatLng? _dropoff;
+  bool _dropoffFromManualCoords = false;
   File? _photoFile;
   int? _estimatedPrice;
   double? _distanceKm;
@@ -92,6 +95,7 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
       _distanceKm = null;
       _durationMin = null;
       _dropoff = null;
+      _dropoffFromManualCoords = false;
     });
   }
 
@@ -168,11 +172,40 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
     });
   }
 
+  void _setDropoffFromCoords(LatLng coords, String label) {
+    _dropoff = ServiceAreaLocation.ensureInServiceArea(coords, address: label);
+    _dropoffController.text = label;
+    setState(() {
+      _showSuggestions = false;
+      _suggestions = [];
+      _estimatedPrice = null;
+      _dropoffFromManualCoords = true;
+    });
+  }
+
+  void _onMapDropoffTap(LatLng raw) {
+    final coords = ServiceAreaLocation.ensureInServiceArea(raw);
+    if (!ServiceAreaLocation.isInBounds(coords)) {
+      setState(() => _validationError = ServiceAreaLocation.outOfAreaMessage());
+      return;
+    }
+    _setDropoffFromCoords(coords, 'Point sélectionné sur la carte');
+  }
+
   Future<void> _resolveCoords() async {
     _pickup = ServiceAreaLocation.ensureInServiceArea(
       _pickup,
       address: _pickupController.text,
     );
+    if (_dropoffFromManualCoords && _dropoff != null && ServiceAreaLocation.isInBounds(_dropoff!)) {
+      return;
+    }
+    final fromTextCoords = DestinationCoords.parseText(_dropoffController.text);
+    if (fromTextCoords != null && ServiceAreaLocation.isInBounds(fromTextCoords)) {
+      _dropoff = fromTextCoords;
+      _dropoffFromManualCoords = true;
+      return;
+    }
     if (_dropoff == null || !ServiceAreaLocation.isInBounds(_dropoff!)) {
       var resolved = ServiceAreaLocation.coordsFromAddress(_dropoffController.text);
       if (!ServiceAreaLocation.isInBounds(resolved)) {
@@ -380,7 +413,13 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          MovaRideMap(pickup: _pickup, dropoff: _dropoff, height: 180),
+          MovaRideMap(
+            pickup: _pickup,
+            dropoff: _dropoff,
+            height: 180,
+            onDropoffTap: _onMapDropoffTap,
+            dropoffEditable: true,
+          ),
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(16),
@@ -446,6 +485,11 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
                         }).toList(),
                       ),
                     ),
+                  DestinationCoordPanel(
+                    initialLat: _dropoff?.latitude,
+                    initialLng: _dropoff?.longitude,
+                    onApply: _setDropoffFromCoords,
+                  ),
                   const SizedBox(height: 16),
                   Text('Catégorie de poids', style: theme.textTheme.titleSmall),
                   const SizedBox(height: 4),
@@ -497,32 +541,38 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              const Text('Estimation', style: TextStyle(fontSize: 16)),
-                              Text(
-                                MarketConfig.formatCdf(_estimatedPrice!),
-                                style: const TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                  color: MovaColors.green,
+                              const Expanded(
+                                child: Text('Estimation', style: TextStyle(fontSize: 16)),
+                              ),
+                              Flexible(
+                                child: Text(
+                                  MarketConfig.formatCdf(_estimatedPrice!),
+                                  style: const TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                    color: MovaColors.green,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  textAlign: TextAlign.end,
                                 ),
                               ),
                             ],
                           ),
                           if (_distanceKm != null || _durationMin != null) ...[
                             const SizedBox(height: 8),
-                            Row(
+                            Wrap(
+                              spacing: 4,
+                              runSpacing: 4,
+                              crossAxisAlignment: WrapCrossAlignment.center,
                               children: [
                                 if (_distanceKm != null) ...[
                                   const Icon(Icons.straighten, size: 16, color: MovaColors.textSecondary),
-                                  const SizedBox(width: 4),
                                   Text('${_distanceKm!.toStringAsFixed(1)} km'),
-                                  const SizedBox(width: 16),
                                 ],
                                 if (_durationMin != null) ...[
                                   const Icon(Icons.schedule, size: 16, color: MovaColors.textSecondary),
-                                  const SizedBox(width: 4),
                                   Text('${_durationMin!.ceil()} min'),
                                 ],
                               ],

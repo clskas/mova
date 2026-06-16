@@ -14,6 +14,8 @@ class MovaRideMap extends StatefulWidget {
     this.driver,
     this.height = 220,
     this.driverIcon = Icons.two_wheeler,
+    this.onDropoffTap,
+    this.dropoffEditable = false,
   });
 
   final LatLng pickup;
@@ -21,6 +23,9 @@ class MovaRideMap extends StatefulWidget {
   final LatLng? driver;
   final double height;
   final IconData driverIcon;
+  /// Tap sur la carte pour placer la destination (pin violet).
+  final ValueChanged<LatLng>? onDropoffTap;
+  final bool dropoffEditable;
 
   static LatLng mapDefaultCenter() =>
       LatLng(MarketConfig.mapCenterLat, MarketConfig.mapCenterLng);
@@ -33,8 +38,15 @@ class MovaRideMap extends StatefulWidget {
 }
 
 class _MovaRideMapState extends State<MovaRideMap> {
+  final MapController _mapController = MapController();
   LatLng? _prevDriver;
   double _driverBearing = 0;
+
+  @override
+  void dispose() {
+    _mapController.dispose();
+    super.dispose();
+  }
 
   @override
   void didUpdateWidget(covariant MovaRideMap oldWidget) {
@@ -48,6 +60,30 @@ class _MovaRideMapState extends State<MovaRideMap> {
       }
     }
     if (driver != null) _prevDriver = driver;
+
+    final pickupMoved = oldWidget.pickup.latitude != widget.pickup.latitude ||
+        oldWidget.pickup.longitude != widget.pickup.longitude;
+    final dropoffMoved = oldWidget.dropoff?.latitude != widget.dropoff?.latitude ||
+        oldWidget.dropoff?.longitude != widget.dropoff?.longitude;
+    if (pickupMoved || dropoffMoved) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _recenterCamera();
+      });
+    }
+  }
+
+  void _recenterCamera() {
+    final pickup = widget.pickup;
+    final dropoff = widget.dropoff;
+    final driver = widget.driver;
+    if (dropoff != null) {
+      final points = [pickup, dropoff, if (driver != null) driver];
+      _mapController.fitCamera(
+        CameraFit.bounds(bounds: LatLngBounds.fromPoints(points), padding: const EdgeInsets.all(48)),
+      );
+    } else {
+      _mapController.move(pickup, 15);
+    }
   }
 
   static double _bearing(LatLng from, LatLng to) {
@@ -70,20 +106,27 @@ class _MovaRideMapState extends State<MovaRideMap> {
     return SizedBox(
       height: widget.height,
       width: double.infinity,
-      child: ClipRRect(
-        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
-        child: FlutterMap(
-          options: MapOptions(
-            initialCenter: driver ?? pickup,
-            initialZoom: 14,
-            initialCameraFit: points.length > 1
-                ? CameraFit.bounds(bounds: bounds, padding: const EdgeInsets.all(48))
-                : null,
-            interactionOptions: const InteractionOptions(
-              flags: InteractiveFlag.pinchZoom | InteractiveFlag.drag,
-            ),
-          ),
-          children: [
+      child: Stack(
+        children: [
+          ClipRRect(
+            borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
+            child: FlutterMap(
+              mapController: _mapController,
+              options: MapOptions(
+                initialCenter: driver ?? pickup,
+                initialZoom: 14,
+                initialCameraFit: points.length > 1
+                    ? CameraFit.bounds(bounds: bounds, padding: const EdgeInsets.all(48))
+                    : null,
+                onMapReady: _recenterCamera,
+                onTap: widget.onDropoffTap != null
+                    ? (_, point) => widget.onDropoffTap!(point)
+                    : null,
+                interactionOptions: const InteractionOptions(
+                  flags: InteractiveFlag.pinchZoom | InteractiveFlag.drag,
+                ),
+              ),
+              children: [
             TileLayer(
               urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
               userAgentPackageName: 'com.mova.passenger',
@@ -140,7 +183,27 @@ class _MovaRideMapState extends State<MovaRideMap> {
               ],
             ),
           ],
-        ),
+            ),
+          ),
+          if (widget.dropoffEditable)
+            Positioned(
+              left: 8,
+              bottom: 8,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: MovaColors.midnight.withValues(alpha: 0.75),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  child: Text(
+                    'Appuyez sur la carte pour la destination',
+                    style: TextStyle(color: MovaColors.white, fontSize: 11),
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

@@ -8,6 +8,7 @@ import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
+import '../booking/payment_screen.dart';
 
 class ErrandTrackingScreen extends ConsumerStatefulWidget {
   const ErrandTrackingScreen({
@@ -30,6 +31,8 @@ class ErrandTrackingScreen extends ConsumerStatefulWidget {
 class _ErrandTrackingScreenState extends ConsumerState<ErrandTrackingScreen> {
   Map<String, dynamic>? _order;
   bool _loading = true;
+  bool _cancelling = false;
+  bool _paymentNavigated = false;
   String? _error;
   Timer? _pollTimer;
 
@@ -72,6 +75,7 @@ class _ErrandTrackingScreenState extends ConsumerState<ErrandTrackingScreen> {
               data['errand'] as Map<String, dynamic>? ??
               data;
           _error = null;
+          _maybeGoToPayment();
         case Failure(:final error):
           if (!silent) _error = error.message;
       }
@@ -91,6 +95,61 @@ class _ErrandTrackingScreenState extends ConsumerState<ErrandTrackingScreen> {
     return _defaultTimeline.asMap().entries.map((e) {
       return {'label': e.value['label'], 'done': e.key <= step};
     }).toList();
+  }
+
+  bool get _canCancel {
+    final status = _order?['status']?.toString();
+    return status == 'PENDING' || status == 'ASSIGNED';
+  }
+
+  void _maybeGoToPayment() {
+    if (_paymentNavigated || !mounted) return;
+    final status = _order?['status']?.toString();
+    final paymentReady = _order?['paymentReady'] == true || status == 'COMPLETED';
+    if (!paymentReady) return;
+    final price = _order?['estimatedPriceCdf'] as int? ??
+        _order?['priceCdf'] as int? ??
+        widget.totalCdf;
+    _paymentNavigated = true;
+    _pollTimer?.cancel();
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PaymentScreen(
+          serviceType: 'ERRAND',
+          serviceId: widget.errandId,
+          amountCdf: price,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _cancelErrand() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Annuler la course ?'),
+        content: const Text('Votre demande de courses sera annulée si le livreur n\'a pas encore commencé.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Non')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Oui, annuler')),
+        ],
+      ),
+    );
+    if (confirm != true || !mounted) return;
+    setState(() => _cancelling = true);
+    _pollTimer?.cancel();
+    final api = ref.read(apiClientProvider);
+    final result = await api.cancelErrand(widget.errandId);
+    if (!mounted) return;
+    setState(() => _cancelling = false);
+    switch (result) {
+      case Success():
+        Navigator.popUntil(context, (r) => r.isFirst);
+      case Failure(:final error):
+        setState(() => _error = error.message);
+        _pollTimer = Timer.periodic(const Duration(seconds: 5), (_) => _load(silent: true));
+    }
   }
 
   @override
@@ -183,6 +242,15 @@ class _ErrandTrackingScreenState extends ConsumerState<ErrandTrackingScreen> {
                   ),
                 ],
                 const SizedBox(height: 24),
+                if (_canCancel)
+                  MovaButton(
+                    label: 'Annuler la course',
+                    isSecondary: true,
+                    isLoading: _cancelling,
+                    icon: Icons.cancel_outlined,
+                    onPressed: _cancelling ? null : _cancelErrand,
+                  ),
+                if (_canCancel) const SizedBox(height: 8),
                 MovaButton(
                   label: 'Retour à l\'accueil',
                   isSecondary: true,

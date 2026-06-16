@@ -1,10 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { apiFetch, formatCdf, updateDeliveryStatus, type DeliveryOverview } from "@/lib/api";
+import { apiFetch, cancelDelivery, formatCdf, updateDeliveryStatus, type DeliveryOverview } from "@/lib/api";
 import { useAdmin } from "@/components/AdminProvider";
 import {
+  BtnDanger,
   Card,
+  ConfirmDialog,
   EmptyState,
   ErrorBanner,
   FieldLabel,
@@ -31,6 +33,7 @@ export default function LivraisonsPage() {
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<DeliveryOverview | null>(null);
   const [newStatus, setNewStatus] = useState("");
+  const [cancelTarget, setCancelTarget] = useState<DeliveryOverview | null>(null);
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
@@ -47,6 +50,24 @@ export default function LivraisonsPage() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  const canCancel = (s?: string) => s && !["DELIVERED", "CANCELLED"].includes(s);
+
+  async function doCancel() {
+    if (!cancelTarget) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await cancelDelivery(cancelTarget.id, "Annulé par administrateur");
+      setCancelTarget(null);
+      setSelected(null);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Échec de l'annulation");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   async function saveStatus() {
     if (!selected || !newStatus) return;
@@ -131,11 +152,25 @@ export default function LivraisonsPage() {
                 >
                   {saving ? "Enregistrement…" : "Mettre à jour le statut"}
                 </button>
+                {canCancel(selected.status) && (
+                  <BtnDanger onClick={() => setCancelTarget(selected)}>Annuler la livraison</BtnDanger>
+                )}
               </>
             )}
           </div>
         )}
       </Modal>
+
+      <ConfirmDialog
+        open={!!cancelTarget}
+        onClose={() => setCancelTarget(null)}
+        onConfirm={doCancel}
+        title="Annuler la livraison"
+        message="Confirmer l'annulation de cette livraison ?"
+        confirmLabel="Annuler la livraison"
+        danger
+        loading={saving}
+      />
     </div>
   );
 }

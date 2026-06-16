@@ -9,6 +9,7 @@ import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
+import '../booking/payment_screen.dart';
 import 'widgets/delivery_tracking_map.dart';
 
 class ParcelTrackingScreen extends ConsumerStatefulWidget {
@@ -23,6 +24,8 @@ class ParcelTrackingScreen extends ConsumerStatefulWidget {
 class _ParcelTrackingScreenState extends ConsumerState<ParcelTrackingScreen> {
   Map<String, dynamic>? _delivery;
   bool _loading = true;
+  bool _cancelling = false;
+  bool _paymentNavigated = false;
   String? _error;
   Timer? _pollTimer;
 
@@ -56,6 +59,7 @@ class _ParcelTrackingScreenState extends ConsumerState<ParcelTrackingScreen> {
         case Success(:final data):
           _delivery = data['delivery'] as Map<String, dynamic>? ?? data;
           _error = null;
+          _maybeGoToPayment();
         case Failure(:final error):
           if (!silent) _error = error.message;
       }
@@ -79,6 +83,64 @@ class _ParcelTrackingScreenState extends ConsumerState<ParcelTrackingScreen> {
       {'label': 'En route', 'done': false},
       {'label': 'Livré', 'done': false},
     ];
+  }
+
+  int get _totalCdf =>
+      _delivery?['estimatedPriceCdf'] as int? ??
+      _delivery?['priceCdf'] as int? ??
+      _delivery?['finalPriceCdf'] as int? ??
+      0;
+
+  bool get _canCancel {
+    final status = _delivery?['status']?.toString();
+    return status == 'PENDING' || status == 'PICKED_UP';
+  }
+
+  void _maybeGoToPayment() {
+    if (_paymentNavigated || !mounted || _totalCdf <= 0) return;
+    final status = _delivery?['status']?.toString();
+    final paymentReady = _delivery?['paymentReady'] == true || status == 'DELIVERED';
+    if (!paymentReady) return;
+    _paymentNavigated = true;
+    _pollTimer?.cancel();
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PaymentScreen(
+          serviceType: 'DELIVERY',
+          serviceId: widget.parcelId,
+          amountCdf: _totalCdf,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _cancelDelivery() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Annuler la livraison ?'),
+        content: const Text('La livraison sera annulée si le coursier n\'a pas encore pris en charge le colis.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Non')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Oui, annuler')),
+        ],
+      ),
+    );
+    if (confirm != true || !mounted) return;
+    setState(() => _cancelling = true);
+    _pollTimer?.cancel();
+    final api = ref.read(apiClientProvider);
+    final result = await api.cancelDelivery(widget.parcelId);
+    if (!mounted) return;
+    setState(() => _cancelling = false);
+    switch (result) {
+      case Success():
+        Navigator.popUntil(context, (r) => r.isFirst);
+      case Failure(:final error):
+        setState(() => _error = error.message);
+        _pollTimer = Timer.periodic(const Duration(seconds: 5), (_) => _load(silent: true));
+    }
   }
 
   LatLng get _pickup => LatLng(
@@ -212,11 +274,25 @@ class _ParcelTrackingScreenState extends ConsumerState<ParcelTrackingScreen> {
                     ),
                     Padding(
                       padding: const EdgeInsets.all(16),
-                      child: MovaButton(
-                        label: 'Retour à l\'accueil',
-                        isSecondary: true,
-                        icon: Icons.home_outlined,
-                        onPressed: () => Navigator.popUntil(context, (r) => r.isFirst),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if (_canCancel)
+                            MovaButton(
+                              label: 'Annuler la livraison',
+                              isSecondary: true,
+                              isLoading: _cancelling,
+                              icon: Icons.cancel_outlined,
+                              onPressed: _cancelling ? null : _cancelDelivery,
+                            ),
+                          if (_canCancel) const SizedBox(height: 8),
+                          MovaButton(
+                            label: 'Retour à l\'accueil',
+                            isSecondary: true,
+                            icon: Icons.home_outlined,
+                            onPressed: () => Navigator.popUntil(context, (r) => r.isFirst),
+                          ),
+                        ],
                       ),
                     ),
                   ],

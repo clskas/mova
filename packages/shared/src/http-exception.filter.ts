@@ -92,6 +92,15 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
     if (exception instanceof Error) {
       this.logger.error(`${tag}${exception.message}`, exception.stack);
+      if (exception.message.includes('entity too large')) {
+        const message = 'Fichier trop volumineux (max 3 Mo pour les photos colis).';
+        this.logger.warn(`${tag}${MovaErrorCode.VALIDATION_ERROR}: ${message}`);
+        return response.status(HttpStatus.PAYLOAD_TOO_LARGE).json({
+          success: false,
+          error: { code: MovaErrorCode.VALIDATION_ERROR, message },
+          timestamp: new Date().toISOString(),
+        });
+      }
       const message =
         exception.message.includes('Tarif non configuré') ||
         exception.message.includes('non configuré')

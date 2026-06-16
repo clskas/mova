@@ -27,6 +27,7 @@ Write-Host "[1/5] Staff roles (+243900000001-005)..." -ForegroundColor Yellow
 $env:DATABASE_URL = $env:AUTH_DATABASE_URL
 Push-Location (Join-Path $root "services\auth-service")
 try {
+  npm exec -- prisma generate
   npx ts-node prisma/seed-staff-roles.ts
 } finally { Pop-Location }
 
@@ -42,12 +43,14 @@ Write-Host "[4/5] Demo users (auth) + drivers/KYC/incidents (driver)..." -Foregr
 Push-Location (Join-Path $root "services\auth-service")
 try {
   $env:DATABASE_URL = $env:AUTH_DATABASE_URL
+  npm exec -- prisma generate
   npx ts-node prisma/seed-demo.ts
 } finally { Pop-Location }
 
 Push-Location (Join-Path $root "services\driver-service")
 try {
   $env:DATABASE_URL = $env:DRIVER_DATABASE_URL
+  npm exec -- prisma generate
   npx ts-node prisma/seed-demo.ts
 } finally { Pop-Location }
 

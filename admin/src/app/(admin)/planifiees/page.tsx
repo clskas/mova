@@ -1,19 +1,37 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { apiFetch, cancelScheduledRide, formatCdf, formatDate, type ScheduledOverview } from "@/lib/api";
+import {
+  apiFetch,
+  cancelScheduledRide,
+  formatCdf,
+  formatDate,
+  updateScheduledRideStatus,
+  type ScheduledOverview,
+} from "@/lib/api";
 import { useAdmin } from "@/components/AdminProvider";
 import {
   BtnDanger,
+  BtnPrimary,
   Card,
   ConfirmDialog,
   EmptyState,
   ErrorBanner,
+  FieldLabel,
   LoadingState,
   Modal,
   PageHeader,
+  SelectInput,
   StatusBadge,
 } from "@/components/ui";
+
+const SCHEDULED_STATUSES = [
+  { value: "SCHEDULED", label: "Planifiée" },
+  { value: "CONFIRMED", label: "Confirmée" },
+  { value: "IN_PROGRESS", label: "En cours" },
+  { value: "COMPLETED", label: "Terminée" },
+  { value: "CANCELLED", label: "Annulée" },
+];
 
 export default function PlanifieesPage() {
   const { canWrite } = useAdmin();
@@ -23,6 +41,7 @@ export default function PlanifieesPage() {
   const [error, setError] = useState<string | null>(null);
   const [cancelTarget, setCancelTarget] = useState<ScheduledOverview | null>(null);
   const [selected, setSelected] = useState<ScheduledOverview | null>(null);
+  const [newStatus, setNewStatus] = useState("");
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
@@ -39,6 +58,21 @@ export default function PlanifieesPage() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  async function saveStatus() {
+    if (!selected || !newStatus || newStatus === selected.status) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await updateScheduledRideStatus(selected.id, newStatus);
+      setSelected(null);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Échec de la mise à jour du statut");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   async function doCancel() {
     if (!cancelTarget) return;
@@ -85,7 +119,7 @@ export default function PlanifieesPage() {
                   <td className="p-3"><StatusBadge status={s.status} /></td>
                   <td className="p-3 text-[#6C63FF]">{formatCdf(s.priceCdf)}</td>
                   <td className="p-3">
-                    <button type="button" onClick={() => setSelected(s)} className="text-[#6C63FF] hover:underline">Détail</button>
+                    <button type="button" onClick={() => { setSelected(s); setNewStatus(s.status ?? "SCHEDULED"); }} className="text-[#6C63FF] hover:underline">Détail</button>
                   </td>
                 </tr>
               ))}
@@ -104,6 +138,15 @@ export default function PlanifieesPage() {
             <p><span className="text-gray-500">Date:</span> {formatDate(selected.scheduledAt)}</p>
             <p><span className="text-gray-500">Statut:</span> <StatusBadge status={selected.status} /></p>
             <p><span className="text-gray-500">Prix:</span> {formatCdf(selected.priceCdf)}</p>
+            {!readOnly && (
+              <>
+                <FieldLabel>Modifier le statut</FieldLabel>
+                <SelectInput value={newStatus} onChange={setNewStatus} options={SCHEDULED_STATUSES} />
+                <BtnPrimary onClick={saveStatus} disabled={saving || newStatus === selected.status}>
+                  {saving ? "Enregistrement…" : "Enregistrer le statut"}
+                </BtnPrimary>
+              </>
+            )}
             {canCancel(selected.status) && !readOnly && (
               <BtnDanger onClick={() => setCancelTarget(selected)}>Annuler la réservation</BtnDanger>
             )}

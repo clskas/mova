@@ -1,10 +1,11 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { DeliveryStatus, DeliveryType, Prisma, SurchargeType, VehicleType, WeightCategory } from '@prisma/client';
-import { INTERNAL_API_KEY, MARKET_RDC, MovaErrorCode, MovaHttpException, formatCdf, serviceUrl } from '@mova/shared';
+import { INTERNAL_API_KEY, MARKET_RDC, MOVA_EVENTS, MovaErrorCode, MovaHttpException, formatCdf, resolveCityFromCoords, serviceUrl } from '@mova/shared';
+import { RedisService } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { PricingService } from '../rides/pricing.service';
-import { SurchargeService } from '../rides/surcharge.service';
-import { CreateFoodDeliveryDto, CreateParcelDeliveryDto } from './deliveries.dto';
+import { PromoService, SurchargeService } from '../rides/surcharge.service';
+import { CreateFoodDeliveryDto, CreateFoodMultiDeliveryDto, CreateParcelDeliveryDto, RateDeliveryDto } from './deliveries.dto';
 import { assertServiceAreaPair } from '../common/address.util';
 import {
   buildParcelTimeline,
@@ -29,12 +30,24 @@ const WEIGHT_KG_MULTIPLIERS: { maxKg: number; category: WeightCategory; multipli
 
 const FOOD_DELIVERY_BASE_CDF = 3000;
 
+type MenuSize = { label?: string; name?: string; priceCdf?: number; unitPriceCdf?: number };
+type MenuOption = { label?: string; name?: string; priceCdf?: number; unitPriceCdf?: number };
+type MenuItem = {
+  name?: string;
+  unitPriceCdf?: number;
+  priceCdf?: number;
+  sizes?: MenuSize[];
+  options?: MenuOption[];
+};
+
 @Injectable()
 export class DeliveriesService {
   constructor(
     private prisma: PrismaService,
     private pricing: PricingService,
     private surcharges: SurchargeService,
+    private promo: PromoService,
+    private redis: RedisService,
   ) {}
 
   private validateParcelDto(dto: CreateParcelDeliveryDto) {
@@ -131,22 +144,79 @@ export class DeliveriesService {
     return { delivery: formatted, estimate };
   }
 
+  private async applyFoodPromo(totalCdf: number, promoCode?: string, redeem = false) {
+    if (!promoCode?.trim()) {
+      return { estimatedPriceCdf: totalCdf, discountCdf: 0, promoCode: null as string | null };
+    }
+    const promoRow = redeem ? await this.promo.redeem(promoCode) : await this.promo.peek(promoCode);
+    const estimatedPriceCdf = this.promo.applyDiscount(totalCdf, promoRow);
+    return { estimatedPriceCdf, discountCdf: totalCdf - estimatedPriceCdf, promoCode: promoRow.code };
+  }
+
+  async validatePromoCode(code: string) {
+    const promo = await this.promo.peek(code);
+    return {
+      code: promo.code,
+      discountPercent: promo.discountPercent,
+      discountCdf: promo.discountCdf,
+      validUntil: promo.validUntil?.toISOString() ?? null,
+    };
+  }
+
+  private computeFoodItemUnitPriceCdf(menuItem: MenuItem, size?: string, options?: string[]): number {
+    const base = menuItem.unitPriceCdf ?? menuItem.priceCdf ?? 0;
+    let total = base;
+
+    if (size != null && size.trim().length > 0 && Array.isArray(menuItem.sizes)) {
+      const s = menuItem.sizes.find((x) => (x.label ?? x.name)?.toString() === size);
+      const sPrice = s?.priceCdf ?? s?.unitPriceCdf;
+      if (sPrice != null && sPrice > 0) total = sPrice;
+    }
+
+    if (options != null && options.length > 0 && Array.isArray(menuItem.options)) {
+      for (const opt of options) {
+        const o = menuItem.options.find((x) => (x.label ?? x.name)?.toString() === opt);
+        const oPrice = o?.priceCdf ?? o?.unitPriceCdf ?? 0;
+        total += oPrice;
+      }
+    }
+    return Math.max(0, total);
+  }
+
+  private resolveFoodItemsSubtotalCdf(restaurantMenu: unknown, items: CreateFoodDeliveryDto['items']) {
+    const menu = (Array.isArray(restaurantMenu) ? restaurantMenu : []) as MenuItem[];
+    let subtotal = 0;
+    const normalized = items.map((it) => {
+      const menuItem = menu.find((m) => (m.name ?? '').toString() === it.name);
+      if (!menuItem) {
+        throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, `Plat introuvable: ${it.name}`);
+      }
+      const unitPriceCdf = this.computeFoodItemUnitPriceCdf(menuItem, it.size, it.options);
+      subtotal += unitPriceCdf * it.quantity;
+      return { ...it, unitPriceCdf };
+    });
+    return { subtotalCdf: subtotal, normalizedItems: normalized };
+  }
+
   async estimateFood(dto: CreateFoodDeliveryDto) {
     const restaurant = await this.prisma.restaurant.findUnique({ where: { id: dto.restaurantId } });
     if (!restaurant || !restaurant.isActive) throw new MovaHttpException(MovaErrorCode.RESTAURANT_NOT_FOUND, HttpStatus.NOT_FOUND);
     const foodSurcharge = await this.surcharges.get(SurchargeType.DELIVERY_FOOD);
-    const itemsSubtotal = dto.items.reduce((sum, item) => sum + item.quantity * item.unitPriceCdf, 0);
+    const { subtotalCdf: itemsSubtotal } = this.resolveFoodItemsSubtotalCdf(restaurant.menuItems, dto.items);
     const distanceKm = this.pricing.haversineKm(restaurant.lat, restaurant.lng, dto.deliveryLat, dto.deliveryLng);
     const durationMin = (distanceKm / 20) * 60;
     const fare = await this.pricing.estimateFare(VehicleType.MOTO_TAXI, distanceKm, durationMin);
     const deliveryFeeCdf = Math.max(foodSurcharge.baseFeeCdf || FOOD_DELIVERY_BASE_CDF, Math.ceil(fare.estimatedFareCdf * foodSurcharge.multiplier));
-    const estimatedPriceCdf = itemsSubtotal + deliveryFeeCdf;
+    const subtotalWithDelivery = itemsSubtotal + deliveryFeeCdf;
+    const promoApplied = await this.applyFoodPromo(subtotalWithDelivery, dto.promoCode, false);
     return {
       restaurant: { id: restaurant.id, name: restaurant.name },
       itemsSubtotalCdf: itemsSubtotal,
       deliveryFeeCdf,
-      estimatedPriceCdf,
-      formatted: `${estimatedPriceCdf.toLocaleString('fr-CD')} FC`,
+      discountCdf: promoApplied.discountCdf,
+      promoCode: promoApplied.promoCode,
+      estimatedPriceCdf: promoApplied.estimatedPriceCdf,
+      formatted: `${promoApplied.estimatedPriceCdf.toLocaleString('fr-CD')} FC`,
       distanceKm,
       durationMin,
     };
@@ -156,7 +226,9 @@ export class DeliveriesService {
     const restaurant = await this.prisma.restaurant.findUnique({ where: { id: dto.restaurantId } });
     if (!restaurant || !restaurant.isActive) throw new MovaHttpException(MovaErrorCode.RESTAURANT_NOT_FOUND, HttpStatus.NOT_FOUND);
     if (!dto.items.length) throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR);
-    const estimate = await this.estimateFood(dto);
+    const { subtotalCdf, normalizedItems } = this.resolveFoodItemsSubtotalCdf(restaurant.menuItems, dto.items);
+    const estimate = await this.estimateFood({ ...dto, items: normalizedItems });
+    const promoApplied = await this.applyFoodPromo(subtotalCdf + estimate.deliveryFeeCdf, dto.promoCode, true);
     const delivery = await this.prisma.delivery.create({
       data: {
         userId,
@@ -164,22 +236,141 @@ export class DeliveriesService {
         status: DeliveryStatus.PENDING,
         deliveryPin: generateDeliveryPin(),
         restaurantId: dto.restaurantId,
-        items: dto.items as unknown as Prisma.InputJsonValue,
+        items: normalizedItems as unknown as Prisma.InputJsonValue,
         deliveryAddress: dto.deliveryAddress,
         deliveryLat: dto.deliveryLat,
         deliveryLng: dto.deliveryLng,
         pickupLat: restaurant.lat,
         pickupLng: restaurant.lng,
         pickupAddress: restaurant.address,
-        estimatedPriceCdf: estimate.estimatedPriceCdf,
+        estimatedPriceCdf: promoApplied.estimatedPriceCdf,
         distanceKm: estimate.distanceKm,
         durationMin: estimate.durationMin,
       },
       include: { restaurant: true, events: true },
     });
-    await this.prisma.deliveryEvent.create({ data: { deliveryId: delivery.id, event: 'ORDER_PLACED', metadata: { items: dto.items } as unknown as Prisma.InputJsonValue } });
+    await this.prisma.deliveryEvent.create({
+      data: {
+        deliveryId: delivery.id,
+        event: 'ORDER_PLACED',
+        metadata: { items: normalizedItems, promoCode: promoApplied.promoCode, discountCdf: promoApplied.discountCdf } as unknown as Prisma.InputJsonValue,
+      },
+    });
+    await this.redis.publish(MOVA_EVENTS.DELIVERY_CREATED, {
+      deliveryId: delivery.id,
+      userId,
+      type: delivery.type,
+      restaurantName: restaurant.name,
+      estimatedPriceCdf: delivery.estimatedPriceCdf,
+    });
     const withEvents = { ...delivery, events: [{ id: '1', deliveryId: delivery.id, event: 'ORDER_PLACED', metadata: null, createdAt: new Date() }] };
-    return { delivery: formatParcelDelivery(withEvents), estimate };
+    return { delivery: formatParcelDelivery(withEvents), estimate: { ...estimate, estimatedPriceCdf: promoApplied.estimatedPriceCdf, discountCdf: promoApplied.discountCdf } };
+  }
+
+  async estimateFoodMulti(dto: CreateFoodMultiDeliveryDto) {
+    if (!dto.orders?.length) throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Ajoutez au moins un restaurant.');
+
+    const restaurants = await this.prisma.restaurant.findMany({
+      where: { id: { in: dto.orders.map((o) => o.restaurantId) }, isActive: true },
+    });
+    if (restaurants.length !== dto.orders.length) {
+      throw new MovaHttpException(MovaErrorCode.RESTAURANT_NOT_FOUND, HttpStatus.NOT_FOUND);
+    }
+
+    let itemsSubtotalCdf = 0;
+    let maxDistanceKm = 0;
+    let maxDurationMin = 0;
+
+    for (const order of dto.orders) {
+      const r = restaurants.find((x) => x.id === order.restaurantId)!;
+      const { subtotalCdf } = this.resolveFoodItemsSubtotalCdf(r.menuItems, order.items as CreateFoodDeliveryDto['items']);
+      itemsSubtotalCdf += subtotalCdf;
+      const distanceKm = this.pricing.haversineKm(r.lat, r.lng, dto.deliveryLat, dto.deliveryLng);
+      const durationMin = (distanceKm / 20) * 60;
+      if (distanceKm > maxDistanceKm) maxDistanceKm = distanceKm;
+      if (durationMin > maxDurationMin) maxDurationMin = durationMin;
+    }
+
+    const foodSurcharge = await this.surcharges.get(SurchargeType.DELIVERY_FOOD);
+    const fare = await this.pricing.estimateFare(VehicleType.MOTO_TAXI, maxDistanceKm, maxDurationMin);
+    const deliveryFeeCdf = Math.max(foodSurcharge.baseFeeCdf || FOOD_DELIVERY_BASE_CDF, Math.ceil(fare.estimatedFareCdf * foodSurcharge.multiplier));
+    const subtotalWithDelivery = itemsSubtotalCdf + deliveryFeeCdf;
+    const promoApplied = await this.applyFoodPromo(subtotalWithDelivery, dto.promoCode, false);
+
+    return {
+      restaurants: restaurants.map((r) => ({ id: r.id, name: r.name })),
+      itemsSubtotalCdf,
+      deliveryFeeCdf,
+      discountCdf: promoApplied.discountCdf,
+      promoCode: promoApplied.promoCode,
+      estimatedPriceCdf: promoApplied.estimatedPriceCdf,
+      formatted: `${promoApplied.estimatedPriceCdf.toLocaleString('fr-CD')} FC`,
+      distanceKm: maxDistanceKm,
+      durationMin: maxDurationMin,
+    };
+  }
+
+  async createFoodMulti(userId: string, dto: CreateFoodMultiDeliveryDto) {
+    if (!dto.orders?.length) throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Ajoutez au moins un restaurant.');
+
+    const restaurants = await this.prisma.restaurant.findMany({
+      where: { id: { in: dto.orders.map((o) => o.restaurantId) }, isActive: true },
+    });
+    if (restaurants.length !== dto.orders.length) {
+      throw new MovaHttpException(MovaErrorCode.RESTAURANT_NOT_FOUND, HttpStatus.NOT_FOUND);
+    }
+
+    // Normalize items and compute subtotal
+    const normalizedOrders = dto.orders.map((o) => {
+      const r = restaurants.find((x) => x.id === o.restaurantId)!;
+      const { subtotalCdf, normalizedItems } = this.resolveFoodItemsSubtotalCdf(r.menuItems, o.items as CreateFoodDeliveryDto['items']);
+      return { restaurant: r, items: normalizedItems, subtotalCdf };
+    });
+    const itemsSubtotalCdf = normalizedOrders.reduce((sum, o) => sum + o.subtotalCdf, 0);
+    const estimate = await this.estimateFoodMulti({ ...dto, orders: normalizedOrders.map((o) => ({ restaurantId: o.restaurant.id, items: o.items })) });
+    const promoApplied = await this.applyFoodPromo(itemsSubtotalCdf + estimate.deliveryFeeCdf, dto.promoCode, true);
+
+    // Pickup uses first restaurant for now (single delivery entity)
+    const first = normalizedOrders[0].restaurant;
+    const delivery = await this.prisma.delivery.create({
+      data: {
+        userId,
+        type: DeliveryType.FOOD,
+        status: DeliveryStatus.PENDING,
+        deliveryPin: generateDeliveryPin(),
+        restaurantId: null,
+        items: normalizedOrders.map((o) => ({ restaurantId: o.restaurant.id, restaurantName: o.restaurant.name, items: o.items })) as unknown as Prisma.InputJsonValue,
+        deliveryAddress: dto.deliveryAddress,
+        deliveryLat: dto.deliveryLat,
+        deliveryLng: dto.deliveryLng,
+        pickupLat: first.lat,
+        pickupLng: first.lng,
+        pickupAddress: first.address,
+        estimatedPriceCdf: promoApplied.estimatedPriceCdf,
+        distanceKm: estimate.distanceKm,
+        durationMin: estimate.durationMin,
+      },
+      include: { events: true },
+    });
+
+    await this.prisma.deliveryEvent.create({
+      data: {
+        deliveryId: delivery.id,
+        event: 'ORDER_PLACED',
+        metadata: { orders: normalizedOrders.map((o) => ({ restaurantId: o.restaurant.id, restaurantName: o.restaurant.name, items: o.items })), promoCode: promoApplied.promoCode, discountCdf: promoApplied.discountCdf } as unknown as Prisma.InputJsonValue,
+      },
+    });
+
+    await this.redis.publish(MOVA_EVENTS.DELIVERY_CREATED, {
+      deliveryId: delivery.id,
+      userId,
+      type: delivery.type,
+      restaurantName: 'Multi-restaurants',
+      estimatedPriceCdf: delivery.estimatedPriceCdf,
+    });
+
+    const withEvents = { ...delivery, events: [{ id: '1', deliveryId: delivery.id, event: 'ORDER_PLACED', metadata: null, createdAt: new Date() }] };
+    return { delivery: formatParcelDelivery(withEvents), estimate: { ...estimate, estimatedPriceCdf: promoApplied.estimatedPriceCdf, discountCdf: promoApplied.discountCdf } };
   }
 
   async estimateExpress(dto: CreateParcelDeliveryDto) {
@@ -258,7 +449,51 @@ export class DeliveriesService {
       etaMinutes: formatted.etaMinutes,
       deliveryPin: formatted.deliveryPin,
       paymentReady: formatted.paymentReady,
+      rated: await this.prisma.deliveryRating.findUnique({
+        where: { deliveryId_fromUserId: { deliveryId: id, fromUserId: userId } },
+      }).then((r) => r != null),
     };
+  }
+
+  async rateDelivery(id: string, userId: string, dto: RateDeliveryDto) {
+    const delivery = await this.prisma.delivery.findUnique({ where: { id }, include: { restaurant: true } });
+    if (!delivery) throw new MovaHttpException(MovaErrorCode.DELIVERY_NOT_FOUND, HttpStatus.NOT_FOUND);
+    if (delivery.userId !== userId) throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
+    if (delivery.type !== DeliveryType.FOOD) throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR);
+    if (delivery.status !== DeliveryStatus.DELIVERED) throw new MovaHttpException(MovaErrorCode.DELIVERY_INVALID_STATUS);
+    const existing = await this.prisma.deliveryRating.findUnique({
+      where: { deliveryId_fromUserId: { deliveryId: id, fromUserId: userId } },
+    });
+    if (existing) throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Commande déjà notée.');
+    const rating = await this.prisma.deliveryRating.create({
+      data: {
+        deliveryId: id,
+        fromUserId: userId,
+        restaurantScore: dto.restaurantScore,
+        courierScore: dto.courierScore,
+        comment: dto.comment,
+      },
+    });
+    if (delivery.restaurantId) {
+      const agg = await this.prisma.deliveryRating.aggregate({
+        where: { delivery: { restaurantId: delivery.restaurantId } },
+        _avg: { restaurantScore: true },
+      });
+      if (agg._avg.restaurantScore) {
+        await this.prisma.restaurant.update({
+          where: { id: delivery.restaurantId },
+          data: { rating: Math.round(agg._avg.restaurantScore * 10) / 10 },
+        });
+      }
+    }
+    if (delivery.driverId && dto.courierScore != null) {
+      await fetch(serviceUrl('driver', `/internal/drivers/${delivery.driverId}/rating`), {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'x-internal-api-key': INTERNAL_API_KEY },
+        body: JSON.stringify({ ratingAvg: dto.courierScore }),
+      }).catch(() => undefined);
+    }
+    return rating;
   }
 
   private async fetchUserBrief(userId: string): Promise<{ name?: string; phone?: string } | null> {
@@ -315,21 +550,74 @@ export class DeliveriesService {
     return { data: rows.map((d) => formatParcelDelivery(d)) };
   }
 
-  async listRestaurants(deliveryLat?: number, deliveryLng?: number) {
+  async listRestaurants(
+    deliveryLat?: number,
+    deliveryLng?: number,
+    cuisine?: string,
+    maxEtaMin?: number,
+    maxPriceCdf?: number,
+    maxDistanceKm?: number,
+  ) {
     const rows = await this.prisma.restaurant.findMany({
-      where: { isActive: true },
+      where: {
+        isActive: true,
+        ...(cuisine?.trim() ? { cuisine: { contains: cuisine.trim(), mode: 'insensitive' } } : {}),
+      },
       orderBy: { rating: 'desc' },
-      select: { id: true, name: true, cuisine: true, address: true, lat: true, lng: true, rating: true, imageUrl: true, menuItems: true },
+      select: {
+        id: true, name: true, cuisine: true, address: true, lat: true, lng: true,
+        rating: true, imageUrl: true, menuItems: true, promotionLabel: true,
+      },
     });
-    const data = rows.map((r) => {
-      let deliveryEtaMin: number | null = null;
-      if (deliveryLat != null && deliveryLng != null) {
-        const distanceKm = this.pricing.haversineKm(r.lat, r.lng, deliveryLat, deliveryLng);
-        const travelMin = Math.ceil((distanceKm / 20) * 60);
-        deliveryEtaMin = Math.max(20, travelMin + 15);
+
+    let scoped = rows;
+    if (deliveryLat != null && deliveryLng != null) {
+      const city = resolveCityFromCoords(deliveryLat, deliveryLng);
+      const cityLower = city.toLowerCase();
+      const inCity = rows.filter(
+        (r) =>
+          r.address.toLowerCase().includes(cityLower) ||
+          resolveCityFromCoords(r.lat, r.lng).toLowerCase() === cityLower,
+      );
+      if (inCity.length > 0) {
+        scoped = inCity;
+      } else {
+        const kinshasa = rows.filter((r) => r.address.toLowerCase().includes('kinshasa'));
+        if (kinshasa.length > 0) scoped = kinshasa;
       }
-      return { ...r, deliveryEtaMin };
-    });
+    } else {
+      const kinshasa = rows.filter((r) => r.address.toLowerCase().includes('kinshasa'));
+      if (kinshasa.length > 0) scoped = kinshasa;
+    }
+
+    const data = scoped
+      .map((r) => {
+        let deliveryEtaMin: number | null = null;
+        let distanceKm: number | null = null;
+        let minMenuPriceCdf = 0;
+        const menu = (r.menuItems as { unitPriceCdf?: number; priceCdf?: number }[] | null) ?? [];
+        if (menu.length > 0) {
+          minMenuPriceCdf = menu.reduce((min, item) => {
+            const p = item.unitPriceCdf ?? item.priceCdf ?? 0;
+            return min === 0 ? p : Math.min(min, p);
+          }, 0);
+        }
+        if (deliveryLat != null && deliveryLng != null) {
+          distanceKm = this.pricing.haversineKm(r.lat, r.lng, deliveryLat, deliveryLng);
+          const travelMin = Math.ceil((distanceKm / 20) * 60);
+          deliveryEtaMin = Math.max(20, travelMin + 15);
+        }
+        return { ...r, deliveryEtaMin, distanceKm, minMenuPriceCdf };
+      })
+      .filter((r) => (maxEtaMin != null ? (r.deliveryEtaMin ?? 999) <= maxEtaMin : true))
+      .filter((r) => (maxPriceCdf != null ? (r.minMenuPriceCdf ?? 0) <= maxPriceCdf : true))
+      .filter((r) => (maxDistanceKm != null ? (r.distanceKm ?? 999) <= maxDistanceKm : true))
+      .sort((a, b) => {
+        if (deliveryLat == null || deliveryLng == null) return 0;
+        const da = this.pricing.haversineKm(a.lat, a.lng, deliveryLat, deliveryLng);
+        const db = this.pricing.haversineKm(b.lat, b.lng, deliveryLat, deliveryLng);
+        return da - db;
+      });
     return { data };
   }
 
@@ -409,7 +697,8 @@ export class DeliveriesService {
     await this.prisma.deliveryEvent.create({
       data: { deliveryId, event: 'ASSIGNED', metadata: { driverUserId } },
     });
-    const formatted = formatParcelDelivery(updated);
+    const courier = await this.fetchCourierProfile(driverUserId);
+    const formatted = formatParcelDelivery(updated, courier);
     return { delivery: formatted, success: true };
   }
 
@@ -435,8 +724,32 @@ export class DeliveriesService {
     if (status === DeliveryStatus.CANCELLED) updates.cancelledAt = new Date();
     const updated = await this.prisma.delivery.update({ where: { id }, data: updates, include: { events: { orderBy: { createdAt: 'asc' } }, restaurant: true } });
     await this.prisma.deliveryEvent.create({ data: { deliveryId: id, event: status, metadata: { updatedBy: userId } } });
-    const formatted = formatParcelDelivery(updated);
-    return { delivery: formatted, paymentReady: status === DeliveryStatus.DELIVERED };
+    const courier = updated.driverId ? await this.fetchCourierProfile(updated.driverId) : null;
+    const formatted = formatParcelDelivery(updated, courier);
+    const statusLabel = this.deliveryStatusLabel(updated.type, status);
+    await this.redis.publish(MOVA_EVENTS.DELIVERY_STATUS_UPDATED, {
+      deliveryId: id,
+      userId: delivery.userId,
+      type: delivery.type,
+      status,
+      restaurantName: updated.restaurant?.name,
+    });
+    return { delivery: formatted, paymentReady: status === DeliveryStatus.DELIVERED, statusLabel };
+  }
+
+  private deliveryStatusLabel(type: DeliveryType, status: DeliveryStatus): string {
+    if (type === DeliveryType.FOOD) {
+      return (
+        {
+          [DeliveryStatus.PENDING]: 'Commande confirmée',
+          [DeliveryStatus.PICKED_UP]: 'En préparation',
+          [DeliveryStatus.IN_TRANSIT]: 'Livreur en route',
+          [DeliveryStatus.DELIVERED]: 'Commande livrée',
+          [DeliveryStatus.CANCELLED]: 'Commande annulée',
+        }[status] ?? status
+      );
+    }
+    return status;
   }
 
   async listForAdmin(take = 50) {

@@ -1,10 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { apiFetch, cancelRide, formatCdf, formatDate, type RideOverview } from "@/lib/api";
+import { apiFetch, cancelRide, formatCdf, formatDate, updateRideStatus, type RideOverview } from "@/lib/api";
 import { useAdmin } from "@/components/AdminProvider";
 import {
   BtnDanger,
+  BtnPrimary,
   Card,
   ConfirmDialog,
   EmptyState,
@@ -28,6 +29,16 @@ const STATUSES = [
   { value: "CANCELLED", label: "Annulée" },
 ];
 
+const RIDE_STATUS_OPTIONS = [
+  { value: "REQUESTED", label: "Demandée" },
+  { value: "SEARCHING", label: "Recherche" },
+  { value: "ACCEPTED", label: "Acceptée" },
+  { value: "DRIVER_ARRIVED", label: "Chauffeur arrivé" },
+  { value: "IN_PROGRESS", label: "En cours" },
+  { value: "COMPLETED", label: "Terminée" },
+  { value: "CANCELLED", label: "Annulée" },
+];
+
 export default function CoursesPage() {
   const { canWrite } = useAdmin();
   const readOnly = !canWrite("courses");
@@ -39,6 +50,7 @@ export default function CoursesPage() {
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<RideOverview | null>(null);
   const [cancelTarget, setCancelTarget] = useState<RideOverview | null>(null);
+  const [newStatus, setNewStatus] = useState("");
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
@@ -59,6 +71,21 @@ export default function CoursesPage() {
   }, [status, dateFrom, dateTo]);
 
   useEffect(() => { load(); }, [load]);
+
+  async function saveStatus() {
+    if (!selected || !newStatus || newStatus === selected.status) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await updateRideStatus(selected.id, newStatus);
+      setSelected(null);
+      load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Échec de la mise à jour");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   async function doCancel() {
     if (!cancelTarget) return;
@@ -121,7 +148,7 @@ export default function CoursesPage() {
                   <td className="p-3 text-[#6C63FF]">{formatCdf(r.priceCdf)}</td>
                   <td className="p-3 text-gray-500">{formatDate(r.createdAt)}</td>
                   <td className="p-3">
-                    <button type="button" onClick={() => setSelected(r)} className="text-[#6C63FF] hover:underline">Détail</button>
+                    <button type="button" onClick={() => { setSelected(r); setNewStatus(r.status ?? ""); }} className="text-[#6C63FF] hover:underline">Détail</button>
                   </td>
                 </tr>
               ))}
@@ -140,6 +167,19 @@ export default function CoursesPage() {
             <p><span className="text-gray-500">Départ:</span> {selected.pickupAddress}</p>
             <p><span className="text-gray-500">Arrivée:</span> {selected.dropoffAddress}</p>
             <p><span className="text-gray-500">Prix:</span> {formatCdf(selected.priceCdf)}</p>
+            {!readOnly && (
+              <>
+                <FieldLabel>Changer le statut</FieldLabel>
+                <SelectInput
+                  value={newStatus}
+                  onChange={setNewStatus}
+                  options={RIDE_STATUS_OPTIONS}
+                />
+                <BtnPrimary onClick={saveStatus} disabled={saving || newStatus === selected.status}>
+                  {saving ? "Enregistrement…" : "Mettre à jour le statut"}
+                </BtnPrimary>
+              </>
+            )}
             {canCancel(selected.status) && !readOnly && (
               <BtnDanger onClick={() => setCancelTarget(selected)}>Annuler la course</BtnDanger>
             )}

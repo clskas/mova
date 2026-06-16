@@ -108,6 +108,23 @@ export class WalletService {
     return { data, total, skip, take, currency: 'CDF' };
   }
 
+  async overview() {
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+    const [balanceAgg, transactionsToday, walletCount] = await Promise.all([
+      this.prisma.wallet.aggregate({ _sum: { balanceCdf: true } }),
+      this.prisma.walletTransaction.count({ where: { createdAt: { gte: startOfDay } } }),
+      this.prisma.wallet.count(),
+    ]);
+    return {
+      totalBalanceCdf: balanceAgg._sum.balanceCdf ?? 0,
+      pendingPayoutsCdf: 0,
+      transactionsToday,
+      walletCount,
+      currency: 'CDF',
+    };
+  }
+
   async adminAdjust(userId: string, amountCdf: number, type: 'CREDIT' | 'DEBIT', description: string) {
     if (type === 'CREDIT') {
       const wallet = await this.credit(userId, amountCdf, description, `admin_adjust_${Date.now()}`);

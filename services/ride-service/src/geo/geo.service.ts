@@ -35,19 +35,19 @@ export class GeoService {
     }));
   }
 
-  getCommunes(city?: string) {
+  async getCommunes(city?: string) {
     if (!city) {
-      return DRC_SERVICE_AREAS.flatMap((area) =>
-        getCommunesForArea(area.id).map((d, idx) => ({
-          id: `${area.id}-${idx}`,
-          name: d.name,
-          city: area.name,
-          lat: d.lat,
-          lng: d.lng,
-        })),
-      );
+      return this.prisma.commune.findMany({
+        orderBy: [{ city: 'asc' }, { name: 'asc' }],
+      });
     }
     const area = findServiceAreaByName(city) ?? getServiceArea(city);
+    const cityName = area?.name ?? city;
+    const db = await this.prisma.commune.findMany({
+      where: { city: cityName },
+      orderBy: { name: 'asc' },
+    });
+    if (db.length > 0) return db;
     if (area) {
       return getCommunesForArea(area.id).map((d, idx) => ({
         id: `${area.id}-${idx}`,
@@ -58,6 +58,16 @@ export class GeoService {
       }));
     }
     return this.prisma.commune.findMany({ where: { city }, orderBy: { name: 'asc' } });
+  }
+
+  async createCommune(data: { name: string; city: string; lat: number; lng: number }) {
+    return this.prisma.commune.create({ data });
+  }
+
+  async deleteCommune(id: string) {
+    const commune = await this.prisma.commune.findUnique({ where: { id } });
+    if (!commune) throw new MovaHttpException(MovaErrorCode.NOT_FOUND, undefined, 'Commune introuvable.');
+    return this.prisma.commune.delete({ where: { id } });
   }
 
   async updateCommune(id: string, data: Partial<{ name: string; lat: number; lng: number; city: string }>) {

@@ -71,6 +71,8 @@ class _KycScreenState extends ConsumerState<KycScreen> {
           const Text(
             'Photographiez vos documents pour validation',
             style: TextStyle(color: MovaColors.textSecondary),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
           if (_error != null) ...[
             const SizedBox(height: 12),
@@ -157,6 +159,7 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
       child: _data == null
           ? const Center(child: CircularProgressIndicator())
           : Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 _earningsRow('Aujourd\'hui', _data!['todayCdf']),
                 _earningsRow('Cette semaine', _data!['weekCdf']),
@@ -192,12 +195,23 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
     return MovaCard(
       margin: const EdgeInsets.only(bottom: 8),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label),
-          Text(
-            '${(amount as int? ?? 0).toString()} FC',
-            style: const TextStyle(fontWeight: FontWeight.bold),
+          Expanded(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              '${(amount as int? ?? 0).toString()} FC',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.end,
+            ),
           ),
         ],
       ),

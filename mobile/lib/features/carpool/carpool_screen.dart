@@ -322,16 +322,28 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
     }
   }
 
-  void _openDetail(Map<String, dynamic> ride) {
+  void _openDetail(
+    Map<String, dynamic> ride, {
+    CarpoolViewerRole role = CarpoolViewerRole.guest,
+  }) {
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => CarpoolDetailScreen(
           tripId: ride['id']?.toString() ?? '',
           initialTrip: ride,
+          viewerRole: role,
         ),
       ),
-    );
+    ).then((_) => _loadMyTrips());
+  }
+
+  Color _statusColor(String? status) {
+    final s = status?.toUpperCase() ?? '';
+    if (s.contains('EN ROUTE') || s == 'IN_PROGRESS') return MovaColors.violet;
+    if (s.contains('TERMIN') || s == 'COMPLETED') return MovaColors.green;
+    if (s.contains('ANNUL') || s == 'CANCELLED') return Colors.red.shade300;
+    return MovaColors.textSecondary;
   }
 
   Widget _rideCard(Map<String, dynamic> ride) {
@@ -427,6 +439,26 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: MovaColors.violet.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: const Row(
+            children: [
+              Icon(Icons.people_outline, size: 18, color: MovaColors.violet),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Trajets planifiés partagés — pas une course VTC immédiate.',
+                  style: TextStyle(fontSize: 12, color: MovaColors.violet),
+                ),
+              ),
+            ],
+          ),
+        ),
         TextField(
           controller: _fromController,
           decoration: const InputDecoration(
@@ -612,11 +644,28 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
         else
           ..._myDriverTrips.map((t) {
             final trip = _normalizeTrip(t);
+            final step = trip['timelineStep']?.toString() ?? trip['status']?.toString() ?? '';
             return ListTile(
               title: Text('${trip['fromAddress']} → ${trip['toAddress']}'),
-              subtitle: Text('${trip['timelineStep'] ?? trip['status']} · ${trip['passengerCount']} passager(s)'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => _openDetail(trip),
+              subtitle: Text('$step · ${trip['passengerCount']} passager(s)'),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: _statusColor(step).withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      step,
+                      style: TextStyle(fontSize: 11, color: _statusColor(step), fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right),
+                ],
+              ),
+              onTap: () => _openDetail(trip, role: CarpoolViewerRole.driver),
             );
           }),
         const SizedBox(height: 20),
@@ -627,11 +676,28 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
         else
           ..._myPassengerTrips.map((t) {
             final trip = _normalizeTrip(t);
+            final step = trip['timelineStep']?.toString() ?? trip['status']?.toString() ?? '';
             return ListTile(
               title: Text('${trip['fromAddress']} → ${trip['toAddress']}'),
               subtitle: Text('${trip['driverName']} · ${MarketConfig.formatCdf(trip['pricePerSeatCdf'] as int? ?? 0)}'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => _openDetail(trip),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: _statusColor(step).withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      step,
+                      style: TextStyle(fontSize: 11, color: _statusColor(step), fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right),
+                ],
+              ),
+              onTap: () => _openDetail(trip, role: CarpoolViewerRole.passenger),
             );
           }),
       ],

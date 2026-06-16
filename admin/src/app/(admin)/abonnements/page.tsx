@@ -44,8 +44,15 @@ export default function AbonnementsPage() {
     setError(null);
     try {
       const [p, s] = await Promise.all([fetchSubscriptionPlans(), fetchSubscriptions()]);
-      setPlans(Array.isArray(p) ? p : []);
-      setSubs(Array.isArray(s) ? s : []);
+      const subs = Array.isArray(s) ? s : [];
+      const plansWithCounts = (Array.isArray(p) ? p : []).map((plan) => ({
+        ...plan,
+        subscriberCount: subs.filter(
+          (x) => x.planId === plan.id && x.status === "ACTIVE",
+        ).length,
+      }));
+      setPlans(plansWithCounts);
+      setSubs(subs);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur de chargement");
     } finally {

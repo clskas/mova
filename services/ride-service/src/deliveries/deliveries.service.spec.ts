@@ -124,4 +124,35 @@ describe('DeliveriesService', () => {
       }),
     );
   });
+
+  it('liste les restaurants Kinshasa pour des coords Gombe', async () => {
+    prisma.restaurant.findMany.mockResolvedValue([
+      {
+        id: 'r1',
+        name: 'Chez Flore',
+        cuisine: 'Congolais',
+        address: 'Gombe, Kinshasa',
+        lat: -4.3105,
+        lng: 15.3032,
+        rating: 4.6,
+        imageUrl: null,
+        menuItems: [],
+      },
+      {
+        id: 'r2',
+        name: 'Le Roxy',
+        cuisine: 'Grill',
+        address: 'Lubumbashi',
+        lat: -11.664,
+        lng: 27.48,
+        rating: 4.3,
+        imageUrl: null,
+        menuItems: [],
+      },
+    ]);
+    const result = await service.listRestaurants(-4.3217, 15.3125);
+    expect(result.data).toHaveLength(1);
+    expect(result.data[0].name).toBe('Chez Flore');
+    expect(result.data[0].deliveryEtaMin).toBeGreaterThan(0);
+  });
 });

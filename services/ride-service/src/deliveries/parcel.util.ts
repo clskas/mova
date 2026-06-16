@@ -159,7 +159,16 @@ export function computeDeliveryEtaMinutes(
   return computeDriverEta(courierLat, courierLng, dropoffLat, dropoffLng).etaMinutes;
 }
 
-/** Position mock coursier (interpolation selon statut) */
+export type CourierProfile = {
+  userId: string;
+  name?: string;
+  rating?: number;
+  phone?: string;
+  lat?: number | null;
+  lng?: number | null;
+};
+
+/** Position mock coursier (interpolation selon statut) — uniquement sans livreur assigné */
 export function mockCourierLocation(
   delivery: Pick<Delivery, 'status' | 'pickupLat' | 'pickupLng' | 'dropoffLat' | 'dropoffLng'>,
 ): { lat: number; lng: number; ts: number } | null {
@@ -180,14 +189,21 @@ export function mockCourierLocation(
   };
 }
 
-export type CourierProfile = {
-  userId: string;
-  name?: string;
-  rating?: number;
-  phone?: string;
-  lat?: number | null;
-  lng?: number | null;
-};
+export function resolveCourierLocation(
+  delivery: Pick<Delivery, 'status' | 'driverId' | 'pickupLat' | 'pickupLng' | 'dropoffLat' | 'dropoffLng'>,
+  courier?: CourierProfile | null,
+): { lat: number; lng: number; ts: number } | null {
+  if (courier?.lat != null && courier?.lng != null) {
+    return { lat: courier.lat, lng: courier.lng, ts: Date.now() };
+  }
+  if (delivery.driverId) {
+    if (delivery.pickupLat != null && delivery.pickupLng != null) {
+      return { lat: delivery.pickupLat, lng: delivery.pickupLng, ts: Date.now() };
+    }
+    return null;
+  }
+  return mockCourierLocation(delivery);
+}
 
 export function formatParcelDelivery(
   delivery: Delivery & { events?: DeliveryEvent[]; restaurant?: { id: string; name: string; cuisine?: string | null } | null },
@@ -198,10 +214,7 @@ export function formatParcelDelivery(
   const city = resolveCityFromCoords(delivery.pickupLat ?? 0, delivery.pickupLng ?? 0);
   const dropLat = delivery.dropoffLat ?? delivery.deliveryLat;
   const dropLng = delivery.dropoffLng ?? delivery.deliveryLng;
-  const courierLoc =
-    courier?.lat != null && courier?.lng != null
-      ? { lat: courier.lat, lng: courier.lng, ts: Date.now() }
-      : mockCourierLocation(delivery);
+  const courierLoc = resolveCourierLocation(delivery, courier);
   let etaMinutes: number | null = null;
   if (
     courierLoc &&

@@ -4,7 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 import '../../core/api/api_client.dart';
+import '../../core/location/destination_coords.dart';
 import '../../core/location/location_service.dart';
+import '../../core/widgets/destination_coord_panel.dart';
+import '../../core/location/service_area_location.dart';
 import '../../core/config/market_config.dart';
 import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
@@ -26,8 +29,10 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   final _destinationController = TextEditingController();
 
   String _vehicleType = 'MOTO_TAXI';
-  LatLng _pickup = MovaRideMap.mapDefaultCenter();
+  LatLng _pickup = ServiceAreaLocation.defaultCenter;
   LatLng? _dropoff;
+  bool _dropoffFromSuggestion = false;
+  bool _dropoffFromManualCoords = false;
   Map<String, VehicleEstimate> _estimates = {};
   Map<String, dynamic>? _selectedEstimate;
   List<Map<String, dynamic>> _suggestions = [];
@@ -62,6 +67,8 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
       _selectedEstimate = null;
       _estimates = {};
       _dropoff = null;
+      _dropoffFromSuggestion = false;
+      _dropoffFromManualCoords = false;
     });
   }
 
@@ -82,7 +89,10 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
     }
     setState(() {
       _loadingGps = false;
-      _pickup = result.position;
+      _pickup = ServiceAreaLocation.ensureInServiceArea(
+        result.position,
+        address: result.label,
+      );
       _pickupController.text = result.label;
       _selectedEstimate = null;
       _estimates = {};
@@ -123,24 +133,110 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
         suggestion['address']?.toString() ??
         '';
     _destinationController.text = label;
-    _dropoff = LatLng(
-      (suggestion['lat'] as num?)?.toDouble() ?? MarketConfig.defaultLat - 0.03,
-      (suggestion['lng'] as num?)?.toDouble() ?? MarketConfig.defaultLng + 0.04,
+    _dropoff = ServiceAreaLocation.ensureInServiceArea(
+      LatLng(
+        (suggestion['lat'] as num?)?.toDouble() ?? MarketConfig.defaultLat - 0.03,
+        (suggestion['lng'] as num?)?.toDouble() ?? MarketConfig.defaultLng + 0.04,
+      ),
+      address: label,
     );
     setState(() {
       _showSuggestions = false;
       _suggestions = [];
+      _dropoffFromSuggestion = true;
+      _dropoffFromManualCoords = false;
     });
     _fetchAllEstimates();
   }
 
-  Map<String, dynamic> _estimatePayload(String vehicleType) => {
-        'pickupLat': _pickup.latitude,
-        'pickupLng': _pickup.longitude,
-        'dropoffLat': _dropoff?.latitude ?? MarketConfig.defaultLat - 0.03,
-        'dropoffLng': _dropoff?.longitude ?? MarketConfig.defaultLng + 0.04,
-        'vehicleType': MarketConfig.apiVehicleType(vehicleType),
-      };
+  void _setDropoffFromCoords(LatLng coords, String label) {
+    _dropoff = ServiceAreaLocation.ensureInServiceArea(coords, address: label);
+    _destinationController.text = label;
+    setState(() {
+      _showSuggestions = false;
+      _suggestions = [];
+      _dropoffFromSuggestion = false;
+      _dropoffFromManualCoords = true;
+      _selectedEstimate = null;
+      _estimates = {};
+    });
+    _fetchAllEstimates();
+  }
+
+  void _onMapDropoffTap(LatLng raw) {
+    final coords = ServiceAreaLocation.ensureInServiceArea(raw);
+    if (!ServiceAreaLocation.isInBounds(coords)) {
+      setState(() => _validationError = ServiceAreaLocation.outOfAreaMessage());
+      return;
+    }
+    _setDropoffFromCoords(coords, 'Point sélectionné sur la carte');
+  }
+
+  Future<String?> _resolveCoords() async {
+    _pickup = ServiceAreaLocation.ensureInServiceArea(
+      _pickup,
+      address: _pickupController.text,
+    );
+
+    if (_dropoffFromManualCoords && _dropoff != null && ServiceAreaLocation.isInBounds(_dropoff!)) {
+      return null;
+    }
+
+    final fromTextCoords = DestinationCoords.parseText(_destinationController.text);
+    if (fromTextCoords != null && ServiceAreaLocation.isInBounds(fromTextCoords)) {
+      _dropoff = fromTextCoords;
+      _dropoffFromManualCoords = true;
+      _dropoffFromSuggestion = false;
+      return null;
+    }
+
+    if (_dropoff == null || !ServiceAreaLocation.isInBounds(_dropoff!)) {
+      var resolved = ServiceAreaLocation.coordsFromAddress(_destinationController.text);
+      if (!ServiceAreaLocation.destinationInServiceArea(
+        _destinationController.text,
+        coords: resolved,
+        fromSuggestion: _dropoffFromSuggestion,
+      )) {
+        final api = ref.read(apiClientProvider);
+        final result = await api.geoAutocomplete(_destinationController.text.trim());
+        if (result case Success(:final data) when data.isNotEmpty) {
+          final s = data.first;
+          resolved = LatLng(
+            (s['lat'] as num?)?.toDouble() ?? MarketConfig.defaultLat,
+            (s['lng'] as num?)?.toDouble() ?? MarketConfig.defaultLng,
+          );
+          if (ServiceAreaLocation.isInBounds(resolved)) {
+            _dropoff = resolved;
+            _dropoffFromSuggestion = true;
+            return null;
+          }
+        }
+        return ServiceAreaLocation.outOfAreaMessage();
+      }
+      _dropoff = ServiceAreaLocation.ensureInServiceArea(
+        resolved,
+        address: _destinationController.text,
+      );
+    } else if (!ServiceAreaLocation.destinationInServiceArea(
+      _destinationController.text,
+      coords: _dropoff,
+      fromSuggestion: _dropoffFromSuggestion,
+    )) {
+      return ServiceAreaLocation.outOfAreaMessage();
+    }
+    return null;
+  }
+
+  Map<String, dynamic> _estimatePayload(String vehicleType) {
+    final dropoff = _dropoff ?? ServiceAreaLocation.defaultDropoffOffset();
+    return {
+      'pickupLat': _pickup.latitude,
+      'pickupLng': _pickup.longitude,
+      'dropoffLat': dropoff.latitude,
+      'dropoffLng': dropoff.longitude,
+      'vehicleType': MarketConfig.apiVehicleType(vehicleType),
+    };
+  }
 
   String? _validate() {
     if (_pickupController.text.trim().isEmpty) {
@@ -167,45 +263,63 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
           v.id: VehicleEstimate(vehicleType: v.id, loading: true),
       };
     });
-    final api = ref.read(apiClientProvider);
-    await api.checkHealth();
-    final useMockTypes = api.isMockMode;
-
-    final results = await Future.wait(
-      MarketConfig.vehicleTypes.map((v) async {
-        final payload = _estimatePayload(v.id);
-        payload['vehicleType'] = useMockTypes
-            ? v.id
-            : (v.id == 'VIP' ? 'COMFORT' : v.id);
-        final result = await api.post('/rides/estimate', payload);
-        return (v.id, result);
-      }),
-    );
-
-    if (!mounted) return;
-    final estimates = <String, VehicleEstimate>{};
-    Map<String, dynamic>? selectedData;
-    for (final (type, result) in results) {
-      switch (result) {
-        case Success(:final data):
-          var price = (data['estimatedFareCdf'] ?? data['estimatedPriceCdf']) as int?;
-          var enriched = Map<String, dynamic>.from(data);
-          if (type == 'VIP' && price != null && !useMockTypes) {
-            price = (price * 1.35).ceil();
-            enriched['estimatedFareCdf'] = price;
-          }
-          estimates[type] = VehicleEstimate(vehicleType: type, priceCdf: price);
-          if (type == _vehicleType) selectedData = enriched;
-        case Failure():
-          estimates[type] = VehicleEstimate(vehicleType: type);
+    try {
+      final coordError = await _resolveCoords();
+      if (!mounted) return;
+      if (coordError != null) {
+        setState(() {
+          _loadingEstimate = false;
+          _validationError = coordError;
+          _estimates = {};
+        });
+        return;
       }
-    }
 
-    setState(() {
-      _loadingEstimate = false;
-      _estimates = estimates;
-      _selectedEstimate = selectedData;
-    });
+      final api = ref.read(apiClientProvider);
+      await api.checkHealth();
+
+      final results = await Future.wait(
+        MarketConfig.vehicleTypes.map((v) async {
+          final payload = _estimatePayload(v.id);
+          final result = await api.post('/rides/estimate', payload);
+          return (v.id, result);
+        }),
+      );
+
+      if (!mounted) return;
+      final estimates = <String, VehicleEstimate>{};
+      Map<String, dynamic>? selectedData;
+      String? errorMessage;
+      for (final (type, result) in results) {
+        switch (result) {
+          case Success(:final data):
+            final price = (data['estimatedFareCdf'] ?? data['estimatedPriceCdf']) as int?;
+            final enriched = Map<String, dynamic>.from(data);
+            estimates[type] = VehicleEstimate(vehicleType: type, priceCdf: price);
+            if (type == _vehicleType) selectedData = enriched;
+          case Failure(:final error):
+            estimates[type] = VehicleEstimate(vehicleType: type);
+            errorMessage ??= error.message;
+        }
+      }
+      if (selectedData == null) {
+        errorMessage ??= 'Estimation indisponible. Réessayez.';
+      }
+
+      setState(() {
+        _loadingEstimate = false;
+        _estimates = estimates;
+        _selectedEstimate = selectedData;
+        _error = selectedData == null ? errorMessage : null;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loadingEstimate = false;
+        _estimates = {};
+        _error = 'Estimation indisponible. Réessayez.';
+      });
+    }
   }
 
   Future<void> _onVehicleSelected(String type) async {
@@ -227,6 +341,13 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
         setState(() => _validationError = 'Estimation indisponible. Réessayez.');
         return;
       }
+    }
+
+    final coordError = await _resolveCoords();
+    if (!mounted) return;
+    if (coordError != null) {
+      setState(() => _validationError = coordError);
+      return;
     }
 
     setState(() {
@@ -293,7 +414,12 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          MovaRideMap(pickup: _pickup, dropoff: _dropoff),
+          MovaRideMap(
+            pickup: _pickup,
+            dropoff: _dropoff,
+            onDropoffTap: _onMapDropoffTap,
+            dropoffEditable: true,
+          ),
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(16),
@@ -359,6 +485,11 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                         }).toList(),
                       ),
                     ),
+                  DestinationCoordPanel(
+                    initialLat: _dropoff?.latitude,
+                    initialLng: _dropoff?.longitude,
+                    onApply: _setDropoffFromCoords,
+                  ),
                   const SizedBox(height: 16),
                   Text('Choisissez votre véhicule', style: theme.textTheme.titleSmall),
                   const SizedBox(height: 8),

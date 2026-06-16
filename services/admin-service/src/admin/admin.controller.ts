@@ -295,6 +295,20 @@ export class AdminController {
     return this.adminService.updateCommune(id, body);
   }
 
+  @Post('communes')
+  @RequirePermissions(AdminPermission.PRICING_WRITE)
+  @ApiOperation({ summary: 'Créer une commune' })
+  createCommune(@Body() body: Record<string, unknown>) {
+    return this.adminService.createCommune(body);
+  }
+
+  @Delete('communes/:id')
+  @RequirePermissions(AdminPermission.PRICING_WRITE)
+  @ApiOperation({ summary: 'Supprimer une commune' })
+  deleteCommune(@Param('id') id: string) {
+    return this.adminService.deleteCommune(id);
+  }
+
   @Get('carpool')
   @RequirePermissions(AdminPermission.RIDES_READ)
   @ApiOperation({ summary: 'Trajets covoiturage' })
@@ -358,6 +372,13 @@ export class AdminController {
     return this.adminService.updateRentalInquiryStatus(id, status);
   }
 
+  @Get('wallet/overview')
+  @RequirePermissions(AdminPermission.WALLETS_READ)
+  @ApiOperation({ summary: 'Agrégats portefeuilles plateforme' })
+  walletOverview() {
+    return this.adminService.getWalletOverview();
+  }
+
   @Get('wallet/transactions')
   @RequirePermissions(AdminPermission.WALLETS_READ)
   @ApiOperation({ summary: 'Transactions portefeuille' })
@@ -374,7 +395,7 @@ export class AdminController {
 
   @Post('wallet/:userId/adjust')
   @RequirePermissions(AdminPermission.WALLETS_WRITE)
-  @ApiOperation({ summary: 'Ajustement manuel portefeuille (mock)' })
+  @ApiOperation({ summary: 'Ajustement manuel portefeuille' })
   adjustWallet(
     @Param('userId') userId: string,
     @Body() body: { amountCdf: number; type: 'CREDIT' | 'DEBIT'; description: string },

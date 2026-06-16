@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../core/api/api_client.dart';
 import '../../core/config/market_config.dart';
 import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
+import 'rental_booking_detail_screen.dart';
 import 'rental_detail_screen.dart';
 
 enum _RentalStep { search, compare }
@@ -59,6 +61,14 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
   String _formatDate(DateTime dt) =>
       '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
 
+  List<Map<String, dynamic>> _parseVehicles(Map<String, dynamic> data) {
+    final raw = data['data'] ?? data['vehicles'];
+    if (raw is List) {
+      return raw.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+    }
+    return [];
+  }
+
   Future<void> _search() async {
     setState(() {
       _loading = true;
@@ -74,13 +84,14 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
     };
     final query = params.entries.map((e) => '${e.key}=${Uri.encodeComponent(e.value)}').join('&');
     final api = ref.read(apiClientProvider);
+    await api.checkHealth();
     final result = await api.get('/rental/vehicles${query.isNotEmpty ? '?$query' : ''}');
     if (!mounted) return;
     setState(() {
       _loading = false;
       switch (result) {
         case Success(:final data):
-          _vehicles = (data['data'] as List? ?? []).cast<Map<String, dynamic>>();
+          _vehicles = _parseVehicles(data);
         case Failure(:final error):
           _error = error.message;
       }
@@ -90,14 +101,34 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
   Future<void> _loadMyRentals() async {
     setState(() => _loadingList = true);
     final api = ref.read(apiClientProvider);
-    final result = await api.get('/rental/inquiries');
+    final result = await api.get('/rental/bookings');
     if (!mounted) return;
     setState(() {
       _loadingList = false;
       if (result case Success(:final data)) {
-        _myRentals = (data['data'] as List? ?? data['inquiries'] as List? ?? []).cast<Map<String, dynamic>>();
+        _myRentals = (data['data'] as List? ?? data['bookings'] as List? ?? []).cast<Map<String, dynamic>>();
       }
     });
+  }
+
+  Future<void> _openBooking(Map<String, dynamic> booking) async {
+    final id = booking['id']?.toString() ?? '';
+    final refreshed = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => RentalBookingDetailScreen(
+          bookingId: id,
+          initialBooking: booking,
+        ),
+      ),
+    );
+    if (refreshed == true) _loadMyRentals();
+  }
+
+  Future<void> _callOwner(String? phone) async {
+    if (phone == null || phone.isEmpty) return;
+    final uri = Uri.parse('tel:$phone');
+    if (await canLaunchUrl(uri)) await launchUrl(uri);
   }
 
   Future<void> _pickDate({required bool isStart}) async {
@@ -272,6 +303,26 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (_step == _RentalStep.search) ...[
+          Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: MovaColors.violet.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.info_outline, size: 18, color: MovaColors.violet),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Louez un véhicule pour plusieurs jours. Pour un trajet immédiat, utilisez « Commander une course ».',
+                    style: TextStyle(fontSize: 12, color: MovaColors.violet),
+                  ),
+                ),
+              ],
+            ),
+          ),
           Text(
             'Louez un véhicule à la journée ou à la semaine.',
             style: theme.textTheme.bodyMedium?.copyWith(color: MovaColors.textSecondary),
@@ -427,6 +478,7 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
         return Padding(
           padding: const EdgeInsets.only(bottom: 12),
           child: MovaCard(
+            onTap: () => _openBooking(inq),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -448,12 +500,15 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
                 _timeline(inq['timeline'] as List?),
                 if (inq['ownerContactPhone'] != null) ...[
                   const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      const Icon(Icons.phone_outlined, size: 16, color: MovaColors.violet),
-                      const SizedBox(width: 4),
-                      Text('Propriétaire : ${inq['ownerContactPhone']}'),
-                    ],
+                  InkWell(
+                    onTap: () => _callOwner(inq['ownerContactPhone']?.toString()),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.phone_outlined, size: 16, color: MovaColors.violet),
+                        const SizedBox(width: 4),
+                        Text('Propriétaire : ${inq['ownerContactPhone']}'),
+                      ],
+                    ),
                   ),
                 ],
               ],

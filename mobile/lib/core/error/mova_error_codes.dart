@@ -9,7 +9,7 @@ const movaErrorMessages = <String, String>{
   'MOVA_RIDE_001': 'Course introuvable.',
   'MOVA_RIDE_002': 'Statut de course invalide pour cette action.',
   'MOVA_RIDE_003':
-      'Aucun chauffeur disponible à Kinshasa pour le moment. Réessayez dans 2 min.',
+      'Aucun chauffeur disponible dans votre zone pour le moment. Réessayez dans 2 min.',
   'MOVA_RIDE_004': 'Vous avez déjà une course en cours.',
   'MOVA_RIDE_005': "Délai d'acceptation expiré (30 secondes).",
   'MOVA_RIDE_006': 'Réservation planifiée introuvable.',

@@ -63,7 +63,7 @@ export const MOVA_ERROR_MESSAGES: Record<MovaErrorCode, string> = {
   [MovaErrorCode.RIDE_NOT_FOUND]: 'Course introuvable.',
   [MovaErrorCode.RIDE_INVALID_STATUS]: 'Statut de course invalide pour cette action.',
   [MovaErrorCode.RIDE_NO_DRIVERS]:
-    'Aucun chauffeur disponible à Kinshasa pour le moment. Réessayez dans 2 min.',
+    'Aucun chauffeur disponible dans votre zone pour le moment. Réessayez dans 2 min.',
   [MovaErrorCode.RIDE_ALREADY_ACTIVE]: 'Vous avez déjà une course en cours.',
   [MovaErrorCode.RIDE_ACCEPT_TIMEOUT]: "Délai d'acceptation expiré (30 secondes).",
   [MovaErrorCode.RIDE_ALREADY_RATED]: 'Vous avez déjà noté cette course.',

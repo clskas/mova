@@ -4,11 +4,14 @@ import {
   findServiceAreaByName,
   fallbackServiceArea,
   getServiceArea,
+  isInDrcTerritory,
   isInServiceArea,
   MARKET_RDC,
   MovaErrorCode,
   MovaHttpException,
+  rdcTerritoryOutOfBoundsMessage,
   serviceAreaOutOfBoundsMessage,
+  resolveServiceAreaForCoords,
   getCommunesForArea,
   type ServiceArea,
 } from '@mova/shared';
@@ -52,15 +55,14 @@ export function assertServiceAreaCoords(lat: number, lng: number, areaId?: strin
     }
     return area;
   }
-  const area = findServiceAreaByCoords(lat, lng);
-  if (!area) {
+  if (!isInDrcTerritory(lat, lng)) {
     throw new MovaHttpException(
       MovaErrorCode.VALIDATION_ERROR,
       undefined,
-      serviceAreaOutOfBoundsMessage(),
+      rdcTerritoryOutOfBoundsMessage(),
     );
   }
-  return area;
+  return resolveServiceAreaForCoords(lat, lng);
 }
 
 /** Destination dans une zone de service MOVA (adresse ou coords valides). */

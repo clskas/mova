@@ -12,6 +12,15 @@ class MarketConfig {
   static const mapCenterLat = -2.88;
   static const mapCenterLng = 23.66;
 
+  /// Emprise approximative du territoire RDC (couverture nationale).
+  static const rdcMinLat = -13.6;
+  static const rdcMaxLat = 5.6;
+  static const rdcMinLng = 12.0;
+  static const rdcMaxLng = 31.5;
+
+  static bool isInDrcTerritory(double lat, double lng) =>
+      lat >= rdcMinLat && lat <= rdcMaxLat && lng >= rdcMinLng && lng <= rdcMaxLng;
+
   /// Alias technique — centre carte RDC (pas Kinshasa).
   static const defaultLat = mapCenterLat;
   static const defaultLng = mapCenterLng;

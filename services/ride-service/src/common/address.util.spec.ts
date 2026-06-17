@@ -28,7 +28,7 @@ describe('address.util', () => {
     } catch (e) {
       expect((e as MovaHttpException).getResponse()).toMatchObject({
         code: MovaErrorCode.VALIDATION_ERROR,
-        message: expect.stringContaining('MOVA couvre'),
+        message: expect.stringMatching(/RDC|MOVA couvre/i),
       });
     }
   });
@@ -56,7 +56,12 @@ describe('address.util', () => {
     expect(pair.isInterCity).toBe(false);
   });
 
-  it('rejette des coords hors zones MOVA', () => {
+  it('accepte des coords en zone rurale RDC (hors boîte urbaine)', () => {
+    const pair = assertServiceAreaPair(-3.0, 24.0, -3.05, 24.05);
+    expect(pair.isInterCity).toBe(false);
+  });
+
+  it('rejette des coords hors territoire RDC', () => {
     expect(() => assertKinshasaDestination('Ma position', { lat: 48.8566, lng: 2.3522 })).toThrow(
       MovaHttpException,
     );

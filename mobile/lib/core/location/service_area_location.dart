@@ -1,5 +1,6 @@
 import 'package:latlong2/latlong.dart';
 
+import '../config/market_config.dart';
 import 'service_areas.dart';
 
 /// Validation GPS et géocodage stub par zone de service MOVA.
@@ -23,6 +24,7 @@ class ServiceAreaLocation {
 
   static bool isInBounds(LatLng coords, {String? areaId}) {
     if (areaId != null) return areaFor(areaId).contains(coords);
+    if (MarketConfig.isInDrcTerritory(coords.latitude, coords.longitude)) return true;
     return ServiceAreas.byCoords(coords) != null;
   }
 
@@ -89,7 +91,7 @@ class ServiceAreaLocation {
     String? areaId,
   }) {
     if (isInBounds(coords, areaId: areaId)) return coords;
-    if (isInBounds(coords)) return coords;
+    if (MarketConfig.isInDrcTerritory(coords.latitude, coords.longitude)) return coords;
     if (address != null && address.trim().isNotEmpty) {
       final byName = ServiceAreas.byName(address);
       final resolvedAreaId = areaId ?? byName?.id;
@@ -106,7 +108,7 @@ class ServiceAreaLocation {
   }
 
   static String outOfAreaMessage() =>
-      'MOVA couvre ${ServiceAreas.coverageMessage()}. Choisissez une adresse dans une ville desservie en RDC.';
+      'Choisissez une adresse en République Démocratique du Congo.';
 
   /// @deprecated Utiliser [districtFromAddress]
   static LatLng? communeFromAddress(String address, {String? areaId}) =>

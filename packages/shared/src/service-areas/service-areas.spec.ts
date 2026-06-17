@@ -17,7 +17,12 @@ describe('service-areas', () => {
     expect(findServiceAreaByCoords(-11.6647, 27.4794)?.name).toBe('Lubumbashi');
   });
 
-  it('rejects coords outside DRC service areas', () => {
+  it('accepts coords anywhere in DRC territory', () => {
+    expect(isInServiceArea(0.495, 29.473)).toBe(true);
+    expect(isInServiceArea(-3.0, 24.0)).toBe(true);
+  });
+
+  it('rejects coords outside DRC territory', () => {
     expect(isInServiceArea(48.8566, 2.3522)).toBe(false);
   });
 });

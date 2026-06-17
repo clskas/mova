@@ -1,4 +1,5 @@
 import { KINSHASA_COMMUNES } from '../communes-seed';
+import { isInDrcTerritory } from '../territory/rdc-territory';
 import {
   DEFAULT_SERVICE_AREA_ID,
   RDC_MAP_CENTER,
@@ -41,7 +42,7 @@ export function isInServiceArea(
     const b = area.bounds;
     return lat >= b.minLat && lat <= b.maxLat && lng >= b.minLng && lng <= b.maxLng;
   }
-  return findServiceAreaByCoords(lat, lng) != null;
+  return isInDrcTerritory(lat, lng);
 }
 
 /** @deprecated Utiliser isInServiceArea — conservé pour compatibilité. */
@@ -95,6 +96,11 @@ export function resolveCityFromCoords(lat: number, lng: number): string {
   return findServiceAreaByCoords(lat, lng)?.name ?? findNearestServiceArea(lat, lng).name;
 }
 
+/** Zone la plus proche pour tarification / libellé (tout point en RDC). */
+export function resolveServiceAreaForCoords(lat: number, lng: number): ServiceArea {
+  return findServiceAreaByCoords(lat, lng) ?? findNearestServiceArea(lat, lng);
+}
+
 export function getCommunesForArea(areaId: string): ServiceAreaDistrict[] {
   const area = getServiceArea(areaId);
   if (!area) return [];
@@ -111,5 +117,5 @@ export function formatServiceAreasList(max = 8): string {
 }
 
 export function serviceAreaOutOfBoundsMessage(): string {
-  return `MOVA couvre ${formatServiceAreasList()}. Choisissez une adresse dans une ville desservie.`;
+  return 'Choisissez une adresse en République Démocratique du Congo.';
 }

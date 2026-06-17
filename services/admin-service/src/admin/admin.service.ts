@@ -225,6 +225,36 @@ export class AdminService {
     return this.proxy('ride', `/internal/communes/${id}`, { method: 'DELETE' });
   }
 
+  listProvinces() {
+    return this.fetchJson('ride', '/internal/provinces');
+  }
+  createProvince(name: string) {
+    return this.proxy('ride', '/internal/provinces', { method: 'POST', body: JSON.stringify({ name }) });
+  }
+  updateProvince(id: string, name: string) {
+    return this.proxy('ride', `/internal/provinces/${id}`, { method: 'PATCH', body: JSON.stringify({ name }) });
+  }
+  deleteProvince(id: string) {
+    return this.proxy('ride', `/internal/provinces/${id}`, { method: 'DELETE' });
+  }
+
+  listCities(provinceId?: string) {
+    const q = provinceId ? `?provinceId=${encodeURIComponent(provinceId)}` : '';
+    return this.fetchJson('ride', `/internal/cities${q}`);
+  }
+  listCitiesCatalog() {
+    return this.fetchJson('ride', '/internal/cities/catalog');
+  }
+  createCity(body: Record<string, unknown>) {
+    return this.proxy('ride', '/internal/cities', { method: 'POST', body: JSON.stringify(body) });
+  }
+  updateCity(id: string, body: Record<string, unknown>) {
+    return this.proxy('ride', `/internal/cities/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
+  }
+  deleteCity(id: string) {
+    return this.proxy('ride', `/internal/cities/${id}`, { method: 'DELETE' });
+  }
+
   listCarpool(take = 50) {
     return this.fetchJson('ride', `/internal/carpool?take=${take}`);
   }

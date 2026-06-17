@@ -316,6 +316,69 @@ export class AdminController {
     return this.adminService.deleteCommune(id);
   }
 
+  @Get('provinces')
+  @RequirePermissions(AdminPermission.PRICING_READ)
+  @ApiOperation({ summary: 'Provinces RDC' })
+  provinces() {
+    return this.adminService.listProvinces();
+  }
+
+  @Post('provinces')
+  @RequirePermissions(AdminPermission.PRICING_WRITE)
+  @ApiOperation({ summary: 'Créer une province' })
+  createProvince(@Body('name') name: string) {
+    return this.adminService.createProvince(name);
+  }
+
+  @Patch('provinces/:id')
+  @RequirePermissions(AdminPermission.PRICING_WRITE)
+  @ApiOperation({ summary: 'Modifier une province' })
+  updateProvince(@Param('id') id: string, @Body('name') name: string) {
+    return this.adminService.updateProvince(id, name);
+  }
+
+  @Delete('provinces/:id')
+  @RequirePermissions(AdminPermission.PRICING_WRITE)
+  @ApiOperation({ summary: 'Supprimer une province' })
+  deleteProvince(@Param('id') id: string) {
+    return this.adminService.deleteProvince(id);
+  }
+
+  @Get('cities')
+  @RequirePermissions(AdminPermission.PRICING_READ)
+  @ApiOperation({ summary: 'Villes MOVA' })
+  cities(@Query('provinceId') provinceId?: string) {
+    return this.adminService.listCities(provinceId);
+  }
+
+  @Get('cities/catalog')
+  @RequirePermissions(AdminPermission.PRICING_READ)
+  @ApiOperation({ summary: 'Catalogue villes (DB + statique)' })
+  citiesCatalog() {
+    return this.adminService.listCitiesCatalog();
+  }
+
+  @Post('cities')
+  @RequirePermissions(AdminPermission.PRICING_WRITE)
+  @ApiOperation({ summary: 'Créer une ville' })
+  createCity(@Body() body: Record<string, unknown>) {
+    return this.adminService.createCity(body);
+  }
+
+  @Patch('cities/:id')
+  @RequirePermissions(AdminPermission.PRICING_WRITE)
+  @ApiOperation({ summary: 'Modifier une ville' })
+  updateCity(@Param('id') id: string, @Body() body: Record<string, unknown>) {
+    return this.adminService.updateCity(id, body);
+  }
+
+  @Delete('cities/:id')
+  @RequirePermissions(AdminPermission.PRICING_WRITE)
+  @ApiOperation({ summary: 'Supprimer une ville' })
+  deleteCity(@Param('id') id: string) {
+    return this.adminService.deleteCity(id);
+  }
+
   @Get('carpool')
   @RequirePermissions(AdminPermission.RIDES_READ)
   @ApiOperation({ summary: 'Trajets covoiturage' })

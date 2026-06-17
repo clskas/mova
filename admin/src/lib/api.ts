@@ -248,6 +248,27 @@ export type Commune = {
   lng?: number;
 };
 
+export type Province = {
+  id: string;
+  name: string;
+  _count?: { cities: number };
+};
+
+export type AdminCity = {
+  id: string;
+  slug: string;
+  name: string;
+  provinceId: string;
+  province?: { id: string; name: string };
+  centerLat: number;
+  centerLng: number;
+  minLat: number;
+  maxLat: number;
+  minLng: number;
+  maxLng: number;
+  isActive: boolean;
+};
+
 export class ApiError extends Error {
   constructor(message: string, readonly status: number) {
     super(message);
@@ -599,6 +620,46 @@ export async function createCommune(data: { name: string; city: string; lat: num
 
 export async function deleteCommune(id: string) {
   return apiFetch(`/api/admin/communes/${id}`, { method: "DELETE" });
+}
+
+export async function fetchProvinces(): Promise<Province[]> {
+  return apiFetch<Province[]>("/api/admin/provinces");
+}
+
+export async function createProvince(name: string) {
+  return apiFetch<Province>("/api/admin/provinces", { method: "POST", body: JSON.stringify({ name }) });
+}
+
+export async function updateProvince(id: string, name: string) {
+  return apiFetch<Province>(`/api/admin/provinces/${id}`, { method: "PATCH", body: JSON.stringify({ name }) });
+}
+
+export async function deleteProvince(id: string) {
+  return apiFetch(`/api/admin/provinces/${id}`, { method: "DELETE" });
+}
+
+export async function fetchCities(provinceId?: string): Promise<AdminCity[]> {
+  const q = provinceId ? `?provinceId=${encodeURIComponent(provinceId)}` : "";
+  return apiFetch<AdminCity[]>(`/api/admin/cities${q}`);
+}
+
+export async function createCity(data: {
+  name: string;
+  slug: string;
+  provinceId: string;
+  centerLat: number;
+  centerLng: number;
+  isActive?: boolean;
+}) {
+  return apiFetch<AdminCity>("/api/admin/cities", { method: "POST", body: JSON.stringify(data) });
+}
+
+export async function updateCity(id: string, data: Partial<AdminCity>) {
+  return apiFetch<AdminCity>(`/api/admin/cities/${id}`, { method: "PATCH", body: JSON.stringify(data) });
+}
+
+export async function deleteCity(id: string) {
+  return apiFetch(`/api/admin/cities/${id}`, { method: "DELETE" });
 }
 
 export async function updateCommune(id: string, data: Partial<Commune>) {

@@ -42,6 +42,8 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
   final Set<String> _dismissedOffers = {};
   String? _profileError;
   bool _showingOffer = false;
+  List<Map<String, dynamic>> _rideOffers = [];
+  String? _offersError;
 
   @override
   void initState() {
@@ -202,13 +204,65 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
   void _startPolling() {
     _offerPollTimer?.cancel();
     _pollOffers();
-    _offerPollTimer = Timer.periodic(const Duration(seconds: 5), (_) => _pollOffers());
+    _offerPollTimer = Timer.periodic(const Duration(seconds: 3), (_) => _pollOffers());
     _startLocationUpdates();
+    _refreshRideOffers();
   }
 
   void _stopPolling() {
     _offerPollTimer?.cancel();
     _stopLocationUpdates();
+  }
+
+  String? _vehicleIdForOffer(Map<String, dynamic> offer) {
+    final rideType = (offer['vehicleType']?.toString() ?? 'STANDARD').toUpperCase();
+    final normalized = rideType == 'MOTO' ? 'MOTO_TAXI' : rideType;
+    final vehicles = (_profile?['vehicles'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    for (final v in vehicles) {
+      if (v['isActive'] == false) continue;
+      if ((v['type']?.toString() ?? '').toUpperCase() == normalized) {
+        return v['id']?.toString();
+      }
+    }
+    return _vehicleId;
+  }
+
+  Future<void> _openRideOffer(Map<String, dynamic> offer) async {
+    final id = offer['id']?.toString() ?? '';
+    if (id.isEmpty) return;
+    _showingOffer = true;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => RideOfferScreen(
+          offer: offer,
+          vehicleId: _vehicleIdForOffer(offer),
+        ),
+      ),
+    );
+    _dismissedOffers.add('ride:$id');
+    _showingOffer = false;
+    await _loadActiveRide();
+    await _refreshRideOffers();
+  }
+
+  Future<void> _refreshRideOffers() async {
+    if (!_available || _activeRide != null || _activeDelivery != null) {
+      if (mounted) setState(() => _rideOffers = []);
+      return;
+    }
+    final api = ref.read(apiClientProvider);
+    final rideResult = await api.getDriverOffers();
+    if (!mounted) return;
+    switch (rideResult) {
+      case Success(:final data):
+        setState(() {
+          _rideOffers = data;
+          _offersError = null;
+        });
+      case Failure(:final error):
+        setState(() => _offersError = error.message);
+    }
   }
 
   Future<void> _pollOffers() async {
@@ -218,22 +272,18 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
     final rideResult = await api.getDriverOffers();
     if (!mounted || _showingOffer) return;
     if (rideResult case Success(:final data)) {
+      setState(() {
+        _rideOffers = data;
+        _offersError = null;
+      });
       for (final offer in data) {
         final id = offer['id']?.toString() ?? '';
         if (id.isEmpty || _dismissedOffers.contains('ride:$id')) continue;
-        _showingOffer = true;
-        if (!mounted) return;
-        await Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => RideOfferScreen(offer: offer, vehicleId: _vehicleId),
-          ),
-        );
-        _dismissedOffers.add('ride:$id');
-        _showingOffer = false;
-        await _loadActiveRide();
+        await _openRideOffer(offer);
         return;
       }
+    } else if (rideResult case Failure(:final error)) {
+      setState(() => _offersError = error.message);
     }
 
     final deliveryResult = await api.getDeliveryOffers();
@@ -549,15 +599,67 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
             ),
           ],
           const SizedBox(height: 16),
-          if (_available && _activeRide == null && _activeDelivery == null)
-            const Padding(
-              padding: EdgeInsets.only(bottom: 12),
-              child: Text(
-                'En attente de courses ou livraisons à proximité…',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: MovaColors.textSecondary),
+          if (_available && _activeRide == null && _activeDelivery == null) ...[
+            if (_offersError != null) ...[
+              MovaErrorBanner(message: _offersError!, onRetry: _refreshRideOffers),
+              const SizedBox(height: 12),
+            ],
+            if (_rideOffers.isNotEmpty) ...[
+              MovaCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.local_taxi, color: MovaColors.green, size: 20),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Courses disponibles (${_rideOffers.length})',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    ..._rideOffers.take(5).map((offer) {
+                      final fare = (offer['estimatedFareCdf'] ?? offer['priceCdf']) as num?;
+                      return ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(
+                          offer['pickupAddress']?.toString() ?? 'Course',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        subtitle: Text(
+                          '→ ${offer['dropoffAddress']?.toString() ?? ''}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        trailing: fare != null
+                            ? Text(
+                                MarketConfig.formatCdf(fare.toInt()),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: MovaColors.green,
+                                ),
+                              )
+                            : const Icon(Icons.chevron_right),
+                        onTap: () => _openRideOffer(offer),
+                      );
+                    }),
+                  ],
+                ),
               ),
-            ),
+              const SizedBox(height: 12),
+            ] else
+              const Padding(
+                padding: EdgeInsets.only(bottom: 12),
+                child: Text(
+                  'En attente de courses ou livraisons à proximité…',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: MovaColors.textSecondary),
+                ),
+              ),
+          ],
           MovaButton(
             label: 'Publier un covoiturage',
             isSecondary: true,

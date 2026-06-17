@@ -202,6 +202,49 @@ export class SeedService implements OnModuleInit {
   }
 
   async ensureSeedData() {
+    await this.seedSection('provinces-cities', async () => {
+      const provinceIds = new Map<string, string>();
+      for (const area of DRC_SERVICE_AREAS) {
+        let provinceId = provinceIds.get(area.province);
+        if (!provinceId) {
+          const p = await this.prisma.province.upsert({
+            where: { name: area.province },
+            create: { name: area.province },
+            update: {},
+          });
+          provinceId = p.id;
+          provinceIds.set(area.province, provinceId);
+        }
+        const b = area.bounds;
+        await this.prisma.city.upsert({
+          where: { slug: area.id },
+          create: {
+            slug: area.id,
+            name: area.name,
+            provinceId,
+            centerLat: area.centerLat,
+            centerLng: area.centerLng,
+            minLat: b.minLat,
+            maxLat: b.maxLat,
+            minLng: b.minLng,
+            maxLng: b.maxLng,
+            isActive: area.active,
+          },
+          update: {
+            name: area.name,
+            provinceId,
+            centerLat: area.centerLat,
+            centerLng: area.centerLng,
+            minLat: b.minLat,
+            maxLat: b.maxLat,
+            minLng: b.minLng,
+            maxLng: b.maxLng,
+            isActive: area.active,
+          },
+        });
+      }
+    });
+
     await this.seedSection('communes', async () => {
       for (const c of KINSHASA_COMMUNES) {
         await this.prisma.commune.upsert({

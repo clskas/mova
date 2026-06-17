@@ -219,6 +219,62 @@ export class InternalController {
     return this.geo.deleteCommune(id);
   }
 
+  @Get('provinces')
+  listProvinces() {
+    return this.geo.listProvinces();
+  }
+
+  @Post('provinces')
+  createProvince(@Body('name') name: string) {
+    return this.geo.createProvince(name);
+  }
+
+  @Patch('provinces/:id')
+  updateProvince(@Param('id') id: string, @Body('name') name: string) {
+    return this.geo.updateProvince(id, name);
+  }
+
+  @Delete('provinces/:id')
+  deleteProvince(@Param('id') id: string) {
+    return this.geo.deleteProvince(id);
+  }
+
+  @Get('cities')
+  listCities(@Query('provinceId') provinceId?: string) {
+    return this.geo.listCities(provinceId);
+  }
+
+  @Get('cities/catalog')
+  citiesCatalog() {
+    return this.geo.listCitiesCatalog();
+  }
+
+  @Post('cities')
+  createCity(@Body() body: {
+    name: string;
+    slug: string;
+    provinceId: string;
+    centerLat: number;
+    centerLng: number;
+    minLat?: number;
+    maxLat?: number;
+    minLng?: number;
+    maxLng?: number;
+    isActive?: boolean;
+  }) {
+    return this.geo.createCity(body);
+  }
+
+  @Patch('cities/:id')
+  updateCity(@Param('id') id: string, @Body() body: Record<string, unknown>) {
+    return this.geo.updateCity(id, body);
+  }
+
+  @Delete('cities/:id')
+  deleteCity(@Param('id') id: string) {
+    return this.geo.deleteCity(id);
+  }
+
   @Get('carpool')
   listCarpool(@Query('take') take?: string) {
     return this.carpool.listForAdmin(Number(take ?? 50));

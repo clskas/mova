@@ -35,6 +35,7 @@ class _MatchingScreenState extends ConsumerState<MatchingScreen>
   bool _cancelling = false;
   String? _error;
   int _attempt = 0;
+  int _driversFound = 0;
   double? _radiusKm;
   DateTime? _lastSearchAt;
   Timer? _pollTimer;
@@ -70,8 +71,10 @@ class _MatchingScreenState extends ConsumerState<MatchingScreen>
 
     switch (result) {
       case Success(:final data):
+        final found = (data['driversFound'] as num?)?.toInt() ?? 0;
         setState(() {
           _attempt = (data['attempt'] as num?)?.toInt() ?? 0;
+          _driversFound = found;
           _radiusKm = (data['radiusKm'] as num?)?.toDouble();
           _lastSearchAt = DateTime.now();
         });
@@ -243,6 +246,32 @@ class _MatchingScreenState extends ConsumerState<MatchingScreen>
                       'Rayon de recherche : ${_radiusKm!.toStringAsFixed(0)} km',
                       textAlign: TextAlign.center,
                       style: const TextStyle(fontSize: 13, color: MovaColors.textSecondary),
+                    ),
+                  ],
+                  if (_driversFound > 0) ...[
+                    const SizedBox(height: 12),
+                    MovaCard(
+                      child: Row(
+                        children: [
+                          const Icon(Icons.check_circle_outline, color: MovaColors.green),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              _driversFound == 1
+                                  ? '1 chauffeur disponible — en attente d\'acceptation…'
+                                  : '$_driversFound chauffeurs disponibles — en attente d\'acceptation…',
+                              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ] else if (_searching && _attempt > 1) ...[
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Élargissement du rayon de recherche…',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 13, color: MovaColors.orange),
                     ),
                   ],
                   const SizedBox(height: 16),

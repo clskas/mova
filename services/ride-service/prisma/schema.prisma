@@ -66,6 +66,36 @@ model Commune {
   @@map("communes")
 }
 
+model Province {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  cities    City[]
+
+  @@map("provinces")
+}
+
+model City {
+  id         String   @id @default(uuid())
+  slug       String   @unique
+  name       String
+  provinceId String
+  province   Province @relation(fields: [provinceId], references: [id], onDelete: Cascade)
+  centerLat  Float
+  centerLng  Float
+  minLat     Float
+  maxLat     Float
+  minLng     Float
+  maxLng     Float
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([name, provinceId])
+  @@map("cities")
+}
+
 model PricingRule {
   id              String      @id @default(uuid())
   vehicleType     VehicleType

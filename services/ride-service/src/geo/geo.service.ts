@@ -35,6 +35,136 @@ export class GeoService {
     }));
   }
 
+  async listProvinces() {
+    return this.prisma.province.findMany({
+      orderBy: { name: 'asc' },
+      include: { _count: { select: { cities: true } } },
+    });
+  }
+
+  async createProvince(name: string) {
+    const trimmed = name.trim();
+    if (!trimmed) throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Nom de province requis.');
+    return this.prisma.province.create({ data: { name: trimmed } });
+  }
+
+  async updateProvince(id: string, name: string) {
+    const trimmed = name.trim();
+    if (!trimmed) throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Nom de province requis.');
+    const existing = await this.prisma.province.findUnique({ where: { id } });
+    if (!existing) throw new MovaHttpException(MovaErrorCode.NOT_FOUND, undefined, 'Province introuvable.');
+    return this.prisma.province.update({ where: { id }, data: { name: trimmed } });
+  }
+
+  async deleteProvince(id: string) {
+    const existing = await this.prisma.province.findUnique({ where: { id }, include: { _count: { select: { cities: true } } } });
+    if (!existing) throw new MovaHttpException(MovaErrorCode.NOT_FOUND, undefined, 'Province introuvable.');
+    if (existing._count.cities > 0) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Supprimez d\'abord les villes de cette province.');
+    }
+    return this.prisma.province.delete({ where: { id } });
+  }
+
+  async listCities(provinceId?: string) {
+    return this.prisma.city.findMany({
+      where: provinceId ? { provinceId } : undefined,
+      orderBy: [{ province: { name: 'asc' } }, { name: 'asc' }],
+      include: { province: { select: { id: true, name: true } } },
+    });
+  }
+
+  async createCity(data: {
+    name: string;
+    slug: string;
+    provinceId: string;
+    centerLat: number;
+    centerLng: number;
+    minLat?: number;
+    maxLat?: number;
+    minLng?: number;
+    maxLng?: number;
+    isActive?: boolean;
+  }) {
+    const radius = 0.12;
+    const minLat = data.minLat ?? data.centerLat - radius;
+    const maxLat = data.maxLat ?? data.centerLat + radius;
+    const minLng = data.minLng ?? data.centerLng - radius;
+    const maxLng = data.maxLng ?? data.centerLng + radius;
+    return this.prisma.city.create({
+      data: {
+        name: data.name.trim(),
+        slug: data.slug.trim().toLowerCase(),
+        provinceId: data.provinceId,
+        centerLat: data.centerLat,
+        centerLng: data.centerLng,
+        minLat,
+        maxLat,
+        minLng,
+        maxLng,
+        isActive: data.isActive ?? true,
+      },
+      include: { province: { select: { id: true, name: true } } },
+    });
+  }
+
+  async updateCity(id: string, data: Record<string, unknown>) {
+    const existing = await this.prisma.city.findUnique({ where: { id } });
+    if (!existing) throw new MovaHttpException(MovaErrorCode.NOT_FOUND, undefined, 'Ville introuvable.');
+    const patch: Record<string, unknown> = {};
+    if (typeof data.name === 'string') patch.name = data.name.trim();
+    if (typeof data.slug === 'string') patch.slug = data.slug.trim().toLowerCase();
+    if (typeof data.provinceId === 'string') patch.provinceId = data.provinceId;
+    if (typeof data.centerLat === 'number') patch.centerLat = data.centerLat;
+    if (typeof data.centerLng === 'number') patch.centerLng = data.centerLng;
+    if (typeof data.minLat === 'number') patch.minLat = data.minLat;
+    if (typeof data.maxLat === 'number') patch.maxLat = data.maxLat;
+    if (typeof data.minLng === 'number') patch.minLng = data.minLng;
+    if (typeof data.maxLng === 'number') patch.maxLng = data.maxLng;
+    if (typeof data.isActive === 'boolean') patch.isActive = data.isActive;
+    return this.prisma.city.update({
+      where: { id },
+      data: patch,
+      include: { province: { select: { id: true, name: true } } },
+    });
+  }
+
+  async deleteCity(id: string) {
+    const existing = await this.prisma.city.findUnique({ where: { id } });
+    if (!existing) throw new MovaHttpException(MovaErrorCode.NOT_FOUND, undefined, 'Ville introuvable.');
+    return this.prisma.city.delete({ where: { id } });
+  }
+
+  /** Liste villes pour admin / mobile — DB prioritaire, fallback catalogue statique. */
+  async listCitiesCatalog() {
+    const db = await this.listCities();
+    if (db.length > 0) {
+      return db.map((c) => ({
+        id: c.id,
+        slug: c.slug,
+        name: c.name,
+        province: c.province.name,
+        provinceId: c.provinceId,
+        centerLat: c.centerLat,
+        centerLng: c.centerLng,
+        bounds: { minLat: c.minLat, maxLat: c.maxLat, minLng: c.minLng, maxLng: c.maxLng },
+        isActive: c.isActive,
+        source: 'db' as const,
+      }));
+    }
+    return getActiveServiceAreas().map((a) => ({
+      id: a.id,
+      slug: a.id,
+      name: a.name,
+      province: a.province,
+      provinceId: null,
+      centerLat: a.centerLat,
+      centerLng: a.centerLng,
+      bounds: a.bounds,
+      isActive: a.active,
+      source: 'static' as const,
+    }));
+  }
+
   async getCommunes(city?: string) {
     if (!city) {
       return this.prisma.commune.findMany({

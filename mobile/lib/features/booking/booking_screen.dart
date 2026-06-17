@@ -411,22 +411,19 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
       title: 'Taxi / Moto-taxi',
       scrollable: false,
       padding: EdgeInsets.zero,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          MovaRideMap(
-            pickup: _pickup,
-            dropoff: _dropoff,
-            onDropoffTap: _onMapDropoffTap,
-            dropoffEditable: true,
-          ),
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  TextField(
+      child: MovaMapFormLayout(
+        maxMapHeight: 190,
+        mapBuilder: (height) => MovaRideMap(
+          pickup: _pickup,
+          dropoff: _dropoff,
+          height: height,
+          onDropoffTap: _onMapDropoffTap,
+          dropoffEditable: true,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TextField(
                     controller: _pickupController,
                     decoration: InputDecoration(
                       labelText: 'Départ',
@@ -505,15 +502,21 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              const Text('Estimation', style: TextStyle(fontSize: 16)),
-                              Text(
-                                MarketConfig.formatCdf(total),
-                                style: const TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                  color: MovaColors.green,
+                              const Expanded(
+                                child: Text('Estimation', style: TextStyle(fontSize: 16)),
+                              ),
+                              Flexible(
+                                child: Text(
+                                  MarketConfig.formatCdf(total),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  textAlign: TextAlign.end,
+                                  style: const TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                    color: MovaColors.green,
+                                  ),
                                 ),
                               ),
                             ],
@@ -538,13 +541,25 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                                 if (distance != null) ...[
                                   const Icon(Icons.straighten, size: 16, color: MovaColors.textSecondary),
                                   const SizedBox(width: 4),
-                                  Text('${distance.toStringAsFixed(1)} km'),
-                                  const SizedBox(width: 16),
+                                  Flexible(
+                                    child: Text(
+                                      '${distance.toStringAsFixed(1)} km',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
                                 ],
                                 if (duration != null) ...[
                                   const Icon(Icons.schedule, size: 16, color: MovaColors.textSecondary),
                                   const SizedBox(width: 4),
-                                  Text('${duration.ceil()} min'),
+                                  Flexible(
+                                    child: Text(
+                                      '${duration.ceil()} min',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
                                 ],
                               ],
                             ),
@@ -601,11 +616,8 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                       icon: Icons.check_circle_outline,
                       onPressed: _loadingConfirm ? null : _confirmRide,
                     ),
-                ],
-              ),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

@@ -16,5 +16,5 @@ export class DriversController {
   @Post('location') location(@Request() req: { user: { id: string } }, @Body() dto: LocationDto) { return this.driversService.updateLocation(req.user.id, dto.lat, dto.lng); }
   @Post('kyc') kyc(@Request() req: { user: { id: string } }, @Body() dto: KycUploadDto) { return this.driversService.uploadKyc(req.user.id, dto.type, dto.url); }
   @Get('earnings') earnings(@Request() req: { user: { id: string } }) { return this.driversService.getEarnings(req.user.id); }
-  @Get('profile') profile(@Request() req: { user: { id: string } }) { return this.driversService.getProfile(req.user.id); }
+  @Get('profile') profile(@Request() req: { user: { id: string } }) { return this.driversService.getOrCreateProfile(req.user.id); }
 }

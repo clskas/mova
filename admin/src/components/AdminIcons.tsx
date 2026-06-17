@@ -138,3 +138,35 @@ export function WalletIcon({ className }: IconProps) {
     </Svg>
   );
 }
+
+export function LocationsIcon({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <path d="M5 17h14l-1.5-4.5H6.5L5 17z" />
+      <path d="M7 12.5V9a5 5 0 0110 0v3.5" />
+      <circle cx="7.5" cy="17.5" r="1.5" fill="currentColor" stroke="none" />
+      <circle cx="16.5" cy="17.5" r="1.5" fill="currentColor" stroke="none" />
+    </Svg>
+  );
+}
+
+export function MovingIcon({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <rect x="3" y="8" width="12" height="10" rx="1" />
+      <path d="M15 12h4l2 2v4h-6v-6z" />
+      <path d="M7 5v3M11 5v3" />
+    </Svg>
+  );
+}
+
+export function CarpoolIcon({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <circle cx="8" cy="9" r="2.5" />
+      <circle cx="16" cy="9" r="2.5" />
+      <path d="M3 18v-1a4 4 0 014-4h2M21 18v-1a4 4 0 00-4-4h-2" />
+      <path d="M10 14h4" />
+    </Svg>
+  );
+}

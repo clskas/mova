@@ -29,9 +29,10 @@ class VehicleSelector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 118,
+      height: 124,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
         itemCount: MarketConfig.vehicleTypes.length,
         separatorBuilder: (_, __) => const SizedBox(width: 10),
         itemBuilder: (context, index) {
@@ -45,14 +46,14 @@ class VehicleSelector extends StatelessWidget {
           };
 
           return SizedBox(
-            width: 108,
+            width: 104,
             child: Material(
               color: Colors.transparent,
               child: InkWell(
                 onTap: () => onSelected(option.id),
                 borderRadius: BorderRadius.circular(16),
                 child: Container(
-                  padding: const EdgeInsets.all(10),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
                   decoration: BoxDecoration(
                     color: Theme.of(context).cardColor,
                     borderRadius: BorderRadius.circular(16),
@@ -69,44 +70,47 @@ class VehicleSelector extends StatelessWidget {
                     ],
                   ),
                   child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(option.icon, style: const TextStyle(fontSize: 22)),
-                    const SizedBox(height: 4),
-                    Text(
-                      option.label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13,
-                        color: isSelected ? MovaColors.midnight : MovaColors.textSecondary,
-                      ),
-                    ),
-                    const Spacer(),
-                    if (estimate?.loading == true)
-                      const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    else if (estimate?.priceCdf != null)
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(option.icon, style: const TextStyle(fontSize: 20)),
+                      const SizedBox(height: 4),
                       Text(
-                        MarketConfig.formatCdf(estimate!.priceCdf!),
+                        option.label,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
+                          fontWeight: FontWeight.w600,
                           fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: accentColor,
+                          color: isSelected ? MovaColors.midnight : MovaColors.textSecondary,
                         ),
-                      )
-                    else
-                      const Text(
-                        '—',
-                        style: TextStyle(color: MovaColors.textSecondary, fontSize: 12),
                       ),
-                  ],
+                      const Spacer(),
+                      if (estimate?.loading == true)
+                        const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      else if (estimate?.priceCdf != null)
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            MarketConfig.formatCdf(estimate!.priceCdf!),
+                            maxLines: 1,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: accentColor,
+                            ),
+                          ),
+                        )
+                      else
+                        const Text(
+                          '—',
+                          style: TextStyle(color: MovaColors.textSecondary, fontSize: 12),
+                        ),
+                    ],
                   ),
                 ),
               ),

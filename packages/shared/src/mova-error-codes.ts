@@ -24,6 +24,7 @@ export enum MovaErrorCode {
   CARPOOL_NOT_FOUND = 'MOVA_CAR_001',
   CARPOOL_NO_SEATS = 'MOVA_CAR_002',
   CARPOOL_ALREADY_JOINED = 'MOVA_CAR_003',
+  CARPOOL_PUBLISH_DRIVER_ONLY = 'MOVA_CAR_004',
 
   ERRAND_NOT_FOUND = 'MOVA_ERR_001',
   ERRAND_INVALID_STATUS = 'MOVA_ERR_002',
@@ -79,6 +80,8 @@ export const MOVA_ERROR_MESSAGES: Record<MovaErrorCode, string> = {
   [MovaErrorCode.CARPOOL_NOT_FOUND]: 'Trajet covoiturage introuvable.',
   [MovaErrorCode.CARPOOL_NO_SEATS]: 'Plus de places disponibles sur ce trajet.',
   [MovaErrorCode.CARPOOL_ALREADY_JOINED]: 'Vous avez déjà rejoint ce trajet.',
+  [MovaErrorCode.CARPOOL_PUBLISH_DRIVER_ONLY]:
+    'Seuls les chauffeurs MOVA validés (KYC approuvé) peuvent publier un covoiturage.',
 
   [MovaErrorCode.ERRAND_NOT_FOUND]: 'Commande de course introuvable.',
   [MovaErrorCode.ERRAND_INVALID_STATUS]: 'Statut de commande invalide pour cette action.',

@@ -4,6 +4,7 @@ import {
   INTERNAL_API_KEY,
   MovaErrorCode,
   MovaHttpException,
+  UserRole,
   findServiceAreaByName,
   serviceUrl,
 } from '@mova/shared';
@@ -78,6 +79,17 @@ export class CarpoolService {
       };
     } catch {
       return null;
+    }
+  }
+
+  /** Publication réservée aux chauffeurs MOVA avec KYC approuvé. */
+  async assertCanPublishCarpool(userId: string, role?: string): Promise<void> {
+    if (role !== UserRole.DRIVER) {
+      throw new MovaHttpException(MovaErrorCode.CARPOOL_PUBLISH_DRIVER_ONLY);
+    }
+    const profile = await this.fetchDriverProfile(userId);
+    if (!profile || profile.kycStatus !== 'APPROVED') {
+      throw new MovaHttpException(MovaErrorCode.DRIVER_KYC_PENDING);
     }
   }
 
@@ -186,6 +198,7 @@ export class CarpoolService {
       ladiesOnly?: boolean;
       instantBooking?: boolean;
       vehicleInfo?: string;
+      actorRole?: string;
     },
   ) {
     const pickup = addressToCoords(fromAddress);
@@ -210,7 +223,7 @@ export class CarpoolService {
       instantBooking: opts?.instantBooking,
       vehicleInfo: opts?.vehicleInfo,
     };
-    const { trip } = await this.create(driverId, dto);
+    const { trip } = await this.create(driverId, dto, opts?.actorRole);
     const user = await this.fetchUserBrief(driverId);
     return {
       trip: await this.formatTripForMobile({ ...trip, passengers: [] }, { name: user?.name ?? 'Vous', phone: user?.phone }),
@@ -301,7 +314,8 @@ export class CarpoolService {
     return { data: formatted, count: formatted.length };
   }
 
-  async create(driverId: string, dto: CreateCarpoolTripDto) {
+  async create(driverId: string, dto: CreateCarpoolTripDto, actorRole?: string) {
+    await this.assertCanPublishCarpool(driverId, actorRole);
     const departureAt = new Date(dto.departureAt);
     if (departureAt <= new Date()) throw new MovaHttpException(MovaErrorCode.SCHEDULED_RIDE_PAST);
     const distanceKm = this.pricing.haversineKm(dto.pickupLat, dto.pickupLng, dto.dropoffLat, dto.dropoffLng);

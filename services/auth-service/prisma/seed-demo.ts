@@ -1,4 +1,4 @@
-import { PrismaClient, UserRole } from '@prisma/client';
+import { PrismaClient, UserRole, UserStatus } from '@prisma/client';
 
 /** Fixed IDs so driver/ride demo seeds can reference the same users across DBs. */
 export const DEMO_USER_IDS = {
@@ -26,8 +26,8 @@ async function main() {
   for (const u of DEMO_USERS) {
     await prisma.user.upsert({
       where: { phone: u.phone },
-      create: u,
-      update: { firstName: u.firstName, lastName: u.lastName, role: u.role },
+      create: { ...u, status: UserStatus.ACTIVE },
+      update: { firstName: u.firstName, lastName: u.lastName, role: u.role, status: UserStatus.ACTIVE },
     });
   }
   console.log(`Demo users seeded: ${DEMO_USERS.length} (3 passengers, 4 drivers)`);

@@ -2,6 +2,7 @@ import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } f
 import { ApiTags } from '@nestjs/swagger';
 import {
   CarpoolStatus,
+  CommissionServiceType,
   DeliveryStatus,
   MovingRequestStatus,
   RentalInquiryStatus,
@@ -171,6 +172,16 @@ export class InternalController {
   @Patch('delivery-pricing-rules/:category')
   updateDeliveryPricing(@Param('category') category: string, @Body() body: Record<string, unknown>) {
     return this.pricingAdmin.updateDeliveryPricingRule(category, body);
+  }
+
+  @Get('commissions')
+  listCommissions() {
+    return this.pricingAdmin.listCommissions();
+  }
+
+  @Patch('commissions/:serviceType')
+  updateCommission(@Param('serviceType') serviceType: CommissionServiceType, @Body() body: Record<string, unknown>) {
+    return this.pricingAdmin.updateCommission(serviceType, body as never);
   }
 
   @Get('promo-codes')

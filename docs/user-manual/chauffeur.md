@@ -1,5 +1,12 @@
 # MOVA Chauffeur
 
+## Connexion
+
+1. Ouvrez l'app **MOVA Chauffeur** (flavor `driver`).
+2. Saisissez un numéro **+243** valide (démo : `+243900000020`).
+3. Recevez le code OTP (en dev : **`123456`** si `MOCK_OTP=true`).
+4. Si le message **« Compte suspendu »** s'affiche, demandez à l'admin de réactiver le compte dans **Utilisateurs → statut ACTIVE**.
+
 ## Mise en route
 
 1. Complétez votre **KYC** (permis, carte grise, photo).
@@ -17,6 +24,14 @@
 | Repas | Récupération restaurant → livraison client |
 | Planifiée | Trajet confirmé à l'avance (J+7 max) |
 | Courses | Achats ou commissions pour le compte du passager |
+| Covoiturage | Publier un trajet partagé (KYC approuvé) depuis **Publier un covoiturage** |
+
+## Covoiturage (conducteur)
+
+1. Depuis l'accueil, appuyez sur **Publier un covoiturage**.
+2. Renseignez date/heure, villes, places (1–6), prix par place, point de rendez-vous et notes.
+3. Publiez le trajet — les passagers le réservent depuis l'app Passager.
+4. Gérez le trajet dans **Mes trajets** (démarrer, terminer, annuler).
 
 ## Support
 

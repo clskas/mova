@@ -20,7 +20,10 @@ const CATEGORY_ALIASES: Record<string, string> = {
   suv: 'SUV',
   premium: 'PREMIUM',
   vip: 'PREMIUM',
-  confort: 'PREMIUM',
+  citadine: 'ECONOMY',
+  utilitaire: 'VAN',
+  van: 'VAN',
+  camionnette: 'VAN',
 };
 
 const TIMELINE_STEPS = [
@@ -105,6 +108,8 @@ export class RentalService {
         return 'SUV';
       case 'PREMIUM':
         return 'Premium';
+      case 'VAN':
+        return 'Utilitaire';
       default:
         return category;
     }
@@ -148,7 +153,7 @@ export class RentalService {
       data: rows.map((r) => this.mapVehicle(r)),
       currency: MARKET_RDC.currency,
       filters: {
-        categories: ['ECONOMY', 'SUV', 'PREMIUM'],
+        categories: ['ECONOMY', 'SUV', 'PREMIUM', 'VAN'],
         transmissions: ['AUTO', 'MANUAL'],
         sortOptions: [
           { id: 'price_asc', label: 'Prix croissant' },

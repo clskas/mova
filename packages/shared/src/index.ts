@@ -9,5 +9,6 @@ export * from './communes-seed';
 export * from './service-areas';
 export * from './kinshasa-bounds';
 export * from './service-urls';
+export * from './jwt-user';
 export * from './redis.module';
 export * from './request-id.middleware';

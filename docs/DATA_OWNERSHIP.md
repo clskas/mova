@@ -28,7 +28,7 @@ Ce document clarifie **qui crée** chaque entité, **qui la gère** côté admin
 | **Subscription plans** | Admin (Finance) | Plans MOVA Plus, abonnés | **Admin:** `GET/POST/PATCH /api/admin/subscription-plans`, `GET /api/admin/subscriptions` (backend à venir — mock UI) · **Propriétaire:** Finance |
 | **Communes** | Seed (`ride-service`) | Lecture seule (Paramètres admin) | **User:** `GET /api/geo/communes` · **Admin:** même endpoint (pas de CRUD UI) |
 | **Incidents / litiges** | User ou Driver | Résolution | **User:** `POST /api/incidents` · **Admin:** `GET /api/admin/incidents`, `POST /api/admin/incidents/:id/resolve` |
-| **Carpool** | Driver / Passenger | — | **User:** `GET/POST /api/carpool/rides`, `POST /api/carpool/estimate`, `POST /api/carpool/search` · **Canonique:** `/api/carpool` |
+| **Carpool** | Driver (KYC approuvé) | Passenger (réservation) | **Driver:** `POST /api/carpool/rides`, `POST /api/carpool/estimate` · **Passenger:** `POST /api/carpool/search`, `POST /api/carpool/:id/book` · **Admin:** `/api/admin/carpool` |
 | **Wallet / Payments** | Auto à l'inscription + transactions user | — | **User:** `GET /api/wallet`, `POST /api/payments/*` · **Admin:** revenus agrégés dans métriques |
 
 ---

@@ -19,8 +19,8 @@ export class CarpoolController {
   }
 
   @Post('rides')
-  @ApiOperation({ summary: 'Créer trajet covoiturage (contrat mobile)' })
-  createRide(@Request() req: { user: { id: string } }, @Body() dto: MobileCarpoolCreateDto) {
+  @ApiOperation({ summary: 'Créer trajet covoiturage (chauffeur KYC validé uniquement)' })
+  createRide(@Request() req: { user: { id: string; role: string } }, @Body() dto: MobileCarpoolCreateDto) {
     return this.carpoolService.createFromMobile(
       req.user.id,
       dto.fromAddress,
@@ -34,6 +34,7 @@ export class CarpoolController {
         ladiesOnly: dto.ladiesOnly,
         instantBooking: dto.instantBooking,
         vehicleInfo: dto.vehicleInfo,
+        actorRole: req.user.role,
       },
     );
   }
@@ -56,15 +57,16 @@ export class CarpoolController {
   }
 
   @Post('estimate')
-  @ApiOperation({ summary: 'Estimer covoiturage (contrat mobile)' })
-  estimate(@Body() dto: MobileCarpoolEstimateDto) {
+  @ApiOperation({ summary: 'Estimer covoiturage (chauffeur KYC validé uniquement)' })
+  async estimate(@Request() req: { user: { id: string; role: string } }, @Body() dto: MobileCarpoolEstimateDto) {
+    await this.carpoolService.assertCanPublishCarpool(req.user.id, req.user.role);
     return this.carpoolService.estimateMobile(dto.fromAddress, dto.toAddress, dto.seats ?? 3);
   }
 
   @Post()
-  @ApiOperation({ summary: 'Créer un trajet covoiturage' })
-  create(@Request() req: { user: { id: string } }, @Body() dto: CreateCarpoolTripDto) {
-    return this.carpoolService.create(req.user.id, dto);
+  @ApiOperation({ summary: 'Créer un trajet covoiturage (chauffeur KYC validé uniquement)' })
+  create(@Request() req: { user: { id: string; role: string } }, @Body() dto: CreateCarpoolTripDto) {
+    return this.carpoolService.create(req.user.id, dto, req.user.role);
   }
 
   @Get()

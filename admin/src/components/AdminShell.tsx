@@ -7,11 +7,14 @@ import { AuthGate } from "@/components/AuthGate";
 import { AdminProvider, useAdmin } from "@/components/AdminProvider";
 import {
   CalendarIcon,
+  CarpoolIcon,
   DeliveriesIcon,
   DriversIcon,
   IncidentsIcon,
   KycIcon,
+  LocationsIcon,
   MetricsIcon,
+  MovingIcon,
   PricingIcon,
   RestaurantsIcon,
   RidesIcon,
@@ -39,6 +42,9 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   "/litiges": IncidentsIcon,
   "/planifiees": CalendarIcon,
   "/parametres": SettingsIcon,
+  "/locations": LocationsIcon,
+  "/demenagements": MovingIcon,
+  "/covoiturage": CarpoolIcon,
 };
 
 function ShellInner({ children }: { children: React.ReactNode }) {

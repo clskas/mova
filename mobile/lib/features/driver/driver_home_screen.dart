@@ -10,8 +10,10 @@ import '../../core/widgets/mova_widgets.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/cache/profile_cache.dart';
 import '../../core/api/api_client.dart';
+import '../../core/auth/session.dart';
 import '../../core/error/result.dart';
 import '../help/driver_help_screen.dart';
+import '../carpool/carpool_screen.dart';
 import 'active_delivery_screen.dart';
 import 'active_ride_screen.dart';
 import 'kyc_screen.dart';
@@ -25,7 +27,7 @@ class DriverHomeScreen extends ConsumerStatefulWidget {
   ConsumerState<DriverHomeScreen> createState() => _DriverHomeScreenState();
 }
 
-class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
+class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with WidgetsBindingObserver {
   bool _available = false;
   bool _bootstrapping = true;
   Map<String, dynamic>? _earnings;
@@ -38,20 +40,30 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
   Timer? _locationTimer;
   Timer? _profilePollTimer;
   final Set<String> _dismissedOffers = {};
+  String? _profileError;
   bool _showingOffer = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _bootstrap();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _offerPollTimer?.cancel();
     _locationTimer?.cancel();
     _profilePollTimer?.cancel();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted) {
+      _loadProfile(clearCache: true);
+    }
   }
 
   Future<void> _bootstrap() async {
@@ -68,28 +80,45 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
   Future<void> _loadProfile({bool clearCache = false}) async {
     if (clearCache) await ProfileCache.clear();
     final api = ref.read(apiClientProvider);
-    final result = await api.getDriverProfile();
+    final previousKyc = _profile?['kycStatus']?.toString();
+    final result = await api.getDriverProfile(forceRefresh: clearCache);
     if (!mounted) return;
-    if (result case Success(:final data)) {
-      final vehicles = data['vehicles'] as List? ?? [];
-      final activeVehicle = vehicles.cast<Map<String, dynamic>>().firstWhere(
-            (v) => v['isActive'] == true,
-            orElse: () => vehicles.isNotEmpty ? vehicles.first as Map<String, dynamic> : {},
+    switch (result) {
+      case Success(:final data):
+        final vehicles = data['vehicles'] as List? ?? [];
+        final activeVehicle = vehicles.cast<Map<String, dynamic>>().firstWhere(
+              (v) => v['isActive'] == true,
+              orElse: () => vehicles.isNotEmpty ? vehicles.first as Map<String, dynamic> : {},
+            );
+        final kycStatus = data['kycStatus']?.toString();
+        setState(() {
+          _profile = data;
+          _available = data['isAvailable'] == true;
+          _vehicleId = activeVehicle['id']?.toString();
+          _availabilityError = null;
+          _profileError = null;
+        });
+        if (previousKyc != 'APPROVED' && kycStatus == 'APPROVED' && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('KYC approuvé — vous pouvez passer en ligne.'),
+              backgroundColor: MovaColors.green,
+            ),
           );
-      setState(() {
-        _profile = data;
-        _available = data['isAvailable'] == true;
-        _vehicleId = activeVehicle['id']?.toString();
-        _availabilityError = null;
-      });
-      _syncProfilePoll(data['kycStatus']?.toString());
+        }
+        _syncProfilePoll(kycStatus);
+      case Failure(:final error):
+        setState(() {
+          _profileError = error.message;
+          if (clearCache) _profile = null;
+        });
     }
   }
 
   void _syncProfilePoll(String? kycStatus) {
     _profilePollTimer?.cancel();
-    if (kycStatus == 'PENDING') {
-      _profilePollTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+    if (kycStatus != 'APPROVED') {
+      _profilePollTimer = Timer.periodic(const Duration(seconds: 5), (_) {
         if (mounted) _loadProfile(clearCache: true);
       });
     }
@@ -146,17 +175,18 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
     }
   }
 
-  Future<void> _pushLocation() async {
-    if (!await Geolocator.isLocationServiceEnabled()) return;
+  Future<bool> _pushLocation() async {
+    if (!await Geolocator.isLocationServiceEnabled()) return false;
     var permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
     }
     if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
-      return;
+      return false;
     }
     final pos = await Geolocator.getCurrentPosition();
-    await ref.read(apiClientProvider).updateDriverLocation(pos.latitude, pos.longitude);
+    final result = await ref.read(apiClientProvider).updateDriverLocation(pos.latitude, pos.longitude);
+    return result is Success;
   }
 
   void _startLocationUpdates() {
@@ -192,6 +222,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
         final id = offer['id']?.toString() ?? '';
         if (id.isEmpty || _dismissedOffers.contains('ride:$id')) continue;
         _showingOffer = true;
+        if (!mounted) return;
         await Navigator.push(
           context,
           MaterialPageRoute(
@@ -212,6 +243,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
         final id = offer['id']?.toString() ?? '';
         if (id.isEmpty || _dismissedOffers.contains('delivery:$id')) continue;
         _showingOffer = true;
+        if (!mounted) return;
         final accepted = await Navigator.push<Map<String, dynamic>?>(
           context,
           MaterialPageRoute(builder: (_) => DeliveryOfferScreen(offer: offer)),
@@ -235,7 +267,12 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
   Future<void> _toggleAvailability(bool value) async {
     setState(() => _availabilityError = null);
     if (value) {
-      await _pushLocation();
+      final located = await _pushLocation();
+      if (!located) {
+        setState(() => _availabilityError =
+            'Activez le GPS pour recevoir des courses près de vous.');
+        return;
+      }
     }
     final api = ref.read(apiClientProvider);
     final result = await api.patch('/drivers/availability', {'isAvailable': value});
@@ -269,6 +306,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
 
     return MovaScreen(
       title: 'MOVA Chauffeur',
+      scrollable: false,
       actions: [
         IconButton(
           icon: const Icon(Icons.account_balance_wallet_outlined),
@@ -297,14 +335,39 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
             if (mounted) await _loadProfile(clearCache: true);
           },
         ),
+        IconButton(
+          icon: const Icon(Icons.logout),
+          tooltip: 'Déconnexion',
+          onPressed: () async {
+            final confirm = await showDialog<bool>(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                title: const Text('Déconnexion'),
+                content: const Text('Voulez-vous vous déconnecter ?'),
+                actions: [
+                  TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
+                  TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Déconnexion')),
+                ],
+              ),
+            );
+            if (confirm == true) {
+              if (!context.mounted) return;
+              await logoutDriver(context, ref);
+            }
+          },
+        ),
       ],
       child: RefreshIndicator(
         onRefresh: _refreshAll,
         child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
+          physics: kMovaScrollPhysics,
           child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (_profileError != null) ...[
+            MovaErrorBanner(message: _profileError!, onRetry: () => _loadProfile(clearCache: true)),
+            const SizedBox(height: 12),
+          ],
           if (mockBanner)
             const Padding(
               padding: EdgeInsets.only(bottom: 12),
@@ -319,13 +382,18 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
             MovaCard(
               child: Row(
                 children: [
-                  const Icon(Icons.warning_amber, color: MovaColors.orange),
+                  Icon(
+                    _kycStatus == 'REJECTED' ? Icons.error_outline : Icons.warning_amber,
+                    color: _kycStatus == 'REJECTED' ? MovaColors.orange : MovaColors.orange,
+                  ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
                       _kycStatus == 'PENDING'
                           ? 'KYC en cours de validation — vous ne pouvez pas passer en ligne.'
-                          : 'Documents KYC requis pour accepter des courses.',
+                          : _kycStatus == 'REJECTED'
+                              ? 'KYC refusé — renvoyez vos documents via l\'icône KYC.'
+                              : 'Documents KYC requis pour accepter des courses.',
                       maxLines: 3,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -375,6 +443,29 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
             const SizedBox(height: 8),
             MovaErrorBanner(message: _availabilityError!),
           ],
+          const SizedBox(height: 12),
+          MovaCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.info_outline, size: 18, color: MovaColors.violet),
+                    SizedBox(width: 8),
+                    Text('Offres reçues en ligne', style: TextStyle(fontWeight: FontWeight.w600)),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  '• Courses taxi : proches de votre GPS, dans le rayon de recherche, véhicule compatible.\n'
+                  '• Livraisons : colis/repas/express en attente, dans un rayon de 15 km.\n'
+                  '• Locations, déménagements et courses planifiées : gérés par l’admin (pas d’offre directe ici).\n'
+                  '• Covoiturage : publiez votre trajet via le bouton ci-dessous.',
+                  style: TextStyle(fontSize: 12, color: MovaColors.textSecondary, height: 1.4),
+                ),
+              ],
+            ),
+          ),
           if (_earnings != null) ...[
             const SizedBox(height: 16),
             MovaCard(
@@ -462,11 +553,23 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
             const Padding(
               padding: EdgeInsets.only(bottom: 12),
               child: Text(
-                'En attente de courses…',
+                'En attente de courses ou livraisons à proximité…',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: MovaColors.textSecondary),
               ),
             ),
+          MovaButton(
+            label: 'Publier un covoiturage',
+            isSecondary: true,
+            icon: Icons.people_alt_outlined,
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const CarpoolScreen(forDriver: true),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
           if (kDebugMode) ...[
             MovaButton(
               label: 'Simulation (debug)',
@@ -524,6 +627,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
               MaterialPageRoute(builder: (_) => const IncidentScreen()),
             ),
           ),
+          SizedBox(height: MediaQuery.paddingOf(context).bottom + 16),
         ],
           ),
         ),

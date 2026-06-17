@@ -1,5 +1,7 @@
 import { ErrandsService } from './errands.service';
 import { PricingService } from '../rides/pricing.service';
+import { CommissionService } from '../rides/commission.service';
+import { CommissionServiceType } from '@prisma/client';
 
 describe('ErrandsService', () => {
   const pricing = {
@@ -7,11 +9,23 @@ describe('ErrandsService', () => {
     estimateFare: jest.fn().mockResolvedValue({ estimatedFareCdf: 8000 }),
   } as unknown as PricingService;
 
+  const commission = {
+    get: jest.fn().mockResolvedValue({
+      serviceType: CommissionServiceType.ERRAND,
+      platformPercent: 15,
+      driverPercent: 85,
+      fixedFeeCdf: 2500,
+      perItemFeeCdf: 1500,
+      description: 'Courses & commissions',
+      isActive: true,
+    }),
+  } as unknown as CommissionService;
+
   const prisma = {
     errandOrder: { create: jest.fn(), findMany: jest.fn(), findUnique: jest.fn() },
   };
 
-  const service = new ErrandsService(prisma as never, pricing);
+  const service = new ErrandsService(prisma as never, pricing, commission);
 
   const dto = {
     description: 'Acheter pain et lait',

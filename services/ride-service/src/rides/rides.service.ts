@@ -1,5 +1,5 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { RideStatus, VehicleType } from '@prisma/client';
+import { CommissionServiceType, RideStatus, VehicleType } from '@prisma/client';
 import {
   formatCdf,
   fromMobileRideStatus,
@@ -17,6 +17,7 @@ import {
 import { RedisService } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { PricingService } from './pricing.service';
+import { CommissionService } from './commission.service';
 import { MatchingService } from '../matching/matching.service';
 import { computeDriverEta } from '../matching/eta.util';
 import { TrackingGateway } from '../websocket/tracking.gateway';
@@ -48,6 +49,7 @@ export class RidesService {
     private matching: MatchingService,
     private redis: RedisService,
     private tracking: TrackingGateway,
+    private commission: CommissionService,
   ) {}
 
   private emitStatusChange(rideId: string, status: RideStatus) {
@@ -562,19 +564,25 @@ export class RidesService {
 
   async getDriverEarnings(driverUserId: string) {
     const rides = await this.prisma.ride.findMany({ where: { driverId: driverUserId, status: RideStatus.COMPLETED } });
+    const rule = await this.commission.get(CommissionServiceType.RIDE);
     const now = new Date();
     const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const startOfWeek = new Date(startOfDay);
     startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const net = (gross: number) => this.commission.splitGross(gross, rule.platformPercent).driverNetCdf;
     const sum = (from: Date) =>
-      rides.filter((r) => r.completedAt && r.completedAt >= from).reduce((a, r) => a + (r.finalFareCdf ?? r.estimatedFareCdf ?? 0), 0);
+      rides
+        .filter((r) => r.completedAt && r.completedAt >= from)
+        .reduce((a, r) => a + net(r.finalFareCdf ?? r.estimatedFareCdf ?? 0), 0);
     return {
       totalCdf: sum(new Date(0)),
       todayCdf: sum(startOfDay),
       weekCdf: sum(startOfWeek),
       monthCdf: sum(startOfMonth),
       rideCount: rides.length,
+      commissionPercent: rule.platformPercent,
+      currency: 'CDF',
     };
   }
 

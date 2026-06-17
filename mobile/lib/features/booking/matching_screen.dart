@@ -189,85 +189,97 @@ class _MatchingScreenState extends ConsumerState<MatchingScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const SizedBox(height: 24),
-          Center(
-            child: AnimatedBuilder(
-              animation: _pulseController,
-              builder: (context, child) {
-                final scale = 1.0 + (_pulseController.value * 0.15);
-                return Transform.scale(scale: scale, child: child);
-              },
-              child: Container(
-                width: 100,
-                height: 100,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: MovaColors.violet.withValues(alpha: 0.12),
-                  border: Border.all(color: MovaColors.violet, width: 2),
-                ),
-                child: const Icon(Icons.search, size: 48, color: MovaColors.violet),
+          Expanded(
+            child: MovaFlexScroll(
+              padding: const EdgeInsets.symmetric(horizontal: 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const SizedBox(height: 16),
+                  Center(
+                    child: AnimatedBuilder(
+                      animation: _pulseController,
+                      builder: (context, child) {
+                        final scale = 1.0 + (_pulseController.value * 0.15);
+                        return Transform.scale(scale: scale, child: child);
+                      },
+                      child: Container(
+                        width: 100,
+                        height: 100,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: MovaColors.violet.withValues(alpha: 0.12),
+                          border: Border.all(color: MovaColors.violet, width: 2),
+                        ),
+                        child: const Icon(Icons.search, size: 48, color: MovaColors.violet),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    _searching ? 'Recherche d\'un chauffeur…' : 'Chauffeur trouvé !',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '${widget.pickupAddress} → ${widget.dropoffAddress}',
+                    textAlign: TextAlign.center,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: MovaColors.textSecondary),
+                  ),
+                  if (_attempt > 0) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      'Tentative $_attempt',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 13, color: MovaColors.textSecondary),
+                    ),
+                  ],
+                  if (_radiusKm != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'Rayon de recherche : ${_radiusKm!.toStringAsFixed(0)} km',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 13, color: MovaColors.textSecondary),
+                    ),
+                  ],
+                  const SizedBox(height: 16),
+                  MovaCard(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.lock_outline, color: MovaColors.green),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            'Tarif estimé : ${MarketConfig.formatCdf(widget.estimatedFareCdf)}',
+                            textAlign: TextAlign.center,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  if (_searching)
+                    const LinearProgressIndicator(color: MovaColors.violet)
+                  else
+                    const Center(
+                      child: Icon(Icons.check_circle, color: MovaColors.green, size: 32),
+                    ),
+                  if (_error != null) ...[
+                    const SizedBox(height: 16),
+                    MovaErrorBanner(message: _error!, onRetry: _search),
+                  ],
+                  const SizedBox(height: 16),
+                ],
               ),
             ),
           ),
-          const SizedBox(height: 24),
-          Text(
-            _searching ? 'Recherche d\'un chauffeur…' : 'Chauffeur trouvé !',
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '${widget.pickupAddress} → ${widget.dropoffAddress}',
-            textAlign: TextAlign.center,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: MovaColors.textSecondary),
-          ),
-          if (_attempt > 0) ...[
-            const SizedBox(height: 8),
-            Text(
-              'Tentative $_attempt',
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 13, color: MovaColors.textSecondary),
-            ),
-          ],
-          if (_radiusKm != null) ...[
-            const SizedBox(height: 4),
-            Text(
-              'Rayon de recherche : ${_radiusKm!.toStringAsFixed(0)} km',
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 13, color: MovaColors.textSecondary),
-            ),
-          ],
-          const SizedBox(height: 16),
-          MovaCard(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.lock_outline, color: MovaColors.green),
-                const SizedBox(width: 8),
-                Flexible(
-                  child: Text(
-                    'Tarif estimé : ${MarketConfig.formatCdf(widget.estimatedFareCdf)}',
-                    textAlign: TextAlign.center,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          if (_searching)
-            const LinearProgressIndicator(color: MovaColors.violet)
-          else
-            const Icon(Icons.check_circle, color: MovaColors.green, size: 32),
-          if (_error != null) ...[
-            const SizedBox(height: 16),
-            MovaErrorBanner(message: _error!, onRetry: _search),
-          ],
-          const Spacer(),
           MovaButton(
             label: 'Annuler la recherche',
             isSecondary: true,
@@ -279,8 +291,11 @@ class _MatchingScreenState extends ConsumerState<MatchingScreen>
           const Text(
             'Politique d\'annulation : gratuite avant acceptation du chauffeur.',
             textAlign: TextAlign.center,
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
             style: TextStyle(fontSize: 12, color: MovaColors.textSecondary),
           ),
+          SizedBox(height: MediaQuery.paddingOf(context).bottom + 8),
         ],
       ),
     );

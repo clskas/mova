@@ -5,6 +5,7 @@ import { ScheduledRidesService } from './scheduled-rides.service';
 import { RideSearchScheduler } from './ride-search.scheduler';
 import { PricingService } from './pricing.service';
 import { PricingAdminService } from './pricing-admin.service';
+import { CommissionService } from './commission.service';
 import { SurchargeService, PromoService } from './surcharge.service';
 import { MatchingModule } from '../matching/matching.module';
 import { WebsocketModule } from '../websocket/websocket.module';
@@ -12,7 +13,7 @@ import { WebsocketModule } from '../websocket/websocket.module';
 @Module({
   imports: [MatchingModule, WebsocketModule],
   controllers: [RidesController],
-  providers: [RidesService, ScheduledRidesService, RideSearchScheduler, PricingService, PricingAdminService, SurchargeService, PromoService],
-  exports: [RidesService, ScheduledRidesService, PricingService, PricingAdminService, SurchargeService, PromoService],
+  providers: [RidesService, ScheduledRidesService, RideSearchScheduler, PricingService, PricingAdminService, CommissionService, SurchargeService, PromoService],
+  exports: [RidesService, ScheduledRidesService, PricingService, PricingAdminService, CommissionService, SurchargeService, PromoService],
 })
 export class RidesModule {}

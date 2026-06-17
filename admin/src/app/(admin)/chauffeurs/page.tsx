@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { apiFetch, fetchDrivers, setDriverStatus, type AdminDriver } from "@/lib/api";
+import { apiFetch, fetchDrivers, reviewDriverKyc, setDriverStatus, type AdminDriver } from "@/lib/api";
 import { useAdmin } from "@/components/AdminProvider";
 import {
   BtnDanger,
@@ -21,6 +21,7 @@ import {
 export default function ChauffeursPage() {
   const { canWrite } = useAdmin();
   const readOnly = !canWrite("chauffeurs");
+  const canReviewKyc = canWrite("kyc");
   const [drivers, setDrivers] = useState<AdminDriver[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
@@ -65,6 +66,21 @@ export default function ChauffeursPage() {
       load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Échec de la mise à jour");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function reviewKyc(approved: boolean) {
+    if (!selected) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await reviewDriverKyc(selected.userId, approved);
+      setSelected(null);
+      load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Échec validation KYC");
     } finally {
       setSaving(false);
     }
@@ -140,6 +156,25 @@ export default function ChauffeursPage() {
             <Link href="/kyc" className="text-sm text-[#6C63FF] hover:underline inline-block">
               → Voir documents KYC en attente
             </Link>
+            {canReviewKyc && selected.kycStatus !== "APPROVED" && (
+              <div className="flex flex-wrap gap-2 pt-2 border-t">
+                <BtnSuccess onClick={() => reviewKyc(true)} disabled={saving}>
+                  Approuver KYC
+                </BtnSuccess>
+                {selected.kycStatus !== "REJECTED" && (
+                  <BtnDanger onClick={() => reviewKyc(false)} disabled={saving}>
+                    Rejeter KYC
+                  </BtnDanger>
+                )}
+              </div>
+            )}
+            {canReviewKyc && selected.kycStatus === "APPROVED" && (
+              <div className="flex flex-wrap gap-2 pt-2 border-t">
+                <BtnDanger onClick={() => reviewKyc(false)} disabled={saving}>
+                  Révoquer KYC
+                </BtnDanger>
+              </div>
+            )}
             {!readOnly && (
               <div className="flex gap-2 pt-2">
                 {selected.isAvailable ? (

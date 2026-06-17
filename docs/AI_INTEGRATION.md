@@ -2,6 +2,29 @@
 
 Guide concis des cas d’usage IA compatibles avec l’architecture microservices MOVA (gateway NestJS + 7 services).
 
+## Configuration des clés API
+
+Toutes les clés IA se configurent **côté serveur** dans :
+
+```
+config/external-apis.env
+```
+
+(copiez depuis `config/external-apis.env.example`)
+
+| Variable | Usage |
+|----------|--------|
+| `OPENAI_API_KEY` | OpenAI API (ChatGPT) |
+| `OPENAI_MODEL` | Modèle, ex. `gpt-4o-mini` |
+| `AZURE_OPENAI_ENDPOINT` | URL ressource Azure OpenAI |
+| `AZURE_OPENAI_API_KEY` | Clé Azure |
+| `AZURE_OPENAI_DEPLOYMENT` | Nom du déploiement (ex. `gpt-4o`) |
+| `AI_ENABLED` | `true` pour activer les routes IA |
+
+**Ne jamais** mettre ces clés dans l'app mobile (`--dart-define`) ni dans le dépôt Git.
+
+Après modification : redémarrer les services Docker concernés (`docker compose up -d`).
+
 ## État actuel
 
 MOVA n’intègre pas encore de modèle IA en production. Les briques existantes facilitent l’ajout :
@@ -62,10 +85,18 @@ MOVA n’intègre pas encore de modèle IA en production. Les briques existantes
 
 **Recommandation architecture** : exposer `POST /api/ai/chat` et `POST /internal/ai/ocr` via le **gateway**, secrets `AZURE_OPENAI_*` ou `OPENAI_API_KEY` dans `config/external-apis.env` (même pattern que Twilio). Ne pas embarquer les clés dans l’app mobile.
 
+## Activer l'IA (checklist)
+
+1. Copier `config/external-apis.env.example` → `config/external-apis.env`.
+2. Renseigner `OPENAI_API_KEY=sk-...` (ou variables Azure).
+3. Mettre `AI_ENABLED=true`.
+4. Implémenter le module `ai-service` ou routes gateway (étapes ci-dessous).
+5. L'app mobile appelle `POST /api/ai/chat` avec le JWT utilisateur — la clé ne quitte jamais le serveur.
+
 ## Prochaines étapes techniques
 
 1. Créer `services/ai-service` (NestJS) ou module `AiModule` dans `admin-service`.
-2. Ajouter variables dans `config/external-apis.env.example` : `OPENAI_API_KEY`, `AZURE_OPENAI_ENDPOINT`, etc.
+2. Variables documentées dans `config/external-apis.env.example`.
 3. RAG minimal : indexer `docs/user-manual/*.md` en embeddings (pgvector sur une DB existante ou service managé).
 4. Pilote : assistant FAQ passager/chauffeur en français (fr-CD).
 

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/config/market_config.dart';
+import '../../core/api/api_client.dart';
+import '../../core/auth/session.dart';
+import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_service_icons.dart';
@@ -17,8 +19,43 @@ import '../help/help_screen.dart';
 import '../history/history_screen.dart';
 import 'service_card.dart';
 
-class HomeScreen extends ConsumerWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObserver {
+  Map<String, dynamic>? _user;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _loadUser();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _loadUser(forceRefresh: true);
+  }
+
+  Future<void> _loadUser({bool forceRefresh = false}) async {
+    final api = ref.read(apiClientProvider);
+    await api.loadToken();
+    final result = await api.getCurrentUser(forceRefresh: forceRefresh);
+    if (!mounted) return;
+    if (result case Success(:final data)) {
+      setState(() => _user = data);
+    }
+  }
 
   String _greeting() {
     final hour = DateTime.now().hour;
@@ -31,9 +68,22 @@ class HomeScreen extends ConsumerWidget {
     Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
   }
 
+  String _userLabel() {
+    final first = _user?['firstName']?.toString().trim();
+    final last = _user?['lastName']?.toString().trim();
+    if (first != null && first.isNotEmpty) {
+      return last != null && last.isNotEmpty ? '$first $last' : first;
+    }
+    final phone = _user?['phone']?.toString();
+    if (phone != null && phone.isNotEmpty) return phone;
+    return '';
+  }
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final userLabel = _userLabel();
+    final suspended = _user?['status']?.toString() == 'SUSPENDED';
 
     return MovaScreen(
       titleWidget: Row(
@@ -62,6 +112,26 @@ class HomeScreen extends ConsumerWidget {
           icon: const Icon(Icons.help_outline),
           tooltip: 'Aide',
           onPressed: () => _open(context, const HelpScreen()),
+        ),
+        IconButton(
+          icon: const Icon(Icons.logout),
+          tooltip: 'Déconnexion',
+          onPressed: () async {
+            final confirm = await showDialog<bool>(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                title: const Text('Déconnexion'),
+                content: const Text('Voulez-vous vous déconnecter de MOVA ?'),
+                actions: [
+                  TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
+                  TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Déconnexion')),
+                ],
+              ),
+            );
+            if (confirm == true && context.mounted) {
+              await logoutPassenger(context, ref);
+            }
+          },
         ),
       ],
       bottomNavigationBar: NavigationBar(
@@ -101,9 +171,28 @@ class HomeScreen extends ConsumerWidget {
           ),
         ],
       ),
-      child: Column(
+      scrollable: false,
+      child: RefreshIndicator(
+        onRefresh: () => _loadUser(forceRefresh: true),
+        child: SingleChildScrollView(
+          physics: kMovaScrollPhysics,
+          child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (suspended)
+            const Padding(
+              padding: EdgeInsets.only(bottom: 12),
+              child: Card(
+                color: Color(0xFFFFF3E0),
+                child: Padding(
+                  padding: EdgeInsets.all(12),
+                  child: Text(
+                    'Compte suspendu — contactez le support MOVA.',
+                    style: TextStyle(color: MovaColors.orange, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ),
+            ),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -112,7 +201,7 @@ class HomeScreen extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '${_greeting()} 👋',
+                      userLabel.isNotEmpty ? '${_greeting()}, $userLabel 👋' : '${_greeting()} 👋',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.headlineSmall?.copyWith(
@@ -237,7 +326,10 @@ class HomeScreen extends ConsumerWidget {
               );
             },
           ),
+          SizedBox(height: MediaQuery.paddingOf(context).bottom + kBottomNavigationBarHeight + 16),
         ],
+      ),
+        ),
       ),
     );
   }

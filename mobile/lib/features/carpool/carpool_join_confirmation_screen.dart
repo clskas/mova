@@ -161,11 +161,16 @@ class _CarpoolJoinConfirmationScreenState extends ConsumerState<CarpoolJoinConfi
               );
             }),
           const SizedBox(height: 16),
-          OutlinedButton.icon(
-            onPressed: () => showCarpoolContact(context, contactPhone: _contactPhone),
-            icon: const Icon(Icons.phone_outlined),
-            label: Text(
-              _contactPhone != null ? 'Contacter · $_contactPhone' : 'Contacter le conducteur',
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () => showCarpoolContact(context, contactPhone: _contactPhone),
+              icon: const Icon(Icons.phone_outlined),
+              label: Text(
+                _contactPhone != null ? 'Contacter · $_contactPhone' : 'Contacter le conducteur',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
           ),
           const SizedBox(height: 12),

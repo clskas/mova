@@ -22,6 +22,7 @@ const movaErrorMessages = <String, String>{
   'MOVA_CAR_001': 'Trajet covoiturage introuvable.',
   'MOVA_CAR_002': 'Plus de places disponibles sur ce trajet.',
   'MOVA_CAR_003': 'Vous avez déjà rejoint ce trajet.',
+  'MOVA_CAR_004': 'Seuls les chauffeurs MOVA validés peuvent publier un covoiturage.',
   'MOVA_ERR_001': 'Commande de course introuvable.',
   'MOVA_REN_001': 'Demande de location introuvable.',
   'MOVA_PAY_001': 'Le paiement a échoué. Vérifiez votre solde.',

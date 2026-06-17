@@ -20,7 +20,15 @@ export class AdminService {
 
   private proxy(service: MovaService, path: string, init: RequestInit) {
     return fetch(serviceUrl(service, path), { ...init, headers: { ...this.jsonHeaders, ...(init.headers as Record<string, string>) } }).then(
-      (r) => r.json(),
+      async (r) => {
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) {
+          const raw = (data as { message?: string | string[] })?.message;
+          const message = Array.isArray(raw) ? raw.join(', ') : raw ?? `Admin proxy failed: ${service}${path} (${r.status})`;
+          throw new Error(message);
+        }
+        return data;
+      },
     );
   }
 
@@ -116,6 +124,9 @@ export class AdminService {
   }
   approveKyc(id: string, approved: boolean, notes?: string) {
     return this.proxy('driver', `/internal/kyc/${id}/review`, { method: 'POST', body: JSON.stringify({ approved, notes }) });
+  }
+  reviewDriverKyc(userId: string, approved: boolean, notes?: string) {
+    return this.proxy('driver', `/internal/drivers/${userId}/kyc`, { method: 'PATCH', body: JSON.stringify({ approved, notes }) });
   }
   listIncidents() {
     return this.fetchJson('driver', '/internal/incidents');
@@ -264,6 +275,14 @@ export class AdminService {
   }
   updateSurcharge(type: string, body: Record<string, unknown>) {
     return this.proxy('ride', `/internal/surcharges/${type}`, { method: 'PATCH', body: JSON.stringify(body) });
+  }
+
+  listCommissions() {
+    return this.fetchJson('ride', '/internal/commissions');
+  }
+
+  updateCommission(serviceType: string, body: Record<string, unknown>) {
+    return this.proxy('ride', `/internal/commissions/${serviceType}`, { method: 'PATCH', body: JSON.stringify(body) });
   }
 
   listPromoCodes() {

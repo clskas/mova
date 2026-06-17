@@ -1,7 +1,7 @@
 import { ExecutionContext, Injectable } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 
-const PUBLIC_SUFFIXES = ['/rides/estimate', '/geo'];
+const PUBLIC_SUFFIXES = ['/rides/estimate', '/geo', '/rental/vehicles'];
 
 function isPublicPath(path: string): boolean {
   if (path.includes('/health')) return true;

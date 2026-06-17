@@ -22,6 +22,12 @@ describe('CarpoolService', () => {
     prisma.carpoolRating.aggregate.mockResolvedValue({ _avg: { score: null } });
   });
 
+  it('refuse la publication covoiturage aux passagers', async () => {
+    await expect(service.assertCanPublishCarpool('user-1', 'PASSENGER')).rejects.toMatchObject({
+      code: 'MOVA_CAR_004',
+    });
+  });
+
   it('filtre les trajets par proximité (matching stub)', async () => {
     prisma.carpoolTrip.findMany.mockResolvedValue([
       { id: 't1', pickupLat: -4.31, pickupLng: 15.3, dropoffLat: -4.34, dropoffLng: 15.32, status: CarpoolStatus.OPEN, seatsAvailable: 2, passengers: [], departureAt: new Date(Date.now() + 86400000), pricePerSeatCdf: 3000, seatsTotal: 3, driverId: 'd1' },

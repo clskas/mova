@@ -1,5 +1,5 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { SurchargeType, VehicleType } from '@prisma/client';
+import { CommissionServiceType, SurchargeType, VehicleType } from '@prisma/client';
 import { DRC_SERVICE_AREAS, getCommunesForArea, KINSHASA_COMMUNES } from '@mova/shared';
 import { PrismaService } from './prisma.service';
 
@@ -44,7 +44,7 @@ const RENTAL_VEHICLES = [
     ownerName: 'Jean K.',
     ownerBadge: 'PRO',
     ownerContactPhone: '+243812345678',
-    features: ['Climatisation', 'Bluetooth'],
+    features: ['Climatisation', 'Bluetooth', 'Essence'],
     cancellationPolicy: 'Annulation gratuite 24 h avant prise en charge.',
     mileageUnlimited: true,
     limitedMileageFeeCdf: 15000,
@@ -65,7 +65,7 @@ const RENTAL_VEHICLES = [
     ownerName: 'Marie L.',
     ownerBadge: 'SUPER_HOST',
     ownerContactPhone: '+243898765432',
-    features: ['Climatisation', 'GPS', '4x4'],
+    features: ['Climatisation', 'GPS', '4x4', 'Diesel'],
     cancellationPolicy: 'Annulation gratuite 48 h avant prise en charge.',
     mileageUnlimited: true,
     limitedMileageFeeCdf: 20000,
@@ -86,7 +86,7 @@ const RENTAL_VEHICLES = [
     ownerName: 'MOVA Fleet',
     ownerBadge: 'PRO',
     ownerContactPhone: '+243900000000',
-    features: ['Climatisation', 'GPS', 'Cuir', 'Toit ouvrant'],
+    features: ['Climatisation', 'GPS', 'Cuir', 'Toit ouvrant', 'Essence'],
     cancellationPolicy: 'Annulation gratuite 72 h avant prise en charge.',
     mileageUnlimited: false,
     limitedMileageFeeCdf: 25000,
@@ -128,10 +128,31 @@ const RENTAL_VEHICLES = [
     ownerName: 'Transport Kasaï',
     ownerBadge: 'PRO',
     ownerContactPhone: '+243855566677',
-    features: ['Climatisation', 'GPS'],
+    features: ['Climatisation', 'GPS', 'Diesel'],
     cancellationPolicy: 'Annulation gratuite 24 h avant prise en charge.',
     mileageUnlimited: true,
     limitedMileageFeeCdf: 30000,
+  },
+  {
+    name: 'Isuzu NPR Utilitaire',
+    make: 'Isuzu',
+    model: 'NPR',
+    year: 2018,
+    category: 'VAN',
+    transmission: 'MANUAL',
+    city: 'Kinshasa',
+    seats: 3,
+    dailyRateCdf: 95000,
+    depositCdf: 180000,
+    weeklyDiscountPct: 8,
+    rating: 4.5,
+    ownerName: 'MOVA Fleet',
+    ownerBadge: 'PRO',
+    ownerContactPhone: '+243900000000',
+    features: ['Hayon', 'GPS', 'Diesel', 'Assistance routière'],
+    cancellationPolicy: 'Annulation gratuite 48 h avant prise en charge.',
+    mileageUnlimited: false,
+    limitedMileageFeeCdf: 20000,
   },
 ];
 
@@ -140,6 +161,22 @@ const SERVICE_SURCHARGES = [
   { type: SurchargeType.DELIVERY_FOOD, baseFeeCdf: 3000, multiplier: 1.0, description: 'Livraison repas — frais de base CDF' },
   { type: SurchargeType.DELIVERY_EXPRESS, baseFeeCdf: 0, multiplier: 1.35, description: 'Livraison express — majoration 35%' },
   { type: SurchargeType.MOVING, baseFeeCdf: 15000, multiplier: 1.5, perUnitCdf: 8000, description: 'Déménagement — base + majoration course + CDF/m³' },
+];
+
+const PLATFORM_COMMISSIONS = [
+  { serviceType: CommissionServiceType.RIDE, platformPercent: 15, driverPercent: 85, description: 'Courses taxi / moto' },
+  { serviceType: CommissionServiceType.DELIVERY, platformPercent: 20, driverPercent: 80, description: 'Livraisons' },
+  { serviceType: CommissionServiceType.MOVING, platformPercent: 18, driverPercent: 82, description: 'Déménagements' },
+  { serviceType: CommissionServiceType.RENTAL, platformPercent: 12, driverPercent: 88, description: 'Location véhicule' },
+  { serviceType: CommissionServiceType.CARPOOL, platformPercent: 10, driverPercent: 90, description: 'Covoiturage' },
+  {
+    serviceType: CommissionServiceType.ERRAND,
+    platformPercent: 15,
+    driverPercent: 85,
+    fixedFeeCdf: 2500,
+    perItemFeeCdf: 1500,
+    description: 'Courses & commissions',
+  },
 ];
 
 @Injectable()
@@ -204,6 +241,19 @@ export class SeedService implements OnModuleInit {
       }
       for (const p of CANCELLATION_POLICIES) {
         await this.prisma.cancellationPolicy.upsert({ where: { vehicleType: p.vehicleType }, create: p, update: p });
+      }
+      for (const c of PLATFORM_COMMISSIONS) {
+        await this.prisma.platformCommission.upsert({
+          where: { serviceType: c.serviceType },
+          create: c,
+          update: {
+            platformPercent: c.platformPercent,
+            driverPercent: c.driverPercent,
+            description: c.description,
+            ...(c.fixedFeeCdf != null ? { fixedFeeCdf: c.fixedFeeCdf } : {}),
+            ...(c.perItemFeeCdf != null ? { perItemFeeCdf: c.perItemFeeCdf } : {}),
+          },
+        });
       }
     });
 

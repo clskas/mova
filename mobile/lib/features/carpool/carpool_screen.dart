@@ -10,7 +10,11 @@ import 'carpool_detail_screen.dart';
 import 'carpool_join_confirmation_screen.dart';
 
 class CarpoolScreen extends ConsumerStatefulWidget {
-  const CarpoolScreen({super.key});
+  const CarpoolScreen({super.key, this.forDriver = false, this.initialTabIndex});
+
+  /// Mode chauffeur : onglets Publier + Mes trajets conducteur uniquement.
+  final bool forDriver;
+  final int? initialTabIndex;
 
   @override
   ConsumerState<CarpoolScreen> createState() => _CarpoolScreenState();
@@ -45,8 +49,14 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
-    _search();
+    _tabController = TabController(
+      length: 2,
+      vsync: this,
+      initialIndex: widget.initialTabIndex?.clamp(0, 1) ?? 0,
+    );
+    if (!widget.forDriver) {
+      _search();
+    }
     _loadMyTrips();
   }
 
@@ -274,7 +284,7 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
                   onPressed: () {
                     Navigator.pop(ctx);
                     _loadMyTrips();
-                    _tabController.index = 2;
+                    _tabController.index = 1;
                   },
                   child: const Text('Voir mes trajets'),
                 ),
@@ -338,14 +348,6 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
     ).then((_) => _loadMyTrips());
   }
 
-  Color _statusColor(String? status) {
-    final s = status?.toUpperCase() ?? '';
-    if (s.contains('EN ROUTE') || s == 'IN_PROGRESS') return MovaColors.violet;
-    if (s.contains('TERMIN') || s == 'COMPLETED') return MovaColors.green;
-    if (s.contains('ANNUL') || s == 'CANCELLED') return Colors.red.shade300;
-    return MovaColors.textSecondary;
-  }
-
   Widget _rideCard(Map<String, dynamic> ride) {
     final perSeat = ride['pricePerSeatCdf'] as int? ?? 0;
     final seats = ride['availableSeats'] as int? ?? 1;
@@ -362,6 +364,7 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
                   child: Text(
@@ -371,9 +374,13 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                Text(
-                  MarketConfig.formatCdf(perSeat),
-                  style: const TextStyle(fontWeight: FontWeight.bold, color: MovaColors.green, fontSize: 16),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    MarketConfig.formatCdf(perSeat),
+                    textAlign: TextAlign.end,
+                    style: const TextStyle(fontWeight: FontWeight.bold, color: MovaColors.green, fontSize: 16),
+                  ),
                 ),
               ],
             ),
@@ -386,6 +393,8 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
                   child: Text(
                     '$driver · ★ $rating · $seats pl.',
                     style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 if (kyc)
@@ -637,39 +646,36 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text('En tant que conducteur', style: Theme.of(context).textTheme.titleSmall),
-        const SizedBox(height: 8),
-        if (_myDriverTrips.isEmpty)
-          const Text('Aucun trajet publié.', style: TextStyle(color: MovaColors.textSecondary))
-        else
-          ..._myDriverTrips.map((t) {
-            final trip = _normalizeTrip(t);
-            final step = trip['timelineStep']?.toString() ?? trip['status']?.toString() ?? '';
-            return ListTile(
-              title: Text('${trip['fromAddress']} → ${trip['toAddress']}'),
-              subtitle: Text('$step · ${trip['passengerCount']} passager(s)'),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: _statusColor(step).withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      step,
-                      style: TextStyle(fontSize: 11, color: _statusColor(step), fontWeight: FontWeight.w600),
-                    ),
-                  ),
-                  const Icon(Icons.chevron_right),
-                ],
-              ),
-              onTap: () => _openDetail(trip, role: CarpoolViewerRole.driver),
-            );
-          }),
-        const SizedBox(height: 20),
-        Text('En tant que passager', style: Theme.of(context).textTheme.titleSmall),
+        if (widget.forDriver) ...[
+          Text('En tant que conducteur', style: Theme.of(context).textTheme.titleSmall),
+          const SizedBox(height: 8),
+          if (_myDriverTrips.isEmpty)
+            const Text('Aucun trajet publié.', style: TextStyle(color: MovaColors.textSecondary))
+          else
+            ..._myDriverTrips.map((t) {
+              final trip = _normalizeTrip(t);
+              final step = trip['timelineStep']?.toString() ?? trip['status']?.toString() ?? '';
+              return ListTile(
+                title: Text(
+                  '${trip['fromAddress']} → ${trip['toAddress']}',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                subtitle: Text(
+                  '$step · ${trip['passengerCount']} passager(s)',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => _openDetail(trip, role: CarpoolViewerRole.driver),
+              );
+            }),
+          const SizedBox(height: 20),
+        ],
+        Text(
+          widget.forDriver ? 'Mes réservations passager' : 'Mes réservations',
+          style: Theme.of(context).textTheme.titleSmall,
+        ),
         const SizedBox(height: 8),
         if (_myPassengerTrips.isEmpty)
           const Text('Aucune réservation.', style: TextStyle(color: MovaColors.textSecondary))
@@ -678,25 +684,17 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
             final trip = _normalizeTrip(t);
             final step = trip['timelineStep']?.toString() ?? trip['status']?.toString() ?? '';
             return ListTile(
-              title: Text('${trip['fromAddress']} → ${trip['toAddress']}'),
-              subtitle: Text('${trip['driverName']} · ${MarketConfig.formatCdf(trip['pricePerSeatCdf'] as int? ?? 0)}'),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: _statusColor(step).withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      step,
-                      style: TextStyle(fontSize: 11, color: _statusColor(step), fontWeight: FontWeight.w600),
-                    ),
-                  ),
-                  const Icon(Icons.chevron_right),
-                ],
+              title: Text(
+                '${trip['fromAddress']} → ${trip['toAddress']}',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
+              subtitle: Text(
+                '${trip['driverName']} · ${MarketConfig.formatCdf(trip['pricePerSeatCdf'] as int? ?? 0)} · $step',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              trailing: const Icon(Icons.chevron_right),
               onTap: () => _openDetail(trip, role: CarpoolViewerRole.passenger),
             );
           }),
@@ -704,37 +702,50 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
     );
   }
 
+  Widget _scrollableTab(Widget child) {
+    return MovaFlexScroll(child: child);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final tabViews = widget.forDriver
+        ? [
+            _scrollableTab(_createTab()),
+            _scrollableTab(_myTripsTab()),
+          ]
+        : [
+            _scrollableTab(_searchTab()),
+            _scrollableTab(_myTripsTab()),
+          ];
+
     return MovaScreen(
-      title: 'Covoiturage',
+      title: widget.forDriver ? 'Publier covoiturage' : 'Covoiturage',
+      scrollable: false,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           TabBar(
             controller: _tabController,
-            onTap: (_) => setState(() {}),
+            isScrollable: true,
+            tabAlignment: TabAlignment.start,
             labelColor: MovaColors.violet,
             unselectedLabelColor: MovaColors.textSecondary,
-            tabs: const [
-              Tab(text: 'Rechercher'),
-              Tab(text: 'Publier'),
-              Tab(text: 'Mes trajets'),
-            ],
+            tabs: widget.forDriver
+                ? const [
+                    Tab(text: 'Publier'),
+                    Tab(text: 'Mes trajets'),
+                  ]
+                : const [
+                    Tab(text: 'Rechercher'),
+                    Tab(text: 'Mes réservations'),
+                  ],
           ),
-          const SizedBox(height: 16),
-          AnimatedBuilder(
-            animation: _tabController,
-            builder: (context, _) {
-              switch (_tabController.index) {
-                case 1:
-                  return _createTab();
-                case 2:
-                  return _myTripsTab();
-                default:
-                  return _searchTab();
-              }
-            },
+          const SizedBox(height: 8),
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: tabViews,
+            ),
           ),
         ],
       ),

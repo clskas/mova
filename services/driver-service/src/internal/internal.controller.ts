@@ -16,7 +16,10 @@ class NearbyQuery {
   @IsOptional() @IsString() city?: string;
 }
 class RatingDto { @IsNumber() ratingAvg: number; }
-class ReviewKycDto { approved: boolean; notes?: string; }
+class ReviewKycDto {
+  @IsBoolean() approved: boolean;
+  @IsOptional() @IsString() notes?: string;
+}
 class UpdateDriverStatusDto {
   @IsOptional() @IsBoolean() isAvailable?: boolean;
   @IsOptional() @IsBoolean() active?: boolean;
@@ -45,6 +48,10 @@ export class InternalController {
   }
   @Get('kyc/pending') pendingKyc() { return this.drivers.pendingKyc(); }
   @Post('kyc/:id/review') reviewKyc(@Param('id') id: string, @Body() dto: ReviewKycDto) { return this.drivers.approveKyc(id, dto.approved, dto.notes); }
+  @Patch('drivers/:userId/kyc')
+  reviewDriverKyc(@Param('userId') userId: string, @Body() dto: ReviewKycDto) {
+    return this.drivers.setDriverKycStatus(userId, dto.approved, dto.notes);
+  }
   @Get('drivers/:userId')
   getDriver(@Param('userId') userId: string) { return this.drivers.getProfile(userId); }
   @Patch('drivers/:userId/status')

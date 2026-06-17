@@ -27,10 +27,11 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
   final Set<String> _compareIds = {};
   String _category = '';
   String _transmission = '';
+  String _fuel = '';
   String _sortBy = 'price_asc';
   String _city = 'Kinshasa';
-  int? _minPrice;
-  int? _maxPrice;
+  final _minPriceController = TextEditingController();
+  final _maxPriceController = TextEditingController();
   DateTime _startDate = DateTime.now().add(const Duration(days: 1));
   DateTime _endDate = DateTime.now().add(const Duration(days: 3));
   bool _loading = false;
@@ -39,9 +40,17 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
 
   static const _categories = [
     ('', 'Toutes'),
-    ('ECONOMY', 'Économique'),
+    ('ECONOMY', 'Citadine'),
     ('SUV', 'SUV'),
+    ('VAN', 'Utilitaire'),
     ('PREMIUM', 'Premium'),
+  ];
+
+  static const _fuelOptions = [
+    ('', 'Tous carburants'),
+    ('ESSENCE', 'Essence'),
+    ('DIESEL', 'Diesel'),
+    ('ELECTRIC', 'Électrique'),
   ];
 
   @override
@@ -55,7 +64,25 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
   @override
   void dispose() {
     _tabController.dispose();
+    _minPriceController.dispose();
+    _maxPriceController.dispose();
     super.dispose();
+  }
+
+  bool _matchesFuel(Map<String, dynamic> v) {
+    if (_fuel.isEmpty) return true;
+    final features = (v['features'] as List?)?.map((e) => e.toString().toLowerCase()).join(' ') ?? '';
+    return switch (_fuel) {
+      'ESSENCE' => features.contains('essence'),
+      'DIESEL' => features.contains('diesel'),
+      'ELECTRIC' => features.contains('électr') || features.contains('electr'),
+      _ => true,
+    };
+  }
+
+  int? _parsePrice(String raw) {
+    final n = int.tryParse(raw.replaceAll(RegExp(r'[^0-9]'), ''));
+    return n != null && n > 0 ? n : null;
   }
 
   String _formatDate(DateTime dt) =>
@@ -74,26 +101,34 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
       _loading = true;
       _error = null;
     });
+    final minPrice = _parsePrice(_minPriceController.text);
+    final maxPrice = _parsePrice(_maxPriceController.text);
     final params = <String, String>{
       if (_city.isNotEmpty) 'city': _city,
       if (_category.isNotEmpty) 'category': _category,
       if (_transmission.isNotEmpty) 'transmission': _transmission,
       if (_sortBy.isNotEmpty) 'sort': _sortBy,
-      if (_minPrice != null) 'minPrice': '$_minPrice',
-      if (_maxPrice != null) 'maxPrice': '$_maxPrice',
+      if (minPrice != null) 'minPrice': '$minPrice',
+      if (maxPrice != null) 'maxPrice': '$maxPrice',
     };
     final query = params.entries.map((e) => '${e.key}=${Uri.encodeComponent(e.value)}').join('&');
     final api = ref.read(apiClientProvider);
+    await api.loadToken();
     await api.checkHealth();
-    final result = await api.get('/rental/vehicles${query.isNotEmpty ? '?$query' : ''}');
+    final result = await api.get(
+      '/rental/vehicles${query.isNotEmpty ? '?$query' : ''}',
+      skipCache: true,
+    );
     if (!mounted) return;
     setState(() {
       _loading = false;
       switch (result) {
         case Success(:final data):
-          _vehicles = _parseVehicles(data);
+          _vehicles = _parseVehicles(data).where(_matchesFuel).toList();
+          _error = null;
         case Failure(:final error):
           _error = error.message;
+          _vehicles = [];
       }
     });
   }
@@ -101,7 +136,7 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
   Future<void> _loadMyRentals() async {
     setState(() => _loadingList = true);
     final api = ref.read(apiClientProvider);
-    final result = await api.get('/rental/bookings');
+    final result = await api.get('/rental/bookings', skipCache: true);
     if (!mounted) return;
     setState(() {
       _loadingList = false;
@@ -183,56 +218,95 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
       padding: const EdgeInsets.only(bottom: 12),
       child: MovaCard(
         onTap: () => _openDetail(v),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Image.network(
-                v['imageUrl']?.toString() ?? '',
-                width: 88,
-                height: 66,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Container(
-                  width: 88,
-                  height: 66,
-                  color: MovaColors.violet.withValues(alpha: 0.12),
-                  child: const Icon(Icons.directions_car, color: MovaColors.violet),
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(v['name']?.toString() ?? 'Véhicule', style: const TextStyle(fontWeight: FontWeight.w600)),
-                  Text(
-                    '${v['categoryLabel'] ?? v['category']} · ${v['make'] ?? ''} ${v['model'] ?? ''}',
-                    style: const TextStyle(fontSize: 12, color: MovaColors.textSecondary),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.network(
+                    v['imageUrl']?.toString() ?? '',
+                    width: 72,
+                    height: 54,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      width: 72,
+                      height: 54,
+                      color: MovaColors.violet.withValues(alpha: 0.12),
+                      child: const Icon(Icons.directions_car, color: MovaColors.violet, size: 28),
+                    ),
                   ),
-                  Row(
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      if (v['rating'] != null) ...[
-                        const Icon(Icons.star, size: 14, color: Colors.amber),
-                        Text(' ${v['rating']}  ', style: const TextStyle(fontSize: 12)),
-                      ],
                       Text(
-                        MarketConfig.formatCdf(v['dailyRateCdf'] as int? ?? 0),
-                        style: const TextStyle(color: MovaColors.green, fontWeight: FontWeight.w600, fontSize: 13),
+                        v['name']?.toString() ?? 'Véhicule',
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      const Text('/j', style: TextStyle(fontSize: 12)),
+                      Container(
+                        margin: const EdgeInsets.only(top: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: MovaColors.green.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text(
+                          'Disponible',
+                          style: TextStyle(fontSize: 10, color: MovaColors.green, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${v['categoryLabel'] ?? v['category']} · ${v['make'] ?? ''} ${v['model'] ?? ''}'.trim(),
+                        style: const TextStyle(fontSize: 12, color: MovaColors.textSecondary),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Wrap(
+                        spacing: 4,
+                        runSpacing: 4,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          if (v['rating'] != null) ...[
+                            const Icon(Icons.star, size: 14, color: Colors.amber),
+                            Text('${v['rating']}', style: const TextStyle(fontSize: 12)),
+                          ],
+                          Text(
+                            '${MarketConfig.formatCdf(v['dailyRateCdf'] as int? ?? 0)}/j',
+                            style: const TextStyle(color: MovaColors.green, fontWeight: FontWeight.w600, fontSize: 13),
+                          ),
+                        ],
+                      ),
+                      if (v['ownerBadge'] != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            v['ownerBadge'].toString(),
+                            style: const TextStyle(fontSize: 11, color: MovaColors.violet),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
                     ],
                   ),
-                  if (v['ownerBadge'] != null)
-                    Text(v['ownerBadge'].toString(), style: const TextStyle(fontSize: 11, color: MovaColors.violet)),
-                ],
-              ),
+                ),
+              ],
             ),
-            IconButton(
-              icon: Icon(selected ? Icons.check_box : Icons.check_box_outline_blank, color: MovaColors.violet),
-              onPressed: () => _toggleCompare(id),
-              tooltip: 'Comparer',
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: () => _toggleCompare(id),
+                icon: Icon(selected ? Icons.check_box : Icons.check_box_outline_blank, color: MovaColors.violet, size: 20),
+                label: Text(selected ? 'Retirer' : 'Comparer', style: const TextStyle(fontSize: 12)),
+              ),
             ),
           ],
         ),
@@ -272,37 +346,70 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
 
   Widget _timeline(List<dynamic>? timeline) {
     if (timeline == null || timeline.isEmpty) return const SizedBox.shrink();
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: timeline.map<Widget>((step) {
-        final m = step as Map<String, dynamic>;
-        final done = m['completed'] == true;
-        final current = m['current'] == true;
-        return Expanded(
-          child: Column(
-            children: [
-              Icon(
-                done ? Icons.check_circle : Icons.radio_button_unchecked,
-                size: 18,
-                color: current ? MovaColors.violet : (done ? MovaColors.green : MovaColors.textSecondary),
-              ),
-              Text(
-                m['label']?.toString() ?? '',
-                style: TextStyle(fontSize: 10, color: current ? MovaColors.violet : MovaColors.textSecondary),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-        );
-      }).toList(),
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: timeline.map<Widget>((step) {
+          final m = step as Map<String, dynamic>;
+          final done = m['completed'] == true;
+          final current = m['current'] == true;
+          return SizedBox(
+            width: 72,
+            child: Column(
+              children: [
+                Icon(
+                  done ? Icons.check_circle : Icons.radio_button_unchecked,
+                  size: 18,
+                  color: current ? MovaColors.violet : (done ? MovaColors.green : MovaColors.textSecondary),
+                ),
+                Text(
+                  m['label']?.toString() ?? '',
+                  style: TextStyle(fontSize: 10, color: current ? MovaColors.violet : MovaColors.textSecondary),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _featureChip(IconData icon, String label) {
+    return Chip(
+      avatar: Icon(icon, size: 16, color: MovaColors.violet),
+      label: Text(label, style: const TextStyle(fontSize: 11)),
+      backgroundColor: MovaColors.violet.withValues(alpha: 0.08),
     );
   }
 
   Widget _searchTab(ThemeData theme) {
+    final bottomPad = MediaQuery.paddingOf(context).bottom + 24;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (_step == _RentalStep.search) ...[
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _featureChip(Icons.verified_user, 'KYC & permis'),
+                const SizedBox(width: 6),
+                _featureChip(Icons.bolt, 'Dispo temps réel'),
+                const SizedBox(width: 6),
+                _featureChip(Icons.payment, 'Mobile money'),
+                const SizedBox(width: 6),
+                _featureChip(Icons.gps_fixed, 'GPS retrait'),
+                const SizedBox(width: 6),
+                _featureChip(Icons.shield, 'Assurance'),
+                const SizedBox(width: 6),
+                _featureChip(Icons.card_giftcard, 'Fidélité'),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
           Container(
             margin: const EdgeInsets.only(bottom: 12),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -379,68 +486,156 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
             }).toList(),
           ),
           const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: DropdownButtonFormField<String>(
-                  value: _transmission.isEmpty ? null : _transmission,
-                  decoration: const InputDecoration(labelText: 'Transmission', isDense: true),
-                  items: const [
-                    DropdownMenuItem(value: '', child: Text('Toutes')),
-                    DropdownMenuItem(value: 'AUTO', child: Text('Automatique')),
-                    DropdownMenuItem(value: 'MANUAL', child: Text('Manuelle')),
-                  ],
-                  onChanged: (v) => setState(() => _transmission = v ?? ''),
+          DropdownButtonFormField<String?>(
+            value: _fuel.isEmpty ? null : _fuel,
+            decoration: const InputDecoration(labelText: 'Carburant', isDense: true),
+            items: _fuelOptions
+                .map((f) => DropdownMenuItem<String?>(value: f.$1.isEmpty ? null : f.$1, child: Text(f.$2)))
+                .toList(),
+            onChanged: (v) => setState(() => _fuel = v ?? ''),
+          ),
+          const SizedBox(height: 8),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final stacked = constraints.maxWidth < 400;
+              final priceFields = [
+                Expanded(
+                  child: TextField(
+                    controller: _minPriceController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Prix min (CDF/j)',
+                      isDense: true,
+                    ),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: DropdownButtonFormField<String>(
-                  value: _sortBy,
-                  decoration: const InputDecoration(labelText: 'Tri', isDense: true),
-                  items: const [
-                    DropdownMenuItem(value: 'price_asc', child: Text('Prix ↑')),
-                    DropdownMenuItem(value: 'price_desc', child: Text('Prix ↓')),
-                    DropdownMenuItem(value: 'rating', child: Text('Note')),
-                    DropdownMenuItem(value: 'category', child: Text('Catégorie')),
-                  ],
-                  onChanged: (v) => setState(() => _sortBy = v ?? 'price_asc'),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    controller: _maxPriceController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Prix max (CDF/j)',
+                      isDense: true,
+                    ),
+                  ),
                 ),
-              ),
-            ],
+              ];
+              final filterFields = [
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    value: _transmission.isEmpty ? null : _transmission,
+                    decoration: const InputDecoration(labelText: 'Transmission', isDense: true),
+                    items: const [
+                      DropdownMenuItem(value: 'AUTO', child: Text('Automatique')),
+                      DropdownMenuItem(value: 'MANUAL', child: Text('Manuelle')),
+                    ],
+                    onChanged: (v) => setState(() => _transmission = v ?? ''),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    value: _sortBy,
+                    decoration: const InputDecoration(labelText: 'Tri', isDense: true),
+                    items: const [
+                      DropdownMenuItem(value: 'price_asc', child: Text('Prix ↑')),
+                      DropdownMenuItem(value: 'price_desc', child: Text('Prix ↓')),
+                      DropdownMenuItem(value: 'rating', child: Text('Note')),
+                      DropdownMenuItem(value: 'category', child: Text('Catégorie')),
+                    ],
+                    onChanged: (v) => setState(() => _sortBy = v ?? 'price_asc'),
+                  ),
+                ),
+              ];
+              if (stacked) {
+                return Column(
+                  children: [
+                    Row(children: priceFields),
+                    const SizedBox(height: 8),
+                    DropdownButtonFormField<String>(
+                      value: _transmission.isEmpty ? null : _transmission,
+                      decoration: const InputDecoration(labelText: 'Transmission', isDense: true),
+                      items: const [
+                        DropdownMenuItem(value: 'AUTO', child: Text('Automatique')),
+                        DropdownMenuItem(value: 'MANUAL', child: Text('Manuelle')),
+                      ],
+                      onChanged: (v) => setState(() => _transmission = v ?? ''),
+                    ),
+                    const SizedBox(height: 8),
+                    DropdownButtonFormField<String>(
+                      value: _sortBy,
+                      decoration: const InputDecoration(labelText: 'Tri', isDense: true),
+                      items: const [
+                        DropdownMenuItem(value: 'price_asc', child: Text('Prix ↑')),
+                        DropdownMenuItem(value: 'price_desc', child: Text('Prix ↓')),
+                        DropdownMenuItem(value: 'rating', child: Text('Note')),
+                        DropdownMenuItem(value: 'category', child: Text('Catégorie')),
+                      ],
+                      onChanged: (v) => setState(() => _sortBy = v ?? 'price_asc'),
+                    ),
+                  ],
+                );
+              }
+              return Column(
+                children: [
+                  Row(children: priceFields),
+                  const SizedBox(height: 8),
+                  Row(children: filterFields),
+                ],
+              );
+            },
           ),
           const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: MovaButton(
-                  label: 'Rechercher',
-                  icon: Icons.search,
-                  isLoading: _loading,
-                  onPressed: _loading ? null : _search,
-                ),
+          if (_compareIds.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: MovaButton(
+                label: 'Comparer (${_compareIds.length})',
+                isSecondary: true,
+                onPressed: () => setState(() => _step = _RentalStep.compare),
               ),
-              if (_compareIds.isNotEmpty) ...[
-                const SizedBox(width: 8),
-                MovaButton(
-                  label: 'Comparer (${_compareIds.length})',
-                  isSecondary: true,
-                  onPressed: () => setState(() => _step = _RentalStep.compare),
-                ),
-              ],
-            ],
+            ),
+          MovaButton(
+            label: 'Rechercher',
+            icon: Icons.search,
+            isLoading: _loading,
+            onPressed: _loading ? null : _search,
           ),
           if (_error != null) ...[
             const SizedBox(height: 12),
             MovaErrorBanner(message: _error!, onRetry: _search),
           ],
           const SizedBox(height: 16),
+          if (!_loading && _vehicles.isNotEmpty)
+            Text(
+              '${_vehicles.length} véhicule${_vehicles.length > 1 ? 's' : ''} disponible${_vehicles.length > 1 ? 's' : ''}',
+              style: theme.textTheme.labelLarge?.copyWith(color: MovaColors.green),
+            ),
           if (_loading)
             const Center(child: CircularProgressIndicator())
           else if (_vehicles.isEmpty)
-            const Text('Aucun véhicule disponible.', style: TextStyle(color: MovaColors.textSecondary))
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              child: Column(
+                children: [
+                  const Icon(Icons.directions_car_outlined, size: 48, color: MovaColors.textSecondary),
+                  const SizedBox(height: 12),
+                  Text(
+                    _error != null
+                        ? 'Impossible de charger le catalogue.\nVérifiez votre connexion réseau.'
+                        : 'Aucun véhicule pour ces critères.\nÉlargissez les filtres ou changez de ville.',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: MovaColors.textSecondary),
+                  ),
+                  const SizedBox(height: 12),
+                  MovaButton(label: 'Réessayer', isSecondary: true, onPressed: _search),
+                ],
+              ),
+            )
           else
             ..._vehicles.map(_vehicleCard),
+          SizedBox(height: bottomPad),
         ] else ...[
           Row(
             children: [
@@ -448,18 +643,24 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
                 icon: const Icon(Icons.arrow_back),
                 onPressed: () => setState(() => _step = _RentalStep.search),
               ),
-              Text('Comparaison', style: theme.textTheme.titleMedium),
+              Expanded(
+                child: Text('Comparaison', style: theme.textTheme.titleMedium, overflow: TextOverflow.ellipsis),
+              ),
             ],
           ),
           _compareTable(),
           const SizedBox(height: 16),
           ..._vehicles
               .where((v) => _compareIds.contains(v['id']?.toString()))
-              .map((v) => MovaButton(
-                    label: 'Réserver ${v['name']}',
-                    isSecondary: true,
-                    onPressed: () => _openDetail(v),
+              .map((v) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: MovaButton(
+                      label: 'Réserver ${v['name']}',
+                      isSecondary: true,
+                      onPressed: () => _openDetail(v),
+                    ),
                   )),
+          SizedBox(height: bottomPad),
         ],
       ],
     );
@@ -468,9 +669,22 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
   Widget _myRentalsTab(ThemeData theme) {
     if (_loadingList) return const Center(child: CircularProgressIndicator());
     if (_myRentals.isEmpty) {
-      return const Center(child: Text('Aucune location en cours.', style: TextStyle(color: MovaColors.textSecondary)));
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: const [
+          SizedBox(height: 48),
+          Icon(Icons.event_busy, size: 48, color: MovaColors.textSecondary),
+          SizedBox(height: 12),
+          Text(
+            'Aucune réservation.\nParcourez le catalogue et réservez en quelques clics.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: MovaColors.textSecondary),
+          ),
+        ],
+      );
     }
     return ListView.builder(
+      physics: const AlwaysScrollableScrollPhysics(),
       itemCount: _myRentals.length,
       itemBuilder: (_, i) {
         final inq = _myRentals[i];
@@ -506,7 +720,13 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
                       children: [
                         const Icon(Icons.phone_outlined, size: 16, color: MovaColors.violet),
                         const SizedBox(width: 4),
-                        Text('Propriétaire : ${inq['ownerContactPhone']}'),
+                        Expanded(
+                          child: Text(
+                            'Propriétaire : ${inq['ownerContactPhone']}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -524,6 +744,7 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
     final theme = Theme.of(context);
     return MovaScreen(
       title: 'Location véhicule',
+      scrollable: false,
       child: Column(
         children: [
           TabBar(
@@ -538,8 +759,17 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
             child: TabBarView(
               controller: _tabController,
               children: [
-                SingleChildScrollView(child: _searchTab(theme)),
-                _myRentalsTab(theme),
+                RefreshIndicator(
+                  onRefresh: _search,
+                  child: SingleChildScrollView(
+                    physics: kMovaScrollPhysics,
+                    child: _searchTab(theme),
+                  ),
+                ),
+                RefreshIndicator(
+                  onRefresh: _loadMyRentals,
+                  child: _myRentalsTab(theme),
+                ),
               ],
             ),
           ),

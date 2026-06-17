@@ -57,10 +57,11 @@ MOVA est votre application de mobilité urbaine en RDC. Commandez un taxi ou mot
 
 1. Appuyez sur **Covoiturage**.
 2. **Rechercher** : indiquez ville de départ, destination et date. Triez par prix, heure ou note conducteur. Chaque résultat affiche la distance, l'ETA et le badge KYC si le conducteur est vérifié.
-3. **Publier** : choisissez date/heure, villes, nombre de places (1–6), prix par place en CDF, point de rendez-vous et notes (ex. « 2 bagages max »). Options : femmes uniquement, réservation instantanée.
-4. **Réserver** : sélectionnez un trajet, choisissez le nombre de places et confirmez. Vous voyez le récapitulatif conducteur et pouvez contacter le conducteur (téléphone masqué).
-5. **Mes trajets** : consultez vos trajets publiés (conducteur) et vos réservations (passager). Annulez avant le départ si besoin.
-6. **Détail trajet** : carte du parcours, timeline (Publié → Places réservées → En route → Terminé), liste des passagers pour le conducteur.
+3. **Réserver** : sélectionnez un trajet, choisissez le nombre de places et confirmez. Vous voyez le récapitulatif conducteur et pouvez contacter le conducteur (téléphone masqué).
+4. **Mes réservations** : consultez vos trajets réservés. Annulez avant le départ si besoin.
+5. **Détail trajet** : carte du parcours, timeline (Publié → Places réservées → En route → Terminé).
+
+> La publication de trajets est réservée aux **chauffeurs MOVA** (app Chauffeur, KYC approuvé).
 
 ## 8. Livraison express
 

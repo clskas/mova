@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { apiFetch, type KycItem } from "@/lib/api";
+import { apiFetch, fetchDrivers, reviewDriverKyc, type AdminDriver, type KycItem } from "@/lib/api";
 import { authHeaders } from "@/lib/auth";
 import { useAdmin } from "@/components/AdminProvider";
 import {
@@ -26,6 +26,7 @@ function resolveDocumentUrl(url?: string | null): string | null {
 export default function KycPage() {
   const { canWrite } = useAdmin();
   const [items, setItems] = useState<KycItem[]>([]);
+  const [pendingDrivers, setPendingDrivers] = useState<AdminDriver[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState<KycItem | null>(null);
@@ -35,8 +36,14 @@ export default function KycPage() {
     setLoading(true);
     setError(null);
     try {
-      const data = await apiFetch<KycItem[]>("/api/admin/kyc/pending");
+      const [data, drivers] = await Promise.all([
+        apiFetch<KycItem[]>("/api/admin/kyc/pending"),
+        fetchDrivers(),
+      ]);
       setItems(Array.isArray(data) ? data : []);
+      setPendingDrivers(
+        drivers.filter((d) => d.kycStatus === "PENDING" || d.kycStatus === "REJECTED"),
+      );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur de chargement");
     } finally {
@@ -83,38 +90,80 @@ export default function KycPage() {
     }
   }
 
+  async function reviewDriver(userId: string, approved: boolean) {
+    try {
+      await reviewDriverKyc(userId, approved);
+      load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Échec de la validation");
+    }
+  }
+
   return (
     <div className="max-w-4xl mx-auto">
       <PageHeader title="KYC" subtitle="Validation des documents chauffeurs" />
       {error && <div className="mb-4"><ErrorBanner message={error} onRetry={load} /></div>}
       {loading ? (
         <LoadingState />
-      ) : items.length === 0 ? (
+      ) : items.length === 0 && pendingDrivers.length === 0 ? (
         <EmptyState message="Aucun KYC en attente" />
       ) : (
-        <div className="space-y-3">
-          {items.map((k) => (
-            <Card key={k.id} className="p-4 flex flex-wrap justify-between items-center gap-4">
-              <div>
-                <p className="font-medium">{k.type}</p>
-                <p className="text-sm text-gray-500">Utilisateur {k.userId}</p>
-                <StatusBadge status={k.status} />
-                {k.url && (
-                  <button type="button" onClick={() => setPreview(k)} className="block mt-2 text-sm text-[#6C63FF] hover:underline">
-                    Aperçu document
-                  </button>
+        <div className="space-y-6">
+          {items.length > 0 && (
+            <div className="space-y-3">
+              <h2 className="text-sm font-semibold text-gray-700">Documents en attente</h2>
+              {items.map((k) => (
+                <Card key={k.id} className="p-4 flex flex-wrap justify-between items-center gap-4">
+                  <div>
+                    <p className="font-medium">{k.type}</p>
+                    <p className="text-sm text-gray-500">Utilisateur {k.userId}</p>
+                    <StatusBadge status={k.status} />
+                    {k.url && (
+                      <button type="button" onClick={() => setPreview(k)} className="block mt-2 text-sm text-[#6C63FF] hover:underline">
+                        Aperçu document
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    {canWrite("kyc") && (
+                      <>
+                        <BtnSuccess onClick={() => review(k.id, true)}>Approuver</BtnSuccess>
+                        <BtnDanger onClick={() => review(k.id, false)}>Rejeter</BtnDanger>
+                      </>
+                    )}
+                  </div>
+                </Card>
+              ))}
+            </div>
+          )}
+          {pendingDrivers.length > 0 && (
+            <div className="space-y-3">
+              <h2 className="text-sm font-semibold text-gray-700">
+                Chauffeurs sans validation complète
+                {items.length === 0 && (
+                  <span className="block font-normal text-gray-500 mt-1">
+                    Aucun document en attente — validez le profil chauffeur directement.
+                  </span>
                 )}
-              </div>
-              <div className="flex gap-2">
-                {canWrite("kyc") && (
-                  <>
-                    <BtnSuccess onClick={() => review(k.id, true)}>Approuver</BtnSuccess>
-                    <BtnDanger onClick={() => review(k.id, false)}>Rejeter</BtnDanger>
-                  </>
-                )}
-              </div>
-            </Card>
-          ))}
+              </h2>
+              {pendingDrivers.map((d) => (
+                <Card key={d.id} className="p-4 flex flex-wrap justify-between items-center gap-4">
+                  <div>
+                    <p className="font-medium font-mono text-sm">{d.userId}</p>
+                    <StatusBadge status={d.kycStatus} />
+                  </div>
+                  {canWrite("kyc") && (
+                    <div className="flex gap-2">
+                      <BtnSuccess onClick={() => reviewDriver(d.userId, true)}>Approuver</BtnSuccess>
+                      {d.kycStatus !== "REJECTED" && (
+                        <BtnDanger onClick={() => reviewDriver(d.userId, false)}>Rejeter</BtnDanger>
+                      )}
+                    </div>
+                  )}
+                </Card>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

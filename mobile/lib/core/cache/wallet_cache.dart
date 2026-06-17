@@ -13,6 +13,12 @@ class WalletCache {
     await prefs.setString(_syncedAtKey, DateTime.now().toIso8601String());
   }
 
+  static Future<void> clear() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_payloadKey);
+    await prefs.remove(_syncedAtKey);
+  }
+
   static Future<WalletSnapshot> load() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_payloadKey);

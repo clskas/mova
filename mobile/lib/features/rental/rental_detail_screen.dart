@@ -217,6 +217,7 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
 
     return MovaScreen(
       title: v['name']?.toString() ?? 'Véhicule',
+      scrollable: true,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -262,6 +263,8 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
                 child: Text(
                   '${v['make'] ?? ''} ${v['model'] ?? ''} ${v['year'] ?? ''}'.trim(),
                   style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
               if (v['rating'] != null)
@@ -283,7 +286,13 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
               children: [
                 const Icon(Icons.verified_user_outlined, size: 16, color: MovaColors.violet),
                 const SizedBox(width: 4),
-                Text('Propriétaire : ${v['ownerName']}'),
+                Expanded(
+                  child: Text(
+                    'Propriétaire : ${v['ownerName']}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
                 if (v['ownerBadge'] != null) ...[
                   const SizedBox(width: 8),
                   Container(
@@ -383,16 +392,19 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
               }),
             ),
             const SizedBox(height: 12),
-            SegmentedButton<String>(
-              segments: const [
-                ButtonSegment(value: 'DAILY', label: Text('Journée')),
-                ButtonSegment(value: 'WEEKLY', label: Text('Semaine')),
-              ],
-              selected: {_rentalPeriod},
-              onSelectionChanged: (s) => setState(() {
-                _rentalPeriod = s.first;
-                _quote = null;
-              }),
+            SizedBox(
+              width: double.infinity,
+              child: SegmentedButton<String>(
+                segments: const [
+                  ButtonSegment(value: 'DAILY', label: Text('Journée')),
+                  ButtonSegment(value: 'WEEKLY', label: Text('Semaine')),
+                ],
+                selected: {_rentalPeriod},
+                onSelectionChanged: (s) => setState(() {
+                  _rentalPeriod = s.first;
+                  _quote = null;
+                }),
+              ),
             ),
             const SizedBox(height: 12),
             Text('Assurance', style: theme.textTheme.titleSmall),
@@ -409,16 +421,19 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
               );
             }),
             Text('Kilométrage', style: theme.textTheme.titleSmall),
-            SegmentedButton<String>(
-              segments: const [
-                ButtonSegment(value: 'UNLIMITED', label: Text('Illimité')),
-                ButtonSegment(value: 'LIMITED', label: Text('Limité')),
-              ],
-              selected: {_mileageType},
-              onSelectionChanged: (s) => setState(() {
-                _mileageType = s.first;
-                _quote = null;
-              }),
+            SizedBox(
+              width: double.infinity,
+              child: SegmentedButton<String>(
+                segments: const [
+                  ButtonSegment(value: 'UNLIMITED', label: Text('Illimité')),
+                  ButtonSegment(value: 'LIMITED', label: Text('Limité')),
+                ],
+                selected: {_mileageType},
+                onSelectionChanged: (s) => setState(() {
+                  _mileageType = s.first;
+                  _quote = null;
+                }),
+              ),
             ),
             const SizedBox(height: 8),
             Text('Options', style: theme.textTheme.titleSmall),

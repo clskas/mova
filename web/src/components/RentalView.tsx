@@ -103,7 +103,7 @@ export function RentalView({ onBack, mock }: Props) {
         vehicles.map((v) => (
           <label key={v.id} className="flex items-center gap-3 bg-white rounded-xl p-3 shadow-sm cursor-pointer">
             <input type="radio" name="vehicle" checked={selectedId === v.id} onChange={() => { setSelectedId(v.id); setEstimate(null); }} />
-            <span className="flex-1 font-medium">{v.name}</span>
+            <span className="flex-1 min-w-0 font-medium truncate">{v.name}</span>
             <span className="text-sm text-[#6C63FF]">{formatCdf(pricePerDay(v))}/j</span>
           </label>
         ))

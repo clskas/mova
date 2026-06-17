@@ -1,7 +1,7 @@
 import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { UserRole } from '@prisma/client';
+import { UserRole, UserStatus } from '@prisma/client';
 import * as crypto from 'crypto';
 import {
   MOVA_EVENTS,
@@ -86,8 +86,28 @@ export class AuthService {
         body: JSON.stringify({ userId: user.id }),
       });
     }
-    const token = this.jwt.sign({ sub: user.id, phone: user.phone, role: user.role });
-    return { success: true, accessToken: token, isNew, user: { id: user.id, phone: user.phone, role: user.role, firstName: user.firstName, lastName: user.lastName } };
+    if (user.status === UserStatus.SUSPENDED) {
+      throw new MovaHttpException(MovaErrorCode.AUTH_FORBIDDEN, HttpStatus.FORBIDDEN, 'Compte suspendu. Contactez le support MOVA.');
+    }
+    const token = this.jwt.sign({
+      sub: user.id,
+      phone: user.phone,
+      role: user.role,
+      status: user.status,
+    });
+    return {
+      success: true,
+      accessToken: token,
+      isNew,
+      user: {
+        id: user.id,
+        phone: user.phone,
+        role: user.role,
+        status: user.status,
+        firstName: user.firstName,
+        lastName: user.lastName,
+      },
+    };
   }
 
   async validateUser(userId: string) {

@@ -255,6 +255,8 @@ class _CarpoolDetailScreenState extends ConsumerState<CarpoolDetailScreen> {
                   Text(
                     '${trip['fromAddress']} → ${trip['toAddress']}',
                     style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   if (trip['etaLabel'] != null)
                     Text(
@@ -280,7 +282,7 @@ class _CarpoolDetailScreenState extends ConsumerState<CarpoolDetailScreen> {
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: const Text(
-                            'KYC vérifié',
+                            'KYC',
                             style: TextStyle(color: MovaColors.green, fontSize: 11, fontWeight: FontWeight.w600),
                           ),
                         ),
@@ -432,13 +434,18 @@ class _CarpoolDetailScreenState extends ConsumerState<CarpoolDetailScreen> {
                   ],
                   if (!_isDriver) ...[
                     const SizedBox(height: 8),
-                    OutlinedButton.icon(
-                      onPressed: _contactDriver,
-                      icon: const Icon(Icons.phone_outlined),
-                      label: Text(
-                        trip['contactPhone'] != null
-                            ? 'Appeler · ${trip['contactPhone']}'
-                            : 'Contacter le conducteur',
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: _contactDriver,
+                        icon: const Icon(Icons.phone_outlined),
+                        label: Text(
+                          trip['contactPhone'] != null
+                              ? 'Appeler · ${trip['contactPhone']}'
+                              : 'Contacter le conducteur',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                     ),
                   ],
@@ -467,41 +474,43 @@ class _Timeline extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
-      children: List.generate(steps.length * 2 - 1, (i) {
-        if (i.isOdd) {
-          final lineIdx = i ~/ 2;
-          return Expanded(
-            child: Container(
-              height: 2,
-              color: lineIdx < currentStep ? MovaColors.green : MovaColors.textSecondary.withValues(alpha: 0.3),
-            ),
-          );
-        }
-        final stepIdx = i ~/ 2;
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: List.generate(steps.length, (stepIdx) {
         final done = stepIdx <= currentStep;
-        return Column(
-          children: [
-            CircleAvatar(
-              radius: 12,
-              backgroundColor: done ? MovaColors.green : MovaColors.textSecondary.withValues(alpha: 0.3),
-              child: done
-                  ? const Icon(Icons.check, size: 14, color: Colors.white)
-                  : Text('${stepIdx + 1}', style: const TextStyle(fontSize: 10)),
-            ),
-            const SizedBox(height: 4),
-            SizedBox(
-              width: 64,
-              child: Text(
+        final lineColor = done ? MovaColors.green : MovaColors.textSecondary.withValues(alpha: 0.3);
+        return Expanded(
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  if (stepIdx > 0)
+                    Expanded(child: Container(height: 2, color: stepIdx <= currentStep ? MovaColors.green : lineColor)),
+                  CircleAvatar(
+                    radius: 12,
+                    backgroundColor: done ? MovaColors.green : MovaColors.textSecondary.withValues(alpha: 0.3),
+                    child: done
+                        ? const Icon(Icons.check, size: 14, color: Colors.white)
+                        : Text('${stepIdx + 1}', style: const TextStyle(fontSize: 10, color: Colors.white)),
+                  ),
+                  if (stepIdx < steps.length - 1)
+                    Expanded(child: Container(height: 2, color: stepIdx < currentStep ? MovaColors.green : lineColor)),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
                 steps[stepIdx],
                 textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontSize: 9,
+                  height: 1.2,
                   color: done ? MovaColors.green : MovaColors.textSecondary,
                   fontWeight: done ? FontWeight.w600 : FontWeight.normal,
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         );
       }),
     );

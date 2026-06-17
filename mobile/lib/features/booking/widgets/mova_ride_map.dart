@@ -188,6 +188,7 @@ class _MovaRideMapState extends State<MovaRideMap> {
           if (widget.dropoffEditable)
             Positioned(
               left: 8,
+              right: 8,
               bottom: 8,
               child: DecoratedBox(
                 decoration: BoxDecoration(
@@ -199,6 +200,9 @@ class _MovaRideMapState extends State<MovaRideMap> {
                   child: Text(
                     'Appuyez sur la carte pour la destination',
                     style: TextStyle(color: MovaColors.white, fontSize: 11),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
                   ),
                 ),
               ),

@@ -2,7 +2,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
-import { isAdminPanelRole } from '@mova/shared';
+import { assertActiveUserStatus, isAdminPanelRole, MovaJwtPayload } from '@mova/shared';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
@@ -14,10 +14,15 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  validate(payload: { sub: string; role: string }) {
+  validate(payload: MovaJwtPayload) {
+    try {
+      assertActiveUserStatus(payload.status);
+    } catch {
+      throw new UnauthorizedException('Compte suspendu');
+    }
     if (!isAdminPanelRole(payload.role)) {
       throw new UnauthorizedException('Accès réservé au panneau admin MOVA');
     }
-    return { id: payload.sub, role: payload.role };
+    return { id: payload.sub, role: payload.role, status: payload.status };
   }
 }

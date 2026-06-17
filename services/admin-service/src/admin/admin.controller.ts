@@ -107,6 +107,13 @@ export class AdminController {
     return this.adminService.approveKyc(id, dto.approved, dto.notes);
   }
 
+  @Patch('drivers/:userId/kyc')
+  @RequirePermissions(AdminPermission.KYC_WRITE)
+  @ApiOperation({ summary: 'Valider/rejeter KYC chauffeur (profil)' })
+  reviewDriverKyc(@Param('userId') userId: string, @Body() dto: ApproveKycDto) {
+    return this.adminService.reviewDriverKyc(userId, dto.approved, dto.notes);
+  }
+
   @Get('rides')
   @RequirePermissions(AdminPermission.RIDES_READ)
   @ApiOperation({ summary: 'Liste courses taxi' })
@@ -415,6 +422,20 @@ export class AdminController {
   @ApiOperation({ summary: 'Modifier majoration service' })
   updateSurcharge(@Param('type') type: string, @Body() body: Record<string, unknown>) {
     return this.adminService.updateSurcharge(type, body);
+  }
+
+  @Get('commissions')
+  @RequirePermissions(AdminPermission.PRICING_READ)
+  @ApiOperation({ summary: 'Commissions plateforme MOVA par service' })
+  commissions() {
+    return this.adminService.listCommissions();
+  }
+
+  @Patch('commissions/:serviceType')
+  @RequirePermissions(AdminPermission.PRICING_WRITE)
+  @ApiOperation({ summary: 'Modifier commission plateforme' })
+  updateCommission(@Param('serviceType') serviceType: string, @Body() body: Record<string, unknown>) {
+    return this.adminService.updateCommission(serviceType, body);
   }
 
   @Get('promo-codes')

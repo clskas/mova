@@ -20,7 +20,40 @@ export class DriversService {
   constructor(private prisma: PrismaService) {}
 
   async createProfile(userId: string) {
-    return this.prisma.driverProfile.upsert({ where: { userId }, create: { userId }, update: {} });
+    const profile = await this.prisma.driverProfile.upsert({
+      where: { userId },
+      create: { userId, operatingCity: 'Kinshasa' },
+      update: {},
+    });
+    await this.ensureDefaultVehicle(profile.id);
+    return this.prisma.driverProfile.findUnique({ where: { userId }, include: { vehicles: true } });
+  }
+
+  private async ensureDefaultVehicle(driverProfileId: string) {
+    const existing = await this.prisma.vehicle.findFirst({ where: { driverProfileId } });
+    if (existing) return existing;
+    return this.prisma.vehicle.create({
+      data: {
+        driverProfileId,
+        type: VehicleType.STANDARD,
+        make: 'Toyota',
+        model: 'Corolla',
+        plateNumber: `KIN-${driverProfileId.slice(0, 4).toUpperCase()}`,
+        color: 'Noir',
+        isActive: true,
+      },
+    });
+  }
+
+  async getOrCreateProfile(userId: string) {
+    let profile = await this.prisma.driverProfile.findUnique({ where: { userId }, include: { vehicles: true } });
+    if (!profile) {
+      profile = await this.createProfile(userId);
+    } else if (!profile.vehicles.length) {
+      await this.ensureDefaultVehicle(profile.id);
+      profile = await this.prisma.driverProfile.findUnique({ where: { userId }, include: { vehicles: true } });
+    }
+    return profile;
   }
 
   async findNearby(lat: number, lng: number, vehicleType: VehicleType, searchAttempt = 0, city?: string): Promise<DriverCandidate[]> {
@@ -28,10 +61,9 @@ export class DriversService {
       MARKET_RDC.matching.initialRadiusKm + searchAttempt * MARKET_RDC.matching.radiusIncrementKm,
       MARKET_RDC.matching.maxRadiusKm,
     );
-    const operatingCity = city ?? resolveCityFromCoords(lat, lng);
+    const pickupCity = city ?? resolveCityFromCoords(lat, lng);
     const drivers = await this.prisma.driverProfile.findMany({
       where: {
-        operatingCity,
         isAvailable: true,
         kycStatus: KycStatus.APPROVED,
         currentLat: { not: null },
@@ -45,14 +77,17 @@ export class DriversService {
       if (driver.currentLat == null || driver.currentLng == null) continue;
       const distanceKm = this.haversineKm(lat, lng, driver.currentLat, driver.currentLng);
       if (distanceKm > effectiveRadius) continue;
+      const sameCity = driver.operatingCity === pickupCity;
+      const rating = driver.ratingAvg;
+      const baseScore = this.computeScore(distanceKm, rating, driver.totalRides);
       candidates.push({
         driverId: driver.id,
         userId: driver.userId,
         lat: driver.currentLat,
         lng: driver.currentLng,
-        rating: driver.ratingAvg,
+        rating,
         distanceKm,
-        score: this.computeScore(distanceKm, driver.ratingAvg, driver.totalRides),
+        score: sameCity ? baseScore : baseScore * 0.85,
         vehicleId: driver.vehicles[0]?.id,
       });
     }
@@ -67,16 +102,28 @@ export class DriversService {
   }
 
   async updateLocation(userId: string, lat: number, lng: number) {
-    return this.prisma.driverProfile.update({ where: { userId }, data: { currentLat: lat, currentLng: lng } });
+    const operatingCity = resolveCityFromCoords(lat, lng);
+    return this.prisma.driverProfile.update({
+      where: { userId },
+      data: { currentLat: lat, currentLng: lng, operatingCity },
+    });
   }
 
   async uploadKyc(userId: string, type: string, url: string) {
     await this.prisma.kycDocument.create({ data: { userId, type, url } });
-    return this.prisma.driverProfile.upsert({ where: { userId }, create: { userId, kycStatus: KycStatus.PENDING }, update: { kycStatus: KycStatus.PENDING } });
+    const profile = await this.getOrCreateProfile(userId);
+    if (profile) await this.ensureDefaultVehicle(profile.id);
+    if (profile?.kycStatus === KycStatus.APPROVED) {
+      return profile;
+    }
+    return this.prisma.driverProfile.update({
+      where: { userId },
+      data: { kycStatus: KycStatus.PENDING },
+    });
   }
 
   async getProfile(userId: string) {
-    return this.prisma.driverProfile.findUnique({ where: { userId }, include: { vehicles: true } });
+    return this.getOrCreateProfile(userId);
   }
 
   async getEarnings(userId: string) {
@@ -95,19 +142,46 @@ export class DriversService {
       data: { status: approved ? KycStatus.APPROVED : KycStatus.REJECTED, notes },
     });
     if (approved) {
+      await this.prisma.kycDocument.updateMany({
+        where: { userId: doc.userId, status: KycStatus.PENDING },
+        data: { status: KycStatus.APPROVED },
+      });
       await this.prisma.driverProfile.upsert({
         where: { userId: doc.userId },
         create: { userId: doc.userId, kycStatus: KycStatus.APPROVED },
         update: { kycStatus: KycStatus.APPROVED },
       });
     } else {
-      await this.prisma.driverProfile.upsert({
-        where: { userId: doc.userId },
-        create: { userId: doc.userId, kycStatus: KycStatus.REJECTED },
-        update: { kycStatus: KycStatus.REJECTED },
+      const approvedCount = await this.prisma.kycDocument.count({
+        where: { userId: doc.userId, status: KycStatus.APPROVED },
       });
+      if (approvedCount === 0) {
+        await this.prisma.driverProfile.upsert({
+          where: { userId: doc.userId },
+          create: { userId: doc.userId, kycStatus: KycStatus.REJECTED },
+          update: { kycStatus: KycStatus.REJECTED },
+        });
+      }
     }
     return doc;
+  }
+
+  /** Valide ou rejette le KYC d'un chauffeur (profil + tous les documents). */
+  async setDriverKycStatus(userId: string, approved: boolean, notes?: string) {
+    const status = approved ? KycStatus.APPROVED : KycStatus.REJECTED;
+    await this.prisma.kycDocument.updateMany({
+      where: { userId },
+      data: { status, ...(notes ? { notes } : {}) },
+    });
+    const profile = await this.prisma.driverProfile.upsert({
+      where: { userId },
+      create: { userId, kycStatus: status },
+      update: { kycStatus: status },
+    });
+    if (approved) {
+      await this.ensureDefaultVehicle(profile.id);
+    }
+    return this.prisma.driverProfile.findUnique({ where: { userId }, include: { vehicles: true } });
   }
 
   async updateRating(userId: string, ratingAvg: number) {

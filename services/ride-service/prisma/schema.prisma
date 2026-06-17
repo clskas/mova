@@ -486,6 +486,30 @@ enum SurchargeType {
   MOVING
 }
 
+enum CommissionServiceType {
+  RIDE
+  DELIVERY
+  MOVING
+  RENTAL
+  CARPOOL
+  ERRAND
+}
+
+model PlatformCommission {
+  id              String                @id @default(uuid())
+  serviceType     CommissionServiceType @unique
+  platformPercent Float                 @default(15)
+  driverPercent   Float                 @default(85)
+  fixedFeeCdf     Int?
+  perItemFeeCdf   Int?
+  description     String?
+  isActive        Boolean               @default(true)
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  @@map("platform_commissions")
+}
+
 model ServiceSurcharge {
   id          String        @id @default(uuid())
   type        SurchargeType @unique

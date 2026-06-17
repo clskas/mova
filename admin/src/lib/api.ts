@@ -148,6 +148,17 @@ export type ServiceSurcharge = {
   isActive?: boolean;
 };
 
+export type PlatformCommission = {
+  id: string;
+  serviceType: string;
+  platformPercent: number;
+  driverPercent: number;
+  fixedFeeCdf?: number | null;
+  perItemFeeCdf?: number | null;
+  description?: string | null;
+  isActive?: boolean;
+};
+
 export type PromoCode = {
   id: string;
   code: string;
@@ -642,6 +653,59 @@ export async function cancelRentalInquiry(id: string) {
   return apiFetch(`/api/admin/rental-inquiries/${id}/cancel`, { method: "POST", body: JSON.stringify({}) });
 }
 
+export type MovingRequest = {
+  id: string;
+  userId?: string;
+  status?: string;
+  volumeM3?: number;
+  pickupAddress?: string;
+  dropoffAddress?: string;
+  priceCdf?: number;
+  estimatedPriceCdf?: number;
+  createdAt?: string;
+};
+
+export type CarpoolTrip = {
+  id: string;
+  driverId?: string;
+  fromAddress?: string;
+  toAddress?: string;
+  fromCity?: string;
+  toCity?: string;
+  status?: string;
+  seatsAvailable?: number;
+  passengerCount?: number;
+  pricePerSeatCdf?: number;
+  departureAt?: string;
+  createdAt?: string;
+};
+
+export async function fetchMovingRequests(): Promise<MovingRequest[]> {
+  const data = await apiFetch<MovingRequest[] | { data?: MovingRequest[] }>("/api/admin/moving");
+  return Array.isArray(data) ? data : data.data ?? [];
+}
+
+export async function updateMovingStatus(id: string, status: string) {
+  return apiFetch(`/api/admin/moving/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) });
+}
+
+export async function cancelMovingRequest(id: string) {
+  return apiFetch(`/api/admin/moving/${id}/cancel`, { method: "POST", body: JSON.stringify({}) });
+}
+
+export async function fetchCarpoolTrips(): Promise<CarpoolTrip[]> {
+  const data = await apiFetch<CarpoolTrip[] | { data?: CarpoolTrip[] }>("/api/admin/carpool");
+  return Array.isArray(data) ? data : data.data ?? [];
+}
+
+export async function updateCarpoolStatus(id: string, status: string) {
+  return apiFetch(`/api/admin/carpool/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) });
+}
+
+export async function cancelCarpoolTrip(id: string) {
+  return apiFetch(`/api/admin/carpool/${id}/cancel`, { method: "POST", body: JSON.stringify({}) });
+}
+
 export async function deleteSubscriptionPlan(id: string) {
   return updateSubscriptionPlan(id, { isActive: false });
 }
@@ -684,6 +748,14 @@ export async function updateUser(id: string, data: Partial<AdminUser>) {
   return apiFetch<AdminUser>(`/api/admin/users/${id}`, { method: "PATCH", body: JSON.stringify(data) });
 }
 
+export async function fetchUsers(skip = 0, take = 100, search?: string): Promise<{ data: AdminUser[]; total: number }> {
+  const params = new URLSearchParams({ skip: String(skip), take: String(take) });
+  if (search?.trim()) params.set("search", search.trim());
+  const raw = await apiFetch<AdminUser[] | { data?: AdminUser[]; total?: number }>(`/api/admin/users?${params}`);
+  if (Array.isArray(raw)) return { data: raw, total: raw.length };
+  return { data: raw.data ?? [], total: raw.total ?? raw.data?.length ?? 0 };
+}
+
 export async function fetchDrivers(): Promise<AdminDriver[]> {
   const data = await apiFetch<AdminDriver[] | { data?: AdminDriver[] }>("/api/admin/drivers");
   return Array.isArray(data) ? data : data.data ?? [];
@@ -693,6 +765,13 @@ export async function setDriverStatus(userId: string, active: boolean, suspendUs
   return apiFetch(`/api/admin/drivers/${userId}/status`, {
     method: "PATCH",
     body: JSON.stringify({ active, suspendUser }),
+  });
+}
+
+export async function reviewDriverKyc(userId: string, approved: boolean, notes?: string) {
+  return apiFetch(`/api/admin/drivers/${userId}/kyc`, {
+    method: "PATCH",
+    body: JSON.stringify({ approved, notes }),
   });
 }
 
@@ -770,6 +849,18 @@ export async function fetchSurcharges(): Promise<ServiceSurcharge[]> {
 
 export async function updateSurcharge(type: string, data: Partial<ServiceSurcharge>) {
   return apiFetch<ServiceSurcharge>(`/api/admin/surcharges/${type}`, { method: "PATCH", body: JSON.stringify(data) });
+}
+
+export async function fetchCommissions(): Promise<PlatformCommission[]> {
+  const raw = await apiFetch<PlatformCommission[]>("/api/admin/commissions");
+  return Array.isArray(raw) ? raw : [];
+}
+
+export async function updateCommission(serviceType: string, data: Partial<PlatformCommission>) {
+  return apiFetch<PlatformCommission>(`/api/admin/commissions/${serviceType}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
 }
 
 export async function fetchPromoCodes(): Promise<PromoCode[]> {

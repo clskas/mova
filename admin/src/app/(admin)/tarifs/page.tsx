@@ -6,17 +6,20 @@ import {
   createPromoCode,
   deactivatePromoCode,
   deletePricingRule,
+  fetchCommissions,
   fetchDeliveryPricingRules,
   fetchPricingRules,
   fetchPromoCodes,
   fetchSurcharges,
   formatCdf,
   MOVA_CITIES,
+  updateCommission,
   updateDeliveryPricingRule,
   updatePricingRule,
   updatePromoCode,
   updateSurcharge,
   type DeliveryPricingRule,
+  type PlatformCommission,
   type PricingRule,
   type PromoCode,
   type ServiceSurcharge,
@@ -50,6 +53,15 @@ const DELIVERY_LABELS: Record<string, string> = {
 
 const SURCHARGE_LABELS: Record<string, string> = {
   MOVING: "Déménagement",
+};
+
+const COMMISSION_LABELS: Record<string, string> = {
+  RIDE: "Courses (taxi/moto)",
+  DELIVERY: "Livraisons",
+  MOVING: "Déménagements",
+  RENTAL: "Location véhicule",
+  CARPOOL: "Covoiturage",
+  ERRAND: "Courses & commissions",
 };
 
 function VehicleRow({
@@ -229,6 +241,66 @@ function SurchargeRow({
   );
 }
 
+function CommissionRow({
+  label,
+  rule,
+  onSave,
+  readOnly,
+}: {
+  label: string;
+  rule: PlatformCommission;
+  onSave: (data: Partial<PlatformCommission>) => Promise<void>;
+  readOnly?: boolean;
+}) {
+  const [platformPercent, setPlatformPercent] = useState(String(rule.platformPercent));
+  const [fixedFee, setFixedFee] = useState(rule.fixedFeeCdf != null ? String(rule.fixedFeeCdf) : "");
+  const [perItem, setPerItem] = useState(rule.perItemFeeCdf != null ? String(rule.perItemFeeCdf) : "");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setPlatformPercent(String(rule.platformPercent));
+    setFixedFee(rule.fixedFeeCdf != null ? String(rule.fixedFeeCdf) : "");
+    setPerItem(rule.perItemFeeCdf != null ? String(rule.perItemFeeCdf) : "");
+  }, [rule]);
+
+  async function save() {
+    setSaving(true);
+    try {
+      await onSave({
+        platformPercent: Number(platformPercent),
+        fixedFeeCdf: fixedFee.trim() ? Number(fixedFee) : null,
+        perItemFeeCdf: perItem.trim() ? Number(perItem) : null,
+      });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const driverPct = Math.max(0, 100 - (Number(platformPercent) || 0));
+
+  return (
+    <tr className="border-b">
+      <td className="p-3 font-medium">{label}</td>
+      <td className="p-2">
+        <TextInput value={platformPercent} onChange={setPlatformPercent} type="number" className="!p-2" disabled={readOnly} />
+      </td>
+      <td className="p-3 text-gray-600">{driverPct} %</td>
+      <td className="p-2">
+        <TextInput value={fixedFee} onChange={setFixedFee} type="number" className="!p-2" disabled={readOnly} placeholder="—" />
+      </td>
+      <td className="p-2">
+        <TextInput value={perItem} onChange={setPerItem} type="number" className="!p-2" disabled={readOnly} placeholder="—" />
+      </td>
+      <td className="p-3 text-gray-500 text-xs hidden md:table-cell max-w-xs">{rule.description ?? "—"}</td>
+      <td className="p-3">
+        {!readOnly && (
+          <BtnPrimary onClick={save} disabled={saving}>{saving ? "…" : "Enregistrer"}</BtnPrimary>
+        )}
+      </td>
+    </tr>
+  );
+}
+
 export default function TarifsPage() {
   const { canWrite } = useAdmin();
   const readOnly = !canWrite("tarifs");
@@ -236,6 +308,7 @@ export default function TarifsPage() {
   const [vehicleRules, setVehicleRules] = useState<PricingRule[]>([]);
   const [deliveryRules, setDeliveryRules] = useState<DeliveryPricingRule[]>([]);
   const [otherSurcharges, setOtherSurcharges] = useState<ServiceSurcharge[]>([]);
+  const [commissions, setCommissions] = useState<PlatformCommission[]>([]);
   const [promos, setPromos] = useState<PromoCode[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -290,15 +363,17 @@ export default function TarifsPage() {
     setLoading(true);
     setError(null);
     try {
-      const [v, d, s, p] = await Promise.all([
+      const [v, d, s, c, p] = await Promise.all([
         fetchPricingRules(city),
         fetchDeliveryPricingRules(),
         fetchSurcharges(),
+        fetchCommissions(),
         fetchPromoCodes(),
       ]);
       setVehicleRules(Array.isArray(v) ? v : []);
       setDeliveryRules(Array.isArray(d) ? d : []);
       setOtherSurcharges((Array.isArray(s) ? s : []).filter((x) => x.type === "MOVING"));
+      setCommissions(Array.isArray(c) ? c : []);
       setPromos(Array.isArray(p) ? p : []);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur de chargement");
@@ -505,6 +580,43 @@ export default function TarifsPage() {
               </Card>
             </section>
           )}
+
+          <section>
+            <h2 className="font-semibold text-[#1A1A2E] mb-1">Commissions plateforme MOVA</h2>
+            <p className="text-sm text-gray-500 mb-3">
+              Part prélevée par MOVA sur chaque service. Le reste revient au chauffeur / partenaire. Les revenus chauffeur affichés dans l&apos;app sont nets de commission.
+            </p>
+            <Card className="overflow-x-auto">
+              <table className="w-full text-sm min-w-[720px]">
+                <thead>
+                  <tr className="border-b text-left text-gray-500">
+                    <th className="p-3">Service</th>
+                    <th className="p-3">MOVA (%)</th>
+                    <th className="p-3">Chauffeur (%)</th>
+                    <th className="p-3">Frais fixe (CDF)</th>
+                    <th className="p-3">Par article (CDF)</th>
+                    <th className="p-3 hidden md:table-cell">Description</th>
+                    <th className="p-3"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {commissions.length === 0 ? (
+                    <tr><td colSpan={7} className="p-4 text-gray-500">Aucune commission configurée.</td></tr>
+                  ) : (
+                    commissions.map((r) => (
+                      <CommissionRow
+                        key={r.serviceType}
+                        label={COMMISSION_LABELS[r.serviceType] ?? r.serviceType}
+                        rule={r}
+                        readOnly={readOnly}
+                        onSave={(data) => updateCommission(r.serviceType, data).then(load)}
+                      />
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </Card>
+          </section>
 
           <section>
             <div className="flex items-center justify-between mb-3">

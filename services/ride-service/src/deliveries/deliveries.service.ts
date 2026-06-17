@@ -802,7 +802,36 @@ export class DeliveriesService {
   }
 
   async updateStatusAdmin(id: string, status: DeliveryStatus) {
-    return this.updateStatus(id, status, 'admin');
+    const delivery = await this.prisma.delivery.findUnique({
+      where: { id },
+      include: { events: { orderBy: { createdAt: 'asc' } }, restaurant: true },
+    });
+    if (!delivery) throw new MovaHttpException(MovaErrorCode.DELIVERY_NOT_FOUND, HttpStatus.NOT_FOUND);
+
+    const updates: Record<string, unknown> = { status };
+    if (status === DeliveryStatus.PICKED_UP) updates.pickedUpAt = new Date();
+    if (status === DeliveryStatus.DELIVERED) updates.deliveredAt = new Date();
+    if (status === DeliveryStatus.CANCELLED) updates.cancelledAt = new Date();
+
+    const updated = await this.prisma.delivery.update({
+      where: { id },
+      data: updates,
+      include: { events: { orderBy: { createdAt: 'asc' } }, restaurant: true },
+    });
+    await this.prisma.deliveryEvent.create({
+      data: { deliveryId: id, event: status, metadata: { updatedBy: 'admin' } },
+    });
+    const courier = updated.driverId ? await this.fetchCourierProfile(updated.driverId) : null;
+    const formatted = formatParcelDelivery(updated, courier);
+    const statusLabel = this.deliveryStatusLabel(updated.type, status);
+    await this.redis.publish(MOVA_EVENTS.DELIVERY_STATUS_UPDATED, {
+      deliveryId: id,
+      userId: delivery.userId,
+      type: delivery.type,
+      status,
+      restaurantName: updated.restaurant?.name,
+    });
+    return { delivery: formatted, paymentReady: status === DeliveryStatus.DELIVERED, statusLabel };
   }
 
   async deleteRestaurant(id: string) {

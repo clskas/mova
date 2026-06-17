@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  apiFetch,
   deactivateUser as deactivateUserApi,
+  fetchUsers,
   formatUserName,
   updateUser,
   type AdminUser,
@@ -30,6 +30,7 @@ export default function UtilisateursPage() {
   const { canWrite } = useAdmin();
   const readOnly = !canWrite("utilisateurs");
   const [users, setUsers] = useState<AdminUser[]>([]);
+  const [total, setTotal] = useState(0);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -46,8 +47,9 @@ export default function UtilisateursPage() {
     setLoading(true);
     setError(null);
     try {
-      const data = await apiFetch<AdminUser[]>("/api/admin/users");
-      setUsers(Array.isArray(data) ? data : []);
+      const { data, total: count } = await fetchUsers(0, 100);
+      setUsers(data);
+      setTotal(count);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur de chargement");
     } finally {
@@ -115,7 +117,14 @@ export default function UtilisateursPage() {
 
   return (
     <div className="max-w-6xl mx-auto">
-      <PageHeader title="Utilisateurs" subtitle={readOnly ? "Consultation des comptes (lecture seule)" : "Gestion des comptes passagers, chauffeurs et admins"} />
+      <PageHeader
+        title="Utilisateurs"
+        subtitle={
+          readOnly
+            ? `Consultation des comptes (${total} au total)`
+            : `Gestion des comptes passagers, chauffeurs et admins — ${total} au total`
+        }
+      />
       {error && <div className="mb-4"><ErrorBanner message={error} onRetry={load} /></div>}
       <div className="space-y-4">
         <SearchInput value={search} onChange={setSearch} placeholder="Rechercher par nom, téléphone ou rôle…" />

@@ -410,22 +410,18 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
       title: 'Livraison colis',
       scrollable: false,
       padding: EdgeInsets.zero,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          MovaRideMap(
-            pickup: _pickup,
-            dropoff: _dropoff,
-            height: 180,
-            onDropoffTap: _onMapDropoffTap,
-            dropoffEditable: true,
-          ),
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
+      child: MovaMapFormLayout(
+        maxMapHeight: 170,
+        mapBuilder: (height) => MovaRideMap(
+          pickup: _pickup,
+          dropoff: _dropoff,
+          height: height,
+          onDropoffTap: _onMapDropoffTap,
+          dropoffEditable: true,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
                   TextField(
                     controller: _pickupController,
                     decoration: InputDecoration(
@@ -599,11 +595,8 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
                         : Icons.local_shipping_outlined,
                     onPressed: _loading ? null : (_estimatedPrice == null ? _estimate : _confirm),
                   ),
-                ],
-              ),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

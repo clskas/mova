@@ -81,6 +81,9 @@ class ApiClient {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('auth_token');
     await prefs.remove('user_phone');
+    await ProfileCache.clear();
+    await WalletCache.clear();
+    await UnifiedHistoryCache.clear();
   }
 
   Future<void> saveUserPhone(String phone) async {
@@ -635,13 +638,15 @@ class ApiClient {
     return const Failure(NetworkFailure());
   }
 
-  Future<Result<dynamic>> get(String path, {int retries = 3}) async {
+  Future<Result<dynamic>> get(String path, {int retries = 3, bool skipCache = false}) async {
     await ensureReady();
 
     // Hors ligne : cache local d'abord, mock uniquement en mode démo explicite.
     if (_isOffline && !_mockMode) {
-      final cached = await _readCacheForGet(path);
-      if (cached != null) return Success(cached);
+      if (!skipCache) {
+        final cached = await _readCacheForGet(path);
+        if (cached != null) return Success(cached);
+      }
       return const Failure(
         OfflineFailure('Données non disponibles hors ligne.'),
       );
@@ -669,11 +674,13 @@ class ApiClient {
       } catch (e) {
         if (i == retries - 1) {
           if (_mockMode) {
-            final cached = await _readCacheForGet(path);
-            if (cached != null) return Success(cached);
+            if (!skipCache) {
+              final cached = await _readCacheForGet(path);
+              if (cached != null) return Success(cached);
+            }
             final fallback = _mockFor('GET', path, null);
             if (fallback != null) return fallback;
-          } else {
+          } else if (!skipCache) {
             final cached = await _readCacheForGet(path);
             if (cached != null) return Success(cached);
           }
@@ -798,8 +805,20 @@ class ApiClient {
     return post('/drivers/location', {'lat': lat, 'lng': lng});
   }
 
-  Future<Result<Map<String, dynamic>>> getDriverProfile() async {
-    final result = await get('/drivers/profile');
+  Future<Result<Map<String, dynamic>>> getCurrentUser({bool forceRefresh = false}) async {
+    final result = await get('/users/me', skipCache: forceRefresh);
+    return switch (result) {
+      Success(:final data) => Success(Map<String, dynamic>.from(data as Map)),
+      Failure(:final error) => Failure(error),
+    };
+  }
+
+  Future<Result<Map<String, dynamic>>> getDriverProfile({bool forceRefresh = false}) async {
+    if (forceRefresh) await ProfileCache.clear();
+    final path = forceRefresh
+        ? '/drivers/profile?_=${DateTime.now().millisecondsSinceEpoch}'
+        : '/drivers/profile';
+    final result = await get(path, skipCache: forceRefresh);
     return switch (result) {
       Success(:final data) => Success(data['profile'] as Map<String, dynamic>? ?? data),
       Failure(:final error) => Failure(error),

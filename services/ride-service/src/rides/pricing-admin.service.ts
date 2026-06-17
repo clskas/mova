@@ -1,5 +1,5 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { SurchargeType, VehicleType } from '@prisma/client';
+import { CommissionServiceType, SurchargeType, VehicleType } from '@prisma/client';
 import { MovaErrorCode, MovaHttpException } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -193,5 +193,35 @@ export class PricingAdminService {
       throw new MovaHttpException(MovaErrorCode.PROMO_INVALID, HttpStatus.BAD_REQUEST);
     }
     return promo;
+  }
+
+  listCommissions() {
+    return this.prisma.platformCommission.findMany({ orderBy: { serviceType: 'asc' } });
+  }
+
+  async updateCommission(
+    serviceType: CommissionServiceType,
+    data: Partial<{
+      platformPercent: number;
+      fixedFeeCdf: number | null;
+      perItemFeeCdf: number | null;
+      description: string;
+      isActive: boolean;
+    }>,
+  ) {
+    const existing = await this.prisma.platformCommission.findUnique({ where: { serviceType } });
+    if (!existing) throw new MovaHttpException(MovaErrorCode.PRICING_NOT_CONFIGURED, HttpStatus.NOT_FOUND);
+    const platformPercent = data.platformPercent ?? existing.platformPercent;
+    if (platformPercent < 0 || platformPercent > 100) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, HttpStatus.BAD_REQUEST, 'Commission entre 0 et 100 %.');
+    }
+    return this.prisma.platformCommission.update({
+      where: { serviceType },
+      data: {
+        ...data,
+        platformPercent,
+        driverPercent: 100 - platformPercent,
+      },
+    });
   }
 }

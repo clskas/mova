@@ -207,22 +207,18 @@ class _ExpressDeliveryScreenState extends ConsumerState<ExpressDeliveryScreen> {
       title: 'Livraison express',
       scrollable: false,
       padding: EdgeInsets.zero,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          MovaRideMap(
-            pickup: _pickup,
-            dropoff: _dropoff,
-            height: 160,
-            onDropoffTap: _onMapDropoffTap,
-            dropoffEditable: true,
-          ),
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
+      child: MovaMapFormLayout(
+        maxMapHeight: 160,
+        mapBuilder: (height) => MovaRideMap(
+          pickup: _pickup,
+          dropoff: _dropoff,
+          height: height,
+          onDropoffTap: _onMapDropoffTap,
+          dropoffEditable: true,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
                   Text(
                     'Envoi urgent — livraison en moins de 45 min.',
                     style: theme.textTheme.bodyMedium?.copyWith(color: MovaColors.textSecondary),
@@ -324,11 +320,8 @@ class _ExpressDeliveryScreenState extends ConsumerState<ExpressDeliveryScreen> {
                     icon: Icons.bolt_outlined,
                     onPressed: _loading ? null : (_estimatedPrice == null ? _estimate : _confirm),
                   ),
-                ],
-              ),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

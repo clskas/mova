@@ -7,6 +7,7 @@ function isPublicPath(path: string): boolean {
   if (PUBLIC_PATHS.some((p) => path.startsWith(p))) return true;
   if (path.startsWith('/api/geo')) return true;
   if (path.startsWith('/api/rides/estimate')) return true;
+  if (path.startsWith('/api/rental/vehicles')) return true;
   return false;
 }
 

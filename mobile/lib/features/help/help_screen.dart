@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/auth/session.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import 'contact_support_screen.dart';
@@ -7,7 +9,7 @@ import 'help_config.dart';
 import 'legal_screen.dart';
 import 'manual_screen.dart';
 
-class HelpScreen extends StatelessWidget {
+class HelpScreen extends ConsumerWidget {
   const HelpScreen({super.key});
 
   void _open(BuildContext context, Widget screen) {
@@ -15,7 +17,7 @@ class HelpScreen extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
 
     return MovaScreen(
@@ -114,6 +116,30 @@ class HelpScreen extends StatelessWidget {
               context,
               const LegalScreen(title: 'Confidentialité', asset: 'assets/legal/privacy_fr.md'),
             ),
+          ),
+          const SizedBox(height: 16),
+          OutlinedButton.icon(
+            onPressed: () async {
+              final confirm = await showDialog<bool>(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: const Text('Déconnexion'),
+                  content: const Text('Voulez-vous vous déconnecter de MOVA ?'),
+                  actions: [
+                    TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, true),
+                      child: const Text('Déconnexion', style: TextStyle(color: MovaColors.orange)),
+                    ),
+                  ],
+                ),
+              );
+              if (confirm == true && context.mounted) {
+                await logoutPassenger(context, ref);
+              }
+            },
+            icon: const Icon(Icons.logout, color: MovaColors.orange),
+            label: const Text('Se déconnecter', style: TextStyle(color: MovaColors.orange)),
           ),
         ],
       ),

@@ -1,30 +1,41 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { ErrandOrderStatus, VehicleType } from '@prisma/client';
+import { CommissionServiceType, ErrandOrderStatus, VehicleType } from '@prisma/client';
 import { MovaErrorCode, MovaHttpException } from '@mova/shared';
 import { addressToCoords, DEFAULT_PICKUP } from '../common/address.util';
 import { buildErrandTimeline } from '../deliveries/parcel.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { PricingService } from '../rides/pricing.service';
+import { CommissionService } from '../rides/commission.service';
 import { CreateErrandOrderDto } from './errands.dto';
-
-const ERRAND_BASE_CDF = 2500;
-const ITEM_FEE_CDF = 1500;
 
 @Injectable()
 export class ErrandsService {
-  constructor(private prisma: PrismaService, private pricing: PricingService) {}
+  constructor(
+    private prisma: PrismaService,
+    private pricing: PricingService,
+    private commission: CommissionService,
+  ) {}
+
+  private async errandFees() {
+    const rule = await this.commission.get(CommissionServiceType.ERRAND);
+    return {
+      baseCdf: rule.fixedFeeCdf ?? 2500,
+      itemCdf: rule.perItemFeeCdf ?? 1500,
+    };
+  }
 
   async estimate(dto: CreateErrandOrderDto) {
+    const { baseCdf } = await this.errandFees();
     const distanceKm = this.pricing.haversineKm(dto.pickupLat, dto.pickupLng, dto.dropoffLat, dto.dropoffLng);
     const durationMin = (distanceKm / 18) * 60;
     const fare = await this.pricing.estimateFare(VehicleType.MOTO_TAXI, distanceKm, durationMin);
-    const estimatedPriceCdf = Math.ceil(fare.estimatedFareCdf + ERRAND_BASE_CDF);
+    const estimatedPriceCdf = Math.ceil(fare.estimatedFareCdf + baseCdf);
     return {
       estimatedPriceCdf,
       formatted: `${estimatedPriceCdf.toLocaleString('fr-CD')} FC`,
       distanceKm,
       durationMin,
-      errandFeeCdf: ERRAND_BASE_CDF,
+      errandFeeCdf: baseCdf,
     };
   }
 
@@ -52,7 +63,8 @@ export class ErrandsService {
       dropoffLng: dropoff.lng,
     };
     const estimate = await this.estimate(dto);
-    const itemsFee = items.length * ITEM_FEE_CDF;
+    const { itemCdf } = await this.errandFees();
+    const itemsFee = items.length * itemCdf;
     const estimatedPriceCdf = estimate.estimatedPriceCdf + itemsFee;
     return { ...estimate, estimatedPriceCdf, itemsFeeCdf: itemsFee, currency: 'CDF' };
   }
@@ -100,7 +112,8 @@ export class ErrandsService {
       dropoffLng: dropoff.lng,
     };
     const { order, estimate } = await this.create(userId, dto);
-    const itemsFee = items.length * ITEM_FEE_CDF;
+    const { itemCdf } = await this.errandFees();
+    const itemsFee = items.length * itemCdf;
     const priceCdf = estimate.estimatedPriceCdf + itemsFee;
     return {
       errand: {

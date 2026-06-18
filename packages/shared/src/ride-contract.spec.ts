@@ -1,8 +1,10 @@
 import { RideStatus, VehicleType } from './enums';
 import {
   buildFareBreakdown,
+  driverVehicleTypesForRide,
   fromMobileRideStatus,
   normalizeVehicleType,
+  rideTypesDriverCanServe,
   toMobileRideStatus,
   toMobileVehicleType,
 } from './ride-contract';
@@ -24,6 +26,14 @@ describe('ride-contract', () => {
     expect(toMobileVehicleType('MOTO_TAXI')).toBe('MOTO');
     expect(toMobileVehicleType('COMFORT')).toBe('CONFORT');
     expect(toMobileVehicleType('VIP')).toBe('VIP');
+  });
+
+  it('matches driver tiers to ride types', () => {
+    expect(rideTypesDriverCanServe(['STANDARD'])).toEqual(['STANDARD']);
+    expect(rideTypesDriverCanServe(['COMFORT']).sort()).toEqual(['COMFORT', 'STANDARD'].sort());
+    expect(rideTypesDriverCanServe(['VIP']).sort()).toEqual(['COMFORT', 'STANDARD', 'VIP'].sort());
+    expect(driverVehicleTypesForRide('COMFORT').sort()).toEqual(['COMFORT', 'VIP'].sort());
+    expect(driverVehicleTypesForRide('STANDARD').sort()).toEqual(['COMFORT', 'STANDARD', 'VIP'].sort());
   });
 
   it('builds fare breakdown with surcharge', () => {

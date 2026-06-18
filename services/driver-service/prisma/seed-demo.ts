@@ -179,6 +179,12 @@ async function main() {
         model: 'CB125',
         type: VehicleType.MOTO_TAXI,
       });
+      await ensureExtraVehicle(prisma, userId, {
+        plate: 'CD-COMF-020',
+        make: 'Toyota',
+        model: 'Camry',
+        type: VehicleType.COMFORT,
+      });
     }
     synced++;
   }

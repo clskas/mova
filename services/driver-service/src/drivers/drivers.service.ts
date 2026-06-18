@@ -12,6 +12,7 @@ import {
   REQUIRED_DRIVER_KYC_TYPES,
   OPTIONAL_DRIVER_KYC_TYPES,
   normalizeKycDocumentType,
+  driverVehicleTypesForRide,
   formatMovaPublicId,
   maskPhoneRdc,
 } from '@mova/shared';
@@ -77,15 +78,16 @@ export class DriversService {
       MARKET_RDC.matching.maxRadiusKm,
     );
     const pickupCity = city ?? resolveCityFromCoords(lat, lng);
+    const compatibleTypes = driverVehicleTypesForRide(vehicleType) as VehicleType[];
     const drivers = await this.prisma.driverProfile.findMany({
       where: {
         isAvailable: true,
         kycStatus: KycStatus.APPROVED,
         currentLat: { not: null },
         currentLng: { not: null },
-        vehicles: { some: { type: vehicleType, isActive: true } },
+        vehicles: { some: { type: { in: compatibleTypes }, isActive: true } },
       },
-      include: { vehicles: { where: { type: vehicleType, isActive: true } } },
+      include: { vehicles: { where: { type: { in: compatibleTypes }, isActive: true } } },
     });
     const candidates: DriverCandidate[] = [];
     for (const driver of drivers) {
@@ -350,24 +352,37 @@ export class DriversService {
       headers: { 'x-internal-api-key': INTERNAL_API_KEY },
     }).catch(() => undefined);
 
-    const [earningsRes, walletRes] = await Promise.all([
-      fetch(serviceUrl('ride', `/internal/rides/driver/${userId}/earnings`), {
-        headers: { 'x-internal-api-key': INTERNAL_API_KEY },
-      }),
-      fetch(serviceUrl('payment', `/internal/wallets/${userId}`), {
-        headers: { 'x-internal-api-key': INTERNAL_API_KEY },
-      }),
+    const fetchJson = async (url: string) => {
+      try {
+        const res = await fetch(url, { headers: { 'x-internal-api-key': INTERNAL_API_KEY } });
+        if (!res.ok) return null;
+        return res.json();
+      } catch {
+        return null;
+      }
+    };
+
+    const [earnings, wallet] = await Promise.all([
+      fetchJson(serviceUrl('ride', `/internal/rides/driver/${userId}/earnings`)),
+      fetchJson(serviceUrl('payment', `/internal/wallets/${userId}`)),
     ]);
 
-    const earnings = earningsRes.ok
-      ? await earningsRes.json()
-      : { totalCdf: 0, todayCdf: 0, weekCdf: 0, monthCdf: 0, rideCount: 0 };
-    const wallet = walletRes.ok ? await walletRes.json() : { balanceCdf: 0 };
+    const earningsData = earnings ?? {
+      totalCdf: 0,
+      todayCdf: 0,
+      weekCdf: 0,
+      monthCdf: 0,
+      rideCount: 0,
+      deliveryCount: 0,
+      rideEarningsCdf: 0,
+      deliveryEarningsCdf: 0,
+    };
+    const walletData = wallet ?? { balanceCdf: 0 };
 
     return {
-      ...earnings,
-      walletBalanceCdf: wallet.balanceCdf ?? 0,
-      withdrawableCdf: wallet.balanceCdf ?? 0,
+      ...earningsData,
+      walletBalanceCdf: walletData.balanceCdf ?? 0,
+      withdrawableCdf: walletData.balanceCdf ?? 0,
       currency: 'CDF',
     };
   }

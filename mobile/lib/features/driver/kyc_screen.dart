@@ -27,6 +27,13 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
   Map<String, dynamic>? _data;
   final _amountController = TextEditingController(text: '5000');
   String? _error;
+  bool _loading = true;
+
+  int _asInt(dynamic value) {
+    if (value is int) return value;
+    if (value is num) return value.round();
+    return int.tryParse(value?.toString() ?? '') ?? 0;
+  }
 
   @override
   void initState() {
@@ -41,10 +48,27 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
   }
 
   Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     final api = ref.read(apiClientProvider);
     await api.checkHealth();
     final result = await api.get('/drivers/earnings');
-    if (result case Success(:final data)) setState(() => _data = data);
+    if (!mounted) return;
+    switch (result) {
+      case Success(:final data):
+        setState(() {
+          _data = data;
+          _loading = false;
+        });
+      case Failure(:final error):
+        setState(() {
+          _data = const {};
+          _error = error.message;
+          _loading = false;
+        });
+    }
   }
 
   Future<void> _withdraw() async {
@@ -53,7 +77,7 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
       setState(() => _error = 'Montant minimum : 1 000 FC');
       return;
     }
-    final available = (_data?['withdrawableCdf'] ?? _data?['walletBalanceCdf']) as int? ?? 0;
+    final available = _asInt(_data?['withdrawableCdf'] ?? _data?['walletBalanceCdf']);
     if (amount > available) {
       setState(() => _error = 'Solde disponible : $available FC. Ouvrez Revenus pour synchroniser.');
       return;
@@ -81,25 +105,27 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
   Widget build(BuildContext context) {
     return MovaScreen(
       title: 'Revenus',
-      child: _data == null
+      actions: [
+        IconButton(icon: const Icon(Icons.refresh), onPressed: _load),
+      ],
+      child: _loading
           ? const Center(child: CircularProgressIndicator())
           : Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                if (_error != null) ...[
+                  MovaErrorBanner(message: _error!, onRetry: _load),
+                  const SizedBox(height: 12),
+                ],
                 _earningsRow('Aujourd\'hui', _data!['todayCdf']),
                 _earningsRow('Cette semaine', _data!['weekCdf']),
                 _earningsRow('Ce mois', _data!['monthCdf']),
                 _earningsRow('Total', _data!['totalCdf']),
-                if (_data!['withdrawableCdf'] != null)
-                  _earningsRow('Solde disponible (retrait)', _data!['withdrawableCdf']),
-                if (_data!['rideEarningsCdf'] != null)
-                  _earningsRow('Courses (net)', _data!['rideEarningsCdf']),
-                if (_data!['deliveryEarningsCdf'] != null)
-                  _earningsRow('Livraisons (net)', _data!['deliveryEarningsCdf']),
-                if (_data!['rideCount'] != null)
-                  _earningsRow('Courses terminées', _data!['rideCount']),
-                if (_data!['deliveryCount'] != null)
-                  _earningsRow('Livraisons terminées', _data!['deliveryCount']),
+                _earningsRow('Solde disponible (retrait)', _data!['withdrawableCdf'] ?? _data!['walletBalanceCdf']),
+                _earningsRow('Courses (net)', _data!['rideEarningsCdf']),
+                _earningsRow('Livraisons (net)', _data!['deliveryEarningsCdf']),
+                _earningsRow('Courses terminées', _data!['rideCount']),
+                _earningsRow('Livraisons terminées', _data!['deliveryCount']),
                 const SizedBox(height: 24),
                 TextField(
                   controller: _amountController,
@@ -139,7 +165,7 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
           const SizedBox(width: 8),
           Flexible(
             child: Text(
-              '${(amount as int? ?? 0).toString()} FC',
+              '${_asInt(amount)} FC',
               style: const TextStyle(fontWeight: FontWeight.bold),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,

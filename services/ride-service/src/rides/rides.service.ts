@@ -10,6 +10,7 @@ import {
   RideCreatedPayload,
   MARKET_RDC,
   serviceUrl,
+  rideTypesDriverCanServe,
   toMobileRideStatus,
   toMobileVehicleType,
   toRideSummary,
@@ -230,9 +231,10 @@ export class RidesService {
     if (vehicleTypes.length === 0) {
       return { offers: [] as Record<string, unknown>[] };
     }
+    const serveableTypes = rideTypesDriverCanServe(vehicleTypes) as VehicleType[];
 
     const rides = await this.prisma.ride.findMany({
-      where: { status: RideStatus.SEARCHING, vehicleType: { in: vehicleTypes } },
+      where: { status: RideStatus.SEARCHING, vehicleType: { in: serveableTypes } },
       orderBy: { createdAt: 'desc' },
       take: 30,
       include: { events: { where: { event: { in: ['SEARCH_ATTEMPT', 'DRIVER_REJECTED'] } } } },

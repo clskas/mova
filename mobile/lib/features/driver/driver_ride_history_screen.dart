@@ -38,10 +38,7 @@ class _DriverRideHistoryScreenState extends ConsumerState<DriverRideHistoryScree
         final all = (data['data'] as List? ?? data['rides'] as List? ?? [])
             .cast<Map<String, dynamic>>();
         setState(() {
-          _rides = all.where((r) {
-            final s = r['status']?.toString() ?? '';
-            return s == 'COMPLETED' || s == 'CANCELLED';
-          }).toList();
+          _rides = all;
           _loading = false;
         });
       case Failure(:final error):
@@ -55,12 +52,16 @@ class _DriverRideHistoryScreenState extends ConsumerState<DriverRideHistoryScree
   String _statusLabel(String? status) => switch (status) {
         'COMPLETED' => 'Terminée',
         'CANCELLED' => 'Annulée',
+        'DRIVER_ASSIGNED' => 'Assignée',
+        'ARRIVING' => 'En route',
+        'IN_PROGRESS' => 'En cours',
         _ => status ?? '—',
       };
 
   Color _statusColor(String? status) => switch (status) {
         'COMPLETED' => MovaColors.green,
         'CANCELLED' => MovaColors.error,
+        'DRIVER_ASSIGNED' || 'ARRIVING' || 'IN_PROGRESS' => MovaColors.violet,
         _ => MovaColors.textSecondary,
       };
 
@@ -68,6 +69,7 @@ class _DriverRideHistoryScreenState extends ConsumerState<DriverRideHistoryScree
   Widget build(BuildContext context) {
     return MovaScreen(
       title: 'Mes courses',
+      scrollable: false,
       actions: [
         IconButton(icon: const Icon(Icons.refresh), onPressed: _load),
       ],
@@ -78,7 +80,7 @@ class _DriverRideHistoryScreenState extends ConsumerState<DriverRideHistoryScree
               : _rides.isEmpty
                   ? const Center(
                       child: Text(
-                        'Aucune course terminée pour le moment.',
+                        'Aucune course pour le moment.',
                         style: TextStyle(color: MovaColors.textSecondary),
                       ),
                     )

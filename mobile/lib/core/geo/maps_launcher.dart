@@ -31,6 +31,24 @@ abstract final class MapsLauncher {
     );
   }
 
+  static Uri googleMapsDaddrUri({
+    required double destinationLat,
+    required double destinationLng,
+  }) {
+    return Uri.https('maps.google.com', '/', {
+      'daddr': '$destinationLat,$destinationLng',
+      'dirflg': 'd',
+    });
+  }
+
+  static Future<bool> _tryLaunch(Uri uri, LaunchMode mode) async {
+    try {
+      return await launchUrl(uri, mode: mode);
+    } catch (_) {
+      return false;
+    }
+  }
+
   static Future<bool> openDirections({
     required double destinationLat,
     required double destinationLng,
@@ -49,12 +67,24 @@ abstract final class MapsLauncher {
       destinationLat: destinationLat,
       destinationLng: destinationLng,
     );
+    final daddrUri = googleMapsDaddrUri(
+      destinationLat: destinationLat,
+      destinationLng: destinationLng,
+    );
+    final geoUri = Uri.parse(
+      'geo:$destinationLat,$destinationLng?q=$destinationLat,$destinationLng',
+    );
 
-    if (await canLaunchUrl(navUri)) {
-      return launchUrl(navUri, mode: LaunchMode.externalApplication);
-    }
-    if (await canLaunchUrl(webUri)) {
-      return launchUrl(webUri, mode: LaunchMode.externalApplication);
+    for (final entry in [
+      (navUri, LaunchMode.externalNonBrowserApplication),
+      (navUri, LaunchMode.externalApplication),
+      (webUri, LaunchMode.externalApplication),
+      (daddrUri, LaunchMode.externalApplication),
+      (daddrUri, LaunchMode.platformDefault),
+      (geoUri, LaunchMode.externalApplication),
+      (geoUri, LaunchMode.platformDefault),
+    ]) {
+      if (await _tryLaunch(entry.$1, entry.$2)) return true;
     }
     return false;
   }

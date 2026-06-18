@@ -397,13 +397,20 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
     final publicId = _state?['publicId']?.toString();
     return MovaScreen(
       title: widget.canSkipToHome ? 'Mon dossier chauffeur' : 'Enregistrement chauffeur',
+      scrollable: false,
       actions: [
         if (widget.canSkipToHome)
           TextButton(
-            onPressed: () => Navigator.of(context).pushReplacement(
-              MaterialPageRoute(builder: (_) => const DriverHomeScreen()),
-            ),
-            child: const Text('Plus tard'),
+            onPressed: () {
+              if (Navigator.canPop(context)) {
+                Navigator.of(context).pop();
+              } else {
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(builder: (_) => const DriverHomeScreen()),
+                );
+              }
+            },
+            child: const Text('Fermer'),
           ),
       ],
       child: _loading && _state == null

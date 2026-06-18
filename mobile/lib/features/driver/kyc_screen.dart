@@ -1,99 +1,18 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:image_picker/image_picker.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/api/api_client.dart';
 import '../../core/error/result.dart';
+import 'driver_onboarding_screen.dart';
 
-class KycScreen extends ConsumerStatefulWidget {
+class KycScreen extends ConsumerWidget {
   const KycScreen({super.key});
 
   @override
-  ConsumerState<KycScreen> createState() => _KycScreenState();
-}
-
-class _KycScreenState extends ConsumerState<KycScreen> {
-  final _picker = ImagePicker();
-  String? _uploadingType;
-  String? _error;
-
-  static const _docs = [
-    ('permis_de_conduire', 'Permis de conduire'),
-    ('carte_grise', 'Carte grise'),
-    ('photo_identite', 'Photo identité'),
-  ];
-
-  Future<void> _upload(String type, String label) async {
-    final file = await _picker.pickImage(source: ImageSource.camera, imageQuality: 80);
-    if (file == null) return;
-
-    setState(() {
-      _uploadingType = type;
-      _error = null;
-    });
-    final api = ref.read(apiClientProvider);
-    await api.checkHealth();
-    final upload = await api.uploadParcelPhoto(File(file.path));
-    if (!mounted) return;
-    switch (upload) {
-      case Success(:final data):
-        final url = data;
-        final result = await api.post('/drivers/kyc', {'type': type, 'url': url});
-        setState(() => _uploadingType = null);
-        if (!mounted) return;
-        switch (result) {
-          case Success():
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('$label envoyé pour validation')),
-            );
-          case Failure(:final error):
-            setState(() => _error = error.message);
-        }
-      case Failure(:final error):
-        setState(() {
-          _uploadingType = null;
-          _error = error.message;
-        });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return MovaScreen(
-      title: 'Documents KYC',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Text(
-            'Photographiez vos documents pour validation',
-            style: TextStyle(color: MovaColors.textSecondary),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-          if (_error != null) ...[
-            const SizedBox(height: 12),
-            MovaErrorBanner(message: _error!),
-          ],
-          const SizedBox(height: 24),
-          ..._docs.map(
-            (doc) => Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: MovaButton(
-                label: 'Photographier — ${doc.$2}',
-                isSecondary: true,
-                isLoading: _uploadingType == doc.$1,
-                icon: Icons.camera_alt,
-                onPressed: _uploadingType != null ? null : () => _upload(doc.$1, doc.$2),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
+  Widget build(BuildContext context, WidgetRef ref) {
+    return const DriverOnboardingScreen(canSkipToHome: true);
   }
 }
 

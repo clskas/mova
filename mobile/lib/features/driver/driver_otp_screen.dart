@@ -6,6 +6,7 @@ import '../../core/api/api_client.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import '../../core/theme/mova_colors.dart';
+import 'driver_onboarding_screen.dart';
 import 'driver_home_screen.dart';
 
 class DriverOtpScreen extends ConsumerStatefulWidget {
@@ -72,8 +73,12 @@ class _DriverOtpScreenState extends ConsumerState<DriverOtpScreen> {
           await api.saveToken(token);
           await api.saveUserPhone(phone);
           if (mounted) {
+            final onboarding = await api.get('/drivers/onboarding');
+            final completed = onboarding case Success(:final data) && data['profile']?['onboardingCompleted'] == true;
             Navigator.of(context).pushReplacement(
-              MaterialPageRoute(builder: (_) => const DriverHomeScreen()),
+              MaterialPageRoute(
+                builder: (_) => completed ? const DriverHomeScreen() : const DriverOnboardingScreen(),
+              ),
             );
           }
         } else {

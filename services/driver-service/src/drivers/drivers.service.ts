@@ -1,7 +1,22 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { KycStatus, VehicleType } from '@prisma/client';
-import { MovaErrorCode, MovaHttpException, INTERNAL_API_KEY, resolveCityFromCoords, serviceUrl, MARKET_RDC } from '@mova/shared';
+import * as crypto from 'crypto';
+import {
+  MovaErrorCode,
+  MovaHttpException,
+  INTERNAL_API_KEY,
+  resolveCityFromCoords,
+  serviceUrl,
+  MARKET_RDC,
+  KYC_DOCUMENT_LABELS,
+  REQUIRED_DRIVER_KYC_TYPES,
+  OPTIONAL_DRIVER_KYC_TYPES,
+  normalizeKycDocumentType,
+  formatMovaPublicId,
+  maskPhoneRdc,
+} from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
+import { UpdateOnboardingDto } from './drivers.dto';
 
 export interface DriverCandidate {
   driverId: string;
@@ -97,7 +112,16 @@ export class DriversService {
   async setAvailability(userId: string, isAvailable: boolean) {
     const profile = await this.prisma.driverProfile.findUnique({ where: { userId } });
     if (!profile) throw new MovaHttpException(MovaErrorCode.DRIVER_KYC_PENDING);
-    if (profile.kycStatus !== KycStatus.APPROVED && isAvailable) throw new MovaHttpException(MovaErrorCode.DRIVER_KYC_PENDING);
+    if (profile.kycStatus !== KycStatus.APPROVED && isAvailable) {
+      throw new MovaHttpException(MovaErrorCode.DRIVER_KYC_PENDING);
+    }
+    if (profile.kycStatus === KycStatus.APPROVED && !profile.activationPinVerifiedAt && isAvailable) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        undefined,
+        'Activez votre compte avec le code PIN reçu après validation MOVA.',
+      );
+    }
     return this.prisma.driverProfile.update({ where: { userId }, data: { isAvailable } });
   }
 
@@ -110,7 +134,13 @@ export class DriversService {
   }
 
   async uploadKyc(userId: string, type: string, url: string) {
-    await this.prisma.kycDocument.create({ data: { userId, type, url } });
+    let docType: string;
+    try {
+      docType = normalizeKycDocumentType(type);
+    } catch {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Type de document KYC invalide.');
+    }
+    await this.prisma.kycDocument.create({ data: { userId, type: docType, url } });
     const profile = await this.getOrCreateProfile(userId);
     if (profile) await this.ensureDefaultVehicle(profile.id);
     if (profile?.kycStatus === KycStatus.APPROVED) {
@@ -120,6 +150,192 @@ export class DriversService {
       where: { userId },
       data: { kycStatus: KycStatus.PENDING },
     });
+  }
+
+  private async fetchAuthUser(userId: string) {
+    try {
+      const res = await fetch(serviceUrl('auth', `/internal/users/${userId}`), {
+        headers: { 'x-internal-api-key': INTERNAL_API_KEY },
+      });
+      if (!res.ok) return null;
+      return res.json() as Promise<{
+        id: string;
+        phone: string;
+        firstName?: string | null;
+        lastName?: string | null;
+        email?: string | null;
+        role: string;
+      }>;
+    } catch {
+      return null;
+    }
+  }
+
+  async getKycStatus(userId: string) {
+    const docs = await this.prisma.kycDocument.findMany({ where: { userId }, orderBy: { createdAt: 'desc' } });
+    const latestByType = new Map<string, (typeof docs)[number]>();
+    for (const doc of docs) {
+      try {
+        const key = normalizeKycDocumentType(doc.type);
+        if (!latestByType.has(key)) latestByType.set(key, doc);
+      } catch {
+        /* legacy unknown type */
+      }
+    }
+    const checklist = [...REQUIRED_DRIVER_KYC_TYPES, ...OPTIONAL_DRIVER_KYC_TYPES].map((type) => {
+      const doc = latestByType.get(type);
+      return {
+        type,
+        label: KYC_DOCUMENT_LABELS[type],
+        required: REQUIRED_DRIVER_KYC_TYPES.includes(type),
+        uploaded: !!doc,
+        status: doc?.status ?? null,
+        url: doc?.url ?? null,
+      };
+    });
+    const requiredComplete = REQUIRED_DRIVER_KYC_TYPES.every((t) => latestByType.has(t));
+    return { documents: docs, checklist, requiredComplete };
+  }
+
+  async getOnboarding(userId: string) {
+    const [profile, kyc, user] = await Promise.all([
+      this.getOrCreateProfile(userId),
+      this.getKycStatus(userId),
+      this.fetchAuthUser(userId),
+    ]);
+    const vehicle = profile?.vehicles.find((v) => v.isActive) ?? profile?.vehicles[0];
+    const publicId = formatMovaPublicId(userId, 'DRIVER');
+    return {
+      publicId,
+      user: user
+        ? {
+            firstName: user.firstName,
+            lastName: user.lastName,
+            email: user.email,
+            phone: user.phone,
+            phoneMasked: maskPhoneRdc(user.phone),
+          }
+        : null,
+      profile: {
+        licenseNumber: profile?.licenseNumber,
+        idDocumentNumber: profile?.idDocumentNumber,
+        licenseExpiry: profile?.licenseExpiry,
+        insuranceExpiry: profile?.insuranceExpiry,
+        technicalInspectionExpiry: profile?.technicalInspectionExpiry,
+        payoutProvider: profile?.payoutProvider,
+        payoutPhone: profile?.payoutPhone,
+        charterAcceptedAt: profile?.charterAcceptedAt,
+        trainingCompletedAt: profile?.trainingCompletedAt,
+        onboardingCompleted: profile?.onboardingCompleted ?? false,
+        kycStatus: profile?.kycStatus,
+        activationPinVerified: !!profile?.activationPinVerifiedAt,
+        needsActivationPin: profile?.kycStatus === KycStatus.APPROVED && !profile?.activationPinVerifiedAt,
+      },
+      vehicle: vehicle
+        ? {
+            id: vehicle.id,
+            type: vehicle.type,
+            make: vehicle.make,
+            model: vehicle.model,
+            plateNumber: vehicle.plateNumber,
+            color: vehicle.color,
+          }
+        : null,
+      kyc,
+    };
+  }
+
+  async updateOnboarding(userId: string, dto: UpdateOnboardingDto) {
+    const profile = await this.getOrCreateProfile(userId);
+    if (!profile) throw new MovaHttpException(MovaErrorCode.DRIVER_KYC_PENDING);
+
+    const profileData: Record<string, unknown> = {};
+    if (dto.licenseNumber !== undefined) profileData.licenseNumber = dto.licenseNumber;
+    if (dto.idDocumentNumber !== undefined) profileData.idDocumentNumber = dto.idDocumentNumber;
+    if (dto.licenseExpiry !== undefined) profileData.licenseExpiry = new Date(dto.licenseExpiry);
+    if (dto.insuranceExpiry !== undefined) profileData.insuranceExpiry = new Date(dto.insuranceExpiry);
+    if (dto.technicalInspectionExpiry !== undefined) {
+      profileData.technicalInspectionExpiry = new Date(dto.technicalInspectionExpiry);
+    }
+    if (dto.payoutProvider !== undefined) profileData.payoutProvider = dto.payoutProvider;
+    if (dto.payoutPhone !== undefined) profileData.payoutPhone = dto.payoutPhone;
+    if (dto.charterAccepted === true) profileData.charterAcceptedAt = new Date();
+    if (dto.trainingCompleted === true) profileData.trainingCompletedAt = new Date();
+    if (dto.onboardingCompleted === true) profileData.onboardingCompleted = true;
+
+    await this.prisma.driverProfile.update({ where: { userId }, data: profileData });
+
+    if (dto.plateNumber || dto.vehicleMake || dto.vehicleModel || dto.vehicleType || dto.vehicleColor) {
+      const vehicle = profile.vehicles.find((v) => v.isActive) ?? profile.vehicles[0];
+      if (vehicle) {
+        await this.prisma.vehicle.update({
+          where: { id: vehicle.id },
+          data: {
+            ...(dto.plateNumber !== undefined ? { plateNumber: dto.plateNumber } : {}),
+            ...(dto.vehicleMake !== undefined ? { make: dto.vehicleMake } : {}),
+            ...(dto.vehicleModel !== undefined ? { model: dto.vehicleModel } : {}),
+            ...(dto.vehicleType !== undefined ? { type: dto.vehicleType } : {}),
+            ...(dto.vehicleColor !== undefined ? { color: dto.vehicleColor } : {}),
+          },
+        });
+      }
+    }
+
+    if (dto.onboardingCompleted) {
+      await this.prisma.driverProfile.update({
+        where: { userId },
+        data: { kycStatus: KycStatus.PENDING },
+      });
+    }
+
+    return this.getOnboarding(userId);
+  }
+
+  async verifyActivationPin(userId: string, pin: string) {
+    const profile = await this.prisma.driverProfile.findUnique({ where: { userId } });
+    if (!profile) throw new MovaHttpException(MovaErrorCode.DRIVER_KYC_PENDING);
+    if (profile.kycStatus !== KycStatus.APPROVED) {
+      throw new MovaHttpException(MovaErrorCode.DRIVER_KYC_PENDING, undefined, 'KYC non encore approuvé.');
+    }
+    if (!profile.activationPin || profile.activationPin !== pin.trim()) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Code PIN incorrect.');
+    }
+    return this.prisma.driverProfile.update({
+      where: { userId },
+      data: { activationPinVerifiedAt: new Date() },
+    });
+  }
+
+  async getProfileWithUser(userId: string) {
+    const profile = await this.getOrCreateProfile(userId);
+    const user = await this.fetchAuthUser(userId);
+    return {
+      ...profile,
+      publicId: formatMovaPublicId(userId, 'DRIVER'),
+      user,
+      needsActivationPin: profile?.kycStatus === KycStatus.APPROVED && !profile?.activationPinVerifiedAt,
+    };
+  }
+
+  private generateActivationPin() {
+    return crypto.randomInt(100000, 999999).toString();
+  }
+
+  private async applyKycApproval(userId: string) {
+    const pin = this.generateActivationPin();
+    await this.prisma.driverProfile.upsert({
+      where: { userId },
+      create: { userId, kycStatus: KycStatus.APPROVED, activationPin: pin, activationPinVerifiedAt: null },
+      update: { kycStatus: KycStatus.APPROVED, activationPin: pin, activationPinVerifiedAt: null },
+    });
+    await fetch(serviceUrl('auth', `/internal/users/${userId}`), {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'x-internal-api-key': INTERNAL_API_KEY },
+      body: JSON.stringify({ status: 'ACTIVE' }),
+    }).catch((e) => this.logger.warn(`Could not activate auth user ${userId}`, e));
+    const profile = await this.prisma.driverProfile.findUnique({ where: { userId } });
+    if (profile) await this.ensureDefaultVehicle(profile.id);
+    return pin;
   }
 
   async getProfile(userId: string) {
@@ -168,11 +384,8 @@ export class DriversService {
         where: { userId: doc.userId, status: KycStatus.PENDING },
         data: { status: KycStatus.APPROVED },
       });
-      await this.prisma.driverProfile.upsert({
-        where: { userId: doc.userId },
-        create: { userId: doc.userId, kycStatus: KycStatus.APPROVED },
-        update: { kycStatus: KycStatus.APPROVED },
-      });
+      const activationPin = await this.applyKycApproval(doc.userId);
+      return { ...doc, activationPin };
     } else {
       const approvedCount = await this.prisma.kycDocument.count({
         where: { userId: doc.userId, status: KycStatus.APPROVED },
@@ -188,22 +401,24 @@ export class DriversService {
     return doc;
   }
 
-  /** Valide ou rejette le KYC d'un chauffeur (profil + tous les documents). */
   async setDriverKycStatus(userId: string, approved: boolean, notes?: string) {
     const status = approved ? KycStatus.APPROVED : KycStatus.REJECTED;
     await this.prisma.kycDocument.updateMany({
       where: { userId },
       data: { status, ...(notes ? { notes } : {}) },
     });
-    const profile = await this.prisma.driverProfile.upsert({
-      where: { userId },
-      create: { userId, kycStatus: status },
-      update: { kycStatus: status },
-    });
+    let activationPin: string | undefined;
     if (approved) {
-      await this.ensureDefaultVehicle(profile.id);
+      activationPin = await this.applyKycApproval(userId);
+    } else {
+      await this.prisma.driverProfile.upsert({
+        where: { userId },
+        create: { userId, kycStatus: status },
+        update: { kycStatus: status, activationPin: null, activationPinVerifiedAt: null },
+      });
     }
-    return this.prisma.driverProfile.findUnique({ where: { userId }, include: { vehicles: true } });
+    const profile = await this.prisma.driverProfile.findUnique({ where: { userId }, include: { vehicles: true } });
+    return { ...profile, activationPin };
   }
 
   async updateRating(userId: string, ratingAvg: number) {

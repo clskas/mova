@@ -332,6 +332,12 @@ class ApiClient {
     if (path.contains('/drivers/earnings')) {
       return Success(MockData.earnings());
     }
+    if (path.contains('/drivers/onboarding') && method == 'GET') {
+      return Success(MockData.driverOnboarding());
+    }
+    if (path.contains('/drivers/onboarding') && method == 'PATCH') {
+      return Success(MockData.driverOnboarding());
+    }
     if (RegExp(r'^/rides/offers$').hasMatch(path) && method == 'GET') {
       return Success({'offers': MockData.driverOffers()});
     }

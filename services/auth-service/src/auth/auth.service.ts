@@ -12,6 +12,8 @@ import {
   serviceUrl,
   validatePhoneRdc,
   INTERNAL_API_KEY,
+  formatMovaPublicId,
+  maskPhoneRdc,
 } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '@mova/shared';
@@ -72,14 +74,23 @@ export class AuthService {
     let user = await this.prisma.user.findUnique({ where: { phone: normalized } });
     let isNew = false;
     if (!user) {
-      user = await this.prisma.user.create({ data: { phone: normalized, role: role ?? UserRole.PASSENGER } });
+      user = await this.prisma.user.create({
+        data: {
+          phone: normalized,
+          role: role ?? UserRole.PASSENGER,
+          status: role === UserRole.DRIVER ? UserStatus.PENDING_KYC : UserStatus.ACTIVE,
+        },
+      });
       isNew = true;
       await this.provisionUser(user.id, user.role);
       const payload: UserCreatedPayload = { userId: user.id, phone: user.phone, role: user.role };
       await this.redis.publish(MOVA_EVENTS.USER_CREATED, payload);
     }
     if (role === UserRole.DRIVER && user.role !== UserRole.DRIVER) {
-      user = await this.prisma.user.update({ where: { id: user.id }, data: { role: UserRole.DRIVER } });
+      user = await this.prisma.user.update({
+        where: { id: user.id },
+        data: { role: UserRole.DRIVER, status: UserStatus.PENDING_KYC },
+      });
       await fetch(serviceUrl('driver', '/internal/profiles'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-internal-api-key': INTERNAL_API_KEY },
@@ -102,6 +113,8 @@ export class AuthService {
       user: {
         id: user.id,
         phone: user.phone,
+        phoneMasked: maskPhoneRdc(user.phone),
+        publicId: formatMovaPublicId(user.id, user.role),
         role: user.role,
         status: user.status,
         firstName: user.firstName,

@@ -16,6 +16,7 @@ import '../help/driver_help_screen.dart';
 import '../carpool/carpool_screen.dart';
 import 'active_delivery_screen.dart';
 import 'active_ride_screen.dart';
+import 'driver_onboarding_screen.dart';
 import 'kyc_screen.dart';
 import 'driver_ride_history_screen.dart';
 import 'ride_offer_screen.dart';
@@ -105,10 +106,13 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
         if (previousKyc != 'APPROVED' && kycStatus == 'APPROVED' && mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('KYC approuvé — vous pouvez passer en ligne.'),
+              content: Text('KYC approuvé — saisissez votre code PIN d\'activation.'),
               backgroundColor: MovaColors.green,
             ),
           );
+          _maybeShowActivationPin(force: true);
+        } else if (data['needsActivationPin'] == true) {
+          _maybeShowActivationPin();
         }
         _syncProfilePoll(kycStatus);
       case Failure(:final error):
@@ -117,6 +121,59 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
           if (clearCache) _profile = null;
         });
     }
+  }
+
+  void _maybeShowActivationPin({bool force = false}) {
+    if (_profile?['needsActivationPin'] != true && !force) return;
+    if (!mounted) return;
+    final controller = TextEditingController();
+    showDialog<void>(
+      context: context,
+      barrierDismissible: !force,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Code PIN d\'activation'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'Entrez le code à 6 chiffres communiqué par MOVA après validation de votre dossier.',
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              keyboardType: TextInputType.number,
+              maxLength: 6,
+              decoration: const InputDecoration(labelText: 'PIN'),
+            ),
+          ],
+        ),
+        actions: [
+          if (!force)
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Plus tard')),
+          TextButton(
+            onPressed: () async {
+              final api = ref.read(apiClientProvider);
+              final result = await api.post('/drivers/activation-pin', {'pin': controller.text.trim()});
+              if (!ctx.mounted) return;
+              switch (result) {
+                case Success():
+                  Navigator.pop(ctx);
+                  await _loadProfile(clearCache: true);
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Compte activé — vous pouvez passer en ligne.')),
+                    );
+                  }
+                case Failure(:final error):
+                  ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(error.message)));
+              }
+            },
+            child: const Text('Activer'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _syncProfilePoll(String? kycStatus) {
@@ -421,7 +478,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
           onPressed: () async {
             await Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => const KycScreen()),
+              MaterialPageRoute(builder: (_) => const DriverOnboardingScreen(canSkipToHome: true)),
             );
             if (mounted) await _loadProfile(clearCache: true);
           },
@@ -851,7 +908,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
             onPressed: () async {
               await Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const KycScreen()),
+                MaterialPageRoute(builder: (_) => const DriverOnboardingScreen(canSkipToHome: true)),
               );
               if (mounted) await _loadProfile(clearCache: true);
             },

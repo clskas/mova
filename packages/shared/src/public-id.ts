@@ -1,0 +1,14 @@
+/** Identifiant public court (style Uber) — affiché dans l'app et le support. */
+export function formatMovaPublicId(userId: string, role: string): string {
+  const prefix = role === 'DRIVER' ? 'DRV' : 'RDR';
+  const compact = userId.replace(/-/g, '').slice(0, 6).toUpperCase();
+  return `${prefix}-${compact}`;
+}
+
+/** Masque le téléphone pour affichage (ex. +243 *** 9010). */
+export function maskPhoneRdc(phone: string): string {
+  const digits = phone.replace(/\D/g, '');
+  if (digits.length < 4) return phone;
+  const last4 = digits.slice(-4);
+  return `+243 *** ${last4}`;
+}

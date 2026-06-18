@@ -29,10 +29,21 @@ enum IncidentType {
 }
 
 model DriverProfile {
-  id            String    @id @default(uuid())
-  userId        String    @unique
-  licenseNumber String?
-  operatingCity String    @default("Kinshasa")
+  id                        String    @id @default(uuid())
+  userId                    String    @unique
+  licenseNumber             String?
+  idDocumentNumber          String?
+  licenseExpiry             DateTime?
+  insuranceExpiry           DateTime?
+  technicalInspectionExpiry DateTime?
+  payoutProvider            String?
+  payoutPhone               String?
+  charterAcceptedAt         DateTime?
+  trainingCompletedAt       DateTime?
+  onboardingCompleted       Boolean   @default(false)
+  activationPin             String?
+  activationPinVerifiedAt   DateTime?
+  operatingCity             String    @default("Kinshasa")
   isAvailable   Boolean   @default(false)
   currentLat    Float?
   currentLng    Float?

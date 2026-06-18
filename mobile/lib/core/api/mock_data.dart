@@ -13,11 +13,15 @@ abstract final class MockData {
       return {'success': false, 'message': 'Code invalide'};
     }
     final isDriver = role == 'DRIVER';
+    final digits = phone.replaceAll(RegExp(r'\D'), '');
+    final last4 = digits.length >= 4 ? digits.substring(digits.length - 4) : digits;
     return {
       'accessToken': 'mock-jwt-token',
       'user': {
         'id': isDriver ? 'driver-mock-1' : 'passenger-mock-1',
         'phone': phone,
+        'phoneMasked': '+243 *** $last4',
+        'publicId': isDriver ? 'DRV-MOCK01' : 'RDR-MOCK01',
         'role': isDriver ? 'DRIVER' : 'PASSENGER',
         'name': isDriver ? 'Jean Chauffeur' : 'Marie Passagère',
       },
@@ -252,13 +256,45 @@ abstract final class MockData {
 
   static Map<String, dynamic> driverProfile() => {
         'userId': 'mock-driver',
+        'publicId': 'DRV-MOCK01',
         'kycStatus': 'APPROVED',
+        'needsActivationPin': false,
         'isAvailable': false,
         'ratingAvg': 4.8,
         'totalRides': 120,
         'vehicles': [
           {'id': 'veh-mock-1', 'type': 'STANDARD', 'make': 'Toyota', 'model': 'Corolla', 'plateNumber': 'KIN-1234', 'isActive': true},
         ],
+      };
+
+  static Map<String, dynamic> driverOnboarding() => {
+        'publicId': 'DRV-MOCK01',
+        'user': {
+          'firstName': 'Jean',
+          'lastName': 'Kabila',
+          'email': 'jean@example.cd',
+          'phone': '+243900000020',
+          'phoneMasked': '+243 *** 0020',
+        },
+        'profile': {
+          'onboardingCompleted': false,
+          'kycStatus': 'PENDING',
+          'activationPinVerified': false,
+          'needsActivationPin': false,
+        },
+        'vehicle': {
+          'type': 'STANDARD',
+          'make': 'Toyota',
+          'model': 'Corolla',
+          'plateNumber': 'KIN-1234',
+        },
+        'kyc': {
+          'requiredComplete': false,
+          'checklist': [
+            {'type': 'ID_PHOTO', 'label': 'Carte d\'identité', 'required': true, 'uploaded': false},
+            {'type': 'SELFIE', 'label': 'Photo profil', 'required': true, 'uploaded': false},
+          ],
+        },
       };
 
   static List<Map<String, dynamic>> driverOffers() => [

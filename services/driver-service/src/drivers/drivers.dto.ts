@@ -1,0 +1,39 @@
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { VehicleType } from '@prisma/client';
+import { Type } from 'class-transformer';
+import { IsBoolean, IsDateString, IsEnum, IsOptional, IsString, MinLength } from 'class-validator';
+
+export class KycUploadDto {
+  @ApiProperty({ description: 'Type document KYC (ID_PHOTO, SELFIE, DRIVERS_LICENSE, …)' })
+  @IsString()
+  type: string;
+
+  @ApiProperty()
+  @IsString()
+  url: string;
+}
+
+export class UpdateOnboardingDto {
+  @ApiPropertyOptional() @IsOptional() @IsString() licenseNumber?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() idDocumentNumber?: string;
+  @ApiPropertyOptional() @IsOptional() @IsDateString() licenseExpiry?: string;
+  @ApiPropertyOptional() @IsOptional() @IsDateString() insuranceExpiry?: string;
+  @ApiPropertyOptional() @IsOptional() @IsDateString() technicalInspectionExpiry?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() payoutProvider?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() payoutPhone?: string;
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() charterAccepted?: boolean;
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() trainingCompleted?: boolean;
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() onboardingCompleted?: boolean;
+  @ApiPropertyOptional() @IsOptional() @IsString() plateNumber?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() vehicleMake?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() vehicleModel?: string;
+  @ApiPropertyOptional() @IsOptional() @IsEnum(VehicleType) vehicleType?: VehicleType;
+  @ApiPropertyOptional() @IsOptional() @IsString() vehicleColor?: string;
+}
+
+export class ActivationPinDto {
+  @ApiProperty({ description: 'Code PIN à 6 chiffres reçu après validation MOVA' })
+  @IsString()
+  @MinLength(6)
+  pin: string;
+}

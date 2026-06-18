@@ -13,6 +13,7 @@ import '../../core/geo/geo_utils.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
+import '../chat/ride_chat_screen.dart';
 import 'payment_screen.dart';
 import 'widgets/mova_ride_map.dart';
 
@@ -546,6 +547,22 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
                                         ),
                                       ],
                                     ),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.chat_bubble_outline, color: MovaColors.violet),
+                                    tooltip: 'Chat',
+                                    onPressed: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => RideChatScreen(
+                                            rideId: widget.rideId,
+                                            myRole: 'passenger',
+                                            peerLabel: driverName,
+                                          ),
+                                        ),
+                                      );
+                                    },
                                   ),
                                   IconButton(
                                     icon: const Icon(Icons.phone, color: MovaColors.green),

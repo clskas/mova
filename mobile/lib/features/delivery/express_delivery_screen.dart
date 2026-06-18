@@ -43,7 +43,7 @@ class _ExpressDeliveryScreenState extends ConsumerState<ExpressDeliveryScreen> {
   }
 
   void _setDropoffFromCoords(LatLng coords, String label) {
-    _dropoff = ServiceAreaLocation.ensureInServiceArea(coords, address: label);
+    _dropoff = coords;
     _dropoffController.text = label;
     setState(() {
       _estimatedPrice = null;
@@ -52,14 +52,15 @@ class _ExpressDeliveryScreenState extends ConsumerState<ExpressDeliveryScreen> {
   }
 
   Future<void> _onMapDropoffTap(LatLng raw) async {
-    final coords = ServiceAreaLocation.ensureInServiceArea(raw);
-    if (!ServiceAreaLocation.isInBounds(coords)) {
+    if (!ServiceAreaLocation.isInBounds(raw)) {
       if (mounted) setState(() => _validationError = ServiceAreaLocation.outOfAreaMessage());
       return;
     }
-    final label = await ServiceAreaLocation.labelForCoords(coords);
-    if (!mounted) return;
-    _setDropoffFromCoords(coords, label);
+    _setDropoffFromCoords(raw, LocationService.coordsLabel(raw));
+    final label = await ServiceAreaLocation.labelForCoords(raw);
+    if (!mounted || !_dropoffFromManualCoords) return;
+    _dropoffController.text = label;
+    setState(() {});
   }
 
   Future<void> _resolveCoords() async {
@@ -108,7 +109,7 @@ class _ExpressDeliveryScreenState extends ConsumerState<ExpressDeliveryScreen> {
   }
 
   Map<String, dynamic> _payload() {
-    final dropoff = _dropoff ?? ServiceAreaLocation.defaultDropoffOffset();
+    final dropoff = _dropoff ?? ServiceAreaLocation.defaultDropoffOffset(near: _pickup);
     return {
       'pickupLat': _pickup.latitude,
       'pickupLng': _pickup.longitude,

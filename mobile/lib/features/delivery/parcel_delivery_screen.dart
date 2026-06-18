@@ -11,6 +11,7 @@ import '../../core/error/result.dart';
 import '../../core/location/service_area_location.dart';
 import '../../core/location/service_areas.dart';
 import '../../core/location/destination_coords.dart';
+import '../../core/location/destination_field_sync.dart';
 import '../../core/location/location_service.dart';
 import '../../core/widgets/destination_coord_panel.dart';
 import '../../core/theme/mova_colors.dart';
@@ -77,6 +78,7 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
       _weightCategory = widget.initialWeightCategory!;
     }
     _dropoffController.addListener(_onDropoffChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _useMyLocation());
   }
 
   @override
@@ -130,7 +132,7 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
     final label = suggestion['label']?.toString() ??
         suggestion['address']?.toString() ??
         '';
-    _dropoffController.text = label;
+    DestinationFieldSync.setText(_dropoffController, _onDropoffChanged, label);
     _dropoff = ServiceAreaLocation.ensureInServiceArea(
       LatLng(
         (suggestion['lat'] as num?)?.toDouble() ?? MarketConfig.defaultLat - 0.03,
@@ -142,6 +144,7 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
       _showSuggestions = false;
       _suggestions = [];
       _estimatedPrice = null;
+      _dropoffFromManualCoords = false;
     });
   }
 
@@ -175,7 +178,7 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
 
   void _setDropoffFromCoords(LatLng coords, String label) {
     _dropoff = ServiceAreaLocation.ensureInServiceArea(coords, address: label);
-    _dropoffController.text = label;
+    DestinationFieldSync.setText(_dropoffController, _onDropoffChanged, label);
     setState(() {
       _showSuggestions = false;
       _suggestions = [];
@@ -185,14 +188,16 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
   }
 
   Future<void> _onMapDropoffTap(LatLng raw) async {
-    final coords = ServiceAreaLocation.ensureInServiceArea(raw);
-    if (!ServiceAreaLocation.isInBounds(coords)) {
+    if (!ServiceAreaLocation.isInBounds(raw)) {
       if (mounted) setState(() => _validationError = ServiceAreaLocation.outOfAreaMessage());
       return;
     }
+    final coords = raw;
+    _setDropoffFromCoords(coords, LocationService.coordsLabel(coords));
     final label = await ServiceAreaLocation.labelForCoords(coords);
-    if (!mounted) return;
-    _setDropoffFromCoords(coords, label);
+    if (!mounted || !_dropoffFromManualCoords) return;
+    DestinationFieldSync.setText(_dropoffController, _onDropoffChanged, label);
+    setState(() {});
   }
 
   Future<void> _resolveCoords() async {
@@ -241,7 +246,7 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
   }
 
   Map<String, dynamic> _parcelPayload({bool includePhoto = false}) {
-    final dropoff = _dropoff ?? ServiceAreaLocation.defaultDropoffOffset();
+    final dropoff = _dropoff ?? ServiceAreaLocation.defaultDropoffOffset(near: _pickup);
     final payload = {
       'pickupAddress': _pickupController.text.trim(),
       'dropoffAddress': _dropoffController.text.trim(),

@@ -243,6 +243,11 @@ abstract final class MockData {
         'monthCdf': 580000,
         'totalCdf': 1250000,
         'rideCount': 42,
+        'deliveryCount': 18,
+        'todayRideCount': 3,
+        'todayDeliveryCount': 2,
+        'rideEarningsCdf': 980000,
+        'deliveryEarningsCdf': 270000,
       };
 
   static Map<String, dynamic> driverProfile() => {

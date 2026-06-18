@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 import '../../core/api/api_client.dart';
 import '../../core/location/destination_coords.dart';
+import '../../core/location/destination_field_sync.dart';
 import '../../core/location/location_service.dart';
 import '../../core/widgets/destination_coord_panel.dart';
 import '../../core/location/service_area_location.dart';
@@ -135,7 +136,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
     final label = suggestion['label']?.toString() ??
         suggestion['address']?.toString() ??
         '';
-    _destinationController.text = label;
+    DestinationFieldSync.setText(_destinationController, _onDestinationChanged, label);
     _dropoff = ServiceAreaLocation.ensureInServiceArea(
       LatLng(
         (suggestion['lat'] as num?)?.toDouble() ?? MarketConfig.defaultLat - 0.03,
@@ -154,7 +155,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
 
   void _setDropoffFromCoords(LatLng coords, String label) {
     _dropoff = ServiceAreaLocation.ensureInServiceArea(coords, address: label);
-    _destinationController.text = label;
+    DestinationFieldSync.setText(_destinationController, _onDestinationChanged, label);
     setState(() {
       _showSuggestions = false;
       _suggestions = [];
@@ -167,14 +168,16 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   }
 
   Future<void> _onMapDropoffTap(LatLng raw) async {
-    final coords = ServiceAreaLocation.ensureInServiceArea(raw);
-    if (!ServiceAreaLocation.isInBounds(coords)) {
+    if (!ServiceAreaLocation.isInBounds(raw)) {
       if (mounted) setState(() => _validationError = ServiceAreaLocation.outOfAreaMessage());
       return;
     }
+    final coords = raw;
+    _setDropoffFromCoords(coords, LocationService.coordsLabel(coords));
     final label = await ServiceAreaLocation.labelForCoords(coords);
-    if (!mounted) return;
-    _setDropoffFromCoords(coords, label);
+    if (!mounted || !_dropoffFromManualCoords) return;
+    DestinationFieldSync.setText(_destinationController, _onDestinationChanged, label);
+    setState(() {});
   }
 
   Future<String?> _resolveCoords() async {
@@ -239,7 +242,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   }
 
   Map<String, dynamic> _estimatePayload(String vehicleType) {
-    final dropoff = _dropoff ?? ServiceAreaLocation.defaultDropoffOffset();
+    final dropoff = _dropoff ?? ServiceAreaLocation.defaultDropoffOffset(near: _pickup);
     return {
       'pickupLat': _pickup.latitude,
       'pickupLng': _pickup.longitude,
@@ -414,7 +417,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final distance = (_selectedEstimate?['distanceKm'] as num?)?.toDouble();
-    final duration = (_selectedEstimate?['durationMin'] as num?)?.toDouble();
+    final duration = (_selectedEstimate?['durationMin'] ?? _selectedEstimate?['etaMinutes']) as num?;
     final total = (_selectedEstimate?['estimatedFareCdf'] ??
         _selectedEstimate?['estimatedPriceCdf']) as int?;
 

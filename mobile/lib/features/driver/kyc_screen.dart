@@ -165,8 +165,14 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
                 _earningsRow('Cette semaine', _data!['weekCdf']),
                 _earningsRow('Ce mois', _data!['monthCdf']),
                 _earningsRow('Total', _data!['totalCdf']),
+                if (_data!['rideEarningsCdf'] != null)
+                  _earningsRow('Courses (net)', _data!['rideEarningsCdf']),
+                if (_data!['deliveryEarningsCdf'] != null)
+                  _earningsRow('Livraisons (net)', _data!['deliveryEarningsCdf']),
                 if (_data!['rideCount'] != null)
-                  _earningsRow('Courses', _data!['rideCount']),
+                  _earningsRow('Courses terminées', _data!['rideCount']),
+                if (_data!['deliveryCount'] != null)
+                  _earningsRow('Livraisons terminées', _data!['deliveryCount']),
                 const SizedBox(height: 24),
                 TextField(
                   controller: _amountController,

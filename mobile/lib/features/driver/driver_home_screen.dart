@@ -17,6 +17,7 @@ import '../carpool/carpool_screen.dart';
 import 'active_delivery_screen.dart';
 import 'active_ride_screen.dart';
 import 'kyc_screen.dart';
+import 'driver_ride_history_screen.dart';
 import 'ride_offer_screen.dart';
 import 'delivery_offer_screen.dart';
 
@@ -228,6 +229,27 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
       }
     }
     return _vehicleId;
+  }
+
+  Future<void> _rejectRideOffer(Map<String, dynamic> offer) async {
+    final id = offer['id']?.toString() ?? '';
+    if (id.isEmpty) return;
+    final api = ref.read(apiClientProvider);
+    final result = await api.rejectRide(id);
+    if (!mounted) return;
+    if (result case Success()) {
+      _dismissedOffers.add('ride:$id');
+      await _refreshRideOffers();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Course refusée')),
+        );
+      }
+    } else if (result case Failure(:final error)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message)),
+      );
+    }
   }
 
   Future<void> _openRideOffer(Map<String, dynamic> offer) async {
@@ -547,9 +569,9 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  if (_earnings!['rideCount'] != null)
+                  if (_earnings!['rideCount'] != null || _earnings!['deliveryCount'] != null)
                     Text(
-                      '${_earnings!['rideCount']} courses terminées',
+                      '${_earnings!['rideCount'] ?? 0} courses · ${_earnings!['deliveryCount'] ?? 0} livraisons',
                       style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -652,15 +674,28 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        trailing: fare != null
-                            ? Text(
-                                MarketConfig.formatCdf(fare.toInt()),
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: MovaColors.green,
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (fare != null)
+                              Padding(
+                                padding: const EdgeInsets.only(right: 4),
+                                child: Text(
+                                  MarketConfig.formatCdf(fare.toInt()),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: MovaColors.green,
+                                  ),
                                 ),
-                              )
-                            : const Icon(Icons.chevron_right),
+                              ),
+                            IconButton(
+                              icon: const Icon(Icons.close, color: MovaColors.error, size: 20),
+                              tooltip: 'Refuser',
+                              onPressed: () => _rejectRideOffer(offer),
+                            ),
+                            const Icon(Icons.chevron_right, size: 20),
+                          ],
+                        ),
                         onTap: () => _openRideOffer(offer),
                       );
                     }),
@@ -783,6 +818,16 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
             ),
             const SizedBox(height: 8),
           ],
+          MovaButton(
+            label: 'Mes courses',
+            isSecondary: true,
+            icon: Icons.history,
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const DriverRideHistoryScreen()),
+            ),
+          ),
+          const SizedBox(height: 8),
           MovaButton(
             label: 'Mes revenus',
             isSecondary: true,

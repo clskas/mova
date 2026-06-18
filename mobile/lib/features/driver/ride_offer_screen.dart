@@ -106,7 +106,7 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
     final fare = widget.offer['estimatedFareCdf'] as int? ??
         widget.offer['priceCdf'] as int? ??
         0;
-    final distance = widget.offer['distanceKm'] as num?;
+    final distance = widget.offer['tripDistanceKm'] as num? ?? widget.offer['distanceKm'] as num?;
     final pickup = widget.offer['pickupAddress']?.toString() ?? 'Point de départ';
     final dropoff = widget.offer['dropoffAddress']?.toString() ?? 'Destination';
     final vehicleType = widget.offer['vehicleType']?.toString() ?? 'Moto-taxi';
@@ -268,27 +268,25 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
                     ),
                   ),
                   const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: MovaButton(
-                          label: 'Navigation',
-                          isSecondary: true,
-                          icon: Icons.navigation_outlined,
-                          onPressed: _openNavigation,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: MovaButton(
-                          label: 'Refuser',
-                          isSecondary: true,
-                          icon: Icons.close,
-                          isLoading: _loading,
-                          onPressed: _loading ? null : _reject,
-                        ),
-                      ),
-                    ],
+                  SizedBox(
+                    width: double.infinity,
+                    child: MovaButton(
+                      label: 'Refuser',
+                      isSecondary: true,
+                      icon: Icons.close,
+                      isLoading: _loading,
+                      onPressed: _loading ? null : _reject,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    child: MovaButton(
+                      label: 'Navigation vers le passager',
+                      isSecondary: true,
+                      icon: Icons.navigation_outlined,
+                      onPressed: _openNavigation,
+                    ),
                   ),
                 ],
               ),

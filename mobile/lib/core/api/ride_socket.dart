@@ -20,14 +20,18 @@ class RideSocket {
 
   void Function(Map<String, dynamic> payload)? _onLocation;
   void Function(Map<String, dynamic> payload)? _onStatus;
+  void Function(Map<String, dynamic> payload)? _onChat;
   void Function()? _onConnected;
   void Function()? _onDisconnected;
+
+  set onChat(void Function(Map<String, dynamic> payload)? handler) => _onChat = handler;
 
   void connect({
     required String rideId,
     String? token,
     void Function(Map<String, dynamic> payload)? onLocation,
     void Function(Map<String, dynamic> payload)? onStatus,
+    void Function(Map<String, dynamic> payload)? onChat,
     void Function()? onConnected,
     void Function()? onDisconnected,
     bool forceReconnect = false,
@@ -36,6 +40,7 @@ class RideSocket {
     _token = token;
     _onLocation = onLocation;
     _onStatus = onStatus;
+    _onChat = onChat;
     _onConnected = onConnected;
     _onDisconnected = onDisconnected;
 
@@ -92,6 +97,11 @@ class RideSocket {
             _onStatus?.call(Map<String, dynamic>.from(data));
           }
         })
+        ..on('ride:chat', (data) {
+          if (data is Map) {
+            _onChat?.call(Map<String, dynamic>.from(data));
+          }
+        })
         ..onConnectError((_) => _scheduleReconnect())
         ..connect();
     } catch (_) {
@@ -142,5 +152,10 @@ class RideSocket {
       'lng': lng,
       if (rideId != null) 'rideId': rideId,
     });
+  }
+
+  void emitChat(Map<String, dynamic> payload) {
+    if (!isConnected) return;
+    _socket?.emit('ride:chat', payload);
   }
 }

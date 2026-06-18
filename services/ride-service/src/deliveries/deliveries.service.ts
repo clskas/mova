@@ -7,6 +7,7 @@ import { PricingService } from '../rides/pricing.service';
 import { PromoService, SurchargeService } from '../rides/surcharge.service';
 import { CreateFoodDeliveryDto, CreateFoodMultiDeliveryDto, CreateParcelDeliveryDto, RateDeliveryDto } from './deliveries.dto';
 import { assertServiceAreaPair } from '../common/address.util';
+import { tripDistanceKm } from '../common/geo.util';
 import {
   buildParcelTimeline,
   detectCommune,
@@ -664,18 +665,23 @@ export class DeliveriesService {
       .map((d) => {
         const pickupLat = d.pickupLat ?? d.deliveryLat ?? 0;
         const pickupLng = d.pickupLng ?? d.deliveryLng ?? 0;
-        const distanceKm = this.pricing.haversineKm(profile.currentLat!, profile.currentLng!, pickupLat, pickupLng);
+        const dropLat = d.dropoffLat ?? d.deliveryLat ?? pickupLat;
+        const dropLng = d.dropoffLng ?? d.deliveryLng ?? pickupLng;
+        const tripKm = tripDistanceKm(pickupLat, pickupLng, dropLat, dropLng, d.distanceKm);
+        const distanceToPickupKm = tripDistanceKm(profile.currentLat!, profile.currentLng!, pickupLat, pickupLng);
         const formatted = formatParcelDelivery(d as Parameters<typeof formatParcelDelivery>[0]);
         return {
           ...formatted,
+          distanceKm: tripKm,
+          tripDistanceKm: tripKm,
+          distanceToPickupKm,
           offerType: 'DELIVERY',
           type: d.type,
           restaurantName: d.restaurant?.name,
-          distanceKm: Math.round(distanceKm * 100) / 100,
         };
       })
-      .filter((o) => o.distanceKm <= radiusKm)
-      .sort((a, b) => a.distanceKm - b.distanceKm);
+      .filter((o) => o.distanceToPickupKm <= radiusKm)
+      .sort((a, b) => a.distanceToPickupKm - b.distanceToPickupKm);
 
     return { offers };
   }

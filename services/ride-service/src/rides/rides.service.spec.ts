@@ -42,8 +42,18 @@ describe('RidesService', () => {
   };
   const redis = { publish: jest.fn() };
   const tracking = { broadcastRideStatus: jest.fn() };
+  const commission = {
+    get: jest.fn().mockResolvedValue({ platformPercent: 15, driverPercent: 85 }),
+    splitGross: jest.fn().mockImplementation((gross: number, pct: number) => ({
+      grossCdf: gross,
+      platformFeeCdf: Math.ceil(gross * (pct / 100)),
+      driverNetCdf: gross - Math.ceil(gross * (pct / 100)),
+      platformPercent: pct,
+      driverPercent: 100 - pct,
+    })),
+  };
 
-  const service = new RidesService(prisma as never, pricing as never, matching as never, redis as never, tracking as never);
+  const service = new RidesService(prisma as never, pricing as never, matching as never, redis as never, tracking as never, commission as never);
 
   beforeEach(() => jest.clearAllMocks());
 

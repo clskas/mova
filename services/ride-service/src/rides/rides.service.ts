@@ -1,5 +1,5 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { CommissionServiceType, RideStatus, VehicleType } from '@prisma/client';
+import { CommissionServiceType, DeliveryStatus, DeliveryType, RideStatus, VehicleType } from '@prisma/client';
 import {
   formatCdf,
   fromMobileRideStatus,
@@ -22,6 +22,7 @@ import { MatchingService } from '../matching/matching.service';
 import { computeDriverEta } from '../matching/eta.util';
 import { TrackingGateway } from '../websocket/tracking.gateway';
 import { assertServiceAreaPair, assertServiceAreaCoords } from '../common/address.util';
+import { tripDistanceKm } from '../common/geo.util';
 
 const ACTIVE_STATUSES: RideStatus[] = [
   RideStatus.REQUESTED,
@@ -88,7 +89,13 @@ export class RidesService {
     assertServiceAreaPair(data.pickupLat, data.pickupLng, data.dropoffLat, data.dropoffLng);
 
     const estimate = await this.estimate(data.pickupLat, data.pickupLng, data.dropoffLat, data.dropoffLng, data.vehicleType);
-    const distanceKm = estimate.distanceKm;
+    const distanceKm = tripDistanceKm(
+      data.pickupLat,
+      data.pickupLng,
+      data.dropoffLat,
+      data.dropoffLng,
+      estimate.distanceKm,
+    );
     const ride = await this.prisma.ride.create({
       data: {
         passengerId,
@@ -241,17 +248,26 @@ export class RidesService {
       .map((ride) => {
         const attempts = ride.events.filter((e) => e.event === 'SEARCH_ATTEMPT').length;
         const radiusKm = this.matching.computeRadiusKm(attempts > 0 ? attempts - 1 : 0);
-        const distanceKm = this.pricing.haversineKm(
+        const tripKm = tripDistanceKm(
+          ride.pickupLat,
+          ride.pickupLng,
+          ride.dropoffLat,
+          ride.dropoffLng,
+          ride.distanceKm,
+        );
+        const distanceToPickupKm = tripDistanceKm(
           profile.currentLat,
           profile.currentLng,
           ride.pickupLat,
           ride.pickupLng,
         );
         return {
-          ...this.formatRideDetail(ride),
-          distanceKm: Math.round(distanceKm * 100) / 100,
+          ...this.formatRideDetail({ ...ride, distanceKm: tripKm }),
+          distanceKm: tripKm,
+          tripDistanceKm: tripKm,
+          distanceToPickupKm,
           searchRadiusKm: radiusKm,
-          _withinRadius: distanceKm <= radiusKm,
+          _withinRadius: distanceToPickupKm <= radiusKm,
         };
       })
       .filter((o) => o._withinRadius)
@@ -528,6 +544,13 @@ export class RidesService {
     const priceCdf = ride.finalFareCdf ?? ride.estimatedFareCdf ?? 0;
     const mobileStatus = toMobileRideStatus(ride.status);
     const tripEtaMinutes = ride.durationMin ? Math.ceil(ride.durationMin) : null;
+    const resolvedDistanceKm = tripDistanceKm(
+      ride.pickupLat,
+      ride.pickupLng,
+      ride.dropoffLat,
+      ride.dropoffLng,
+      ride.distanceKm,
+    );
     return {
       id: ride.id,
       passengerId: ride.passengerId,
@@ -547,7 +570,8 @@ export class RidesService {
       priceCdf,
       totalCdf: priceCdf,
       totalFormatted: formatCdf(priceCdf),
-      distanceKm: ride.distanceKm,
+      distanceKm: resolvedDistanceKm,
+      durationMin: tripEtaMinutes,
       etaMinutes: tripEtaMinutes,
       tripEtaMinutes,
       currency: MARKET_RDC.currency,
@@ -563,25 +587,64 @@ export class RidesService {
   }
 
   async getDriverEarnings(driverUserId: string) {
-    const rides = await this.prisma.ride.findMany({ where: { driverId: driverUserId, status: RideStatus.COMPLETED } });
-    const rule = await this.commission.get(CommissionServiceType.RIDE);
+    const [rides, deliveries, rideRule, deliveryRule] = await Promise.all([
+      this.prisma.ride.findMany({ where: { driverId: driverUserId, status: RideStatus.COMPLETED } }),
+      this.prisma.delivery.findMany({ where: { driverId: driverUserId, status: DeliveryStatus.DELIVERED } }),
+      this.commission.get(CommissionServiceType.RIDE),
+      this.commission.get(CommissionServiceType.DELIVERY),
+    ]);
     const now = new Date();
     const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const startOfWeek = new Date(startOfDay);
     startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const net = (gross: number) => this.commission.splitGross(gross, rule.platformPercent).driverNetCdf;
-    const sum = (from: Date) =>
+    const rideNet = (gross: number) => this.commission.splitGross(gross, rideRule.platformPercent).driverNetCdf;
+    const deliveryNet = (gross: number) => this.commission.splitGross(gross, deliveryRule.platformPercent).driverNetCdf;
+
+    const deliveryDriverGross = (d: (typeof deliveries)[number]) => {
+      const gross = d.finalPriceCdf ?? d.estimatedPriceCdf ?? 0;
+      if (d.type !== DeliveryType.FOOD) return gross;
+      const items = d.items;
+      if (!Array.isArray(items)) return Math.max(3000, gross);
+      let itemsTotal = 0;
+      for (const entry of items) {
+        if (entry && typeof entry === 'object' && 'restaurantId' in entry && Array.isArray((entry as { items?: unknown }).items)) {
+          for (const sub of (entry as { items: { unitPriceCdf?: number; priceCdf?: number; quantity?: number }[] }).items) {
+            const qty = sub.quantity ?? 1;
+            itemsTotal += (sub.unitPriceCdf ?? sub.priceCdf ?? 0) * qty;
+          }
+        } else {
+          const row = entry as { unitPriceCdf?: number; priceCdf?: number; quantity?: number };
+          const qty = row.quantity ?? 1;
+          itemsTotal += (row.unitPriceCdf ?? row.priceCdf ?? 0) * qty;
+        }
+      }
+      return Math.max(3000, gross - itemsTotal);
+    };
+
+    const sumRides = (from: Date) =>
       rides
         .filter((r) => r.completedAt && r.completedAt >= from)
-        .reduce((a, r) => a + net(r.finalFareCdf ?? r.estimatedFareCdf ?? 0), 0);
+        .reduce((a, r) => a + rideNet(r.finalFareCdf ?? r.estimatedFareCdf ?? 0), 0);
+    const sumDeliveries = (from: Date) =>
+      deliveries
+        .filter((d) => d.deliveredAt && d.deliveredAt >= from)
+        .reduce((a, d) => a + deliveryNet(deliveryDriverGross(d)), 0);
+    const sumAll = (from: Date) => sumRides(from) + sumDeliveries(from);
+
     return {
-      totalCdf: sum(new Date(0)),
-      todayCdf: sum(startOfDay),
-      weekCdf: sum(startOfWeek),
-      monthCdf: sum(startOfMonth),
+      totalCdf: sumAll(new Date(0)),
+      todayCdf: sumAll(startOfDay),
+      weekCdf: sumAll(startOfWeek),
+      monthCdf: sumAll(startOfMonth),
       rideCount: rides.length,
-      commissionPercent: rule.platformPercent,
+      deliveryCount: deliveries.length,
+      todayRideCount: rides.filter((r) => r.completedAt && r.completedAt >= startOfDay).length,
+      todayDeliveryCount: deliveries.filter((d) => d.deliveredAt && d.deliveredAt >= startOfDay).length,
+      rideEarningsCdf: sumRides(new Date(0)),
+      deliveryEarningsCdf: sumDeliveries(new Date(0)),
+      commissionPercent: rideRule.platformPercent,
+      deliveryCommissionPercent: deliveryRule.platformPercent,
       currency: 'CDF',
     };
   }

@@ -11,6 +11,7 @@ import '../../core/geo/maps_launcher.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
+import '../chat/ride_chat_screen.dart';
 
 class ActiveRideScreen extends ConsumerStatefulWidget {
   const ActiveRideScreen({super.key, required this.ride});
@@ -191,6 +192,22 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
     return MovaScreen(
       title: 'Course en cours',
       actions: [
+        IconButton(
+          icon: const Icon(Icons.chat_bubble_outline),
+          tooltip: 'Chat passager',
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => RideChatScreen(
+                  rideId: _rideId,
+                  myRole: 'driver',
+                  peerLabel: 'Passager',
+                ),
+              ),
+            );
+          },
+        ),
         IconButton(icon: const Icon(Icons.refresh), onPressed: _refreshRide),
       ],
       child: Column(

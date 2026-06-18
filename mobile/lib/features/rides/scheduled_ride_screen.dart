@@ -7,6 +7,7 @@ import '../../core/api/api_client.dart';
 import '../../core/config/market_config.dart';
 import '../../core/error/result.dart';
 import '../../core/location/service_area_location.dart';
+import '../../core/location/destination_field_sync.dart';
 import '../../core/location/location_service.dart';
 import '../../core/theme/mova_colors.dart';
 import '../booking/widgets/mova_ride_map.dart';
@@ -65,7 +66,7 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
   }
 
   Map<String, dynamic> _ridePayload() {
-    final dropoff = _dropoff ?? ServiceAreaLocation.defaultDropoffOffset();
+    final dropoff = _dropoff ?? ServiceAreaLocation.defaultDropoffOffset(near: _pickup);
     return {
       'pickupLat': _pickup.latitude,
       'pickupLng': _pickup.longitude,
@@ -137,7 +138,7 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
     final label = suggestion['label']?.toString() ??
         suggestion['address']?.toString() ??
         '';
-    _destinationController.text = label;
+    DestinationFieldSync.setText(_destinationController, _onDestinationChanged, label);
     _dropoff = ServiceAreaLocation.ensureInServiceArea(
       LatLng(
         (suggestion['lat'] as num?)?.toDouble() ?? MarketConfig.defaultLat - 0.03,
@@ -156,7 +157,7 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
 
   void _setDropoffFromCoords(LatLng coords, String label) {
     _dropoff = ServiceAreaLocation.ensureInServiceArea(coords, address: label);
-    _destinationController.text = label;
+    DestinationFieldSync.setText(_destinationController, _onDestinationChanged, label);
     setState(() {
       _showSuggestions = false;
       _suggestions = [];
@@ -166,14 +167,17 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
     });
   }
 
-  void _onMapDropoffTap(LatLng raw) {
-    final coords = ServiceAreaLocation.ensureInServiceArea(raw);
-    if (!ServiceAreaLocation.isInBounds(coords)) {
+  Future<void> _onMapDropoffTap(LatLng raw) async {
+    if (!ServiceAreaLocation.isInBounds(raw)) {
       setState(() => _validationError =
           'MOVA couvre les principales villes de RDC. Choisissez une destination dans une ville desservie.');
       return;
     }
-    _setDropoffFromCoords(coords, 'Point sélectionné sur la carte');
+    _setDropoffFromCoords(raw, LocationService.coordsLabel(raw));
+    final label = await ServiceAreaLocation.labelForCoords(raw);
+    if (!mounted || !_dropoffFromManualCoords) return;
+    DestinationFieldSync.setText(_destinationController, _onDestinationChanged, label);
+    setState(() {});
   }
 
   Future<void> _useMyLocation({bool silent = false}) async {

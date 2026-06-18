@@ -13,6 +13,7 @@ import {
 } from '@mova/shared';
 import { Delivery, DeliveryEvent, DeliveryStatus, DeliveryType } from '@prisma/client';
 import { computeDriverEta } from '../matching/eta.util';
+import { tripDistanceKm } from '../common/geo.util';
 
 export { KINSHASA_BOUNDS };
 
@@ -214,6 +215,13 @@ export function formatParcelDelivery(
   const city = resolveCityFromCoords(delivery.pickupLat ?? 0, delivery.pickupLng ?? 0);
   const dropLat = delivery.dropoffLat ?? delivery.deliveryLat;
   const dropLng = delivery.dropoffLng ?? delivery.deliveryLng;
+  const resolvedDistanceKm = tripDistanceKm(
+    delivery.pickupLat,
+    delivery.pickupLng,
+    dropLat,
+    dropLng,
+    delivery.distanceKm,
+  );
   const courierLoc = resolveCourierLocation(delivery, courier);
   let etaMinutes: number | null = null;
   if (
@@ -247,7 +255,7 @@ export function formatParcelDelivery(
     formattedPrice: formatCdf(priceCdf),
     currency: 'CDF',
     city,
-    distanceKm: delivery.distanceKm,
+    distanceKm: resolvedDistanceKm,
     durationMin: delivery.durationMin,
     paymentReady,
     restaurant: delivery.restaurant ? { id: delivery.restaurant.id, name: delivery.restaurant.name, cuisine: delivery.restaurant.cuisine } : undefined,

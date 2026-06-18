@@ -86,6 +86,8 @@ export interface FareBreakdown {
   vehicleType: MobileVehicleType;
   distanceKm: number;
   etaMinutes: number;
+  /** Alias mobile — même valeur que etaMinutes */
+  durationMin: number;
   baseFareCdf: number;
   distanceFareCdf: number;
   durationFareCdf: number;
@@ -118,6 +120,7 @@ export function buildFareBreakdown(
     vehicleType: toMobileVehicleType(vehicleType),
     distanceKm: Math.round(distanceKm * 100) / 100,
     etaMinutes: Math.ceil(etaMinutes),
+    durationMin: Math.ceil(etaMinutes),
     baseFareCdf,
     distanceFareCdf,
     durationFareCdf,

@@ -278,7 +278,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
     setState(() {
       _rideOffers = rides;
       _deliveryOffers = deliveries;
-      _offersError = deliveryResult is Failure ? deliveryResult.error.message : null;
+      _offersError = null;
     });
   }
 

@@ -1,7 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { VehicleType } from '@prisma/client';
 import { Type } from 'class-transformer';
-import { IsBoolean, IsDateString, IsEnum, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsBoolean, IsDateString, IsEnum, IsInt, IsOptional, IsString, Min, MinLength } from 'class-validator';
 
 export class KycUploadDto {
   @ApiProperty({ description: 'Type document KYC (ID_PHOTO, SELFIE, DRIVERS_LICENSE, …)' })
@@ -36,4 +36,12 @@ export class ActivationPinDto {
   @IsString()
   @MinLength(6)
   pin: string;
+}
+
+export class DriverWithdrawDto {
+  @ApiProperty({ description: 'Montant en FC (minimum 500)' })
+  @Type(() => Number)
+  @IsInt()
+  @Min(500)
+  amountCdf: number;
 }

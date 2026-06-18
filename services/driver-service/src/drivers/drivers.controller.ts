@@ -4,7 +4,7 @@ import { IsBoolean, IsNumber } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { DriversService } from './drivers.service';
-import { ActivationPinDto, KycUploadDto, UpdateOnboardingDto } from './drivers.dto';
+import { ActivationPinDto, DriverWithdrawDto, KycUploadDto, UpdateOnboardingDto } from './drivers.dto';
 
 class AvailabilityDto { @ApiProperty() @IsBoolean() isAvailable: boolean; }
 class LocationDto { @ApiProperty() @IsNumber() lat: number; @ApiProperty() @IsNumber() lng: number; }
@@ -58,6 +58,12 @@ export class DriversController {
   @Get('earnings')
   earnings(@Request() req: { user: { id: string } }) {
     return this.driversService.getEarnings(req.user.id);
+  }
+
+  @Post('withdraw')
+  @ApiOperation({ summary: 'Retrait Mobile Money vers le numéro configuré dans le dossier' })
+  withdraw(@Request() req: { user: { id: string } }, @Body() dto: DriverWithdrawDto) {
+    return this.driversService.withdraw(req.user.id, dto.amountCdf);
   }
 
   @Get('profile')

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/config/market_config.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import '../../core/theme/mova_colors.dart';
@@ -28,11 +29,23 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
   final _amountController = TextEditingController(text: '5000');
   String? _error;
   bool _loading = true;
+  bool _withdrawing = false;
 
   int _asInt(dynamic value) {
     if (value is int) return value;
     if (value is num) return value.round();
     return int.tryParse(value?.toString() ?? '') ?? 0;
+  }
+
+  int get _minWithdraw => _asInt(_data?['minWithdrawCdf']).clamp(500, 999999999);
+
+  bool get _payoutConfigured => _data?['payoutConfigured'] == true;
+
+  String get _payoutLabel {
+    final provider = _data?['payoutProvider']?.toString() ?? 'Mobile Money';
+    final masked = _data?['payoutPhoneMasked']?.toString();
+    if (masked != null && masked.isNotEmpty) return '$provider · $masked';
+    return provider;
   }
 
   @override
@@ -71,30 +84,44 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
     }
   }
 
+  Future<void> _openDossier() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const DriverOnboardingScreen(canSkipToHome: true)),
+    );
+    if (mounted) await _load();
+  }
+
   Future<void> _withdraw() async {
+    if (!_payoutConfigured) {
+      setState(() => _error = 'Configurez votre numéro Mobile Money dans Mon dossier.');
+      return;
+    }
     final amount = int.tryParse(_amountController.text.trim());
-    if (amount == null || amount < 1000) {
-      setState(() => _error = 'Montant minimum : 1 000 FC');
+    if (amount == null || amount < _minWithdraw) {
+      setState(() => _error = 'Montant minimum : ${MarketConfig.formatCdf(_minWithdraw)}');
       return;
     }
     final available = _asInt(_data?['withdrawableCdf'] ?? _data?['walletBalanceCdf']);
     if (amount > available) {
-      setState(() => _error = 'Solde disponible : $available FC. Ouvrez Revenus pour synchroniser.');
+      setState(() => _error = 'Solde disponible : ${MarketConfig.formatCdf(available)}');
       return;
     }
-    final api = ref.read(apiClientProvider);
-    final phone = await api.loadUserPhone() ?? '+243812345678';
-    final result = await api.post('/wallet/withdraw', {
-      'amountCdf': amount,
-      'provider': 'ORANGE_MONEY',
-      'phone': phone,
+
+    setState(() {
+      _withdrawing = true;
+      _error = null;
     });
+
+    final api = ref.read(apiClientProvider);
+    final result = await api.post('/drivers/withdraw', {'amountCdf': amount});
     if (!mounted) return;
+
+    setState(() => _withdrawing = false);
     switch (result) {
-      case Success():
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Retrait en cours…')),
-        );
+      case Success(:final data):
+        final message = data['message']?.toString() ?? 'Retrait en cours…';
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
         await _load();
       case Failure(:final error):
         setState(() => _error = error.message);
@@ -106,46 +133,77 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
     return MovaScreen(
       title: 'Revenus',
       actions: [
-        IconButton(icon: const Icon(Icons.refresh), onPressed: _load),
+        IconButton(icon: const Icon(Icons.refresh), onPressed: _loading || _withdrawing ? null : _load),
       ],
       child: _loading
           ? const Center(child: CircularProgressIndicator())
-          : Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (_error != null) ...[
-                  MovaErrorBanner(message: _error!, onRetry: _load),
-                  const SizedBox(height: 12),
-                ],
-                _earningsRow('Aujourd\'hui', _data!['todayCdf']),
-                _earningsRow('Cette semaine', _data!['weekCdf']),
-                _earningsRow('Ce mois', _data!['monthCdf']),
-                _earningsRow('Total', _data!['totalCdf']),
-                _earningsRow('Solde disponible (retrait)', _data!['withdrawableCdf'] ?? _data!['walletBalanceCdf']),
-                _earningsRow('Courses (net)', _data!['rideEarningsCdf']),
-                _earningsRow('Livraisons (net)', _data!['deliveryEarningsCdf']),
-                _earningsRow('Courses terminées', _data!['rideCount']),
-                _earningsRow('Livraisons terminées', _data!['deliveryCount']),
-                const SizedBox(height: 24),
-                TextField(
-                  controller: _amountController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Montant retrait (FC)',
-                    prefixIcon: Icon(Icons.payments_outlined),
+          : MovaFlexScroll(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (_error != null) ...[
+                    MovaErrorBanner(message: _error!, onRetry: _load),
+                    const SizedBox(height: 12),
+                  ],
+                  _earningsRow('Aujourd\'hui', _data!['todayCdf']),
+                  _earningsRow('Cette semaine', _data!['weekCdf']),
+                  _earningsRow('Ce mois', _data!['monthCdf']),
+                  _earningsRow('Total', _data!['totalCdf']),
+                  _earningsRow('Solde disponible (retrait)', _data!['withdrawableCdf'] ?? _data!['walletBalanceCdf']),
+                  _earningsRow('Courses (net)', _data!['rideEarningsCdf']),
+                  _earningsRow('Livraisons (net)', _data!['deliveryEarningsCdf']),
+                  _earningsRow('Courses terminées', _data!['rideCount']),
+                  _earningsRow('Livraisons terminées', _data!['deliveryCount']),
+                  const SizedBox(height: 24),
+                  const Text(
+                    'Retrait Mobile Money',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                   ),
-                ),
-                if (_error != null) ...[
+                  const SizedBox(height: 8),
+                  if (_payoutConfigured)
+                    Text(
+                      'Vers $_payoutLabel',
+                      style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
+                    )
+                  else
+                    MovaCard(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          const Text(
+                            'Numéro de retrait non configuré.',
+                            style: TextStyle(color: MovaColors.error),
+                          ),
+                          const SizedBox(height: 8),
+                          MovaButton(
+                            label: 'Configurer dans Mon dossier',
+                            isSecondary: true,
+                            icon: Icons.folder_open,
+                            onPressed: _openDossier,
+                          ),
+                        ],
+                      ),
+                    ),
                   const SizedBox(height: 12),
-                  MovaErrorBanner(message: _error!),
+                  TextField(
+                    controller: _amountController,
+                    enabled: !_withdrawing && _payoutConfigured,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      labelText: 'Montant retrait (FC)',
+                      helperText: 'Minimum ${MarketConfig.formatCdf(_minWithdraw)}',
+                      prefixIcon: const Icon(Icons.payments_outlined),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  MovaButton(
+                    label: 'Retirer vers Mobile Money',
+                    icon: Icons.account_balance,
+                    isLoading: _withdrawing,
+                    onPressed: (_withdrawing || !_payoutConfigured) ? null : _withdraw,
+                  ),
                 ],
-                const SizedBox(height: 16),
-                MovaButton(
-                  label: 'Retrait mobile money',
-                  icon: Icons.account_balance,
-                  onPressed: _withdraw,
-                ),
-              ],
+              ),
             ),
     );
   }
@@ -193,10 +251,9 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
   Future<void> _submit() async {
     setState(() => _loading = true);
     final api = ref.read(apiClientProvider);
-    await api.checkHealth();
     final result = await api.post('/incidents', {
       'type': _type,
-      'description': _descController.text,
+      'description': _descController.text.trim(),
     });
     if (!mounted) return;
     setState(() => _loading = false);
@@ -214,10 +271,17 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
   }
 
   @override
+  void dispose() {
+    _descController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return MovaScreen(
       title: 'Signaler un incident',
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           DropdownButtonFormField<String>(
             value: _type,
@@ -225,19 +289,22 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
             items: const [
               DropdownMenuItem(value: 'ACCIDENT', child: Text('Accident')),
               DropdownMenuItem(value: 'HARASSMENT', child: Text('Harcèlement')),
-              DropdownMenuItem(value: 'FRAUD', child: Text('Fraude')),
               DropdownMenuItem(value: 'OTHER', child: Text('Autre')),
             ],
-            onChanged: (v) => setState(() => _type = v!),
+            onChanged: (v) => setState(() => _type = v ?? 'OTHER'),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           TextField(
             controller: _descController,
             maxLines: 4,
             decoration: const InputDecoration(labelText: 'Description'),
           ),
-          const SizedBox(height: 24),
-          MovaButton(label: 'Envoyer', isLoading: _loading, onPressed: _submit),
+          const SizedBox(height: 16),
+          MovaButton(
+            label: 'Envoyer',
+            isLoading: _loading,
+            onPressed: _submit,
+          ),
         ],
       ),
     );

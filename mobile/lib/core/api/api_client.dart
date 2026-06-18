@@ -332,6 +332,17 @@ class ApiClient {
     if (path.contains('/drivers/earnings')) {
       return Success(MockData.earnings());
     }
+    if (path.contains('/drivers/withdraw') && method == 'POST') {
+      final amount = body?['amountCdf'] as int? ?? 5000;
+      return Success({
+        'success': true,
+        'message': 'Retrait de $amount FC en cours vers +243 *** 0020',
+        'amountCdf': amount,
+        'provider': 'ORANGE_MONEY',
+        'phoneMasked': '+243 *** 0020',
+        'balanceCdf': 40000,
+      });
+    }
     if (path.contains('/drivers/onboarding') && method == 'GET') {
       return Success(MockData.driverOnboarding());
     }

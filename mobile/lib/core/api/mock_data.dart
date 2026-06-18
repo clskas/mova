@@ -252,6 +252,13 @@ abstract final class MockData {
         'todayDeliveryCount': 2,
         'rideEarningsCdf': 980000,
         'deliveryEarningsCdf': 270000,
+        'withdrawableCdf': 450000,
+        'walletBalanceCdf': 450000,
+        'payoutProvider': 'ORANGE_MONEY',
+        'payoutPhone': '+243900000020',
+        'payoutPhoneMasked': '+243 *** 0020',
+        'payoutConfigured': true,
+        'minWithdrawCdf': 500,
       };
 
   static Map<String, dynamic> driverProfile() => {

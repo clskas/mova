@@ -352,6 +352,8 @@ export class DriversService {
       headers: { 'x-internal-api-key': INTERNAL_API_KEY },
     }).catch(() => undefined);
 
+    const profile = await this.getOrCreateProfile(userId);
+
     const fetchJson = async (url: string) => {
       try {
         const res = await fetch(url, { headers: { 'x-internal-api-key': INTERNAL_API_KEY } });
@@ -384,6 +386,69 @@ export class DriversService {
       walletBalanceCdf: walletData.balanceCdf ?? 0,
       withdrawableCdf: walletData.balanceCdf ?? 0,
       currency: 'CDF',
+      payoutProvider: profile?.payoutProvider ?? null,
+      payoutPhone: profile?.payoutPhone ?? null,
+      payoutPhoneMasked: profile?.payoutPhone ? maskPhoneRdc(profile.payoutPhone) : null,
+      payoutConfigured: !!profile?.payoutPhone,
+      minWithdrawCdf: 500,
+    };
+  }
+
+  async withdraw(userId: string, amountCdf: number) {
+    const profile = await this.getOrCreateProfile(userId);
+    const payoutPhone = profile?.payoutPhone?.trim();
+    const payoutProvider = profile?.payoutProvider?.trim() || 'ORANGE_MONEY';
+    if (!payoutPhone) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        undefined,
+        'Configurez votre numéro Mobile Money dans Mon dossier (étape Paiement).',
+      );
+    }
+
+    await fetch(serviceUrl('payment', `/internal/driver-payouts/sync/${userId}`), {
+      method: 'POST',
+      headers: { 'x-internal-api-key': INTERNAL_API_KEY },
+    }).catch(() => undefined);
+
+    let res: Response;
+    try {
+      res = await fetch(serviceUrl('payment', `/internal/wallets/${userId}/withdraw`), {
+        method: 'POST',
+        headers: {
+          'x-internal-api-key': INTERNAL_API_KEY,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ amountCdf, provider: payoutProvider, phone: payoutPhone }),
+      });
+    } catch {
+      throw new MovaHttpException(MovaErrorCode.INTERNAL_ERROR, undefined, 'Service paiement indisponible.');
+    }
+
+    const body = (await res.json().catch(() => ({}))) as {
+      success?: boolean;
+      message?: string;
+      error?: { message?: string; code?: string };
+      balanceCdf?: number;
+      amountCdf?: number;
+      provider?: string;
+      phoneMasked?: string;
+      reference?: string;
+    };
+
+    if (!res.ok) {
+      const msg = body.error?.message ?? body.message ?? 'Retrait impossible.';
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, msg);
+    }
+
+    return {
+      success: true,
+      message: body.message ?? `Retrait de ${amountCdf} FC en cours vers ${maskPhoneRdc(payoutPhone)}`,
+      amountCdf: body.amountCdf ?? amountCdf,
+      provider: body.provider ?? payoutProvider,
+      phoneMasked: body.phoneMasked ?? maskPhoneRdc(payoutPhone),
+      balanceCdf: body.balanceCdf,
+      reference: body.reference,
     };
   }
 

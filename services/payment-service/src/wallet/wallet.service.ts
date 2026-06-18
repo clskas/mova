@@ -93,6 +93,36 @@ export class WalletService {
     };
   }
 
+  async withdrawToMobileMoney(userId: string, amountCdf: number, provider: string, phone: string) {
+    const normalizedProvider = provider?.trim().toUpperCase() || 'ORANGE_MONEY';
+    const normalizedPhone = phone?.trim();
+    if (!normalizedPhone) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Numéro Mobile Money requis.');
+    }
+    if (amountCdf < 500) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Montant minimum : 500 FC.');
+    }
+
+    const reference = `withdraw_${normalizedProvider}_${Date.now()}`;
+    const wallet = await this.debit(
+      userId,
+      amountCdf,
+      `Retrait ${normalizedProvider} vers ${normalizedPhone}`,
+      reference,
+    );
+
+    return {
+      success: true,
+      message: `Retrait de ${formatCdf(amountCdf)} vers ${normalizedPhone} en cours`,
+      amountCdf,
+      provider: normalizedProvider,
+      phone: normalizedPhone,
+      balanceCdf: wallet.balanceCdf,
+      formattedBalance: formatCdf(wallet.balanceCdf),
+      reference,
+    };
+  }
+
   async listTransactionsAdmin(skip = 0, take = 50, userId?: string) {
     const where = userId ? { wallet: { userId } } : {};
     const [data, total] = await Promise.all([

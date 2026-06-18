@@ -37,6 +37,12 @@ class AdminAdjustDto {
   @IsString() description: string;
 }
 
+class InternalWithdrawDto {
+  @Type(() => Number) @IsInt() @Min(500) amountCdf: number;
+  @IsString() provider: string;
+  @IsString() phone: string;
+}
+
 @ApiTags('internal')
 @Controller('internal')
 @UseGuards(InternalApiGuard)
@@ -74,6 +80,11 @@ export class InternalController {
   @Post('wallets/:userId/adjust')
   adjust(@Param('userId') userId: string, @Body() dto: AdminAdjustDto) {
     return this.wallet.adminAdjust(userId, dto.amountCdf, dto.type, dto.description);
+  }
+
+  @Post('wallets/:userId/withdraw')
+  withdraw(@Param('userId') userId: string, @Body() dto: InternalWithdrawDto) {
+    return this.wallet.withdrawToMobileMoney(userId, dto.amountCdf, dto.provider, dto.phone);
   }
 
   @Post('driver-payouts/sync/:userId')

@@ -6,7 +6,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { WalletService } from './wallet.service';
 
 class WithdrawDto {
-  @ApiProperty() @IsInt() @Min(100) amountCdf: number;
+  @ApiProperty() @IsInt() @Min(500) amountCdf: number;
   @ApiProperty() @IsString() provider: string;
   @ApiProperty() @IsString() phone: string;
 }
@@ -70,7 +70,6 @@ export class WalletController {
   @Post('withdraw')
   @ApiOperation({ summary: 'Retrait mobile money' })
   async withdraw(@Request() req: { user: { id: string } }, @Body() dto: WithdrawDto) {
-    await this.walletService.debit(req.user.id, dto.amountCdf, `Retrait ${dto.provider} vers ${dto.phone}`);
-    return { success: true, message: `Retrait de ${dto.amountCdf} FC en cours`, amountCdf: dto.amountCdf };
+    return this.walletService.withdrawToMobileMoney(req.user.id, dto.amountCdf, dto.provider, dto.phone);
   }
 }

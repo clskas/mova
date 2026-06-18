@@ -9,6 +9,7 @@ import '../../core/api/api_client.dart';
 import '../../core/config/market_config.dart';
 import '../../core/error/result.dart';
 import '../../core/location/service_area_location.dart';
+import '../../core/location/service_areas.dart';
 import '../../core/location/destination_coords.dart';
 import '../../core/location/location_service.dart';
 import '../../core/widgets/destination_coord_panel.dart';
@@ -110,7 +111,7 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
     }
     setState(() => _loadingSuggestions = true);
     final api = ref.read(apiClientProvider);
-    final result = await api.geoAutocomplete(query);
+    final result = await api.geoAutocomplete(query, city: ServiceAreas.cityNameForCoords(_pickup));
     if (!mounted) return;
     setState(() {
       _loadingSuggestions = false;
@@ -183,13 +184,15 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
     });
   }
 
-  void _onMapDropoffTap(LatLng raw) {
+  Future<void> _onMapDropoffTap(LatLng raw) async {
     final coords = ServiceAreaLocation.ensureInServiceArea(raw);
     if (!ServiceAreaLocation.isInBounds(coords)) {
-      setState(() => _validationError = ServiceAreaLocation.outOfAreaMessage());
+      if (mounted) setState(() => _validationError = ServiceAreaLocation.outOfAreaMessage());
       return;
     }
-    _setDropoffFromCoords(coords, 'Point sélectionné sur la carte');
+    final label = await ServiceAreaLocation.labelForCoords(coords);
+    if (!mounted) return;
+    _setDropoffFromCoords(coords, label);
   }
 
   Future<void> _resolveCoords() async {
@@ -207,10 +210,16 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
       return;
     }
     if (_dropoff == null || !ServiceAreaLocation.isInBounds(_dropoff!)) {
-      var resolved = ServiceAreaLocation.coordsFromAddress(_dropoffController.text);
+      var resolved = ServiceAreaLocation.coordsFromAddress(
+        _dropoffController.text,
+        near: _pickup,
+      );
       if (!ServiceAreaLocation.isInBounds(resolved)) {
         final api = ref.read(apiClientProvider);
-        final result = await api.geoAutocomplete(_dropoffController.text.trim());
+        final result = await api.geoAutocomplete(
+          _dropoffController.text.trim(),
+          city: ServiceAreas.cityNameForCoords(_pickup),
+        );
         if (result case Success(:final data) when data.isNotEmpty) {
           final s = data.first;
           resolved = LatLng(

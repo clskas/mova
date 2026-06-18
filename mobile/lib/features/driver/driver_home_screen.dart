@@ -43,6 +43,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
   String? _profileError;
   bool _showingOffer = false;
   List<Map<String, dynamic>> _rideOffers = [];
+  List<Map<String, dynamic>> _deliveryOffers = [];
   String? _offersError;
 
   @override
@@ -155,6 +156,8 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
       }).toList();
       if (active.isNotEmpty) {
         setState(() => _activeRide = active.first);
+      } else {
+        setState(() => _activeRide = null);
       }
     }
   }
@@ -248,21 +251,35 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
 
   Future<void> _refreshRideOffers() async {
     if (!_available || _activeRide != null || _activeDelivery != null) {
-      if (mounted) setState(() => _rideOffers = []);
+      if (mounted) setState(() {
+        _rideOffers = [];
+        _deliveryOffers = [];
+      });
       return;
     }
     final api = ref.read(apiClientProvider);
     final rideResult = await api.getDriverOffers();
+    final deliveryResult = await api.getDeliveryOffers();
     if (!mounted) return;
-    switch (rideResult) {
-      case Success(:final data):
-        setState(() {
-          _rideOffers = data;
-          _offersError = null;
-        });
-      case Failure(:final error):
+    final rides = switch (rideResult) {
+      Success(:final data) => data,
+      Failure(:final error) => null,
+    };
+    if (rides == null) {
+      if (rideResult case Failure(:final error)) {
         setState(() => _offersError = error.message);
+      }
+      return;
     }
+    final deliveries = switch (deliveryResult) {
+      Success(:final data) => data,
+      Failure() => <Map<String, dynamic>>[],
+    };
+    setState(() {
+      _rideOffers = rides;
+      _deliveryOffers = deliveries;
+      _offersError = deliveryResult is Failure ? deliveryResult.error.message : null;
+    });
   }
 
   Future<void> _pollOffers() async {
@@ -289,6 +306,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
     final deliveryResult = await api.getDeliveryOffers();
     if (!mounted || _showingOffer) return;
     if (deliveryResult case Success(:final data)) {
+      setState(() => _deliveryOffers = data);
       for (final offer in data) {
         final id = offer['id']?.toString() ?? '';
         if (id.isEmpty || _dismissedOffers.contains('delivery:$id')) continue;
@@ -509,7 +527,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                 const Text(
                   '• Courses taxi : proches de votre GPS, dans le rayon de recherche, véhicule compatible.\n'
                   '• Livraisons : colis/repas/express en attente, dans un rayon de 15 km.\n'
-                  '• Locations, déménagements et courses planifiées : gérés par l’admin (pas d’offre directe ici).\n'
+                  '• Réservations planifiées, déménagements et locations : assignés par l’admin (pas d’offre directe ici).\n'
                   '• Covoiturage : publiez votre trajet via le bouton ci-dessous.',
                   style: TextStyle(fontSize: 12, color: MovaColors.textSecondary, height: 1.4),
                 ),
@@ -650,15 +668,83 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                 ),
               ),
               const SizedBox(height: 12),
-            ] else
+            ] else if (_rideOffers.isEmpty && _deliveryOffers.isEmpty)
               const Padding(
                 padding: EdgeInsets.only(bottom: 12),
                 child: Text(
-                  'En attente de courses ou livraisons à proximité…',
+                  'En attente de courses ou livraisons à proximité…\n'
+                  'Vérifiez : En ligne, GPS activé, KYC approuvé.',
                   textAlign: TextAlign.center,
                   style: TextStyle(color: MovaColors.textSecondary),
                 ),
               ),
+            if (_deliveryOffers.isNotEmpty) ...[
+              MovaCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.delivery_dining, color: MovaColors.violet, size: 20),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Livraisons disponibles (${_deliveryOffers.length})',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    ..._deliveryOffers.take(5).map((offer) {
+                      final fare = (offer['estimatedPriceCdf'] ?? offer['priceCdf']) as num?;
+                      final type = offer['type']?.toString() ?? 'PARCEL';
+                      return ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(
+                          offer['pickupAddress']?.toString() ?? 'Livraison $type',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        subtitle: Text(
+                          '→ ${offer['dropoffAddress']?.toString() ?? offer['deliveryAddress']?.toString() ?? ''}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        trailing: fare != null
+                            ? Text(
+                                MarketConfig.formatCdf(fare.toInt()),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: MovaColors.violet,
+                                ),
+                              )
+                            : const Icon(Icons.chevron_right),
+                        onTap: () async {
+                          final id = offer['id']?.toString() ?? '';
+                          if (id.isEmpty) return;
+                          _showingOffer = true;
+                          final accepted = await Navigator.push<Map<String, dynamic>?>(
+                            context,
+                            MaterialPageRoute(builder: (_) => DeliveryOfferScreen(offer: offer)),
+                          );
+                          _dismissedOffers.add('delivery:$id');
+                          _showingOffer = false;
+                          if (accepted != null && mounted) {
+                            setState(() => _activeDelivery = accepted);
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => ActiveDeliveryScreen(delivery: accepted)),
+                            );
+                            await _loadActiveDelivery();
+                          }
+                          await _refreshRideOffers();
+                        },
+                      );
+                    }),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
           ],
           MovaButton(
             label: 'Publier un covoiturage',

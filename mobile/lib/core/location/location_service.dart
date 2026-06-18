@@ -33,6 +33,8 @@ class LocationService {
     return LocationResult(position: latLng, label: label);
   }
 
+  static Future<String> labelForCoords(LatLng pos) => _reverseGeocode(pos);
+
   static Future<String> _reverseGeocode(LatLng pos) async {
     try {
       final placemarks = await placemarkFromCoordinates(pos.latitude, pos.longitude);

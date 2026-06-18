@@ -8,6 +8,7 @@ import '../../core/location/destination_coords.dart';
 import '../../core/location/location_service.dart';
 import '../../core/widgets/destination_coord_panel.dart';
 import '../../core/location/service_area_location.dart';
+import '../../core/location/service_areas.dart';
 import '../../core/config/market_config.dart';
 import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
@@ -49,6 +50,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   void initState() {
     super.initState();
     _destinationController.addListener(_onDestinationChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _useMyLocation());
   }
 
   @override
@@ -113,7 +115,8 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
     }
     setState(() => _loadingSuggestions = true);
     final api = ref.read(apiClientProvider);
-    final result = await api.geoAutocomplete(query);
+    final nearCity = ServiceAreas.cityNameForCoords(_pickup);
+    final result = await api.geoAutocomplete(query, city: nearCity);
     if (!mounted) return;
     setState(() {
       _loadingSuggestions = false;
@@ -163,13 +166,15 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
     _fetchAllEstimates();
   }
 
-  void _onMapDropoffTap(LatLng raw) {
+  Future<void> _onMapDropoffTap(LatLng raw) async {
     final coords = ServiceAreaLocation.ensureInServiceArea(raw);
     if (!ServiceAreaLocation.isInBounds(coords)) {
-      setState(() => _validationError = ServiceAreaLocation.outOfAreaMessage());
+      if (mounted) setState(() => _validationError = ServiceAreaLocation.outOfAreaMessage());
       return;
     }
-    _setDropoffFromCoords(coords, 'Point sélectionné sur la carte');
+    final label = await ServiceAreaLocation.labelForCoords(coords);
+    if (!mounted) return;
+    _setDropoffFromCoords(coords, label);
   }
 
   Future<String?> _resolveCoords() async {
@@ -191,14 +196,20 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
     }
 
     if (_dropoff == null || !ServiceAreaLocation.isInBounds(_dropoff!)) {
-      var resolved = ServiceAreaLocation.coordsFromAddress(_destinationController.text);
+      var resolved = ServiceAreaLocation.coordsFromAddress(
+        _destinationController.text,
+        near: _pickup,
+      );
       if (!ServiceAreaLocation.destinationInServiceArea(
         _destinationController.text,
         coords: resolved,
         fromSuggestion: _dropoffFromSuggestion,
       )) {
         final api = ref.read(apiClientProvider);
-        final result = await api.geoAutocomplete(_destinationController.text.trim());
+        final result = await api.geoAutocomplete(
+          _destinationController.text.trim(),
+          city: ServiceAreas.cityNameForCoords(_pickup),
+        );
         if (result case Success(:final data) when data.isNotEmpty) {
           final s = data.first;
           resolved = LatLng(

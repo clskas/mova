@@ -165,6 +165,10 @@ class ServiceAreas {
     return null;
   }
 
+  /// Ville MOVA la plus proche des coordonnées (pour libellés et autocomplétion).
+  static String cityNameForCoords(LatLng coords) =>
+      (byCoords(coords) ?? nearest(coords)).name;
+
   static ServiceArea nearest(LatLng coords) {
     ServiceArea? best;
     var bestDist = double.infinity;

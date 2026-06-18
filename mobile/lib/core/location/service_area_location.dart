@@ -1,6 +1,7 @@
 import 'package:latlong2/latlong.dart';
 
 import '../config/market_config.dart';
+import 'location_service.dart';
 import 'service_areas.dart';
 
 /// Validation GPS et géocodage stub par zone de service MOVA.
@@ -54,10 +55,13 @@ class ServiceAreaLocation {
     return null;
   }
 
-  static LatLng coordsFromAddress(String address, {String? areaId}) {
+  static LatLng coordsFromAddress(String address, {String? areaId, LatLng? near}) {
     final fromDistrict = districtFromAddress(address, areaId: areaId);
     if (fromDistrict != null) return fromDistrict;
-    final area = areaId != null ? areaFor(areaId) : ServiceAreas.fallbackArea;
+    final area = areaId != null
+        ? areaFor(areaId)
+        : (ServiceAreas.byName(address) ??
+            (near != null ? ServiceAreas.nearest(near) : ServiceAreas.fallbackArea));
     var hash = 0;
     for (final code in address.runes) {
       hash = (hash + code) % 1000;
@@ -104,7 +108,15 @@ class ServiceAreaLocation {
         return coordsFromAddress(address, areaId: resolvedAreaId);
       }
     }
-    return centerFor(areaId);
+    return ServiceAreas.nearest(coords).center;
+  }
+
+  /// Libellé adresse pour un point carte / GPS (ville MOVA + reverse geocoding si possible).
+  static Future<String> labelForCoords(LatLng coords) async {
+    final city = ServiceAreas.cityNameForCoords(coords);
+    final geo = await LocationService.labelForCoords(coords);
+    if (geo.toLowerCase().contains(city.toLowerCase())) return geo;
+    return '$city — $geo';
   }
 
   static String outOfAreaMessage() =>

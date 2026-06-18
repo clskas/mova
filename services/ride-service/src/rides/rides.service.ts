@@ -438,7 +438,8 @@ export class RidesService {
       orderBy: { createdAt: 'desc' },
       take: 50,
     });
-    return rides.map(toRideSummary);
+    const data = rides.map(toRideSummary);
+    return { data, rides: data };
   }
 
   private computeTrackingEta(

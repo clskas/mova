@@ -150,7 +150,8 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
     final result = await api.get('/rides/history?role=driver');
     if (!mounted) return;
     if (result case Success(:final data)) {
-      final rides = (data['data'] as List? ?? []).cast<Map<String, dynamic>>();
+      final rides = (data['data'] as List? ?? data['rides'] as List? ?? [])
+          .cast<Map<String, dynamic>>();
       final active = rides.where((r) {
         final s = r['status']?.toString() ?? '';
         return s == 'DRIVER_ASSIGNED' || s == 'ARRIVING' || s == 'IN_PROGRESS';

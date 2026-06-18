@@ -78,10 +78,11 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
   }
 
   @SubscribeMessage('ride:chat')
-  handleRideChat(@MessageBody() data: { rideId: string; senderId?: string; senderRole?: string; text: string; ts?: number }) {
+  handleRideChat(@ConnectedSocket() client: Socket, @MessageBody() data: { rideId: string; senderId?: string; senderRole?: string; text: string; ts?: number }) {
     if (!data?.rideId || !data.text?.trim()) {
       return { ok: false };
     }
+    client.join(`ride:${data.rideId}`);
     const payload = {
       rideId: data.rideId,
       senderId: data.senderId ?? 'unknown',

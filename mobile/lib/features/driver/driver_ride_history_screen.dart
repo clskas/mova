@@ -35,7 +35,8 @@ class _DriverRideHistoryScreenState extends ConsumerState<DriverRideHistoryScree
     if (!mounted) return;
     switch (result) {
       case Success(:final data):
-        final all = (data['data'] as List? ?? []).cast<Map<String, dynamic>>();
+        final all = (data['data'] as List? ?? data['rides'] as List? ?? [])
+            .cast<Map<String, dynamic>>();
         setState(() {
           _rides = all.where((r) {
             final s = r['status']?.toString() ?? '';

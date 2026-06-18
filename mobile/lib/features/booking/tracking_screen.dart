@@ -17,14 +17,40 @@ import '../chat/ride_chat_screen.dart';
 import 'payment_screen.dart';
 import 'widgets/mova_ride_map.dart';
 
-const _fallbackTimeline = [
-  {'label': 'Recherche', 'done': false},
-  {'label': 'Chauffeur assigné', 'done': false},
-  {'label': 'En route', 'done': false},
-  {'label': 'Arrivé', 'done': false},
-  {'label': 'En course', 'done': false},
-  {'label': 'Terminé', 'done': false},
-];
+List<Map<String, dynamic>> computeRideTimeline(String mobileStatus) {
+  const steps = [
+    'Recherche',
+    'Chauffeur assigné',
+    'En route',
+    'Arrivé',
+    'En course',
+    'Terminé',
+  ];
+  if (mobileStatus == 'CANCELLED') {
+    return [{'label': 'Course annulée', 'done': true}];
+  }
+  final normalized = switch (mobileStatus) {
+    'ACCEPTED' => 'DRIVER_ASSIGNED',
+    'SEARCHING' => 'MATCHING',
+    'DRIVER_ARRIVED' => 'ARRIVING',
+    _ => mobileStatus,
+  };
+  const order = ['REQUESTED', 'MATCHING', 'DRIVER_ASSIGNED', 'ARRIVING', 'IN_PROGRESS', 'COMPLETED'];
+  var currentIdx = order.indexOf(normalized);
+  if (currentIdx < 0) currentIdx = normalized == 'MATCHING' ? 1 : 0;
+  const enRouteIdx = 2;
+  return List.generate(steps.length, (idx) {
+    final done = switch (idx) {
+      0 => currentIdx >= 1,
+      1 => currentIdx >= enRouteIdx,
+      2 => currentIdx > enRouteIdx || (currentIdx == enRouteIdx && normalized == 'DRIVER_ASSIGNED'),
+      3 => currentIdx >= 3,
+      4 => currentIdx >= 4,
+      _ => currentIdx >= 5,
+    };
+    return {'label': steps[idx], 'done': done};
+  });
+}
 
 class TrackingScreen extends ConsumerStatefulWidget {
   const TrackingScreen({
@@ -74,11 +100,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
     super.dispose();
   }
 
-  List<Map<String, dynamic>> get _timelineSteps {
-    final raw = _ride?['timeline'] as List? ?? _ride?['tracking'] as List?;
-    if (raw != null && raw.isNotEmpty) return raw.cast<Map<String, dynamic>>();
-    return _fallbackTimeline;
-  }
+  List<Map<String, dynamic>> get _timelineSteps => computeRideTimeline(_status);
 
   bool get _canCancel {
     const cancellable = {'REQUESTED', 'SEARCHING', 'ACCEPTED', 'DRIVER_ARRIVED'};
@@ -288,7 +310,12 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
       onStatus: (payload) {
         final status = payload['status']?.toString();
         if (status != null && mounted) {
-          setState(() => _status = status);
+          setState(() {
+            _status = status;
+            if (_ride != null) {
+              _ride = {..._ride!, 'status': status};
+            }
+          });
           if (status == 'COMPLETED') _goToPayment();
           if (status == 'CANCELLED') Navigator.pop(context);
         }

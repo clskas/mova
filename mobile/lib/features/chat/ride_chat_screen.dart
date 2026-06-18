@@ -82,7 +82,6 @@ class _RideChatScreenState extends ConsumerState<RideChatScreen> {
     socket.connect(
       rideId: widget.rideId,
       token: token,
-      forceReconnect: true,
       onChat: _onIncomingChat,
       onConnected: () {
         if (mounted) setState(() => _error = null);
@@ -134,7 +133,16 @@ class _RideChatScreenState extends ConsumerState<RideChatScreen> {
       'text': text,
       'ts': ts.millisecondsSinceEpoch,
     };
-    _socket?.emitChat(payload);
+    if (_socket == null || !_socket!.isConnected) {
+      if (mounted) {
+        setState(() {
+          _sending = false;
+          _error = 'Connexion chat indisponible. Réessayez.';
+        });
+      }
+      return;
+    }
+    _socket!.emitChat(payload);
     setState(() {
       _messages.add(RideChatMessage(
         text: text,

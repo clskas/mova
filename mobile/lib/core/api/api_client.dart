@@ -184,7 +184,7 @@ class ApiClient {
     if (path.contains('/rides/history') || path == '/rides') {
       final list = data['rides'] as List? ?? data['data'] as List? ?? [];
       await RideHistoryCache.save(list);
-      await UnifiedHistoryCache.save({'data': list});
+      await UnifiedHistoryCache.save({'data': list, 'rides': list});
     }
   }
 

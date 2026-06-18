@@ -37,18 +37,18 @@ class RideSocket {
     bool forceReconnect = false,
   }) {
     _rideId = rideId;
-    _token = token;
-    _onLocation = onLocation;
-    _onStatus = onStatus;
-    _onChat = onChat;
-    _onConnected = onConnected;
-    _onDisconnected = onDisconnected;
+    if (token != null && token.isNotEmpty) _token = token;
+    if (onLocation != null) _onLocation = onLocation;
+    if (onStatus != null) _onStatus = onStatus;
+    if (onChat != null) _onChat = onChat;
+    if (onConnected != null) _onConnected = onConnected;
+    if (onDisconnected != null) _onDisconnected = onDisconnected;
 
     if (!forceReconnect && _socket?.connected == true && _rideId == rideId) {
       _socket?.emit('ride:subscribe', {'rideId': rideId});
       isConnected = true;
       connectionFailed = false;
-      onConnected?.call();
+      _onConnected?.call();
       return;
     }
 

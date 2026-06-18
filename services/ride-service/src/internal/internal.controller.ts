@@ -53,6 +53,16 @@ export class InternalController {
     return this.rides.getDriverEarnings(userId);
   }
 
+  @Get('rides/driver/:userId/payout-items')
+  driverPayoutItems(@Param('userId') userId: string) {
+    return this.rides.getDriverPayoutItems(userId);
+  }
+
+  @Get('rides/:id/payout')
+  ridePayout(@Param('id') id: string) {
+    return this.rides.getRidePayout(id);
+  }
+
   @Get('rides')
   listRides(
     @Query('status') status?: string,

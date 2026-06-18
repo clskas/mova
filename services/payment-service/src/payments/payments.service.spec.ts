@@ -21,6 +21,10 @@ describe('PaymentsService', () => {
   const wallet = {
     debit: jest.fn().mockResolvedValue({ balanceCdf: 0 }),
   };
+  const driverPayouts = {
+    fetchRidePayout: jest.fn().mockResolvedValue(null),
+    creditRidePayoutFromPayment: jest.fn().mockResolvedValue({ credited: false }),
+  };
   const redis = { publish: jest.fn().mockResolvedValue(undefined) };
   const config = { get: jest.fn((key: string) => (key === 'MOCK_PAYMENTS' ? 'true' : undefined)) } as unknown as ConfigService;
 
@@ -28,6 +32,7 @@ describe('PaymentsService', () => {
     prisma as unknown as PrismaService,
     config,
     wallet as unknown as WalletService,
+    driverPayouts as never,
     redis as unknown as RedisService,
     new MockPaymentProvider(config),
     new OrangeMoneyProvider(config),

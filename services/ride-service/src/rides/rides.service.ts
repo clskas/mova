@@ -587,6 +587,70 @@ export class RidesService {
     };
   }
 
+  private deliveryDriverGross(d: {
+    type: DeliveryType;
+    finalPriceCdf: number | null;
+    estimatedPriceCdf: number | null;
+    items: unknown;
+  }) {
+    const gross = d.finalPriceCdf ?? d.estimatedPriceCdf ?? 0;
+    if (d.type !== DeliveryType.FOOD) return gross;
+    const items = d.items;
+    if (!Array.isArray(items)) return Math.max(3000, gross);
+    let itemsTotal = 0;
+    for (const entry of items) {
+      if (entry && typeof entry === 'object' && 'restaurantId' in entry && Array.isArray((entry as { items?: unknown }).items)) {
+        for (const sub of (entry as { items: { unitPriceCdf?: number; priceCdf?: number; quantity?: number }[] }).items) {
+          const qty = sub.quantity ?? 1;
+          itemsTotal += (sub.unitPriceCdf ?? sub.priceCdf ?? 0) * qty;
+        }
+      } else {
+        const row = entry as { unitPriceCdf?: number; priceCdf?: number; quantity?: number };
+        const qty = row.quantity ?? 1;
+        itemsTotal += (row.unitPriceCdf ?? row.priceCdf ?? 0) * qty;
+      }
+    }
+    return Math.max(3000, gross - itemsTotal);
+  }
+
+  async getRidePayout(rideId: string) {
+    const ride = await this.prisma.ride.findUnique({ where: { id: rideId } });
+    if (!ride || ride.status !== RideStatus.COMPLETED || !ride.driverId) {
+      return { rideId, driverId: ride?.driverId ?? null, driverNetCdf: 0, grossCdf: 0 };
+    }
+    const rule = await this.commission.get(CommissionServiceType.RIDE);
+    const gross = ride.finalFareCdf ?? ride.estimatedFareCdf ?? 0;
+    const { driverNetCdf } = this.commission.splitGross(gross, rule.platformPercent);
+    return { rideId, driverId: ride.driverId, driverNetCdf, grossCdf: gross };
+  }
+
+  async getDriverPayoutItems(driverUserId: string) {
+    const [rides, deliveries, rideRule, deliveryRule] = await Promise.all([
+      this.prisma.ride.findMany({ where: { driverId: driverUserId, status: RideStatus.COMPLETED } }),
+      this.prisma.delivery.findMany({ where: { driverId: driverUserId, status: DeliveryStatus.DELIVERED } }),
+      this.commission.get(CommissionServiceType.RIDE),
+      this.commission.get(CommissionServiceType.DELIVERY),
+    ]);
+    const rideNet = (gross: number) => this.commission.splitGross(gross, rideRule.platformPercent).driverNetCdf;
+    const deliveryNet = (gross: number) => this.commission.splitGross(gross, deliveryRule.platformPercent).driverNetCdf;
+
+    const items = [
+      ...rides.map((r) => ({
+        referenceType: 'RIDE',
+        referenceId: r.id,
+        driverNetCdf: rideNet(r.finalFareCdf ?? r.estimatedFareCdf ?? 0),
+        completedAt: r.completedAt?.toISOString() ?? null,
+      })),
+      ...deliveries.map((d) => ({
+        referenceType: 'DELIVERY',
+        referenceId: d.id,
+        driverNetCdf: deliveryNet(this.deliveryDriverGross(d)),
+        completedAt: d.deliveredAt?.toISOString() ?? null,
+      })),
+    ];
+    return { items };
+  }
+
   async getDriverEarnings(driverUserId: string) {
     const [rides, deliveries, rideRule, deliveryRule] = await Promise.all([
       this.prisma.ride.findMany({ where: { driverId: driverUserId, status: RideStatus.COMPLETED } }),
@@ -602,27 +666,6 @@ export class RidesService {
     const rideNet = (gross: number) => this.commission.splitGross(gross, rideRule.platformPercent).driverNetCdf;
     const deliveryNet = (gross: number) => this.commission.splitGross(gross, deliveryRule.platformPercent).driverNetCdf;
 
-    const deliveryDriverGross = (d: (typeof deliveries)[number]) => {
-      const gross = d.finalPriceCdf ?? d.estimatedPriceCdf ?? 0;
-      if (d.type !== DeliveryType.FOOD) return gross;
-      const items = d.items;
-      if (!Array.isArray(items)) return Math.max(3000, gross);
-      let itemsTotal = 0;
-      for (const entry of items) {
-        if (entry && typeof entry === 'object' && 'restaurantId' in entry && Array.isArray((entry as { items?: unknown }).items)) {
-          for (const sub of (entry as { items: { unitPriceCdf?: number; priceCdf?: number; quantity?: number }[] }).items) {
-            const qty = sub.quantity ?? 1;
-            itemsTotal += (sub.unitPriceCdf ?? sub.priceCdf ?? 0) * qty;
-          }
-        } else {
-          const row = entry as { unitPriceCdf?: number; priceCdf?: number; quantity?: number };
-          const qty = row.quantity ?? 1;
-          itemsTotal += (row.unitPriceCdf ?? row.priceCdf ?? 0) * qty;
-        }
-      }
-      return Math.max(3000, gross - itemsTotal);
-    };
-
     const sumRides = (from: Date) =>
       rides
         .filter((r) => r.completedAt && r.completedAt >= from)
@@ -630,7 +673,7 @@ export class RidesService {
     const sumDeliveries = (from: Date) =>
       deliveries
         .filter((d) => d.deliveredAt && d.deliveredAt >= from)
-        .reduce((a, d) => a + deliveryNet(deliveryDriverGross(d)), 0);
+        .reduce((a, d) => a + deliveryNet(this.deliveryDriverGross(d)), 0);
     const sumAll = (from: Date) => sumRides(from) + sumDeliveries(from);
 
     return {

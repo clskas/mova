@@ -134,6 +134,11 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
       setState(() => _error = 'Montant minimum : 1 000 FC');
       return;
     }
+    final available = (_data?['withdrawableCdf'] ?? _data?['walletBalanceCdf']) as int? ?? 0;
+    if (amount > available) {
+      setState(() => _error = 'Solde disponible : $available FC. Ouvrez Revenus pour synchroniser.');
+      return;
+    }
     final api = ref.read(apiClientProvider);
     final phone = await api.loadUserPhone() ?? '+243812345678';
     final result = await api.post('/wallet/withdraw', {
@@ -147,6 +152,7 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Retrait en cours…')),
         );
+        await _load();
       case Failure(:final error):
         setState(() => _error = error.message);
     }
@@ -165,6 +171,8 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
                 _earningsRow('Cette semaine', _data!['weekCdf']),
                 _earningsRow('Ce mois', _data!['monthCdf']),
                 _earningsRow('Total', _data!['totalCdf']),
+                if (_data!['withdrawableCdf'] != null)
+                  _earningsRow('Solde disponible (retrait)', _data!['withdrawableCdf']),
                 if (_data!['rideEarningsCdf'] != null)
                   _earningsRow('Courses (net)', _data!['rideEarningsCdf']),
                 if (_data!['deliveryEarningsCdf'] != null)

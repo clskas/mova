@@ -15,6 +15,7 @@ import {
 import { RedisService } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { WalletService } from '../wallet/wallet.service';
+import { DriverPayoutService } from '../payouts/driver-payout.service';
 import { AirtelMoneyProvider, MockPaymentProvider, MpesaProvider, OrangeMoneyProvider } from './payment-providers';
 import { PaymentProvider } from './payment-provider.interface';
 
@@ -33,6 +34,7 @@ export class PaymentsService {
     private prisma: PrismaService,
     private config: ConfigService,
     private walletService: WalletService,
+    private driverPayouts: DriverPayoutService,
     private redis: RedisService,
     mock: MockPaymentProvider,
     orange: OrangeMoneyProvider,
@@ -98,6 +100,12 @@ export class PaymentsService {
     }
   }
 
+  private async creditDriverAfterRidePayment(rideId: string) {
+    const payout = await this.driverPayouts.fetchRidePayout(rideId);
+    if (!payout?.driverId || payout.driverNetCdf <= 0) return;
+    await this.driverPayouts.creditRidePayoutFromPayment(rideId, payout.driverId, payout.driverNetCdf);
+  }
+
   async processPayment(rideId: string, userId: string, amountCdf: number, method: PaymentMethod, phone: string) {
     const provider = this.getProvider(method);
     const result = await provider.initiatePayment(amountCdf, phone, rideId);
@@ -108,6 +116,7 @@ export class PaymentsService {
     });
     if (!result.success) throw new MovaHttpException(MovaErrorCode.PAYMENT_FAILED);
     await this.publishPaymentCompleted({ rideId, userId, amountCdf, method } as PaymentCompletedPayload);
+    await this.creditDriverAfterRidePayment(rideId);
     return { success: true, payment, message: result.message ?? 'Paiement effectué' };
   }
 
@@ -129,6 +138,7 @@ export class PaymentsService {
         update: { status: PaymentStatus.COMPLETED, method, amountCdf },
       });
       await this.publishPaymentCompleted({ rideId, userId, amountCdf, method: method.toString() });
+      await this.creditDriverAfterRidePayment(rideId);
       return { success: true, payment, message: 'Paiement portefeuille effectué' };
     }
     if (method === PaymentMethod.CASH) {
@@ -138,6 +148,7 @@ export class PaymentsService {
         update: { status: PaymentStatus.COMPLETED, method, amountCdf },
       });
       await this.publishPaymentCompleted({ rideId, userId, amountCdf, method: 'CASH' });
+      await this.creditDriverAfterRidePayment(rideId);
       return { success: true, payment, message: 'Paiement espèces enregistré' };
     }
     return this.processPayment(rideId, userId, amountCdf, method, paymentPhone);

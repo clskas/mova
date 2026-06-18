@@ -127,9 +127,31 @@ export class DriversService {
   }
 
   async getEarnings(userId: string) {
-    const res = await fetch(serviceUrl('ride', `/internal/rides/driver/${userId}/earnings`), { headers: { 'x-internal-api-key': INTERNAL_API_KEY } });
-    if (!res.ok) return { totalCdf: 0, todayCdf: 0, weekCdf: 0, monthCdf: 0, rideCount: 0 };
-    return res.json();
+    await fetch(serviceUrl('payment', `/internal/driver-payouts/sync/${userId}`), {
+      method: 'POST',
+      headers: { 'x-internal-api-key': INTERNAL_API_KEY },
+    }).catch(() => undefined);
+
+    const [earningsRes, walletRes] = await Promise.all([
+      fetch(serviceUrl('ride', `/internal/rides/driver/${userId}/earnings`), {
+        headers: { 'x-internal-api-key': INTERNAL_API_KEY },
+      }),
+      fetch(serviceUrl('payment', `/internal/wallets/${userId}`), {
+        headers: { 'x-internal-api-key': INTERNAL_API_KEY },
+      }),
+    ]);
+
+    const earnings = earningsRes.ok
+      ? await earningsRes.json()
+      : { totalCdf: 0, todayCdf: 0, weekCdf: 0, monthCdf: 0, rideCount: 0 };
+    const wallet = walletRes.ok ? await walletRes.json() : { balanceCdf: 0 };
+
+    return {
+      ...earnings,
+      walletBalanceCdf: wallet.balanceCdf ?? 0,
+      withdrawableCdf: wallet.balanceCdf ?? 0,
+      currency: 'CDF',
+    };
   }
 
   async pendingKyc() {

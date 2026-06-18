@@ -6,6 +6,7 @@ import { Type } from 'class-transformer';
 import { InternalApiGuard } from '../common/internal-api.guard';
 import { WalletService } from '../wallet/wallet.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
+import { DriverPayoutService } from '../payouts/driver-payout.service';
 
 class CreateWalletDto {
   @IsString() userId: string;
@@ -43,6 +44,7 @@ export class InternalController {
   constructor(
     private wallet: WalletService,
     private subscriptions: SubscriptionsService,
+    private driverPayouts: DriverPayoutService,
   ) {}
 
   @Post('wallets')
@@ -72,6 +74,11 @@ export class InternalController {
   @Post('wallets/:userId/adjust')
   adjust(@Param('userId') userId: string, @Body() dto: AdminAdjustDto) {
     return this.wallet.adminAdjust(userId, dto.amountCdf, dto.type, dto.description);
+  }
+
+  @Post('driver-payouts/sync/:userId')
+  syncDriverPayouts(@Param('userId') userId: string) {
+    return this.driverPayouts.syncDriverPayouts(userId);
   }
 
   @Get('subscription-plans')

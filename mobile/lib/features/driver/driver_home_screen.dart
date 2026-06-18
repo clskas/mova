@@ -570,6 +570,11 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
+                  if (_earnings!['withdrawableCdf'] != null)
+                    Text(
+                      'Solde retrait : ${MarketConfig.formatCdf(_earnings!['withdrawableCdf'] as int? ?? 0)}',
+                      style: const TextStyle(color: MovaColors.green, fontWeight: FontWeight.w600, fontSize: 13),
+                    ),
                   if (_earnings!['rideCount'] != null || _earnings!['deliveryCount'] != null)
                     Text(
                       '${_earnings!['rideCount'] ?? 0} courses · ${_earnings!['deliveryCount'] ?? 0} livraisons',

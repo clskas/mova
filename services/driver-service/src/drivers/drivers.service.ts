@@ -309,11 +309,13 @@ export class DriversService {
   async getProfileWithUser(userId: string) {
     const profile = await this.getOrCreateProfile(userId);
     const user = await this.fetchAuthUser(userId);
+    const pinVerified = !!profile?.activationPinVerifiedAt;
     return {
       ...profile,
       publicId: formatMovaPublicId(userId, 'DRIVER'),
       user,
-      needsActivationPin: profile?.kycStatus === KycStatus.APPROVED && !profile?.activationPinVerifiedAt,
+      activationPinVerified: pinVerified,
+      needsActivationPin: profile?.kycStatus === KycStatus.APPROVED && !pinVerified,
     };
   }
 
@@ -429,6 +431,42 @@ export class DriversService {
     return this.prisma.driverProfile.count();
   }
 
+  async regenerateActivationPin(userId: string) {
+    const profile = await this.prisma.driverProfile.findUnique({ where: { userId } });
+    if (!profile) throw new MovaHttpException(MovaErrorCode.DRIVER_KYC_PENDING);
+    if (profile.kycStatus !== KycStatus.APPROVED) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        undefined,
+        'Le KYC doit être approuvé avant de générer un PIN.',
+      );
+    }
+    const pin = this.generateActivationPin();
+    await this.prisma.driverProfile.update({
+      where: { userId },
+      data: { activationPin: pin, activationPinVerifiedAt: null },
+    });
+    return { activationPin: pin, userId, publicId: formatMovaPublicId(userId, 'DRIVER') };
+  }
+
+  private kycUploadSummary(userId: string, docs: { userId: string; type: string }[]) {
+    const userDocs = docs.filter((d) => d.userId === userId);
+    const types = new Set<string>();
+    for (const doc of userDocs) {
+      try {
+        types.add(normalizeKycDocumentType(doc.type));
+      } catch {
+        /* legacy */
+      }
+    }
+    const uploadedRequired = REQUIRED_DRIVER_KYC_TYPES.filter((t) => types.has(t)).length;
+    return {
+      kycDocumentsUploaded: uploadedRequired,
+      kycDocumentsRequired: REQUIRED_DRIVER_KYC_TYPES.length,
+      kycDocumentsComplete: REQUIRED_DRIVER_KYC_TYPES.every((t) => types.has(t)),
+    };
+  }
+
   async listDriversAdmin(
     skip = 0,
     take = 50,
@@ -438,7 +476,7 @@ export class DriversService {
       ...(filters?.kycStatus ? { kycStatus: filters.kycStatus } : {}),
       ...(filters?.isAvailable !== undefined ? { isAvailable: filters.isAvailable } : {}),
     };
-    const [data, total] = await Promise.all([
+    const [rows, total] = await Promise.all([
       this.prisma.driverProfile.findMany({
         where,
         skip,
@@ -448,7 +486,86 @@ export class DriversService {
       }),
       this.prisma.driverProfile.count({ where }),
     ]);
+    const userIds = rows.map((p) => p.userId);
+    const allDocs =
+      userIds.length > 0
+        ? await this.prisma.kycDocument.findMany({
+            where: { userId: { in: userIds } },
+            select: { userId: true, type: true },
+          })
+        : [];
+    const data = rows.map((p) => {
+      const kycSummary = this.kycUploadSummary(p.userId, allDocs);
+      return {
+        ...p,
+        publicId: formatMovaPublicId(p.userId, 'DRIVER'),
+        activationPinVerified: !!p.activationPinVerifiedAt,
+        ...kycSummary,
+        readyForReview: p.onboardingCompleted && p.kycStatus === KycStatus.PENDING,
+      };
+    });
     return { data, total, skip, take };
+  }
+
+  async getDriverAdminDetail(userId: string) {
+    const [profile, kyc, user] = await Promise.all([
+      this.getOrCreateProfile(userId),
+      this.getKycStatus(userId),
+      this.fetchAuthUser(userId),
+    ]);
+    const vehicle = profile?.vehicles.find((v) => v.isActive) ?? profile?.vehicles[0];
+    return {
+      id: profile?.id,
+      userId,
+      publicId: formatMovaPublicId(userId, 'DRIVER'),
+      user: user
+        ? {
+            firstName: user.firstName,
+            lastName: user.lastName,
+            email: user.email,
+            phone: user.phone,
+            phoneMasked: maskPhoneRdc(user.phone),
+          }
+        : null,
+      licenseNumber: profile?.licenseNumber,
+      idDocumentNumber: profile?.idDocumentNumber,
+      licenseExpiry: profile?.licenseExpiry,
+      insuranceExpiry: profile?.insuranceExpiry,
+      technicalInspectionExpiry: profile?.technicalInspectionExpiry,
+      payoutProvider: profile?.payoutProvider,
+      payoutPhone: profile?.payoutPhone,
+      charterAcceptedAt: profile?.charterAcceptedAt,
+      trainingCompletedAt: profile?.trainingCompletedAt,
+      onboardingCompleted: profile?.onboardingCompleted ?? false,
+      kycStatus: profile?.kycStatus,
+      isAvailable: profile?.isAvailable,
+      ratingAvg: profile?.ratingAvg,
+      totalRides: profile?.totalRides,
+      activationPinVerified: !!profile?.activationPinVerifiedAt,
+      activationPinVerifiedAt: profile?.activationPinVerifiedAt,
+      activationPin:
+        profile?.kycStatus === KycStatus.APPROVED && profile?.activationPin ? profile.activationPin : undefined,
+      activationPinPending: profile?.kycStatus === KycStatus.APPROVED && !profile?.activationPinVerifiedAt,
+      canGenerateActivationPin:
+        profile?.kycStatus === KycStatus.APPROVED && !profile?.activationPinVerifiedAt,
+      readyForReview: profile?.onboardingCompleted && profile?.kycStatus === KycStatus.PENDING,
+      kycDocumentsUploaded: kyc.checklist.filter((c) => c.required && c.uploaded).length,
+      kycDocumentsRequired: kyc.checklist.filter((c) => c.required).length,
+      kycDocumentsComplete: kyc.requiredComplete,
+      vehicles: profile?.vehicles ?? [],
+      vehicle: vehicle
+        ? {
+            id: vehicle.id,
+            type: vehicle.type,
+            make: vehicle.make,
+            model: vehicle.model,
+            plateNumber: vehicle.plateNumber,
+            color: vehicle.color,
+          }
+        : null,
+      kyc,
+      createdAt: profile?.createdAt,
+    };
   }
 
   async updateDriverAdmin(userId: string, data: { isAvailable?: boolean; active?: boolean }) {

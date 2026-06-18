@@ -42,7 +42,12 @@ export default function KycPage() {
       ]);
       setItems(Array.isArray(data) ? data : []);
       setPendingDrivers(
-        drivers.filter((d) => d.kycStatus === "PENDING" || d.kycStatus === "REJECTED"),
+        drivers.filter(
+          (d) =>
+            d.kycStatus === "PENDING" ||
+            d.kycStatus === "REJECTED" ||
+            (d.readyForReview && d.kycStatus === "PENDING"),
+        ),
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur de chargement");
@@ -80,10 +85,13 @@ export default function KycPage() {
 
   async function review(id: string, approved: boolean) {
     try {
-      await apiFetch(`/api/admin/kyc/${id}/review`, {
+      const result = await apiFetch<{ activationPin?: string }>(`/api/admin/kyc/${id}/review`, {
         method: "POST",
         body: JSON.stringify({ approved }),
       });
+      if (approved && result.activationPin) {
+        window.alert(`KYC approuvé.\n\nCode PIN d'activation chauffeur : ${result.activationPin}\n\nCommuniquez ce code au chauffeur pour qu'il puisse passer en ligne.`);
+      }
       load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Échec de la validation");
@@ -92,7 +100,10 @@ export default function KycPage() {
 
   async function reviewDriver(userId: string, approved: boolean) {
     try {
-      await reviewDriverKyc(userId, approved);
+      const result = await reviewDriverKyc(userId, approved);
+      if (approved && result.activationPin) {
+        window.alert(`KYC approuvé.\n\nCode PIN d'activation : ${result.activationPin}`);
+      }
       load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Échec de la validation");
@@ -116,7 +127,7 @@ export default function KycPage() {
                 <Card key={k.id} className="p-4 flex flex-wrap justify-between items-center gap-4">
                   <div>
                     <p className="font-medium">{k.type}</p>
-                    <p className="text-sm text-gray-500">Utilisateur {k.userId}</p>
+                    <p className="text-sm text-gray-500">Utilisateur {k.userId?.slice(0, 8)}…</p>
                     <StatusBadge status={k.status} />
                     {k.url && (
                       <button type="button" onClick={() => setPreview(k)} className="block mt-2 text-sm text-[#6C63FF] hover:underline">
@@ -149,8 +160,14 @@ export default function KycPage() {
               {pendingDrivers.map((d) => (
                 <Card key={d.id} className="p-4 flex flex-wrap justify-between items-center gap-4">
                   <div>
-                    <p className="font-medium font-mono text-sm">{d.userId}</p>
+                    <p className="font-medium font-mono text-sm">{d.publicId ?? `${d.userId.slice(0, 8)}…`}</p>
                     <StatusBadge status={d.kycStatus} />
+                    {!d.onboardingCompleted && (
+                      <p className="text-xs text-amber-600 mt-1">Enregistrement en cours</p>
+                    )}
+                    {d.onboardingCompleted && d.kycStatus === "PENDING" && (
+                      <p className="text-xs text-green-700 mt-1 font-medium">Dossier complet — prêt à valider</p>
+                    )}
                   </div>
                   {canWrite("kyc") && (
                     <div className="flex gap-2">

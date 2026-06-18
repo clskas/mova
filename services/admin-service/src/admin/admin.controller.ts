@@ -114,6 +114,13 @@ export class AdminController {
     return this.adminService.reviewDriverKyc(userId, dto.approved, dto.notes);
   }
 
+  @Post('drivers/:userId/activation-pin')
+  @RequirePermissions(AdminPermission.KYC_WRITE)
+  @ApiOperation({ summary: 'Générer ou régénérer le PIN d\'activation chauffeur' })
+  regenerateDriverPin(@Param('userId') userId: string) {
+    return this.adminService.regenerateDriverActivationPin(userId);
+  }
+
   @Get('rides')
   @RequirePermissions(AdminPermission.RIDES_READ)
   @ApiOperation({ summary: 'Liste courses taxi' })

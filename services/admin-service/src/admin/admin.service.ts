@@ -109,7 +109,7 @@ export class AdminService {
     return this.fetchJson('driver', `/internal/drivers?${params}`);
   }
   getDriver(userId: string) {
-    return this.fetchJson('driver', `/internal/drivers/${userId}`);
+    return this.fetchJson('driver', `/internal/drivers/${userId}/detail`);
   }
   setDriverStatus(userId: string, active: boolean, suspendUser = false) {
     return Promise.all([
@@ -127,6 +127,9 @@ export class AdminService {
   }
   reviewDriverKyc(userId: string, approved: boolean, notes?: string) {
     return this.proxy('driver', `/internal/drivers/${userId}/kyc`, { method: 'PATCH', body: JSON.stringify({ approved, notes }) });
+  }
+  regenerateDriverActivationPin(userId: string) {
+    return this.proxy('driver', `/internal/drivers/${userId}/activation-pin`, { method: 'POST', body: JSON.stringify({}) });
   }
   listIncidents() {
     return this.fetchJson('driver', '/internal/incidents');

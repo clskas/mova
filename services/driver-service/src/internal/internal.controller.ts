@@ -52,8 +52,14 @@ export class InternalController {
   reviewDriverKyc(@Param('userId') userId: string, @Body() dto: ReviewKycDto) {
     return this.drivers.setDriverKycStatus(userId, dto.approved, dto.notes);
   }
+  @Post('drivers/:userId/activation-pin')
+  regenerateActivationPin(@Param('userId') userId: string) {
+    return this.drivers.regenerateActivationPin(userId);
+  }
+  @Get('drivers/:userId/detail')
+  getDriverDetail(@Param('userId') userId: string) { return this.drivers.getDriverAdminDetail(userId); }
   @Get('drivers/:userId')
-  getDriver(@Param('userId') userId: string) { return this.drivers.getProfile(userId); }
+  getDriver(@Param('userId') userId: string) { return this.drivers.getProfileWithUser(userId); }
   @Patch('drivers/:userId/status')
   updateDriverStatus(@Param('userId') userId: string, @Body() dto: UpdateDriverStatusDto) {
     return this.drivers.updateDriverAdmin(userId, dto);

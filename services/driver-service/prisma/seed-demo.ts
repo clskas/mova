@@ -61,8 +61,12 @@ async function upsertDriver(
     type: VehicleType;
     kycStatus: KycStatus;
     isAvailable?: boolean;
+    onboardingCompleted?: boolean;
+    activationPin?: string;
+    activationPinVerified?: boolean;
   },
 ) {
+  const now = new Date();
   const profile = await prisma.driverProfile.upsert({
     where: { userId },
     create: {
@@ -73,11 +77,26 @@ async function upsertDriver(
       currentLat: -4.32,
       currentLng: 15.31,
       operatingCity: 'Kinshasa',
+      onboardingCompleted: data.onboardingCompleted ?? false,
+      charterAcceptedAt: data.onboardingCompleted ? now : null,
+      trainingCompletedAt: data.onboardingCompleted ? now : null,
+      payoutProvider: 'ORANGE_MONEY',
+      activationPin: data.activationPin ?? null,
+      activationPinVerifiedAt: data.activationPinVerified ? now : null,
     },
     update: {
       licenseNumber: data.license,
       ...(data.kycStatus === KycStatus.APPROVED ? { kycStatus: KycStatus.APPROVED } : {}),
       ...(data.isAvailable !== undefined ? { isAvailable: data.isAvailable } : {}),
+      ...(data.onboardingCompleted
+        ? {
+            onboardingCompleted: true,
+            charterAcceptedAt: now,
+            trainingCompletedAt: now,
+          }
+        : {}),
+      ...(data.activationPin ? { activationPin: data.activationPin } : {}),
+      ...(data.activationPinVerified ? { activationPinVerifiedAt: now } : {}),
     },
   });
   const existingVehicle = await prisma.vehicle.findFirst({
@@ -148,7 +167,11 @@ async function main() {
       console.warn(`Skip driver seed — user not found: ${d.phone}`);
       continue;
     }
-    await upsertDriver(prisma, userId, { ...d, kycStatus: KycStatus.PENDING });
+    await upsertDriver(prisma, userId, {
+      ...d,
+      kycStatus: KycStatus.PENDING,
+      onboardingCompleted: d.phone === '+243900000020',
+    });
     if (d.phone === '+243900000020') {
       await ensureExtraVehicle(prisma, userId, {
         plate: 'CD-MOTO-020',
@@ -166,6 +189,9 @@ async function main() {
       ...APPROVED_DRIVER,
       kycStatus: KycStatus.APPROVED,
       isAvailable: true,
+      onboardingCompleted: true,
+      activationPin: '123456',
+      activationPinVerified: true,
     });
     synced++;
   }

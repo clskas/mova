@@ -46,6 +46,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
   String _payoutProvider = 'ORANGE_MONEY';
   bool _charterAccepted = false;
   bool _trainingCompleted = false;
+  bool _isEditingDossier = false;
 
   static const _steps = [
     'Identité',
@@ -105,12 +106,75 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
           _state = data;
           _loading = false;
         });
+        final done = data['profile']?['onboardingCompleted'] == true;
+        if (done && !widget.canSkipToHome && mounted) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const DriverHomeScreen()),
+          );
+        }
       case Failure(:final error):
         setState(() {
           _loading = false;
           _error = error.message;
         });
     }
+  }
+
+  Future<void> _requirePatch(Future<Result<Map<String, dynamic>>> call) async {
+    final result = await call;
+    switch (result) {
+      case Success():
+        return;
+      case Failure(:final error):
+        throw Exception(error.message);
+    }
+  }
+
+  String? _validateStep() {
+    switch (_step) {
+      case 0:
+        if (_firstName.text.trim().isEmpty || _lastName.text.trim().isEmpty) {
+          return 'Renseignez prénom et nom.';
+        }
+        if (_idNumber.text.trim().isEmpty) return 'Renseignez le numéro de pièce d\'identité.';
+        return null;
+      case 1:
+        if (_licenseNumber.text.trim().isEmpty) return 'Renseignez le numéro de permis.';
+        return null;
+      case 2:
+        if (_plate.text.trim().isEmpty || _make.text.trim().isEmpty || _model.text.trim().isEmpty) {
+          return 'Renseignez plaque, marque et modèle du véhicule.';
+        }
+        return null;
+      case 4:
+        if (_payoutPhone.text.trim().isEmpty) return 'Renseignez le numéro Mobile Money.';
+        return null;
+      default:
+        return null;
+    }
+  }
+
+  Future<ImageSource?> _pickDocSource() async {
+    return showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt),
+              title: const Text('Prendre une photo'),
+              onTap: () => Navigator.pop(ctx, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library),
+              title: const Text('Choisir depuis la galerie'),
+              onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _applyState(Map<String, dynamic> data) {
@@ -133,6 +197,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
     _vehicleType = vehicle?['type']?.toString() ?? 'STANDARD';
     _charterAccepted = profile?['charterAcceptedAt'] != null;
     _trainingCompleted = profile?['trainingCompletedAt'] != null;
+    _isEditingDossier = profile?['onboardingCompleted'] == true;
   }
 
   String _dateOnly(dynamic raw) {
@@ -142,43 +207,43 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
 
   Future<void> _savePersonal() async {
     final api = ref.read(apiClientProvider);
-    await api.patch('/users/me', {
+    await _requirePatch(api.patch('/users/me', {
       'firstName': _firstName.text.trim(),
       'lastName': _lastName.text.trim(),
       'email': _email.text.trim().isEmpty ? null : _email.text.trim(),
-    });
-    await api.patch('/drivers/onboarding', {
+    }));
+    await _requirePatch(api.patch('/drivers/onboarding', {
       'idDocumentNumber': _idNumber.text.trim(),
-    });
+    }));
   }
 
   Future<void> _saveLicense() async {
-    await ref.read(apiClientProvider).patch('/drivers/onboarding', {
+    await _requirePatch(ref.read(apiClientProvider).patch('/drivers/onboarding', {
       'licenseNumber': _licenseNumber.text.trim(),
       if (_licenseExpiry.text.trim().isNotEmpty) 'licenseExpiry': _licenseExpiry.text.trim(),
-    });
+    }));
   }
 
   Future<void> _saveVehicle() async {
-    await ref.read(apiClientProvider).patch('/drivers/onboarding', {
+    await _requirePatch(ref.read(apiClientProvider).patch('/drivers/onboarding', {
       'plateNumber': _plate.text.trim(),
       'vehicleMake': _make.text.trim(),
       'vehicleModel': _model.text.trim(),
       'vehicleType': _vehicleType,
       if (_insuranceExpiry.text.trim().isNotEmpty) 'insuranceExpiry': _insuranceExpiry.text.trim(),
       if (_inspectionExpiry.text.trim().isNotEmpty) 'technicalInspectionExpiry': _inspectionExpiry.text.trim(),
-    });
+    }));
   }
 
   Future<void> _savePayout() async {
-    await ref.read(apiClientProvider).patch('/drivers/onboarding', {
+    await _requirePatch(ref.read(apiClientProvider).patch('/drivers/onboarding', {
       'payoutProvider': _payoutProvider,
       'payoutPhone': MarketConfig.normalizePhone(_payoutPhone.text.trim()),
-    });
+    }));
   }
 
   Future<void> _finishOnboarding() async {
-    if (!_charterAccepted || !_trainingCompleted) {
+    if (!_isEditingDossier && (!_charterAccepted || !_trainingCompleted)) {
       setState(() => _error = 'Acceptez la charte et confirmez la formation.');
       return;
     }
@@ -187,6 +252,24 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
       _error = null;
     });
     final api = ref.read(apiClientProvider);
+    if (_isEditingDossier) {
+      final result = await api.patch('/drivers/onboarding', {
+        if (_charterAccepted) 'charterAccepted': true,
+        if (_trainingCompleted) 'trainingCompleted': true,
+      });
+      if (!mounted) return;
+      setState(() => _loading = false);
+      switch (result) {
+        case Success():
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Dossier mis à jour.'), backgroundColor: MovaColors.green),
+          );
+          Navigator.of(context).pop();
+        case Failure(:final error):
+          setState(() => _error = error.message);
+      }
+      return;
+    }
     final result = await api.patch('/drivers/onboarding', {
       'charterAccepted': true,
       'trainingCompleted': true,
@@ -211,7 +294,9 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
   }
 
   Future<void> _uploadDoc(String type, String label) async {
-    final file = await _picker.pickImage(source: ImageSource.camera, imageQuality: 80);
+    final source = await _pickDocSource();
+    if (source == null) return;
+    final file = await _picker.pickImage(source: source, imageQuality: 80);
     if (file == null) return;
     setState(() {
       _uploadingDoc = type;
@@ -223,13 +308,27 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
     switch (upload) {
       case Success(:final data):
         final url = data;
+        if (url.isEmpty) {
+          setState(() {
+            _uploadingDoc = null;
+            _error = 'Échec envoi photo — réessayez.';
+          });
+          return;
+        }
         final result = await api.post('/drivers/kyc', {'type': type, 'url': url});
-        setState(() => _uploadingDoc = null);
-        if (result case Success()) {
-          await _load();
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$label enregistré')));
-          }
+        if (!mounted) return;
+        switch (result) {
+          case Success():
+            setState(() => _uploadingDoc = null);
+            await _load();
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$label enregistré')));
+            }
+          case Failure(:final error):
+            setState(() {
+              _uploadingDoc = null;
+              _error = error.message;
+            });
         }
       case Failure(:final error):
         setState(() {
@@ -248,6 +347,11 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
   }
 
   Future<void> _next() async {
+    final validationError = _validateStep();
+    if (validationError != null) {
+      setState(() => _error = validationError);
+      return;
+    }
     setState(() {
       _loading = true;
       _error = null;
@@ -277,7 +381,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
     } catch (e) {
       setState(() {
         _loading = false;
-        _error = e.toString();
+        _error = e.toString().replaceFirst('Exception: ', '');
       });
     }
   }
@@ -292,7 +396,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
   Widget build(BuildContext context) {
     final publicId = _state?['publicId']?.toString();
     return MovaScreen(
-      title: 'Enregistrement chauffeur',
+      title: widget.canSkipToHome ? 'Mon dossier chauffeur' : 'Enregistrement chauffeur',
       actions: [
         if (widget.canSkipToHome)
           TextButton(
@@ -312,6 +416,13 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
                     'Identifiant chauffeur : $publicId',
                     style: const TextStyle(fontWeight: FontWeight.bold, color: MovaColors.violet),
                   ),
+                if (_state?['kyc'] != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    'Documents : ${_state!['kyc']['checklist'] is List ? (_state!['kyc']['checklist'] as List).where((i) => i is Map && i['required'] == true && i['uploaded'] == true).length : 0}/6 obligatoires',
+                    style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
+                  ),
+                ],
                 const SizedBox(height: 8),
                 LinearProgressIndicator(
                   value: (_step + 1) / _steps.length,
@@ -355,7 +466,9 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
                     if (_step > 0) const SizedBox(width: 8),
                     Expanded(
                       child: MovaButton(
-                        label: _step == _steps.length - 1 ? 'Envoyer le dossier' : 'Continuer',
+                        label: _step == _steps.length - 1
+                            ? (_isEditingDossier ? 'Enregistrer' : 'Envoyer le dossier')
+                            : 'Continuer',
                         isLoading: _loading,
                         onPressed: _loading ? null : _next,
                       ),

@@ -106,12 +106,12 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
         if (previousKyc != 'APPROVED' && kycStatus == 'APPROVED' && mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('KYC approuvé — saisissez votre code PIN d\'activation.'),
+              content: Text('KYC approuvé — saisissez votre code PIN d\'activation si demandé.'),
               backgroundColor: MovaColors.green,
             ),
           );
-          _maybeShowActivationPin(force: true);
-        } else if (data['needsActivationPin'] == true) {
+        }
+        if (data['needsActivationPin'] == true && data['activationPinVerified'] != true) {
           _maybeShowActivationPin();
         }
         _syncProfilePoll(kycStatus);
@@ -124,6 +124,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
   }
 
   void _maybeShowActivationPin({bool force = false}) {
+    if (_profile?['activationPinVerified'] == true) return;
     if (_profile?['needsActivationPin'] != true && !force) return;
     if (!mounted) return;
     final controller = TextEditingController();
@@ -473,8 +474,8 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
           ),
         ),
         IconButton(
-          icon: const Icon(Icons.upload_file),
-          tooltip: 'KYC',
+          icon: const Icon(Icons.badge_outlined),
+          tooltip: 'Mon dossier',
           onPressed: () async {
             await Navigator.push(
               context,

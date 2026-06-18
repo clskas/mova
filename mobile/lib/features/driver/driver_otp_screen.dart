@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/cache/profile_cache.dart';
 import '../../core/config/market_config.dart';
 import '../../core/error/result.dart';
 import '../../core/api/api_client.dart';
@@ -72,12 +73,18 @@ class _DriverOtpScreenState extends ConsumerState<DriverOtpScreen> {
         if (token != null) {
           await api.saveToken(token);
           await api.saveUserPhone(phone);
+          await ProfileCache.clear();
           if (mounted) {
             final onboarding = await api.get('/drivers/onboarding');
-            final completed = onboarding case Success(:final data) && data['profile']?['onboardingCompleted'] == true;
+            var onboardingDone = false;
+            if (onboarding case Success(:final data)) {
+              onboardingDone = data['profile']?['onboardingCompleted'] == true;
+            }
             Navigator.of(context).pushReplacement(
               MaterialPageRoute(
-                builder: (_) => completed ? const DriverHomeScreen() : const DriverOnboardingScreen(),
+                builder: (_) => onboardingDone
+                    ? const DriverHomeScreen()
+                    : const DriverOnboardingScreen(canSkipToHome: true),
               ),
             );
           }

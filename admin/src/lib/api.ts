@@ -36,15 +36,57 @@ export type AdminUser = {
 export type AdminDriver = {
   id: string;
   userId: string;
+  publicId?: string;
   licenseNumber?: string | null;
   isAvailable?: boolean;
   ratingAvg?: number;
   totalRides?: number;
   kycStatus?: string;
+  onboardingCompleted?: boolean;
+  activationPinVerified?: boolean;
+  kycDocumentsUploaded?: number;
+  kycDocumentsRequired?: number;
+  kycDocumentsComplete?: boolean;
+  readyForReview?: boolean;
   currentLat?: number | null;
   currentLng?: number | null;
   vehicles?: { id: string; type: string; plateNumber: string; make?: string; model?: string; isActive?: boolean }[];
   createdAt?: string;
+};
+
+export type AdminDriverDetail = AdminDriver & {
+  user?: {
+    firstName?: string | null;
+    lastName?: string | null;
+    email?: string | null;
+    phone?: string;
+    phoneMasked?: string;
+  } | null;
+  idDocumentNumber?: string | null;
+  licenseExpiry?: string | null;
+  insuranceExpiry?: string | null;
+  technicalInspectionExpiry?: string | null;
+  payoutProvider?: string | null;
+  payoutPhone?: string | null;
+  charterAcceptedAt?: string | null;
+  trainingCompletedAt?: string | null;
+  activationPin?: string;
+  canGenerateActivationPin?: boolean;
+  activationPinVerifiedAt?: string | null;
+  readyForReview?: boolean;
+  kycDocumentsUploaded?: number;
+  kycDocumentsRequired?: number;
+  kycDocumentsComplete?: boolean;
+  kyc?: {
+    checklist?: {
+      type: string;
+      label: string;
+      required: boolean;
+      uploaded: boolean;
+      status?: string | null;
+    }[];
+    requiredComplete?: boolean;
+  };
 };
 
 export type KycItem = {
@@ -822,6 +864,10 @@ export async function fetchDrivers(): Promise<AdminDriver[]> {
   return Array.isArray(data) ? data : data.data ?? [];
 }
 
+export async function fetchDriverDetail(userId: string): Promise<AdminDriverDetail> {
+  return apiFetch<AdminDriverDetail>(`/api/admin/drivers/${userId}`);
+}
+
 export async function setDriverStatus(userId: string, active: boolean, suspendUser?: boolean) {
   return apiFetch(`/api/admin/drivers/${userId}/status`, {
     method: "PATCH",
@@ -830,9 +876,16 @@ export async function setDriverStatus(userId: string, active: boolean, suspendUs
 }
 
 export async function reviewDriverKyc(userId: string, approved: boolean, notes?: string) {
-  return apiFetch(`/api/admin/drivers/${userId}/kyc`, {
+  return apiFetch<{ activationPin?: string }>(`/api/admin/drivers/${userId}/kyc`, {
     method: "PATCH",
     body: JSON.stringify({ approved, notes }),
+  });
+}
+
+export async function regenerateDriverActivationPin(userId: string) {
+  return apiFetch<{ activationPin: string; publicId?: string }>(`/api/admin/drivers/${userId}/activation-pin`, {
+    method: "POST",
+    body: JSON.stringify({}),
   });
 }
 

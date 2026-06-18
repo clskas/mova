@@ -18,7 +18,7 @@ class ServiceAreaLocation {
     return area.center;
   }
 
-  static LatLng defaultDropoffOffset([String? areaId, LatLng? near]) {
+  static LatLng defaultDropoffOffset({String? areaId, LatLng? near}) {
     final base = near ?? centerFor(areaId);
     return LatLng(base.latitude + 0.008, base.longitude + 0.012);
   }

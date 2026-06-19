@@ -654,6 +654,7 @@ export class DeliveriesService {
         kycStatus?: string;
         currentLat?: number | null;
         currentLng?: number | null;
+        operatingCity?: string | null;
         ratingAvg?: number;
       };
     } catch {
@@ -666,9 +667,9 @@ export class DeliveriesService {
     if (!profile?.isAvailable || profile.kycStatus !== 'APPROVED') {
       return { offers: [] as Record<string, unknown>[] };
     }
-    if (profile.currentLat == null || profile.currentLng == null) {
-      return { offers: [] as Record<string, unknown>[] };
-    }
+
+    const hasGps = profile.currentLat != null && profile.currentLng != null;
+    const operatingCity = (profile.operatingCity?.trim() || 'Kinshasa').toLowerCase();
 
     const deliveries = await this.prisma.delivery.findMany({
       where: {
@@ -678,36 +679,49 @@ export class DeliveriesService {
           { type: { in: [DeliveryType.PARCEL, DeliveryType.EXPRESS] }, status: DeliveryStatus.PENDING },
           {
             type: DeliveryType.FOOD,
-            status: { in: [DeliveryStatus.RESTAURANT_CONFIRMED, DeliveryStatus.READY_FOR_PICKUP] },
+            status: DeliveryStatus.READY_FOR_PICKUP,
           },
         ],
       },
       orderBy: { createdAt: 'desc' },
       take: 30,
-      include: { restaurant: { select: { id: true, name: true, cuisine: true } } },
+      include: {
+        restaurant: { select: { id: true, name: true, cuisine: true, lat: true, lng: true, address: true } },
+      },
     });
 
     const radiusKm = MARKET_RDC.matching.maxRadiusKm;
     const offers = deliveries
       .map((d) => {
-        const pickupLat = d.pickupLat ?? d.deliveryLat ?? 0;
-        const pickupLng = d.pickupLng ?? d.deliveryLng ?? 0;
+        const pickupLat = d.pickupLat ?? d.restaurant?.lat ?? 0;
+        const pickupLng = d.pickupLng ?? d.restaurant?.lng ?? 0;
         const dropLat = d.dropoffLat ?? d.deliveryLat ?? pickupLat;
         const dropLng = d.dropoffLng ?? d.deliveryLng ?? pickupLng;
         const tripKm = tripDistanceKm(pickupLat, pickupLng, dropLat, dropLng, d.distanceKm);
-        const distanceToPickupKm = tripDistanceKm(profile.currentLat!, profile.currentLng!, pickupLat, pickupLng);
+        const distanceToPickupKm = hasGps
+          ? tripDistanceKm(profile.currentLat!, profile.currentLng!, pickupLat, pickupLng)
+          : Number.POSITIVE_INFINITY;
+        const pickupCity = resolveCityFromCoords(pickupLat, pickupLng).toLowerCase();
         const formatted = formatParcelDelivery(d as Parameters<typeof formatParcelDelivery>[0]);
         return {
           ...formatted,
           distanceKm: tripKm,
           tripDistanceKm: tripKm,
           distanceToPickupKm,
+          pickupCity,
           offerType: 'DELIVERY',
           type: d.type,
           restaurantName: d.restaurant?.name,
+          pickupAddress: formatted.pickupAddress ?? d.restaurant?.address ?? undefined,
         };
       })
-      .filter((o) => o.distanceToPickupKm <= radiusKm)
+      .filter((o) => {
+        if (o.type === DeliveryType.FOOD) {
+          return o.pickupCity === operatingCity || (hasGps && o.distanceToPickupKm <= radiusKm);
+        }
+        if (!hasGps) return false;
+        return o.distanceToPickupKm <= radiusKm;
+      })
       .sort((a, b) => a.distanceToPickupKm - b.distanceToPickupKm);
 
     return { offers };
@@ -717,9 +731,7 @@ export class DeliveriesService {
     const delivery = await this.prisma.delivery.findUnique({ where: { id: deliveryId } });
     if (!delivery) throw new MovaHttpException(MovaErrorCode.DELIVERY_NOT_FOUND, HttpStatus.NOT_FOUND);
     const foodAcceptable =
-      delivery.type === DeliveryType.FOOD &&
-      (delivery.status === DeliveryStatus.RESTAURANT_CONFIRMED ||
-        delivery.status === DeliveryStatus.READY_FOR_PICKUP);
+      delivery.type === DeliveryType.FOOD && delivery.status === DeliveryStatus.READY_FOR_PICKUP;
     const parcelAcceptable =
       delivery.type !== DeliveryType.FOOD && delivery.status === DeliveryStatus.PENDING;
     if (!foodAcceptable && !parcelAcceptable) {

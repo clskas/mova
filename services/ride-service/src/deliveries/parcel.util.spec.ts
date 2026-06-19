@@ -63,6 +63,24 @@ describe('parcel.util', () => {
     ]);
     expect(timeline[0]?.done).toBe(true);
     expect(timeline[1]?.done).toBe(true);
-    expect(timeline[2]?.done).toBe(false);
+    expect(timeline[2]?.done).toBe(true);
+    expect(timeline[3]?.done).toBe(false);
+  });
+
+  it('buildParcelTimeline advances for restaurant food statuses', () => {
+    const confirmed = buildParcelTimeline(
+      { status: DeliveryStatus.RESTAURANT_CONFIRMED, type: DeliveryType.FOOD },
+      [],
+    );
+    expect(confirmed[0]?.done).toBe(true);
+    expect(confirmed[1]?.done).toBe(true);
+    expect(confirmed[2]?.done).toBe(false);
+
+    const ready = buildParcelTimeline(
+      { status: DeliveryStatus.READY_FOR_PICKUP, type: DeliveryType.FOOD },
+      [],
+    );
+    expect(ready[1]?.done).toBe(true);
+    expect(ready[2]?.done).toBe(false);
   });
 });

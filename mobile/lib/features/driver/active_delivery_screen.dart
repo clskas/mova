@@ -1,9 +1,7 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../core/api/api_client.dart';
+import '../../core/geo/maps_launcher.dart';
 import '../../core/config/market_config.dart';
 import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
@@ -73,11 +71,32 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
   }
 
   Future<void> _openMaps() async {
-    final lat = _delivery['dropoffLat'] as num? ?? _delivery['deliveryLat'] as num?;
-    final lng = _delivery['dropoffLng'] as num? ?? _delivery['deliveryLng'] as num?;
-    if (lat == null || lng == null) return;
-    final uri = Uri.parse('https://www.google.com/maps/dir/?api=1&destination=$lat,$lng');
-    await launchUrl(uri, mode: LaunchMode.externalApplication);
+    final toPickup = _status == 'PICKED_UP';
+    final lat = (toPickup
+            ? _delivery['pickupLat']
+            : (_delivery['dropoffLat'] ?? _delivery['deliveryLat']))
+        as num?;
+    final lng = (toPickup
+            ? _delivery['pickupLng']
+            : (_delivery['dropoffLng'] ?? _delivery['deliveryLng']))
+        as num?;
+    if (lat == null || lng == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Coordonnées GPS indisponibles pour la navigation')),
+        );
+      }
+      return;
+    }
+    final opened = await MapsLauncher.openDirections(
+      destinationLat: lat.toDouble(),
+      destinationLng: lng.toDouble(),
+    );
+    if (!opened && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Impossible d\'ouvrir Google Maps')),
+      );
+    }
   }
 
   String? get _nextAction {
@@ -102,7 +121,9 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
 
     return MovaScreen(
       title: 'Livraison active',
-      child: Column(
+      scrollable: false,
+      child: MovaFlexScroll(
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           MovaCard(
@@ -177,10 +198,10 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
             ),
           const SizedBox(height: 8),
           MovaButton(
-            label: 'Ouvrir la navigation',
+            label: _status == 'PICKED_UP' ? 'Navigation — restaurant' : 'Ouvrir la navigation',
             isSecondary: true,
             icon: Icons.map_outlined,
-            onPressed: _openMaps,
+            onPressed: _loading ? null : _openMaps,
           ),
           const SizedBox(height: 8),
           MovaButton(
@@ -190,6 +211,7 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
             onPressed: _loading ? null : _refresh,
           ),
         ],
+        ),
       ),
     );
   }

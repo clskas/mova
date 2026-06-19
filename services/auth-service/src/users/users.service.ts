@@ -59,6 +59,7 @@ export class UsersService {
     const allowed: UserRole[] = [
       UserRole.PASSENGER,
       UserRole.DRIVER,
+      UserRole.RESTAURANT,
       UserRole.SUPER_ADMIN,
       UserRole.ADMIN,
       UserRole.SUPPORT,

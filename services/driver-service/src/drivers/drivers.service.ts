@@ -128,11 +128,16 @@ export class DriversService {
   }
 
   async updateLocation(userId: string, lat: number, lng: number) {
-    const operatingCity = resolveCityFromCoords(lat, lng);
-    return this.prisma.driverProfile.update({
-      where: { userId },
-      data: { currentLat: lat, currentLng: lng, operatingCity },
-    });
+    const profile = await this.prisma.driverProfile.findUnique({ where: { userId } });
+    const data: { currentLat: number; currentLng: number; operatingCity?: string } = {
+      currentLat: lat,
+      currentLng: lng,
+    };
+    // Ne pas écraser la ville d'exploitation à chaque ping GPS (évite les faux négatifs repas).
+    if (!profile?.operatingCity?.trim()) {
+      data.operatingCity = resolveCityFromCoords(lat, lng);
+    }
+    return this.prisma.driverProfile.update({ where: { userId }, data });
   }
 
   async uploadKyc(userId: string, type: string, url: string) {

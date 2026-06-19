@@ -93,19 +93,26 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
       widget.totalCdf;
 
   String get _statusLabel {
+    final fromApi = _delivery?['statusLabel']?.toString();
+    if (fromApi != null && fromApi.isNotEmpty) return fromApi;
     final status = _delivery?['status']?.toString();
     return switch (status) {
-      'DELIVERED' => 'Livré',
+      'PENDING' => 'En attente du restaurant',
+      'RESTAURANT_CONFIRMED' => 'En préparation',
+      'READY_FOR_PICKUP' => 'Prête — livreur en route',
+      'PICKED_UP' => 'Livreur assigné',
       'IN_TRANSIT' => 'En livraison',
-      'PICKED_UP' => 'Préparation',
-      'PENDING' => 'Confirmé',
-      _ => 'En cours de livraison',
+      'DELIVERED' => 'Livré',
+      'CANCELLED' => 'Annulée',
+      _ => 'En cours',
     };
   }
 
   bool get _canCancel {
     final status = _delivery?['status']?.toString();
-    return status == 'PENDING' || status == 'PICKED_UP';
+    return status == 'PENDING' ||
+        status == 'RESTAURANT_CONFIRMED' ||
+        status == 'READY_FOR_PICKUP';
   }
 
   Future<bool> _showFoodRatingPrompt() async {
@@ -122,20 +129,28 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
         return StatefulBuilder(
           builder: (ctx, setState) {
             return AlertDialog(
+              scrollable: true,
+              insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
               title: const Text('Noter le restaurant'),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Row(
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: List.generate(
                         5,
                         (i) => IconButton(
+                          padding: EdgeInsets.zero,
+                          visualDensity: VisualDensity.compact,
+                          constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
                           icon: Icon(
                             i < score ? Icons.star : Icons.star_border,
                             color: Colors.amber,
-                            size: 36,
+                            size: 32,
                           ),
                           onPressed: submitting
                               ? null
@@ -143,24 +158,26 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
                         ),
                       ),
                     ),
-                    TextField(
-                      enabled: !submitting,
-                      maxLines: 3,
-                      onChanged: (v) => comment = v,
-                      decoration: const InputDecoration(
-                        labelText: 'Commentaire (optionnel)',
-                        hintText: 'Votre avis…',
-                      ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    enabled: !submitting,
+                    maxLines: 3,
+                    onChanged: (v) => comment = v,
+                    decoration: const InputDecoration(
+                      labelText: 'Commentaire (optionnel)',
+                      hintText: 'Votre avis…',
+                      isDense: true,
                     ),
-                    if (dialogError != null) ...[
-                      const SizedBox(height: 12),
-                      Text(
-                        dialogError!,
-                        style: const TextStyle(color: Colors.red),
-                      ),
-                    ],
+                  ),
+                  if (dialogError != null) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      dialogError!,
+                      style: const TextStyle(color: Colors.red),
+                    ),
                   ],
-                ),
+                ],
               ),
               actions: [
                 TextButton(

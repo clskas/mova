@@ -132,78 +132,74 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
   Widget build(BuildContext context) {
     return MovaScreen(
       title: 'Revenus',
+      scrollable: false,
       actions: [
         IconButton(icon: const Icon(Icons.refresh), onPressed: _loading || _withdrawing ? null : _load),
       ],
       child: _loading
           ? const Center(child: CircularProgressIndicator())
-          : MovaFlexScroll(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (_error != null) ...[
-                    MovaErrorBanner(message: _error!, onRetry: _load),
-                    const SizedBox(height: 12),
-                  ],
-                  _earningsRow('Aujourd\'hui', _data!['todayCdf']),
-                  _earningsRow('Cette semaine', _data!['weekCdf']),
-                  _earningsRow('Ce mois', _data!['monthCdf']),
-                  _earningsRow('Total', _data!['totalCdf']),
-                  _earningsRow('Solde disponible (retrait)', _data!['withdrawableCdf'] ?? _data!['walletBalanceCdf']),
-                  _earningsRow('Courses (net)', _data!['rideEarningsCdf']),
-                  _earningsRow('Livraisons (net)', _data!['deliveryEarningsCdf']),
-                  _earningsRow('Courses terminées', _data!['rideCount']),
-                  _earningsRow('Livraisons terminées', _data!['deliveryCount']),
-                  const SizedBox(height: 24),
-                  const Text(
-                    'Retrait Mobile Money',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                  ),
-                  const SizedBox(height: 8),
-                  if (_payoutConfigured)
-                    Text(
-                      'Vers $_payoutLabel',
-                      style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
-                    )
-                  else
-                    MovaCard(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          const Text(
-                            'Numéro de retrait non configuré.',
-                            style: TextStyle(color: MovaColors.error),
-                          ),
-                          const SizedBox(height: 8),
-                          MovaButton(
-                            label: 'Configurer dans Mon dossier',
-                            isSecondary: true,
-                            icon: Icons.folder_open,
-                            onPressed: _openDossier,
-                          ),
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: MovaFlexScroll(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        if (_error != null) ...[
+                          MovaErrorBanner(message: _error!, onRetry: _load),
+                          const SizedBox(height: 12),
                         ],
-                      ),
-                    ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _amountController,
-                    enabled: !_withdrawing && _payoutConfigured,
-                    keyboardType: TextInputType.number,
-                    decoration: InputDecoration(
-                      labelText: 'Montant retrait (FC)',
-                      helperText: 'Minimum ${MarketConfig.formatCdf(_minWithdraw)}',
-                      prefixIcon: const Icon(Icons.payments_outlined),
+                        _earningsRow('Aujourd\'hui', _data!['todayCdf']),
+                        _earningsRow('Cette semaine', _data!['weekCdf']),
+                        _earningsRow('Ce mois', _data!['monthCdf']),
+                        _earningsRow('Total', _data!['totalCdf']),
+                        _earningsRow('Solde disponible (retrait)', _data!['withdrawableCdf'] ?? _data!['walletBalanceCdf']),
+                        _earningsRow('Courses (net)', _data!['rideEarningsCdf']),
+                        _earningsRow('Livraisons (net)', _data!['deliveryEarningsCdf']),
+                        _earningsRow('Courses terminées', _data!['rideCount']),
+                        _earningsRow('Livraisons terminées', _data!['deliveryCount']),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  MovaButton(
-                    label: 'Retirer vers Mobile Money',
-                    icon: Icons.account_balance,
-                    isLoading: _withdrawing,
-                    onPressed: (_withdrawing || !_payoutConfigured) ? null : _withdraw,
+                ),
+                const Divider(height: 24),
+                const Text(
+                  'Retrait Mobile Money',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                const SizedBox(height: 8),
+                if (_payoutConfigured)
+                  Text(
+                    'Vers $_payoutLabel',
+                    style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
+                  )
+                else
+                  Text(
+                    'Configurez votre numéro dans Mon dossier pour activer le retrait.',
+                    style: const TextStyle(color: MovaColors.error, fontSize: 13),
                   ),
-                ],
-              ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _amountController,
+                  enabled: !_withdrawing && _payoutConfigured,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: 'Montant retrait (FC)',
+                    helperText: 'Minimum ${MarketConfig.formatCdf(_minWithdraw)}',
+                    prefixIcon: const Icon(Icons.payments_outlined),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                MovaButton(
+                  label: _payoutConfigured ? 'Retirer vers Mobile Money' : 'Configurer Mobile Money',
+                  icon: _payoutConfigured ? Icons.account_balance : Icons.settings,
+                  isLoading: _withdrawing,
+                  onPressed: _withdrawing
+                      ? null
+                      : (_payoutConfigured ? _withdraw : _openDossier),
+                ),
+              ],
             ),
     );
   }

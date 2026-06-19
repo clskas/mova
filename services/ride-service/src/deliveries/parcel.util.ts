@@ -67,10 +67,28 @@ const PARCEL_TIMELINE: { status: DeliveryStatus; label: string }[] = [
 
 const FOOD_TIMELINE: { status: DeliveryStatus; label: string }[] = [
   { status: DeliveryStatus.PENDING, label: 'Confirmé' },
-  { status: DeliveryStatus.PICKED_UP, label: 'Préparation' },
-  { status: DeliveryStatus.IN_TRANSIT, label: 'En route' },
+  { status: DeliveryStatus.RESTAURANT_CONFIRMED, label: 'Préparation' },
+  { status: DeliveryStatus.PICKED_UP, label: 'En route' },
   { status: DeliveryStatus.DELIVERED, label: 'Livré' },
 ];
+
+/** Indice d'avancement UI repas (4 étapes) — inclut les statuts restaurant. */
+function foodStatusIndex(status: DeliveryStatus): number {
+  switch (status) {
+    case DeliveryStatus.PENDING:
+      return 0;
+    case DeliveryStatus.RESTAURANT_CONFIRMED:
+    case DeliveryStatus.READY_FOR_PICKUP:
+      return 1;
+    case DeliveryStatus.PICKED_UP:
+    case DeliveryStatus.IN_TRANSIT:
+      return 2;
+    case DeliveryStatus.DELIVERED:
+      return 3;
+    default:
+      return -1;
+  }
+}
 
 const EXPRESS_TIMELINE: { status: DeliveryStatus; label: string }[] = [
   { status: DeliveryStatus.PENDING, label: 'Express enregistré' },
@@ -99,9 +117,12 @@ export function buildParcelTimeline(
       : delivery.type === DeliveryType.EXPRESS
         ? EXPRESS_TIMELINE
         : PARCEL_TIMELINE;
-  const currentIdx = STATUS_ORDER.indexOf(delivery.status);
+  const currentIdx =
+    delivery.type === DeliveryType.FOOD
+      ? foodStatusIndex(delivery.status)
+      : STATUS_ORDER.indexOf(delivery.status);
   return steps.map((step, idx) => {
-    const event = events?.find((e) => e.event === step.status);
+    const event = events?.find((e) => e.event === step.status || e.event === delivery.status);
     return {
       label: step.label,
       done: idx <= currentIdx,
@@ -176,7 +197,9 @@ export function mockCourierLocation(
   if (!delivery.pickupLat || !delivery.pickupLng || !delivery.dropoffLat || !delivery.dropoffLng) return null;
   if (delivery.status === DeliveryStatus.DELIVERED || delivery.status === DeliveryStatus.CANCELLED) return null;
   const progress =
-    delivery.status === DeliveryStatus.PENDING
+    delivery.status === DeliveryStatus.PENDING ||
+    delivery.status === DeliveryStatus.RESTAURANT_CONFIRMED ||
+    delivery.status === DeliveryStatus.READY_FOR_PICKUP
       ? 0.1
       : delivery.status === DeliveryStatus.PICKED_UP
         ? 0.35
@@ -239,13 +262,30 @@ export function formatParcelDelivery(
     id: delivery.id,
     type: delivery.type,
     status: delivery.status,
+    statusLabel:
+      delivery.type === DeliveryType.FOOD
+        ? (
+            {
+              [DeliveryStatus.PENDING]: 'En attente du restaurant',
+              [DeliveryStatus.RESTAURANT_CONFIRMED]: 'En préparation',
+              [DeliveryStatus.READY_FOR_PICKUP]: 'Prête — livreur en route',
+              [DeliveryStatus.PICKED_UP]: 'Livreur assigné',
+              [DeliveryStatus.IN_TRANSIT]: 'En livraison',
+              [DeliveryStatus.DELIVERED]: 'Commande livrée',
+              [DeliveryStatus.CANCELLED]: 'Commande annulée',
+            } as Record<DeliveryStatus, string>
+          )[delivery.status] ?? delivery.status
+        : delivery.status,
     pickupLat: delivery.pickupLat,
     pickupLng: delivery.pickupLng,
     pickupAddress: delivery.pickupAddress,
     pickupCommune: detectCommune(delivery.pickupLat ?? 0, delivery.pickupLng ?? 0, delivery.pickupAddress ?? undefined),
-    dropoffLat: delivery.dropoffLat,
-    dropoffLng: delivery.dropoffLng,
-    dropoffAddress: delivery.dropoffAddress,
+    dropoffLat: dropLat,
+    dropoffLng: dropLng,
+    dropoffAddress: delivery.dropoffAddress ?? delivery.deliveryAddress,
+    deliveryLat: delivery.deliveryLat,
+    deliveryLng: delivery.deliveryLng,
+    deliveryAddress: delivery.deliveryAddress,
     dropoffCommune: detectCommune(delivery.dropoffLat ?? 0, delivery.dropoffLng ?? 0, delivery.dropoffAddress ?? undefined),
     photoUrl: delivery.photoUrl,
     weightCategory: delivery.weightCategory,

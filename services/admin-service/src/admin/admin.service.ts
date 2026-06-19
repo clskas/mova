@@ -23,7 +23,8 @@ export class AdminService {
       async (r) => {
         const data = await r.json().catch(() => ({}));
         if (!r.ok) {
-          const raw = (data as { message?: string | string[] })?.message;
+          const payload = data as { message?: string | string[]; error?: { message?: string } };
+          const raw = payload.error?.message ?? payload.message;
           const message = Array.isArray(raw) ? raw.join(', ') : raw ?? `Admin proxy failed: ${service}${path} (${r.status})`;
           throw new Error(message);
         }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:latlong2/latlong.dart';
 import '../../core/api/api_client.dart';
 import '../../core/config/market_config.dart';
 import '../../core/error/result.dart';
@@ -7,6 +8,7 @@ import '../../core/geo/geo_utils.dart';
 import '../../core/location/location_service.dart';
 import '../../core/location/service_area_location.dart';
 import '../../core/theme/mova_colors.dart';
+import '../../core/widgets/destination_coord_panel.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import 'food_tracking_screen.dart';
@@ -43,6 +45,7 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
   String? _error;
   String? _validationError;
   String _searchQuery = '';
+  bool _loadingGps = false;
   double _deliveryLat = ServiceAreaLocation.centerFor('kinshasa').latitude;
   double _deliveryLng = ServiceAreaLocation.centerFor('kinshasa').longitude;
 
@@ -62,6 +65,50 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
       return raw.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
     }
     return [];
+  }
+
+  Future<void> _useMyLocationForDelivery() async {
+    setState(() {
+      _loadingGps = true;
+      _validationError = null;
+    });
+    final result = await LocationService.getCurrentLocation();
+    if (!mounted) return;
+    if (result == null) {
+      setState(() {
+        _loadingGps = false;
+        _validationError =
+            'Impossible d\'obtenir votre position. Activez le GPS et autorisez la localisation.';
+      });
+      return;
+    }
+    final coords = ServiceAreaLocation.ensureInServiceArea(
+      result.position,
+      address: result.label,
+    );
+    setState(() {
+      _loadingGps = false;
+      _deliveryLat = coords.latitude;
+      _deliveryLng = coords.longitude;
+      _addressController.text = ServiceAreaLocation.isInBounds(result.position)
+          ? result.label
+          : LocationService.coordsLabel(coords);
+      _estimatedTotal = null;
+    });
+    await _loadRestaurants();
+  }
+
+  void _setDeliveryFromCoords(LatLng coords, String label) {
+    final safe = ServiceAreaLocation.ensureInServiceArea(coords, address: label);
+    setState(() {
+      _deliveryLat = safe.latitude;
+      _deliveryLng = safe.longitude;
+      if (_addressController.text.trim().isEmpty || _addressController.text == 'Ma position') {
+        _addressController.text = label;
+      }
+      _estimatedTotal = null;
+    });
+    _loadRestaurants();
   }
 
   Future<void> _resolveDeliveryCoords() async {
@@ -720,11 +767,30 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
           const SizedBox(height: 16),
           TextField(
             controller: _addressController,
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               labelText: 'Adresse de livraison',
-              prefixIcon: Icon(Icons.delivery_dining),
+              prefixIcon: const Icon(Icons.delivery_dining),
+              suffixIcon: _loadingGps
+                  ? const Padding(
+                      padding: EdgeInsets.all(12),
+                      child: SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    )
+                  : IconButton(
+                      icon: const Icon(Icons.gps_fixed, color: MovaColors.violet),
+                      tooltip: 'Ma position',
+                      onPressed: _loadingGps ? null : _useMyLocationForDelivery,
+                    ),
             ),
             onChanged: (_) => setState(() => _estimatedTotal = null),
+          ),
+          DestinationCoordPanel(
+            initialLat: _deliveryLat,
+            initialLng: _deliveryLng,
+            onApply: _setDeliveryFromCoords,
           ),
           const SizedBox(height: 12),
           TextField(

@@ -890,7 +890,10 @@ export async function fetchDrivers(): Promise<AdminDriver[]> {
 export async function fetchDriversForAssignment(): Promise<AdminDriver[]> {
   const params = new URLSearchParams({ take: "200", kycStatus: "APPROVED" });
   const data = await apiFetch<AdminDriver[] | { data?: AdminDriver[] }>(`/api/admin/drivers?${params}`);
-  return Array.isArray(data) ? data : data.data ?? [];
+  const approved = Array.isArray(data) ? data : data.data ?? [];
+  if (approved.length > 0) return approved;
+  const all = await fetchDrivers();
+  return all.filter((d) => d.kycStatus === "APPROVED");
 }
 
 export async function fetchDriverDetail(userId: string): Promise<AdminDriverDetail> {

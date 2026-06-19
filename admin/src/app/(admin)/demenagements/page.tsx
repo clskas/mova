@@ -13,7 +13,7 @@ import {
   type MovingRequest,
 } from "@/lib/api";
 import { useAdmin } from "@/components/AdminProvider";
-import { AssignDriverSelect } from "@/components/AssignDriverSelect";
+import { AssignDriverPanel } from "@/components/AssignDriverPanel";
 import { ContactBlock } from "@/components/ContactActions";
 import {
   BtnDanger,
@@ -49,6 +49,8 @@ export default function DemenagementsPage() {
   const [selected, setSelected] = useState<MovingRequest | null>(null);
   const [newStatus, setNewStatus] = useState("");
   const [assignDriverId, setAssignDriverId] = useState("");
+  const [rowAssign, setRowAssign] = useState<Record<string, string>>({});
+  const [assigningId, setAssigningId] = useState<string | null>(null);
   const [cancelTarget, setCancelTarget] = useState<MovingRequest | null>(null);
 
   const load = useCallback(async () => {
@@ -92,18 +94,26 @@ export default function DemenagementsPage() {
     }
   }
 
-  async function saveAssignment() {
-    if (!selected || !assignDriverId || assignDriverId === (selected.driverId ?? "")) return;
-    setSaving(true);
+  async function assignDriver(recordId: string, driverId: string) {
+    if (!driverId) return;
+    setAssigningId(recordId);
+    setError(null);
     try {
-      await assignMovingDriver(selected.id, assignDriverId);
+      await assignMovingDriver(recordId, driverId);
       setSelected(null);
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Échec assignation");
     } finally {
-      setSaving(false);
+      setAssigningId(null);
     }
+  }
+
+  async function saveAssignment() {
+    if (!selected || !assignDriverId) return;
+    setSaving(true);
+    await assignDriver(selected.id, assignDriverId);
+    setSaving(false);
   }
 
   async function doCancel() {
@@ -129,6 +139,16 @@ export default function DemenagementsPage() {
         title="Déménagements"
         subtitle="Contact passager/équipe et assignation chauffeur"
       />
+      {readOnly && (
+        <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2 mb-4">
+          Accès lecture seule — l&apos;assignation chauffeur nécessite un rôle Admin ou Support avec droits d&apos;écriture.
+        </p>
+      )}
+      {!readOnly && (
+        <p className="text-sm text-violet-800 bg-violet-50 border border-violet-200 rounded-xl px-4 py-2 mb-4">
+          Colonne <strong>Assigner chauffeur</strong> : liste déroulante + bouton Assigner. Disponible aussi dans <strong>Détail</strong>.
+        </p>
+      )}
       {error && <ErrorBanner message={error} onRetry={load} />}
       {loading ? (
         <LoadingState />
@@ -146,6 +166,7 @@ export default function DemenagementsPage() {
                 <th className="p-3">Prix est.</th>
                 <th className="p-3">Statut</th>
                 <th className="p-3">Créée</th>
+                {!readOnly && <th className="p-3 min-w-[220px]">Assigner chauffeur</th>}
                 <th className="p-3"></th>
               </tr>
             </thead>
@@ -164,6 +185,19 @@ export default function DemenagementsPage() {
                     <StatusBadge status={r.status ?? "PENDING"} />
                   </td>
                   <td className="p-3 text-gray-500">{formatDate(r.createdAt)}</td>
+                  {!readOnly && (
+                    <td className="p-3">
+                      <AssignDriverPanel
+                        compact
+                        drivers={drivers}
+                        value={rowAssign[r.id] ?? r.driverId ?? ""}
+                        currentDriverId={r.driverId}
+                        onChange={(v) => setRowAssign((prev) => ({ ...prev, [r.id]: v }))}
+                        onAssign={() => assignDriver(r.id, rowAssign[r.id] ?? "")}
+                        saving={assigningId === r.id}
+                      />
+                    </td>
+                  )}
                   <td className="p-3">
                     <button type="button" onClick={() => openDetail(r)} className="text-[#6C63FF] hover:underline">
                       Détail
@@ -190,20 +224,18 @@ export default function DemenagementsPage() {
             <ContactBlock title="Chauffeur / équipe assignée" name={selected.driverName} phone={selected.driverPhone} />
 
             {!readOnly && (
-              <>
-                <AssignDriverSelect
-                  drivers={drivers}
-                  value={assignDriverId}
-                  onChange={setAssignDriverId}
-                  disabled={saving}
-                />
-                <BtnPrimary
-                  onClick={saveAssignment}
-                  disabled={saving || !assignDriverId || assignDriverId === (selected.driverId ?? "")}
-                >
-                  {saving ? "Enregistrement…" : "Assigner le chauffeur"}
-                </BtnPrimary>
+              <AssignDriverPanel
+                drivers={drivers}
+                value={assignDriverId}
+                currentDriverId={selected.driverId}
+                onChange={setAssignDriverId}
+                onAssign={saveAssignment}
+                saving={saving}
+              />
+            )}
 
+            {!readOnly && (
+              <>
                 <FieldLabel>Modifier le statut</FieldLabel>
                 <SelectInput value={newStatus} onChange={setNewStatus} options={STATUSES} />
                 <BtnPrimary onClick={saveStatus} disabled={saving || newStatus === selected.status}>

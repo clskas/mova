@@ -13,7 +13,7 @@ import {
   type ScheduledOverview,
 } from "@/lib/api";
 import { useAdmin } from "@/components/AdminProvider";
-import { AssignDriverSelect } from "@/components/AssignDriverSelect";
+import { AssignDriverPanel } from "@/components/AssignDriverPanel";
 import { ContactBlock } from "@/components/ContactActions";
 import {
   BtnDanger,
@@ -49,6 +49,8 @@ export default function PlanifieesPage() {
   const [selected, setSelected] = useState<ScheduledOverview | null>(null);
   const [newStatus, setNewStatus] = useState("");
   const [assignDriverId, setAssignDriverId] = useState("");
+  const [rowAssign, setRowAssign] = useState<Record<string, string>>({});
+  const [assigningId, setAssigningId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
@@ -91,19 +93,26 @@ export default function PlanifieesPage() {
     }
   }
 
-  async function saveAssignment() {
-    if (!selected || !assignDriverId || assignDriverId === (selected.driverId ?? "")) return;
-    setSaving(true);
+  async function assignDriver(recordId: string, driverId: string) {
+    if (!driverId) return;
+    setAssigningId(recordId);
     setError(null);
     try {
-      await assignScheduledDriver(selected.id, assignDriverId);
+      await assignScheduledDriver(recordId, driverId);
       setSelected(null);
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Échec de l'assignation");
     } finally {
-      setSaving(false);
+      setAssigningId(null);
     }
+  }
+
+  async function saveAssignment() {
+    if (!selected || !assignDriverId) return;
+    setSaving(true);
+    await assignDriver(selected.id, assignDriverId);
+    setSaving(false);
   }
 
   async function doCancel() {
@@ -126,6 +135,16 @@ export default function PlanifieesPage() {
   return (
     <div className="max-w-6xl mx-auto">
       <PageHeader title="Courses planifiées" subtitle="Réservations à l'avance — contact passager/chauffeur et assignation" />
+      {readOnly && (
+        <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2 mb-4">
+          Accès lecture seule — l&apos;assignation chauffeur nécessite un rôle Admin ou Support avec droits d&apos;écriture.
+        </p>
+      )}
+      {!readOnly && (
+        <p className="text-sm text-violet-800 bg-violet-50 border border-violet-200 rounded-xl px-4 py-2 mb-4">
+          Colonne <strong>Assigner</strong> : choisissez un chauffeur puis cliquez Assigner. Ou ouvrez <strong>Détail</strong> pour contacts Appeler/WhatsApp.
+        </p>
+      )}
       {error && <ErrorBanner message={error} onRetry={load} />}
       {loading ? (
         <LoadingState />
@@ -142,6 +161,7 @@ export default function PlanifieesPage() {
                 <th className="p-3">Chauffeur</th>
                 <th className="p-3">Statut</th>
                 <th className="p-3">Prix</th>
+                {!readOnly && <th className="p-3 min-w-[220px]">Assigner chauffeur</th>}
                 <th className="p-3"></th>
               </tr>
             </thead>
@@ -154,6 +174,19 @@ export default function PlanifieesPage() {
                   <td className="p-3 text-gray-600">{s.driverName ?? (s.driverId ? "Assigné" : "—")}</td>
                   <td className="p-3"><StatusBadge status={s.status} /></td>
                   <td className="p-3 text-[#6C63FF]">{formatCdf(s.priceCdf)}</td>
+                  {!readOnly && (
+                    <td className="p-3">
+                      <AssignDriverPanel
+                        compact
+                        drivers={drivers}
+                        value={rowAssign[s.id] ?? s.driverId ?? ""}
+                        currentDriverId={s.driverId}
+                        onChange={(v) => setRowAssign((prev) => ({ ...prev, [s.id]: v }))}
+                        onAssign={() => assignDriver(s.id, rowAssign[s.id] ?? "")}
+                        saving={assigningId === s.id}
+                      />
+                    </td>
+                  )}
                   <td className="p-3">
                     <button type="button" onClick={() => openDetail(s)} className="text-[#6C63FF] hover:underline">Détail</button>
                   </td>
@@ -177,20 +210,18 @@ export default function PlanifieesPage() {
             <ContactBlock title="Chauffeur assigné" name={selected.driverName} phone={selected.driverPhone} />
 
             {!readOnly && (
-              <>
-                <AssignDriverSelect
-                  drivers={drivers}
-                  value={assignDriverId}
-                  onChange={setAssignDriverId}
-                  disabled={saving}
-                />
-                <BtnPrimary
-                  onClick={saveAssignment}
-                  disabled={saving || !assignDriverId || assignDriverId === (selected.driverId ?? "")}
-                >
-                  {saving ? "Enregistrement…" : "Assigner le chauffeur"}
-                </BtnPrimary>
+              <AssignDriverPanel
+                drivers={drivers}
+                value={assignDriverId}
+                currentDriverId={selected.driverId}
+                onChange={setAssignDriverId}
+                onAssign={saveAssignment}
+                saving={saving}
+              />
+            )}
 
+            {!readOnly && (
+              <>
                 <FieldLabel>Modifier le statut</FieldLabel>
                 <SelectInput value={newStatus} onChange={setNewStatus} options={SCHEDULED_STATUSES} />
                 <BtnPrimary onClick={saveStatus} disabled={saving || newStatus === selected.status}>

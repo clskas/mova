@@ -93,6 +93,9 @@ export default function LocationsPage() {
   return (
     <div className="max-w-6xl mx-auto">
       <PageHeader title="Demandes de location" subtitle="Contact passager et propriétaire du véhicule" />
+      <p className="text-sm text-sky-800 bg-sky-50 border border-sky-200 rounded-xl px-4 py-2 mb-4">
+        La location ne passe pas par un chauffeur MOVA : contactez le <strong>passager</strong> et le <strong>propriétaire du véhicule</strong> via Détail, puis passez le statut à <strong>CONTACTED</strong> ou <strong>CONFIRMED</strong>.
+      </p>
       {error && <ErrorBanner message={error} onRetry={load} />}
       {loading ? (
         <LoadingState />

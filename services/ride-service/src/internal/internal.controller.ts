@@ -124,6 +124,11 @@ export class InternalController {
     return this.scheduledRides.adminUpdateStatus(id, status);
   }
 
+  @Patch('scheduled-rides/:id/assign')
+  assignScheduled(@Param('id') id: string, @Body('driverId') driverId: string) {
+    return this.scheduledRides.adminAssignDriver(id, driverId);
+  }
+
   @Get('restaurants')
   listRestaurants() {
     return this.deliveries.listRestaurantsAdmin();
@@ -313,6 +318,11 @@ export class InternalController {
   @Patch('moving/:id/status')
   updateMovingStatus(@Param('id') id: string, @Body('status') status: MovingRequestStatus) {
     return this.moving.adminUpdateStatus(id, status);
+  }
+
+  @Patch('moving/:id/assign')
+  assignMoving(@Param('id') id: string, @Body('driverId') driverId: string) {
+    return this.moving.adminAssignDriver(id, driverId);
   }
 
   @Get('rental-inquiries')

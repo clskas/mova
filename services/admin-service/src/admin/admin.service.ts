@@ -180,6 +180,9 @@ export class AdminService {
   updateScheduledRideStatus(id: string, status: string) {
     return this.proxy('ride', `/internal/scheduled-rides/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) });
   }
+  assignScheduledDriver(id: string, driverId: string) {
+    return this.proxy('ride', `/internal/scheduled-rides/${id}/assign`, { method: 'PATCH', body: JSON.stringify({ driverId }) });
+  }
 
   listRestaurants() {
     return this.fetchJson('ride', '/internal/restaurants');
@@ -277,6 +280,9 @@ export class AdminService {
   }
   updateMovingStatus(id: string, status: string) {
     return this.proxy('ride', `/internal/moving/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) });
+  }
+  assignMovingDriver(id: string, driverId: string) {
+    return this.proxy('ride', `/internal/moving/${id}/assign`, { method: 'PATCH', body: JSON.stringify({ driverId }) });
   }
 
   listRentalInquiries(take = 50) {

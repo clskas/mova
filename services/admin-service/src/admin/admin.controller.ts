@@ -218,6 +218,13 @@ export class AdminController {
     return this.adminService.updateScheduledRideStatus(id, status);
   }
 
+  @Patch('scheduled-rides/:id/assign')
+  @RequirePermissions(AdminPermission.SCHEDULED_WRITE)
+  @ApiOperation({ summary: 'Assigner un chauffeur à une réservation planifiée' })
+  assignScheduled(@Param('id') id: string, @Body('driverId') driverId: string) {
+    return this.adminService.assignScheduledDriver(id, driverId);
+  }
+
   @Get('restaurants')
   @RequirePermissions(AdminPermission.RESTAURANTS_READ)
   @ApiOperation({ summary: 'Liste restaurants' })
@@ -426,6 +433,13 @@ export class AdminController {
   @ApiOperation({ summary: 'Statut déménagement' })
   movingStatus(@Param('id') id: string, @Body('status') status: string) {
     return this.adminService.updateMovingStatus(id, status);
+  }
+
+  @Patch('moving/:id/assign')
+  @RequirePermissions(AdminPermission.DELIVERIES_WRITE)
+  @ApiOperation({ summary: 'Assigner un chauffeur au déménagement' })
+  assignMoving(@Param('id') id: string, @Body('driverId') driverId: string) {
+    return this.adminService.assignMovingDriver(id, driverId);
   }
 
   @Get('rental-inquiries')

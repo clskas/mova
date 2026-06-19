@@ -1,6 +1,7 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { Prisma, RentalInquiryStatus } from '@prisma/client';
 import { MARKET_RDC, MovaErrorCode, MovaHttpException, formatCdf } from '@mova/shared';
+import { fetchAuthUserBrief } from '../common/internal-lookup.util';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   CreateRentalBookingDto,
@@ -476,21 +477,32 @@ export class RentalService {
       take,
       include: { vehicle: true },
     });
-    return rows.map((r) => ({
-      id: r.id,
-      userId: r.userId,
-      status: r.status,
-      vehicleName: r.vehicle?.name ?? r.vehicleType,
-      vehicleType: r.vehicleType,
-      pickupCity: r.pickupCity,
-      returnCity: r.returnCity,
-      insuranceTier: r.insuranceTier,
-      startDate: r.startDate.toISOString(),
-      endDate: r.endDate.toISOString(),
-      priceCdf: r.totalCdf ?? r.estimatedPriceCdf,
-      estimatedPriceCdf: r.totalCdf ?? r.estimatedPriceCdf,
-      createdAt: r.createdAt.toISOString(),
-    }));
+    return Promise.all(
+      rows.map(async (r) => {
+        const passenger = await fetchAuthUserBrief(r.userId);
+        return {
+          id: r.id,
+          userId: r.userId,
+          passengerName: passenger?.name,
+          passengerPhone: r.contactPhone ?? passenger?.phone,
+          status: r.status,
+          vehicleName: r.vehicle?.name ?? r.vehicleType,
+          vehicleType: r.vehicleType,
+          ownerName: r.vehicle?.ownerName,
+          ownerContactPhone: r.vehicle?.ownerContactPhone,
+          contactPhone: r.contactPhone,
+          notes: r.notes,
+          pickupCity: r.pickupCity,
+          returnCity: r.returnCity,
+          insuranceTier: r.insuranceTier,
+          startDate: r.startDate.toISOString(),
+          endDate: r.endDate.toISOString(),
+          priceCdf: r.totalCdf ?? r.estimatedPriceCdf,
+          estimatedPriceCdf: r.totalCdf ?? r.estimatedPriceCdf,
+          createdAt: r.createdAt.toISOString(),
+        };
+      }),
+    );
   }
 
   async adminCancel(id: string) {

@@ -3,6 +3,7 @@ import { MovingRequestStatus, SurchargeType, VehicleType } from '@prisma/client'
 import { MovaErrorCode, MovaHttpException, formatCdf } from '@mova/shared';
 import { buildMovingTimeline } from '../deliveries/parcel.util';
 import { assertServiceAreaPair } from '../common/address.util';
+import { fetchAuthUserBrief } from '../common/internal-lookup.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { PricingService } from '../rides/pricing.service';
 import { SurchargeService } from '../rides/surcharge.service';
@@ -139,16 +140,51 @@ export class MovingService {
 
   async listForAdmin(take = 50) {
     const rows = await this.prisma.movingRequest.findMany({ orderBy: { createdAt: 'desc' }, take });
-    return rows.map((r) => ({
-      id: r.id,
-      userId: r.userId,
-      status: r.status,
-      volumeM3: r.volumeM3,
-      pickupAddress: r.pickupAddress,
-      dropoffAddress: r.dropoffAddress,
-      priceCdf: r.estimatedPriceCdf,
-      createdAt: r.createdAt.toISOString(),
-    }));
+    return Promise.all(
+      rows.map(async (r) => {
+        const passenger = await fetchAuthUserBrief(r.userId);
+        const driver = r.driverId ? await fetchAuthUserBrief(r.driverId) : null;
+        return {
+          id: r.id,
+          userId: r.userId,
+          passengerName: passenger?.name,
+          passengerPhone: passenger?.phone,
+          driverId: r.driverId,
+          driverName: driver?.name,
+          driverPhone: driver?.phone,
+          status: r.status,
+          volumeM3: r.volumeM3,
+          pickupAddress: r.pickupAddress,
+          dropoffAddress: r.dropoffAddress,
+          priceCdf: r.estimatedPriceCdf,
+          createdAt: r.createdAt.toISOString(),
+        };
+      }),
+    );
+  }
+
+  async adminAssignDriver(id: string, driverId: string) {
+    if (!driverId?.trim()) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Chauffeur requis.');
+    }
+    const request = await this.prisma.movingRequest.findUnique({ where: { id } });
+    if (!request) throw new MovaHttpException(MovaErrorCode.MOVING_NOT_FOUND, HttpStatus.NOT_FOUND);
+    if (request.status === MovingRequestStatus.COMPLETED || request.status === MovingRequestStatus.CANCELLED) {
+      throw new MovaHttpException(MovaErrorCode.MOVING_INVALID_STATUS);
+    }
+    const data: { driverId: string; status?: MovingRequestStatus } = { driverId: driverId.trim() };
+    if (request.status === MovingRequestStatus.PENDING) {
+      data.status = MovingRequestStatus.ASSIGNED;
+    }
+    const updated = await this.prisma.movingRequest.update({ where: { id }, data });
+    const driver = await fetchAuthUserBrief(updated.driverId!);
+    return {
+      id: updated.id,
+      driverId: updated.driverId,
+      driverName: driver?.name,
+      driverPhone: driver?.phone,
+      status: updated.status,
+    };
   }
 
   async adminCancel(id: string) {

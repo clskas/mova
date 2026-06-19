@@ -126,6 +126,12 @@ export type DeliveryOverview = {
 export type ScheduledOverview = {
   id: string;
   passengerId?: string;
+  passengerName?: string;
+  passengerPhone?: string;
+  driverId?: string | null;
+  driverName?: string;
+  driverPhone?: string;
+  vehicleType?: string;
   pickupAddress?: string;
   dropoffAddress?: string;
   scheduledAt?: string;
@@ -732,8 +738,12 @@ export type WalletTransactionsPage = {
 export type RentalInquiry = {
   id: string;
   userId?: string;
+  passengerName?: string;
+  passengerPhone?: string;
   vehicleName?: string;
   vehicleType?: string;
+  ownerName?: string;
+  ownerContactPhone?: string;
   status?: string;
   startDate?: string;
   endDate?: string;
@@ -743,6 +753,7 @@ export type RentalInquiry = {
   pickupCity?: string;
   returnCity?: string;
   contactPhone?: string;
+  notes?: string;
   createdAt?: string;
 };
 
@@ -762,6 +773,11 @@ export async function cancelRentalInquiry(id: string) {
 export type MovingRequest = {
   id: string;
   userId?: string;
+  passengerName?: string;
+  passengerPhone?: string;
+  driverId?: string | null;
+  driverName?: string;
+  driverPhone?: string;
   status?: string;
   volumeM3?: number;
   pickupAddress?: string;
@@ -793,6 +809,10 @@ export async function fetchMovingRequests(): Promise<MovingRequest[]> {
 
 export async function updateMovingStatus(id: string, status: string) {
   return apiFetch(`/api/admin/moving/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) });
+}
+
+export async function assignMovingDriver(id: string, driverId: string) {
+  return apiFetch(`/api/admin/moving/${id}/assign`, { method: "PATCH", body: JSON.stringify({ driverId }) });
 }
 
 export async function cancelMovingRequest(id: string) {
@@ -867,6 +887,12 @@ export async function fetchDrivers(): Promise<AdminDriver[]> {
   return Array.isArray(data) ? data : data.data ?? [];
 }
 
+export async function fetchDriversForAssignment(): Promise<AdminDriver[]> {
+  const params = new URLSearchParams({ take: "200", kycStatus: "APPROVED" });
+  const data = await apiFetch<AdminDriver[] | { data?: AdminDriver[] }>(`/api/admin/drivers?${params}`);
+  return Array.isArray(data) ? data : data.data ?? [];
+}
+
 export async function fetchDriverDetail(userId: string): Promise<AdminDriverDetail> {
   return apiFetch<AdminDriverDetail>(`/api/admin/drivers/${userId}`);
 }
@@ -906,6 +932,10 @@ export async function cancelScheduledRide(id: string, reason?: string) {
 
 export async function updateScheduledRideStatus(id: string, status: string) {
   return apiFetch(`/api/admin/scheduled-rides/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) });
+}
+
+export async function assignScheduledDriver(id: string, driverId: string) {
+  return apiFetch(`/api/admin/scheduled-rides/${id}/assign`, { method: "PATCH", body: JSON.stringify({ driverId }) });
 }
 
 export async function updateDeliveryStatus(id: string, status: string) {

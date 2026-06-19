@@ -2,6 +2,7 @@ import { HttpStatus, Injectable } from '@nestjs/common';
 import { ScheduledRideStatus, VehicleType } from '@prisma/client';
 import { MovaErrorCode, MovaHttpException, normalizeVehicleType, resolveCityFromCoords } from '@mova/shared';
 import { assertServiceAreaCoords, assertServiceAreaDestination, assertServiceAreaPair, addressToCoords, DEFAULT_PICKUP } from '../common/address.util';
+import { fetchAuthUserBrief } from '../common/internal-lookup.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { PricingService } from './pricing.service';
 import { CreateScheduledRideDto } from './scheduled-rides.dto';
@@ -123,15 +124,51 @@ export class ScheduledRidesService {
       orderBy: { scheduledAt: 'asc' },
       take,
     });
-    return rows.map((r) => ({
-      id: r.id,
-      passengerId: r.passengerId,
-      pickupAddress: r.pickupAddress,
-      dropoffAddress: r.dropoffAddress,
-      scheduledAt: r.scheduledAt.toISOString(),
-      status: r.status,
-      priceCdf: r.estimatedPriceCdf,
-    }));
+    return Promise.all(
+      rows.map(async (r) => {
+        const passenger = await fetchAuthUserBrief(r.passengerId);
+        const driver = r.driverId ? await fetchAuthUserBrief(r.driverId) : null;
+        return {
+          id: r.id,
+          passengerId: r.passengerId,
+          passengerName: passenger?.name,
+          passengerPhone: passenger?.phone,
+          driverId: r.driverId,
+          driverName: driver?.name,
+          driverPhone: driver?.phone,
+          vehicleType: r.vehicleType,
+          pickupAddress: r.pickupAddress,
+          dropoffAddress: r.dropoffAddress,
+          scheduledAt: r.scheduledAt.toISOString(),
+          status: r.status,
+          priceCdf: r.estimatedPriceCdf,
+        };
+      }),
+    );
+  }
+
+  async adminAssignDriver(id: string, driverId: string) {
+    if (!driverId?.trim()) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Chauffeur requis.');
+    }
+    const ride = await this.prisma.scheduledRide.findUnique({ where: { id } });
+    if (!ride) throw new MovaHttpException(MovaErrorCode.SCHEDULED_RIDE_NOT_FOUND, HttpStatus.NOT_FOUND);
+    if (ride.status === ScheduledRideStatus.CANCELLED || ride.status === ScheduledRideStatus.COMPLETED) {
+      throw new MovaHttpException(MovaErrorCode.SCHEDULED_RIDE_INVALID_STATUS);
+    }
+    const data: { driverId: string; status?: ScheduledRideStatus } = { driverId: driverId.trim() };
+    if (ride.status === ScheduledRideStatus.SCHEDULED) {
+      data.status = ScheduledRideStatus.CONFIRMED;
+    }
+    const updated = await this.prisma.scheduledRide.update({ where: { id }, data });
+    const driver = await fetchAuthUserBrief(updated.driverId!);
+    return {
+      id: updated.id,
+      driverId: updated.driverId,
+      driverName: driver?.name,
+      driverPhone: driver?.phone,
+      status: updated.status,
+    };
   }
 
   async adminCancel(id: string, reason?: string) {

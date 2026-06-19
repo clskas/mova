@@ -1,0 +1,197 @@
+import { HttpStatus, Injectable } from '@nestjs/common';
+import { DeliveryStatus, DeliveryType, Prisma } from '@prisma/client';
+import { MOVA_EVENTS, MovaErrorCode, MovaHttpException } from '@mova/shared';
+import { RedisService } from '@mova/shared';
+import { PrismaService } from '../prisma/prisma.service';
+import { formatParcelDelivery } from '../deliveries/parcel.util';
+import { UpdateRestaurantMenuDto } from './restaurant-portal.dto';
+
+@Injectable()
+export class RestaurantPortalService {
+  constructor(private prisma: PrismaService, private redis: RedisService) {}
+
+  async getRestaurantForOwner(ownerUserId: string) {
+    const restaurant = await this.prisma.restaurant.findFirst({
+      where: { ownerUserId, isActive: true },
+    });
+    if (!restaurant) {
+      throw new MovaHttpException(MovaErrorCode.RESTAURANT_NOT_FOUND, HttpStatus.NOT_FOUND, 'Aucun restaurant lié à ce compte.');
+    }
+    return restaurant;
+  }
+
+  async getProfile(ownerUserId: string) {
+    const restaurant = await this.getRestaurantForOwner(ownerUserId);
+    return {
+      id: restaurant.id,
+      name: restaurant.name,
+      cuisine: restaurant.cuisine,
+      address: restaurant.address,
+      rating: restaurant.rating,
+      isAcceptingOrders: restaurant.isAcceptingOrders,
+      prepTimeMin: restaurant.prepTimeMin,
+      promotionLabel: restaurant.promotionLabel,
+      menuItems: restaurant.menuItems ?? [],
+    };
+  }
+
+  async listOrders(ownerUserId: string, status?: string) {
+    const restaurant = await this.getRestaurantForOwner(ownerUserId);
+    const statuses = status
+      ? status.split(',').map((s) => s.trim()).filter(Boolean)
+      : [
+          DeliveryStatus.PENDING,
+          DeliveryStatus.RESTAURANT_CONFIRMED,
+          DeliveryStatus.READY_FOR_PICKUP,
+          DeliveryStatus.PICKED_UP,
+          DeliveryStatus.IN_TRANSIT,
+        ];
+    const rows = await this.prisma.delivery.findMany({
+      where: {
+        restaurantId: restaurant.id,
+        type: DeliveryType.FOOD,
+        status: { in: statuses as DeliveryStatus[] },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+      include: { events: { orderBy: { createdAt: 'asc' } } },
+    });
+    return {
+      restaurant: { id: restaurant.id, name: restaurant.name },
+      orders: rows.map((d) => this.formatOrder(d)),
+    };
+  }
+
+  private formatOrder(d: {
+    id: string;
+    status: DeliveryStatus;
+    items: unknown;
+    deliveryAddress: string | null;
+    estimatedPriceCdf: number;
+    createdAt: Date;
+    driverId: string | null;
+  }) {
+    return {
+      id: d.id,
+      status: d.status,
+      statusLabel: this.statusLabel(d.status),
+      items: d.items,
+      deliveryAddress: d.deliveryAddress,
+      estimatedPriceCdf: d.estimatedPriceCdf,
+      createdAt: d.createdAt.toISOString(),
+      driverAssigned: Boolean(d.driverId),
+    };
+  }
+
+  private statusLabel(status: DeliveryStatus): string {
+    return (
+      {
+        [DeliveryStatus.PENDING]: 'Nouvelle commande',
+        [DeliveryStatus.RESTAURANT_CONFIRMED]: 'En préparation',
+        [DeliveryStatus.READY_FOR_PICKUP]: 'Prête pour livreur',
+        [DeliveryStatus.PICKED_UP]: 'Livreur assigné',
+        [DeliveryStatus.IN_TRANSIT]: 'En livraison',
+        [DeliveryStatus.DELIVERED]: 'Livrée',
+        [DeliveryStatus.CANCELLED]: 'Annulée',
+      }[status] ?? status
+    );
+  }
+
+  private async assertOrderAccess(deliveryId: string, ownerUserId: string) {
+    const restaurant = await this.getRestaurantForOwner(ownerUserId);
+    const delivery = await this.prisma.delivery.findUnique({
+      where: { id: deliveryId },
+      include: { restaurant: true, events: { orderBy: { createdAt: 'asc' } } },
+    });
+    if (!delivery || delivery.restaurantId !== restaurant.id) {
+      throw new MovaHttpException(MovaErrorCode.DELIVERY_NOT_FOUND, HttpStatus.NOT_FOUND);
+    }
+    if (delivery.type !== DeliveryType.FOOD) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Commande repas uniquement.');
+    }
+    return { delivery, restaurant };
+  }
+
+  async confirmOrder(deliveryId: string, ownerUserId: string) {
+    const { delivery } = await this.assertOrderAccess(deliveryId, ownerUserId);
+    if (delivery.status !== DeliveryStatus.PENDING) {
+      throw new MovaHttpException(MovaErrorCode.DELIVERY_INVALID_STATUS);
+    }
+    return this.transition(delivery.id, DeliveryStatus.RESTAURANT_CONFIRMED, ownerUserId, 'RESTAURANT_CONFIRMED');
+  }
+
+  async markReady(deliveryId: string, ownerUserId: string) {
+    const { delivery } = await this.assertOrderAccess(deliveryId, ownerUserId);
+    if (delivery.status !== DeliveryStatus.RESTAURANT_CONFIRMED) {
+      throw new MovaHttpException(MovaErrorCode.DELIVERY_INVALID_STATUS);
+    }
+    return this.transition(delivery.id, DeliveryStatus.READY_FOR_PICKUP, ownerUserId, 'READY_FOR_PICKUP');
+  }
+
+  async rejectOrder(deliveryId: string, ownerUserId: string, reason?: string) {
+    const { delivery } = await this.assertOrderAccess(deliveryId, ownerUserId);
+    if (delivery.status !== DeliveryStatus.PENDING && delivery.status !== DeliveryStatus.RESTAURANT_CONFIRMED) {
+      throw new MovaHttpException(MovaErrorCode.DELIVERY_INVALID_STATUS);
+    }
+    const updated = await this.prisma.delivery.update({
+      where: { id: deliveryId },
+      data: { status: DeliveryStatus.CANCELLED, cancelledAt: new Date() },
+      include: { restaurant: true, events: { orderBy: { createdAt: 'asc' } } },
+    });
+    await this.prisma.deliveryEvent.create({
+      data: {
+        deliveryId,
+        event: 'CANCELLED',
+        metadata: { updatedBy: ownerUserId, reason: reason ?? 'Refus restaurant' } as Prisma.InputJsonValue,
+      },
+    });
+    await this.publishStatus(updated, DeliveryStatus.CANCELLED);
+    return { order: this.formatOrder(updated), delivery: formatParcelDelivery(updated) };
+  }
+
+  async updateMenu(ownerUserId: string, dto: UpdateRestaurantMenuDto) {
+    const restaurant = await this.getRestaurantForOwner(ownerUserId);
+    const updated = await this.prisma.restaurant.update({
+      where: { id: restaurant.id },
+      data: {
+        ...(dto.menuItems != null ? { menuItems: dto.menuItems as Prisma.InputJsonValue } : {}),
+        ...(dto.promotionLabel !== undefined ? { promotionLabel: dto.promotionLabel } : {}),
+        ...(dto.isAcceptingOrders !== undefined ? { isAcceptingOrders: dto.isAcceptingOrders } : {}),
+        ...(dto.prepTimeMin !== undefined ? { prepTimeMin: dto.prepTimeMin } : {}),
+      },
+    });
+    return {
+      id: updated.id,
+      menuItems: updated.menuItems ?? [],
+      promotionLabel: updated.promotionLabel,
+      isAcceptingOrders: updated.isAcceptingOrders,
+      prepTimeMin: updated.prepTimeMin,
+    };
+  }
+
+  private async transition(deliveryId: string, status: DeliveryStatus, ownerUserId: string, event: string) {
+    const updated = await this.prisma.delivery.update({
+      where: { id: deliveryId },
+      data: { status },
+      include: { restaurant: true, events: { orderBy: { createdAt: 'asc' } } },
+    });
+    await this.prisma.deliveryEvent.create({
+      data: { deliveryId, event, metadata: { updatedBy: ownerUserId } as Prisma.InputJsonValue },
+    });
+    await this.publishStatus(updated, status);
+    return { order: this.formatOrder(updated), delivery: formatParcelDelivery(updated) };
+  }
+
+  private async publishStatus(
+    delivery: { id: string; userId: string; type: DeliveryType; restaurant?: { name: string } | null },
+    status: DeliveryStatus,
+  ) {
+    await this.redis.publish(MOVA_EVENTS.DELIVERY_STATUS_UPDATED, {
+      deliveryId: delivery.id,
+      userId: delivery.userId,
+      type: delivery.type,
+      status,
+      restaurantName: delivery.restaurant?.name,
+    });
+  }
+}

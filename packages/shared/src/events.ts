@@ -34,7 +34,9 @@ export interface DeliveryCreatedPayload {
   deliveryId: string;
   userId: string;
   type: string;
+  restaurantId?: string;
   restaurantName?: string;
+  restaurantOwnerUserId?: string;
   estimatedPriceCdf?: number;
 }
 

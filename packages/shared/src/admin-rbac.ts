@@ -45,6 +45,7 @@ export function isAdminPanelRole(role: string): role is UserRole {
 export const ADMIN_ROLE_PERMISSIONS: Record<UserRole, AdminPermission[]> = {
   [UserRole.PASSENGER]: [],
   [UserRole.DRIVER]: [],
+  [UserRole.RESTAURANT]: [],
   [UserRole.SUPER_ADMIN]: Object.values(AdminPermission),
   [UserRole.ADMIN]: [
     AdminPermission.METRICS_READ,

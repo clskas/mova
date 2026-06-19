@@ -53,11 +53,18 @@ class ApiClient {
     return connectivity.isOnline;
   }
 
-  bool get _isOffline {
+  bool get _hasNoNetwork {
     if (_mockMode) return false;
     final connectivity = _connectivity;
     if (connectivity == null) return false;
-    return connectivity.isOffline;
+    return !connectivity.hasNetwork;
+  }
+
+  /// Bloque uniquement sans réseau — la passerelle peut être réessayée même si /health a échoué.
+  bool get _isOffline => _hasNoNetwork;
+
+  void _markGatewayReachable() {
+    _connectivity?.setGatewayUp(true);
   }
 
   Future<String?> authToken() async {
@@ -115,7 +122,7 @@ class ApiClient {
     try {
       final res = await _client
           .get(Uri.parse('${MarketConfig.gatewayBaseUrl}/health'))
-          .timeout(const Duration(seconds: 3));
+          .timeout(const Duration(seconds: 8));
       final ok = res.statusCode == 200;
       _connectivity?.setGatewayUp(ok);
       return ok;
@@ -575,6 +582,7 @@ class ApiClient {
 
         final data = _decodeBody(response.body);
         if (response.statusCode >= 200 && response.statusCode < 300) {
+          _markGatewayReachable();
           return Success(_normalizeSuccess(data));
         }
         if (data is Map<String, dynamic>) {
@@ -635,6 +643,7 @@ class ApiClient {
 
         final data = _decodeBody(response.body);
         if (response.statusCode >= 200 && response.statusCode < 300) {
+          _markGatewayReachable();
           return Success(_normalizeSuccess(data));
         }
         if (data is Map<String, dynamic>) {
@@ -680,6 +689,7 @@ class ApiClient {
 
         final data = _decodeBody(response.body);
         if (response.statusCode >= 200 && response.statusCode < 300) {
+          _markGatewayReachable();
           final normalized = _normalizeSuccess(data);
           await _persistCacheForGet(path, normalized);
           return Success(normalized);

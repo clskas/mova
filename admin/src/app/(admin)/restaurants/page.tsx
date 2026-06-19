@@ -76,6 +76,7 @@ export default function RestaurantsPage() {
           name: editTarget.name,
           cuisine: editTarget.cuisine ?? undefined,
           address: editTarget.address ?? undefined,
+          ownerUserId: editTarget.ownerUserId ?? undefined,
         },
         editTarget.id,
       );
@@ -175,6 +176,8 @@ export default function RestaurantsPage() {
             <label><FieldLabel>Nom</FieldLabel><TextInput value={editTarget.name} onChange={(v) => setEditTarget({ ...editTarget, name: v })} /></label>
             <label><FieldLabel>Cuisine</FieldLabel><TextInput value={editTarget.cuisine ?? ""} onChange={(v) => setEditTarget({ ...editTarget, cuisine: v })} /></label>
             <label><FieldLabel>Adresse</FieldLabel><TextInput value={editTarget.address ?? ""} onChange={(v) => setEditTarget({ ...editTarget, address: v })} /></label>
+            <label><FieldLabel>ID compte partenaire (ownerUserId)</FieldLabel><TextInput value={editTarget.ownerUserId ?? ""} onChange={(v) => setEditTarget({ ...editTarget, ownerUserId: v || null })} placeholder="UUID utilisateur RESTAURANT" /></label>
+            <p className="text-xs text-gray-400">Créez le compte dans Utilisateurs (rôle RESTAURANT), puis collez son ID ici.</p>
             <BtnPrimary onClick={handleUpdate} disabled={saving}>{saving ? "Enregistrement…" : "Enregistrer"}</BtnPrimary>
           </div>
         )}

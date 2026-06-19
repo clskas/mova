@@ -1,0 +1,193 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import { PortalShell } from "@/components/PortalShell";
+import {
+  confirmOrder,
+  fetchOrders,
+  fetchProfile,
+  formatCdf,
+  markOrderReady,
+  rejectOrder,
+  type RestaurantOrder,
+  type RestaurantProfile,
+} from "@/lib/api";
+
+function formatItems(items: unknown): string {
+  if (!Array.isArray(items)) return "—";
+  return items
+    .map((it) => {
+      if (typeof it !== "object" || !it) return "";
+      const row = it as Record<string, unknown>;
+      const qty = row.quantity ?? row.qty ?? 1;
+      const name = row.name ?? row.itemName ?? "Article";
+      return `${qty}× ${name}`;
+    })
+    .filter(Boolean)
+    .join(", ");
+}
+
+export default function OrdersPage() {
+  const [profile, setProfile] = useState<RestaurantProfile | null>(null);
+  const [orders, setOrders] = useState<RestaurantOrder[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setError(null);
+    try {
+      const [p, o] = await Promise.all([fetchProfile(), fetchOrders()]);
+      setProfile(p);
+      setOrders(o.orders ?? []);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erreur de chargement");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+    const timer = setInterval(load, 12000);
+    return () => clearInterval(timer);
+  }, [load]);
+
+  async function act(id: string, action: "confirm" | "ready" | "reject") {
+    setBusyId(id);
+    setError(null);
+    try {
+      if (action === "confirm") await confirmOrder(id);
+      else if (action === "ready") await markOrderReady(id);
+      else await rejectOrder(id, "Indisponible");
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Action impossible");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  const pending = orders.filter((o) => o.status === "PENDING");
+  const active = orders.filter((o) => !["DELIVERED", "CANCELLED", "PENDING"].includes(o.status));
+
+  return (
+    <PortalShell restaurantName={profile?.name}>
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-xl font-bold">Commandes en cours</h2>
+          <p className="text-sm text-gray-500">Actualisation automatique toutes les 12 secondes</p>
+        </div>
+
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-4 text-sm">{error}</div>
+        )}
+
+        {loading ? (
+          <p className="text-gray-400 py-12 text-center">Chargement…</p>
+        ) : (
+          <>
+            <section>
+              <h3 className="font-semibold text-orange-700 mb-3">
+                Nouvelles ({pending.length})
+              </h3>
+              {pending.length === 0 ? (
+                <p className="text-gray-400 text-sm bg-white rounded-xl p-6 border">Aucune nouvelle commande</p>
+              ) : (
+                <div className="space-y-3">
+                  {pending.map((o) => (
+                    <OrderCard key={o.id} order={o} busy={busyId === o.id} onConfirm={() => act(o.id, "confirm")} onReject={() => act(o.id, "reject")} />
+                  ))}
+                </div>
+              )}
+            </section>
+
+            <section>
+              <h3 className="font-semibold text-violet-700 mb-3">En cours ({active.length})</h3>
+              {active.length === 0 ? (
+                <p className="text-gray-400 text-sm bg-white rounded-xl p-6 border">Rien en cuisine pour le moment</p>
+              ) : (
+                <div className="space-y-3">
+                  {active.map((o) => (
+                    <OrderCard
+                      key={o.id}
+                      order={o}
+                      busy={busyId === o.id}
+                      onReady={o.status === "RESTAURANT_CONFIRMED" ? () => act(o.id, "ready") : undefined}
+                    />
+                  ))}
+                </div>
+              )}
+            </section>
+          </>
+        )}
+      </div>
+    </PortalShell>
+  );
+}
+
+function OrderCard({
+  order,
+  busy,
+  onConfirm,
+  onReject,
+  onReady,
+}: {
+  order: RestaurantOrder;
+  busy: boolean;
+  onConfirm?: () => void;
+  onReject?: () => void;
+  onReady?: () => void;
+}) {
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 md:p-5">
+      <div className="flex flex-wrap items-start justify-between gap-2 mb-3">
+        <div>
+          <p className="font-semibold text-[#1A1A2E]">#{order.id.slice(0, 8)}</p>
+          <p className="text-xs text-gray-400">{order.createdAt ? new Date(order.createdAt).toLocaleString("fr-CD") : ""}</p>
+        </div>
+        <span className="text-xs px-2 py-1 rounded-full bg-orange-50 text-orange-800 font-medium">
+          {order.statusLabel ?? order.status}
+        </span>
+      </div>
+      <p className="text-sm text-gray-800 mb-1">{formatItems(order.items)}</p>
+      <p className="text-sm text-gray-500 mb-1">Livraison : {order.deliveryAddress ?? "—"}</p>
+      <p className="text-sm font-medium text-[#6C63FF] mb-4">{formatCdf(order.estimatedPriceCdf)}</p>
+      <div className="flex flex-wrap gap-2">
+        {onConfirm && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onConfirm}
+            className="px-4 py-2 rounded-xl bg-green-600 text-white text-sm font-medium disabled:opacity-60"
+          >
+            Accepter
+          </button>
+        )}
+        {onReady && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onReady}
+            className="px-4 py-2 rounded-xl bg-[#6C63FF] text-white text-sm font-medium disabled:opacity-60"
+          >
+            Prête pour livreur
+          </button>
+        )}
+        {onReject && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onReject}
+            className="px-4 py-2 rounded-xl border border-red-200 text-red-600 text-sm disabled:opacity-60"
+          >
+            Refuser
+          </button>
+        )}
+        {order.driverAssigned && (
+          <span className="text-xs text-green-700 self-center">Livreur assigné</span>
+        )}
+      </div>
+    </div>
+  );
+}

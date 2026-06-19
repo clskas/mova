@@ -202,6 +202,9 @@ export class DeliveriesService {
   async estimateFood(dto: CreateFoodDeliveryDto) {
     const restaurant = await this.prisma.restaurant.findUnique({ where: { id: dto.restaurantId } });
     if (!restaurant || !restaurant.isActive) throw new MovaHttpException(MovaErrorCode.RESTAURANT_NOT_FOUND, HttpStatus.NOT_FOUND);
+    if (!restaurant.isAcceptingOrders) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Ce restaurant n\'accepte pas de commandes pour le moment.');
+    }
     const foodSurcharge = await this.surcharges.get(SurchargeType.DELIVERY_FOOD);
     const { subtotalCdf: itemsSubtotal } = this.resolveFoodItemsSubtotalCdf(restaurant.menuItems, dto.items);
     const distanceKm = this.pricing.haversineKm(restaurant.lat, restaurant.lng, dto.deliveryLat, dto.deliveryLng);
@@ -226,6 +229,9 @@ export class DeliveriesService {
   async createFood(userId: string, dto: CreateFoodDeliveryDto) {
     const restaurant = await this.prisma.restaurant.findUnique({ where: { id: dto.restaurantId } });
     if (!restaurant || !restaurant.isActive) throw new MovaHttpException(MovaErrorCode.RESTAURANT_NOT_FOUND, HttpStatus.NOT_FOUND);
+    if (!restaurant.isAcceptingOrders) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Ce restaurant n\'accepte pas de commandes pour le moment.');
+    }
     if (!dto.items.length) throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR);
     const { subtotalCdf, normalizedItems } = this.resolveFoodItemsSubtotalCdf(restaurant.menuItems, dto.items);
     const estimate = await this.estimateFood({ ...dto, items: normalizedItems });
@@ -261,7 +267,9 @@ export class DeliveriesService {
       deliveryId: delivery.id,
       userId,
       type: delivery.type,
+      restaurantId: restaurant.id,
       restaurantName: restaurant.name,
+      restaurantOwnerUserId: restaurant.ownerUserId ?? undefined,
       estimatedPriceCdf: delivery.estimatedPriceCdf,
     });
     const withEvents = { ...delivery, events: [{ id: '1', deliveryId: delivery.id, event: 'ORDER_PLACED', metadata: null, createdAt: new Date() }] };
@@ -425,6 +433,9 @@ export class DeliveriesService {
   async getRestaurant(id: string) {
     const restaurant = await this.prisma.restaurant.findUnique({ where: { id } });
     if (!restaurant || !restaurant.isActive) throw new MovaHttpException(MovaErrorCode.RESTAURANT_NOT_FOUND, HttpStatus.NOT_FOUND);
+    if (!restaurant.isAcceptingOrders) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Ce restaurant n\'accepte pas de commandes pour le moment.');
+    }
     return {
       ...restaurant,
       menu: restaurant.menuItems ?? [],
@@ -651,9 +662,15 @@ export class DeliveriesService {
 
     const deliveries = await this.prisma.delivery.findMany({
       where: {
-        status: DeliveryStatus.PENDING,
         driverId: null,
         type: { in: [DeliveryType.PARCEL, DeliveryType.FOOD, DeliveryType.EXPRESS] },
+        OR: [
+          { type: { in: [DeliveryType.PARCEL, DeliveryType.EXPRESS] }, status: DeliveryStatus.PENDING },
+          {
+            type: DeliveryType.FOOD,
+            status: { in: [DeliveryStatus.RESTAURANT_CONFIRMED, DeliveryStatus.READY_FOR_PICKUP] },
+          },
+        ],
       },
       orderBy: { createdAt: 'desc' },
       take: 30,
@@ -689,7 +706,13 @@ export class DeliveriesService {
   async acceptDelivery(deliveryId: string, driverUserId: string) {
     const delivery = await this.prisma.delivery.findUnique({ where: { id: deliveryId } });
     if (!delivery) throw new MovaHttpException(MovaErrorCode.DELIVERY_NOT_FOUND, HttpStatus.NOT_FOUND);
-    if (delivery.status !== DeliveryStatus.PENDING) {
+    const foodAcceptable =
+      delivery.type === DeliveryType.FOOD &&
+      (delivery.status === DeliveryStatus.RESTAURANT_CONFIRMED ||
+        delivery.status === DeliveryStatus.READY_FOR_PICKUP);
+    const parcelAcceptable =
+      delivery.type !== DeliveryType.FOOD && delivery.status === DeliveryStatus.PENDING;
+    if (!foodAcceptable && !parcelAcceptable) {
       throw new MovaHttpException(MovaErrorCode.DELIVERY_INVALID_STATUS);
     }
     if (delivery.driverId) {
@@ -716,6 +739,8 @@ export class DeliveriesService {
     }
     const allowed: Record<DeliveryStatus, DeliveryStatus[]> = {
       [DeliveryStatus.PENDING]: [DeliveryStatus.PICKED_UP, DeliveryStatus.CANCELLED],
+      [DeliveryStatus.RESTAURANT_CONFIRMED]: [DeliveryStatus.CANCELLED],
+      [DeliveryStatus.READY_FOR_PICKUP]: [DeliveryStatus.CANCELLED],
       [DeliveryStatus.PICKED_UP]: [DeliveryStatus.IN_TRANSIT, DeliveryStatus.CANCELLED],
       [DeliveryStatus.IN_TRANSIT]: [DeliveryStatus.DELIVERED],
       [DeliveryStatus.DELIVERED]: [],
@@ -747,8 +772,10 @@ export class DeliveriesService {
     if (type === DeliveryType.FOOD) {
       return (
         {
-          [DeliveryStatus.PENDING]: 'Commande confirmée',
-          [DeliveryStatus.PICKED_UP]: 'En préparation',
+          [DeliveryStatus.PENDING]: 'En attente du restaurant',
+          [DeliveryStatus.RESTAURANT_CONFIRMED]: 'En préparation',
+          [DeliveryStatus.READY_FOR_PICKUP]: 'Prête — livreur en route',
+          [DeliveryStatus.PICKED_UP]: 'Livreur assigné',
           [DeliveryStatus.IN_TRANSIT]: 'Livreur en route',
           [DeliveryStatus.DELIVERED]: 'Commande livrée',
           [DeliveryStatus.CANCELLED]: 'Commande annulée',

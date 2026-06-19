@@ -11,6 +11,7 @@ datasource db {
 enum UserRole {
   PASSENGER
   DRIVER
+  RESTAURANT
   SUPER_ADMIN
   ADMIN
   SUPPORT

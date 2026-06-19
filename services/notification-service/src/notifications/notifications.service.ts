@@ -47,10 +47,20 @@ export class NotificationsService implements OnModuleInit {
     await this.create(
       payload.userId,
       'Commande confirmée',
-      `Votre commande${label} est enregistrée. Suivi en temps réel dans l'app.`,
+      `Votre commande${label} est enregistrée. Le restaurant va la confirmer.`,
       'DELIVERY_CREATED',
       payload,
     );
+    if (payload.restaurantOwnerUserId) {
+      await this.create(
+        payload.restaurantOwnerUserId,
+        'Nouvelle commande repas',
+        `Commande reçue${label}. Ouvrez le portail restaurant pour confirmer.`,
+        'RESTAURANT_ORDER',
+        payload,
+      );
+      this.logger.log(`restaurant order notification for ${payload.deliveryId}`);
+    }
   }
 
   async onDeliveryStatusUpdated(payload: DeliveryStatusUpdatedPayload) {
@@ -63,8 +73,10 @@ export class NotificationsService implements OnModuleInit {
     if (payload.type !== 'FOOD') return null;
     return (
       {
-        PENDING: 'Commande confirmée — le restaurant prépare votre repas.',
-        PICKED_UP: 'Votre commande est en préparation.',
+        PENDING: 'Commande envoyée au restaurant.',
+        RESTAURANT_CONFIRMED: 'Le restaurant prépare votre repas.',
+        READY_FOR_PICKUP: 'Votre commande est prête — le livreur arrive.',
+        PICKED_UP: 'Le livreur a récupéré votre commande.',
         IN_TRANSIT: 'Le livreur est en route vers vous.',
         DELIVERED: 'Commande livrée. Bon appétit !',
         CANCELLED: 'Votre commande a été annulée.',

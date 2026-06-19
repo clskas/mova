@@ -19,8 +19,9 @@ import { HistoryModule } from './history/history.module';
 import { MovingModule } from './moving/moving.module';
 import { ExpressModule } from './express/express.module';
 import { UploadsModule } from './uploads/uploads.module';
+import { RestaurantModule } from './restaurant/restaurant.module';
 
-@Module({ imports: [ConfigModule.forRoot({ isGlobal: true }), RedisModule, PrismaModule, HealthModule, AuthModule, RidesModule, DeliveriesModule, ServicesCatalogModule, CarpoolModule, ErrandsModule, RentalModule, GeoModule, RatingsModule, MatchingModule, WebsocketModule, InternalModule, HistoryModule, MovingModule, ExpressModule, UploadsModule] })
+@Module({ imports: [ConfigModule.forRoot({ isGlobal: true }), RedisModule, PrismaModule, HealthModule, AuthModule, RidesModule, DeliveriesModule, ServicesCatalogModule, CarpoolModule, ErrandsModule, RentalModule, GeoModule, RatingsModule, MatchingModule, WebsocketModule, InternalModule, HistoryModule, MovingModule, ExpressModule, UploadsModule, RestaurantModule] })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
     consumer.apply(RequestIdMiddleware).forRoutes({ path: '*', method: RequestMethod.ALL });

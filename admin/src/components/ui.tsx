@@ -101,6 +101,8 @@ const STATUS_COLORS: Record<string, string> = {
   SCHEDULED: "bg-blue-100 text-blue-700",
   DELIVERED: "bg-green-100 text-green-700",
   IN_TRANSIT: "bg-violet-100 text-violet-700",
+  RESTAURANT_CONFIRMED: "bg-amber-100 text-amber-800",
+  READY_FOR_PICKUP: "bg-blue-100 text-blue-700",
 };
 
 export function StatusBadge({ status }: { status?: string }) {

@@ -18,7 +18,9 @@ import {
 } from "@/components/ui";
 
 const DELIVERY_STATUSES = [
-  { value: "PENDING", label: "En attente" },
+  { value: "PENDING", label: "En attente restaurant" },
+  { value: "RESTAURANT_CONFIRMED", label: "En préparation" },
+  { value: "READY_FOR_PICKUP", label: "Prête livreur" },
   { value: "PICKED_UP", label: "Pris en charge" },
   { value: "IN_TRANSIT", label: "En transit" },
   { value: "DELIVERED", label: "Livré" },

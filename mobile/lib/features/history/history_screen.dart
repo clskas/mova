@@ -10,6 +10,7 @@ import '../../core/widgets/mova_widgets.dart';
 import '../delivery/food_delivery_screen.dart';
 import '../delivery/parcel_delivery_screen.dart';
 import '../../core/widgets/offline_shell.dart';
+import 'history_detail_dialog.dart';
 
 class HistoryScreen extends ConsumerStatefulWidget {
   const HistoryScreen({super.key});
@@ -88,6 +89,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: MovaCard(
+        onTap: () => showHistoryDetailDialog(context, ref, item),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -121,42 +123,12 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
 
   Widget _unifiedTile(Map<String, dynamic> item) {
     final type = item['type']?.toString();
-    final meta = item['meta'] as Map<String, dynamic>? ?? {};
     if (type == 'RIDE') return _rideTile(item);
-    if (type == 'PARCEL' || type == 'EXPRESS') {
-      return _parcelTile({
-        ...meta,
-        'pickupAddress': meta['pickupAddress'] ?? item['title'],
-        'dropoffAddress': meta['dropoffAddress'] ?? '',
-        'priceCdf': item['priceCdf'],
-        'status': item['status'],
-      }, meta: meta);
-    }
-    if (type == 'FOOD') {
-      return _foodTile({
-        ...meta,
-        'restaurantName': meta['restaurantName'] ?? item['title'],
-        'deliveryAddress': meta['deliveryAddress'] ?? '',
-        'priceCdf': item['priceCdf'],
-        'status': item['status'],
-      }, meta: meta);
-    }
-    if (type == 'SCHEDULED') {
-      return _scheduledTile({
-        'dropoffAddress': item['title'],
-        'scheduledAt': meta['scheduledAt'] ?? item['createdAt'],
-        'priceCdf': item['priceCdf'],
-        'status': item['status'],
-      });
-    }
-    if (type == 'ERRAND') {
-      return _errandTile({
-        'deliveryAddress': item['title'],
-        'items': meta['items'] ?? [],
-        'priceCdf': item['priceCdf'],
-        'status': item['status'],
-      });
-    }
+    if (type == 'PARCEL' || type == 'EXPRESS') return _parcelTile(item);
+    if (type == 'FOOD') return _foodTile(item);
+    if (type == 'SCHEDULED') return _scheduledTile(item);
+    if (type == 'MOVING') return _movingTile(item);
+    if (type == 'ERRAND') return _errandTile(item);
     return _rideTile(item);
   }
 
@@ -167,11 +139,12 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
         ),
       );
 
-  Widget _parcelTile(Map<String, dynamic> item, {Map<String, dynamic>? meta}) {
-    final m = meta ?? item;
+  Widget _parcelTile(Map<String, dynamic> item) {
+    final meta = item['meta'] as Map<String, dynamic>? ?? {};
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: MovaCard(
+        onTap: () => showHistoryDetailDialog(context, ref, item),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -184,7 +157,8 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
             ),
             const SizedBox(height: 4),
             Text(
-              '${item['pickupAddress'] ?? m['pickupAddress'] ?? 'Enlèvement'} → ${item['dropoffAddress'] ?? m['dropoffAddress'] ?? 'Livraison'}',
+              item['title']?.toString() ??
+                  '${meta['pickupAddress'] ?? 'Enlèvement'} → ${meta['dropoffAddress'] ?? 'Livraison'}',
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
@@ -208,9 +182,9 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
                     context,
                     MaterialPageRoute(
                       builder: (_) => ParcelDeliveryScreen(
-                        initialPickupAddress: m['pickupAddress']?.toString(),
-                        initialDropoffAddress: m['dropoffAddress']?.toString(),
-                        initialWeightCategory: m['weightCategory']?.toString(),
+                        initialPickupAddress: meta['pickupAddress']?.toString(),
+                        initialDropoffAddress: meta['dropoffAddress']?.toString(),
+                        initialWeightCategory: meta['weightCategory']?.toString(),
                       ),
                     ),
                   );
@@ -223,11 +197,12 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
     );
   }
 
-  Widget _foodTile(Map<String, dynamic> item, {Map<String, dynamic>? meta}) {
-    final m = meta ?? item;
+  Widget _foodTile(Map<String, dynamic> item) {
+    final meta = item['meta'] as Map<String, dynamic>? ?? {};
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: MovaCard(
+        onTap: () => showHistoryDetailDialog(context, ref, item),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -240,13 +215,13 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
             ),
             const SizedBox(height: 4),
             Text(
-              item['restaurantName']?.toString() ?? 'Restaurant',
+              meta['restaurantName']?.toString() ?? item['title']?.toString() ?? 'Restaurant',
               style: const TextStyle(fontWeight: FontWeight.w600),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
             Text(
-              item['deliveryAddress']?.toString() ?? '',
+              meta['deliveryAddress']?.toString() ?? '',
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
@@ -267,14 +242,14 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
                 isSecondary: true,
                 icon: Icons.replay,
                 onPressed: () {
-                  final items = (m['items'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+                  final items = (meta['items'] as List?)?.cast<Map<String, dynamic>>() ?? [];
                   Navigator.push(
                     context,
                     MaterialPageRoute(
                       builder: (_) => FoodDeliveryScreen(
-                        initialRestaurantId: m['restaurantId']?.toString(),
+                        initialRestaurantId: meta['restaurantId']?.toString(),
                         initialItems: items,
-                        initialDeliveryAddress: m['deliveryAddress']?.toString(),
+                        initialDeliveryAddress: meta['deliveryAddress']?.toString(),
                       ),
                     ),
                   );
@@ -287,10 +262,12 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
     );
   }
 
-  Widget _scheduledTile(Map<String, dynamic> ride) {
+  Widget _scheduledTile(Map<String, dynamic> item) {
+    final meta = item['meta'] as Map<String, dynamic>? ?? {};
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: MovaCard(
+        onTap: () => showHistoryDetailDialog(context, ref, item),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -303,24 +280,60 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
             ),
             const SizedBox(height: 4),
             Text(
-              ride['dropoffAddress']?.toString() ?? 'Destination',
+              item['title']?.toString() ?? 'Destination',
               style: const TextStyle(fontWeight: FontWeight.w600),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
             Text(
-              ride['scheduledAt']?.toString() ?? '',
+              meta['scheduledAt']?.toString() ?? item['createdAt']?.toString() ?? '',
               style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
             const SizedBox(height: 4),
             Text(
-              MarketConfig.formatCdf(ride['priceCdf'] as int? ?? 0),
+              MarketConfig.formatCdf(item['priceCdf'] as int? ?? 0),
               style: const TextStyle(color: MovaColors.violet),
             ),
             Text(
-              _statusLabel(ride['status']?.toString()),
+              historyStatusLabel(item['status']?.toString()),
+              style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _movingTile(Map<String, dynamic> item) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: MovaCard(
+        onTap: () => showHistoryDetailDialog(context, ref, item),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.local_shipping_outlined, size: 18, color: MovaColors.midnight),
+                SizedBox(width: 6),
+                Text('Déménagement', style: TextStyle(fontWeight: FontWeight.w600)),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              item['title']?.toString() ?? '',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              MarketConfig.formatCdf(item['priceCdf'] as int? ?? 0),
+              style: const TextStyle(color: MovaColors.violet),
+            ),
+            Text(
+              historyStatusLabel(item['status']?.toString()),
               style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
             ),
           ],
@@ -330,10 +343,12 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
   }
 
   Widget _errandTile(Map<String, dynamic> item) {
-    final items = item['items'] as List? ?? [];
+    final meta = item['meta'] as Map<String, dynamic>? ?? {};
+    final items = meta['items'] as List? ?? [];
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: MovaCard(
+        onTap: () => showHistoryDetailDialog(context, ref, item),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -346,7 +361,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
             ),
             const SizedBox(height: 4),
             Text(
-              item['deliveryAddress']?.toString() ?? '',
+              item['title']?.toString() ?? '',
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
@@ -381,6 +396,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
     }
 
     final rides = _history.where((d) => (d as Map)['type'] == 'RIDE').toList();
+    final movings = _history.where((d) => (d as Map)['type'] == 'MOVING').toList();
     final errands = _history.where((d) => (d as Map)['type'] == 'ERRAND').toList();
     final parcels = _history.where((d) {
       final t = (d as Map)['type'];
@@ -409,7 +425,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
               children: scheduled.map((s) => _unifiedTile(s as Map<String, dynamic>)).toList(),
             );
           default:
-            final courses = [...rides, ...errands];
+            final courses = [...rides, ...errands, ...movings];
             if (courses.isEmpty) return _empty('Aucune course');
             return Column(
               children: courses.map((e) => _unifiedTile(e as Map<String, dynamic>)).toList(),

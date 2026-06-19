@@ -8,6 +8,7 @@ import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
+import '../history/history_detail_dialog.dart';
 
 class MovingTrackingScreen extends ConsumerStatefulWidget {
   const MovingTrackingScreen({
@@ -71,28 +72,22 @@ class _MovingTrackingScreenState extends ConsumerState<MovingTrackingScreen> {
 
   List<Map<String, dynamic>> get _timeline {
     final raw = _request?['timeline'] as List?;
-    if (raw != null && raw.isNotEmpty) return raw.cast<Map<String, dynamic>>();
-    final status = _request?['status']?.toString() ?? 'PENDING';
-    final step = switch (status) {
-      'COMPLETED' => 3,
-      'IN_PROGRESS' => 2,
-      'ASSIGNED' => 1,
-      _ => 0,
-    };
-    const labels = [
-      'Demande enregistrée',
-      'Devis confirmé',
-      'Équipe en route',
-      'Déménagement terminé',
-    ];
-    return labels.asMap().entries.map((e) {
-      return {'label': e.value, 'done': e.key <= step};
-    }).toList();
+    if (raw != null && raw.isNotEmpty) {
+      return raw.cast<Map<String, dynamic>>();
+    }
+    return movingTimelineSteps(_request?['status']?.toString());
+  }
+
+  List<String> get _photoUrls {
+    final raw = _request?['photoUrls'] as List?;
+    if (raw == null) return [];
+    return raw.map((e) => e.toString()).where((u) => u.isNotEmpty).toList();
   }
 
   @override
   Widget build(BuildContext context) {
     final price = _request?['estimatedPriceCdf'] as int? ?? widget.estimatedPrice;
+    final status = _request?['status']?.toString() ?? 'PENDING';
 
     return MovaScreen(
       title: 'Suivi déménagement',
@@ -113,7 +108,7 @@ class _MovingTrackingScreenState extends ConsumerState<MovingTrackingScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Déménagement #${widget.movingId}',
+                        'Déménagement #${widget.movingId.length <= 8 ? widget.movingId.toUpperCase() : widget.movingId.substring(0, 8).toUpperCase()}',
                         style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                       ),
                       const SizedBox(height: 4),
@@ -132,14 +127,48 @@ class _MovingTrackingScreenState extends ConsumerState<MovingTrackingScreen> {
                         ),
                       ),
                       Text(
-                        _request?['status']?.toString() ?? 'PENDING',
+                        historyStatusLabel(status),
                         style: const TextStyle(color: MovaColors.violet, fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Un administrateur MOVA valide votre demande, assigne une équipe/camion, '
+                        'puis met à jour le statut. Vous voyez ici les changements en temps réel.',
+                        style: TextStyle(fontSize: 12, color: MovaColors.textSecondary, height: 1.35),
                       ),
                     ],
                   ),
                 ),
+                if (_photoUrls.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  Text('Photos inventaire', style: Theme.of(context).textTheme.titleSmall),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    height: 88,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: _photoUrls.length,
+                      separatorBuilder: (_, __) => const SizedBox(width: 8),
+                      itemBuilder: (_, i) => ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.network(
+                          MarketConfig.resolveMediaUrl(_photoUrls[i]),
+                          width: 88,
+                          height: 88,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Container(
+                            width: 88,
+                            height: 88,
+                            color: Colors.grey.shade200,
+                            child: const Icon(Icons.broken_image_outlined),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 20),
-                Text('Statuts', style: Theme.of(context).textTheme.titleSmall),
+                Text('Suivi', style: Theme.of(context).textTheme.titleSmall),
                 const SizedBox(height: 12),
                 ..._timeline.map((step) {
                   final done = step['done'] == true;

@@ -156,6 +156,9 @@ export type Restaurant = {
   imageUrl?: string | null;
   menuItems?: unknown;
   isActive?: boolean;
+  isAcceptingOrders?: boolean;
+  prepTimeMin?: number;
+  ownerUserId?: string | null;
 };
 
 export type PricingRule = {

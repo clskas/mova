@@ -41,12 +41,22 @@ class MarketConfig {
     return apiBaseUrl;
   }
 
-  /// WebSocket GPS (ride-service namespace `/tracking`). Définir via `--dart-define=WS_URL=...`
-  /// Ex. émulateur Android : `http://10.0.2.2:3002`
-  static const wsUrl = String.fromEnvironment(
-    'WS_URL',
-    defaultValue: 'http://10.0.2.2:3002',
-  );
+  /// URL absolue pour afficher une photo uploadée (`/api/uploads/...` ou URL complète).
+  static String resolveMediaUrl(String url) {
+    final trimmed = url.trim();
+    if (trimmed.isEmpty) return trimmed;
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed;
+    if (trimmed.startsWith('/')) return '$gatewayBaseUrl$trimmed';
+    return '$gatewayBaseUrl/api/uploads/parcels/$trimmed';
+  }
+
+  /// WebSocket (`/tracking` via api-gateway). Définir via `--dart-define=WS_URL=...`
+  /// Par défaut : même hôte que [gatewayBaseUrl] (port 3000, pas ride-service direct).
+  static String get wsUrl {
+    const fromEnv = String.fromEnvironment('WS_URL', defaultValue: '');
+    if (fromEnv.isNotEmpty) return fromEnv;
+    return gatewayBaseUrl;
+  }
 
   static const mobileMoneyProviders = [
     MobileMoneyProvider(id: 'ORANGE_MONEY', name: 'Orange Money', color: 0xFFFF6600),

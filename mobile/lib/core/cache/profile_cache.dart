@@ -19,6 +19,15 @@ class ProfileCache {
     await prefs.remove(_syncedAtKey);
   }
 
+  /// Met à jour uniquement le flag disponibilité dans le cache local.
+  static Future<void> patchAvailability(bool isAvailable) async {
+    final snapshot = await load();
+    if (snapshot.profile == null) return;
+    final profile = Map<String, dynamic>.from(snapshot.profile!);
+    profile['isAvailable'] = isAvailable;
+    await save(profile);
+  }
+
   static Future<ProfileSnapshot> load() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_payloadKey);

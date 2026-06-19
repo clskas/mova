@@ -67,6 +67,7 @@ export class MovingService {
         estimatedPriceCdf: estimate.estimatedPriceCdf,
         distanceKm: estimate.distanceKm,
         durationMin: estimate.durationMin,
+        photoUrls: dto.photoUrls?.length ? dto.photoUrls : undefined,
       },
     });
     return { moving: request, estimate };
@@ -85,8 +86,12 @@ export class MovingService {
     if (!request) throw new MovaHttpException(MovaErrorCode.MOVING_NOT_FOUND, HttpStatus.NOT_FOUND);
     if (request.userId !== userId) throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
     const timeline = buildMovingTimeline(request.status, request.completedAt);
+    const photoUrls = Array.isArray(request.photoUrls)
+      ? (request.photoUrls as string[])
+      : [];
     return {
       ...request,
+      photoUrls,
       timeline,
       tracking: timeline,
       paymentReady: request.status === MovingRequestStatus.COMPLETED,

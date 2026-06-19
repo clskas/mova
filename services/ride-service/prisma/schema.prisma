@@ -40,6 +40,8 @@ enum WeightCategory {
 
 enum DeliveryStatus {
   PENDING
+  RESTAURANT_CONFIRMED
+  READY_FOR_PICKUP
   PICKED_UP
   IN_TRANSIT
   DELIVERED
@@ -190,22 +192,26 @@ model Rating {
 }
 
 model Restaurant {
-  id              String   @id @default(uuid())
-  name            String
-  cuisine         String
-  address         String
-  lat             Float
-  lng             Float
-  rating          Float    @default(4.0)
-  imageUrl        String?
-  promotionLabel  String?
-  menuItems       Json?
-  isActive        Boolean  @default(true)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id                String   @id @default(uuid())
+  name              String
+  cuisine           String
+  address           String
+  lat               Float
+  lng               Float
+  rating            Float    @default(4.0)
+  imageUrl          String?
+  promotionLabel    String?
+  menuItems         Json?
+  isActive          Boolean  @default(true)
+  isAcceptingOrders Boolean  @default(true)
+  prepTimeMin       Int      @default(25)
+  ownerUserId       String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   deliveries Delivery[]
 
+  @@index([ownerUserId])
   @@map("restaurants")
 }
 
@@ -499,6 +505,7 @@ model MovingRequest {
   distanceKm        Float?
   durationMin       Float?
   driverId          String?
+  photoUrls         Json?
   completedAt       DateTime?
   cancelledAt       DateTime?
   createdAt         DateTime            @default(now())

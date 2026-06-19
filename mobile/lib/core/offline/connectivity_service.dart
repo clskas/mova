@@ -53,6 +53,7 @@ class ConnectivityService {
   bool _hasNetwork = true;
   int _pendingSyncCount = 0;
   StreamSubscription<List<ConnectivityResult>>? _subscription;
+  Timer? _healthRetryTimer;
   void Function()? onBackOnline;
 
   Stream<OfflineState> get stream => _controller.stream;
@@ -67,6 +68,16 @@ class ConnectivityService {
     _applyConnectivity(results);
     _subscription = _connectivity.onConnectivityChanged.listen(_applyConnectivity);
     _emit();
+  }
+
+  /// Réessaie périodiquement la santé de la passerelle tant qu'elle est marquée indisponible.
+  void startGatewayHealthRetry(Future<bool> Function() checkHealth) {
+    _healthRetryTimer?.cancel();
+    _healthRetryTimer = Timer.periodic(const Duration(seconds: 15), (_) async {
+      if (_hasNetwork && !_gatewayUp) {
+        await checkHealth();
+      }
+    });
   }
 
   void setGatewayUp(bool up) {
@@ -112,6 +123,7 @@ class ConnectivityService {
 
   void dispose() {
     _subscription?.cancel();
+    _healthRetryTimer?.cancel();
     _controller.close();
   }
 }

@@ -15,6 +15,7 @@ import '../../core/location/destination_coords.dart';
 import '../../core/widgets/destination_coord_panel.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
+import '../history/history_detail_dialog.dart';
 
 class ScheduledRideScreen extends ConsumerStatefulWidget {
   const ScheduledRideScreen({super.key});
@@ -42,6 +43,7 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
   String? _error;
   String? _validationError;
   Timer? _debounce;
+  Timer? _pollTimer;
 
   String _vehicleLabel(String id) {
     for (final v in MarketConfig.vehicleTypes) {
@@ -86,12 +88,14 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
     super.initState();
     _destinationController.addListener(_onDestinationChanged);
     _loadUpcoming();
+    _pollTimer = Timer.periodic(const Duration(seconds: 12), (_) => _loadUpcoming(silent: true));
     _useMyLocation(silent: true);
   }
 
   @override
   void dispose() {
     _debounce?.cancel();
+    _pollTimer?.cancel();
     _destinationController.removeListener(_onDestinationChanged);
     _destinationController.dispose();
     super.dispose();
@@ -251,20 +255,102 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
     return null;
   }
 
-  Future<void> _loadUpcoming() async {
-    setState(() => _loadingUpcoming = true);
+  Future<void> _loadUpcoming({bool silent = false}) async {
+    if (!silent) setState(() => _loadingUpcoming = true);
     final api = ref.read(apiClientProvider);
     await api.checkHealth();
     final result = await api.get('/rides/scheduled');
     if (result case Success(:final data)) {
       final list = data['data'] as List? ?? (data is List ? data : null);
-      setState(() {
-        _upcoming = (list ?? []).cast<Map<String, dynamic>>();
-        _loadingUpcoming = false;
-      });
-    } else {
+      if (mounted) {
+        setState(() {
+          _upcoming = (list ?? []).cast<Map<String, dynamic>>();
+          if (!silent) _loadingUpcoming = false;
+        });
+      }
+    } else if (mounted && !silent) {
       setState(() => _loadingUpcoming = false);
     }
+  }
+
+  Future<void> _showScheduledDetail(Map<String, dynamic> ride) async {
+    final id = ride['id']?.toString() ?? '';
+    Map<String, dynamic>? live = ride;
+    if (id.isNotEmpty) {
+      final api = ref.read(apiClientProvider);
+      final result = await api.get('/rides/scheduled/$id');
+      if (result case Success(:final data)) {
+        live = data is Map<String, dynamic> ? data : ride;
+      }
+    }
+    if (!mounted) return;
+    final status = live?['status']?.toString() ?? 'SCHEDULED';
+    final timeline = scheduledTimelineSteps(status);
+    final scheduledRaw = live?['scheduledAt']?.toString();
+    final when = scheduledRaw != null ? _formatDateTime(DateTime.parse(scheduledRaw)) : '—';
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Réservation planifiée'),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Réf. ${_shortRef(id)}', style: const TextStyle(color: MovaColors.violet, fontSize: 12)),
+              const SizedBox(height: 8),
+              Text(live?['dropoffAddress']?.toString() ?? 'Destination',
+                  style: const TextStyle(fontWeight: FontWeight.w600)),
+              Text('Départ : ${live?['pickupAddress'] ?? 'Ma position'}',
+                  style: const TextStyle(fontSize: 13, color: MovaColors.textSecondary)),
+              Text('Date : $when', style: const TextStyle(fontSize: 13)),
+              Text(
+                historyStatusLabel(status),
+                style: const TextStyle(color: MovaColors.violet, fontWeight: FontWeight.w600),
+              ),
+              Text(MarketConfig.formatCdf(live?['estimatedPriceCdf'] as int? ?? 0)),
+              const SizedBox(height: 12),
+              const Text(
+                'MOVA confirme la réservation et assigne un chauffeur avant l\'heure prévue. '
+                'Les mises à jour admin apparaissent ici automatiquement.',
+                style: TextStyle(fontSize: 12, color: MovaColors.textSecondary, height: 1.35),
+              ),
+              const SizedBox(height: 12),
+              const Text('Suivi', style: TextStyle(fontWeight: FontWeight.w600)),
+              ...timeline.map((step) {
+                final done = step['done'] == true;
+                return Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Row(
+                    children: [
+                      Icon(
+                        done ? Icons.check_circle : Icons.radio_button_unchecked,
+                        size: 18,
+                        color: done ? MovaColors.green : MovaColors.textSecondary,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text(step['label']?.toString() ?? '')),
+                    ],
+                  ),
+                );
+              }),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Fermer')),
+          if (id.isNotEmpty && status != 'CANCELLED' && status != 'COMPLETED')
+            TextButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                _cancelScheduled(id);
+              },
+              child: const Text('Annuler'),
+            ),
+        ],
+      ),
+    );
   }
 
   Future<void> _cancelScheduled(String id) async {
@@ -468,6 +554,7 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
               return Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: MovaCard(
+                  onTap: () => _showScheduledDetail(map),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -497,6 +584,10 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
                           map['estimatedPriceCdf'] as int? ?? map['priceCdf'] as int? ?? 0,
                         ),
                         style: const TextStyle(color: MovaColors.violet),
+                      ),
+                      Text(
+                        historyStatusLabel(map['status']?.toString()),
+                        style: const TextStyle(color: MovaColors.violet, fontWeight: FontWeight.w600, fontSize: 13),
                       ),
                       if (id.isNotEmpty && map['status']?.toString() != 'CANCELLED')
                         Align(

@@ -67,15 +67,23 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed && mounted) {
-      _loadProfile(clearCache: true);
+      ref.read(apiClientProvider).checkHealth().then((_) {
+        if (mounted) _loadProfile(clearCache: true);
+      });
     }
+  }
+
+  bool _readAvailability(Map<String, dynamic> data) {
+    final value = data['isAvailable'];
+    if (value == true || value == 1 || value == 'true' || value == '1') return true;
+    return false;
   }
 
   Future<void> _bootstrap() async {
     final api = ref.read(apiClientProvider);
     await api.loadToken();
     await api.checkHealth();
-    await Future.wait([_loadProfile(), _loadEarnings(), _loadActiveRide(), _loadActiveDelivery()]);
+    await Future.wait([_loadProfile(clearCache: true), _loadEarnings(), _loadActiveRide(), _loadActiveDelivery()]);
     if (mounted) {
       setState(() => _bootstrapping = false);
       if (_available) _startPolling();
@@ -98,7 +106,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
         final kycStatus = data['kycStatus']?.toString();
         setState(() {
           _profile = data;
-          _available = data['isAvailable'] == true;
+          _available = _readAvailability(data);
           _vehicleId = activeVehicle['id']?.toString();
           _availabilityError = null;
           _profileError = null;
@@ -240,7 +248,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
     }
   }
 
-  Future<bool> _pushLocation() async {
+  Future<bool> _ensureGpsPosition() async {
     if (!await Geolocator.isLocationServiceEnabled()) return false;
     var permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
@@ -249,6 +257,17 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
     if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
       return false;
     }
+    return true;
+  }
+
+  Future<void> _pushLocation() async {
+    if (!await _ensureGpsPosition()) return;
+    final pos = await Geolocator.getCurrentPosition();
+    await ref.read(apiClientProvider).updateDriverLocation(pos.latitude, pos.longitude);
+  }
+
+  Future<bool> _pushLocationRequired() async {
+    if (!await _ensureGpsPosition()) return false;
     final pos = await Geolocator.getCurrentPosition();
     final result = await ref.read(apiClientProvider).updateDriverLocation(pos.latitude, pos.longitude);
     return result is Success;
@@ -415,12 +434,18 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
 
   Future<void> _toggleAvailability(bool value) async {
     setState(() => _availabilityError = null);
+    String? locationWarning;
     if (value) {
-      final located = await _pushLocation();
-      if (!located) {
+      final gpsReady = await _ensureGpsPosition();
+      if (!gpsReady) {
         setState(() => _availabilityError =
             'Activez le GPS pour recevoir des courses près de vous.');
         return;
+      }
+      final located = await _pushLocationRequired();
+      if (!located) {
+        locationWarning =
+            'Position non synchronisée — les offres peuvent être limitées tant que le réseau est instable.';
       }
     }
     final api = ref.read(apiClientProvider);
@@ -428,7 +453,14 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
     if (!mounted) return;
     switch (result) {
       case Success():
-        setState(() => _available = value);
+        await ProfileCache.patchAvailability(value);
+        setState(() {
+          _available = value;
+          if (_profile != null) {
+            _profile = Map<String, dynamic>.from(_profile!)..['isAvailable'] = value;
+          }
+          _availabilityError = locationWarning;
+        });
         if (value) {
           _startPolling();
         } else {

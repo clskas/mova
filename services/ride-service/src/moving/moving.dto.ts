@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsArray, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
 
 export class EstimateMovingDto {
   @ApiProperty({ description: 'Volume estimé en m³' }) @IsNumber() @Min(1) @Max(100) volumeM3: number;
@@ -13,4 +13,9 @@ export class EstimateMovingDto {
 
 export class CreateMovingDto extends EstimateMovingDto {
   @ApiPropertyOptional() @IsOptional() @IsString() contactPhone?: string;
+  @ApiPropertyOptional({ type: [String], description: 'URLs photos inventaire (/api/uploads/...)' })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  photoUrls?: string[];
 }

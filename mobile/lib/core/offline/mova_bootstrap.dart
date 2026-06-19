@@ -35,4 +35,5 @@ Future<void> bootstrapMovaApp(WidgetRef ref) async {
 
   connectivity.setPendingSyncCount(queue.pendingCount);
   await api.checkHealth();
+  connectivity.startGatewayHealthRetry(() => api.checkHealth());
 }

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -9,6 +10,7 @@ import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
+import '../history/history_detail_dialog.dart';
 import 'moving_tracking_screen.dart';
 
 const _volumeOptions = [
@@ -17,6 +19,12 @@ const _volumeOptions = [
   ('HOUSE', 'Maison', '15–30 m³'),
   ('OFFICE', 'Bureau', 'Sur devis'),
 ];
+
+class _MovingPhoto {
+  _MovingPhoto({this.localPath, this.remoteUrl});
+  final String? localPath;
+  final String? remoteUrl;
+}
 
 class MovingScreen extends ConsumerStatefulWidget {
   const MovingScreen({super.key});
@@ -32,13 +40,16 @@ class _MovingScreenState extends ConsumerState<MovingScreen> {
   String _volume = 'APARTMENT';
   int _rooms = 2;
   final List<String> _items = [];
-  final List<String> _photoUrls = [];
+  final List<_MovingPhoto> _photos = [];
   final _picker = ImagePicker();
   bool _uploadingPhoto = false;
   int? _estimatedPrice;
   bool _loading = false;
+  bool _loadingRequests = true;
+  List<Map<String, dynamic>> _myRequests = [];
   String? _error;
   String? _validationError;
+  Timer? _pollTimer;
 
   static const _fromLat = MarketConfig.defaultLat + 0.01;
   static const _fromLng = MarketConfig.defaultLng - 0.01;
@@ -46,11 +57,37 @@ class _MovingScreenState extends ConsumerState<MovingScreen> {
   static const _toLng = MarketConfig.defaultLng + 0.05;
 
   @override
+  void initState() {
+    super.initState();
+    _loadMyRequests();
+    _pollTimer = Timer.periodic(const Duration(seconds: 12), (_) => _loadMyRequests(silent: true));
+  }
+
+  @override
   void dispose() {
+    _pollTimer?.cancel();
     _fromController.dispose();
     _toController.dispose();
     _itemController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadMyRequests({bool silent = false}) async {
+    if (!silent) setState(() => _loadingRequests = true);
+    final api = ref.read(apiClientProvider);
+    final result = await api.get('/moving');
+    if (!mounted) return;
+    setState(() {
+      _loadingRequests = silent ? _loadingRequests : false;
+      if (result case Success(:final data)) {
+        final list = data is List
+            ? data
+            : (data is Map
+                ? (data['data'] as List? ?? data['movings'] as List? ?? [])
+                : []);
+        _myRequests = list.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+      }
+    });
   }
 
   void _addItem() {
@@ -84,35 +121,48 @@ class _MovingScreenState extends ConsumerState<MovingScreen> {
   Future<void> _addPhoto() async {
     final file = await _picker.pickImage(source: ImageSource.camera, imageQuality: 75);
     if (file == null) return;
-    setState(() => _uploadingPhoto = true);
+    final localPath = file.path;
+    setState(() {
+      _uploadingPhoto = true;
+      _photos.add(_MovingPhoto(localPath: localPath));
+    });
     final api = ref.read(apiClientProvider);
     await api.checkHealth();
-    final result = await api.uploadParcelPhoto(File(file.path));
+    final result = await api.uploadParcelPhoto(File(localPath));
     if (!mounted) return;
     setState(() => _uploadingPhoto = false);
-    if (result case Success(:final data)) {
-      setState(() => _photoUrls.add(data));
+    switch (result) {
+      case Success(:final data):
+        final idx = _photos.indexWhere((p) => p.localPath == localPath);
+        if (idx >= 0) {
+          setState(() {
+            _photos[idx] = _MovingPhoto(localPath: localPath, remoteUrl: data);
+          });
+        }
+      case Failure(:final error):
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Photo non envoyée : ${error.message}')),
+        );
     }
   }
 
+  List<String> get _uploadedPhotoUrls =>
+      _photos.map((p) => p.remoteUrl).whereType<String>().where((u) => u.isNotEmpty).toList();
+
   Map<String, dynamic> _payload() {
-    final notes = <String>[
-      if (_items.isNotEmpty) _items.join(', '),
-      'Pièces: $_rooms',
-      if (_photoUrls.isNotEmpty) 'Photos: ${_photoUrls.join(', ')}',
-    ].join(' | ');
     return {
-      'pickupAddress': notes.isNotEmpty
-          ? '${_fromController.text.trim()} ($notes)'
-          : _fromController.text.trim(),
+      'pickupAddress': _fromController.text.trim(),
       'pickupLat': _fromLat,
       'pickupLng': _fromLng,
       'dropoffAddress': _toController.text.trim(),
       'dropoffLat': _toLat,
       'dropoffLng': _toLng,
       'volumeM3': _volumeM3(),
+      if (_items.isNotEmpty) 'itemsNotes': _items.join(', '),
+      if (_uploadedPhotoUrls.isNotEmpty) 'photoUrls': _uploadedPhotoUrls,
     };
   }
+
   String? _validate() {
     if (_fromController.text.trim().isEmpty) return 'Indiquez l\'adresse de départ.';
     if (_toController.text.trim().length < 3) return 'Indiquez l\'adresse d\'arrivée.';
@@ -162,10 +212,12 @@ class _MovingScreenState extends ConsumerState<MovingScreen> {
     switch (result) {
       case Success(:final data):
         if (mounted) {
-          final request = data['request'] as Map<String, dynamic>? ??
-              data['moving'] as Map<String, dynamic>? ??
+          final request = data['moving'] as Map<String, dynamic>? ??
+              data['request'] as Map<String, dynamic>? ??
               data;
-          Navigator.pushReplacement(
+          await _loadMyRequests();
+          if (!mounted) return;
+          Navigator.push(
             context,
             MaterialPageRoute(
               builder: (_) => MovingTrackingScreen(
@@ -182,6 +234,20 @@ class _MovingScreenState extends ConsumerState<MovingScreen> {
     }
   }
 
+  void _openRequestDetail(Map<String, dynamic> request) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => MovingTrackingScreen(
+          movingId: request['id']?.toString() ?? '',
+          fromAddress: request['pickupAddress']?.toString() ?? '',
+          toAddress: request['dropoffAddress']?.toString() ?? '',
+          estimatedPrice: request['estimatedPriceCdf'] as int? ?? 0,
+        ),
+      ),
+    ).then((_) => _loadMyRequests());
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -192,12 +258,50 @@ class _MovingScreenState extends ConsumerState<MovingScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'Décrivez votre déménagement — camion + manutention.',
+            'Décrivez votre déménagement — camion + manutention. '
+            'MOVA assigne une équipe après validation admin.',
             style: theme.textTheme.bodyMedium?.copyWith(color: MovaColors.textSecondary),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 16),
+          if (_loadingRequests)
+            const LinearProgressIndicator(minHeight: 2)
+          else if (_myRequests.isNotEmpty) ...[
+            Text('Mes demandes', style: theme.textTheme.titleSmall),
+            const SizedBox(height: 8),
+            ..._myRequests.take(5).map((r) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: MovaCard(
+                  onTap: () => _openRequestDetail(r),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '${r['pickupAddress'] ?? ''} → ${r['dropoffAddress'] ?? ''}',
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontWeight: FontWeight.w600),
+                            ),
+                            Text(
+                              historyStatusLabel(r['status']?.toString()),
+                              style: const TextStyle(color: MovaColors.violet, fontSize: 13),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(Icons.chevron_right),
+                    ],
+                  ),
+                ),
+              );
+            }),
+            const Divider(height: 24),
+            Text('Nouvelle demande', style: theme.textTheme.titleSmall),
+            const SizedBox(height: 12),
+          ],
           TextField(
             controller: _fromController,
             decoration: const InputDecoration(
@@ -234,7 +338,8 @@ class _MovingScreenState extends ConsumerState<MovingScreen> {
             style: theme.textTheme.bodySmall?.copyWith(color: MovaColors.textSecondary),
           ),
           const SizedBox(height: 8),
-          Text('Volume / type de logement', style: theme.textTheme.titleSmall),          const SizedBox(height: 8),
+          Text('Volume / type de logement', style: theme.textTheme.titleSmall),
+          const SizedBox(height: 8),
           ..._volumeOptions.map((v) {
             return RadioListTile<String>(
               title: Text(v.$2),
@@ -251,7 +356,7 @@ class _MovingScreenState extends ConsumerState<MovingScreen> {
           Row(
             children: [
               Expanded(
-                child: Text('Photos inventaire (${_photoUrls.length})', style: theme.textTheme.titleSmall),
+                child: Text('Photos inventaire (${_photos.length})', style: theme.textTheme.titleSmall),
               ),
               TextButton.icon(
                 onPressed: _uploadingPhoto ? null : _addPhoto,
@@ -262,13 +367,26 @@ class _MovingScreenState extends ConsumerState<MovingScreen> {
               ),
             ],
           ),
-          if (_photoUrls.isNotEmpty)
-            Text(
-              '${_photoUrls.length} photo(s) jointe(s) à la demande',
-              style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
+          if (_photos.isNotEmpty)
+            SizedBox(
+              height: 88,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: _photos.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                itemBuilder: (_, i) => movingPhotoThumbnail(
+                  localPath: _photos[i].localPath,
+                  remoteUrl: _photos[i].remoteUrl,
+                  onRemove: () => setState(() {
+                    _photos.removeAt(i);
+                    _estimatedPrice = null;
+                  }),
+                ),
+              ),
             ),
           const SizedBox(height: 8),
-          Text('Meubles / cartons', style: theme.textTheme.titleSmall),          const SizedBox(height: 8),
+          Text('Meubles / cartons', style: theme.textTheme.titleSmall),
+          const SizedBox(height: 8),
           Row(
             children: [
               Expanded(
@@ -294,11 +412,7 @@ class _MovingScreenState extends ConsumerState<MovingScreen> {
                 child: Row(
                   children: [
                     Expanded(
-                      child: Text(
-                        _items[i],
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                      child: Text(_items[i], maxLines: 2, overflow: TextOverflow.ellipsis),
                     ),
                     IconButton(
                       icon: const Icon(Icons.close, size: 20),

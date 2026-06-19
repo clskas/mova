@@ -213,6 +213,7 @@ export class HistoryService {
             distanceKm: m.distanceKm,
             pickupAddress: m.pickupAddress,
             dropoffAddress: m.dropoffAddress,
+            photoUrls: Array.isArray(m.photoUrls) ? m.photoUrls : [],
           },
         });
       }

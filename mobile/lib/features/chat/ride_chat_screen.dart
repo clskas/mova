@@ -100,6 +100,7 @@ class _RideChatScreenState extends ConsumerState<RideChatScreen> {
         ? DateTime.fromMillisecondsSinceEpoch(tsRaw.toInt())
         : DateTime.now();
     final mine = role == widget.myRole;
+    if (mine && _messages.any((m) => m.isMine && m.text == text)) return;
     if (!mounted) return;
     setState(() {
       _messages.add(RideChatMessage(text: text, senderRole: role, ts: ts, isMine: mine));
@@ -134,13 +135,17 @@ class _RideChatScreenState extends ConsumerState<RideChatScreen> {
       'ts': ts.millisecondsSinceEpoch,
     };
     if (_socket == null || !_socket!.isConnected) {
-      if (mounted) {
-        setState(() {
-          _sending = false;
-          _error = 'Connexion chat indisponible. Réessayez.';
-        });
+      await _connectSocket();
+      await Future<void>.delayed(const Duration(milliseconds: 800));
+      if (_socket == null || !_socket!.isConnected) {
+        if (mounted) {
+          setState(() {
+            _sending = false;
+            _error = 'Connexion chat indisponible. Réessayez.';
+          });
+        }
+        return;
       }
-      return;
     }
     _socket!.emitChat(payload);
     setState(() {

@@ -4,11 +4,24 @@ import { MOVA_EVENTS, MovaErrorCode, MovaHttpException } from '@mova/shared';
 import { RedisService } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { formatParcelDelivery } from '../deliveries/parcel.util';
-import { UpdateRestaurantMenuDto } from './restaurant-portal.dto';
+import { UploadsService } from '../uploads/uploads.service';
+import { MenuItemDto, UpdateRestaurantMenuDto } from './restaurant-portal.dto';
+
+type StoredMenuItem = {
+  name: string;
+  unitPriceCdf: number;
+  imageUrl?: string;
+  description?: string;
+  isAvailable?: boolean;
+};
 
 @Injectable()
 export class RestaurantPortalService {
-  constructor(private prisma: PrismaService, private redis: RedisService) {}
+  constructor(
+    private prisma: PrismaService,
+    private redis: RedisService,
+    private uploads: UploadsService,
+  ) {}
 
   async getRestaurantForOwner(ownerUserId: string) {
     const restaurant = await this.prisma.restaurant.findFirst({
@@ -149,12 +162,69 @@ export class RestaurantPortalService {
     return { order: this.formatOrder(updated), delivery: formatParcelDelivery(updated) };
   }
 
+  async getMenu(ownerUserId: string) {
+    const restaurant = await this.getRestaurantForOwner(ownerUserId);
+    const items = this.parseMenuItems(restaurant.menuItems);
+    return { restaurantId: restaurant.id, menuItems: items };
+  }
+
+  async uploadMenuPhoto(ownerUserId: string, imageBase64: string, mimeType?: string) {
+    await this.getRestaurantForOwner(ownerUserId);
+    return this.uploads.uploadMenuPhoto(imageBase64, mimeType);
+  }
+
+  private parseMenuItems(raw: unknown): StoredMenuItem[] {
+    if (!Array.isArray(raw)) return [];
+    return raw
+      .map((entry) => {
+        if (!entry || typeof entry !== 'object') return null;
+        const row = entry as Record<string, unknown>;
+        const name = String(row.name ?? '').trim();
+        const price = Number(row.unitPriceCdf ?? row.priceCdf ?? 0);
+        if (!name || !Number.isFinite(price) || price <= 0) return null;
+        const item: StoredMenuItem = {
+          name,
+          unitPriceCdf: Math.round(price),
+          isAvailable: row.isAvailable !== false,
+        };
+        if (row.imageUrl) item.imageUrl = String(row.imageUrl);
+        if (row.description) item.description = String(row.description);
+        return item;
+      })
+      .filter((x): x is StoredMenuItem => x !== null);
+  }
+
+  private normalizeMenuItems(items: MenuItemDto[]): StoredMenuItem[] {
+    const seen = new Set<string>();
+    const normalized: StoredMenuItem[] = [];
+    for (const item of items) {
+      const name = item.name.trim();
+      if (!name) continue;
+      const key = name.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      normalized.push({
+        name,
+        unitPriceCdf: Math.round(item.unitPriceCdf),
+        ...(item.imageUrl?.trim() ? { imageUrl: item.imageUrl.trim() } : {}),
+        ...(item.description?.trim() ? { description: item.description.trim() } : {}),
+        isAvailable: item.isAvailable !== false,
+      });
+    }
+    if (!normalized.length) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Ajoutez au moins un plat au menu.');
+    }
+    return normalized;
+  }
+
   async updateMenu(ownerUserId: string, dto: UpdateRestaurantMenuDto) {
     const restaurant = await this.getRestaurantForOwner(ownerUserId);
+    const menuItems =
+      dto.menuItems != null ? this.normalizeMenuItems(dto.menuItems) : undefined;
     const updated = await this.prisma.restaurant.update({
       where: { id: restaurant.id },
       data: {
-        ...(dto.menuItems != null ? { menuItems: dto.menuItems as Prisma.InputJsonValue } : {}),
+        ...(menuItems != null ? { menuItems: menuItems as unknown as Prisma.InputJsonValue } : {}),
         ...(dto.promotionLabel !== undefined ? { promotionLabel: dto.promotionLabel } : {}),
         ...(dto.isAcceptingOrders !== undefined ? { isAcceptingOrders: dto.isAcceptingOrders } : {}),
         ...(dto.prepTimeMin !== undefined ? { prepTimeMin: dto.prepTimeMin } : {}),

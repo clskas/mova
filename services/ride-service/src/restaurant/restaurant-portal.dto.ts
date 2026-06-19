@@ -1,11 +1,31 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsArray, IsBoolean, IsInt, IsOptional, IsString, Min } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsArray, IsBoolean, IsInt, IsOptional, IsString, Min, ValidateNested } from 'class-validator';
+
+export class MenuItemDto {
+  @ApiProperty() @IsString() name: string;
+  @ApiProperty() @IsInt() @Min(1) unitPriceCdf: number;
+  @ApiPropertyOptional() @IsOptional() @IsString() imageUrl?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() description?: string;
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() isAvailable?: boolean;
+}
 
 export class UpdateRestaurantMenuDto {
-  @ApiPropertyOptional() @IsOptional() @IsArray() menuItems?: unknown[];
+  @ApiPropertyOptional({ type: [MenuItemDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => MenuItemDto)
+  menuItems?: MenuItemDto[];
+
   @ApiPropertyOptional() @IsOptional() @IsString() promotionLabel?: string;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() isAcceptingOrders?: boolean;
   @ApiPropertyOptional() @IsOptional() @IsInt() @Min(5) prepTimeMin?: number;
+}
+
+export class UploadMenuPhotoDto {
+  @ApiProperty() @IsString() imageBase64: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() mimeType?: string;
 }
 
 export class RejectOrderDto {

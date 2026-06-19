@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { PortalShell } from "@/components/PortalShell";
-import { fetchProfile, updateMenu, type RestaurantProfile } from "@/lib/api";
+import { fetchProfile, updateMenuSettings, type RestaurantProfile } from "@/lib/api";
 
 export default function SettingsPage() {
   const [profile, setProfile] = useState<RestaurantProfile | null>(null);
@@ -35,7 +35,7 @@ export default function SettingsPage() {
     setError(null);
     setMessage(null);
     try {
-      await updateMenu({
+      await updateMenuSettings({
         isAcceptingOrders: accepting,
         prepTimeMin: prepTime,
         promotionLabel: promo.trim() || undefined,
@@ -91,17 +91,9 @@ export default function SettingsPage() {
             </button>
             {message && <p className="text-sm text-green-700">{message}</p>}
             {error && <p className="text-sm text-red-600">{error}</p>}
-          </div>
-        )}
-        {profile?.menuItems && profile.menuItems.length > 0 && (
-          <div className="bg-white rounded-2xl border p-6">
-            <h3 className="font-semibold mb-3">Menu actuel</h3>
-            <ul className="text-sm space-y-1 text-gray-700">
-              {profile.menuItems.map((item, i) => (
-                <li key={i}>{item.name} — {(item.unitPriceCdf ?? 0).toLocaleString("fr-CD")} FC</li>
-              ))}
-            </ul>
-            <p className="text-xs text-gray-400 mt-3">Modification complète du menu via l&apos;équipe MOVA (admin).</p>
+            <p className="text-xs text-gray-400">
+              Gérez les plats et photos dans l&apos;onglet <a href="/menu" className="text-orange-600 underline">Menu</a>.
+            </p>
           </div>
         )}
       </div>

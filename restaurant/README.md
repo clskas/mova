@@ -18,7 +18,14 @@ npm run dev
 
 Ouvrir http://localhost:3007
 
-## Connexion test
+## PWA (installer sur tablette / téléphone)
+
+1. Ouvrir http://localhost:3007 dans **Chrome** (Android) ou **Safari** (iOS)
+2. Menu navigateur → **Ajouter à l'écran d'accueil** / **Installer l'application**
+3. L'app s'ouvre en plein écran (`standalone`) avec icône MOVA Resto
+
+Service worker : cache léger + fonctionnement basique hors ligne sur les pages visitées.
+
 
 | Champ | Valeur |
 |-------|--------|
@@ -39,11 +46,13 @@ Ouvrir http://localhost:3007
 | Méthode | Route | Description |
 |---------|-------|-------------|
 | GET | `/profile` | Profil restaurant lié |
+| GET | `/menu` | Menu complet (plats + photos) |
 | GET | `/orders` | Commandes actives |
 | POST | `/orders/:id/confirm` | Accepter |
 | POST | `/orders/:id/ready` | Prête pour livreur |
 | POST | `/orders/:id/reject` | Refuser |
-| PATCH | `/menu` | Disponibilité, délai prep |
+| PATCH | `/menu` | Publier menu / paramètres |
+| POST | `/menu-photo` | Upload photo plat (base64) |
 
 JWT requis, rôle `RESTAURANT`.
 

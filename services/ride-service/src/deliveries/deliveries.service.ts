@@ -436,10 +436,20 @@ export class DeliveriesService {
     if (!restaurant.isAcceptingOrders) {
       throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Ce restaurant n\'accepte pas de commandes pour le moment.');
     }
+    const menu = this.publicMenuItems(restaurant.menuItems);
     return {
       ...restaurant,
-      menu: restaurant.menuItems ?? [],
+      menuItems: menu,
+      menu,
     };
+  }
+
+  private publicMenuItems(raw: unknown) {
+    if (!Array.isArray(raw)) return [];
+    return raw.filter((entry) => {
+      if (!entry || typeof entry !== 'object') return false;
+      return (entry as { isAvailable?: boolean }).isAvailable !== false;
+    });
   }
 
   async getDelivery(id: string, userId: string) {
@@ -619,7 +629,7 @@ export class DeliveriesService {
           const travelMin = Math.ceil((distanceKm / 20) * 60);
           deliveryEtaMin = Math.max(20, travelMin + 15);
         }
-        return { ...r, deliveryEtaMin, distanceKm, minMenuPriceCdf };
+        return { ...r, menuItems: this.publicMenuItems(r.menuItems), deliveryEtaMin, distanceKm, minMenuPriceCdf };
       })
       .filter((r) => (maxEtaMin != null ? (r.deliveryEtaMin ?? 999) <= maxEtaMin : true))
       .filter((r) => (maxPriceCdf != null ? (r.minMenuPriceCdf ?? 0) <= maxPriceCdf : true))

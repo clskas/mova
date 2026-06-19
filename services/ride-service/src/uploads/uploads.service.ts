@@ -5,11 +5,19 @@ import { mkdir, writeFile } from 'fs/promises';
 import { join } from 'path';
 
 const MAX_BYTES = 5 * 1024 * 1024;
-const UPLOAD_DIR = join(process.cwd(), 'uploads', 'parcels');
+type UploadCategory = 'parcels' | 'menu';
 
 @Injectable()
 export class UploadsService {
-  async uploadParcelPhoto(base64: string, mimeType = 'image/jpeg'): Promise<{ photoUrl: string; cloudinaryMockUrl: string }> {
+  async uploadParcelPhoto(base64: string, mimeType = 'image/jpeg') {
+    return this.uploadImage('parcels', base64, mimeType);
+  }
+
+  async uploadMenuPhoto(base64: string, mimeType = 'image/jpeg') {
+    return this.uploadImage('menu', base64, mimeType);
+  }
+
+  private async uploadImage(category: UploadCategory, base64: string, mimeType = 'image/jpeg') {
     const raw = base64.includes(',') ? base64.split(',')[1]! : base64;
     const buffer = Buffer.from(raw, 'base64');
     if (!buffer.length) {
@@ -21,12 +29,13 @@ export class UploadsService {
 
     const ext = mimeType.includes('png') ? 'png' : mimeType.includes('webp') ? 'webp' : 'jpg';
     const id = randomUUID();
-    await mkdir(UPLOAD_DIR, { recursive: true });
+    const dir = join(process.cwd(), 'uploads', category);
+    await mkdir(dir, { recursive: true });
     const filename = `${id}.${ext}`;
-    await writeFile(join(UPLOAD_DIR, filename), buffer);
+    await writeFile(join(dir, filename), buffer);
 
-    const photoUrl = `/api/uploads/parcels/${filename}`;
-    const cloudinaryMockUrl = `https://res.cloudinary.com/mova-mock/image/upload/v1/parcels/${filename}`;
+    const photoUrl = `/api/uploads/${category}/${filename}`;
+    const cloudinaryMockUrl = `https://res.cloudinary.com/mova-mock/image/upload/v1/${category}/${filename}`;
     return { photoUrl, cloudinaryMockUrl };
   }
 }

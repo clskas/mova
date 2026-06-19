@@ -15,6 +15,7 @@ export function PortalShell({ children, restaurantName }: { children: React.Reac
 
   const nav = [
     { href: "/", label: "Commandes" },
+    { href: "/menu", label: "Menu" },
     { href: "/settings", label: "Paramètres" },
   ];
 

@@ -31,11 +31,27 @@ export class UploadsController {
     return this.uploadsService.uploadParcelPhoto(dto.imageBase64, dto.mimeType);
   }
 
+  @Post('menu-photo')
+  @ApiOperation({ summary: 'Téléverser photo plat (stockage local / mock Cloudinary)' })
+  uploadMenuPhoto(@Body() dto: UploadParcelPhotoDto) {
+    return this.uploadsService.uploadMenuPhoto(dto.imageBase64, dto.mimeType);
+  }
+
   @Get('parcels/:filename')
-  @ApiOperation({ summary: 'Télécharger une photo colis / KYC stockée localement' })
+  @ApiOperation({ summary: 'Télécharger une photo colis stockée localement' })
   serveParcelPhoto(@Param('filename') filename: string, @Res() res: Response) {
+    return this.serveUploadedFile('parcels', filename, res);
+  }
+
+  @Get('menu/:filename')
+  @ApiOperation({ summary: 'Télécharger une photo plat stockée localement' })
+  serveMenuPhoto(@Param('filename') filename: string, @Res() res: Response) {
+    return this.serveUploadedFile('menu', filename, res);
+  }
+
+  private serveUploadedFile(category: 'parcels' | 'menu', filename: string, res: Response) {
     const safe = filename.replace(/[^a-zA-Z0-9._-]/g, '');
-    const filePath = join(process.cwd(), 'uploads', 'parcels', safe);
+    const filePath = join(process.cwd(), 'uploads', category, safe);
     if (!existsSync(filePath)) throw new NotFoundException('Fichier introuvable');
     const ext = safe.split('.').pop()?.toLowerCase();
     const mime = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';

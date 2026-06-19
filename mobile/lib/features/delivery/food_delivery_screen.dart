@@ -88,8 +88,16 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
   }
 
   List<Map<String, dynamic>> _menuItems(Map<String, dynamic> restaurant) {
-    return (restaurant['menuItems'] as List? ?? restaurant['items'] as List? ?? [])
-        .cast<Map<String, dynamic>>();
+    return (restaurant['menuItems'] as List? ?? restaurant['items'] as List? ?? restaurant['menu'] as List? ?? [])
+        .cast<Map<String, dynamic>>()
+        .where((item) => item['isAvailable'] != false)
+        .toList();
+  }
+
+  String? _itemImageUrl(Map<String, dynamic> item) {
+    final raw = item['imageUrl']?.toString();
+    if (raw == null || raw.isEmpty) return null;
+    return MarketConfig.resolveMediaUrl(raw);
   }
 
   String _cartKey(String restaurantId, String itemName, {String? size, List<String>? options}) {
@@ -431,7 +439,7 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
                     borderRadius: BorderRadius.circular(12),
                     child: r['imageUrl'] != null
                         ? Image.network(
-                            r['imageUrl'].toString(),
+                            MarketConfig.resolveMediaUrl(r['imageUrl'].toString()),
                             width: 72,
                             height: 72,
                             fit: BoxFit.cover,
@@ -552,6 +560,24 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
             child: MovaCard(
               child: Row(
                 children: [
+                  if (_itemImageUrl(item) != null)
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: Image.network(
+                        _itemImageUrl(item)!,
+                        width: 64,
+                        height: 64,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => _restaurantPlaceholder(),
+                      ),
+                    )
+                  else
+                    SizedBox(
+                      width: 64,
+                      height: 64,
+                      child: _restaurantPlaceholder(),
+                    ),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -562,6 +588,13 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
+                        if (item['description'] != null && item['description'].toString().isNotEmpty)
+                          Text(
+                            item['description'].toString(),
+                            style: const TextStyle(fontSize: 12, color: MovaColors.textSecondary),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         Text(
                           MarketConfig.formatCdf(_itemPrice(item)),
                           style: const TextStyle(color: MovaColors.violet),

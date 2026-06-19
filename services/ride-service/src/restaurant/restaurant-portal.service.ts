@@ -5,7 +5,7 @@ import { RedisService } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { formatParcelDelivery } from '../deliveries/parcel.util';
 import { UploadsService } from '../uploads/uploads.service';
-import { MenuItemDto, UpdateRestaurantMenuDto } from './restaurant-portal.dto';
+import { MenuItemDto, UpdateRestaurantLocationDto, UpdateRestaurantMenuDto } from './restaurant-portal.dto';
 
 type StoredMenuItem = {
   name: string;
@@ -40,6 +40,8 @@ export class RestaurantPortalService {
       name: restaurant.name,
       cuisine: restaurant.cuisine,
       address: restaurant.address,
+      lat: restaurant.lat,
+      lng: restaurant.lng,
       rating: restaurant.rating,
       isAcceptingOrders: restaurant.isAcceptingOrders,
       prepTimeMin: restaurant.prepTimeMin,
@@ -215,6 +217,30 @@ export class RestaurantPortalService {
       throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Ajoutez au moins un plat au menu.');
     }
     return normalized;
+  }
+
+  async updateLocation(ownerUserId: string, dto: UpdateRestaurantLocationDto) {
+    const restaurant = await this.getRestaurantForOwner(ownerUserId);
+    if (dto.lat != null && (dto.lat < -90 || dto.lat > 90)) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Latitude invalide.');
+    }
+    if (dto.lng != null && (dto.lng < -180 || dto.lng > 180)) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Longitude invalide.');
+    }
+    const updated = await this.prisma.restaurant.update({
+      where: { id: restaurant.id },
+      data: {
+        ...(dto.address !== undefined ? { address: dto.address.trim() || restaurant.address } : {}),
+        ...(dto.lat != null ? { lat: dto.lat } : {}),
+        ...(dto.lng != null ? { lng: dto.lng } : {}),
+      },
+    });
+    return {
+      id: updated.id,
+      address: updated.address,
+      lat: updated.lat,
+      lng: updated.lng,
+    };
   }
 
   async updateMenu(ownerUserId: string, dto: UpdateRestaurantMenuDto) {

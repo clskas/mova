@@ -592,24 +592,18 @@ export class DeliveriesService {
       },
     });
 
+    /** Rayon livraison repas autour du point de livraison (km). */
+    const DELIVERY_RADIUS_KM = 50;
+
     let scoped = rows;
     if (deliveryLat != null && deliveryLng != null) {
-      const city = resolveCityFromCoords(deliveryLat, deliveryLng);
-      const cityLower = city.toLowerCase();
-      const inCity = rows.filter(
-        (r) =>
-          r.address.toLowerCase().includes(cityLower) ||
-          resolveCityFromCoords(r.lat, r.lng).toLowerCase() === cityLower,
-      );
-      if (inCity.length > 0) {
-        scoped = inCity;
-      } else {
-        const kinshasa = rows.filter((r) => r.address.toLowerCase().includes('kinshasa'));
-        if (kinshasa.length > 0) scoped = kinshasa;
-      }
-    } else {
-      const kinshasa = rows.filter((r) => r.address.toLowerCase().includes('kinshasa'));
-      if (kinshasa.length > 0) scoped = kinshasa;
+      const deliveryCity = resolveCityFromCoords(deliveryLat, deliveryLng).toLowerCase();
+      scoped = rows.filter((r) => {
+        const restaurantCity = resolveCityFromCoords(r.lat, r.lng).toLowerCase();
+        if (restaurantCity === deliveryCity) return true;
+        return this.pricing.haversineKm(r.lat, r.lng, deliveryLat, deliveryLng) <= DELIVERY_RADIUS_KM;
+      });
+      if (scoped.length === 0) scoped = rows;
     }
 
     const data = scoped

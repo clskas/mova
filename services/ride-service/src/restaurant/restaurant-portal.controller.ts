@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Param, Patch, Post, Query, Request, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { RejectOrderDto, UpdateRestaurantMenuDto, UploadMenuPhotoDto } from './restaurant-portal.dto';
+import { RejectOrderDto, UpdateRestaurantLocationDto, UpdateRestaurantMenuDto, UploadMenuPhotoDto } from './restaurant-portal.dto';
 import { RestaurantPortalService } from './restaurant-portal.service';
 import { RestaurantRoleGuard } from './restaurant-role.guard';
 
@@ -52,6 +52,12 @@ export class RestaurantPortalController {
   @ApiOperation({ summary: 'Mettre à jour menu et disponibilité' })
   menu(@Request() req: { user: { id: string } }, @Body() dto: UpdateRestaurantMenuDto) {
     return this.portal.updateMenu(req.user.id, dto);
+  }
+
+  @Patch('location')
+  @ApiOperation({ summary: 'Mettre à jour adresse et coordonnées GPS du restaurant' })
+  location(@Request() req: { user: { id: string } }, @Body() dto: UpdateRestaurantLocationDto) {
+    return this.portal.updateLocation(req.user.id, dto);
   }
 
   @Post('menu-photo')

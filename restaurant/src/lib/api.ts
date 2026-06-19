@@ -15,6 +15,8 @@ export type RestaurantProfile = {
   name: string;
   cuisine?: string;
   address?: string;
+  lat?: number;
+  lng?: number;
   isAcceptingOrders?: boolean;
   prepTimeMin?: number;
   menuItems?: MenuItem[];
@@ -102,6 +104,14 @@ export function updateMenuSettings(data: {
   promotionLabel?: string;
 }) {
   return apiFetch("/api/restaurant/menu", { method: "PATCH", body: JSON.stringify(data) });
+}
+
+export function updateRestaurantLocation(data: {
+  address?: string;
+  lat?: number;
+  lng?: number;
+}) {
+  return apiFetch("/api/restaurant/location", { method: "PATCH", body: JSON.stringify(data) });
 }
 
 export async function uploadMenuPhoto(file: File): Promise<string> {

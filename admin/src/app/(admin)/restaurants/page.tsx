@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { apiFetch, deleteRestaurant, saveRestaurant, type Restaurant } from "@/lib/api";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { apiFetch, deleteRestaurant, fetchUsers, formatUserName, saveRestaurant, type AdminUser, type Restaurant } from "@/lib/api";
 import { useAdmin } from "@/components/AdminProvider";
 import {
   BtnDanger,
@@ -15,8 +16,10 @@ import {
   LoadingState,
   Modal,
   PageHeader,
+  SelectInput,
   TextInput,
 } from "@/components/ui";
+import { GpsCoordButton } from "@/components/GpsCoordButton";
 
 export default function RestaurantsPage() {
   const { canWrite } = useAdmin();
@@ -24,17 +27,47 @@ export default function RestaurantsPage() {
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({ name: "", cuisine: "Congolaise", address: "" });
+  const [form, setForm] = useState({
+    name: "",
+    cuisine: "Congolaise",
+    address: "",
+    lat: "-4.3217",
+    lng: "15.3125",
+    ownerUserId: "",
+  });
   const [editTarget, setEditTarget] = useState<Restaurant | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Restaurant | null>(null);
   const [saving, setSaving] = useState(false);
+  const [partnerUsers, setPartnerUsers] = useState<AdminUser[]>([]);
+
+  const partnerOptions = useMemo(
+    () => [
+      { value: "", label: "— Aucun compte lié —" },
+      ...partnerUsers.map((u) => ({
+        value: u.id,
+        label: `${formatUserName(u)}${u.phone ? ` · ${u.phone}` : ""}`,
+      })),
+    ],
+    [partnerUsers],
+  );
+
+  function partnerLabel(ownerUserId?: string | null) {
+    if (!ownerUserId) return "Non lié";
+    const user = partnerUsers.find((u) => u.id === ownerUserId);
+    if (!user) return ownerUserId.slice(0, 8) + "…";
+    return user.phone ? `${formatUserName(user)} (${user.phone})` : formatUserName(user);
+  }
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await apiFetch<Restaurant[]>("/api/admin/restaurants");
+      const [data, usersRes] = await Promise.all([
+        apiFetch<Restaurant[]>("/api/admin/restaurants"),
+        fetchUsers(0, 200),
+      ]);
       setRestaurants(Array.isArray(data) ? data : []);
+      setPartnerUsers((usersRes.data ?? []).filter((u) => u.role === "RESTAURANT" && u.status !== "INACTIVE"));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur de chargement");
     } finally {
@@ -43,6 +76,11 @@ export default function RestaurantsPage() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  function parseCoord(value: string, fallback: number) {
+    const n = Number.parseFloat(value.replace(",", "."));
+    return Number.isFinite(n) ? n : fallback;
+  }
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -54,11 +92,12 @@ export default function RestaurantsPage() {
         name: form.name.trim(),
         cuisine: form.cuisine.trim(),
         address: form.address.trim() || "Kinshasa",
-        lat: -4.32,
-        lng: 15.31,
+        lat: parseCoord(form.lat, -4.3217),
+        lng: parseCoord(form.lng, 15.3125),
         rating: 4.0,
+        ...(form.ownerUserId ? { ownerUserId: form.ownerUserId } : {}),
       });
-      setForm({ name: "", cuisine: "Congolaise", address: "" });
+      setForm({ name: "", cuisine: "Congolaise", address: "", lat: "-4.3217", lng: "15.3125", ownerUserId: "" });
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur création");
@@ -76,7 +115,10 @@ export default function RestaurantsPage() {
           name: editTarget.name,
           cuisine: editTarget.cuisine ?? undefined,
           address: editTarget.address ?? undefined,
-          ownerUserId: editTarget.ownerUserId ?? undefined,
+          lat: editTarget.lat,
+          lng: editTarget.lng,
+          isActive: editTarget.isActive !== false,
+          ownerUserId: editTarget.ownerUserId || null,
         },
         editTarget.id,
       );
@@ -124,6 +166,36 @@ export default function RestaurantsPage() {
             <TextInput value={form.cuisine} onChange={(v) => setForm((f) => ({ ...f, cuisine: v }))} placeholder="Cuisine" />
             <TextInput value={form.address} onChange={(v) => setForm((f) => ({ ...f, address: v }))} placeholder="Adresse" />
           </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="text-sm">
+              <FieldLabel>Latitude GPS</FieldLabel>
+              <TextInput value={form.lat} onChange={(v) => setForm((f) => ({ ...f, lat: v }))} placeholder="-4.3217" />
+            </label>
+            <label className="text-sm">
+              <FieldLabel>Longitude GPS</FieldLabel>
+              <TextInput value={form.lng} onChange={(v) => setForm((f) => ({ ...f, lng: v }))} placeholder="15.3125" />
+            </label>
+          </div>
+          <GpsCoordButton
+            onCoords={(lat, lng) => setForm((f) => ({ ...f, lat, lng }))}
+            onError={setError}
+          />
+          <p className="text-xs text-gray-400">
+            Position géographique du restaurant — visible par les passagers pour le tri par distance.
+          </p>
+          <div className="rounded-xl border border-violet-100 bg-violet-50/50 p-3 space-y-2">
+            <FieldLabel>Compte partenaire (portail restaurant)</FieldLabel>
+            <SelectInput
+              value={form.ownerUserId}
+              onChange={(v) => setForm((f) => ({ ...f, ownerUserId: v }))}
+              options={partnerOptions}
+            />
+            <p className="text-xs text-gray-500">
+              Liez un utilisateur avec le rôle <strong>RESTAURANT</strong> pour qu&apos;il gère menu et commandes sur le portail.
+              {" "}
+              <Link href="/utilisateurs" className="text-[#6C63FF] underline">Créer un compte →</Link>
+            </p>
+          </div>
           <button
             type="submit"
             disabled={saving}
@@ -146,6 +218,9 @@ export default function RestaurantsPage() {
                 <th className="p-3">Nom</th>
                 <th className="p-3">Cuisine</th>
                 <th className="p-3">Adresse</th>
+                <th className="p-3">GPS</th>
+                <th className="p-3">Statut</th>
+                <th className="p-3">Compte partenaire</th>
                 <th className="p-3">Note</th>
                 {!readOnly && <th className="p-3"></th>}
               </tr>
@@ -156,6 +231,17 @@ export default function RestaurantsPage() {
                   <td className="p-3 font-medium">{r.name}</td>
                   <td className="p-3">{r.cuisine ?? "—"}</td>
                   <td className="p-3 text-gray-500">{r.address ?? "—"}</td>
+                  <td className="p-3 text-gray-500 text-xs font-mono">
+                    {r.lat != null && r.lng != null ? `${r.lat.toFixed(4)}, ${r.lng.toFixed(4)}` : "—"}
+                  </td>
+                  <td className="p-3">
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${r.isActive !== false ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-600"}`}>
+                      {r.isActive !== false ? "Actif" : "Inactif"}
+                    </span>
+                  </td>
+                  <td className="p-3 text-gray-600 text-xs max-w-[180px] truncate" title={partnerLabel(r.ownerUserId)}>
+                    {partnerLabel(r.ownerUserId)}
+                  </td>
                   <td className="p-3">{r.rating?.toFixed(1) ?? "—"}</td>
                   {!readOnly && (
                     <td className="p-3 flex gap-2">
@@ -176,8 +262,45 @@ export default function RestaurantsPage() {
             <label><FieldLabel>Nom</FieldLabel><TextInput value={editTarget.name} onChange={(v) => setEditTarget({ ...editTarget, name: v })} /></label>
             <label><FieldLabel>Cuisine</FieldLabel><TextInput value={editTarget.cuisine ?? ""} onChange={(v) => setEditTarget({ ...editTarget, cuisine: v })} /></label>
             <label><FieldLabel>Adresse</FieldLabel><TextInput value={editTarget.address ?? ""} onChange={(v) => setEditTarget({ ...editTarget, address: v })} /></label>
-            <label><FieldLabel>ID compte partenaire (ownerUserId)</FieldLabel><TextInput value={editTarget.ownerUserId ?? ""} onChange={(v) => setEditTarget({ ...editTarget, ownerUserId: v || null })} placeholder="UUID utilisateur RESTAURANT" /></label>
-            <p className="text-xs text-gray-400">Créez le compte dans Utilisateurs (rôle RESTAURANT), puis collez son ID ici.</p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label><FieldLabel>Latitude</FieldLabel><TextInput value={String(editTarget.lat ?? "")} onChange={(v) => setEditTarget({ ...editTarget, lat: parseCoord(v, editTarget.lat ?? -4.3217) })} /></label>
+              <label><FieldLabel>Longitude</FieldLabel><TextInput value={String(editTarget.lng ?? "")} onChange={(v) => setEditTarget({ ...editTarget, lng: parseCoord(v, editTarget.lng ?? 15.3125) })} /></label>
+            </div>
+            <GpsCoordButton
+              onCoords={(lat, lng) =>
+                setEditTarget({
+                  ...editTarget,
+                  lat: parseCoord(lat, editTarget.lat ?? -4.3217),
+                  lng: parseCoord(lng, editTarget.lng ?? 15.3125),
+                })
+              }
+              onError={setError}
+            />
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={editTarget.isActive !== false}
+                onChange={(e) => setEditTarget({ ...editTarget, isActive: e.target.checked })}
+                className="w-4 h-4"
+              />
+              Restaurant actif (visible côté passager)
+            </label>
+            <div className="rounded-xl border border-violet-100 bg-violet-50/50 p-3 space-y-2">
+              <FieldLabel>Lier au compte partenaire</FieldLabel>
+              <SelectInput
+                value={editTarget.ownerUserId ?? ""}
+                onChange={(v) => setEditTarget({ ...editTarget, ownerUserId: v || null })}
+                options={partnerOptions}
+              />
+              <p className="text-xs text-gray-500">
+                Le compte choisi pourra se connecter au{" "}
+                <a href={process.env.NEXT_PUBLIC_RESTAURANT_URL ?? "http://localhost:3007"} target="_blank" rel="noreferrer" className="text-[#6C63FF] underline">
+                  portail restaurant
+                </a>
+                . Créez d&apos;abord un utilisateur rôle RESTAURANT dans{" "}
+                <Link href="/utilisateurs" className="text-[#6C63FF] underline">Utilisateurs</Link>.
+              </p>
+            </div>
             <BtnPrimary onClick={handleUpdate} disabled={saving}>{saving ? "Enregistrement…" : "Enregistrer"}</BtnPrimary>
           </div>
         )}

@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsArray, IsBoolean, IsInt, IsOptional, IsString, Min, ValidateNested } from 'class-validator';
+import { IsArray, IsBoolean, IsInt, IsNumber, IsOptional, IsString, Min, ValidateNested } from 'class-validator';
 
 export class MenuItemDto {
   @ApiProperty() @IsString() name: string;
@@ -30,4 +30,10 @@ export class UploadMenuPhotoDto {
 
 export class RejectOrderDto {
   @ApiPropertyOptional() @IsOptional() @IsString() reason?: string;
+}
+
+export class UpdateRestaurantLocationDto {
+  @ApiPropertyOptional() @IsOptional() @IsString() address?: string;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() lat?: number;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() lng?: number;
 }

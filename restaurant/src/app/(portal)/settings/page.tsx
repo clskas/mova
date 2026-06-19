@@ -2,15 +2,19 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { PortalShell } from "@/components/PortalShell";
-import { fetchProfile, updateMenuSettings, type RestaurantProfile } from "@/lib/api";
+import { fetchProfile, updateMenuSettings, updateRestaurantLocation, type RestaurantProfile } from "@/lib/api";
 
 export default function SettingsPage() {
   const [profile, setProfile] = useState<RestaurantProfile | null>(null);
   const [accepting, setAccepting] = useState(true);
   const [prepTime, setPrepTime] = useState(25);
   const [promo, setPromo] = useState("");
+  const [address, setAddress] = useState("");
+  const [lat, setLat] = useState("");
+  const [lng, setLng] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [locating, setLocating] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -21,6 +25,9 @@ export default function SettingsPage() {
       setAccepting(p.isAcceptingOrders ?? true);
       setPrepTime(p.prepTimeMin ?? 25);
       setPromo("");
+      setAddress(p.address ?? "");
+      setLat(p.lat != null ? String(p.lat) : "");
+      setLng(p.lng != null ? String(p.lng) : "");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur");
     } finally {
@@ -30,16 +37,55 @@ export default function SettingsPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  function parseCoord(value: string): number | null {
+    const n = Number.parseFloat(value.replace(",", "."));
+    return Number.isFinite(n) ? n : null;
+  }
+
+  function useMyLocation() {
+    if (!navigator.geolocation) {
+      setError("Géolocalisation non disponible sur cet appareil.");
+      return;
+    }
+    setLocating(true);
+    setError(null);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setLat(pos.coords.latitude.toFixed(6));
+        setLng(pos.coords.longitude.toFixed(6));
+        setLocating(false);
+      },
+      () => {
+        setError("Impossible d'obtenir votre position GPS.");
+        setLocating(false);
+      },
+      { enableHighAccuracy: true, timeout: 15000 },
+    );
+  }
+
   async function save() {
     setSaving(true);
     setError(null);
     setMessage(null);
     try {
+      const latNum = parseCoord(lat);
+      const lngNum = parseCoord(lng);
+      if (lat.trim() && latNum == null) throw new Error("Latitude invalide");
+      if (lng.trim() && lngNum == null) throw new Error("Longitude invalide");
+      if ((latNum != null && lngNum == null) || (latNum == null && lngNum != null)) {
+        throw new Error("Renseignez latitude et longitude ensemble.");
+      }
       await updateMenuSettings({
         isAcceptingOrders: accepting,
         prepTimeMin: prepTime,
         promotionLabel: promo.trim() || undefined,
       });
+      if (address.trim() || latNum != null) {
+        await updateRestaurantLocation({
+          ...(address.trim() ? { address: address.trim() } : {}),
+          ...(latNum != null && lngNum != null ? { lat: latNum, lng: lngNum } : {}),
+        });
+      }
       setMessage("Paramètres enregistrés");
       await load();
     } catch (e) {
@@ -57,6 +103,49 @@ export default function SettingsPage() {
           <p className="text-gray-400">Chargement…</p>
         ) : (
           <div className="bg-white rounded-2xl border p-6 space-y-5">
+            <div className="space-y-3 pb-4 border-b">
+              <h3 className="font-semibold text-sm text-gray-700">Localisation du restaurant</h3>
+              <label className="block text-sm">
+                <span className="text-gray-600">Adresse</span>
+                <input
+                  className="mt-1 w-full rounded-xl border p-3"
+                  placeholder="Ex. Gombe, Kinshasa"
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                />
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <label className="block text-sm">
+                  <span className="text-gray-600">Latitude</span>
+                  <input
+                    className="mt-1 w-full rounded-xl border p-3 font-mono text-sm"
+                    placeholder="-4.3217"
+                    value={lat}
+                    onChange={(e) => setLat(e.target.value)}
+                  />
+                </label>
+                <label className="block text-sm">
+                  <span className="text-gray-600">Longitude</span>
+                  <input
+                    className="mt-1 w-full rounded-xl border p-3 font-mono text-sm"
+                    placeholder="15.3125"
+                    value={lng}
+                    onChange={(e) => setLng(e.target.value)}
+                  />
+                </label>
+              </div>
+              <button
+                type="button"
+                disabled={locating}
+                onClick={useMyLocation}
+                className="w-full py-2 rounded-xl border border-orange-200 text-orange-700 text-sm font-medium disabled:opacity-60"
+              >
+                {locating ? "Localisation…" : "Utiliser ma position GPS"}
+              </button>
+              <p className="text-xs text-gray-400">
+                Les passagers voient les restaurants proches de leur adresse de livraison. Une position précise améliore votre visibilité.
+              </p>
+            </div>
             <label className="flex items-center justify-between gap-4">
               <span className="text-sm">Accepter les commandes</span>
               <input type="checkbox" checked={accepting} onChange={(e) => setAccepting(e.target.checked)} className="w-5 h-5" />

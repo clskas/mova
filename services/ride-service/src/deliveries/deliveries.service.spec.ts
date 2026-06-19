@@ -155,4 +155,44 @@ describe('DeliveriesService', () => {
     expect(result.data[0].name).toBe('Chez Flore');
     expect(result.data[0].deliveryEtaMin).toBeGreaterThan(0);
   });
+
+  it('inclut les restaurants de la même ville même sans Kinshasa dans l\'adresse', async () => {
+    prisma.restaurant.findMany.mockResolvedValue([
+      {
+        id: 'r1',
+        name: 'Chez Flore',
+        cuisine: 'Congolais',
+        address: 'Gombe',
+        lat: -4.3105,
+        lng: 15.3032,
+        rating: 4.6,
+        imageUrl: null,
+        menuItems: [],
+      },
+      {
+        id: 'r2',
+        name: 'Limoncello',
+        cuisine: 'Italien',
+        address: 'Malepe',
+        lat: -4.335,
+        lng: 15.29,
+        rating: 4.5,
+        imageUrl: null,
+        menuItems: [],
+      },
+      {
+        id: 'r3',
+        name: 'Le Roxy',
+        cuisine: 'Grill',
+        address: 'Centre',
+        lat: -11.664,
+        lng: 27.48,
+        rating: 4.3,
+        imageUrl: null,
+        menuItems: [],
+      },
+    ]);
+    const result = await service.listRestaurants(-4.3217, 15.3125);
+    expect(result.data.map((r) => r.name)).toEqual(['Chez Flore', 'Limoncello']);
+  });
 });

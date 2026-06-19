@@ -169,6 +169,317 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
   int _itemPrice(Map<String, dynamic> item) =>
       item['unitPriceCdf'] as int? ?? item['priceCdf'] as int? ?? 0;
 
+  int _itemQtyInCart(String restaurantId, String itemName) {
+    return _cart.entries
+        .where((e) => e.key.startsWith('$restaurantId|$itemName|'))
+        .fold<int>(0, (sum, e) => sum + e.value);
+  }
+
+  void _removeOneFromCart(String restaurantId, String itemName) {
+    final keys = _cart.keys.where((k) => k.startsWith('$restaurantId|$itemName|')).toList();
+    if (keys.isEmpty) return;
+    final k = keys.last;
+    final current = _cart[k] ?? 0;
+    if (current <= 1) {
+      _cart.remove(k);
+    } else {
+      _cart[k] = current - 1;
+    }
+    _estimatedTotal = null;
+  }
+
+  Future<void> _promptAndAddToCart(Map<String, dynamic> item, String restaurantId) async {
+    final name = _itemKey(item);
+    final baseKey = _cartKey(restaurantId, name);
+    final sizes = (item['sizes'] as List?)?.cast<Map<String, dynamic>>();
+    final options = (item['options'] as List?)?.cast<Map<String, dynamic>>();
+
+    if ((sizes != null && sizes.isNotEmpty) || (options != null && options.isNotEmpty)) {
+      String? selectedSize;
+      final selectedOptions = <String>{};
+      final ok = await showModalBottomSheet<bool>(
+        context: context,
+        isScrollControlled: true,
+        builder: (ctx) {
+          return StatefulBuilder(
+            builder: (ctx, setStateSheet) {
+              return Padding(
+                padding: EdgeInsets.only(
+                  left: 16,
+                  right: 16,
+                  top: 16,
+                  bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    const SizedBox(height: 12),
+                    if (sizes != null && sizes.isNotEmpty) ...[
+                      const Text('Taille', style: TextStyle(fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 8,
+                        children: sizes.map((s) {
+                          final label = (s['label'] ?? s['name'])?.toString() ?? '';
+                          return ChoiceChip(
+                            label: Text(label),
+                            selected: selectedSize == label,
+                            onSelected: (_) => setStateSheet(() => selectedSize = label),
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+                    if (options != null && options.isNotEmpty) ...[
+                      const Text('Options', style: TextStyle(fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 6),
+                      ...options.map((o) {
+                        final label = (o['label'] ?? o['name'])?.toString() ?? '';
+                        return CheckboxListTile(
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          value: selectedOptions.contains(label),
+                          onChanged: (v) => setStateSheet(() {
+                            if (v == true) {
+                              selectedOptions.add(label);
+                            } else {
+                              selectedOptions.remove(label);
+                            }
+                          }),
+                          title: Text(label),
+                        );
+                      }),
+                      const SizedBox(height: 12),
+                    ],
+                    ElevatedButton(
+                      onPressed: () => Navigator.pop(ctx, true),
+                      child: const Text('Ajouter'),
+                    ),
+                  ],
+                ),
+              );
+            },
+          );
+        },
+      );
+      if (ok == true && mounted) {
+        setState(() {
+          final key = _cartKey(restaurantId, name, size: selectedSize, options: selectedOptions.toList());
+          _cart[key] = (_cart[key] ?? 0) + 1;
+          _estimatedTotal = null;
+        });
+      }
+    } else {
+      setState(() {
+        _cart[baseKey] = (_cart[baseKey] ?? 0) + 1;
+        _estimatedTotal = null;
+      });
+    }
+  }
+
+  Future<void> _showMealDetailModal(
+    Map<String, dynamic> item,
+    String restaurantId,
+    String restaurantName,
+  ) async {
+    final name = _itemKey(item);
+    final imageUrl = _itemImageUrl(item);
+    final price = _itemPrice(item);
+    final description = item['description']?.toString().trim() ?? '';
+    final sizes = (item['sizes'] as List?)?.cast<Map<String, dynamic>>();
+    final options = (item['options'] as List?)?.cast<Map<String, dynamic>>();
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setModalState) {
+            final qty = _itemQtyInCart(restaurantId, name);
+            return DraggableScrollableSheet(
+              initialChildSize: 0.72,
+              minChildSize: 0.45,
+              maxChildSize: 0.92,
+              builder: (_, scrollController) {
+                return Container(
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                  ),
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 10),
+                      Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade300,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                      Expanded(
+                        child: ListView(
+                          controller: scrollController,
+                          padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+                          children: [
+                            if (imageUrl != null)
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(16),
+                                child: Image.network(
+                                  imageUrl,
+                                  height: 200,
+                                  width: double.infinity,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => SizedBox(
+                                    height: 160,
+                                    child: _restaurantPlaceholder(),
+                                  ),
+                                ),
+                              )
+                            else
+                              SizedBox(height: 160, child: _restaurantPlaceholder()),
+                            const SizedBox(height: 16),
+                            Text(
+                              name,
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 22),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              restaurantName,
+                              style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              MarketConfig.formatCdf(price),
+                              style: const TextStyle(
+                                color: MovaColors.violet,
+                                fontSize: 20,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            if (description.isNotEmpty) ...[
+                              const SizedBox(height: 16),
+                              const Text(
+                                'Description',
+                                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                description,
+                                style: const TextStyle(
+                                  color: MovaColors.textSecondary,
+                                  fontSize: 14,
+                                  height: 1.45,
+                                ),
+                              ),
+                            ],
+                            if (sizes != null && sizes.isNotEmpty) ...[
+                              const SizedBox(height: 16),
+                              const Text('Tailles disponibles', style: TextStyle(fontWeight: FontWeight.w600)),
+                              const SizedBox(height: 8),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: sizes.map((s) {
+                                  final label = (s['label'] ?? s['name'])?.toString() ?? '';
+                                  return Chip(label: Text(label));
+                                }).toList(),
+                              ),
+                            ],
+                            if (options != null && options.isNotEmpty) ...[
+                              const SizedBox(height: 16),
+                              const Text('Options', style: TextStyle(fontWeight: FontWeight.w600)),
+                              const SizedBox(height: 8),
+                              ...options.map((o) {
+                                final label = (o['label'] ?? o['name'])?.toString() ?? '';
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 4),
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.check_circle_outline, size: 18, color: MovaColors.green),
+                                      const SizedBox(width: 8),
+                                      Expanded(child: Text(label)),
+                                    ],
+                                  ),
+                                );
+                              }),
+                            ],
+                          ],
+                        ),
+                      ),
+                      SafeArea(
+                        top: false,
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+                          child: Row(
+                            children: [
+                              Container(
+                                decoration: BoxDecoration(
+                                  border: Border.all(color: Colors.grey.shade300),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    IconButton(
+                                      icon: const Icon(Icons.remove),
+                                      onPressed: qty > 0
+                                          ? () {
+                                              setState(() => _removeOneFromCart(restaurantId, name));
+                                              setModalState(() {});
+                                            }
+                                          : null,
+                                    ),
+                                    Text(
+                                      '$qty',
+                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.add),
+                                      onPressed: () async {
+                                        await _promptAndAddToCart(item, restaurantId);
+                                        if (ctx.mounted) setModalState(() {});
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: MovaColors.violet,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(vertical: 14),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                  onPressed: () async {
+                                    await _promptAndAddToCart(item, restaurantId);
+                                    if (ctx.mounted) Navigator.pop(ctx);
+                                  },
+                                  child: Text(qty > 0 ? 'Ajouter encore' : 'Ajouter au panier'),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
   Future<void> _loadRestaurants() async {
     setState(() {
       _loading = true;
@@ -598,165 +909,82 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
         const SizedBox(height: 8),
         ...items.map((item) {
           final name = _itemKey(item);
-          final baseKey = _cartKey(restaurantId, name);
-          final qty = _cart.entries
-              .where((e) => e.key.startsWith('$restaurantId|$name|'))
-              .fold<int>(0, (sum, e) => sum + e.value);
+          final qty = _itemQtyInCart(restaurantId, name);
           return Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: MovaCard(
               child: Row(
                 children: [
-                  if (_itemImageUrl(item) != null)
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
-                      child: Image.network(
-                        _itemImageUrl(item)!,
-                        width: 64,
-                        height: 64,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => _restaurantPlaceholder(),
-                      ),
-                    )
-                  else
-                    SizedBox(
-                      width: 64,
-                      height: 64,
-                      child: _restaurantPlaceholder(),
-                    ),
-                  const SizedBox(width: 12),
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          name,
-                          style: const TextStyle(fontWeight: FontWeight.w600),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        if (item['description'] != null && item['description'].toString().isNotEmpty)
-                          Text(
-                            item['description'].toString(),
-                            style: const TextStyle(fontSize: 12, color: MovaColors.textSecondary),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
+                    child: InkWell(
+                      onTap: () => _showMealDetailModal(
+                        item,
+                        restaurantId,
+                        restaurant['name']?.toString() ?? '',
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                      child: Row(
+                        children: [
+                          if (_itemImageUrl(item) != null)
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(10),
+                              child: Image.network(
+                                _itemImageUrl(item)!,
+                                width: 64,
+                                height: 64,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => _restaurantPlaceholder(),
+                              ),
+                            )
+                          else
+                            SizedBox(
+                              width: 64,
+                              height: 64,
+                              child: _restaurantPlaceholder(),
+                            ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  name,
+                                  style: const TextStyle(fontWeight: FontWeight.w600),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                if (item['description'] != null && item['description'].toString().isNotEmpty)
+                                  Text(
+                                    item['description'].toString(),
+                                    style: const TextStyle(fontSize: 12, color: MovaColors.textSecondary),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                Text(
+                                  MarketConfig.formatCdf(_itemPrice(item)),
+                                  style: const TextStyle(color: MovaColors.violet),
+                                ),
+                                const Text(
+                                  'Voir le détail',
+                                  style: TextStyle(fontSize: 11, color: MovaColors.violet),
+                                ),
+                              ],
+                            ),
                           ),
-                        Text(
-                          MarketConfig.formatCdf(_itemPrice(item)),
-                          style: const TextStyle(color: MovaColors.violet),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                   IconButton(
                     icon: const Icon(Icons.remove_circle_outline),
                     onPressed: qty > 0
-                        ? () => setState(() {
-                              // Retire 1 unité de la dernière variante ajoutée (simple LIFO par clé)
-                              final keys = _cart.keys.where((k) => k.startsWith('$restaurantId|$name|')).toList();
-                              if (keys.isEmpty) return;
-                              final k = keys.last;
-                              final current = _cart[k] ?? 0;
-                              if (current <= 1) {
-                                _cart.remove(k);
-                              } else {
-                                _cart[k] = current - 1;
-                              }
-                              _estimatedTotal = null;
-                            })
+                        ? () => setState(() => _removeOneFromCart(restaurantId, name))
                         : null,
                   ),
                   Text('$qty', style: const TextStyle(fontWeight: FontWeight.bold)),
                   IconButton(
                     icon: const Icon(Icons.add_circle_outline),
-                    onPressed: () async {
-                      final sizes = (item['sizes'] as List?)?.cast<Map<String, dynamic>>();
-                      final options = (item['options'] as List?)?.cast<Map<String, dynamic>>();
-                      if ((sizes != null && sizes.isNotEmpty) || (options != null && options.isNotEmpty)) {
-                        String? selectedSize;
-                        final selectedOptions = <String>{};
-                        final ok = await showModalBottomSheet<bool>(
-                          context: context,
-                          isScrollControlled: true,
-                          builder: (ctx) {
-                            return StatefulBuilder(
-                              builder: (ctx, setStateSheet) {
-                                return Padding(
-                                  padding: EdgeInsets.only(
-                                    left: 16,
-                                    right: 16,
-                                    top: 16,
-                                    bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
-                                  ),
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                                    children: [
-                                      Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                                      const SizedBox(height: 12),
-                                      if (sizes != null && sizes.isNotEmpty) ...[
-                                        const Text('Taille', style: TextStyle(fontWeight: FontWeight.w600)),
-                                        const SizedBox(height: 6),
-                                        Wrap(
-                                          spacing: 8,
-                                          children: sizes.map((s) {
-                                            final label = (s['label'] ?? s['name'])?.toString() ?? '';
-                                            return ChoiceChip(
-                                              label: Text(label),
-                                              selected: selectedSize == label,
-                                              onSelected: (_) => setStateSheet(() => selectedSize = label),
-                                            );
-                                          }).toList(),
-                                        ),
-                                        const SizedBox(height: 12),
-                                      ],
-                                      if (options != null && options.isNotEmpty) ...[
-                                        const Text('Options', style: TextStyle(fontWeight: FontWeight.w600)),
-                                        const SizedBox(height: 6),
-                                        ...options.map((o) {
-                                          final label = (o['label'] ?? o['name'])?.toString() ?? '';
-                                          return CheckboxListTile(
-                                            dense: true,
-                                            contentPadding: EdgeInsets.zero,
-                                            value: selectedOptions.contains(label),
-                                            onChanged: (v) => setStateSheet(() {
-                                              if (v == true) {
-                                                selectedOptions.add(label);
-                                              } else {
-                                                selectedOptions.remove(label);
-                                              }
-                                            }),
-                                            title: Text(label),
-                                          );
-                                        }),
-                                        const SizedBox(height: 12),
-                                      ],
-                                      ElevatedButton(
-                                        onPressed: () => Navigator.pop(ctx, true),
-                                        child: const Text('Ajouter'),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              },
-                            );
-                          },
-                        );
-                        if (ok == true && mounted) {
-                          setState(() {
-                            final key = _cartKey(restaurantId, name, size: selectedSize, options: selectedOptions.toList());
-                            _cart[key] = (_cart[key] ?? 0) + 1;
-                            _estimatedTotal = null;
-                          });
-                        }
-                      } else {
-                        setState(() {
-                          _cart[baseKey] = (_cart[baseKey] ?? 0) + 1;
-                          _estimatedTotal = null;
-                        });
-                      }
-                    },
+                    onPressed: () => _promptAndAddToCart(item, restaurantId),
                   ),
                 ],
               ),

@@ -21,6 +21,7 @@ import 'kyc_screen.dart';
 import 'driver_ride_history_screen.dart';
 import 'ride_offer_screen.dart';
 import 'delivery_offer_screen.dart';
+import 'driver_moving_mission_screen.dart';
 
 class DriverHomeScreen extends ConsumerStatefulWidget {
   const DriverHomeScreen({super.key});
@@ -132,10 +133,23 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
       'ASSIGNED' => 'Assigné',
       'CONFIRMED' => 'Confirmé',
       'IN_PROGRESS' => 'En cours',
+      'COMPLETED' => 'Terminé',
       'SCHEDULED' => 'Planifié',
       'PENDING' => 'En attente',
       _ => status ?? '—',
     };
+  }
+
+  void _openAssignedMission(Map<String, dynamic> mission) {
+    if (mission['type']?.toString() != 'MOVING') return;
+    final id = mission['id']?.toString();
+    if (id == null || id.isEmpty) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => DriverMovingMissionScreen(movingId: id, initialMission: mission),
+      ),
+    ).then((_) => _loadAssignments());
   }
 
   Future<void> _loadProfile({bool clearCache = false}) async {
@@ -688,7 +702,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                 const Text(
                   '• Courses taxi : proches de votre GPS, dans le rayon de recherche, véhicule compatible.\n'
                   '• Livraisons : colis/repas/express en attente, dans un rayon de 15 km.\n'
-                  '• Réservations planifiées et déménagements : assignés par l’admin — consultez la section « Missions assignées » ci-dessous.\n'
+                  '• Réservations planifiées et déménagements : assignés par l’admin — ouvrez une mission pour démarrer / terminer.\n'
                   '• Covoiturage : publiez votre trajet via le bouton ci-dessous.',
                   style: TextStyle(fontSize: 12, color: MovaColors.textSecondary, height: 1.4),
                 ),
@@ -719,33 +733,48 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                         : '';
                     return Padding(
                       padding: const EdgeInsets.only(top: 8),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Icon(icon, size: 20, color: MovaColors.violet),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  m['label']?.toString() ?? 'Mission',
-                                  style: const TextStyle(fontWeight: FontWeight.w600),
+                      child: InkWell(
+                        onTap: m['type'] == 'MOVING' ? () => _openAssignedMission(m) : null,
+                        borderRadius: BorderRadius.circular(8),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Icon(icon, size: 20, color: MovaColors.violet),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      m['label']?.toString() ?? 'Mission',
+                                      style: const TextStyle(fontWeight: FontWeight.w600),
+                                    ),
+                                    Text(
+                                      '$subtitle$extra',
+                                      style: const TextStyle(fontSize: 12, color: MovaColors.textSecondary),
+                                      maxLines: 3,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    Text(
+                                      _missionStatusLabel(m['status']?.toString()),
+                                      style: const TextStyle(fontSize: 11, color: MovaColors.violet, fontWeight: FontWeight.w600),
+                                    ),
+                                    if (m['type'] == 'MOVING' &&
+                                        (m['status'] == 'ASSIGNED' || m['status'] == 'IN_PROGRESS'))
+                                      const Text(
+                                        'Appuyer pour gérer la mission',
+                                        style: TextStyle(fontSize: 11, color: MovaColors.green),
+                                      ),
+                                  ],
                                 ),
-                                Text(
-                                  '$subtitle$extra',
-                                  style: const TextStyle(fontSize: 12, color: MovaColors.textSecondary),
-                                  maxLines: 3,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                Text(
-                                  _missionStatusLabel(m['status']?.toString()),
-                                  style: const TextStyle(fontSize: 11, color: MovaColors.violet, fontWeight: FontWeight.w600),
-                                ),
-                              ],
-                            ),
+                              ),
+                              if (m['type'] == 'MOVING')
+                                const Icon(Icons.chevron_right, size: 20, color: MovaColors.textSecondary),
+                            ],
                           ),
-                        ],
+                        ),
                       ),
                     );
                   }),

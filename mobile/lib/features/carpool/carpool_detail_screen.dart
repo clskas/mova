@@ -313,16 +313,13 @@ class _CarpoolDetailScreenState extends ConsumerState<CarpoolDetailScreen> {
                           Text('Notes : ${trip['notes']}', style: const TextStyle(color: MovaColors.textSecondary)),
                         ],
                         if (trip['vehicleInfo'] != null || trip['vehicleImageUrl'] != null) ...[
-                          const vehiclePhoto = trip['vehicleImageUrl']?.toString();
-                          const photoUrl = vehiclePhoto != null && vehiclePhoto.isNotEmpty
-                              ? MarketConfig.resolveMediaUrl(vehiclePhoto)
-                              : null;
                           const SizedBox(height: 8),
-                          if (photoUrl != null)
+                          if (trip['vehicleImageUrl'] != null &&
+                              trip['vehicleImageUrl'].toString().isNotEmpty)
                             ClipRRect(
                               borderRadius: BorderRadius.circular(12),
                               child: Image.network(
-                                photoUrl,
+                                MarketConfig.resolveMediaUrl(trip['vehicleImageUrl'].toString()),
                                 height: 120,
                                 width: double.infinity,
                                 fit: BoxFit.cover,

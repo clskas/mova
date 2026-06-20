@@ -16,7 +16,9 @@ describe('MovingService', () => {
     get: jest.fn().mockResolvedValue({ baseFeeCdf: 15000, multiplier: 1.5, perUnitCdf: 8000 }),
   };
 
-  const service = new MovingService(prisma as never, pricing, surcharges as never);
+  const redis = { publish: jest.fn().mockResolvedValue(undefined) };
+
+  const service = new MovingService(prisma as never, pricing, surcharges as never, redis as never);
 
   const dto = {
     volumeM3: 5,
@@ -39,5 +41,21 @@ describe('MovingService', () => {
     prisma.movingRequest.create.mockResolvedValue({ id: 'm1', status: 'PENDING' });
     const result = await service.create('user-1', dto);
     expect(result.moving.id).toBe('m1');
+  });
+
+  it('permet au chauffeur assigné de démarrer puis terminer', async () => {
+    prisma.movingRequest.findUnique
+      .mockResolvedValueOnce({ id: 'm1', driverId: 'driver-1', userId: 'user-1', status: 'ASSIGNED' })
+      .mockResolvedValueOnce({ id: 'm1', driverId: 'driver-1', userId: 'user-1', status: 'IN_PROGRESS' });
+    prisma.movingRequest.update
+      .mockResolvedValueOnce({ id: 'm1', driverId: 'driver-1', userId: 'user-1', status: 'IN_PROGRESS', completedAt: null })
+      .mockResolvedValueOnce({ id: 'm1', driverId: 'driver-1', userId: 'user-1', status: 'COMPLETED', completedAt: new Date() });
+
+    const started = await service.updateStatusByDriver('m1', 'driver-1', 'IN_PROGRESS' as never);
+    expect(started.moving.status).toBe('IN_PROGRESS');
+    expect(redis.publish).toHaveBeenCalled();
+
+    const done = await service.updateStatusByDriver('m1', 'driver-1', 'COMPLETED' as never);
+    expect(done.moving.status).toBe('COMPLETED');
   });
 });

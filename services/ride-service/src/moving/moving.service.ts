@@ -84,14 +84,16 @@ export class MovingService {
     });
   }
 
-  async get(id: string, userId: string) {
-    const request = await this.prisma.movingRequest.findUnique({ where: { id } });
-    if (!request) throw new MovaHttpException(MovaErrorCode.MOVING_NOT_FOUND, HttpStatus.NOT_FOUND);
-    if (request.userId !== userId) throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
+  private formatMovingDetail(request: {
+    id: string;
+    status: MovingRequestStatus;
+    completedAt: Date | null;
+    estimatedPriceCdf: number;
+    photoUrls: unknown;
+    [key: string]: unknown;
+  }) {
     const timeline = buildMovingTimeline(request.status, request.completedAt);
-    const photoUrls = Array.isArray(request.photoUrls)
-      ? (request.photoUrls as string[])
-      : [];
+    const photoUrls = Array.isArray(request.photoUrls) ? (request.photoUrls as string[]) : [];
     return {
       ...request,
       photoUrls,
@@ -102,6 +104,54 @@ export class MovingService {
       formattedPrice: formatCdf(request.estimatedPriceCdf),
       currency: 'CDF',
       city: 'Kinshasa',
+    };
+  }
+
+  async get(id: string, userId: string) {
+    const request = await this.prisma.movingRequest.findUnique({ where: { id } });
+    if (!request) throw new MovaHttpException(MovaErrorCode.MOVING_NOT_FOUND, HttpStatus.NOT_FOUND);
+    if (request.userId !== userId) throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
+    return this.formatMovingDetail(request);
+  }
+
+  async getForParticipant(id: string, userId: string) {
+    const request = await this.prisma.movingRequest.findUnique({ where: { id } });
+    if (!request) throw new MovaHttpException(MovaErrorCode.MOVING_NOT_FOUND, HttpStatus.NOT_FOUND);
+    if (request.userId !== userId && request.driverId !== userId) {
+      throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
+    }
+    return this.formatMovingDetail(request);
+  }
+
+  async updateStatusByDriver(id: string, driverId: string, status: MovingRequestStatus) {
+    const request = await this.prisma.movingRequest.findUnique({ where: { id } });
+    if (!request) throw new MovaHttpException(MovaErrorCode.MOVING_NOT_FOUND, HttpStatus.NOT_FOUND);
+    if (request.driverId !== driverId) {
+      throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
+    }
+    const allowed: Record<MovingRequestStatus, MovingRequestStatus[]> = {
+      [MovingRequestStatus.PENDING]: [],
+      [MovingRequestStatus.ASSIGNED]: [MovingRequestStatus.IN_PROGRESS],
+      [MovingRequestStatus.IN_PROGRESS]: [MovingRequestStatus.COMPLETED],
+      [MovingRequestStatus.COMPLETED]: [],
+      [MovingRequestStatus.CANCELLED]: [],
+    };
+    if (!allowed[request.status]?.includes(status)) {
+      throw new MovaHttpException(MovaErrorCode.MOVING_INVALID_STATUS);
+    }
+    const updates: Record<string, unknown> = { status };
+    if (status === MovingRequestStatus.COMPLETED) updates.completedAt = new Date();
+    const updated = await this.prisma.movingRequest.update({ where: { id }, data: updates });
+    await this.redis.publish(MOVA_EVENTS.SERVICE_STATUS_UPDATED, {
+      serviceType: 'MOVING',
+      referenceId: updated.id,
+      userId: updated.userId,
+      status: updated.status,
+    });
+    return {
+      moving: updated,
+      timeline: buildMovingTimeline(updated.status, updated.completedAt),
+      paymentReady: status === MovingRequestStatus.COMPLETED,
     };
   }
 

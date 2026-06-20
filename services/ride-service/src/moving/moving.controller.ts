@@ -41,9 +41,19 @@ export class MovingController {
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Détail déménagement' })
+  @ApiOperation({ summary: 'Détail déménagement (passager ou chauffeur assigné)' })
   get(@Request() req: { user: { id: string } }, @Param('id') id: string) {
-    return this.movingService.get(id, req.user.id);
+    return this.movingService.getForParticipant(id, req.user.id);
+  }
+
+  @Patch(':id/driver-status')
+  @ApiOperation({ summary: 'Mettre à jour statut déménagement (chauffeur assigné)' })
+  driverStatus(
+    @Request() req: { user: { id: string } },
+    @Param('id') id: string,
+    @Body() dto: UpdateMovingStatusDto,
+  ) {
+    return this.movingService.updateStatusByDriver(id, req.user.id, dto.status);
   }
 
   @Post(':id/cancel')

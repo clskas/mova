@@ -10,6 +10,7 @@ import {
   type CarpoolTrip,
 } from "@/lib/api";
 import { useAdmin } from "@/components/AdminProvider";
+import { resolveMediaUrl } from "@/components/VehiclePhotoUpload";
 import {
   BtnDanger,
   BtnPrimary,
@@ -176,6 +177,33 @@ export default function CovoituragePage() {
             <p>
               <span className="text-gray-500">Prix / place:</span> {formatCdf(selected.pricePerSeatCdf ?? 0)}
             </p>
+            {(selected.vehicleInfo || selected.vehicleImageUrl) && (
+              <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 space-y-2">
+                <p className="text-gray-500 font-medium">Véhicule du conducteur</p>
+                <div className="flex gap-3 items-start">
+                  {selected.vehicleImageUrl && resolveMediaUrl(selected.vehicleImageUrl) ? (
+                    <img
+                      src={resolveMediaUrl(selected.vehicleImageUrl)!}
+                      alt="Véhicule"
+                      className="w-28 h-20 object-cover rounded-lg border"
+                    />
+                  ) : (
+                    <div className="w-28 h-20 rounded-lg border border-dashed border-gray-300 bg-white flex items-center justify-center text-[10px] text-gray-400 text-center px-1">
+                      Photo non fournie
+                    </div>
+                  )}
+                  <div>
+                    <p>{selected.vehicleInfo ?? "—"}</p>
+                    {selected.vehicleType && (
+                      <p className="text-xs text-gray-500 mt-1">Type : {selected.vehicleType}</p>
+                    )}
+                    {selected.vehiclePlate && (
+                      <p className="text-xs text-gray-500">Plaque : {selected.vehiclePlate}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
             <p>
               <span className="text-gray-500">Statut:</span> <StatusBadge status={selected.status ?? "OPEN"} />
             </p>

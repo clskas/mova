@@ -15,6 +15,7 @@ import {
 import { useAdmin } from "@/components/AdminProvider";
 import { AssignDriverPanel } from "@/components/AssignDriverPanel";
 import { ContactBlock } from "@/components/ContactActions";
+import { DriverVehiclePreview } from "@/components/DriverVehiclePreview";
 import {
   BtnDanger,
   BtnPrimary,
@@ -222,6 +223,12 @@ export default function DemenagementsPage() {
 
             <ContactBlock title="Passager" name={selected.passengerName} phone={selected.passengerPhone} />
             <ContactBlock title="Chauffeur / équipe assignée" name={selected.driverName} phone={selected.driverPhone} />
+            {selected.driverId && (
+              <DriverVehiclePreview
+                driver={drivers.find((d) => d.userId === selected.driverId)}
+                title="Engin assigné au déménagement"
+              />
+            )}
 
             {!readOnly && (
               <AssignDriverPanel

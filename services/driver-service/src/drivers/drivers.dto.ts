@@ -29,6 +29,7 @@ export class UpdateOnboardingDto {
   @ApiPropertyOptional() @IsOptional() @IsString() vehicleModel?: string;
   @ApiPropertyOptional() @IsOptional() @IsEnum(VehicleType) vehicleType?: VehicleType;
   @ApiPropertyOptional() @IsOptional() @IsString() vehicleColor?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() vehicleImageUrl?: string;
 }
 
 export class ActivationPinDto {

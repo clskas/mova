@@ -67,6 +67,7 @@ model Vehicle {
   model           String?
   plateNumber     String
   color           String?
+  imageUrl        String?
   isActive        Boolean       @default(true)
   createdAt       DateTime      @default(now())
 

@@ -1,6 +1,7 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { MovingRequestStatus, SurchargeType, VehicleType } from '@prisma/client';
-import { MovaErrorCode, MovaHttpException, formatCdf } from '@mova/shared';
+import { MovaErrorCode, MovaHttpException, MOVA_EVENTS, formatCdf } from '@mova/shared';
+import { RedisService } from '@mova/shared';
 import { buildMovingTimeline } from '../deliveries/parcel.util';
 import { assertServiceAreaPair } from '../common/address.util';
 import { fetchAuthUserBrief } from '../common/internal-lookup.util';
@@ -15,6 +16,7 @@ export class MovingService {
     private prisma: PrismaService,
     private pricing: PricingService,
     private surcharges: SurchargeService,
+    private redis: RedisService,
   ) {}
 
   private validateCoords(dto: EstimateMovingDto) {
@@ -178,6 +180,23 @@ export class MovingService {
     }
     const updated = await this.prisma.movingRequest.update({ where: { id }, data });
     const driver = await fetchAuthUserBrief(updated.driverId!);
+    await this.redis.publish(MOVA_EVENTS.SERVICE_ASSIGNED, {
+      serviceType: 'MOVING',
+      referenceId: updated.id,
+      driverId: updated.driverId!,
+      passengerId: updated.userId,
+      summary: `Déménagement ${updated.pickupAddress} → ${updated.dropoffAddress}`,
+      pickupAddress: updated.pickupAddress,
+      dropoffAddress: updated.dropoffAddress,
+    });
+    if (updated.status !== request.status) {
+      await this.redis.publish(MOVA_EVENTS.SERVICE_STATUS_UPDATED, {
+        serviceType: 'MOVING',
+        referenceId: updated.id,
+        userId: updated.userId,
+        status: updated.status,
+      });
+    }
     return {
       id: updated.id,
       driverId: updated.driverId,
@@ -202,6 +221,39 @@ export class MovingService {
     const updates: Record<string, unknown> = { status };
     if (status === MovingRequestStatus.COMPLETED) updates.completedAt = new Date();
     if (status === MovingRequestStatus.CANCELLED) updates.cancelledAt = new Date();
-    return this.prisma.movingRequest.update({ where: { id }, data: updates });
+    const updated = await this.prisma.movingRequest.update({ where: { id }, data: updates });
+    if (updated.status !== request.status) {
+      await this.redis.publish(MOVA_EVENTS.SERVICE_STATUS_UPDATED, {
+        serviceType: 'MOVING',
+        referenceId: updated.id,
+        userId: updated.userId,
+        status: updated.status,
+      });
+    }
+    return updated;
+  }
+
+  async listForDriver(driverId: string) {
+    const rows = await this.prisma.movingRequest.findMany({
+      where: {
+        driverId,
+        status: { notIn: [MovingRequestStatus.COMPLETED, MovingRequestStatus.CANCELLED] },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+    });
+    return {
+      data: rows.map((r) => ({
+        id: r.id,
+        type: 'MOVING',
+        label: 'Déménagement',
+        status: r.status,
+        pickupAddress: r.pickupAddress,
+        dropoffAddress: r.dropoffAddress,
+        volumeM3: r.volumeM3,
+        priceCdf: r.estimatedPriceCdf,
+        createdAt: r.createdAt.toISOString(),
+      })),
+    };
   }
 }

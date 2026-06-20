@@ -1,6 +1,7 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { ScheduledRideStatus, VehicleType } from '@prisma/client';
-import { MovaErrorCode, MovaHttpException, normalizeVehicleType, resolveCityFromCoords } from '@mova/shared';
+import { MovaErrorCode, MovaHttpException, MOVA_EVENTS, normalizeVehicleType, resolveCityFromCoords } from '@mova/shared';
+import { RedisService } from '@mova/shared';
 import { assertServiceAreaCoords, assertServiceAreaDestination, assertServiceAreaPair, addressToCoords, DEFAULT_PICKUP } from '../common/address.util';
 import { fetchAuthUserBrief } from '../common/internal-lookup.util';
 import { PrismaService } from '../prisma/prisma.service';
@@ -12,7 +13,7 @@ const MAX_SCHEDULE_DAYS = 7;
 
 @Injectable()
 export class ScheduledRidesService {
-  constructor(private prisma: PrismaService, private pricing: PricingService) {}
+  constructor(private prisma: PrismaService, private pricing: PricingService, private redis: RedisService) {}
 
   private parseVehicleType(value: string): VehicleType {
     try {
@@ -162,6 +163,24 @@ export class ScheduledRidesService {
     }
     const updated = await this.prisma.scheduledRide.update({ where: { id }, data });
     const driver = await fetchAuthUserBrief(updated.driverId!);
+    await this.redis.publish(MOVA_EVENTS.SERVICE_ASSIGNED, {
+      serviceType: 'SCHEDULED',
+      referenceId: updated.id,
+      driverId: updated.driverId!,
+      passengerId: updated.passengerId,
+      summary: `Course planifiée ${updated.pickupAddress ?? ''} → ${updated.dropoffAddress}`,
+      pickupAddress: updated.pickupAddress ?? undefined,
+      dropoffAddress: updated.dropoffAddress,
+      scheduledAt: updated.scheduledAt.toISOString(),
+    });
+    if (updated.status !== ride.status) {
+      await this.redis.publish(MOVA_EVENTS.SERVICE_STATUS_UPDATED, {
+        serviceType: 'SCHEDULED',
+        referenceId: updated.id,
+        userId: updated.passengerId,
+        status: updated.status,
+      });
+    }
     return {
       id: updated.id,
       driverId: updated.driverId,
@@ -186,7 +205,40 @@ export class ScheduledRidesService {
   async adminUpdateStatus(id: string, status: ScheduledRideStatus) {
     const ride = await this.prisma.scheduledRide.findUnique({ where: { id } });
     if (!ride) throw new MovaHttpException(MovaErrorCode.SCHEDULED_RIDE_NOT_FOUND, HttpStatus.NOT_FOUND);
-    return this.prisma.scheduledRide.update({ where: { id }, data: { status } });
+    const updated = await this.prisma.scheduledRide.update({ where: { id }, data: { status } });
+    if (updated.status !== ride.status) {
+      await this.redis.publish(MOVA_EVENTS.SERVICE_STATUS_UPDATED, {
+        serviceType: 'SCHEDULED',
+        referenceId: updated.id,
+        userId: updated.passengerId,
+        status: updated.status,
+      });
+    }
+    return updated;
+  }
+
+  async listForDriver(driverId: string) {
+    const rows = await this.prisma.scheduledRide.findMany({
+      where: {
+        driverId,
+        status: { notIn: [ScheduledRideStatus.CANCELLED, ScheduledRideStatus.COMPLETED] },
+      },
+      orderBy: { scheduledAt: 'asc' },
+      take: 20,
+    });
+    return {
+      data: rows.map((r) => ({
+        id: r.id,
+        type: 'SCHEDULED',
+        label: 'Course planifiée',
+        status: r.status,
+        pickupAddress: r.pickupAddress,
+        dropoffAddress: r.dropoffAddress,
+        scheduledAt: r.scheduledAt.toISOString(),
+        vehicleType: r.vehicleType,
+        priceCdf: r.estimatedPriceCdf,
+      })),
+    };
   }
 
   /** Compatibilité mobile — coords pickup/dropoff optionnelles (zones MOVA nationales). */

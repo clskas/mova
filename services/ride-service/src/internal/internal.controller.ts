@@ -339,4 +339,24 @@ export class InternalController {
   updateRentalStatus(@Param('id') id: string, @Body('status') status: RentalInquiryStatus) {
     return this.rental.adminUpdateStatus(id, status);
   }
+
+  @Get('rental-vehicles')
+  listRentalVehicles() {
+    return this.rental.listVehiclesAdmin();
+  }
+
+  @Post('rental-vehicles')
+  createRentalVehicle(@Body() body: Record<string, unknown>) {
+    return this.rental.upsertVehicleAdmin(null, body);
+  }
+
+  @Patch('rental-vehicles/:id')
+  updateRentalVehicle(@Param('id') id: string, @Body() body: Record<string, unknown>) {
+    return this.rental.upsertVehicleAdmin(id, body);
+  }
+
+  @Delete('rental-vehicles/:id')
+  deleteRentalVehicle(@Param('id') id: string) {
+    return this.rental.deleteVehicleAdmin(id);
+  }
 }

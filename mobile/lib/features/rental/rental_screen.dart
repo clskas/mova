@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -37,6 +39,7 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
   bool _loading = false;
   bool _loadingList = true;
   String? _error;
+  Timer? _rentalsPollTimer;
 
   static const _categories = [
     ('', 'Toutes'),
@@ -57,12 +60,35 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(_onTabChanged);
     _search();
     _loadMyRentals();
   }
 
+  void _onTabChanged() {
+    if (_tabController.index == 1) {
+      _loadMyRentals(silent: true);
+      _startRentalsPolling();
+    } else {
+      _stopRentalsPolling();
+    }
+  }
+
+  void _startRentalsPolling() {
+    _rentalsPollTimer?.cancel();
+    _rentalsPollTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (_tabController.index == 1) _loadMyRentals(silent: true);
+    });
+  }
+
+  void _stopRentalsPolling() {
+    _rentalsPollTimer?.cancel();
+  }
+
   @override
   void dispose() {
+    _stopRentalsPolling();
+    _tabController.removeListener(_onTabChanged);
     _tabController.dispose();
     _minPriceController.dispose();
     _maxPriceController.dispose();
@@ -133,17 +159,35 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
     });
   }
 
-  Future<void> _loadMyRentals() async {
-    setState(() => _loadingList = true);
+  Future<void> _loadMyRentals({bool silent = false}) async {
+    if (!silent) setState(() => _loadingList = true);
     final api = ref.read(apiClientProvider);
     final result = await api.get('/rental/bookings', skipCache: true);
     if (!mounted) return;
     setState(() {
-      _loadingList = false;
+      if (!silent) _loadingList = false;
       if (result case Success(:final data)) {
         _myRentals = (data['data'] as List? ?? data['bookings'] as List? ?? []).cast<Map<String, dynamic>>();
       }
     });
+  }
+
+  Widget _statusChip(String? label, String? status) {
+    final text = label ?? status ?? '—';
+    final color = switch (status?.toUpperCase()) {
+      'CONFIRMED' || 'IN_PROGRESS' => MovaColors.green,
+      'CONTACTED' => MovaColors.violet,
+      'CLOSED' || 'CANCELLED' => Colors.red.shade700,
+      _ => MovaColors.textSecondary,
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(text, style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w600)),
+    );
   }
 
   Future<void> _openBooking(Map<String, dynamic> booking) async {
@@ -696,9 +740,16 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  vehicle?['name']?.toString() ?? inq['vehicleType']?.toString() ?? 'Location',
-                  style: const TextStyle(fontWeight: FontWeight.w600),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        vehicle?['name']?.toString() ?? inq['vehicleType']?.toString() ?? 'Location',
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                    _statusChip(inq['statusLabel']?.toString(), inq['status']?.toString()),
+                  ],
                 ),
                 Text(
                   '${_formatDate(DateTime.parse(inq['startDate']?.toString() ?? DateTime.now().toIso8601String()))} → '

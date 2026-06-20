@@ -1,5 +1,13 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { MOVA_EVENTS, DeliveryCreatedPayload, DeliveryStatusUpdatedPayload, PaymentCompletedPayload, RideCreatedPayload } from '@mova/shared';
+import {
+  MOVA_EVENTS,
+  DeliveryCreatedPayload,
+  DeliveryStatusUpdatedPayload,
+  PaymentCompletedPayload,
+  RideCreatedPayload,
+  ServiceAssignedPayload,
+  ServiceStatusUpdatedPayload,
+} from '@mova/shared';
 import { RedisService } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -14,6 +22,8 @@ export class NotificationsService implements OnModuleInit {
       MOVA_EVENTS.PAYMENT_COMPLETED,
       MOVA_EVENTS.DELIVERY_CREATED,
       MOVA_EVENTS.DELIVERY_STATUS_UPDATED,
+      MOVA_EVENTS.SERVICE_ASSIGNED,
+      MOVA_EVENTS.SERVICE_STATUS_UPDATED,
     );
     this.redis.sub.on('message', async (channel, message) => {
       try {
@@ -22,6 +32,8 @@ export class NotificationsService implements OnModuleInit {
         if (channel === MOVA_EVENTS.PAYMENT_COMPLETED) await this.onPaymentCompleted(data as PaymentCompletedPayload);
         if (channel === MOVA_EVENTS.DELIVERY_CREATED) await this.onDeliveryCreated(data as DeliveryCreatedPayload);
         if (channel === MOVA_EVENTS.DELIVERY_STATUS_UPDATED) await this.onDeliveryStatusUpdated(data as DeliveryStatusUpdatedPayload);
+        if (channel === MOVA_EVENTS.SERVICE_ASSIGNED) await this.onServiceAssigned(data as ServiceAssignedPayload);
+        if (channel === MOVA_EVENTS.SERVICE_STATUS_UPDATED) await this.onServiceStatusUpdated(data as ServiceStatusUpdatedPayload);
       } catch (e) {
         this.logger.error('Event handler error', e);
       }
@@ -67,6 +79,69 @@ export class NotificationsService implements OnModuleInit {
     const body = this.deliveryStatusMessage(payload);
     if (!body) return;
     await this.create(payload.userId, 'Mise à jour commande', body, 'DELIVERY_STATUS', payload);
+  }
+
+  async onServiceAssigned(payload: ServiceAssignedPayload) {
+    const label = payload.serviceType === 'MOVING' ? 'Nouveau déménagement' : 'Nouvelle course planifiée';
+    const when = payload.scheduledAt ? ` · ${new Date(payload.scheduledAt).toLocaleString('fr-FR')}` : '';
+    await this.create(
+      payload.driverId,
+      label,
+      `${payload.summary}${when}`,
+      'SERVICE_ASSIGNED',
+      payload,
+    );
+    this.logger.log(`service.assigned notification for driver ${payload.driverId}`);
+  }
+
+  async onServiceStatusUpdated(payload: ServiceStatusUpdatedPayload) {
+    const body = this.serviceStatusMessage(payload);
+    if (!body) return;
+    const title =
+      payload.serviceType === 'RENTAL'
+        ? 'Mise à jour location'
+        : payload.serviceType === 'MOVING'
+          ? 'Mise à jour déménagement'
+          : 'Mise à jour course planifiée';
+    await this.create(payload.userId, title, body, 'SERVICE_STATUS', payload);
+  }
+
+  private serviceStatusMessage(payload: ServiceStatusUpdatedPayload): string | null {
+    if (payload.serviceType === 'RENTAL') {
+      return (
+        {
+          PENDING: 'Votre demande de location est en attente.',
+          CONTACTED: 'MOVA vous a contacté pour votre location.',
+          CONFIRMED: 'Votre location est confirmée.',
+          IN_PROGRESS: 'Votre location est en cours.',
+          RETURNED: 'Le véhicule a été retourné.',
+          CLOSED: 'Votre réservation de location a été annulée.',
+        }[payload.status] ?? null
+      );
+    }
+    if (payload.serviceType === 'MOVING') {
+      return (
+        {
+          PENDING: 'Demande de déménagement en attente.',
+          ASSIGNED: 'Un chauffeur a été assigné à votre déménagement.',
+          IN_PROGRESS: 'Votre déménagement est en cours.',
+          COMPLETED: 'Déménagement terminé.',
+          CANCELLED: 'Déménagement annulé.',
+        }[payload.status] ?? null
+      );
+    }
+    if (payload.serviceType === 'SCHEDULED') {
+      return (
+        {
+          SCHEDULED: 'Course planifiée enregistrée.',
+          CONFIRMED: 'Votre course planifiée est confirmée.',
+          IN_PROGRESS: 'Votre course planifiée est en cours.',
+          COMPLETED: 'Course planifiée terminée.',
+          CANCELLED: 'Course planifiée annulée.',
+        }[payload.status] ?? null
+      );
+    }
+    return null;
   }
 
   private deliveryStatusMessage(payload: DeliveryStatusUpdatedPayload): string | null {

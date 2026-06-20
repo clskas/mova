@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import {
   cancelRentalInquiry,
@@ -93,6 +94,13 @@ export default function LocationsPage() {
   return (
     <div className="max-w-6xl mx-auto">
       <PageHeader title="Demandes de location" subtitle="Contact passager et propriétaire du véhicule" />
+      <p className="text-sm text-gray-600">
+        Pour ajouter ou modifier les véhicules du catalogue passager, ouvrez{" "}
+        <Link href="/catalogue-location" className="text-[#6C63FF] underline">
+          Catalogue location
+        </Link>
+        .
+      </p>
       <p className="text-sm text-sky-800 bg-sky-50 border border-sky-200 rounded-xl px-4 py-2 mb-4">
         La location ne passe pas par un chauffeur MOVA : contactez le <strong>passager</strong> et le <strong>propriétaire du véhicule</strong> via Détail, puis passez le statut à <strong>CONTACTED</strong> ou <strong>CONFIRMED</strong>.
       </p>

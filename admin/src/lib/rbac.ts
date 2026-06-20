@@ -87,6 +87,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/planifiees", label: "Planifiées", section: "planifiees" },
   { href: "/parametres", label: "Communes", section: "parametres" },
   { href: "/locations", label: "Locations", section: "locations" },
+  { href: "/catalogue-location", label: "Catalogue location", section: "locations" },
   { href: "/demenagements", label: "Déménagements", section: "demenagements" },
   { href: "/covoiturage", label: "Covoiturage", section: "covoiturage" },
 ];

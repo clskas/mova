@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import type { AdminDriver } from "@/lib/api";
 import { FieldLabel, SelectInput } from "@/components/ui";
 import { driverOptionLabel } from "./AssignDriverSelect";
+import { DriverVehiclePreview } from "./DriverVehiclePreview";
 
 type AssignDriverPanelProps = {
   drivers: AdminDriver[];
@@ -38,6 +39,11 @@ export function AssignDriverPanel({
   );
 
   const canAssign = !!value && value !== (currentDriverId ?? "") && !disabled && !saving;
+  const selectedDriver = useMemo(() => drivers.find((d) => d.userId === value), [drivers, value]);
+  const currentDriver = useMemo(
+    () => (currentDriverId ? drivers.find((d) => d.userId === currentDriverId) : undefined),
+    [drivers, currentDriverId],
+  );
 
   if (drivers.length === 0) {
     return (
@@ -51,6 +57,9 @@ export function AssignDriverPanel({
     return (
       <div className="flex flex-col gap-2 min-w-[200px]">
         <SelectInput value={value} onChange={onChange} options={options} disabled={disabled || saving} />
+        {selectedDriver && value && (
+          <DriverVehiclePreview driver={selectedDriver} compact />
+        )}
         <button
           type="button"
           disabled={!canAssign}
@@ -68,6 +77,12 @@ export function AssignDriverPanel({
       <p className="font-semibold text-[#6C63FF]">Assigner un chauffeur</p>
       <FieldLabel>Chauffeur MOVA (KYC approuvé)</FieldLabel>
       <SelectInput value={value} onChange={onChange} options={options} disabled={disabled || saving} />
+      {currentDriver && currentDriverId && value === currentDriverId && (
+        <DriverVehiclePreview driver={currentDriver} title="Engin actuellement assigné" />
+      )}
+      {selectedDriver && value && value !== (currentDriverId ?? "") && (
+        <DriverVehiclePreview driver={selectedDriver} title="Engin du chauffeur sélectionné" />
+      )}
       <button
         type="button"
         disabled={!canAssign}

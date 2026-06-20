@@ -5,6 +5,9 @@ const PUBLIC_SUFFIXES = ['/rides/estimate', '/geo', '/rental/vehicles'];
 
 function isPublicPath(path: string): boolean {
   if (path.includes('/health')) return true;
+  if (path.includes('/uploads/parcels/') || path.includes('/uploads/menu/') || path.includes('/uploads/vehicles/')) {
+    return true;
+  }
   return PUBLIC_SUFFIXES.some((suffix) => path.includes(suffix));
 }
 

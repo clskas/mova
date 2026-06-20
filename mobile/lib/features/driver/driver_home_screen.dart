@@ -41,11 +41,13 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
   Timer? _offerPollTimer;
   Timer? _locationTimer;
   Timer? _profilePollTimer;
+  Timer? _assignmentsPollTimer;
   final Set<String> _dismissedOffers = {};
   String? _profileError;
   bool _showingOffer = false;
   List<Map<String, dynamic>> _rideOffers = [];
   List<Map<String, dynamic>> _deliveryOffers = [];
+  List<Map<String, dynamic>> _assignedMissions = [];
   String? _offersError;
 
   @override
@@ -61,6 +63,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
     _offerPollTimer?.cancel();
     _locationTimer?.cancel();
     _profilePollTimer?.cancel();
+    _assignmentsPollTimer?.cancel();
     super.dispose();
   }
 
@@ -83,11 +86,56 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
     final api = ref.read(apiClientProvider);
     await api.loadToken();
     await api.checkHealth();
-    await Future.wait([_loadProfile(clearCache: true), _loadEarnings(), _loadActiveRide(), _loadActiveDelivery()]);
+    await Future.wait([
+      _loadProfile(clearCache: true),
+      _loadEarnings(),
+      _loadActiveRide(),
+      _loadActiveDelivery(),
+      _loadAssignments(),
+    ]);
     if (mounted) {
       setState(() => _bootstrapping = false);
+      _startAssignmentsPolling();
       if (_available) _startPolling();
     }
+  }
+
+  void _startAssignmentsPolling() {
+    _assignmentsPollTimer?.cancel();
+    _assignmentsPollTimer = Timer.periodic(const Duration(seconds: 15), (_) => _loadAssignments());
+  }
+
+  Future<void> _loadAssignments() async {
+    final api = ref.read(apiClientProvider);
+    final movingResult = await api.get('/moving/assignments', skipCache: true);
+    final scheduledResult = await api.get('/rides/scheduled/assignments', skipCache: true);
+    if (!mounted) return;
+    final missions = <Map<String, dynamic>>[];
+    if (movingResult case Success(:final data)) {
+      final rows = (data['data'] as List? ?? []).cast<Map<String, dynamic>>();
+      missions.addAll(rows);
+    }
+    if (scheduledResult case Success(:final data)) {
+      final rows = (data['data'] as List? ?? []).cast<Map<String, dynamic>>();
+      missions.addAll(rows);
+    }
+    missions.sort((a, b) {
+      final aDate = a['scheduledAt']?.toString() ?? a['createdAt']?.toString() ?? '';
+      final bDate = b['scheduledAt']?.toString() ?? b['createdAt']?.toString() ?? '';
+      return aDate.compareTo(bDate);
+    });
+    setState(() => _assignedMissions = missions);
+  }
+
+  String _missionStatusLabel(String? status) {
+    return switch (status?.toUpperCase()) {
+      'ASSIGNED' => 'Assigné',
+      'CONFIRMED' => 'Confirmé',
+      'IN_PROGRESS' => 'En cours',
+      'SCHEDULED' => 'Planifié',
+      'PENDING' => 'En attente',
+      _ => status ?? '—',
+    };
   }
 
   Future<void> _loadProfile({bool clearCache = false}) async {
@@ -640,13 +688,71 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                 const Text(
                   '• Courses taxi : proches de votre GPS, dans le rayon de recherche, véhicule compatible.\n'
                   '• Livraisons : colis/repas/express en attente, dans un rayon de 15 km.\n'
-                  '• Réservations planifiées, déménagements et locations : assignés par l’admin (pas d’offre directe ici).\n'
+                  '• Réservations planifiées et déménagements : assignés par l’admin — consultez la section « Missions assignées » ci-dessous.\n'
                   '• Covoiturage : publiez votre trajet via le bouton ci-dessous.',
                   style: TextStyle(fontSize: 12, color: MovaColors.textSecondary, height: 1.4),
                 ),
               ],
             ),
           ),
+          if (_assignedMissions.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            MovaCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.assignment_ind, size: 18, color: MovaColors.violet),
+                      SizedBox(width: 8),
+                      Text('Missions assignées', style: TextStyle(fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  ..._assignedMissions.map((m) {
+                    final icon = m['type'] == 'MOVING' ? Icons.local_shipping : Icons.event;
+                    final subtitle = m['type'] == 'MOVING'
+                        ? '${m['pickupAddress'] ?? ''} → ${m['dropoffAddress'] ?? ''}'
+                        : '${m['pickupAddress'] ?? 'Départ'} → ${m['dropoffAddress'] ?? ''}';
+                    final extra = m['scheduledAt'] != null
+                        ? '\n${DateTime.tryParse(m['scheduledAt'].toString())?.toLocal().toString().substring(0, 16) ?? ''}'
+                        : '';
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(icon, size: 20, color: MovaColors.violet),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  m['label']?.toString() ?? 'Mission',
+                                  style: const TextStyle(fontWeight: FontWeight.w600),
+                                ),
+                                Text(
+                                  '$subtitle$extra',
+                                  style: const TextStyle(fontSize: 12, color: MovaColors.textSecondary),
+                                  maxLines: 3,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                Text(
+                                  _missionStatusLabel(m['status']?.toString()),
+                                  style: const TextStyle(fontSize: 11, color: MovaColors.violet, fontWeight: FontWeight.w600),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+                ],
+              ),
+            ),
+          ],
           if (_earnings != null) ...[
             const SizedBox(height: 16),
             MovaCard(

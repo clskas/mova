@@ -246,6 +246,7 @@ export class DriversService {
             model: vehicle.model,
             plateNumber: vehicle.plateNumber,
             color: vehicle.color,
+            imageUrl: vehicle.imageUrl,
           }
         : null,
       kyc,
@@ -272,7 +273,7 @@ export class DriversService {
 
     await this.prisma.driverProfile.update({ where: { userId }, data: profileData });
 
-    if (dto.plateNumber || dto.vehicleMake || dto.vehicleModel || dto.vehicleType || dto.vehicleColor) {
+    if (dto.plateNumber || dto.vehicleMake || dto.vehicleModel || dto.vehicleType || dto.vehicleColor || dto.vehicleImageUrl) {
       const vehicle = profile.vehicles.find((v) => v.isActive) ?? profile.vehicles[0];
       if (vehicle) {
         await this.prisma.vehicle.update({
@@ -283,6 +284,7 @@ export class DriversService {
             ...(dto.vehicleModel !== undefined ? { model: dto.vehicleModel } : {}),
             ...(dto.vehicleType !== undefined ? { type: dto.vehicleType } : {}),
             ...(dto.vehicleColor !== undefined ? { color: dto.vehicleColor } : {}),
+            ...(dto.vehicleImageUrl !== undefined ? { imageUrl: dto.vehicleImageUrl } : {}),
           },
         });
       }
@@ -646,6 +648,7 @@ export class DriversService {
             model: vehicle.model,
             plateNumber: vehicle.plateNumber,
             color: vehicle.color,
+            imageUrl: vehicle.imageUrl,
           }
         : null,
       kyc,

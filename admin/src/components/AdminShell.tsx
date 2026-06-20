@@ -43,6 +43,7 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   "/planifiees": CalendarIcon,
   "/parametres": SettingsIcon,
   "/locations": LocationsIcon,
+  "/catalogue-location": LocationsIcon,
   "/demenagements": MovingIcon,
   "/covoiturage": CarpoolIcon,
 };

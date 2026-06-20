@@ -295,6 +295,19 @@ export class AdminService {
     return this.proxy('ride', `/internal/rental-inquiries/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) });
   }
 
+  listRentalVehicles() {
+    return this.fetchJson('ride', '/internal/rental-vehicles');
+  }
+  createRentalVehicle(body: Record<string, unknown>) {
+    return this.proxy('ride', '/internal/rental-vehicles', { method: 'POST', body: JSON.stringify(body) });
+  }
+  updateRentalVehicle(id: string, body: Record<string, unknown>) {
+    return this.proxy('ride', `/internal/rental-vehicles/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
+  }
+  deleteRentalVehicle(id: string) {
+    return this.proxy('ride', `/internal/rental-vehicles/${id}`, { method: 'DELETE' });
+  }
+
   listWalletTransactions(skip = 0, take = 50, userId?: string) {
     const params = new URLSearchParams({ skip: String(skip), take: String(take) });
     if (userId) params.set('userId', userId);

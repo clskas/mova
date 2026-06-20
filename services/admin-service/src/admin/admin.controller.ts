@@ -463,6 +463,34 @@ export class AdminController {
     return this.adminService.updateRentalInquiryStatus(id, status);
   }
 
+  @Get('rental-vehicles')
+  @RequirePermissions(AdminPermission.RESTAURANTS_READ)
+  @ApiOperation({ summary: 'Catalogue véhicules location' })
+  rentalVehicles() {
+    return this.adminService.listRentalVehicles();
+  }
+
+  @Post('rental-vehicles')
+  @RequirePermissions(AdminPermission.RESTAURANTS_WRITE)
+  @ApiOperation({ summary: 'Ajouter véhicule au catalogue location' })
+  createRentalVehicle(@Body() body: Record<string, unknown>) {
+    return this.adminService.createRentalVehicle(body);
+  }
+
+  @Patch('rental-vehicles/:id')
+  @RequirePermissions(AdminPermission.RESTAURANTS_WRITE)
+  @ApiOperation({ summary: 'Modifier véhicule catalogue location' })
+  updateRentalVehicle(@Param('id') id: string, @Body() body: Record<string, unknown>) {
+    return this.adminService.updateRentalVehicle(id, body);
+  }
+
+  @Delete('rental-vehicles/:id')
+  @RequirePermissions(AdminPermission.RESTAURANTS_WRITE)
+  @ApiOperation({ summary: 'Désactiver véhicule catalogue location' })
+  deleteRentalVehicle(@Param('id') id: string) {
+    return this.adminService.deleteRentalVehicle(id);
+  }
+
   @Get('wallet/overview')
   @RequirePermissions(AdminPermission.WALLETS_READ)
   @ApiOperation({ summary: 'Agrégats portefeuilles plateforme' })

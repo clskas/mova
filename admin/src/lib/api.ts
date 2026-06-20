@@ -50,7 +50,7 @@ export type AdminDriver = {
   readyForReview?: boolean;
   currentLat?: number | null;
   currentLng?: number | null;
-  vehicles?: { id: string; type: string; plateNumber: string; make?: string; model?: string; isActive?: boolean }[];
+  vehicles?: { id: string; type: string; plateNumber: string; make?: string; model?: string; imageUrl?: string | null; isActive?: boolean }[];
   createdAt?: string;
 };
 
@@ -534,6 +534,27 @@ function mockFor<T>(path: string, init?: RequestInit): T {
       },
     ] as T;
   }
+  if (path.includes("/rental-vehicles") && method !== "GET") {
+    return { id: "rv-1", name: body.name ?? "Véhicule", isActive: true, dailyRateCdf: 45000, category: "ECONOMY", ...body } as T;
+  }
+  if (path.includes("/rental-vehicles")) {
+    return [
+      {
+        id: "rv-1",
+        name: "Toyota Corolla",
+        category: "ECONOMY",
+        city: "Kinshasa",
+        dailyRateCdf: 45000,
+        seats: 5,
+        isActive: true,
+        ownerName: "Jean K.",
+        ownerContactPhone: "+243812345678",
+      },
+    ] as T;
+  }
+  if (path.includes("/uploads/vehicle-photo") && method === "POST") {
+    return { photoUrl: "/api/uploads/vehicles/mock-vehicle.jpg" } as T;
+  }
   if (path.includes("/delivery-pricing-rules") && method !== "GET") {
     return { category: path.split("/").pop(), ...body } as T;
   }
@@ -770,6 +791,62 @@ export async function cancelRentalInquiry(id: string) {
   return apiFetch(`/api/admin/rental-inquiries/${id}/cancel`, { method: "POST", body: JSON.stringify({}) });
 }
 
+export type RentalCatalogVehicle = {
+  id: string;
+  name: string;
+  make?: string;
+  model?: string;
+  year?: number;
+  category: string;
+  categoryLabel?: string;
+  transmission?: string;
+  city?: string;
+  seats?: number;
+  dailyRateCdf: number;
+  depositCdf?: number;
+  weeklyDiscountPct?: number;
+  rating?: number;
+  ownerName?: string;
+  ownerBadge?: string;
+  ownerContactPhone?: string;
+  features?: string[];
+  cancellationPolicy?: string;
+  mileageUnlimited?: boolean;
+  limitedMileageFeeCdf?: number;
+  imageUrl?: string | null;
+  isActive?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export async function fetchRentalVehicles(): Promise<RentalCatalogVehicle[]> {
+  const data = await apiFetch<RentalCatalogVehicle[] | { data?: RentalCatalogVehicle[] }>("/api/admin/rental-vehicles");
+  return Array.isArray(data) ? data : data.data ?? [];
+}
+
+export async function saveRentalVehicle(data: Partial<RentalCatalogVehicle>, id?: string) {
+  if (id) {
+    return apiFetch<RentalCatalogVehicle>(`/api/admin/rental-vehicles/${id}`, { method: "PATCH", body: JSON.stringify(data) });
+  }
+  return apiFetch<RentalCatalogVehicle>("/api/admin/rental-vehicles", { method: "POST", body: JSON.stringify(data) });
+}
+
+export async function deleteRentalVehicle(id: string) {
+  return apiFetch(`/api/admin/rental-vehicles/${id}`, { method: "DELETE" });
+}
+
+export async function uploadVehiclePhoto(file: File): Promise<string> {
+  const bytes = await file.arrayBuffer();
+  const base64 = btoa(String.fromCharCode(...new Uint8Array(bytes)));
+  const mimeType = file.type || "image/jpeg";
+  const result = await apiFetch<{ photoUrl?: string }>("/api/uploads/vehicle-photo", {
+    method: "POST",
+    body: JSON.stringify({ imageBase64: base64, mimeType }),
+  });
+  if (!result.photoUrl) throw new Error("URL photo manquante");
+  return result.photoUrl;
+}
+
 export type MovingRequest = {
   id: string;
   userId?: string;
@@ -790,6 +867,7 @@ export type MovingRequest = {
 export type CarpoolTrip = {
   id: string;
   driverId?: string;
+  driverName?: string;
   fromAddress?: string;
   toAddress?: string;
   fromCity?: string;
@@ -800,6 +878,10 @@ export type CarpoolTrip = {
   pricePerSeatCdf?: number;
   departureAt?: string;
   createdAt?: string;
+  vehicleInfo?: string | null;
+  vehicleImageUrl?: string | null;
+  vehicleType?: string | null;
+  vehiclePlate?: string | null;
 };
 
 export async function fetchMovingRequests(): Promise<MovingRequest[]> {

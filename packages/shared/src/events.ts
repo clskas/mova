@@ -6,6 +6,8 @@ export const MOVA_EVENTS = {
   DRIVER_RATING_UPDATED: 'driver.rating.updated',
   DELIVERY_CREATED: 'delivery.created',
   DELIVERY_STATUS_UPDATED: 'delivery.status.updated',
+  SERVICE_ASSIGNED: 'service.assigned',
+  SERVICE_STATUS_UPDATED: 'service.status.updated',
 } as const;
 
 export type MovaEventName = (typeof MOVA_EVENTS)[keyof typeof MOVA_EVENTS];
@@ -46,4 +48,22 @@ export interface DeliveryStatusUpdatedPayload {
   type: string;
   status: string;
   restaurantName?: string;
+}
+
+export interface ServiceAssignedPayload {
+  serviceType: 'MOVING' | 'SCHEDULED';
+  referenceId: string;
+  driverId: string;
+  passengerId: string;
+  summary: string;
+  pickupAddress?: string;
+  dropoffAddress?: string;
+  scheduledAt?: string;
+}
+
+export interface ServiceStatusUpdatedPayload {
+  serviceType: 'RENTAL' | 'MOVING' | 'SCHEDULED';
+  referenceId: string;
+  userId: string;
+  status: string;
 }

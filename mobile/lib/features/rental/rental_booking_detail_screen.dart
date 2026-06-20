@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -27,6 +29,7 @@ class _RentalBookingDetailScreenState extends ConsumerState<RentalBookingDetailS
   bool _loading = true;
   bool _actionLoading = false;
   String? _error;
+  Timer? _pollTimer;
 
   @override
   void initState() {
@@ -36,26 +39,35 @@ class _RentalBookingDetailScreenState extends ConsumerState<RentalBookingDetailS
       _loading = false;
     }
     _loadBooking();
+    _pollTimer = Timer.periodic(const Duration(seconds: 8), (_) => _loadBooking(silent: true));
   }
 
-  Future<void> _loadBooking() async {
+  @override
+  void dispose() {
+    _pollTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _loadBooking({bool silent = false}) async {
     if (widget.bookingId.isEmpty) {
       setState(() => _loading = false);
       return;
     }
+    if (!silent) setState(() => _loading = _booking == null);
     final api = ref.read(apiClientProvider);
-    final result = await api.get('/rental/bookings/${widget.bookingId}');
+    final result = await api.get('/rental/bookings/${widget.bookingId}', skipCache: true);
     if (!mounted) return;
     setState(() {
-      _loading = false;
+      if (!silent) _loading = false;
       switch (result) {
         case Success(:final data):
-          _booking = data['inquiry'] as Map<String, dynamic>? ??
-              data['booking'] as Map<String, dynamic>? ??
-              data;
+          final raw = data is Map<String, dynamic> ? data : Map<String, dynamic>.from(data as Map);
+          _booking = raw['inquiry'] as Map<String, dynamic>? ??
+              raw['booking'] as Map<String, dynamic>? ??
+              raw;
           _error = null;
         case Failure(:final error):
-          _error = error.message;
+          if (_booking == null) _error = error.message;
       }
     });
   }
@@ -152,18 +164,30 @@ class _RentalBookingDetailScreenState extends ConsumerState<RentalBookingDetailS
 
     final total = b['totalCdf'] as int? ?? b['estimatedPriceCdf'] as int? ?? b['priceCdf'] as int? ?? 0;
     final ownerPhone = b['ownerContactPhone']?.toString();
+    final statusLabel = b['statusLabel']?.toString() ?? b['status']?.toString() ?? 'En attente';
+    final status = b['status']?.toString().toUpperCase();
+    final statusColor = switch (status) {
+      'CONFIRMED' || 'IN_PROGRESS' || 'RETURNED' => MovaColors.green,
+      'CONTACTED' => MovaColors.violet,
+      'CLOSED' => Colors.red.shade700,
+      _ => MovaColors.textSecondary,
+    };
 
     return MovaScreen(
-      title: 'Réservation confirmée',
+      title: 'Ma location',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Icon(Icons.check_circle, color: MovaColors.green, size: 64),
+          Icon(
+            status == 'CLOSED' ? Icons.cancel_outlined : Icons.directions_car,
+            color: statusColor,
+            size: 64,
+          ),
           const SizedBox(height: 8),
           Text(
-            'Location enregistrée',
+            statusLabel,
             textAlign: TextAlign.center,
-            style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+            style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, color: statusColor),
           ),
           const SizedBox(height: 4),
           Text(

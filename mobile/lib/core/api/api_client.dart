@@ -920,6 +920,28 @@ class ApiClient {
     };
   }
 
+  /// Upload photo véhicule — retourne l'URL `/api/uploads/vehicles/...`.
+  Future<Result<String>> uploadVehiclePhoto(File file) async {
+    await ensureReady();
+    final bytes = await file.readAsBytes();
+    if (bytes.length > 3 * 1024 * 1024) {
+      return const Failure(ServerFailure('Photo trop volumineuse (max 3 Mo).'));
+    }
+    final result = await post('/uploads/vehicle-photo', {
+      'imageBase64': base64Encode(bytes),
+      'mimeType': 'image/jpeg',
+    });
+    return switch (result) {
+      Success(:final data) => Success(
+          data['photoUrl']?.toString() ??
+              data['cloudinaryMockUrl']?.toString() ??
+              data['url']?.toString() ??
+              '',
+        ),
+      Failure(:final error) => Failure(error),
+    };
+  }
+
   bool rideHasDriver(Map<String, dynamic> ride) {
     if (ride['driverId'] != null) return true;
     if (ride['driver'] != null) return true;

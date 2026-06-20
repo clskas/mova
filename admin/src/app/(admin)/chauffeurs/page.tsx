@@ -317,12 +317,27 @@ export default function ChauffeursPage() {
             {selected.vehicles && selected.vehicles.length > 0 && (
               <div>
                 <p className="text-sm font-medium mb-2">Véhicules</p>
-                <ul className="text-sm space-y-1">
-                  {selected.vehicles.map((v) => (
-                    <li key={v.id} className="bg-gray-50 rounded-lg px-3 py-2">
-                      {v.type} · {v.plateNumber} {v.make && `· ${v.make} ${v.model ?? ""}`}
-                    </li>
-                  ))}
+                <ul className="text-sm space-y-2">
+                  {selected.vehicles.map((v) => {
+                    const photo = v.imageUrl?.startsWith("http")
+                      ? v.imageUrl
+                      : v.imageUrl
+                        ? `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000"}${v.imageUrl}`
+                        : null;
+                    return (
+                      <li key={v.id} className="bg-gray-50 rounded-lg px-3 py-2">
+                        <div className="flex gap-3 items-start">
+                          {photo ? (
+                            <img src={photo} alt="" className="w-16 h-12 object-cover rounded border shrink-0" />
+                          ) : null}
+                          <div>
+                            {v.type} · {v.plateNumber} {v.make && `· ${v.make} ${v.model ?? ""}`}
+                            {!photo && <span className="block text-xs text-gray-400 mt-1">Photo non fournie</span>}
+                          </div>
+                        </div>
+                      </li>
+                    );
+                  })}
                 </ul>
               </div>
             )}

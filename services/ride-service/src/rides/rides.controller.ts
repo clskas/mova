@@ -39,6 +39,12 @@ export class RidesController {
     return this.scheduledRidesService.list(req.user.id);
   }
 
+  @Get('scheduled/assignments')
+  @ApiOperation({ summary: 'Courses planifiées assignées au chauffeur' })
+  listScheduledAssignments(@Request() req: { user: { id: string } }) {
+    return this.scheduledRidesService.listForDriver(req.user.id);
+  }
+
   @Get('scheduled/:id')
   @ApiOperation({ summary: 'Détail réservation planifiée' })
   getScheduled(@Request() req: { user: { id: string } }, @Param('id') id: string) {

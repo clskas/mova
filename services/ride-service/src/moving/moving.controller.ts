@@ -34,6 +34,12 @@ export class MovingController {
     return this.movingService.list(req.user.id);
   }
 
+  @Get('assignments')
+  @ApiOperation({ summary: 'Déménagements assignés au chauffeur' })
+  assignments(@Request() req: { user: { id: string } }) {
+    return this.movingService.listForDriver(req.user.id);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Détail déménagement' })
   get(@Request() req: { user: { id: string } }, @Param('id') id: string) {

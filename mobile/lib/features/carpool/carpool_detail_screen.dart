@@ -312,9 +312,30 @@ class _CarpoolDetailScreenState extends ConsumerState<CarpoolDetailScreen> {
                           const SizedBox(height: 4),
                           Text('Notes : ${trip['notes']}', style: const TextStyle(color: MovaColors.textSecondary)),
                         ],
-                        if (trip['vehicleInfo'] != null) ...[
-                          const SizedBox(height: 4),
-                          Text('Véhicule : ${trip['vehicleInfo']}'),
+                        if (trip['vehicleInfo'] != null || trip['vehicleImageUrl'] != null) ...[
+                          const vehiclePhoto = trip['vehicleImageUrl']?.toString();
+                          const photoUrl = vehiclePhoto != null && vehiclePhoto.isNotEmpty
+                              ? MarketConfig.resolveMediaUrl(vehiclePhoto)
+                              : null;
+                          const SizedBox(height: 8),
+                          if (photoUrl != null)
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: Image.network(
+                                photoUrl,
+                                height: 120,
+                                width: double.infinity,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                              ),
+                            ),
+                          if (trip['vehicleInfo'] != null)
+                            Text('Véhicule : ${trip['vehicleInfo']}'),
+                          if (trip['vehicleType'] != null)
+                            Text(
+                              'Type : ${trip['vehicleType']}',
+                              style: const TextStyle(fontSize: 12, color: MovaColors.textSecondary),
+                            ),
                         ],
                         if (trip['ladiesOnly'] == true)
                           const Padding(

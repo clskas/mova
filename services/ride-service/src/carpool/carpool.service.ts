@@ -73,9 +73,18 @@ export class CarpoolService {
       return (await res.json()) as {
         kycStatus?: string;
         ratingAvg?: number;
+        vehicles?: Array<{
+          type?: string;
+          make?: string | null;
+          model?: string | null;
+          plateNumber?: string;
+          imageUrl?: string | null;
+          isActive?: boolean;
+        }>;
         vehicleMake?: string;
         vehicleModel?: string;
         vehiclePlate?: string;
+        user?: { firstName?: string; lastName?: string; phone?: string };
       };
     } catch {
       return null;
@@ -116,6 +125,39 @@ export class CarpoolService {
     return 'Publié';
   }
 
+  private pickDriverVehicle(profile: {
+    vehicles?: Array<{
+      type?: string;
+      make?: string | null;
+      model?: string | null;
+      plateNumber?: string;
+      imageUrl?: string | null;
+      isActive?: boolean;
+    }>;
+    vehicleMake?: string;
+    vehicleModel?: string;
+    vehiclePlate?: string;
+  } | null) {
+    if (!profile) return null;
+    const vehicle = profile.vehicles?.find((v) => v.isActive !== false) ?? profile.vehicles?.[0];
+    if (vehicle) {
+      return {
+        type: vehicle.type,
+        make: vehicle.make,
+        model: vehicle.model,
+        plateNumber: vehicle.plateNumber,
+        imageUrl: vehicle.imageUrl,
+        label: [vehicle.make, vehicle.model, vehicle.plateNumber].filter(Boolean).join(' · '),
+      };
+    }
+    if (profile.vehicleMake || profile.vehicleModel || profile.vehiclePlate) {
+      return {
+        label: [profile.vehicleMake, profile.vehicleModel, profile.vehiclePlate].filter(Boolean).join(' · '),
+      };
+    }
+    return null;
+  }
+
   private async formatTripForMobile(t: TripRow, driverMeta?: { name?: string; phone?: string; rating?: number; kycVerified?: boolean }) {
     const passengers = t.passengers ?? [];
     const distanceKm = t.distanceKm ?? this.pricing.haversineKm(t.pickupLat, t.pickupLng, t.dropoffLat, t.dropoffLng);
@@ -125,6 +167,7 @@ export class CarpoolService {
     const kycVerified = driverMeta?.kycVerified ?? profile?.kycStatus === 'APPROVED';
     const driverName = driverMeta?.name ?? `Conducteur ${(t.driverId ?? 'unknown').slice(0, 6)}`;
     const contactPhone = this.maskPhone(driverMeta?.phone);
+    const driverVehicle = this.pickDriverVehicle(profile);
 
     return {
       id: t.id,
@@ -153,7 +196,10 @@ export class CarpoolService {
       notes: t.notes,
       ladiesOnly: t.ladiesOnly ?? false,
       instantBooking: t.instantBooking ?? true,
-      vehicleInfo: t.vehicleInfo,
+      vehicleInfo: t.vehicleInfo ?? driverVehicle?.label ?? null,
+      vehicleImageUrl: driverVehicle?.imageUrl ?? null,
+      vehicleType: driverVehicle?.type ?? null,
+      vehiclePlate: driverVehicle?.plateNumber ?? null,
       passengerCount: passengers.length,
       passengers: passengers.map((p) => ({
         id: p.id,
@@ -560,20 +606,34 @@ export class CarpoolService {
       take,
       include: { passengers: { select: { id: true, userId: true, seats: true } } },
     });
-    return rows.map((t) => ({
-      id: t.id,
-      driverId: t.driverId,
-      fromAddress: t.pickupAddress,
-      toAddress: t.dropoffAddress,
-      fromCity: t.fromCity,
-      toCity: t.toCity,
-      status: t.status,
-      seatsAvailable: t.seatsAvailable,
-      passengerCount: t.passengers.length,
-      pricePerSeatCdf: t.pricePerSeatCdf,
-      departureAt: t.departureAt.toISOString(),
-      createdAt: t.createdAt.toISOString(),
-    }));
+    return Promise.all(
+      rows.map(async (t) => {
+        const profile = await this.fetchDriverProfile(t.driverId);
+        const driverVehicle = this.pickDriverVehicle(profile);
+        const driverName = profile?.user
+          ? [profile.user.firstName, profile.user.lastName].filter(Boolean).join(' ').trim()
+          : undefined;
+        return {
+          id: t.id,
+          driverId: t.driverId,
+          driverName,
+          fromAddress: t.pickupAddress,
+          toAddress: t.dropoffAddress,
+          fromCity: t.fromCity,
+          toCity: t.toCity,
+          status: t.status,
+          seatsAvailable: t.seatsAvailable,
+          passengerCount: t.passengers.length,
+          pricePerSeatCdf: t.pricePerSeatCdf,
+          departureAt: t.departureAt.toISOString(),
+          createdAt: t.createdAt.toISOString(),
+          vehicleInfo: t.vehicleInfo ?? driverVehicle?.label ?? null,
+          vehicleImageUrl: driverVehicle?.imageUrl ?? null,
+          vehicleType: driverVehicle?.type ?? null,
+          vehiclePlate: driverVehicle?.plateNumber ?? null,
+        };
+      }),
+    );
   }
 
   async adminCancel(tripId: string) {

@@ -29,6 +29,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
   String? _error;
   Map<String, dynamic>? _state;
   String? _uploadingDoc;
+  String? _vehicleImageUrl;
 
   final _firstName = TextEditingController();
   final _lastName = TextEditingController();
@@ -145,6 +146,9 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
         if (_plate.text.trim().isEmpty || _make.text.trim().isEmpty || _model.text.trim().isEmpty) {
           return 'Renseignez plaque, marque et modèle du véhicule.';
         }
+        if (!_isEditingDossier && (_vehicleImageUrl == null || _vehicleImageUrl!.isEmpty)) {
+          return 'Ajoutez une photo de votre véhicule.';
+        }
         return null;
       case 4:
         if (_payoutPhone.text.trim().isEmpty) return 'Renseignez le numéro Mobile Money.';
@@ -195,6 +199,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
     _make.text = vehicle?['make']?.toString() ?? '';
     _model.text = vehicle?['model']?.toString() ?? '';
     _vehicleType = vehicle?['type']?.toString() ?? 'STANDARD';
+    _vehicleImageUrl = vehicle?['imageUrl']?.toString();
     _charterAccepted = profile?['charterAcceptedAt'] != null;
     _trainingCompleted = profile?['trainingCompletedAt'] != null;
     _isEditingDossier = profile?['onboardingCompleted'] == true;
@@ -230,9 +235,59 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
       'vehicleMake': _make.text.trim(),
       'vehicleModel': _model.text.trim(),
       'vehicleType': _vehicleType,
+      if (_vehicleImageUrl != null && _vehicleImageUrl!.isNotEmpty) 'vehicleImageUrl': _vehicleImageUrl,
       if (_insuranceExpiry.text.trim().isNotEmpty) 'insuranceExpiry': _insuranceExpiry.text.trim(),
       if (_inspectionExpiry.text.trim().isNotEmpty) 'technicalInspectionExpiry': _inspectionExpiry.text.trim(),
     }));
+  }
+
+  Future<void> _uploadVehiclePhoto() async {
+    final source = await _pickDocSource();
+    if (source == null) return;
+    final file = await _picker.pickImage(source: source, imageQuality: 80);
+    if (file == null) return;
+    setState(() {
+      _uploadingDoc = 'VEHICLE_PHOTO';
+      _error = null;
+    });
+    final api = ref.read(apiClientProvider);
+    final upload = await api.uploadVehiclePhoto(File(file.path));
+    if (!mounted) return;
+    switch (upload) {
+      case Success(:final data):
+        final url = data;
+        if (url.isEmpty) {
+          setState(() {
+            _uploadingDoc = null;
+            _error = 'Échec envoi photo — réessayez.';
+          });
+          return;
+        }
+        final result = await api.patch('/drivers/onboarding', {'vehicleImageUrl': url});
+        if (!mounted) return;
+        switch (result) {
+          case Success():
+            setState(() {
+              _uploadingDoc = null;
+              _vehicleImageUrl = url;
+            });
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Photo du véhicule enregistrée')),
+              );
+            }
+          case Failure(:final error):
+            setState(() {
+              _uploadingDoc = null;
+              _error = error.message;
+            });
+        }
+      case Failure(:final error):
+        setState(() {
+          _uploadingDoc = null;
+          _error = error.message;
+        });
+    }
   }
 
   Future<void> _savePayout() async {
@@ -554,6 +609,50 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
         TextField(controller: _insuranceExpiry, decoration: const InputDecoration(labelText: 'Assurance expire le')),
         const SizedBox(height: 8),
         TextField(controller: _inspectionExpiry, decoration: const InputDecoration(labelText: 'Visite technique expire le')),
+        const SizedBox(height: 16),
+        const Text('Photo de l\'engin', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+        const SizedBox(height: 8),
+        if (_vehicleImageUrl != null && _vehicleImageUrl!.isNotEmpty)
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Image.network(
+              MarketConfig.resolveMediaUrl(_vehicleImageUrl!),
+              height: 160,
+              width: double.infinity,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => Container(
+                height: 120,
+                color: MovaColors.violet.withValues(alpha: 0.1),
+                child: const Icon(Icons.directions_car, size: 48, color: MovaColors.violet),
+              ),
+            ),
+          )
+        else
+          Container(
+            height: 120,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: MovaColors.violet.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: MovaColors.violet.withValues(alpha: 0.2)),
+            ),
+            child: const Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.camera_alt_outlined, color: MovaColors.violet, size: 32),
+                SizedBox(height: 4),
+                Text('Photo requise — vue latérale ou 3/4', style: TextStyle(fontSize: 12, color: MovaColors.textSecondary)),
+              ],
+            ),
+          ),
+        const SizedBox(height: 8),
+        OutlinedButton.icon(
+          onPressed: _uploadingDoc == 'VEHICLE_PHOTO' ? null : _uploadVehiclePhoto,
+          icon: _uploadingDoc == 'VEHICLE_PHOTO'
+              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+              : const Icon(Icons.photo_camera_outlined),
+          label: Text(_vehicleImageUrl != null && _vehicleImageUrl!.isNotEmpty ? 'Changer la photo' : 'Prendre une photo'),
+        ),
         const SizedBox(height: 16),
         _docButton('VEHICLE_REGISTRATION', 'Carte grise'),
         _docButton('VEHICLE_INSURANCE', 'Assurance'),

@@ -1,6 +1,7 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { Prisma, RentalInquiryStatus } from '@prisma/client';
-import { MARKET_RDC, MovaErrorCode, MovaHttpException, formatCdf } from '@mova/shared';
+import { MARKET_RDC, MOVA_EVENTS, MovaErrorCode, MovaHttpException, formatCdf } from '@mova/shared';
+import { RedisService } from '@mova/shared';
 import { fetchAuthUserBrief } from '../common/internal-lookup.util';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -29,14 +30,24 @@ const CATEGORY_ALIASES: Record<string, string> = {
 
 const TIMELINE_STEPS = [
   { status: RentalInquiryStatus.PENDING, label: 'Demande' },
+  { status: RentalInquiryStatus.CONTACTED, label: 'Contact MOVA' },
   { status: RentalInquiryStatus.CONFIRMED, label: 'Confirmée' },
   { status: RentalInquiryStatus.IN_PROGRESS, label: 'En cours' },
   { status: RentalInquiryStatus.RETURNED, label: 'Retournée' },
 ] as const;
 
+const RENTAL_STATUS_LABELS: Record<RentalInquiryStatus, string> = {
+  [RentalInquiryStatus.PENDING]: 'En attente',
+  [RentalInquiryStatus.CONTACTED]: 'Contacté par MOVA',
+  [RentalInquiryStatus.CONFIRMED]: 'Confirmée',
+  [RentalInquiryStatus.IN_PROGRESS]: 'En cours',
+  [RentalInquiryStatus.RETURNED]: 'Retournée',
+  [RentalInquiryStatus.CLOSED]: 'Annulée',
+};
+
 @Injectable()
 export class RentalService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, private redis: RedisService) {}
 
   private normalizeCategory(raw?: string): string | undefined {
     if (!raw) return undefined;
@@ -401,6 +412,7 @@ export class RentalService {
       ownerContactPhone: ownerContact,
       ownerName: inquiry.vehicle?.ownerName,
       ownerBadge: inquiry.vehicle?.ownerBadge,
+      statusLabel: RENTAL_STATUS_LABELS[inquiry.status],
       timeline: this.buildTimeline(inquiry.status),
     };
   }
@@ -408,11 +420,7 @@ export class RentalService {
   private buildTimeline(current: RentalInquiryStatus) {
     const order = TIMELINE_STEPS.map((s) => s.status);
     const currentIdx =
-      current === RentalInquiryStatus.CLOSED
-        ? -1
-        : current === RentalInquiryStatus.CONTACTED
-          ? order.indexOf(RentalInquiryStatus.CONFIRMED)
-          : order.indexOf(current);
+      current === RentalInquiryStatus.CLOSED ? -1 : order.indexOf(current);
     return TIMELINE_STEPS.map((step, idx) => ({
       status: step.status,
       label: step.label,
@@ -513,6 +521,12 @@ export class RentalService {
       data: { status: RentalInquiryStatus.CLOSED },
       include: { vehicle: true },
     });
+    await this.redis.publish(MOVA_EVENTS.SERVICE_STATUS_UPDATED, {
+      serviceType: 'RENTAL',
+      referenceId: updated.id,
+      userId: updated.userId,
+      status: updated.status,
+    });
     return this.enrichInquiry(updated);
   }
 
@@ -524,6 +538,84 @@ export class RentalService {
       data: { status },
       include: { vehicle: true },
     });
+    if (updated.status !== inquiry.status) {
+      await this.redis.publish(MOVA_EVENTS.SERVICE_STATUS_UPDATED, {
+        serviceType: 'RENTAL',
+        referenceId: updated.id,
+        userId: updated.userId,
+        status: updated.status,
+      });
+    }
     return this.enrichInquiry(updated);
+  }
+
+  async listVehiclesAdmin() {
+    const rows = await this.prisma.rentalVehicle.findMany({ orderBy: [{ city: 'asc' }, { name: 'asc' }] });
+    return rows.map((r) => ({
+      ...this.mapVehicle(r),
+      isActive: r.isActive,
+      ownerContactPhone: r.ownerContactPhone,
+      createdAt: r.createdAt.toISOString(),
+      updatedAt: r.updatedAt.toISOString(),
+    }));
+  }
+
+  async upsertVehicleAdmin(id: string | null, data: Record<string, unknown>) {
+    const payload = this.normalizeVehicleAdminPayload(data);
+    if (id) {
+      const existing = await this.prisma.rentalVehicle.findUnique({ where: { id } });
+      if (!existing) throw new MovaHttpException(MovaErrorCode.RENTAL_VEHICLE_NOT_FOUND, HttpStatus.NOT_FOUND);
+      const updated = await this.prisma.rentalVehicle.update({ where: { id }, data: payload });
+      return { ...this.mapVehicle(updated), isActive: updated.isActive, ownerContactPhone: updated.ownerContactPhone };
+    }
+    const created = await this.prisma.rentalVehicle.create({ data: payload });
+    return { ...this.mapVehicle(created), isActive: created.isActive, ownerContactPhone: created.ownerContactPhone };
+  }
+
+  async deleteVehicleAdmin(id: string) {
+    const existing = await this.prisma.rentalVehicle.findUnique({ where: { id } });
+    if (!existing) throw new MovaHttpException(MovaErrorCode.RENTAL_VEHICLE_NOT_FOUND, HttpStatus.NOT_FOUND);
+    const updated = await this.prisma.rentalVehicle.update({ where: { id }, data: { isActive: false } });
+    return { id: updated.id, isActive: updated.isActive };
+  }
+
+  private normalizeVehicleAdminPayload(data: Record<string, unknown>): Prisma.RentalVehicleCreateInput {
+    const name = String(data.name ?? '').trim();
+    if (!name) throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Nom du véhicule requis.');
+    const category = this.normalizeCategory(String(data.category ?? 'ECONOMY')) ?? 'ECONOMY';
+    const dailyRateCdf = Number(data.dailyRateCdf ?? 0);
+    if (!Number.isFinite(dailyRateCdf) || dailyRateCdf <= 0) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Tarif journalier invalide.');
+    }
+    const seats = Number(data.seats ?? 5);
+    const features = Array.isArray(data.features)
+      ? data.features.map((f) => String(f))
+      : typeof data.features === 'string' && data.features.trim()
+        ? data.features.split(',').map((f) => f.trim()).filter(Boolean)
+        : undefined;
+    return {
+      name,
+      make: data.make != null ? String(data.make) : undefined,
+      model: data.model != null ? String(data.model) : undefined,
+      year: data.year != null ? Number(data.year) : undefined,
+      category,
+      transmission: String(data.transmission ?? 'MANUAL').toUpperCase() === 'AUTO' ? 'AUTO' : 'MANUAL',
+      city: String(data.city ?? 'Kinshasa').trim() || 'Kinshasa',
+      seats: Number.isFinite(seats) && seats > 0 ? seats : 5,
+      dailyRateCdf: Math.round(dailyRateCdf),
+      depositCdf: data.depositCdf != null ? Math.round(Number(data.depositCdf)) : 50000,
+      weeklyDiscountPct: data.weeklyDiscountPct != null ? Math.round(Number(data.weeklyDiscountPct)) : 10,
+      rating: data.rating != null ? Number(data.rating) : 4.5,
+      ownerName: data.ownerName != null ? String(data.ownerName) : undefined,
+      ownerBadge: data.ownerBadge != null ? String(data.ownerBadge) : undefined,
+      ownerContactPhone: data.ownerContactPhone != null ? String(data.ownerContactPhone) : undefined,
+      features: features ?? undefined,
+      cancellationPolicy: data.cancellationPolicy != null ? String(data.cancellationPolicy) : undefined,
+      mileageUnlimited: data.mileageUnlimited !== false,
+      limitedMileageFeeCdf:
+        data.limitedMileageFeeCdf != null ? Math.round(Number(data.limitedMileageFeeCdf)) : 15000,
+      imageUrl: data.imageUrl != null ? String(data.imageUrl) : undefined,
+      isActive: data.isActive !== false,
+    };
   }
 }

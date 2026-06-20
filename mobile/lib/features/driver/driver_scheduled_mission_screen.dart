@@ -7,51 +7,69 @@ import '../../core/geo/maps_launcher.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
-import '../history/history_detail_dialog.dart';
 
-class DriverMovingMissionScreen extends ConsumerStatefulWidget {
-  const DriverMovingMissionScreen({
+List<Map<String, dynamic>> scheduledTimelineSteps(String? status) {
+  const steps = [
+    ('SCHEDULED', 'Réservation enregistrée'),
+    ('CONFIRMED', 'Chauffeur confirmé'),
+    ('IN_PROGRESS', 'Course en cours'),
+    ('COMPLETED', 'Course terminée'),
+  ];
+  if (status == 'CANCELLED') {
+    return [{'label': 'Course annulée', 'done': true}];
+  }
+  final order = steps.map((s) => s.$1).toList();
+  final idx = order.indexOf(status ?? 'SCHEDULED');
+  return steps
+      .asMap()
+      .entries
+      .map((e) => {'label': e.value.$2, 'done': idx >= 0 && e.key <= idx})
+      .toList();
+}
+
+class DriverScheduledMissionScreen extends ConsumerStatefulWidget {
+  const DriverScheduledMissionScreen({
     super.key,
-    required this.movingId,
+    required this.rideId,
     this.initialMission,
   });
 
-  final String movingId;
+  final String rideId;
   final Map<String, dynamic>? initialMission;
 
   @override
-  ConsumerState<DriverMovingMissionScreen> createState() => _DriverMovingMissionScreenState();
+  ConsumerState<DriverScheduledMissionScreen> createState() => _DriverScheduledMissionScreenState();
 }
 
-class _DriverMovingMissionScreenState extends ConsumerState<DriverMovingMissionScreen> {
-  Map<String, dynamic>? _moving;
+class _DriverScheduledMissionScreenState extends ConsumerState<DriverScheduledMissionScreen> {
+  Map<String, dynamic>? _ride;
   bool _loading = true;
   bool _saving = false;
   String? _error;
 
-  String get _status => _moving?['status']?.toString() ?? widget.initialMission?['status']?.toString() ?? 'ASSIGNED';
+  String get _status => _ride?['status']?.toString() ?? widget.initialMission?['status']?.toString() ?? 'CONFIRMED';
 
   @override
   void initState() {
     super.initState();
     if (widget.initialMission != null) {
-      _moving = Map<String, dynamic>.from(widget.initialMission!);
+      _ride = Map<String, dynamic>.from(widget.initialMission!);
     }
     _load();
   }
 
   Future<void> _load() async {
     setState(() {
-      _loading = _moving == null;
+      _loading = _ride == null;
       _error = null;
     });
-    final result = await ref.read(apiClientProvider).get('/moving/${widget.movingId}');
+    final result = await ref.read(apiClientProvider).get('/rides/scheduled/${widget.rideId}');
     if (!mounted) return;
     setState(() {
       _loading = false;
       switch (result) {
         case Success(:final data):
-          _moving = data['moving'] as Map<String, dynamic>? ?? data;
+          _ride = data['scheduledRide'] as Map<String, dynamic>? ?? data;
           _error = null;
         case Failure(:final error):
           _error = error.message;
@@ -65,14 +83,14 @@ class _DriverMovingMissionScreenState extends ConsumerState<DriverMovingMissionS
       _error = null;
     });
     final result = await ref.read(apiClientProvider).patch(
-      '/moving/${widget.movingId}/driver-status',
+      '/rides/scheduled/${widget.rideId}/driver-status',
       {'status': nextStatus},
     );
     if (!mounted) return;
     setState(() => _saving = false);
     switch (result) {
       case Success(:final data):
-        setState(() => _moving = data['moving'] as Map<String, dynamic>? ?? _moving);
+        setState(() => _ride = data['scheduledRide'] as Map<String, dynamic>? ?? _ride);
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(successMessage)));
         if (nextStatus == 'COMPLETED') {
           Navigator.pop(context, true);
@@ -85,8 +103,8 @@ class _DriverMovingMissionScreenState extends ConsumerState<DriverMovingMissionS
   }
 
   Future<void> _openMaps({required bool toPickup}) async {
-    final lat = _moving?[toPickup ? 'pickupLat' : 'dropoffLat'] as num?;
-    final lng = _moving?[toPickup ? 'pickupLng' : 'dropoffLng'] as num?;
+    final lat = _ride?[toPickup ? 'pickupLat' : 'dropoffLat'] as num?;
+    final lng = _ride?[toPickup ? 'pickupLng' : 'dropoffLng'] as num?;
     if (lat == null || lng == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -106,31 +124,35 @@ class _DriverMovingMissionScreenState extends ConsumerState<DriverMovingMissionS
     }
   }
 
-  List<Map<String, dynamic>> get _timeline {
-    final raw = _moving?['timeline'] as List?;
-    if (raw != null && raw.isNotEmpty) {
-      return raw.cast<Map<String, dynamic>>();
-    }
-    return movingTimelineSteps(_status);
+  String? _formatScheduledAt() {
+    final raw = _ride?['scheduledAt'] ?? widget.initialMission?['scheduledAt'];
+    if (raw == null) return null;
+    final dt = DateTime.tryParse(raw.toString())?.toLocal();
+    if (dt == null) return raw.toString();
+    return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')} '
+        '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
   }
+
+  bool get _canStart => _status == 'CONFIRMED' || _status == 'SCHEDULED';
 
   @override
   Widget build(BuildContext context) {
-    if (_loading && _moving == null) {
+    if (_loading && _ride == null) {
       return const MovaScreen(
-        title: 'Mission déménagement',
+        title: 'Mission planifiée',
         scrollable: false,
         child: Center(child: CircularProgressIndicator(color: MovaColors.violet)),
       );
     }
 
-    final pickup = _moving?['pickupAddress']?.toString() ?? widget.initialMission?['pickupAddress']?.toString() ?? '—';
-    final dropoff = _moving?['dropoffAddress']?.toString() ?? widget.initialMission?['dropoffAddress']?.toString() ?? '—';
-    final volume = _moving?['volumeM3'] ?? widget.initialMission?['volumeM3'];
-    final price = _moving?['priceCdf'] ?? _moving?['estimatedPriceCdf'] ?? widget.initialMission?['priceCdf'];
+    final pickup = _ride?['pickupAddress']?.toString() ?? widget.initialMission?['pickupAddress']?.toString() ?? '—';
+    final dropoff = _ride?['dropoffAddress']?.toString() ?? widget.initialMission?['dropoffAddress']?.toString() ?? '—';
+    final price = _ride?['priceCdf'] ?? _ride?['estimatedPriceCdf'] ?? widget.initialMission?['priceCdf'];
+    final vehicleType = _ride?['vehicleType'] ?? widget.initialMission?['vehicleType'];
+    final scheduledAt = _formatScheduledAt();
 
     return MovaScreen(
-      title: 'Mission déménagement',
+      title: 'Mission planifiée',
       scrollable: false,
       child: MovaFlexScroll(
         child: Column(
@@ -148,20 +170,21 @@ class _DriverMovingMissionScreenState extends ConsumerState<DriverMovingMissionS
                 children: [
                   Text(
                     _statusLabel(_status),
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: MovaColors.violet,
-                    ),
+                    style: const TextStyle(fontWeight: FontWeight.bold, color: MovaColors.violet),
                   ),
+                  if (scheduledAt != null) ...[
+                    const SizedBox(height: 8),
+                    Text('Date prévue : $scheduledAt'),
+                  ],
                   const SizedBox(height: 12),
                   Text('Départ', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
                   Text(pickup, style: const TextStyle(fontWeight: FontWeight.w600)),
                   const SizedBox(height: 8),
                   Text('Arrivée', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
                   Text(dropoff, style: const TextStyle(fontWeight: FontWeight.w600)),
-                  if (volume != null) ...[
+                  if (vehicleType != null) ...[
                     const SizedBox(height: 8),
-                    Text('Volume : $volume m³'),
+                    Text('Véhicule : $vehicleType'),
                   ],
                   if (price != null) ...[
                     const SizedBox(height: 8),
@@ -180,7 +203,7 @@ class _DriverMovingMissionScreenState extends ConsumerState<DriverMovingMissionS
                 children: [
                   const Text('Suivi', style: TextStyle(fontWeight: FontWeight.w600)),
                   const SizedBox(height: 8),
-                  ..._timeline.map((step) {
+                  ...scheduledTimelineSteps(_status).map((step) {
                     final done = step['done'] == true;
                     return Padding(
                       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -201,31 +224,31 @@ class _DriverMovingMissionScreenState extends ConsumerState<DriverMovingMissionS
               ),
             ),
             const SizedBox(height: 12),
-            if (_status == 'ASSIGNED' || _status == 'IN_PROGRESS') ...[
+            if (_canStart || _status == 'IN_PROGRESS') ...[
               MovaButton(
-                label: _status == 'ASSIGNED' ? 'Itinéraire départ' : 'Itinéraire arrivée',
+                label: _status == 'IN_PROGRESS' ? 'Itinéraire arrivée' : 'Itinéraire départ',
                 icon: Icons.map,
-                onPressed: _saving ? null : () => _openMaps(toPickup: _status == 'ASSIGNED'),
+                onPressed: _saving ? null : () => _openMaps(toPickup: _status != 'IN_PROGRESS'),
               ),
               const SizedBox(height: 8),
             ],
-            if (_status == 'ASSIGNED')
+            if (_canStart)
               MovaButton(
-                label: 'Démarrer le déménagement',
+                label: 'Démarrer la course',
                 icon: Icons.play_arrow,
                 isLoading: _saving,
                 onPressed: _saving
                     ? null
-                    : () => _advanceStatus('IN_PROGRESS', 'Déménagement démarré'),
+                    : () => _advanceStatus('IN_PROGRESS', 'Course démarrée'),
               ),
             if (_status == 'IN_PROGRESS')
               MovaButton(
-                label: 'Terminer le déménagement',
+                label: 'Terminer la course',
                 icon: Icons.check,
                 isLoading: _saving,
                 onPressed: _saving
                     ? null
-                    : () => _advanceStatus('COMPLETED', 'Déménagement terminé'),
+                    : () => _advanceStatus('COMPLETED', 'Course terminée'),
               ),
           ],
         ),
@@ -235,9 +258,10 @@ class _DriverMovingMissionScreenState extends ConsumerState<DriverMovingMissionS
 
   String _statusLabel(String status) {
     return switch (status.toUpperCase()) {
-      'ASSIGNED' => 'Assigné — prêt à démarrer',
-      'IN_PROGRESS' => 'Déménagement en cours',
-      'COMPLETED' => 'Terminé',
+      'SCHEDULED' => 'Planifiée — en attente',
+      'CONFIRMED' => 'Confirmée — prêt à démarrer',
+      'IN_PROGRESS' => 'Course en cours',
+      'COMPLETED' => 'Terminée',
       _ => status,
     };
   }

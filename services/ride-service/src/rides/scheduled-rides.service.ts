@@ -106,6 +106,41 @@ export class ScheduledRidesService {
     return ride;
   }
 
+  async getForParticipant(id: string, userId: string) {
+    const ride = await this.prisma.scheduledRide.findUnique({ where: { id } });
+    if (!ride) throw new MovaHttpException(MovaErrorCode.SCHEDULED_RIDE_NOT_FOUND, HttpStatus.NOT_FOUND);
+    if (ride.passengerId !== userId && ride.driverId !== userId) {
+      throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
+    }
+    return ride;
+  }
+
+  async updateStatusByDriver(id: string, driverId: string, status: ScheduledRideStatus) {
+    const ride = await this.prisma.scheduledRide.findUnique({ where: { id } });
+    if (!ride) throw new MovaHttpException(MovaErrorCode.SCHEDULED_RIDE_NOT_FOUND, HttpStatus.NOT_FOUND);
+    if (ride.driverId !== driverId) {
+      throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
+    }
+    const allowed: Record<ScheduledRideStatus, ScheduledRideStatus[]> = {
+      [ScheduledRideStatus.SCHEDULED]: [ScheduledRideStatus.IN_PROGRESS],
+      [ScheduledRideStatus.CONFIRMED]: [ScheduledRideStatus.IN_PROGRESS],
+      [ScheduledRideStatus.IN_PROGRESS]: [ScheduledRideStatus.COMPLETED],
+      [ScheduledRideStatus.COMPLETED]: [],
+      [ScheduledRideStatus.CANCELLED]: [],
+    };
+    if (!allowed[ride.status]?.includes(status)) {
+      throw new MovaHttpException(MovaErrorCode.SCHEDULED_RIDE_INVALID_STATUS);
+    }
+    const updated = await this.prisma.scheduledRide.update({ where: { id }, data: { status } });
+    await this.redis.publish(MOVA_EVENTS.SERVICE_STATUS_UPDATED, {
+      serviceType: 'SCHEDULED',
+      referenceId: updated.id,
+      userId: updated.passengerId,
+      status: updated.status,
+    });
+    return { scheduledRide: updated };
+  }
+
   async cancel(id: string, passengerId: string, reason?: string) {
     const ride = await this.prisma.scheduledRide.findUnique({ where: { id } });
     if (!ride) throw new MovaHttpException(MovaErrorCode.SCHEDULED_RIDE_NOT_FOUND, HttpStatus.NOT_FOUND);

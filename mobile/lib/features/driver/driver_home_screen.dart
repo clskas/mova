@@ -22,6 +22,7 @@ import 'driver_ride_history_screen.dart';
 import 'ride_offer_screen.dart';
 import 'delivery_offer_screen.dart';
 import 'driver_moving_mission_screen.dart';
+import 'driver_scheduled_mission_screen.dart';
 
 class DriverHomeScreen extends ConsumerStatefulWidget {
   const DriverHomeScreen({super.key});
@@ -141,15 +142,34 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
   }
 
   void _openAssignedMission(Map<String, dynamic> mission) {
-    if (mission['type']?.toString() != 'MOVING') return;
     final id = mission['id']?.toString();
     if (id == null || id.isEmpty) return;
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => DriverMovingMissionScreen(movingId: id, initialMission: mission),
-      ),
-    ).then((_) => _loadAssignments());
+    final type = mission['type']?.toString();
+    if (type == 'MOVING') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => DriverMovingMissionScreen(movingId: id, initialMission: mission),
+        ),
+      ).then((_) => _loadAssignments());
+      return;
+    }
+    if (type == 'SCHEDULED') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => DriverScheduledMissionScreen(rideId: id, initialMission: mission),
+        ),
+      ).then((_) => _loadAssignments());
+    }
+  }
+
+  bool _missionIsActionable(Map<String, dynamic> mission) {
+    final type = mission['type']?.toString();
+    if (type != 'MOVING' && type != 'SCHEDULED') return false;
+    final status = mission['status']?.toString() ?? '';
+    if (type == 'MOVING') return status == 'ASSIGNED' || status == 'IN_PROGRESS';
+    return status == 'SCHEDULED' || status == 'CONFIRMED' || status == 'IN_PROGRESS';
   }
 
   Future<void> _loadProfile({bool clearCache = false}) async {
@@ -734,7 +754,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                     return Padding(
                       padding: const EdgeInsets.only(top: 8),
                       child: InkWell(
-                        onTap: m['type'] == 'MOVING' ? () => _openAssignedMission(m) : null,
+                        onTap: _missionIsActionable(m) ? () => _openAssignedMission(m) : null,
                         borderRadius: BorderRadius.circular(8),
                         child: Padding(
                           padding: const EdgeInsets.symmetric(vertical: 4),
@@ -761,8 +781,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                                       _missionStatusLabel(m['status']?.toString()),
                                       style: const TextStyle(fontSize: 11, color: MovaColors.violet, fontWeight: FontWeight.w600),
                                     ),
-                                    if (m['type'] == 'MOVING' &&
-                                        (m['status'] == 'ASSIGNED' || m['status'] == 'IN_PROGRESS'))
+                                    if (_missionIsActionable(m))
                                       const Text(
                                         'Appuyer pour gérer la mission',
                                         style: TextStyle(fontSize: 11, color: MovaColors.green),
@@ -770,7 +789,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                                   ],
                                 ),
                               ),
-                              if (m['type'] == 'MOVING')
+                              if (_missionIsActionable(m))
                                 const Icon(Icons.chevron_right, size: 20, color: MovaColors.textSecondary),
                             ],
                           ),

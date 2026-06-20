@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Param, Patch, Post, Query, Request, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { VehicleType } from '@prisma/client';
+import { ScheduledRideStatus, VehicleType } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CancelRideDto, CreateRideDto, EstimateRideDto, UpdateRideStatusDto } from './rides.dto';
 import { CancelScheduledRideDto, CreateScheduledRideDto } from './scheduled-rides.dto';
@@ -46,9 +46,19 @@ export class RidesController {
   }
 
   @Get('scheduled/:id')
-  @ApiOperation({ summary: 'Détail réservation planifiée' })
+  @ApiOperation({ summary: 'Détail réservation planifiée (passager ou chauffeur assigné)' })
   getScheduled(@Request() req: { user: { id: string } }, @Param('id') id: string) {
-    return this.scheduledRidesService.get(id, req.user.id);
+    return this.scheduledRidesService.getForParticipant(id, req.user.id);
+  }
+
+  @Patch('scheduled/:id/driver-status')
+  @ApiOperation({ summary: 'Mettre à jour statut course planifiée (chauffeur assigné)' })
+  driverScheduledStatus(
+    @Request() req: { user: { id: string } },
+    @Param('id') id: string,
+    @Body('status') status: ScheduledRideStatus,
+  ) {
+    return this.scheduledRidesService.updateStatusByDriver(id, req.user.id, status);
   }
 
   @Post('scheduled/:id/cancel')

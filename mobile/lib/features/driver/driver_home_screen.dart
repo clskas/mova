@@ -111,6 +111,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
     final api = ref.read(apiClientProvider);
     final movingResult = await api.get('/moving/assignments', skipCache: true);
     final scheduledResult = await api.get('/rides/scheduled/assignments', skipCache: true);
+    final errandResult = await api.get('/deliveries/assignments', skipCache: true);
     if (!mounted) return;
     final missions = <Map<String, dynamic>>[];
     if (movingResult case Success(:final data)) {
@@ -121,12 +122,17 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
       final rows = (data['data'] as List? ?? []).cast<Map<String, dynamic>>();
       missions.addAll(rows);
     }
+    if (errandResult case Success(:final data)) {
+      final rows = (data['data'] as List? ?? []).cast<Map<String, dynamic>>();
+      missions.addAll(rows);
+    }
     missions.sort((a, b) {
       final aDate = a['scheduledAt']?.toString() ?? a['createdAt']?.toString() ?? '';
       final bDate = b['scheduledAt']?.toString() ?? b['createdAt']?.toString() ?? '';
       return aDate.compareTo(bDate);
     });
     setState(() => _assignedMissions = missions);
+    await _loadActiveDelivery();
   }
 
   String _missionStatusLabel(String? status) {
@@ -161,13 +167,23 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
           builder: (_) => DriverScheduledMissionScreen(rideId: id, initialMission: mission),
         ),
       ).then((_) => _loadAssignments());
+      return;
+    }
+    if (type == 'ERRAND') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ActiveDeliveryScreen(delivery: mission),
+        ),
+      ).then((_) => _loadAssignments());
     }
   }
 
   bool _missionIsActionable(Map<String, dynamic> mission) {
     final type = mission['type']?.toString();
-    if (type != 'MOVING' && type != 'SCHEDULED') return false;
     final status = mission['status']?.toString() ?? '';
+    if (type == 'ERRAND') return status == 'ASSIGNED' || status == 'IN_PROGRESS';
+    if (type != 'MOVING' && type != 'SCHEDULED') return false;
     if (type == 'MOVING') return status == 'ASSIGNED' || status == 'IN_PROGRESS';
     return status == 'SCHEDULED' || status == 'CONFIRMED' || status == 'IN_PROGRESS';
   }
@@ -320,6 +336,10 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
       final deliveries = (data['data'] as List? ?? []).cast<Map<String, dynamic>>();
       final active = deliveries.where((d) {
         final s = d['status']?.toString() ?? '';
+        final type = d['type']?.toString() ?? '';
+        if (type == 'ERRAND') {
+          return s == 'ASSIGNED' || s == 'IN_PROGRESS';
+        }
         return s == 'PICKED_UP' || s == 'IN_TRANSIT';
       }).toList();
       if (active.isNotEmpty) {
@@ -492,6 +512,10 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
       for (final offer in data) {
         final id = offer['id']?.toString() ?? '';
         if (id.isEmpty || _dismissedOffers.contains('delivery:$id')) continue;
+        if (offer['alreadyAssigned'] == true) {
+          if (mounted) setState(() => _activeDelivery = offer);
+          continue;
+        }
         _showingOffer = true;
         if (!mounted) return;
         final accepted = await Navigator.push<Map<String, dynamic>?>(
@@ -554,6 +578,15 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
   }
 
   String? get _kycStatus => _profile?['kycStatus']?.toString();
+
+  Map<String, dynamic>? get _documentsStatus =>
+      _profile?['documentsStatus'] as Map<String, dynamic>?;
+
+  bool get _documentsCanOperate => _documentsStatus?['canOperate'] == true;
+
+  bool get _documentsRenewalPending => _profile?['documentsRenewalPending'] == true;
+
+  String? get _documentsBlockReason => _documentsStatus?['blockReason']?.toString();
 
   @override
   Widget build(BuildContext context) {
@@ -666,6 +699,50 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
             ),
             const SizedBox(height: 12),
           ],
+          if (_kycStatus == 'APPROVED' && (_documentsRenewalPending || !_documentsCanOperate)) ...[
+            MovaCard(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.description_outlined, color: MovaColors.orange),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      _documentsRenewalPending
+                          ? 'Renouvellement de documents en cours de validation MOVA. Mettez à jour vos justificatifs dans Enregistrement si nécessaire.'
+                          : (_documentsBlockReason ??
+                              'Permis, assurance ou visite technique expiré(s) ou incomplet(s). '
+                                  'Mettez à jour vos dates dans Enregistrement avant de recevoir des missions.'),
+                      maxLines: 4,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+          if (_kycStatus == 'APPROVED' &&
+              _documentsCanOperate &&
+              (_documentsStatus?['expiringSoon'] as List?)?.isNotEmpty == true) ...[
+            MovaCard(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.schedule, color: MovaColors.violet),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Attention : certains documents expirent bientôt. Pensez à les renouveler.',
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
           MovaCard(
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -696,6 +773,12 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                           'Documents KYC approuvés requis pour passer en ligne.');
                       return;
                     }
+                    if (value && !_documentsCanOperate) {
+                      setState(() => _availabilityError =
+                          _documentsBlockReason ??
+                              'Documents expirés ou incomplets — mettez à jour vos dates d\'expiration.');
+                      return;
+                    }
                     _toggleAvailability(value);
                   },
                 ),
@@ -721,7 +804,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                 const SizedBox(height: 8),
                 const Text(
                   '• Courses taxi : proches de votre GPS, dans le rayon de recherche, véhicule compatible.\n'
-                  '• Livraisons : colis/repas/express en attente, dans un rayon de 15 km.\n'
+                  '• Livraisons & courses/commissions : colis, repas, express et achats en attente, dans un rayon de 15 km.\n'
                   '• Réservations planifiées et déménagements : assignés par l’admin — ouvrez une mission pour démarrer / terminer.\n'
                   '• Covoiturage : publiez votre trajet via le bouton ci-dessous.',
                   style: TextStyle(fontSize: 12, color: MovaColors.textSecondary, height: 1.4),
@@ -744,10 +827,12 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                   ),
                   const SizedBox(height: 8),
                   ..._assignedMissions.map((m) {
-                    final icon = m['type'] == 'MOVING' ? Icons.local_shipping : Icons.event;
-                    final subtitle = m['type'] == 'MOVING'
-                        ? '${m['pickupAddress'] ?? ''} → ${m['dropoffAddress'] ?? ''}'
-                        : '${m['pickupAddress'] ?? 'Départ'} → ${m['dropoffAddress'] ?? ''}';
+                    final icon = switch (m['type']?.toString()) {
+                      'MOVING' => Icons.local_shipping,
+                      'ERRAND' => Icons.shopping_bag_outlined,
+                      _ => Icons.event,
+                    };
+                    final subtitle = '${m['pickupAddress'] ?? ''} → ${m['dropoffAddress'] ?? m['deliveryAddress'] ?? ''}';
                     final extra = m['scheduledAt'] != null
                         ? '\n${DateTime.tryParse(m['scheduledAt'].toString())?.toLocal().toString().substring(0, 16) ?? ''}'
                         : '';
@@ -982,10 +1067,16 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                     ..._deliveryOffers.take(5).map((offer) {
                       final fare = (offer['estimatedPriceCdf'] ?? offer['priceCdf']) as num?;
                       final type = offer['type']?.toString() ?? 'PARCEL';
+                      final typeLabel = type == 'ERRAND' ? 'Courses' : type;
+                      final assigned = offer['alreadyAssigned'] == true;
                       return ListTile(
                         contentPadding: EdgeInsets.zero,
                         title: Text(
-                          offer['pickupAddress']?.toString() ?? 'Livraison $type',
+                          assigned
+                              ? 'Mission assignée — ${type == 'ERRAND' ? (offer['description']?.toString() ?? 'Courses & commissions') : (offer['pickupAddress']?.toString() ?? 'Livraison $typeLabel')}'
+                              : type == 'ERRAND'
+                                  ? (offer['description']?.toString() ?? 'Courses & commissions')
+                                  : (offer['pickupAddress']?.toString() ?? 'Livraison $typeLabel'),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -1006,6 +1097,16 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                         onTap: () async {
                           final id = offer['id']?.toString() ?? '';
                           if (id.isEmpty) return;
+                          if (offer['alreadyAssigned'] == true) {
+                            setState(() => _activeDelivery = offer);
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => ActiveDeliveryScreen(delivery: offer)),
+                            );
+                            await _loadActiveDelivery();
+                            await _refreshRideOffers();
+                            return;
+                          }
                           _showingOffer = true;
                           final accepted = await Navigator.push<Map<String, dynamic>?>(
                             context,

@@ -576,3 +576,22 @@ model PromoCode {
 
   @@map("promo_codes")
 }
+
+enum TrackingReferenceType {
+  RIDE
+  DELIVERY
+  ERRAND
+  MOVING
+}
+
+model TrackingPoint {
+  id            String                @id @default(uuid())
+  referenceType TrackingReferenceType
+  referenceId   String
+  lat           Float
+  lng           Float
+  recordedAt    DateTime              @default(now())
+
+  @@index([referenceType, referenceId, recordedAt])
+  @@map("tracking_points")
+}

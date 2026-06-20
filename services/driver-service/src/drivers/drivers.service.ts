@@ -15,9 +15,12 @@ import {
   driverVehicleTypesForRide,
   formatMovaPublicId,
   maskPhoneRdc,
+  evaluateDriverDocuments,
+  type DriverDocumentsStatus,
 } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateOnboardingDto } from './drivers.dto';
+import { OcrService } from '../ocr/ocr.service';
 
 export interface DriverCandidate {
   driverId: string;
@@ -33,7 +36,63 @@ export interface DriverCandidate {
 @Injectable()
 export class DriversService {
   private readonly logger = new Logger(DriversService.name);
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private ocrService: OcrService,
+  ) {}
+
+  private documentsStatusFor(profile: {
+    licenseExpiry?: Date | null;
+    insuranceExpiry?: Date | null;
+    technicalInspectionExpiry?: Date | null;
+    documentsRenewalPending?: boolean;
+    vehicles?: { typeApprovalStatus?: KycStatus; typeApprovalNotes?: string | null; isActive?: boolean }[];
+  }): DriverDocumentsStatus {
+    const activeVehicle = profile.vehicles?.find((v) => v.isActive !== false) ?? profile.vehicles?.[0];
+    return evaluateDriverDocuments({
+      licenseExpiry: profile.licenseExpiry,
+      insuranceExpiry: profile.insuranceExpiry,
+      technicalInspectionExpiry: profile.technicalInspectionExpiry,
+      documentsRenewalPending: profile.documentsRenewalPending,
+      vehicleTypeApprovalStatus: activeVehicle?.typeApprovalStatus,
+      vehicleTypeApprovalNotes: activeVehicle?.typeApprovalNotes,
+    });
+  }
+
+  private sameCalendarDay(a?: Date | null, b?: string | Date | null): boolean {
+    if (!a && (b == null || b === '')) return true;
+    if (!a || b == null || b === '') return false;
+    const left = new Date(a);
+    const right = new Date(b);
+    if (Number.isNaN(left.getTime()) || Number.isNaN(right.getTime())) return false;
+    return (
+      left.getUTCFullYear() === right.getUTCFullYear() &&
+      left.getUTCMonth() === right.getUTCMonth() &&
+      left.getUTCDate() === right.getUTCDate()
+    );
+  }
+
+  private markDocumentsRenewalIfNeeded(
+    profile: {
+      kycStatus: KycStatus;
+      licenseExpiry?: Date | null;
+      insuranceExpiry?: Date | null;
+      technicalInspectionExpiry?: Date | null;
+    },
+    dto: UpdateOnboardingDto,
+    profileData: Record<string, unknown>,
+  ) {
+    if (profile.kycStatus !== KycStatus.APPROVED) return;
+    const expiryChanged =
+      (dto.licenseExpiry !== undefined && !this.sameCalendarDay(profile.licenseExpiry, dto.licenseExpiry)) ||
+      (dto.insuranceExpiry !== undefined && !this.sameCalendarDay(profile.insuranceExpiry, dto.insuranceExpiry)) ||
+      (dto.technicalInspectionExpiry !== undefined &&
+        !this.sameCalendarDay(profile.technicalInspectionExpiry, dto.technicalInspectionExpiry));
+    if (expiryChanged) {
+      profileData.documentsRenewalPending = true;
+      profileData.documentsRenewalRequestedAt = new Date();
+    }
+  }
 
   async createProfile(userId: string) {
     const profile = await this.prisma.driverProfile.upsert({
@@ -85,12 +144,13 @@ export class DriversService {
         kycStatus: KycStatus.APPROVED,
         currentLat: { not: null },
         currentLng: { not: null },
-        vehicles: { some: { type: { in: compatibleTypes }, isActive: true } },
+        vehicles: { some: { type: { in: compatibleTypes }, isActive: true, typeApprovalStatus: KycStatus.APPROVED } },
       },
-      include: { vehicles: { where: { type: { in: compatibleTypes }, isActive: true } } },
+      include: { vehicles: { where: { type: { in: compatibleTypes }, isActive: true, typeApprovalStatus: KycStatus.APPROVED } } },
     });
     const candidates: DriverCandidate[] = [];
     for (const driver of drivers) {
+      if (!this.documentsStatusFor(driver).canOperate) continue;
       if (driver.currentLat == null || driver.currentLng == null) continue;
       const distanceKm = this.haversineKm(lat, lng, driver.currentLat, driver.currentLng);
       if (distanceKm > effectiveRadius) continue;
@@ -112,7 +172,10 @@ export class DriversService {
   }
 
   async setAvailability(userId: string, isAvailable: boolean) {
-    const profile = await this.prisma.driverProfile.findUnique({ where: { userId } });
+    const profile = await this.prisma.driverProfile.findUnique({
+      where: { userId },
+      include: { vehicles: true },
+    });
     if (!profile) throw new MovaHttpException(MovaErrorCode.DRIVER_KYC_PENDING);
     if (profile.kycStatus !== KycStatus.APPROVED && isAvailable) {
       throw new MovaHttpException(MovaErrorCode.DRIVER_KYC_PENDING);
@@ -122,6 +185,14 @@ export class DriversService {
         MovaErrorCode.VALIDATION_ERROR,
         undefined,
         'Activez votre compte avec le code PIN reçu après validation MOVA.',
+      );
+    }
+    const documentsStatus = this.documentsStatusFor(profile);
+    if (isAvailable && !documentsStatus.canOperate) {
+      throw new MovaHttpException(
+        MovaErrorCode.DRIVER_DOCUMENTS_EXPIRED,
+        undefined,
+        documentsStatus.blockReason,
       );
     }
     return this.prisma.driverProfile.update({ where: { userId }, data: { isAvailable } });
@@ -147,11 +218,26 @@ export class DriversService {
     } catch {
       throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Type de document KYC invalide.');
     }
-    await this.prisma.kycDocument.create({ data: { userId, type: docType, url } });
+    const doc = await this.prisma.kycDocument.create({ data: { userId, type: docType, url } });
+    this.ocrService.scheduleAnalysis(doc.id);
     const profile = await this.getOrCreateProfile(userId);
     if (profile) await this.ensureDefaultVehicle(profile.id);
+    const renewalDocTypes = new Set([
+      'DRIVERS_LICENSE',
+      'VEHICLE_INSURANCE',
+      'TECHNICAL_INSPECTION',
+    ]);
     if (profile?.kycStatus === KycStatus.APPROVED) {
-      return profile;
+      if (renewalDocTypes.has(docType)) {
+        await this.prisma.driverProfile.update({
+          where: { userId },
+          data: {
+            documentsRenewalPending: true,
+            documentsRenewalRequestedAt: new Date(),
+          },
+        });
+      }
+      return this.getOrCreateProfile(userId);
     }
     return this.prisma.driverProfile.update({
       where: { userId },
@@ -178,6 +264,39 @@ export class DriversService {
     }
   }
 
+  private ocrFieldsFor(doc?: {
+    ocrStatus?: string;
+    ocrExtractedExpiry?: Date | null;
+    ocrProfileExpiry?: Date | null;
+    ocrConfidence?: number | null;
+    ocrNotes?: string | null;
+    ocrCheckedAt?: Date | null;
+    id?: string;
+  } | null) {
+    if (!doc) return null;
+    return {
+      documentId: doc.id,
+      status: doc.ocrStatus ?? 'PENDING',
+      extractedExpiry: doc.ocrExtractedExpiry ?? null,
+      profileExpiry: doc.ocrProfileExpiry ?? null,
+      confidence: doc.ocrConfidence ?? null,
+      notes: doc.ocrNotes ?? null,
+      checkedAt: doc.ocrCheckedAt ?? null,
+    };
+  }
+
+  async runKycOcr(documentId: string) {
+    const doc = await this.prisma.kycDocument.findUnique({ where: { id: documentId } });
+    if (!doc) throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Document KYC introuvable.');
+    const updated = await this.ocrService.analyzeDocument(documentId);
+    return {
+      documentId,
+      userId: doc.userId,
+      type: doc.type,
+      ocr: this.ocrFieldsFor(updated),
+    };
+  }
+
   async getKycStatus(userId: string) {
     const docs = await this.prisma.kycDocument.findMany({ where: { userId }, orderBy: { createdAt: 'desc' } });
     const latestByType = new Map<string, (typeof docs)[number]>();
@@ -198,6 +317,7 @@ export class DriversService {
         uploaded: !!doc,
         status: doc?.status ?? null,
         url: doc?.url ?? null,
+        ocr: this.ocrFieldsFor(doc),
       };
     });
     const requiredComplete = REQUIRED_DRIVER_KYC_TYPES.every((t) => latestByType.has(t));
@@ -234,6 +354,9 @@ export class DriversService {
         charterAcceptedAt: profile?.charterAcceptedAt,
         trainingCompletedAt: profile?.trainingCompletedAt,
         onboardingCompleted: profile?.onboardingCompleted ?? false,
+        documentsRenewalPending: profile?.documentsRenewalPending ?? false,
+        documentsRenewalRequestedAt: profile?.documentsRenewalRequestedAt,
+        documentsStatus: this.documentsStatusFor(profile ?? {}),
         kycStatus: profile?.kycStatus,
         activationPinVerified: !!profile?.activationPinVerifiedAt,
         needsActivationPin: profile?.kycStatus === KycStatus.APPROVED && !profile?.activationPinVerifiedAt,
@@ -247,8 +370,12 @@ export class DriversService {
             plateNumber: vehicle.plateNumber,
             color: vehicle.color,
             imageUrl: vehicle.imageUrl,
+            typeApprovalStatus: vehicle.typeApprovalStatus,
+            typeApprovalNotes: vehicle.typeApprovalNotes,
+            typeApprovedAt: vehicle.typeApprovedAt,
           }
         : null,
+      vehicleTypeApprovalStatus: vehicle?.typeApprovalStatus,
       kyc,
     };
   }
@@ -271,11 +398,14 @@ export class DriversService {
     if (dto.trainingCompleted === true) profileData.trainingCompletedAt = new Date();
     if (dto.onboardingCompleted === true) profileData.onboardingCompleted = true;
 
+    this.markDocumentsRenewalIfNeeded(profile, dto, profileData);
+
     await this.prisma.driverProfile.update({ where: { userId }, data: profileData });
 
     if (dto.plateNumber || dto.vehicleMake || dto.vehicleModel || dto.vehicleType || dto.vehicleColor || dto.vehicleImageUrl) {
       const vehicle = profile.vehicles.find((v) => v.isActive) ?? profile.vehicles[0];
       if (vehicle) {
+        const typeOrPhotoChanged = dto.vehicleType !== undefined || dto.vehicleImageUrl !== undefined;
         await this.prisma.vehicle.update({
           where: { id: vehicle.id },
           data: {
@@ -285,6 +415,9 @@ export class DriversService {
             ...(dto.vehicleType !== undefined ? { type: dto.vehicleType } : {}),
             ...(dto.vehicleColor !== undefined ? { color: dto.vehicleColor } : {}),
             ...(dto.vehicleImageUrl !== undefined ? { imageUrl: dto.vehicleImageUrl } : {}),
+            ...(typeOrPhotoChanged
+              ? { typeApprovalStatus: KycStatus.PENDING, typeApprovalNotes: null, typeApprovedAt: null }
+              : {}),
           },
         });
       }
@@ -298,6 +431,100 @@ export class DriversService {
     }
 
     return this.getOnboarding(userId);
+  }
+
+  async reviewDocumentsRenewal(userId: string, approved: boolean, notes?: string) {
+    const profile = await this.prisma.driverProfile.findUnique({
+      where: { userId },
+      include: { vehicles: true },
+    });
+    if (!profile) throw new MovaHttpException(MovaErrorCode.DRIVER_KYC_PENDING);
+    if (!profile.documentsRenewalPending) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        undefined,
+        'Aucun renouvellement de documents en attente pour ce chauffeur.',
+      );
+    }
+    if (!approved) {
+      await this.prisma.driverProfile.update({
+        where: { userId },
+        data: { isAvailable: false },
+      });
+      return {
+        userId,
+        documentsRenewalPending: true,
+        approved: false,
+        notes: notes ?? null,
+        message: 'Renouvellement refusé — le chauffeur reste bloqué jusqu’à correction.',
+      };
+    }
+    const nextProfile = {
+      ...profile,
+      documentsRenewalPending: false,
+    };
+    const documentsStatus = this.documentsStatusFor(nextProfile);
+    if (!documentsStatus.valid) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        undefined,
+        documentsStatus.blockReason ?? 'Les dates saisies ne sont pas encore valides.',
+      );
+    }
+    const updated = await this.prisma.driverProfile.update({
+      where: { userId },
+      data: { documentsRenewalPending: false },
+      include: { vehicles: true },
+    });
+    return {
+      userId,
+      documentsRenewalPending: false,
+      approved: true,
+      notes: notes ?? null,
+      documentsStatus: this.documentsStatusFor(updated),
+      message: 'Renouvellement validé — le chauffeur peut repasser en ligne.',
+    };
+  }
+
+  async reviewVehicleTypeApproval(userId: string, approved: boolean, notes?: string) {
+    const profile = await this.prisma.driverProfile.findUnique({
+      where: { userId },
+      include: { vehicles: true },
+    });
+    if (!profile) throw new MovaHttpException(MovaErrorCode.DRIVER_KYC_PENDING);
+    const vehicle = profile.vehicles.find((v) => v.isActive) ?? profile.vehicles[0];
+    if (!vehicle) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        undefined,
+        'Aucun véhicule enregistré pour ce chauffeur.',
+      );
+    }
+    const status = approved ? KycStatus.APPROVED : KycStatus.REJECTED;
+    await this.prisma.vehicle.update({
+      where: { id: vehicle.id },
+      data: {
+        typeApprovalStatus: status,
+        typeApprovalNotes: notes?.trim() || null,
+        typeApprovedAt: approved ? new Date() : null,
+      },
+    });
+    if (!approved) {
+      await this.prisma.driverProfile.update({ where: { userId }, data: { isAvailable: false } });
+    }
+    const refreshed = await this.getOrCreateProfile(userId);
+    const documentsStatus = this.documentsStatusFor(refreshed ?? { vehicles: [] });
+    return {
+      userId,
+      vehicleId: vehicle.id,
+      vehicleType: vehicle.type,
+      typeApprovalStatus: status,
+      typeApprovalNotes: notes?.trim() || null,
+      documentsStatus,
+      message: approved
+        ? 'Type d\'engin validé — le chauffeur peut passer en ligne si le reste du dossier est conforme.'
+        : 'Type d\'engin refusé — le chauffeur doit corriger sa déclaration ou sa photo.',
+    };
   }
 
   async verifyActivationPin(userId: string, pin: string) {
@@ -317,6 +544,11 @@ export class DriversService {
 
   async getProfileWithUser(userId: string) {
     const profile = await this.getOrCreateProfile(userId);
+    const documentsStatus = this.documentsStatusFor(profile);
+    if (!documentsStatus.canOperate && profile.isAvailable) {
+      await this.prisma.driverProfile.update({ where: { userId }, data: { isAvailable: false } });
+      profile.isAvailable = false;
+    }
     const user = await this.fetchAuthUser(userId);
     const pinVerified = !!profile?.activationPinVerifiedAt;
     return {
@@ -325,6 +557,9 @@ export class DriversService {
       user,
       activationPinVerified: pinVerified,
       needsActivationPin: profile?.kycStatus === KycStatus.APPROVED && !pinVerified,
+      documentsRenewalPending: profile?.documentsRenewalPending ?? false,
+      documentsRenewalRequestedAt: profile?.documentsRenewalRequestedAt,
+      documentsStatus,
     };
   }
 
@@ -583,12 +818,16 @@ export class DriversService {
         : [];
     const data = rows.map((p) => {
       const kycSummary = this.kycUploadSummary(p.userId, allDocs);
+      const documentsStatus = this.documentsStatusFor(p);
       return {
         ...p,
         publicId: formatMovaPublicId(p.userId, 'DRIVER'),
         activationPinVerified: !!p.activationPinVerifiedAt,
         ...kycSummary,
         readyForReview: p.onboardingCompleted && p.kycStatus === KycStatus.PENDING,
+        documentsStatus,
+        documentsCanOperate: documentsStatus.canOperate,
+        documentsRenewalPending: p.documentsRenewalPending ?? false,
       };
     });
     return { data, total, skip, take };
@@ -601,6 +840,7 @@ export class DriversService {
       this.fetchAuthUser(userId),
     ]);
     const vehicle = profile?.vehicles.find((v) => v.isActive) ?? profile?.vehicles[0];
+    const documentsStatus = profile ? this.documentsStatusFor(profile) : evaluateDriverDocuments({});
     return {
       id: profile?.id,
       userId,
@@ -619,6 +859,8 @@ export class DriversService {
       licenseExpiry: profile?.licenseExpiry,
       insuranceExpiry: profile?.insuranceExpiry,
       technicalInspectionExpiry: profile?.technicalInspectionExpiry,
+      documentsRenewalPending: profile?.documentsRenewalPending ?? false,
+      documentsRenewalRequestedAt: profile?.documentsRenewalRequestedAt,
       payoutProvider: profile?.payoutProvider,
       payoutPhone: profile?.payoutPhone,
       charterAcceptedAt: profile?.charterAcceptedAt,
@@ -649,10 +891,17 @@ export class DriversService {
             plateNumber: vehicle.plateNumber,
             color: vehicle.color,
             imageUrl: vehicle.imageUrl,
+            typeApprovalStatus: vehicle.typeApprovalStatus,
+            typeApprovalNotes: vehicle.typeApprovalNotes,
+            typeApprovedAt: vehicle.typeApprovedAt,
           }
         : null,
+      vehicleTypeApprovalPending: vehicle?.typeApprovalStatus === KycStatus.PENDING,
+      vehicleTypeApprovalStatus: vehicle?.typeApprovalStatus,
       kyc,
       createdAt: profile?.createdAt,
+      documentsStatus,
+      documentsCanOperate: documentsStatus.canOperate,
     };
   }
 

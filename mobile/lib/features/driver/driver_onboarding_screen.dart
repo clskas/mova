@@ -210,6 +210,56 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
     return s.length >= 10 ? s.substring(0, 10) : s;
   }
 
+  String _formatPickerDate(DateTime date) {
+    final y = date.year.toString().padLeft(4, '0');
+    final m = date.month.toString().padLeft(2, '0');
+    final d = date.day.toString().padLeft(2, '0');
+    return '$y-$m-$d';
+  }
+
+  Future<void> _pickDate(TextEditingController controller) async {
+    final initial = DateTime.tryParse(controller.text.trim()) ?? DateTime.now().add(const Duration(days: 365));
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial.isBefore(DateTime.now()) ? DateTime.now().add(const Duration(days: 30)) : initial,
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365 * 15)),
+      helpText: 'Choisir une date',
+      cancelText: 'Annuler',
+      confirmText: 'OK',
+    );
+    if (picked != null && mounted) {
+      setState(() => controller.text = _formatPickerDate(picked));
+    }
+  }
+
+  Widget _datePickerField({
+    required TextEditingController controller,
+    required String label,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: InkWell(
+        onTap: () => _pickDate(controller),
+        borderRadius: BorderRadius.circular(8),
+        child: InputDecorator(
+          decoration: InputDecoration(
+            labelText: label,
+            suffixIcon: const Icon(Icons.calendar_today, color: MovaColors.violet),
+          ),
+          child: Text(
+            controller.text.isEmpty ? 'Appuyez pour choisir une date' : controller.text,
+            style: TextStyle(
+              color: controller.text.isEmpty ? MovaColors.textSecondary : null,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  bool get _renewalPending => _state?['profile']?['documentsRenewalPending'] == true;
+
   Future<void> _savePersonal() async {
     final api = ref.read(apiClientProvider);
     await _requirePatch(api.patch('/users/me', {
@@ -570,14 +620,26 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
     return ListView(
       children: [
         const Text('Permis de conduire', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        if (_renewalPending) ...[
+          const SizedBox(height: 8),
+          const MovaCard(
+            child: Text(
+              'Renouvellement en attente : après modification des dates, MOVA doit valider vos nouveaux justificatifs avant que vous puissiez repasser en ligne.',
+              style: TextStyle(color: MovaColors.orange, fontSize: 13),
+            ),
+          ),
+        ],
+        if (_isEditingDossier) ...[
+          const SizedBox(height: 8),
+          const Text(
+            'Si vous changez une date, téléversez à nouveau le permis correspondant. L\'admin comparera le document avec la date saisie.',
+            style: TextStyle(color: MovaColors.textSecondary, fontSize: 13),
+          ),
+        ],
         const SizedBox(height: 12),
         TextField(controller: _licenseNumber, decoration: const InputDecoration(labelText: 'N° permis')),
+        _datePickerField(controller: _licenseExpiry, label: 'Date d\'expiration du permis'),
         const SizedBox(height: 8),
-        TextField(
-          controller: _licenseExpiry,
-          decoration: const InputDecoration(labelText: 'Expiration (AAAA-MM-JJ)'),
-        ),
-        const SizedBox(height: 16),
         _docButton('DRIVERS_LICENSE', 'Photographier le permis'),
       ],
     );
@@ -606,10 +668,16 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
           onChanged: (v) => setState(() => _vehicleType = v ?? 'STANDARD'),
         ),
         const SizedBox(height: 8),
-        TextField(controller: _insuranceExpiry, decoration: const InputDecoration(labelText: 'Assurance expire le')),
+        _datePickerField(controller: _insuranceExpiry, label: 'Assurance expire le'),
+        _datePickerField(controller: _inspectionExpiry, label: 'Visite technique expire le'),
+        if (_isEditingDossier) ...[
+          const SizedBox(height: 4),
+          const Text(
+            'En cas de changement, renvoyez les photos assurance et visite technique.',
+            style: TextStyle(color: MovaColors.textSecondary, fontSize: 12),
+          ),
+        ],
         const SizedBox(height: 8),
-        TextField(controller: _inspectionExpiry, decoration: const InputDecoration(labelText: 'Visite technique expire le')),
-        const SizedBox(height: 16),
         const Text('Photo de l\'engin', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
         const SizedBox(height: 8),
         if (_vehicleImageUrl != null && _vehicleImageUrl!.isNotEmpty)

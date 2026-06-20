@@ -14,6 +14,8 @@ Ce document décrit **comment tester MOVA** :
 | [A. Applications](#partie-a--applications) | Admin → Passager → Chauffeur |
 | [B. Microservices](#partie-b--microservices-backend) | Chaque service un par un |
 | [C. Scénario E2E](#c-scénario-bout-en-bout) | Enchaînement des 3 apps |
+| [C2. Suivi GPS & traces](#c2-suivi-gps--traces-de-route) | Carte admin + polyline mobile |
+| [C3. RBAC admin par rôle](#c3-rbac-admin--test-par-niveau-daccès) | 5 comptes staff |
 | [D. Dépannage](#d-dépannage-rapide) | Problèmes fréquents |
 
 ---
@@ -117,7 +119,19 @@ adb devices    # USB debugging activé
 | **Passager** | `+243900000010` | PASSENGER (Marie Kabila) |
 | **Chauffeur** | `+243900000020` | DRIVER (Jean Mukendi) |
 
-Autres comptes démo : passagers `+243900000011`–`012`, chauffeurs `+243900000021`–`023`, staff admin `+243900000002`–`005`.
+Autres comptes démo : passagers `+243900000011`–`012`, chauffeurs `+243900000021`–`023`.
+
+### Comptes staff admin (RBAC)
+
+| Téléphone | Rôle | Usage test |
+|-----------|------|------------|
+| `+243900000001` | SUPER_ADMIN | Accès complet + écriture partout |
+| `+243900000002` | ADMIN | Idem SUPER_ADMIN (sans gestion des rôles système) |
+| `+243900000003` | SUPPORT | Opérations : KYC, courses, livraisons, litiges |
+| `+243900000004` | FINANCE | Tarifs, abonnements, portefeuille |
+| `+243900000005` | CONTENT | Restaurants, communes, catalogue location |
+
+Détail des menus et droits d’écriture : [RBAC_TESTING.md](./RBAC_TESTING.md) et [Manuel Admin — Niveaux d’accès](user-manual/admin.md#niveaux-daccès-par-rôle).
 
 ---
 
@@ -161,16 +175,18 @@ Cochez au fur et à mesure :
 | 1 | Tableau de bord | `/` | Ouvrir la page | Métriques (utilisateurs, courses, etc.) |
 | 2 | Utilisateurs | `/utilisateurs` | Rechercher `+243900000010` | Liste avec passager démo |
 | 3 | Chauffeurs | `/chauffeurs` | Ouvrir **Détail** sur `+243900000020` | Profil, véhicules, statut KYC |
-| 4 | KYC | `/kyc` | Approuver un chauffeur en attente | Badge **APPROVED** ou section « Chauffeurs sans validation » |
-| 4b | Chauffeurs | `/chauffeurs` | **Approuver KYC** dans le modal Détail | Statut passe à **APPROVED** |
-| 5 | Courses | `/courses` | Filtrer / consulter | Liste des courses |
-| 6 | Locations | `/locations` | Consulter demandes | Tableau réservations véhicules |
-| 7 | Déménagements | `/demenagements` | Ouvrir **Détail**, changer statut | Demande passager visible |
-| 8 | Covoiturage | `/covoiturage` | Ouvrir **Détail**, changer statut | Trajet chauffeur/passager visible |
-| 7 | Tarifs | `/tarifs` | Modifier un tarif Kinshasa ; section **Commissions plateforme** | Enregistrement OK |
-| 8 | Restaurants | `/restaurants` | CRUD restaurant | Création / édition |
-| 9 | Communes | `/parametres` | Ajouter / modifier une commune | Liste mise à jour |
-| 10 | Déconnexion | Header | Cliquer **Déconnexion** | Retour login |
+| 4 | KYC | `/kyc` | Approuver un chauffeur en attente ; vérifier badges OCR | Badge **APPROVED** ; champs OCR si documents uploadés |
+| 4b | Chauffeurs | `/chauffeurs` | **Approuver KYC** ; **Valider type d’engin** (VIP/Confort…) | Statut KYC **APPROVED** ; `typeApprovalStatus` **APPROVED** |
+| 5 | Courses | `/courses` | Ouvrir **Détail** d’une course active | Carte **Trace GPS** (D/A + polyline) ; refresh 10 s |
+| 6 | Livraisons | `/livraisons` | Ouvrir **Détail** colis/repas/ERRAND actif | Trace GPS + assignation chauffeur (ERRAND) |
+| 7 | Locations | `/locations` | Consulter demandes | Tableau réservations véhicules |
+| 8 | Catalogue location | `/catalogue-location` | CRUD véhicule catalogue | Création / édition sans erreur de compilation |
+| 9 | Déménagements | `/demenagements` | Ouvrir **Détail**, changer statut | Demande passager visible |
+| 10 | Covoiturage | `/covoiturage` | Ouvrir **Détail**, changer statut | Trajet chauffeur/passager visible |
+| 11 | Tarifs | `/tarifs` | Modifier un tarif Kinshasa ; section **Commissions plateforme** | Enregistrement OK |
+| 12 | Restaurants | `/restaurants` | CRUD restaurant | Création / édition |
+| 13 | Communes | `/parametres` | Ajouter / modifier une commune | Liste mise à jour |
+| 14 | Déconnexion | Header | Cliquer **Déconnexion** | Retour login |
 
 ### Test rapide KYC (PowerShell)
 
@@ -229,10 +245,11 @@ flutter run --flavor passenger -t lib/main_passenger.dart -d R3CN70C59KF `
 |---|-------|--------|------------------|
 | 1 | Accueil | Faire défiler toutes les cartes services | Location, Déménagement, etc. visibles (pas coupées) |
 | 2 | Commander une course | Saisir départ / arrivée, estimer | Prix en CDF affiché |
+| 2b | Suivi course | Pendant course active | Carte : position chauffeur + **polyline** (trajet parcouru) |
 | 3 | Location véhicule | Onglet **Rechercher** → filtres → **Rechercher** | Catalogue (ex. 5 véhicules Kinshasa), pas d’overflow |
 | 4 | Location véhicule | Ouvrir un véhicule → réserver | Réservation ou devis OK |
 | 5 | Mes locations | Onglet **Mes locations** | Liste (vide ou réservations) |
-| 6 | Livraison / Food | Ouvrir le service | Catalogue ou écran chargé |
+| 6 | Livraison / Food | Commander puis suivre | Carte avec trace GPS si livraison en cours |
 | 7 | Portefeuille | Consulter solde | Affichage sans erreur |
 | 8 | Aide | Ouvrir | Bouton **Déconnexion** visible |
 | 9 | Déconnexion | Se déconnecter | Retour écran login |
@@ -283,11 +300,13 @@ Si `adb devices` ne liste pas le V2 PRO : câble USB, **Débogage USB** activé,
 | 2 | Admin approuve KYC | Attendre ~5 s ou pull-to-refresh | Passage à écran opérationnel, snackbar possible |
 | 3 | Disponibilité | Activer **En ligne** | Statut disponible |
 | 4 | Course entrante | Depuis passager, commander une course | Offre reçue sur chauffeur |
-| 5 | Accepter course | Accepter l’offre | Course en cours |
+| 5 | Accepter course | Accepter l’offre | Course en cours ; GPS envoyé (WebSocket + REST) |
+| 5b | Livraison active | Accepter colis/repas | Position envoyée ~toutes les 12 s |
 | 6 | Gains | Consulter gains | Montants affichés |
-| 7 | KYC / documents | Upload si demandé | Ne doit pas repasser en PENDING si déjà APPROVED |
-| 8 | Aide | Ouvrir | **Déconnexion** visible |
-| 9 | Déconnexion | Se déconnecter | Retour login |
+| 7 | KYC / documents | Upload permis, carte grise | Badges OCR si service configuré ; ne pas repasser en PENDING si déjà APPROVED |
+| 8 | Type d’engin | Si véhicule VIP/Confort en attente | Blocage **canOperate** tant que admin n’a pas validé le type |
+| 9 | Aide | Ouvrir | **Déconnexion** visible |
+| 10 | Déconnexion | Se déconnecter | Retour login |
 
 ### Vérifier le statut KYC côté API
 
@@ -513,6 +532,30 @@ Invoke-RestMethod "http://localhost:3000/api/rental/vehicles?city=Kinshasa"
 | 3 | `GET /api/rides/offers` | JWT chauffeur | Offres SEARCHING |
 | 4 | `GET /api/rides/history` | JWT | Historique |
 
+#### Suivi GPS (traces de route)
+
+| # | Endpoint | Auth | Test |
+|---|----------|------|------|
+| 1 | `POST /api/tracking/ride/:id/points` | JWT chauffeur | `{ "lat": -4.32, "lng": 15.32 }` → point enregistré |
+| 2 | `GET /api/tracking/ride/:id/trace` | JWT passager/chauffeur/admin | `{ "points": [...], "summary": {...} }` |
+| 3 | `GET /api/tracking/delivery/:id/trace` | JWT | Trace livraison colis/repas |
+| 4 | `GET /api/tracking/errand/:id/trace` | JWT | Trace course & commissions |
+| 5 | `GET /api/admin/tracking/:type/:id/trace` | JWT staff (SUPPORT+) | Proxy admin pour carte **GpsTraceMap** |
+
+```powershell
+$driverToken = Get-MovaToken "+243900000020" -Role "DRIVER"
+# Remplacer RIDE_ID par une course en cours
+Invoke-RestMethod -Uri "http://localhost:3000/api/tracking/ride/RIDE_ID/points" -Method POST `
+  -Headers @{ Authorization = "Bearer $driverToken" } -ContentType "application/json" `
+  -Body '{"lat":-4.3217,"lng":15.3125}'
+
+$adminToken = Get-MovaToken "+243900000001"
+Invoke-RestMethod "http://localhost:3000/api/admin/tracking/ride/RIDE_ID/trace" `
+  -Headers @{ Authorization = "Bearer $adminToken" }
+```
+
+> Les points sont aussi enregistrés automatiquement via WebSocket (`driver:location`, `courier:location`). Déduplication : ~8 s ou ~8 m entre deux points identiques.
+
 ```powershell
 $passToken = Get-MovaToken "+243900000010"
 $body = @{
@@ -620,6 +663,7 @@ docker compose up -d --build api-gateway
 | Login OTP | auth-service | Admin, Passager, Chauffeur |
 | KYC chauffeur | driver-service | Admin, Chauffeur |
 | Course taxi | ride-service + driver-service | Passager, Chauffeur, Admin |
+| **Trace GPS** | ride-service (`TrackingPoint`) | Passager, Chauffeur, Admin (`/courses`, `/livraisons`) |
 | Location véhicule | ride-service | Passager, Admin (`/locations`) |
 | Portefeuille | payment-service | Passager, Chauffeur |
 | Tarifs / communes | ride-service (admin proxy) | Admin |
@@ -638,9 +682,49 @@ Enchaînement type pour valider l’écosystème :
 | 2 | Chauffeur | Connexion, passer **En ligne** |
 | 3 | Passager | Commander une course Kinshasa → Kinshasa |
 | 4 | Chauffeur | Accepter et terminer la course |
+| 4b | Passager + Admin | Vérifier **polyline** (trajet) sur suivi passager et **Trace GPS** admin |
 | 5 | Admin | Vérifier la course dans `/courses` |
 | 6 | Passager | **Location véhicule** → réserver 2 jours |
 | 7 | Admin | Vérifier dans `/locations` |
+
+---
+
+## C2. Suivi GPS & traces de route
+
+Test dédié au module GPS (courses, livraisons, ERRAND).
+
+| Étape | Qui | Action | Résultat attendu |
+|-------|-----|--------|------------------|
+| 1 | Admin | Approuver KYC + type d’engin chauffeur `+243900000020` | Chauffeur **canOperate** |
+| 2 | Chauffeur | **En ligne**, accepter une course ou livraison | Mission active |
+| 3 | Chauffeur | Se déplacer (ou simuler GPS) 30–60 s | Points enregistrés en base |
+| 4 | Passager | Ouvrir écran de suivi | Marqueur chauffeur + **ligne bleue** (≥ 2 points) |
+| 5 | Admin | `/courses` ou `/livraisons` → **Détail** | Carte **Trace GPS** : **D** départ, **A** arrivée, polyline |
+| 6 | API | `GET /api/admin/tracking/ride/:id/trace` | Tableau `points[]` non vide |
+
+**Comptes admin avec accès trace :** SUPER_ADMIN, ADMIN, SUPPORT (sections Courses / Livraisons). FINANCE et CONTENT n’ont pas ces menus.
+
+**Types supportés :** `ride`, `delivery`, `errand` (`moving` prévu côté enum, pas encore branché mobile).
+
+---
+
+## C3. RBAC admin — test par niveau d’accès
+
+Connectez-vous à http://localhost:3002/login avec chaque compte staff (OTP `123456`) et vérifiez :
+
+| Rôle | Téléphone | Doit voir | Ne doit pas voir | Écriture typique |
+|------|-----------|-----------|------------------|------------------|
+| SUPER_ADMIN | `+243900000001` | Tout le menu | — | CRUD partout |
+| ADMIN | `+243900000002` | Tout le menu | — | CRUD partout |
+| SUPPORT | `+243900000003` | Utilisateurs, Chauffeurs, KYC, Courses, Livraisons, Litiges, Planifiées, Locations, Déménagements, Covoiturage | Dashboard, Tarifs, Restaurants, Portefeuille, Abonnements, Communes | KYC, litiges, statuts livraisons |
+| FINANCE | `+243900000004` | Dashboard, Portefeuille, Tarifs, Abonnements | Utilisateurs, Courses, KYC… | Tarifs, abonnements, portefeuille |
+| CONTENT | `+243900000005` | Restaurants, Tarifs, Communes, Locations, Catalogue location | Courses, KYC, Utilisateurs… | Restaurants, communes, catalogue |
+
+Test rapide SUPPORT : ouvrir `/courses` → détail course active → carte GPS visible. Sur `/tarifs` : accès refusé (redirection).
+
+Test rapide FINANCE : `/tarifs` → **Enregistrer** visible ; `/courses` → menu absent.
+
+Régression automatisée : `e2e/tests/admin-rbac-roles.spec.ts` (voir [RBAC_TESTING.md](./RBAC_TESTING.md)).
 
 ---
 
@@ -660,6 +744,8 @@ Enchaînement type pour valider l’écosystème :
 | Port 3000 occupé | `docker compose ps` ; redémarrer la gateway |
 | V2 PRO introuvable | `adb devices` ; rebrancher USB |
 | Catalogue location vide | `GET /api/rental/vehicles?city=Kinshasa` ; `npm run seed:rides` |
+| Trace GPS vide sur admin | Chauffeur en mission ? Attendre 8+ s entre points ; vérifier WebSocket `WS_URL` |
+| Chauffeur bloqué malgré KYC OK | Vérifier **validation type d’engin** (VIP/Confort) dans `/chauffeurs` → Détail |
 | ride-service seul en panne | `docker compose up -d --build ride-service` |
 
 ### Commandes utiles

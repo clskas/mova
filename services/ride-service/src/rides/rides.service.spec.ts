@@ -41,7 +41,8 @@ describe('RidesService', () => {
     computeRadiusKm: jest.fn().mockReturnValue(10),
   };
   const redis = { publish: jest.fn() };
-  const tracking = { broadcastRideStatus: jest.fn() };
+  const trackingGateway = { broadcastRideStatus: jest.fn() };
+  const trackingService = { getTrace: jest.fn().mockResolvedValue([]) };
   const commission = {
     get: jest.fn().mockResolvedValue({ platformPercent: 15, driverPercent: 85 }),
     splitGross: jest.fn().mockImplementation((gross: number, pct: number) => ({
@@ -53,7 +54,7 @@ describe('RidesService', () => {
     })),
   };
 
-  const service = new RidesService(prisma as never, pricing as never, matching as never, redis as never, tracking as never, commission as never);
+  const service = new RidesService(prisma as never, pricing as never, matching as never, redis as never, trackingGateway as never, trackingService as never, commission as never);
 
   beforeEach(() => jest.clearAllMocks());
 
@@ -118,7 +119,7 @@ describe('RidesService', () => {
     );
     expect(result.status).toBe('MATCHING');
     expect(result.driversFound).toBe(1);
-    expect(tracking.broadcastRideStatus).toHaveBeenCalledWith('ride-1', 'MATCHING');
+    expect(trackingGateway.broadcastRideStatus).toHaveBeenCalledWith('ride-1', 'MATCHING');
   });
 
   it('records driver rejection without changing ride status', async () => {
@@ -249,6 +250,6 @@ describe('RidesService', () => {
       }),
     );
     expect(result.ride.status).toBe('CANCELLED');
-    expect(tracking.broadcastRideStatus).toHaveBeenCalledWith('ride-1', 'CANCELLED');
+    expect(trackingGateway.broadcastRideStatus).toHaveBeenCalledWith('ride-1', 'CANCELLED');
   });
 });

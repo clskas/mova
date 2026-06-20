@@ -1,5 +1,5 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { DeliveryStatus, DeliveryType, Prisma, SurchargeType, VehicleType, WeightCategory } from '@prisma/client';
+import { DeliveryStatus, DeliveryType, Prisma, SurchargeType, TrackingReferenceType, VehicleType, WeightCategory } from '@prisma/client';
 import { INTERNAL_API_KEY, MARKET_RDC, MOVA_EVENTS, MovaErrorCode, MovaHttpException, formatCdf, resolveCityFromCoords, serviceUrl } from '@mova/shared';
 import { RedisService } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
@@ -14,6 +14,8 @@ import {
   formatParcelDelivery,
   generateDeliveryPin,
 } from './parcel.util';
+import { assertDriverCanReceiveJobs, driverCanReceiveJobs, fetchDriverProfileSnapshot } from '../common/driver-eligibility.util';
+import { TrackingService } from '../tracking/tracking.service';
 
 const WEIGHT_MULTIPLIERS: Record<WeightCategory, number> = {
   [WeightCategory.DOCUMENTS]: 1.0,
@@ -49,6 +51,7 @@ export class DeliveriesService {
     private surcharges: SurchargeService,
     private promo: PromoService,
     private redis: RedisService,
+    private trackingService: TrackingService,
   ) {}
 
   private validateParcelDto(dto: CreateParcelDeliveryDto) {
@@ -463,6 +466,7 @@ export class DeliveriesService {
     }
     const courier = delivery.driverId ? await this.fetchCourierProfile(delivery.driverId) : null;
     const formatted = formatParcelDelivery(delivery, courier);
+    const gpsTrace = await this.trackingService.getTrace(TrackingReferenceType.DELIVERY, id);
     return {
       delivery: formatted,
       tracking: formatted.timeline,
@@ -471,6 +475,7 @@ export class DeliveriesService {
       etaMinutes: formatted.etaMinutes,
       deliveryPin: formatted.deliveryPin,
       paymentReady: formatted.paymentReady,
+      gpsTrace,
       rated: await this.prisma.deliveryRating.findUnique({
         where: { deliveryId_fromUserId: { deliveryId: id, fromUserId: userId } },
       }).then((r) => r != null),
@@ -657,9 +662,9 @@ export class DeliveriesService {
   }
 
   async getDriverOffers(driverUserId: string) {
-    const profile = await this.fetchDriverProfile(driverUserId);
-    if (!profile?.isAvailable || profile.kycStatus !== 'APPROVED') {
-      return { offers: [] as Record<string, unknown>[] };
+    const profile = await fetchDriverProfileSnapshot(driverUserId);
+    if (!profile?.isAvailable || !driverCanReceiveJobs(profile)) {
+      return { offers: [] as Record<string, unknown>[], documentsBlocked: profile?.documentsStatus?.canOperate === false };
     }
 
     const hasGps = profile.currentLat != null && profile.currentLng != null;
@@ -722,6 +727,7 @@ export class DeliveriesService {
   }
 
   async acceptDelivery(deliveryId: string, driverUserId: string) {
+    await assertDriverCanReceiveJobs(driverUserId);
     const delivery = await this.prisma.delivery.findUnique({ where: { id: deliveryId } });
     if (!delivery) throw new MovaHttpException(MovaErrorCode.DELIVERY_NOT_FOUND, HttpStatus.NOT_FOUND);
     const foodAcceptable =
@@ -835,6 +841,7 @@ export class DeliveriesService {
     });
     if (!delivery) throw new MovaHttpException(MovaErrorCode.DELIVERY_NOT_FOUND, HttpStatus.NOT_FOUND);
     const formatted = formatParcelDelivery(delivery);
+    const gpsTrace = await this.trackingService.getTrace(TrackingReferenceType.DELIVERY, id);
     return {
       id: delivery.id,
       type: delivery.type,
@@ -842,11 +849,16 @@ export class DeliveriesService {
       userId: delivery.userId,
       pickupAddress: delivery.pickupAddress,
       dropoffAddress: delivery.dropoffAddress ?? delivery.deliveryAddress,
+      pickupLat: delivery.pickupLat,
+      pickupLng: delivery.pickupLng,
+      dropoffLat: delivery.dropoffLat ?? delivery.deliveryLat,
+      dropoffLng: delivery.dropoffLng ?? delivery.deliveryLng,
       restaurantName: delivery.restaurant?.name,
       priceCdf: delivery.estimatedPriceCdf,
       createdAt: delivery.createdAt.toISOString(),
       events: delivery.events,
       timeline: formatted.timeline,
+      gpsTrace,
     };
   }
 

@@ -9,11 +9,24 @@
 
 ## Mise en route
 
-1. Complétez votre **KYC** (permis, carte grise, photo).
-2. Activez **En ligne** depuis l'écran principal.
-3. Acceptez ou refusez courses, livraisons colis/repas et réservations planifiées.
-4. Utilisez la **navigation** vers le passager ou le point de livraison.
-5. Consultez **Revenus** et demandez un retrait (minimum 500 FC).
+1. Complétez votre **KYC** (permis, carte grise, photo). L'admin peut voir des informations extraites par OCR après upload.
+2. Attendez l'**approbation KYC** par l'équipe MOVA.
+3. Si votre véhicule est **VIP** ou **Confort**, l'admin doit aussi **valider le type d'engin** avant que vous puissiez travailler.
+4. Activez **En ligne** depuis l'écran principal.
+5. Acceptez ou refusez courses, livraisons colis/repas et réservations planifiées.
+6. Utilisez la **navigation** vers le passager ou le point de livraison.
+7. Consultez **Revenus** et demandez un retrait (minimum 500 FC).
+
+## Position GPS pendant les missions
+
+Pendant une course ou une livraison active, l'application envoie automatiquement votre position :
+
+- **Courses** : via WebSocket et sauvegarde de secours REST
+- **Livraisons / ERRAND** : envoi régulier (~12 s) + WebSocket
+
+Ces points permettent au **passager** de vous suivre et à l'**équipe MOVA** de consulter la trace sur la console admin.
+
+Gardez le **GPS activé** et l'application au premier plan pendant la mission.
 
 ## Types de missions
 
@@ -23,8 +36,18 @@
 | Colis & express | Enlèvement et livraison avec suivi statut |
 | Repas | Récupération restaurant → livraison client |
 | Planifiée | Trajet confirmé à l'avance (J+7 max) |
-| Courses | Achats ou commissions pour le compte du passager |
+| Courses & commissions | Achats pour le compte du passager (ERRAND) |
 | Covoiturage | Publier un trajet partagé (KYC approuvé) depuis **Publier un covoiturage** |
+| Déménagement | Mission assignée — mise à jour des statuts depuis l'app |
+
+## Blocages fréquents
+
+| Message / comportement | Cause | Action |
+|------------------------|-------|--------|
+| KYC en attente | Dossier non approuvé | Compléter documents ; contacter support |
+| Type d'engin en attente | Véhicule VIP/Confort non validé | Attendre validation admin |
+| Compte suspendu | Statut utilisateur | Admin → Utilisateurs → ACTIVE |
+| Pas d'offres | Hors ligne ou indisponible | Activer **En ligne** |
 
 ## Covoiturage (conducteur)
 

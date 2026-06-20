@@ -48,9 +48,18 @@ export class InternalController {
   }
   @Get('kyc/pending') pendingKyc() { return this.drivers.pendingKyc(); }
   @Post('kyc/:id/review') reviewKyc(@Param('id') id: string, @Body() dto: ReviewKycDto) { return this.drivers.approveKyc(id, dto.approved, dto.notes); }
+  @Post('kyc/:id/ocr') runKycOcr(@Param('id') id: string) { return this.drivers.runKycOcr(id); }
   @Patch('drivers/:userId/kyc')
   reviewDriverKyc(@Param('userId') userId: string, @Body() dto: ReviewKycDto) {
     return this.drivers.setDriverKycStatus(userId, dto.approved, dto.notes);
+  }
+  @Patch('drivers/:userId/documents-renewal')
+  reviewDocumentsRenewal(@Param('userId') userId: string, @Body() dto: ReviewKycDto) {
+    return this.drivers.reviewDocumentsRenewal(userId, dto.approved, dto.notes);
+  }
+  @Patch('drivers/:userId/vehicle-type')
+  reviewVehicleType(@Param('userId') userId: string, @Body() dto: ReviewKycDto) {
+    return this.drivers.reviewVehicleTypeApproval(userId, dto.approved, dto.notes);
   }
   @Post('drivers/:userId/activation-pin')
   regenerateActivationPin(@Param('userId') userId: string) {

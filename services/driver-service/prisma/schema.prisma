@@ -21,6 +21,15 @@ enum KycStatus {
   REJECTED
 }
 
+enum KycOcrStatus {
+  PENDING
+  PROCESSING
+  MATCH
+  MISMATCH
+  UNREADABLE
+  SKIPPED
+}
+
 enum IncidentType {
   ACCIDENT
   HARASSMENT
@@ -36,6 +45,8 @@ model DriverProfile {
   licenseExpiry             DateTime?
   insuranceExpiry           DateTime?
   technicalInspectionExpiry DateTime?
+  documentsRenewalPending   Boolean   @default(false)
+  documentsRenewalRequestedAt DateTime?
   payoutProvider            String?
   payoutPhone               String?
   charterAcceptedAt         DateTime?
@@ -59,30 +70,39 @@ model DriverProfile {
 }
 
 model Vehicle {
-  id              String        @id @default(uuid())
-  driverProfileId String
-  driverProfile   DriverProfile @relation(fields: [driverProfileId], references: [id], onDelete: Cascade)
-  type            VehicleType
-  make            String?
-  model           String?
-  plateNumber     String
-  color           String?
-  imageUrl        String?
-  isActive        Boolean       @default(true)
-  createdAt       DateTime      @default(now())
+  id                 String        @id @default(uuid())
+  driverProfileId    String
+  driverProfile      DriverProfile @relation(fields: [driverProfileId], references: [id], onDelete: Cascade)
+  type               VehicleType
+  make               String?
+  model              String?
+  plateNumber        String
+  color              String?
+  imageUrl           String?
+  typeApprovalStatus KycStatus     @default(PENDING)
+  typeApprovalNotes  String?
+  typeApprovedAt     DateTime?
+  isActive           Boolean       @default(true)
+  createdAt          DateTime      @default(now())
 
   @@map("vehicles")
 }
 
 model KycDocument {
-  id        String    @id @default(uuid())
-  userId    String
-  type      String
-  url       String
-  status    KycStatus @default(PENDING)
-  notes     String?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id                 String        @id @default(uuid())
+  userId             String
+  type               String
+  url                String
+  status             KycStatus     @default(PENDING)
+  notes              String?
+  ocrStatus          KycOcrStatus  @default(PENDING)
+  ocrExtractedExpiry DateTime?
+  ocrProfileExpiry   DateTime?
+  ocrConfidence      Float?
+  ocrNotes           String?
+  ocrCheckedAt       DateTime?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
 
   @@index([userId])
   @@map("kyc_documents")

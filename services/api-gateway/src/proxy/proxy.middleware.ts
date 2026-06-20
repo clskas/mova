@@ -8,6 +8,7 @@ const ROUTES: Record<string, keyof typeof SERVICE_PORTS> = {
   '/api/auth': 'auth',
   '/api/users': 'auth',
   '/api/rides': 'ride',
+  '/api/tracking': 'ride',
   '/api/deliveries': 'ride',
   '/api/restaurant': 'ride',
   '/api/services': 'ride',

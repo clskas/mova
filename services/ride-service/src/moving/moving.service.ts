@@ -5,6 +5,7 @@ import { RedisService } from '@mova/shared';
 import { buildMovingTimeline } from '../deliveries/parcel.util';
 import { assertServiceAreaPair } from '../common/address.util';
 import { fetchAuthUserBrief } from '../common/internal-lookup.util';
+import { assertDriverCanReceiveJobs } from '../common/driver-eligibility.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { PricingService } from '../rides/pricing.service';
 import { SurchargeService } from '../rides/surcharge.service';
@@ -130,7 +131,7 @@ export class MovingService {
       throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
     }
     const allowed: Record<MovingRequestStatus, MovingRequestStatus[]> = {
-      [MovingRequestStatus.PENDING]: [],
+      [MovingRequestStatus.PENDING]: [MovingRequestStatus.IN_PROGRESS],
       [MovingRequestStatus.ASSIGNED]: [MovingRequestStatus.IN_PROGRESS],
       [MovingRequestStatus.IN_PROGRESS]: [MovingRequestStatus.COMPLETED],
       [MovingRequestStatus.COMPLETED]: [],
@@ -138,6 +139,9 @@ export class MovingService {
     };
     if (!allowed[request.status]?.includes(status)) {
       throw new MovaHttpException(MovaErrorCode.MOVING_INVALID_STATUS);
+    }
+    if (status === MovingRequestStatus.IN_PROGRESS) {
+      await assertDriverCanReceiveJobs(driverId);
     }
     const updates: Record<string, unknown> = { status };
     if (status === MovingRequestStatus.COMPLETED) updates.completedAt = new Date();
@@ -219,6 +223,7 @@ export class MovingService {
     if (!driverId?.trim()) {
       throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Chauffeur requis.');
     }
+    await assertDriverCanReceiveJobs(driverId.trim());
     const request = await this.prisma.movingRequest.findUnique({ where: { id } });
     if (!request) throw new MovaHttpException(MovaErrorCode.MOVING_NOT_FOUND, HttpStatus.NOT_FOUND);
     if (request.status === MovingRequestStatus.COMPLETED || request.status === MovingRequestStatus.CANCELLED) {

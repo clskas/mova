@@ -10,6 +10,7 @@ import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import '../booking/payment_screen.dart';
+import '../booking/widgets/mova_ride_map.dart';
 import 'widgets/delivery_tracking_map.dart';
 
 class ParcelTrackingScreen extends ConsumerStatefulWidget {
@@ -57,7 +58,12 @@ class _ParcelTrackingScreenState extends ConsumerState<ParcelTrackingScreen> {
       _loading = silent ? _loading : false;
       switch (result) {
         case Success(:final data):
-          _delivery = data['delivery'] as Map<String, dynamic>? ?? data;
+          final delivery = data['delivery'] as Map<String, dynamic>? ?? data;
+          if (data['gpsTrace'] != null) {
+            _delivery = {...delivery, 'gpsTrace': data['gpsTrace']};
+          } else {
+            _delivery = delivery;
+          }
           _error = null;
           _maybeGoToPayment();
         case Failure(:final error):
@@ -202,6 +208,7 @@ class _ParcelTrackingScreenState extends ConsumerState<ParcelTrackingScreen> {
                               pickup: _pickup,
                               dropoff: _dropoff,
                               courier: courierLoc,
+                              routeTrace: MovaRideMap.parseGpsTrace(_delivery?['gpsTrace']),
                               etaMinutes: eta,
                               deliveryPin: pin,
                               courierName: courier?['name']?.toString(),

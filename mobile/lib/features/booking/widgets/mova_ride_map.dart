@@ -12,6 +12,7 @@ class MovaRideMap extends StatefulWidget {
     required this.pickup,
     this.dropoff,
     this.driver,
+    this.routeTrace,
     this.height = 220,
     this.driverIcon = Icons.two_wheeler,
     this.onDropoffTap,
@@ -21,6 +22,7 @@ class MovaRideMap extends StatefulWidget {
   final LatLng pickup;
   final LatLng? dropoff;
   final LatLng? driver;
+  final List<LatLng>? routeTrace;
   final double height;
   final IconData driverIcon;
   /// Tap sur la carte pour placer la destination (pin violet).
@@ -32,6 +34,19 @@ class MovaRideMap extends StatefulWidget {
 
   /// @deprecated Utiliser [mapDefaultCenter]
   static LatLng kinshasaDefault() => mapDefaultCenter();
+
+  static List<LatLng> parseGpsTrace(dynamic raw) {
+    if (raw is! List) return const [];
+    final out = <LatLng>[];
+    for (final item in raw) {
+      if (item is! Map) continue;
+      final lat = (item['lat'] as num?)?.toDouble();
+      final lng = (item['lng'] as num?)?.toDouble();
+      if (lat == null || lng == null) continue;
+      out.add(LatLng(lat, lng));
+    }
+    return out;
+  }
 
   @override
   State<MovaRideMap> createState() => _MovaRideMapState();
@@ -134,11 +149,18 @@ class _MovaRideMapState extends State<MovaRideMap> {
             if (dropoff != null)
               PolylineLayer(
                 polylines: [
-                  Polyline(
-                    points: [pickup, dropoff],
-                    color: MovaColors.violet.withValues(alpha: 0.6),
-                    strokeWidth: 3,
-                  ),
+                  if (widget.routeTrace != null && widget.routeTrace!.length >= 2)
+                    Polyline(
+                      points: widget.routeTrace!,
+                      color: MovaColors.violet,
+                      strokeWidth: 4,
+                    )
+                  else
+                    Polyline(
+                      points: [pickup, dropoff],
+                      color: MovaColors.violet.withValues(alpha: 0.6),
+                      strokeWidth: 3,
+                    ),
                 ],
               ),
             MarkerLayer(

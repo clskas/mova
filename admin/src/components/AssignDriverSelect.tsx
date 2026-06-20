@@ -33,7 +33,7 @@ export function AssignDriverSelect({ drivers, value, onChange, disabled }: Assig
     <div className="space-y-2">
       <FieldLabel>Chauffeur assigné</FieldLabel>
       <SelectInput value={value} onChange={onChange} options={options} disabled={disabled} />
-      <p className="text-xs text-gray-400">Seuls les chauffeurs KYC approuvés sont listés.</p>
+      <p className="text-xs text-gray-400">Seuls les chauffeurs KYC approuvés avec documents valides (non expirés) sont listés.</p>
     </div>
   );
 }

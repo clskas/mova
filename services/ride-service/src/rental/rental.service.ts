@@ -1,6 +1,6 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { Prisma, RentalInquiryStatus } from '@prisma/client';
-import { MARKET_RDC, MOVA_EVENTS, MovaErrorCode, MovaHttpException, formatCdf } from '@mova/shared';
+import { MARKET_RDC, MOVA_EVENTS, MovaErrorCode, MovaHttpException, formatCdf, formatRentalRemaining } from '@mova/shared';
 import { RedisService } from '@mova/shared';
 import { fetchAuthUserBrief } from '../common/internal-lookup.util';
 import { PrismaService } from '../prisma/prisma.service';
@@ -406,6 +406,15 @@ export class RentalService {
       inquiry.status === RentalInquiryStatus.RETURNED
         ? inquiry.vehicle?.ownerContactPhone ?? MARKET_RDC.support.phone
         : null;
+    const showRemaining =
+      inquiry.status === RentalInquiryStatus.CONFIRMED ||
+      inquiry.status === RentalInquiryStatus.IN_PROGRESS ||
+      inquiry.status === RentalInquiryStatus.RETURNED;
+    const remaining = showRemaining ? formatRentalRemaining(inquiry.endDate) : null;
+    const rentalDurationDays = Math.max(
+      1,
+      Math.ceil((inquiry.endDate.getTime() - inquiry.startDate.getTime()) / 86_400_000),
+    );
     return {
       ...inquiry,
       priceCdf: inquiry.totalCdf ?? inquiry.estimatedPriceCdf,
@@ -414,6 +423,12 @@ export class RentalService {
       ownerBadge: inquiry.vehicle?.ownerBadge,
       statusLabel: RENTAL_STATUS_LABELS[inquiry.status],
       timeline: this.buildTimeline(inquiry.status),
+      rentalDurationDays,
+      remainingMs: remaining?.remainingMs ?? 0,
+      remainingDays: remaining?.remainingDays ?? 0,
+      remainingHours: remaining?.remainingHours ?? 0,
+      remainingLabel: remaining?.remainingLabel ?? null,
+      remainingActive: remaining?.isActive ?? false,
     };
   }
 

@@ -65,7 +65,10 @@ export class AdminService {
     ]);
     const openIncidents = Array.isArray(incidents) ? incidents.filter((i: { status?: string }) => i.status === 'OPEN').length : 0;
     const activeDeliveries = Array.isArray(deliveries)
-      ? deliveries.filter((d: { status?: string }) => !['DELIVERED', 'CANCELLED'].includes(d.status ?? '')).length
+      ? deliveries.filter((d: { status?: string; type?: string }) => {
+          if (d.type === 'ERRAND') return !['COMPLETED', 'CANCELLED'].includes(d.status ?? '');
+          return !['DELIVERED', 'CANCELLED'].includes(d.status ?? '');
+        }).length
       : 0;
     return {
       users: users.count,
@@ -129,6 +132,21 @@ export class AdminService {
   reviewDriverKyc(userId: string, approved: boolean, notes?: string) {
     return this.proxy('driver', `/internal/drivers/${userId}/kyc`, { method: 'PATCH', body: JSON.stringify({ approved, notes }) });
   }
+  reviewDriverDocumentsRenewal(userId: string, approved: boolean, notes?: string) {
+    return this.proxy('driver', `/internal/drivers/${userId}/documents-renewal`, {
+      method: 'PATCH',
+      body: JSON.stringify({ approved, notes }),
+    });
+  }
+  reviewVehicleTypeApproval(userId: string, approved: boolean, notes?: string) {
+    return this.proxy('driver', `/internal/drivers/${userId}/vehicle-type`, {
+      method: 'PATCH',
+      body: JSON.stringify({ approved, notes }),
+    });
+  }
+  runKycOcr(documentId: string) {
+    return this.proxy('driver', `/internal/kyc/${documentId}/ocr`, { method: 'POST', body: JSON.stringify({}) });
+  }
   regenerateDriverActivationPin(userId: string) {
     return this.proxy('driver', `/internal/drivers/${userId}/activation-pin`, { method: 'POST', body: JSON.stringify({}) });
   }
@@ -151,6 +169,9 @@ export class AdminService {
   getRide(id: string) {
     return this.fetchJson('ride', `/internal/rides/${id}`);
   }
+  getGpsTrace(type: string, id: string) {
+    return this.fetchJson('ride', `/internal/tracking/${type}/${id}/trace`);
+  }
   cancelRide(id: string, reason?: string) {
     return this.proxy('ride', `/internal/rides/${id}/cancel`, { method: 'POST', body: JSON.stringify({ reason }) });
   }
@@ -169,6 +190,9 @@ export class AdminService {
   }
   cancelDelivery(id: string, reason?: string) {
     return this.proxy('ride', `/internal/deliveries/${id}/cancel`, { method: 'POST', body: JSON.stringify({ reason }) });
+  }
+  assignDeliveryDriver(id: string, driverId: string) {
+    return this.proxy('ride', `/internal/deliveries/${id}/assign`, { method: 'PATCH', body: JSON.stringify({ driverId }) });
   }
 
   listScheduledRides(take = 50) {

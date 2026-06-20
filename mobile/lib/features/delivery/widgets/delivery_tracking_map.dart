@@ -12,6 +12,7 @@ class DeliveryTrackingMap extends StatelessWidget {
     required this.pickup,
     this.dropoff,
     this.courier,
+    this.routeTrace,
     this.etaMinutes,
     this.deliveryPin,
     this.courierName,
@@ -21,6 +22,7 @@ class DeliveryTrackingMap extends StatelessWidget {
   final LatLng pickup;
   final LatLng? dropoff;
   final LatLng? courier;
+  final List<LatLng>? routeTrace;
   final int? etaMinutes;
   final String? deliveryPin;
   final String? courierName;
@@ -62,6 +64,7 @@ class DeliveryTrackingMap extends StatelessWidget {
           pickup: pickup,
           dropoff: dropoff,
           driver: courier,
+          routeTrace: routeTrace,
           height: 180,
           driverIcon: Icons.delivery_dining,
         ),

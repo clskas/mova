@@ -114,6 +114,27 @@ export class AdminController {
     return this.adminService.reviewDriverKyc(userId, dto.approved, dto.notes);
   }
 
+  @Patch('drivers/:userId/documents-renewal')
+  @RequirePermissions(AdminPermission.KYC_WRITE)
+  @ApiOperation({ summary: 'Valider/rejeter renouvellement documents chauffeur' })
+  reviewDriverDocumentsRenewal(@Param('userId') userId: string, @Body() dto: ApproveKycDto) {
+    return this.adminService.reviewDriverDocumentsRenewal(userId, dto.approved, dto.notes);
+  }
+
+  @Patch('drivers/:userId/vehicle-type')
+  @RequirePermissions(AdminPermission.KYC_WRITE)
+  @ApiOperation({ summary: 'Valider/rejeter le type d\'engin déclaré (Moto-taxi, Standard, Confort, VIP)' })
+  reviewVehicleType(@Param('userId') userId: string, @Body() dto: ApproveKycDto) {
+    return this.adminService.reviewVehicleTypeApproval(userId, dto.approved, dto.notes);
+  }
+
+  @Post('kyc/:id/ocr')
+  @RequirePermissions(AdminPermission.KYC_WRITE)
+  @ApiOperation({ summary: 'Lancer l\'analyse OCR sur un document KYC' })
+  runKycOcr(@Param('id') id: string) {
+    return this.adminService.runKycOcr(id);
+  }
+
   @Post('drivers/:userId/activation-pin')
   @RequirePermissions(AdminPermission.KYC_WRITE)
   @ApiOperation({ summary: 'Générer ou régénérer le PIN d\'activation chauffeur' })
@@ -139,6 +160,13 @@ export class AdminController {
   @ApiOperation({ summary: 'Détail course' })
   getRide(@Param('id') id: string) {
     return this.adminService.getRide(id);
+  }
+
+  @Get('tracking/:type/:id/trace')
+  @RequirePermissions(AdminPermission.RIDES_READ)
+  @ApiOperation({ summary: 'Trace GPS course / livraison / commission' })
+  getGpsTrace(@Param('type') type: string, @Param('id') id: string) {
+    return this.adminService.getGpsTrace(type, id);
   }
 
   @Post('rides/:id/cancel')
@@ -195,6 +223,13 @@ export class AdminController {
   @ApiOperation({ summary: 'Annuler livraison' })
   cancelDelivery(@Param('id') id: string, @Body('reason') reason?: string) {
     return this.adminService.cancelDelivery(id, reason);
+  }
+
+  @Patch('deliveries/:id/assign')
+  @RequirePermissions(AdminPermission.DELIVERIES_WRITE)
+  @ApiOperation({ summary: 'Assigner un chauffeur à une livraison ou course/commission' })
+  assignDelivery(@Param('id') id: string, @Body('driverId') driverId: string) {
+    return this.adminService.assignDeliveryDriver(id, driverId);
   }
 
   @Get('scheduled-rides')

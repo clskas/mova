@@ -83,6 +83,7 @@ class RideSocket {
           _reconnectAttempt = 0;
           if (_rideId != null) {
             _socket?.emit('ride:subscribe', {'rideId': _rideId});
+            _socket?.emit('delivery:subscribe', {'deliveryId': _rideId});
           }
           _onConnected?.call();
         })
@@ -92,6 +93,7 @@ class RideSocket {
         })
         ..on('driver:location', _handleLocation)
         ..on('ride:location', _handleLocation)
+        ..on('courier:location', _handleLocation)
         ..on('ride:status', (data) {
           if (data is Map) {
             _onStatus?.call(Map<String, dynamic>.from(data));
@@ -151,6 +153,42 @@ class RideSocket {
       'lat': lat,
       'lng': lng,
       if (rideId != null) 'rideId': rideId,
+    });
+  }
+
+  void connectDelivery({
+    required String deliveryId,
+    String? token,
+    String? referenceType,
+    void Function(Map<String, dynamic> payload)? onLocation,
+    void Function()? onConnected,
+    void Function()? onDisconnected,
+  }) {
+    _rideId = deliveryId;
+    if (token != null && token.isNotEmpty) _token = token;
+    if (onLocation != null) _onLocation = onLocation;
+    if (onConnected != null) _onConnected = onConnected;
+    if (onDisconnected != null) _onDisconnected = onDisconnected;
+    _reconnectAttempt = 0;
+    connectionFailed = false;
+    _openSocket();
+  }
+
+  void emitCourierLocation({
+    required String userId,
+    required double lat,
+    required double lng,
+    required String deliveryId,
+    String referenceType = 'DELIVERY',
+  }) {
+    if (!isConnected) return;
+    _socket?.emit('courier:location', {
+      'userId': userId,
+      'lat': lat,
+      'lng': lng,
+      'deliveryId': deliveryId,
+      'referenceId': deliveryId,
+      'referenceType': referenceType,
     });
   }
 

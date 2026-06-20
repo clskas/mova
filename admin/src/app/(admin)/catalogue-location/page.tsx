@@ -98,8 +98,8 @@ export default function CatalogueLocationPage() {
             .filter(Boolean);
     return {
       name: source.name?.trim(),
-      make: (source as RentalCatalogVehicle).make ?? (source as typeof form).make?.trim() || undefined,
-      model: (source as RentalCatalogVehicle).model ?? (source as typeof form).model?.trim() || undefined,
+      make: (source as RentalCatalogVehicle).make ?? ((source as typeof form).make?.trim() || undefined),
+      model: (source as RentalCatalogVehicle).model ?? ((source as typeof form).model?.trim() || undefined),
       year: (source as typeof form).year
         ? Number((source as typeof form).year)
         : (source as RentalCatalogVehicle).year,
@@ -114,13 +114,12 @@ export default function CatalogueLocationPage() {
         (source as typeof form).depositCdf || (source as RentalCatalogVehicle).depositCdf || 50000,
       ),
       ownerName:
-        (source as RentalCatalogVehicle).ownerName ?? (source as typeof form).ownerName?.trim() || undefined,
+        (source as RentalCatalogVehicle).ownerName ?? ((source as typeof form).ownerName?.trim() || undefined),
       ownerContactPhone:
         (source as RentalCatalogVehicle).ownerContactPhone ??
-        (source as typeof form).ownerContactPhone?.trim() ||
-        undefined,
+        ((source as typeof form).ownerContactPhone?.trim() || undefined),
       ownerBadge:
-        (source as RentalCatalogVehicle).ownerBadge ?? (source as typeof form).ownerBadge?.trim() || undefined,
+        (source as RentalCatalogVehicle).ownerBadge ?? ((source as typeof form).ownerBadge?.trim() || undefined),
       features,
       imageUrl: (source as RentalCatalogVehicle).imageUrl ?? (source as typeof form).imageUrl ?? undefined,
       isActive: (source as RentalCatalogVehicle).isActive !== false,

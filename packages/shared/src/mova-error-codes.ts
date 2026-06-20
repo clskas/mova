@@ -43,6 +43,7 @@ export enum MovaErrorCode {
   USER_NOT_FOUND = 'MOVA_USER_001',
   DRIVER_NOT_AVAILABLE = 'MOVA_DRIVER_001',
   DRIVER_KYC_PENDING = 'MOVA_DRIVER_002',
+  DRIVER_DOCUMENTS_EXPIRED = 'MOVA_DRIVER_003',
 
   VALIDATION_ERROR = 'MOVA_VAL_001',
   NOT_FOUND = 'MOVA_VAL_002',
@@ -101,6 +102,8 @@ export const MOVA_ERROR_MESSAGES: Record<MovaErrorCode, string> = {
   [MovaErrorCode.USER_NOT_FOUND]: 'Utilisateur introuvable.',
   [MovaErrorCode.DRIVER_NOT_AVAILABLE]: 'Chauffeur non disponible.',
   [MovaErrorCode.DRIVER_KYC_PENDING]: 'Votre dossier KYC est en cours de validation.',
+  [MovaErrorCode.DRIVER_DOCUMENTS_EXPIRED]:
+    'Un ou plusieurs documents (permis, assurance, visite technique) sont expirés ou incomplets.',
 
   [MovaErrorCode.VALIDATION_ERROR]: 'Données invalides.',
   [MovaErrorCode.NOT_FOUND]: 'Ressource introuvable.',

@@ -832,6 +832,15 @@ class ApiClient {
     return post('/drivers/location', {'lat': lat, 'lng': lng});
   }
 
+  Future<Result<Map<String, dynamic>>> recordTrackingPoint(
+    String type,
+    String referenceId,
+    double lat,
+    double lng,
+  ) async {
+    return post('/tracking/$type/$referenceId/points', {'lat': lat, 'lng': lng});
+  }
+
   Future<Result<Map<String, dynamic>>> getCurrentUser({bool forceRefresh = false}) async {
     final result = await get('/users/me', skipCache: forceRefresh);
     return switch (result) {

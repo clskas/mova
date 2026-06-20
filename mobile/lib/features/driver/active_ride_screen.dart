@@ -111,6 +111,9 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
       lng: pos.longitude,
       rideId: _rideId,
     );
+    if (!api.isMockMode) {
+      await api.recordTrackingPoint('ride', _rideId, pos.latitude, pos.longitude);
+    }
   }
 
   Future<void> _openNavigation({required bool toPickup}) async {

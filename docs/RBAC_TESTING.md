@@ -43,6 +43,19 @@ Connexion : http://localhost:3002/login — saisir le téléphone, OTP `123456`.
 | Planifiées | ✓ | ✓ | ✓ | — | — |
 | Communes | ✓ | ✓ | — | — | ✓ |
 | Locations | ✓ | ✓ | ✓ | — | ✓ |
+| Catalogue location | ✓ | ✓ | ✓ | — | ✓ |
+| Déménagements | ✓ | ✓ | ✓ | — | — |
+| Covoiturage | ✓ | ✓ | ✓ | — | — |
+
+### Trace GPS (Courses / Livraisons)
+
+Les rôles **SUPER_ADMIN**, **ADMIN** et **SUPPORT** voient la carte **Trace GPS** dans le modal Détail (`/courses`, `/livraisons`). FINANCE et CONTENT n'ont pas accès à ces sections.
+
+| Test | SUPPORT `+243900000003` | FINANCE `+243900000004` |
+|------|-------------------------|-------------------------|
+| Menu **Courses** | Visible | Absent |
+| Détail course → carte GPS | Visible si course avec points | N/A |
+| URL directe `/courses` | OK | Redirection vers `/` ou première page autorisée |
 
 ### Écriture par page (exemples clés)
 
@@ -51,6 +64,9 @@ Connexion : http://localhost:3002/login — saisir le téléphone, OTP `123456`.
 | `/tarifs` | Enregistrer | Enregistrer | — (menu masqué) | Enregistrer | Enregistrer |
 | `/utilisateurs` | Édition | Édition | Lecture seule | — | — |
 | `/kyc` | Approuver/Rejeter | Approuver/Rejeter | Approuver/Rejeter | — | — |
+| `/chauffeurs` (type engin) | Valider type | Valider type | Lecture + validation KYC | — | — |
+| `/courses` (trace GPS) | Détail + carte | Détail + carte | Détail + carte | — | — |
+| `/livraisons` | Statut + assignation | Statut + assignation | Statut + assignation ERRAND | — | — |
 | `/litiges` | Résoudre | Résoudre | Résoudre | — | — |
 | `/restaurants` | CRUD | CRUD | — | — | CRUD |
 | `/abonnements` | CRUD | CRUD | — | CRUD | — |

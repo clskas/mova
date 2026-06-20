@@ -26,7 +26,18 @@ describe('DeliveriesService', () => {
     }),
   };
 
-  const service = new DeliveriesService(prisma as never, pricing, surcharges as never);
+  const promo = { validate: jest.fn() };
+  const redis = { publish: jest.fn() };
+  const trackingService = { getTrace: jest.fn().mockResolvedValue([]) };
+
+  const service = new DeliveriesService(
+    prisma as never,
+    pricing,
+    surcharges as never,
+    promo as never,
+    redis as never,
+    trackingService as never,
+  );
 
   beforeEach(() => jest.clearAllMocks());
 

@@ -23,6 +23,7 @@ MOVA est votre application de mobilité urbaine en RDC. Commandez un taxi ou mot
 3. Choisissez le type de véhicule : Moto-taxi, Standard ou Confort.
 4. Appuyez sur **Estimer le prix**, puis **Confirmer la course**.
 5. Suivez votre chauffeur en temps réel sur l'écran de suivi.
+6. Une **ligne bleue** sur la carte représente le trajet déjà parcouru (trace GPS), en plus de la position actuelle du chauffeur.
 
 ## 3. Livraison colis
 
@@ -31,6 +32,7 @@ MOVA est votre application de mobilité urbaine en RDC. Commandez un taxi ou mot
 3. Sélectionnez la catégorie de poids (documents, petit, moyen, grand).
 4. Ajoutez une photo (optionnel).
 5. Estimez, confirmez, puis suivez votre colis.
+6. Sur l'écran de suivi, la **trace GPS** (ligne sur la carte) montre le parcours du livreur.
 
 ## 4. Réservation planifiée
 
@@ -46,7 +48,7 @@ MOVA est votre application de mobilité urbaine en RDC. Commandez un taxi ou mot
 2. Choisissez un restaurant parmi la liste.
 3. Ajoutez des plats au panier.
 4. Indiquez l'adresse de livraison et commandez.
-5. Suivez la livraison en temps réel.
+5. Suivez la livraison en temps réel (position + trace du trajet).
 
 ## 6. Courses & commissions
 
@@ -58,8 +60,12 @@ MOVA est votre application de mobilité urbaine en RDC. Commandez un taxi ou mot
 ## 7. Covoiturage
 
 1. Appuyez sur **Covoiturage**.
-2. **Rechercher** : trouvez un trajet partagé et voyez le prix par passager.
-3. **Proposer** : publiez votre propre trajet avec répartition du coût.
+2. **Rechercher** : indiquez ville de départ, destination et date. Triez par prix, heure ou note conducteur. Chaque résultat affiche la distance, l'ETA et le badge KYC si le conducteur est vérifié.
+3. **Réserver** : sélectionnez un trajet, choisissez le nombre de places et confirmez. Vous voyez le récapitulatif conducteur et pouvez contacter le conducteur (téléphone masqué).
+4. **Mes réservations** : consultez vos trajets réservés. Annulez avant le départ si besoin.
+5. **Détail trajet** : carte du parcours, timeline (Publié → Places réservées → En route → Terminé).
+
+> La publication de trajets est réservée aux **chauffeurs MOVA** (app Chauffeur, KYC approuvé).
 
 ## 8. Livraison express
 
@@ -89,7 +95,19 @@ Consultez votre solde, rechargez via Orange Money, M-Pesa ou Airtel Money, et pa
 
 Retrouvez tous vos trajets, colis, commandes repas, réservations et courses dans l'onglet **Historique** (onglets : Trajets | Colis | Repas | Réservations | Courses).
 
-## 13. Aide et support
+## 14. Suivi GPS en temps réel
+
+Pendant une **course**, **livraison colis**, **repas**, **express** ou **course & commissions** active :
+
+| Élément carte | Signification |
+|---------------|---------------|
+| Marqueur chauffeur / livreur | Position actuelle |
+| Ligne bleue | Trajet déjà parcouru (mise à jour automatique) |
+| Points départ / arrivée | Adresses de la commande |
+
+La trace se construit au fur et à mesure du déplacement. En cas de faible réseau, la position peut être retardée ; la trace se complète à la reconnexion.
+
+## 15. Aide et support
 
 - **WhatsApp :** +243 900 000 000
 - **E-mail :** support@mova.cd

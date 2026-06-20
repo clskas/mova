@@ -1,13 +1,8 @@
 import { Body, Controller, Get, Param, Patch, Post, Request, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { ErrandOrderStatus } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { CreateErrandOrderDto } from './errands.dto';
+import { CreateErrandOrderDto, UpdateErrandStatusDto } from './errands.dto';
 import { ErrandsService } from './errands.service';
-
-class UpdateErrandStatusDto {
-  status!: ErrandOrderStatus;
-}
 
 @ApiTags('errands')
 @Controller('errands')
@@ -50,5 +45,21 @@ export class ErrandsController {
   @ApiOperation({ summary: 'Mettre à jour statut commande courses' })
   status(@Request() req: { user: { id: string } }, @Param('id') id: string, @Body() dto: UpdateErrandStatusDto) {
     return this.errandsService.updateStatus(id, req.user.id, dto.status);
+  }
+
+  @Post(':id/accept')
+  @ApiOperation({ summary: 'Accepter une course/commission (chauffeur)' })
+  accept(@Request() req: { user: { id: string } }, @Param('id') id: string) {
+    return this.errandsService.acceptErrand(id, req.user.id);
+  }
+
+  @Patch(':id/driver-status')
+  @ApiOperation({ summary: 'Avancer le statut (chauffeur assigné)' })
+  driverStatus(
+    @Request() req: { user: { id: string } },
+    @Param('id') id: string,
+    @Body() dto: UpdateErrandStatusDto,
+  ) {
+    return this.errandsService.updateStatusByDriver(id, req.user.id, dto.status);
   }
 }

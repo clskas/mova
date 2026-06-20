@@ -1,5 +1,5 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { CommissionServiceType, DeliveryStatus, DeliveryType, RideStatus, VehicleType } from '@prisma/client';
+import { CommissionServiceType, DeliveryStatus, DeliveryType, RideStatus, TrackingReferenceType, VehicleType } from '@prisma/client';
 import {
   formatCdf,
   fromMobileRideStatus,
@@ -22,8 +22,10 @@ import { CommissionService } from './commission.service';
 import { MatchingService } from '../matching/matching.service';
 import { computeDriverEta } from '../matching/eta.util';
 import { TrackingGateway } from '../websocket/tracking.gateway';
+import { TrackingService } from '../tracking/tracking.service';
 import { assertServiceAreaPair, assertServiceAreaCoords } from '../common/address.util';
 import { tripDistanceKm } from '../common/geo.util';
+import { assertDriverCanReceiveJobs, driverCanReceiveJobs, fetchDriverProfileSnapshot } from '../common/driver-eligibility.util';
 
 const ACTIVE_STATUSES: RideStatus[] = [
   RideStatus.REQUESTED,
@@ -50,12 +52,13 @@ export class RidesService {
     private pricing: PricingService,
     private matching: MatchingService,
     private redis: RedisService,
-    private tracking: TrackingGateway,
+    private trackingGateway: TrackingGateway,
+    private trackingService: TrackingService,
     private commission: CommissionService,
   ) {}
 
   private emitStatusChange(rideId: string, status: RideStatus) {
-    this.tracking.broadcastRideStatus(rideId, toMobileRideStatus(status));
+    this.trackingGateway.broadcastRideStatus(rideId, toMobileRideStatus(status));
   }
 
   async estimate(pickupLat: number, pickupLng: number, dropoffLat: number, dropoffLng: number, vehicleType: VehicleType) {
@@ -193,6 +196,7 @@ export class RidesService {
   }
 
   async acceptRide(rideId: string, driverUserId: string, vehicleId?: string) {
+    await assertDriverCanReceiveJobs(driverUserId);
     const ride = await this.prisma.ride.findUnique({ where: { id: rideId } });
     if (!ride) throw new MovaHttpException(MovaErrorCode.RIDE_NOT_FOUND, HttpStatus.NOT_FOUND);
     if (ride.status !== RideStatus.SEARCHING) throw new MovaHttpException(MovaErrorCode.RIDE_INVALID_STATUS);
@@ -218,16 +222,16 @@ export class RidesService {
   }
 
   async getDriverOffers(driverUserId: string) {
-    const profile = await this.fetchDriverProfile(driverUserId);
-    if (!profile?.isAvailable || profile.kycStatus !== 'APPROVED') {
-      return { offers: [] as Record<string, unknown>[] };
+    const profile = await fetchDriverProfileSnapshot(driverUserId);
+    if (!profile?.isAvailable || !driverCanReceiveJobs(profile)) {
+      return { offers: [] as Record<string, unknown>[], documentsBlocked: profile?.documentsStatus?.canOperate === false };
     }
     if (profile.currentLat == null || profile.currentLng == null) {
       return { offers: [] as Record<string, unknown>[] };
     }
     const vehicleTypes = (profile.vehicles ?? [])
-      .filter((v: { isActive?: boolean }) => v.isActive !== false)
-      .map((v: { type: VehicleType }) => v.type);
+      .filter((v) => v.isActive !== false)
+      .map((v) => v.type as VehicleType);
     if (vehicleTypes.length === 0) {
       return { offers: [] as Record<string, unknown>[] };
     }
@@ -386,12 +390,14 @@ export class RidesService {
     const detail = this.formatRideDetail(ride);
     const trackingEta = this.computeTrackingEta(ride, driver);
     const timeline = this.buildRideTimeline(ride.status, ride.events);
+    const gpsTrace = await this.trackingService.getTrace(TrackingReferenceType.RIDE, rideId);
     return {
       ...detail,
       ...trackingEta,
       events: ride.events.map((e) => ({ ...e, status: e.event })),
       timeline,
       tracking: timeline,
+      gpsTrace,
       ratings: ride.ratings,
       driver,
     };

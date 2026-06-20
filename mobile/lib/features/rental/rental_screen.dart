@@ -756,6 +756,20 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
                   '${_formatDate(DateTime.parse(inq['endDate']?.toString() ?? DateTime.now().toIso8601String()))}',
                   style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
                 ),
+                if (inq['remainingLabel'] != null &&
+                    ['CONFIRMED', 'IN_PROGRESS', 'RETURNED'].contains(inq['status']?.toString().toUpperCase())) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    inq['remainingActive'] == true
+                        ? 'Temps restant : ${inq['remainingLabel']}'
+                        : inq['remainingLabel']?.toString() ?? '',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: inq['remainingActive'] == true ? MovaColors.violet : MovaColors.textSecondary,
+                    ),
+                  ),
+                ],
                 if (inq['totalCdf'] != null || inq['estimatedPriceCdf'] != null)
                   Text(
                     MarketConfig.formatCdf(inq['totalCdf'] as int? ?? inq['estimatedPriceCdf'] as int? ?? 0),

@@ -1,6 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geolocator/geolocator.dart';
 import '../../core/api/api_client.dart';
+import '../../core/api/ride_socket.dart';
 import '../../core/geo/maps_launcher.dart';
 import '../../core/config/market_config.dart';
 import '../../core/error/result.dart';
@@ -21,6 +25,8 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
   late Map<String, dynamic> _delivery;
   bool _loading = false;
   String? _error;
+  Timer? _locationTimer;
+  String? _userId;
 
   String get _deliveryId => _delivery['id']?.toString() ?? '';
   String get _status => _delivery['status']?.toString() ?? 'PENDING';
@@ -30,21 +36,100 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
       'FOOD' => 'Livraison repas',
       'EXPRESS' => 'Express',
       'PARCEL' => 'Colis',
+      'ERRAND' => 'Courses & commissions',
       _ => 'Livraison',
     };
   }
+
+  bool get _isErrand => _delivery['type']?.toString() == 'ERRAND';
 
   @override
   void initState() {
     super.initState();
     _delivery = Map<String, dynamic>.from(widget.delivery);
+    _bootstrapTracking();
+  }
+
+  @override
+  void dispose() {
+    _locationTimer?.cancel();
+    ref.read(rideSocketProvider).dispose();
+    super.dispose();
+  }
+
+  Future<void> _bootstrapTracking() async {
+    final api = ref.read(apiClientProvider);
+    final profile = await api.getDriverProfile();
+    if (profile case Success(:final data)) {
+      _userId = data['userId']?.toString();
+    }
+    await _connectTrackingSocket();
+    _startLocationUpdates();
+  }
+
+  Future<void> _connectTrackingSocket() async {
+    final api = ref.read(apiClientProvider);
+    if (api.isMockMode) return;
+    final token = await api.authToken();
+    if (!mounted) return;
+    ref.read(rideSocketProvider).connectDelivery(
+      deliveryId: _deliveryId,
+      token: token,
+      referenceType: _isErrand ? 'ERRAND' : 'DELIVERY',
+    );
+  }
+
+  void _startLocationUpdates() {
+    _locationTimer?.cancel();
+    _locationTimer = Timer.periodic(const Duration(seconds: 12), (_) => _pushLocation());
+    _pushLocation();
+  }
+
+  Future<void> _pushLocation() async {
+    if (!await Geolocator.isLocationServiceEnabled()) return;
+    var permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+    if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+      return;
+    }
+    final pos = await Geolocator.getCurrentPosition();
+    final api = ref.read(apiClientProvider);
+    await api.updateDriverLocation(pos.latitude, pos.longitude);
+
+    final socket = ref.read(rideSocketProvider);
+    if (!socket.isConnected && !api.isMockMode) {
+      await _connectTrackingSocket();
+    }
+    socket.emitCourierLocation(
+      userId: _userId ?? '',
+      lat: pos.latitude,
+      lng: pos.longitude,
+      deliveryId: _deliveryId,
+      referenceType: _isErrand ? 'ERRAND' : 'DELIVERY',
+    );
+    if (!api.isMockMode) {
+      await api.recordTrackingPoint(
+        _isErrand ? 'errand' : 'delivery',
+        _deliveryId,
+        pos.latitude,
+        pos.longitude,
+      );
+    }
   }
 
   Future<void> _refresh() async {
-    final result = await ref.read(apiClientProvider).get('/deliveries/$_deliveryId');
+    final api = ref.read(apiClientProvider);
+    final path = _isErrand ? '/errands/$_deliveryId' : '/deliveries/$_deliveryId';
+    final result = await api.get(path);
     if (!mounted) return;
     if (result case Success(:final data)) {
-      setState(() => _delivery = data['delivery'] as Map<String, dynamic>? ?? data);
+      setState(() {
+        _delivery = data['errand'] as Map<String, dynamic>? ??
+            data['delivery'] as Map<String, dynamic>? ??
+            data;
+      });
     }
   }
 
@@ -53,13 +138,23 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
       _loading = true;
       _error = null;
     });
-    final result = await ref.read(apiClientProvider).updateDeliveryStatus(_deliveryId, nextStatus);
+    final api = ref.read(apiClientProvider);
+    final Result<Map<String, dynamic>> result;
+    if (_isErrand) {
+      result = await api.patch('/errands/$_deliveryId/driver-status', {'status': nextStatus});
+    } else {
+      result = await api.updateDeliveryStatus(_deliveryId, nextStatus);
+    }
     if (!mounted) return;
     setState(() => _loading = false);
     switch (result) {
       case Success(:final data):
-        setState(() => _delivery = data['delivery'] as Map<String, dynamic>? ?? data);
-        if (nextStatus == 'DELIVERED') {
+        setState(() {
+          _delivery = data['errand'] as Map<String, dynamic>? ??
+              data['delivery'] as Map<String, dynamic>? ??
+              data;
+        });
+        if (nextStatus == 'DELIVERED' || nextStatus == 'COMPLETED') {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(successMessage)));
           Navigator.pop(context, true);
         } else {
@@ -100,6 +195,13 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
   }
 
   String? get _nextAction {
+    if (_isErrand) {
+      return switch (_status) {
+        'ASSIGNED' => 'IN_PROGRESS',
+        'IN_PROGRESS' => 'COMPLETED',
+        _ => null,
+      };
+    }
     return switch (_status) {
       'PICKED_UP' => 'IN_TRANSIT',
       'IN_TRANSIT' => 'DELIVERED',
@@ -108,6 +210,13 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
   }
 
   String get _actionLabel {
+    if (_isErrand) {
+      return switch (_status) {
+        'ASSIGNED' => 'Démarrer les courses',
+        'IN_PROGRESS' => 'Marquer comme terminé',
+        _ => 'Actualiser',
+      };
+    }
     return switch (_status) {
       'PICKED_UP' => 'En route vers le client',
       'IN_TRANSIT' => 'Marquer comme livré',

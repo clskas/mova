@@ -50,7 +50,27 @@ export type AdminDriver = {
   readyForReview?: boolean;
   currentLat?: number | null;
   currentLng?: number | null;
-  vehicles?: { id: string; type: string; plateNumber: string; make?: string; model?: string; imageUrl?: string | null; isActive?: boolean }[];
+  documentsCanOperate?: boolean;
+  documentsRenewalPending?: boolean;
+  documentsStatus?: {
+    canOperate?: boolean;
+    blockReason?: string;
+    expiringSoon?: string[];
+    expired?: string[];
+    items?: { field: string; label: string; daysRemaining: number | null; status: string }[];
+  };
+  vehicles?: {
+    id: string;
+    type: string;
+    plateNumber: string;
+    make?: string;
+    model?: string;
+    imageUrl?: string | null;
+    isActive?: boolean;
+    typeApprovalStatus?: string;
+    typeApprovalNotes?: string | null;
+    typeApprovedAt?: string | null;
+  }[];
   createdAt?: string;
 };
 
@@ -66,6 +86,8 @@ export type AdminDriverDetail = AdminDriver & {
   licenseExpiry?: string | null;
   insuranceExpiry?: string | null;
   technicalInspectionExpiry?: string | null;
+  documentsRenewalPending?: boolean;
+  documentsRenewalRequestedAt?: string | null;
   payoutProvider?: string | null;
   payoutPhone?: string | null;
   charterAcceptedAt?: string | null;
@@ -77,6 +99,19 @@ export type AdminDriverDetail = AdminDriver & {
   kycDocumentsUploaded?: number;
   kycDocumentsRequired?: number;
   kycDocumentsComplete?: boolean;
+  vehicleTypeApprovalPending?: boolean;
+  vehicleTypeApprovalStatus?: string;
+  vehicle?: {
+    id?: string;
+    type?: string;
+    typeApprovalStatus?: string;
+    typeApprovalNotes?: string | null;
+    typeApprovedAt?: string | null;
+    imageUrl?: string | null;
+    plateNumber?: string;
+    make?: string;
+    model?: string;
+  } | null;
   kyc?: {
     checklist?: {
       type: string;
@@ -84,6 +119,16 @@ export type AdminDriverDetail = AdminDriver & {
       required: boolean;
       uploaded: boolean;
       status?: string | null;
+      url?: string | null;
+      ocr?: {
+        documentId?: string;
+        status?: string;
+        extractedExpiry?: string | null;
+        profileExpiry?: string | null;
+        confidence?: number | null;
+        notes?: string | null;
+        checkedAt?: string | null;
+      } | null;
     }[];
     requiredComplete?: boolean;
   };
@@ -116,9 +161,20 @@ export type DeliveryOverview = {
   pickupAddress?: string;
   dropoffAddress?: string;
   restaurantName?: string;
+  description?: string;
   priceCdf?: number;
   createdAt?: string;
   userId?: string;
+  driverId?: string | null;
+  passengerName?: string;
+  driverName?: string;
+  passengerPhone?: string;
+  driverPhone?: string;
+  pickupLat?: number;
+  pickupLng?: number;
+  dropoffLat?: number;
+  dropoffLng?: number;
+  gpsTrace?: GpsPoint[];
   events?: { event: string; createdAt: string }[];
   timeline?: { label: string; done: boolean; at?: string }[];
 };
@@ -147,8 +203,23 @@ export type RideOverview = {
   vehicleType?: string;
   pickupAddress?: string;
   dropoffAddress?: string;
+  pickupLat?: number;
+  pickupLng?: number;
+  dropoffLat?: number;
+  dropoffLng?: number;
   priceCdf?: number;
   createdAt?: string;
+  gpsTrace?: GpsPoint[];
+};
+
+export type GpsPoint = { lat: number; lng: number; recordedAt?: string };
+
+export type GpsTraceResponse = {
+  referenceType?: string;
+  referenceId?: string;
+  pointCount?: number;
+  points?: GpsPoint[];
+  lastPoint?: GpsPoint | null;
 };
 
 export type Restaurant = {
@@ -930,6 +1001,10 @@ export async function fetchRide(id: string) {
   return apiFetch<RideOverview>(`/api/admin/rides/${id}`);
 }
 
+export async function fetchGpsTrace(type: "ride" | "delivery" | "errand" | "moving", id: string) {
+  return apiFetch<GpsTraceResponse>(`/api/admin/tracking/${type}/${id}/trace`);
+}
+
 export async function fetchDelivery(id: string) {
   return apiFetch<DeliveryOverview>(`/api/admin/deliveries/${id}`);
 }
@@ -973,9 +1048,10 @@ export async function fetchDriversForAssignment(): Promise<AdminDriver[]> {
   const params = new URLSearchParams({ take: "200", kycStatus: "APPROVED" });
   const data = await apiFetch<AdminDriver[] | { data?: AdminDriver[] }>(`/api/admin/drivers?${params}`);
   const approved = Array.isArray(data) ? data : data.data ?? [];
-  if (approved.length > 0) return approved;
+  const eligible = approved.filter((d) => d.documentsCanOperate !== false);
+  if (eligible.length > 0) return eligible;
   const all = await fetchDrivers();
-  return all.filter((d) => d.kycStatus === "APPROVED");
+  return all.filter((d) => d.kycStatus === "APPROVED" && d.documentsCanOperate !== false);
 }
 
 export async function fetchDriverDetail(userId: string): Promise<AdminDriverDetail> {
@@ -993,6 +1069,40 @@ export async function reviewDriverKyc(userId: string, approved: boolean, notes?:
   return apiFetch<{ activationPin?: string }>(`/api/admin/drivers/${userId}/kyc`, {
     method: "PATCH",
     body: JSON.stringify({ approved, notes }),
+  });
+}
+
+export async function reviewDriverDocumentsRenewal(userId: string, approved: boolean, notes?: string) {
+  return apiFetch(`/api/admin/drivers/${userId}/documents-renewal`, {
+    method: "PATCH",
+    body: JSON.stringify({ approved, notes }),
+  });
+}
+
+export async function reviewVehicleTypeApproval(userId: string, approved: boolean, notes?: string) {
+  return apiFetch(`/api/admin/drivers/${userId}/vehicle-type`, {
+    method: "PATCH",
+    body: JSON.stringify({ approved, notes }),
+  });
+}
+
+export async function runKycOcr(documentId: string) {
+  return apiFetch<{
+    documentId: string;
+    userId: string;
+    type: string;
+    ocr?: {
+      documentId?: string;
+      status?: string;
+      extractedExpiry?: string | null;
+      profileExpiry?: string | null;
+      confidence?: number | null;
+      notes?: string | null;
+      checkedAt?: string | null;
+    } | null;
+  }>(`/api/admin/kyc/${documentId}/ocr`, {
+    method: "POST",
+    body: JSON.stringify({}),
   });
 }
 
@@ -1025,6 +1135,10 @@ export async function assignScheduledDriver(id: string, driverId: string) {
 
 export async function updateDeliveryStatus(id: string, status: string) {
   return apiFetch(`/api/admin/deliveries/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) });
+}
+
+export async function assignDeliveryDriver(id: string, driverId: string) {
+  return apiFetch(`/api/admin/deliveries/${id}/assign`, { method: "PATCH", body: JSON.stringify({ driverId }) });
 }
 
 export async function cancelDelivery(id: string, reason?: string) {

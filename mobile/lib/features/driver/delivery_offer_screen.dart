@@ -31,6 +31,7 @@ class _DeliveryOfferScreenState extends ConsumerState<DeliveryOfferScreen> {
       'FOOD' => 'Livraison repas',
       'PARCEL' => 'Colis',
       'EXPRESS' => 'Express',
+      'ERRAND' => 'Courses & commissions',
       _ => 'Livraison',
     };
   }
@@ -100,11 +101,18 @@ class _DeliveryOfferScreenState extends ConsumerState<DeliveryOfferScreen> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                if (widget.offer['restaurantName'] != null)
+                if (widget.offer['restaurantName'] != null && widget.offer['type']?.toString() != 'ERRAND')
                   Text(
                     widget.offer['restaurantName']?.toString() ?? '',
                     style: const TextStyle(color: MovaColors.textSecondary),
                     maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                if (widget.offer['description'] != null)
+                  Text(
+                    widget.offer['description']?.toString() ?? '',
+                    style: const TextStyle(color: MovaColors.textSecondary),
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
                 const SizedBox(height: 12),

@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsArray, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
+import { MovingRequestStatus } from '@prisma/client';
+import { IsArray, IsEnum, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
 
 export class EstimateMovingDto {
   @ApiProperty({ description: 'Volume estimé en m³' }) @IsNumber() @Min(1) @Max(100) volumeM3: number;
@@ -18,4 +19,10 @@ export class CreateMovingDto extends EstimateMovingDto {
   @IsArray()
   @IsString({ each: true })
   photoUrls?: string[];
+}
+
+export class UpdateMovingStatusDto {
+  @ApiProperty({ enum: MovingRequestStatus })
+  @IsEnum(MovingRequestStatus)
+  status!: MovingRequestStatus;
 }

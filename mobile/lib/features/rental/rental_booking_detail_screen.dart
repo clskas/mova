@@ -209,6 +209,29 @@ class _RentalBookingDetailScreenState extends ConsumerState<RentalBookingDetailS
                   '${_formatDate(b['startDate']?.toString())} → ${_formatDate(b['endDate']?.toString())}',
                   style: const TextStyle(color: MovaColors.textSecondary),
                 ),
+                if (b['remainingLabel'] != null &&
+                    (status == 'CONFIRMED' || status == 'IN_PROGRESS' || status == 'RETURNED')) ...[
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Icon(
+                        b['remainingActive'] == true ? Icons.timer_outlined : Icons.event_available,
+                        size: 16,
+                        color: b['remainingActive'] == true ? MovaColors.violet : MovaColors.textSecondary,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        b['remainingActive'] == true
+                            ? 'Temps restant : ${b['remainingLabel']}'
+                            : b['remainingLabel']?.toString() ?? '',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: b['remainingActive'] == true ? MovaColors.violet : MovaColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
                 if (b['pickupCity'] != null)
                   Text('Prise en charge : ${b['pickupCity']}${b['returnCity'] != null && b['returnCity'] != b['pickupCity'] ? ' → ${b['returnCity']}' : ''}'),
                 const SizedBox(height: 8),

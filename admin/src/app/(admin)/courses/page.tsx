@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { apiFetch, cancelRide, formatCdf, formatDate, updateRideStatus, type RideOverview } from "@/lib/api";
+import { apiFetch, cancelRide, fetchGpsTrace, fetchRide, formatCdf, formatDate, updateRideStatus, type GpsPoint, type RideOverview } from "@/lib/api";
 import { useAdmin } from "@/components/AdminProvider";
+import { GpsTraceMap } from "@/components/GpsTraceMap";
 import {
   BtnDanger,
   BtnPrimary,
@@ -52,6 +53,38 @@ export default function CoursesPage() {
   const [cancelTarget, setCancelTarget] = useState<RideOverview | null>(null);
   const [newStatus, setNewStatus] = useState("");
   const [saving, setSaving] = useState(false);
+  const [rideDetail, setRideDetail] = useState<RideOverview | null>(null);
+  const [gpsTrace, setGpsTrace] = useState<GpsPoint[]>([]);
+
+  useEffect(() => {
+    if (!selected?.id) {
+      setRideDetail(null);
+      setGpsTrace([]);
+      return;
+    }
+    let cancelled = false;
+    const loadTrace = async () => {
+      try {
+        const [detail, trace] = await Promise.all([
+          fetchRide(selected.id),
+          fetchGpsTrace("ride", selected.id),
+        ]);
+        if (!cancelled) {
+          setRideDetail(detail);
+          setGpsTrace(trace.points ?? detail.gpsTrace ?? []);
+        }
+      } catch {
+        if (!cancelled) setGpsTrace([]);
+      }
+    };
+    loadTrace();
+    const active = selected.status && !["COMPLETED", "CANCELLED"].includes(selected.status);
+    const timer = active ? setInterval(loadTrace, 10000) : undefined;
+    return () => {
+      cancelled = true;
+      if (timer) clearInterval(timer);
+    };
+  }, [selected?.id, selected?.status]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -167,6 +200,21 @@ export default function CoursesPage() {
             <p><span className="text-gray-500">Départ:</span> {selected.pickupAddress}</p>
             <p><span className="text-gray-500">Arrivée:</span> {selected.dropoffAddress}</p>
             <p><span className="text-gray-500">Prix:</span> {formatCdf(selected.priceCdf)}</p>
+            <GpsTraceMap
+              title="Trace GPS du trajet"
+              points={gpsTrace}
+              pickup={
+                rideDetail?.pickupLat != null && rideDetail?.pickupLng != null
+                  ? { lat: rideDetail.pickupLat, lng: rideDetail.pickupLng }
+                  : null
+              }
+              dropoff={
+                rideDetail?.dropoffLat != null && rideDetail?.dropoffLng != null
+                  ? { lat: rideDetail.dropoffLat, lng: rideDetail.dropoffLng }
+                  : null
+              }
+              live={!!selected.status && !["COMPLETED", "CANCELLED"].includes(selected.status ?? "")}
+            />
             {!readOnly && (
               <>
                 <FieldLabel>Changer le statut</FieldLabel>

@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Param, Patch, Post, Query, Request, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { MovaErrorCode, MovaHttpException } from '@mova/shared';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ErrandsService } from '../errands/errands.service';
 import { CreateFoodDeliveryDto, CreateFoodMultiDeliveryDto, CreateParcelDeliveryDto, RateDeliveryDto, UpdateDeliveryStatusDto, ValidatePromoDto } from './deliveries.dto';
@@ -118,21 +119,53 @@ export class DeliveriesController {
   }
 
   @Get('offers')
-  @ApiOperation({ summary: 'Offres livraison pour chauffeur/coursier' })
-  offers(@Request() req: { user: { id: string } }) {
-    return this.deliveriesService.getDriverOffers(req.user.id);
+  @ApiOperation({ summary: 'Offres livraison et courses/commissions pour chauffeur' })
+  async offers(@Request() req: { user: { id: string } }) {
+    const [deliveries, errands] = await Promise.all([
+      this.deliveriesService.getDriverOffers(req.user.id),
+      this.errandsService.getDriverOffers(req.user.id),
+    ]);
+    const offers = [...deliveries.offers, ...errands.offers].sort((a, b) => {
+      const left = a as Record<string, unknown>;
+      const right = b as Record<string, unknown>;
+      if (left.alreadyAssigned && !right.alreadyAssigned) return -1;
+      if (!left.alreadyAssigned && right.alreadyAssigned) return 1;
+      return ((left.distanceToPickupKm as number) ?? 999) - ((right.distanceToPickupKm as number) ?? 999);
+    });
+    return { offers, documentsBlocked: deliveries.documentsBlocked };
+  }
+
+  @Get('assignments')
+  @ApiOperation({ summary: 'Courses/commissions assignées au chauffeur par l\'admin' })
+  assignments(@Request() req: { user: { id: string } }) {
+    return this.errandsService.listForDriver(req.user.id);
   }
 
   @Post(':id/accept')
-  @ApiOperation({ summary: 'Accepter une livraison (chauffeur/coursier)' })
-  accept(@Request() req: { user: { id: string } }, @Param('id') id: string) {
-    return this.deliveriesService.acceptDelivery(id, req.user.id);
+  @ApiOperation({ summary: 'Accepter une livraison ou course/commission (chauffeur)' })
+  async accept(@Request() req: { user: { id: string } }, @Param('id') id: string) {
+    try {
+      return await this.deliveriesService.acceptDelivery(id, req.user.id);
+    } catch (error) {
+      if (error instanceof MovaHttpException && error.code === MovaErrorCode.DELIVERY_NOT_FOUND) {
+        return this.errandsService.acceptErrand(id, req.user.id);
+      }
+      throw error;
+    }
   }
 
   @Get('history')
   @ApiOperation({ summary: 'Historique livraisons (passager ou chauffeur via ?role=driver)' })
-  history(@Request() req: { user: { id: string } }, @Query('role') role?: string) {
-    return this.deliveriesService.getHistory(req.user.id, role);
+  async history(@Request() req: { user: { id: string } }, @Query('role') role?: string) {
+    const deliveries = await this.deliveriesService.getHistory(req.user.id, role);
+    if (role !== 'driver') return deliveries;
+    const errands = await this.errandsService.listDriverHistory(req.user.id);
+    return {
+      data: [...deliveries.data, ...errands].sort(
+        (a, b) =>
+          new Date((b.createdAt as string) ?? 0).getTime() - new Date((a.createdAt as string) ?? 0).getTime(),
+      ),
+    };
   }
 
   @Post(':id/cancel')
@@ -142,9 +175,16 @@ export class DeliveriesController {
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Détail livraison' })
-  get(@Request() req: { user: { id: string } }, @Param('id') id: string) {
-    return this.deliveriesService.getDelivery(id, req.user.id);
+  @ApiOperation({ summary: 'Détail livraison ou course/commission' })
+  async get(@Request() req: { user: { id: string } }, @Param('id') id: string) {
+    try {
+      return this.deliveriesService.getDelivery(id, req.user.id);
+    } catch (error) {
+      if (error instanceof MovaHttpException && error.code === MovaErrorCode.DELIVERY_NOT_FOUND) {
+        return this.errandsService.get(id, req.user.id);
+      }
+      throw error;
+    }
   }
 
   @Patch(':id/status')

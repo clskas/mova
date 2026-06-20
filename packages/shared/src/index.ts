@@ -14,4 +14,6 @@ export * from './jwt-user';
 export * from './redis.module';
 export * from './request-id.middleware';
 export * from './kyc-documents';
+export * from './kyc-ocr';
+export * from './driver-documents';
 export * from './public-id';

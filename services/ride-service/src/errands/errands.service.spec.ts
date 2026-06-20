@@ -22,10 +22,13 @@ describe('ErrandsService', () => {
   } as unknown as CommissionService;
 
   const prisma = {
-    errandOrder: { create: jest.fn(), findMany: jest.fn(), findUnique: jest.fn() },
+    errandOrder: { create: jest.fn(), findMany: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
   };
 
-  const service = new ErrandsService(prisma as never, pricing, commission);
+  const redis = { publish: jest.fn().mockResolvedValue(1) };
+  const trackingService = { getTrace: jest.fn().mockResolvedValue([]) };
+
+  const service = new ErrandsService(prisma as never, pricing, commission, redis as never, trackingService as never);
 
   const dto = {
     description: 'Acheter pain et lait',
@@ -48,5 +51,10 @@ describe('ErrandsService', () => {
     const result = await service.create('user-1', dto);
     expect(result.order.status).toBe('PENDING');
     expect(prisma.errandOrder.create).toHaveBeenCalled();
+  });
+
+  it('retourne une liste vide si le chauffeur est indisponible', async () => {
+    const offers = await service.getDriverOffers('driver-offline');
+    expect(offers.offers).toEqual([]);
   });
 });

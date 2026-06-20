@@ -1,12 +1,16 @@
 import { Logger } from '@nestjs/common';
 import { ConnectedSocket, MessageBody, OnGatewayConnection, OnGatewayDisconnect, SubscribeMessage, WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
+import { TrackingReferenceType } from '@prisma/client';
 import { INTERNAL_API_KEY, serviceUrl } from '@mova/shared';
 import { Server, Socket } from 'socket.io';
+import { TrackingService } from '../tracking/tracking.service';
 
 @WebSocketGateway({ cors: { origin: '*' }, namespace: '/tracking' })
 export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer() server: Server;
   private readonly logger = new Logger(TrackingGateway.name);
+
+  constructor(private tracking: TrackingService) {}
 
   handleConnection(client: Socket) {
     this.logger.log(`Client connected: ${client.id}`);
@@ -28,19 +32,40 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
     return this.broadcastDriverLocation(client, data);
   }
 
+  @SubscribeMessage('courier:location')
+  async handleCourierLocation(
+    @ConnectedSocket() client: Socket,
+    @MessageBody()
+    data: {
+      userId: string;
+      lat: number;
+      lng: number;
+      deliveryId?: string;
+      referenceType?: string;
+      referenceId?: string;
+    },
+  ) {
+    await this.updateDriverCoords(client, data.userId, data.lat, data.lng);
+    const refType = (data.referenceType ?? (data.deliveryId ? 'DELIVERY' : undefined))?.toUpperCase();
+    const refId = data.referenceId ?? data.deliveryId;
+    if (refType && refId) {
+      try {
+        await this.tracking.recordPoint(this.tracking.normalizeType(refType), refId, data.lat, data.lng);
+      } catch {
+        /* type inconnu */
+      }
+    }
+    const payload = { lat: data.lat, lng: data.lng, ts: Date.now() };
+    if (refId) {
+      this.server.to(`delivery:${refId}`).emit('courier:location', payload);
+    }
+    return { success: true };
+  }
+
   private async broadcastDriverLocation(client: Socket, data: { userId: string; lat: number; lng: number; rideId?: string }) {
-    if (data.userId) {
-      await fetch(serviceUrl('driver', '/drivers/location'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${client.handshake.auth?.token ?? ''}` },
-        body: JSON.stringify({ lat: data.lat, lng: data.lng }),
-      }).catch(() =>
-        fetch(serviceUrl('driver', `/internal/drivers/${data.userId}/location`), {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json', 'x-internal-api-key': INTERNAL_API_KEY },
-          body: JSON.stringify({ lat: data.lat, lng: data.lng }),
-        }),
-      );
+    await this.updateDriverCoords(client, data.userId, data.lat, data.lng);
+    if (data.rideId) {
+      await this.tracking.recordPoint(TrackingReferenceType.RIDE, data.rideId, data.lat, data.lng);
     }
     const payload = { lat: data.lat, lng: data.lng, ts: Date.now() };
     if (data.rideId) {
@@ -48,6 +73,21 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
       this.server.to(`ride:${data.rideId}`).emit('ride:location', payload);
     }
     return { success: true };
+  }
+
+  private async updateDriverCoords(client: Socket, userId: string, lat: number, lng: number) {
+    if (!userId) return;
+    await fetch(serviceUrl('driver', '/drivers/location'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${client.handshake.auth?.token ?? ''}` },
+      body: JSON.stringify({ lat, lng }),
+    }).catch(() =>
+      fetch(serviceUrl('driver', `/internal/drivers/${userId}/location`), {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'x-internal-api-key': INTERNAL_API_KEY },
+        body: JSON.stringify({ lat, lng }),
+      }),
+    );
   }
 
   @SubscribeMessage('ride:subscribe')
@@ -64,7 +104,7 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
       client.emit('courier:location', payload);
       this.server.to(`delivery:${data.deliveryId}`).emit('courier:location', payload);
     }
-    return { subscribed: data.deliveryId, mode: 'mock' };
+    return { subscribed: data.deliveryId };
   }
 
   @SubscribeMessage('ride:status')

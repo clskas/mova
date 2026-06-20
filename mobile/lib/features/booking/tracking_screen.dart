@@ -73,6 +73,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
   LatLng _pickup = MovaRideMap.mapDefaultCenter();
   LatLng? _dropoff;
   LatLng? _driverPos;
+  List<LatLng> _routeTrace = [];
   int _etaMinutes = 5;
   bool _loading = true;
   bool _waitingDriver = false;
@@ -201,6 +202,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
     if (driverLat != null && driverLng != null) {
       _driverPos = LatLng(driverLat, driverLng);
     }
+    _routeTrace = MovaRideMap.parseGpsTrace(data['gpsTrace']);
     _updateEtaFromRide(data);
 
     if (api.rideHasDriver(data)) {
@@ -229,6 +231,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
       'vehicleModel': 'Honda Ace',
     };
     _driverPos ??= LatLng(_pickup.latitude + 0.008, _pickup.longitude + 0.005);
+    _routeTrace = [_driverPos!];
     _dropoff ??= LatLng(MarketConfig.defaultLat - 0.03, MarketConfig.defaultLng + 0.04);
     _startMockSimulation();
   }
@@ -252,6 +255,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
             _driverPos = LatLng(driverLat, driverLng);
             _updateEtaFromDriverPosition(_driverPos!);
           }
+          _routeTrace = MovaRideMap.parseGpsTrace(data['gpsTrace']);
           _updateEtaFromRide(data);
         });
       }
@@ -303,6 +307,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
           final pos = LatLng(lat.toDouble(), lng.toDouble());
           setState(() {
             _driverPos = pos;
+            _appendTracePoint(pos);
             _updateEtaFromDriverPosition(pos);
           });
         }
@@ -323,6 +328,16 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
     );
   }
 
+  void _appendTracePoint(LatLng pos) {
+    if (_routeTrace.isNotEmpty) {
+      final last = _routeTrace.last;
+      final moved = (last.latitude - pos.latitude).abs() > 0.00001 ||
+          (last.longitude - pos.longitude).abs() > 0.00001;
+      if (!moved) return;
+    }
+    _routeTrace = [..._routeTrace, pos];
+  }
+
   void _startMockSimulation() {
     if (!ref.read(apiClientProvider).isMockMode) return;
     if (_mockTimer?.isActive == true) return;
@@ -339,6 +354,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
             _driverPos!.latitude - 0.002,
             _driverPos!.longitude - 0.001,
           );
+          _appendTracePoint(_driverPos!);
         }
         if (_mockStep >= mockStatuses.length - 1) {
           _mockTimer?.cancel();
@@ -507,6 +523,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
                       pickup: _pickup,
                       dropoff: _dropoff,
                       driver: _driverPos,
+                      routeTrace: _routeTrace,
                       height: 200,
                     ),
                     if (_mock)

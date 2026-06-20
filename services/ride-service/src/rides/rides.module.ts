@@ -8,10 +8,11 @@ import { PricingAdminService } from './pricing-admin.service';
 import { CommissionService } from './commission.service';
 import { SurchargeService, PromoService } from './surcharge.service';
 import { MatchingModule } from '../matching/matching.module';
+import { TrackingModule } from '../tracking/tracking.module';
 import { WebsocketModule } from '../websocket/websocket.module';
 
 @Module({
-  imports: [MatchingModule, WebsocketModule],
+  imports: [MatchingModule, WebsocketModule, TrackingModule],
   controllers: [RidesController],
   providers: [RidesService, ScheduledRidesService, RideSearchScheduler, PricingService, PricingAdminService, CommissionService, SurchargeService, PromoService],
   exports: [RidesService, ScheduledRidesService, PricingService, PricingAdminService, CommissionService, SurchargeService, PromoService],

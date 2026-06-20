@@ -7,6 +7,9 @@ import {
   fetchDrivers,
   regenerateDriverActivationPin,
   reviewDriverKyc,
+  reviewDriverDocumentsRenewal,
+  reviewVehicleTypeApproval,
+  runKycOcr,
   setDriverStatus,
   type AdminDriver,
   type AdminDriverDetail,
@@ -36,7 +39,117 @@ const KYC_DOC_LABELS: Record<string, string> = {
   CRIMINAL_RECORD: "Casier judiciaire",
 };
 
+const RENEWAL_DOC_TYPES = ["DRIVERS_LICENSE", "VEHICLE_INSURANCE", "TECHNICAL_INSPECTION"] as const;
+
+const VEHICLE_TYPE_LABELS: Record<string, string> = {
+  MOTO_TAXI: "Moto-taxi",
+  STANDARD: "Standard",
+  COMFORT: "Confort",
+  VIP: "VIP",
+};
+
+function activeDriverVehicle(driver?: AdminDriver | AdminDriverDetail | null) {
+  if (!driver?.vehicles?.length) return null;
+  return driver.vehicles.find((v) => v.isActive !== false) ?? driver.vehicles[0];
+}
+
+function vehicleTypeApprovalLabel(status?: string | null): string {
+  switch (status) {
+    case "APPROVED":
+      return "Type validé";
+    case "REJECTED":
+      return "Type refusé";
+    case "PENDING":
+    default:
+      return "Type en attente";
+  }
+}
+
+function vehicleTypeApprovalClass(status?: string | null): string {
+  switch (status) {
+    case "APPROVED":
+      return "text-green-800 bg-green-50 border-green-200";
+    case "REJECTED":
+      return "text-red-800 bg-red-50 border-red-200";
+    default:
+      return "text-amber-900 bg-amber-50 border-amber-200";
+  }
+}
+
+type KycOcrInfo = NonNullable<NonNullable<AdminDriverDetail["kyc"]>["checklist"]>[number]["ocr"];
+
+function ocrStatusLabel(status?: string | null): string {
+  switch (status) {
+    case "MATCH":
+      return "OCR conforme";
+    case "MISMATCH":
+      return "OCR — écart détecté";
+    case "UNREADABLE":
+      return "OCR illisible";
+    case "SKIPPED":
+      return "OCR désactivé";
+    case "PROCESSING":
+      return "OCR en cours…";
+    default:
+      return "OCR en attente";
+  }
+}
+
+function ocrStatusClass(status?: string | null): string {
+  switch (status) {
+    case "MATCH":
+      return "text-green-700 bg-green-50 border-green-200";
+    case "MISMATCH":
+      return "text-red-700 bg-red-50 border-red-200";
+    case "UNREADABLE":
+      return "text-amber-800 bg-amber-50 border-amber-200";
+    case "SKIPPED":
+      return "text-gray-600 bg-gray-50 border-gray-200";
+    case "PROCESSING":
+      return "text-blue-700 bg-blue-50 border-blue-200";
+    default:
+      return "text-gray-500 bg-gray-50 border-gray-200";
+  }
+}
+
+function formatOcrDate(value?: string | null): string | null {
+  if (!value) return null;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString("fr-FR");
+}
+
+function OcrBadge({ ocr }: { ocr?: KycOcrInfo | null }) {
+  if (!ocr) return null;
+  const extracted = formatOcrDate(ocr.extractedExpiry);
+  const profile = formatOcrDate(ocr.profileExpiry);
+  return (
+    <div className={`mt-2 rounded-lg border px-3 py-2 text-xs space-y-1 ${ocrStatusClass(ocr.status)}`}>
+      <p className="font-medium">{ocrStatusLabel(ocr.status)}</p>
+      {extracted && <p>Date détectée : {extracted}</p>}
+      {profile && <p>Date profil : {profile}</p>}
+      {ocr.confidence != null && <p>Confiance : {Math.round(ocr.confidence * 100)} %</p>}
+      {ocr.notes && <p>{ocr.notes}</p>}
+      {ocr.checkedAt && (
+        <p className="opacity-70">Analysé le {new Date(ocr.checkedAt).toLocaleString("fr-FR")}</p>
+      )}
+    </div>
+  );
+}
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
+
+function resolveDocumentUrl(url?: string | null): string | null {
+  if (!url) return null;
+  if (url.startsWith("http://") || url.startsWith("https://")) return url;
+  return `${API_BASE}${url.startsWith("/") ? url : `/${url}`}`;
+}
+
 function driverStageLabel(d: AdminDriver | AdminDriverDetail): string {
+  const vehicle = activeDriverVehicle(d);
+  if (vehicle?.typeApprovalStatus === "REJECTED") return "Type engin refusé";
+  if (vehicle?.typeApprovalStatus === "PENDING" && d.onboardingCompleted) return "Type engin — à valider";
+  if (d.documentsRenewalPending) return "Renouvellement docs — à valider";
   if (d.kycStatus === "APPROVED") {
     if (d.activationPinVerified) return "Actif (PIN OK)";
     return "KYC OK — PIN à transmettre";
@@ -63,6 +176,7 @@ export default function ChauffeursPage() {
   const [actionTarget, setActionTarget] = useState<{ driver: AdminDriver; activate: boolean } | null>(null);
   const [saving, setSaving] = useState(false);
   const [activationPin, setActivationPin] = useState<string | null>(null);
+  const [vehicleTypeRejectNotes, setVehicleTypeRejectNotes] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -152,6 +266,58 @@ export default function ChauffeursPage() {
     }
   }
 
+  async function reviewDocumentsRenewal(approved: boolean) {
+    if (!selectedId) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await reviewDriverDocumentsRenewal(selectedId, approved);
+      load();
+      const refreshed = await fetchDriverDetail(selectedId);
+      setDetail(refreshed);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Échec validation renouvellement");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function reviewVehicleType(approved: boolean) {
+    if (!selectedId) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await reviewVehicleTypeApproval(
+        selectedId,
+        approved,
+        approved ? undefined : vehicleTypeRejectNotes.trim() || undefined,
+      );
+      if (approved) setVehicleTypeRejectNotes("");
+      load();
+      const refreshed = await fetchDriverDetail(selectedId);
+      setDetail(refreshed);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Échec validation type d'engin");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function triggerKycOcr(documentId: string) {
+    if (!selectedId) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await runKycOcr(documentId);
+      const refreshed = await fetchDriverDetail(selectedId);
+      setDetail(refreshed);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Échec analyse OCR");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function generatePin() {
     if (!selectedId) return;
     setSaving(true);
@@ -169,6 +335,11 @@ export default function ChauffeursPage() {
   }
 
   const selected = detail ?? drivers.find((d) => d.userId === selectedId) ?? null;
+  const selectedVehicle = activeDriverVehicle(selected);
+  const vehicleTypeStatus =
+    selectedVehicle?.typeApprovalStatus ??
+    ("vehicleTypeApprovalStatus" in (selected ?? {}) ? selected?.vehicleTypeApprovalStatus : undefined) ??
+    selected?.vehicle?.typeApprovalStatus;
 
   return (
     <div className="max-w-6xl mx-auto">
@@ -234,6 +405,38 @@ export default function ChauffeursPage() {
               <p><span className="text-gray-500">Note:</span> {selected.ratingAvg?.toFixed(1)} / 5</p>
               <p><span className="text-gray-500">Courses:</span> {selected.totalRides}</p>
               <p><span className="text-gray-500">Permis:</span> {selected.licenseNumber ?? "—"}</p>
+              {"licenseExpiry" in selected && (
+                <p>
+                  <span className="text-gray-500">Expiration permis:</span>{" "}
+                  {selected.licenseExpiry ? new Date(selected.licenseExpiry).toLocaleDateString("fr-FR") : "—"}
+                </p>
+              )}
+              {"insuranceExpiry" in selected && (
+                <p>
+                  <span className="text-gray-500">Expiration assurance:</span>{" "}
+                  {selected.insuranceExpiry ? new Date(selected.insuranceExpiry).toLocaleDateString("fr-FR") : "—"}
+                </p>
+              )}
+              {"technicalInspectionExpiry" in selected && (
+                <p>
+                  <span className="text-gray-500">Visite technique:</span>{" "}
+                  {selected.technicalInspectionExpiry
+                    ? new Date(selected.technicalInspectionExpiry).toLocaleDateString("fr-FR")
+                    : "—"}
+                </p>
+              )}
+              {"documentsStatus" in selected && selected.documentsStatus && (
+                <p>
+                  <span className="text-gray-500">Documents opérationnels:</span>{" "}
+                  {selected.documentsStatus.canOperate ? (
+                    <span className="text-green-700">Oui</span>
+                  ) : (
+                    <span className="text-red-700">
+                      Non — {selected.documentsStatus.blockReason ?? "expirés ou incomplets"}
+                    </span>
+                  )}
+                </p>
+              )}
               <p><span className="text-gray-500">N° identité:</span> {"idDocumentNumber" in selected ? selected.idDocumentNumber ?? "—" : "—"}</p>
               <p><span className="text-gray-500">Disponible:</span> {selected.isAvailable ? "Oui" : "Non"}</p>
               {"payoutProvider" in selected && selected.payoutProvider && (
@@ -298,19 +501,167 @@ export default function ChauffeursPage() {
               </div>
             )}
 
+            {"documentsRenewalPending" in selected && selected.documentsRenewalPending && canReviewKyc && (
+              <div className="rounded-xl bg-amber-50 border border-amber-200 p-4 text-sm space-y-3">
+                <p className="font-semibold text-amber-950">Renouvellement de documents à vérifier</p>
+                <p className="text-amber-900">
+                  Le chauffeur a modifié une date d&apos;expiration
+                  {selected.documentsRenewalRequestedAt
+                    ? ` le ${new Date(selected.documentsRenewalRequestedAt).toLocaleString("fr-FR")}`
+                    : ""}
+                  . L&apos;OCR compare automatiquement les dates sur les justificatifs avec le profil — validez manuellement après vérification.
+                </p>
+                <ol className="list-decimal list-inside text-amber-900 space-y-1">
+                  <li>Consultez le résultat OCR (date détectée vs date profil).</li>
+                  <li>Ouvrez le justificatif si l&apos;OCR signale un écart ou est illisible.</li>
+                  <li>Validez uniquement si le document est authentique et non expiré.</li>
+                </ol>
+                {"kyc" in selected && selected.kyc?.checklist && (
+                  <ul className="space-y-2">
+                    {selected.kyc.checklist
+                      .filter((item) => RENEWAL_DOC_TYPES.includes(item.type as (typeof RENEWAL_DOC_TYPES)[number]))
+                      .map((item) => (
+                        <li key={item.type} className="flex flex-col gap-2 bg-white/70 rounded-lg px-3 py-2">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <span>{item.label ?? KYC_DOC_LABELS[item.type] ?? item.type}</span>
+                            <div className="flex flex-wrap items-center gap-2">
+                              {item.ocr?.documentId && canReviewKyc && (
+                                <button
+                                  type="button"
+                                  onClick={() => triggerKycOcr(item.ocr!.documentId!)}
+                                  disabled={saving || item.ocr?.status === "PROCESSING"}
+                                  className="text-xs text-[#6C63FF] hover:underline disabled:opacity-50"
+                                >
+                                  {item.ocr?.status === "PROCESSING" ? "Analyse…" : "Relancer OCR"}
+                                </button>
+                              )}
+                              {item.url ? (
+                                <a
+                                  href={resolveDocumentUrl(item.url) ?? "#"}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="text-[#6C63FF] hover:underline text-sm"
+                                >
+                                  Voir le justificatif
+                                </a>
+                              ) : (
+                                <span className="text-red-700 text-sm">Document manquant</span>
+                              )}
+                            </div>
+                          </div>
+                          <OcrBadge ocr={item.ocr} />
+                        </li>
+                      ))}
+                  </ul>
+                )}
+                <div className="flex flex-wrap gap-2 pt-1">
+                  <BtnSuccess onClick={() => reviewDocumentsRenewal(true)} disabled={saving}>
+                    Valider le renouvellement
+                  </BtnSuccess>
+                  <BtnDanger onClick={() => reviewDocumentsRenewal(false)} disabled={saving}>
+                    Refuser (chauffeur bloqué)
+                  </BtnDanger>
+                </div>
+              </div>
+            )}
+
             {"kyc" in selected && selected.kyc?.checklist && selected.kyc.checklist.length > 0 && (
               <div>
                 <p className="text-sm font-medium mb-2">Documents KYC</p>
                 <ul className="text-sm space-y-1">
                   {selected.kyc.checklist.map((item) => (
-                    <li key={item.type} className="flex justify-between bg-gray-50 rounded-lg px-3 py-2">
-                      <span>{item.label ?? KYC_DOC_LABELS[item.type] ?? item.type}</span>
-                      <span className={item.uploaded ? "text-green-600" : "text-gray-400"}>
-                        {item.uploaded ? `✓ ${item.status ?? "uploadé"}` : item.required ? "Manquant" : "Optionnel"}
-                      </span>
+                    <li key={item.type} className="bg-gray-50 rounded-lg px-3 py-2 space-y-1">
+                      <div className="flex justify-between">
+                        <span>{item.label ?? KYC_DOC_LABELS[item.type] ?? item.type}</span>
+                        <span className={item.uploaded ? "text-green-600" : "text-gray-400"}>
+                          {item.uploaded ? `✓ ${item.status ?? "uploadé"}` : item.required ? "Manquant" : "Optionnel"}
+                        </span>
+                      </div>
+                      {RENEWAL_DOC_TYPES.includes(item.type as (typeof RENEWAL_DOC_TYPES)[number]) && item.uploaded && (
+                        <>
+                          <OcrBadge ocr={item.ocr} />
+                          {item.ocr?.documentId && canReviewKyc && (
+                            <button
+                              type="button"
+                              onClick={() => triggerKycOcr(item.ocr!.documentId!)}
+                              disabled={saving || item.ocr?.status === "PROCESSING"}
+                              className="text-xs text-[#6C63FF] hover:underline disabled:opacity-50"
+                            >
+                              {item.ocr?.status === "PROCESSING" ? "Analyse OCR…" : "Analyser OCR"}
+                            </button>
+                          )}
+                        </>
+                      )}
                     </li>
                   ))}
                 </ul>
+              </div>
+            )}
+
+            {selectedVehicle && (
+              <div className={`rounded-xl border p-4 text-sm space-y-3 ${vehicleTypeApprovalClass(vehicleTypeStatus)}`}>
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <p className="font-semibold">Validation du type d&apos;engin</p>
+                  <span className="text-xs font-medium px-2 py-0.5 rounded-full border bg-white/60">
+                    {vehicleTypeApprovalLabel(vehicleTypeStatus)}
+                  </span>
+                </div>
+                <p>
+                  Catégorie déclarée par le chauffeur :{" "}
+                  <strong>{VEHICLE_TYPE_LABELS[selectedVehicle.type] ?? selectedVehicle.type}</strong>
+                </p>
+                <p className="text-xs opacity-90">
+                  Comparez la photo de l&apos;engin avec la catégorie (ex. refuser VIP si la photo montre une moto).
+                  Le chauffeur ne peut pas passer en ligne tant que le type n&apos;est pas validé.
+                </p>
+                {(() => {
+                  const photo = resolveDocumentUrl(selectedVehicle.imageUrl);
+                  return photo ? (
+                    <img
+                      src={photo}
+                      alt="Photo engin"
+                      className="w-full max-w-xs h-36 object-cover rounded-lg border bg-white"
+                    />
+                  ) : (
+                    <p className="text-xs">Photo de l&apos;engin non fournie — demandez une mise à jour au chauffeur.</p>
+                  );
+                })()}
+                {selectedVehicle.typeApprovalNotes && vehicleTypeStatus === "REJECTED" && (
+                  <p className="text-xs">
+                    Motif du refus : <em>{selectedVehicle.typeApprovalNotes}</em>
+                  </p>
+                )}
+                {selectedVehicle.typeApprovedAt && vehicleTypeStatus === "APPROVED" && (
+                  <p className="text-xs opacity-80">
+                    Validé le {new Date(selectedVehicle.typeApprovedAt).toLocaleString("fr-FR")}
+                  </p>
+                )}
+                {canReviewKyc && vehicleTypeStatus !== "APPROVED" && (
+                  <div className="space-y-2 pt-1">
+                    <textarea
+                      value={vehicleTypeRejectNotes}
+                      onChange={(e) => setVehicleTypeRejectNotes(e.target.value)}
+                      placeholder="Motif du refus (ex. photo = moto, catégorie VIP déclarée) — optionnel"
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs text-gray-800 bg-white"
+                      rows={2}
+                    />
+                    <div className="flex flex-wrap gap-2">
+                      <BtnSuccess onClick={() => reviewVehicleType(true)} disabled={saving}>
+                        Valider ce type d&apos;engin
+                      </BtnSuccess>
+                      <BtnDanger onClick={() => reviewVehicleType(false)} disabled={saving}>
+                        Refuser le type déclaré
+                      </BtnDanger>
+                    </div>
+                  </div>
+                )}
+                {canReviewKyc && vehicleTypeStatus === "APPROVED" && (
+                  <div className="flex flex-wrap gap-2 pt-1 border-t border-green-200/80">
+                    <BtnDanger onClick={() => reviewVehicleType(false)} disabled={saving}>
+                      Révoquer la validation du type
+                    </BtnDanger>
+                  </div>
+                )}
               </div>
             )}
 
@@ -331,7 +682,12 @@ export default function ChauffeursPage() {
                             <img src={photo} alt="" className="w-16 h-12 object-cover rounded border shrink-0" />
                           ) : null}
                           <div>
-                            {v.type} · {v.plateNumber} {v.make && `· ${v.make} ${v.model ?? ""}`}
+                            {VEHICLE_TYPE_LABELS[v.type] ?? v.type} · {v.plateNumber} {v.make && `· ${v.make} ${v.model ?? ""}`}
+                            {v.typeApprovalStatus && (
+                              <span className="block text-xs text-gray-500 mt-0.5">
+                                Validation type : {vehicleTypeApprovalLabel(v.typeApprovalStatus)}
+                              </span>
+                            )}
                             {!photo && <span className="block text-xs text-gray-400 mt-1">Photo non fournie</span>}
                           </div>
                         </div>

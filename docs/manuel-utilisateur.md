@@ -1,13 +1,45 @@
 # Manuel utilisateur MOVA
 
 !!! tip "Documentation vivante"
-    Le manuel détaillé est maintenu dans [`docs/user-manual/`](user-manual/index.md) et alimente le contenu in-app mobile.
+    Le manuel détaillé est maintenu dans [`docs/user-manual/`](user-manual/index.md) et alimente le contenu in-app mobile (`mobile/assets/legal/manuel_fr.md`).
 
-## Sommaire
+## Sommaire par profil
 
-- [Vue d'ensemble](user-manual/index.md)
-- [Passager](user-manual/passager.md) — taxi, colis, repas, express, location, déménagement…
-- [Chauffeur](user-manual/chauffeur.md)
-- [Admin](user-manual/admin.md)
+| Profil | Document | Accès |
+|--------|----------|-------|
+| **Passager** | [passager.md](user-manual/passager.md) | App mobile Passager, Web PWA — taxi, colis, repas, location, suivi GPS… |
+| **Chauffeur** | [chauffeur.md](user-manual/chauffeur.md) | App mobile Chauffeur — KYC, missions, position GPS, revenus |
+| **Équipe interne** | [admin.md](user-manual/admin.md) | Console admin — **5 rôles** avec menus et droits différents |
+
+## Niveaux d'accès — vue d'ensemble
+
+### Applications mobiles (grand public)
+
+- **Passager** : commander et suivre des services (courses, livraisons, wallet). Pas d'accès à la console admin.
+- **Chauffeur** : accepter des missions après validation KYC (et type d'engin si applicable). Envoi automatique de la position GPS en mission.
+
+### Console admin (staff uniquement)
+
+| Rôle | Téléphone démo | Périmètre |
+|------|----------------|-----------|
+| SUPER_ADMIN | `+243900000001` | Accès et écriture sur tous les modules |
+| ADMIN | `+243900000002` | Idem |
+| SUPPORT | `+243900000003` | KYC, courses, livraisons, litiges, traces GPS |
+| FINANCE | `+243900000004` | Tarifs, abonnements, portefeuille |
+| CONTENT | `+243900000005` | Restaurants, communes, catalogue location |
+
+Voir [Admin — Niveaux d'accès par rôle](user-manual/admin.md#niveaux-daccès-par-rôle) pour le détail des menus et permissions.
+
+## Nouveautés récentes (juin 2026)
+
+- **Trace GPS** : trajet parcouru visible passager, chauffeur (mission active) et admin (Courses / Livraisons).
+- **Validation type d'engin** : VIP, Confort, etc. — approbation admin avant mise en ligne.
+- **OCR KYC** : aide à la lecture des documents chauffeur côté admin.
+- **Catalogue location** : gestion des véhicules à louer (rôle CONTENT+).
+
+## Guides de test
+
+- [GUIDE_TEST_APPS.md](GUIDE_TEST_APPS.md) — test manuel Admin, Passager, Chauffeur + microservices
+- [RBAC_TESTING.md](RBAC_TESTING.md) — vérification des rôles staff
 
 Voir aussi la section **Documentation utilisateur** sur la [page d'accueil](index.md).

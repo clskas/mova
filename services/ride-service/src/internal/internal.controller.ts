@@ -4,6 +4,7 @@ import {
   CarpoolStatus,
   CommissionServiceType,
   DeliveryStatus,
+  ErrandOrderStatus,
   MovingRequestStatus,
   RentalInquiryStatus,
   RideStatus,
@@ -11,9 +12,11 @@ import {
   VehicleType,
   SurchargeType,
 } from '@prisma/client';
+import { MovaErrorCode, MovaHttpException } from '@mova/shared';
 import { InternalApiGuard } from '../common/internal-api.guard';
 import { CarpoolService } from '../carpool/carpool.service';
 import { DeliveriesService } from '../deliveries/deliveries.service';
+import { ErrandsService } from '../errands/errands.service';
 import { GeoService } from '../geo/geo.service';
 import { MovingService } from '../moving/moving.service';
 import { PaymentInfoService } from './payment-info.service';
@@ -21,6 +24,7 @@ import { PricingAdminService } from '../rides/pricing-admin.service';
 import { RentalService } from '../rental/rental.service';
 import { ScheduledRidesService } from '../rides/scheduled-rides.service';
 import { RidesService } from '../rides/rides.service';
+import { TrackingService } from '../tracking/tracking.service';
 
 @ApiTags('internal')
 @Controller('internal')
@@ -29,6 +33,7 @@ export class InternalController {
   constructor(
     private rides: RidesService,
     private deliveries: DeliveriesService,
+    private errands: ErrandsService,
     private scheduledRides: ScheduledRidesService,
     private pricingAdmin: PricingAdminService,
     private paymentInfo: PaymentInfoService,
@@ -36,7 +41,14 @@ export class InternalController {
     private carpool: CarpoolService,
     private moving: MovingService,
     private rental: RentalService,
+    private tracking: TrackingService,
   ) {}
+
+  @Get('tracking/:type/:id/trace')
+  getGpsTrace(@Param('type') type: string, @Param('id') id: string) {
+    const referenceType = this.tracking.normalizeType(type);
+    return this.tracking.getTraceSummary(referenceType, id);
+  }
 
   @Get('services/:referenceType/:referenceId/payment-info')
   getPaymentInfo(@Param('referenceType') referenceType: string, @Param('referenceId') referenceId: string) {
@@ -90,23 +102,56 @@ export class InternalController {
   }
 
   @Get('deliveries')
-  listDeliveries(@Query('take') take?: string) {
-    return this.deliveries.listForAdmin(Number(take ?? 50));
+  async listDeliveries(@Query('take') take?: string) {
+    const limit = Number(take ?? 50);
+    const [deliveries, errands] = await Promise.all([
+      this.deliveries.listForAdmin(limit),
+      this.errands.listForAdmin(limit),
+    ]);
+    return [...deliveries, ...errands]
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, limit);
   }
 
   @Get('deliveries/:id')
-  getDelivery(@Param('id') id: string) {
-    return this.deliveries.getDeliveryAdmin(id);
+  async getDelivery(@Param('id') id: string) {
+    try {
+      return await this.deliveries.getDeliveryAdmin(id);
+    } catch (error) {
+      if (error instanceof MovaHttpException && error.code === MovaErrorCode.DELIVERY_NOT_FOUND) {
+        return this.errands.getAdmin(id);
+      }
+      throw error;
+    }
   }
 
   @Patch('deliveries/:id/status')
-  updateDeliveryStatus(@Param('id') id: string, @Body('status') status: DeliveryStatus) {
-    return this.deliveries.updateStatusAdmin(id, status);
+  async updateDeliveryStatus(@Param('id') id: string, @Body('status') status: DeliveryStatus | ErrandOrderStatus) {
+    try {
+      return await this.deliveries.updateStatusAdmin(id, status as DeliveryStatus);
+    } catch (error) {
+      if (error instanceof MovaHttpException && error.code === MovaErrorCode.DELIVERY_NOT_FOUND) {
+        return this.errands.adminUpdateStatus(id, status as ErrandOrderStatus);
+      }
+      throw error;
+    }
   }
 
   @Post('deliveries/:id/cancel')
-  cancelDelivery(@Param('id') id: string, @Body('reason') reason?: string) {
-    return this.deliveries.adminCancelDelivery(id, reason);
+  async cancelDelivery(@Param('id') id: string, @Body('reason') reason?: string) {
+    try {
+      return await this.deliveries.adminCancelDelivery(id, reason);
+    } catch (error) {
+      if (error instanceof MovaHttpException && error.code === MovaErrorCode.DELIVERY_NOT_FOUND) {
+        return this.errands.adminCancel(id, reason);
+      }
+      throw error;
+    }
+  }
+
+  @Patch('deliveries/:id/assign')
+  assignDelivery(@Param('id') id: string, @Body('driverId') driverId: string) {
+    return this.errands.adminAssignDriver(id, driverId);
   }
 
   @Get('scheduled-rides')

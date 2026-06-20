@@ -35,6 +35,7 @@ export class InternalController {
     return this.drivers.findNearby(q.lat, q.lng, q.vehicleType as VehicleType, q.searchAttempt ?? 0, q.city);
   }
   @Get('drivers/count') count() { return this.drivers.countDrivers().then((count) => ({ count })); }
+  @Get('drivers/stats') driverStats() { return this.drivers.getAdminStats(); }
   @Get('drivers') listDrivers(
     @Query('skip') skip?: string,
     @Query('take') take?: string,

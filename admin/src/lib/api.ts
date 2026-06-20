@@ -10,15 +10,60 @@ const USE_API_MOCK = process.env.NEXT_PUBLIC_USE_API_MOCK === "true";
 export type AdminMetrics = {
   users?: number;
   drivers?: number;
+  availableDrivers?: number;
+  pendingKyc?: number;
+  approvedDrivers?: number;
   rides?: number;
   completedRides?: number;
   revenueCdf?: number;
   openIncidents?: number;
+  sosIncidents?: number;
+  activeRides?: number;
+  activeDeliveries?: number;
+  cancelledRides?: number;
+  scheduledRides?: number;
+  carpoolTrips?: number;
+  movingRequests?: number;
+  rentalInquiries?: number;
+  walletBalanceCdf?: number;
+  walletCount?: number;
+  walletTransactionsToday?: number;
   city?: string;
   totalUsers?: number;
   activeDrivers?: number;
   ridesToday?: number;
   revenueTodayCdf?: number;
+  todayRides?: number;
+  todayCompleted?: number;
+};
+
+export type AdminReports = {
+  periodDays: number;
+  generatedAt: string;
+  daily: { date: string; rides: number; completed: number; revenueCdf: number; cancelled: number; deliveries: number }[];
+  vehicleBreakdown: Record<string, number>;
+  serviceBreakdown: {
+    rides: number;
+    deliveries: number;
+    errands: number;
+    food: number;
+    parcel: number;
+    express: number;
+    moving: number;
+    scheduled: number;
+    carpool: number;
+  };
+  kpis: {
+    totalRides: number;
+    completedRides: number;
+    cancelledRides: number;
+    completionRate: number;
+    cancelRate: number;
+    totalRevenueCdf: number;
+    deliveryRevenueCdf: number;
+    avgTicketCdf: number;
+    totalDeliveries: number;
+  };
 };
 
 export type AdminUser = {
@@ -458,11 +503,62 @@ function mockFor<T>(path: string, init?: RequestInit): T {
     return {
       users: 1240,
       drivers: 86,
-      rides: 312,
-      completedRides: 298,
-      revenueCdf: 2450000,
+      availableDrivers: 42,
+      pendingKyc: 7,
+      approvedDrivers: 72,
+      rides: 3120,
+      completedRides: 2980,
+      revenueCdf: 24500000,
+      todayRides: 312,
+      todayCompleted: 298,
+      todayRevenueCdf: 2450000,
+      activeRides: 18,
+      activeDeliveries: 12,
+      cancelledRides: 140,
       openIncidents: 3,
-      city: "Kinshasa",
+      sosIncidents: 1,
+      scheduledRides: 24,
+      carpoolTrips: 8,
+      movingRequests: 5,
+      rentalInquiries: 3,
+      walletBalanceCdf: 8900000,
+      walletCount: 980,
+      walletTransactionsToday: 156,
+      city: "RDC",
+    } as T;
+  }
+  if (path.includes("/reports")) {
+    const daysMatch = path.match(/days=(\d+)/);
+    const days = daysMatch ? Number(daysMatch[1]) : 30;
+    const daily = Array.from({ length: Math.min(days, 14) }, (_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() - (Math.min(days, 14) - 1 - i));
+      return {
+        date: d.toISOString().slice(0, 10),
+        rides: 20 + Math.floor(Math.random() * 30),
+        completed: 18 + Math.floor(Math.random() * 25),
+        revenueCdf: 150000 + Math.floor(Math.random() * 200000),
+        cancelled: Math.floor(Math.random() * 4),
+        deliveries: 8 + Math.floor(Math.random() * 12),
+      };
+    });
+    return {
+      periodDays: days,
+      generatedAt: new Date().toISOString(),
+      daily,
+      vehicleBreakdown: { MOTO_TAXI: 120, STANDARD: 85, COMFORT: 45, VIP: 12 },
+      serviceBreakdown: { rides: 262, deliveries: 98, errands: 34, food: 40, parcel: 35, express: 23, moving: 5, scheduled: 24, carpool: 8 },
+      kpis: {
+        totalRides: 262,
+        completedRides: 240,
+        cancelledRides: 22,
+        completionRate: 0.916,
+        cancelRate: 0.084,
+        totalRevenueCdf: 4200000,
+        deliveryRevenueCdf: 890000,
+        avgTicketCdf: 17500,
+        totalDeliveries: 132,
+      },
     } as T;
   }
   if (path.match(/\/users\/[^/?]+/) && method === "GET") {
@@ -747,11 +843,62 @@ export function normalizeMetrics(raw: AdminMetrics) {
   return {
     totalUsers: raw.totalUsers ?? raw.users ?? 0,
     activeDrivers: raw.activeDrivers ?? raw.drivers ?? 0,
-    ridesToday: raw.ridesToday ?? raw.rides ?? 0,
+    availableDrivers: raw.availableDrivers ?? 0,
+    pendingKyc: raw.pendingKyc ?? 0,
+    approvedDrivers: raw.approvedDrivers ?? 0,
+    ridesToday: raw.ridesToday ?? raw.todayRides ?? 0,
+    todayCompleted: raw.todayCompleted ?? 0,
     revenueTodayCdf: raw.revenueTodayCdf ?? raw.revenueCdf ?? 0,
+    totalRides: raw.rides ?? 0,
+    completedRides: raw.completedRides ?? 0,
+    totalRevenueCdf: raw.revenueCdf ?? 0,
+    activeRides: raw.activeRides ?? 0,
+    activeDeliveries: raw.activeDeliveries ?? 0,
+    cancelledRides: raw.cancelledRides ?? 0,
     openIncidents: raw.openIncidents ?? 0,
-    city: raw.city ?? "Kinshasa",
+    sosIncidents: raw.sosIncidents ?? 0,
+    scheduledRides: raw.scheduledRides ?? 0,
+    carpoolTrips: raw.carpoolTrips ?? 0,
+    movingRequests: raw.movingRequests ?? 0,
+    rentalInquiries: raw.rentalInquiries ?? 0,
+    walletBalanceCdf: raw.walletBalanceCdf ?? 0,
+    walletCount: raw.walletCount ?? 0,
+    walletTransactionsToday: raw.walletTransactionsToday ?? 0,
+    city: raw.city ?? "RDC",
   };
+}
+
+export async function fetchAdminReports(days = 30): Promise<AdminReports> {
+  return apiFetch<AdminReports>(`/api/admin/reports?days=${days}`);
+}
+
+export function exportReportsCsv(reports: AdminReports, metrics: ReturnType<typeof normalizeMetrics>) {
+  const lines = [
+    "MOVA — Rapport analytique",
+    `Généré;${reports.generatedAt}`,
+    `Période (jours);${reports.periodDays}`,
+    "",
+    "Indicateur;Valeur",
+    `Utilisateurs;${metrics.totalUsers}`,
+    `Chauffeurs approuvés;${metrics.approvedDrivers}`,
+    `Courses (période);${reports.kpis.totalRides}`,
+    `Taux complétion;${(reports.kpis.completionRate * 100).toFixed(1)}%`,
+    `Taux annulation;${(reports.kpis.cancelRate * 100).toFixed(1)}%`,
+    `Revenus courses;${reports.kpis.totalRevenueCdf}`,
+    `Panier moyen;${reports.kpis.avgTicketCdf}`,
+    "",
+    "Date;Courses;Complétées;Revenus FC;Annulées;Livraisons",
+    ...reports.daily.map(
+      (d) => `${d.date};${d.rides};${d.completed};${d.revenueCdf};${d.cancelled};${d.deliveries}`,
+    ),
+  ];
+  const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `mova-rapport-${reports.periodDays}j-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 export function formatUserName(u: AdminUser) {

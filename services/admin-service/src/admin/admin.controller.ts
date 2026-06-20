@@ -39,6 +39,13 @@ export class AdminController {
     return this.adminService.getMetrics();
   }
 
+  @Get('reports')
+  @RequirePermissions(AdminPermission.METRICS_READ)
+  @ApiOperation({ summary: 'Rapports analytiques (séries temporelles, KPIs)' })
+  reports(@Query('days') days?: string) {
+    return this.adminService.getReports(Number(days ?? 30));
+  }
+
   @Get('users')
   @RequirePermissions(AdminPermission.USERS_READ)
   @ApiOperation({ summary: 'Liste utilisateurs' })

@@ -753,6 +753,16 @@ export class DriversService {
     return this.prisma.driverProfile.count();
   }
 
+  async getAdminStats() {
+    const [total, available, pendingKyc, approved] = await Promise.all([
+      this.prisma.driverProfile.count(),
+      this.prisma.driverProfile.count({ where: { isAvailable: true, kycStatus: KycStatus.APPROVED } }),
+      this.prisma.driverProfile.count({ where: { kycStatus: KycStatus.PENDING } }),
+      this.prisma.driverProfile.count({ where: { kycStatus: KycStatus.APPROVED } }),
+    ]);
+    return { total, available, pendingKyc, approved };
+  }
+
   async regenerateActivationPin(userId: string) {
     const profile = await this.prisma.driverProfile.findUnique({ where: { userId } });
     if (!profile) throw new MovaHttpException(MovaErrorCode.DRIVER_KYC_PENDING);

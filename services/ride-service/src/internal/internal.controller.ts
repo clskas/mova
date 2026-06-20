@@ -60,6 +60,11 @@ export class InternalController {
     return this.rides.getStats();
   }
 
+  @Get('rides/reports')
+  reports(@Query('days') days?: string) {
+    return this.rides.getReportAnalytics(Number(days ?? 30));
+  }
+
   @Get('rides/driver/:userId/earnings')
   earnings(@Param('userId') userId: string) {
     return this.rides.getDriverEarnings(userId);

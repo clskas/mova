@@ -34,9 +34,12 @@ export class AdminService {
   }
 
   async getMetrics() {
-    const [users, drivers, rideStats, incidents, deliveries, scheduled, carpool, moving, rental] = await Promise.all([
+    const [users, driverStats, rideStats, incidents, deliveries, scheduled, carpool, moving, rental, wallet] = await Promise.all([
       this.fetchJson<{ count: number }>('auth', '/internal/users/count').catch(() => ({ count: 0 })),
-      this.fetchJson<{ count: number }>('driver', '/internal/drivers/count').catch(() => ({ count: 0 })),
+      this.fetchJson<{ total?: number; available?: number; pendingKyc?: number; approved?: number }>(
+        'driver',
+        '/internal/drivers/stats',
+      ).catch(() => ({ total: 0, available: 0, pendingKyc: 0, approved: 0 })),
       this.fetchJson<{
         rides?: number;
         completed?: number;
@@ -56,14 +59,21 @@ export class AdminService {
         activeRides: 0,
         cancelled: 0,
       })),
-      this.fetchJson<unknown[]>('driver', '/internal/incidents').catch(() => []),
+      this.fetchJson<{ status?: string; type?: string }[]>('driver', '/internal/incidents').catch(() => []),
       this.fetchJson<unknown[]>('ride', '/internal/deliveries?take=100').catch(() => []),
       this.fetchJson<unknown[]>('ride', '/internal/scheduled-rides?take=100').catch(() => []),
       this.fetchJson<unknown[]>('ride', '/internal/carpool?take=100').catch(() => []),
       this.fetchJson<unknown[]>('ride', '/internal/moving?take=100').catch(() => []),
       this.fetchJson<unknown[]>('ride', '/internal/rental-inquiries?take=100').catch(() => []),
+      this.fetchJson<{ totalBalanceCdf?: number; walletCount?: number; transactionsToday?: number }>(
+        'payment',
+        '/internal/wallets/overview',
+      ).catch(() => ({ totalBalanceCdf: 0, walletCount: 0, transactionsToday: 0 })),
     ]);
-    const openIncidents = Array.isArray(incidents) ? incidents.filter((i: { status?: string }) => i.status === 'OPEN').length : 0;
+    const openIncidents = Array.isArray(incidents) ? incidents.filter((i) => i.status === 'OPEN').length : 0;
+    const sosIncidents = Array.isArray(incidents)
+      ? incidents.filter((i) => i.status === 'OPEN' && i.type === 'SOS').length
+      : 0;
     const activeDeliveries = Array.isArray(deliveries)
       ? deliveries.filter((d: { status?: string; type?: string }) => {
           if (d.type === 'ERRAND') return !['COMPLETED', 'CANCELLED'].includes(d.status ?? '');
@@ -72,7 +82,10 @@ export class AdminService {
       : 0;
     return {
       users: users.count,
-      drivers: drivers.count,
+      drivers: driverStats.total ?? 0,
+      availableDrivers: driverStats.available ?? 0,
+      pendingKyc: driverStats.pendingKyc ?? 0,
+      approvedDrivers: driverStats.approved ?? 0,
       rides: rideStats.rides ?? 0,
       completedRides: rideStats.completed ?? 0,
       revenueCdf: rideStats.revenueCdf ?? 0,
@@ -82,13 +95,21 @@ export class AdminService {
       activeRides: rideStats.activeRides ?? 0,
       cancelledRides: rideStats.cancelled ?? 0,
       openIncidents,
+      sosIncidents,
       activeDeliveries,
       scheduledRides: Array.isArray(scheduled) ? scheduled.length : 0,
       carpoolTrips: Array.isArray(carpool) ? carpool.length : 0,
       movingRequests: Array.isArray(moving) ? moving.length : 0,
       rentalInquiries: Array.isArray(rental) ? rental.length : 0,
-      city: 'Kinshasa',
+      walletBalanceCdf: wallet.totalBalanceCdf ?? 0,
+      walletCount: wallet.walletCount ?? 0,
+      walletTransactionsToday: wallet.transactionsToday ?? 0,
+      city: 'RDC',
     };
+  }
+
+  getReports(days = 30) {
+    return this.fetchJson('ride', `/internal/rides/reports?days=${days}`);
   }
 
   listUsers(skip = 0, take = 50, search?: string) {

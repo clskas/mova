@@ -777,6 +777,115 @@ export class RidesService {
     return { rides, completed, revenueCdf, todayRides, todayCompleted, todayRevenueCdf, activeRides, cancelled };
   }
 
+  /** Séries temporelles et KPIs pour rapports admin (7–90 jours). */
+  async getReportAnalytics(days = 30) {
+    const periodDays = Math.min(Math.max(Number(days) || 30, 7), 90);
+    const since = new Date();
+    since.setDate(since.getDate() - periodDays + 1);
+    since.setHours(0, 0, 0, 0);
+
+    const [rides, deliveries, errands, moving, scheduled, carpool] = await Promise.all([
+      this.prisma.ride.findMany({
+        where: { createdAt: { gte: since } },
+        select: {
+          createdAt: true,
+          status: true,
+          vehicleType: true,
+          finalFareCdf: true,
+          estimatedFareCdf: true,
+        },
+      }),
+      this.prisma.delivery.findMany({
+        where: { createdAt: { gte: since } },
+        select: { createdAt: true, status: true, type: true, finalPriceCdf: true, estimatedPriceCdf: true },
+      }),
+      this.prisma.errandOrder.findMany({
+        where: { createdAt: { gte: since } },
+        select: { createdAt: true, status: true, finalPriceCdf: true },
+      }),
+      this.prisma.movingRequest.count({ where: { createdAt: { gte: since } } }),
+      this.prisma.scheduledRide.count({ where: { createdAt: { gte: since } } }),
+      this.prisma.carpoolTrip.count({ where: { createdAt: { gte: since } } }),
+    ]);
+
+    const dailyMap = new Map<string, { date: string; rides: number; completed: number; revenueCdf: number; cancelled: number; deliveries: number }>();
+    for (let i = 0; i < periodDays; i++) {
+      const d = new Date(since);
+      d.setDate(d.getDate() + i);
+      const key = d.toISOString().slice(0, 10);
+      dailyMap.set(key, { date: key, rides: 0, completed: 0, revenueCdf: 0, cancelled: 0, deliveries: 0 });
+    }
+
+    const vehicleBreakdown: Record<string, number> = {};
+    let completedCount = 0;
+    let cancelledCount = 0;
+    let totalRevenue = 0;
+
+    for (const ride of rides) {
+      const key = ride.createdAt.toISOString().slice(0, 10);
+      const bucket = dailyMap.get(key);
+      if (bucket) {
+        bucket.rides++;
+        if (ride.status === RideStatus.COMPLETED) {
+          bucket.completed++;
+          const fare = ride.finalFareCdf ?? ride.estimatedFareCdf ?? 0;
+          bucket.revenueCdf += fare;
+          totalRevenue += fare;
+          completedCount++;
+        }
+        if (ride.status === RideStatus.CANCELLED) {
+          bucket.cancelled++;
+          cancelledCount++;
+        }
+      }
+      vehicleBreakdown[ride.vehicleType] = (vehicleBreakdown[ride.vehicleType] ?? 0) + 1;
+    }
+
+    for (const delivery of deliveries) {
+      const key = delivery.createdAt.toISOString().slice(0, 10);
+      if (dailyMap.has(key)) dailyMap.get(key)!.deliveries += 1;
+    }
+    for (const errand of errands) {
+      const key = errand.createdAt.toISOString().slice(0, 10);
+      if (dailyMap.has(key)) dailyMap.get(key)!.deliveries += 1;
+    }
+
+    const deliveryRevenue = deliveries.reduce(
+      (sum, d) => sum + (d.finalPriceCdf ?? d.estimatedPriceCdf ?? 0),
+      0,
+    );
+    const errandRevenue = errands.reduce((sum, e) => sum + (e.finalPriceCdf ?? 0), 0);
+
+    return {
+      periodDays,
+      generatedAt: new Date().toISOString(),
+      daily: Array.from(dailyMap.values()),
+      vehicleBreakdown,
+      serviceBreakdown: {
+        rides: rides.length,
+        deliveries: deliveries.length,
+        errands: errands.length,
+        food: deliveries.filter((d) => d.type === DeliveryType.FOOD).length,
+        parcel: deliveries.filter((d) => d.type === DeliveryType.PARCEL).length,
+        express: deliveries.filter((d) => d.type === DeliveryType.EXPRESS).length,
+        moving,
+        scheduled,
+        carpool,
+      },
+      kpis: {
+        totalRides: rides.length,
+        completedRides: completedCount,
+        cancelledRides: cancelledCount,
+        completionRate: rides.length ? completedCount / rides.length : 0,
+        cancelRate: rides.length ? cancelledCount / rides.length : 0,
+        totalRevenueCdf: totalRevenue,
+        deliveryRevenueCdf: deliveryRevenue + errandRevenue,
+        avgTicketCdf: completedCount ? Math.round(totalRevenue / completedCount) : 0,
+        totalDeliveries: deliveries.length + errands.length,
+      },
+    };
+  }
+
   async listForAdmin(opts: { status?: string; from?: string; to?: string; skip?: number; take?: number }) {
     const where: { status?: RideStatus; createdAt?: { gte?: Date; lte?: Date } } = {};
     if (opts.status) where.status = opts.status as RideStatus;

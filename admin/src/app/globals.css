@@ -3,11 +3,31 @@
 @tailwind utilities;
 
 :root {
-  --background: #f5f4ff;
-  --foreground: #1a1a2e;
+  --background: #f4f3ff;
+  --foreground: #0d0d1a;
+  --mova-midnight: #0d0d1a;
+  --mova-violet: #6366f1;
+  --mova-violet-light: #8b5cf6;
+  --mova-green: #10b981;
+  --mova-orange: #f97316;
+  --mova-gold: #fbbf24;
+  --mova-border: #e2e8f0;
+  --mova-card: #ffffff;
+  --sidebar-gradient: linear-gradient(180deg, #0d0d1a 0%, #1a1a2e 45%, #2d2b55 100%);
 }
 
 body {
   color: var(--foreground);
   background: var(--background);
+  font-family: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+@layer components {
+  .mova-card {
+    @apply bg-white rounded-2xl border border-[var(--mova-border)] shadow-sm;
+  }
+  .mova-btn-primary {
+    @apply px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] hover:opacity-95 disabled:opacity-50 transition-opacity;
+  }
 }

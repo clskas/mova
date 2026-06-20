@@ -20,7 +20,6 @@ import {
 } from "@/lib/api";
 import { useAdmin } from "@/components/AdminProvider";
 import {
-  BtnDanger,
   BtnPrimary,
   Card,
   EmptyState,

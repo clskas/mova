@@ -9,6 +9,7 @@ import '../cache/wallet_cache.dart';
 import '../config/market_config.dart';
 import '../error/mova_error_codes.dart';
 import '../error/result.dart';
+import '../error/user_friendly_error.dart';
 import '../offline/connectivity_service.dart';
 import '../offline/sync_queue.dart';
 import 'mock_data.dart';
@@ -532,7 +533,7 @@ class ApiClient {
     if (data is Map<String, dynamic>) {
       return Failure(failureFromApiResponse(statusCode, data));
     }
-    return Failure(ServerFailure('Erreur serveur ($statusCode).'));
+    return Failure(ServerFailure(sanitizeUserMessage(null)));
   }
 
   Map<String, dynamic> _normalizeSuccess(dynamic data) {
@@ -588,7 +589,7 @@ class ApiClient {
         if (data is Map<String, dynamic>) {
           return _failureFromResponse(response.statusCode, data);
         }
-        return Failure(ServerFailure('Erreur serveur (${response.statusCode}).'));
+        return Failure(ServerFailure(sanitizeUserMessage(null)));
       } catch (e) {
         if (i == retries - 1) {
           if (_mockMode) {
@@ -649,7 +650,7 @@ class ApiClient {
         if (data is Map<String, dynamic>) {
           return _failureFromResponse(response.statusCode, data);
         }
-        return Failure(ServerFailure('Erreur serveur (${response.statusCode}).'));
+        return Failure(ServerFailure(sanitizeUserMessage(null)));
       } catch (e) {
         if (i == retries - 1) {
           if (_mockMode) {
@@ -697,7 +698,7 @@ class ApiClient {
         if (data is Map<String, dynamic>) {
           return _failureFromResponse(response.statusCode, data);
         }
-        return Failure(ServerFailure('Erreur serveur (${response.statusCode}).'));
+        return Failure(ServerFailure(sanitizeUserMessage(null)));
       } catch (e) {
         if (i == retries - 1) {
           if (_mockMode) {

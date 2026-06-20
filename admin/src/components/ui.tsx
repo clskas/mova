@@ -105,10 +105,33 @@ const STATUS_COLORS: Record<string, string> = {
   READY_FOR_PICKUP: "bg-blue-100 text-blue-700",
 };
 
+const STATUS_LABELS: Record<string, string> = {
+  ACTIVE: "Actif",
+  SUSPENDED: "Suspendu",
+  PENDING_KYC: "KYC en attente",
+  OPEN: "Ouvert",
+  RESOLVED: "Résolu",
+  PENDING: "En attente",
+  APPROVED: "Approuvé",
+  REJECTED: "Refusé",
+  COMPLETED: "Terminé",
+  CANCELLED: "Annulé",
+  IN_PROGRESS: "En cours",
+  SEARCHING: "Recherche",
+  SCHEDULED: "Planifié",
+  DELIVERED: "Livré",
+  IN_TRANSIT: "En transit",
+  RESTAURANT_CONFIRMED: "Restaurant OK",
+  READY_FOR_PICKUP: "Prêt",
+  ASSIGNED: "Assigné",
+  SOS: "SOS",
+};
+
 export function StatusBadge({ status }: { status?: string }) {
   if (!status) return <span className="text-gray-400">—</span>;
   const cls = STATUS_COLORS[status] ?? "bg-gray-100 text-gray-600";
-  return <span className={`text-xs px-2 py-0.5 rounded font-medium ${cls}`}>{status}</span>;
+  const label = STATUS_LABELS[status] ?? status.replace(/_/g, " ").toLowerCase();
+  return <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${cls}`}>{label}</span>;
 }
 
 export function PageHeader({ title, subtitle, action }: { title: string; subtitle?: string; action?: React.ReactNode }) {
@@ -200,5 +223,5 @@ export function SelectInput({ value, onChange, options, disabled }: { value: str
 
 export function DemoBadge({ show }: { show: boolean }) {
   if (!show) return null;
-  return <span className="text-xs bg-[#FF6B35] text-white px-2 py-1 rounded">Mode démo</span>;
+  return <span className="text-xs bg-[#FF6B35] text-white px-2 py-1 rounded-full">Hors ligne</span>;
 }

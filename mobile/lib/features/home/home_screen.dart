@@ -6,6 +6,7 @@ import '../../core/auth/session.dart';
 import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
+import '../../core/widgets/mova_widgets.dart';
 import '../../core/widgets/mova_service_icons.dart';
 import '../../core/widgets/service_area_selector.dart';
 import '../booking/booking_screen.dart';
@@ -193,48 +194,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                 ),
               ),
             ),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      userLabel.isNotEmpty ? '${_greeting()}, $userLabel 👋' : '${_greeting()} 👋',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: MovaColors.midnight,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    const ServiceAreaSelector(compact: true),
-                  ],
-                ),
-              ),
-            ],
+          const SizedBox(height: 16),
+          MovaWelcomeBanner(
+            greeting: userLabel.isNotEmpty ? '${_greeting()}, $userLabel 👋' : '${_greeting()} 👋',
+            subtitle: 'Mobilité partout en RDC — choisissez un service',
           ),
-          const SizedBox(height: 8),
-          Text(
-            'La mobilité, simplement.',
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.titleMedium?.copyWith(
-              color: MovaColors.violet,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Choisissez un service pour continuer',
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: MovaColors.textSecondary,
-            ),
-          ),
+          const SizedBox(height: 12),
+          const Align(alignment: Alignment.centerLeft, child: ServiceAreaSelector(compact: true)),
           const SizedBox(height: 20),
           LayoutBuilder(
             builder: (context, constraints) {
@@ -260,7 +226,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                       icon: MovaServiceIcon.taxi(color: MovaColors.violet),
                       iconColor: MovaColors.violet,
                       title: 'Taxi / Moto-taxi',
-                      subtitle: 'Course immédiate partout en ville',
+                      subtitle: 'Course immédiate partout en RDC',
                       onTap: () => _open(context, const BookingScreen()),
                     ),
                     ServiceCard(
@@ -308,14 +274,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                   const SizedBox(height: spacing),
                   gridRow([
                     ServiceCard(
-                      icon: const Icon(Icons.directions_car_outlined, color: MovaColors.violet, size: 28),
+                      icon: MovaServiceIcon.rental(color: MovaColors.violet),
                       iconColor: MovaColors.violet,
                       title: 'Location véhicule',
                       subtitle: 'Voiture, SUV ou minibus',
                       onTap: () => _open(context, const RentalScreen()),
                     ),
                     ServiceCard(
-                      icon: const Icon(Icons.local_shipping_outlined, color: MovaColors.midnight, size: 28),
+                      icon: MovaServiceIcon.moving(color: MovaColors.midnight),
                       iconColor: MovaColors.midnight,
                       title: 'Déménagement',
                       subtitle: 'Camion et manutention',

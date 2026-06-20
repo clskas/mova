@@ -35,6 +35,12 @@ class MovaServiceIcon extends StatelessWidget {
   factory MovaServiceIcon.location({Color? color, double size = 24}) =>
       MovaServiceIcon._(_LocationIconPainter(color), color: color, size: size);
 
+  factory MovaServiceIcon.rental({Color? color, double size = 24}) =>
+      MovaServiceIcon._(_RentalIconPainter(color), color: color, size: size);
+
+  factory MovaServiceIcon.moving({Color? color, double size = 24}) =>
+      MovaServiceIcon._(_MovingIconPainter(color), color: color, size: size);
+
   @override
   Widget build(BuildContext context) {
     return SizedBox(
@@ -203,6 +209,38 @@ class _LocationIconPainter extends _StrokeIconPainter {
     canvas.scale(s);
     canvas.drawPath(Path()..moveTo(12, 21)..cubicTo(12, 21, 18, 15.8, 18, 11)..arcToPoint(const Offset(12, 5), radius: const Radius.circular(6), clockwise: false)..arcToPoint(const Offset(6, 11), radius: const Radius.circular(6), clockwise: false)..cubicTo(6, 15.8, 12, 21, 12, 21)..close(), stroke);
     canvas.drawCircle(const Offset(12, 11), 2, fill);
+    canvas.restore();
+  }
+}
+
+class _RentalIconPainter extends _StrokeIconPainter {
+  _RentalIconPainter(super.color);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final s = size.width / 24;
+    canvas.save();
+    canvas.scale(s);
+    canvas.drawRRect(RRect.fromRectAndRadius(const Rect.fromLTWH(3, 9, 18, 8), const Radius.circular(2)), stroke);
+    canvas.drawPath(Path()..moveTo(5, 9)..lineTo(8, 5)..lineTo(16, 5)..lineTo(19, 9), stroke);
+    canvas.drawCircle(const Offset(8, 17), 2, fill);
+    canvas.drawCircle(const Offset(16, 17), 2, fill);
+    canvas.restore();
+  }
+}
+
+class _MovingIconPainter extends _StrokeIconPainter {
+  _MovingIconPainter(super.color);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final s = size.width / 24;
+    canvas.save();
+    canvas.scale(s);
+    canvas.drawRRect(RRect.fromRectAndRadius(const Rect.fromLTWH(2, 8, 14, 9), const Radius.circular(1.5)), stroke);
+    canvas.drawPath(Path()..moveTo(16, 11)..lineTo(21, 11)..lineTo(22, 14)..lineTo(22, 17)..lineTo(16, 17), stroke);
+    canvas.drawCircle(const Offset(7, 17), 2, fill);
+    canvas.drawCircle(const Offset(19, 17), 2, fill);
     canvas.restore();
   }
 }

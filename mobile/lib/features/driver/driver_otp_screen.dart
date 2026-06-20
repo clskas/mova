@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/cache/profile_cache.dart';
@@ -128,7 +129,7 @@ class _DriverOtpScreenState extends ConsumerState<DriverOtpScreen> {
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
-          if (_mockHint != null) ...[
+          if (kDebugMode && _mockHint != null) ...[
             const SizedBox(height: 8),
             Container(
               padding: const EdgeInsets.all(10),
@@ -137,7 +138,7 @@ class _DriverOtpScreenState extends ConsumerState<DriverOtpScreen> {
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
-                'Mode démo : code OTP $_mockHint',
+                'Code test : $_mockHint',
                 style: const TextStyle(fontSize: 12, color: MovaColors.violet),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,

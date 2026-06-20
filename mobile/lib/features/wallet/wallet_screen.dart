@@ -186,21 +186,11 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final api = ref.read(apiClientProvider);
-    final mockBanner = api.isMockMode;
-
     return MovaScreen(
       title: 'Portefeuille',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (mockBanner)
-            const Padding(
-              padding: EdgeInsets.only(bottom: 12),
-              child: MovaErrorBanner(
-                message: 'Mode démo — connectez la passerelle pour un solde réel.',
-              ),
-            ),
           MovaCard(
             child: Column(
               children: [

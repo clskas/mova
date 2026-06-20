@@ -43,18 +43,7 @@ export function isKinshasaAddress(address: string): boolean {
   return isServiceAreaAddress(address);
 }
 
-export function assertServiceAreaCoords(lat: number, lng: number, areaId?: string): ServiceArea {
-  if (areaId) {
-    const area = getServiceArea(areaId);
-    if (!area || !isInServiceArea(lat, lng, area)) {
-      throw new MovaHttpException(
-        MovaErrorCode.VALIDATION_ERROR,
-        undefined,
-        serviceAreaOutOfBoundsMessage(),
-      );
-    }
-    return area;
-  }
+export function assertServiceAreaCoords(lat: number, lng: number, _areaId?: string): ServiceArea {
   if (!isInDrcTerritory(lat, lng)) {
     throw new MovaHttpException(
       MovaErrorCode.VALIDATION_ERROR,
@@ -65,23 +54,18 @@ export function assertServiceAreaCoords(lat: number, lng: number, areaId?: strin
   return resolveServiceAreaForCoords(lat, lng);
 }
 
-/** Destination dans une zone de service MOVA (adresse ou coords valides). */
+/** Destination valide si coords en RDC ou adresse renseignée (couverture nationale). */
 export function assertServiceAreaDestination(
   address: string,
   coords?: { lat: number; lng: number },
   areaId?: string,
 ): ServiceArea {
   if (coords) {
-    try {
-      return assertServiceAreaCoords(coords.lat, coords.lng, areaId);
-    } catch {
-      /* fall through to address check */
-    }
+    return assertServiceAreaCoords(coords.lat, coords.lng, areaId);
   }
-  if (isServiceAreaAddress(address, areaId)) {
-    const area = areaId ? getServiceArea(areaId) : findServiceAreaByName(address);
-    if (area) return area;
-    return fallbackServiceArea();
+  const trimmed = address.trim();
+  if (trimmed.length >= 3) {
+    return areaId ? (getServiceArea(areaId) ?? fallbackServiceArea()) : fallbackServiceArea();
   }
   throw new MovaHttpException(
     MovaErrorCode.VALIDATION_ERROR,

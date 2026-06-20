@@ -63,7 +63,7 @@ class ServiceAreaSelector extends ConsumerWidget {
               Padding(
                 padding: const EdgeInsets.all(16),
                 child: Text(
-                  'Choisir votre ville',
+                  'Choisir votre ville préférée',
                   style: Theme.of(ctx).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                 ),
               ),

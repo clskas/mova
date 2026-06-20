@@ -67,5 +67,5 @@ MovaFailure failureFromApiResponse(int statusCode, Map<String, dynamic> body) {
   if (statusCode == 401) {
     return const AuthFailure('Session expirée. Reconnectez-vous.');
   }
-  return ServerFailure('Erreur serveur ($statusCode).');
+  return ServerFailure('Impossible de contacter le serveur. Réessayez.');
 }

@@ -334,12 +334,10 @@ export default function ChauffeursPage() {
     }
   }
 
-  const selected = detail ?? drivers.find((d) => d.userId === selectedId) ?? null;
+  const selected = (detail ?? drivers.find((d) => d.userId === selectedId) ?? null) as AdminDriverDetail | null;
   const selectedVehicle = activeDriverVehicle(selected);
   const vehicleTypeStatus =
-    selectedVehicle?.typeApprovalStatus ??
-    ("vehicleTypeApprovalStatus" in (selected ?? {}) ? selected?.vehicleTypeApprovalStatus : undefined) ??
-    selected?.vehicle?.typeApprovalStatus;
+    selectedVehicle?.typeApprovalStatus ?? selected?.vehicleTypeApprovalStatus;
 
   return (
     <div className="max-w-6xl mx-auto">
@@ -395,8 +393,8 @@ export default function ChauffeursPage() {
           <div className="space-y-4">
             <div className="grid sm:grid-cols-2 gap-3 text-sm">
               <p><span className="text-gray-500">Identifiant MOVA:</span> <span className="font-mono font-medium">{selected.publicId ?? "—"}</span></p>
-              <p><span className="text-gray-500">Téléphone:</span> {"user" in selected && selected.user?.phone ? selected.user.phone : "—"}</p>
-              <p><span className="text-gray-500">Nom:</span> {"user" in selected ? [selected.user?.firstName, selected.user?.lastName].filter(Boolean).join(" ") || "—" : "—"}</p>
+              <p><span className="text-gray-500">Téléphone:</span> {detail?.user?.phone ?? "—"}</p>
+              <p><span className="text-gray-500">Nom:</span> {[detail?.user?.firstName, detail?.user?.lastName].filter(Boolean).join(" ") || "—"}</p>
               <p><span className="text-gray-500">KYC:</span> <StatusBadge status={selected.kycStatus} /></p>
               <p><span className="text-gray-500">Étape:</span> {driverStageLabel(selected)}</p>
               <p><span className="text-gray-500">Dossier enregistrement:</span> {selected.onboardingCompleted ? "Soumis ✓" : "En cours"}</p>
@@ -405,39 +403,37 @@ export default function ChauffeursPage() {
               <p><span className="text-gray-500">Note:</span> {selected.ratingAvg?.toFixed(1)} / 5</p>
               <p><span className="text-gray-500">Courses:</span> {selected.totalRides}</p>
               <p><span className="text-gray-500">Permis:</span> {selected.licenseNumber ?? "—"}</p>
-              {"licenseExpiry" in selected && (
+              {detail?.licenseExpiry != null && (
                 <p>
                   <span className="text-gray-500">Expiration permis:</span>{" "}
-                  {selected.licenseExpiry ? new Date(selected.licenseExpiry).toLocaleDateString("fr-FR") : "—"}
+                  {new Date(detail.licenseExpiry).toLocaleDateString("fr-FR")}
                 </p>
               )}
-              {"insuranceExpiry" in selected && (
+              {detail?.insuranceExpiry != null && (
                 <p>
                   <span className="text-gray-500">Expiration assurance:</span>{" "}
-                  {selected.insuranceExpiry ? new Date(selected.insuranceExpiry).toLocaleDateString("fr-FR") : "—"}
+                  {new Date(detail.insuranceExpiry).toLocaleDateString("fr-FR")}
                 </p>
               )}
-              {"technicalInspectionExpiry" in selected && (
+              {detail?.technicalInspectionExpiry != null && (
                 <p>
                   <span className="text-gray-500">Visite technique:</span>{" "}
-                  {selected.technicalInspectionExpiry
-                    ? new Date(selected.technicalInspectionExpiry).toLocaleDateString("fr-FR")
-                    : "—"}
+                  {new Date(detail.technicalInspectionExpiry).toLocaleDateString("fr-FR")}
                 </p>
               )}
-              {"documentsStatus" in selected && selected.documentsStatus && (
+              {detail?.documentsStatus && (
                 <p>
                   <span className="text-gray-500">Documents opérationnels:</span>{" "}
-                  {selected.documentsStatus.canOperate ? (
+                  {detail.documentsStatus.canOperate ? (
                     <span className="text-green-700">Oui</span>
                   ) : (
                     <span className="text-red-700">
-                      Non — {selected.documentsStatus.blockReason ?? "expirés ou incomplets"}
+                      Non — {detail.documentsStatus.blockReason ?? "expirés ou incomplets"}
                     </span>
                   )}
                 </p>
               )}
-              <p><span className="text-gray-500">N° identité:</span> {"idDocumentNumber" in selected ? selected.idDocumentNumber ?? "—" : "—"}</p>
+              <p><span className="text-gray-500">N° identité:</span> {detail?.idDocumentNumber ?? "—"}</p>
               <p><span className="text-gray-500">Disponible:</span> {selected.isAvailable ? "Oui" : "Non"}</p>
               {"payoutProvider" in selected && selected.payoutProvider && (
                 <p><span className="text-gray-500">Retrait:</span> {selected.payoutProvider} · {selected.payoutPhone ?? "—"}</p>

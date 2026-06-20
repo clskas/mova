@@ -597,9 +597,6 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
       );
     }
 
-    final api = ref.read(apiClientProvider);
-    final mockBanner = api.isMockMode;
-
     return MovaScreen(
       title: 'MOVA Chauffeur',
       scrollable: false,
@@ -664,16 +661,6 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
             MovaErrorBanner(message: _profileError!, onRetry: () => _loadProfile(clearCache: true)),
             const SizedBox(height: 12),
           ],
-          if (mockBanner)
-            const Padding(
-              padding: EdgeInsets.only(bottom: 12),
-              child: MovaCard(
-                child: Text(
-                  'Mode démo — passerelle indisponible',
-                  style: TextStyle(color: MovaColors.orange, fontWeight: FontWeight.w600),
-                ),
-              ),
-            ),
           if (_kycStatus != null && _kycStatus != 'APPROVED') ...[
             MovaCard(
               child: Row(

@@ -71,4 +71,5 @@ config/external-apis.env
 
 # Temp
 _temp_*
+tmp-*
 *.zip

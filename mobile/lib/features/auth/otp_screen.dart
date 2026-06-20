@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/config/market_config.dart';
@@ -128,9 +129,9 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
               ),
             ),
           ],
-          if (_mockHint != null) ...[
+          if (kDebugMode && _mockHint != null) ...[
             const SizedBox(height: 8),
-            Text('Mode démo : code $_mockHint', style: const TextStyle(color: MovaColors.orange, fontSize: 13)),
+            Text('Code test : $_mockHint', style: const TextStyle(color: MovaColors.orange, fontSize: 13)),
           ],
           if (_error != null) ...[
             const SizedBox(height: 16),

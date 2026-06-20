@@ -34,10 +34,15 @@ class ServiceCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.all(11),
             decoration: BoxDecoration(
-              color: iconColor.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(12),
+              gradient: LinearGradient(
+                colors: [
+                  iconColor.withValues(alpha: 0.18),
+                  iconColor.withValues(alpha: 0.06),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(14),
             ),
             child: icon,
           ),

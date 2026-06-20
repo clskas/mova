@@ -47,6 +47,7 @@ export type AdminDriver = {
   kycDocumentsUploaded?: number;
   kycDocumentsRequired?: number;
   kycDocumentsComplete?: boolean;
+  vehicleTypeApprovalStatus?: string;
   readyForReview?: boolean;
   currentLat?: number | null;
   currentLng?: number | null;
@@ -400,6 +401,19 @@ export class ApiError extends Error {
   }
 }
 
+export function sanitizeAdminError(message: string, status?: number): string {
+  if (!message || message.startsWith("HTTP ")) {
+    if (status === 401) return "Session expirée. Reconnectez-vous.";
+    if (status === 403) return "Accès refusé.";
+    if (status === 404) return "Élément introuvable.";
+    return "Une erreur est survenue. Réessayez.";
+  }
+  if (message.includes("MOVA_") && message.includes("_")) {
+    return "Une erreur est survenue. Réessayez.";
+  }
+  return message;
+}
+
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const url = `${API_BASE}${path}`;
   const hasToken = Boolean(getToken());
@@ -420,7 +434,7 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
       /* ignore */
     }
     if (hasToken || !USE_API_MOCK) {
-      throw new ApiError(message, res.status);
+      throw new ApiError(sanitizeAdminError(message, res.status), res.status);
     }
     return mockFor<T>(path, init);
   }
@@ -909,9 +923,18 @@ export async function deleteRentalVehicle(id: string) {
   return apiFetch(`/api/admin/rental-vehicles/${id}`, { method: "DELETE" });
 }
 
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += 1) {
+    binary += String.fromCharCode(bytes[i]!);
+  }
+  return btoa(binary);
+}
+
 export async function uploadVehiclePhoto(file: File): Promise<string> {
   const bytes = await file.arrayBuffer();
-  const base64 = btoa(String.fromCharCode(...new Uint8Array(bytes)));
+  const base64 = arrayBufferToBase64(bytes);
   const mimeType = file.type || "image/jpeg";
   const result = await apiFetch<{ photoUrl?: string }>("/api/uploads/vehicle-photo", {
     method: "POST",

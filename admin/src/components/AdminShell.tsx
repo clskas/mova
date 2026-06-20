@@ -67,14 +67,14 @@ function ShellInner({ children }: { children: React.ReactNode }) {
         <button type="button" className="fixed inset-0 bg-black/30 z-40 lg:hidden" onClick={() => setSidebarOpen(false)} aria-label="Fermer menu" />
       )}
 
-      <aside className={`fixed lg:static inset-y-0 left-0 z-50 w-64 bg-[#1A1A2E] text-white flex flex-col transform transition-transform lg:translate-x-0 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
+      <aside className={`fixed lg:static inset-y-0 left-0 z-50 w-64 text-white flex flex-col transform transition-transform lg:translate-x-0 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`} style={{ background: "var(--sidebar-gradient)" }}>
         <div className="p-5 border-b border-white/10">
           <div className="flex items-center gap-3">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/icon.png" alt="" width={36} height={36} className="rounded-lg" />
             <div>
               <p className="font-semibold">MOVA Admin</p>
-              <p className="text-xs opacity-60">RDC · nationwide</p>
+              <p className="text-xs opacity-60">Couverture nationale RDC</p>
             </div>
           </div>
         </div>
@@ -116,7 +116,7 @@ function ShellInner({ children }: { children: React.ReactNode }) {
             )}
             {role && !loading && (
               <span className={`text-xs px-2.5 py-1 rounded-full hidden sm:inline ${hasWriteAccess ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-600"}`}>
-                {hasWriteAccess ? "CRUD actif" : "Lecture seule"}
+                {hasWriteAccess ? "Édition" : "Consultation"}
               </span>
             )}
             {user?.firstName && (

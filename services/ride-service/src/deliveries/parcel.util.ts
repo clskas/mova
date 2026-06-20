@@ -3,13 +3,13 @@ import {
   formatCdf,
   getCommunesForArea,
   getServiceArea,
-  isInServiceArea,
+  isInDrcTerritory,
   KINSHASA_BOUNDS,
   KINSHASA_COMMUNES,
   MovaErrorCode,
   MovaHttpException,
+  rdcTerritoryOutOfBoundsMessage,
   resolveCityFromCoords,
-  serviceAreaOutOfBoundsMessage,
 } from '@mova/shared';
 import { Delivery, DeliveryEvent, DeliveryStatus, DeliveryType } from '@prisma/client';
 import { computeDriverEta } from '../matching/eta.util';
@@ -17,12 +17,12 @@ import { tripDistanceKm } from '../common/geo.util';
 
 export { KINSHASA_BOUNDS };
 
-export function assertServiceAreaCoords(lat: number, lng: number, areaId?: string): void {
-  if (!isInServiceArea(lat, lng, areaId)) {
+export function assertServiceAreaCoords(lat: number, lng: number, _areaId?: string): void {
+  if (!isInDrcTerritory(lat, lng)) {
     throw new MovaHttpException(
       MovaErrorCode.VALIDATION_ERROR,
       undefined,
-      serviceAreaOutOfBoundsMessage(),
+      rdcTerritoryOutOfBoundsMessage(),
     );
   }
 }

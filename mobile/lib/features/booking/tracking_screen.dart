@@ -581,15 +581,6 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
                       routeTrace: _routeTrace,
                       height: 200,
                     ),
-                    if (_mock)
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 6),
-                        child: Text(
-                          'Mode démo — suivi GPS simulé',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: MovaColors.orange, fontSize: 12),
-                        ),
-                      ),
                     Expanded(
                       child: SingleChildScrollView(
                         padding: const EdgeInsets.all(16),

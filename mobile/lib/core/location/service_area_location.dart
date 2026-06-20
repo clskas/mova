@@ -23,10 +23,9 @@ class ServiceAreaLocation {
     return LatLng(base.latitude + 0.008, base.longitude + 0.012);
   }
 
+  /// Couverture nationale RDC — toute coordonnée dans le territoire congolais est acceptée.
   static bool isInBounds(LatLng coords, {String? areaId}) {
-    if (areaId != null) return areaFor(areaId).contains(coords);
-    if (MarketConfig.isInDrcTerritory(coords.latitude, coords.longitude)) return true;
-    return ServiceAreas.byCoords(coords) != null;
+    return MarketConfig.isInDrcTerritory(coords.latitude, coords.longitude);
   }
 
   static bool addressMentionsArea(String address, {String? areaId}) {
@@ -78,14 +77,8 @@ class ServiceAreaLocation {
     bool fromSuggestion = false,
     String? areaId,
   }) {
-    if (addressMentionsArea(address, areaId: areaId) ||
-        districtFromAddress(address, areaId: areaId) != null) {
-      return true;
-    }
-    if (fromSuggestion && coords != null && isInBounds(coords, areaId: areaId)) {
-      return true;
-    }
     if (coords != null && isInBounds(coords)) return true;
+    if (address.trim().length >= 3) return true;
     return false;
   }
 
@@ -120,7 +113,7 @@ class ServiceAreaLocation {
   }
 
   static String outOfAreaMessage() =>
-      'Choisissez une adresse en République Démocratique du Congo.';
+      'Indiquez une adresse en République Démocratique du Congo.';
 
   /// @deprecated Utiliser [districtFromAddress]
   static LatLng? communeFromAddress(String address, {String? areaId}) =>

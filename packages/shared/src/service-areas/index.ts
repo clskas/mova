@@ -117,5 +117,5 @@ export function formatServiceAreasList(max = 8): string {
 }
 
 export function serviceAreaOutOfBoundsMessage(): string {
-  return 'Choisissez une adresse en République Démocratique du Congo.';
+  return 'Indiquez une adresse en République Démocratique du Congo.';
 }

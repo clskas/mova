@@ -173,8 +173,7 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
 
   Future<void> _onMapDropoffTap(LatLng raw) async {
     if (!ServiceAreaLocation.isInBounds(raw)) {
-      setState(() => _validationError =
-          'MOVA couvre les principales villes de RDC. Choisissez une destination dans une ville desservie.');
+      setState(() => _validationError = ServiceAreaLocation.outOfAreaMessage());
       return;
     }
     _setDropoffFromCoords(raw, LocationService.coordsLabel(raw));
@@ -239,7 +238,7 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
             return null;
           }
         }
-        return 'MOVA couvre les principales villes de RDC. Choisissez une destination dans une ville desservie.';
+        return 'MOVA couvre toute la République Démocratique du Congo. Indiquez une destination valide.';
       }
       _dropoff = ServiceAreaLocation.ensureInServiceArea(
         resolved,
@@ -250,7 +249,7 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
       coords: _dropoff,
       fromSuggestion: _dropoffFromSuggestion,
     )) {
-      return 'MOVA couvre les principales villes de RDC. Choisissez une destination dans une ville desservie.';
+      return ServiceAreaLocation.outOfAreaMessage();
     }
     return null;
   }

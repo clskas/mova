@@ -23,7 +23,7 @@ export class DeliveriesController {
   @Post('errand/estimate')
   @ApiOperation({ summary: 'Estimer course/commission (contrat mobile)' })
   estimateErrand(@Body() dto: MobileErrandEstimateDto) {
-    return this.errandsService.estimateMobile(dto.deliveryAddress, dto.items ?? [], dto.pickupAddress);
+    return this.errandsService.estimateMobile(dto.deliveryAddress, dto.items ?? [], dto.pickupAddress, dto.budgetCdf);
   }
 
   @Post('errand')
@@ -36,6 +36,7 @@ export class DeliveriesController {
       dto.deliveryLat,
       dto.deliveryLng,
       dto.pickupAddress,
+      dto.budgetCdf,
     );
   }
 

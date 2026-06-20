@@ -126,4 +126,10 @@ export class RidesController {
   cancel(@Request() req: { user: { id: string } }, @Param('id') id: string, @Body() dto: CancelRideDto) {
     return this.ridesService.cancelRide(id, req.user.id, dto.reason);
   }
+
+  @Post(':id/share-link')
+  @ApiOperation({ summary: 'Générer lien de suivi partageable (24 h)' })
+  shareLink(@Request() req: { user: { id: string } }, @Param('id') id: string) {
+    return this.ridesService.createShareLink(id, req.user.id);
+  }
 }

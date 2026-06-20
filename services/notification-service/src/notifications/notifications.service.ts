@@ -3,18 +3,21 @@ import {
   MOVA_EVENTS,
   DeliveryCreatedPayload,
   DeliveryStatusUpdatedPayload,
+  IncidentCreatedPayload,
   PaymentCompletedPayload,
   RideCreatedPayload,
+  RideStatusSmsPayload,
   ServiceAssignedPayload,
   ServiceStatusUpdatedPayload,
 } from '@mova/shared';
 import { RedisService } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
+import { SmsService } from '../sms/sms.service';
 
 @Injectable()
 export class NotificationsService implements OnModuleInit {
   private readonly logger = new Logger(NotificationsService.name);
-  constructor(private prisma: PrismaService, private redis: RedisService) {}
+  constructor(private prisma: PrismaService, private redis: RedisService, private sms: SmsService) {}
 
   onModuleInit() {
     this.redis.sub.subscribe(
@@ -24,6 +27,8 @@ export class NotificationsService implements OnModuleInit {
       MOVA_EVENTS.DELIVERY_STATUS_UPDATED,
       MOVA_EVENTS.SERVICE_ASSIGNED,
       MOVA_EVENTS.SERVICE_STATUS_UPDATED,
+      MOVA_EVENTS.INCIDENT_CREATED,
+      MOVA_EVENTS.RIDE_STATUS_SMS,
     );
     this.redis.sub.on('message', async (channel, message) => {
       try {
@@ -34,6 +39,8 @@ export class NotificationsService implements OnModuleInit {
         if (channel === MOVA_EVENTS.DELIVERY_STATUS_UPDATED) await this.onDeliveryStatusUpdated(data as DeliveryStatusUpdatedPayload);
         if (channel === MOVA_EVENTS.SERVICE_ASSIGNED) await this.onServiceAssigned(data as ServiceAssignedPayload);
         if (channel === MOVA_EVENTS.SERVICE_STATUS_UPDATED) await this.onServiceStatusUpdated(data as ServiceStatusUpdatedPayload);
+        if (channel === MOVA_EVENTS.INCIDENT_CREATED) await this.onIncidentCreated(data as IncidentCreatedPayload);
+        if (channel === MOVA_EVENTS.RIDE_STATUS_SMS) await this.onRideStatusSms(data as RideStatusSmsPayload);
       } catch (e) {
         this.logger.error('Event handler error', e);
       }
@@ -50,8 +57,19 @@ export class NotificationsService implements OnModuleInit {
   }
 
   async onPaymentCompleted(payload: PaymentCompletedPayload) {
-    await this.create(payload.userId, 'Paiement confirmé', `Paiement de ${payload.amountCdf} FC effectué`, 'PAYMENT_COMPLETED', payload);
-    this.logger.log(`payment.completed notification for ride ${payload.rideId}`);
+    const label = payload.rideId ? `course ${payload.rideId}` : `${payload.referenceType} ${payload.referenceId}`;
+    await this.create(payload.userId, 'Paiement confirmé', `Paiement de ${payload.amountCdf} FC effectué (${label})`, 'PAYMENT_COMPLETED', payload);
+    this.logger.log(`payment.completed notification for ${payload.rideId ?? payload.referenceId}`);
+  }
+
+  async onIncidentCreated(payload: IncidentCreatedPayload) {
+    const title = payload.isEmergency || payload.type === 'SOS' ? '🚨 Alerte SOS' : 'Nouvel incident';
+    await this.create(payload.userId, title, 'Votre signalement a été transmis à l\'équipe MOVA.', 'INCIDENT_CREATED', payload);
+    this.logger.warn(`incident.created ${payload.incidentId} type=${payload.type} emergency=${payload.isEmergency}`);
+  }
+
+  async onRideStatusSms(payload: RideStatusSmsPayload) {
+    await this.sms.sendMessage(payload.phone, payload.message);
   }
 
   async onDeliveryCreated(payload: DeliveryCreatedPayload) {
@@ -82,13 +100,25 @@ export class NotificationsService implements OnModuleInit {
   }
 
   async onServiceAssigned(payload: ServiceAssignedPayload) {
-    const label = payload.serviceType === 'MOVING' ? 'Nouveau déménagement' : 'Nouvelle course planifiée';
+    const label =
+      payload.serviceType === 'MOVING'
+        ? 'Nouveau déménagement'
+        : payload.serviceType === 'ERRAND'
+          ? 'Nouvelle course & commissions'
+          : 'Nouvelle course planifiée';
     const when = payload.scheduledAt ? ` · ${new Date(payload.scheduledAt).toLocaleString('fr-FR')}` : '';
     await this.create(
       payload.driverId,
       label,
       `${payload.summary}${when}`,
       'SERVICE_ASSIGNED',
+      payload,
+    );
+    await this.create(
+      payload.passengerId,
+      'Livreur assigné',
+      `Un livreur a été assigné : ${payload.summary}`,
+      'SERVICE_ASSIGNED_PASSENGER',
       payload,
     );
     this.logger.log(`service.assigned notification for driver ${payload.driverId}`);
@@ -102,11 +132,24 @@ export class NotificationsService implements OnModuleInit {
         ? 'Mise à jour location'
         : payload.serviceType === 'MOVING'
           ? 'Mise à jour déménagement'
-          : 'Mise à jour course planifiée';
+          : payload.serviceType === 'ERRAND'
+            ? 'Mise à jour courses & commissions'
+            : 'Mise à jour course planifiée';
     await this.create(payload.userId, title, body, 'SERVICE_STATUS', payload);
   }
 
   private serviceStatusMessage(payload: ServiceStatusUpdatedPayload): string | null {
+    if (payload.serviceType === 'ERRAND') {
+      return (
+        {
+          PENDING: 'Votre liste de courses est en attente d\'un livreur.',
+          ASSIGNED: 'Un livreur a été assigné à vos achats.',
+          IN_PROGRESS: 'Vos achats sont en cours.',
+          COMPLETED: 'Courses & commissions livrées.',
+          CANCELLED: 'Commande annulée.',
+        }[payload.status] ?? null
+      );
+    }
     if (payload.serviceType === 'RENTAL') {
       return (
         {

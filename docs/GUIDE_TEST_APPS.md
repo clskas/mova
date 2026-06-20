@@ -16,6 +16,7 @@ Ce document décrit **comment tester MOVA** :
 | [C. Scénario E2E](#c-scénario-bout-en-bout) | Enchaînement des 3 apps |
 | [C2. Suivi GPS & traces](#c2-suivi-gps--traces-de-route) | Carte admin + polyline mobile |
 | [C3. RBAC admin par rôle](#c3-rbac-admin--test-par-niveau-daccès) | 5 comptes staff |
+| [C4. SOS, ERRAND v2, Cash/SMS](#c4-sos-errand-v2-cashsms) | Nouveautés juin 2026 |
 | [D. Dépannage](#d-dépannage-rapide) | Problèmes fréquents |
 
 ---
@@ -728,6 +729,31 @@ Régression automatisée : `e2e/tests/admin-rbac-roles.spec.ts` (voir [RBAC_TEST
 
 ---
 
+## C4. SOS, ERRAND v2, Cash/SMS
+
+Voir [CAHIER_DES_CHARGES_V2.md](./CAHIER_DES_CHARGES_V2.md) pour le détail fonctionnel.
+
+| # | Fonction | Test | Résultat attendu |
+|---|----------|------|------------------|
+| 1 | SOS passager | Course active → bouton SOS sur suivi | Incident `SOS` dans admin **Litiges** |
+| 2 | Partage trajet | Icône partager → lien copié | `GET /api/public/trips/:token` retourne statut + trace |
+| 3 | ERRAND v2 | Articles + budget → créer commande | `budgetCdf` et `items` en base ; carte sur suivi |
+| 4 | Cash course | Payer **Espèces** → chauffeur saisit PIN | Payment `COMPLETED` après `POST /payments/rides/:id/cash/confirm` |
+| 5 | SMS statut | Accepter course (logs notification-service) | `[MOCK SMS]` dans logs Docker |
+
+```powershell
+# Lien public (remplacer TOKEN)
+Invoke-RestMethod "http://localhost:3000/api/public/trips/TOKEN"
+
+# SOS API
+$passToken = Get-MovaToken "+243900000010"
+Invoke-RestMethod -Uri "http://localhost:3000/api/incidents" -Method POST `
+  -Headers @{ Authorization = "Bearer $passToken" } -ContentType "application/json" `
+  -Body '{"type":"SOS","description":"Test SOS","rideId":"RIDE_ID","lat":-4.32,"lng":15.31}'
+```
+
+---
+
 ## D. Dépannage rapide
 
 | Problème | Piste |
@@ -760,6 +786,7 @@ docker compose logs driver-service --tail 30
 
 ## E. Références
 
+- [CAHIER_DES_CHARGES_V2.md](./CAHIER_DES_CHARGES_V2.md) — SOS, ERRAND v2, Cash/SMS
 - [RBAC_TESTING.md](./RBAC_TESTING.md) — rôles admin détaillés
 - [testing-e2e.md](./testing-e2e.md) — tests Playwright / Appium automatisés
 - [README.md](../README.md) — installation complète du monorepo

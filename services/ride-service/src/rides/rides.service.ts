@@ -14,6 +14,7 @@ import {
   toMobileRideStatus,
   toMobileVehicleType,
   toRideSummary,
+  RideStatusSmsPayload,
 } from '@mova/shared';
 import { RedisService } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
@@ -26,6 +27,8 @@ import { TrackingService } from '../tracking/tracking.service';
 import { assertServiceAreaPair, assertServiceAreaCoords } from '../common/address.util';
 import { tripDistanceKm } from '../common/geo.util';
 import { assertDriverCanReceiveJobs, driverCanReceiveJobs, fetchDriverProfileSnapshot } from '../common/driver-eligibility.util';
+import { fetchAuthUserBrief } from '../common/internal-lookup.util';
+import { TripShareService } from '../share/trip-share.service';
 
 const ACTIVE_STATUSES: RideStatus[] = [
   RideStatus.REQUESTED,
@@ -55,6 +58,7 @@ export class RidesService {
     private trackingGateway: TrackingGateway,
     private trackingService: TrackingService,
     private commission: CommissionService,
+    private tripShare: TripShareService,
   ) {}
 
   private emitStatusChange(rideId: string, status: RideStatus) {
@@ -195,17 +199,68 @@ export class RidesService {
     };
   }
 
+  private async notifyRideStatusSms(rideId: string, userId: string, status: RideStatus) {
+    const user = await fetchAuthUserBrief(userId);
+    if (!user?.phone) return;
+    const messages: Partial<Record<RideStatus, string>> = {
+      [RideStatus.ACCEPTED]: 'MOVA : votre chauffeur a accepté la course.',
+      [RideStatus.DRIVER_ARRIVED]: 'MOVA : votre chauffeur est arrivé au point de départ.',
+      [RideStatus.IN_PROGRESS]: 'MOVA : votre course est en cours.',
+      [RideStatus.COMPLETED]: 'MOVA : course terminée. Merci d\'avoir voyagé avec MOVA.',
+    };
+    const message = messages[status];
+    if (!message) return;
+    try {
+      await this.redis.publish(MOVA_EVENTS.RIDE_STATUS_SMS, {
+        rideId,
+        userId,
+        phone: user.phone,
+        status: toMobileRideStatus(status),
+        message,
+      } satisfies RideStatusSmsPayload);
+    } catch {
+      /* non-blocking */
+    }
+  }
+
+  async createShareLink(rideId: string, userId: string) {
+    const ride = await this.prisma.ride.findUnique({ where: { id: rideId } });
+    if (!ride) throw new MovaHttpException(MovaErrorCode.RIDE_NOT_FOUND, HttpStatus.NOT_FOUND);
+    if (ride.passengerId !== userId && ride.driverId !== userId) {
+      throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
+    }
+    const token = this.tripShare.generateToken();
+    const link = await this.prisma.tripShareLink.create({
+      data: {
+        rideId,
+        token,
+        createdBy: userId,
+        expiresAt: this.tripShare.shareExpiresAt(),
+      },
+    });
+    const shareUrl = this.tripShare.buildShareUrl(link.token);
+    return { token: link.token, shareUrl, expiresAt: link.expiresAt.toISOString() };
+  }
+
   async acceptRide(rideId: string, driverUserId: string, vehicleId?: string) {
     await assertDriverCanReceiveJobs(driverUserId);
     const ride = await this.prisma.ride.findUnique({ where: { id: rideId } });
     if (!ride) throw new MovaHttpException(MovaErrorCode.RIDE_NOT_FOUND, HttpStatus.NOT_FOUND);
     if (ride.status !== RideStatus.SEARCHING) throw new MovaHttpException(MovaErrorCode.RIDE_INVALID_STATUS);
+    const completionPin = this.tripShare.generateCompletionPin();
     const updated = await this.prisma.ride.update({
       where: { id: rideId },
-      data: { driverId: driverUserId, vehicleId, status: RideStatus.ACCEPTED, acceptedAt: new Date() },
+      data: {
+        driverId: driverUserId,
+        vehicleId,
+        status: RideStatus.ACCEPTED,
+        acceptedAt: new Date(),
+        completionPin,
+      },
     });
     await this.prisma.rideEvent.create({ data: { rideId, event: RideStatus.ACCEPTED } });
     this.emitStatusChange(rideId, RideStatus.ACCEPTED);
+    await this.notifyRideStatusSms(rideId, ride.passengerId, RideStatus.ACCEPTED);
     return this.formatRideDetail(updated);
   }
 
@@ -326,6 +381,7 @@ export class RidesService {
     const updated = await this.prisma.ride.update({ where: { id: rideId }, data: updates });
     await this.prisma.rideEvent.create({ data: { rideId, event: status } });
     this.emitStatusChange(rideId, status);
+    await this.notifyRideStatusSms(rideId, ride.passengerId, status);
     if (status === RideStatus.COMPLETED) {
       await this.redis.publish(MOVA_EVENTS.RIDE_COMPLETED, {
         rideId,
@@ -547,6 +603,7 @@ export class RidesService {
     completedAt?: Date | null;
     cancelledAt?: Date | null;
     cancelReason?: string | null;
+    completionPin?: string | null;
     createdAt: Date;
     updatedAt: Date;
   }) {
@@ -590,6 +647,7 @@ export class RidesService {
       completedAt: ride.completedAt,
       cancelledAt: ride.cancelledAt,
       cancelReason: ride.cancelReason,
+      completionPin: ride.completionPin ?? undefined,
       createdAt: ride.createdAt,
       updatedAt: ride.updatedAt,
     };

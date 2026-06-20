@@ -144,12 +144,15 @@ export class PaymentsService {
     if (method === PaymentMethod.CASH) {
       const payment = await this.prisma.payment.upsert({
         where: { rideId },
-        create: { rideId, userId, amountCdf, method, status: PaymentStatus.COMPLETED, providerRef: `cash_${rideId}` },
-        update: { status: PaymentStatus.COMPLETED, method, amountCdf },
+        create: { rideId, userId, amountCdf, method, status: PaymentStatus.PENDING, providerRef: `cash_pending_${rideId}` },
+        update: { status: PaymentStatus.PENDING, method, amountCdf },
       });
-      await this.publishPaymentCompleted({ rideId, userId, amountCdf, method: 'CASH' });
-      await this.creditDriverAfterRidePayment(rideId);
-      return { success: true, payment, message: 'Paiement espèces enregistré' };
+      return {
+        success: true,
+        payment,
+        pendingCash: true,
+        message: 'Paiement espèces en attente — communiquez le code PIN au chauffeur.',
+      };
     }
     return this.processPayment(rideId, userId, amountCdf, method, paymentPhone);
   }
@@ -206,15 +209,16 @@ export class PaymentsService {
         create: { referenceType: type, referenceId, userId, amountCdf, method, status: PaymentStatus.COMPLETED, providerRef: `wallet_${refKey}` },
         update: { status: PaymentStatus.COMPLETED, method, amountCdf },
       });
+      await this.publishPaymentCompleted({ referenceType: type, referenceId, userId, amountCdf, method: method.toString() });
       return { success: true, payment, message: 'Paiement portefeuille effectué', amountCdf, currency: 'CDF' };
     }
     if (method === PaymentMethod.CASH) {
       const payment = await this.prisma.servicePayment.upsert({
         where: { referenceType_referenceId: { referenceType: type, referenceId } },
-        create: { referenceType: type, referenceId, userId, amountCdf, method, status: PaymentStatus.COMPLETED, providerRef: `cash_${refKey}` },
-        update: { status: PaymentStatus.COMPLETED, method, amountCdf },
+        create: { referenceType: type, referenceId, userId, amountCdf, method, status: PaymentStatus.PENDING, providerRef: `cash_pending_${refKey}` },
+        update: { status: PaymentStatus.PENDING, method, amountCdf },
       });
-      return { success: true, payment, message: 'Paiement espèces enregistré', amountCdf, currency: 'CDF' };
+      return { success: true, payment, pendingCash: true, message: 'Paiement espèces en attente — communiquez le code PIN au livreur.', amountCdf, currency: 'CDF' };
     }
 
     const provider = this.getProvider(method);
@@ -238,6 +242,46 @@ export class PaymentsService {
       },
     });
     if (!result.success) throw new MovaHttpException(MovaErrorCode.PAYMENT_FAILED);
+    await this.publishPaymentCompleted({
+      referenceType: type,
+      referenceId,
+      userId,
+      amountCdf,
+      method: method.toString(),
+    });
     return { success: true, payment, message: result.message ?? 'Paiement effectué', amountCdf, currency: 'CDF' };
+  }
+
+  async confirmCashRide(rideId: string, driverUserId: string, pin: string) {
+    const ride = await this.fetchRide(rideId);
+    if (ride.driverId !== driverUserId) {
+      throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
+    }
+    if (this.resolveRideStatus(ride) !== 'COMPLETED') {
+      throw new MovaHttpException(MovaErrorCode.RIDE_INVALID_STATUS);
+    }
+    const expectedPin = String(ride.completionPin ?? '').trim();
+    if (!expectedPin || String(pin).trim() !== expectedPin) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Code PIN incorrect.');
+    }
+    const existing = await this.prisma.payment.findUnique({ where: { rideId } });
+    if (!existing || existing.method !== PaymentMethod.CASH) {
+      throw new MovaHttpException(MovaErrorCode.PAYMENT_FAILED, undefined, 'Aucun paiement espèces en attente.');
+    }
+    if (existing.status === PaymentStatus.COMPLETED) {
+      return { success: true, payment: existing, message: 'Paiement déjà confirmé' };
+    }
+    const payment = await this.prisma.payment.update({
+      where: { rideId },
+      data: { status: PaymentStatus.COMPLETED, providerRef: `cash_confirmed_${rideId}` },
+    });
+    await this.publishPaymentCompleted({
+      rideId,
+      userId: existing.userId,
+      amountCdf: existing.amountCdf,
+      method: 'CASH',
+    });
+    await this.creditDriverAfterRidePayment(rideId);
+    return { success: true, payment, message: 'Paiement espèces confirmé' };
   }
 }

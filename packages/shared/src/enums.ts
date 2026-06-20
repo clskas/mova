@@ -57,6 +57,7 @@ export enum IncidentType {
   ACCIDENT = 'ACCIDENT',
   HARASSMENT = 'HARASSMENT',
   FRAUD = 'FRAUD',
+  SOS = 'SOS',
   OTHER = 'OTHER',
 }
 

@@ -56,8 +56,17 @@ export default function LitigesPage() {
           {incidents.map((i) => (
             <Card key={i.id} className="p-4 flex flex-wrap justify-between gap-4">
               <div>
-                <p className="font-medium">{i.type}</p>
+                <p className="font-medium flex items-center gap-2">
+                  {i.type === "SOS" || i.isEmergency ? (
+                    <span className="px-2 py-0.5 rounded bg-red-600 text-white text-xs font-bold">SOS</span>
+                  ) : null}
+                  {i.type}
+                </p>
                 <p className="text-sm text-gray-600 mt-1">{i.description}</p>
+                {i.rideId && <p className="text-xs text-gray-500 mt-1">Course : {i.rideId}</p>}
+                {(i.lat != null && i.lng != null) && (
+                  <p className="text-xs text-gray-500">GPS : {i.lat?.toFixed(5)}, {i.lng?.toFixed(5)}</p>
+                )}
                 <div className="flex gap-2 mt-2 items-center">
                   <StatusBadge status={i.status} />
                   <span className="text-xs text-gray-400">{formatDate(i.createdAt)}</span>

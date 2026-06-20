@@ -875,6 +875,31 @@ class ApiClient {
     });
   }
 
+  Future<Result<Map<String, dynamic>>> confirmCashRide(String rideId, String pin) async {
+    return post('/payments/rides/$rideId/cash/confirm', {'pin': pin});
+  }
+
+  Future<Result<Map<String, dynamic>>> createRideShareLink(String rideId) async {
+    return post('/rides/$rideId/share-link', {});
+  }
+
+  Future<Result<Map<String, dynamic>>> reportSos({
+    required String description,
+    String? rideId,
+    double? lat,
+    double? lng,
+  }) async {
+    return post('/incidents', {
+      'type': 'SOS',
+      'description': description,
+      if (rideId != null) 'rideId': rideId,
+      if (lat != null) 'lat': lat,
+      if (lng != null) 'lng': lng,
+      'referenceType': rideId != null ? 'RIDE' : null,
+      'referenceId': rideId,
+    });
+  }
+
   Future<Result<Map<String, dynamic>>> payService(
     String referenceType,
     String referenceId, {

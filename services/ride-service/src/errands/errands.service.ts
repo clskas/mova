@@ -15,7 +15,10 @@ import { PrismaService } from '../prisma/prisma.service';
 import { PricingService } from '../rides/pricing.service';
 import { CommissionService } from '../rides/commission.service';
 import { TrackingService } from '../tracking/tracking.service';
+import { TripShareService } from '../share/trip-share.service';
 import { CreateErrandOrderDto } from './errands.dto';
+
+export type ErrandItemRow = { label: string; qty?: number; estimatedCdf?: number };
 
 @Injectable()
 export class ErrandsService {
@@ -25,6 +28,7 @@ export class ErrandsService {
     private commission: CommissionService,
     private redis: RedisService,
     private trackingService: TrackingService,
+    private tripShare: TripShareService,
   ) {}
 
   private async errandFees() {
@@ -35,18 +39,38 @@ export class ErrandsService {
     };
   }
 
-  async estimate(dto: CreateErrandOrderDto) {
+  private parseMobileItems(rawItems: string[], budgetCdf?: number): { items: ErrandItemRow[]; description: string; budget: number | null } {
+    const items = rawItems
+      .filter((line) => !/^Budget max:/i.test(line.trim()))
+      .map((label) => ({ label: label.trim(), qty: 1 }));
+    const description = items.map((i) => i.label).join(', ') || 'Course';
+    const budget = budgetCdf && budgetCdf > 0 ? budgetCdf : null;
+    return { items, description, budget };
+  }
+
+  private itemsFromOrder(order: ErrandOrder): ErrandItemRow[] {
+    if (order.items && Array.isArray(order.items)) {
+      return order.items as ErrandItemRow[];
+    }
+    return order.description.split(', ').filter(Boolean).map((label) => ({ label, qty: 1 }));
+  }
+
+  async estimate(dto: CreateErrandOrderDto, itemCount = 0) {
     const { baseCdf } = await this.errandFees();
     const distanceKm = this.pricing.haversineKm(dto.pickupLat, dto.pickupLng, dto.dropoffLat, dto.dropoffLng);
     const durationMin = (distanceKm / 18) * 60;
     const fare = await this.pricing.estimateFare(VehicleType.MOTO_TAXI, distanceKm, durationMin);
-    const estimatedPriceCdf = Math.ceil(fare.estimatedFareCdf + baseCdf);
+    const { itemCdf } = await this.errandFees();
+    const itemsFee = itemCount * itemCdf;
+    const estimatedPriceCdf = Math.ceil(fare.estimatedFareCdf + baseCdf + itemsFee);
     return {
       estimatedPriceCdf,
       formatted: `${estimatedPriceCdf.toLocaleString('fr-CD')} FC`,
       distanceKm,
       durationMin,
       errandFeeCdf: baseCdf,
+      itemsFeeCdf: itemsFee,
+      budgetCdf: dto.budgetCdf,
     };
   }
 
@@ -59,34 +83,35 @@ export class ErrandsService {
     return { label: DEFAULT_PICKUP.label, lat: DEFAULT_PICKUP.lat, lng: DEFAULT_PICKUP.lng };
   }
 
-  /** Compatibilité mobile: { deliveryAddress, items[], pickupAddress? } */
-  async estimateMobile(deliveryAddress: string, items: string[], pickupAddress?: string) {
+  /** Compatibilité mobile: { deliveryAddress, items[], pickupAddress?, budgetCdf? } */
+  async estimateMobile(deliveryAddress: string, items: string[], pickupAddress?: string, budgetCdf?: number) {
+    const parsed = this.parseMobileItems(items, budgetCdf);
     const pickup = this.resolvePickup(pickupAddress);
     const dropoff = addressToCoords(deliveryAddress);
-    const description = items.length ? items.join(', ') : 'Course';
     const dto: CreateErrandOrderDto = {
-      description,
+      description: parsed.description,
       pickupAddress: pickup.label,
       pickupLat: pickup.lat,
       pickupLng: pickup.lng,
       dropoffAddress: deliveryAddress,
       dropoffLat: dropoff.lat,
       dropoffLng: dropoff.lng,
+      budgetCdf: parsed.budget ?? undefined,
     };
-    const estimate = await this.estimate(dto);
-    const { itemCdf } = await this.errandFees();
-    const itemsFee = items.length * itemCdf;
-    const estimatedPriceCdf = estimate.estimatedPriceCdf + itemsFee;
-    return { ...estimate, estimatedPriceCdf, itemsFeeCdf: itemsFee, currency: 'CDF' };
+    const estimate = await this.estimate(dto, parsed.items.length);
+    return { ...estimate, currency: 'CDF', items: parsed.items };
   }
 
-  async create(userId: string, dto: CreateErrandOrderDto) {
-    const estimate = await this.estimate(dto);
+  async create(userId: string, dto: CreateErrandOrderDto, structuredItems?: ErrandItemRow[]) {
+    const itemCount = structuredItems?.length ?? 0;
+    const estimate = await this.estimate(dto, itemCount);
     const order = await this.prisma.errandOrder.create({
       data: {
         userId,
         status: ErrandOrderStatus.PENDING,
         description: dto.description,
+        items: structuredItems?.length ? structuredItems : undefined,
+        budgetCdf: dto.budgetCdf,
         pickupAddress: dto.pickupAddress,
         pickupLat: dto.pickupLat,
         pickupLng: dto.pickupLng,
@@ -101,7 +126,6 @@ export class ErrandsService {
     return { order, estimate };
   }
 
-  /** Compatibilité mobile: retourne { errand: { priceCdf, ... } } */
   async createMobile(
     userId: string,
     deliveryAddress: string,
@@ -109,32 +133,33 @@ export class ErrandsService {
     deliveryLat?: number,
     deliveryLng?: number,
     pickupAddress?: string,
+    budgetCdf?: number,
   ) {
+    const parsed = this.parseMobileItems(items, budgetCdf);
     const pickup = this.resolvePickup(pickupAddress);
     const dropoff = deliveryLat != null && deliveryLng != null ? { lat: deliveryLat, lng: deliveryLng } : addressToCoords(deliveryAddress);
-    const description = items.length ? items.join(', ') : 'Course';
     const dto: CreateErrandOrderDto = {
-      description,
+      description: parsed.description,
       pickupAddress: pickup.label,
       pickupLat: pickup.lat,
       pickupLng: pickup.lng,
       dropoffAddress: deliveryAddress,
       dropoffLat: dropoff.lat,
       dropoffLng: dropoff.lng,
+      budgetCdf: parsed.budget ?? undefined,
     };
-    const { order, estimate } = await this.create(userId, dto);
-    const { itemCdf } = await this.errandFees();
-    const itemsFee = items.length * itemCdf;
-    const priceCdf = estimate.estimatedPriceCdf + itemsFee;
+    const { order, estimate } = await this.create(userId, dto, parsed.items);
     return {
       errand: {
         id: order.id,
         status: order.status,
         type: 'ERRAND',
         deliveryAddress,
-        items,
-        priceCdf,
-        estimatedPriceCdf: priceCdf,
+        items: parsed.items.map((i) => i.label),
+        structuredItems: parsed.items,
+        budgetCdf: order.budgetCdf,
+        priceCdf: estimate.estimatedPriceCdf,
+        estimatedPriceCdf: estimate.estimatedPriceCdf,
         createdAt: order.createdAt.toISOString(),
       },
     };
@@ -162,6 +187,7 @@ export class ErrandsService {
   }
 
   private formatErrand(order: ErrandOrder, extra?: Record<string, unknown>) {
+    const structuredItems = this.itemsFromOrder(order);
     const timeline = buildErrandTimeline(order.status, order.completedAt);
     return {
       id: order.id,
@@ -170,7 +196,13 @@ export class ErrandsService {
       userId: order.userId,
       driverId: order.driverId,
       description: order.description,
-      items: order.description.split(', ').filter(Boolean),
+      items: structuredItems.map((i) => i.label),
+      structuredItems,
+      budgetCdf: order.budgetCdf,
+      purchaseTotalCdf: order.purchaseTotalCdf,
+      finalPriceCdf: order.finalPriceCdf ?? order.estimatedPriceCdf,
+      completionPin: order.completionPin,
+      proofPhotoUrl: order.proofPhotoUrl,
       pickupAddress: order.pickupAddress,
       pickupLat: order.pickupLat,
       pickupLng: order.pickupLng,
@@ -311,9 +343,24 @@ export class ErrandsService {
     }
     const updated = await this.prisma.errandOrder.update({
       where: { id: errandId },
-      data: { driverId: driverUserId, status: ErrandOrderStatus.ASSIGNED },
+      data: { driverId: driverUserId, status: ErrandOrderStatus.ASSIGNED, completionPin: this.tripShare.generateCompletionPin() },
     });
     const formatted = this.formatErrand(updated);
+    await this.redis.publish(MOVA_EVENTS.SERVICE_ASSIGNED, {
+      serviceType: 'ERRAND',
+      referenceId: updated.id,
+      driverId: driverUserId,
+      passengerId: updated.userId,
+      summary: `Courses ${updated.pickupAddress} → ${updated.dropoffAddress}`,
+      pickupAddress: updated.pickupAddress,
+      dropoffAddress: updated.dropoffAddress,
+    });
+    await this.redis.publish(MOVA_EVENTS.SERVICE_STATUS_UPDATED, {
+      serviceType: 'ERRAND',
+      referenceId: updated.id,
+      userId: updated.userId,
+      status: updated.status,
+    });
     return { errand: formatted, delivery: formatted, success: true };
   }
 
@@ -346,9 +393,18 @@ export class ErrandsService {
       await assertDriverCanReceiveJobs(driverId);
     }
     const updates: Record<string, unknown> = { status };
-    if (status === ErrandOrderStatus.COMPLETED) updates.completedAt = new Date();
+    if (status === ErrandOrderStatus.COMPLETED) {
+      updates.completedAt = new Date();
+      updates.finalPriceCdf = order.finalPriceCdf ?? order.estimatedPriceCdf;
+    }
     const updated = await this.prisma.errandOrder.update({ where: { id }, data: updates });
     const formatted = this.formatErrand(updated);
+    await this.redis.publish(MOVA_EVENTS.SERVICE_STATUS_UPDATED, {
+      serviceType: 'ERRAND',
+      referenceId: updated.id,
+      userId: updated.userId,
+      status: updated.status,
+    });
     return {
       errand: formatted,
       delivery: formatted,
@@ -446,6 +502,7 @@ export class ErrandsService {
       data: {
         driverId: driverId.trim(),
         status: order.status === ErrandOrderStatus.PENDING ? ErrandOrderStatus.ASSIGNED : order.status,
+        completionPin: order.completionPin ?? this.tripShare.generateCompletionPin(),
       },
     });
     const driver = await fetchAuthUserBrief(updated.driverId!);

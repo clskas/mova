@@ -311,9 +311,53 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
               onPressed: _loading ? null : () => _advanceStatus(nextStatus),
             ),
           ],
+          if (_status == 'COMPLETED') ...[
+            const SizedBox(height: 12),
+            MovaButton(
+              label: 'Confirmer paiement espèces',
+              isSecondary: true,
+              icon: Icons.payments_outlined,
+              onPressed: _confirmCash,
+            ),
+          ],
         ],
       ),
     );
+  }
+
+  Future<void> _confirmCash() async {
+    final pinController = TextEditingController();
+    final pin = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Confirmer espèces'),
+        content: TextField(
+          controller: pinController,
+          keyboardType: TextInputType.number,
+          maxLength: 4,
+          decoration: const InputDecoration(labelText: 'Code PIN passager'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Annuler')),
+          TextButton(onPressed: () => Navigator.pop(ctx, pinController.text.trim()), child: const Text('Valider')),
+        ],
+      ),
+    );
+    pinController.dispose();
+    if (pin == null || pin.isEmpty || !mounted) return;
+    setState(() => _loading = true);
+    final api = ref.read(apiClientProvider);
+    final result = await api.confirmCashRide(_rideId, pin);
+    if (!mounted) return;
+    setState(() => _loading = false);
+    switch (result) {
+      case Success():
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Paiement espèces confirmé')),
+        );
+      case Failure(:final error):
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
+    }
   }
 
   String _statusLabel(String status) => switch (status) {

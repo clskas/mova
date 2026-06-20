@@ -25,6 +25,7 @@ class PaymentScreen extends ConsumerStatefulWidget {
     this.serviceType,
     this.serviceId,
     required this.amountCdf,
+    this.completionPin,
   }) : assert(rideId != null || (serviceType != null && serviceId != null));
 
   /// Course taxi — utilise POST /payments/rides/:id
@@ -35,6 +36,7 @@ class PaymentScreen extends ConsumerStatefulWidget {
   final String? serviceId;
 
   final int amountCdf;
+  final String? completionPin;
 
   @override
   ConsumerState<PaymentScreen> createState() => _PaymentScreenState();
@@ -103,7 +105,23 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     setState(() => _loading = false);
 
     switch (result) {
-      case Success():
+      case Success(:final data):
+        if (_method == 'CASH' && data['pendingCash'] == true) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Paiement espèces en attente — communiquez le code PIN au chauffeur.'),
+            ),
+          );
+          if (widget.rideId != null) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => RatingScreen(rideId: widget.rideId!)),
+            );
+          } else {
+            Navigator.of(context).popUntil((r) => r.isFirst);
+          }
+          return;
+        }
         if (widget.rideId != null) {
           Navigator.pushReplacement(
             context,
@@ -142,6 +160,14 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                     color: MovaColors.green,
                   ),
                 ),
+                if (widget.completionPin != null && widget.completionPin!.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  const Text('Code PIN espèces (à donner au chauffeur)', style: TextStyle(color: MovaColors.textSecondary)),
+                  Text(
+                    widget.completionPin!,
+                    style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, letterSpacing: 8),
+                  ),
+                ],
               ],
             ),
           ),

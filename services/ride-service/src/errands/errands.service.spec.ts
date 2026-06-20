@@ -27,8 +27,9 @@ describe('ErrandsService', () => {
 
   const redis = { publish: jest.fn().mockResolvedValue(1) };
   const trackingService = { getTrace: jest.fn().mockResolvedValue([]) };
+  const tripShare = { generateCompletionPin: jest.fn().mockReturnValue('1234') };
 
-  const service = new ErrandsService(prisma as never, pricing, commission, redis as never, trackingService as never);
+  const service = new ErrandsService(prisma as never, pricing, commission, redis as never, trackingService as never, tripShare as never);
 
   const dto = {
     description: 'Acheter pain et lait',

@@ -2,12 +2,14 @@ export const MOVA_EVENTS = {
   USER_CREATED: 'user.created',
   RIDE_CREATED: 'ride.created',
   RIDE_COMPLETED: 'ride.completed',
+  RIDE_STATUS_SMS: 'ride.status.sms',
   PAYMENT_COMPLETED: 'payment.completed',
   DRIVER_RATING_UPDATED: 'driver.rating.updated',
   DELIVERY_CREATED: 'delivery.created',
   DELIVERY_STATUS_UPDATED: 'delivery.status.updated',
   SERVICE_ASSIGNED: 'service.assigned',
   SERVICE_STATUS_UPDATED: 'service.status.updated',
+  INCIDENT_CREATED: 'incident.created',
 } as const;
 
 export type MovaEventName = (typeof MOVA_EVENTS)[keyof typeof MOVA_EVENTS];
@@ -25,11 +27,33 @@ export interface RideCreatedPayload {
   estimatedFareCdf?: number;
 }
 
-export interface PaymentCompletedPayload {
+export interface RideStatusSmsPayload {
   rideId: string;
+  userId: string;
+  phone: string;
+  status: string;
+  message: string;
+}
+
+export interface PaymentCompletedPayload {
+  rideId?: string;
+  referenceType?: string;
+  referenceId?: string;
   userId: string;
   amountCdf: number;
   method: string;
+}
+
+export interface IncidentCreatedPayload {
+  incidentId: string;
+  userId: string;
+  type: string;
+  rideId?: string;
+  referenceType?: string;
+  referenceId?: string;
+  lat?: number;
+  lng?: number;
+  isEmergency?: boolean;
 }
 
 export interface DeliveryCreatedPayload {
@@ -51,7 +75,7 @@ export interface DeliveryStatusUpdatedPayload {
 }
 
 export interface ServiceAssignedPayload {
-  serviceType: 'MOVING' | 'SCHEDULED';
+  serviceType: 'MOVING' | 'SCHEDULED' | 'ERRAND';
   referenceId: string;
   driverId: string;
   passengerId: string;
@@ -62,7 +86,7 @@ export interface ServiceAssignedPayload {
 }
 
 export interface ServiceStatusUpdatedPayload {
-  serviceType: 'RENTAL' | 'MOVING' | 'SCHEDULED';
+  serviceType: 'RENTAL' | 'MOVING' | 'SCHEDULED' | 'ERRAND';
   referenceId: string;
   userId: string;
   status: string;

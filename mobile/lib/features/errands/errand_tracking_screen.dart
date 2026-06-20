@@ -8,6 +8,8 @@ import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
+import 'package:latlong2/latlong.dart';
+import '../booking/widgets/mova_ride_map.dart';
 import '../booking/payment_screen.dart';
 
 class ErrandTrackingScreen extends ConsumerStatefulWidget {
@@ -119,6 +121,7 @@ class _ErrandTrackingScreenState extends ConsumerState<ErrandTrackingScreen> {
           serviceType: 'ERRAND',
           serviceId: widget.errandId,
           amountCdf: price,
+          completionPin: _order?['completionPin']?.toString(),
         ),
       ),
     );
@@ -168,6 +171,21 @@ class _ErrandTrackingScreenState extends ConsumerState<ErrandTrackingScreen> {
               children: [
                 if (_error != null) ...[
                   MovaErrorBanner(message: _error!, onRetry: _load),
+                  const SizedBox(height: 12),
+                ],
+                if (_order != null) ...[
+                  MovaRideMap(
+                    pickup: LatLng(
+                      (_order!['pickupLat'] as num?)?.toDouble() ?? MarketConfig.defaultLat,
+                      (_order!['pickupLng'] as num?)?.toDouble() ?? MarketConfig.defaultLng,
+                    ),
+                    dropoff: LatLng(
+                      (_order!['dropoffLat'] as num?)?.toDouble() ?? MarketConfig.defaultLat,
+                      (_order!['dropoffLng'] as num?)?.toDouble() ?? MarketConfig.defaultLng,
+                    ),
+                    routeTrace: MovaRideMap.parseGpsTrace(_order!['gpsTrace']),
+                    height: 160,
+                  ),
                   const SizedBox(height: 12),
                 ],
                 MovaCard(

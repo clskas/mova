@@ -371,7 +371,11 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
-        builder: (_) => PaymentScreen(rideId: widget.rideId, amountCdf: price),
+        builder: (_) => PaymentScreen(
+          rideId: widget.rideId,
+          amountCdf: price,
+          completionPin: _ride?['completionPin']?.toString(),
+        ),
       ),
     );
   }
@@ -397,17 +401,63 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
   }
 
   Future<void> _shareTrip() async {
-    final pickup = _ride?['pickupAddress']?.toString() ?? 'Départ';
-    final dropoff = _ride?['dropoffAddress']?.toString() ?? 'Arrivée';
-    final driverName = _driver?['name']?.toString() ?? 'mon chauffeur';
-    final text =
-        'Je suis en course MOVA avec $driverName ($pickup → $dropoff). '
-        'Suivi en direct : https://mova.cd/suivi/${widget.rideId}';
-    await Clipboard.setData(ClipboardData(text: text));
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Lien de suivi copié dans le presse-papiers')),
-      );
+    final api = ref.read(apiClientProvider);
+    final result = await api.createRideShareLink(widget.rideId);
+    if (!mounted) return;
+    switch (result) {
+      case Success(:final data):
+        final url = data['shareUrl']?.toString() ?? 'https://mova.cd/suivi/${widget.rideId}';
+        final pickup = _ride?['pickupAddress']?.toString() ?? 'Départ';
+        final dropoff = _ride?['dropoffAddress']?.toString() ?? 'Arrivée';
+        final text = 'Je suis en course MOVA ($pickup → $dropoff). Suivi : $url';
+        await Clipboard.setData(ClipboardData(text: text));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Lien de suivi copié dans le presse-papiers')),
+        );
+      case Failure():
+        final pickup = _ride?['pickupAddress']?.toString() ?? 'Départ';
+        final dropoff = _ride?['dropoffAddress']?.toString() ?? 'Arrivée';
+        final text = 'Je suis en course MOVA ($pickup → $dropoff). https://mova.cd/suivi/${widget.rideId}';
+        await Clipboard.setData(ClipboardData(text: text));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Lien copié (mode secours)')),
+        );
+    }
+  }
+
+  Future<void> _triggerSos() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Alerte SOS'),
+        content: const Text(
+          'MOVA transmettra votre position à l\'équipe support. En cas de danger immédiat, appelez aussi les secours locaux.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Envoyer SOS', style: TextStyle(color: MovaColors.red)),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true || !mounted) return;
+    final api = ref.read(apiClientProvider);
+    final result = await api.reportSos(
+      description: 'SOS course ${widget.rideId}',
+      rideId: widget.rideId,
+      lat: _driverPos?.latitude ?? _pickup.latitude,
+      lng: _driverPos?.longitude ?? _pickup.longitude,
+    );
+    if (!mounted) return;
+    switch (result) {
+      case Success():
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Alerte SOS envoyée — l\'équipe MOVA a été notifiée')),
+        );
+      case Failure(:final error):
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
     }
   }
 
@@ -499,6 +549,11 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
       scrollable: false,
       padding: EdgeInsets.zero,
       actions: [
+        IconButton(
+          icon: const Icon(Icons.emergency_share, color: MovaColors.red),
+          tooltip: 'SOS',
+          onPressed: _triggerSos,
+        ),
         IconButton(
           icon: const Icon(Icons.share_outlined),
           tooltip: 'Partager',

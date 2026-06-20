@@ -17,6 +17,16 @@ export class PaymentsController {
     return this.paymentsService.payRide(rideId, req.user.id, dto.method, dto.phone, dto.amountCdf);
   }
 
+  @Post('rides/:rideId/cash/confirm')
+  @ApiOperation({ summary: 'Confirmer paiement espèces (chauffeur + PIN)' })
+  confirmCashRide(
+    @Request() req: { user: { id: string } },
+    @Param('rideId') rideId: string,
+    @Body('pin') pin: string,
+  ) {
+    return this.paymentsService.confirmCashRide(rideId, req.user.id, pin);
+  }
+
   @Post('services/:referenceType/:referenceId')
   @ApiOperation({ summary: 'Payer un service terminé (livraison, course, déménagement, location, covoiturage)' })
   payService(

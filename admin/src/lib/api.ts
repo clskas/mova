@@ -151,6 +151,9 @@ export type Incident = {
   type?: string;
   description?: string;
   status?: string;
+  lat?: number | null;
+  lng?: number | null;
+  isEmergency?: boolean;
   createdAt?: string;
 };
 

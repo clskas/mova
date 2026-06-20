@@ -151,6 +151,7 @@ model Ride {
   cancelledAt      DateTime?
   cancelReason     String?
   cancelledBy      String?
+  completionPin    String?
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
 
@@ -410,6 +411,12 @@ model ErrandOrder {
   userId            String
   status            ErrandOrderStatus @default(PENDING)
   description       String
+  items             Json?
+  budgetCdf         Int?
+  purchaseTotalCdf  Int?
+  finalPriceCdf     Int?
+  proofPhotoUrl     String?
+  completionPin     String?
   pickupAddress     String
   pickupLat         Float
   pickupLng         Float
@@ -428,6 +435,18 @@ model ErrandOrder {
   @@index([userId])
   @@index([status])
   @@map("errand_orders")
+}
+
+model TripShareLink {
+  id        String   @id @default(uuid())
+  rideId    String
+  token     String   @unique
+  createdBy String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([rideId])
+  @@map("trip_share_links")
 }
 
 model RentalVehicle {

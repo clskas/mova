@@ -1,6 +1,6 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { ErrandOrderStatus } from '@prisma/client';
-import { IsEnum, IsNumber, IsString, MinLength } from 'class-validator';
+import { IsEnum, IsNumber, IsOptional, IsString, MinLength } from 'class-validator';
 
 export class CreateErrandOrderDto {
   @ApiProperty({ example: 'Acheter médicaments à la pharmacie du coin' })
@@ -14,6 +14,7 @@ export class CreateErrandOrderDto {
   @ApiProperty() @IsString() dropoffAddress!: string;
   @ApiProperty() @IsNumber() dropoffLat!: number;
   @ApiProperty() @IsNumber() dropoffLng!: number;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() budgetCdf?: number;
 }
 
 export class UpdateErrandStatusDto {

@@ -75,17 +75,14 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
   }
 
   Map<String, dynamic> _errandPayload() {
-    final items = List<String>.from(_items);
     final budget = int.tryParse(_budgetController.text.trim());
-    if (budget != null && budget > 0) {
-      items.insert(0, 'Budget max: ${MarketConfig.formatCdf(budget)}');
-    }
     return {
       'pickupAddress': _pickupController.text.trim(),
       'deliveryAddress': _dropoffController.text.trim(),
       'deliveryLat': _deliveryLat ?? MarketConfig.defaultLat,
       'deliveryLng': _deliveryLng ?? MarketConfig.defaultLng,
-      'items': items,
+      'items': List<String>.from(_items),
+      if (budget != null && budget > 0) 'budgetCdf': budget,
     };
   }
 

@@ -16,6 +16,19 @@ MOVA est votre application de mobilité urbaine en RDC. Commandez un taxi ou mot
 3. Entrez le code OTP reçu par SMS.
 4. Vous accédez à l'écran d'accueil avec tous les services.
 
+## 1.1 Écran d'accueil — ordre des services
+
+Les services sont présentés en **grille 2×4** (de haut en bas, gauche puis droite) :
+
+| Ligne | Gauche | Droite |
+|-------|--------|--------|
+| 1 | Taxi / Moto-taxi | Livraisons |
+| 2 | Réservation planifiée | Covoiturage |
+| 3 | Location véhicule | Déménagement |
+| 4 | Wallet MOVA | Historique |
+
+Les services **Wallet MOVA** et **Historique** sont en bas de la grille. Vous y accédez aussi via la barre de navigation (icônes portefeuille et horloge) et le menu en haut de l'écran.
+
 ## 2. Taxi / Moto-taxi
 
 1. Appuyez sur **Taxi / Moto-taxi**.
@@ -89,11 +102,11 @@ MOVA est votre application de mobilité urbaine en RDC. Commandez un taxi ou mot
 
 ## 11. Wallet MOVA
 
-Consultez votre solde, rechargez via Orange Money, M-Pesa ou Airtel Money, et payez vos courses directement depuis le portefeuille.
+Carte en **dernière ligne** de l'accueil (ou icône portefeuille dans la barre du bas). Consultez votre solde, rechargez via Orange Money, M-Pesa ou Airtel Money, et payez vos courses directement depuis le portefeuille.
 
 ## 12. Historique
 
-Retrouvez tous vos trajets, colis, commandes repas, réservations et courses dans l'onglet **Historique** (onglets : Trajets | Colis | Repas | Réservations | Courses).
+Carte en **dernière ligne** de l'accueil (ou icône horloge dans la barre du bas). Retrouvez tous vos trajets, colis, commandes repas, réservations et courses (onglets : Trajets | Colis | Repas | Réservations | Courses).
 
 ## 14. Suivi GPS en temps réel
 

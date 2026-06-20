@@ -244,7 +244,7 @@ flutter run --flavor passenger -t lib/main_passenger.dart -d R3CN70C59KF `
 
 | # | Écran | Action | Résultat attendu |
 |---|-------|--------|------------------|
-| 1 | Accueil | Faire défiler toutes les cartes services | Location, Déménagement, etc. visibles (pas coupées) |
+| 1 | Accueil | Faire défiler toutes les cartes services | Ordre grille : Taxi/Livraisons → Réservation/Covoiturage → Location/Déménagement → **Wallet/Historique** en bas ; rien coupé |
 | 2 | Commander une course | Saisir départ / arrivée, estimer | Prix en CDF affiché |
 | 2b | Suivi course | Pendant course active | Carte : position chauffeur + **polyline** (trajet parcouru) |
 | 3 | Location véhicule | Onglet **Rechercher** → filtres → **Rechercher** | Catalogue (ex. 5 véhicules Kinshasa), pas d’overflow |
@@ -333,7 +333,7 @@ Ouvrir **http://localhost:3001** — même compte passager `+243900000010` / OTP
 
 | # | Écran | Résultat attendu |
 |---|-------|------------------|
-| 1 | Accueil | Cartes services visibles |
+| 1 | Accueil | Grille services : Wallet/Historique en dernière ligne |
 | 2 | Location véhicule | Catalogue + estimation + réservation |
 | 3 | Course taxi | Estimation tarif |
 

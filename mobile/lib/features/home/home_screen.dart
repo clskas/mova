@@ -240,23 +240,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                   const SizedBox(height: spacing),
                   gridRow([
                     ServiceCard(
-                      icon: MovaServiceIcon.wallet(color: MovaColors.midnight),
-                      iconColor: MovaColors.midnight,
-                      title: 'Wallet MOVA',
-                      subtitle: 'Solde, recharge et paiements',
-                      onTap: () => _open(context, const WalletScreen()),
-                    ),
-                    ServiceCard(
-                      icon: MovaServiceIcon.history(color: MovaColors.orange),
-                      iconColor: MovaColors.orange,
-                      title: 'Historique',
-                      subtitle: 'Vos courses et transactions',
-                      onTap: () => _open(context, const HistoryScreen()),
-                    ),
-                  ]),
-                  const SizedBox(height: spacing),
-                  gridRow([
-                    ServiceCard(
                       icon: MovaServiceIcon.calendar(color: MovaColors.violet),
                       iconColor: MovaColors.violet,
                       title: 'Réservation planifiée',
@@ -286,6 +269,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                       title: 'Déménagement',
                       subtitle: 'Camion et manutention',
                       onTap: () => _open(context, const MovingScreen()),
+                    ),
+                  ]),
+                  const SizedBox(height: spacing),
+                  gridRow([
+                    ServiceCard(
+                      icon: MovaServiceIcon.wallet(color: MovaColors.midnight),
+                      iconColor: MovaColors.midnight,
+                      title: 'Wallet MOVA',
+                      subtitle: 'Solde, recharge et paiements',
+                      onTap: () => _open(context, const WalletScreen()),
+                    ),
+                    ServiceCard(
+                      icon: MovaServiceIcon.history(color: MovaColors.orange),
+                      iconColor: MovaColors.orange,
+                      title: 'Historique',
+                      subtitle: 'Vos courses et transactions',
+                      onTap: () => _open(context, const HistoryScreen()),
                     ),
                   ]),
                 ],

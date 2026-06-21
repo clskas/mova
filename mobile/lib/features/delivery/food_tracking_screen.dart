@@ -335,6 +335,8 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
                           deliveryPin: pin,
                           courierName: courier?['name']?.toString(),
                           courierRating: (courier?['rating'] as num?)?.toDouble(),
+                          pickupLabel: _delivery?['pickupAddress']?.toString(),
+                          dropoffLabel: _delivery?['dropoffAddress']?.toString(),
                         ),
                         const SizedBox(height: 12),
                         MovaCard(

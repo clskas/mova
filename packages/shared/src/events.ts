@@ -9,6 +9,7 @@ export const MOVA_EVENTS = {
   DELIVERY_STATUS_UPDATED: 'delivery.status.updated',
   SERVICE_ASSIGNED: 'service.assigned',
   SERVICE_STATUS_UPDATED: 'service.status.updated',
+  RENTAL_BOOKING: 'rental.booking',
   INCIDENT_CREATED: 'incident.created',
 } as const;
 
@@ -75,13 +76,15 @@ export interface DeliveryStatusUpdatedPayload {
 }
 
 export interface ServiceAssignedPayload {
-  serviceType: 'MOVING' | 'SCHEDULED' | 'ERRAND';
+  serviceType: 'RENTAL' | 'MOVING' | 'SCHEDULED' | 'ERRAND';
   referenceId: string;
   driverId: string;
   passengerId: string;
   summary: string;
   pickupAddress?: string;
   dropoffAddress?: string;
+  pickupCity?: string;
+  returnCity?: string;
   scheduledAt?: string;
 }
 
@@ -90,4 +93,24 @@ export interface ServiceStatusUpdatedPayload {
   referenceId: string;
   userId: string;
   status: string;
+}
+
+export type RentalBookingEventKind = 'NEW_BOOKING' | 'CONFIRMED' | 'CANCELLED' | 'LOGISTICS_ASSIGNED';
+
+export interface RentalBookingPayload {
+  kind: RentalBookingEventKind;
+  inquiryId: string;
+  ownerUserId: string;
+  passengerId: string;
+  passengerName?: string;
+  passengerPhone?: string;
+  vehicleName: string;
+  pickupCity?: string | null;
+  returnCity?: string | null;
+  pickupAddress?: string | null;
+  startDate: string;
+  endDate: string;
+  priceCdf?: number | null;
+  status: string;
+  logisticsSummary?: string;
 }

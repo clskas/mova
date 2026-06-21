@@ -15,6 +15,9 @@
     "prisma:seed": "ts-node prisma/seed.ts",
     "prisma:seed-staff-roles": "ts-node prisma/seed-staff-roles.ts"
   },
+  "prisma": {
+    "seed": "ts-node prisma/seed.ts"
+  },
   "dependencies": {
     "@mova/shared": "file:../../packages/shared",
     "@nestjs/common": "^10.0.0",

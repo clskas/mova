@@ -185,6 +185,8 @@ class _ErrandTrackingScreenState extends ConsumerState<ErrandTrackingScreen> {
                     ),
                     routeTrace: MovaRideMap.parseGpsTrace(_order!['gpsTrace']),
                     height: 160,
+                    pickupLabel: _order!['pickupAddress']?.toString(),
+                    dropoffLabel: _order!['dropoffAddress']?.toString(),
                   ),
                   const SizedBox(height: 12),
                 ],

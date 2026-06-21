@@ -83,14 +83,17 @@ export default function LivraisonsPage() {
       try {
         const [detail, trace] = await Promise.all([
           fetchDelivery(selected.id),
-          fetchGpsTrace(traceType, selected.id),
+          fetchGpsTrace(traceType, selected.id).catch(() => ({ points: [] as GpsPoint[] })),
         ]);
         if (!cancelled) {
           setDeliveryDetail(detail);
           setGpsTrace(trace.points ?? detail.gpsTrace ?? []);
         }
       } catch {
-        if (!cancelled) setGpsTrace([]);
+        if (!cancelled) {
+          setDeliveryDetail(selected);
+          setGpsTrace([]);
+        }
       }
     };
     loadTrace();
@@ -265,6 +268,8 @@ export default function LivraisonsPage() {
                   ? { lat: deliveryDetail.dropoffLat, lng: deliveryDetail.dropoffLng }
                   : null
               }
+              pickupLabel={selected.pickupAddress ?? deliveryDetail?.pickupAddress}
+              dropoffLabel={selected.dropoffAddress ?? deliveryDetail?.dropoffAddress}
               live={
                 !!selected.status &&
                 !["DELIVERED", "COMPLETED", "CANCELLED"].includes(selected.status ?? "")

@@ -17,6 +17,8 @@ class MovaRideMap extends StatefulWidget {
     this.driverIcon = Icons.two_wheeler,
     this.onDropoffTap,
     this.dropoffEditable = false,
+    this.pickupLabel,
+    this.dropoffLabel,
   });
 
   final LatLng pickup;
@@ -25,6 +27,10 @@ class MovaRideMap extends StatefulWidget {
   final List<LatLng>? routeTrace;
   final double height;
   final IconData driverIcon;
+  /// Libellé affiché près du marqueur départ (ex. Gombe, Avenue …).
+  final String? pickupLabel;
+  /// Libellé affiché près du marqueur arrivée.
+  final String? dropoffLabel;
   /// Tap sur la carte pour placer la destination (pin violet).
   final ValueChanged<LatLng>? onDropoffTap;
   final bool dropoffEditable;
@@ -34,6 +40,14 @@ class MovaRideMap extends StatefulWidget {
 
   /// @deprecated Utiliser [mapDefaultCenter]
   static LatLng kinshasaDefault() => mapDefaultCenter();
+
+  /// Raccourcit une adresse pour l'affichage sur la carte.
+  static String mapLabel(String? address, {required String fallback, int maxLen = 32}) {
+    final t = address?.trim() ?? '';
+    if (t.isEmpty) return fallback;
+    if (t.length <= maxLen) return t;
+    return '${t.substring(0, maxLen - 1)}…';
+  }
 
   static List<LatLng> parseGpsTrace(dynamic raw) {
     if (raw is! List) return const [];
@@ -167,16 +181,26 @@ class _MovaRideMapState extends State<MovaRideMap> {
               markers: [
                 Marker(
                   point: pickup,
-                  width: 36,
-                  height: 36,
-                  child: const _PinIcon(color: MovaColors.green, icon: Icons.trip_origin),
+                  width: 140,
+                  height: 72,
+                  alignment: Alignment.topCenter,
+                  child: _LabeledPin(
+                    color: MovaColors.green,
+                    icon: Icons.trip_origin,
+                    label: MovaRideMap.mapLabel(widget.pickupLabel, fallback: 'Départ'),
+                  ),
                 ),
                 if (dropoff != null)
                   Marker(
                     point: dropoff,
-                    width: 36,
-                    height: 36,
-                    child: const _PinIcon(color: MovaColors.violet, icon: Icons.place),
+                    width: 140,
+                    height: 72,
+                    alignment: Alignment.topCenter,
+                    child: _LabeledPin(
+                      color: MovaColors.violet,
+                      icon: Icons.place,
+                      label: MovaRideMap.mapLabel(widget.dropoffLabel, fallback: 'Arrivée'),
+                    ),
                   ),
                 if (driver != null)
                   Marker(
@@ -231,6 +255,57 @@ class _MovaRideMapState extends State<MovaRideMap> {
             ),
         ],
       ),
+    );
+  }
+}
+
+class _LabeledPin extends StatelessWidget {
+  const _LabeledPin({
+    required this.color,
+    required this.icon,
+    required this.label,
+  });
+
+  final Color color;
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          constraints: const BoxConstraints(maxWidth: 132),
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+          decoration: BoxDecoration(
+            color: MovaColors.white,
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: color.withValues(alpha: 0.5)),
+            boxShadow: [
+              BoxShadow(
+                color: MovaColors.midnight.withValues(alpha: 0.12),
+                blurRadius: 4,
+                offset: const Offset(0, 1),
+              ),
+            ],
+          ),
+          child: Text(
+            label,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              color: MovaColors.midnight,
+              height: 1.15,
+            ),
+          ),
+        ),
+        const SizedBox(height: 2),
+        _PinIcon(color: color, icon: icon),
+      ],
     );
   }
 }

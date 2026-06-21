@@ -2,6 +2,7 @@ export enum UserRole {
   PASSENGER = 'PASSENGER',
   DRIVER = 'DRIVER',
   RESTAURANT = 'RESTAURANT',
+  RENTAL_PARTNER = 'RENTAL_PARTNER',
   SUPER_ADMIN = 'SUPER_ADMIN',
   ADMIN = 'ADMIN',
   SUPPORT = 'SUPPORT',
@@ -30,6 +31,14 @@ export enum RideStatus {
   IN_PROGRESS = 'IN_PROGRESS',
   COMPLETED = 'COMPLETED',
   CANCELLED = 'CANCELLED',
+}
+
+/** Qui gère la remise / récupération du véhicule loué. */
+export enum RentalLogisticsMode {
+  SELF_PASSENGER = 'SELF_PASSENGER',
+  PASSENGER_DRIVER = 'PASSENGER_DRIVER',
+  OWNER_DRIVER = 'OWNER_DRIVER',
+  MOVA_DRIVER = 'MOVA_DRIVER',
 }
 
 export enum PaymentMethod {

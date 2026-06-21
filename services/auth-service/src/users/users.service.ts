@@ -60,6 +60,7 @@ export class UsersService {
       UserRole.PASSENGER,
       UserRole.DRIVER,
       UserRole.RESTAURANT,
+      UserRole.RENTAL_PARTNER,
       UserRole.SUPER_ADMIN,
       UserRole.ADMIN,
       UserRole.SUPPORT,

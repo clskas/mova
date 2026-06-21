@@ -336,8 +336,14 @@ export class AdminService {
   cancelRentalInquiry(id: string) {
     return this.proxy('ride', `/internal/rental-inquiries/${id}/cancel`, { method: 'POST', body: JSON.stringify({}) });
   }
-  updateRentalInquiryStatus(id: string, status: string) {
-    return this.proxy('ride', `/internal/rental-inquiries/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) });
+  updateRentalInquiryStatus(id: string, status: string, forceOverride?: boolean) {
+    return this.proxy('ride', `/internal/rental-inquiries/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status, forceOverride: forceOverride === true }),
+    });
+  }
+  assignRentalDriver(id: string, driverId: string) {
+    return this.proxy('ride', `/internal/rental-inquiries/${id}/assign`, { method: 'PATCH', body: JSON.stringify({ driverId }) });
   }
 
   listRentalVehicles() {

@@ -17,6 +17,7 @@ class MovaScreen extends StatelessWidget {
     required this.child,
     this.scrollable = true,
     this.padding = const EdgeInsets.all(16),
+    this.centerContent = false,
   });
 
   final String? title;
@@ -27,10 +28,23 @@ class MovaScreen extends StatelessWidget {
   final Widget child;
   final bool scrollable;
   final EdgeInsets padding;
+  /// Centre verticalement le contenu (écrans de connexion OTP).
+  final bool centerContent;
 
   @override
   Widget build(BuildContext context) {
     final viewInsets = MediaQuery.viewInsetsOf(context);
+
+    Widget bodyChild = Padding(padding: padding, child: child);
+
+    if (centerContent) {
+      bodyChild = Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: bodyChild,
+        ),
+      );
+    }
 
     return Scaffold(
       resizeToAvoidBottomInset: true,
@@ -46,7 +60,7 @@ class MovaScreen extends StatelessWidget {
               return SizedBox(
                 height: constraints.maxHeight,
                 width: constraints.maxWidth,
-                child: Padding(padding: padding, child: child),
+                child: bodyChild,
               );
             }
             return SingleChildScrollView(
@@ -55,7 +69,9 @@ class MovaScreen extends StatelessWidget {
               padding: EdgeInsets.only(bottom: viewInsets.bottom),
               child: ConstrainedBox(
                 constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                child: Padding(padding: padding, child: child),
+                child: centerContent
+                    ? Align(alignment: Alignment.center, child: bodyChild)
+                    : bodyChild,
               ),
             );
           },

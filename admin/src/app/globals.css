@@ -2,6 +2,8 @@
 @tailwind components;
 @tailwind utilities;
 
+@import "leaflet/dist/leaflet.css";
+
 :root {
   --background: #f4f3ff;
   --foreground: #0d0d1a;
@@ -30,4 +32,23 @@ body {
   .mova-btn-primary {
     @apply px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] hover:opacity-95 disabled:opacity-50 transition-opacity;
   }
+}
+
+/* Étiquettes permanentes départ / arrivée sur cartes Leaflet (admin) */
+.leaflet-tooltip.mova-map-marker-label {
+  background: #fff;
+  border: 1px solid #c7d2fe;
+  border-radius: 6px;
+  box-shadow: 0 1px 4px rgba(13, 13, 26, 0.12);
+  color: #0d0d1a;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  max-width: 160px;
+  padding: 4px 8px;
+  text-align: center;
+  white-space: normal;
+}
+.leaflet-tooltip.mova-map-marker-label::before {
+  border-top-color: #c7d2fe;
 }

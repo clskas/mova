@@ -101,6 +101,7 @@ class _DriverOtpScreenState extends ConsumerState<DriverOtpScreen> {
   Widget build(BuildContext context) {
     return MovaScreen(
       title: 'MOVA Chauffeur',
+      centerContent: true,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -118,6 +119,7 @@ class _DriverOtpScreenState extends ConsumerState<DriverOtpScreen> {
           const SizedBox(height: 16),
           const Text(
             'Espace chauffeur',
+            textAlign: TextAlign.center,
             style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
@@ -125,10 +127,19 @@ class _DriverOtpScreenState extends ConsumerState<DriverOtpScreen> {
           const SizedBox(height: 6),
           const Text(
             'Connectez-vous avec votre numéro +243',
+            textAlign: TextAlign.center,
             style: TextStyle(color: MovaColors.textSecondary),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
+          if (kDebugMode) ...[
+            const SizedBox(height: 10),
+            Text(
+              'API : ${MarketConfig.apiBaseUrl}',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 11, color: MovaColors.textSecondary.withValues(alpha: 0.8)),
+            ),
+          ],
           if (kDebugMode && _mockHint != null) ...[
             const SizedBox(height: 8),
             Container(

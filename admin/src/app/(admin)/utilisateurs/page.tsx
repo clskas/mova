@@ -178,6 +178,7 @@ export default function UtilisateursPage() {
                   { value: "PASSENGER", label: "Passager" },
                   { value: "DRIVER", label: "Chauffeur" },
                   { value: "RESTAURANT", label: "Restaurant partenaire" },
+                  { value: "RENTAL_PARTNER", label: "Partenaire location" },
                   { value: "ADMIN", label: "Administrateur" },
                   { value: "SUPER_ADMIN", label: "Super admin" },
                   { value: "SUPPORT", label: "Support" },

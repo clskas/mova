@@ -1,5 +1,6 @@
-import { Body, Controller, Get, Param, Post, Query, Request, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, Request, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { RentalInquiryStatus } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import {
   CreateRentalBookingDto,
@@ -75,12 +76,32 @@ export class RentalController {
     return this.rentalService.cancelBooking(id, req.user.id);
   }
 
-  @Post('inquiries')
+  @Get('assignments')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Soumettre demande de location véhicule' })
-  create(@Request() req: { user: { id: string } }, @Body() dto: CreateRentalInquiryDto) {
-    return this.rentalService.create(req.user.id, dto);
+  @ApiOperation({ summary: 'Missions location assignées au chauffeur' })
+  assignments(@Request() req: { user: { id: string } }) {
+    return this.rentalService.listForDriver(req.user.id);
+  }
+
+  @Get('inquiries/:id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Détail demande avec timeline statut' })
+  get(@Request() req: { user: { id: string } }, @Param('id') id: string) {
+    return this.rentalService.getForParticipant(id, req.user.id);
+  }
+
+  @Patch('inquiries/:id/driver-status')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Mettre à jour statut location (chauffeur assigné)' })
+  driverStatus(
+    @Request() req: { user: { id: string } },
+    @Param('id') id: string,
+    @Body('status') status: RentalInquiryStatus,
+  ) {
+    return this.rentalService.updateStatusByDriver(id, req.user.id, status);
   }
 
   @Get('inquiries')
@@ -91,11 +112,11 @@ export class RentalController {
     return this.rentalService.list(req.user.id);
   }
 
-  @Get('inquiries/:id')
+  @Post('inquiries')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Détail demande avec timeline statut' })
-  get(@Request() req: { user: { id: string } }, @Param('id') id: string) {
-    return this.rentalService.get(id, req.user.id);
+  @ApiOperation({ summary: 'Soumettre demande de location véhicule' })
+  create(@Request() req: { user: { id: string } }, @Body() dto: CreateRentalInquiryDto) {
+    return this.rentalService.create(req.user.id, dto);
   }
 }

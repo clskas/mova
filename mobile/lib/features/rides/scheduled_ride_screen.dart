@@ -651,6 +651,8 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
             onDropoffTap: _onMapDropoffTap,
             dropoffEditable: true,
             height: 180,
+            pickupLabel: 'Ma position',
+            dropoffLabel: _destinationController.text,
           ),
           const SizedBox(height: 12),
           Row(

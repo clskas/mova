@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/api/api_client.dart';
 import '../../core/config/market_config.dart';
+import '../../core/location/service_areas.dart';
 import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
@@ -43,6 +44,9 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
   bool _childSeat = false;
   bool _gps = false;
   bool _extraDriver = false;
+  String _logisticsMode = 'SELF_PASSENGER';
+  final _passengerDriverNameController = TextEditingController();
+  final _passengerDriverPhoneController = TextEditingController();
   final _pickupController = TextEditingController(text: 'Gombe, Kinshasa');
   final _phoneController = TextEditingController(text: '+243812345678');
   final _notesController = TextEditingController();
@@ -70,6 +74,8 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
     _pickupController.dispose();
     _phoneController.dispose();
     _notesController.dispose();
+    _passengerDriverNameController.dispose();
+    _passengerDriverPhoneController.dispose();
     super.dispose();
   }
 
@@ -107,6 +113,12 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
           'gps': _gps,
           'extraDriver': _extraDriver,
         },
+        'logisticsMode': _logisticsMode,
+        if (_logisticsMode == 'PASSENGER_DRIVER') ...{
+          if (_passengerDriverNameController.text.trim().isNotEmpty)
+            'passengerDriverName': _passengerDriverNameController.text.trim(),
+          'passengerDriverPhone': MarketConfig.normalizePhone(_passengerDriverPhoneController.text.trim()),
+        },
       };
 
   Future<void> _fetchQuote() async {
@@ -132,6 +144,11 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
   Future<void> _confirm() async {
     if (!MarketConfig.validatePhone(_phoneController.text.trim())) {
       setState(() => _error = 'Numéro de téléphone invalide (+243…).');
+      return;
+    }
+    if (_logisticsMode == 'PASSENGER_DRIVER' &&
+        !MarketConfig.validatePhone(_passengerDriverPhoneController.text.trim())) {
+      setState(() => _error = 'Téléphone du chauffeur passager invalide (+243…).');
       return;
     }
     setState(() {
@@ -213,6 +230,9 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
     }
 
     final imageUrl = v['imageUrl']?.toString();
+    final resolvedImage = imageUrl != null && imageUrl.isNotEmpty
+        ? MarketConfig.resolveMediaUrl(imageUrl)
+        : null;
     final features = (v['features'] as List?)?.cast<String>() ?? [];
 
     return MovaScreen(
@@ -241,11 +261,11 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
               ],
             ),
           ),
-          if (imageUrl != null)
+          if (resolvedImage != null && resolvedImage.isNotEmpty)
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
               child: Image.network(
-                imageUrl,
+                resolvedImage,
                 height: 180,
                 width: double.infinity,
                 fit: BoxFit.cover,
@@ -371,7 +391,7 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
             DropdownButtonFormField<String>(
               value: _pickupCity,
               decoration: const InputDecoration(labelText: 'Ville de prise en charge'),
-              items: ['Kinshasa', 'Lubumbashi', 'Goma', 'Matadi']
+              items: ServiceAreas.cityNames
                   .map((c) => DropdownMenuItem(value: c, child: Text(c)))
                   .toList(),
               onChanged: (v) => setState(() {
@@ -383,7 +403,7 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
             DropdownButtonFormField<String>(
               value: _returnCity,
               decoration: const InputDecoration(labelText: 'Ville de retour'),
-              items: ['Kinshasa', 'Lubumbashi', 'Goma', 'Matadi']
+              items: ServiceAreas.cityNames
                   .map((c) => DropdownMenuItem(value: c, child: Text(c)))
                   .toList(),
               onChanged: (v) => setState(() {
@@ -467,6 +487,41 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
               controlAffinity: ListTileControlAffinity.leading,
               contentPadding: EdgeInsets.zero,
             ),
+            const SizedBox(height: 8),
+            Text('Remise du véhicule', style: theme.textTheme.titleSmall),
+            RadioListTile<String>(
+              title: const Text('Je récupère le véhicule moi-même'),
+              value: 'SELF_PASSENGER',
+              groupValue: _logisticsMode,
+              onChanged: (v) => setState(() => _logisticsMode = v!),
+              contentPadding: EdgeInsets.zero,
+            ),
+            RadioListTile<String>(
+              title: const Text('Mon chauffeur s\'occupe du transport'),
+              value: 'PASSENGER_DRIVER',
+              groupValue: _logisticsMode,
+              onChanged: (v) => setState(() => _logisticsMode = v!),
+              contentPadding: EdgeInsets.zero,
+            ),
+            RadioListTile<String>(
+              title: const Text('Livraison par un chauffeur MOVA'),
+              value: 'MOVA_DRIVER',
+              groupValue: _logisticsMode,
+              onChanged: (v) => setState(() => _logisticsMode = v!),
+              contentPadding: EdgeInsets.zero,
+            ),
+            if (_logisticsMode == 'PASSENGER_DRIVER') ...[
+              TextField(
+                controller: _passengerDriverNameController,
+                decoration: const InputDecoration(labelText: 'Nom du chauffeur (optionnel)'),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _passengerDriverPhoneController,
+                keyboardType: TextInputType.phone,
+                decoration: const InputDecoration(labelText: 'Téléphone du chauffeur *'),
+              ),
+            ],
             if (_step == 2) ...[
               TextField(
                 controller: _pickupController,

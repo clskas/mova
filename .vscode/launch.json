@@ -2,6 +2,20 @@
   "version": "0.2.0",
   "configurations": [
     {
+      "name": "MOVA Passager (USB)",
+      "request": "launch",
+      "type": "dart",
+      "cwd": "${workspaceFolder}/mobile",
+      "program": "lib/main_passenger.dart",
+      "args": [
+        "--flavor",
+        "passenger",
+        "--dart-define=API_URL=http://127.0.0.1:3000/api",
+        "--dart-define=WS_URL=http://127.0.0.1:3000"
+      ],
+      "preLaunchTask": "mova-adb-reverse"
+    },
+    {
       "name": "MOVA Passager (LAN)",
       "request": "launch",
       "type": "dart",
@@ -13,6 +27,20 @@
         "--dart-define=API_URL=http://192.168.1.64:3000/api",
         "--dart-define=WS_URL=http://192.168.1.64:3000"
       ]
+    },
+    {
+      "name": "MOVA Chauffeur (USB)",
+      "request": "launch",
+      "type": "dart",
+      "cwd": "${workspaceFolder}/mobile",
+      "program": "lib/main_driver.dart",
+      "args": [
+        "--flavor",
+        "driver",
+        "--dart-define=API_URL=http://127.0.0.1:3000/api",
+        "--dart-define=WS_URL=http://127.0.0.1:3000"
+      ],
+      "preLaunchTask": "mova-adb-reverse"
     },
     {
       "name": "MOVA Chauffeur (LAN)",

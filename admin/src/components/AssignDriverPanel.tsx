@@ -15,6 +15,11 @@ type AssignDriverPanelProps = {
   saving?: boolean;
   currentDriverId?: string | null;
   compact?: boolean;
+  title?: string;
+  fieldLabel?: string;
+  assignLabel?: string;
+  hint?: string;
+  emptyLabel?: string;
 };
 
 export function AssignDriverPanel({
@@ -26,6 +31,11 @@ export function AssignDriverPanel({
   saving,
   currentDriverId,
   compact,
+  title = "Assigner un chauffeur",
+  fieldLabel = "Chauffeur MOVA (KYC approuvé)",
+  assignLabel,
+  hint = "L'assignation passe automatiquement le statut à Confirmé (planifiée, location) ou Assigné (déménagement, livraison).",
+  emptyLabel,
 }: AssignDriverPanelProps) {
   const options = useMemo(
     () => [
@@ -45,10 +55,15 @@ export function AssignDriverPanel({
     [drivers, currentDriverId],
   );
 
+  const resolvedAssignLabel =
+    assignLabel ?? (compact ? "Assigner" : "Confirmer l'assignation");
+  const resolvedCompactAssignLabel = assignLabel ?? "Assigner";
+
   if (drivers.length === 0) {
     return (
       <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-        Aucun chauffeur KYC approuvé. Validez un dossier dans <strong>Chauffeurs → KYC</strong> d&apos;abord.
+        {emptyLabel ??
+          "Aucun chauffeur KYC approuvé. Validez un dossier dans Chauffeurs → KYC d'abord."}
       </p>
     );
   }
@@ -66,7 +81,7 @@ export function AssignDriverPanel({
           onClick={onAssign}
           className="px-3 py-1.5 rounded-lg bg-[#6C63FF] text-white text-xs font-medium disabled:opacity-40 hover:bg-[#5a52e0]"
         >
-          {saving ? "…" : "Assigner"}
+          {saving ? "…" : resolvedCompactAssignLabel}
         </button>
       </div>
     );
@@ -74,8 +89,8 @@ export function AssignDriverPanel({
 
   return (
     <div className="rounded-xl border-2 border-[#6C63FF]/30 bg-violet-50/40 p-4 space-y-3">
-      <p className="font-semibold text-[#6C63FF]">Assigner un chauffeur</p>
-      <FieldLabel>Chauffeur MOVA (KYC approuvé)</FieldLabel>
+      <p className="font-semibold text-[#6C63FF]">{title}</p>
+      <FieldLabel>{fieldLabel}</FieldLabel>
       <SelectInput value={value} onChange={onChange} options={options} disabled={disabled || saving} />
       {currentDriver && currentDriverId && value === currentDriverId && (
         <DriverVehiclePreview driver={currentDriver} title="Engin actuellement assigné" />
@@ -89,11 +104,9 @@ export function AssignDriverPanel({
         onClick={onAssign}
         className="w-full px-4 py-2.5 rounded-xl bg-[#6C63FF] text-white text-sm font-medium disabled:opacity-40 hover:bg-[#5a52e0]"
       >
-        {saving ? "Assignation…" : "Confirmer l'assignation"}
+        {saving ? "Assignation…" : resolvedAssignLabel}
       </button>
-      <p className="text-xs text-gray-500">
-        L&apos;assignation passe automatiquement le statut à Confirmé (planifiée) ou Assigné (déménagement).
-      </p>
+      {hint ? <p className="text-xs text-gray-500">{hint}</p> : null}
     </div>
   );
 }

@@ -1000,6 +1000,15 @@ export type RentalInquiry = {
   vehicleType?: string;
   ownerName?: string;
   ownerContactPhone?: string;
+  ownerUserId?: string | null;
+  logisticsMode?: string;
+  logisticsModeLabel?: string;
+  needsMovaLogistics?: boolean;
+  passengerDriverName?: string | null;
+  passengerDriverPhone?: string | null;
+  ownerDriverName?: string | null;
+  ownerDriverPhone?: string | null;
+  movaDriverId?: string | null;
   status?: string;
   startDate?: string;
   endDate?: string;
@@ -1010,6 +1019,9 @@ export type RentalInquiry = {
   returnCity?: string;
   contactPhone?: string;
   notes?: string;
+  driverId?: string | null;
+  driverName?: string;
+  driverPhone?: string;
   createdAt?: string;
 };
 
@@ -1018,12 +1030,19 @@ export async function fetchRentalInquiries(): Promise<RentalInquiry[]> {
   return Array.isArray(data) ? data : data.data ?? [];
 }
 
-export async function updateRentalInquiryStatus(id: string, status: string) {
-  return apiFetch(`/api/admin/rental-inquiries/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) });
+export async function updateRentalInquiryStatus(id: string, status: string, forceOverride?: boolean) {
+  return apiFetch(`/api/admin/rental-inquiries/${id}/status`, {
+    method: "PATCH",
+    body: JSON.stringify({ status, forceOverride: forceOverride === true }),
+  });
 }
 
 export async function cancelRentalInquiry(id: string) {
   return apiFetch(`/api/admin/rental-inquiries/${id}/cancel`, { method: "POST", body: JSON.stringify({}) });
+}
+
+export async function assignRentalDriver(id: string, driverId: string) {
+  return apiFetch(`/api/admin/rental-inquiries/${id}/assign`, { method: "PATCH", body: JSON.stringify({ driverId }) });
 }
 
 export type RentalCatalogVehicle = {
@@ -1050,6 +1069,9 @@ export type RentalCatalogVehicle = {
   limitedMileageFeeCdf?: number;
   imageUrl?: string | null;
   isActive?: boolean;
+  approvalStatus?: 'PENDING' | 'APPROVED' | 'REJECTED';
+  approvalStatusLabel?: string;
+  ownerUserId?: string | null;
   createdAt?: string;
   updatedAt?: string;
 };
@@ -1068,6 +1090,16 @@ export async function saveRentalVehicle(data: Partial<RentalCatalogVehicle>, id?
 
 export async function deleteRentalVehicle(id: string) {
   return apiFetch(`/api/admin/rental-vehicles/${id}`, { method: "DELETE" });
+}
+
+export async function reviewRentalVehicle(id: string, action: "approve" | "reject") {
+  return saveRentalVehicle(
+    {
+      approvalStatus: action === "approve" ? "APPROVED" : "REJECTED",
+      isActive: action === "approve",
+    },
+    id,
+  );
 }
 
 function arrayBufferToBase64(buffer: ArrayBuffer): string {

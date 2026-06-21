@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { africasTalkingInitiateMobileMoney, useAfricasTalkingMobileMoney } from '@mova/shared';
 import { PaymentInitResult, PaymentProvider } from './payment-provider.interface';
 
 @Injectable()
@@ -18,31 +19,46 @@ function missingConfigMessage(provider: string, vars: string[]): string {
   return `${provider} non configuré. Définissez : ${vars.join(', ')}. Consultez config/external-apis.env.example.`;
 }
 
+function atGetter(config: ConfigService) {
+  return (key: string) => config.get<string>(key);
+}
+
 @Injectable()
 export class OrangeMoneyProvider implements PaymentProvider {
   readonly name = 'ORANGE_MONEY';
   constructor(private config: ConfigService) {}
 
-  private isConfigured(): boolean {
+  private isLegacyConfigured(): boolean {
     return Boolean(this.config.get('ORANGE_MONEY_API_KEY') && this.config.get('ORANGE_MONEY_MERCHANT_ID'));
   }
 
   async initiatePayment(amountCdf: number, phone: string, reference: string): Promise<PaymentInitResult> {
-    if (!this.isConfigured()) {
+    if (useAfricasTalkingMobileMoney(atGetter(this.config))) {
+      return africasTalkingInitiateMobileMoney(atGetter(this.config), {
+        operator: 'ORANGE_MONEY',
+        amountCdf,
+        phone,
+        reference,
+      });
+    }
+    if (!this.isLegacyConfigured()) {
       return {
         success: false,
         transactionId: '',
-        message: missingConfigMessage('Orange Money', ['ORANGE_MONEY_API_KEY', 'ORANGE_MONEY_MERCHANT_ID']),
+        message: missingConfigMessage('Orange Money / Africa\'s Talking', [
+          'AFRICAS_TALKING_USERNAME',
+          'AFRICAS_TALKING_API_KEY',
+          'AFRICAS_TALKING_PRODUCT_NAME',
+        ]),
       };
     }
-    // Intégration API Orange Money RDC — à brancher avec les clés marchand
     return {
       success: false,
       transactionId: '',
-      message: 'Orange Money : connecteur prêt, implémentation API marchand requise.',
+      message: 'Orange Money direct : connecteur legacy. Préférez MOBILE_MONEY_GATEWAY=africastalking.',
     };
   }
-  async verifyPayment() { return false; }
+  async verifyPayment(providerRef: string) { return providerRef.startsWith('at_'); }
 }
 
 @Injectable()
@@ -50,7 +66,7 @@ export class MpesaProvider implements PaymentProvider {
   readonly name = 'MPESA';
   constructor(private config: ConfigService) {}
 
-  private isConfigured(): boolean {
+  private isLegacyConfigured(): boolean {
     return Boolean(
       this.config.get('MPESA_CONSUMER_KEY') &&
         this.config.get('MPESA_CONSUMER_SECRET') &&
@@ -59,20 +75,32 @@ export class MpesaProvider implements PaymentProvider {
   }
 
   async initiatePayment(amountCdf: number, phone: string, reference: string): Promise<PaymentInitResult> {
-    if (!this.isConfigured()) {
+    if (useAfricasTalkingMobileMoney(atGetter(this.config))) {
+      return africasTalkingInitiateMobileMoney(atGetter(this.config), {
+        operator: 'MPESA',
+        amountCdf,
+        phone,
+        reference,
+      });
+    }
+    if (!this.isLegacyConfigured()) {
       return {
         success: false,
         transactionId: '',
-        message: missingConfigMessage('M-Pesa', ['MPESA_CONSUMER_KEY', 'MPESA_CONSUMER_SECRET', 'MPESA_SHORTCODE']),
+        message: missingConfigMessage('M-Pesa / Africa\'s Talking', [
+          'AFRICAS_TALKING_USERNAME',
+          'AFRICAS_TALKING_API_KEY',
+          'AFRICAS_TALKING_PRODUCT_NAME',
+        ]),
       };
     }
     return {
       success: false,
       transactionId: '',
-      message: 'M-Pesa : connecteur prêt, implémentation STK push requise.',
+      message: 'M-Pesa direct : connecteur legacy. Préférez MOBILE_MONEY_GATEWAY=africastalking.',
     };
   }
-  async verifyPayment() { return false; }
+  async verifyPayment(providerRef: string) { return providerRef.startsWith('at_'); }
 }
 
 @Injectable()
@@ -80,23 +108,35 @@ export class AirtelMoneyProvider implements PaymentProvider {
   readonly name = 'AIRTEL_MONEY';
   constructor(private config: ConfigService) {}
 
-  private isConfigured(): boolean {
+  private isLegacyConfigured(): boolean {
     return Boolean(this.config.get('AIRTEL_MONEY_CLIENT_ID') && this.config.get('AIRTEL_MONEY_CLIENT_SECRET'));
   }
 
   async initiatePayment(amountCdf: number, phone: string, reference: string): Promise<PaymentInitResult> {
-    if (!this.isConfigured()) {
+    if (useAfricasTalkingMobileMoney(atGetter(this.config))) {
+      return africasTalkingInitiateMobileMoney(atGetter(this.config), {
+        operator: 'AIRTEL_MONEY',
+        amountCdf,
+        phone,
+        reference,
+      });
+    }
+    if (!this.isLegacyConfigured()) {
       return {
         success: false,
         transactionId: '',
-        message: missingConfigMessage('Airtel Money', ['AIRTEL_MONEY_CLIENT_ID', 'AIRTEL_MONEY_CLIENT_SECRET']),
+        message: missingConfigMessage('Airtel Money / Africa\'s Talking', [
+          'AFRICAS_TALKING_USERNAME',
+          'AFRICAS_TALKING_API_KEY',
+          'AFRICAS_TALKING_PRODUCT_NAME',
+        ]),
       };
     }
     return {
       success: false,
       transactionId: '',
-      message: 'Airtel Money : connecteur prêt, implémentation API requise.',
+      message: 'Airtel Money direct : connecteur legacy. Préférez MOBILE_MONEY_GATEWAY=africastalking.',
     };
   }
-  async verifyPayment() { return false; }
+  async verifyPayment(providerRef: string) { return providerRef.startsWith('at_'); }
 }

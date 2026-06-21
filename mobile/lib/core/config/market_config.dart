@@ -47,7 +47,7 @@ class MarketConfig {
     if (trimmed.isEmpty) return trimmed;
     if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed;
     if (trimmed.startsWith('/')) return '$gatewayBaseUrl$trimmed';
-    return '$gatewayBaseUrl/api/uploads/parcels/$trimmed';
+    return '$gatewayBaseUrl/api/uploads/vehicles/$trimmed';
   }
 
   /// WebSocket (`/tracking` via api-gateway). Définir via `--dart-define=WS_URL=...`

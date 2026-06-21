@@ -85,6 +85,12 @@ export const MARKET_RDC = {
     limitedMileageKmPerDay: 100,
     cancellationPolicyDefault:
       'Annulation gratuite jusqu\'à 24 h avant la prise en charge. Au-delà, 50 % du montant location retenu.',
+    logisticsModes: {
+      SELF_PASSENGER: { label: 'Je récupère le véhicule moi-même' },
+      PASSENGER_DRIVER: { label: 'Mon chauffeur s\'occupe du transport' },
+      OWNER_DRIVER: { label: 'Chauffeur du propriétaire' },
+      MOVA_DRIVER: { label: 'Livraison par un chauffeur MOVA' },
+    },
   },
 
   support: {

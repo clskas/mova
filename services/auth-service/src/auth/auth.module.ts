@@ -5,7 +5,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtStrategy } from './jwt.strategy';
-import { MockSmsProvider, SmsService, TwilioSmsProvider } from './sms.providers';
+import { MockSmsProvider, AfricasTalkingSmsProvider, SmsService, TwilioSmsProvider } from './sms.providers';
 @Module({
   imports: [
     PassportModule.register({ defaultStrategy: 'jwt' }),
@@ -16,7 +16,7 @@ import { MockSmsProvider, SmsService, TwilioSmsProvider } from './sms.providers'
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, MockSmsProvider, TwilioSmsProvider, SmsService],
+  providers: [AuthService, JwtStrategy, MockSmsProvider, AfricasTalkingSmsProvider, TwilioSmsProvider, SmsService],
   exports: [AuthService, JwtModule],
 })
 export class AuthModule {}

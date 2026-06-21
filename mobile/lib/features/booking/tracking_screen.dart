@@ -580,6 +580,8 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
                       driver: _driverPos,
                       routeTrace: _routeTrace,
                       height: 200,
+                      pickupLabel: _ride?['pickupAddress']?.toString(),
+                      dropoffLabel: _ride?['dropoffAddress']?.toString(),
                     ),
                     Expanded(
                       child: SingleChildScrollView(

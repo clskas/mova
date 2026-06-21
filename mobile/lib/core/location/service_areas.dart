@@ -187,8 +187,11 @@ class ServiceAreas {
   }
 
   static String coverageMessage({int max = 8}) {
-    final names = all.map((a) => a.name).toList();
+    final names = cityNames;
     if (names.length <= max) return names.join(', ');
     return '${names.take(max).join(', ')}… (+${names.length - max} villes)';
   }
+
+  /// Noms des villes MOVA (32 zones — aligné admin / packages/shared).
+  static List<String> get cityNames => all.map((a) => a.name).toList();
 }

@@ -50,7 +50,7 @@ for key in "${!DB_NAMES[@]}"; do
 done
 
 if [ -n "${BACKUP_ONLY:-}" ]; then
-  if [ -z "${DB_URLS[$BACKUP_ONLY]:-}" ]; then
+  if [ -z "${DB_NAMES[$BACKUP_ONLY]:-}" ]; then
     echo "Unknown BACKUP_ONLY=$BACKUP_ONLY (auth|rides|payments|drivers|notifications)" >&2
     exit 1
   fi
@@ -70,6 +70,19 @@ backup_via_pg_dump() {
   local out="$2"
   pg_dump "$url" --no-owner --no-acl -f "$out"
 }
+
+# Docker entrypoint : une seule base via DATABASE_URL (ex. postgres:5432)
+if [ -n "${BACKUP_ONLY:-}" ] && [ -n "${DATABASE_URL:-}" ]; then
+  db_name="${DB_NAMES[$BACKUP_ONLY]}"
+  out="${BACKUP_DIR}/mova_${BACKUP_ONLY}_${TIMESTAMP}.sql"
+  echo "=== MOVA DB backup ($TIMESTAMP) -> $BACKUP_DIR ==="
+  echo "Backing up $BACKUP_ONLY ($db_name) via DATABASE_URL -> $out"
+  backup_via_pg_dump "$DATABASE_URL" "$out"
+  gzip -f "$out"
+  echo "  -> ${out}.gz"
+  echo "=== Backups complete ==="
+  exit 0
+fi
 
 echo "=== MOVA DB backup ($TIMESTAMP) -> $BACKUP_DIR ==="
 

@@ -97,6 +97,48 @@ export class AuthService {
         body: JSON.stringify({ userId: user.id }),
       });
     }
+    const staffRoles: UserRole[] = [
+      UserRole.SUPER_ADMIN,
+      UserRole.ADMIN,
+      UserRole.SUPPORT,
+      UserRole.FINANCE,
+      UserRole.CONTENT,
+    ];
+    if (role === UserRole.PASSENGER && user.role === UserRole.DRIVER) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.FORBIDDEN,
+        'Ce numéro est un compte chauffeur. Utilisez l\'application MOVA Chauffeur.',
+      );
+    }
+    if (role === UserRole.DRIVER && staffRoles.includes(user.role)) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.FORBIDDEN,
+        'Compte staff — connexion réservée à la console admin.',
+      );
+    }
+    if (role === UserRole.PASSENGER && staffRoles.includes(user.role)) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.FORBIDDEN,
+        'Compte staff — connexion réservée à la console admin.',
+      );
+    }
+    if ((role === UserRole.PASSENGER || role === UserRole.DRIVER) && user.role === UserRole.RENTAL_PARTNER) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.FORBIDDEN,
+        'Compte partenaire location — utilisez le portail MOVA Location.',
+      );
+    }
+    if ((role === UserRole.PASSENGER || role === UserRole.DRIVER) && user.role === UserRole.RESTAURANT) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.FORBIDDEN,
+        'Compte restaurant — utilisez le portail MOVA Restaurant.',
+      );
+    }
     if (user.status === UserStatus.SUSPENDED) {
       throw new MovaHttpException(MovaErrorCode.AUTH_FORBIDDEN, HttpStatus.FORBIDDEN, 'Compte suspendu. Contactez le support MOVA.');
     }

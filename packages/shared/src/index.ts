@@ -17,3 +17,4 @@ export * from './kyc-documents';
 export * from './kyc-ocr';
 export * from './driver-documents';
 export * from './public-id';
+export * from './africas-talking';

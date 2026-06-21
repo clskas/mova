@@ -81,6 +81,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
   Widget build(BuildContext context) {
     return MovaScreen(
       title: 'Connexion MOVA',
+      centerContent: true,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -98,6 +99,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
           const SizedBox(height: 24),
           Text(
             'Bienvenue sur MOVA',
+            textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.bold,
                   color: MovaColors.midnight,
@@ -106,8 +108,17 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
           const SizedBox(height: 8),
           Text(
             'Mobilité partout en RDC — entrez votre numéro +243 pour recevoir un code OTP',
+            textAlign: TextAlign.center,
             style: TextStyle(color: MovaColors.textSecondary),
           ),
+          if (kDebugMode) ...[
+            const SizedBox(height: 12),
+            Text(
+              'API : ${MarketConfig.apiBaseUrl}',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 11, color: MovaColors.textSecondary.withValues(alpha: 0.8)),
+            ),
+          ],
           const SizedBox(height: 32),
           TextField(
             controller: _phoneController,

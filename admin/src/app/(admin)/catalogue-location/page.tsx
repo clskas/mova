@@ -5,6 +5,8 @@ import Link from "next/link";
 import {
   deleteRentalVehicle,
   fetchRentalVehicles,
+  MOVA_CITIES,
+  reviewRentalVehicle,
   saveRentalVehicle,
   type RentalCatalogVehicle,
 } from "@/lib/api";
@@ -71,6 +73,37 @@ export default function CatalogueLocationPage() {
   const [editTarget, setEditTarget] = useState<RentalCatalogVehicle | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<RentalCatalogVehicle | null>(null);
   const [saving, setSaving] = useState(false);
+  const [reviewingId, setReviewingId] = useState<string | null>(null);
+  const [filter, setFilter] = useState<"all" | "pending" | "approved" | "rejected" | "inactive">("all");
+
+  const filteredVehicles = vehicles.filter((v) => {
+    switch (filter) {
+      case "pending":
+        return v.approvalStatus === "PENDING";
+      case "approved":
+        return v.approvalStatus === "APPROVED" && v.isActive !== false;
+      case "rejected":
+        return v.approvalStatus === "REJECTED";
+      case "inactive":
+        return v.isActive === false;
+      default:
+        return true;
+    }
+  });
+
+  async function handleReview(id: string, action: "approve" | "reject") {
+    setReviewingId(id);
+    setError(null);
+    try {
+      await reviewRentalVehicle(id, action);
+      if (editTarget?.id === id) setEditTarget(null);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erreur validation");
+    } finally {
+      setReviewingId(null);
+    }
+  }
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -156,6 +189,20 @@ export default function CatalogueLocationPage() {
     }
   }
 
+  async function handleReactivate(v: RentalCatalogVehicle) {
+    if (readOnly) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await saveRentalVehicle({ ...buildPayload(v), isActive: true }, v.id);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erreur réactivation");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function handleDelete() {
     if (!deleteTarget || readOnly) return;
     setSaving(true);
@@ -182,7 +229,11 @@ export default function CatalogueLocationPage() {
       />
       <p className="text-sm text-gray-600">
         Les <Link href="/locations" className="text-[#6C63FF] underline">demandes de location</Link> sont gérées
-        séparément. Ici vous alimentez le catalogue affiché côté passager.
+        séparément. Les partenaires peuvent soumettre des véhicules via le{" "}
+        <a href="http://localhost:3008" target="_blank" rel="noreferrer" className="text-[#6C63FF] underline">
+          portail partenaire PWA
+        </a>{" "}
+        (validation ici : Approuver / Refuser).
       </p>
       {error && <ErrorBanner message={error} onRetry={load} />}
 
@@ -216,7 +267,11 @@ export default function CatalogueLocationPage() {
             </label>
             <label>
               <FieldLabel>Ville</FieldLabel>
-              <TextInput value={form.city} onChange={(v) => setForm({ ...form, city: v })} />
+              <SelectInput
+                value={form.city}
+                onChange={(v) => setForm({ ...form, city: v })}
+                options={MOVA_CITIES.map((c) => ({ value: c, label: c }))}
+              />
             </label>
             <label>
               <FieldLabel>Places</FieldLabel>
@@ -272,6 +327,31 @@ export default function CatalogueLocationPage() {
         <EmptyState message="Aucun véhicule dans le catalogue" />
       ) : (
         <Card className="overflow-x-auto">
+          <div className="flex flex-wrap gap-2 p-3 border-b">
+            {(
+              [
+                ["all", "Tous"],
+                ["pending", "En attente"],
+                ["approved", "Approuvés"],
+                ["rejected", "Refusés"],
+                ["inactive", "Inactifs"],
+              ] as const
+            ).map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setFilter(key)}
+                className={`px-3 py-1 rounded-full text-xs font-medium ${
+                  filter === key ? "bg-[#6C63FF] text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {filteredVehicles.length === 0 ? (
+            <p className="p-6 text-sm text-gray-500">Aucun véhicule pour ce filtre.</p>
+          ) : (
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b text-left text-gray-500">
@@ -286,7 +366,7 @@ export default function CatalogueLocationPage() {
               </tr>
             </thead>
             <tbody>
-              {vehicles.map((v) => {
+              {filteredVehicles.map((v) => {
                 const thumb = resolveMediaUrl(v.imageUrl);
                 return (
                   <tr key={v.id} className="border-b">
@@ -310,18 +390,54 @@ export default function CatalogueLocationPage() {
                     <td className="p-3">{formatCdf(v.dailyRateCdf)}</td>
                     <td className="p-3 text-xs text-gray-600">{v.ownerName ?? "—"}</td>
                     <td className="p-3">
-                      <span
-                        className={`text-xs px-2 py-0.5 rounded-full ${
-                          v.isActive !== false ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-600"
-                        }`}
-                      >
-                        {v.isActive !== false ? "Actif" : "Inactif"}
-                      </span>
+                      <div className="flex flex-col gap-1">
+                        <span
+                          className={`text-xs px-2 py-0.5 rounded-full w-fit ${
+                            v.isActive !== false ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-600"
+                          }`}
+                        >
+                          {v.isActive !== false ? "Actif" : "Inactif"}
+                        </span>
+                        {v.approvalStatus === "PENDING" && (
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 w-fit">
+                            En attente partenaire
+                          </span>
+                        )}
+                        {v.approvalStatus === "REJECTED" && (
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-800 w-fit">
+                            Refusé
+                          </span>
+                        )}
+                      </div>
                     </td>
                     {!readOnly && (
-                      <td className="p-3 flex gap-2">
-                        <BtnGhost onClick={() => setEditTarget({ ...v })}>Modifier</BtnGhost>
-                        <BtnDanger onClick={() => setDeleteTarget(v)}>Désactiver</BtnDanger>
+                      <td className="p-3">
+                        <div className="flex flex-wrap gap-2">
+                          {v.approvalStatus === "PENDING" && (
+                            <>
+                              <BtnPrimary
+                                disabled={reviewingId === v.id}
+                                onClick={() => handleReview(v.id, "approve")}
+                              >
+                                Approuver
+                              </BtnPrimary>
+                              <BtnDanger
+                                disabled={reviewingId === v.id}
+                                onClick={() => handleReview(v.id, "reject")}
+                              >
+                                Refuser
+                              </BtnDanger>
+                            </>
+                          )}
+                          <BtnGhost onClick={() => setEditTarget({ ...v })}>Modifier</BtnGhost>
+                          {v.isActive === false ? (
+                            <BtnPrimary disabled={saving} onClick={() => handleReactivate(v)}>
+                              Réactiver
+                            </BtnPrimary>
+                          ) : (
+                            <BtnDanger onClick={() => setDeleteTarget(v)}>Désactiver</BtnDanger>
+                          )}
+                        </div>
                       </td>
                     )}
                   </tr>
@@ -329,6 +445,7 @@ export default function CatalogueLocationPage() {
               })}
             </tbody>
           </table>
+          )}
         </Card>
       )}
 
@@ -336,7 +453,7 @@ export default function CatalogueLocationPage() {
         {editTarget && (
           <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
             <label>
-              <FieldLabel>Nom</FieldLabel>
+              <FieldLabel>Nom *</FieldLabel>
               <TextInput value={editTarget.name} onChange={(v) => setEditTarget({ ...editTarget, name: v })} />
             </label>
             <div className="grid gap-3 sm:grid-cols-2">
@@ -349,6 +466,13 @@ export default function CatalogueLocationPage() {
                 <TextInput value={editTarget.model ?? ""} onChange={(v) => setEditTarget({ ...editTarget, model: v })} />
               </label>
             </div>
+            <label>
+              <FieldLabel>Année</FieldLabel>
+              <TextInput
+                value={editTarget.year != null ? String(editTarget.year) : ""}
+                onChange={(v) => setEditTarget({ ...editTarget, year: v ? Number(v) : undefined })}
+              />
+            </label>
             <div className="grid gap-3 sm:grid-cols-2">
               <label>
                 <FieldLabel>Catégorie</FieldLabel>
@@ -359,10 +483,44 @@ export default function CatalogueLocationPage() {
                 />
               </label>
               <label>
+                <FieldLabel>Transmission</FieldLabel>
+                <SelectInput
+                  value={editTarget.transmission ?? "MANUAL"}
+                  onChange={(v) => setEditTarget({ ...editTarget, transmission: v })}
+                  options={TRANSMISSIONS}
+                />
+              </label>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label>
+                <FieldLabel>Ville</FieldLabel>
+                <SelectInput
+                  value={editTarget.city ?? "Kinshasa"}
+                  onChange={(v) => setEditTarget({ ...editTarget, city: v })}
+                  options={MOVA_CITIES.map((c) => ({ value: c, label: c }))}
+                />
+              </label>
+              <label>
+                <FieldLabel>Places</FieldLabel>
+                <TextInput
+                  value={String(editTarget.seats ?? 5)}
+                  onChange={(v) => setEditTarget({ ...editTarget, seats: Number(v) || 5 })}
+                />
+              </label>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label>
                 <FieldLabel>Tarif / jour (FC)</FieldLabel>
                 <TextInput
                   value={String(editTarget.dailyRateCdf ?? "")}
                   onChange={(v) => setEditTarget({ ...editTarget, dailyRateCdf: Number(v) || 0 })}
+                />
+              </label>
+              <label>
+                <FieldLabel>Caution (FC)</FieldLabel>
+                <TextInput
+                  value={String(editTarget.depositCdf ?? "")}
+                  onChange={(v) => setEditTarget({ ...editTarget, depositCdf: Number(v) || 0 })}
                 />
               </label>
             </div>
@@ -408,9 +566,21 @@ export default function CatalogueLocationPage() {
               />
               Visible dans le catalogue passager
             </label>
-            <BtnPrimary onClick={handleUpdate} disabled={saving}>
-              {saving ? "Enregistrement…" : "Enregistrer"}
-            </BtnPrimary>
+            <div className="flex gap-2 flex-wrap">
+              <BtnPrimary onClick={handleUpdate} disabled={saving}>
+                {saving ? "Enregistrement…" : "Enregistrer"}
+              </BtnPrimary>
+              {editTarget.approvalStatus === "PENDING" && (
+                <>
+                  <BtnPrimary disabled={reviewingId === editTarget.id} onClick={() => handleReview(editTarget.id, "approve")}>
+                    Approuver
+                  </BtnPrimary>
+                  <BtnDanger disabled={reviewingId === editTarget.id} onClick={() => handleReview(editTarget.id, "reject")}>
+                    Refuser
+                  </BtnDanger>
+                </>
+              )}
+            </div>
           </div>
         )}
       </Modal>

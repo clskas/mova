@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/api/api_client.dart';
 import '../../core/config/market_config.dart';
+import '../../core/location/service_area_prefs.dart';
+import '../../core/location/service_areas.dart';
 import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
@@ -59,6 +61,7 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
   @override
   void initState() {
     super.initState();
+    _city = ref.read(selectedServiceAreaProvider).name;
     _tabController = TabController(length: 2, vsync: this);
     _tabController.addListener(_onTabChanged);
     _search();
@@ -258,6 +261,7 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
   Widget _vehicleCard(Map<String, dynamic> v) {
     final id = v['id']?.toString() ?? '';
     final selected = _compareIds.contains(id);
+    final imageUrl = MarketConfig.resolveMediaUrl(v['imageUrl']?.toString() ?? '');
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: MovaCard(
@@ -271,7 +275,7 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
                 ClipRRect(
                   borderRadius: BorderRadius.circular(8),
                   child: Image.network(
-                    v['imageUrl']?.toString() ?? '',
+                    imageUrl,
                     width: 72,
                     height: 54,
                     fit: BoxFit.cover,
@@ -512,7 +516,7 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
           DropdownButtonFormField<String>(
             value: _city,
             decoration: const InputDecoration(labelText: 'Ville', isDense: true),
-            items: ['Kinshasa', 'Lubumbashi', 'Goma', 'Matadi']
+            items: ServiceAreas.cityNames
                 .map((c) => DropdownMenuItem(value: c, child: Text(c)))
                 .toList(),
             onChanged: (v) => setState(() => _city = v ?? _city),

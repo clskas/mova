@@ -70,4 +70,13 @@ export class CreateRentalBookingDto extends RentalQuoteDto {
   @ApiPropertyOptional() @IsOptional() @IsString() pickupAddress?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() contactPhone?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() notes?: string;
+  @ApiPropertyOptional({
+    enum: ['SELF_PASSENGER', 'PASSENGER_DRIVER', 'MOVA_DRIVER'],
+    description: 'Mode logistique choisi par le passager',
+  })
+  @IsOptional()
+  @IsIn(['SELF_PASSENGER', 'PASSENGER_DRIVER', 'MOVA_DRIVER'])
+  logisticsMode?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() passengerDriverName?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() passengerDriverPhone?: string;
 }

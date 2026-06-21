@@ -5,6 +5,7 @@ import {
   DeliveryStatusUpdatedPayload,
   IncidentCreatedPayload,
   PaymentCompletedPayload,
+  RentalBookingPayload,
   RideCreatedPayload,
   RideStatusSmsPayload,
   ServiceAssignedPayload,
@@ -27,6 +28,7 @@ export class NotificationsService implements OnModuleInit {
       MOVA_EVENTS.DELIVERY_STATUS_UPDATED,
       MOVA_EVENTS.SERVICE_ASSIGNED,
       MOVA_EVENTS.SERVICE_STATUS_UPDATED,
+      MOVA_EVENTS.RENTAL_BOOKING,
       MOVA_EVENTS.INCIDENT_CREATED,
       MOVA_EVENTS.RIDE_STATUS_SMS,
     );
@@ -39,6 +41,7 @@ export class NotificationsService implements OnModuleInit {
         if (channel === MOVA_EVENTS.DELIVERY_STATUS_UPDATED) await this.onDeliveryStatusUpdated(data as DeliveryStatusUpdatedPayload);
         if (channel === MOVA_EVENTS.SERVICE_ASSIGNED) await this.onServiceAssigned(data as ServiceAssignedPayload);
         if (channel === MOVA_EVENTS.SERVICE_STATUS_UPDATED) await this.onServiceStatusUpdated(data as ServiceStatusUpdatedPayload);
+        if (channel === MOVA_EVENTS.RENTAL_BOOKING) await this.onRentalBooking(data as RentalBookingPayload);
         if (channel === MOVA_EVENTS.INCIDENT_CREATED) await this.onIncidentCreated(data as IncidentCreatedPayload);
         if (channel === MOVA_EVENTS.RIDE_STATUS_SMS) await this.onRideStatusSms(data as RideStatusSmsPayload);
       } catch (e) {
@@ -101,11 +104,13 @@ export class NotificationsService implements OnModuleInit {
 
   async onServiceAssigned(payload: ServiceAssignedPayload) {
     const label =
-      payload.serviceType === 'MOVING'
-        ? 'Nouveau déménagement'
-        : payload.serviceType === 'ERRAND'
-          ? 'Nouvelle course & commissions'
-          : 'Nouvelle course planifiée';
+      payload.serviceType === 'RENTAL'
+        ? 'Mission logistique location'
+        : payload.serviceType === 'MOVING'
+          ? 'Nouveau déménagement'
+          : payload.serviceType === 'ERRAND'
+            ? 'Nouvelle course & commissions'
+            : 'Nouvelle course planifiée';
     const when = payload.scheduledAt ? ` · ${new Date(payload.scheduledAt).toLocaleString('fr-FR')}` : '';
     await this.create(
       payload.driverId,
@@ -114,14 +119,47 @@ export class NotificationsService implements OnModuleInit {
       'SERVICE_ASSIGNED',
       payload,
     );
-    await this.create(
-      payload.passengerId,
-      'Livreur assigné',
-      `Un livreur a été assigné : ${payload.summary}`,
-      'SERVICE_ASSIGNED_PASSENGER',
-      payload,
-    );
-    this.logger.log(`service.assigned notification for driver ${payload.driverId}`);
+    const passengerTitle =
+      payload.serviceType === 'RENTAL' ? 'Chauffeur logistique assigné' : 'Livreur assigné';
+    const passengerBody =
+      payload.serviceType === 'RENTAL'
+        ? `Un chauffeur MOVA a été assigné pour la livraison/récupération : ${payload.summary}`
+        : `Un livreur a été assigné : ${payload.summary}`;
+    await this.create(payload.passengerId, passengerTitle, passengerBody, 'SERVICE_ASSIGNED_PASSENGER', payload);
+    this.logger.log(`service.assigned notification for driver ${payload.driverId} (${payload.serviceType})`);
+  }
+
+  async onRentalBooking(payload: RentalBookingPayload) {
+    const period = `${new Date(payload.startDate).toLocaleDateString('fr-FR')} → ${new Date(payload.endDate).toLocaleDateString('fr-FR')}`;
+    const route =
+      payload.pickupCity != null
+        ? ` · ${payload.pickupCity}${payload.returnCity && payload.returnCity !== payload.pickupCity ? ` → ${payload.returnCity}` : ''}`
+        : '';
+    const passenger = payload.passengerName ?? payload.passengerPhone ?? 'Un passager';
+    let title: string;
+    let body: string;
+    switch (payload.kind) {
+      case 'NEW_BOOKING':
+        title = 'Nouvelle réservation location';
+        body = `${passenger} souhaite louer ${payload.vehicleName} (${period})${route}. Ouvrez le portail partenaire pour confirmer.`;
+        break;
+      case 'CONFIRMED':
+        title = 'Réservation confirmée';
+        body = `La location ${payload.vehicleName} (${period})${route} est confirmée.`;
+        break;
+      case 'CANCELLED':
+        title = 'Réservation annulée';
+        body = `La demande pour ${payload.vehicleName} (${period})${route} a été annulée.`;
+        break;
+      case 'LOGISTICS_ASSIGNED':
+        title = 'Chauffeur logistique MOVA';
+        body =
+          payload.logisticsSummary ??
+          `Un chauffeur MOVA a été assigné pour la livraison/récupération de ${payload.vehicleName}.`;
+        break;
+    }
+    await this.create(payload.ownerUserId, title, body, 'RENTAL_BOOKING', payload);
+    this.logger.log(`rental.booking ${payload.kind} for owner ${payload.ownerUserId}`);
   }
 
   async onServiceStatusUpdated(payload: ServiceStatusUpdatedPayload) {

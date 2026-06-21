@@ -386,8 +386,17 @@ export class InternalController {
   }
 
   @Patch('rental-inquiries/:id/status')
-  updateRentalStatus(@Param('id') id: string, @Body('status') status: RentalInquiryStatus) {
-    return this.rental.adminUpdateStatus(id, status);
+  updateRentalStatus(
+    @Param('id') id: string,
+    @Body('status') status: RentalInquiryStatus,
+    @Body('forceOverride') forceOverride?: boolean,
+  ) {
+    return this.rental.adminUpdateStatus(id, status, forceOverride === true);
+  }
+
+  @Patch('rental-inquiries/:id/assign')
+  assignRental(@Param('id') id: string, @Body('driverId') driverId: string) {
+    return this.rental.adminAssignDriver(id, driverId);
   }
 
   @Get('rental-vehicles')

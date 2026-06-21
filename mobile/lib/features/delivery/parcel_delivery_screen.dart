@@ -432,6 +432,8 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
           height: height,
           onDropoffTap: _onMapDropoffTap,
           dropoffEditable: true,
+          pickupLabel: _pickupController.text,
+          dropoffLabel: _dropoffController.text,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,

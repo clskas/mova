@@ -433,6 +433,8 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
           height: height,
           onDropoffTap: _onMapDropoffTap,
           dropoffEditable: true,
+          pickupLabel: _pickupController.text,
+          dropoffLabel: _destinationController.text,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,

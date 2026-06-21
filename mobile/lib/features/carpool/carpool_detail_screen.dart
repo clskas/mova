@@ -249,6 +249,8 @@ class _CarpoolDetailScreenState extends ConsumerState<CarpoolDetailScreen> {
                         : null,
                     height: 200,
                     driverIcon: Icons.directions_car,
+                    pickupLabel: trip['fromAddress']?.toString(),
+                    dropoffLabel: trip['toAddress']?.toString(),
                   ),
                 const SizedBox(height: 16),
                 if (trip != null) ...[

@@ -1,5 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import {
+  africasTalkingSendSms,
+  isAfricasTalkingConfigured,
+  isTwilioSmsConfigured,
+  resolveSmsBackend,
+} from '@mova/shared';
 
 export interface SmsSendResult {
   success: boolean;
@@ -28,6 +34,29 @@ export class MockSmsProvider implements SmsProvider {
 }
 
 @Injectable()
+export class AfricasTalkingSmsProvider implements SmsProvider {
+  readonly name = 'AFRICASTALKING';
+  private readonly logger = new Logger(AfricasTalkingSmsProvider.name);
+
+  constructor(private config: ConfigService) {}
+
+  private get = (key: string) => this.config.get<string>(key);
+
+  isConfigured(): boolean {
+    return isAfricasTalkingConfigured(this.get);
+  }
+
+  async sendOtp(phone: string, code: string): Promise<SmsSendResult> {
+    const result = await africasTalkingSendSms(this.get, {
+      to: phone,
+      message: `Votre code MOVA : ${code}. Valide 10 minutes.`,
+    });
+    if (!result.success) this.logger.warn(`Africa's Talking SMS: ${result.message}`);
+    return result;
+  }
+}
+
+@Injectable()
 export class TwilioSmsProvider implements SmsProvider {
   readonly name = 'TWILIO';
   private readonly logger = new Logger(TwilioSmsProvider.name);
@@ -35,11 +64,7 @@ export class TwilioSmsProvider implements SmsProvider {
   constructor(private config: ConfigService) {}
 
   isConfigured(): boolean {
-    return Boolean(
-      this.config.get('TWILIO_ACCOUNT_SID') &&
-        this.config.get('TWILIO_AUTH_TOKEN') &&
-        (this.config.get('TWILIO_VERIFY_SERVICE_SID') || this.config.get('TWILIO_PHONE_NUMBER')),
-    );
+    return isTwilioSmsConfigured((key) => this.config.get<string>(key));
   }
 
   async sendOtp(phone: string, code: string): Promise<SmsSendResult> {
@@ -47,7 +72,7 @@ export class TwilioSmsProvider implements SmsProvider {
       return {
         success: false,
         message:
-          'Service SMS non configuré. Définissez TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN et TWILIO_PHONE_NUMBER (ou TWILIO_VERIFY_SERVICE_SID).',
+          'Service SMS Twilio non configuré. Définissez TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN et TWILIO_PHONE_NUMBER.',
       };
     }
 
@@ -69,7 +94,7 @@ export class TwilioSmsProvider implements SmsProvider {
         if (!res.ok) {
           const body = await res.text();
           this.logger.warn(`Twilio Verify failed: ${res.status} ${body}`);
-          return { success: false, message: 'Échec envoi SMS via Twilio Verify. Vérifiez la configuration.' };
+          return { success: false, message: 'Échec envoi SMS via Twilio Verify.' };
         }
         return { success: true, message: 'Code OTP envoyé par SMS' };
       }
@@ -89,7 +114,7 @@ export class TwilioSmsProvider implements SmsProvider {
       if (!res.ok) {
         const body = await res.text();
         this.logger.warn(`Twilio SMS failed: ${res.status} ${body}`);
-        return { success: false, message: 'Échec envoi SMS. Vérifiez TWILIO_PHONE_NUMBER et les crédits Twilio.' };
+        return { success: false, message: 'Échec envoi SMS Twilio.' };
       }
       return { success: true, message: 'Code OTP envoyé par SMS' };
     } catch (e) {
@@ -106,13 +131,17 @@ export class SmsService {
   constructor(
     private config: ConfigService,
     private mock: MockSmsProvider,
+    private africasTalking: AfricasTalkingSmsProvider,
     private twilio: TwilioSmsProvider,
   ) {}
 
+  private get = (key: string) => this.config.get<string>(key);
+
   private resolveProvider(): SmsProvider {
-    if (this.config.get('MOCK_OTP') === 'true') return this.mock;
-    if (this.twilio.isConfigured()) return this.twilio;
-    return this.mock;
+    const backend = resolveSmsBackend(this.get, this.config.get('MOCK_OTP') === 'true');
+    if (backend === 'mock') return this.mock;
+    if (backend === 'africastalking') return this.africasTalking;
+    return this.twilio;
   }
 
   async sendOtp(phone: string, code: string): Promise<SmsSendResult> {
@@ -125,6 +154,8 @@ export class SmsService {
   }
 
   isProductionReady(): boolean {
-    return this.config.get('MOCK_OTP') !== 'true' && this.twilio.isConfigured();
+    if (this.config.get('MOCK_OTP') === 'true') return false;
+    const backend = resolveSmsBackend(this.get, false);
+    return backend === 'africastalking' || backend === 'twilio';
   }
 }

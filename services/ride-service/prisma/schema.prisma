@@ -334,6 +334,13 @@ enum RentalInquiryStatus {
   CLOSED
 }
 
+enum RentalLogisticsMode {
+  SELF_PASSENGER
+  PASSENGER_DRIVER
+  OWNER_DRIVER
+  MOVA_DRIVER
+}
+
 enum MovingRequestStatus {
   PENDING
   ASSIGNED
@@ -466,6 +473,8 @@ model RentalVehicle {
   ownerName            String?
   ownerBadge           String?
   ownerContactPhone    String?
+  ownerUserId          String?
+  approvalStatus       RentalVehicleApprovalStatus @default(APPROVED)
   features             Json?
   cancellationPolicy   String?
   mileageUnlimited     Boolean  @default(true)
@@ -478,7 +487,14 @@ model RentalVehicle {
   bookings RentalInquiry[]
 
   @@index([city, category, isActive])
+  @@index([ownerUserId])
   @@map("rental_vehicles")
+}
+
+enum RentalVehicleApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }
 
 model RentalInquiry {
@@ -501,11 +517,18 @@ model RentalInquiry {
   notes             String?
   estimatedPriceCdf Int?
   totalCdf          Int?
+  logisticsMode           RentalLogisticsMode @default(SELF_PASSENGER)
+  passengerDriverName     String?
+  passengerDriverPhone    String?
+  ownerDriverName         String?
+  ownerDriverPhone        String?
+  driverId                String?
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
 
   @@index([userId])
   @@index([status])
+  @@index([driverId])
   @@map("rental_inquiries")
 }
 

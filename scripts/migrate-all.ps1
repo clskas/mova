@@ -20,7 +20,7 @@ $databases = @{
 
 Write-Host "=== MOVA migrate:all (Postgres $PostgresHost) ===" -ForegroundColor Cyan
 
-& "$PSScriptRoot\backup-db.ps1" -PostgresHost ($PostgresHost -replace ':.*','') -PostgresPort $(if ($PostgresHost -match ':(\d+)$') { $Matches[1] } else { $PostgresPort })
+& "$PSScriptRoot\backup-db.ps1" -PostgresHost ($PostgresHost -replace ':.*','') -PostgresPort $(if ($PostgresHost -match ':(\d+)$') { $Matches[1] } else { '54320' })
 
 foreach ($entry in $databases.GetEnumerator()) {
   $svcPath = $entry.Key

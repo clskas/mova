@@ -17,6 +17,8 @@ class DeliveryTrackingMap extends StatelessWidget {
     this.deliveryPin,
     this.courierName,
     this.courierRating,
+    this.pickupLabel,
+    this.dropoffLabel,
   });
 
   final LatLng pickup;
@@ -27,6 +29,8 @@ class DeliveryTrackingMap extends StatelessWidget {
   final String? deliveryPin;
   final String? courierName;
   final double? courierRating;
+  final String? pickupLabel;
+  final String? dropoffLabel;
 
   static LatLng? parseLocation(Map<String, dynamic>? raw) {
     if (raw == null) return null;
@@ -67,6 +71,8 @@ class DeliveryTrackingMap extends StatelessWidget {
           routeTrace: routeTrace,
           height: 180,
           driverIcon: Icons.delivery_dining,
+          pickupLabel: pickupLabel,
+          dropoffLabel: dropoffLabel,
         ),
         if (etaMinutes != null || deliveryPin != null || courierName != null) ...[
           const SizedBox(height: 12),

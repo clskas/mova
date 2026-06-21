@@ -67,14 +67,17 @@ export default function CoursesPage() {
       try {
         const [detail, trace] = await Promise.all([
           fetchRide(selected.id),
-          fetchGpsTrace("ride", selected.id),
+          fetchGpsTrace("ride", selected.id).catch(() => ({ points: [] as GpsPoint[] })),
         ]);
         if (!cancelled) {
           setRideDetail(detail);
           setGpsTrace(trace.points ?? detail.gpsTrace ?? []);
         }
       } catch {
-        if (!cancelled) setGpsTrace([]);
+        if (!cancelled) {
+          setRideDetail(selected);
+          setGpsTrace([]);
+        }
       }
     };
     loadTrace();
@@ -213,6 +216,8 @@ export default function CoursesPage() {
                   ? { lat: rideDetail.dropoffLat, lng: rideDetail.dropoffLng }
                   : null
               }
+              pickupLabel={selected.pickupAddress}
+              dropoffLabel={selected.dropoffAddress}
               live={!!selected.status && !["COMPLETED", "CANCELLED"].includes(selected.status ?? "")}
             />
             {!readOnly && (

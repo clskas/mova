@@ -501,8 +501,19 @@ export class AdminController {
   @Patch('rental-inquiries/:id/status')
   @RequirePermissions(AdminPermission.SCHEDULED_WRITE)
   @ApiOperation({ summary: 'Statut demande location' })
-  rentalStatus(@Param('id') id: string, @Body('status') status: string) {
-    return this.adminService.updateRentalInquiryStatus(id, status);
+  rentalStatus(
+    @Param('id') id: string,
+    @Body('status') status: string,
+    @Body('forceOverride') forceOverride?: boolean,
+  ) {
+    return this.adminService.updateRentalInquiryStatus(id, status, forceOverride === true);
+  }
+
+  @Patch('rental-inquiries/:id/assign')
+  @RequirePermissions(AdminPermission.SCHEDULED_WRITE)
+  @ApiOperation({ summary: 'Assigner chauffeur location (remise véhicule)' })
+  assignRentalDriver(@Param('id') id: string, @Body('driverId') driverId: string) {
+    return this.adminService.assignRentalDriver(id, driverId);
   }
 
   @Get('rental-vehicles')

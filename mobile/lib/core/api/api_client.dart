@@ -123,7 +123,7 @@ class ApiClient {
     try {
       final res = await _client
           .get(Uri.parse('${MarketConfig.gatewayBaseUrl}/health'))
-          .timeout(const Duration(seconds: 8));
+          .timeout(const Duration(seconds: 12));
       final ok = res.statusCode == 200;
       _connectivity?.setGatewayUp(ok);
       return ok;

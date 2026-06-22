@@ -1,7 +1,7 @@
 {
   "ownerId": "tea-d8gnpfm7r5hc73bceacg",
   "region": "frankfurt",
-  "repo": "https://github.com/clskas/mova",
+  "repo": "https://github.com/afri-soft-com/mova",
   "branch": "main",
   "autoDeploy": true,
   "gatewayUrl": "https://mova-gateway.onrender.com",

@@ -47,7 +47,7 @@ jobs:
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
           RENDER_OWNER_ID: tea-d8gnpfm7r5hc73bceacg
-          RENDER_REPO: https://github.com/${{ github.repository }}
+          RENDER_REPO: https://github.com/afri-soft-com/mova
           RENDER_BRANCH: main
           RENDER_PLAN: free
           DATABASE_URL_AUTH: ${{ secrets.DATABASE_URL_AUTH }}

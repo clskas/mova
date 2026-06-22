@@ -58,10 +58,24 @@ jobs:
           retention-days: 14
           if-no-files-found: ignore
 
+      - name: Resolve Render service IDs
+        id: render
+        run: |
+          if [ -n "${{ secrets.RENDER_SERVICE_IDS }}" ]; then
+            echo "ids=${{ secrets.RENDER_SERVICE_IDS }}" >> "$GITHUB_OUTPUT"
+            echo "gateway=${{ secrets.GATEWAY_RENDER_SERVICE_ID }}" >> "$GITHUB_OUTPUT"
+          elif [ -f config/render-services.json ]; then
+            ids=$(jq -r '.serviceIds | join(" ")' config/render-services.json)
+            gateway=$(jq -r '.gatewayServiceId // empty' config/render-services.json)
+            echo "ids=$ids" >> "$GITHUB_OUTPUT"
+            echo "gateway=$gateway" >> "$GITHUB_OUTPUT"
+            echo "Using service IDs from config/render-services.json"
+          fi
+
       - name: Trigger Render deploy
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
-          RENDER_SERVICE_IDS: ${{ secrets.RENDER_SERVICE_IDS }}
+          RENDER_SERVICE_IDS: ${{ steps.render.outputs.ids }}
         run: |
           if [ -z "$RENDER_API_KEY" ] || [ -z "$RENDER_SERVICE_IDS" ]; then
             echo "::warning::RENDER_API_KEY or RENDER_SERVICE_IDS not set — skip remote deploy"
@@ -78,7 +92,7 @@ jobs:
       - name: Wait for Render deploy (gateway)
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
-          GATEWAY_RENDER_SERVICE_ID: ${{ secrets.GATEWAY_RENDER_SERVICE_ID }}
+          GATEWAY_RENDER_SERVICE_ID: ${{ steps.render.outputs.gateway }}
         run: |
           if [ -z "$RENDER_API_KEY" ] || [ -z "$GATEWAY_RENDER_SERVICE_ID" ]; then
             echo "RENDER_API_KEY or GATEWAY_RENDER_SERVICE_ID not set — skip wait"

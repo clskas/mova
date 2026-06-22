@@ -1,0 +1,14 @@
+{
+  "name": "mova-rdc",
+  "projectId": "flat-sunset-51785163",
+  "branchId": "br-crimson-thunder-as8yzt2b",
+  "region": "aws-eu-central-1",
+  "databases": [
+    "mova_auth",
+    "mova_rides",
+    "mova_payments",
+    "mova_drivers",
+    "mova_notifications"
+  ],
+  "updatedAt": "2026-06-22T16:10:00.000Z"
+}

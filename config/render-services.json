@@ -1,0 +1,54 @@
+{
+  "ownerId": "tea-d8gnpfm7r5hc73bceacg",
+  "region": "frankfurt",
+  "repo": "https://github.com/clskas/mova",
+  "branch": "main",
+  "autoDeploy": true,
+  "gatewayUrl": "https://mova-gateway.onrender.com",
+  "gatewayServiceId": "srv-d8slprv7f7vs73d2qn50",
+  "serviceIds": [
+    "srv-d8slrr6rnols73b4bgbg",
+    "srv-d8slrpu7r5hc73fm3h50",
+    "srv-d8slrosm0tmc739cnnvg",
+    "srv-d8slrnf7f7vs73d2t290",
+    "srv-d8slrm8g4nts73bq9pj0",
+    "srv-d8slrlernols73b4bcq0",
+    "srv-d8slrk8js32c73dac310",
+    "srv-d8slprv7f7vs73d2qn50"
+  ],
+  "services": {
+    "mova-web": {
+      "id": "srv-d8slrr6rnols73b4bgbg",
+      "url": "https://mova-web.onrender.com"
+    },
+    "mova-admin": {
+      "id": "srv-d8slrpu7r5hc73fm3h50",
+      "url": "https://mova-admin.onrender.com"
+    },
+    "mova-notification": {
+      "id": "srv-d8slrosm0tmc739cnnvg",
+      "url": "https://mova-notification.onrender.com"
+    },
+    "mova-driver": {
+      "id": "srv-d8slrnf7f7vs73d2t290",
+      "url": "https://mova-driver.onrender.com"
+    },
+    "mova-payment": {
+      "id": "srv-d8slrm8g4nts73bq9pj0",
+      "url": "https://mova-payment.onrender.com"
+    },
+    "mova-ride": {
+      "id": "srv-d8slrlernols73b4bcq0",
+      "url": "https://mova-ride.onrender.com"
+    },
+    "mova-auth": {
+      "id": "srv-d8slrk8js32c73dac310",
+      "url": "https://mova-auth.onrender.com"
+    },
+    "mova-gateway": {
+      "id": "srv-d8slprv7f7vs73d2qn50",
+      "url": "https://mova-gateway.onrender.com"
+    }
+  },
+  "updatedAt": "2026-06-22T16:08:57.868Z"
+}

@@ -91,6 +91,24 @@ jobs:
             --dart-define=API_URL=${{ env.PROD_API_URL }} \
             --dart-define=WS_URL=${{ env.PROD_WS_URL }}
 
+      - name: Build passenger APK (install direct)
+        working-directory: mobile
+        run: |
+          flutter build apk --release \
+            --flavor passenger \
+            -t lib/main_passenger.dart \
+            --dart-define=API_URL=${{ env.PROD_API_URL }} \
+            --dart-define=WS_URL=${{ env.PROD_WS_URL }}
+
+      - name: Build driver APK (install direct)
+        working-directory: mobile
+        run: |
+          flutter build apk --release \
+            --flavor driver \
+            -t lib/main_driver.dart \
+            --dart-define=API_URL=${{ env.PROD_API_URL }} \
+            --dart-define=WS_URL=${{ env.PROD_WS_URL }}
+
       - name: Upload passenger AAB artifact
         uses: actions/upload-artifact@v4
         with:

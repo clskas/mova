@@ -1,0 +1,59 @@
+name: Render Provision
+
+# One-shot or re-run to sync MOVA services on Render (API, idempotent).
+# Normal deploys go through CI → build-push → deploy.yml (automatic on main).
+
+on:
+  workflow_dispatch:
+    inputs:
+      wire_env:
+        description: Re-apply env vars (DATABASE_URL_*, REDIS_URL from secrets)
+        type: boolean
+        default: true
+  push:
+    branches: [main]
+    paths:
+      - scripts/render-provision.mjs
+      - config/render-services.json
+
+permissions:
+  contents: read
+
+jobs:
+  provision:
+    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Validate render.yaml (Render API)
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+        run: |
+          if [ -z "$RENDER_API_KEY" ]; then
+            echo "::warning::RENDER_API_KEY not set — skip blueprint validation"
+            exit 0
+          fi
+          curl -sf -X POST "https://api.render.com/v1/blueprints/validate?ownerId=tea-d8gnpfm7r5hc73bceacg" \
+            -H "Authorization: Bearer $RENDER_API_KEY" \
+            -F "file=@render.yaml" | jq .
+
+      - name: Provision Render services
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_OWNER_ID: tea-d8gnpfm7r5hc73bceacg
+          RENDER_REPO: https://github.com/${{ github.repository }}
+          RENDER_BRANCH: main
+          RENDER_PLAN: free
+          DATABASE_URL_AUTH: ${{ secrets.DATABASE_URL_AUTH }}
+          DATABASE_URL_RIDES: ${{ secrets.DATABASE_URL_RIDES }}
+          DATABASE_URL_PAYMENTS: ${{ secrets.DATABASE_URL_PAYMENTS }}
+          DATABASE_URL_DRIVERS: ${{ secrets.DATABASE_URL_DRIVERS }}
+          DATABASE_URL_NOTIFICATIONS: ${{ secrets.DATABASE_URL_NOTIFICATIONS }}
+          REDIS_URL: ${{ secrets.REDIS_URL }}
+        run: node scripts/render-provision.mjs

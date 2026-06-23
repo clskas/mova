@@ -31,6 +31,10 @@ services:
         fromService: { name: mova-notification, type: web, property: hostport }
       - key: ADMIN_SERVICE_URL
         fromService: { name: mova-admin, type: web, property: hostport }
+      - key: HEALTH_CHECK_TIMEOUT_MS
+        value: "45000"
+      - key: HEALTH_CHECK_RETRIES
+        value: "2"
 
   - type: web
     name: mova-auth

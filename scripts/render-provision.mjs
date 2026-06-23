@@ -150,6 +150,8 @@ async function wireEnvVars(services) {
       DRIVER_SERVICE_URL: `https://${url('mova-driver')}`,
       NOTIFICATION_SERVICE_URL: `https://${url('mova-notification')}`,
       ADMIN_SERVICE_URL: `https://${url('mova-admin')}`,
+      HEALTH_CHECK_TIMEOUT_MS: '45000',
+      HEALTH_CHECK_RETRIES: '2',
     },
     'mova-auth': {
       DATABASE_URL: process.env.DATABASE_URL_AUTH,

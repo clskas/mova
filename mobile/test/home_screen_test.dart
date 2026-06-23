@@ -80,13 +80,22 @@ void main() {
 
     await _tapBack(tester);
     await _tapBack(tester);
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(find.text('Taxi / Moto-taxi'), findsWidgets);
 
     final scheduledCard = find.text('Programmez votre trajet à l\'avance');
-    await tester.scrollUntilVisible(
-      scheduledCard.first,
-      120,
-      scrollable: find.byType(Scrollable).first,
+    final homeScrollable = find.descendant(
+      of: find.byType(HomeScreen),
+      matching: find.byType(Scrollable),
     );
+    if (homeScrollable.evaluate().isNotEmpty) {
+      await tester.scrollUntilVisible(
+        scheduledCard.first,
+        120,
+        scrollable: homeScrollable.first,
+      );
+    }
     await tester.ensureVisible(scheduledCard.first);
     await tester.tap(scheduledCard.first);
     await tester.pumpAndSettle();

@@ -492,11 +492,14 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                       child: Column(
                         children: _suggestions.map((s) {
                           final label = s['label']?.toString() ?? s['address']?.toString() ?? '';
-                          return ListTile(
-                            dense: true,
-                            leading: const Icon(Icons.location_on_outlined, size: 20),
-                            title: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
-                            onTap: () => _selectSuggestion(s),
+                          return Material(
+                            color: Colors.transparent,
+                            child: ListTile(
+                              dense: true,
+                              leading: const Icon(Icons.location_on_outlined, size: 20),
+                              title: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
+                              onTap: () => _selectSuggestion(s),
+                            ),
                           );
                         }).toList(),
                       ),

@@ -82,7 +82,7 @@ void main() {
     await _tapBack(tester);
     await tester.pump(const Duration(milliseconds: 400));
 
-    if (find.byType(HomeScreen).evaluate().isEmpty) {
+    if (find.text('Taxi / Moto-taxi').evaluate().isEmpty) {
       await tester.pumpWidget(_testApp(const HomeScreen()));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));

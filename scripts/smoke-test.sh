@@ -4,6 +4,7 @@ set -euo pipefail
 
 GATEWAY_URL="${GATEWAY_URL:-${API_URL:-${SMOKE_API_URL:-http://localhost:3000}}}"
 GATEWAY_URL="${GATEWAY_URL%/}"
+GATEWAY_URL="${GATEWAY_URL%/api}"
 REQUEST_ID="${SMOKE_REQUEST_ID:-smoke-$(date +%Y%m%d%H%M%S)}"
 HEADERS=(-H "X-Request-Id: $REQUEST_ID")
 FAIL=0

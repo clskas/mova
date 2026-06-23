@@ -18,12 +18,6 @@ Widget _testApp(Widget home) {
   );
 }
 
-Future<void> _tapBack(WidgetTester tester) async {
-  await tester.tap(find.byTooltip('Back').first, warnIfMissed: false);
-  await tester.pump();
-  await tester.pump(const Duration(milliseconds: 400));
-}
-
 void main() {
   final widths = [360.0, 375.0, 390.0, 428.0];
 
@@ -61,12 +55,13 @@ void main() {
     expect(find.text('Bientôt'), findsNothing);
   });
 
-  testWidgets('HomeScreen navigates to implemented services', (tester) async {
+  testWidgets('HomeScreen navigates to parcel delivery', (tester) async {
     tester.view.physicalSize = const Size(400, 900);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
 
     await tester.pumpWidget(_testApp(const HomeScreen()));
+    await tester.pump();
 
     await tester.tap(find.text('Livraisons').first);
     await tester.pump();
@@ -77,31 +72,23 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.text('Catégorie de poids'), findsOneWidget);
+  });
 
-    await _tapBack(tester);
-    await _tapBack(tester);
-    await tester.pump(const Duration(milliseconds: 400));
+  testWidgets('HomeScreen opens scheduled ride flow', (tester) async {
+    tester.view.physicalSize = const Size(400, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
 
-    if (find.text('Taxi / Moto-taxi').evaluate().isEmpty) {
-      await tester.pumpWidget(_testApp(const HomeScreen()));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 300));
-    }
-
-    expect(find.text('Taxi / Moto-taxi'), findsWidgets);
+    await tester.pumpWidget(_testApp(const HomeScreen()));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
 
     final scheduledCard = find.text('Programmez votre trajet à l\'avance');
-    final homeScrollable = find.descendant(
-      of: find.byType(HomeScreen),
-      matching: find.byType(Scrollable),
+    await tester.scrollUntilVisible(
+      scheduledCard.first,
+      120,
+      scrollable: find.byType(Scrollable).first,
     );
-    if (homeScrollable.evaluate().isNotEmpty) {
-      await tester.scrollUntilVisible(
-        scheduledCard.first,
-        120,
-        scrollable: homeScrollable.first,
-      );
-    }
     await tester.ensureVisible(scheduledCard.first);
     await tester.tap(scheduledCard.first);
     await tester.pumpAndSettle();
@@ -113,14 +100,16 @@ void main() {
       scrollable: find.byType(Scrollable).last,
     );
     expect(j7Hint, findsOneWidget);
+  });
 
-    await _tapBack(tester);
+  testWidgets('HomeScreen opens food delivery', (tester) async {
+    tester.view.physicalSize = const Size(400, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
 
-    await tester.scrollUntilVisible(
-      find.text('Livraisons').first,
-      120,
-      scrollable: find.byType(Scrollable).first,
-    );
+    await tester.pumpWidget(_testApp(const HomeScreen()));
+    await tester.pump();
+
     await tester.tap(find.text('Livraisons').first);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));

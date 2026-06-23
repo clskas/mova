@@ -91,7 +91,7 @@ jobs:
           for i in $(seq 1 45); do
             status=$(curl -sf -H "Authorization: Bearer $RENDER_API_KEY" \
               "https://api.render.com/v1/services/${GATEWAY_RENDER_SERVICE_ID}/deploys?limit=1" \
-              | jq -r '.[0].status // "unknown"')
+              | jq -r '.[0].status // .[0].deploy.status // "unknown"')
             echo "Gateway deploy status: $status (attempt $i)"
             if [ "$status" = "live" ]; then exit 0; fi
             if [ "$status" = "build_failed" ] || [ "$status" = "update_failed" ]; then

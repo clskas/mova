@@ -2,8 +2,10 @@
 **/dist
 **/.git
 mobile
-web
-admin
+web/node_modules
+web/.next
+admin/node_modules
+admin/.next
 backend/node_modules
 backend/dist
 *.docx

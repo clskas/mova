@@ -26,8 +26,8 @@ permissions:
 
 env:
   FLUTTER_VERSION: stable
-  PROD_API_URL: ${{ secrets.PROD_API_URL || 'https://api.mova.cd/api' }}
-  PROD_WS_URL: ${{ secrets.PROD_WS_URL || 'https://api.mova.cd' }}
+  PROD_API_URL: ${{ secrets.PROD_API_URL || 'https://mova-gateway.onrender.com/api' }}
+  PROD_WS_URL: ${{ secrets.PROD_WS_URL || 'https://mova-gateway.onrender.com' }}
 
 jobs:
   build-android:

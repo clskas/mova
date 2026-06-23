@@ -17,6 +17,9 @@ const OWNER_ID = process.env.RENDER_OWNER_ID || 'tea-d8gnpfm7r5hc73bceacg';
 const REPO = process.env.RENDER_REPO || 'https://github.com/clskas/mova';
 const BRANCH = process.env.RENDER_BRANCH || 'main';
 const REGION = process.env.RENDER_REGION || 'frankfurt';
+/** Internal Render Key Value URL (same region as MOVA services). Prefer over external rediss:// URLs. */
+const REDIS_INTERNAL_URL =
+  process.env.REDIS_INTERNAL_URL || 'redis://red-d8ldvi6q1p3s738q1cn0:6379';
 const PLAN = process.env.RENDER_PLAN || 'free';
 
 const key = process.env.RENDER_API_KEY;
@@ -150,18 +153,18 @@ async function wireEnvVars(services) {
     },
     'mova-auth': {
       DATABASE_URL: process.env.DATABASE_URL_AUTH,
-      REDIS_URL: process.env.REDIS_URL,
+      REDIS_URL: process.env.REDIS_URL || REDIS_INTERNAL_URL,
       JWT_SECRET: jwtSecret,
     },
     'mova-ride': {
       DATABASE_URL: process.env.DATABASE_URL_RIDES,
-      REDIS_URL: process.env.REDIS_URL,
+      REDIS_URL: process.env.REDIS_URL || REDIS_INTERNAL_URL,
       JWT_SECRET: jwtSecret,
       DRIVER_SERVICE_URL: `https://${url('mova-driver')}`,
     },
     'mova-payment': {
       DATABASE_URL: process.env.DATABASE_URL_PAYMENTS,
-      REDIS_URL: process.env.REDIS_URL,
+      REDIS_URL: process.env.REDIS_URL || REDIS_INTERNAL_URL,
       JWT_SECRET: jwtSecret,
       RIDE_SERVICE_URL: `https://${url('mova-ride')}`,
     },
@@ -172,7 +175,7 @@ async function wireEnvVars(services) {
     },
     'mova-notification': {
       DATABASE_URL: process.env.DATABASE_URL_NOTIFICATIONS,
-      REDIS_URL: process.env.REDIS_URL,
+      REDIS_URL: process.env.REDIS_URL || REDIS_INTERNAL_URL,
       JWT_SECRET: jwtSecret,
     },
     'mova-admin': {

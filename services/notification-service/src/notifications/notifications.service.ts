@@ -30,7 +30,7 @@ export class NotificationsService implements OnModuleInit {
   ) {}
 
   onModuleInit() {
-    this.redis.sub.subscribe(
+    const channels = [
       MOVA_EVENTS.RIDE_CREATED,
       MOVA_EVENTS.PAYMENT_COMPLETED,
       MOVA_EVENTS.DELIVERY_CREATED,
@@ -41,7 +41,14 @@ export class NotificationsService implements OnModuleInit {
       MOVA_EVENTS.INCIDENT_CREATED,
       MOVA_EVENTS.RIDE_STATUS_SMS,
       MOVA_EVENTS.DRIVER_JOB_ALERT,
-    );
+    ];
+    this.redis.sub.subscribe(...channels, (err) => {
+      if (err) {
+        this.logger.warn(`Redis subscribe unavailable: ${err.message}`);
+        return;
+      }
+      this.logger.log(`Subscribed to ${channels.length} MOVA event channels`);
+    });
     this.redis.sub.on('message', async (channel, message) => {
       try {
         const data = JSON.parse(message);

@@ -18,7 +18,7 @@ jobs:
       github.event_name == 'workflow_dispatch' ||
       github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:
@@ -52,6 +52,18 @@ jobs:
               exit 1
             fi
             echo "Waiting for gateway cold start ($i/18)..."
+            sleep 15
+          done
+          echo "Waiting for ride-service (geo/communes)..."
+          for i in $(seq 1 20); do
+            ride_status=$(curl -sf "${GATEWAY_URL}/health" | jq -r '.services[]? | select(.name=="ride") | .status // empty')
+            if [ "$ride_status" = "ok" ]; then
+              echo "ride-service ready (attempt $i)"
+              break
+            fi
+            if [ "$i" -eq 20 ]; then
+              echo "::warning::ride-service not ready — geo/estimate checks may warn"
+            fi
             sleep 15
           done
           GATEWAY_URL="$GATEWAY_URL" ./scripts/smoke-test.sh

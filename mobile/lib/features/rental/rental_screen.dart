@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/api/api_client.dart';
 import '../../core/config/market_config.dart';
+import '../../core/location/location_service.dart';
 import '../../core/location/service_area_prefs.dart';
 import '../../core/location/service_areas.dart';
 import '../../core/error/result.dart';
@@ -39,8 +40,10 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
   DateTime _startDate = DateTime.now().add(const Duration(days: 1));
   DateTime _endDate = DateTime.now().add(const Duration(days: 3));
   bool _loading = false;
+  bool _loadingGps = false;
   bool _loadingList = true;
   String? _error;
+  String? _locationHint;
   Timer? _rentalsPollTimer;
 
   static const _categories = [
@@ -123,6 +126,29 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
       return raw.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
     }
     return [];
+  }
+
+  Future<void> _useMyLocation() async {
+    setState(() {
+      _loadingGps = true;
+      _error = null;
+    });
+    final loc = await LocationService.getCurrentLocation();
+    if (!mounted) return;
+    if (loc == null) {
+      setState(() {
+        _loadingGps = false;
+        _error = 'Impossible d\'obtenir votre position. Activez le GPS et autorisez la localisation.';
+      });
+      return;
+    }
+    final city = ServiceAreas.cityNameForCoords(loc.position);
+    setState(() {
+      _loadingGps = false;
+      _city = city;
+      _locationHint = 'Position : ${loc.label} → $city';
+    });
+    await _search();
   }
 
   Future<void> _search() async {
@@ -379,6 +405,7 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
         ],
         rows: [
           _compareRow('Prix/jour', compared.map((v) => MarketConfig.formatCdf(v['dailyRateCdf'] as int? ?? 0)).toList()),
+          _compareRow('Caution', compared.map((v) => MarketConfig.formatCdf(v['depositCdf'] as int? ?? 0)).toList()),
           _compareRow('Catégorie', compared.map((v) => v['categoryLabel']?.toString() ?? v['category']?.toString() ?? '').toList()),
           _compareRow('Transmission', compared.map((v) => v['transmissionLabel']?.toString() ?? v['transmission']?.toString() ?? '').toList()),
           _compareRow('Note', compared.map((v) => v['rating']?.toString() ?? '—').toList()),
@@ -513,14 +540,53 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
             ],
           ),
           const SizedBox(height: 12),
-          DropdownButtonFormField<String>(
-            value: _city,
-            decoration: const InputDecoration(labelText: 'Ville', isDense: true),
-            items: ServiceAreas.cityNames
-                .map((c) => DropdownMenuItem(value: c, child: Text(c)))
-                .toList(),
-            onChanged: (v) => setState(() => _city = v ?? _city),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  value: ServiceAreas.cityNames.contains(_city) ? _city : ServiceAreas.cityNames.first,
+                  decoration: const InputDecoration(labelText: 'Ville', isDense: true),
+                  items: ServiceAreas.cityNames
+                      .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                      .toList(),
+                  onChanged: (v) => setState(() {
+                    _city = v ?? _city;
+                    _locationHint = null;
+                  }),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: OutlinedButton.icon(
+                  onPressed: _loadingGps ? null : _useMyLocation,
+                  icon: _loadingGps
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.my_location, size: 18),
+                  label: const Text('Ma position', style: TextStyle(fontSize: 12)),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: MovaColors.violet,
+                    side: const BorderSide(color: MovaColors.violet),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                  ),
+                ),
+              ),
+            ],
           ),
+          if (_locationHint != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              _locationHint!,
+              style: const TextStyle(fontSize: 11, color: MovaColors.textSecondary),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
@@ -781,6 +847,14 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
                   ),
                 const SizedBox(height: 8),
                 _timeline(inq['timeline'] as List?),
+                if (inq['nextStepHint'] != null &&
+                    inq['status']?.toString().toUpperCase() == 'CONFIRMED') ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    inq['nextStepHint'].toString(),
+                    style: const TextStyle(fontSize: 11, color: MovaColors.violet),
+                  ),
+                ],
                 if (inq['ownerContactPhone'] != null) ...[
                   const SizedBox(height: 8),
                   InkWell(

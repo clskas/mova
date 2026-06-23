@@ -8,7 +8,8 @@
 
 param(
     [string]$ApiUrl = "",
-    [string]$WsUrl = ""
+    [string]$WsUrl = "",
+    [switch]$UsbReverse
 )
 
 $ErrorActionPreference = "Stop"
@@ -16,7 +17,7 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 $mobileDir = Join-Path $repoRoot "mobile"
 . (Join-Path $PSScriptRoot "mobile-api-url.ps1")
 
-$urls = Get-MovaMobileApiUrls -ApiUrl $ApiUrl -WsUrl $WsUrl
+$urls = Get-MovaMobileApiUrls -ApiUrl $ApiUrl -WsUrl $WsUrl -UsbReverse:$UsbReverse
 $ApiUrl = $urls.ApiUrl
 $WsUrl = $urls.WsUrl
 

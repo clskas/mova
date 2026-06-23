@@ -123,6 +123,20 @@ jobs:
           path: mobile/build/app/outputs/bundle/driverRelease/app-driver-release.aab
           retention-days: 30
 
+      - name: Upload passenger APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mova-passenger-apk
+          path: mobile/build/app/outputs/flutter-apk/app-passenger-release.apk
+          retention-days: 30
+
+      - name: Upload driver APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mova-driver-apk
+          path: mobile/build/app/outputs/flutter-apk/app-driver-release.apk
+          retention-days: 30
+
   upload-android:
     name: Upload Play Store (internal)
     needs: build-android

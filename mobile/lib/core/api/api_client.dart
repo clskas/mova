@@ -505,6 +505,15 @@ class ApiClient {
     if (path.contains('/rental/bookings/') && path.endsWith('/cancel') && method == 'POST') {
       return Success({'status': 'CLOSED', 'cancelled': true});
     }
+    if (path.contains('/rental/bookings/') && path.endsWith('/handover') && method == 'POST') {
+      final id = path.split('/')[3];
+      final booking = MockData.rentalBookings().firstWhere(
+        (b) => b['id'] == id,
+        orElse: () => MockData.createRentalBooking({'id': id})['inquiry'] as Map<String, dynamic>,
+      );
+      final updated = Map<String, dynamic>.from(booking)..['status'] = 'IN_PROGRESS'..['statusLabel'] = 'En cours';
+      return Success({'inquiry': updated, 'booking': updated});
+    }
     if (path == '/rental/inquiries' && method == 'POST') {
       return Success(MockData.createRentalInquiry(body ?? {}));
     }
@@ -520,6 +529,9 @@ class ApiClient {
     if (RegExp(r'^/moving/[^/]+$').hasMatch(path) && method == 'GET') {
       final id = path.split('/').last;
       return Success({'moving': MockData.movingDetail(id)});
+    }
+    if (path.contains('/moving/') && path.endsWith('/cancel') && method == 'POST') {
+      return Success({'status': 'CANCELLED', 'cancelled': true});
     }
     return null;
   }

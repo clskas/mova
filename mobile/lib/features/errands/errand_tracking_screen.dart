@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/api/api_client.dart';
 import '../../core/config/market_config.dart';
 import '../../core/error/result.dart';
+import '../../core/services/cancel_eligibility.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
@@ -99,10 +100,7 @@ class _ErrandTrackingScreenState extends ConsumerState<ErrandTrackingScreen> {
     }).toList();
   }
 
-  bool get _canCancel {
-    final status = _order?['status']?.toString();
-    return status == 'PENDING' || status == 'ASSIGNED';
-  }
+  bool get _canCancel => CancelEligibility.errand(_order);
 
   void _maybeGoToPayment() {
     if (_paymentNavigated || !mounted) return;

@@ -1022,6 +1022,7 @@ export type RentalInquiry = {
   driverId?: string | null;
   driverName?: string;
   driverPhone?: string;
+  nextStepHint?: string | null;
   createdAt?: string;
 };
 

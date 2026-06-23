@@ -4,6 +4,7 @@ import 'package:latlong2/latlong.dart';
 import '../../core/api/api_client.dart';
 import '../../core/config/market_config.dart';
 import '../../core/error/result.dart';
+import '../../core/services/cancel_eligibility.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
@@ -469,7 +470,7 @@ class _CarpoolDetailScreenState extends ConsumerState<CarpoolDetailScreen> {
                       ),
                     ),
                   ],
-                  if (_isDriver || _isPassenger)
+                  if ((_isDriver || _isPassenger) && CancelEligibility.carpool(trip))
                     TextButton(
                       onPressed: _actionLoading ? null : _cancel,
                       child: Text(_isDriver ? 'Annuler le trajet' : 'Annuler ma réservation'),

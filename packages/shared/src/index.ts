@@ -18,3 +18,5 @@ export * from './kyc-ocr';
 export * from './driver-documents';
 export * from './public-id';
 export * from './africas-talking';
+export * from './service-cancel.util';
+export * from './rental-addons.util';

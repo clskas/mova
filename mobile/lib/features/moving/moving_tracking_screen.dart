@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/api/api_client.dart';
 import '../../core/config/market_config.dart';
 import '../../core/error/result.dart';
+import '../../core/services/cancel_eligibility.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
@@ -31,6 +32,7 @@ class MovingTrackingScreen extends ConsumerStatefulWidget {
 class _MovingTrackingScreenState extends ConsumerState<MovingTrackingScreen> {
   Map<String, dynamic>? _request;
   bool _loading = true;
+  bool _cancelling = false;
   String? _error;
   Timer? _pollTimer;
 
@@ -68,6 +70,35 @@ class _MovingTrackingScreenState extends ConsumerState<MovingTrackingScreen> {
           if (!silent) _error = error.message;
       }
     });
+  }
+
+  Future<void> _cancelMoving() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Annuler le déménagement ?'),
+        content: const Text('Votre demande sera annulée si l\'équipe n\'a pas encore commencé.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Non')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Oui, annuler')),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    setState(() => _cancelling = true);
+    final api = ref.read(apiClientProvider);
+    final result = await api.post('/moving/${widget.movingId}/cancel', {});
+    if (!mounted) return;
+    setState(() => _cancelling = false);
+    switch (result) {
+      case Success():
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Demande de déménagement annulée')),
+        );
+        await _load(silent: true);
+      case Failure(:final error):
+        setState(() => _error = error.message);
+    }
   }
 
   List<Map<String, dynamic>> get _timeline {
@@ -187,6 +218,16 @@ class _MovingTrackingScreenState extends ConsumerState<MovingTrackingScreen> {
                     ),
                   );
                 }),
+                if (CancelEligibility.moving(_request)) ...[
+                  const SizedBox(height: 16),
+                  MovaButton(
+                    label: 'Annuler la demande',
+                    icon: Icons.cancel_outlined,
+                    isLoading: _cancelling,
+                    isSecondary: true,
+                    onPressed: _cancelling ? null : _cancelMoving,
+                  ),
+                ],
                 const SizedBox(height: 24),
                 MovaButton(
                   label: 'Retour à l\'accueil',

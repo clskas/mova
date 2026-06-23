@@ -18,9 +18,10 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 $mobileDir = Join-Path $repoRoot "mobile"
 . (Join-Path $PSScriptRoot "mobile-api-url.ps1")
 
+$deviceId = Get-MovaFlutterDevice -MobileDir $mobileDir -DeviceId $Device
+
 if ($UsbReverse) {
-    Write-Host "adb reverse tcp:3000 tcp:3000 (USB -> PC localhost:3000)" -ForegroundColor Yellow
-    adb reverse tcp:3000 tcp:3000
+    Set-MovaAdbReverse -DeviceId $deviceId
 }
 
 $urls = Get-MovaMobileApiUrls -ApiUrl $ApiUrl -WsUrl $WsUrl -UsbReverse:$UsbReverse
@@ -32,13 +33,15 @@ $defines = @(
     "--dart-define=WS_URL=$WsUrl"
 )
 
-$deviceId = Get-MovaFlutterDevice -MobileDir $mobileDir -DeviceId $Device
-
 Push-Location $mobileDir
 try {
     flutter pub get
     Write-Host "Running passenger on $deviceId" -ForegroundColor Cyan
-    Write-Host "API_URL=$ApiUrl  (Wi-Fi/LAN — telephone et PC sur le meme reseau)" -ForegroundColor DarkGray
+    if ($UsbReverse) {
+        Write-Host "API_URL=$ApiUrl  (USB reverse -> PC localhost:3000)" -ForegroundColor DarkGray
+    } else {
+        Write-Host "API_URL=$ApiUrl  (Wi-Fi/LAN, telephone et PC sur le meme reseau)" -ForegroundColor DarkGray
+    }
     flutter run --flavor passenger -t lib/main_passenger.dart -d $deviceId @defines
 }
 finally {

@@ -76,6 +76,14 @@ export class RentalController {
     return this.rentalService.cancelBooking(id, req.user.id);
   }
 
+  @Post('bookings/:id/handover')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Confirmer réception du véhicule (passage En cours)' })
+  confirmHandover(@Request() req: { user: { id: string } }, @Param('id') id: string) {
+    return this.rentalService.passengerConfirmHandover(id, req.user.id);
+  }
+
   @Get('assignments')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()

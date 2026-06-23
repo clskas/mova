@@ -1,6 +1,6 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { MovingRequestStatus, SurchargeType, VehicleType } from '@prisma/client';
-import { MovaErrorCode, MovaHttpException, MOVA_EVENTS, formatCdf } from '@mova/shared';
+import { MovingRequestStatus, MovingVehicleCategory, SurchargeType, VehicleType } from '@prisma/client';
+import { MovaErrorCode, MovaHttpException, MOVA_EVENTS, canCancelMoving, formatCdf } from '@mova/shared';
 import { RedisService } from '@mova/shared';
 import { buildMovingTimeline } from '../deliveries/parcel.util';
 import { assertServiceAreaPair } from '../common/address.util';
@@ -24,6 +24,28 @@ export class MovingService {
     assertServiceAreaPair(dto.pickupLat, dto.pickupLng, dto.dropoffLat, dto.dropoffLng);
   }
 
+  private vehicleCategoryMultiplier(category: MovingVehicleCategory): number {
+    return (
+      {
+        [MovingVehicleCategory.CAMIONNETTE]: 0.85,
+        [MovingVehicleCategory.CAMION_15M3]: 1,
+        [MovingVehicleCategory.CAMION_30M3]: 1.45,
+        [MovingVehicleCategory.CAMION_50M3]: 1.9,
+      }[category] ?? 1
+    );
+  }
+
+  private vehicleCategoryLabel(category: MovingVehicleCategory): string {
+    return (
+      {
+        [MovingVehicleCategory.CAMIONNETTE]: 'Camionnette / pick-up',
+        [MovingVehicleCategory.CAMION_15M3]: 'Camion ~15 m³',
+        [MovingVehicleCategory.CAMION_30M3]: 'Camion ~30 m³',
+        [MovingVehicleCategory.CAMION_50M3]: 'Gros camion ~50 m³',
+      }[category] ?? category
+    );
+  }
+
   async estimate(dto: EstimateMovingDto) {
     const { pickupArea, dropoffArea, isInterCity } = assertServiceAreaPair(
       dto.pickupLat,
@@ -38,7 +60,10 @@ export class MovingService {
     const withInterCity = this.pricing.withInterCitySurcharge(fare, isInterCity, distanceKm);
     const perM3 = moving.perUnitCdf ?? 8000;
     const volumeFee = Math.ceil(dto.volumeM3 * perM3);
-    const estimatedPriceCdf = Math.ceil(withInterCity.estimatedFareCdf * moving.multiplier + moving.baseFeeCdf + volumeFee);
+    const vehicleMultiplier = this.vehicleCategoryMultiplier(dto.vehicleCategory);
+    const estimatedPriceCdf = Math.ceil(
+      (withInterCity.estimatedFareCdf * moving.multiplier + moving.baseFeeCdf + volumeFee) * vehicleMultiplier,
+    );
     return {
       estimatedPriceCdf,
       formatted: formatCdf(estimatedPriceCdf),
@@ -48,6 +73,8 @@ export class MovingService {
       dropoffCity: dropoffArea.name,
       isInterCity,
       volumeM3: dto.volumeM3,
+      vehicleCategory: dto.vehicleCategory,
+      vehicleCategoryLabel: this.vehicleCategoryLabel(dto.vehicleCategory),
       volumeFeeCdf: volumeFee,
       baseFeeCdf: moving.baseFeeCdf,
       distanceKm,
@@ -62,6 +89,7 @@ export class MovingService {
         userId,
         status: MovingRequestStatus.PENDING,
         volumeM3: dto.volumeM3,
+        vehicleCategory: dto.vehicleCategory,
         pickupLat: dto.pickupLat,
         pickupLng: dto.pickupLng,
         pickupAddress: dto.pickupAddress.trim(),
@@ -95,9 +123,11 @@ export class MovingService {
   }) {
     const timeline = buildMovingTimeline(request.status, request.completedAt);
     const photoUrls = Array.isArray(request.photoUrls) ? (request.photoUrls as string[]) : [];
+    const vehicleCategory = request.vehicleCategory as MovingVehicleCategory | undefined;
     return {
       ...request,
       photoUrls,
+      vehicleCategoryLabel: vehicleCategory ? this.vehicleCategoryLabel(vehicleCategory) : undefined,
       timeline,
       tracking: timeline,
       paymentReady: request.status === MovingRequestStatus.COMPLETED,
@@ -105,6 +135,7 @@ export class MovingService {
       formattedPrice: formatCdf(request.estimatedPriceCdf),
       currency: 'CDF',
       city: 'Kinshasa',
+      ...canCancelMoving({ status: request.status }),
     };
   }
 
@@ -185,8 +216,13 @@ export class MovingService {
 
   async cancel(id: string, userId: string) {
     const request = await this.get(id, userId);
-    if (request.status === MovingRequestStatus.COMPLETED || request.status === MovingRequestStatus.CANCELLED) {
-      throw new MovaHttpException(MovaErrorCode.MOVING_INVALID_STATUS);
+    const cancelEligibility = canCancelMoving({ status: request.status });
+    if (!cancelEligibility.canCancel) {
+      throw new MovaHttpException(
+        MovaErrorCode.MOVING_INVALID_STATUS,
+        undefined,
+        cancelEligibility.cancelBlockReason,
+      );
     }
     return this.prisma.movingRequest.update({
       where: { id },

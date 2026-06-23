@@ -1,9 +1,12 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { MovingRequestStatus } from '@prisma/client';
+import { MovingRequestStatus, MovingVehicleCategory } from '@prisma/client';
 import { IsArray, IsEnum, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
 
 export class EstimateMovingDto {
   @ApiProperty({ description: 'Volume estimé en m³' }) @IsNumber() @Min(1) @Max(100) volumeM3: number;
+  @ApiProperty({ enum: MovingVehicleCategory, description: 'Type d\'engin souhaité' })
+  @IsEnum(MovingVehicleCategory)
+  vehicleCategory: MovingVehicleCategory;
   @ApiProperty() @IsNumber() pickupLat: number;
   @ApiProperty() @IsNumber() pickupLng: number;
   @ApiProperty() @IsString() pickupAddress: string;

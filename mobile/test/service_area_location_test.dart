@@ -41,9 +41,16 @@ void main() {
       );
     });
 
-    test('destinationInServiceArea rejects foreign addresses', () {
+    test('destinationInServiceArea accepts addresses with at least 3 characters', () {
       expect(
         ServiceAreaLocation.destinationInServiceArea('Paris, France'),
+        isTrue,
+      );
+    });
+
+    test('destinationInServiceArea rejects very short addresses without coords', () {
+      expect(
+        ServiceAreaLocation.destinationInServiceArea('AB'),
         isFalse,
       );
     });

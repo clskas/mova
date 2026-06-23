@@ -150,6 +150,6 @@ describe('CarpoolService', () => {
       passengers: [],
     });
     const result = await service.cancelTripOrBooking('t1', 'user-2');
-    expect(result.cancelled).toBe(true);
+    expect('cancelled' in result && result.cancelled).toBe(true);
   });
 });

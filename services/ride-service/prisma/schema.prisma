@@ -349,6 +349,13 @@ enum MovingRequestStatus {
   CANCELLED
 }
 
+enum MovingVehicleCategory {
+  CAMIONNETTE
+  CAMION_15M3
+  CAMION_30M3
+  CAMION_50M3
+}
+
 model CarpoolTrip {
   id                String        @id @default(uuid())
   driverId          String
@@ -535,8 +542,9 @@ model RentalInquiry {
 model MovingRequest {
   id                String              @id @default(uuid())
   userId            String
-  status            MovingRequestStatus @default(PENDING)
+  status            MovingRequestStatus     @default(PENDING)
   volumeM3          Float
+  vehicleCategory   MovingVehicleCategory   @default(CAMION_15M3)
   pickupLat         Float
   pickupLng         Float
   pickupAddress     String

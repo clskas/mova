@@ -41,7 +41,7 @@ void main() {
     expect(find.text('Confort'), findsOneWidget);
     expect(find.text('VIP'), findsOneWidget);
     expect(find.text('Estimer le prix'), findsOneWidget);
-    expect(find.byTooltip('Ma position'), findsOneWidget);
+    expect(find.byIcon(Icons.gps_fixed), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -99,7 +99,17 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
 
-    await tester.tap(find.text('Confirmer la course'));
+    final confirm = find.text('Confirmer la course');
+    await tester.scrollUntilVisible(
+      confirm,
+      120,
+      scrollable: find.descendant(
+        of: find.byType(BookingScreen),
+        matching: find.byType(Scrollable),
+      ).first,
+    );
+    await tester.ensureVisible(confirm);
+    await tester.tap(confirm);
     await tester.pump();
     await tester.pump(const Duration(seconds: 2));
 

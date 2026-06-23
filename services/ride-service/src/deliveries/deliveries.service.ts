@@ -1,6 +1,6 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { DeliveryStatus, DeliveryType, Prisma, SurchargeType, TrackingReferenceType, VehicleType, WeightCategory } from '@prisma/client';
-import { INTERNAL_API_KEY, MARKET_RDC, MOVA_EVENTS, MovaErrorCode, MovaHttpException, formatCdf, resolveCityFromCoords, serviceUrl } from '@mova/shared';
+import { INTERNAL_API_KEY, MARKET_RDC, MOVA_EVENTS, MovaErrorCode, MovaHttpException, canCancelDelivery, formatCdf, resolveCityFromCoords, serviceUrl } from '@mova/shared';
 import { RedisService } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { PricingService } from '../rides/pricing.service';
@@ -16,6 +16,8 @@ import {
 } from './parcel.util';
 import { assertDriverCanReceiveJobs, driverCanReceiveJobs, fetchDriverProfileSnapshot } from '../common/driver-eligibility.util';
 import { TrackingService } from '../tracking/tracking.service';
+import { MatchingService } from '../matching/matching.service';
+import { notifyNearbyDrivers } from '../common/driver-job-alert.util';
 
 const WEIGHT_MULTIPLIERS: Record<WeightCategory, number> = {
   [WeightCategory.DOCUMENTS]: 1.0,
@@ -52,7 +54,34 @@ export class DeliveriesService {
     private promo: PromoService,
     private redis: RedisService,
     private trackingService: TrackingService,
+    private matching: MatchingService,
   ) {}
+
+  private async alertDeliveryOffer(delivery: {
+    id: string;
+    type: DeliveryType;
+    pickupLat?: number | null;
+    pickupLng?: number | null;
+    pickupAddress?: string | null;
+    restaurant?: { name?: string | null; lat?: number | null; lng?: number | null; address?: string | null } | null;
+  }) {
+    const pickupLat = delivery.pickupLat ?? delivery.restaurant?.lat;
+    const pickupLng = delivery.pickupLng ?? delivery.restaurant?.lng;
+    if (pickupLat == null || pickupLng == null) return;
+    const pickup = delivery.pickupAddress?.trim() || delivery.restaurant?.address?.trim() || delivery.restaurant?.name?.trim() || 'près de vous';
+    const label =
+      delivery.type === DeliveryType.FOOD ? 'Repas' : delivery.type === DeliveryType.EXPRESS ? 'Express' : 'Colis';
+    await notifyNearbyDrivers(this.redis, this.matching, {
+      jobKind: 'DELIVERY_OFFER',
+      referenceId: delivery.id,
+      pickupLat,
+      pickupLng,
+      pickupAddress: pickup,
+      title: 'Nouvelle livraison MOVA',
+      body: `${label} · ${pickup}`,
+      data: { deliveryType: delivery.type },
+    }).catch(() => undefined);
+  }
 
   private validateParcelDto(dto: CreateParcelDeliveryDto) {
     assertServiceAreaPair(dto.pickupLat, dto.pickupLng, dto.dropoffLat, dto.dropoffLng);
@@ -144,6 +173,7 @@ export class DeliveriesService {
       include: { events: true },
     });
     await this.prisma.deliveryEvent.create({ data: { deliveryId: delivery.id, event: 'CREATED' } });
+    await this.alertDeliveryOffer(delivery);
     const formatted = formatParcelDelivery({ ...delivery, events: [{ id: '1', deliveryId: delivery.id, event: 'CREATED', metadata: null, createdAt: new Date() }] });
     return { delivery: formatted, estimate };
   }
@@ -425,6 +455,7 @@ export class DeliveriesService {
       include: { events: true },
     });
     await this.prisma.deliveryEvent.create({ data: { deliveryId: delivery.id, event: 'EXPRESS_CREATED' } });
+    await this.alertDeliveryOffer(delivery);
     const formatted = formatParcelDelivery({ ...delivery, events: [{ id: '1', deliveryId: delivery.id, event: 'EXPRESS_CREATED', metadata: null, createdAt: new Date() }] });
     return { delivery: formatted, estimate };
   }
@@ -771,6 +802,19 @@ export class DeliveriesService {
     if (!allowed[delivery.status]?.includes(status)) {
       throw new MovaHttpException(MovaErrorCode.DELIVERY_INVALID_STATUS);
     }
+    if (status === DeliveryStatus.CANCELLED) {
+      const cancelEligibility = canCancelDelivery({
+        status: delivery.status,
+        type: delivery.type,
+      });
+      if (!cancelEligibility.canCancel) {
+        throw new MovaHttpException(
+          MovaErrorCode.DELIVERY_INVALID_STATUS,
+          undefined,
+          cancelEligibility.cancelBlockReason,
+        );
+      }
+    }
     const updates: Record<string, unknown> = { status };
     if (status === DeliveryStatus.PICKED_UP) updates.pickedUpAt = new Date();
     if (status === DeliveryStatus.DELIVERED) updates.deliveredAt = new Date();
@@ -787,6 +831,9 @@ export class DeliveriesService {
       status,
       restaurantName: updated.restaurant?.name,
     });
+    if (status === DeliveryStatus.READY_FOR_PICKUP && !updated.driverId) {
+      await this.alertDeliveryOffer(updated);
+    }
     return { delivery: formatted, paymentReady: status === DeliveryStatus.DELIVERED, statusLabel };
   }
 
@@ -892,6 +939,9 @@ export class DeliveriesService {
       status,
       restaurantName: updated.restaurant?.name,
     });
+    if (status === DeliveryStatus.READY_FOR_PICKUP && !updated.driverId) {
+      await this.alertDeliveryOffer(updated);
+    }
     return { delivery: formatted, paymentReady: status === DeliveryStatus.DELIVERED, statusLabel };
   }
 

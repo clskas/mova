@@ -263,6 +263,11 @@ export default function LocationsPage() {
             )}
             <p><span className="text-gray-500">Prix estimé:</span> {formatCdf(selected.estimatedPriceCdf ?? selected.priceCdf ?? 0)}</p>
             <p><span className="text-gray-500">Statut:</span> <StatusBadge status={selected.status ?? "PENDING"} /></p>
+            {selected.nextStepHint && (
+              <p className="text-xs text-indigo-800 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2">
+                {selected.nextStepHint}
+              </p>
+            )}
             <p>
               <span className="text-gray-500">Logistique:</span>{" "}
               {selected.logisticsModeLabel ?? selected.logisticsMode ?? "—"}
@@ -284,8 +289,10 @@ export default function LocationsPage() {
             <ContactBlock title="Propriétaire du véhicule" name={selected.ownerName} phone={selected.ownerContactPhone} />
             {selected.ownerUserId && (
               <p className="text-xs text-indigo-800 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2">
-                Véhicule partenaire — confirmation et remise/retour gérées par le propriétaire via le portail partenaire.
-                L&apos;admin ne peut clôturer qu&apos;en cas de litige, ou forcer un statut (override).
+                Véhicule partenaire — confirmation et remise/retour gérées par le propriétaire via le portail
+                partenaire (bouton « Remise effectuée » pour passer en En cours). Le passager peut aussi confirmer
+                la réception ; passage automatique possible à la date de début. L&apos;admin ne peut clôturer
+                qu&apos;en cas de litige, ou forcer un statut (override).
               </p>
             )}
             <ContactBlock title="Chauffeur logistique MOVA" name={selected.driverName} phone={selected.driverPhone} />

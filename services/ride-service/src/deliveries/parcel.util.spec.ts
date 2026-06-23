@@ -39,15 +39,15 @@ describe('parcel.util', () => {
     expect(noGps).toEqual({ lat: -4.32, lng: 15.31, ts: expect.any(Number) });
 
     const unassigned = resolveCourierLocation({ ...delivery, driverId: null }, null);
-    expect(unassigned).toEqual(
-      mockCourierLocation({
-        status: delivery.status,
-        pickupLat: delivery.pickupLat,
-        pickupLng: delivery.pickupLng,
-        dropoffLat: delivery.dropoffLat,
-        dropoffLng: delivery.dropoffLng,
-      }),
-    );
+    const expected = mockCourierLocation({
+      status: delivery.status,
+      pickupLat: delivery.pickupLat,
+      pickupLng: delivery.pickupLng,
+      dropoffLat: delivery.dropoffLat,
+      dropoffLng: delivery.dropoffLng,
+    });
+    expect(unassigned).toMatchObject({ lat: expected.lat, lng: expected.lng });
+    expect(unassigned?.ts).toEqual(expect.any(Number));
   });
 
   it('buildParcelTimeline uses Glovo-style food labels', () => {

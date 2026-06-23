@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../config/market_config.dart';
 import '../offline/connectivity_service.dart';
 import '../theme/mova_colors.dart';
 
@@ -50,7 +52,9 @@ class MovaOfflineShell extends ConsumerWidget {
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
-                                state.bannerMessage,
+                                kDebugMode && state.reason == OfflineReason.serverUnavailable
+                                    ? '${state.bannerMessage}\nAPI: ${MarketConfig.apiBaseUrl}'
+                                    : state.bannerMessage,
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 13,

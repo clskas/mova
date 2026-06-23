@@ -29,6 +29,7 @@ describe('DeliveriesService', () => {
   const promo = { validate: jest.fn() };
   const redis = { publish: jest.fn() };
   const trackingService = { getTrace: jest.fn().mockResolvedValue([]) };
+  const matching = { findNearbyDrivers: jest.fn().mockResolvedValue([]) };
 
   const service = new DeliveriesService(
     prisma as never,
@@ -37,6 +38,7 @@ describe('DeliveriesService', () => {
     promo as never,
     redis as never,
     trackingService as never,
+    matching as never,
   );
 
   beforeEach(() => jest.clearAllMocks());
@@ -96,6 +98,8 @@ describe('DeliveriesService', () => {
       lat: -4.31,
       lng: 15.3,
       isActive: true,
+      isAcceptingOrders: true,
+      menuItems: [{ name: 'Poulet', priceCdf: 5000, isAvailable: true }],
     });
     const result = await service.estimateFood({
       restaurantId: 'r1',

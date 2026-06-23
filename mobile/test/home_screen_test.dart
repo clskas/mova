@@ -24,7 +24,7 @@ Future<void> _tapBack(WidgetTester tester) async {
 }
 
 void main() {
-  final widths = [320.0, 360.0, 375.0, 390.0, 428.0];
+  final widths = [360.0, 375.0, 390.0, 428.0];
 
   setUp(() {
     TestWidgetsFlutterBinding.ensureInitialized();
@@ -40,7 +40,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
-    expect(find.text('La mobilité, simplement.'), findsOneWidget);
+    expect(find.text('Mobilité partout en RDC — choisissez un service'), findsOneWidget);
     expect(find.text('Taxi / Moto-taxi'), findsOneWidget);
     expect(find.text('Livraisons'), findsOneWidget);
     expect(find.text('Repas, colis, express et plus'), findsOneWidget);

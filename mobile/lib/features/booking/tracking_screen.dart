@@ -9,6 +9,7 @@ import '../../core/api/api_client.dart';
 import '../../core/api/ride_socket.dart';
 import '../../core/config/market_config.dart';
 import '../../core/error/result.dart';
+import '../../core/services/cancel_eligibility.dart';
 import '../../core/geo/geo_utils.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
@@ -103,10 +104,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
 
   List<Map<String, dynamic>> get _timelineSteps => computeRideTimeline(_status);
 
-  bool get _canCancel {
-    const cancellable = {'REQUESTED', 'SEARCHING', 'ACCEPTED', 'DRIVER_ARRIVED'};
-    return cancellable.contains(_status);
-  }
+  bool get _canCancel => CancelEligibility.ride(_ride ?? {'status': _status});
 
   void _updateEtaFromRide(Map<String, dynamic> data) {
     final apiEta = (data['etaMinutes'] as num?)?.toInt();

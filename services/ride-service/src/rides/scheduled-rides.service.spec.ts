@@ -14,7 +14,8 @@ describe('ScheduledRidesService', () => {
     scheduledRide: { create: jest.fn(), findMany: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
   };
 
-  const service = new ScheduledRidesService(prisma as never, pricing);
+  const redis = { publish: jest.fn().mockResolvedValue(undefined) };
+  const service = new ScheduledRidesService(prisma as never, pricing, redis as never);
 
   beforeEach(() => jest.clearAllMocks());
 
@@ -119,7 +120,7 @@ describe('ScheduledRidesService', () => {
     scheduledAt.setDate(scheduledAt.getDate() + 1);
     const result = await service.estimateMobile({
       dropoffAddress: 'Gombe, Kinshasa',
-      vehicleType: 'MOTO',
+      vehicleType: VehicleType.MOTO_TAXI,
       scheduledAt: scheduledAt.toISOString(),
       pickupLat: -4.32,
       pickupLng: 15.31,

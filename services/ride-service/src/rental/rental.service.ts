@@ -1,6 +1,6 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { Prisma, RentalInquiryStatus, RentalLogisticsMode, RentalVehicleApprovalStatus } from '@prisma/client';
-import { MARKET_RDC, MOVA_EVENTS, MovaErrorCode, MovaHttpException, formatCdf, formatRentalRemaining, type RentalBookingEventKind } from '@mova/shared';
+import { MARKET_RDC, MOVA_EVENTS, MovaErrorCode, MovaHttpException, canCancelRentalBooking, formatCdf, formatRentalRemaining, shouldChargeGpsAddOn, vehicleHasBuiltInGps, type RentalBookingEventKind } from '@mova/shared';
 import { RedisService } from '@mova/shared';
 import { fetchAuthUserBrief } from '../common/internal-lookup.util';
 import { assertDriverCanReceiveJobs } from '../common/driver-eligibility.util';
@@ -255,6 +255,7 @@ export class RentalService {
       id: inquiry.id,
       status: inquiry.status,
       statusLabel: RENTAL_STATUS_LABELS[inquiry.status],
+      nextStepHint: this.getNextStepHint(inquiry, 'owner'),
       vehicleName: inquiry.vehicle?.name ?? inquiry.vehicleType,
       vehicleId: inquiry.vehicleId,
       passengerName: passenger?.name,
@@ -318,6 +319,21 @@ export class RentalService {
       mileageUnlimited: row.mileageUnlimited,
       limitedMileageFeeCdf: row.limitedMileageFeeCdf,
       imageUrl: row.imageUrl ?? `https://placehold.co/600x400/6C63FF/white?text=${encodeURIComponent(row.name)}`,
+    };
+  }
+
+  private mapAddOnOptions(features: unknown) {
+    const builtInGps = vehicleHasBuiltInGps(features);
+    const { childSeat, gps, extraDriver } = MARKET_RDC.rental.addOns;
+    return {
+      childSeat: { ...childSeat, included: false },
+      gps: {
+        ...gps,
+        included: builtInGps,
+        priceCdf: builtInGps ? 0 : gps.priceCdf,
+        label: builtInGps ? `${gps.label} (intégré au véhicule)` : gps.label,
+      },
+      extraDriver: { ...extraDriver, included: false },
     };
   }
 
@@ -396,17 +412,21 @@ export class RentalService {
       vehicle: this.mapVehicle(vehicle),
       options: {
         insuranceTiers: MARKET_RDC.rental.insuranceTiers,
-        addOns: MARKET_RDC.rental.addOns,
+        addOns: this.mapAddOnOptions(vehicle.features),
         rentalPeriods: [
           { id: 'DAILY', label: 'À la journée' },
           { id: 'WEEKLY', label: 'À la semaine', discountPct: MARKET_RDC.rental.weeklyDiscountPct },
         ],
         mileageTypes: [
-          { id: 'UNLIMITED', label: 'Kilométrage illimité' },
           {
             id: 'LIMITED',
             label: `Limité (${MARKET_RDC.rental.limitedMileageKmPerDay} km/j)`,
-            feeCdf: MARKET_RDC.rental.limitedMileageFeeCdf,
+            feeCdf: 0,
+          },
+          {
+            id: 'UNLIMITED',
+            label: 'Kilométrage illimité',
+            surchargeCdf: MARKET_RDC.rental.unlimitedMileageSurchargeCdf,
           },
         ],
       },
@@ -423,13 +443,17 @@ export class RentalService {
       category: string;
       name: string;
       seats: number;
+      features?: unknown;
     },
     dto: RentalQuoteDto,
     startDate: Date,
     endDate: Date,
   ) {
     const days = this.rentalDays(startDate, endDate);
-    const rentalPeriod = dto.rentalPeriod ?? 'DAILY';
+    let rentalPeriod = dto.rentalPeriod ?? 'DAILY';
+    if (rentalPeriod === 'WEEKLY' && days < 7) {
+      rentalPeriod = 'DAILY';
+    }
     const mileageType = dto.mileageType ?? 'UNLIMITED';
     const insuranceTier = (dto.insuranceTier ?? 'BASIC') as keyof typeof MARKET_RDC.rental.insuranceTiers;
     const addOns = (dto.addOns ?? {}) as RentalAddOns;
@@ -451,10 +475,17 @@ export class RentalService {
     const addOnDetails: { id: string; label: string; priceCdf: number }[] = [];
     for (const [key, selected] of Object.entries(addOns)) {
       if (!selected) continue;
+      if (key === 'gps' && !shouldChargeGpsAddOn(vehicle.features, addOns)) continue;
       const cfg = MARKET_RDC.rental.addOns[key as keyof typeof MARKET_RDC.rental.addOns];
       if (!cfg) continue;
-      addOnsFeeCdf += cfg.priceCdf;
-      addOnDetails.push({ id: key, label: cfg.label, priceCdf: cfg.priceCdf });
+      const priceCdf =
+        key === 'gps' && vehicleHasBuiltInGps(vehicle.features) ? 0 : cfg.priceCdf;
+      addOnsFeeCdf += priceCdf;
+      addOnDetails.push({
+        id: key,
+        label: key === 'gps' && vehicleHasBuiltInGps(vehicle.features) ? `${cfg.label} (inclus)` : cfg.label,
+        priceCdf,
+      });
     }
 
     let interCityFeeCdf = 0;
@@ -463,8 +494,10 @@ export class RentalService {
     }
 
     let mileageFeeCdf = 0;
-    if (mileageType === 'LIMITED') {
-      mileageFeeCdf = vehicle.limitedMileageFeeCdf ?? MARKET_RDC.rental.limitedMileageFeeCdf;
+    if (mileageType === 'UNLIMITED') {
+      mileageFeeCdf =
+        vehicle.limitedMileageFeeCdf ??
+        MARKET_RDC.rental.unlimitedMileageSurchargeCdf;
     }
 
     const depositCdf = vehicle.depositCdf;
@@ -595,7 +628,8 @@ export class RentalService {
     };
   }
 
-  private enrichInquiry(inquiry: {
+  private enrichInquiry(
+    inquiry: {
     id: string;
     userId: string;
     status: RentalInquiryStatus;
@@ -628,7 +662,9 @@ export class RentalService {
       ownerContactPhone: string | null;
       ownerBadge: string | null;
     } | null;
-  }) {
+  },
+    audience: 'passenger' | 'owner' | 'admin' | 'driver' = 'passenger',
+  ) {
     const ownerContact =
       inquiry.status === RentalInquiryStatus.CONFIRMED ||
       inquiry.status === RentalInquiryStatus.CONTACTED ||
@@ -645,6 +681,10 @@ export class RentalService {
       1,
       Math.ceil((inquiry.endDate.getTime() - inquiry.startDate.getTime()) / 86_400_000),
     );
+    const cancelEligibility = canCancelRentalBooking({
+      status: inquiry.status,
+      startDate: inquiry.startDate,
+    });
     return {
       ...inquiry,
       ...this.mapLogisticsFields(inquiry),
@@ -654,6 +694,9 @@ export class RentalService {
       ownerBadge: inquiry.vehicle?.ownerBadge,
       statusLabel: RENTAL_STATUS_LABELS[inquiry.status],
       timeline: this.buildTimeline(inquiry.status),
+      nextStepHint: this.getNextStepHint(inquiry, audience),
+      canConfirmHandover: inquiry.status === RentalInquiryStatus.CONFIRMED,
+      ...cancelEligibility,
       rentalDurationDays,
       remainingMs: remaining?.remainingMs ?? 0,
       remainingDays: remaining?.remainingDays ?? 0,
@@ -675,6 +718,123 @@ export class RentalService {
     }));
   }
 
+  private getNextStepHint(
+    inquiry: {
+      status: RentalInquiryStatus;
+      logisticsMode?: RentalLogisticsMode;
+      driverId?: string | null;
+    },
+    audience: 'passenger' | 'owner' | 'admin' | 'driver',
+  ): string | null {
+    const mode = inquiry.logisticsMode ?? RentalLogisticsMode.SELF_PASSENGER;
+    switch (inquiry.status) {
+      case RentalInquiryStatus.PENDING:
+        if (audience === 'owner') {
+          return 'Prenez en charge la demande, puis confirmez la disponibilité du véhicule.';
+        }
+        return 'Le propriétaire ou MOVA examine votre demande.';
+      case RentalInquiryStatus.CONTACTED:
+        if (audience === 'owner') {
+          return 'Confirmez la disponibilité pour valider la réservation.';
+        }
+        return 'En attente de confirmation de disponibilité par le propriétaire.';
+      case RentalInquiryStatus.CONFIRMED:
+        if (audience === 'owner') {
+          return 'À la remise du véhicule au passager, cliquez « Remise effectuée » : le statut passera à En cours.';
+        }
+        if (audience === 'driver') {
+          return 'Rendez-vous sur place pour la remise du véhicule, puis appuyez sur « Remise effectuée ».';
+        }
+        if (audience === 'admin') {
+          const movaPart =
+            mode === RentalLogisticsMode.MOVA_DRIVER
+              ? ' Le chauffeur MOVA assigné peut aussi activer « En cours » à la remise.'
+              : '';
+          return `« En cours » : remise par le propriétaire, confirmation passager, chauffeur MOVA, ou automatiquement à la date de début.${movaPart}`;
+        }
+        return 'Appuyez sur « J\'ai reçu le véhicule » à la remise, ou attendez le propriétaire / chauffeur MOVA. Sinon, passage automatique à En cours à la date de début.';
+      case RentalInquiryStatus.IN_PROGRESS:
+        if (audience === 'owner') {
+          return 'À la fin de la location, cliquez « Véhicule rendu » pour enregistrer le retour.';
+        }
+        if (audience === 'driver') {
+          return 'À la récupération du véhicule, appuyez sur « Véhicule rendu » pour clôturer la mission.';
+        }
+        return 'Location active — le retour sera confirmé par le propriétaire à la fin de la période.';
+      case RentalInquiryStatus.RETURNED:
+        return 'Location terminée.';
+      case RentalInquiryStatus.CLOSED:
+        return 'Réservation annulée ou refusée.';
+      default:
+        return null;
+    }
+  }
+
+  private isRentalStartDue(inquiry: { status: RentalInquiryStatus; startDate: Date }): boolean {
+    return inquiry.status === RentalInquiryStatus.CONFIRMED && inquiry.startDate.getTime() <= Date.now();
+  }
+
+  async transitionToInProgress(inquiry: {
+    id: string;
+    status: RentalInquiryStatus;
+    userId: string;
+  }) {
+    if (inquiry.status === RentalInquiryStatus.IN_PROGRESS) {
+      return this.prisma.rentalInquiry.findUniqueOrThrow({
+        where: { id: inquiry.id },
+        include: { vehicle: true },
+      });
+    }
+    if (inquiry.status !== RentalInquiryStatus.CONFIRMED) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        undefined,
+        'La location doit être confirmée avant de passer en cours.',
+      );
+    }
+    const updated = await this.prisma.rentalInquiry.update({
+      where: { id: inquiry.id },
+      data: { status: RentalInquiryStatus.IN_PROGRESS },
+      include: { vehicle: true },
+    });
+    await this.redis.publish(MOVA_EVENTS.SERVICE_STATUS_UPDATED, {
+      serviceType: 'RENTAL',
+      referenceId: updated.id,
+      userId: updated.userId,
+      status: updated.status,
+    });
+    return updated;
+  }
+
+  private async maybeAutoStartInquiry<
+    T extends { id: string; status: RentalInquiryStatus; startDate: Date; userId: string },
+  >(inquiry: T): Promise<T> {
+    if (!this.isRentalStartDue(inquiry)) return inquiry;
+    return (await this.transitionToInProgress(inquiry)) as unknown as T;
+  }
+
+  async autoStartDueBookings(limit = 50): Promise<number> {
+    const due = await this.prisma.rentalInquiry.findMany({
+      where: {
+        status: RentalInquiryStatus.CONFIRMED,
+        startDate: { lte: new Date() },
+      },
+      orderBy: { startDate: 'asc' },
+      take: limit,
+      include: { vehicle: true },
+    });
+    let count = 0;
+    for (const inquiry of due) {
+      try {
+        await this.transitionToInProgress(inquiry);
+        count += 1;
+      } catch {
+        // ignore race / invalid row
+      }
+    }
+    return count;
+  }
+
   async list(userId: string) {
     const rows = await this.prisma.rentalInquiry.findMany({
       where: { userId },
@@ -682,7 +842,8 @@ export class RentalService {
       take: 20,
       include: { vehicle: true },
     });
-    return { data: rows.map((r) => this.enrichInquiry(r)) };
+    const started = await Promise.all(rows.map((r) => this.maybeAutoStartInquiry(r)));
+    return { data: started.map((r) => this.enrichInquiry(r)) };
   }
 
   async listBookings(userId: string) {
@@ -692,8 +853,9 @@ export class RentalService {
       take: 20,
       include: { vehicle: true },
     });
+    const started = await Promise.all(rows.map((r) => this.maybeAutoStartInquiry(r)));
     return {
-      data: rows.map((r) => ({
+      data: started.map((r) => ({
         ...this.enrichInquiry(r),
         paymentReady:
           r.status === RentalInquiryStatus.CONFIRMED ||
@@ -706,9 +868,26 @@ export class RentalService {
   }
 
   async cancelBooking(id: string, userId: string) {
-    const inquiry = await this.get(id, userId);
-    if (inquiry.status === RentalInquiryStatus.CLOSED || inquiry.status === RentalInquiryStatus.RETURNED) {
-      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Cette réservation ne peut plus être annulée.');
+    const inquiry = await this.prisma.rentalInquiry.findUnique({
+      where: { id },
+      include: { vehicle: true },
+    });
+    if (!inquiry) {
+      throw new MovaHttpException(MovaErrorCode.RENTAL_INQUIRY_NOT_FOUND, HttpStatus.NOT_FOUND);
+    }
+    if (inquiry.userId !== userId) {
+      throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
+    }
+    const cancelEligibility = canCancelRentalBooking({
+      status: inquiry.status,
+      startDate: inquiry.startDate,
+    });
+    if (!cancelEligibility.canCancel) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        undefined,
+        cancelEligibility.cancelBlockReason ?? 'Cette réservation ne peut plus être annulée.',
+      );
     }
     const updated = await this.prisma.rentalInquiry.update({
       where: { id },
@@ -725,6 +904,21 @@ export class RentalService {
     return this.enrichInquiry(updated);
   }
 
+  async passengerConfirmHandover(id: string, userId: string) {
+    const inquiry = await this.prisma.rentalInquiry.findUnique({
+      where: { id },
+      include: { vehicle: true },
+    });
+    if (!inquiry) {
+      throw new MovaHttpException(MovaErrorCode.RENTAL_INQUIRY_NOT_FOUND, HttpStatus.NOT_FOUND);
+    }
+    if (inquiry.userId !== userId) {
+      throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
+    }
+    const updated = await this.transitionToInProgress(inquiry);
+    return this.enrichInquiry(updated);
+  }
+
   async ownerListBookings(ownerUserId: string) {
     const rows = await this.prisma.rentalInquiry.findMany({
       where: { vehicle: { ownerUserId } },
@@ -732,7 +926,8 @@ export class RentalService {
       take: 50,
       include: { vehicle: true },
     });
-    return { data: await Promise.all(rows.map((r) => this.enrichOwnerBooking(r))) };
+    const started = await Promise.all(rows.map((r) => this.maybeAutoStartInquiry(r)));
+    return { data: await Promise.all(started.map((r) => this.enrichOwnerBooking(r))) };
   }
 
   async ownerGetBooking(ownerUserId: string, id: string) {
@@ -741,7 +936,8 @@ export class RentalService {
       include: { vehicle: true },
     });
     if (!inquiry) throw new MovaHttpException(MovaErrorCode.RENTAL_INQUIRY_NOT_FOUND, HttpStatus.NOT_FOUND);
-    return this.enrichOwnerBooking(inquiry);
+    const started = await this.maybeAutoStartInquiry(inquiry);
+    return this.enrichOwnerBooking(started);
   }
 
   async ownerUpdateBookingStatus(
@@ -767,10 +963,8 @@ export class RentalService {
       }
       newStatus = RentalInquiryStatus.CONFIRMED;
     } else if (action === 'start') {
-      if (inquiry.status !== RentalInquiryStatus.CONFIRMED) {
-        throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'La location doit être confirmée avant la remise.');
-      }
-      newStatus = RentalInquiryStatus.IN_PROGRESS;
+      const updated = await this.transitionToInProgress(inquiry);
+      return this.enrichOwnerBooking(updated);
     } else if (action === 'return') {
       if (inquiry.status !== RentalInquiryStatus.IN_PROGRESS) {
         throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'La location doit être en cours pour enregistrer le retour.');
@@ -841,7 +1035,8 @@ export class RentalService {
     const inquiry = await this.prisma.rentalInquiry.findUnique({ where: { id }, include: { vehicle: true } });
     if (!inquiry) throw new MovaHttpException(MovaErrorCode.RENTAL_INQUIRY_NOT_FOUND, HttpStatus.NOT_FOUND);
     if (inquiry.userId !== userId) throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
-    return this.enrichInquiry(inquiry);
+    const started = await this.maybeAutoStartInquiry(inquiry);
+    return this.enrichInquiry(started);
   }
 
   async getForParticipant(id: string, userId: string) {
@@ -850,7 +1045,10 @@ export class RentalService {
     if (inquiry.userId !== userId && inquiry.driverId !== userId) {
       throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
     }
-    return this.enrichInquiry(inquiry);
+    const started = await this.maybeAutoStartInquiry(inquiry);
+    const audience =
+      inquiry.driverId === userId ? 'driver' : inquiry.userId === userId ? 'passenger' : 'admin';
+    return this.enrichInquiry(started, audience);
   }
 
   async listForDriver(driverId: string) {
@@ -902,6 +1100,8 @@ export class RentalService {
     }
     if (status === RentalInquiryStatus.IN_PROGRESS) {
       await assertDriverCanReceiveJobs(driverId);
+      const updated = await this.transitionToInProgress(inquiry);
+      return { rental: this.enrichInquiry(updated), inquiry: this.enrichInquiry(updated) };
     }
     const updated = await this.prisma.rentalInquiry.update({
       where: { id },
@@ -936,6 +1136,7 @@ export class RentalService {
           driverName: driver?.name,
           driverPhone: driver?.phone,
           status: r.status,
+          nextStepHint: this.getNextStepHint(r, 'admin'),
           vehicleName: r.vehicle?.name ?? r.vehicleType,
           vehicleType: r.vehicleType,
           ownerName: r.vehicle?.ownerName,

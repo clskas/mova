@@ -35,6 +35,7 @@ export type PartnerBooking = {
   passengerDriverPhone?: string | null;
   ownerDriverName?: string | null;
   ownerDriverPhone?: string | null;
+  nextStepHint?: string | null;
 };
 
 export type PartnerVehicle = {

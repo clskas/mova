@@ -21,7 +21,11 @@ import 'kyc_screen.dart';
 import 'driver_ride_history_screen.dart';
 import 'ride_offer_screen.dart';
 import 'delivery_offer_screen.dart';
+import 'driver_background_service.dart';
+import 'driver_job_alert_service.dart';
 import 'driver_moving_mission_screen.dart';
+import 'driver_push_service.dart';
+import 'driver_rental_mission_screen.dart';
 import 'driver_scheduled_mission_screen.dart';
 
 class DriverHomeScreen extends ConsumerStatefulWidget {
@@ -50,6 +54,10 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
   List<Map<String, dynamic>> _rideOffers = [];
   List<Map<String, dynamic>> _deliveryOffers = [];
   List<Map<String, dynamic>> _assignedMissions = [];
+  final Set<String> _knownMissionKeys = {};
+  final Set<String> _knownOfferKeys = {};
+  bool _missionAlertsSeeded = false;
+  bool _offerAlertsSeeded = false;
   String? _offersError;
 
   @override
@@ -95,10 +103,15 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
       _loadActiveDelivery(),
       _loadAssignments(),
     ]);
+    await DriverJobAlertService.init();
+    await DriverPushService.init(ref.read(apiClientProvider));
     if (mounted) {
       setState(() => _bootstrapping = false);
       _startAssignmentsPolling();
-      if (_available) _startPolling();
+      if (_available) {
+        _startPolling();
+        await DriverBackgroundService.start();
+      }
     }
   }
 
@@ -112,6 +125,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
     final movingResult = await api.get('/moving/assignments', skipCache: true);
     final scheduledResult = await api.get('/rides/scheduled/assignments', skipCache: true);
     final errandResult = await api.get('/deliveries/assignments', skipCache: true);
+    final rentalResult = await api.get('/rental/assignments', skipCache: true);
     if (!mounted) return;
     final missions = <Map<String, dynamic>>[];
     if (movingResult case Success(:final data)) {
@@ -126,12 +140,38 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
       final rows = (data['data'] as List? ?? []).cast<Map<String, dynamic>>();
       missions.addAll(rows);
     }
+    if (rentalResult case Success(:final data)) {
+      final rows = (data['data'] as List? ?? []).cast<Map<String, dynamic>>();
+      missions.addAll(rows);
+    }
     missions.sort((a, b) {
-      final aDate = a['scheduledAt']?.toString() ?? a['createdAt']?.toString() ?? '';
-      final bDate = b['scheduledAt']?.toString() ?? b['createdAt']?.toString() ?? '';
+      final aDate = a['startDate']?.toString() ??
+          a['scheduledAt']?.toString() ??
+          a['createdAt']?.toString() ??
+          '';
+      final bDate = b['startDate']?.toString() ??
+          b['scheduledAt']?.toString() ??
+          b['createdAt']?.toString() ??
+          '';
       return aDate.compareTo(bDate);
     });
+    final newMissions = missions.where((m) {
+      final key = DriverJobAlertService.missionKey(m);
+      return key.length > 1 && !_knownMissionKeys.contains(key);
+    }).toList();
     setState(() => _assignedMissions = missions);
+    _knownMissionKeys
+      ..clear()
+      ..addAll(missions.map(DriverJobAlertService.missionKey).where((k) => k.length > 1));
+    if (_missionAlertsSeeded && newMissions.isNotEmpty && mounted) {
+      final message = DriverJobAlertService.messageForMissions(newMissions);
+      await DriverJobAlertService.notify(title: 'Mission assignée', body: message);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message), duration: const Duration(seconds: 4)),
+      );
+    }
+    _missionAlertsSeeded = true;
     await _loadActiveDelivery();
   }
 
@@ -176,6 +216,18 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
           builder: (_) => ActiveDeliveryScreen(delivery: mission),
         ),
       ).then((_) => _loadAssignments());
+      return;
+    }
+    if (type == 'RENTAL') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => DriverRentalMissionScreen(
+            inquiryId: id,
+            initialMission: mission,
+          ),
+        ),
+      ).then((_) => _loadAssignments());
     }
   }
 
@@ -183,6 +235,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
     final type = mission['type']?.toString();
     final status = mission['status']?.toString() ?? '';
     if (type == 'ERRAND') return status == 'ASSIGNED' || status == 'IN_PROGRESS';
+    if (type == 'RENTAL') return status == 'CONFIRMED' || status == 'IN_PROGRESS';
     if (type != 'MOVING' && type != 'SCHEDULED') return false;
     if (type == 'MOVING') return status == 'ASSIGNED' || status == 'IN_PROGRESS';
     return status == 'SCHEDULED' || status == 'CONFIRMED' || status == 'IN_PROGRESS';
@@ -451,6 +504,36 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
     await _refreshRideOffers();
   }
 
+  Future<void> _syncKnownOfferKeys(Iterable<String> keys, {required List<Map<String, dynamic>> newOffers}) async {
+    if (_offerAlertsSeeded && newOffers.isNotEmpty && mounted) {
+      for (final offer in newOffers) {
+        final isRide = offer.containsKey('vehicleType') && !offer.containsKey('deliveryType');
+        final title = isRide ? 'Nouvelle course' : 'Nouvelle livraison';
+        final body = isRide
+            ? DriverJobAlertService.rideOfferMessage(offer)
+            : DriverJobAlertService.deliveryOfferMessage(offer);
+        await DriverJobAlertService.notify(title: title, body: body);
+      }
+    }
+    _knownOfferKeys
+      ..clear()
+      ..addAll(keys);
+    _offerAlertsSeeded = true;
+  }
+
+  Set<String> _collectOfferKeys(List<Map<String, dynamic>> rides, List<Map<String, dynamic>> deliveries) {
+    final keys = <String>{};
+    for (final o in rides) {
+      final id = o['id']?.toString();
+      if (id != null && id.isNotEmpty) keys.add(DriverJobAlertService.offerKey('ride', id));
+    }
+    for (final o in deliveries) {
+      final id = o['id']?.toString();
+      if (id != null && id.isNotEmpty) keys.add(DriverJobAlertService.offerKey('delivery', id));
+    }
+    return keys;
+  }
+
   Future<void> _refreshRideOffers() async {
     if (!_available || _activeRide != null || _activeDelivery != null) {
       if (mounted) setState(() {
@@ -465,7 +548,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
     if (!mounted) return;
     final rides = switch (rideResult) {
       Success(:final data) => data,
-      Failure(:final error) => null,
+      Failure() => null,
     };
     if (rides == null) {
       if (rideResult case Failure(:final error)) {
@@ -477,6 +560,21 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
       Success(:final data) => data,
       Failure() => <Map<String, dynamic>>[],
     };
+    final keys = _collectOfferKeys(rides, deliveries);
+    final newOffers = <Map<String, dynamic>>[];
+    for (final o in rides) {
+      final id = o['id']?.toString();
+      if (id == null || id.isEmpty) continue;
+      final key = DriverJobAlertService.offerKey('ride', id);
+      if (!_knownOfferKeys.contains(key) && !_dismissedOffers.contains('ride:$id')) newOffers.add(o);
+    }
+    for (final o in deliveries) {
+      final id = o['id']?.toString();
+      if (id == null || id.isEmpty) continue;
+      final key = DriverJobAlertService.offerKey('delivery', id);
+      if (!_knownOfferKeys.contains(key) && !_dismissedOffers.contains('delivery:$id')) newOffers.add(o);
+    }
+    await _syncKnownOfferKeys(keys, newOffers: newOffers);
     setState(() {
       _rideOffers = rides;
       _deliveryOffers = deliveries;
@@ -489,52 +587,76 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
     final api = ref.read(apiClientProvider);
 
     final rideResult = await api.getDriverOffers();
-    if (!mounted || _showingOffer) return;
-    if (rideResult case Success(:final data)) {
-      setState(() {
-        _rideOffers = data;
-        _offersError = null;
-      });
-      for (final offer in data) {
-        final id = offer['id']?.toString() ?? '';
-        if (id.isEmpty || _dismissedOffers.contains('ride:$id')) continue;
-        await _openRideOffer(offer);
-        return;
-      }
-    } else if (rideResult case Failure(:final error)) {
-      setState(() => _offersError = error.message);
-    }
-
     final deliveryResult = await api.getDeliveryOffers();
     if (!mounted || _showingOffer) return;
-    if (deliveryResult case Success(:final data)) {
-      setState(() => _deliveryOffers = data);
-      for (final offer in data) {
-        final id = offer['id']?.toString() ?? '';
-        if (id.isEmpty || _dismissedOffers.contains('delivery:$id')) continue;
-        if (offer['alreadyAssigned'] == true) {
-          if (mounted) setState(() => _activeDelivery = offer);
-          continue;
-        }
-        _showingOffer = true;
-        if (!mounted) return;
-        final accepted = await Navigator.push<Map<String, dynamic>?>(
-          context,
-          MaterialPageRoute(builder: (_) => DeliveryOfferScreen(offer: offer)),
-        );
-        _dismissedOffers.add('delivery:$id');
-        _showingOffer = false;
-        if (accepted != null && mounted) {
-          setState(() => _activeDelivery = accepted);
-          await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => ActiveDeliveryScreen(delivery: accepted)),
-          );
-          await _loadActiveDelivery();
-          return;
-        }
-        break;
+
+    final rides = switch (rideResult) {
+      Success(:final data) => data,
+      Failure() => null,
+    };
+    if (rides == null) {
+      if (rideResult case Failure(:final error)) {
+        setState(() => _offersError = error.message);
       }
+      return;
+    }
+    final deliveries = switch (deliveryResult) {
+      Success(:final data) => data,
+      Failure() => <Map<String, dynamic>>[],
+    };
+    final keys = _collectOfferKeys(rides, deliveries);
+    final newOffers = <Map<String, dynamic>>[];
+    for (final o in rides) {
+      final id = o['id']?.toString();
+      if (id == null || id.isEmpty) continue;
+      final key = DriverJobAlertService.offerKey('ride', id);
+      if (!_knownOfferKeys.contains(key) && !_dismissedOffers.contains('ride:$id')) newOffers.add(o);
+    }
+    for (final o in deliveries) {
+      final id = o['id']?.toString();
+      if (id == null || id.isEmpty) continue;
+      final key = DriverJobAlertService.offerKey('delivery', id);
+      if (!_knownOfferKeys.contains(key) && !_dismissedOffers.contains('delivery:$id')) newOffers.add(o);
+    }
+    await _syncKnownOfferKeys(keys, newOffers: newOffers);
+
+    setState(() {
+      _rideOffers = rides;
+      _deliveryOffers = deliveries;
+      _offersError = null;
+    });
+
+    for (final offer in rides) {
+      final id = offer['id']?.toString() ?? '';
+      if (id.isEmpty || _dismissedOffers.contains('ride:$id')) continue;
+      await _openRideOffer(offer);
+      return;
+    }
+
+    for (final offer in deliveries) {
+      final id = offer['id']?.toString() ?? '';
+      if (id.isEmpty || _dismissedOffers.contains('delivery:$id')) continue;
+      if (offer['alreadyAssigned'] == true) {
+        if (mounted) setState(() => _activeDelivery = offer);
+        continue;
+      }
+      _showingOffer = true;
+      if (!mounted) return;
+      final accepted = await Navigator.push<Map<String, dynamic>?>(
+        context,
+        MaterialPageRoute(builder: (_) => DeliveryOfferScreen(offer: offer)),
+      );
+      _dismissedOffers.add('delivery:$id');
+      _showingOffer = false;
+      if (accepted != null && mounted) {
+        setState(() => _activeDelivery = accepted);
+        await Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => ActiveDeliveryScreen(delivery: accepted)),
+        );
+        await _loadActiveDelivery();
+      }
+      return;
     }
   }
 
@@ -569,8 +691,10 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
         });
         if (value) {
           _startPolling();
+          await DriverBackgroundService.start();
         } else {
           _stopPolling();
+          await DriverBackgroundService.stop();
         }
       case Failure(:final error):
         setState(() => _availabilityError = error.message);
@@ -792,7 +916,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                 const Text(
                   '• Courses taxi : proches de votre GPS, dans le rayon de recherche, véhicule compatible.\n'
                   '• Livraisons & courses/commissions : colis, repas, express et achats en attente, dans un rayon de 15 km.\n'
-                  '• Réservations planifiées et déménagements : assignés par l’admin — ouvrez une mission pour démarrer / terminer.\n'
+                  '• Réservations planifiées, déménagements et locations logistiques : assignés par l’admin — ouvrez une mission pour démarrer / terminer.\n'
                   '• Covoiturage : publiez votre trajet via le bouton ci-dessous.',
                   style: TextStyle(fontSize: 12, color: MovaColors.textSecondary, height: 1.4),
                 ),
@@ -817,12 +941,17 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                     final icon = switch (m['type']?.toString()) {
                       'MOVING' => Icons.local_shipping,
                       'ERRAND' => Icons.shopping_bag_outlined,
+                      'RENTAL' => Icons.directions_car_filled_outlined,
                       _ => Icons.event,
                     };
-                    final subtitle = '${m['pickupAddress'] ?? ''} → ${m['dropoffAddress'] ?? m['deliveryAddress'] ?? ''}';
-                    final extra = m['scheduledAt'] != null
-                        ? '\n${DateTime.tryParse(m['scheduledAt'].toString())?.toLocal().toString().substring(0, 16) ?? ''}'
-                        : '';
+                    final subtitle = m['type']?.toString() == 'RENTAL'
+                        ? '${m['vehicleName'] ?? m['label'] ?? 'Location'} · ${m['pickupAddress'] ?? m['pickupCity'] ?? ''}'
+                        : '${m['pickupAddress'] ?? ''} → ${m['dropoffAddress'] ?? m['deliveryAddress'] ?? ''}';
+                    final extra = m['startDate'] != null
+                        ? '\n${DateTime.tryParse(m['startDate'].toString())?.toLocal().toString().substring(0, 16) ?? ''}'
+                        : m['scheduledAt'] != null
+                            ? '\n${DateTime.tryParse(m['scheduledAt'].toString())?.toLocal().toString().substring(0, 16) ?? ''}'
+                            : '';
                     return Padding(
                       padding: const EdgeInsets.only(top: 8),
                       child: InkWell(
@@ -1132,6 +1261,24 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
           ),
           const SizedBox(height: 8),
           if (kDebugMode) ...[
+            MovaButton(
+              label: 'Tester son & vibration',
+              isSecondary: true,
+              icon: Icons.notifications_active_outlined,
+              onPressed: () async {
+                await DriverJobAlertService.notify(
+                  title: 'MOVA Chauffeur',
+                  body: 'Test alerte — course disponible · Gombe · 8500 FC',
+                  payload: 'debug:alert',
+                );
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Alerte envoyée (sans Firebase)')),
+                  );
+                }
+              },
+            ),
+            const SizedBox(height: 8),
             MovaButton(
               label: 'Simulation (debug)',
               isSecondary: true,

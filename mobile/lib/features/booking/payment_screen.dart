@@ -162,7 +162,18 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                 ),
                 if (widget.completionPin != null && widget.completionPin!.isNotEmpty) ...[
                   const SizedBox(height: 12),
-                  const Text('Code PIN espèces (à donner au chauffeur)', style: TextStyle(color: MovaColors.textSecondary)),
+                  const Text(
+                    'Code de confirmation espèces',
+                    style: TextStyle(color: MovaColors.textSecondary, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Une fois l\'argent remis au chauffeur, communiquez-lui ce code. '
+                    'Il le saisit dans son app pour confirmer le paiement.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: MovaColors.textSecondary, fontSize: 12),
+                  ),
+                  const SizedBox(height: 8),
                   Text(
                     widget.completionPin!,
                     style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, letterSpacing: 8),

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/config/market_config.dart';
 import '../../core/api/api_client.dart';
 import '../../core/api/ride_socket.dart';
 import '../../core/error/result.dart';
@@ -47,6 +48,7 @@ class _RideChatScreenState extends ConsumerState<RideChatScreen> {
   RideSocket? _socket;
   String? _userId;
   bool _sending = false;
+  bool _connecting = true;
   String? _error;
 
   @override
@@ -77,6 +79,10 @@ class _RideChatScreenState extends ConsumerState<RideChatScreen> {
     final api = ref.read(apiClientProvider);
     final token = await api.authToken();
     if (!mounted) return;
+    setState(() {
+      _connecting = true;
+      _error = null;
+    });
     final socket = ref.read(rideSocketProvider);
     _socket = socket;
     socket.connect(
@@ -84,10 +90,30 @@ class _RideChatScreenState extends ConsumerState<RideChatScreen> {
       token: token,
       onChat: _onIncomingChat,
       onConnected: () {
-        if (mounted) setState(() => _error = null);
+        if (mounted) {
+          setState(() {
+            _error = null;
+            _connecting = false;
+          });
+        }
+      },
+      onDisconnected: () {
+        if (mounted && socket.connectionFailed) {
+          setState(() {
+            _connecting = false;
+            _error = 'Connexion chat indisponible (${MarketConfig.wsUrl}).';
+          });
+        }
       },
     );
-    _socket = socket;
+    final ok = await socket.ensureConnected();
+    if (!mounted) return;
+    setState(() {
+      _connecting = false;
+      if (!ok) {
+        _error = 'Connexion chat indisponible (${MarketConfig.wsUrl}).';
+      }
+    });
   }
 
   void _onIncomingChat(Map<String, dynamic> payload) {
@@ -136,12 +162,12 @@ class _RideChatScreenState extends ConsumerState<RideChatScreen> {
     };
     if (_socket == null || !_socket!.isConnected) {
       await _connectSocket();
-      await Future<void>.delayed(const Duration(milliseconds: 800));
-      if (_socket == null || !_socket!.isConnected) {
+      final ok = _socket != null && await _socket!.ensureConnected();
+      if (!ok) {
         if (mounted) {
           setState(() {
             _sending = false;
-            _error = 'Connexion chat indisponible. Réessayez.';
+            _error = 'Connexion chat indisponible. Vérifiez le réseau et réessayez.';
           });
         }
         return;
@@ -170,6 +196,11 @@ class _RideChatScreenState extends ConsumerState<RideChatScreen> {
           if (_error != null) ...[
             MovaErrorBanner(message: _error!),
             const SizedBox(height: 8),
+            if (_connecting)
+              const Center(child: Padding(
+                padding: EdgeInsets.all(8),
+                child: Text('Connexion au chat…', style: TextStyle(color: MovaColors.textSecondary)),
+              )),
           ],
           Expanded(
             child: _messages.isEmpty

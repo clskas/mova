@@ -1,6 +1,7 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { CarpoolStatus, VehicleType } from '@prisma/client';
 import {
+  canCancelCarpoolTrip,
   INTERNAL_API_KEY,
   MovaErrorCode,
   MovaHttpException,
@@ -210,6 +211,7 @@ export class CarpoolService {
       timelineStep: this.timelineStep(t.status, passengers.length),
       contactPhone,
       contactAction: 'Contacter le conducteur',
+      ...canCancelCarpoolTrip({ status: t.status, departureAt: t.departureAt }),
     };
   }
 

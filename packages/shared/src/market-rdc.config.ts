@@ -81,8 +81,11 @@ export const MARKET_RDC = {
       gps: { label: 'GPS', priceCdf: 8_000 },
       extraDriver: { label: 'Conducteur supplémentaire', priceCdf: 15_000 },
     },
-    limitedMileageFeeCdf: 15_000,
     limitedMileageKmPerDay: 100,
+    /** Majoration si le passager choisit le kilométrage illimité (le forfait limité est inclus). */
+    unlimitedMileageSurchargeCdf: 15_000,
+    /** @deprecated Utiliser unlimitedMileageSurchargeCdf — conservé pour compatibilité véhicules. */
+    limitedMileageFeeCdf: 15_000,
     cancellationPolicyDefault:
       'Annulation gratuite jusqu\'à 24 h avant la prise en charge. Au-delà, 50 % du montant location retenu.',
     logisticsModes: {

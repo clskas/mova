@@ -35,6 +35,32 @@ function Get-MovaLanIp {
     return '192.168.1.64'
 }
 
+function Set-MovaAdbReverse {
+    param([string]$DeviceId = "")
+
+    $adbArgs = @('reverse', 'tcp:3000', 'tcp:3000')
+    $allIds = @(adb devices 2>$null |
+        Where-Object { $_ -match '\tdevice$' } |
+        ForEach-Object { ($_ -split '\t')[0].Trim() } |
+        Where-Object { $_ })
+
+    if ($allIds.Count -eq 0) {
+        throw "adb reverse impossible : aucun telephone connecte (adb devices)."
+    }
+
+    foreach ($id in $allIds) {
+        Write-Host "adb -s $id reverse tcp:3000 tcp:3000 (USB -> PC localhost:3000)" -ForegroundColor Yellow
+        & adb -s $id @adbArgs
+        if ($LASTEXITCODE -ne 0) {
+            throw "adb reverse a echoue pour $id. Verifiez adb devices et le debogage USB."
+        }
+    }
+
+    if ($DeviceId -and $allIds -notcontains $DeviceId) {
+        Write-Host "Attention : -Device $DeviceId n'est pas dans adb devices." -ForegroundColor Yellow
+    }
+}
+
 function Get-MovaMobileApiUrls {
     param(
         [string]$ApiUrl,

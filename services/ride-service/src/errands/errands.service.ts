@@ -1,6 +1,6 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { CommissionServiceType, ErrandOrder, ErrandOrderStatus, TrackingReferenceType, VehicleType } from '@prisma/client';
-import { MARKET_RDC, MovaErrorCode, MovaHttpException, MOVA_EVENTS } from '@mova/shared';
+import { MARKET_RDC, MovaErrorCode, MovaHttpException, MOVA_EVENTS, canCancelErrand } from '@mova/shared';
 import { RedisService } from '@mova/shared';
 import { addressToCoords, DEFAULT_PICKUP } from '../common/address.util';
 import {
@@ -220,6 +220,7 @@ export class ErrandsService {
       paymentReady: order.status === ErrandOrderStatus.COMPLETED,
       currency: 'CDF',
       city: 'Kinshasa',
+      ...canCancelErrand({ status: order.status }),
       ...extra,
     };
   }
@@ -528,8 +529,13 @@ export class ErrandsService {
 
   async cancel(id: string, userId: string) {
     const order = await this.get(id, userId);
-    if (order.status === ErrandOrderStatus.COMPLETED || order.status === ErrandOrderStatus.CANCELLED) {
-      throw new MovaHttpException(MovaErrorCode.ERRAND_INVALID_STATUS);
+    const cancelEligibility = canCancelErrand({ status: order.status });
+    if (!cancelEligibility.canCancel) {
+      throw new MovaHttpException(
+        MovaErrorCode.ERRAND_INVALID_STATUS,
+        undefined,
+        cancelEligibility.cancelBlockReason,
+      );
     }
     return this.prisma.errandOrder.update({
       where: { id },

@@ -10,6 +10,7 @@ import {
   MovaHttpException,
   rdcTerritoryOutOfBoundsMessage,
   resolveCityFromCoords,
+  canCancelDelivery,
 } from '@mova/shared';
 import { Delivery, DeliveryEvent, DeliveryStatus, DeliveryType } from '@prisma/client';
 import { computeDriverEta } from '../matching/eta.util';
@@ -312,5 +313,6 @@ export function formatParcelDelivery(
           phone: courier.phone ?? '',
         }
       : null,
+    ...canCancelDelivery({ status: delivery.status, type: delivery.type }),
   };
 }

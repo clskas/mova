@@ -20,15 +20,17 @@ describe('address.util', () => {
     expect(() => assertServiceAreaDestination('Butembo')).not.toThrow();
   });
 
-  it('rejette une adresse hors zones MOVA', () => {
+  it('rejette des coords hors territoire RDC', () => {
     expect(isKinshasaAddress('Paris, France')).toBe(false);
-    expect(() => assertKinshasaDestination('Paris, France')).toThrow(MovaHttpException);
+    expect(() => assertKinshasaDestination('Paris, France', { lat: 48.8566, lng: 2.3522 })).toThrow(
+      MovaHttpException,
+    );
     try {
-      assertKinshasaDestination('Paris, France');
+      assertKinshasaDestination('Paris, France', { lat: 48.8566, lng: 2.3522 });
     } catch (e) {
       expect((e as MovaHttpException).getResponse()).toMatchObject({
         code: MovaErrorCode.VALIDATION_ERROR,
-        message: expect.stringMatching(/RDC|MOVA couvre/i),
+        message: expect.stringMatching(/RDC|MOVA couvre|République Démocratique/i),
       });
     }
   });

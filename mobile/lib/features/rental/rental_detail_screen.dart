@@ -7,7 +7,9 @@ import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
+import 'rental_addons.dart';
 import 'rental_booking_detail_screen.dart';
+import 'rental_quote_estimator.dart';
 
 class RentalDetailScreen extends ConsumerStatefulWidget {
   const RentalDetailScreen({
@@ -39,7 +41,7 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
   String _pickupCity = 'Kinshasa';
   String _returnCity = 'Kinshasa';
   String _rentalPeriod = 'DAILY';
-  String _mileageType = 'UNLIMITED';
+  String _mileageType = 'LIMITED';
   String _insuranceTier = 'BASIC';
   bool _childSeat = false;
   bool _gps = false;
@@ -92,6 +94,9 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
       switch (result) {
         case Success(:final data):
           _vehicle = data['vehicle'] as Map<String, dynamic>? ?? data;
+          if (RentalAddons.vehicleHasBuiltInGps(_vehicle?['features'] as List<dynamic>?)) {
+            _gps = false;
+          }
           _error = null;
         case Failure(:final error):
           _error = error.message;
@@ -209,8 +214,149 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
       } else {
         _endDate = date;
       }
+      _ensureRentalPeriod();
       _quote = null;
     });
+  }
+
+  int get _rentalDays => RentalQuoteEstimator.rentalDays(_startDate, _endDate);
+
+  bool get _weeklyEligible => _rentalDays >= 7;
+
+  bool get _gpsBuiltIn =>
+      RentalAddons.vehicleHasBuiltInGps(_vehicle?['features'] as List<dynamic>?);
+
+  void _ensureRentalPeriod() {
+    if (!_weeklyEligible && _rentalPeriod == 'WEEKLY') {
+      _rentalPeriod = 'DAILY';
+    }
+  }
+
+  RentalQuoteEstimate? get _previewEstimate {
+    final v = _vehicle;
+    if (v == null || _step < 1) return null;
+    return RentalQuoteEstimator.estimate(
+      dailyRateCdf: v['dailyRateCdf'] as int? ?? 0,
+      depositCdf: v['depositCdf'] as int? ?? 0,
+      startDate: _startDate,
+      endDate: _endDate,
+      rentalPeriod: _rentalPeriod,
+      mileageType: _mileageType,
+      insuranceTier: _insuranceTier,
+      childSeat: _childSeat,
+      gps: _gps,
+      extraDriver: _extraDriver,
+      pickupCity: _pickupCity,
+      returnCity: _returnCity,
+      gpsBuiltIn: _gpsBuiltIn,
+      vehicleUnlimitedMileageSurchargeCdf: v['limitedMileageFeeCdf'] as int?,
+    );
+  }
+
+  String _optionPriceLabel(int amount, {bool included = false}) {
+    if (included || amount <= 0) return 'Inclus';
+    return '+${MarketConfig.formatCdf(amount)}';
+  }
+
+  Widget _livePreviewCard(RentalQuoteEstimate estimate) {
+    final lines = <Widget>[
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text('Location (${estimate.days} j)', style: const TextStyle(fontWeight: FontWeight.w600)),
+          Text(MarketConfig.formatCdf(estimate.rentalFeeCdf + estimate.weeklyDiscountCdf)),
+        ],
+      ),
+    ];
+    if (estimate.weeklyDiscountCdf > 0) {
+      lines.add(
+        _previewLine('Remise semaine', '-${MarketConfig.formatCdf(estimate.weeklyDiscountCdf)}', color: MovaColors.green),
+      );
+    }
+    if (estimate.insuranceFeeCdf > 0) {
+      lines.add(_previewLine('Assurance ${_insuranceTierLabel(_insuranceTier)}', MarketConfig.formatCdf(estimate.insuranceFeeCdf)));
+    }
+    if (estimate.mileageFeeCdf > 0) {
+      lines.add(_previewLine('Kilométrage illimité', MarketConfig.formatCdf(estimate.mileageFeeCdf)));
+    }
+    if (_childSeat) {
+      lines.add(_previewLine('Siège enfant', MarketConfig.formatCdf(RentalQuoteEstimator.addOnPrices['childSeat']!)));
+    }
+    if (_gpsBuiltIn) {
+      lines.add(_previewLine('GPS', 'Inclus', color: MovaColors.green));
+    } else if (_gps) {
+      lines.add(_previewLine('GPS', MarketConfig.formatCdf(RentalQuoteEstimator.addOnPrices['gps']!)));
+    }
+    if (_extraDriver) {
+      lines.add(
+        _previewLine('Conducteur supplémentaire', MarketConfig.formatCdf(RentalQuoteEstimator.addOnPrices['extraDriver']!)),
+      );
+    }
+    if (estimate.interCityFeeCdf > 0) {
+      lines.add(_previewLine('Inter-villes', MarketConfig.formatCdf(estimate.interCityFeeCdf)));
+    }
+
+    return MovaCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text('Aperçu du devis', style: TextStyle(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 8),
+          ...lines,
+          const Divider(height: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Sous-total'),
+              Text(MarketConfig.formatCdf(estimate.subtotalCdf), style: const TextStyle(fontWeight: FontWeight.w600)),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Caution (restituée)', style: TextStyle(color: MovaColors.textSecondary, fontSize: 12)),
+              Text(
+                MarketConfig.formatCdf(estimate.depositCdf),
+                style: const TextStyle(color: MovaColors.textSecondary, fontSize: 12),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Total estimé', style: TextStyle(fontWeight: FontWeight.w700)),
+              Text(
+                MarketConfig.formatCdf(estimate.totalCdf),
+                style: const TextStyle(fontWeight: FontWeight.w700, color: MovaColors.green, fontSize: 18),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _previewLine(String label, String value, {Color? color}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(fontSize: 12, color: MovaColors.textSecondary)),
+          Text(value, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: color)),
+        ],
+      ),
+    );
+  }
+
+  String _insuranceTierLabel(String tier) {
+    return switch (tier) {
+      'STANDARD' => 'Standard',
+      'PREMIUM' => 'Premium',
+      _ => 'Basique',
+    };
   }
 
   @override
@@ -234,6 +380,7 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
         ? MarketConfig.resolveMediaUrl(imageUrl)
         : null;
     final features = (v['features'] as List?)?.cast<String>() ?? [];
+    final preview = _previewEstimate;
 
     return MovaScreen(
       title: v['name']?.toString() ?? 'Véhicule',
@@ -352,7 +499,10 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
             MovaButton(
               label: 'Configurer la location',
               icon: Icons.tune_outlined,
-              onPressed: () => setState(() => _step = 1),
+              onPressed: () => setState(() {
+                _ensureRentalPeriod();
+                _step = 1;
+              }),
             ),
           ],
           if (_step >= 1) ...[
@@ -399,6 +549,14 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
                 _quote = null;
               }),
             ),
+            if (preview != null && preview.interCityFeeCdf > 0)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text(
+                  'Majoration inter-villes : +${MarketConfig.formatCdf(preview.interCityFeeCdf)}',
+                  style: const TextStyle(fontSize: 12, color: MovaColors.green, fontWeight: FontWeight.w600),
+                ),
+              ),
             const SizedBox(height: 8),
             DropdownButtonFormField<String>(
               value: _returnCity,
@@ -412,26 +570,55 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
               }),
             ),
             const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: SegmentedButton<String>(
-                segments: const [
-                  ButtonSegment(value: 'DAILY', label: Text('Journée')),
-                  ButtonSegment(value: 'WEEKLY', label: Text('Semaine')),
-                ],
-                selected: {_rentalPeriod},
-                onSelectionChanged: (s) => setState(() {
-                  _rentalPeriod = s.first;
-                  _quote = null;
-                }),
+            if (preview != null) ...[
+              _livePreviewCard(preview),
+              const SizedBox(height: 12),
+            ],
+            if (_weeklyEligible)
+              SizedBox(
+                width: double.infinity,
+                child: SegmentedButton<String>(
+                  segments: [
+                    const ButtonSegment(value: 'DAILY', label: Text('Journée')),
+                    ButtonSegment(
+                      value: 'WEEKLY',
+                      label: Text('Semaine (-${RentalQuoteEstimator.weeklyDiscountPct} %)'),
+                    ),
+                  ],
+                  selected: {_rentalPeriod},
+                  onSelectionChanged: (s) => setState(() {
+                    _rentalPeriod = s.first;
+                    _quote = null;
+                  }),
+                ),
+              )
+            else ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: MovaColors.violet.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  'Tarif à la journée · remise semaine à partir de 7 jours ($_rentalDays j sélectionné${_rentalDays > 1 ? 's' : ''})',
+                  style: theme.textTheme.bodySmall?.copyWith(color: MovaColors.violet),
+                ),
               ),
-            ),
+            ],
             const SizedBox(height: 12),
             Text('Assurance', style: theme.textTheme.titleSmall),
             ...['BASIC', 'STANDARD', 'PREMIUM'].map((tier) {
-              final labels = {'BASIC': 'Basique', 'STANDARD': 'Standard', 'PREMIUM': 'Premium'};
+              final fee = preview?.insuranceFeeByTier[tier] ?? 0;
               return RadioListTile<String>(
-                title: Text(labels[tier] ?? tier),
+                title: Text(_insuranceTierLabel(tier)),
+                subtitle: Text(
+                  _optionPriceLabel(fee, included: tier == 'BASIC'),
+                  style: TextStyle(
+                    color: fee > 0 ? MovaColors.green : MovaColors.textSecondary,
+                    fontWeight: fee > 0 && _insuranceTier == tier ? FontWeight.w600 : FontWeight.normal,
+                  ),
+                ),
                 value: tier,
                 groupValue: _insuranceTier,
                 onChanged: (v) => setState(() {
@@ -444,9 +631,17 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
             SizedBox(
               width: double.infinity,
               child: SegmentedButton<String>(
-                segments: const [
-                  ButtonSegment(value: 'UNLIMITED', label: Text('Illimité')),
-                  ButtonSegment(value: 'LIMITED', label: Text('Limité')),
+                segments: [
+                  ButtonSegment(
+                    value: 'LIMITED',
+                    label: Text('Limité (${RentalQuoteEstimator.limitedMileageKmPerDay} km/j)'),
+                  ),
+                  ButtonSegment(
+                    value: 'UNLIMITED',
+                    label: Text(
+                      'Illimité (+${MarketConfig.formatCdf(preview?.unlimitedMileageSurchargeCdf ?? RentalQuoteEstimator.unlimitedMileageSurchargeCdf)})',
+                    ),
+                  ),
                 ],
                 selected: {_mileageType},
                 onSelectionChanged: (s) => setState(() {
@@ -455,10 +650,32 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
                 }),
               ),
             ),
+            if (_mileageType == 'LIMITED')
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(
+                  'Forfait limité inclus dans le tarif de base',
+                  style: theme.textTheme.bodySmall?.copyWith(color: MovaColors.textSecondary),
+                ),
+              ),
+            if (_mileageType == 'UNLIMITED' && (preview?.mileageFeeCdf ?? 0) > 0)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(
+                  '+${MarketConfig.formatCdf(preview!.mileageFeeCdf)} · kilométrage sans plafond',
+                  style: theme.textTheme.bodySmall?.copyWith(color: MovaColors.green, fontWeight: FontWeight.w600),
+                ),
+              ),
             const SizedBox(height: 8),
             Text('Options', style: theme.textTheme.titleSmall),
             CheckboxListTile(
               title: const Text('Siège enfant'),
+              subtitle: _childSeat
+                  ? Text(
+                      '+${MarketConfig.formatCdf(RentalQuoteEstimator.addOnPrices['childSeat']!)}',
+                      style: const TextStyle(color: MovaColors.green, fontWeight: FontWeight.w600),
+                    )
+                  : null,
               value: _childSeat,
               onChanged: (v) => setState(() {
                 _childSeat = v ?? false;
@@ -467,18 +684,41 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
               controlAffinity: ListTileControlAffinity.leading,
               contentPadding: EdgeInsets.zero,
             ),
-            CheckboxListTile(
-              title: const Text('GPS'),
-              value: _gps,
-              onChanged: (v) => setState(() {
-                _gps = v ?? false;
-                _quote = null;
-              }),
-              controlAffinity: ListTileControlAffinity.leading,
-              contentPadding: EdgeInsets.zero,
-            ),
+            if (_gpsBuiltIn)
+              ListTile(
+                leading: const Icon(Icons.gps_fixed, color: MovaColors.green),
+                title: const Text('GPS'),
+                subtitle: const Text(
+                  'Inclus — équipement intégré au véhicule',
+                  style: TextStyle(color: MovaColors.green, fontWeight: FontWeight.w600),
+                ),
+                contentPadding: EdgeInsets.zero,
+              )
+            else
+              CheckboxListTile(
+                title: const Text('GPS'),
+                subtitle: _gps
+                    ? Text(
+                        '+${MarketConfig.formatCdf(RentalQuoteEstimator.addOnPrices['gps']!)}',
+                        style: const TextStyle(color: MovaColors.green, fontWeight: FontWeight.w600),
+                      )
+                    : const Text('Boîtier portable ou service navigation'),
+                value: _gps,
+                onChanged: (v) => setState(() {
+                  _gps = v ?? false;
+                  _quote = null;
+                }),
+                controlAffinity: ListTileControlAffinity.leading,
+                contentPadding: EdgeInsets.zero,
+              ),
             CheckboxListTile(
               title: const Text('Conducteur supplémentaire'),
+              subtitle: _extraDriver
+                  ? Text(
+                      '+${MarketConfig.formatCdf(RentalQuoteEstimator.addOnPrices['extraDriver']!)}',
+                      style: const TextStyle(color: MovaColors.green, fontWeight: FontWeight.w600),
+                    )
+                  : null,
               value: _extraDriver,
               onChanged: (v) => setState(() {
                 _extraDriver = v ?? false;

@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import '../../../core/config/test_runtime_config.dart';
 import '../../../core/config/market_config.dart';
 import '../../../core/theme/mova_colors.dart';
 
@@ -137,6 +138,8 @@ class _MovaRideMapState extends State<MovaRideMap> {
       width: double.infinity,
       child: Stack(
         children: [
+          if (!movaMapTilesEnabled)
+            const ColoredBox(color: Color(0xFFE8EEF2)),
           ClipRRect(
             borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
             child: FlutterMap(
@@ -156,10 +159,11 @@ class _MovaRideMapState extends State<MovaRideMap> {
                 ),
               ),
               children: [
-            TileLayer(
-              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-              userAgentPackageName: 'com.mova.passenger',
-            ),
+            if (movaMapTilesEnabled)
+              TileLayer(
+                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                userAgentPackageName: 'com.mova.passenger',
+              ),
             if (dropoff != null)
               PolylineLayer(
                 polylines: [

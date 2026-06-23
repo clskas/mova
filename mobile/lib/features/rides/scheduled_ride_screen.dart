@@ -6,6 +6,7 @@ import 'package:latlong2/latlong.dart';
 import '../../core/api/api_client.dart';
 import '../../core/config/market_config.dart';
 import '../../core/error/result.dart';
+import '../../core/services/cancel_eligibility.dart';
 import '../../core/location/service_area_location.dart';
 import '../../core/location/destination_field_sync.dart';
 import '../../core/location/location_service.dart';
@@ -588,7 +589,7 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
                         historyStatusLabel(map['status']?.toString()),
                         style: const TextStyle(color: MovaColors.violet, fontWeight: FontWeight.w600, fontSize: 13),
                       ),
-                      if (id.isNotEmpty && map['status']?.toString() != 'CANCELLED')
+                      if (id.isNotEmpty && CancelEligibility.scheduled(map))
                         Align(
                           alignment: Alignment.centerRight,
                           child: TextButton.icon(

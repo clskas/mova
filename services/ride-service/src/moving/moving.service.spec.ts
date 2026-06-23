@@ -1,6 +1,14 @@
 import { MovingService } from './moving.service';
 import { PricingService } from '../rides/pricing.service';
 
+jest.mock('../common/driver-eligibility.util', () => ({
+  ...jest.requireActual('../common/driver-eligibility.util'),
+  assertDriverCanReceiveJobs: jest.fn().mockResolvedValue({
+    kycStatus: 'APPROVED',
+    documentsStatus: { canOperate: true },
+  }),
+}));
+
 describe('MovingService', () => {
   const pricing = {
     haversineKm: jest.fn().mockReturnValue(10),
@@ -22,6 +30,7 @@ describe('MovingService', () => {
 
   const dto = {
     volumeM3: 5,
+    vehicleCategory: 'CAMION_15M3' as const,
     pickupLat: -4.32,
     pickupLng: 15.31,
     pickupAddress: 'Gombe',

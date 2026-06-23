@@ -3,6 +3,7 @@ import { CommissionServiceType, DeliveryStatus, DeliveryType, RideStatus, Tracki
 import {
   formatCdf,
   fromMobileRideStatus,
+  canCancelRide,
   INTERNAL_API_KEY,
   MOVA_EVENTS,
   MovaErrorCode,
@@ -15,6 +16,7 @@ import {
   toMobileVehicleType,
   toRideSummary,
   RideStatusSmsPayload,
+  DriverJobAlertPayload,
 } from '@mova/shared';
 import { RedisService } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
@@ -29,6 +31,7 @@ import { tripDistanceKm } from '../common/geo.util';
 import { assertDriverCanReceiveJobs, driverCanReceiveJobs, fetchDriverProfileSnapshot } from '../common/driver-eligibility.util';
 import { fetchAuthUserBrief } from '../common/internal-lookup.util';
 import { TripShareService } from '../share/trip-share.service';
+import { publishDriverJobAlert } from '../common/driver-job-alert.util';
 
 const ACTIVE_STATUSES: RideStatus[] = [
   RideStatus.REQUESTED,
@@ -164,7 +167,9 @@ export class RidesService {
     status: RideStatus;
     pickupLat: number;
     pickupLng: number;
+    pickupAddress?: string | null;
     vehicleType: VehicleType;
+    estimatedFareCdf?: number | null;
   }) {
     if (ride.status === RideStatus.REQUESTED) {
       await this.prisma.ride.update({ where: { id: ride.id }, data: { status: RideStatus.SEARCHING } });
@@ -177,6 +182,21 @@ export class RidesService {
     await this.prisma.rideEvent.create({
       data: { rideId: ride.id, event: 'SEARCH_ATTEMPT', metadata: { attempt: attempts + 1, driversFound: drivers.length } },
     });
+    if (drivers.length > 0) {
+      const pickup = ride.pickupAddress?.trim() || 'près de vous';
+      const fare = ride.estimatedFareCdf != null ? ` · ${ride.estimatedFareCdf} FC` : '';
+      const alert: DriverJobAlertPayload = {
+        jobKind: 'RIDE_OFFER',
+        referenceId: ride.id,
+        driverUserIds: drivers.map((d) => d.userId),
+        title: 'Nouvelle course MOVA',
+        body: `Course disponible · ${pickup}${fare}`,
+        pickupAddress: ride.pickupAddress ?? undefined,
+        pickupLat: ride.pickupLat,
+        pickupLng: ride.pickupLng,
+      };
+      await publishDriverJobAlert(this.redis, alert).catch(() => undefined);
+    }
     const meta = this.matching.getMatchingMeta(attempts);
 
     return {
@@ -401,6 +421,14 @@ export class RidesService {
     }
     if (ride.status === RideStatus.COMPLETED || ride.status === RideStatus.CANCELLED) {
       throw new MovaHttpException(MovaErrorCode.RIDE_INVALID_STATUS);
+    }
+    const cancelEligibility = canCancelRide({ status: toMobileRideStatus(ride.status) });
+    if (!cancelEligibility.canCancel) {
+      throw new MovaHttpException(
+        MovaErrorCode.RIDE_INVALID_STATUS,
+        undefined,
+        cancelEligibility.cancelBlockReason,
+      );
     }
 
     const policy = await this.prisma.cancellationPolicy.findUnique({ where: { vehicleType: ride.vehicleType } });
@@ -650,6 +678,7 @@ export class RidesService {
       completionPin: ride.completionPin ?? undefined,
       createdAt: ride.createdAt,
       updatedAt: ride.updatedAt,
+      ...canCancelRide({ status: mobileStatus }),
     };
   }
 

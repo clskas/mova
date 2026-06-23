@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mova/core/api/api_client.dart';
 import 'package:mova/core/theme/mova_theme.dart';
 import 'package:mova/features/help/faq_screen.dart';
 import 'package:mova/features/help/help_config.dart';
@@ -10,9 +12,12 @@ void main() {
   final widths = [320.0, 360.0, 375.0, 390.0, 428.0];
 
   Widget testApp(Widget home) {
-    return MaterialApp(
-      theme: buildMovaTheme(),
-      home: movaMediaQueryWrapper(child: home),
+    return ProviderScope(
+      overrides: [apiClientProvider.overrideWith((ref) => ApiClient.mock())],
+      child: MaterialApp(
+        theme: buildMovaTheme(),
+        home: movaMediaQueryWrapper(child: home),
+      ),
     );
   }
 
@@ -59,6 +64,8 @@ void main() {
       tester.view.devicePixelRatio = 1.0;
 
       for (final screen in [const HelpScreen(), const FaqScreen(), const ManualScreen()]) {
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pump();
         await tester.pumpWidget(testApp(screen));
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull, reason: 'Overflow at width $width');

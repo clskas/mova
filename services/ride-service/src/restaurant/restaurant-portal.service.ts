@@ -6,6 +6,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { formatParcelDelivery } from '../deliveries/parcel.util';
 import { UploadsService } from '../uploads/uploads.service';
 import { MenuItemDto, UpdateRestaurantLocationDto, UpdateRestaurantMenuDto } from './restaurant-portal.dto';
+import { MatchingService } from '../matching/matching.service';
+import { notifyNearbyDrivers } from '../common/driver-job-alert.util';
 
 type StoredMenuItem = {
   name: string;
@@ -21,6 +23,7 @@ export class RestaurantPortalService {
     private prisma: PrismaService,
     private redis: RedisService,
     private uploads: UploadsService,
+    private matching: MatchingService,
   ) {}
 
   async getRestaurantForOwner(ownerUserId: string) {
@@ -275,6 +278,23 @@ export class RestaurantPortalService {
       data: { deliveryId, event, metadata: { updatedBy: ownerUserId } as Prisma.InputJsonValue },
     });
     await this.publishStatus(updated, status);
+    if (status === DeliveryStatus.READY_FOR_PICKUP && !updated.driverId) {
+      const pickupLat = updated.pickupLat ?? updated.restaurant?.lat;
+      const pickupLng = updated.pickupLng ?? updated.restaurant?.lng;
+      if (pickupLat != null && pickupLng != null) {
+        const pickup = updated.pickupAddress?.trim() || updated.restaurant?.address?.trim() || updated.restaurant?.name?.trim() || 'près de vous';
+        await notifyNearbyDrivers(this.redis, this.matching, {
+          jobKind: 'DELIVERY_OFFER',
+          referenceId: updated.id,
+          pickupLat,
+          pickupLng,
+          pickupAddress: pickup,
+          title: 'Nouvelle livraison MOVA',
+          body: `Repas · ${pickup}`,
+          data: { deliveryType: updated.type },
+        }).catch(() => undefined);
+      }
+    }
     return { order: this.formatOrder(updated), delivery: formatParcelDelivery(updated) };
   }
 

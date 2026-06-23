@@ -3,6 +3,7 @@ import {
   MOVA_EVENTS,
   DeliveryCreatedPayload,
   DeliveryStatusUpdatedPayload,
+  DriverJobAlertPayload,
   IncidentCreatedPayload,
   PaymentCompletedPayload,
   RentalBookingPayload,
@@ -14,11 +15,19 @@ import {
 import { RedisService } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { SmsService } from '../sms/sms.service';
+import { FcmPushService } from '../push/fcm-push.service';
+import { PushTokensService } from '../push/push-tokens.service';
 
 @Injectable()
 export class NotificationsService implements OnModuleInit {
   private readonly logger = new Logger(NotificationsService.name);
-  constructor(private prisma: PrismaService, private redis: RedisService, private sms: SmsService) {}
+  constructor(
+    private prisma: PrismaService,
+    private redis: RedisService,
+    private sms: SmsService,
+    private fcm: FcmPushService,
+    private pushTokens: PushTokensService,
+  ) {}
 
   onModuleInit() {
     this.redis.sub.subscribe(
@@ -31,6 +40,7 @@ export class NotificationsService implements OnModuleInit {
       MOVA_EVENTS.RENTAL_BOOKING,
       MOVA_EVENTS.INCIDENT_CREATED,
       MOVA_EVENTS.RIDE_STATUS_SMS,
+      MOVA_EVENTS.DRIVER_JOB_ALERT,
     );
     this.redis.sub.on('message', async (channel, message) => {
       try {
@@ -44,10 +54,18 @@ export class NotificationsService implements OnModuleInit {
         if (channel === MOVA_EVENTS.RENTAL_BOOKING) await this.onRentalBooking(data as RentalBookingPayload);
         if (channel === MOVA_EVENTS.INCIDENT_CREATED) await this.onIncidentCreated(data as IncidentCreatedPayload);
         if (channel === MOVA_EVENTS.RIDE_STATUS_SMS) await this.onRideStatusSms(data as RideStatusSmsPayload);
+        if (channel === MOVA_EVENTS.DRIVER_JOB_ALERT) await this.onDriverJobAlert(data as DriverJobAlertPayload);
       } catch (e) {
         this.logger.error('Event handler error', e);
       }
     });
+  }
+
+  private async pushToDrivers(userIds: string[], title: string, body: string, data?: Record<string, string>) {
+    if (!this.fcm.isConfigured() || userIds.length === 0) return;
+    const tokens = await this.pushTokens.tokensForUsers(userIds);
+    if (tokens.length === 0) return;
+    await this.fcm.sendToTokens(tokens, { title, body, data });
   }
 
   async create(userId: string, title: string, body: string, type: string, data?: object) {
@@ -119,6 +137,12 @@ export class NotificationsService implements OnModuleInit {
       'SERVICE_ASSIGNED',
       payload,
     );
+    await this.pushToDrivers(
+      [payload.driverId],
+      label,
+      `${payload.summary}${when}`,
+      { type: 'SERVICE_ASSIGNED', referenceId: payload.referenceId, jobKind: 'MISSION' },
+    );
     const passengerTitle =
       payload.serviceType === 'RENTAL' ? 'Chauffeur logistique assigné' : 'Livreur assigné';
     const passengerBody =
@@ -127,6 +151,17 @@ export class NotificationsService implements OnModuleInit {
         : `Un livreur a été assigné : ${payload.summary}`;
     await this.create(payload.passengerId, passengerTitle, passengerBody, 'SERVICE_ASSIGNED_PASSENGER', payload);
     this.logger.log(`service.assigned notification for driver ${payload.driverId} (${payload.serviceType})`);
+  }
+
+  async onDriverJobAlert(payload: DriverJobAlertPayload) {
+    const userIds = [...new Set(payload.driverUserIds ?? [])];
+    if (userIds.length === 0) return;
+    await this.pushToDrivers(userIds, payload.title, payload.body, {
+      type: payload.jobKind,
+      referenceId: payload.referenceId,
+      jobKind: payload.jobKind,
+    });
+    this.logger.log(`driver.job.alert push ${payload.jobKind} → ${userIds.length} chauffeur(s)`);
   }
 
   async onRentalBooking(payload: RentalBookingPayload) {

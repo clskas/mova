@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/api/api_client.dart';
 import '../../core/config/market_config.dart';
 import '../../core/error/result.dart';
+import '../../core/services/cancel_eligibility.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
@@ -95,6 +96,44 @@ class _RentalBookingDetailScreenState extends ConsumerState<RentalBookingDetailS
     }
   }
 
+  Future<void> _confirmHandover() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Confirmer la réception'),
+        content: const Text(
+          'Confirmez-vous avoir reçu le véhicule ? La location passera au statut « En cours ».',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Oui, j\'ai reçu le véhicule')),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _actionLoading = true);
+    final api = ref.read(apiClientProvider);
+    final result = await api.post('/rental/bookings/${widget.bookingId}/handover', {});
+    if (!mounted) return;
+    setState(() => _actionLoading = false);
+    switch (result) {
+      case Success(:final data):
+        final raw = data is Map<String, dynamic> ? data : Map<String, dynamic>.from(data as Map);
+        setState(() {
+          _booking = raw['inquiry'] as Map<String, dynamic>? ??
+              raw['booking'] as Map<String, dynamic>? ??
+              raw;
+          _error = null;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Location démarrée — bon voyage !')),
+        );
+      case Failure(:final error):
+        setState(() => _error = error.message);
+    }
+  }
+
   Future<void> _cancel() async {
     setState(() => _actionLoading = true);
     final api = ref.read(apiClientProvider);
@@ -166,6 +205,8 @@ class _RentalBookingDetailScreenState extends ConsumerState<RentalBookingDetailS
     final ownerPhone = b['ownerContactPhone']?.toString();
     final statusLabel = b['statusLabel']?.toString() ?? b['status']?.toString() ?? 'En attente';
     final status = b['status']?.toString().toUpperCase();
+    final canConfirmHandover = b['canConfirmHandover'] == true || status == 'CONFIRMED';
+    final canCancel = CancelEligibility.rental(b);
     final statusColor = switch (status) {
       'CONFIRMED' || 'IN_PROGRESS' || 'RETURNED' => MovaColors.green,
       'CONTACTED' => MovaColors.violet,
@@ -250,12 +291,44 @@ class _RentalBookingDetailScreenState extends ConsumerState<RentalBookingDetailS
           Text('Suivi de la réservation', style: theme.textTheme.titleSmall),
           const SizedBox(height: 12),
           _timeline(b['timeline'] as List?),
+          if (b['nextStepHint'] != null) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: MovaColors.violet.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: MovaColors.violet.withValues(alpha: 0.2)),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.info_outline, size: 18, color: MovaColors.violet),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      b['nextStepHint'].toString(),
+                      style: theme.textTheme.bodySmall,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           if (ownerPhone != null) ...[
             const SizedBox(height: 16),
             OutlinedButton.icon(
               onPressed: () => _callOwner(ownerPhone),
               icon: const Icon(Icons.phone_outlined),
               label: Text('Propriétaire · $ownerPhone'),
+            ),
+          ],
+          if (canConfirmHandover) ...[
+            const SizedBox(height: 16),
+            MovaButton(
+              label: 'J\'ai reçu le véhicule',
+              icon: Icons.key_outlined,
+              onPressed: _actionLoading ? null : _confirmHandover,
             ),
           ],
           if (_error != null) ...[
@@ -269,10 +342,11 @@ class _RentalBookingDetailScreenState extends ConsumerState<RentalBookingDetailS
             onPressed: () => Navigator.pop(context, true),
           ),
           const SizedBox(height: 8),
-          TextButton(
-            onPressed: _actionLoading ? null : _cancel,
-            child: const Text('Annuler la réservation'),
-          ),
+          if (canCancel)
+            TextButton(
+              onPressed: _actionLoading ? null : _cancel,
+              child: const Text('Annuler la réservation'),
+            ),
         ],
       ),
     );

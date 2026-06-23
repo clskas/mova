@@ -20,6 +20,13 @@ const _volumeOptions = [
   ('OFFICE', 'Bureau', 'Sur devis'),
 ];
 
+const _vehicleCategories = [
+  ('CAMIONNETTE', 'Camionnette / pick-up', 'Studio, quelques cartons'),
+  ('CAMION_15M3', 'Camion ~15 m³', 'Appartement T2–T3'),
+  ('CAMION_30M3', 'Camion ~30 m³', 'Maison, gros volume'),
+  ('CAMION_50M3', 'Gros camion ~50 m³', 'Bureau, déménagement complet'),
+];
+
 class _MovingPhoto {
   _MovingPhoto({this.localPath, this.remoteUrl});
   final String? localPath;
@@ -38,6 +45,7 @@ class _MovingScreenState extends ConsumerState<MovingScreen> {
   final _toController = TextEditingController();
   final _itemController = TextEditingController();
   String _volume = 'APARTMENT';
+  String _vehicleCategory = 'CAMION_15M3';
   int _rooms = 2;
   final List<String> _items = [];
   final List<_MovingPhoto> _photos = [];
@@ -118,6 +126,16 @@ class _MovingScreenState extends ConsumerState<MovingScreen> {
     return (base + (_rooms - 1) * 2).clamp(1, 50);
   }
 
+  void _syncVehicleFromVolume(String volume) {
+    _vehicleCategory = switch (volume) {
+      'STUDIO' => 'CAMIONNETTE',
+      'APARTMENT' => 'CAMION_15M3',
+      'HOUSE' => 'CAMION_30M3',
+      'OFFICE' => 'CAMION_50M3',
+      _ => 'CAMION_15M3',
+    };
+  }
+
   Future<void> _addPhoto() async {
     final file = await _picker.pickImage(source: ImageSource.camera, imageQuality: 75);
     if (file == null) return;
@@ -158,6 +176,7 @@ class _MovingScreenState extends ConsumerState<MovingScreen> {
       'dropoffLat': _toLat,
       'dropoffLng': _toLng,
       'volumeM3': _volumeM3(),
+      'vehicleCategory': _vehicleCategory,
       if (_items.isNotEmpty) 'itemsNotes': _items.join(', '),
       if (_uploadedPhotoUrls.isNotEmpty) 'photoUrls': _uploadedPhotoUrls,
     };
@@ -348,6 +367,27 @@ class _MovingScreenState extends ConsumerState<MovingScreen> {
               groupValue: _volume,
               onChanged: (val) => setState(() {
                 _volume = val!;
+                _syncVehicleFromVolume(val);
+                _estimatedPrice = null;
+              }),
+            );
+          }),
+          const SizedBox(height: 12),
+          Text('Type d\'engin souhaité', style: theme.textTheme.titleSmall),
+          const SizedBox(height: 4),
+          Text(
+            'Précise le camion nécessaire — l\'admin assigne l\'équipe adaptée.',
+            style: theme.textTheme.bodySmall?.copyWith(color: MovaColors.textSecondary),
+          ),
+          const SizedBox(height: 8),
+          ..._vehicleCategories.map((v) {
+            return RadioListTile<String>(
+              title: Text(v.$2),
+              subtitle: Text(v.$3, style: const TextStyle(fontSize: 12)),
+              value: v.$1,
+              groupValue: _vehicleCategory,
+              onChanged: (val) => setState(() {
+                _vehicleCategory = val!;
                 _estimatedPrice = null;
               }),
             );

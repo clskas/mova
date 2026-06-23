@@ -202,6 +202,12 @@ export default function ReservationsPage() {
 
                   <LogisticsEditor booking={b} busy={busyId === b.id} onSave={load} />
 
+                  {b.nextStepHint && !closed && (
+                    <p className="text-xs text-indigo-800 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2">
+                      {b.nextStepHint}
+                    </p>
+                  )}
+
                   {!closed && (
                     <div className="flex flex-wrap gap-2 pt-1">
                       {pending && (
@@ -241,7 +247,7 @@ export default function ReservationsPage() {
                           onClick={() => act(b.id, "start")}
                           className="px-3 py-1.5 rounded-lg text-sm bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
                         >
-                          {busyId === b.id ? "…" : "Remise effectuée"}
+                          {busyId === b.id ? "…" : "Remise effectuée → En cours"}
                         </button>
                       )}
                       {inProgress && (

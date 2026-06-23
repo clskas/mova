@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 import '../../core/api/api_client.dart';
+import '../../core/config/test_runtime_config.dart';
 import '../../core/location/destination_coords.dart';
 import '../../core/location/destination_field_sync.dart';
 import '../../core/location/location_service.dart';
@@ -51,7 +52,9 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   void initState() {
     super.initState();
     _destinationController.addListener(_onDestinationChanged);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _useMyLocation());
+    if (!movaDisableAutoGps) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _useMyLocation());
+    }
   }
 
   @override

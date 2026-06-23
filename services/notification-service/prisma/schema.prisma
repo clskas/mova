@@ -21,3 +21,16 @@ model Notification {
   @@index([userId])
   @@map("notifications")
 }
+
+model PushDevice {
+  id        String   @id @default(uuid())
+  userId    String
+  token     String   @unique
+  platform  String?
+  appFlavor String   @default("driver")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@map("push_devices")
+}

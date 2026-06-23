@@ -6,6 +6,7 @@ import 'package:latlong2/latlong.dart';
 import '../../core/api/api_client.dart';
 import '../../core/config/market_config.dart';
 import '../../core/error/result.dart';
+import '../../core/services/cancel_eligibility.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
@@ -97,10 +98,7 @@ class _ParcelTrackingScreenState extends ConsumerState<ParcelTrackingScreen> {
       _delivery?['finalPriceCdf'] as int? ??
       0;
 
-  bool get _canCancel {
-    final status = _delivery?['status']?.toString();
-    return status == 'PENDING' || status == 'PICKED_UP';
-  }
+  bool get _canCancel => CancelEligibility.delivery(_delivery);
 
   void _maybeGoToPayment() {
     if (_paymentNavigated || !mounted || _totalCdf <= 0) return;

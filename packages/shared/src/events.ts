@@ -11,6 +11,7 @@ export const MOVA_EVENTS = {
   SERVICE_STATUS_UPDATED: 'service.status.updated',
   RENTAL_BOOKING: 'rental.booking',
   INCIDENT_CREATED: 'incident.created',
+  DRIVER_JOB_ALERT: 'driver.job.alert',
 } as const;
 
 export type MovaEventName = (typeof MOVA_EVENTS)[keyof typeof MOVA_EVENTS];
@@ -96,6 +97,20 @@ export interface ServiceStatusUpdatedPayload {
 }
 
 export type RentalBookingEventKind = 'NEW_BOOKING' | 'CONFIRMED' | 'CANCELLED' | 'LOGISTICS_ASSIGNED';
+
+export type DriverJobKind = 'RIDE_OFFER' | 'DELIVERY_OFFER' | 'MISSION';
+
+export interface DriverJobAlertPayload {
+  jobKind: DriverJobKind;
+  referenceId: string;
+  driverUserIds: string[];
+  title: string;
+  body: string;
+  pickupAddress?: string;
+  pickupLat?: number;
+  pickupLng?: number;
+  data?: Record<string, unknown>;
+}
 
 export interface RentalBookingPayload {
   kind: RentalBookingEventKind;

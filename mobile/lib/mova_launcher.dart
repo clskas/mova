@@ -6,6 +6,7 @@ import 'core/offline/sync_queue.dart';
 import 'core/theme/mova_theme.dart';
 import 'core/widgets/offline_shell.dart';
 import 'features/auth/otp_screen.dart';
+import 'features/driver/driver_job_alert_service.dart';
 import 'features/driver/driver_otp_screen.dart';
 
 /// Point d'entrée partagé — évite SyncQueue non initialisé si le mauvais main.dart est ciblé.
@@ -22,6 +23,7 @@ Future<void> runMovaPassengerApp() async {
 Future<void> runMovaDriverApp() async {
   WidgetsFlutterBinding.ensureInitialized();
   await SyncQueue.init();
+  await DriverJobAlertService.init();
   runApp(
     const ProviderScope(
       child: MovaDriverApp(),

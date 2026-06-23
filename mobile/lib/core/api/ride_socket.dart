@@ -23,8 +23,28 @@ class RideSocket {
   void Function(Map<String, dynamic> payload)? _onChat;
   void Function()? _onConnected;
   void Function()? _onDisconnected;
+  final List<Completer<bool>> _connectWaiters = [];
 
   set onChat(void Function(Map<String, dynamic> payload)? handler) => _onChat = handler;
+
+  /// Attend que le socket soit connecté (ou échoue après [timeout]).
+  Future<bool> ensureConnected({Duration timeout = const Duration(seconds: 12)}) async {
+    if (_socket?.connected == true && isConnected) return true;
+    if (connectionFailed) return false;
+    final waiter = Completer<bool>();
+    _connectWaiters.add(waiter);
+    Future.delayed(timeout, () {
+      if (!waiter.isCompleted) waiter.complete(false);
+    });
+    return waiter.future;
+  }
+
+  void _completeConnectWaiters(bool ok) {
+    for (final w in _connectWaiters) {
+      if (!w.isCompleted) w.complete(ok);
+    }
+    _connectWaiters.clear();
+  }
 
   void connect({
     required String rideId,
@@ -49,6 +69,7 @@ class RideSocket {
       isConnected = true;
       connectionFailed = false;
       _onConnected?.call();
+      _completeConnectWaiters(true);
       return;
     }
 
@@ -67,7 +88,7 @@ class RideSocket {
       _socket = io.io(
         '${MarketConfig.wsUrl}/tracking',
         io.OptionBuilder()
-            .setTransports(['websocket'])
+            .setTransports(['websocket', 'polling'])
             .disableAutoConnect()
             .enableReconnection()
             .setReconnectionAttempts(_maxReconnectAttempts)
@@ -86,6 +107,7 @@ class RideSocket {
             _socket?.emit('delivery:subscribe', {'deliveryId': _rideId});
           }
           _onConnected?.call();
+          _completeConnectWaiters(true);
         })
         ..onDisconnect((_) {
           isConnected = false;
@@ -104,7 +126,10 @@ class RideSocket {
             _onChat?.call(Map<String, dynamic>.from(data));
           }
         })
-        ..onConnectError((_) => _scheduleReconnect())
+        ..onConnectError((_) {
+          isConnected = false;
+          _scheduleReconnect();
+        })
         ..connect();
     } catch (_) {
       _scheduleReconnect();
@@ -121,6 +146,7 @@ class RideSocket {
     isConnected = false;
     if (_reconnectAttempt >= _maxReconnectAttempts) {
       connectionFailed = true;
+      _completeConnectWaiters(false);
       _onDisconnected?.call();
       return;
     }
@@ -194,6 +220,10 @@ class RideSocket {
 
   void emitChat(Map<String, dynamic> payload) {
     if (!isConnected) return;
+    final rideId = payload['rideId']?.toString();
+    if (rideId != null && rideId.isNotEmpty) {
+      _socket?.emit('ride:subscribe', {'rideId': rideId});
+    }
     _socket?.emit('ride:chat', payload);
   }
 }

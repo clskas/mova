@@ -124,6 +124,7 @@ services:
       REDIS_URL: redis://redis:6379
       JWT_SECRET: dev_secret
       PORT: 3000
+      FCM_SERVER_KEY: ${FCM_SERVER_KEY:-}
     depends_on:
       postgres:
         condition: service_healthy

@@ -27,6 +27,17 @@ export class PaymentsController {
     return this.paymentsService.confirmCashRide(rideId, req.user.id, pin);
   }
 
+  @Post('services/:referenceType/:referenceId/cash/confirm')
+  @ApiOperation({ summary: 'Confirmer paiement espèces service (chauffeur + PIN)' })
+  confirmCashService(
+    @Request() req: { user: { id: string } },
+    @Param('referenceType') referenceType: string,
+    @Param('referenceId') referenceId: string,
+    @Body('pin') pin: string,
+  ) {
+    return this.paymentsService.confirmCashService(referenceType, referenceId, req.user.id, pin);
+  }
+
   @Post('services/:referenceType/:referenceId')
   @ApiOperation({ summary: 'Payer un service terminé (livraison, course, déménagement, location, covoiturage)' })
   payService(

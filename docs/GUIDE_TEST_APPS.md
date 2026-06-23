@@ -112,27 +112,63 @@ Le PC et le téléphone doivent être sur le **même Wi‑Fi**.
 adb devices    # USB debugging activé
 ```
 
-### Comptes de test
+### Comptes de test — passagers et chauffeurs (10 + 10)
+
+> **OTP local :** toujours **`123456`** (`MOCK_OTP=true` dans `config/external-apis.env`).
+
+**Prérequis chauffeur :** KYC **APPROVED** pour accepter des courses. Après `npm run seed:admin-demo`, les numéros marqués ✅ sont prêts ; les autres sont en **KYC en attente** (à approuver dans l’admin).
+
+#### Passagers (app **Passager** ou web `localhost:3001`)
+
+| # | Téléphone | Nom | Usage suggéré |
+|---|-----------|-----|----------------|
+| 1 | `+243900000010` | Marie Kabila | Compte principal démo |
+| 2 | `+243900000011` | Paul Mutombo | Courses + livraisons |
+| 3 | `+243900000012` | Grace Lumumba | Location véhicule |
+| 4 | `+243900000013` | Joseph Mbuyi | Testeur 4 |
+| 5 | `+243900000014` | Chantal Ngoy | Testeur 5 |
+| 6 | `+243900000015` | David Kasongo | Testeur 6 |
+| 7 | `+243900000016` | Esther Mwamba | Testeur 7 |
+| 8 | `+243900000017` | Fabrice Ilunga | Testeur 8 |
+| 9 | `+243900000018` | Hortense Tshilombo | Testeur 9 |
+| 10 | `+243900000019` | Innocent Bemba | Testeur 10 |
+
+#### Chauffeurs (app **Chauffeur**)
+
+| # | Téléphone | Nom | KYC après seed | Usage suggéré |
+|---|-----------|-----|----------------|---------------|
+| 1 | `+243900000020` | Jean Mukendi | En attente | Onboarding + multi-véhicules |
+| 2 | `+243900000021` | Patrick Kalala | En attente | Workflow KYC admin |
+| 3 | `+243900000022` | Emmanuel Tshisekedi | En attente | Workflow KYC admin |
+| 4 | `+243900000023` | Alain Kabeya | ✅ Approuvé | Courses immédiates |
+| 5 | `+243900000024` | Serge Mpunga | ✅ Approuvé | Courses immédiates |
+| 6 | `+243900000025` | Olivier Nzeba | ✅ Approuvé | Moto-taxi |
+| 7 | `+243900000026` | Rachel Kazadi | En attente | Workflow KYC admin |
+| 8 | `+243900000027` | Michel Banza | ✅ Approuvé | Confort |
+| 9 | `+243900000028` | Nadège Mwadi | En attente | Workflow KYC admin |
+| 10 | `+243900000029` | Christian Odia | ✅ Approuvé | Courses immédiates |
+
+#### Staff admin (back-office `localhost:3002`)
+
+| Téléphone | Rôle |
+|-----------|------|
+| `+243900000001` | SUPER_ADMIN |
+| `+243900000002` | ADMIN |
+| `+243900000003` | SUPPORT |
+| `+243900000004` | FINANCE |
+| `+243900000005` | CONTENT |
+
+Détail RBAC : [RBAC_TESTING.md](./RBAC_TESTING.md).
+
+### Comptes de test (résumé rapide)
 
 | Application | Téléphone | Rôle |
 |-------------|-----------|------|
 | **Admin** | `+243900000001` | SUPER_ADMIN |
 | **Passager** | `+243900000010` | PASSENGER (Marie Kabila) |
-| **Chauffeur** | `+243900000020` | DRIVER (Jean Mukendi) |
+| **Chauffeur** | `+243900000023` | DRIVER (Alain Kabeya, KYC ✅) |
 
-Autres comptes démo : passagers `+243900000011`–`012`, chauffeurs `+243900000021`–`023`.
-
-### Comptes staff admin (RBAC)
-
-| Téléphone | Rôle | Usage test |
-|-----------|------|------------|
-| `+243900000001` | SUPER_ADMIN | Accès complet + écriture partout |
-| `+243900000002` | ADMIN | Idem SUPER_ADMIN (sans gestion des rôles système) |
-| `+243900000003` | SUPPORT | Opérations : KYC, courses, livraisons, litiges |
-| `+243900000004` | FINANCE | Tarifs, abonnements, portefeuille |
-| `+243900000005` | CONTENT | Restaurants, communes, catalogue location |
-
-Détail des menus et droits d’écriture : [RBAC_TESTING.md](./RBAC_TESTING.md) et [Manuel Admin — Niveaux d’accès](user-manual/admin.md#niveaux-daccès-par-rôle).
+Voir les tableaux ci-dessus pour les **10 passagers** et **10 chauffeurs**.
 
 ---
 

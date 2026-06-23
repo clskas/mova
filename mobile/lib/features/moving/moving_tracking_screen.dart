@@ -9,6 +9,7 @@ import '../../core/services/cancel_eligibility.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
+import '../booking/payment_screen.dart';
 import '../history/history_detail_dialog.dart';
 
 class MovingTrackingScreen extends ConsumerStatefulWidget {
@@ -33,6 +34,7 @@ class _MovingTrackingScreenState extends ConsumerState<MovingTrackingScreen> {
   Map<String, dynamic>? _request;
   bool _loading = true;
   bool _cancelling = false;
+  bool _paymentNavigated = false;
   String? _error;
   Timer? _pollTimer;
 
@@ -66,6 +68,7 @@ class _MovingTrackingScreenState extends ConsumerState<MovingTrackingScreen> {
         case Success(:final data):
           _request = data['moving'] as Map<String, dynamic>? ?? data['request'] as Map<String, dynamic>? ?? data;
           _error = null;
+          _maybeGoToPayment();
         case Failure(:final error):
           if (!silent) _error = error.message;
       }
@@ -113,6 +116,28 @@ class _MovingTrackingScreenState extends ConsumerState<MovingTrackingScreen> {
     final raw = _request?['photoUrls'] as List?;
     if (raw == null) return [];
     return raw.map((e) => e.toString()).where((u) => u.isNotEmpty).toList();
+  }
+
+  int get _totalCdf =>
+      _request?['estimatedPriceCdf'] as int? ?? widget.estimatedPrice;
+
+  void _maybeGoToPayment() {
+    if (_paymentNavigated || !mounted || _totalCdf <= 0) return;
+    final paymentReady = _request?['paymentReady'] == true ||
+        _request?['status']?.toString() == 'COMPLETED';
+    if (!paymentReady) return;
+    _paymentNavigated = true;
+    _pollTimer?.cancel();
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PaymentScreen(
+          serviceType: 'MOVING',
+          serviceId: widget.movingId,
+          amountCdf: _totalCdf,
+        ),
+      ),
+    );
   }
 
   @override

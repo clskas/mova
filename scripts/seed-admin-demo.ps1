@@ -63,7 +63,7 @@ Write-Host ""
 Write-Host "=== Demo seed complete ===" -ForegroundColor Green
 Write-Host 'Staff logins: +243900000001 SUPER_ADMIN, +243900000002 ADMIN, +243900000003 SUPPORT'
 Write-Host '              +243900000004 FINANCE, +243900000005 CONTENT  — OTP 123456'
-Write-Host 'Demo users:   3 passengers (+243900000010-012), 4 drivers (+243900000020-023)'
+Write-Host 'Demo users:   10 passengers (+243900000010-019), 10 drivers (+243900000020-029)'
 Write-Host 'RBAC guide:   docs/RBAC_TESTING.md'
 Write-Host 'Dashboard:    3 KYC pending, 2 open incidents, 3 rides, 2 deliveries, 2 scheduled'
 Write-Host 'Start admin:  cd admin; npm run dev on port 3002'

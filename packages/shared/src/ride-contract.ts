@@ -88,6 +88,60 @@ export function driverVehicleTypesForRide(rideType: VehicleTypeValue): VehicleTy
   }
 }
 
+export type MovingVehicleCategoryValue =
+  | 'CAMIONNETTE'
+  | 'CAMION_15M3'
+  | 'CAMION_30M3'
+  | 'CAMION_50M3';
+
+/** Colis MEDIUM/LARGE : voiture requise ; DOCUMENTS/SMALL : moto ou voiture. */
+export function driverEligibleForParcelWeight(
+  driverVehicleTypes: VehicleTypeValue[],
+  weightCategory: string | null | undefined,
+): boolean {
+  const types = driverVehicleTypes.filter(Boolean);
+  const hasCar = types.some((t) => t === 'STANDARD' || t === 'COMFORT' || t === 'VIP');
+  const hasMoto = types.includes('MOTO_TAXI');
+  const cat = (weightCategory ?? 'SMALL').toUpperCase();
+  if (cat === 'MEDIUM' || cat === 'LARGE') return hasCar;
+  return hasMoto || hasCar;
+}
+
+/** Chauffeur peut accepter une course du type demandé. */
+export function driverEligibleForRide(
+  driverVehicleTypes: VehicleTypeValue[],
+  rideVehicleType: VehicleTypeValue | string,
+): boolean {
+  let normalized: VehicleTypeValue;
+  try {
+    normalized = normalizeVehicleType(String(rideVehicleType)) as VehicleTypeValue;
+  } catch {
+    return false;
+  }
+  const active = driverVehicleTypes.filter(Boolean);
+  const eligibleVehicleTypes = driverVehicleTypesForRide(normalized);
+  return active.some((t) => eligibleVehicleTypes.includes(t));
+}
+
+/** Chauffeur éligible pour un déménagement (jamais moto seule). */
+export function driverEligibleForMoving(
+  driverVehicleTypes: VehicleTypeValue[],
+  category: MovingVehicleCategoryValue | string,
+): boolean {
+  const active = driverVehicleTypes.filter((t) => t !== 'MOTO_TAXI');
+  if (active.length === 0) return false;
+  switch (category) {
+    case 'CAMIONNETTE':
+    case 'CAMION_15M3':
+      return active.some((t) => t === 'STANDARD' || t === 'COMFORT' || t === 'VIP');
+    case 'CAMION_30M3':
+    case 'CAMION_50M3':
+      return active.some((t) => t === 'COMFORT' || t === 'VIP' || t === 'STANDARD');
+    default:
+      return active.length > 0;
+  }
+}
+
 const STATUS_TO_MOBILE: Record<RideStatusValue, MobileRideStatus> = {
   REQUESTED: 'REQUESTED',
   SEARCHING: 'MATCHING',

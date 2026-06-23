@@ -5,10 +5,11 @@ import { RedisService } from '@mova/shared';
 import { buildMovingTimeline } from '../deliveries/parcel.util';
 import { assertServiceAreaPair } from '../common/address.util';
 import { fetchAuthUserBrief } from '../common/internal-lookup.util';
-import { assertDriverCanReceiveJobs } from '../common/driver-eligibility.util';
+import { assertDriverCanReceiveJobs, assertDriverEligibleForMoving } from '../common/driver-eligibility.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { PricingService } from '../rides/pricing.service';
 import { SurchargeService } from '../rides/surcharge.service';
+import { TripShareService } from '../share/trip-share.service';
 import { CreateMovingDto, EstimateMovingDto } from './moving.dto';
 
 @Injectable()
@@ -18,6 +19,7 @@ export class MovingService {
     private pricing: PricingService,
     private surcharges: SurchargeService,
     private redis: RedisService,
+    private tripShare: TripShareService,
   ) {}
 
   private validateCoords(dto: EstimateMovingDto) {
@@ -100,6 +102,7 @@ export class MovingService {
         distanceKm: estimate.distanceKm,
         durationMin: estimate.durationMin,
         photoUrls: dto.photoUrls?.length ? dto.photoUrls : undefined,
+        itemsNotes: dto.itemsNotes?.trim() || undefined,
       },
     });
     return { moving: request, estimate };
@@ -119,6 +122,8 @@ export class MovingService {
     completedAt: Date | null;
     estimatedPriceCdf: number;
     photoUrls: unknown;
+    itemsNotes?: string | null;
+    completionPin?: string | null;
     [key: string]: unknown;
   }) {
     const timeline = buildMovingTimeline(request.status, request.completedAt);
@@ -131,6 +136,8 @@ export class MovingService {
       timeline,
       tracking: timeline,
       paymentReady: request.status === MovingRequestStatus.COMPLETED,
+      completionPin: request.completionPin ?? undefined,
+      itemsNotes: request.itemsNotes ?? undefined,
       priceCdf: request.estimatedPriceCdf,
       formattedPrice: formatCdf(request.estimatedPriceCdf),
       currency: 'CDF',
@@ -191,27 +198,16 @@ export class MovingService {
   }
 
   async updateStatus(id: string, userId: string, status: MovingRequestStatus) {
-    const request = await this.get(id, userId);
-    const allowed: Record<MovingRequestStatus, MovingRequestStatus[]> = {
-      [MovingRequestStatus.PENDING]: [MovingRequestStatus.ASSIGNED, MovingRequestStatus.CANCELLED],
-      [MovingRequestStatus.ASSIGNED]: [MovingRequestStatus.IN_PROGRESS, MovingRequestStatus.CANCELLED],
-      [MovingRequestStatus.IN_PROGRESS]: [MovingRequestStatus.COMPLETED],
-      [MovingRequestStatus.COMPLETED]: [],
-      [MovingRequestStatus.CANCELLED]: [],
-    };
-    if (!allowed[request.status]?.includes(status)) {
-      throw new MovaHttpException(MovaErrorCode.MOVING_INVALID_STATUS);
+    await this.get(id, userId);
+    // Passager : annulation uniquement (statuts gérés par admin/chauffeur).
+    if (status !== MovingRequestStatus.CANCELLED) {
+      throw new MovaHttpException(
+        MovaErrorCode.MOVING_INVALID_STATUS,
+        HttpStatus.FORBIDDEN,
+        'Seul l\'annulation est autorisée depuis l\'application passager.',
+      );
     }
-    const updates: Record<string, unknown> = { status };
-    if (status === MovingRequestStatus.COMPLETED) updates.completedAt = new Date();
-    if (status === MovingRequestStatus.CANCELLED) updates.cancelledAt = new Date();
-    const updated = await this.prisma.movingRequest.update({ where: { id }, data: updates });
-    const timeline = buildMovingTimeline(updated.status, updated.completedAt);
-    return {
-      moving: updated,
-      timeline,
-      paymentReady: status === MovingRequestStatus.COMPLETED,
-    };
+    return this.cancel(id, userId);
   }
 
   async cancel(id: string, userId: string) {
@@ -246,6 +242,7 @@ export class MovingService {
           driverPhone: driver?.phone,
           status: r.status,
           volumeM3: r.volumeM3,
+          vehicleCategory: r.vehicleCategory,
           pickupAddress: r.pickupAddress,
           dropoffAddress: r.dropoffAddress,
           priceCdf: r.estimatedPriceCdf,
@@ -259,13 +256,16 @@ export class MovingService {
     if (!driverId?.trim()) {
       throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Chauffeur requis.');
     }
-    await assertDriverCanReceiveJobs(driverId.trim());
     const request = await this.prisma.movingRequest.findUnique({ where: { id } });
     if (!request) throw new MovaHttpException(MovaErrorCode.MOVING_NOT_FOUND, HttpStatus.NOT_FOUND);
+    await assertDriverEligibleForMoving(driverId.trim(), request.vehicleCategory);
     if (request.status === MovingRequestStatus.COMPLETED || request.status === MovingRequestStatus.CANCELLED) {
       throw new MovaHttpException(MovaErrorCode.MOVING_INVALID_STATUS);
     }
-    const data: { driverId: string; status?: MovingRequestStatus } = { driverId: driverId.trim() };
+    const data: { driverId: string; status?: MovingRequestStatus; completionPin?: string } = {
+      driverId: driverId.trim(),
+      completionPin: request.completionPin ?? this.tripShare.generateCompletionPin(),
+    };
     if (request.status === MovingRequestStatus.PENDING) {
       data.status = MovingRequestStatus.ASSIGNED;
     }

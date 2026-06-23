@@ -300,6 +300,7 @@ model ScheduledRide {
   cancelledAt       DateTime?
   cancelReason      String?
   rideId            String?
+  completionPin     String?
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
 
@@ -556,6 +557,8 @@ model MovingRequest {
   durationMin       Float?
   driverId          String?
   photoUrls         Json?
+  itemsNotes        String?
+  completionPin     String?
   completedAt       DateTime?
   cancelledAt       DateTime?
   createdAt         DateTime            @default(now())

@@ -4,7 +4,8 @@ import { MovaErrorCode, MovaHttpException, MOVA_EVENTS, normalizeVehicleType, re
 import { RedisService } from '@mova/shared';
 import { assertServiceAreaCoords, assertServiceAreaDestination, assertServiceAreaPair, addressToCoords, DEFAULT_PICKUP } from '../common/address.util';
 import { fetchAuthUserBrief } from '../common/internal-lookup.util';
-import { assertDriverCanReceiveJobs } from '../common/driver-eligibility.util';
+import { assertDriverCanReceiveJobs, assertDriverEligibleForRide } from '../common/driver-eligibility.util';
+import { TripShareService } from '../share/trip-share.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { PricingService } from './pricing.service';
 import { CreateScheduledRideDto } from './scheduled-rides.dto';
@@ -14,7 +15,12 @@ const MAX_SCHEDULE_DAYS = 7;
 
 @Injectable()
 export class ScheduledRidesService {
-  constructor(private prisma: PrismaService, private pricing: PricingService, private redis: RedisService) {}
+  constructor(
+    private prisma: PrismaService,
+    private pricing: PricingService,
+    private redis: RedisService,
+    private tripShare: TripShareService,
+  ) {}
 
   private parseVehicleType(value: string): VehicleType {
     try {
@@ -111,6 +117,7 @@ export class ScheduledRidesService {
     pickupAddress: string;
     dropoffAddress: string;
     estimatedPriceCdf: number | null;
+    completionPin?: string | null;
     createdAt: Date;
     updatedAt: Date;
   }) {
@@ -120,6 +127,8 @@ export class ScheduledRidesService {
       createdAt: ride.createdAt.toISOString(),
       updatedAt: ride.updatedAt.toISOString(),
       priceCdf: ride.estimatedPriceCdf,
+      paymentReady: ride.status === ScheduledRideStatus.COMPLETED,
+      completionPin: ride.completionPin ?? undefined,
       ...canCancelScheduledRide({ status: ride.status, scheduledAt: ride.scheduledAt }),
     };
   }
@@ -223,13 +232,16 @@ export class ScheduledRidesService {
     if (!driverId?.trim()) {
       throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Chauffeur requis.');
     }
-    await assertDriverCanReceiveJobs(driverId.trim());
     const ride = await this.prisma.scheduledRide.findUnique({ where: { id } });
     if (!ride) throw new MovaHttpException(MovaErrorCode.SCHEDULED_RIDE_NOT_FOUND, HttpStatus.NOT_FOUND);
     if (ride.status === ScheduledRideStatus.CANCELLED || ride.status === ScheduledRideStatus.COMPLETED) {
       throw new MovaHttpException(MovaErrorCode.SCHEDULED_RIDE_INVALID_STATUS);
     }
-    const data: { driverId: string; status?: ScheduledRideStatus } = { driverId: driverId.trim() };
+    await assertDriverEligibleForRide(driverId.trim(), ride.vehicleType);
+    const data: { driverId: string; status?: ScheduledRideStatus; completionPin?: string } = {
+      driverId: driverId.trim(),
+      completionPin: ride.completionPin ?? this.tripShare.generateCompletionPin(),
+    };
     if (ride.status === ScheduledRideStatus.SCHEDULED) {
       data.status = ScheduledRideStatus.CONFIRMED;
     }

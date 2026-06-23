@@ -12,6 +12,7 @@ import {
   type AdminDriver,
   type MovingRequest,
 } from "@/lib/api";
+import { filterDriversForMoving } from "@/lib/driver-assignment";
 import { useAdmin } from "@/components/AdminProvider";
 import { AssignDriverPanel } from "@/components/AssignDriverPanel";
 import { ContactBlock } from "@/components/ContactActions";
@@ -190,12 +191,13 @@ export default function DemenagementsPage() {
                     <td className="p-3">
                       <AssignDriverPanel
                         compact
-                        drivers={drivers}
+                        drivers={filterDriversForMoving(drivers, r.vehicleCategory)}
                         value={rowAssign[r.id] ?? r.driverId ?? ""}
                         currentDriverId={r.driverId}
                         onChange={(v) => setRowAssign((prev) => ({ ...prev, [r.id]: v }))}
                         onAssign={() => assignDriver(r.id, rowAssign[r.id] ?? "")}
                         saving={assigningId === r.id}
+                        emptyLabel="Aucun chauffeur avec engin adapté (moto exclue). Validez un véhicule STANDARD+ dans KYC."
                       />
                     </td>
                   )}
@@ -217,6 +219,9 @@ export default function DemenagementsPage() {
             <p><span className="text-gray-500">Départ:</span> {selected.pickupAddress}</p>
             <p><span className="text-gray-500">Arrivée:</span> {selected.dropoffAddress}</p>
             <p><span className="text-gray-500">Volume:</span> {selected.volumeM3 ?? "—"} m³</p>
+            {selected.vehicleCategory && (
+              <p><span className="text-gray-500">Engin demandé:</span> {selected.vehicleCategory.replace(/_/g, " ")}</p>
+            )}
             <p><span className="text-gray-500">Prix estimé:</span> {formatCdf(selected.priceCdf ?? selected.estimatedPriceCdf ?? 0)}</p>
             <p><span className="text-gray-500">Statut:</span> <StatusBadge status={selected.status ?? "PENDING"} /></p>
             <p><span className="text-gray-500">Créée:</span> {formatDate(selected.createdAt)}</p>
@@ -232,7 +237,7 @@ export default function DemenagementsPage() {
 
             {!readOnly && (
               <AssignDriverPanel
-                drivers={drivers}
+                drivers={filterDriversForMoving(drivers, selected.vehicleCategory)}
                 value={assignDriverId}
                 currentDriverId={selected.driverId}
                 onChange={setAssignDriverId}

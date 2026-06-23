@@ -1134,6 +1134,7 @@ export type MovingRequest = {
   driverPhone?: string;
   status?: string;
   volumeM3?: number;
+  vehicleCategory?: string;
   pickupAddress?: string;
   dropoffAddress?: string;
   priceCdf?: number;

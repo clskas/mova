@@ -1,5 +1,5 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { CommissionServiceType, DeliveryStatus, DeliveryType, RideStatus, TrackingReferenceType, VehicleType } from '@prisma/client';
+import { CommissionServiceType, DeliveryStatus, DeliveryType, ErrandOrderStatus, MovingRequestStatus, RentalInquiryStatus, RideStatus, ScheduledRideStatus, TrackingReferenceType, VehicleType } from '@prisma/client';
 import {
   formatCdf,
   fromMobileRideStatus,
@@ -28,7 +28,7 @@ import { TrackingGateway } from '../websocket/tracking.gateway';
 import { TrackingService } from '../tracking/tracking.service';
 import { assertServiceAreaPair, assertServiceAreaCoords } from '../common/address.util';
 import { tripDistanceKm } from '../common/geo.util';
-import { assertDriverCanReceiveJobs, driverCanReceiveJobs, fetchDriverProfileSnapshot } from '../common/driver-eligibility.util';
+import { assertDriverCanReceiveJobs, assertDriverEligibleForRide, driverCanReceiveJobs, fetchDriverProfileSnapshot } from '../common/driver-eligibility.util';
 import { fetchAuthUserBrief } from '../common/internal-lookup.util';
 import { TripShareService } from '../share/trip-share.service';
 import { publishDriverJobAlert } from '../common/driver-job-alert.util';
@@ -263,10 +263,10 @@ export class RidesService {
   }
 
   async acceptRide(rideId: string, driverUserId: string, vehicleId?: string) {
-    await assertDriverCanReceiveJobs(driverUserId);
     const ride = await this.prisma.ride.findUnique({ where: { id: rideId } });
     if (!ride) throw new MovaHttpException(MovaErrorCode.RIDE_NOT_FOUND, HttpStatus.NOT_FOUND);
     if (ride.status !== RideStatus.SEARCHING) throw new MovaHttpException(MovaErrorCode.RIDE_INVALID_STATUS);
+    await assertDriverEligibleForRide(driverUserId, ride.vehicleType);
     const completionPin = this.tripShare.generateCompletionPin();
     const updated = await this.prisma.ride.update({
       where: { id: rideId },
@@ -719,28 +719,167 @@ export class RidesService {
     return { rideId, driverId: ride.driverId, driverNetCdf, grossCdf: gross };
   }
 
+  async getServicePayout(referenceType: string, referenceId: string) {
+    const type = referenceType.toUpperCase();
+    switch (type) {
+      case 'RIDE':
+        return this.getRidePayout(referenceId);
+      case 'DELIVERY': {
+        const d = await this.prisma.delivery.findUnique({ where: { id: referenceId } });
+        if (!d || d.status !== DeliveryStatus.DELIVERED || !d.driverId) {
+          return { referenceType: type, referenceId, driverId: d?.driverId ?? null, driverNetCdf: 0 };
+        }
+        const rule = await this.commission.get(CommissionServiceType.DELIVERY);
+        const gross = this.deliveryDriverGross(d);
+        return {
+          referenceType: type,
+          referenceId,
+          driverId: d.driverId,
+          driverNetCdf: this.commission.splitGross(gross, rule.platformPercent).driverNetCdf,
+        };
+      }
+      case 'ERRAND': {
+        const o = await this.prisma.errandOrder.findUnique({ where: { id: referenceId } });
+        if (!o || o.status !== ErrandOrderStatus.COMPLETED || !o.driverId) {
+          return { referenceType: type, referenceId, driverId: o?.driverId ?? null, driverNetCdf: 0 };
+        }
+        const rule = await this.commission.get(CommissionServiceType.ERRAND);
+        const gross = (o.finalPriceCdf ?? o.estimatedPriceCdf) + (o.purchaseTotalCdf ?? 0);
+        return {
+          referenceType: type,
+          referenceId,
+          driverId: o.driverId,
+          driverNetCdf: this.commission.splitGross(gross, rule.platformPercent).driverNetCdf,
+        };
+      }
+      case 'MOVING': {
+        const m = await this.prisma.movingRequest.findUnique({ where: { id: referenceId } });
+        if (!m || m.status !== MovingRequestStatus.COMPLETED || !m.driverId) {
+          return { referenceType: type, referenceId, driverId: m?.driverId ?? null, driverNetCdf: 0 };
+        }
+        const rule = await this.commission.get(CommissionServiceType.MOVING);
+        const gross = m.estimatedPriceCdf;
+        return {
+          referenceType: type,
+          referenceId,
+          driverId: m.driverId,
+          driverNetCdf: this.commission.splitGross(gross, rule.platformPercent).driverNetCdf,
+        };
+      }
+      case 'RENTAL': {
+        const r = await this.prisma.rentalInquiry.findUnique({ where: { id: referenceId } });
+        if (!r || !r.driverId || (r.status !== RentalInquiryStatus.RETURNED && r.status !== RentalInquiryStatus.IN_PROGRESS)) {
+          return { referenceType: type, referenceId, driverId: r?.driverId ?? null, driverNetCdf: 0 };
+        }
+        const rule = await this.commission.get(CommissionServiceType.RENTAL);
+        const gross = r.totalCdf ?? r.estimatedPriceCdf ?? 0;
+        return {
+          referenceType: type,
+          referenceId,
+          driverId: r.driverId,
+          driverNetCdf: this.commission.splitGross(gross, rule.platformPercent).driverNetCdf,
+        };
+      }
+      case 'CARPOOL': {
+        const t = await this.prisma.carpoolTrip.findUnique({ where: { id: referenceId } });
+        if (!t || t.status !== 'COMPLETED' || !t.driverId) {
+          return { referenceType: type, referenceId, driverId: t?.driverId ?? null, driverNetCdf: 0 };
+        }
+        const rule = await this.commission.get(CommissionServiceType.CARPOOL);
+        const booked = t.seatsTotal - t.seatsAvailable;
+        const gross = t.pricePerSeatCdf * Math.max(booked, 1);
+        return {
+          referenceType: type,
+          referenceId,
+          driverId: t.driverId,
+          driverNetCdf: this.commission.splitGross(gross, rule.platformPercent).driverNetCdf,
+        };
+      }
+      case 'SCHEDULED': {
+        const s = await this.prisma.scheduledRide.findUnique({ where: { id: referenceId } });
+        if (!s || s.status !== ScheduledRideStatus.COMPLETED || !s.driverId) {
+          return { referenceType: type, referenceId, driverId: s?.driverId ?? null, driverNetCdf: 0 };
+        }
+        const rule = await this.commission.get(CommissionServiceType.RIDE);
+        const gross = s.estimatedPriceCdf;
+        return {
+          referenceType: type,
+          referenceId,
+          driverId: s.driverId,
+          driverNetCdf: this.commission.splitGross(gross, rule.platformPercent).driverNetCdf,
+        };
+      }
+      default:
+        return { referenceType: type, referenceId, driverId: null, driverNetCdf: 0 };
+    }
+  }
+
   async getDriverPayoutItems(driverUserId: string) {
-    const [rides, deliveries, rideRule, deliveryRule] = await Promise.all([
+    const [rides, deliveries, movings, errands, rentals, carpools, scheduled, rideRule, deliveryRule, movingRule, errandRule, rentalRule, carpoolRule] =
+      await Promise.all([
       this.prisma.ride.findMany({ where: { driverId: driverUserId, status: RideStatus.COMPLETED } }),
       this.prisma.delivery.findMany({ where: { driverId: driverUserId, status: DeliveryStatus.DELIVERED } }),
+      this.prisma.movingRequest.findMany({ where: { driverId: driverUserId, status: MovingRequestStatus.COMPLETED } }),
+      this.prisma.errandOrder.findMany({ where: { driverId: driverUserId, status: ErrandOrderStatus.COMPLETED } }),
+      this.prisma.rentalInquiry.findMany({
+        where: { driverId: driverUserId, status: { in: [RentalInquiryStatus.IN_PROGRESS, RentalInquiryStatus.RETURNED] } },
+      }),
+      this.prisma.carpoolTrip.findMany({ where: { driverId: driverUserId, status: 'COMPLETED' } }),
+      this.prisma.scheduledRide.findMany({ where: { driverId: driverUserId, status: ScheduledRideStatus.COMPLETED } }),
       this.commission.get(CommissionServiceType.RIDE),
       this.commission.get(CommissionServiceType.DELIVERY),
+      this.commission.get(CommissionServiceType.MOVING),
+      this.commission.get(CommissionServiceType.ERRAND),
+      this.commission.get(CommissionServiceType.RENTAL),
+      this.commission.get(CommissionServiceType.CARPOOL),
     ]);
-    const rideNet = (gross: number) => this.commission.splitGross(gross, rideRule.platformPercent).driverNetCdf;
-    const deliveryNet = (gross: number) => this.commission.splitGross(gross, deliveryRule.platformPercent).driverNetCdf;
+    const rideNet = (gross: number, pct: number) => this.commission.splitGross(gross, pct).driverNetCdf;
 
     const items = [
       ...rides.map((r) => ({
         referenceType: 'RIDE',
         referenceId: r.id,
-        driverNetCdf: rideNet(r.finalFareCdf ?? r.estimatedFareCdf ?? 0),
+        driverNetCdf: rideNet(r.finalFareCdf ?? r.estimatedFareCdf ?? 0, rideRule.platformPercent),
         completedAt: r.completedAt?.toISOString() ?? null,
       })),
       ...deliveries.map((d) => ({
         referenceType: 'DELIVERY',
         referenceId: d.id,
-        driverNetCdf: deliveryNet(this.deliveryDriverGross(d)),
+        driverNetCdf: rideNet(this.deliveryDriverGross(d), deliveryRule.platformPercent),
         completedAt: d.deliveredAt?.toISOString() ?? null,
+      })),
+      ...movings.map((m) => ({
+        referenceType: 'MOVING',
+        referenceId: m.id,
+        driverNetCdf: rideNet(m.estimatedPriceCdf, movingRule.platformPercent),
+        completedAt: m.completedAt?.toISOString() ?? null,
+      })),
+      ...errands.map((e) => ({
+        referenceType: 'ERRAND',
+        referenceId: e.id,
+        driverNetCdf: rideNet((e.finalPriceCdf ?? e.estimatedPriceCdf) + (e.purchaseTotalCdf ?? 0), errandRule.platformPercent),
+        completedAt: e.completedAt?.toISOString() ?? null,
+      })),
+      ...rentals.map((r) => ({
+        referenceType: 'RENTAL',
+        referenceId: r.id,
+        driverNetCdf: rideNet(r.totalCdf ?? r.estimatedPriceCdf ?? 0, rentalRule.platformPercent),
+        completedAt: r.updatedAt.toISOString(),
+      })),
+      ...carpools.map((t) => {
+        const booked = t.seatsTotal - t.seatsAvailable;
+        return {
+          referenceType: 'CARPOOL',
+          referenceId: t.id,
+          driverNetCdf: rideNet(t.pricePerSeatCdf * Math.max(booked, 1), carpoolRule.platformPercent),
+          completedAt: t.updatedAt.toISOString(),
+        };
+      }),
+      ...scheduled.map((s) => ({
+        referenceType: 'SCHEDULED',
+        referenceId: s.id,
+        driverNetCdf: rideNet(s.estimatedPriceCdf, rideRule.platformPercent),
+        completedAt: s.updatedAt.toISOString(),
       })),
     ];
     return { items };

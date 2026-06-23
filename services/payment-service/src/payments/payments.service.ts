@@ -106,6 +106,25 @@ export class PaymentsService {
     await this.driverPayouts.creditRidePayoutFromPayment(rideId, payout.driverId, payout.driverNetCdf);
   }
 
+  private async creditDriverAfterServicePayment(referenceType: string, referenceId: string) {
+    try {
+      const res = await fetch(
+        serviceUrl('ride', `/internal/services/${referenceType.toUpperCase()}/${referenceId}/payout`),
+        { headers: { 'x-internal-api-key': INTERNAL_API_KEY } },
+      );
+      if (!res.ok) return;
+      const payout = (await res.json()) as { driverId?: string; driverNetCdf?: number };
+      if (!payout?.driverId || (payout.driverNetCdf ?? 0) <= 0) return;
+      await this.driverPayouts.creditPayout(payout.driverId, {
+        referenceType: referenceType.toUpperCase(),
+        referenceId,
+        driverNetCdf: payout.driverNetCdf ?? 0,
+      });
+    } catch (e) {
+      this.logger.warn(`creditDriverAfterServicePayment ${referenceType}/${referenceId} failed`, e);
+    }
+  }
+
   async processPayment(rideId: string, userId: string, amountCdf: number, method: PaymentMethod, phone: string) {
     const provider = this.getProvider(method);
     const result = await provider.initiatePayment(amountCdf, phone, rideId);
@@ -175,6 +194,8 @@ export class PaymentsService {
         referenceType: string;
         referenceId: string;
         title?: string;
+        driverId?: string | null;
+        cashPin?: string | null;
       }>;
     } catch (e) {
       if (e instanceof MovaHttpException) throw e;
@@ -210,6 +231,7 @@ export class PaymentsService {
         update: { status: PaymentStatus.COMPLETED, method, amountCdf },
       });
       await this.publishPaymentCompleted({ referenceType: type, referenceId, userId, amountCdf, method: method.toString() });
+      await this.creditDriverAfterServicePayment(type, referenceId);
       return { success: true, payment, message: 'Paiement portefeuille effectué', amountCdf, currency: 'CDF' };
     }
     if (method === PaymentMethod.CASH) {
@@ -249,7 +271,47 @@ export class PaymentsService {
       amountCdf,
       method: method.toString(),
     });
+    await this.creditDriverAfterServicePayment(type, referenceId);
     return { success: true, payment, message: result.message ?? 'Paiement effectué', amountCdf, currency: 'CDF' };
+  }
+
+  async confirmCashService(referenceType: string, referenceId: string, driverUserId: string, pin: string) {
+    const type = referenceType.toUpperCase();
+    if (type === 'RIDE') return this.confirmCashRide(referenceId, driverUserId, pin);
+
+    const info = await this.fetchServicePaymentInfo(type, referenceId);
+    if (info.driverId !== driverUserId) {
+      throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
+    }
+    if (!info.paymentReady) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Le service n\'est pas prêt pour le paiement.');
+    }
+    const expectedPin = String(info.cashPin ?? '').trim();
+    if (!expectedPin || String(pin).trim() !== expectedPin) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Code PIN incorrect.');
+    }
+    const existing = await this.prisma.servicePayment.findUnique({
+      where: { referenceType_referenceId: { referenceType: type, referenceId } },
+    });
+    if (!existing || existing.method !== PaymentMethod.CASH) {
+      throw new MovaHttpException(MovaErrorCode.PAYMENT_FAILED, undefined, 'Aucun paiement espèces en attente.');
+    }
+    if (existing.status === PaymentStatus.COMPLETED) {
+      return { success: true, payment: existing, message: 'Paiement déjà confirmé' };
+    }
+    const payment = await this.prisma.servicePayment.update({
+      where: { referenceType_referenceId: { referenceType: type, referenceId } },
+      data: { status: PaymentStatus.COMPLETED, providerRef: `cash_confirmed_${type}:${referenceId}` },
+    });
+    await this.publishPaymentCompleted({
+      referenceType: type,
+      referenceId,
+      userId: existing.userId,
+      amountCdf: existing.amountCdf,
+      method: 'CASH',
+    });
+    await this.creditDriverAfterServicePayment(type, referenceId);
+    return { success: true, payment, message: 'Paiement espèces confirmé' };
   }
 
   async confirmCashRide(rideId: string, driverUserId: string, pin: string) {

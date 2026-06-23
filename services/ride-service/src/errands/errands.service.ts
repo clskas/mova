@@ -544,26 +544,14 @@ export class ErrandsService {
   }
 
   async updateStatus(id: string, userId: string, status: ErrandOrderStatus) {
-    const order = await this.get(id, userId);
-    const allowed: Record<ErrandOrderStatus, ErrandOrderStatus[]> = {
-      [ErrandOrderStatus.PENDING]: [ErrandOrderStatus.ASSIGNED, ErrandOrderStatus.CANCELLED],
-      [ErrandOrderStatus.ASSIGNED]: [ErrandOrderStatus.IN_PROGRESS, ErrandOrderStatus.CANCELLED],
-      [ErrandOrderStatus.IN_PROGRESS]: [ErrandOrderStatus.COMPLETED],
-      [ErrandOrderStatus.COMPLETED]: [],
-      [ErrandOrderStatus.CANCELLED]: [],
-    };
-    if (!allowed[order.status]?.includes(status)) {
-      throw new MovaHttpException(MovaErrorCode.ERRAND_INVALID_STATUS);
+    await this.get(id, userId);
+    if (status !== ErrandOrderStatus.CANCELLED) {
+      throw new MovaHttpException(
+        MovaErrorCode.ERRAND_INVALID_STATUS,
+        HttpStatus.FORBIDDEN,
+        'Seul l\'annulation est autorisée depuis l\'application passager.',
+      );
     }
-    const updates: Record<string, unknown> = { status };
-    if (status === ErrandOrderStatus.COMPLETED) updates.completedAt = new Date();
-    if (status === ErrandOrderStatus.CANCELLED) updates.cancelledAt = new Date();
-    const updated = await this.prisma.errandOrder.update({ where: { id }, data: updates });
-    const timeline = buildErrandTimeline(updated.status, updated.completedAt);
-    return {
-      order: updated,
-      timeline,
-      paymentReady: status === ErrandOrderStatus.COMPLETED,
-    };
+    return this.cancel(id, userId);
   }
 }

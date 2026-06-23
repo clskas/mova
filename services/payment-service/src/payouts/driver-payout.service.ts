@@ -41,7 +41,17 @@ export class DriverPayoutService {
     const label =
       item.referenceType.toUpperCase() === 'DELIVERY'
         ? `Revenu livraison ${item.referenceId}`
-        : `Revenu course ${item.referenceId}`;
+        : item.referenceType.toUpperCase() === 'MOVING'
+          ? `Revenu déménagement ${item.referenceId}`
+          : item.referenceType.toUpperCase() === 'ERRAND'
+            ? `Revenu course & commission ${item.referenceId}`
+            : item.referenceType.toUpperCase() === 'RENTAL'
+              ? `Revenu location ${item.referenceId}`
+              : item.referenceType.toUpperCase() === 'CARPOOL'
+                ? `Revenu covoiturage ${item.referenceId}`
+                : item.referenceType.toUpperCase() === 'SCHEDULED'
+                  ? `Revenu course planifiée ${item.referenceId}`
+                  : `Revenu course ${item.referenceId}`;
 
     const wallet = await this.wallet.credit(driverUserId, amount, label, reference);
     return { credited: true, amountCdf: amount, reference, balanceCdf: wallet.balanceCdf };

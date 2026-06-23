@@ -1,9 +1,15 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { DeliveryStatus, ErrandOrderStatus, MovingRequestStatus, RentalInquiryStatus } from '@prisma/client';
+import {
+  DeliveryStatus,
+  ErrandOrderStatus,
+  MovingRequestStatus,
+  RentalInquiryStatus,
+  ScheduledRideStatus,
+} from '@prisma/client';
 import { MovaErrorCode, MovaHttpException, fromMobileRideStatus } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 
-export type ServiceReferenceType = 'RIDE' | 'DELIVERY' | 'ERRAND' | 'MOVING' | 'RENTAL' | 'CARPOOL';
+export type ServiceReferenceType = 'RIDE' | 'DELIVERY' | 'ERRAND' | 'MOVING' | 'RENTAL' | 'CARPOOL' | 'SCHEDULED';
 
 export interface ServicePaymentInfo {
   referenceType: ServiceReferenceType;
@@ -13,6 +19,8 @@ export interface ServicePaymentInfo {
   status: string;
   paymentReady: boolean;
   title?: string;
+  driverId?: string | null;
+  cashPin?: string | null;
 }
 
 @Injectable()
@@ -34,6 +42,8 @@ export class PaymentInfoService {
         return this.rentalInfo(referenceId);
       case 'CARPOOL':
         return this.carpoolInfo(referenceId);
+      case 'SCHEDULED':
+        return this.scheduledInfo(referenceId);
       default:
         throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Type de service invalide pour le paiement.');
     }
@@ -51,6 +61,8 @@ export class PaymentInfoService {
       amountCdf,
       status,
       paymentReady: status === 'COMPLETED',
+      driverId: ride.driverId,
+      cashPin: ride.completionPin,
       title: `${ride.pickupAddress ?? 'Départ'} → ${ride.dropoffAddress ?? 'Arrivée'}`,
     };
   }
@@ -66,6 +78,8 @@ export class PaymentInfoService {
       amountCdf,
       status: delivery.status,
       paymentReady: delivery.status === DeliveryStatus.DELIVERED,
+      driverId: delivery.driverId,
+      cashPin: delivery.deliveryPin,
       title: delivery.dropoffAddress ?? delivery.deliveryAddress ?? 'Livraison',
     };
   }
@@ -73,13 +87,16 @@ export class PaymentInfoService {
   private async errandInfo(errandId: string): Promise<ServicePaymentInfo> {
     const order = await this.prisma.errandOrder.findUnique({ where: { id: errandId } });
     if (!order) throw new MovaHttpException(MovaErrorCode.ERRAND_NOT_FOUND, HttpStatus.NOT_FOUND);
+    const amountCdf = (order.finalPriceCdf ?? order.estimatedPriceCdf) + (order.purchaseTotalCdf ?? 0);
     return {
       referenceType: 'ERRAND',
       referenceId: errandId,
       userId: order.userId,
-      amountCdf: order.estimatedPriceCdf,
+      amountCdf,
       status: order.status,
       paymentReady: order.status === ErrandOrderStatus.COMPLETED,
+      driverId: order.driverId,
+      cashPin: order.completionPin,
       title: order.description,
     };
   }
@@ -94,6 +111,8 @@ export class PaymentInfoService {
       amountCdf: request.estimatedPriceCdf,
       status: request.status,
       paymentReady: request.status === MovingRequestStatus.COMPLETED,
+      driverId: request.driverId,
+      cashPin: request.completionPin,
       title: `${request.pickupAddress} → ${request.dropoffAddress}`,
     };
   }
@@ -101,7 +120,8 @@ export class PaymentInfoService {
   private async rentalInfo(bookingId: string): Promise<ServicePaymentInfo> {
     const inquiry = await this.prisma.rentalInquiry.findUnique({ where: { id: bookingId }, include: { vehicle: true } });
     if (!inquiry) throw new MovaHttpException(MovaErrorCode.RENTAL_INQUIRY_NOT_FOUND, HttpStatus.NOT_FOUND);
-    const ready = inquiry.status === RentalInquiryStatus.CONFIRMED || inquiry.status === RentalInquiryStatus.CONTACTED;
+    const ready =
+      inquiry.status === RentalInquiryStatus.IN_PROGRESS || inquiry.status === RentalInquiryStatus.RETURNED;
     return {
       referenceType: 'RENTAL',
       referenceId: bookingId,
@@ -109,6 +129,7 @@ export class PaymentInfoService {
       amountCdf: inquiry.totalCdf ?? inquiry.estimatedPriceCdf ?? 0,
       status: inquiry.status,
       paymentReady: ready,
+      driverId: inquiry.driverId,
       title: inquiry.vehicle?.name ?? inquiry.vehicleType,
     };
   }
@@ -130,7 +151,24 @@ export class PaymentInfoService {
       amountCdf,
       status: trip.status,
       paymentReady: trip.status === 'COMPLETED',
+      driverId: trip.driverId,
       title: `${trip.pickupAddress ?? 'Départ'} → ${trip.dropoffAddress ?? 'Arrivée'}`,
+    };
+  }
+
+  private async scheduledInfo(scheduledId: string): Promise<ServicePaymentInfo> {
+    const ride = await this.prisma.scheduledRide.findUnique({ where: { id: scheduledId } });
+    if (!ride) throw new MovaHttpException(MovaErrorCode.SCHEDULED_RIDE_NOT_FOUND, HttpStatus.NOT_FOUND);
+    return {
+      referenceType: 'SCHEDULED',
+      referenceId: scheduledId,
+      userId: ride.passengerId,
+      amountCdf: ride.estimatedPriceCdf,
+      status: ride.status,
+      paymentReady: ride.status === ScheduledRideStatus.COMPLETED,
+      driverId: ride.driverId,
+      cashPin: ride.completionPin,
+      title: `${ride.pickupAddress ?? 'Départ'} → ${ride.dropoffAddress ?? 'Arrivée'}`,
     };
   }
 }

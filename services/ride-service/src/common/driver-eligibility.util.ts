@@ -1,5 +1,15 @@
 import { HttpStatus } from '@nestjs/common';
-import { INTERNAL_API_KEY, MovaErrorCode, MovaHttpException, serviceUrl } from '@mova/shared';
+import {
+  driverEligibleForMoving,
+  driverEligibleForParcelWeight,
+  driverEligibleForRide,
+  INTERNAL_API_KEY,
+  MovaErrorCode,
+  MovaHttpException,
+  normalizeVehicleType,
+  serviceUrl,
+  VehicleTypeValue,
+} from '@mova/shared';
 
 export type DriverProfileSnapshot = {
   isAvailable?: boolean;
@@ -42,6 +52,81 @@ export async function assertDriverCanReceiveJobs(userId: string): Promise<Driver
       MovaErrorCode.DRIVER_DOCUMENTS_EXPIRED,
       HttpStatus.FORBIDDEN,
       profile.documentsStatus?.blockReason,
+    );
+  }
+  return profile;
+}
+
+export async function assertDriverEligibleForMoving(
+  userId: string,
+  vehicleCategory: string,
+): Promise<DriverProfileSnapshot> {
+  const profile = await assertDriverCanReceiveJobs(userId);
+  const types = (profile.vehicles ?? [])
+    .filter((v) => v.isActive !== false)
+    .map((v) => {
+      try {
+        return normalizeVehicleType(v.type) as VehicleTypeValue;
+      } catch {
+        return null;
+      }
+    })
+    .filter((t): t is VehicleTypeValue => t != null);
+  if (!driverEligibleForMoving(types, vehicleCategory)) {
+    throw new MovaHttpException(
+      MovaErrorCode.VALIDATION_ERROR,
+      HttpStatus.FORBIDDEN,
+      'Ce chauffeur n\'a pas d\'engin adapté au déménagement (moto-taxi exclu).',
+    );
+  }
+  return profile;
+}
+
+export async function assertDriverEligibleForRide(
+  userId: string,
+  rideVehicleType: string,
+): Promise<DriverProfileSnapshot> {
+  const profile = await assertDriverCanReceiveJobs(userId);
+  const types = (profile.vehicles ?? [])
+    .filter((v) => v.isActive !== false)
+    .map((v) => {
+      try {
+        return normalizeVehicleType(v.type) as VehicleTypeValue;
+      } catch {
+        return null;
+      }
+    })
+    .filter((t): t is VehicleTypeValue => t != null);
+  if (!driverEligibleForRide(types, rideVehicleType)) {
+    throw new MovaHttpException(
+      MovaErrorCode.VALIDATION_ERROR,
+      HttpStatus.FORBIDDEN,
+      'Véhicule du chauffeur incompatible avec le type de course demandé.',
+    );
+  }
+  return profile;
+}
+
+export async function assertDriverEligibleForParcel(
+  userId: string,
+  weightCategory: string | null | undefined,
+): Promise<DriverProfileSnapshot> {
+  const profile = await assertDriverCanReceiveJobs(userId);
+  const types = (profile.vehicles ?? [])
+    .filter((v) => v.isActive !== false)
+    .map((v) => {
+      try {
+        return normalizeVehicleType(v.type) as VehicleTypeValue;
+      } catch {
+        return null;
+      }
+    })
+    .filter((t): t is VehicleTypeValue => t != null);
+  if (!driverEligibleForParcelWeight(types, weightCategory)) {
+    throw new MovaHttpException(
+      MovaErrorCode.VALIDATION_ERROR,
+      HttpStatus.FORBIDDEN,
+      'Engin incompatible avec le poids du colis (voiture requise pour colis moyen/grand).',
     );
   }
   return profile;

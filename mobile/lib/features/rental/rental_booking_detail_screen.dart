@@ -10,6 +10,7 @@ import '../../core/services/cancel_eligibility.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
+import '../booking/payment_screen.dart';
 
 class RentalBookingDetailScreen extends ConsumerStatefulWidget {
   const RentalBookingDetailScreen({
@@ -207,6 +208,9 @@ class _RentalBookingDetailScreenState extends ConsumerState<RentalBookingDetailS
     final status = b['status']?.toString().toUpperCase();
     final canConfirmHandover = b['canConfirmHandover'] == true || status == 'CONFIRMED';
     final canCancel = CancelEligibility.rental(b);
+    final paymentReady = b['paymentReady'] == true ||
+        status == 'IN_PROGRESS' ||
+        status == 'RETURNED';
     final statusColor = switch (status) {
       'CONFIRMED' || 'IN_PROGRESS' || 'RETURNED' => MovaColors.green,
       'CONTACTED' => MovaColors.violet,
@@ -329,6 +333,25 @@ class _RentalBookingDetailScreenState extends ConsumerState<RentalBookingDetailS
               label: 'J\'ai reçu le véhicule',
               icon: Icons.key_outlined,
               onPressed: _actionLoading ? null : _confirmHandover,
+            ),
+          ],
+          if (paymentReady && total > 0) ...[
+            const SizedBox(height: 16),
+            MovaButton(
+              label: 'Payer la location',
+              icon: Icons.payment_outlined,
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => PaymentScreen(
+                      serviceType: 'RENTAL',
+                      serviceId: widget.bookingId,
+                      amountCdf: total,
+                    ),
+                  ),
+                );
+              },
             ),
           ],
           if (_error != null) ...[

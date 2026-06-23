@@ -22,6 +22,10 @@ export class CreateMovingDto extends EstimateMovingDto {
   @IsArray()
   @IsString({ each: true })
   photoUrls?: string[];
+  @ApiPropertyOptional({ description: 'Liste des meubles / cartons (texte libre)' })
+  @IsOptional()
+  @IsString()
+  itemsNotes?: string;
 }
 
 export class UpdateMovingStatusDto {

@@ -15,7 +15,8 @@ describe('ScheduledRidesService', () => {
   };
 
   const redis = { publish: jest.fn().mockResolvedValue(undefined) };
-  const service = new ScheduledRidesService(prisma as never, pricing, redis as never);
+  const tripShare = { generateCompletionPin: jest.fn().mockReturnValue('1234') };
+  const service = new ScheduledRidesService(prisma as never, pricing, redis as never, tripShare as never);
 
   beforeEach(() => jest.clearAllMocks());
 

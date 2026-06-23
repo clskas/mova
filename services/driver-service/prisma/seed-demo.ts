@@ -3,43 +3,34 @@ import { IncidentType, KycStatus, PrismaClient, VehicleType } from '@prisma/clie
 const AUTH_SERVICE_URL = process.env.AUTH_SERVICE_URL ?? 'http://localhost:3011';
 const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY ?? 'mova-internal-dev';
 
-const PENDING_DRIVERS = [
-  {
-    phone: '+243900000020',
-    license: 'KIN-DRV-001',
-    plate: 'CD-1234-KIN',
-    make: 'Toyota',
-    model: 'Corolla',
-    type: VehicleType.STANDARD,
-  },
-  {
-    phone: '+243900000021',
-    license: 'KIN-DRV-002',
-    plate: 'CD-5678-KIN',
-    make: 'Honda',
-    model: 'CB125',
-    type: VehicleType.MOTO_TAXI,
-  },
-  {
-    phone: '+243900000022',
-    license: 'KIN-DRV-003',
-    plate: 'CD-9012-KIN',
-    make: 'Mercedes',
-    model: 'E-Class',
-    type: VehicleType.COMFORT,
-  },
+/** KYC APPROVED — prêts à accepter des courses après connexion. */
+const APPROVED_DRIVER_PHONES = new Set([
+  '+243900000023',
+  '+243900000024',
+  '+243900000025',
+  '+243900000027',
+  '+243900000029',
+]);
+
+const DRIVER_SEEDS = [
+  { phone: '+243900000020', license: 'KIN-DRV-001', plate: 'CD-1234-KIN', make: 'Toyota', model: 'Corolla', type: VehicleType.STANDARD },
+  { phone: '+243900000021', license: 'KIN-DRV-002', plate: 'CD-5678-KIN', make: 'Honda', model: 'CB125', type: VehicleType.MOTO_TAXI },
+  { phone: '+243900000022', license: 'KIN-DRV-003', plate: 'CD-9012-KIN', make: 'Mercedes', model: 'E-Class', type: VehicleType.COMFORT },
+  { phone: '+243900000023', license: 'KIN-DRV-004', plate: 'CD-3456-KIN', make: 'Toyota', model: 'RAV4', type: VehicleType.STANDARD },
+  { phone: '+243900000024', license: 'KIN-DRV-005', plate: 'CD-4567-KIN', make: 'Hyundai', model: 'Accent', type: VehicleType.STANDARD },
+  { phone: '+243900000025', license: 'KIN-DRV-006', plate: 'CD-MOTO-025', make: 'Yamaha', model: 'FZ150', type: VehicleType.MOTO_TAXI },
+  { phone: '+243900000026', license: 'KIN-DRV-007', plate: 'CD-6789-KIN', make: 'Toyota', model: 'Yaris', type: VehicleType.STANDARD },
+  { phone: '+243900000027', license: 'KIN-DRV-008', plate: 'CD-COMF-027', make: 'BMW', model: 'Serie 3', type: VehicleType.COMFORT },
+  { phone: '+243900000028', license: 'KIN-DRV-009', plate: 'CD-MOTO-028', make: 'Honda', model: 'Wave', type: VehicleType.MOTO_TAXI },
+  { phone: '+243900000029', license: 'KIN-DRV-010', plate: 'CD-7890-KIN', make: 'Nissan', model: 'Sentra', type: VehicleType.STANDARD },
 ];
 
-const APPROVED_DRIVER = {
-  phone: '+243900000023',
-  license: 'KIN-DRV-004',
-  plate: 'CD-3456-KIN',
-  make: 'Toyota',
-  model: 'RAV4',
-  type: VehicleType.STANDARD,
-};
-
-const DEMO_PASSENGERS = ['+243900000010', '+243900000011'];
+const DEMO_PASSENGERS = [
+  '+243900000010',
+  '+243900000011',
+  '+243900000012',
+  '+243900000013',
+];
 
 async function userIdByPhone(phone: string): Promise<string | null> {
   const res = await fetch(`${AUTH_SERVICE_URL}/internal/users?take=200`, {
@@ -161,16 +152,24 @@ async function main() {
   const prisma = new PrismaClient();
   let synced = 0;
 
-  for (const d of PENDING_DRIVERS) {
+  for (const d of DRIVER_SEEDS) {
     const userId = await userIdByPhone(d.phone);
     if (!userId) {
       console.warn(`Skip driver seed — user not found: ${d.phone}`);
       continue;
     }
+    const approved = APPROVED_DRIVER_PHONES.has(d.phone);
     await upsertDriver(prisma, userId, {
-      ...d,
-      kycStatus: KycStatus.PENDING,
-      onboardingCompleted: d.phone === '+243900000020',
+      license: d.license,
+      plate: d.plate,
+      make: d.make,
+      model: d.model,
+      type: d.type,
+      kycStatus: approved ? KycStatus.APPROVED : KycStatus.PENDING,
+      isAvailable: approved,
+      onboardingCompleted: approved || d.phone === '+243900000020',
+      activationPin: approved ? '123456' : undefined,
+      activationPinVerified: approved,
     });
     if (d.phone === '+243900000020') {
       await ensureExtraVehicle(prisma, userId, {
@@ -186,19 +185,6 @@ async function main() {
         type: VehicleType.COMFORT,
       });
     }
-    synced++;
-  }
-
-  const approvedUserId = await userIdByPhone(APPROVED_DRIVER.phone);
-  if (approvedUserId) {
-    await upsertDriver(prisma, approvedUserId, {
-      ...APPROVED_DRIVER,
-      kycStatus: KycStatus.APPROVED,
-      isAvailable: true,
-      onboardingCompleted: true,
-      activationPin: '123456',
-      activationPinVerified: true,
-    });
     synced++;
   }
 
@@ -234,7 +220,7 @@ async function main() {
     }
   }
 
-  console.log(`Driver demo seeded for ${synced} drivers (linked by phone via auth-service)`);
+  console.log(`Driver demo seeded for ${synced} drivers (${APPROVED_DRIVER_PHONES.size} KYC approved)`);
   await prisma.$disconnect();
 }
 

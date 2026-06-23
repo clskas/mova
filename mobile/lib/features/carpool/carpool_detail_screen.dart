@@ -8,6 +8,7 @@ import '../../core/services/cancel_eligibility.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
+import '../booking/payment_screen.dart';
 import '../booking/widgets/mova_ride_map.dart';
 import 'carpool_contact.dart';
 
@@ -91,6 +92,30 @@ class _CarpoolDetailScreenState extends ConsumerState<CarpoolDetailScreen> {
   bool get _canComplete {
     final s = _status?.toUpperCase();
     return _isDriver && s == 'IN_PROGRESS';
+  }
+
+  bool get _canPay {
+    final s = _status?.toUpperCase();
+    return _isPassenger && s == 'COMPLETED';
+  }
+
+  Future<void> _openPayment() async {
+    final trip = _trip;
+    if (trip == null) return;
+    final seats = (trip['mySeats'] as int?) ?? (trip['bookedSeats'] as int?) ?? 1;
+    final pricePerSeat = trip['pricePerSeatCdf'] as int? ?? 0;
+    final amount = pricePerSeat * seats;
+    if (amount <= 0) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PaymentScreen(
+          serviceType: 'CARPOOL',
+          serviceId: widget.tripId,
+          amountCdf: amount,
+        ),
+      ),
+    );
   }
 
   bool get _canRate {
@@ -384,6 +409,15 @@ class _CarpoolDetailScreenState extends ConsumerState<CarpoolDetailScreen> {
                         onPressed: _completeTrip,
                       ),
                     ],
+                  ],
+                  if (_canPay) ...[
+                    const SizedBox(height: 16),
+                    MovaButton(
+                      label: 'Payer ma place',
+                      icon: Icons.payment_outlined,
+                      isLoading: _actionLoading,
+                      onPressed: _openPayment,
+                    ),
                   ],
                   if (_canRate) ...[
                     const SizedBox(height: 16),

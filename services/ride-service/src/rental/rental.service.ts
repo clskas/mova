@@ -703,6 +703,8 @@ export class RentalService {
       remainingHours: remaining?.remainingHours ?? 0,
       remainingLabel: remaining?.remainingLabel ?? null,
       remainingActive: remaining?.isActive ?? false,
+      paymentReady:
+        inquiry.status === RentalInquiryStatus.IN_PROGRESS || inquiry.status === RentalInquiryStatus.RETURNED,
     };
   }
 
@@ -858,9 +860,7 @@ export class RentalService {
       data: started.map((r) => ({
         ...this.enrichInquiry(r),
         paymentReady:
-          r.status === RentalInquiryStatus.CONFIRMED ||
-          r.status === RentalInquiryStatus.CONTACTED ||
-          r.status === RentalInquiryStatus.IN_PROGRESS,
+          r.status === RentalInquiryStatus.IN_PROGRESS || r.status === RentalInquiryStatus.RETURNED,
         priceCdf: r.totalCdf ?? r.estimatedPriceCdf,
         currency: MARKET_RDC.currency,
       })),

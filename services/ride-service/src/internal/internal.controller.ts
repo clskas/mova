@@ -80,6 +80,11 @@ export class InternalController {
     return this.rides.getRidePayout(id);
   }
 
+  @Get('services/:referenceType/:referenceId/payout')
+  servicePayout(@Param('referenceType') referenceType: string, @Param('referenceId') referenceId: string) {
+    return this.rides.getServicePayout(referenceType, referenceId);
+  }
+
   @Get('rides')
   listRides(
     @Query('status') status?: string,
@@ -155,8 +160,15 @@ export class InternalController {
   }
 
   @Patch('deliveries/:id/assign')
-  assignDelivery(@Param('id') id: string, @Body('driverId') driverId: string) {
-    return this.errands.adminAssignDriver(id, driverId);
+  async assignDelivery(@Param('id') id: string, @Body('driverId') driverId: string) {
+    try {
+      return await this.deliveries.adminAssignDriver(id, driverId);
+    } catch (error) {
+      if (error instanceof MovaHttpException && error.code === MovaErrorCode.DELIVERY_NOT_FOUND) {
+        return this.errands.adminAssignDriver(id, driverId);
+      }
+      throw error;
+    }
   }
 
   @Get('scheduled-rides')

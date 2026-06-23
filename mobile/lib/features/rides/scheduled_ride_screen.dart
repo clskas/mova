@@ -16,6 +16,7 @@ import '../../core/location/destination_coords.dart';
 import '../../core/widgets/destination_coord_panel.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
+import '../booking/payment_screen.dart';
 import '../history/history_detail_dialog.dart';
 
 class ScheduledRideScreen extends ConsumerStatefulWidget {
@@ -340,6 +341,24 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Fermer')),
+          if (status == 'COMPLETED' && id.isNotEmpty)
+            FilledButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => PaymentScreen(
+                      serviceType: 'SCHEDULED',
+                      serviceId: id,
+                      amountCdf: live?['estimatedPriceCdf'] as int? ?? live?['priceCdf'] as int? ?? 0,
+                      completionPin: live?['completionPin']?.toString(),
+                    ),
+                  ),
+                );
+              },
+              child: const Text('Payer'),
+            ),
           if (id.isNotEmpty && status != 'CANCELLED' && status != 'COMPLETED')
             TextButton(
               onPressed: () {

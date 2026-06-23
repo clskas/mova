@@ -1,6 +1,6 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { DeliveryStatus, DeliveryType, Prisma, SurchargeType, TrackingReferenceType, VehicleType, WeightCategory } from '@prisma/client';
-import { INTERNAL_API_KEY, MARKET_RDC, MOVA_EVENTS, MovaErrorCode, MovaHttpException, canCancelDelivery, formatCdf, resolveCityFromCoords, serviceUrl } from '@mova/shared';
+import { driverEligibleForParcelWeight, INTERNAL_API_KEY, MARKET_RDC, MOVA_EVENTS, MovaErrorCode, MovaHttpException, canCancelDelivery, formatCdf, normalizeVehicleType, resolveCityFromCoords, serviceUrl, VehicleTypeValue } from '@mova/shared';
 import { RedisService } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { PricingService } from '../rides/pricing.service';
@@ -14,7 +14,7 @@ import {
   formatParcelDelivery,
   generateDeliveryPin,
 } from './parcel.util';
-import { assertDriverCanReceiveJobs, driverCanReceiveJobs, fetchDriverProfileSnapshot } from '../common/driver-eligibility.util';
+import { assertDriverCanReceiveJobs, assertDriverEligibleForParcel, driverCanReceiveJobs, fetchDriverProfileSnapshot } from '../common/driver-eligibility.util';
 import { TrackingService } from '../tracking/tracking.service';
 import { MatchingService } from '../matching/matching.service';
 import { notifyNearbyDrivers } from '../common/driver-job-alert.util';
@@ -721,6 +721,16 @@ export class DeliveriesService {
     });
 
     const radiusKm = MARKET_RDC.matching.maxRadiusKm;
+    const driverTypes = (profile.vehicles ?? [])
+      .filter((v) => v.isActive !== false)
+      .map((v) => {
+        try {
+          return normalizeVehicleType(v.type) as VehicleTypeValue;
+        } catch {
+          return null;
+        }
+      })
+      .filter((t): t is VehicleTypeValue => t != null);
     const offers = deliveries
       .map((d) => {
         const pickupLat = d.pickupLat ?? d.restaurant?.lat ?? 0;
@@ -746,6 +756,9 @@ export class DeliveriesService {
         };
       })
       .filter((o) => {
+        if (o.type !== DeliveryType.FOOD && !driverEligibleForParcelWeight(driverTypes, o.weightCategory as string | undefined)) {
+          return false;
+        }
         if (o.type === DeliveryType.FOOD) {
           return o.pickupCity === operatingCity || (hasGps && o.distanceToPickupKm <= radiusKm);
         }
@@ -758,9 +771,13 @@ export class DeliveriesService {
   }
 
   async acceptDelivery(deliveryId: string, driverUserId: string) {
-    await assertDriverCanReceiveJobs(driverUserId);
     const delivery = await this.prisma.delivery.findUnique({ where: { id: deliveryId } });
     if (!delivery) throw new MovaHttpException(MovaErrorCode.DELIVERY_NOT_FOUND, HttpStatus.NOT_FOUND);
+    if (delivery.type !== DeliveryType.FOOD) {
+      await assertDriverEligibleForParcel(driverUserId, delivery.weightCategory);
+    } else {
+      await assertDriverCanReceiveJobs(driverUserId);
+    }
     const foodAcceptable =
       delivery.type === DeliveryType.FOOD && delivery.status === DeliveryStatus.READY_FOR_PICKUP;
     const parcelAcceptable =
@@ -789,6 +806,15 @@ export class DeliveriesService {
     if (!delivery) throw new MovaHttpException(MovaErrorCode.DELIVERY_NOT_FOUND, HttpStatus.NOT_FOUND);
     if (delivery.userId !== userId && delivery.driverId !== userId) {
       throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
+    }
+    const isPassenger = delivery.userId === userId;
+    const isDriver = delivery.driverId === userId;
+    if (isPassenger && !isDriver && status !== DeliveryStatus.CANCELLED) {
+      throw new MovaHttpException(
+        MovaErrorCode.DELIVERY_INVALID_STATUS,
+        HttpStatus.FORBIDDEN,
+        'Seul l\'annulation est autorisée depuis l\'application passager.',
+      );
     }
     const allowed: Record<DeliveryStatus, DeliveryStatus[]> = {
       [DeliveryStatus.PENDING]: [DeliveryStatus.PICKED_UP, DeliveryStatus.CANCELLED],
@@ -907,6 +933,50 @@ export class DeliveriesService {
       timeline: formatted.timeline,
       gpsTrace,
     };
+  }
+
+  async adminAssignDriver(id: string, driverId: string) {
+    if (!driverId?.trim()) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Chauffeur requis.');
+    }
+    const delivery = await this.prisma.delivery.findUnique({ where: { id } });
+    if (!delivery) throw new MovaHttpException(MovaErrorCode.DELIVERY_NOT_FOUND, HttpStatus.NOT_FOUND);
+    if (delivery.type !== DeliveryType.FOOD) {
+      await assertDriverEligibleForParcel(driverId.trim(), delivery.weightCategory);
+    } else {
+      await assertDriverCanReceiveJobs(driverId.trim());
+    }
+    if (delivery.status === DeliveryStatus.DELIVERED || delivery.status === DeliveryStatus.CANCELLED) {
+      throw new MovaHttpException(MovaErrorCode.DELIVERY_INVALID_STATUS);
+    }
+    const nextStatus =
+      delivery.type === DeliveryType.FOOD && delivery.status === DeliveryStatus.READY_FOR_PICKUP
+        ? DeliveryStatus.PICKED_UP
+        : delivery.type !== DeliveryType.FOOD && delivery.status === DeliveryStatus.PENDING
+          ? DeliveryStatus.PICKED_UP
+          : delivery.status;
+    const updated = await this.prisma.delivery.update({
+      where: { id },
+      data: {
+        driverId: driverId.trim(),
+        status: nextStatus,
+        ...(nextStatus === DeliveryStatus.PICKED_UP ? { pickedUpAt: new Date() } : {}),
+      },
+      include: { restaurant: true, events: { orderBy: { createdAt: 'asc' } } },
+    });
+    await this.prisma.deliveryEvent.create({
+      data: { deliveryId: id, event: 'ASSIGNED', metadata: { driverUserId: driverId.trim(), by: 'admin' } },
+    });
+    const courier = await this.fetchCourierProfile(driverId.trim());
+    const formatted = formatParcelDelivery(updated, courier);
+    await this.redis.publish(MOVA_EVENTS.DELIVERY_STATUS_UPDATED, {
+      deliveryId: id,
+      userId: delivery.userId,
+      type: delivery.type,
+      status: updated.status,
+      restaurantName: updated.restaurant?.name,
+    });
+    return { delivery: formatted, driverId: updated.driverId, status: updated.status };
   }
 
   async updateStatusAdmin(id: string, status: DeliveryStatus) {

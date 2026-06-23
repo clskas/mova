@@ -26,7 +26,9 @@ describe('MovingService', () => {
 
   const redis = { publish: jest.fn().mockResolvedValue(undefined) };
 
-  const service = new MovingService(prisma as never, pricing, surcharges as never, redis as never);
+  const tripShare = { generateCompletionPin: jest.fn().mockReturnValue('1234') };
+
+  const service = new MovingService(prisma as never, pricing, surcharges as never, redis as never, tripShare as never);
 
   const dto = {
     volumeM3: 5,

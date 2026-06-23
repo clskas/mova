@@ -892,6 +892,14 @@ class ApiClient {
     return post('/payments/rides/$rideId/cash/confirm', {'pin': pin});
   }
 
+  Future<Result<Map<String, dynamic>>> confirmCashService(
+    String referenceType,
+    String referenceId,
+    String pin,
+  ) async {
+    return post('/payments/services/$referenceType/$referenceId/cash/confirm', {'pin': pin});
+  }
+
   Future<Result<Map<String, dynamic>>> createRideShareLink(String rideId) async {
     return post('/rides/$rideId/share-link', {});
   }

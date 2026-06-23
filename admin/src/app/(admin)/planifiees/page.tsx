@@ -12,6 +12,7 @@ import {
   type AdminDriver,
   type ScheduledOverview,
 } from "@/lib/api";
+import { filterDriversForRideVehicle } from "@/lib/driver-assignment";
 import { useAdmin } from "@/components/AdminProvider";
 import { AssignDriverPanel } from "@/components/AssignDriverPanel";
 import { ContactBlock } from "@/components/ContactActions";
@@ -178,12 +179,13 @@ export default function PlanifieesPage() {
                     <td className="p-3">
                       <AssignDriverPanel
                         compact
-                        drivers={drivers}
+                        drivers={filterDriversForRideVehicle(drivers, s.vehicleType)}
                         value={rowAssign[s.id] ?? s.driverId ?? ""}
                         currentDriverId={s.driverId}
                         onChange={(v) => setRowAssign((prev) => ({ ...prev, [s.id]: v }))}
                         onAssign={() => assignDriver(s.id, rowAssign[s.id] ?? "")}
                         saving={assigningId === s.id}
+                        emptyLabel="Aucun chauffeur avec le type d'engin demandé pour cette course planifiée."
                       />
                     </td>
                   )}
@@ -211,7 +213,7 @@ export default function PlanifieesPage() {
 
             {!readOnly && (
               <AssignDriverPanel
-                drivers={drivers}
+                drivers={filterDriversForRideVehicle(drivers, selected.vehicleType)}
                 value={assignDriverId}
                 currentDriverId={selected.driverId}
                 onChange={setAssignDriverId}

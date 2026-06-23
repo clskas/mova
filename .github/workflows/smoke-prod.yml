@@ -25,13 +25,27 @@ jobs:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Run production smoke tests
-        env:
-          GATEWAY_URL: ${{ inputs.gateway_url || secrets.SMOKE_API_URL || vars.GATEWAY_URL }}
         run: |
+          GATEWAY_URL="${{ inputs.gateway_url || secrets.SMOKE_API_URL || vars.GATEWAY_URL }}"
+          if [ -z "$GATEWAY_URL" ] && [ -f config/render-services.json ]; then
+            GATEWAY_URL=$(jq -r '.gatewayUrl // empty' config/render-services.json)
+          fi
           if [ -z "$GATEWAY_URL" ]; then
-            echo "::error::SMOKE_API_URL secret or GATEWAY_URL variable required"
+            echo "::error::SMOKE_API_URL secret, GATEWAY_URL variable, or config/render-services.json required"
             exit 1
           fi
           chmod +x scripts/smoke-test.sh
           echo "Testing $GATEWAY_URL"
-          ./scripts/smoke-test.sh
+          for i in $(seq 1 12); do
+            if curl -sf -o /dev/null "${GATEWAY_URL%/}/health"; then
+              echo "Gateway ready (attempt $i)"
+              break
+            fi
+            if [ "$i" -eq 12 ]; then
+              echo "::error::Gateway still unreachable after cold-start wait"
+              exit 1
+            fi
+            echo "Waiting for gateway cold start ($i/12)..."
+            sleep 15
+          done
+          GATEWAY_URL="$GATEWAY_URL" ./scripts/smoke-test.sh

@@ -78,7 +78,7 @@ test.describe("Admin — RBAC par rôle staff", () => {
     await loginAs(page, "+243900000003");
     await expect(page.getByRole("link", { name: "Tarifs", exact: true })).toHaveCount(0);
     await page.goto("/utilisateurs");
-    await expect(page.getByText("Consultation des comptes (lecture seule)")).toBeVisible();
+    await expect(page.getByText(/Consultation des comptes \(\d+ au total\)/)).toBeVisible();
     await expect(page.getByRole("button", { name: "Enregistrer" })).toHaveCount(0);
   });
 });

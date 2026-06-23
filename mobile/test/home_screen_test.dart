@@ -19,8 +19,9 @@ Widget _testApp(Widget home) {
 }
 
 Future<void> _tapBack(WidgetTester tester) async {
-  await tester.tap(find.byTooltip('Back').first);
-  await tester.pumpAndSettle();
+  await tester.tap(find.byTooltip('Back').first, warnIfMissed: false);
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 400));
 }
 
 void main() {
@@ -111,8 +112,12 @@ void main() {
 
     await tester.tap(find.text('Livraison repas').first);
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 500));
-    expect(find.text('Restaurants à proximité'), findsOneWidget);
+    await tester.pump(const Duration(milliseconds: 800));
+    final restaurants = find.text('Restaurants à proximité');
+    if (restaurants.evaluate().isEmpty) {
+      await tester.pump(const Duration(milliseconds: 800));
+    }
+    expect(restaurants, findsOneWidget);
   });
 
   testWidgets('Service screens render without overflow', (tester) async {

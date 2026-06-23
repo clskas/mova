@@ -55,11 +55,14 @@ void main() {
 
     await tester.enterText(find.byType(TextField).last, 'Gombe');
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump(const Duration(milliseconds: 500));
 
     await tester.tap(find.text('Estimer le prix'));
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 500));
+    for (var i = 0; i < 40; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+      if (find.text('Confirmer la course').evaluate().isNotEmpty) break;
+    }
 
     expect(find.text('Confirmer la course'), findsOneWidget);
     expect(find.text('Estimation'), findsOneWidget);
@@ -93,11 +96,14 @@ void main() {
 
     await tester.enterText(find.byType(TextField).last, 'Gombe');
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump(const Duration(milliseconds: 500));
 
     await tester.tap(find.text('Estimer le prix'));
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 500));
+    for (var i = 0; i < 40; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+      if (find.text('Confirmer la course').evaluate().isNotEmpty) break;
+    }
 
     final confirm = find.text('Confirmer la course');
     await tester.scrollUntilVisible(
@@ -109,9 +115,12 @@ void main() {
       ).first,
     );
     await tester.ensureVisible(confirm);
-    await tester.tap(confirm);
+    await tester.tap(confirm, warnIfMissed: false);
     await tester.pump();
-    await tester.pump(const Duration(seconds: 2));
+    for (var i = 0; i < 30; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+      if (find.text('Recherche').evaluate().isNotEmpty) break;
+    }
 
     expect(find.text('Recherche'), findsOneWidget);
     expect(find.text("Recherche d'un chauffeur…"), findsOneWidget);

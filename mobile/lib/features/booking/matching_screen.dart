@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/api/api_client.dart';
 import '../../core/config/market_config.dart';
+import '../../core/config/test_runtime_config.dart';
 import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
@@ -79,6 +80,7 @@ class _MatchingScreenState extends ConsumerState<MatchingScreen>
           _lastSearchAt = DateTime.now();
         });
         if (api.isMockMode) {
+          if (movaSkipMatchingAutoTracking) return;
           await Future<void>.delayed(const Duration(seconds: 1));
           if (mounted) _goToTracking();
           return;

@@ -1,6 +1,9 @@
 import { Controller, Get } from '@nestjs/common';
 import { MARKET_RDC, SERVICE_PORTS, serviceUrl } from '@mova/shared';
 
+/** Per-service fetch timeout (ms). 15s tolerates Render free-tier cold starts. */
+const HEALTH_CHECK_TIMEOUT_MS = Number(process.env.HEALTH_CHECK_TIMEOUT_MS ?? 15_000);
+
 @Controller()
 export class HealthController {
   @Get('health')
@@ -10,7 +13,7 @@ export class HealthController {
       services.map(async (name) => {
         try {
           const controller = new AbortController();
-          const timeout = setTimeout(() => controller.abort(), 3000);
+          const timeout = setTimeout(() => controller.abort(), HEALTH_CHECK_TIMEOUT_MS);
           try {
             const res = await fetch(serviceUrl(name, '/health'), { signal: controller.signal });
             const data = await res.json();

@@ -170,6 +170,7 @@ async function wireEnvVars(services) {
     },
     'mova-driver': {
       DATABASE_URL: process.env.DATABASE_URL_DRIVERS,
+      REDIS_URL: process.env.REDIS_URL || REDIS_INTERNAL_URL,
       JWT_SECRET: jwtSecret,
       RIDE_SERVICE_URL: `https://${url('mova-ride')}`,
     },

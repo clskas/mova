@@ -7,6 +7,7 @@ RUN npm run build
 
 FROM node:22-alpine AS builder
 WORKDIR /app
+RUN apk add --no-cache openssl
 COPY --from=shared-builder /app/packages/shared ./packages/shared
 COPY services/driver-service/package*.json ./services/driver-service/
 WORKDIR /app/services/driver-service

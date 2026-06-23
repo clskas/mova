@@ -21,4 +21,9 @@ export class UpdateErrandStatusDto {
   @ApiProperty({ enum: ErrandOrderStatus })
   @IsEnum(ErrandOrderStatus)
   status!: ErrandOrderStatus;
+
+  @ApiPropertyOptional({ description: 'Montant des achats effectués (CDF), saisi à la complétion' })
+  @IsOptional()
+  @IsNumber()
+  purchaseTotalCdf?: number;
 }

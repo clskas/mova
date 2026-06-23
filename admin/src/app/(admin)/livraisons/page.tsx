@@ -16,6 +16,7 @@ import {
 } from "@/lib/api";
 import { useAdmin } from "@/components/AdminProvider";
 import { AssignDriverPanel } from "@/components/AssignDriverPanel";
+import { filterDriversForParcel } from "@/lib/driver-assignment";
 import { ContactBlock } from "@/components/ContactActions";
 import { GpsTraceMap } from "@/components/GpsTraceMap";
 import {
@@ -181,6 +182,16 @@ export default function LivraisonsPage() {
     }
   }
 
+  const canAssignRecord = (d: DeliveryOverview) => {
+    if (!canAssign) return false;
+    if (d.type === "ERRAND") return !["COMPLETED", "CANCELLED"].includes(d.status ?? "");
+    return !["DELIVERED", "CANCELLED"].includes(d.status ?? "");
+  };
+
+  const assignableDrivers = selected
+    ? filterDriversForParcel(drivers, selected.weightCategory)
+    : drivers;
+
   async function saveAssignment() {
     if (!selected || !assignDriverId) return;
     setSaving(true);
@@ -275,9 +286,9 @@ export default function LivraisonsPage() {
                 !["DELIVERED", "COMPLETED", "CANCELLED"].includes(selected.status ?? "")
               }
             />
-            {selected.type === "ERRAND" && canAssign && (
+            {canAssignRecord(selected) && (
               <AssignDriverPanel
-                drivers={drivers}
+                drivers={assignableDrivers}
                 value={assignDriverId}
                 onChange={setAssignDriverId}
                 onAssign={saveAssignment}
@@ -286,9 +297,11 @@ export default function LivraisonsPage() {
                 currentDriverId={selected.driverId ?? undefined}
               />
             )}
-            {selected.type === "ERRAND" && canAssign && (
+            {canAssignRecord(selected) && (
               <p className="text-xs text-gray-500">
-                L&apos;assignation enregistre le chauffeur et passe le statut à « Coursier assigné ». La mission apparaît alors dans l&apos;app chauffeur.
+                {selected.type === "ERRAND"
+                  ? "L'assignation enregistre le chauffeur et passe le statut à « Coursier assigné ». La mission apparaît alors dans l'app chauffeur."
+                  : "L'assignation enregistre le coursier sur cette livraison. Colis moyen/grand : voiture ou utilitaire requis."}
               </p>
             )}
             {!readOnly && (

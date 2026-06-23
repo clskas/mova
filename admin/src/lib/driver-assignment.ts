@@ -1,6 +1,6 @@
 import type { AdminDriver } from "./api";
 
-const CARGO_VEHICLE_TYPES = new Set(["STANDARD", "COMFORT", "VIP"]);
+const CARGO_VEHICLE_TYPES = new Set(["STANDARD", "COMFORT", "VIP", "UTILITAIRE", "CAMION"]);
 
 function activeVehicleTypes(driver: AdminDriver): string[] {
   return (driver.vehicles ?? [])
@@ -22,10 +22,18 @@ export function filterDriversForMoving(
     if (!driverHasCargoVehicle(d)) return false;
     const types = activeVehicleTypes(d);
     if (vehicleCategory === "CAMION_30M3" || vehicleCategory === "CAMION_50M3") {
-      return types.some((t) => t === "COMFORT" || t === "VIP" || t === "STANDARD");
+      return types.some((t) => t === "UTILITAIRE" || t === "CAMION" || t === "COMFORT" || t === "VIP");
+    }
+    if (vehicleCategory === "CAMION_15M3" || vehicleCategory === "CAMIONNETTE") {
+      return types.some((t) => CARGO_VEHICLE_TYPES.has(t));
     }
     return true;
   });
+}
+
+/** Chauffeurs éligibles pour logistique location MOVA (livraison/récupération véhicule). */
+export function filterDriversForRentalLogistics(drivers: AdminDriver[]): AdminDriver[] {
+  return drivers.filter((d) => driverHasCargoVehicle(d));
 }
 
 /** Filtre colis/livraisons selon le poids (MEDIUM/LARGE → voiture). */

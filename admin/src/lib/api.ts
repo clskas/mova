@@ -211,6 +211,7 @@ export type DeliveryOverview = {
   dropoffAddress?: string;
   restaurantName?: string;
   description?: string;
+  weightCategory?: string;
   priceCdf?: number;
   createdAt?: string;
   userId?: string;

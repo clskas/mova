@@ -11,7 +11,7 @@ export type MobileRideStatus =
 
 export type MobileVehicleType = 'MOTO' | 'STANDARD' | 'CONFORT' | 'VIP';
 
-export type VehicleTypeValue = 'MOTO_TAXI' | 'STANDARD' | 'COMFORT' | 'VIP';
+export type VehicleTypeValue = 'MOTO_TAXI' | 'STANDARD' | 'COMFORT' | 'VIP' | 'UTILITAIRE' | 'CAMION';
 export type RideStatusValue =
   | 'REQUESTED'
   | 'SEARCHING'
@@ -28,6 +28,8 @@ const VEHICLE_ALIASES: Record<string, VehicleTypeValue> = {
   CONFORT: 'COMFORT',
   COMFORT: 'COMFORT',
   VIP: 'VIP',
+  UTILITAIRE: 'UTILITAIRE',
+  CAMION: 'CAMION',
 };
 
 export function normalizeVehicleType(input: string): VehicleTypeValue {
@@ -44,6 +46,9 @@ export function toMobileVehicleType(type: VehicleTypeValue): MobileVehicleType {
       return 'CONFORT';
     case 'VIP':
       return 'VIP';
+    case 'UTILITAIRE':
+    case 'CAMION':
+      return 'STANDARD';
     default:
       return 'STANDARD';
   }
@@ -68,6 +73,9 @@ export function rideTypesDriverCanServe(driverVehicleTypes: VehicleTypeValue[]):
         types.add('STANDARD');
         types.add('COMFORT');
         types.add('VIP');
+        break;
+      case 'UTILITAIRE':
+      case 'CAMION':
         break;
     }
   }
@@ -100,7 +108,9 @@ export function driverEligibleForParcelWeight(
   weightCategory: string | null | undefined,
 ): boolean {
   const types = driverVehicleTypes.filter(Boolean);
-  const hasCar = types.some((t) => t === 'STANDARD' || t === 'COMFORT' || t === 'VIP');
+  const hasCar = types.some(
+    (t) => t === 'STANDARD' || t === 'COMFORT' || t === 'VIP' || t === 'UTILITAIRE' || t === 'CAMION',
+  );
   const hasMoto = types.includes('MOTO_TAXI');
   const cat = (weightCategory ?? 'SMALL').toUpperCase();
   if (cat === 'MEDIUM' || cat === 'LARGE') return hasCar;
@@ -133,10 +143,18 @@ export function driverEligibleForMoving(
   switch (category) {
     case 'CAMIONNETTE':
     case 'CAMION_15M3':
-      return active.some((t) => t === 'STANDARD' || t === 'COMFORT' || t === 'VIP');
+      return active.some(
+        (t) =>
+          t === 'STANDARD' ||
+          t === 'COMFORT' ||
+          t === 'VIP' ||
+          t === 'UTILITAIRE' ||
+          t === 'CAMION',
+      );
     case 'CAMION_30M3':
+      return active.some((t) => t === 'UTILITAIRE' || t === 'CAMION' || t === 'COMFORT' || t === 'VIP');
     case 'CAMION_50M3':
-      return active.some((t) => t === 'COMFORT' || t === 'VIP' || t === 'STANDARD');
+      return active.some((t) => t === 'CAMION' || t === 'UTILITAIRE');
     default:
       return active.length > 0;
   }

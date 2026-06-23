@@ -133,7 +133,7 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
     }
   }
 
-  Future<void> _advanceStatus(String nextStatus, String successMessage) async {
+  Future<void> _advanceStatus(String nextStatus, String successMessage, {int? purchaseTotalCdf}) async {
     setState(() {
       _loading = true;
       _error = null;
@@ -141,7 +141,10 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
     final api = ref.read(apiClientProvider);
     final Result<Map<String, dynamic>> result;
     if (_isErrand) {
-      result = await api.patch('/errands/$_deliveryId/driver-status', {'status': nextStatus});
+      result = await api.patch('/errands/$_deliveryId/driver-status', {
+        'status': nextStatus,
+        if (purchaseTotalCdf != null) 'purchaseTotalCdf': purchaseTotalCdf,
+      });
     } else {
       result = await api.updateDeliveryStatus(_deliveryId, nextStatus);
     }
@@ -154,15 +157,91 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
               data['delivery'] as Map<String, dynamic>? ??
               data;
         });
-        if (nextStatus == 'DELIVERED' || nextStatus == 'COMPLETED') {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(successMessage)));
-          Navigator.pop(context, true);
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(successMessage)));
-        }
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(successMessage)));
       case Failure(:final error):
         setState(() => _error = error.message);
     }
+  }
+
+  Future<void> _completeErrandWithPurchase() async {
+    final controller = TextEditingController(text: '0');
+    final purchaseStr = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Montant des achats'),
+        content: TextField(
+          controller: controller,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(
+            labelText: 'Total achats (CDF)',
+            hintText: '0 si aucun achat',
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Annuler')),
+          TextButton(onPressed: () => Navigator.pop(ctx, controller.text.trim()), child: const Text('Valider')),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (purchaseStr == null || !mounted) return;
+    final purchase = int.tryParse(purchaseStr) ?? 0;
+    await _advanceStatus('COMPLETED', 'Courses terminées', purchaseTotalCdf: purchase);
+  }
+
+  Future<void> _handleNextAction() async {
+    if (_isErrand && _nextAction == 'COMPLETED') {
+      await _completeErrandWithPurchase();
+      return;
+    }
+    if (_nextAction != null) {
+      await _advanceStatus(
+        _nextAction!,
+        _nextAction == 'DELIVERED' ? 'Livraison terminée' : 'Statut mis à jour',
+      );
+    }
+  }
+
+  Future<void> _confirmCash() async {
+    final pinController = TextEditingController();
+    final pin = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Confirmer espèces'),
+        content: TextField(
+          controller: pinController,
+          keyboardType: TextInputType.number,
+          maxLength: 4,
+          decoration: const InputDecoration(labelText: 'Code PIN passager'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Annuler')),
+          TextButton(onPressed: () => Navigator.pop(ctx, pinController.text.trim()), child: const Text('Valider')),
+        ],
+      ),
+    );
+    pinController.dispose();
+    if (pin == null || pin.isEmpty || !mounted) return;
+    setState(() => _loading = true);
+    final api = ref.read(apiClientProvider);
+    final refType = _isErrand ? 'ERRAND' : 'DELIVERY';
+    final result = await api.confirmCashService(refType, _deliveryId, pin);
+    if (!mounted) return;
+    setState(() => _loading = false);
+    switch (result) {
+      case Success():
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Paiement espèces confirmé')),
+        );
+        Navigator.pop(context, true);
+      case Failure(:final error):
+        setState(() => _error = error.message);
+    }
+  }
+
+  bool get _awaitingCashConfirm {
+    if (_isErrand) return _status == 'COMPLETED';
+    return _status == 'DELIVERED';
   }
 
   Future<void> _openMaps() async {
@@ -294,17 +373,21 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
             MovaErrorBanner(message: _error!),
           ],
           const SizedBox(height: 16),
-          if (_nextAction != null)
+          if (_nextAction != null && !_awaitingCashConfirm)
             MovaButton(
               label: _actionLabel,
               icon: Icons.delivery_dining,
-              onPressed: _loading
-                  ? null
-                  : () => _advanceStatus(
-                        _nextAction!,
-                        _nextAction == 'DELIVERED' ? 'Livraison terminée' : 'Statut mis à jour',
-                      ),
+              onPressed: _loading ? null : _handleNextAction,
             ),
+          if (_awaitingCashConfirm) ...[
+            const SizedBox(height: 8),
+            MovaButton(
+              label: 'Confirmer paiement espèces',
+              isSecondary: true,
+              icon: Icons.payments_outlined,
+              onPressed: _loading ? null : _confirmCash,
+            ),
+          ],
           const SizedBox(height: 8),
           MovaButton(
             label: _status == 'PICKED_UP' ? 'Navigation — restaurant' : 'Ouvrir la navigation',

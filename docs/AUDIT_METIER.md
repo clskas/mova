@@ -44,26 +44,25 @@ Inspiré des pratiques Uber/Bolt (courses), Deliveroo (livraisons), AnyVan/Lugg 
 
 ---
 
-## Anomalies restantes (P1 — à vérifier en test)
+## Anomalies corrigées (P1 + P2 — commit audit + P2)
 
 ### Paiement
-1. **Location** — pas d'écran paiement mobile ; `paymentReady` avant fin de location
-2. **Covoiturage** — pas de paiement in-app après `completeTrip`
-3. **Planifiée** — type `SCHEDULED` absent du service paiement
-4. **Errand** — montant ne inclut pas achats réels (`purchaseTotalCdf`)
-5. **Espèces livraisons/errands/moving** — pas de confirmation PIN chauffeur (courses seulement)
-6. **Revenus chauffeur** — crédit immédiat : courses uniquement ; autres services via sync batch
+- [x] Location, covoiturage, planifiées : écrans paiement mobile
+- [x] Location : `paymentReady` uniquement à `RETURNED`
+- [x] Errand : `purchaseTotalCdf` saisi chauffeur + total passager (service + achats)
+- [x] Espèces : `confirmCashService()` sur livraisons, errands, moving, planifiées (app chauffeur)
+- [x] Revenus chauffeur : crédit sur tout `payService()`
 
 ### Assignation & missions
-7. **Colis LARGE** — moto peut accepter (devrait exiger voiture)
-8. **Admin livraisons** — assignation colis/food route vers errand (bug API interne)
-9. **acceptRide / acceptDelivery** — pas de re-validation véhicule côté API
-10. **Flotte déménagement** — pas de type camion dans driver-service (STANDARD utilisé comme proxy)
+- [x] Colis MEDIUM/LARGE : filtre véhicule (voiture/utilitaire/camion)
+- [x] Admin livraisons : assignation colis/food + filtre poids
+- [x] acceptRide / acceptDelivery : re-validation véhicule API
+- [x] Types **UTILITAIRE / CAMION** (driver + ride DB, onboarding, admin)
+- [x] Location MOVA driver : assign filtre engin cargo
 
 ### Sécurité / statuts
-11. **Errand** — passager peut self-compléter via `PATCH status`
-12. **Delivery** — passager peut passer `PENDING → PICKED_UP`
-13. **Inventaire déménagement** — `itemsNotes` envoyé par mobile mais non persisté en BDD
+- [x] Errand / delivery / moving : passager annulation seule
+- [x] `itemsNotes` déménagement persisté
 
 ---
 
@@ -93,10 +92,10 @@ OTP : `123456` | Admin : `+243900000001` | Passagers : `+243900000010`–`019` |
 ### 3. Livraisons
 - [ ] Colis : création → accept chauffeur → livraison → paiement
 - [ ] Food : restaurant → ready → courier → paiement
-- [ ] Tester colis LARGE avec chauffeur moto (anomalie attendue si non corrigé)
+- [ ] Tester colis LARGE : moto refusée, voiture acceptée
 
 ### 4. Errands
-- [ ] Création → assign/accept → complete → paiement
+- [ ] Création → assign/accept → chauffeur saisit montant achats → complete → paiement total
 - [ ] Vérifier montant facturé vs achats réels
 
 ### 5. Planifiées
@@ -130,10 +129,8 @@ Coef camion : camionnette 0,85 | 15 m³ 1,0 | 30 m³ 1,45 | 50 m³ 1,9
 
 ## Prochaines évolutions recommandées
 
-1. Types véhicules **CAMION / UTILITAIRE** dans driver-service
-2. Paiement mobile location + covoiturage + planifiées
-3. `confirmCashService()` unifié pour tous les services
-4. Crédit chauffeur automatique sur tout `payService()`
-5. Filtre poids colis → type véhicule minimum
+1. Chauffeur seed démo **+243900000023** : type **UTILITAIRE** (déménagement / logistique)
+2. Migration BDD : `npm run migrate:all` après pull (enum `UTILITAIRE`, `CAMION`)
+3. Tests production Render (cold start gateway)
 
 Voir aussi : [GUIDE_TEST_APPS.md](./GUIDE_TEST_APPS.md)

@@ -107,6 +107,31 @@ export async function assertDriverEligibleForRide(
   return profile;
 }
 
+export async function assertDriverEligibleForRentalLogistics(userId: string): Promise<DriverProfileSnapshot> {
+  const profile = await assertDriverCanReceiveJobs(userId);
+  const types = (profile.vehicles ?? [])
+    .filter((v) => v.isActive !== false)
+    .map((v) => {
+      try {
+        return normalizeVehicleType(v.type) as VehicleTypeValue;
+      } catch {
+        return null;
+      }
+    })
+    .filter((t): t is VehicleTypeValue => t != null);
+  const hasCargo = types.some(
+    (t) => t === 'STANDARD' || t === 'COMFORT' || t === 'VIP' || t === 'UTILITAIRE' || t === 'CAMION',
+  );
+  if (!hasCargo) {
+    throw new MovaHttpException(
+      MovaErrorCode.VALIDATION_ERROR,
+      HttpStatus.FORBIDDEN,
+      'Ce chauffeur n\'a pas d\'engin adapté à la logistique location (moto-taxi exclu).',
+    );
+  }
+  return profile;
+}
+
 export async function assertDriverEligibleForParcel(
   userId: string,
   weightCategory: string | null | undefined,

@@ -107,9 +107,10 @@ class _ErrandTrackingScreenState extends ConsumerState<ErrandTrackingScreen> {
     final status = _order?['status']?.toString();
     final paymentReady = _order?['paymentReady'] == true || status == 'COMPLETED';
     if (!paymentReady) return;
-    final price = _order?['estimatedPriceCdf'] as int? ??
+    final price = _order?['totalPriceCdf'] as int? ??
         _order?['priceCdf'] as int? ??
-        widget.totalCdf;
+        ((_order?['estimatedPriceCdf'] as int? ?? widget.totalCdf) +
+            (_order?['purchaseTotalCdf'] as int? ?? 0));
     _paymentNavigated = true;
     _pollTimer?.cancel();
     Navigator.pushReplacement(
@@ -155,7 +156,9 @@ class _ErrandTrackingScreenState extends ConsumerState<ErrandTrackingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final price = _order?['estimatedPriceCdf'] as int? ?? widget.totalCdf;
+    final price = _order?['totalPriceCdf'] as int? ??
+        ((_order?['estimatedPriceCdf'] as int? ?? widget.totalCdf) +
+            (_order?['purchaseTotalCdf'] as int? ?? 0));
 
     return MovaScreen(
       title: 'Suivi courses',

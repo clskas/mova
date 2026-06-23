@@ -3,7 +3,7 @@ import { Prisma, RentalInquiryStatus, RentalLogisticsMode, RentalVehicleApproval
 import { MARKET_RDC, MOVA_EVENTS, MovaErrorCode, MovaHttpException, canCancelRentalBooking, formatCdf, formatRentalRemaining, shouldChargeGpsAddOn, vehicleHasBuiltInGps, type RentalBookingEventKind } from '@mova/shared';
 import { RedisService } from '@mova/shared';
 import { fetchAuthUserBrief } from '../common/internal-lookup.util';
-import { assertDriverCanReceiveJobs } from '../common/driver-eligibility.util';
+import { assertDriverCanReceiveJobs, assertDriverEligibleForRentalLogistics } from '../common/driver-eligibility.util';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   CreateRentalBookingDto,
@@ -703,8 +703,7 @@ export class RentalService {
       remainingHours: remaining?.remainingHours ?? 0,
       remainingLabel: remaining?.remainingLabel ?? null,
       remainingActive: remaining?.isActive ?? false,
-      paymentReady:
-        inquiry.status === RentalInquiryStatus.IN_PROGRESS || inquiry.status === RentalInquiryStatus.RETURNED,
+      paymentReady: inquiry.status === RentalInquiryStatus.RETURNED,
     };
   }
 
@@ -859,8 +858,7 @@ export class RentalService {
     return {
       data: started.map((r) => ({
         ...this.enrichInquiry(r),
-        paymentReady:
-          r.status === RentalInquiryStatus.IN_PROGRESS || r.status === RentalInquiryStatus.RETURNED,
+        paymentReady: r.status === RentalInquiryStatus.RETURNED,
         priceCdf: r.totalCdf ?? r.estimatedPriceCdf,
         currency: MARKET_RDC.currency,
       })),
@@ -1162,7 +1160,7 @@ export class RentalService {
     if (!driverId?.trim()) {
       throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Chauffeur requis.');
     }
-    await assertDriverCanReceiveJobs(driverId.trim());
+    await assertDriverEligibleForRentalLogistics(driverId.trim());
     const inquiry = await this.prisma.rentalInquiry.findUnique({ where: { id }, include: { vehicle: true } });
     if (!inquiry) throw new MovaHttpException(MovaErrorCode.RENTAL_INQUIRY_NOT_FOUND, HttpStatus.NOT_FOUND);
     if (inquiry.status === RentalInquiryStatus.CLOSED || inquiry.status === RentalInquiryStatus.RETURNED) {

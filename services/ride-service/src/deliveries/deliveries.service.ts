@@ -8,6 +8,7 @@ import { PromoService, SurchargeService } from '../rides/surcharge.service';
 import { CreateFoodDeliveryDto, CreateFoodMultiDeliveryDto, CreateParcelDeliveryDto, RateDeliveryDto } from './deliveries.dto';
 import { assertServiceAreaPair } from '../common/address.util';
 import { tripDistanceKm } from '../common/geo.util';
+import { fetchAuthUserBrief } from '../common/internal-lookup.util';
 import {
   buildParcelTimeline,
   detectCommune,
@@ -886,16 +887,29 @@ export class DeliveriesService {
       take,
       include: { restaurant: { select: { name: true } } },
     });
-    return rows.map((d) => ({
-      id: d.id,
-      type: d.type,
-      status: d.status,
-      pickupAddress: d.pickupAddress,
-      dropoffAddress: d.dropoffAddress ?? d.deliveryAddress,
-      restaurantName: d.restaurant?.name,
-      priceCdf: d.estimatedPriceCdf,
-      createdAt: d.createdAt.toISOString(),
-    }));
+    return Promise.all(
+      rows.map(async (d) => {
+        const passenger = await fetchAuthUserBrief(d.userId);
+        const driver = d.driverId ? await fetchAuthUserBrief(d.driverId) : null;
+        return {
+          id: d.id,
+          type: d.type,
+          status: d.status,
+          pickupAddress: d.pickupAddress,
+          dropoffAddress: d.dropoffAddress ?? d.deliveryAddress,
+          restaurantName: d.restaurant?.name,
+          weightCategory: d.weightCategory,
+          priceCdf: d.estimatedPriceCdf,
+          userId: d.userId,
+          driverId: d.driverId,
+          passengerName: passenger?.name,
+          passengerPhone: passenger?.phone,
+          driverName: driver?.name,
+          driverPhone: driver?.phone,
+          createdAt: d.createdAt.toISOString(),
+        };
+      }),
+    );
   }
 
   async listRestaurantsAdmin() {

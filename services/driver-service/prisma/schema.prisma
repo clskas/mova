@@ -13,6 +13,8 @@ enum VehicleType {
   STANDARD
   COMFORT
   VIP
+  UTILITAIRE
+  CAMION
 }
 
 enum KycStatus {

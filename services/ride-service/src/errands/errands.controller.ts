@@ -60,6 +60,6 @@ export class ErrandsController {
     @Param('id') id: string,
     @Body() dto: UpdateErrandStatusDto,
   ) {
-    return this.errandsService.updateStatusByDriver(id, req.user.id, dto.status);
+    return this.errandsService.updateStatusByDriver(id, req.user.id, dto.status, dto.purchaseTotalCdf);
   }
 }

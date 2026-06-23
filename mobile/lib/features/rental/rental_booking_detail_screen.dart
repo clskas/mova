@@ -208,9 +208,7 @@ class _RentalBookingDetailScreenState extends ConsumerState<RentalBookingDetailS
     final status = b['status']?.toString().toUpperCase();
     final canConfirmHandover = b['canConfirmHandover'] == true || status == 'CONFIRMED';
     final canCancel = CancelEligibility.rental(b);
-    final paymentReady = b['paymentReady'] == true ||
-        status == 'IN_PROGRESS' ||
-        status == 'RETURNED';
+    final paymentReady = b['paymentReady'] == true || status == 'RETURNED';
     final statusColor = switch (status) {
       'CONFIRMED' || 'IN_PROGRESS' || 'RETURNED' => MovaColors.green,
       'CONTACTED' => MovaColors.violet,

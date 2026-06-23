@@ -59,7 +59,7 @@ export class ErrandsService {
     const { baseCdf } = await this.errandFees();
     const distanceKm = this.pricing.haversineKm(dto.pickupLat, dto.pickupLng, dto.dropoffLat, dto.dropoffLng);
     const durationMin = (distanceKm / 18) * 60;
-    const fare = await this.pricing.estimateFare(VehicleType.MOTO_TAXI, distanceKm, durationMin);
+    const fare = await this.pricing.estimateFare(VehicleType.STANDARD, distanceKm, durationMin);
     const { itemCdf } = await this.errandFees();
     const itemsFee = itemCount * itemCdf;
     const estimatedPriceCdf = Math.ceil(fare.estimatedFareCdf + baseCdf + itemsFee);
@@ -189,6 +189,9 @@ export class ErrandsService {
   private formatErrand(order: ErrandOrder, extra?: Record<string, unknown>) {
     const structuredItems = this.itemsFromOrder(order);
     const timeline = buildErrandTimeline(order.status, order.completedAt);
+    const serviceFeeCdf = order.finalPriceCdf ?? order.estimatedPriceCdf;
+    const purchaseCdf = order.purchaseTotalCdf ?? 0;
+    const totalPriceCdf = serviceFeeCdf + purchaseCdf;
     return {
       id: order.id,
       type: 'ERRAND',
@@ -200,7 +203,9 @@ export class ErrandsService {
       structuredItems,
       budgetCdf: order.budgetCdf,
       purchaseTotalCdf: order.purchaseTotalCdf,
-      finalPriceCdf: order.finalPriceCdf ?? order.estimatedPriceCdf,
+      finalPriceCdf: serviceFeeCdf,
+      serviceFeeCdf,
+      totalPriceCdf,
       completionPin: order.completionPin,
       proofPhotoUrl: order.proofPhotoUrl,
       pickupAddress: order.pickupAddress,
@@ -211,7 +216,7 @@ export class ErrandsService {
       dropoffLat: order.dropoffLat,
       dropoffLng: order.dropoffLng,
       estimatedPriceCdf: order.estimatedPriceCdf,
-      priceCdf: order.estimatedPriceCdf,
+      priceCdf: totalPriceCdf,
       distanceKm: order.distanceKm,
       durationMin: order.durationMin,
       createdAt: order.createdAt.toISOString(),
@@ -374,7 +379,7 @@ export class ErrandsService {
     return rows.map((o) => this.formatErrand(o));
   }
 
-  async updateStatusByDriver(id: string, driverId: string, status: ErrandOrderStatus) {
+  async updateStatusByDriver(id: string, driverId: string, status: ErrandOrderStatus, purchaseTotalCdf?: number) {
     const order = await this.prisma.errandOrder.findUnique({ where: { id } });
     if (!order) throw new MovaHttpException(MovaErrorCode.ERRAND_NOT_FOUND, HttpStatus.NOT_FOUND);
     if (order.driverId !== driverId) {
@@ -397,6 +402,9 @@ export class ErrandsService {
     if (status === ErrandOrderStatus.COMPLETED) {
       updates.completedAt = new Date();
       updates.finalPriceCdf = order.finalPriceCdf ?? order.estimatedPriceCdf;
+      if (purchaseTotalCdf != null && purchaseTotalCdf >= 0) {
+        updates.purchaseTotalCdf = Math.round(purchaseTotalCdf);
+      }
     }
     const updated = await this.prisma.errandOrder.update({ where: { id }, data: updates });
     const formatted = this.formatErrand(updated);

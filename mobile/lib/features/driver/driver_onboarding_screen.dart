@@ -664,6 +664,8 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
             DropdownMenuItem(value: 'STANDARD', child: Text('Standard')),
             DropdownMenuItem(value: 'COMFORT', child: Text('Confort')),
             DropdownMenuItem(value: 'VIP', child: Text('VIP')),
+            DropdownMenuItem(value: 'UTILITAIRE', child: Text('Utilitaire')),
+            DropdownMenuItem(value: 'CAMION', child: Text('Camion')),
           ],
           onChanged: (v) => setState(() => _vehicleType = v ?? 'STANDARD'),
         ),

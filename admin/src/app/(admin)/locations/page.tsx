@@ -15,6 +15,7 @@ import {
 } from "@/lib/api";
 import { useAdmin } from "@/components/AdminProvider";
 import { AssignDriverPanel } from "@/components/AssignDriverPanel";
+import { filterDriversForRentalLogistics } from "@/lib/driver-assignment";
 import { ContactBlock } from "@/components/ContactActions";
 import {
   BtnDanger,
@@ -97,6 +98,8 @@ export default function LocationsPage() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  const rentalDrivers = filterDriversForRentalLogistics(drivers);
 
   function openDetail(r: RentalInquiry) {
     setSelected(r);
@@ -222,7 +225,7 @@ export default function LocationsPage() {
                       {canAssignLogistics(r) ? (
                         <AssignDriverPanel
                           compact
-                          drivers={drivers}
+                          drivers={rentalDrivers}
                           value={rowAssign[r.id] ?? r.driverId ?? ""}
                           currentDriverId={r.driverId}
                           onChange={(v) => setRowAssign((prev) => ({ ...prev, [r.id]: v }))}
@@ -299,7 +302,7 @@ export default function LocationsPage() {
 
             {!readOnly && canAssignLogistics(selected) && (
               <AssignDriverPanel
-                drivers={drivers}
+                drivers={rentalDrivers}
                 value={assignDriverId}
                 currentDriverId={selected.driverId}
                 onChange={setAssignDriverId}

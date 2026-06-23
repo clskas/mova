@@ -46,6 +46,8 @@ const VEHICLE_TYPE_LABELS: Record<string, string> = {
   STANDARD: "Standard",
   COMFORT: "Confort",
   VIP: "VIP",
+  UTILITAIRE: "Utilitaire",
+  CAMION: "Camion",
 };
 
 function activeDriverVehicle(driver?: AdminDriver | AdminDriverDetail | null) {

@@ -16,7 +16,7 @@ const DRIVER_SEEDS = [
   { phone: '+243900000020', license: 'KIN-DRV-001', plate: 'CD-1234-KIN', make: 'Toyota', model: 'Corolla', type: VehicleType.STANDARD },
   { phone: '+243900000021', license: 'KIN-DRV-002', plate: 'CD-5678-KIN', make: 'Honda', model: 'CB125', type: VehicleType.MOTO_TAXI },
   { phone: '+243900000022', license: 'KIN-DRV-003', plate: 'CD-9012-KIN', make: 'Mercedes', model: 'E-Class', type: VehicleType.COMFORT },
-  { phone: '+243900000023', license: 'KIN-DRV-004', plate: 'CD-3456-KIN', make: 'Toyota', model: 'RAV4', type: VehicleType.STANDARD },
+  { phone: '+243900000023', license: 'KIN-DRV-004', plate: 'CD-3456-KIN', make: 'Toyota', model: 'Hiace', type: VehicleType.UTILITAIRE },
   { phone: '+243900000024', license: 'KIN-DRV-005', plate: 'CD-4567-KIN', make: 'Hyundai', model: 'Accent', type: VehicleType.STANDARD },
   { phone: '+243900000025', license: 'KIN-DRV-006', plate: 'CD-MOTO-025', make: 'Yamaha', model: 'FZ150', type: VehicleType.MOTO_TAXI },
   { phone: '+243900000026', license: 'KIN-DRV-007', plate: 'CD-6789-KIN', make: 'Toyota', model: 'Yaris', type: VehicleType.STANDARD },

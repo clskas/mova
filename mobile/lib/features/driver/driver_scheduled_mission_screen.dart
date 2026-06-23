@@ -92,11 +92,44 @@ class _DriverScheduledMissionScreenState extends ConsumerState<DriverScheduledMi
       case Success(:final data):
         setState(() => _ride = data['scheduledRide'] as Map<String, dynamic>? ?? _ride);
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(successMessage)));
-        if (nextStatus == 'COMPLETED') {
-          Navigator.pop(context, true);
-        } else {
+        if (nextStatus != 'COMPLETED') {
           await _load();
         }
+      case Failure(:final error):
+        setState(() => _error = error.message);
+    }
+  }
+
+  Future<void> _confirmCash() async {
+    final pinController = TextEditingController();
+    final pin = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Confirmer espèces'),
+        content: TextField(
+          controller: pinController,
+          keyboardType: TextInputType.number,
+          maxLength: 4,
+          decoration: const InputDecoration(labelText: 'Code PIN passager'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Annuler')),
+          TextButton(onPressed: () => Navigator.pop(ctx, pinController.text.trim()), child: const Text('Valider')),
+        ],
+      ),
+    );
+    pinController.dispose();
+    if (pin == null || pin.isEmpty || !mounted) return;
+    setState(() => _saving = true);
+    final result = await ref.read(apiClientProvider).confirmCashService('SCHEDULED', widget.rideId, pin);
+    if (!mounted) return;
+    setState(() => _saving = false);
+    switch (result) {
+      case Success():
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Paiement espèces confirmé')),
+        );
+        Navigator.pop(context, true);
       case Failure(:final error):
         setState(() => _error = error.message);
     }
@@ -250,6 +283,15 @@ class _DriverScheduledMissionScreenState extends ConsumerState<DriverScheduledMi
                     ? null
                     : () => _advanceStatus('COMPLETED', 'Course terminée'),
               ),
+            if (_status == 'COMPLETED') ...[
+              const SizedBox(height: 8),
+              MovaButton(
+                label: 'Confirmer paiement espèces',
+                isSecondary: true,
+                icon: Icons.payments_outlined,
+                onPressed: _saving ? null : _confirmCash,
+              ),
+            ],
           ],
         ),
       ),

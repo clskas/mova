@@ -21,6 +21,8 @@ export enum VehicleType {
   STANDARD = 'STANDARD',
   COMFORT = 'COMFORT',
   VIP = 'VIP',
+  UTILITAIRE = 'UTILITAIRE',
+  CAMION = 'CAMION',
 }
 
 export enum RideStatus {

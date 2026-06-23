@@ -2,7 +2,7 @@ name: Deploy
 
 on:
   workflow_run:
-    workflows: ['Build and Push']
+    workflows: [CI]
     types: [completed]
     branches: [main]
   workflow_dispatch:
@@ -30,7 +30,7 @@ jobs:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Install PostgreSQL client
-        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client jq
 
       - name: Backup databases before deploy
         env:
@@ -65,11 +65,9 @@ jobs:
             echo "ids=${{ secrets.RENDER_SERVICE_IDS }}" >> "$GITHUB_OUTPUT"
             echo "gateway=${{ secrets.GATEWAY_RENDER_SERVICE_ID }}" >> "$GITHUB_OUTPUT"
           elif [ -f config/render-services.json ]; then
-            ids=$(jq -r '.serviceIds | join(" ")' config/render-services.json)
             gateway=$(jq -r '.gatewayServiceId // empty' config/render-services.json)
-            echo "ids=$ids" >> "$GITHUB_OUTPUT"
             echo "gateway=$gateway" >> "$GITHUB_OUTPUT"
-            echo "Using service IDs from config/render-services.json"
+            echo "Using service IDs from config/render-services.json (ordered deploy)"
           fi
 
       - name: Trigger Render deploy
@@ -77,17 +75,8 @@ jobs:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
           RENDER_SERVICE_IDS: ${{ steps.render.outputs.ids }}
         run: |
-          if [ -z "$RENDER_API_KEY" ] || [ -z "$RENDER_SERVICE_IDS" ]; then
-            echo "::warning::RENDER_API_KEY or RENDER_SERVICE_IDS not set — skip remote deploy"
-            exit 0
-          fi
-          for id in $RENDER_SERVICE_IDS; do
-            echo "Deploying Render service $id"
-            curl -sf -X POST "https://api.render.com/v1/services/${id}/deploys" \
-              -H "Authorization: Bearer ${RENDER_API_KEY}" \
-              -H "Content-Type: application/json" \
-              -d '{"clearCache": false}'
-          done
+          chmod +x scripts/render-deploy.sh
+          ./scripts/render-deploy.sh "${{ github.event.workflow_run.head_sha || github.sha }}"
 
       - name: Wait for Render deploy (gateway)
         env:
@@ -99,10 +88,10 @@ jobs:
             sleep 30
             exit 0
           fi
-          for i in $(seq 1 30); do
+          for i in $(seq 1 45); do
             status=$(curl -sf -H "Authorization: Bearer $RENDER_API_KEY" \
               "https://api.render.com/v1/services/${GATEWAY_RENDER_SERVICE_ID}/deploys?limit=1" \
-              | jq -r '.[0].deploy.status // "unknown"')
+              | jq -r '.[0].status // "unknown"')
             echo "Gateway deploy status: $status (attempt $i)"
             if [ "$status" = "live" ]; then exit 0; fi
             if [ "$status" = "build_failed" ] || [ "$status" = "update_failed" ]; then

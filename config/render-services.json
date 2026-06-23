@@ -3,7 +3,7 @@
   "region": "frankfurt",
   "repo": "https://github.com/clskas/mova",
   "branch": "main",
-  "autoDeploy": true,
+  "autoDeploy": false,
   "gatewayUrl": "https://mova-gateway.onrender.com",
   "gatewayServiceId": "srv-d8slprv7f7vs73d2qn50",
   "serviceIds": [

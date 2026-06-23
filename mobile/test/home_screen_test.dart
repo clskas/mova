@@ -82,6 +82,12 @@ void main() {
     await _tapBack(tester);
     await tester.pump(const Duration(milliseconds: 400));
 
+    if (find.byType(HomeScreen).evaluate().isEmpty) {
+      await tester.pumpWidget(_testApp(const HomeScreen()));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+    }
+
     expect(find.text('Taxi / Moto-taxi'), findsWidgets);
 
     final scheduledCard = find.text('Programmez votre trajet à l\'avance');

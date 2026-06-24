@@ -19,7 +19,8 @@ Widget _testApp(Widget home) {
 }
 
 void main() {
-  final widths = [360.0, 375.0, 390.0, 428.0];
+  final widths = [320.0, 360.0, 375.0, 390.0, 428.0];
+  final heights = [568.0, 640.0, 800.0, 900.0];
 
   setUp(() {
     TestWidgetsFlutterBinding.ensureInitialized();
@@ -140,13 +141,19 @@ void main() {
 
   testWidgets('HomeScreen renders without overflow on multiple widths', (tester) async {
     for (final width in widths) {
-      tester.view.physicalSize = Size(width, 900);
-      tester.view.devicePixelRatio = 1.0;
+      for (final height in heights) {
+        tester.view.physicalSize = Size(width, height);
+        tester.view.devicePixelRatio = 1.0;
 
-      await tester.pumpWidget(_testApp(const HomeScreen()));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 300));
-      expect(tester.takeException(), isNull, reason: 'Overflow at width $width');
+        await tester.pumpWidget(_testApp(const HomeScreen()));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+        expect(
+          tester.takeException(),
+          isNull,
+          reason: 'Overflow at ${width.toInt()}x${height.toInt()}',
+        );
+      }
     }
   });
 }

@@ -3,9 +3,12 @@
 ## Connexion
 
 1. Ouvrez l'app **MOVA Chauffeur** (flavor `driver`).
-2. Saisissez un numéro **+243** valide (démo : `+243900000020`).
-3. Recevez le code OTP (en dev : **`123456`** si `MOCK_OTP=true`).
-4. Si le message **« Compte suspendu »** s'affiche, demandez à l'admin de réactiver le compte dans **Utilisateurs → statut ACTIVE**.
+2. **Écran d'accueil animé** (~12 s) : courses, livraisons, missions, revenus, KYC, etc. Appuyez sur **Passer** ou touchez l'écran pour accéder directement à l'OTP.
+3. Saisissez un numéro **+243** valide (démo : `+243900000020`).
+4. Recevez le code OTP (en dev : **`123456`** si `MOCK_OTP=true`).
+5. Si le message **« Compte suspendu »** s'affiche, demandez à l'admin de réactiver le compte dans **Utilisateurs → statut ACTIVE**.
+
+La **ville MOVA** sur l'accueil est détectée via GPS à l'ouverture (modifiable).
 
 ## Mise en route
 

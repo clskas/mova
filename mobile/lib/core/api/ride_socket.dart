@@ -107,7 +107,7 @@ class RideSocket {
 
     try {
       _socket = io.io(
-        '${MarketConfig.wsUrl}/tracking',
+        '${MarketConfig.effectiveWsUrl}/tracking',
         io.OptionBuilder()
             .setPath('/socket.io')
             .setTransports(['polling', 'websocket'])

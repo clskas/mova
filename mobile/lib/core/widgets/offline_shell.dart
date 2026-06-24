@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../api/api_client.dart';
 import '../config/market_config.dart';
 import '../offline/connectivity_service.dart';
 import '../theme/mova_colors.dart';
@@ -35,34 +36,43 @@ class MovaOfflineShell extends ConsumerWidget {
                         : MovaColors.midnight,
                     child: SafeArea(
                       bottom: false,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 8,
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              state.reason == OfflineReason.noNetwork
-                                  ? Icons.wifi_off
-                                  : Icons.cloud_off,
-                              color: Colors.white,
-                              size: 18,
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                kDebugMode && state.reason == OfflineReason.serverUnavailable
-                                    ? '${state.bannerMessage}\nAPI: ${MarketConfig.apiBaseUrl}'
-                                    : state.bannerMessage,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
+                      child: InkWell(
+                        onTap: state.reason == OfflineReason.serverUnavailable
+                            ? () => ref
+                                .read(apiClientProvider)
+                                .checkHealth(resetFailures: true)
+                            : null,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                state.reason == OfflineReason.noNetwork
+                                    ? Icons.wifi_off
+                                    : Icons.cloud_off,
+                                color: Colors.white,
+                                size: 18,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  kDebugMode && state.reason == OfflineReason.serverUnavailable
+                                      ? '${state.bannerMessage}\nAPI: ${MarketConfig.effectiveApiBaseUrl}\nTouchez pour réessayer'
+                                      : state.reason == OfflineReason.serverUnavailable
+                                          ? '${state.bannerMessage}\nTouchez pour réessayer'
+                                          : state.bannerMessage,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     ),

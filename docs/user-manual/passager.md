@@ -10,9 +10,10 @@ MOVA est votre application de mobilité urbaine en RDC. Commandez un taxi ou mot
 ## 1. Créer un compte
 
 1. Ouvrez l'application MOVA Passager.
-2. Saisissez votre numéro de téléphone au format **+243** suivi de 9 chiffres.
-3. Entrez le code OTP reçu par SMS.
-4. Vous accédez à l'écran d'accueil avec tous les services.
+2. **Écran d'accueil animé** (~12 s) : présentation des services (taxi, livraisons, wallet, etc.). Appuyez sur **Passer** ou touchez l'écran pour aller directement à la connexion.
+3. Saisissez votre numéro de téléphone au format **+243** suivi de 9 chiffres.
+4. Entrez le code OTP reçu par SMS.
+5. Vous accédez à l'écran d'accueil : la **ville** affichée correspond à votre position GPS (modifiable via le sélecteur en haut).
 
 ## 1.1 Écran d'accueil — ordre des services
 

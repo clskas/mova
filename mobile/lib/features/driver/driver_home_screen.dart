@@ -11,7 +11,10 @@ import '../../core/theme/mova_colors.dart';
 import '../../core/cache/profile_cache.dart';
 import '../../core/api/api_client.dart';
 import '../../core/auth/session.dart';
+import '../../core/offline/connectivity_service.dart';
+import '../../core/location/service_area_gps.dart';
 import '../../core/error/result.dart';
+import '../../core/widgets/service_area_selector.dart';
 import '../help/driver_help_screen.dart';
 import '../carpool/carpool_screen.dart';
 import 'active_delivery_screen.dart';
@@ -80,8 +83,13 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed && mounted) {
-      ref.read(apiClientProvider).checkHealth().then((_) {
-        if (mounted) _loadProfile(clearCache: true);
+      final connectivity = ref.read(connectivityServiceProvider);
+      connectivity.prepareReconnect();
+      ref.read(apiClientProvider).checkHealth(resetFailures: true).then((_) {
+        if (mounted) {
+          ServiceAreaGps.sync(ref);
+          _loadProfile(clearCache: true);
+        }
       });
     }
   }
@@ -94,8 +102,11 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
 
   Future<void> _bootstrap() async {
     final api = ref.read(apiClientProvider);
+    final connectivity = ref.read(connectivityServiceProvider);
+    connectivity.prepareReconnect();
     await api.loadToken();
-    await api.checkHealth();
+    await api.checkHealth(resetFailures: true);
+    await ServiceAreaGps.sync(ref);
     await Future.wait([
       _loadProfile(clearCache: true),
       _loadEarnings(),
@@ -785,6 +796,11 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
             MovaErrorBanner(message: _profileError!, onRetry: () => _loadProfile(clearCache: true)),
             const SizedBox(height: 12),
           ],
+          const Align(
+            alignment: Alignment.centerLeft,
+            child: ServiceAreaSelector(compact: true),
+          ),
+          const SizedBox(height: 12),
           if (_kycStatus != null && _kycStatus != 'APPROVED') ...[
             MovaCard(
               child: Row(

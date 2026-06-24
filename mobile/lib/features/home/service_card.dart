@@ -13,6 +13,7 @@ class ServiceCard extends StatelessWidget {
     this.onTap,
     this.comingSoon = false,
     this.live = false,
+    this.compact = false,
   });
 
   final Widget icon;
@@ -22,6 +23,7 @@ class ServiceCard extends StatelessWidget {
   final VoidCallback? onTap;
   final bool comingSoon;
   final bool live;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -29,12 +31,12 @@ class ServiceCard extends StatelessWidget {
 
     return MovaCard(
       onTap: onTap,
-      padding: const EdgeInsets.all(14),
+      padding: EdgeInsets.all(compact ? 10 : 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding: const EdgeInsets.all(11),
+            padding: EdgeInsets.all(compact ? 8 : 11),
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
@@ -53,9 +55,12 @@ class ServiceCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   title,
-                  maxLines: 2,
+                  maxLines: compact ? 3 : 2,
                   overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.titleSmall?.copyWith(
+                  style: (compact
+                          ? theme.textTheme.bodyLarge
+                          : theme.textTheme.titleSmall)
+                      ?.copyWith(
                     fontWeight: FontWeight.w700,
                     color: MovaColors.midnight,
                   ),
@@ -98,14 +103,15 @@ class ServiceCard extends StatelessWidget {
               ],
             ],
           ),
-          const SizedBox(height: 4),
+          SizedBox(height: compact ? 2 : 4),
           Text(
             subtitle,
-            maxLines: 2,
+            maxLines: compact ? 3 : 2,
             overflow: TextOverflow.ellipsis,
             style: theme.textTheme.bodySmall?.copyWith(
               color: MovaColors.textSecondary,
               height: 1.3,
+              fontSize: compact ? 11 : null,
             ),
           ),
         ],

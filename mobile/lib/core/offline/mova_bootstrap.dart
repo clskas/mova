@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../api/api_client.dart';
@@ -34,6 +33,20 @@ Future<void> bootstrapMovaApp(WidgetRef ref) async {
   });
 
   connectivity.setPendingSyncCount(queue.pendingCount);
-  await api.checkHealth();
+
+  connectivity.onNetworkRestored = () async {
+    connectivity.prepareReconnect();
+    await api.checkHealth(resetFailures: true);
+  };
+
+  connectivity.prepareReconnect();
+
+  for (var attempt = 0; attempt < 5; attempt++) {
+    if (await api.checkHealth()) break;
+    if (attempt < 4) {
+      await Future.delayed(Duration(seconds: 1 + attempt));
+    }
+  }
+
   connectivity.startGatewayHealthRetry(() => api.checkHealth());
 }

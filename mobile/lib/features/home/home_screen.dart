@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/api/api_client.dart';
 import '../../core/auth/session.dart';
 import '../../core/error/result.dart';
+import '../../core/location/service_area_gps.dart';
+import '../../core/offline/connectivity_service.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
@@ -20,6 +22,8 @@ import '../help/help_screen.dart';
 import '../profile/profile_screen.dart';
 import '../history/history_screen.dart';
 import 'service_card.dart';
+
+enum _HomeMenuAction { wallet, history, help, logout }
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -46,7 +50,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) _loadUser(forceRefresh: true);
+    if (state == AppLifecycleState.resumed) {
+      final connectivity = ref.read(connectivityServiceProvider);
+      connectivity.prepareReconnect();
+      ref.read(apiClientProvider).checkHealth(resetFailures: true);
+      ServiceAreaGps.sync(ref);
+      _loadUser(forceRefresh: true);
+    }
   }
 
   Future<void> _loadUser({bool forceRefresh = false}) async {
@@ -95,6 +105,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
           const SizedBox(width: 8),
           Text(
             'MOVA',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
           ),
         ],
@@ -105,40 +117,72 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
           tooltip: 'Mon profil',
           onPressed: () => _open(context, const ProfileScreen()),
         ),
-        IconButton(
-          icon: const Icon(Icons.account_balance_wallet_outlined),
-          tooltip: 'Wallet',
-          onPressed: () => _open(context, const WalletScreen()),
-        ),
-        IconButton(
-          icon: const Icon(Icons.history),
-          tooltip: 'Historique',
-          onPressed: () => _open(context, const HistoryScreen()),
-        ),
-        IconButton(
-          icon: const Icon(Icons.help_outline),
-          tooltip: 'Aide',
-          onPressed: () => _open(context, const HelpScreen()),
-        ),
-        IconButton(
-          icon: const Icon(Icons.logout),
-          tooltip: 'Déconnexion',
-          onPressed: () async {
-            final confirm = await showDialog<bool>(
-              context: context,
-              builder: (ctx) => AlertDialog(
-                title: const Text('Déconnexion'),
-                content: const Text('Voulez-vous vous déconnecter de MOVA ?'),
-                actions: [
-                  TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
-                  TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Déconnexion')),
-                ],
-              ),
-            );
-            if (confirm == true && context.mounted) {
-              await logoutPassenger(context, ref);
+        PopupMenuButton<_HomeMenuAction>(
+          tooltip: 'Plus',
+          onSelected: (action) async {
+            switch (action) {
+              case _HomeMenuAction.wallet:
+                _open(context, const WalletScreen());
+              case _HomeMenuAction.history:
+                _open(context, const HistoryScreen());
+              case _HomeMenuAction.help:
+                _open(context, const HelpScreen());
+              case _HomeMenuAction.logout:
+                final confirm = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('Déconnexion'),
+                    content: const Text('Voulez-vous vous déconnecter de MOVA ?'),
+                    actions: [
+                      TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
+                      TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Déconnexion')),
+                    ],
+                  ),
+                );
+                if (confirm == true && context.mounted) {
+                  await logoutPassenger(context, ref);
+                }
             }
           },
+          itemBuilder: (context) => const [
+            PopupMenuItem(
+              value: _HomeMenuAction.wallet,
+              child: ListTile(
+                leading: Icon(Icons.account_balance_wallet_outlined),
+                title: Text('Wallet'),
+                contentPadding: EdgeInsets.zero,
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+            PopupMenuItem(
+              value: _HomeMenuAction.history,
+              child: ListTile(
+                leading: Icon(Icons.history),
+                title: Text('Historique'),
+                contentPadding: EdgeInsets.zero,
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+            PopupMenuItem(
+              value: _HomeMenuAction.help,
+              child: ListTile(
+                leading: Icon(Icons.help_outline),
+                title: Text('Aide'),
+                contentPadding: EdgeInsets.zero,
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+            PopupMenuDivider(),
+            PopupMenuItem(
+              value: _HomeMenuAction.logout,
+              child: ListTile(
+                leading: Icon(Icons.logout),
+                title: Text('Déconnexion'),
+                contentPadding: EdgeInsets.zero,
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+          ],
         ),
       ],
       bottomNavigationBar: NavigationBar(
@@ -179,6 +223,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
         ],
       ),
       scrollable: false,
+      padding: EdgeInsets.symmetric(
+        horizontal: MediaQuery.sizeOf(context).width < 360 ? 12 : 16,
+        vertical: 16,
+      ),
       child: RefreshIndicator(
         onRefresh: () => _loadUser(forceRefresh: true),
         child: SingleChildScrollView(
@@ -212,16 +260,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
             builder: (context, constraints) {
               const spacing = 12.0;
               final cardWidth = (constraints.maxWidth - spacing) / 2;
+              final compactCards = cardWidth < 150;
 
               Widget gridRow(List<Widget> cards) {
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    for (var i = 0; i < cards.length; i++) ...[
-                      if (i > 0) const SizedBox(width: spacing),
-                      SizedBox(width: cardWidth, child: cards[i]),
+                return IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      for (var i = 0; i < cards.length; i++) ...[
+                        if (i > 0) const SizedBox(width: spacing),
+                        Expanded(child: cards[i]),
+                      ],
                     ],
-                  ],
+                  ),
                 );
               }
 
@@ -234,6 +285,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                       title: 'Taxi / Moto-taxi',
                       subtitle: 'Course immédiate partout en RDC',
                       onTap: () => _open(context, const BookingScreen()),
+                      compact: compactCards,
                     ),
                     ServiceCard(
                       icon: MovaServiceIcon.parcel(color: MovaColors.green),
@@ -241,6 +293,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                       title: 'Livraisons',
                       subtitle: 'Repas, colis, express et plus',
                       onTap: () => _open(context, const DeliveryHubScreen()),
+                      compact: compactCards,
                     ),
                   ]),
                   const SizedBox(height: spacing),
@@ -251,6 +304,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                       title: 'Réservation planifiée',
                       subtitle: 'Programmez votre trajet à l\'avance',
                       onTap: () => _open(context, const ScheduledRideScreen()),
+                      compact: compactCards,
                     ),
                     ServiceCard(
                       icon: MovaServiceIcon.carpool(color: MovaColors.midnight),
@@ -258,6 +312,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                       title: 'Covoiturage',
                       subtitle: 'Partagez un trajet, économisez',
                       onTap: () => _open(context, const CarpoolScreen()),
+                      compact: compactCards,
                     ),
                   ]),
                   const SizedBox(height: spacing),
@@ -268,6 +323,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                       title: 'Location véhicule',
                       subtitle: 'Voiture, SUV ou minibus',
                       onTap: () => _open(context, const RentalScreen()),
+                      compact: compactCards,
                     ),
                     ServiceCard(
                       icon: MovaServiceIcon.moving(color: MovaColors.midnight),
@@ -275,6 +331,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                       title: 'Déménagement',
                       subtitle: 'Camion et manutention',
                       onTap: () => _open(context, const MovingScreen()),
+                      compact: compactCards,
                     ),
                   ]),
                   const SizedBox(height: spacing),
@@ -285,6 +342,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                       title: 'Wallet MOVA',
                       subtitle: 'Solde, recharge et paiements',
                       onTap: () => _open(context, const WalletScreen()),
+                      compact: compactCards,
                     ),
                     ServiceCard(
                       icon: MovaServiceIcon.history(color: MovaColors.orange),
@@ -292,6 +350,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                       title: 'Historique',
                       subtitle: 'Vos courses et transactions',
                       onTap: () => _open(context, const HistoryScreen()),
+                      compact: compactCards,
                     ),
                   ]),
                 ],

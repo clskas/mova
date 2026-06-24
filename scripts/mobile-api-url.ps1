@@ -35,29 +35,39 @@ function Get-MovaLanIp {
     return '192.168.1.64'
 }
 
+function Test-MovaDeviceGateway {
+    param(
+        [Parameter(Mandatory = $true)][string]$DeviceId,
+        [Parameter(Mandatory = $true)][string]$GatewayBase
+    )
+
+    if (-not $DeviceId) { return $false }
+
+    $code = adb -s $DeviceId shell "curl -s -m 10 -o /dev/null -w '%{http_code}' ${GatewayBase}/health" 2>$null
+    return "$code".Trim() -eq '200'
+}
+
 function Set-MovaAdbReverse {
     param([string]$DeviceId = "")
 
     $adbArgs = @('reverse', 'tcp:3000', 'tcp:3000')
-    $allIds = @(adb devices 2>$null |
-        Where-Object { $_ -match '\tdevice$' } |
-        ForEach-Object { ($_ -split '\t')[0].Trim() } |
-        Where-Object { $_ })
+    $targetIds = if ($DeviceId) { @($DeviceId) } else {
+        @(adb devices 2>$null |
+            Where-Object { $_ -match '\tdevice$' } |
+            ForEach-Object { ($_ -split '\t')[0].Trim() } |
+            Where-Object { $_ })
+    }
 
-    if ($allIds.Count -eq 0) {
+    if ($targetIds.Count -eq 0) {
         throw "adb reverse impossible : aucun telephone connecte (adb devices)."
     }
 
-    foreach ($id in $allIds) {
+    foreach ($id in $targetIds) {
         Write-Host "adb -s $id reverse tcp:3000 tcp:3000 (USB -> PC localhost:3000)" -ForegroundColor Yellow
         & adb -s $id @adbArgs
         if ($LASTEXITCODE -ne 0) {
             throw "adb reverse a echoue pour $id. Verifiez adb devices et le debogage USB."
         }
-    }
-
-    if ($DeviceId -and $allIds -notcontains $DeviceId) {
-        Write-Host "Attention : -Device $DeviceId n'est pas dans adb devices." -ForegroundColor Yellow
     }
 }
 
@@ -65,29 +75,52 @@ function Get-MovaMobileApiUrls {
     param(
         [string]$ApiUrl,
         [string]$WsUrl,
-        [switch]$UsbReverse
+        [switch]$UsbReverse,
+        [string]$DeviceId = ""
     )
 
+    $lanIp = Get-MovaLanIp
+    $lanApiUrl = "http://${lanIp}:3000/api"
+    $lanWsUrl = "http://${lanIp}:3000"
+
     if ($UsbReverse) {
+        $useLan = $false
+        if ($DeviceId -and (Test-MovaDeviceGateway -DeviceId $DeviceId -GatewayBase 'http://127.0.0.1:3000')) {
+            Write-Host "USB reverse OK sur $DeviceId (127.0.0.1:3000)" -ForegroundColor DarkGray
+        } elseif ($DeviceId -and (Test-MovaDeviceGateway -DeviceId $DeviceId -GatewayBase $lanWsUrl)) {
+            Write-Host "adb reverse inactif - bascule LAN $lanIp sur $DeviceId" -ForegroundColor Yellow
+            $useLan = $true
+        } elseif ($DeviceId) {
+            Write-Host "Passerelle injoignable depuis $DeviceId (reverse + LAN). Secours LAN compile dans l app." -ForegroundColor Yellow
+        }
+
+        if ($useLan) {
+            return @{
+                ApiUrl           = $lanApiUrl
+                WsUrl            = $lanWsUrl
+                ApiFallbackUrl   = 'http://127.0.0.1:3000/api'
+            }
+        }
+
         return @{
-            ApiUrl = 'http://127.0.0.1:3000/api'
-            WsUrl  = 'http://127.0.0.1:3000'
+            ApiUrl           = 'http://127.0.0.1:3000/api'
+            WsUrl            = 'http://127.0.0.1:3000'
+            ApiFallbackUrl   = $lanApiUrl
         }
     }
 
     if (-not $ApiUrl) {
-        $ip = Get-MovaLanIp
-        $ApiUrl = "http://${ip}:3000/api"
+        $ApiUrl = $lanApiUrl
     }
     if (-not $WsUrl) {
         if ($ApiUrl -match '^(https?://[^/]+)') {
             $WsUrl = $Matches[1]
         } else {
-            $WsUrl = "http://$(Get-MovaLanIp):3000"
+            $WsUrl = $lanWsUrl
         }
     }
 
-    return @{ ApiUrl = $ApiUrl; WsUrl = $WsUrl }
+    return @{ ApiUrl = $ApiUrl; WsUrl = $WsUrl; ApiFallbackUrl = '' }
 }
 
 function Get-MovaFlutterDeviceByPattern {

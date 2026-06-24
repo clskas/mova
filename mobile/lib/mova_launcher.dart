@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'core/offline/mova_bootstrap.dart';
+import 'core/offline/mova_app_lifecycle.dart';
 import 'core/offline/sync_queue.dart';
 import 'core/theme/mova_theme.dart';
 import 'core/widgets/offline_shell.dart';
 import 'features/auth/otp_screen.dart';
 import 'features/driver/driver_job_alert_service.dart';
 import 'features/driver/driver_otp_screen.dart';
+import 'features/splash/mova_splash_screen.dart';
 
 /// Point d'entrée partagé — évite SyncQueue non initialisé si le mauvais main.dart est ciblé.
 Future<void> runMovaPassengerApp() async {
@@ -38,20 +39,18 @@ class MovaPassengerApp extends ConsumerStatefulWidget {
   ConsumerState<MovaPassengerApp> createState() => _MovaPassengerAppState();
 }
 
-class _MovaPassengerAppState extends ConsumerState<MovaPassengerApp> {
-  @override
-  void initState() {
-    super.initState();
-    Future.microtask(() => bootstrapMovaApp(ref));
-  }
-
+class _MovaPassengerAppState extends ConsumerState<MovaPassengerApp>
+    with WidgetsBindingObserver, MovaAppLifecycleMixin {
   @override
   Widget build(BuildContext context) {
     return movaMediaQueryWrapper(
       child: MaterialApp(
         title: 'MOVA Passager',
         theme: buildMovaTheme(),
-        home: const OtpScreen(),
+        home: MovaSplashScreen(
+          role: MovaSplashRole.passenger,
+          nextScreen: const OtpScreen(),
+        ),
         debugShowCheckedModeBanner: false,
         builder: (context, child) => MovaOfflineShell(child: child),
       ),
@@ -66,20 +65,18 @@ class MovaDriverApp extends ConsumerStatefulWidget {
   ConsumerState<MovaDriverApp> createState() => _MovaDriverAppState();
 }
 
-class _MovaDriverAppState extends ConsumerState<MovaDriverApp> {
-  @override
-  void initState() {
-    super.initState();
-    Future.microtask(() => bootstrapMovaApp(ref));
-  }
-
+class _MovaDriverAppState extends ConsumerState<MovaDriverApp>
+    with WidgetsBindingObserver, MovaAppLifecycleMixin {
   @override
   Widget build(BuildContext context) {
     return movaMediaQueryWrapper(
       child: MaterialApp(
         title: 'MOVA Chauffeur',
         theme: buildMovaTheme(),
-        home: const DriverOtpScreen(),
+        home: MovaSplashScreen(
+          role: MovaSplashRole.driver,
+          nextScreen: const DriverOtpScreen(),
+        ),
         debugShowCheckedModeBanner: false,
         builder: (context, child) => MovaOfflineShell(child: child),
       ),

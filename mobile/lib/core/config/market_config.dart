@@ -32,13 +32,50 @@ class MarketConfig {
     defaultValue: 'http://10.0.2.2:3000/api',
   );
 
+  /// Secours dev (ex. IP LAN si `adb reverse` USB est inactif).
+  static const apiFallbackUrl = String.fromEnvironment(
+    'API_FALLBACK_URL',
+    defaultValue: '',
+  );
+
+  /// URL API active après bascule automatique (health check).
+  static String? _runtimeApiBaseUrl;
+
+  static void applyRuntimeApiBase(String apiBase) {
+    final trimmed = apiBase.trim();
+    if (trimmed.isEmpty) return;
+    _runtimeApiBaseUrl = trimmed;
+  }
+
+  static void clearRuntimeApiBase() {
+    _runtimeApiBaseUrl = null;
+  }
+
+  static String get effectiveApiBaseUrl => _runtimeApiBaseUrl ?? apiBaseUrl;
+
   /// Racine passerelle (sans `/api`) — health check et WebSocket GPS via ride-service.
-  static String get gatewayBaseUrl {
+  static String get gatewayBaseUrl => _gatewayFromApi(apiBaseUrl);
+
+  static String get effectiveGatewayBaseUrl =>
+      _gatewayFromApi(effectiveApiBaseUrl);
+
+  static String _gatewayFromApi(String apiUrl) {
     const suffix = '/api';
-    if (apiBaseUrl.endsWith(suffix)) {
-      return apiBaseUrl.substring(0, apiBaseUrl.length - suffix.length);
+    if (apiUrl.endsWith(suffix)) {
+      return apiUrl.substring(0, apiUrl.length - suffix.length);
     }
-    return apiBaseUrl;
+    return apiUrl;
+  }
+
+  static List<String> get gatewayProbeBases {
+    final bases = <String>[gatewayBaseUrl];
+    if (apiFallbackUrl.isNotEmpty) {
+      final fallback = _gatewayFromApi(apiFallbackUrl);
+      if (!bases.contains(fallback)) bases.add(fallback);
+    }
+    final active = effectiveGatewayBaseUrl;
+    if (!bases.contains(active)) bases.insert(0, active);
+    return bases;
   }
 
   /// URL absolue pour afficher une photo uploadée (`/api/uploads/...` ou URL complète).
@@ -46,17 +83,20 @@ class MarketConfig {
     final trimmed = url.trim();
     if (trimmed.isEmpty) return trimmed;
     if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed;
-    if (trimmed.startsWith('/')) return '$gatewayBaseUrl$trimmed';
-    return '$gatewayBaseUrl/api/uploads/vehicles/$trimmed';
+    if (trimmed.startsWith('/')) return '${effectiveGatewayBaseUrl}$trimmed';
+    return '${effectiveGatewayBaseUrl}/api/uploads/vehicles/$trimmed';
   }
 
   /// WebSocket (`/tracking` via api-gateway). Définir via `--dart-define=WS_URL=...`
   /// Par défaut : même hôte que [gatewayBaseUrl] (port 3000, pas ride-service direct).
   static String get wsUrl {
     const fromEnv = String.fromEnvironment('WS_URL', defaultValue: '');
+    if (_runtimeApiBaseUrl != null) return effectiveGatewayBaseUrl;
     if (fromEnv.isNotEmpty) return fromEnv;
     return gatewayBaseUrl;
   }
+
+  static String get effectiveWsUrl => wsUrl;
 
   static const mobileMoneyProviders = [
     MobileMoneyProvider(id: 'ORANGE_MONEY', name: 'Orange Money', color: 0xFFFF6600),

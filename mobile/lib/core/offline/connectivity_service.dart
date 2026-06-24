@@ -55,6 +55,7 @@ class ConnectivityService {
   StreamSubscription<List<ConnectivityResult>>? _subscription;
   Timer? _healthRetryTimer;
   void Function()? onBackOnline;
+  Future<void> Function()? onNetworkRestored;
 
   Stream<OfflineState> get stream => _controller.stream;
   OfflineReason get reason => _reason;
@@ -73,15 +74,25 @@ class ConnectivityService {
   /// Réessaie périodiquement la santé de la passerelle tant qu'elle est marquée indisponible.
   void startGatewayHealthRetry(Future<bool> Function() checkHealth) {
     _healthRetryTimer?.cancel();
-    _healthRetryTimer = Timer.periodic(const Duration(seconds: 15), (_) async {
+    Future<void> retryIfNeeded() async {
       if (_hasNetwork && !_gatewayUp) {
         await checkHealth();
       }
-    });
+    }
+
+    // Premier essai rapide après un échec au démarrage (cold start Docker / appareil lent).
+    Future.delayed(const Duration(seconds: 2), retryIfNeeded);
+    _healthRetryTimer = Timer.periodic(const Duration(seconds: 5), (_) => retryIfNeeded());
   }
 
   void setGatewayUp(bool up) {
     _gatewayUp = up;
+    _recomputeReason();
+  }
+
+  /// Optimiste au retour au premier plan — le health check confirmera ou infirmera.
+  void prepareReconnect() {
+    _gatewayUp = true;
     _recomputeReason();
   }
 
@@ -91,8 +102,13 @@ class ConnectivityService {
   }
 
   void _applyConnectivity(List<ConnectivityResult> results) {
+    final hadNetwork = _hasNetwork;
     _hasNetwork = results.any((r) => r != ConnectivityResult.none);
+    final networkRestored = !hadNetwork && _hasNetwork;
     _recomputeReason();
+    if (networkRestored) {
+      onNetworkRestored?.call();
+    }
   }
 
   void _recomputeReason() {

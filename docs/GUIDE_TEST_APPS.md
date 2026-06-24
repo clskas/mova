@@ -249,27 +249,35 @@ Invoke-RestMethod -Uri "http://localhost:3000/api/admin/drivers/$driverId/kyc" -
 
 ### Lancer l’app
 
-**Script recommandé** (IP LAN par défaut `192.168.1.64`) :
+**Script recommandé** (détection auto V2 PRO ou Samsung ; IP LAN ou USB reverse) :
 
 ```powershell
 cd c:\Users\Administrator\Mova
-.\scripts\run-mobile-passenger.ps1
+.\scripts\run-mobile-passenger.ps1 -UsbReverse
 ```
 
-**Samsung branché en USB** (device explicite) :
+Sans `-UsbReverse` : le PC et le téléphone doivent être sur le **même Wi‑Fi** (IP LAN auto, ex. `192.168.1.64`).
+
+**Samsung branché en USB** :
 
 ```powershell
-cd c:\Users\Administrator\Mova\mobile
-flutter run --flavor passenger -t lib/main_passenger.dart -d R3CN70C59KF `
-  --dart-define=API_URL=http://192.168.1.64:3000/api `
-  --dart-define=WS_URL=http://192.168.1.64:3000
+.\scripts\run-mobile-passenger.ps1 -UsbReverse -Device R3CN70C59KF
 ```
 
-**Émulateur Android** (`10.0.2.2` = machine hôte) :
+**V2 PRO** :
 
 ```powershell
-.\scripts\run-mobile-passenger.ps1 -ApiUrl "http://10.0.2.2:3000/api" -WsUrl "http://10.0.2.2:3000"
+.\scripts\run-mobile-passenger.ps1 -UsbReverse -Device V220206V01014
 ```
+
+> `adb reverse tcp:3000 tcp:3000` est appliqué automatiquement avec `-UsbReverse`. Si la bannière **Serveur indisponible** apparaît après fermeture de l’app, relancez le script ou touchez la bannière pour réessayer.
+
+### Écran d’accueil animé (splash)
+
+À l’ouverture, un **splash MOVA Passager** (~12 s) présente les **8 services passager** : Taxi/Moto, Livraisons, Réservation, Covoiturage, Location, Déménagement, Wallet, Historique.
+
+- **Passer** ou **toucher l’écran** : accès direct à l’OTP (dès que le chargement réseau est prêt).
+- La **ville MOVA** est pré-sélectionnée selon votre **position GPS** (modifiable sur l’accueil).
 
 ### Connexion
 
@@ -280,7 +288,8 @@ flutter run --flavor passenger -t lib/main_passenger.dart -d R3CN70C59KF `
 
 | # | Écran | Action | Résultat attendu |
 |---|-------|--------|------------------|
-| 1 | Accueil | Faire défiler toutes les cartes services | Ordre grille : Taxi/Livraisons → Réservation/Covoiturage → Location/Déménagement → **Wallet/Historique** en bas ; rien coupé |
+| 0 | Splash | Attendre ou **Passer** | Animation services passager ; puis OTP |
+| 1 | Accueil | Ville GPS + cartes services | Ville la plus proche ; grille sans overflow |
 | 2 | Commander une course | Saisir départ / arrivée, estimer | Prix en CDF affiché |
 | 2b | Suivi course | Pendant course active | Carte : position chauffeur + **polyline** (trajet parcouru) |
 | 3 | Location véhicule | Onglet **Rechercher** → filtres → **Rechercher** | Catalogue (ex. 5 véhicules Kinshasa), pas d’overflow |
@@ -310,19 +319,29 @@ Vérifier Wi‑Fi, IP dans `--dart-define`, et que Docker tourne.
 
 ```powershell
 cd c:\Users\Administrator\Mova
-.\scripts\run-mobile-driver.ps1
+.\scripts\run-mobile-driver.ps1 -UsbReverse
 ```
 
-**V2 PRO en USB** :
+**Samsung G981V** :
 
 ```powershell
-cd c:\Users\Administrator\Mova\mobile
-flutter run --flavor driver -t lib/main_driver.dart -d V220206V01014 `
-  --dart-define=API_URL=http://192.168.1.64:3000/api `
-  --dart-define=WS_URL=http://192.168.1.64:3000
+.\scripts\run-mobile-driver.ps1 -UsbReverse -Device R3CN70C59KF
 ```
 
-Si `adb devices` ne liste pas le V2 PRO : câble USB, **Débogage USB** activé, autoriser l’ordinateur sur l’écran du téléphone.
+**V2 PRO** :
+
+```powershell
+.\scripts\run-mobile-driver.ps1 -UsbReverse -Device V220206V01014
+```
+
+> Si l’installation échoue (`INSTALL_FAILED_INSUFFICIENT_STORAGE`), désinstallez les anciennes APK MOVA sur le téléphone puis relancez.
+
+### Écran d’accueil animé (splash)
+
+À l’ouverture, un **splash MOVA Chauffeur** (~12 s) présente les **8 volets chauffeur** : Courses, Livraisons, Missions assignées, Revenus, Covoiturage, GPS, KYC, Historique.
+
+- **Passer** ou **toucher l’écran** : OTP immédiat (après chargement réseau).
+- Ville MOVA synchronisée au **GPS** (sélecteur sur l’accueil chauffeur).
 
 ### Connexion
 
@@ -333,6 +352,7 @@ Si `adb devices` ne liste pas le V2 PRO : câble USB, **Débogage USB** activé,
 
 | # | Écran | Action | Résultat attendu |
 |---|-------|--------|------------------|
+| 0 | Splash | Attendre ou **Passer** | Animation services chauffeur ; puis OTP |
 | 1 | Accueil (KYC pending) | Si non approuvé | Message / blocage KYC |
 | 2 | Admin approuve KYC | Attendre ~5 s ou pull-to-refresh | Passage à écran opérationnel, snackbar possible |
 | 3 | Disponibilité | Activer **En ligne** | Statut disponible |

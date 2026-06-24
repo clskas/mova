@@ -43,6 +43,7 @@ class ApiClient {
   final SyncQueue? _syncQueue;
   String? _token;
   bool _mockMode = false;
+  int _consecutiveHealthFailures = 0;
 
   bool get isMockMode => _mockMode;
   bool get hasToken => _token != null && _token!.isNotEmpty;
@@ -115,24 +116,48 @@ class ApiClient {
         if (_token != null && _token!.isNotEmpty) 'Authorization': 'Bearer $_token',
       };
 
-  /// Vérifie la santé de la passerelle. Ne bascule plus en mode mock automatique.
-  Future<bool> checkHealth() async {
+  /// Vérifie la santé de la passerelle. Essaie l'URL principale puis le secours LAN (en parallèle).
+  Future<bool> checkHealth({bool forceDown = false, bool resetFailures = false}) async {
     if (_mockMode) return false;
+    if (resetFailures) _consecutiveHealthFailures = 0;
     if (_connectivity != null && !_connectivity!.hasNetwork) {
-      _connectivity!.setGatewayUp(false);
       return false;
     }
-    try {
-      final res = await _client
-          .get(Uri.parse('${MarketConfig.gatewayBaseUrl}/health'))
-          .timeout(const Duration(seconds: 12));
-      final ok = res.statusCode == 200;
-      _connectivity?.setGatewayUp(ok);
-      return ok;
-    } catch (_) {
+
+    final probes = await Future.wait(
+      MarketConfig.gatewayProbeBases.map((gatewayBase) async {
+        try {
+          final res = await _client
+              .get(Uri.parse('$gatewayBase/health'))
+              .timeout(const Duration(seconds: 12));
+          if (res.statusCode == 200) return gatewayBase;
+        } catch (_) {}
+        return null;
+      }),
+    );
+
+    String? winner;
+    for (final probe in probes) {
+      if (probe != null) {
+        winner = probe;
+        break;
+      }
+    }
+    if (winner != null) {
+      final apiBase = winner.endsWith('/api') ? winner : '$winner/api';
+      if (apiBase != MarketConfig.apiBaseUrl) {
+        MarketConfig.applyRuntimeApiBase(apiBase);
+      }
+      _consecutiveHealthFailures = 0;
+      _connectivity?.setGatewayUp(true);
+      return true;
+    }
+
+    _consecutiveHealthFailures++;
+    if (forceDown || _consecutiveHealthFailures >= 2) {
       _connectivity?.setGatewayUp(false);
-      return false;
     }
+    return false;
   }
 
   Future<Map<String, dynamic>?> _readCacheForGet(String path) async {
@@ -608,7 +633,7 @@ class ApiClient {
       try {
         final response = await _client
             .post(
-              Uri.parse('${MarketConfig.apiBaseUrl}$path'),
+              Uri.parse('${MarketConfig.effectiveApiBaseUrl}$path'),
               headers: _headers,
               body: jsonEncode(body),
             )
@@ -669,7 +694,7 @@ class ApiClient {
       try {
         final response = await _client
             .patch(
-              Uri.parse('${MarketConfig.apiBaseUrl}$path'),
+              Uri.parse('${MarketConfig.effectiveApiBaseUrl}$path'),
               headers: _headers,
               body: jsonEncode(body),
             )
@@ -718,7 +743,7 @@ class ApiClient {
     for (var i = 0; i < retries; i++) {
       try {
         final response = await _client
-            .get(Uri.parse('${MarketConfig.apiBaseUrl}$path'), headers: _headers)
+            .get(Uri.parse('${MarketConfig.effectiveApiBaseUrl}$path'), headers: _headers)
             .timeout(const Duration(seconds: 30));
 
         final data = _decodeBody(response.body);

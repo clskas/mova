@@ -31,7 +31,7 @@ if ($UsbReverse) {
     Set-MovaAdbReverse -DeviceId $deviceId
 }
 
-$urls = Get-MovaMobileApiUrls -ApiUrl $ApiUrl -WsUrl $WsUrl -UsbReverse:$UsbReverse
+$urls = Get-MovaMobileApiUrls -ApiUrl $ApiUrl -WsUrl $WsUrl -UsbReverse:$UsbReverse -DeviceId $deviceId
 $ApiUrl = $urls.ApiUrl
 $WsUrl = $urls.WsUrl
 
@@ -39,13 +39,19 @@ $defines = @(
     "--dart-define=API_URL=$ApiUrl",
     "--dart-define=WS_URL=$WsUrl"
 )
+if ($urls.ApiFallbackUrl) {
+    $defines += "--dart-define=API_FALLBACK_URL=$($urls.ApiFallbackUrl)"
+}
 
 Push-Location $mobileDir
 try {
     flutter pub get
     Write-Host "Running driver on $deviceId" -ForegroundColor Cyan
     if ($UsbReverse) {
-        Write-Host "API_URL=$ApiUrl  (USB reverse -> PC localhost:3000)" -ForegroundColor DarkGray
+        Write-Host "API_URL=$ApiUrl  WS_URL=$WsUrl" -ForegroundColor DarkGray
+        if ($urls.ApiFallbackUrl) {
+            Write-Host "API_FALLBACK_URL=$($urls.ApiFallbackUrl)" -ForegroundColor DarkGray
+        }
     } else {
         Write-Host "API_URL=$ApiUrl  (Wi-Fi/LAN, telephone et PC sur le meme reseau)" -ForegroundColor DarkGray
     }

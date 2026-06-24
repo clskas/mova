@@ -107,10 +107,10 @@ function Get-MovaFlutterDeviceByPattern {
         $_.isSupported -and ($_.name -like "*$Pattern*" -or $_.id -like "*$Pattern*")
     })
     if ($match.Count -eq 0) {
-        throw "Aucun appareil correspondant a '$Pattern'. Lancez flutter devices."
+        throw "Aucun appareil correspondant a $Pattern. Lancez flutter devices."
     }
     if ($match.Count -gt 1) {
-        Write-Host "Plusieurs appareils pour '$Pattern' — premier utilise :" -ForegroundColor Yellow
+        Write-Host "Plusieurs appareils pour $Pattern - premier utilise :" -ForegroundColor Yellow
         $match | ForEach-Object { Write-Host "  $($_.id)  $($_.name)" }
     }
     return $match[0].id
@@ -147,7 +147,7 @@ function Get-MovaFlutterDevice {
         return $physical[0].id
     }
     if ($physical.Count -gt 1) {
-        Write-Host 'Plusieurs telephones — premier utilise :' -ForegroundColor Yellow
+        Write-Host "Plusieurs telephones - premier utilise :" -ForegroundColor Yellow
         $physical | ForEach-Object { Write-Host "  $($_.id)  $($_.name)" }
         return $physical[0].id
     }
@@ -157,14 +157,5 @@ function Get-MovaFlutterDevice {
         return $emulators[0].id
     }
 
-    throw @'
-Aucun telephone Android/iOS detecte par Flutter.
-
-1. Branchez le telephone en USB (ou activez le debogage sans fil).
-2. Sur le telephone : Options developpeur > Debogage USB ON, acceptez la cle RSA du PC.
-3. Verifiez : adb devices  puis  flutter devices
-
-Note : mode Wi-Fi (sans -UsbReverse) utilise l IP du PC sur le Wi-Fi pour l API,
-mais il faut quand meme un telephone connecte pour installer/lancer l app.
-'@
+    throw "Aucun telephone Android/iOS detecte. Branchez un telephone USB, activez le debogage USB, puis verifiez adb devices et flutter devices."
 }

@@ -385,6 +385,8 @@ export type SubscriptionPlan = {
   benefits: string[];
   isActive: boolean;
   subscriberCount?: number;
+  feeReductionPercent?: number;
+  priorityMatching?: boolean;
 };
 
 export type SubscriptionRecord = {
@@ -1453,8 +1455,8 @@ export async function createSubscriptionPlan(data: Partial<SubscriptionPlan>) {
     target: "PASSENGER",
     monthlyPriceCdf: data.priceCdfPerMonth ?? 0,
     description: data.benefits?.join(" · ") ?? "",
-    feeReductionPercent: 0,
-    priorityMatching: false,
+    feeReductionPercent: data.feeReductionPercent ?? 0,
+    priorityMatching: data.priorityMatching ?? false,
   };
   const created = await apiFetch<Record<string, unknown>>("/api/admin/subscription-plans", {
     method: "POST",
@@ -1468,6 +1470,8 @@ export async function updateSubscriptionPlan(id: string, data: Partial<Subscript
   if (data.name !== undefined) payload.name = data.name;
   if (data.priceCdfPerMonth !== undefined) payload.monthlyPriceCdf = data.priceCdfPerMonth;
   if (data.benefits !== undefined) payload.description = data.benefits.join(" · ");
+  if (data.feeReductionPercent !== undefined) payload.feeReductionPercent = data.feeReductionPercent;
+  if (data.priorityMatching !== undefined) payload.priorityMatching = data.priorityMatching;
   if (data.isActive !== undefined) payload.isActive = data.isActive;
   const updated = await apiFetch<Record<string, unknown>>(`/api/admin/subscription-plans/${id}`, {
     method: "PATCH",
@@ -1498,6 +1502,8 @@ function normalizeSubscriptionPlan(raw: Record<string, unknown>): SubscriptionPl
     benefits: benefits.length ? benefits : ["Aucun avantage renseigné"],
     isActive: raw.isActive !== false,
     subscriberCount: raw.subscriberCount as number | undefined,
+    feeReductionPercent: fee,
+    priorityMatching: raw.priorityMatching === true,
   };
 }
 

@@ -19,6 +19,7 @@ import { AssignDriverPanel } from "@/components/AssignDriverPanel";
 import { filterDriversForParcel } from "@/lib/driver-assignment";
 import { ContactBlock } from "@/components/ContactActions";
 import { GpsTraceMap } from "@/components/GpsTraceMap";
+import { useLiveGpsTrace } from "@/hooks/useLiveGpsTrace";
 import {
   BtnDanger,
   Card,
@@ -72,6 +73,15 @@ export default function LivraisonsPage() {
   const [deliveryDetail, setDeliveryDetail] = useState<DeliveryOverview | null>(null);
   const [gpsTrace, setGpsTrace] = useState<GpsPoint[]>([]);
 
+  const deliveryActive =
+    !!selected?.status && !["DELIVERED", "COMPLETED", "CANCELLED"].includes(selected.status);
+  const { points: liveTrace, livePosition, socketLive } = useLiveGpsTrace({
+    type: "delivery",
+    id: selected?.id,
+    active: deliveryActive,
+    seed: gpsTrace,
+  });
+
   useEffect(() => {
     if (!selected?.id) {
       setDeliveryDetail(null);
@@ -98,8 +108,7 @@ export default function LivraisonsPage() {
       }
     };
     loadTrace();
-    const active = selected.status && !["DELIVERED", "COMPLETED", "CANCELLED"].includes(selected.status);
-    const timer = active ? setInterval(loadTrace, 10000) : undefined;
+    const timer = deliveryActive ? setInterval(loadTrace, 15000) : undefined;
     return () => {
       cancelled = true;
       if (timer) clearInterval(timer);
@@ -268,7 +277,8 @@ export default function LivraisonsPage() {
             )}
             <GpsTraceMap
               title="Trace GPS du coursier"
-              points={gpsTrace}
+              points={deliveryActive ? liveTrace : gpsTrace}
+              livePosition={deliveryActive ? livePosition : null}
               pickup={
                 deliveryDetail?.pickupLat != null && deliveryDetail?.pickupLng != null
                   ? { lat: deliveryDetail.pickupLat, lng: deliveryDetail.pickupLng }
@@ -281,11 +291,15 @@ export default function LivraisonsPage() {
               }
               pickupLabel={selected.pickupAddress ?? deliveryDetail?.pickupAddress}
               dropoffLabel={selected.dropoffAddress ?? deliveryDetail?.dropoffAddress}
-              live={
-                !!selected.status &&
-                !["DELIVERED", "COMPLETED", "CANCELLED"].includes(selected.status ?? "")
-              }
+              live={deliveryActive}
             />
+            {deliveryActive && (
+              <p className="text-xs text-gray-500">
+                {socketLive
+                  ? "Suivi WebSocket actif — position mise à jour en direct."
+                  : "Connexion temps réel en cours… actualisation HTTP toutes les 15 s."}
+              </p>
+            )}
             {canAssignRecord(selected) && (
               <AssignDriverPanel
                 drivers={assignableDrivers}

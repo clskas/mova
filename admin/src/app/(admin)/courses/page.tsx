@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { apiFetch, cancelRide, fetchGpsTrace, fetchRide, formatCdf, formatDate, updateRideStatus, type GpsPoint, type RideOverview } from "@/lib/api";
 import { useAdmin } from "@/components/AdminProvider";
 import { GpsTraceMap } from "@/components/GpsTraceMap";
+import { useLiveGpsTrace } from "@/hooks/useLiveGpsTrace";
 import {
   BtnDanger,
   BtnPrimary,
@@ -56,6 +57,14 @@ export default function CoursesPage() {
   const [rideDetail, setRideDetail] = useState<RideOverview | null>(null);
   const [gpsTrace, setGpsTrace] = useState<GpsPoint[]>([]);
 
+  const rideActive = !!selected?.status && !["COMPLETED", "CANCELLED"].includes(selected.status);
+  const { points: liveTrace, livePosition, socketLive } = useLiveGpsTrace({
+    type: "ride",
+    id: selected?.id,
+    active: rideActive,
+    seed: gpsTrace,
+  });
+
   useEffect(() => {
     if (!selected?.id) {
       setRideDetail(null);
@@ -81,8 +90,7 @@ export default function CoursesPage() {
       }
     };
     loadTrace();
-    const active = selected.status && !["COMPLETED", "CANCELLED"].includes(selected.status);
-    const timer = active ? setInterval(loadTrace, 10000) : undefined;
+    const timer = rideActive ? setInterval(loadTrace, 15000) : undefined;
     return () => {
       cancelled = true;
       if (timer) clearInterval(timer);
@@ -205,7 +213,8 @@ export default function CoursesPage() {
             <p><span className="text-gray-500">Prix:</span> {formatCdf(selected.priceCdf)}</p>
             <GpsTraceMap
               title="Trace GPS du trajet"
-              points={gpsTrace}
+              points={rideActive ? liveTrace : gpsTrace}
+              livePosition={rideActive ? livePosition : null}
               pickup={
                 rideDetail?.pickupLat != null && rideDetail?.pickupLng != null
                   ? { lat: rideDetail.pickupLat, lng: rideDetail.pickupLng }
@@ -218,8 +227,15 @@ export default function CoursesPage() {
               }
               pickupLabel={selected.pickupAddress}
               dropoffLabel={selected.dropoffAddress}
-              live={!!selected.status && !["COMPLETED", "CANCELLED"].includes(selected.status ?? "")}
+              live={rideActive}
             />
+            {rideActive && (
+              <p className="text-xs text-gray-500">
+                {socketLive
+                  ? "Suivi WebSocket actif — position mise à jour en direct."
+                  : "Connexion temps réel en cours… actualisation HTTP toutes les 15 s."}
+              </p>
+            )}
             {!readOnly && (
               <>
                 <FieldLabel>Changer le statut</FieldLabel>

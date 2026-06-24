@@ -7,7 +7,7 @@ import '../config/market_config.dart';
 
 final rideSocketProvider = Provider((ref) => RideSocket());
 
-/// WebSocket GPS via ride-service (`/tracking` namespace).
+/// WebSocket GPS + chat via api-gateway → ride-service (`/tracking` namespace).
 class RideSocket {
   io.Socket? _socket;
   String? _rideId;
@@ -16,7 +16,7 @@ class RideSocket {
   bool connectionFailed = false;
   Timer? _reconnectTimer;
   int _reconnectAttempt = 0;
-  static const _maxReconnectAttempts = 6;
+  static const _maxReconnectAttempts = 8;
 
   void Function(Map<String, dynamic> payload)? _onLocation;
   void Function(Map<String, dynamic> payload)? _onStatus;
@@ -27,8 +27,26 @@ class RideSocket {
 
   set onChat(void Function(Map<String, dynamic> payload)? handler) => _onChat = handler;
 
+  /// Retire les callbacks sans couper la connexion (écran fermé).
+  void clearHandlers({bool chatOnly = false}) {
+    if (chatOnly) {
+      _onChat = null;
+      return;
+    }
+    _onLocation = null;
+    _onStatus = null;
+    _onChat = null;
+    _onConnected = null;
+    _onDisconnected = null;
+  }
+
+  void resetFailure() {
+    connectionFailed = false;
+    _reconnectAttempt = 0;
+  }
+
   /// Attend que le socket soit connecté (ou échoue après [timeout]).
-  Future<bool> ensureConnected({Duration timeout = const Duration(seconds: 12)}) async {
+  Future<bool> ensureConnected({Duration timeout = const Duration(seconds: 15)}) async {
     if (_socket?.connected == true && isConnected) return true;
     if (connectionFailed) return false;
     final waiter = Completer<bool>();
@@ -64,7 +82,7 @@ class RideSocket {
     if (onConnected != null) _onConnected = onConnected;
     if (onDisconnected != null) _onDisconnected = onDisconnected;
 
-    if (!forceReconnect && _socket?.connected == true && _rideId == rideId) {
+    if (!forceReconnect && _socket?.connected == true) {
       _socket?.emit('ride:subscribe', {'rideId': rideId});
       isConnected = true;
       connectionFailed = false;
@@ -73,6 +91,9 @@ class RideSocket {
       return;
     }
 
+    if (forceReconnect) {
+      resetFailure();
+    }
     _reconnectAttempt = 0;
     connectionFailed = false;
     _openSocket();
@@ -88,12 +109,13 @@ class RideSocket {
       _socket = io.io(
         '${MarketConfig.wsUrl}/tracking',
         io.OptionBuilder()
-            .setTransports(['websocket', 'polling'])
+            .setPath('/socket.io')
+            .setTransports(['polling', 'websocket'])
             .disableAutoConnect()
             .enableReconnection()
             .setReconnectionAttempts(_maxReconnectAttempts)
-            .setReconnectionDelay(2000)
-            .setReconnectionDelayMax(10000)
+            .setReconnectionDelay(1500)
+            .setReconnectionDelayMax(8000)
             .setAuth({if (_token != null && _token!.isNotEmpty) 'token': _token})
             .build(),
       );
@@ -104,7 +126,6 @@ class RideSocket {
           _reconnectAttempt = 0;
           if (_rideId != null) {
             _socket?.emit('ride:subscribe', {'rideId': _rideId});
-            _socket?.emit('delivery:subscribe', {'deliveryId': _rideId});
           }
           _onConnected?.call();
           _completeConnectWaiters(true);
@@ -130,6 +151,9 @@ class RideSocket {
           isConnected = false;
           _scheduleReconnect();
         })
+        ..onError((_) {
+          isConnected = false;
+        })
         ..connect();
     } catch (_) {
       _scheduleReconnect();
@@ -151,7 +175,7 @@ class RideSocket {
       return;
     }
     _reconnectTimer?.cancel();
-    final delaySec = math.min(30, math.pow(2, _reconnectAttempt).toInt());
+    final delaySec = math.min(20, math.pow(2, _reconnectAttempt).toInt());
     _reconnectAttempt++;
     _reconnectTimer = Timer(Duration(seconds: delaySec), _openSocket);
   }
@@ -159,12 +183,14 @@ class RideSocket {
   void dispose() {
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
+    clearHandlers();
     _socket?.dispose();
     _socket = null;
     _rideId = null;
     isConnected = false;
     connectionFailed = false;
     _reconnectAttempt = 0;
+    _completeConnectWaiters(false);
   }
 
   void emitDriverLocation({
@@ -195,6 +221,7 @@ class RideSocket {
     if (onLocation != null) _onLocation = onLocation;
     if (onConnected != null) _onConnected = onConnected;
     if (onDisconnected != null) _onDisconnected = onDisconnected;
+    resetFailure();
     _reconnectAttempt = 0;
     connectionFailed = false;
     _openSocket();

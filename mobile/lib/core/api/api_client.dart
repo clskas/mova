@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../cache/profile_cache.dart';
+import '../cache/user_profile_cache.dart';
 import '../cache/unified_history_cache.dart';
 import '../cache/wallet_cache.dart';
 import '../config/market_config.dart';
@@ -90,6 +91,7 @@ class ApiClient {
     await prefs.remove('auth_token');
     await prefs.remove('user_phone');
     await ProfileCache.clear();
+    await UserProfileCache.clear();
     await WalletCache.clear();
     await UnifiedHistoryCache.clear();
   }
@@ -155,6 +157,15 @@ class ApiClient {
         'syncedAt': snapshot.syncedAt?.toIso8601String(),
       };
     }
+    if (path == '/users/me') {
+      final snapshot = await UserProfileCache.load();
+      if (snapshot.isEmpty) return null;
+      return {
+        ...?snapshot.profile,
+        'cached': true,
+        'syncedAt': snapshot.syncedAt?.toIso8601String(),
+      };
+    }
     if (path.contains('/drivers/profile')) {
       final snapshot = await ProfileCache.load();
       if (snapshot.isEmpty) return null;
@@ -185,6 +196,10 @@ class ApiClient {
       await WalletCache.save(data);
       return;
     }
+    if (path == '/users/me') {
+      await UserProfileCache.save(data);
+      return;
+    }
     if (path.contains('/drivers/profile')) {
       await ProfileCache.save(data);
       return;
@@ -207,6 +222,12 @@ class ApiClient {
         body?['code']?.toString() ?? '',
         role: body?['role']?.toString(),
       ));
+    }
+    if (path == '/users/me' && method == 'GET') {
+      return Success(MockData.currentUser());
+    }
+    if (path == '/users/me' && method == 'PATCH') {
+      return Success(MockData.updateCurrentUser(body ?? {}));
     }
     if (path.contains('/rides/estimate')) {
       return Success(MockData.estimate(body ?? {}));
@@ -862,6 +883,34 @@ class ApiClient {
     };
   }
 
+  Future<Result<Map<String, dynamic>>> updateUserProfile({
+    String? firstName,
+    String? lastName,
+    String? email,
+  }) async {
+    final body = <String, dynamic>{};
+    if (firstName != null) body['firstName'] = firstName;
+    if (lastName != null) body['lastName'] = lastName;
+    if (email != null) body['email'] = email;
+
+    final result = await patch('/users/me', body);
+    if (result case Success(:final data)) {
+      final merged = Map<String, dynamic>.from(data);
+      if (merged['offline'] == true) {
+        final cached = await UserProfileCache.load();
+        final base = cached.profile ?? <String, dynamic>{};
+        await UserProfileCache.save({...base, ...body, ...merged});
+      } else {
+        await UserProfileCache.save(merged);
+      }
+      return Success(merged);
+    }
+    if (result case Failure(:final error)) {
+      return Failure(error);
+    }
+    return const Failure(NetworkFailure());
+  }
+
   Future<Result<Map<String, dynamic>>> getDriverProfile({bool forceRefresh = false}) async {
     if (forceRefresh) await ProfileCache.clear();
     final path = forceRefresh
@@ -872,6 +921,40 @@ class ApiClient {
       Success(:final data) => Success(data['profile'] as Map<String, dynamic>? ?? data),
       Failure(:final error) => Failure(error),
     };
+  }
+
+  /// Récupère le code PIN espèces (completionPin / deliveryPin) depuis l'API.
+  Future<String?> resolveCashPin({
+    String? rideId,
+    String? serviceType,
+    String? serviceId,
+  }) async {
+    if (rideId != null) {
+      final result = await getRide(rideId);
+      if (result case Success(:final data)) {
+        return data['completionPin']?.toString();
+      }
+      return null;
+    }
+    if (serviceType == null || serviceId == null) return null;
+    final path = switch (serviceType.toUpperCase()) {
+      'DELIVERY' => '/deliveries/$serviceId',
+      'ERRAND' => '/errands/$serviceId',
+      'MOVING' => '/moving/$serviceId',
+      _ => null,
+    };
+    if (path == null) return null;
+    final result = await get(path);
+    if (result case Success(:final data)) {
+      final map = data is Map
+          ? Map<String, dynamic>.from(data)
+          : (data is Map<String, dynamic> ? data : null);
+      if (map == null) return null;
+      final nested = map['order'] ?? map['delivery'] ?? map['moving'] ?? map['request'];
+      final source = nested is Map ? Map<String, dynamic>.from(nested) : map;
+      return source['completionPin']?.toString() ?? source['deliveryPin']?.toString();
+    }
+    return null;
   }
 
   Future<Result<Map<String, dynamic>>> payRide(

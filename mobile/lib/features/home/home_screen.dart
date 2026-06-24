@@ -17,6 +17,7 @@ import '../moving/moving_screen.dart';
 import '../rental/rental_screen.dart';
 import '../wallet/wallet_screen.dart';
 import '../help/help_screen.dart';
+import '../profile/profile_screen.dart';
 import '../history/history_screen.dart';
 import 'service_card.dart';
 
@@ -99,6 +100,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
         ],
       ),
       actions: [
+        IconButton(
+          icon: const Icon(Icons.person_outline),
+          tooltip: 'Mon profil',
+          onPressed: () => _open(context, const ProfileScreen()),
+        ),
         IconButton(
           icon: const Icon(Icons.account_balance_wallet_outlined),
           tooltip: 'Wallet',

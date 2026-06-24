@@ -44,7 +44,7 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
   @override
   void dispose() {
     _locationTimer?.cancel();
-    ref.read(rideSocketProvider).dispose();
+    ref.read(rideSocketProvider).clearHandlers();
     super.dispose();
   }
 
@@ -82,7 +82,7 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
 
   void _startLocationUpdates() {
     _locationTimer?.cancel();
-    _locationTimer = Timer.periodic(const Duration(seconds: 12), (_) => _pushLocation());
+    _locationTimer = Timer.periodic(const Duration(seconds: 8), (_) => _pushLocation());
     _pushLocation();
   }
 
@@ -158,7 +158,7 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
         setState(() => _ride = data);
         if (nextStatus == 'COMPLETED') {
           _locationTimer?.cancel();
-          ref.read(rideSocketProvider).dispose();
+          ref.read(rideSocketProvider).clearHandlers();
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text('Course terminée — ${MarketConfig.formatCdf(_ride['priceCdf'] as int? ?? 0)}')),

@@ -28,6 +28,26 @@ abstract final class MockData {
     };
   }
 
+  static Map<String, dynamic> _mockPassengerProfile = {
+    'id': 'passenger-mock-1',
+    'phone': '+243900000010',
+    'role': 'PASSENGER',
+    'status': 'ACTIVE',
+    'firstName': 'Marie',
+    'lastName': 'Passagère',
+    'email': '',
+  };
+
+  static Map<String, dynamic> currentUser() => Map<String, dynamic>.from(_mockPassengerProfile);
+
+  static Map<String, dynamic> updateCurrentUser(Map<String, dynamic> body) {
+    _mockPassengerProfile = {
+      ..._mockPassengerProfile,
+      ...body,
+    };
+    return currentUser();
+  }
+
   static Map<String, dynamic> estimate([Map<String, dynamic>? body]) {
     final vehicleType = body?['vehicleType']?.toString() ?? 'MOTO_TAXI';
     final distanceKm = 3.2;
@@ -140,6 +160,8 @@ abstract final class MockData {
         'distanceKm': 3.2,
         'durationMin': 12,
         'etaMinutes': 5,
+        'paymentReady': false,
+        'completionPin': '4829',
         'driverDistanceKm': 1.2,
         'driver': {
           'id': 'driver-mock-1',
@@ -170,7 +192,8 @@ abstract final class MockData {
         'rideId': rideId,
         'method': body['method'] ?? 'WALLET',
         'amountCdf': body['amountCdf'] ?? 8500,
-        'status': 'COMPLETED',
+        'status': body['method'] == 'CASH' ? 'PENDING_CASH' : 'COMPLETED',
+        if (body['method'] == 'CASH') 'pendingCash': true,
       };
 
   static Map<String, dynamic> payService(String refType, String refId, Map<String, dynamic> body) => {

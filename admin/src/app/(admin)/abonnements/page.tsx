@@ -37,6 +37,8 @@ export default function AbonnementsPage() {
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
   const [benefits, setBenefits] = useState("");
+  const [feeReduction, setFeeReduction] = useState("0");
+  const [priorityMatching, setPriorityMatching] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
@@ -66,6 +68,8 @@ export default function AbonnementsPage() {
     setName("");
     setPrice("");
     setBenefits("");
+    setFeeReduction("0");
+    setPriorityMatching(false);
     setModal("create");
   }
 
@@ -73,6 +77,8 @@ export default function AbonnementsPage() {
     setName(plan.name);
     setPrice(String(plan.priceCdfPerMonth));
     setBenefits(plan.benefits.join("\n"));
+    setFeeReduction(String(plan.feeReductionPercent ?? 0));
+    setPriorityMatching(plan.priorityMatching ?? false);
     setModal(plan);
   }
 
@@ -83,6 +89,8 @@ export default function AbonnementsPage() {
         name: name.trim(),
         priceCdfPerMonth: Number(price),
         benefits: benefits.split("\n").map((b) => b.trim()).filter(Boolean),
+        feeReductionPercent: Number(feeReduction) || 0,
+        priorityMatching,
       };
       if (modal === "create") {
         await createSubscriptionPlan(payload);
@@ -117,6 +125,16 @@ export default function AbonnementsPage() {
         action={!readOnly ? <BtnPrimary onClick={openCreate}>Nouveau plan</BtnPrimary> : undefined}
       />
       {error && <ErrorBanner message={error} onRetry={load} />}
+
+      <Card className="p-4 bg-violet-50 border-violet-100 text-sm text-gray-700 space-y-2">
+        <p className="font-semibold text-[#6C63FF]">Pourquoi les abonnements MOVA Plus ?</p>
+        <p>
+          Sur le modèle d&apos;Uber One / Bolt Plus, un abonnement mensuel en CDF fidélise les passagers
+          réguliers (trajets domicile-travail, livraisons récurrentes) : réduction sur les frais de service,
+          priorité d&apos;assignation chauffeur en heure de pointe à Kinshasa et autres villes, et revenus
+          prévisibles pour la plateforme malgré la volatilité du franc congolais.
+        </p>
+      </Card>
 
       {loading ? (
         <LoadingState />
@@ -200,6 +218,18 @@ export default function AbonnementsPage() {
         <div className="space-y-4">
           <label><FieldLabel>Nom</FieldLabel><TextInput value={name} onChange={setName} /></label>
           <label><FieldLabel>Prix CDF / mois</FieldLabel><TextInput value={price} onChange={setPrice} type="number" /></label>
+          <label>
+            <FieldLabel>Réduction frais de service (%)</FieldLabel>
+            <TextInput value={feeReduction} onChange={setFeeReduction} type="number" />
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={priorityMatching}
+              onChange={(e) => setPriorityMatching(e.target.checked)}
+            />
+            Priorité de matching (heures de pointe)
+          </label>
           <label>
             <FieldLabel>Avantages (un par ligne)</FieldLabel>
             <textarea

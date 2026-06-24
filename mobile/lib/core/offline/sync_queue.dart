@@ -147,8 +147,9 @@ class SyncQueue {
     }
   }
 
-  /// Chemins éligibles à la mise en file (créations / recharges).
+  /// Chemins éligibles à la mise en file (créations / recharges / profil).
   static bool shouldQueue(String method, String path) {
+    if (method == 'PATCH' && path == '/users/me') return true;
     if (method != 'POST') return false;
     if (path.contains('/auth/')) return false;
     if (RegExp(r'^/rides/[^/]+/').hasMatch(path)) return false;
@@ -248,6 +249,9 @@ class SyncQueue {
         'inquiry': {'id': localId, 'status': 'PENDING', ...body, ...meta},
         ...meta,
       };
+    }
+    if (path == '/users/me') {
+      return {...body, ...meta};
     }
     return {'id': localId, ...meta};
   }

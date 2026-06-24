@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mova/core/cache/user_profile_cache.dart';
 import 'package:mova/core/cache/unified_history_cache.dart';
 import 'package:mova/core/cache/wallet_cache.dart';
 import 'package:mova/core/offline/connectivity_service.dart';
@@ -42,6 +43,33 @@ void main() {
       expect(data['offline'], isTrue);
       expect(data['message'], contains('hors ligne'));
       expect((data['ride'] as Map)['id'], 'offline-pending-1');
+    });
+    test('shouldQueue accepts profile PATCH', () {
+      expect(SyncQueue.shouldQueue('PATCH', '/users/me'), isTrue);
+      expect(SyncQueue.shouldQueue('PATCH', '/rides/abc/status'), isFalse);
+    });
+
+    test('optimisticResponse for profile patch', () {
+      final data = SyncQueue.optimisticResponse(
+        '/users/me',
+        {'firstName': 'Jean', 'lastName': 'Kabila'},
+        'pending-2',
+      );
+      expect(data['offline'], isTrue);
+      expect(data['firstName'], 'Jean');
+    });
+  });
+
+  group('UserProfileCache', () {
+    test('save and load round-trip', () async {
+      await UserProfileCache.save({
+        'id': 'u1',
+        'firstName': 'Marie',
+        'phone': '+243900000010',
+      });
+      final snapshot = await UserProfileCache.load();
+      expect(snapshot.profile?['firstName'], 'Marie');
+      expect(snapshot.syncedAt, isNotNull);
     });
   });
 

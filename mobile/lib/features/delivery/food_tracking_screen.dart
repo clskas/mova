@@ -219,11 +219,29 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
     return rated == true;
   }
 
-  Future<void> _maybeGoToPayment() async {
-    if (_paymentNavigated || !mounted) return;
+  bool get _paymentDue {
     final status = _delivery?['status']?.toString();
-    final paymentReady = _delivery?['paymentReady'] == true || status == 'DELIVERED';
-    if (!paymentReady) return;
+    return _delivery?['paymentReady'] == true || status == 'DELIVERED';
+  }
+
+  Future<void> _openPayment() async {
+    if (!mounted) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PaymentScreen(
+          serviceType: 'DELIVERY',
+          serviceId: widget.orderId,
+          amountCdf: _totalCdf,
+          completionPin: _delivery?['deliveryPin']?.toString(),
+        ),
+      ),
+    );
+    if (mounted) await _load(silent: true);
+  }
+
+  Future<void> _maybeGoToPayment() async {
+    if (_paymentNavigated || !mounted || !_paymentDue) return;
 
     final alreadyRated = _delivery?['rated'] == true;
     if (_ratingInProgress) return;
@@ -238,17 +256,7 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
 
     if (_paymentNavigated || !mounted) return;
     _paymentNavigated = true;
-    _pollTimer?.cancel();
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (_) => PaymentScreen(
-          serviceType: 'DELIVERY',
-          serviceId: widget.orderId,
-          amountCdf: _totalCdf,
-        ),
-      ),
-    );
+    _openPayment();
   }
 
   Future<void> _cancelOrder() async {
@@ -423,6 +431,14 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
                           onPressed: _cancelling ? null : _cancelOrder,
                         ),
                       if (_canCancel) const SizedBox(height: 8),
+                      if (_paymentDue) ...[
+                        MovaButton(
+                          label: 'Payer la commande',
+                          icon: Icons.payment_outlined,
+                          onPressed: _openPayment,
+                        ),
+                        const SizedBox(height: 8),
+                      ],
                       MovaButton(
                         label: 'Retour à l\'accueil',
                         isSecondary: true,

@@ -102,18 +102,13 @@ class _ErrandTrackingScreenState extends ConsumerState<ErrandTrackingScreen> {
 
   bool get _canCancel => CancelEligibility.errand(_order);
 
-  void _maybeGoToPayment() {
-    if (_paymentNavigated || !mounted) return;
-    final status = _order?['status']?.toString();
-    final paymentReady = _order?['paymentReady'] == true || status == 'COMPLETED';
-    if (!paymentReady) return;
+  Future<void> _openPayment() async {
+    if (!mounted) return;
     final price = _order?['totalPriceCdf'] as int? ??
         _order?['priceCdf'] as int? ??
         ((_order?['estimatedPriceCdf'] as int? ?? widget.totalCdf) +
             (_order?['purchaseTotalCdf'] as int? ?? 0));
-    _paymentNavigated = true;
-    _pollTimer?.cancel();
-    Navigator.pushReplacement(
+    await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => PaymentScreen(
@@ -124,6 +119,16 @@ class _ErrandTrackingScreenState extends ConsumerState<ErrandTrackingScreen> {
         ),
       ),
     );
+    if (mounted) await _load(silent: true);
+  }
+
+  void _maybeGoToPayment() {
+    if (_paymentNavigated || !mounted) return;
+    final status = _order?['status']?.toString();
+    final paymentReady = _order?['paymentReady'] == true || status == 'COMPLETED';
+    if (!paymentReady) return;
+    _paymentNavigated = true;
+    _openPayment();
   }
 
   Future<void> _cancelErrand() async {
@@ -272,6 +277,15 @@ class _ErrandTrackingScreenState extends ConsumerState<ErrandTrackingScreen> {
                     onPressed: _cancelling ? null : _cancelErrand,
                   ),
                 if (_canCancel) const SizedBox(height: 8),
+                if (_order?['paymentReady'] == true ||
+                    _order?['status']?.toString() == 'COMPLETED') ...[
+                  MovaButton(
+                    label: 'Payer la course',
+                    icon: Icons.payment_outlined,
+                    onPressed: _openPayment,
+                  ),
+                  const SizedBox(height: 8),
+                ],
                 MovaButton(
                   label: 'Retour à l\'accueil',
                   isSecondary: true,

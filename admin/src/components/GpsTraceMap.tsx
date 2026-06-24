@@ -14,6 +14,8 @@ type Props = {
   height?: number;
   title?: string;
   live?: boolean;
+  /** Position temps réel du chauffeur / coursier */
+  livePosition?: { lat: number; lng: number } | null;
 };
 
 const KINSHASA: LatLngExpression = [-4.3217, 15.3125];
@@ -52,6 +54,7 @@ export function GpsTraceMap({
   height = 280,
   title = "Trace GPS",
   live = false,
+  livePosition = null,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<LeafletMap | null>(null);
@@ -125,10 +128,33 @@ export function GpsTraceMap({
         }).addTo(map);
       }
 
+      const driver = livePosition ?? (points.length > 0 ? points[points.length - 1] : null);
+      if (driver && live) {
+        L.circleMarker([driver.lat, driver.lng], {
+          radius: 10,
+          color: "#0f172a",
+          fillColor: "#22c55e",
+          fillOpacity: 0.95,
+          weight: 3,
+        })
+          .addTo(map)
+          .bindPopup("<strong>Position actuelle</strong>");
+        if (pickup && points.length < 2) {
+          L.polyline(
+            [
+              [driver.lat, driver.lng],
+              [pickup.lat, pickup.lng],
+            ],
+            { color: "#22c55e", weight: 3, opacity: 0.7, dashArray: "8 6" },
+          ).addTo(map);
+        }
+      }
+
       const boundsPoints: LatLngExpression[] = [
         ...points.map((p) => [p.lat, p.lng] as LatLngExpression),
         ...(pickup ? ([[pickup.lat, pickup.lng]] as LatLngExpression[]) : []),
         ...(dropoff ? ([[dropoff.lat, dropoff.lng]] as LatLngExpression[]) : []),
+        ...(driver && live ? ([[driver.lat, driver.lng]] as LatLngExpression[]) : []),
       ];
 
       if (boundsPoints.length >= 2) {
@@ -151,7 +177,7 @@ export function GpsTraceMap({
         mapRef.current = null;
       }
     };
-  }, [points, pickup, dropoff, pickupLabel, dropoffLabel]);
+  }, [points, pickup, dropoff, pickupLabel, dropoffLabel, live, livePosition]);
 
   return (
     <div className="rounded-xl border border-gray-200 bg-white overflow-hidden shadow-sm">
@@ -159,7 +185,7 @@ export function GpsTraceMap({
         <p className="text-sm font-medium text-gray-700">{title}</p>
         <span className="text-xs text-gray-500">
           {points.length} point{points.length > 1 ? "s" : ""}
-          {live ? " · live" : ""}
+          {live ? " · temps réel" : ""}
         </span>
       </div>
       <div ref={containerRef} className="w-full z-0" style={{ height, minHeight: height }} />

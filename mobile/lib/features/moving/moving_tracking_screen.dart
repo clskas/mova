@@ -121,23 +121,29 @@ class _MovingTrackingScreenState extends ConsumerState<MovingTrackingScreen> {
   int get _totalCdf =>
       _request?['estimatedPriceCdf'] as int? ?? widget.estimatedPrice;
 
-  void _maybeGoToPayment() {
-    if (_paymentNavigated || !mounted || _totalCdf <= 0) return;
-    final paymentReady = _request?['paymentReady'] == true ||
-        _request?['status']?.toString() == 'COMPLETED';
-    if (!paymentReady) return;
-    _paymentNavigated = true;
-    _pollTimer?.cancel();
-    Navigator.pushReplacement(
+  Future<void> _openPayment() async {
+    if (!mounted || _totalCdf <= 0) return;
+    await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => PaymentScreen(
           serviceType: 'MOVING',
           serviceId: widget.movingId,
           amountCdf: _totalCdf,
+          completionPin: _request?['completionPin']?.toString(),
         ),
       ),
     );
+    if (mounted) await _load(silent: true);
+  }
+
+  void _maybeGoToPayment() {
+    if (_paymentNavigated || !mounted || _totalCdf <= 0) return;
+    final paymentReady = _request?['paymentReady'] == true ||
+        _request?['status']?.toString() == 'COMPLETED';
+    if (!paymentReady) return;
+    _paymentNavigated = true;
+    _openPayment();
   }
 
   @override
@@ -251,6 +257,15 @@ class _MovingTrackingScreenState extends ConsumerState<MovingTrackingScreen> {
                     isLoading: _cancelling,
                     isSecondary: true,
                     onPressed: _cancelling ? null : _cancelMoving,
+                  ),
+                ],
+                if (_request?['paymentReady'] == true ||
+                    _request?['status']?.toString() == 'COMPLETED') ...[
+                  const SizedBox(height: 16),
+                  MovaButton(
+                    label: 'Payer le déménagement',
+                    icon: Icons.payment_outlined,
+                    onPressed: _openPayment,
                   ),
                 ],
                 const SizedBox(height: 24),

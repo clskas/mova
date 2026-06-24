@@ -59,6 +59,7 @@ class _RideChatScreenState extends ConsumerState<RideChatScreen> {
 
   @override
   void dispose() {
+    _socket?.clearHandlers(chatOnly: true);
     _controller.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -75,7 +76,7 @@ class _RideChatScreenState extends ConsumerState<RideChatScreen> {
     await _connectSocket();
   }
 
-  Future<void> _connectSocket() async {
+  Future<void> _connectSocket({bool forceReconnect = false}) async {
     final api = ref.read(apiClientProvider);
     final token = await api.authToken();
     if (!mounted) return;
@@ -85,9 +86,11 @@ class _RideChatScreenState extends ConsumerState<RideChatScreen> {
     });
     final socket = ref.read(rideSocketProvider);
     _socket = socket;
+    if (forceReconnect) socket.resetFailure();
     socket.connect(
       rideId: widget.rideId,
       token: token,
+      forceReconnect: forceReconnect,
       onChat: _onIncomingChat,
       onConnected: () {
         if (mounted) {
@@ -161,7 +164,7 @@ class _RideChatScreenState extends ConsumerState<RideChatScreen> {
       'ts': ts.millisecondsSinceEpoch,
     };
     if (_socket == null || !_socket!.isConnected) {
-      await _connectSocket();
+      await _connectSocket(forceReconnect: _socket?.connectionFailed == true);
       final ok = _socket != null && await _socket!.ensureConnected();
       if (!ok) {
         if (mounted) {
@@ -194,14 +197,28 @@ class _RideChatScreenState extends ConsumerState<RideChatScreen> {
       child: Column(
         children: [
           if (_error != null) ...[
-            MovaErrorBanner(message: _error!),
+            MovaErrorBanner(
+              message: _error!,
+              onRetry: _connecting ? null : () => _connectSocket(forceReconnect: true),
+            ),
             const SizedBox(height: 8),
-            if (_connecting)
-              const Center(child: Padding(
-                padding: EdgeInsets.all(8),
-                child: Text('Connexion au chat…', style: TextStyle(color: MovaColors.textSecondary)),
-              )),
           ],
+          if (_connecting)
+            const Padding(
+              padding: EdgeInsets.all(8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: MovaColors.violet),
+                  ),
+                  SizedBox(width: 8),
+                  Text('Connexion au chat…', style: TextStyle(color: MovaColors.textSecondary)),
+                ],
+              ),
+            ),
           Expanded(
             child: _messages.isEmpty
                 ? const Center(
@@ -253,6 +270,7 @@ class _RideChatScreenState extends ConsumerState<RideChatScreen> {
                   ),
                   textInputAction: TextInputAction.send,
                   onSubmitted: (_) => _send(),
+                  enabled: !_connecting,
                 ),
               ),
               const SizedBox(width: 8),
@@ -264,7 +282,7 @@ class _RideChatScreenState extends ConsumerState<RideChatScreen> {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Icon(Icons.send, color: MovaColors.violet),
-                onPressed: _sending ? null : _send,
+                onPressed: (_sending || _connecting) ? null : _send,
               ),
             ],
           ),

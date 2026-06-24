@@ -10,7 +10,8 @@ param(
     [string]$ApiUrl = "",
     [string]$WsUrl = "",
     [switch]$UsbReverse,
-    [string]$Device = ""
+    [string]$Device = "",
+    [string]$DeviceName = "V2"
 )
 
 $ErrorActionPreference = "Stop"
@@ -18,7 +19,13 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 $mobileDir = Join-Path $repoRoot "mobile"
 . (Join-Path $PSScriptRoot "mobile-api-url.ps1")
 
-$deviceId = Get-MovaFlutterDevice -MobileDir $mobileDir -DeviceId $Device
+$deviceId = if ($Device) {
+    $Device
+} elseif ($DeviceName) {
+    Get-MovaFlutterDeviceByPattern -MobileDir $mobileDir -Pattern $DeviceName
+} else {
+    Get-MovaFlutterDevice -MobileDir $mobileDir -DeviceId $Device
+}
 
 if ($UsbReverse) {
     Set-MovaAdbReverse -DeviceId $deviceId

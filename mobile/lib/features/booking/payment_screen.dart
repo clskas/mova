@@ -46,12 +46,18 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   final _phoneController = TextEditingController(text: '+243');
   String _method = 'WALLET';
   bool _loading = false;
+  bool _loadingPin = true;
   String? _error;
+  String? _cashPin;
+  late int _amountCdf;
 
   @override
   void initState() {
     super.initState();
+    _amountCdf = widget.amountCdf;
+    _cashPin = widget.completionPin;
     _loadPhone();
+    _loadPaymentDetails();
   }
 
   @override
@@ -68,9 +74,43 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     }
   }
 
+  Future<void> _loadPaymentDetails() async {
+    final api = ref.read(apiClientProvider);
+    final pin = await api.resolveCashPin(
+      rideId: widget.rideId,
+      serviceType: widget.serviceType,
+      serviceId: widget.serviceId,
+    );
+    if (widget.rideId != null) {
+      final result = await api.getRide(widget.rideId!);
+      if (result case Success(:final data)) {
+        if (!mounted) return;
+        setState(() {
+          _amountCdf = (data['finalFareCdf'] ?? data['estimatedFareCdf'] ?? _amountCdf) as int;
+          _cashPin = pin ?? data['completionPin']?.toString() ?? _cashPin;
+          _loadingPin = false;
+        });
+        return;
+      }
+    }
+    if (!mounted) return;
+    setState(() {
+      _cashPin = pin ?? _cashPin;
+      _loadingPin = false;
+    });
+  }
+
   bool get _needsPhone => _mobileMoneyMethods.contains(_method);
 
+  bool get _showCashPin =>
+      _method == 'CASH' && _cashPin != null && _cashPin!.isNotEmpty;
+
   Future<void> _pay() async {
+    if (_method == 'CASH' && (_cashPin == null || _cashPin!.isEmpty)) {
+      setState(() => _error = 'Code PIN espèces indisponible. Réessayez dans un instant.');
+      await _loadPaymentDetails();
+      return;
+    }
     if (_needsPhone) {
       final phone = MarketConfig.normalizePhone(_phoneController.text);
       if (!MarketConfig.validatePhone(phone)) {
@@ -89,7 +129,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       result = await api.payRide(
         widget.rideId!,
         method: _method,
-        amountCdf: widget.amountCdf,
+        amountCdf: _amountCdf,
         phone: _needsPhone ? MarketConfig.normalizePhone(_phoneController.text) : null,
       );
     } else {
@@ -97,7 +137,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
         widget.serviceType!,
         widget.serviceId!,
         method: _method,
-        amountCdf: widget.amountCdf,
+        amountCdf: _amountCdf,
         phone: _needsPhone ? MarketConfig.normalizePhone(_phoneController.text) : null,
       );
     }
@@ -153,14 +193,23 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                 const Text('Montant à payer', style: TextStyle(color: MovaColors.textSecondary)),
                 const SizedBox(height: 8),
                 Text(
-                  MarketConfig.formatCdf(widget.amountCdf),
+                  MarketConfig.formatCdf(_amountCdf),
                   style: const TextStyle(
                     fontSize: 28,
                     fontWeight: FontWeight.bold,
                     color: MovaColors.green,
                   ),
                 ),
-                if (widget.completionPin != null && widget.completionPin!.isNotEmpty) ...[
+                if (_loadingPin)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 12),
+                    child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  )
+                else if (_showCashPin) ...[
                   const SizedBox(height: 12),
                   const Text(
                     'Code de confirmation espèces',
@@ -168,15 +217,21 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                   ),
                   const SizedBox(height: 4),
                   const Text(
-                    'Une fois l\'argent remis au chauffeur, communiquez-lui ce code. '
+                    'Remettez l\'argent au chauffeur, puis communiquez-lui ce code. '
                     'Il le saisit dans son app pour confirmer le paiement.',
                     textAlign: TextAlign.center,
                     style: TextStyle(color: MovaColors.textSecondary, fontSize: 12),
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    widget.completionPin!,
+                    _cashPin!,
                     style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, letterSpacing: 8),
+                  ),
+                ] else if (_method == 'CASH' && (_cashPin == null || _cashPin!.isEmpty)) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    'Code PIN en cours de chargement…',
+                    style: TextStyle(color: MovaColors.textSecondary.withValues(alpha: 0.9), fontSize: 12),
                   ),
                 ],
               ],
@@ -225,7 +280,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
           ],
           const SizedBox(height: 24),
           MovaButton(
-            label: 'Payer ${MarketConfig.formatCdf(widget.amountCdf)}',
+            label: 'Payer ${MarketConfig.formatCdf(_amountCdf)}',
             isLoading: _loading,
             icon: Icons.lock_outline,
             onPressed: _loading ? null : _pay,

@@ -86,6 +86,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
   Timer? _trackingPollTimer;
   RideSocket? _socket;
   int _mockStep = 0;
+  bool _autoPaymentLaunched = false;
 
   @override
   void initState() {
@@ -98,13 +99,38 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
     _pollTimer?.cancel();
     _mockTimer?.cancel();
     _trackingPollTimer?.cancel();
-    _socket?.dispose();
+    _socket?.clearHandlers();
     super.dispose();
+  }
+
+  bool get _isTerminalStatus {
+    final s = _status.toUpperCase();
+    return s == 'COMPLETED' || s == 'CANCELLED';
+  }
+
+  LatLng? get _approachTarget {
+    if (_driverPos == null) return null;
+    if (_status.toUpperCase() == 'IN_PROGRESS') return _dropoff ?? _pickup;
+    return _pickup;
+  }
+
+  String _normalizeWsStatus(String status) {
+    return switch (status.toUpperCase()) {
+      'ACCEPTED' => 'DRIVER_ASSIGNED',
+      'SEARCHING' => 'MATCHING',
+      'DRIVER_ARRIVED' => 'ARRIVING',
+      _ => status,
+    };
   }
 
   List<Map<String, dynamic>> get _timelineSteps => computeRideTimeline(_status);
 
   bool get _canCancel => CancelEligibility.ride(_ride ?? {'status': _status});
+
+  bool get _needsPayment {
+    final s = _status.toUpperCase();
+    return s == 'COMPLETED' || _mock;
+  }
 
   void _updateEtaFromRide(Map<String, dynamic> data) {
     final apiEta = (data['etaMinutes'] as num?)?.toInt();
@@ -203,10 +229,15 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
     _routeTrace = MovaRideMap.parseGpsTrace(data['gpsTrace']);
     _updateEtaFromRide(data);
 
+    final terminal = ['COMPLETED', 'CANCELLED'].contains(_status.toUpperCase());
+    if (!api.isMockMode && !terminal) {
+      _connectSocket();
+    }
+
     if (api.rideHasDriver(data)) {
       _waitingDriver = false;
       _pollTimer?.cancel();
-      _connectSocket();
+      _startTrackingPoll();
       if (api.isMockMode && _driver == null) _applyMockDriver();
     } else if (!api.isMockMode) {
       _waitingDriver = true;
@@ -236,8 +267,8 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
 
   void _startTrackingPoll() {
     if (_trackingPollTimer?.isActive == true) return;
-    _trackingPollTimer = Timer.periodic(const Duration(seconds: 8), (_) async {
-      if (!mounted || _mock) return;
+    _trackingPollTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
+      if (!mounted || _mock || _isTerminalStatus) return;
       final api = ref.read(apiClientProvider);
       if (api.isMockMode) return;
       final result = await api.getRide(widget.rideId);
@@ -260,11 +291,6 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
     });
   }
 
-  void _stopTrackingPoll() {
-    _trackingPollTimer?.cancel();
-    _trackingPollTimer = null;
-  }
-
   Future<void> _connectSocket() async {
     final api = ref.read(apiClientProvider);
     if (api.isMockMode) {
@@ -282,7 +308,6 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
       onConnected: () {
         if (!mounted) return;
         _mockTimer?.cancel();
-        _stopTrackingPoll();
         setState(() => _mock = false);
       },
       onDisconnected: () {
@@ -294,9 +319,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
           });
           return;
         }
-        if (socket.connectionFailed) {
-          _startTrackingPoll();
-        }
+        _startTrackingPoll();
       },
       onLocation: (payload) {
         final lat = payload['lat'] as num?;
@@ -311,17 +334,17 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
         }
       },
       onStatus: (payload) {
-        final status = payload['status']?.toString();
-        if (status != null && mounted) {
-          setState(() {
-            _status = status;
-            if (_ride != null) {
-              _ride = {..._ride!, 'status': status};
-            }
-          });
-          if (status == 'COMPLETED') _goToPayment();
-          if (status == 'CANCELLED') Navigator.pop(context);
-        }
+        final raw = payload['status']?.toString();
+        if (raw == null || !mounted) return;
+        final status = _normalizeWsStatus(raw);
+        setState(() {
+          _status = status;
+          if (_ride != null) {
+            _ride = {..._ride!, 'status': status};
+          }
+        });
+        if (status == 'COMPLETED') _triggerAutoPayment();
+        if (status == 'CANCELLED') Navigator.pop(context);
       },
     );
   }
@@ -356,26 +379,44 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
         }
         if (_mockStep >= mockStatuses.length - 1) {
           _mockTimer?.cancel();
-          _goToPayment();
+          _triggerAutoPayment();
         }
       });
     });
   }
 
-  void _goToPayment() {
-    final price = (_ride?['finalFareCdf'] ??
+  void _triggerAutoPayment() {
+    if (_autoPaymentLaunched || !_needsPayment) return;
+    _autoPaymentLaunched = true;
+    _goToPayment();
+  }
+
+  Future<void> _goToPayment() async {
+    final api = ref.read(apiClientProvider);
+    var pin = _ride?['completionPin']?.toString();
+    var price = (_ride?['finalFareCdf'] ??
             _ride?['estimatedFareCdf'] ??
             widget.estimatedFareCdf) as int;
-    Navigator.pushReplacement(
+    if (!api.isMockMode) {
+      final result = await api.getRide(widget.rideId);
+      if (result case Success(:final data)) {
+        if (mounted) setState(() => _ride = data);
+        pin = data['completionPin']?.toString() ?? pin;
+        price = (data['finalFareCdf'] ?? data['estimatedFareCdf'] ?? price) as int;
+      }
+    }
+    if (!mounted) return;
+    await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => PaymentScreen(
           rideId: widget.rideId,
           amountCdf: price,
-          completionPin: _ride?['completionPin']?.toString(),
+          completionPin: pin,
         ),
       ),
     );
+    if (mounted) await _loadRide();
   }
 
   Future<void> _callDriver() async {
@@ -577,7 +618,9 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
                       dropoff: _dropoff,
                       driver: _driverPos,
                       routeTrace: _routeTrace,
-                      height: 200,
+                      approachTarget: _approachTarget,
+                      followDriver: !_isTerminalStatus && _driverPos != null,
+                      height: 240,
                       pickupLabel: _ride?['pickupAddress']?.toString(),
                       dropoffLabel: _ride?['dropoffAddress']?.toString(),
                     ),
@@ -725,10 +768,11 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
                                 isLoading: _cancelling,
                                 onPressed: _cancelling ? null : _cancelRide,
                               ),
-                            if (_mock || _status == 'COMPLETED') ...[
+                            if (_needsPayment) ...[
                               const SizedBox(height: 8),
                               MovaButton(
-                                label: 'Terminer et payer',
+                                label: 'Payer la course',
+                                icon: Icons.payment_outlined,
                                 onPressed: _goToPayment,
                               ),
                             ],

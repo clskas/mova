@@ -100,23 +100,44 @@ class _ParcelTrackingScreenState extends ConsumerState<ParcelTrackingScreen> {
 
   bool get _canCancel => CancelEligibility.delivery(_delivery);
 
-  void _maybeGoToPayment() {
-    if (_paymentNavigated || !mounted || _totalCdf <= 0) return;
+  bool get _paymentDue {
     final status = _delivery?['status']?.toString();
-    final paymentReady = _delivery?['paymentReady'] == true || status == 'DELIVERED';
-    if (!paymentReady) return;
-    _paymentNavigated = true;
-    _pollTimer?.cancel();
-    Navigator.pushReplacement(
+    return _delivery?['paymentReady'] == true || status == 'DELIVERED';
+  }
+
+  Future<void> _openPayment() async {
+    if (!mounted || _totalCdf <= 0) return;
+    final api = ref.read(apiClientProvider);
+    var pin = _delivery?['deliveryPin']?.toString();
+    if (!api.isMockMode) {
+      final result = await api.get('/deliveries/${widget.parcelId}');
+      if (result case Success(:final data)) {
+        final map = data is Map ? Map<String, dynamic>.from(data) : null;
+        if (map != null && mounted) {
+          setState(() => _delivery = map);
+          pin = map['deliveryPin']?.toString() ?? pin;
+        }
+      }
+    }
+    if (!mounted) return;
+    await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => PaymentScreen(
           serviceType: 'DELIVERY',
           serviceId: widget.parcelId,
           amountCdf: _totalCdf,
+          completionPin: pin,
         ),
       ),
     );
+    if (mounted) await _load(silent: true);
+  }
+
+  void _maybeGoToPayment() {
+    if (_paymentNavigated || !mounted || !_paymentDue) return;
+    _paymentNavigated = true;
+    _openPayment();
   }
 
   Future<void> _cancelDelivery() async {
@@ -293,6 +314,14 @@ class _ParcelTrackingScreenState extends ConsumerState<ParcelTrackingScreen> {
                               onPressed: _cancelling ? null : _cancelDelivery,
                             ),
                           if (_canCancel) const SizedBox(height: 8),
+                          if (_paymentDue) ...[
+                            MovaButton(
+                              label: 'Payer la livraison',
+                              icon: Icons.payment_outlined,
+                              onPressed: _openPayment,
+                            ),
+                            const SizedBox(height: 8),
+                          ],
                           MovaButton(
                             label: 'Retour à l\'accueil',
                             isSecondary: true,

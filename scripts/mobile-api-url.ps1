@@ -90,6 +90,32 @@ function Get-MovaMobileApiUrls {
     return @{ ApiUrl = $ApiUrl; WsUrl = $WsUrl }
 }
 
+function Get-MovaFlutterDeviceByPattern {
+    param(
+        [Parameter(Mandatory = $true)][string]$MobileDir,
+        [Parameter(Mandatory = $true)][string]$Pattern
+    )
+
+    Push-Location $MobileDir
+    try {
+        $devices = @(flutter devices --machine 2>$null | ConvertFrom-Json)
+    } finally {
+        Pop-Location
+    }
+
+    $match = @($devices | Where-Object {
+        $_.isSupported -and ($_.name -like "*$Pattern*" -or $_.id -like "*$Pattern*")
+    })
+    if ($match.Count -eq 0) {
+        throw "Aucun appareil correspondant a '$Pattern'. Lancez flutter devices."
+    }
+    if ($match.Count -gt 1) {
+        Write-Host "Plusieurs appareils pour '$Pattern' — premier utilise :" -ForegroundColor Yellow
+        $match | ForEach-Object { Write-Host "  $($_.id)  $($_.name)" }
+    }
+    return $match[0].id
+}
+
 # Sélectionne automatiquement un téléphone/émulateur Android ou iOS (ignore Windows/Chrome).
 function Get-MovaFlutterDevice {
     param(

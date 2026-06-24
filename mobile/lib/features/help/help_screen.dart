@@ -8,6 +8,7 @@ import 'faq_screen.dart';
 import 'help_config.dart';
 import 'legal_screen.dart';
 import 'manual_screen.dart';
+import '../profile/profile_screen.dart';
 
 class HelpScreen extends ConsumerWidget {
   const HelpScreen({super.key});
@@ -67,6 +68,13 @@ class HelpScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 16),
+          _HelpLink(
+            icon: Icons.person_outline,
+            iconColor: MovaColors.violet,
+            title: 'Mon profil',
+            subtitle: 'Prénom, nom et e-mail (optionnels)',
+            onTap: () => _open(context, const ProfileScreen()),
+          ),
           _HelpLink(
             icon: Icons.menu_book_outlined,
             iconColor: MovaColors.violet,

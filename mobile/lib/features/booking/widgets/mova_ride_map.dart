@@ -14,6 +14,8 @@ class MovaRideMap extends StatefulWidget {
     this.dropoff,
     this.driver,
     this.routeTrace,
+    this.approachTarget,
+    this.followDriver = false,
     this.height = 220,
     this.driverIcon = Icons.two_wheeler,
     this.onDropoffTap,
@@ -26,6 +28,10 @@ class MovaRideMap extends StatefulWidget {
   final LatLng? dropoff;
   final LatLng? driver;
   final List<LatLng>? routeTrace;
+  /// Cible d'approche (pickup puis dropoff) — ligne pointillée chauffeur → cible.
+  final LatLng? approachTarget;
+  /// Recentre la caméra quand le chauffeur se déplace (suivi temps réel).
+  final bool followDriver;
   final double height;
   final IconData driverIcon;
   /// Libellé affiché près du marqueur départ (ex. Gombe, Avenue …).
@@ -82,14 +88,21 @@ class _MovaRideMapState extends State<MovaRideMap> {
   void didUpdateWidget(covariant MovaRideMap oldWidget) {
     super.didUpdateWidget(oldWidget);
     final driver = widget.driver;
+    var driverMoved = false;
     if (driver != null && _prevDriver != null) {
-      final moved = (driver.latitude - _prevDriver!.latitude).abs() > 0.00001 ||
+      driverMoved = (driver.latitude - _prevDriver!.latitude).abs() > 0.00001 ||
           (driver.longitude - _prevDriver!.longitude).abs() > 0.00001;
-      if (moved) {
+      if (driverMoved) {
         _driverBearing = _bearing(_prevDriver!, driver);
       }
     }
     if (driver != null) _prevDriver = driver;
+
+    if (widget.followDriver && driver != null && (driverMoved || oldWidget.driver == null)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _followDriverCamera(driver);
+      });
+    }
 
     final pickupMoved = oldWidget.pickup.latitude != widget.pickup.latitude ||
         oldWidget.pickup.longitude != widget.pickup.longitude;
@@ -106,6 +119,10 @@ class _MovaRideMapState extends State<MovaRideMap> {
     final pickup = widget.pickup;
     final dropoff = widget.dropoff;
     final driver = widget.driver;
+    if (driver != null && widget.followDriver) {
+      _followDriverCamera(driver);
+      return;
+    }
     if (dropoff != null) {
       final points = [pickup, dropoff, if (driver != null) driver];
       _mapController.fitCamera(
@@ -114,6 +131,21 @@ class _MovaRideMapState extends State<MovaRideMap> {
     } else {
       _mapController.move(pickup, 15);
     }
+  }
+
+  void _followDriverCamera(LatLng driver) {
+    final points = <LatLng>[
+      driver,
+      widget.approachTarget ?? widget.pickup,
+      if (widget.dropoff != null) widget.dropoff!,
+      widget.pickup,
+    ];
+    _mapController.fitCamera(
+      CameraFit.bounds(
+        bounds: LatLngBounds.fromPoints(points),
+        padding: const EdgeInsets.all(52),
+      ),
+    );
   }
 
   static double _bearing(LatLng from, LatLng to) {
@@ -164,23 +196,29 @@ class _MovaRideMapState extends State<MovaRideMap> {
                 urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                 userAgentPackageName: 'com.mova.passenger',
               ),
-            if (dropoff != null)
-              PolylineLayer(
-                polylines: [
-                  if (widget.routeTrace != null && widget.routeTrace!.length >= 2)
-                    Polyline(
-                      points: widget.routeTrace!,
-                      color: MovaColors.violet,
-                      strokeWidth: 4,
-                    )
-                  else
-                    Polyline(
-                      points: [pickup, dropoff],
-                      color: MovaColors.violet.withValues(alpha: 0.6),
-                      strokeWidth: 3,
-                    ),
-                ],
-              ),
+            PolylineLayer(
+              polylines: [
+                if (widget.routeTrace != null && widget.routeTrace!.length >= 2)
+                  Polyline(
+                    points: widget.routeTrace!,
+                    color: MovaColors.violet,
+                    strokeWidth: 4,
+                  ),
+                if (driver != null && widget.approachTarget != null)
+                  Polyline(
+                    points: [driver, widget.approachTarget!],
+                    color: MovaColors.green.withValues(alpha: 0.75),
+                    strokeWidth: 3,
+                  ),
+                if (dropoff != null &&
+                    (widget.routeTrace == null || widget.routeTrace!.length < 2))
+                  Polyline(
+                    points: [pickup, dropoff],
+                    color: MovaColors.violet.withValues(alpha: 0.45),
+                    strokeWidth: 2.5,
+                  ),
+              ],
+            ),
             MarkerLayer(
               markers: [
                 Marker(

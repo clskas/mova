@@ -10,6 +10,7 @@ import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import '../../core/widgets/mova_service_icons.dart';
+import '../../core/widgets/passenger_service_icons.dart';
 import '../../core/widgets/service_area_selector.dart';
 import '../booking/booking_screen.dart';
 import '../carpool/carpool_screen.dart';
@@ -280,7 +281,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                 children: [
                   gridRow([
                     ServiceCard(
-                      icon: MovaServiceIcon.taxi(color: MovaColors.violet),
+                      icon: PassengerServiceIcon.taxi(size: compactCards ? 52 : 58),
+                      brandedIcon: true,
                       iconColor: MovaColors.violet,
                       title: 'Taxi / Moto-taxi',
                       subtitle: 'Course immédiate partout en RDC',
@@ -288,7 +290,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                       compact: compactCards,
                     ),
                     ServiceCard(
-                      icon: MovaServiceIcon.parcel(color: MovaColors.green),
+                      icon: PassengerServiceIcon.delivery(size: compactCards ? 52 : 58),
+                      brandedIcon: true,
                       iconColor: MovaColors.green,
                       title: 'Livraisons',
                       subtitle: 'Repas, colis, express et plus',
@@ -299,7 +302,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                   const SizedBox(height: spacing),
                   gridRow([
                     ServiceCard(
-                      icon: MovaServiceIcon.calendar(color: MovaColors.violet),
+                      icon: PassengerServiceIcon.scheduled(size: compactCards ? 52 : 58),
+                      brandedIcon: true,
                       iconColor: MovaColors.violet,
                       title: 'Réservation planifiée',
                       subtitle: 'Programmez votre trajet à l\'avance',
@@ -307,7 +311,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                       compact: compactCards,
                     ),
                     ServiceCard(
-                      icon: MovaServiceIcon.carpool(color: MovaColors.midnight),
+                      icon: PassengerServiceIcon.carpool(size: compactCards ? 52 : 58),
+                      brandedIcon: true,
                       iconColor: MovaColors.midnight,
                       title: 'Covoiturage',
                       subtitle: 'Partagez un trajet, économisez',
@@ -318,7 +323,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                   const SizedBox(height: spacing),
                   gridRow([
                     ServiceCard(
-                      icon: MovaServiceIcon.rental(color: MovaColors.violet),
+                      icon: PassengerServiceIcon.rental(size: compactCards ? 52 : 58),
+                      brandedIcon: true,
                       iconColor: MovaColors.violet,
                       title: 'Location véhicule',
                       subtitle: 'Voiture, SUV ou minibus',
@@ -326,7 +332,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                       compact: compactCards,
                     ),
                     ServiceCard(
-                      icon: MovaServiceIcon.moving(color: MovaColors.midnight),
+                      icon: PassengerServiceIcon.moving(size: compactCards ? 52 : 58),
+                      brandedIcon: true,
                       iconColor: MovaColors.midnight,
                       title: 'Déménagement',
                       subtitle: 'Camion et manutention',

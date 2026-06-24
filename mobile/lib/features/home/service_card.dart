@@ -14,6 +14,7 @@ class ServiceCard extends StatelessWidget {
     this.comingSoon = false,
     this.live = false,
     this.compact = false,
+    this.brandedIcon = false,
   });
 
   final Widget icon;
@@ -24,6 +25,8 @@ class ServiceCard extends StatelessWidget {
   final bool comingSoon;
   final bool live;
   final bool compact;
+  /// Icône PNG pleine (sans fond dégradé supplémentaire).
+  final bool brandedIcon;
 
   @override
   Widget build(BuildContext context) {
@@ -35,19 +38,29 @@ class ServiceCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: EdgeInsets.all(compact ? 8 : 11),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  iconColor.withValues(alpha: 0.18),
-                  iconColor.withValues(alpha: 0.06),
-                ],
-              ),
+          if (brandedIcon)
+            ClipRRect(
               borderRadius: BorderRadius.circular(14),
+              child: SizedBox(
+                width: compact ? 52 : 58,
+                height: compact ? 52 : 58,
+                child: FittedBox(fit: BoxFit.cover, child: icon),
+              ),
+            )
+          else
+            Container(
+              padding: EdgeInsets.all(compact ? 8 : 11),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    iconColor.withValues(alpha: 0.18),
+                    iconColor.withValues(alpha: 0.06),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: icon,
             ),
-            child: icon,
-          ),
           const SizedBox(height: 12),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,

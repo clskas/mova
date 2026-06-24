@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_service_icons.dart';
+import '../../core/widgets/passenger_service_icons.dart';
 
 class MovaSplashService {
   const MovaSplashService({
@@ -9,12 +10,14 @@ class MovaSplashService {
     required this.description,
     required this.icon,
     required this.color,
+    this.brandedIcon = false,
   });
 
   final String label;
   final String description;
   final Widget icon;
   final Color color;
+  final bool brandedIcon;
 }
 
 /// Services passager — aligné sur l'écran d'accueil MOVA Passager.
@@ -22,38 +25,44 @@ final passengerSplashServices = <MovaSplashService>[
   MovaSplashService(
     label: 'Taxi / Moto-taxi',
     description: 'Course immédiate partout en RDC',
-    icon: MovaServiceIcon.taxi(color: Colors.white, size: 40),
+    icon: PassengerServiceIcon.taxi(size: 40),
     color: MovaColors.violet,
+    brandedIcon: true,
   ),
   MovaSplashService(
     label: 'Livraisons',
     description: 'Repas, colis, express et commissions',
-    icon: MovaServiceIcon.parcel(color: Colors.white, size: 40),
+    icon: PassengerServiceIcon.delivery(size: 40),
     color: MovaColors.green,
+    brandedIcon: true,
   ),
   MovaSplashService(
     label: 'Réservation planifiée',
     description: 'Programmez votre trajet à l\'avance',
-    icon: MovaServiceIcon.calendar(color: Colors.white, size: 40),
+    icon: PassengerServiceIcon.scheduled(size: 40),
     color: MovaColors.violetLight,
+    brandedIcon: true,
   ),
   MovaSplashService(
     label: 'Covoiturage',
     description: 'Partagez un trajet, économisez',
-    icon: MovaServiceIcon.carpool(color: Colors.white, size: 40),
+    icon: PassengerServiceIcon.carpool(size: 40),
     color: MovaColors.midnightSoft,
+    brandedIcon: true,
   ),
   MovaSplashService(
     label: 'Location véhicule',
     description: 'Voiture, SUV ou minibus',
-    icon: MovaServiceIcon.rental(color: Colors.white, size: 40),
+    icon: PassengerServiceIcon.rental(size: 40),
     color: MovaColors.violet,
+    brandedIcon: true,
   ),
   MovaSplashService(
     label: 'Déménagement',
     description: 'Camion et manutention',
-    icon: MovaServiceIcon.moving(color: Colors.white, size: 40),
+    icon: PassengerServiceIcon.moving(size: 40),
     color: MovaColors.midnight,
+    brandedIcon: true,
   ),
   MovaSplashService(
     label: 'Wallet MOVA',

@@ -274,7 +274,7 @@ Sans `-UsbReverse` : le PC et le téléphone doivent être sur le **même Wi‑F
 
 ### Écran d’accueil animé (splash)
 
-À l’ouverture, un **splash MOVA Passager** (~12 s) présente les **8 services passager** : Taxi/Moto, Livraisons, Réservation, Covoiturage, Location, Déménagement, Wallet, Historique.
+À l’ouverture, un **splash MOVA Passager** (**4 s par service**, ~32 s au total pour 8 services) présente les **8 services passager** : Taxi/Moto, Livraisons, Réservation, Covoiturage, Location, Déménagement, Wallet, Historique.
 
 - **Passer** ou **toucher l’écran** : accès direct à l’OTP (dès que le chargement réseau est prêt).
 - La **ville MOVA** est pré-sélectionnée selon votre **position GPS** (modifiable sur l’accueil).
@@ -338,7 +338,7 @@ cd c:\Users\Administrator\Mova
 
 ### Écran d’accueil animé (splash)
 
-À l’ouverture, un **splash MOVA Chauffeur** (~12 s) présente les **8 volets chauffeur** : Courses, Livraisons, Missions assignées, Revenus, Covoiturage, GPS, KYC, Historique.
+À l’ouverture, un **splash MOVA Chauffeur** (**4 s par service**, ~32 s au total pour 8 volets) présente les **8 volets chauffeur** : Courses, Livraisons, Missions assignées, Revenus, Covoiturage, GPS, KYC, Historique.
 
 - **Passer** ou **toucher l’écran** : OTP immédiat (après chargement réseau).
 - Ville MOVA synchronisée au **GPS** (sélecteur sur l’accueil chauffeur).

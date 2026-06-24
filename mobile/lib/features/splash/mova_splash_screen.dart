@@ -8,6 +8,7 @@ import '../../core/location/service_area_gps.dart';
 import '../../core/offline/mova_bootstrap.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_service_icons.dart';
+import '../../core/widgets/passenger_service_icons.dart';
 import 'mova_splash_content.dart';
 
 enum MovaSplashRole { passenger, driver }
@@ -29,8 +30,9 @@ class MovaSplashScreen extends ConsumerStatefulWidget {
 
 class _MovaSplashScreenState extends ConsumerState<MovaSplashScreen>
     with TickerProviderStateMixin {
-  static const _duration = Duration(seconds: 12);
+  static const _secondsPerService = 4;
 
+  late final Duration _splashDuration;
   late final AnimationController _main;
   late final AnimationController _road;
   late final AnimationController _pulse;
@@ -52,7 +54,8 @@ class _MovaSplashScreenState extends ConsumerState<MovaSplashScreen>
   @override
   void initState() {
     super.initState();
-    _main = AnimationController(vsync: this, duration: _duration);
+    _splashDuration = Duration(seconds: _services.length * _secondsPerService);
+    _main = AnimationController(vsync: this, duration: _splashDuration);
     _road = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1200),
@@ -114,8 +117,8 @@ class _MovaSplashScreenState extends ConsumerState<MovaSplashScreen>
   }
 
   int _secondsRemaining(double t) {
-    final left = (_duration.inMilliseconds * (1 - t)).ceil();
-    return (left / 1000).ceil().clamp(0, _duration.inSeconds);
+    final left = (_splashDuration.inMilliseconds * (1 - t)).ceil();
+    return (left / 1000).ceil().clamp(0, _splashDuration.inSeconds);
   }
 
   @override
@@ -129,7 +132,7 @@ class _MovaSplashScreenState extends ConsumerState<MovaSplashScreen>
   int _highlightIndex(double t) {
     final n = _services.length;
     if (n == 0) return 0;
-    return (t * n * 0.92).floor().clamp(0, n - 1);
+    return (t * n).floor().clamp(0, n - 1);
   }
 
   @override
@@ -349,13 +352,13 @@ class _MovaSplashScreenState extends ConsumerState<MovaSplashScreen>
         _vehicleBubble(
           left: w * (-0.1 + t * 1.15),
           top: roadY - 42,
-          child: MovaServiceIcon.taxi(color: Colors.white, size: 26),
+          child: PassengerServiceIcon.taxi(size: 26),
         ),
         _vehicleBubble(
           left: w * (0.05 + ((t + 0.35) % 1.0) * 1.05),
           top: roadY - 8,
           small: true,
-          child: MovaServiceIcon.parcel(color: Colors.white, size: 20),
+          child: PassengerServiceIcon.delivery(size: 20),
         ),
       ];
     }
@@ -453,6 +456,11 @@ class _ServiceOrbit extends StatelessWidget {
     final y = cy + math.sin(angle) * radius * 0.55 - (active ? 28 : 22);
     final scale = active ? 1.15 : 0.82;
 
+    final chipSize = active ? 56.0 : 44.0;
+    final iconSize = service.brandedIcon
+        ? chipSize
+        : (active ? 26.0 : 18.0);
+
     return AnimatedPositioned(
       duration: const Duration(milliseconds: 280),
       curve: Curves.easeOutCubic,
@@ -465,36 +473,61 @@ class _ServiceOrbit extends StatelessWidget {
           opacity: active ? 1 : 0.55,
           duration: const Duration(milliseconds: 280),
           child: Container(
-            width: active ? 56 : 44,
-            height: active ? 56 : 44,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: LinearGradient(
-                colors: [
-                  service.color.withValues(alpha: active ? 0.95 : 0.5),
-                  service.color.withValues(alpha: active ? 0.55 : 0.25),
-                ],
-              ),
-              border: Border.all(
-                color: Colors.white.withValues(alpha: active ? 0.5 : 0.2),
-                width: active ? 2 : 1,
-              ),
-              boxShadow: active
-                  ? [
-                      BoxShadow(
-                        color: service.color.withValues(alpha: 0.45),
-                        blurRadius: 16,
-                        spreadRadius: 1,
-                      ),
-                    ]
-                  : null,
-            ),
+            width: chipSize,
+            height: chipSize,
+            decoration: service.brandedIcon
+                ? BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: active ? 0.45 : 0.2),
+                      width: active ? 2 : 1,
+                    ),
+                    boxShadow: active
+                        ? [
+                            BoxShadow(
+                              color: service.color.withValues(alpha: 0.35),
+                              blurRadius: 14,
+                              spreadRadius: 1,
+                            ),
+                          ]
+                        : null,
+                  )
+                : BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      colors: [
+                        service.color.withValues(alpha: active ? 0.95 : 0.5),
+                        service.color.withValues(alpha: active ? 0.55 : 0.25),
+                      ],
+                    ),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: active ? 0.5 : 0.2),
+                      width: active ? 2 : 1,
+                    ),
+                    boxShadow: active
+                        ? [
+                            BoxShadow(
+                              color: service.color.withValues(alpha: 0.45),
+                              blurRadius: 16,
+                              spreadRadius: 1,
+                            ),
+                          ]
+                        : null,
+                  ),
             child: Center(
-              child: SizedBox(
-                width: active ? 26 : 18,
-                height: active ? 26 : 18,
-                child: FittedBox(child: service.icon),
-              ),
+              child: service.brandedIcon
+                  ? ClipOval(
+                      child: SizedBox(
+                        width: iconSize,
+                        height: iconSize,
+                        child: FittedBox(fit: BoxFit.cover, child: service.icon),
+                      ),
+                    )
+                  : SizedBox(
+                      width: iconSize,
+                      height: iconSize,
+                      child: FittedBox(child: service.icon),
+                    ),
             ),
           ),
         ),
@@ -525,14 +558,23 @@ class _FeaturedServiceCard extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: service.color.withValues(alpha: 0.35),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: service.icon,
-            ),
+            service.brandedIcon
+                ? ClipRRect(
+                    borderRadius: BorderRadius.circular(14),
+                    child: SizedBox(
+                      width: 52,
+                      height: 52,
+                      child: FittedBox(fit: BoxFit.cover, child: service.icon),
+                    ),
+                  )
+                : Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: service.color.withValues(alpha: 0.35),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: service.icon,
+                  ),
             const SizedBox(width: 14),
             Expanded(
               child: Column(

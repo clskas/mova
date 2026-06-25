@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/config/market_config.dart';
 import '../../core/api/api_client.dart';
-import '../../core/api/ride_socket.dart';
+import '../../core/api/ride_chat_socket.dart';
 import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
@@ -45,8 +45,7 @@ class _RideChatScreenState extends ConsumerState<RideChatScreen> {
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
   final _messages = <RideChatMessage>[];
-  RideSocket? _socket;
-  String? _userId;
+  RideChatSocket? _socket;
   bool _sending = false;
   bool _connecting = true;
   String? _error;
@@ -59,32 +58,58 @@ class _RideChatScreenState extends ConsumerState<RideChatScreen> {
 
   @override
   void dispose() {
-    _socket?.clearHandlers(chatOnly: true);
+    _socket?.clearHandlers();
     _controller.dispose();
     _scrollController.dispose();
     super.dispose();
   }
 
   Future<void> _bootstrap() async {
-    final api = ref.read(apiClientProvider);
-    final profile = widget.myRole == 'driver'
-        ? await api.getDriverProfile()
-        : await api.get('/users/me');
-    if (profile case Success(:final data)) {
-      _userId = (data['userId'] ?? data['id'])?.toString();
-    }
+    await _loadHistory();
     await _connectSocket();
+  }
+
+  Future<void> _loadHistory() async {
+    final api = ref.read(apiClientProvider);
+    final result = await api.getRideChatMessages(widget.rideId);
+    if (!mounted) return;
+    if (result case Success(:final data)) {
+      setState(() {
+        for (final raw in data) {
+          _appendMessage(raw, fromHistory: true);
+        }
+      });
+      _scrollToBottom();
+    }
+  }
+
+  void _appendMessage(Map<String, dynamic> payload, {bool fromHistory = false}) {
+    final role = payload['senderRole']?.toString() ?? 'unknown';
+    final text = payload['text']?.toString() ?? '';
+    if (text.isEmpty) return;
+    final tsRaw = payload['ts'];
+    final ts = tsRaw is num
+        ? DateTime.fromMillisecondsSinceEpoch(tsRaw.toInt())
+        : DateTime.now();
+    final mine = role == widget.myRole;
+    if (_messages.any((m) => m.text == text && m.senderRole == role && m.ts == ts)) return;
+    if (!fromHistory && mine && _messages.any((m) => m.isMine && m.text == text)) return;
+    _messages.add(RideChatMessage(text: text, senderRole: role, ts: ts, isMine: mine));
   }
 
   Future<void> _connectSocket({bool forceReconnect = false}) async {
     final api = ref.read(apiClientProvider);
+    if (api.isMockMode) {
+      if (mounted) setState(() => _connecting = false);
+      return;
+    }
     final token = await api.authToken();
     if (!mounted) return;
     setState(() {
       _connecting = true;
       _error = null;
     });
-    final socket = ref.read(rideSocketProvider);
+    final socket = ref.read(rideChatSocketProvider);
     _socket = socket;
     if (forceReconnect) socket.resetFailure();
     socket.connect(
@@ -113,27 +138,16 @@ class _RideChatScreenState extends ConsumerState<RideChatScreen> {
     if (!mounted) return;
     setState(() {
       _connecting = false;
-      if (!ok) {
-        _error = 'Connexion chat indisponible (${MarketConfig.wsUrl}).';
+      if (!ok && !api.isMockMode) {
+        _error = 'Connexion temps réel limitée — les messages passent par le serveur.';
       }
     });
   }
 
   void _onIncomingChat(Map<String, dynamic> payload) {
     if (payload['rideId']?.toString() != widget.rideId) return;
-    final role = payload['senderRole']?.toString() ?? 'unknown';
-    final text = payload['text']?.toString() ?? '';
-    if (text.isEmpty) return;
-    final tsRaw = payload['ts'];
-    final ts = tsRaw is num
-        ? DateTime.fromMillisecondsSinceEpoch(tsRaw.toInt())
-        : DateTime.now();
-    final mine = role == widget.myRole;
-    if (mine && _messages.any((m) => m.isMine && m.text == text)) return;
     if (!mounted) return;
-    setState(() {
-      _messages.add(RideChatMessage(text: text, senderRole: role, ts: ts, isMine: mine));
-    });
+    setState(() => _appendMessage(payload));
     _scrollToBottom();
   }
 
@@ -155,39 +169,24 @@ class _RideChatScreenState extends ConsumerState<RideChatScreen> {
       _sending = true;
       _error = null;
     });
-    final ts = DateTime.now();
-    final payload = {
-      'rideId': widget.rideId,
-      'senderId': _userId ?? widget.myRole,
-      'senderRole': widget.myRole,
-      'text': text,
-      'ts': ts.millisecondsSinceEpoch,
-    };
-    if (_socket == null || !_socket!.isConnected) {
-      await _connectSocket(forceReconnect: _socket?.connectionFailed == true);
-      final ok = _socket != null && await _socket!.ensureConnected();
-      if (!ok) {
-        if (mounted) {
-          setState(() {
-            _sending = false;
-            _error = 'Connexion chat indisponible. Vérifiez le réseau et réessayez.';
-          });
-        }
-        return;
-      }
+    final api = ref.read(apiClientProvider);
+    final result = await api.sendRideChatMessage(widget.rideId, text);
+    if (!mounted) return;
+    switch (result) {
+      case Success(:final data):
+        setState(() {
+          _appendMessage(data);
+          _controller.clear();
+          _sending = false;
+        });
+        _socket?.subscribe(widget.rideId);
+        _scrollToBottom();
+      case Failure(:final error):
+        setState(() {
+          _sending = false;
+          _error = error.message;
+        });
     }
-    _socket!.emitChat(payload);
-    setState(() {
-      _messages.add(RideChatMessage(
-        text: text,
-        senderRole: widget.myRole,
-        ts: ts,
-        isMine: true,
-      ));
-      _controller.clear();
-      _sending = false;
-    });
-    _scrollToBottom();
   }
 
   @override

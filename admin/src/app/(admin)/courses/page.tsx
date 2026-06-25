@@ -80,7 +80,8 @@ export default function CoursesPage() {
         ]);
         if (!cancelled) {
           setRideDetail(detail);
-          setGpsTrace(trace.points ?? detail.gpsTrace ?? []);
+          const tracePoints = trace.points ?? (Array.isArray(detail.gpsTrace) ? detail.gpsTrace : []);
+          setGpsTrace(tracePoints);
         }
       } catch {
         if (!cancelled) {
@@ -95,7 +96,7 @@ export default function CoursesPage() {
       cancelled = true;
       if (timer) clearInterval(timer);
     };
-  }, [selected?.id, selected?.status]);
+  }, [selected, rideActive]);
 
   const load = useCallback(async () => {
     setLoading(true);

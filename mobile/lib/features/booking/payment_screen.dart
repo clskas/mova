@@ -1,5 +1,8 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import '../../core/api/api_client.dart';
 import '../../core/config/market_config.dart';
 import '../../core/error/result.dart';
@@ -104,6 +107,26 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
 
   bool get _showCashPin =>
       _method == 'CASH' && _cashPin != null && _cashPin!.isNotEmpty;
+
+  bool get _showQrPayment => _needsPhone && widget.rideId != null;
+
+  String get _qrPayload {
+    final ref = widget.rideId!.replaceAll('-', '').substring(0, 8).toUpperCase();
+    return jsonEncode({
+      'app': 'MOVA',
+      'type': 'RIDE_PAYMENT',
+      'rideId': widget.rideId,
+      'amountCdf': _amountCdf,
+      'method': _method,
+      'ref': 'MOVA-$ref',
+    });
+  }
+
+  String get _paymentRef {
+    final id = widget.rideId ?? widget.serviceId ?? '';
+    if (id.isEmpty) return 'MOVA';
+    return 'MOVA-${id.replaceAll('-', '').substring(0, 8).toUpperCase()}';
+  }
 
   Future<void> _pay() async {
     if (_method == 'CASH' && (_cashPin == null || _cashPin!.isEmpty)) {
@@ -273,6 +296,57 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                 prefixIcon: Icon(Icons.phone),
               ),
             ),
+            if (_showQrPayment) ...[
+              const SizedBox(height: 16),
+              MovaCard(
+                child: Column(
+                  children: [
+                    const Text(
+                      'Paiement rapide par QR',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Scannez ce code avec l\'app mobile money ou partagez la référence au guichet.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: MovaColors.textSecondary, fontSize: 12),
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: MovaColors.cloud),
+                      ),
+                      child: QrImageView(
+                        data: _qrPayload,
+                        version: QrVersions.auto,
+                        size: 180,
+                        eyeStyle: const QrEyeStyle(
+                          eyeShape: QrEyeShape.square,
+                          color: MovaColors.violet,
+                        ),
+                        dataModuleStyle: const QrDataModuleStyle(
+                          dataModuleShape: QrDataModuleShape.square,
+                          color: MovaColors.violet,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Réf. $_paymentRef',
+                      style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      MarketConfig.formatCdf(_amountCdf),
+                      style: const TextStyle(color: MovaColors.green, fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ],
           if (_error != null) ...[
             const SizedBox(height: 12),

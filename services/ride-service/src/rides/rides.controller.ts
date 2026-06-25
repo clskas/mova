@@ -7,13 +7,19 @@ import { CancelScheduledRideDto, CreateScheduledRideDto } from './scheduled-ride
 import { MobileScheduledEstimateDto } from '../deliveries/deliveries-mobile.dto';
 import { ScheduledRidesService } from './scheduled-rides.service';
 import { RidesService } from './rides.service';
+import { RideChatService } from '../chat/ride-chat.service';
+import { SendRideChatDto } from '../chat/ride-chat.dto';
 
 @ApiTags('rides')
 @Controller('rides')
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth()
 export class RidesController {
-  constructor(private ridesService: RidesService, private scheduledRidesService: ScheduledRidesService) {}
+  constructor(
+    private ridesService: RidesService,
+    private scheduledRidesService: ScheduledRidesService,
+    private rideChatService: RideChatService,
+  ) {}
 
   @Post('estimate')
   @ApiOperation({ summary: 'Estimer tarif (CDF, Kinshasa)' })
@@ -89,6 +95,18 @@ export class RidesController {
   @ApiOperation({ summary: 'Historique courses (alias)' })
   list(@Request() req: { user: { id: string } }, @Query('role') role?: string) {
     return this.ridesService.getUserRides(req.user.id, role === 'driver' ? 'driver' : 'passenger');
+  }
+
+  @Get(':id/chat')
+  @ApiOperation({ summary: 'Messages chat course (passager / chauffeur)' })
+  getChat(@Request() req: { user: { id: string } }, @Param('id') id: string) {
+    return this.rideChatService.listMessages(id, req.user.id);
+  }
+
+  @Post(':id/chat')
+  @ApiOperation({ summary: 'Envoyer un message chat course' })
+  sendChat(@Request() req: { user: { id: string } }, @Param('id') id: string, @Body() dto: SendRideChatDto) {
+    return this.rideChatService.sendMessage(id, req.user.id, dto.text);
   }
 
   @Get(':id')

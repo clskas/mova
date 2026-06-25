@@ -130,7 +130,11 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
       text: data.text.trim(),
       ts: data.ts ?? Date.now(),
     };
-    this.server.to(`ride:${data.rideId}`).emit('ride:chat', payload);
+    this.broadcastRideChat(payload);
     return { ok: true };
+  }
+
+  broadcastRideChat(payload: { rideId: string; senderId: string; senderRole: string; text: string; ts: number }) {
+    this.server.to(`ride:${payload.rideId}`).emit('ride:chat', payload);
   }
 }

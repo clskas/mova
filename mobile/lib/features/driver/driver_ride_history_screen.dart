@@ -49,18 +49,27 @@ class _DriverRideHistoryScreenState extends ConsumerState<DriverRideHistoryScree
     }
   }
 
-  String _statusLabel(String? status) => switch (status) {
-        'COMPLETED' => 'Terminée',
-        'CANCELLED' => 'Annulée',
-        'DRIVER_ASSIGNED' => 'Assignée',
-        'ARRIVING' => 'En route',
-        'IN_PROGRESS' => 'En cours',
-        _ => status ?? '—',
-      };
+  String _statusLabel(Map<String, dynamic> ride) {
+    final status = ride['status']?.toString();
+    if (status == 'COMPLETED') {
+      final paid = ride['isPaid'] == true;
+      return paid ? 'Terminée · Payée' : 'Terminée · À encaisser';
+    }
+    return switch (status) {
+      'CANCELLED' => 'Annulée',
+      'DRIVER_ASSIGNED' => 'Assignée',
+      'ARRIVING' => 'En route',
+      'IN_PROGRESS' => 'En cours',
+      _ => status ?? '—',
+    };
+  }
 
-  Color _statusColor(String? status) => switch (status) {
-        'COMPLETED' => MovaColors.green,
-        'CANCELLED' => MovaColors.error,
+  Color _statusColor(Map<String, dynamic> ride) {
+    final status = ride['status']?.toString();
+    if (status == 'COMPLETED') {
+      return ride['isPaid'] == true ? MovaColors.green : MovaColors.orange;
+    }
+    return switch (status) {
         'DRIVER_ASSIGNED' || 'ARRIVING' || 'IN_PROGRESS' => MovaColors.violet,
         _ => MovaColors.textSecondary,
       };
@@ -90,7 +99,6 @@ class _DriverRideHistoryScreenState extends ConsumerState<DriverRideHistoryScree
                       itemBuilder: (context, index) {
                         final ride = _rides[index];
                         final fare = (ride['priceCdf'] ?? ride['estimatedFareCdf']) as num?;
-                        final status = ride['status']?.toString();
                         final date = ride['completedAt']?.toString() ??
                             ride['createdAt']?.toString() ??
                             '';
@@ -129,9 +137,9 @@ class _DriverRideHistoryScreenState extends ConsumerState<DriverRideHistoryScree
                               Row(
                                 children: [
                                   Text(
-                                    _statusLabel(status),
+                                    _statusLabel(ride),
                                     style: TextStyle(
-                                      color: _statusColor(status),
+                                      color: _statusColor(ride),
                                       fontSize: 12,
                                       fontWeight: FontWeight.w600,
                                     ),

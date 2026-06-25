@@ -833,6 +833,24 @@ class ApiClient {
     };
   }
 
+  Future<Result<List<Map<String, dynamic>>>> getRideChatMessages(String rideId) async {
+    final result = await get('/rides/$rideId/chat');
+    return switch (result) {
+      Success(:final data) => Success(
+          List<Map<String, dynamic>>.from(data['messages'] as List? ?? []),
+        ),
+      Failure(:final error) => Failure(error),
+    };
+  }
+
+  Future<Result<Map<String, dynamic>>> sendRideChatMessage(String rideId, String text) async {
+    final result = await post('/rides/$rideId/chat', {'text': text});
+    return switch (result) {
+      Success(:final data) => Success(Map<String, dynamic>.from(data as Map)),
+      Failure(:final error) => Failure(error),
+    };
+  }
+
   Future<Result<Map<String, dynamic>>> searchDrivers(String rideId) async {
     return post('/rides/$rideId/search', {});
   }

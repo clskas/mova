@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { apiFetch, formatDate, resolveIncident, type Incident } from "@/lib/api";
+import { SosIncidentMap, SosIncidentMapPlaceholder, googleMapsUrl } from "@/components/SosIncidentMap";
 import { useAdmin } from "@/components/AdminProvider";
 import {
   BtnPrimary,
@@ -53,30 +54,55 @@ export default function LitigesPage() {
         <EmptyState message="Aucun litige" />
       ) : (
         <div className="space-y-3">
-          {incidents.map((i) => (
-            <Card key={i.id} className="p-4 flex flex-wrap justify-between gap-4">
-              <div>
-                <p className="font-medium flex items-center gap-2">
-                  {i.type === "SOS" || i.isEmergency ? (
-                    <span className="px-2 py-0.5 rounded bg-red-600 text-white text-xs font-bold">SOS</span>
-                  ) : null}
-                  {i.type}
-                </p>
-                <p className="text-sm text-gray-600 mt-1">{i.description}</p>
-                {i.rideId && <p className="text-xs text-gray-500 mt-1">Course : {i.rideId}</p>}
-                {(i.lat != null && i.lng != null) && (
-                  <p className="text-xs text-gray-500">GPS : {i.lat?.toFixed(5)}, {i.lng?.toFixed(5)}</p>
-                )}
-                <div className="flex gap-2 mt-2 items-center">
-                  <StatusBadge status={i.status} />
-                  <span className="text-xs text-gray-400">{formatDate(i.createdAt)}</span>
+          {incidents.map((i) => {
+            const hasGps = i.lat != null && i.lng != null;
+            const isSos = i.type === "SOS" || i.isEmergency;
+            return (
+              <Card key={i.id} className="p-4 flex flex-wrap justify-between gap-4">
+                <div className="flex-1 min-w-[260px]">
+                  <p className="font-medium flex items-center gap-2">
+                    {isSos ? (
+                      <span className="px-2 py-0.5 rounded bg-red-600 text-white text-xs font-bold">SOS</span>
+                    ) : null}
+                    {i.type}
+                  </p>
+                  <p className="text-sm text-gray-600 mt-1">{i.description}</p>
+                  {i.rideId && <p className="text-xs text-gray-500 mt-1">Course : {i.rideId}</p>}
+                  {hasGps && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      GPS : {i.lat?.toFixed(5)}, {i.lng?.toFixed(5)}
+                    </p>
+                  )}
+                  {hasGps && (
+                    <a
+                      href={googleMapsUrl(i.lat!, i.lng!)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-xs text-[#6C63FF] hover:underline mt-2"
+                    >
+                      Ouvrir dans Google Maps ↗
+                    </a>
+                  )}
+                  <div className="flex gap-2 mt-2 items-center">
+                    <StatusBadge status={i.status} />
+                    <span className="text-xs text-gray-400">{formatDate(i.createdAt)}</span>
+                  </div>
                 </div>
-              </div>
-              {i.status === "OPEN" && canWrite("litiges") && (
-                <BtnPrimary onClick={() => resolve(i.id)}>Résoudre</BtnPrimary>
-              )}
-            </Card>
-          ))}
+                {isSos && (
+                  <div className="w-full sm:w-72 shrink-0">
+                    {hasGps ? (
+                      <SosIncidentMap lat={i.lat!} lng={i.lng!} label="Alerte SOS" />
+                    ) : (
+                      <SosIncidentMapPlaceholder />
+                    )}
+                  </div>
+                )}
+                {i.status === "OPEN" && canWrite("litiges") && (
+                  <BtnPrimary onClick={() => resolve(i.id)}>Résoudre</BtnPrimary>
+                )}
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>

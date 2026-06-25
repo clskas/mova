@@ -5,36 +5,26 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 import '../config/market_config.dart';
 
-final rideSocketProvider = Provider((ref) => RideSocket());
+final rideChatSocketProvider = Provider((ref) => RideChatSocket());
 
-/// WebSocket GPS + chat via api-gateway → ride-service (`/tracking` namespace).
-class RideSocket {
+/// Socket dédié au chat course — évite les conflits avec le tracking GPS.
+class RideChatSocket {
   io.Socket? _socket;
   String? _rideId;
   String? _token;
-  bool isConnected = false;
   bool connectionFailed = false;
   Timer? _reconnectTimer;
   int _reconnectAttempt = 0;
   static const _maxReconnectAttempts = 8;
 
-  void Function(Map<String, dynamic> payload)? _onLocation;
-  void Function(Map<String, dynamic> payload)? _onStatus;
   void Function(Map<String, dynamic> payload)? _onChat;
   void Function()? _onConnected;
   void Function()? _onDisconnected;
   final List<Completer<bool>> _connectWaiters = [];
 
-  set onChat(void Function(Map<String, dynamic> payload)? handler) => _onChat = handler;
+  bool get isConnected => _socket?.connected == true;
 
-  /// Retire les callbacks sans couper la connexion (écran fermé).
-  void clearHandlers({bool chatOnly = false}) {
-    if (chatOnly) {
-      _onChat = null;
-      return;
-    }
-    _onLocation = null;
-    _onStatus = null;
+  void clearHandlers() {
     _onChat = null;
     _onConnected = null;
     _onDisconnected = null;
@@ -45,9 +35,8 @@ class RideSocket {
     _reconnectAttempt = 0;
   }
 
-  /// Attend que le socket soit connecté (ou échoue après [timeout]).
   Future<bool> ensureConnected({Duration timeout = const Duration(seconds: 15)}) async {
-    if (_socket?.connected == true && isConnected) return true;
+    if (isConnected) return true;
     if (connectionFailed) return false;
     final waiter = Completer<bool>();
     _connectWaiters.add(waiter);
@@ -67,8 +56,6 @@ class RideSocket {
   void connect({
     required String rideId,
     String? token,
-    void Function(Map<String, dynamic> payload)? onLocation,
-    void Function(Map<String, dynamic> payload)? onStatus,
     void Function(Map<String, dynamic> payload)? onChat,
     void Function()? onConnected,
     void Function()? onDisconnected,
@@ -76,24 +63,18 @@ class RideSocket {
   }) {
     _rideId = rideId;
     if (token != null && token.isNotEmpty) _token = token;
-    if (onLocation != null) _onLocation = onLocation;
-    if (onStatus != null) _onStatus = onStatus;
     if (onChat != null) _onChat = onChat;
     if (onConnected != null) _onConnected = onConnected;
     if (onDisconnected != null) _onDisconnected = onDisconnected;
 
-    if (!forceReconnect && _socket?.connected == true) {
+    if (!forceReconnect && isConnected) {
       _socket?.emit('ride:subscribe', {'rideId': rideId});
-      isConnected = true;
-      connectionFailed = false;
       _onConnected?.call();
       _completeConnectWaiters(true);
       return;
     }
 
-    if (forceReconnect) {
-      resetFailure();
-    }
+    if (forceReconnect) resetFailure();
     _reconnectAttempt = 0;
     connectionFailed = false;
     _openSocket();
@@ -103,7 +84,6 @@ class RideSocket {
     _reconnectTimer?.cancel();
     _socket?.dispose();
     _socket = null;
-    isConnected = false;
 
     try {
       _socket = io.io(
@@ -121,7 +101,6 @@ class RideSocket {
       );
       _socket!
         ..onConnect((_) {
-          isConnected = true;
           connectionFailed = false;
           _reconnectAttempt = 0;
           if (_rideId != null) {
@@ -131,16 +110,7 @@ class RideSocket {
           _completeConnectWaiters(true);
         })
         ..onDisconnect((_) {
-          isConnected = false;
           _onDisconnected?.call();
-        })
-        ..on('driver:location', _handleLocation)
-        ..on('ride:location', _handleLocation)
-        ..on('courier:location', _handleLocation)
-        ..on('ride:status', (data) {
-          if (data is Map) {
-            _onStatus?.call(Map<String, dynamic>.from(data));
-          }
         })
         ..on('ride:chat', (data) {
           if (data is Map) {
@@ -148,26 +118,16 @@ class RideSocket {
           }
         })
         ..onConnectError((_) {
-          isConnected = false;
           _scheduleReconnect();
         })
-        ..onError((_) {
-          isConnected = false;
-        })
+        ..onError((_) {})
         ..connect();
     } catch (_) {
       _scheduleReconnect();
     }
   }
 
-  void _handleLocation(dynamic data) {
-    if (data is Map) {
-      _onLocation?.call(Map<String, dynamic>.from(data));
-    }
-  }
-
   void _scheduleReconnect() {
-    isConnected = false;
     if (_reconnectAttempt >= _maxReconnectAttempts) {
       connectionFailed = true;
       _completeConnectWaiters(false);
@@ -182,75 +142,19 @@ class RideSocket {
 
   void dispose() {
     _reconnectTimer?.cancel();
-    _reconnectTimer = null;
     clearHandlers();
     _socket?.dispose();
     _socket = null;
     _rideId = null;
-    isConnected = false;
     connectionFailed = false;
     _reconnectAttempt = 0;
     _completeConnectWaiters(false);
   }
 
-  void emitDriverLocation({
-    required String userId,
-    required double lat,
-    required double lng,
-    String? rideId,
-  }) {
-    if (_socket?.connected != true) return;
-    _socket?.emit('driver:location', {
-      'userId': userId,
-      'lat': lat,
-      'lng': lng,
-      if (rideId != null) 'rideId': rideId,
-    });
-  }
-
-  void connectDelivery({
-    required String deliveryId,
-    String? token,
-    String? referenceType,
-    void Function(Map<String, dynamic> payload)? onLocation,
-    void Function()? onConnected,
-    void Function()? onDisconnected,
-  }) {
-    _rideId = deliveryId;
-    if (token != null && token.isNotEmpty) _token = token;
-    if (onLocation != null) _onLocation = onLocation;
-    if (onConnected != null) _onConnected = onConnected;
-    if (onDisconnected != null) _onDisconnected = onDisconnected;
-    resetFailure();
-    _reconnectAttempt = 0;
-    connectionFailed = false;
-    _openSocket();
-  }
-
-  void emitCourierLocation({
-    required String userId,
-    required double lat,
-    required double lng,
-    required String deliveryId,
-    String referenceType = 'DELIVERY',
-  }) {
-    if (_socket?.connected != true) return;
-    _socket?.emit('courier:location', {
-      'userId': userId,
-      'lat': lat,
-      'lng': lng,
-      'deliveryId': deliveryId,
-      'referenceId': deliveryId,
-      'referenceType': referenceType,
-    });
-  }
-
-  void emitChat(Map<String, dynamic> payload) {
-    if (_socket?.connected != true) return;
-    final rideId = payload['rideId']?.toString();
-    if (rideId != null && rideId.isNotEmpty) {
+  void subscribe(String rideId) {
+    _rideId = rideId;
+    if (isConnected) {
       _socket?.emit('ride:subscribe', {'rideId': rideId});
     }
-    _socket?.emit('ride:chat', payload);
   }
 }

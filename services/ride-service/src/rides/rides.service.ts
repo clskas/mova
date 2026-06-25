@@ -537,7 +537,18 @@ export class RidesService {
       orderBy: { createdAt: 'desc' },
       take: 50,
     });
-    const data = rides.map(toRideSummary);
+    const data = await Promise.all(
+      rides.map(async (ride) => {
+        const summary = toRideSummary(ride);
+        if (ride.status !== RideStatus.COMPLETED) return summary;
+        const payment = await fetchRidePaymentStatus(ride.id);
+        return {
+          ...summary,
+          isPaid: payment.isPaid,
+          paymentStatus: payment.paymentStatus,
+        };
+      }),
+    );
     return { data, rides: data };
   }
 

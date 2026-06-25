@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:geolocator/geolocator.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -468,6 +469,33 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
     }
   }
 
+  Future<({double lat, double lng})> _resolveSosPosition() async {
+    try {
+      if (await Geolocator.isLocationServiceEnabled()) {
+        var permission = await Geolocator.checkPermission();
+        if (permission == LocationPermission.denied) {
+          permission = await Geolocator.requestPermission();
+        }
+        if (permission == LocationPermission.whileInUse ||
+            permission == LocationPermission.always) {
+          final pos = await Geolocator.getCurrentPosition(
+            locationSettings: const LocationSettings(
+              accuracy: LocationAccuracy.high,
+              timeLimit: Duration(seconds: 12),
+            ),
+          );
+          return (lat: pos.latitude, lng: pos.longitude);
+        }
+      }
+    } catch (_) {
+      /* fallback ci-dessous */
+    }
+    if (_driverPos != null) {
+      return (lat: _driverPos!.latitude, lng: _driverPos!.longitude);
+    }
+    return (lat: _pickup.latitude, lng: _pickup.longitude);
+  }
+
   Future<void> _triggerSos() async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -487,11 +515,13 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
     );
     if (confirm != true || !mounted) return;
     final api = ref.read(apiClientProvider);
+    final sosPos = await _resolveSosPosition();
+    if (!mounted) return;
     final result = await api.reportSos(
       description: 'SOS course ${widget.rideId}',
       rideId: widget.rideId,
-      lat: _driverPos?.latitude ?? _pickup.latitude,
-      lng: _driverPos?.longitude ?? _pickup.longitude,
+      lat: sosPos.lat,
+      lng: sosPos.lng,
     );
     if (!mounted) return;
     switch (result) {

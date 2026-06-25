@@ -98,7 +98,8 @@ export default function LivraisonsPage() {
         ]);
         if (!cancelled) {
           setDeliveryDetail(detail);
-          setGpsTrace(trace.points ?? detail.gpsTrace ?? []);
+          const tracePoints = trace.points ?? (Array.isArray(detail.gpsTrace) ? detail.gpsTrace : []);
+          setGpsTrace(tracePoints);
         }
       } catch {
         if (!cancelled) {

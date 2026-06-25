@@ -28,12 +28,14 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
   bool _loading = false;
   String? _error;
   Timer? _locationTimer;
+  Timer? _paymentPollTimer;
   String? _userId;
   double? _currentLat;
   double? _currentLng;
 
   String get _rideId => _ride['id']?.toString() ?? '';
   String get _status => _ride['status']?.toString() ?? 'DRIVER_ASSIGNED';
+  bool get _isPaid => _ride['isPaid'] == true;
 
   @override
   void initState() {
@@ -45,6 +47,7 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
   @override
   void dispose() {
     _locationTimer?.cancel();
+    _paymentPollTimer?.cancel();
     ref.read(rideSocketProvider).clearHandlers();
     super.dispose();
   }
@@ -58,6 +61,7 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
     await _refreshRide();
     await _connectTrackingSocket();
     _startLocationUpdates();
+    _syncPaymentPolling();
   }
 
   Future<void> _connectTrackingSocket() async {
@@ -78,6 +82,14 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
     if (!mounted) return;
     if (result case Success(:final data)) {
       setState(() => _ride = data);
+      _syncPaymentPolling();
+    }
+  }
+
+  void _syncPaymentPolling() {
+    _paymentPollTimer?.cancel();
+    if (_status == 'COMPLETED' && !_isPaid) {
+      _paymentPollTimer = Timer.periodic(const Duration(seconds: 5), (_) => _refreshRide());
     }
   }
 
@@ -159,12 +171,16 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
         setState(() => _ride = data);
         if (nextStatus == 'COMPLETED') {
           _locationTimer?.cancel();
-          ref.read(rideSocketProvider).clearHandlers();
+          _syncPaymentPolling();
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Course terminée — ${MarketConfig.formatCdf(_ride['priceCdf'] as int? ?? 0)}')),
+              SnackBar(
+                content: Text(
+                  'Course terminée — ${MarketConfig.formatCdf(_ride['priceCdf'] as int? ?? 0)}. '
+                  'En attente du paiement passager.',
+                ),
+              ),
             );
-            Navigator.popUntil(context, (r) => r.isFirst);
           }
         }
       case Failure(:final error):
@@ -287,6 +303,10 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
                   _statusLabel(_status),
                   style: const TextStyle(color: MovaColors.violet, fontWeight: FontWeight.w600),
                 ),
+                if (_status == 'COMPLETED') ...[
+                  const SizedBox(height: 8),
+                  _PaymentStatusChip(isPaid: _isPaid),
+                ],
               ],
             ),
           ),
@@ -314,11 +334,19 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
           ],
           if (_status == 'COMPLETED') ...[
             const SizedBox(height: 12),
+            if (!_isPaid)
+              MovaButton(
+                label: 'Confirmer paiement espèces',
+                isSecondary: true,
+                icon: Icons.payments_outlined,
+                onPressed: _confirmCash,
+              ),
+            const SizedBox(height: 12),
             MovaButton(
-              label: 'Confirmer paiement espèces',
+              label: 'Retour au tableau de bord',
               isSecondary: true,
-              icon: Icons.payments_outlined,
-              onPressed: _confirmCash,
+              icon: Icons.home_outlined,
+              onPressed: () => Navigator.popUntil(context, (r) => r.isFirst),
             ),
           ],
         ],
@@ -336,6 +364,8 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
     setState(() => _loading = false);
     switch (result) {
       case Success():
+        await _refreshRide();
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Paiement espèces confirmé')),
         );
@@ -348,7 +378,46 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
         'DRIVER_ASSIGNED' => 'En route vers le passager',
         'ARRIVING' => 'Arrivé — en attente du passager',
         'IN_PROGRESS' => 'Course en cours',
-        'COMPLETED' => 'Terminée',
+        'COMPLETED' => _isPaid ? 'Terminée · Payée' : 'Terminée · En attente de paiement',
         _ => status,
       };
+}
+
+class _PaymentStatusChip extends StatelessWidget {
+  const _PaymentStatusChip({required this.isPaid});
+
+  final bool isPaid;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: (isPaid ? MovaColors.green : MovaColors.orange).withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: (isPaid ? MovaColors.green : MovaColors.orange).withValues(alpha: 0.35),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            isPaid ? Icons.check_circle_outline : Icons.schedule,
+            size: 16,
+            color: isPaid ? MovaColors.green : MovaColors.orange,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            isPaid ? 'Payée' : 'En attente de paiement',
+            style: TextStyle(
+              color: isPaid ? MovaColors.green : MovaColors.orange,
+              fontWeight: FontWeight.w600,
+              fontSize: 13,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

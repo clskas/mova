@@ -11,11 +11,12 @@ import { MatchingModule } from '../matching/matching.module';
 import { TrackingModule } from '../tracking/tracking.module';
 import { WebsocketModule } from '../websocket/websocket.module';
 import { ShareModule } from '../share/share.module';
+import { RideChatService } from '../chat/ride-chat.service';
 
 @Module({
   imports: [MatchingModule, WebsocketModule, TrackingModule, ShareModule],
   controllers: [RidesController],
-  providers: [RidesService, ScheduledRidesService, RideSearchScheduler, PricingService, PricingAdminService, CommissionService, SurchargeService, PromoService],
+  providers: [RidesService, ScheduledRidesService, RideSearchScheduler, PricingService, PricingAdminService, CommissionService, SurchargeService, PromoService, RideChatService],
   exports: [RidesService, ScheduledRidesService, PricingService, PricingAdminService, CommissionService, SurchargeService, PromoService, ShareModule],
 })
 export class RidesModule {}

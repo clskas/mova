@@ -116,11 +116,6 @@ class _MovaSplashScreenState extends ConsumerState<MovaSplashScreen>
     );
   }
 
-  int _secondsRemaining(double t) {
-    final left = (_splashDuration.inMilliseconds * (1 - t)).ceil();
-    return (left / 1000).ceil().clamp(0, _splashDuration.inSeconds);
-  }
-
   @override
   void dispose() {
     _main.dispose();
@@ -204,24 +199,6 @@ class _MovaSplashScreenState extends ConsumerState<MovaSplashScreen>
                     ),
                   ),
                   ..._buildFloatingVehicles(t),
-                  Positioned(
-                    top: 8,
-                    right: 12,
-                    child: TextButton(
-                      onPressed: _skip,
-                      style: TextButton.styleFrom(
-                        foregroundColor: Colors.white,
-                        backgroundColor: Colors.white.withValues(alpha: 0.14),
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                      ),
-                      child: Text(
-                        _bootstrapDone
-                            ? 'Passer${_userSkipped ? '' : ' · ${_secondsRemaining(t)}s'}'
-                            : 'Chargement…',
-                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-                      ),
-                    ),
-                  ),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: IgnorePointer(
@@ -321,7 +298,7 @@ class _MovaSplashScreenState extends ConsumerState<MovaSplashScreen>
                         ),
                         const SizedBox(height: 16),
                         Text(
-                          'Touchez l\'écran ou Passer pour continuer',
+                          'Touchez l\'écran pour continuer',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: Colors.white.withValues(alpha: 0.65),

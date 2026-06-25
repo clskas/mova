@@ -32,7 +32,7 @@ Voir [Admin — Niveaux d'accès par rôle](user-manual/admin.md#niveaux-daccès
 
 ## Nouveautés récentes (juin 2026)
 
-- **Splash animé** : écran d'accueil mobile (**4 s par service**, ~32 s, bouton **Passer**) — contenu **Passager** vs **Chauffeur** distinct.
+- **Splash animé** : écran d'accueil mobile (**4 s par service**, ~32 s, tap sur l'écran) — contenu **Passager** vs **Chauffeur** distinct.
 - **Ville GPS** : sélection automatique de la ville MOVA à l'ouverture (mobile).
 - **Mode hors ligne** : bannière réseau/serveur, secours API LAN, réessai au retour de l'app.
 - **Trace GPS** : trajet parcouru visible passager, chauffeur (mission active) et admin (Courses / Livraisons).

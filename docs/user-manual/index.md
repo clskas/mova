@@ -36,7 +36,7 @@ Pendant une course ou livraison active, le passager voit la position du chauffeu
 
 ### Première connexion (OTP)
 
-1. **Splash animé** (mobile uniquement) : présentation des services MOVA (**4 s par service**, ~32 s au total). **Passer** ou toucher l'écran pour continuer sans attendre.
+1. **Splash animé** (mobile uniquement) : présentation des services MOVA (**4 s par service**, ~32 s au total). Touchez l'écran pour continuer sans attendre.
 2. Saisissez votre numéro au format **+243** suivi de 9 chiffres.
 3. Recevez un code OTP par SMS.
 4. En mode développement (`MOCK_OTP=true`), utilisez le code **123456**.

@@ -288,7 +288,7 @@ Sans `-UsbReverse` : le PC et le téléphone doivent être sur le **même Wi‑F
 
 | # | Écran | Action | Résultat attendu |
 |---|-------|--------|------------------|
-| 0 | Splash | Attendre ou **Passer** | Animation services passager ; puis OTP |
+| 0 | Splash | Attendre ou **toucher l'écran** | Animation services passager ; puis OTP |
 | 1 | Accueil | Ville GPS + cartes services | Ville la plus proche ; grille sans overflow |
 | 2 | Commander une course | Saisir départ / arrivée, estimer | Prix en CDF affiché |
 | 2b | Suivi course | Pendant course active | Carte : position chauffeur + **polyline** (trajet parcouru) |
@@ -352,7 +352,7 @@ cd c:\Users\Administrator\Mova
 
 | # | Écran | Action | Résultat attendu |
 |---|-------|--------|------------------|
-| 0 | Splash | Attendre ou **Passer** | Animation services chauffeur ; puis OTP |
+| 0 | Splash | Attendre ou **toucher l'écran** | Animation services chauffeur ; puis OTP |
 | 1 | Accueil (KYC pending) | Si non approuvé | Message / blocage KYC |
 | 2 | Admin approuve KYC | Attendre ~5 s ou pull-to-refresh | Passage à écran opérationnel, snackbar possible |
 | 3 | Disponibilité | Activer **En ligne** | Statut disponible |

@@ -6,6 +6,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RequirePermissions } from '../auth/permissions.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import { AdminService } from './admin.service';
+import { FraudService } from './fraud.service';
 
 class ApproveKycDto {
   @ApiProperty() @IsBoolean() approved: boolean;
@@ -30,7 +31,7 @@ class DriverStatusDto {
 @UseGuards(JwtAuthGuard, RolesGuard)
 @ApiBearerAuth()
 export class AdminController {
-  constructor(private adminService: AdminService) {}
+  constructor(private adminService: AdminService, private fraudService: FraudService) {}
 
   @Get('metrics')
   @RequirePermissions(AdminPermission.METRICS_READ)
@@ -202,6 +203,33 @@ export class AdminController {
   @ApiOperation({ summary: 'Résoudre incident' })
   resolve(@Param('id') id: string, @Body('status') status: string) {
     return this.adminService.resolveIncident(id, status ?? 'RESOLVED');
+  }
+
+  @Get('fraud/alerts')
+  @RequirePermissions(AdminPermission.FRAUD_READ)
+  @ApiOperation({ summary: 'Alertes anti-contournement (annulations, binômes récurrents, impayés)' })
+  fraudAlerts(
+    @Query('days') days?: string,
+    @Query('threshold') threshold?: string,
+    @Query('autoCreate') autoCreate?: string,
+  ) {
+    return this.fraudService.getAlerts({
+      days: days ? Number(days) : undefined,
+      threshold: threshold ? Number(threshold) : undefined,
+      autoCreate: autoCreate !== 'false',
+    });
+  }
+
+  @Post('fraud/incident')
+  @RequirePermissions(AdminPermission.FRAUD_WRITE)
+  @ApiOperation({ summary: 'Créer manuellement un incident FRAUD depuis une alerte' })
+  createFraudIncident(@Body() body: { entityId: string; entityType: 'DRIVER' | 'PASSENGER'; reasons?: string[]; score?: number }) {
+    return this.fraudService.createIncident({
+      entityId: body.entityId,
+      entityType: body.entityType,
+      reasons: body.reasons ?? [],
+      score: body.score ?? 0,
+    });
   }
 
   @Get('deliveries')

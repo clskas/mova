@@ -11,6 +11,7 @@ export type AdminSection =
   | "restaurants"
   | "tarifs"
   | "litiges"
+  | "fraude"
   | "planifiees"
   | "abonnements"
   | "portefeuille"
@@ -39,6 +40,7 @@ const ALL_SECTIONS: AdminSection[] = [
   "restaurants",
   "tarifs",
   "litiges",
+  "fraude",
   "planifiees",
   "abonnements",
   "portefeuille",
@@ -52,7 +54,7 @@ const ALL_SECTIONS: AdminSection[] = [
 const ROLE_SECTIONS: Record<AdminRole, AdminSection[]> = {
   SUPER_ADMIN: ALL_SECTIONS,
   ADMIN: ALL_SECTIONS,
-  SUPPORT: ["utilisateurs", "chauffeurs", "kyc", "litiges", "courses", "livraisons", "planifiees", "locations", "demenagements", "covoiturage"],
+  SUPPORT: ["utilisateurs", "chauffeurs", "kyc", "litiges", "fraude", "courses", "livraisons", "planifiees", "locations", "demenagements", "covoiturage"],
   FINANCE: ["dashboard", "portefeuille", "tarifs", "abonnements"],
   CONTENT: ["restaurants", "tarifs", "parametres", "locations"],
 };
@@ -84,6 +86,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/abonnements", label: "Abonnements", section: "abonnements" },
   { href: "/portefeuille", label: "Portefeuille", section: "portefeuille" },
   { href: "/litiges", label: "Litiges", section: "litiges" },
+  { href: "/fraude", label: "Fraude", section: "fraude" },
   { href: "/planifiees", label: "Planifiées", section: "planifiees" },
   { href: "/parametres", label: "Communes", section: "parametres" },
   { href: "/locations", label: "Locations", section: "locations" },

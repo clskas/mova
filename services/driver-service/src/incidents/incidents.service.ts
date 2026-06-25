@@ -58,6 +58,14 @@ export class IncidentsService {
     return this.prisma.incident.findMany({ orderBy: { createdAt: 'desc' } });
   }
 
+  /** Incidents ouverts liés à une référence (utilisé pour l'idempotence des alertes fraude). */
+  async findOpenByReference(referenceType: string, referenceId: string) {
+    return this.prisma.incident.findMany({
+      where: { referenceType, referenceId, status: 'OPEN' },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
   async resolve(id: string, status: string) {
     return this.prisma.incident.update({ where: { id }, data: { status } });
   }

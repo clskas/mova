@@ -51,6 +51,15 @@ export function IncidentsIcon({ className }: IconProps) {
   );
 }
 
+export function FraudIcon({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3z" />
+      <path d="M9.5 12l1.8 1.8L15 10" />
+    </Svg>
+  );
+}
+
 export function DeliveriesIcon({ className }: IconProps) {
   return (
     <Svg className={className}>

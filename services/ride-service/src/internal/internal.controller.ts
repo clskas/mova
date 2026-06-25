@@ -24,6 +24,7 @@ import { PricingAdminService } from '../rides/pricing-admin.service';
 import { RentalService } from '../rental/rental.service';
 import { ScheduledRidesService } from '../rides/scheduled-rides.service';
 import { RidesService } from '../rides/rides.service';
+import { FraudService } from '../fraud/fraud.service';
 import { TrackingService } from '../tracking/tracking.service';
 
 @ApiTags('internal')
@@ -42,7 +43,13 @@ export class InternalController {
     private moving: MovingService,
     private rental: RentalService,
     private tracking: TrackingService,
+    private fraud: FraudService,
   ) {}
+
+  @Get('fraud/signals')
+  fraudSignals(@Query('days') days?: string, @Query('minPair') minPair?: string) {
+    return this.fraud.getSignals(Number(days ?? 30), Number(minPair ?? 2));
+  }
 
   @Get('tracking/:type/:id/trace')
   getGpsTrace(@Param('type') type: string, @Param('id') id: string) {

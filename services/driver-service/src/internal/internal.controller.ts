@@ -1,8 +1,8 @@
 import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { IsBoolean, IsNumber, IsOptional, IsString } from 'class-validator';
+import { IsBoolean, IsEnum, IsNumber, IsOptional, IsString } from 'class-validator';
 import { Type } from 'class-transformer';
-import { KycStatus, VehicleType } from '@prisma/client';
+import { IncidentType, KycStatus, VehicleType } from '@prisma/client';
 import { DriversService } from '../drivers/drivers.service';
 import { IncidentsService } from '../incidents/incidents.service';
 import { InternalApiGuard } from '../common/internal-api.guard';
@@ -23,6 +23,14 @@ class ReviewKycDto {
 class UpdateDriverStatusDto {
   @IsOptional() @IsBoolean() isAvailable?: boolean;
   @IsOptional() @IsBoolean() active?: boolean;
+}
+class CreateIncidentDto {
+  @IsString() userId: string;
+  @IsEnum(IncidentType) type: IncidentType;
+  @IsString() description: string;
+  @IsOptional() @IsString() rideId?: string;
+  @IsOptional() @IsString() referenceType?: string;
+  @IsOptional() @IsString() referenceId?: string;
 }
 
 @ApiTags('internal')
@@ -77,5 +85,18 @@ export class InternalController {
   @Patch('drivers/:userId/rating') updateRating(@Param('userId') userId: string, @Body() dto: RatingDto) { return this.drivers.updateRating(userId, dto.ratingAvg); }
   @Patch('drivers/:userId/location') updateLocation(@Param('userId') userId: string, @Body() dto: { lat: number; lng: number }) { return this.drivers.updateLocation(userId, dto.lat, dto.lng); }
   @Get('incidents') listIncidents() { return this.incidents.list(); }
+  @Get('incidents/by-reference') incidentsByReference(@Query('referenceType') referenceType: string, @Query('referenceId') referenceId: string) {
+    return this.incidents.findOpenByReference(referenceType, referenceId);
+  }
+  @Post('incidents') createIncident(@Body() dto: CreateIncidentDto) {
+    return this.incidents.create({
+      userId: dto.userId,
+      type: dto.type,
+      description: dto.description,
+      rideId: dto.rideId,
+      referenceType: dto.referenceType,
+      referenceId: dto.referenceId,
+    });
+  }
   @Post('incidents/:id/resolve') resolve(@Param('id') id: string, @Body('status') status: string) { return this.incidents.resolve(id, status ?? 'RESOLVED'); }
 }

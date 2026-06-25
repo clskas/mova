@@ -203,6 +203,37 @@ export type Incident = {
   createdAt?: string;
 };
 
+export type FraudSeverity = "LOW" | "MEDIUM" | "HIGH";
+
+export type FraudAlert = {
+  entityId: string;
+  entityType: "DRIVER" | "PASSENGER";
+  score: number;
+  severity: FraudSeverity;
+  cancellationsAfterAccept: number;
+  unpaidCompleted: number;
+  recurringPairs: number;
+  counterpartIds: string[];
+  reasons: string[];
+  sampleRideIds: string[];
+  incidentCreated: boolean;
+};
+
+export type FraudAlertsResponse = {
+  periodDays: number;
+  generatedAt: string;
+  autoIncidentThreshold: number;
+  summary: {
+    totalAlerts: number;
+    highSeverity: number;
+    cancellationsAfterAccept: number;
+    unpaidCompleted: number;
+    recurringPairs: number;
+    incidentsCreated: number;
+  };
+  alerts: FraudAlert[];
+};
+
 export type DeliveryOverview = {
   id: string;
   type?: string;
@@ -823,6 +854,53 @@ function mockFor<T>(path: string, init?: RequestInit): T {
       { vehicleType: "VIP", city: "Kinshasa", baseFareCdf: 8000, perKmCdf: 3500, perMinuteCdf: 400, minFareCdf: 12000, peakMultiplier: 1.5, nightMultiplier: 1.4, isActive: true },
     ] as T;
   }
+  if (path.includes("/fraud/incident") && method === "POST") {
+    return true as T;
+  }
+  if (path.includes("/fraud/alerts")) {
+    return {
+      periodDays: 30,
+      generatedAt: new Date().toISOString(),
+      autoIncidentThreshold: 60,
+      summary: { totalAlerts: 2, highSeverity: 1, cancellationsAfterAccept: 5, unpaidCompleted: 3, recurringPairs: 1, incidentsCreated: 1 },
+      alerts: [
+        {
+          entityId: "2",
+          entityType: "DRIVER",
+          score: 76,
+          severity: "HIGH",
+          cancellationsAfterAccept: 4,
+          unpaidCompleted: 2,
+          recurringPairs: 1,
+          counterpartIds: ["1"],
+          reasons: [
+            "4 annulation(s) après acceptation (course possible hors app)",
+            "1 binôme(s) récurrent(s) hors système",
+            "2 course(s) terminée(s) sans paiement validé",
+          ],
+          sampleRideIds: ["r1", "r2", "r3"],
+          incidentCreated: true,
+        },
+        {
+          entityId: "1",
+          entityType: "PASSENGER",
+          score: 38,
+          severity: "MEDIUM",
+          cancellationsAfterAccept: 2,
+          unpaidCompleted: 1,
+          recurringPairs: 1,
+          counterpartIds: ["2"],
+          reasons: [
+            "2 annulation(s) après acceptation (course possible hors app)",
+            "1 binôme(s) récurrent(s) hors système",
+            "1 course(s) terminée(s) sans paiement validé",
+          ],
+          sampleRideIds: ["r4", "r5"],
+          incidentCreated: false,
+        },
+      ],
+    } as T;
+  }
   if (path.includes("/incidents") && method === "POST") {
     return { id: path.split("/")[3], status: "RESOLVED" } as T;
   }
@@ -1357,6 +1435,23 @@ export async function cancelDelivery(id: string, reason?: string) {
 
 export async function resolveIncident(id: string, status = "RESOLVED") {
   return apiFetch(`/api/admin/incidents/${id}/resolve`, { method: "POST", body: JSON.stringify({ status }) });
+}
+
+export async function fetchFraudAlerts(days = 30, autoCreate = true): Promise<FraudAlertsResponse> {
+  const params = new URLSearchParams({ days: String(days), autoCreate: autoCreate ? "true" : "false" });
+  return apiFetch<FraudAlertsResponse>(`/api/admin/fraud/alerts?${params}`);
+}
+
+export async function createFraudIncident(alert: Pick<FraudAlert, "entityId" | "entityType" | "reasons" | "score">) {
+  return apiFetch("/api/admin/fraud/incident", {
+    method: "POST",
+    body: JSON.stringify({
+      entityId: alert.entityId,
+      entityType: alert.entityType,
+      reasons: alert.reasons,
+      score: alert.score,
+    }),
+  });
 }
 
 export async function saveRestaurant(data: Partial<Restaurant>, id?: string) {

@@ -11,6 +11,7 @@ import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
+import 'widgets/driver_cash_pin_dialog.dart';
 
 class ActiveDeliveryScreen extends ConsumerStatefulWidget {
   const ActiveDeliveryScreen({super.key, required this.delivery});
@@ -203,24 +204,7 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
   }
 
   Future<void> _confirmCash() async {
-    final pinController = TextEditingController();
-    final pin = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Confirmer espèces'),
-        content: TextField(
-          controller: pinController,
-          keyboardType: TextInputType.number,
-          maxLength: 4,
-          decoration: const InputDecoration(labelText: 'Code PIN passager'),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Annuler')),
-          TextButton(onPressed: () => Navigator.pop(ctx, pinController.text.trim()), child: const Text('Valider')),
-        ],
-      ),
-    );
-    pinController.dispose();
+    final pin = await DriverCashPinDialog.show(context);
     if (pin == null || pin.isEmpty || !mounted) return;
     setState(() => _loading = true);
     final api = ref.read(apiClientProvider);

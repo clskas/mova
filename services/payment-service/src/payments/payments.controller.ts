@@ -1,4 +1,4 @@
-import { Body, Controller, Param, Post, Request, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Request, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ProcessPaymentDto } from './payments.dto';
@@ -10,6 +10,12 @@ import { PaymentsService } from './payments.service';
 @ApiBearerAuth()
 export class PaymentsController {
   constructor(private paymentsService: PaymentsService) {}
+
+  @Get('rides/unpaid')
+  @ApiOperation({ summary: 'Course terminée en attente de paiement (passager)' })
+  getUnpaidRide(@Request() req: { user: { id: string } }) {
+    return this.paymentsService.findPassengerUnpaidRide(req.user.id);
+  }
 
   @Post('rides/:rideId')
   @ApiOperation({ summary: 'Payer une course' })

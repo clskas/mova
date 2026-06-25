@@ -32,6 +32,7 @@ import { assertDriverCanReceiveJobs, assertDriverEligibleForRide, driverCanRecei
 import { fetchAuthUserBrief } from '../common/internal-lookup.util';
 import { TripShareService } from '../share/trip-share.service';
 import { publishDriverJobAlert } from '../common/driver-job-alert.util';
+import { fetchRidePaymentStatus, fetchRidePaymentStatuses } from '../common/payment-status.util';
 
 const ACTIVE_STATUSES: RideStatus[] = [
   RideStatus.REQUESTED,
@@ -96,6 +97,8 @@ export class RidesService {
       where: { passengerId, status: { in: ACTIVE_STATUSES } },
     });
     if (active) throw new MovaHttpException(MovaErrorCode.RIDE_ALREADY_ACTIVE);
+
+    await this.assertNoUnpaidCompletedRide(passengerId);
 
     assertServiceAreaPair(data.pickupLat, data.pickupLng, data.dropoffLat, data.dropoffLng);
 
@@ -472,11 +475,15 @@ export class RidesService {
     if (!ride) throw new MovaHttpException(MovaErrorCode.RIDE_NOT_FOUND, HttpStatus.NOT_FOUND);
     const driver = ride.driverId ? await this.fetchDriverInfo(ride.driverId) : null;
     const detail = this.formatRideDetail(ride);
+    const payment = await fetchRidePaymentStatus(rideId);
     const trackingEta = this.computeTrackingEta(ride, driver);
     const timeline = this.buildRideTimeline(ride.status, ride.events);
     const gpsTrace = await this.trackingService.getTrace(TrackingReferenceType.RIDE, rideId);
     return {
       ...detail,
+      isPaid: payment.isPaid,
+      paymentStatus: payment.paymentStatus,
+      paymentReady: detail.paymentReady && !payment.isPaid,
       ...trackingEta,
       events: ride.events.map((e) => ({ ...e, status: e.event })),
       timeline,
@@ -609,6 +616,42 @@ export class RidesService {
     }
   }
 
+  private async assertNoUnpaidCompletedRide(passengerId: string) {
+    const completed = await this.prisma.ride.findMany({
+      where: { passengerId, status: RideStatus.COMPLETED },
+      orderBy: { completedAt: 'desc' },
+      take: 5,
+      select: { id: true },
+    });
+    for (const ride of completed) {
+      const { isPaid } = await fetchRidePaymentStatus(ride.id);
+      if (!isPaid) {
+        throw new MovaHttpException(MovaErrorCode.RIDE_UNPAID_PENDING, HttpStatus.CONFLICT);
+      }
+    }
+  }
+
+  async findPassengerUnpaidRide(passengerId: string) {
+    const rides = await this.prisma.ride.findMany({
+      where: { passengerId, status: RideStatus.COMPLETED },
+      orderBy: { completedAt: 'desc' },
+      take: 5,
+    });
+    for (const ride of rides) {
+      const payment = await fetchRidePaymentStatus(ride.id);
+      if (!payment.isPaid) {
+        return {
+          ride: {
+            ...this.formatRideDetail(ride),
+            isPaid: false,
+            paymentStatus: payment.paymentStatus,
+          },
+        };
+      }
+    }
+    return { ride: null };
+  }
+
   private formatRideDetail(ride: {
     id: string;
     passengerId: string;
@@ -670,6 +713,7 @@ export class RidesService {
       tripEtaMinutes,
       currency: MARKET_RDC.currency,
       paymentReady: mobileStatus === 'COMPLETED',
+      isPaid: false,
       acceptedAt: ride.acceptedAt,
       startedAt: ride.startedAt,
       completedAt: ride.completedAt,

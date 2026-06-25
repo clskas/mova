@@ -16,6 +16,8 @@ const movaErrorMessages = <String, String>{
   'MOVA_RIDE_007': 'La réservation ne peut pas dépasser 7 jours.',
   'MOVA_RIDE_008': 'La date de réservation doit être dans le futur.',
   'MOVA_RIDE_009': 'Statut de réservation invalide pour cette action.',
+  'MOVA_RIDE_012':
+      'Vous avez une course terminée non payée. Réglez le paiement avant d\'en commander une nouvelle.',
   'MOVA_DEL_001': 'Livraison introuvable.',
   'MOVA_DEL_002': 'Statut de livraison invalide pour cette action.',
   'MOVA_DEL_003': 'Restaurant introuvable.',

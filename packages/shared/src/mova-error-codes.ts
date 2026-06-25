@@ -12,6 +12,7 @@ export enum MovaErrorCode {
   RIDE_ACCEPT_TIMEOUT = 'MOVA_RIDE_005',
   RIDE_ALREADY_RATED = 'MOVA_RIDE_010',
   RIDE_INVALID_TRANSITION = 'MOVA_RIDE_011',
+  RIDE_UNPAID_PENDING = 'MOVA_RIDE_012',
   SCHEDULED_RIDE_NOT_FOUND = 'MOVA_RIDE_006',
   SCHEDULED_RIDE_TOO_FAR = 'MOVA_RIDE_007',
   SCHEDULED_RIDE_PAST = 'MOVA_RIDE_008',
@@ -69,6 +70,8 @@ export const MOVA_ERROR_MESSAGES: Record<MovaErrorCode, string> = {
   [MovaErrorCode.RIDE_ACCEPT_TIMEOUT]: "Délai d'acceptation expiré (30 secondes).",
   [MovaErrorCode.RIDE_ALREADY_RATED]: 'Vous avez déjà noté cette course.',
   [MovaErrorCode.RIDE_INVALID_TRANSITION]: 'Transition de statut non autorisée pour cette course.',
+  [MovaErrorCode.RIDE_UNPAID_PENDING]:
+    'Vous avez une course terminée non payée. Réglez le paiement avant d\'en commander une nouvelle.',
   [MovaErrorCode.SCHEDULED_RIDE_NOT_FOUND]: 'Réservation planifiée introuvable.',
   [MovaErrorCode.SCHEDULED_RIDE_TOO_FAR]: 'La réservation ne peut pas dépasser 7 jours.',
   [MovaErrorCode.SCHEDULED_RIDE_PAST]: 'La date de réservation doit être dans le futur.',

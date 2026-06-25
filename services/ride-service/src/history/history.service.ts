@@ -3,6 +3,7 @@ import { ScheduledRideStatus } from '@prisma/client';
 import { toRideSummary } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { formatParcelDelivery } from '../deliveries/parcel.util';
+import { fetchRidePaymentStatuses } from '../common/payment-status.util';
 
 export type HistoryType = 'RIDE' | 'PARCEL' | 'FOOD' | 'EXPRESS' | 'ERRAND' | 'SCHEDULED' | 'CARPOOL' | 'RENTAL' | 'MOVING';
 
@@ -21,6 +22,7 @@ export class HistoryService {
       priceCdf: number;
       createdAt: string;
       paymentReady?: boolean;
+      isPaid?: boolean;
       meta?: Record<string, unknown>;
     }[] = [];
 
@@ -32,8 +34,11 @@ export class HistoryService {
         orderBy: { createdAt: 'desc' },
         take: fetchPerType,
       });
+      const paymentMap = await fetchRidePaymentStatuses(rides.map((r) => r.id));
       for (const r of rides) {
         const summary = toRideSummary(r);
+        const payment = paymentMap[r.id];
+        const isPaid = payment?.isPaid ?? false;
         items.push({
           type: 'RIDE',
           id: r.id,
@@ -41,7 +46,8 @@ export class HistoryService {
           title: `${r.pickupAddress ?? 'Départ'} → ${r.dropoffAddress ?? 'Arrivée'}`,
           priceCdf: r.finalFareCdf ?? r.estimatedFareCdf ?? summary.priceCdf ?? 0,
           createdAt: r.createdAt.toISOString(),
-          paymentReady: r.status === 'COMPLETED',
+          paymentReady: r.status === 'COMPLETED' && !isPaid,
+          isPaid: r.status === 'COMPLETED' ? isPaid : undefined,
           meta: {
             vehicleType: r.vehicleType,
             distanceKm: r.distanceKm,

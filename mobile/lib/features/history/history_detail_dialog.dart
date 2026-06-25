@@ -9,8 +9,8 @@ import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
 import '../moving/moving_tracking_screen.dart';
 import '../rides/scheduled_ride_screen.dart';
+import '../booking/tracking_screen.dart';
 
-/// Libellés statuts unifiés (historique + détail).
 String historyStatusLabel(String? status) => switch (status) {
       'COMPLETED' => 'Terminé',
       'DELIVERED' => 'Livré',
@@ -25,6 +25,15 @@ String historyStatusLabel(String? status) => switch (status) {
       'DRIVER_ASSIGNED' => 'Chauffeur assigné',
       _ => status ?? '—',
     };
+
+/// Course taxi : distingue terminée / payée / à payer.
+String rideHistoryStatusLabel(Map<String, dynamic> item) {
+  final status = item['status']?.toString();
+  if (status != 'COMPLETED') return historyStatusLabel(status);
+  if (item['isPaid'] == true) return 'Terminée · Payée';
+  if (item['paymentReady'] == true) return 'Terminée · À payer';
+  return 'Terminée';
+}
 
 String historyTypeLabel(String? type) => switch (type) {
       'RIDE' => 'Course taxi',
@@ -136,8 +145,10 @@ Future<void> showHistoryDetailDialog(
             const SizedBox(height: 8),
             Text(item['title']?.toString() ?? '', style: const TextStyle(fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
-            Text('Statut : ${historyStatusLabel(live?['status']?.toString() ?? status)}',
-                style: const TextStyle(color: MovaColors.violet, fontWeight: FontWeight.w600)),
+            Text(
+              'Statut : ${rideHistoryStatusLabel({...item, ...?live})}',
+              style: const TextStyle(color: MovaColors.violet, fontWeight: FontWeight.w600),
+            ),
             Text(
               MarketConfig.formatCdf(item['priceCdf'] as int? ?? live?['estimatedPriceCdf'] as int? ?? 0),
               style: const TextStyle(fontWeight: FontWeight.bold),
@@ -208,6 +219,26 @@ Future<void> showHistoryDetailDialog(
       ),
       actions: [
         TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Fermer')),
+        if (type == 'RIDE' &&
+            id.isNotEmpty &&
+            item['paymentReady'] == true &&
+            item['isPaid'] != true)
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              final amount = item['priceCdf'] as int? ?? 0;
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => TrackingScreen(
+                    rideId: id,
+                    estimatedFareCdf: amount,
+                  ),
+                ),
+              );
+            },
+            child: const Text('Payer la course'),
+          ),
         if (type == 'MOVING' && id.isNotEmpty)
           TextButton(
             onPressed: () {

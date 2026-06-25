@@ -8,5 +8,6 @@ import { AirtelMoneyProvider, MockPaymentProvider, MpesaProvider, OrangeMoneyPro
   imports: [WalletModule, DriverPayoutModule],
   controllers: [PaymentsController],
   providers: [PaymentsService, MockPaymentProvider, OrangeMoneyProvider, MpesaProvider, AirtelMoneyProvider],
+  exports: [PaymentsService],
 })
 export class PaymentsModule {}

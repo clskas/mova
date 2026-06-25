@@ -129,7 +129,8 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
 
   bool get _needsPayment {
     final s = _status.toUpperCase();
-    return s == 'COMPLETED' || _mock;
+    if (s != 'COMPLETED') return _mock;
+    return _ride?['isPaid'] != true;
   }
 
   void _updateEtaFromRide(Map<String, dynamic> data) {
@@ -201,6 +202,9 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
       switch (result) {
         case Success(:final data):
           _applyRideData(data, api);
+          if (_needsPayment && !_autoPaymentLaunched) {
+            WidgetsBinding.instance.addPostFrameCallback((_) => _triggerAutoPayment());
+          }
         case Failure(:final error):
           _error = error.message;
           if (api.isMockMode) _applyMockDriver();

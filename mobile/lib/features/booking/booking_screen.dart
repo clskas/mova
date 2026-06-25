@@ -17,6 +17,7 @@ import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import 'matching_screen.dart';
+import 'tracking_screen.dart';
 import 'widgets/mova_ride_map.dart';
 import 'widgets/vehicle_selector.dart';
 
@@ -54,6 +55,44 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
     _destinationController.addListener(_onDestinationChanged);
     if (!movaDisableAutoGps) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _useMyLocation());
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkUnpaidRide());
+  }
+
+  Future<void> _checkUnpaidRide() async {
+    final api = ref.read(apiClientProvider);
+    final result = await api.getUnpaidRide();
+    if (!mounted) return;
+    if (result case Success(:final data?) when data['id'] != null) {
+      final rideId = data['id'].toString();
+      final amount = (data['finalFareCdf'] ?? data['estimatedFareCdf'] ?? 0) as int;
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Paiement en attente'),
+          content: const Text(
+            'Vous avez une course terminée non payée. Réglez le paiement avant d\'en commander une nouvelle.',
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Fermer')),
+            FilledButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => TrackingScreen(
+                      rideId: rideId,
+                      estimatedFareCdf: amount,
+                    ),
+                  ),
+                );
+              },
+              child: const Text('Payer maintenant'),
+            ),
+          ],
+        ),
+      );
     }
   }
 

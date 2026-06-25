@@ -101,6 +101,11 @@ export class InternalController {
     return this.rides.getRide(id);
   }
 
+  @Get('passengers/:userId/unpaid-ride')
+  passengerUnpaidRide(@Param('userId') userId: string) {
+    return this.rides.findPassengerUnpaidRide(userId);
+  }
+
   @Post('rides/:id/cancel')
   cancelRide(@Param('id') id: string, @Body('reason') reason?: string) {
     return this.rides.adminCancelRide(id, reason);

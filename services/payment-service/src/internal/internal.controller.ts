@@ -7,6 +7,7 @@ import { InternalApiGuard } from '../common/internal-api.guard';
 import { WalletService } from '../wallet/wallet.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { DriverPayoutService } from '../payouts/driver-payout.service';
+import { PaymentsService } from '../payments/payments.service';
 
 class CreateWalletDto {
   @IsString() userId: string;
@@ -51,6 +52,7 @@ export class InternalController {
     private wallet: WalletService,
     private subscriptions: SubscriptionsService,
     private driverPayouts: DriverPayoutService,
+    private payments: PaymentsService,
   ) {}
 
   @Post('wallets')
@@ -90,6 +92,16 @@ export class InternalController {
   @Post('driver-payouts/sync/:userId')
   syncDriverPayouts(@Param('userId') userId: string) {
     return this.driverPayouts.syncDriverPayouts(userId);
+  }
+
+  @Get('rides/:rideId/payment-status')
+  getRidePaymentStatus(@Param('rideId') rideId: string) {
+    return this.payments.getRidePaymentStatus(rideId);
+  }
+
+  @Post('rides/payment-status')
+  getRidePaymentStatuses(@Body() body: { rideIds?: string[] }) {
+    return this.payments.getRidePaymentStatuses(body.rideIds ?? []);
   }
 
   @Get('subscription-plans')

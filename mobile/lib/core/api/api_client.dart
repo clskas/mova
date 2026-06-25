@@ -823,6 +823,16 @@ class ApiClient {
     };
   }
 
+  /// Course terminée non payée (null si aucune).
+  Future<Result<Map<String, dynamic>?>> getUnpaidRide() async {
+    if (isMockMode) return const Success(null);
+    final result = await get('/payments/rides/unpaid');
+    return switch (result) {
+      Success(:final data) => Success(data as Map<String, dynamic>?),
+      Failure(:final error) => Failure(error),
+    };
+  }
+
   Future<Result<Map<String, dynamic>>> searchDrivers(String rideId) async {
     return post('/rides/$rideId/search', {});
   }

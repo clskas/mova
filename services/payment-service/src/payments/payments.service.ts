@@ -346,4 +346,45 @@ export class PaymentsService {
     await this.creditDriverAfterRidePayment(rideId);
     return { success: true, payment, message: 'Paiement espèces confirmé' };
   }
+
+  async getRidePaymentStatus(rideId: string) {
+    const payment = await this.prisma.payment.findUnique({ where: { rideId } });
+    const isPaid = payment?.status === PaymentStatus.COMPLETED;
+    return {
+      rideId,
+      isPaid,
+      paymentStatus: payment?.status ?? null,
+    };
+  }
+
+  async getRidePaymentStatuses(rideIds: string[]) {
+    const unique = [...new Set(rideIds.filter(Boolean))];
+    const payments = await this.prisma.payment.findMany({
+      where: { rideId: { in: unique } },
+    });
+    const byRide = new Map(payments.map((p) => [p.rideId, p]));
+    const result: Record<string, { rideId: string; isPaid: boolean; paymentStatus: string | null }> = {};
+    for (const rideId of unique) {
+      const payment = byRide.get(rideId);
+      result[rideId] = {
+        rideId,
+        isPaid: payment?.status === PaymentStatus.COMPLETED,
+        paymentStatus: payment?.status ?? null,
+      };
+    }
+    return result;
+  }
+
+  async findPassengerUnpaidRide(passengerId: string) {
+    try {
+      const res = await fetch(serviceUrl('ride', `/internal/passengers/${passengerId}/unpaid-ride`), {
+        headers: { 'x-internal-api-key': INTERNAL_API_KEY },
+      });
+      if (!res.ok) return null;
+      const data = (await res.json()) as { ride: Record<string, unknown> | null };
+      return data.ride;
+    } catch {
+      return null;
+    }
+  }
 }

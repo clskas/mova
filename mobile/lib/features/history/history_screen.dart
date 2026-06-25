@@ -112,7 +112,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
               style: const TextStyle(color: MovaColors.violet),
             ),
             Text(
-              _statusLabel(item['status']?.toString()),
+              rideHistoryStatusLabel(item),
               style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
             ),
           ],

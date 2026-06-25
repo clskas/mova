@@ -833,6 +833,21 @@ class ApiClient {
     };
   }
 
+  /// Course terminée — espèces en attente de PIN chauffeur (null si aucune).
+  Future<Result<Map<String, dynamic>?>> getDriverPendingCashRide() async {
+    if (isMockMode) return const Success(null);
+    final result = await get('/payments/rides/pending-cash');
+    switch (result) {
+      case Success(:final data):
+        final ride = data['ride'];
+        if (ride is Map<String, dynamic>) return Success(ride);
+        if (ride is Map) return Success(Map<String, dynamic>.from(ride));
+        return const Success(null);
+      case Failure(:final error):
+        return Failure(error);
+    }
+  }
+
   Future<Result<List<Map<String, dynamic>>>> getRideChatMessages(String rideId) async {
     final result = await get('/rides/$rideId/chat');
     return switch (result) {

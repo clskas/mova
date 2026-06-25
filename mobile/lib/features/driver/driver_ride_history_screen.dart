@@ -6,6 +6,7 @@ import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
+import 'active_ride_screen.dart';
 
 class DriverRideHistoryScreen extends ConsumerStatefulWidget {
   const DriverRideHistoryScreen({super.key});
@@ -70,9 +71,33 @@ class _DriverRideHistoryScreenState extends ConsumerState<DriverRideHistoryScree
       return ride['isPaid'] == true ? MovaColors.green : MovaColors.orange;
     }
     return switch (status) {
-        'DRIVER_ASSIGNED' || 'ARRIVING' || 'IN_PROGRESS' => MovaColors.violet,
-        _ => MovaColors.textSecondary,
-      };
+      'CANCELLED' => MovaColors.error,
+      'DRIVER_ASSIGNED' || 'ARRIVING' || 'IN_PROGRESS' => MovaColors.violet,
+      _ => MovaColors.textSecondary,
+    };
+  }
+
+  Future<void> _openRide(Map<String, dynamic> ride) async {
+    final rideId = ride['id']?.toString();
+    if (rideId == null) return;
+    final api = ref.read(apiClientProvider);
+    final result = await api.getRide(rideId);
+    if (!mounted) return;
+    switch (result) {
+      case Success(:final data):
+        await Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => ActiveRideScreen(ride: data)),
+        );
+        if (mounted) _load();
+      case Failure(:final error):
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
+    }
+  }
+
+  bool _needsCashConfirm(Map<String, dynamic> ride) {
+    return ride['status']?.toString() == 'COMPLETED' && ride['isPaid'] != true;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -103,6 +128,7 @@ class _DriverRideHistoryScreenState extends ConsumerState<DriverRideHistoryScree
                             ride['createdAt']?.toString() ??
                             '';
                         return MovaCard(
+                          onTap: _needsCashConfirm(ride) ? () => _openRide(ride) : null,
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -160,6 +186,17 @@ class _DriverRideHistoryScreenState extends ConsumerState<DriverRideHistoryScree
                                   ],
                                 ],
                               ),
+                              if (_needsCashConfirm(ride)) ...[
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Appuyez pour confirmer le paiement espèces (PIN)',
+                                  style: TextStyle(
+                                    color: MovaColors.orange.withValues(alpha: 0.95),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
                             ],
                           ),
                         );

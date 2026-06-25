@@ -17,6 +17,12 @@ export class PaymentsController {
     return this.paymentsService.findPassengerUnpaidRide(req.user.id);
   }
 
+  @Get('rides/pending-cash')
+  @ApiOperation({ summary: 'Course terminée — espèces en attente de PIN (chauffeur)' })
+  getDriverPendingCash(@Request() req: { user: { id: string } }) {
+    return this.paymentsService.findDriverPendingCashRide(req.user.id);
+  }
+
   @Post('rides/:rideId')
   @ApiOperation({ summary: 'Payer une course' })
   payRide(@Request() req: { user: { id: string } }, @Param('rideId') rideId: string, @Body() dto: ProcessPaymentDto) {

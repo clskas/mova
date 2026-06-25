@@ -44,6 +44,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
   Map<String, dynamic>? _earnings;
   Map<String, dynamic>? _profile;
   Map<String, dynamic>? _activeRide;
+  Map<String, dynamic>? _pendingCashRide;
   Map<String, dynamic>? _activeDelivery;
   String? _availabilityError;
   String? _vehicleId;
@@ -89,6 +90,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
         if (mounted) {
           ServiceAreaGps.sync(ref);
           _loadProfile(clearCache: true);
+          _loadPendingCashRide();
         }
       });
     }
@@ -111,6 +113,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
       _loadProfile(clearCache: true),
       _loadEarnings(),
       _loadActiveRide(),
+      _loadPendingCashRide(),
       _loadActiveDelivery(),
       _loadAssignments(),
     ]);
@@ -361,6 +364,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
       _loadProfile(clearCache: true),
       _loadEarnings(),
       _loadActiveRide(),
+      _loadPendingCashRide(),
       _loadActiveDelivery(),
     ]);
   }
@@ -370,6 +374,38 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
     final result = await api.get('/drivers/earnings');
     if (result case Success(:final data)) {
       if (mounted) setState(() => _earnings = data);
+    }
+  }
+
+  Future<void> _loadPendingCashRide() async {
+    final api = ref.read(apiClientProvider);
+    final result = await api.getDriverPendingCashRide();
+    if (!mounted) return;
+    switch (result) {
+      case Success(:final data):
+        setState(() => _pendingCashRide = data);
+      case Failure():
+        setState(() => _pendingCashRide = null);
+    }
+  }
+
+  Future<void> _openPendingCashRide() async {
+    final rideId = _pendingCashRide?['id']?.toString();
+    if (rideId == null || !mounted) return;
+    final api = ref.read(apiClientProvider);
+    final result = await api.getRide(rideId);
+    if (!mounted) return;
+    switch (result) {
+      case Success(:final data):
+        await Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => ActiveRideScreen(ride: data)),
+        );
+        if (mounted) {
+          await Future.wait([_loadPendingCashRide(), _loadActiveRide()]);
+        }
+      case Failure(:final error):
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
     }
   }
 
@@ -1047,13 +1083,49 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
               ),
             ),
           ],
+          if (_pendingCashRide != null) ...[
+            const SizedBox(height: 16),
+            MovaCard(
+              onTap: _openPendingCashRide,
+              child: Row(
+                children: [
+                  const Icon(Icons.payments_outlined, color: MovaColors.orange),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Paiement espèces en attente',
+                          style: TextStyle(fontWeight: FontWeight.bold, color: MovaColors.orange),
+                        ),
+                        Text(
+                          _pendingCashRide!['pickupAddress']?.toString() ?? 'Course terminée',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const Text(
+                          'Appuyez pour saisir le code PIN du passager',
+                          style: TextStyle(color: MovaColors.textSecondary, fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right),
+                ],
+              ),
+            ),
+          ],
           if (_activeRide != null) ...[
             const SizedBox(height: 16),
             MovaCard(
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => ActiveRideScreen(ride: _activeRide!)),
-              ).then((_) => _loadActiveRide()),
+              ).then((_) {
+                _loadActiveRide();
+                _loadPendingCashRide();
+              }),
               child: Row(
                 children: [
                   const Icon(Icons.local_taxi, color: MovaColors.violet),

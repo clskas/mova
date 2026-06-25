@@ -6,6 +6,7 @@ import { TrackingGateway } from '../websocket/tracking.gateway';
 export type RideChatSenderRole = 'passenger' | 'driver';
 
 export interface RideChatMessage {
+  id: string;
   rideId: string;
   senderId: string;
   senderRole: RideChatSenderRole;
@@ -15,8 +16,6 @@ export interface RideChatMessage {
 
 @Injectable()
 export class RideChatService {
-  private readonly messages = new Map<string, RideChatMessage[]>();
-
   constructor(
     private prisma: PrismaService,
     private trackingGateway: TrackingGateway,
@@ -28,14 +27,44 @@ export class RideChatService {
       select: { passengerId: true, driverId: true },
     });
     if (!ride) throw new MovaHttpException(MovaErrorCode.RIDE_NOT_FOUND, HttpStatus.NOT_FOUND);
+    if (!ride.driverId) {
+      throw new MovaHttpException(
+        MovaErrorCode.RIDE_INVALID_STATUS,
+        HttpStatus.BAD_REQUEST,
+        'Le chat est disponible une fois le chauffeur assigné.',
+      );
+    }
     if (ride.passengerId === userId) return 'passenger';
     if (ride.driverId === userId) return 'driver';
     throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
   }
 
+  private toPayload(row: {
+    id: string;
+    rideId: string;
+    senderId: string;
+    senderRole: string;
+    text: string;
+    ts: bigint;
+  }): RideChatMessage {
+    return {
+      id: row.id,
+      rideId: row.rideId,
+      senderId: row.senderId,
+      senderRole: row.senderRole as RideChatSenderRole,
+      text: row.text,
+      ts: Number(row.ts),
+    };
+  }
+
   async listMessages(rideId: string, userId: string) {
     await this.assertParticipant(rideId, userId);
-    const messages = this.messages.get(rideId) ?? [];
+    const rows = await this.prisma.rideChatMessage.findMany({
+      where: { rideId },
+      orderBy: { createdAt: 'asc' },
+      take: 200,
+    });
+    const messages = rows.map((r) => this.toPayload(r));
     return { rideId, messages };
   }
 
@@ -44,17 +73,17 @@ export class RideChatService {
     const trimmed = text.trim();
     if (!trimmed) throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, HttpStatus.BAD_REQUEST);
 
-    const payload: RideChatMessage = {
-      rideId,
-      senderId: userId,
-      senderRole,
-      text: trimmed,
-      ts: Date.now(),
-    };
-    const list = this.messages.get(rideId) ?? [];
-    list.push(payload);
-    if (list.length > 200) list.splice(0, list.length - 200);
-    this.messages.set(rideId, list);
+    const ts = Date.now();
+    const row = await this.prisma.rideChatMessage.create({
+      data: {
+        rideId,
+        senderId: userId,
+        senderRole,
+        text: trimmed,
+        ts: BigInt(ts),
+      },
+    });
+    const payload = this.toPayload(row);
     this.trackingGateway.broadcastRideChat(payload);
     return payload;
   }

@@ -387,4 +387,43 @@ export class PaymentsService {
       return null;
     }
   }
+
+  /** Course terminée — paiement espèces en attente de confirmation PIN (chauffeur). */
+  async findDriverPendingCashRide(driverUserId: string) {
+    const pending = await this.prisma.payment.findMany({
+      where: {
+        method: PaymentMethod.CASH,
+        status: PaymentStatus.PENDING,
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 15,
+    });
+    for (const payment of pending) {
+      const rideId = payment.rideId;
+      if (!rideId) continue;
+      try {
+        const ride = await this.fetchRide(rideId);
+        if (ride.driverId !== driverUserId) continue;
+        if (this.resolveRideStatus(ride) !== 'COMPLETED') continue;
+        return {
+          rideId,
+          pendingCash: true,
+          paymentMethod: 'CASH',
+          amountCdf: payment.amountCdf,
+          ride: {
+            id: rideId,
+            status: 'COMPLETED',
+            pickupAddress: ride.pickupAddress,
+            dropoffAddress: ride.dropoffAddress,
+            priceCdf: ride.finalFareCdf ?? ride.estimatedFareCdf ?? ride.priceCdf ?? payment.amountCdf,
+            isPaid: false,
+            paymentStatus: payment.status,
+          },
+        };
+      } catch {
+        continue;
+      }
+    }
+    return { ride: null, pendingCash: false };
+  }
 }

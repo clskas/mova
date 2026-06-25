@@ -12,12 +12,14 @@ import '../../core/widgets/mova_widgets.dart';
 
 class RideChatMessage {
   RideChatMessage({
+    required this.id,
     required this.text,
     required this.senderRole,
     required this.ts,
     this.isMine = false,
   });
 
+  final String id;
   final String text;
   final String senderRole;
   final DateTime ts;
@@ -45,10 +47,14 @@ class _RideChatScreenState extends ConsumerState<RideChatScreen> {
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
   final _messages = <RideChatMessage>[];
+  final _knownIds = <String>{};
   RideChatSocket? _socket;
+  Timer? _pollTimer;
   bool _sending = false;
-  bool _connecting = true;
+  bool _loadingHistory = true;
+  bool _socketLive = false;
   String? _error;
+  String? _socketHint;
 
   @override
   void initState() {
@@ -58,6 +64,7 @@ class _RideChatScreenState extends ConsumerState<RideChatScreen> {
 
   @override
   void dispose() {
+    _pollTimer?.cancel();
     _socket?.clearHandlers();
     _controller.dispose();
     _scrollController.dispose();
@@ -66,20 +73,41 @@ class _RideChatScreenState extends ConsumerState<RideChatScreen> {
 
   Future<void> _bootstrap() async {
     await _loadHistory();
-    await _connectSocket();
+    if (!mounted) return;
+    setState(() => _loadingHistory = false);
+    unawaited(_connectSocket());
+    _pollTimer?.cancel();
+    _pollTimer = Timer.periodic(const Duration(seconds: 4), (_) => _loadHistory());
+  }
+
+  DateTime _parseTs(dynamic tsRaw) {
+    if (tsRaw is num) return DateTime.fromMillisecondsSinceEpoch(tsRaw.toInt());
+    if (tsRaw is String) {
+      final parsed = int.tryParse(tsRaw);
+      if (parsed != null) return DateTime.fromMillisecondsSinceEpoch(parsed);
+    }
+    return DateTime.now();
   }
 
   Future<void> _loadHistory() async {
     final api = ref.read(apiClientProvider);
     final result = await api.getRideChatMessages(widget.rideId);
     if (!mounted) return;
+    if (result case Failure(:final error)) {
+      setState(() => _error = error.message);
+      return;
+    }
     if (result case Success(:final data)) {
-      setState(() {
-        for (final raw in data) {
-          _appendMessage(raw, fromHistory: true);
-        }
-      });
-      _scrollToBottom();
+      var added = false;
+      for (final raw in data) {
+        final before = _messages.length;
+        _appendMessage(raw, fromHistory: true);
+        if (_messages.length > before) added = true;
+      }
+      if (added) {
+        setState(() {});
+        _scrollToBottom();
+      }
     }
   }
 
@@ -87,28 +115,24 @@ class _RideChatScreenState extends ConsumerState<RideChatScreen> {
     final role = payload['senderRole']?.toString() ?? 'unknown';
     final text = payload['text']?.toString() ?? '';
     if (text.isEmpty) return;
-    final tsRaw = payload['ts'];
-    final ts = tsRaw is num
-        ? DateTime.fromMillisecondsSinceEpoch(tsRaw.toInt())
-        : DateTime.now();
+    final id = payload['id']?.toString() ??
+        '${role}_${payload['ts']}_${text.hashCode}';
+    if (_knownIds.contains(id)) return;
+    final ts = _parseTs(payload['ts']);
     final mine = role == widget.myRole;
-    if (_messages.any((m) => m.text == text && m.senderRole == role && m.ts == ts)) return;
     if (!fromHistory && mine && _messages.any((m) => m.isMine && m.text == text)) return;
-    _messages.add(RideChatMessage(text: text, senderRole: role, ts: ts, isMine: mine));
+    _knownIds.add(id);
+    _messages.add(RideChatMessage(id: id, text: text, senderRole: role, ts: ts, isMine: mine));
   }
 
   Future<void> _connectSocket({bool forceReconnect = false}) async {
     final api = ref.read(apiClientProvider);
     if (api.isMockMode) {
-      if (mounted) setState(() => _connecting = false);
+      if (mounted) setState(() => _socketHint = 'Mode démo — messages via le serveur uniquement.');
       return;
     }
     final token = await api.authToken();
     if (!mounted) return;
-    setState(() {
-      _connecting = true;
-      _error = null;
-    });
     final socket = ref.read(rideChatSocketProvider);
     _socket = socket;
     if (forceReconnect) socket.resetFailure();
@@ -120,26 +144,28 @@ class _RideChatScreenState extends ConsumerState<RideChatScreen> {
       onConnected: () {
         if (mounted) {
           setState(() {
-            _error = null;
-            _connecting = false;
+            _socketLive = true;
+            _socketHint = null;
           });
         }
       },
       onDisconnected: () {
-        if (mounted && socket.connectionFailed) {
+        if (mounted) {
           setState(() {
-            _connecting = false;
-            _error = 'Connexion chat indisponible (${MarketConfig.wsUrl}).';
+            _socketLive = false;
+            if (socket.connectionFailed) {
+              _socketHint = 'Temps réel indisponible — synchronisation toutes les 4 s.';
+            }
           });
         }
       },
     );
-    final ok = await socket.ensureConnected();
+    final ok = await socket.ensureConnected(timeout: const Duration(seconds: 8));
     if (!mounted) return;
     setState(() {
-      _connecting = false;
-      if (!ok && !api.isMockMode) {
-        _error = 'Connexion temps réel limitée — les messages passent par le serveur.';
+      _socketLive = ok;
+      if (!ok) {
+        _socketHint = 'Temps réel limité (${MarketConfig.wsUrl}) — les messages passent par le serveur.';
       }
     });
   }
@@ -198,11 +224,31 @@ class _RideChatScreenState extends ConsumerState<RideChatScreen> {
           if (_error != null) ...[
             MovaErrorBanner(
               message: _error!,
-              onRetry: _connecting ? null : () => _connectSocket(forceReconnect: true),
+              onRetry: () => _loadHistory(),
             ),
             const SizedBox(height: 8),
           ],
-          if (_connecting)
+          if (_socketHint != null && !_socketLive)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                children: [
+                  const Icon(Icons.info_outline, size: 16, color: MovaColors.textSecondary),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      _socketHint!,
+                      style: const TextStyle(color: MovaColors.textSecondary, fontSize: 12),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () => _connectSocket(forceReconnect: true),
+                    child: const Text('Réessayer'),
+                  ),
+                ],
+              ),
+            ),
+          if (_loadingHistory)
             const Padding(
               padding: EdgeInsets.all(8),
               child: Row(
@@ -214,7 +260,7 @@ class _RideChatScreenState extends ConsumerState<RideChatScreen> {
                     child: CircularProgressIndicator(strokeWidth: 2, color: MovaColors.violet),
                   ),
                   SizedBox(width: 8),
-                  Text('Connexion au chat…', style: TextStyle(color: MovaColors.textSecondary)),
+                  Text('Chargement des messages…', style: TextStyle(color: MovaColors.textSecondary)),
                 ],
               ),
             ),
@@ -269,7 +315,7 @@ class _RideChatScreenState extends ConsumerState<RideChatScreen> {
                   ),
                   textInputAction: TextInputAction.send,
                   onSubmitted: (_) => _send(),
-                  enabled: !_connecting,
+                  enabled: !_sending && !_loadingHistory,
                 ),
               ),
               const SizedBox(width: 8),
@@ -281,7 +327,7 @@ class _RideChatScreenState extends ConsumerState<RideChatScreen> {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Icon(Icons.send, color: MovaColors.violet),
-                onPressed: (_sending || _connecting) ? null : _send,
+                onPressed: (_sending || _loadingHistory) ? null : _send,
               ),
             ],
           ),

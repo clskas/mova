@@ -650,3 +650,16 @@ model TrackingPoint {
   @@index([referenceType, referenceId, recordedAt])
   @@map("tracking_points")
 }
+
+model RideChatMessage {
+  id         String   @id @default(uuid())
+  rideId     String
+  senderId   String
+  senderRole String
+  text       String
+  ts         BigInt
+  createdAt  DateTime @default(now())
+
+  @@index([rideId, createdAt])
+  @@map("ride_chat_messages")
+}

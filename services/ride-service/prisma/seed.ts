@@ -209,7 +209,11 @@ async function main() {
     await prisma.commune.upsert({ where: { name: c.name }, create: { name: c.name, lat: c.lat, lng: c.lng }, update: { lat: c.lat, lng: c.lng } });
   }
   for (const r of PRICING_RULES) {
-    await prisma.pricingRule.upsert({ where: { vehicleType: r.vehicleType }, create: r, update: r });
+    await prisma.pricingRule.upsert({
+      where: { vehicleType_city: { vehicleType: r.vehicleType, city: 'Kinshasa' } },
+      create: { ...r, city: 'Kinshasa' },
+      update: r,
+    });
   }
   for (const p of CANCELLATION_POLICIES) {
     await prisma.cancellationPolicy.upsert({ where: { vehicleType: p.vehicleType }, create: p, update: p });

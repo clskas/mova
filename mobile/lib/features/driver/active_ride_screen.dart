@@ -109,14 +109,17 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
       return;
     }
     final pos = await Geolocator.getCurrentPosition();
+    if (!mounted) return;
     _currentLat = pos.latitude;
     _currentLng = pos.longitude;
     final api = ref.read(apiClientProvider);
-    await api.updateDriverLocation(pos.latitude, pos.longitude);
-
     final socket = ref.read(rideSocketProvider);
+    await api.updateDriverLocation(pos.latitude, pos.longitude);
+    if (!mounted) return;
+
     if (!socket.isConnected && !api.isMockMode) {
       await _connectTrackingSocket();
+      if (!mounted) return;
     }
     socket.emitDriverLocation(
       userId: _userId ?? '',

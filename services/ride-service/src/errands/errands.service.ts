@@ -1,6 +1,6 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { CommissionServiceType, ErrandOrder, ErrandOrderStatus, TrackingReferenceType, VehicleType } from '@prisma/client';
-import { MARKET_RDC, MovaErrorCode, MovaHttpException, MOVA_EVENTS, canCancelErrand } from '@mova/shared';
+import { MARKET_RDC, MovaErrorCode, MovaHttpException, MOVA_EVENTS, canCancelErrand, estimateRoadDistanceKm, estimateTripDurationMin } from '@mova/shared';
 import { RedisService } from '@mova/shared';
 import { addressToCoords, DEFAULT_PICKUP } from '../common/address.util';
 import {
@@ -57,8 +57,8 @@ export class ErrandsService {
 
   async estimate(dto: CreateErrandOrderDto, itemCount = 0) {
     const { baseCdf } = await this.errandFees();
-    const distanceKm = this.pricing.haversineKm(dto.pickupLat, dto.pickupLng, dto.dropoffLat, dto.dropoffLng);
-    const durationMin = (distanceKm / 18) * 60;
+    const distanceKm = estimateRoadDistanceKm(this.pricing.haversineKm(dto.pickupLat, dto.pickupLng, dto.dropoffLat, dto.dropoffLng));
+    const durationMin = estimateTripDurationMin(distanceKm, MARKET_RDC.trip.averageSpeedKmh.errand);
     const fare = await this.pricing.estimateFare(VehicleType.STANDARD, distanceKm, durationMin);
     const { itemCdf } = await this.errandFees();
     const itemsFee = itemCount * itemCdf;

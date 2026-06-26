@@ -3,9 +3,12 @@ import { CarpoolStatus, VehicleType } from '@prisma/client';
 import {
   canCancelCarpoolTrip,
   INTERNAL_API_KEY,
+  MARKET_RDC,
   MovaErrorCode,
   MovaHttpException,
   UserRole,
+  estimateRoadDistanceKm,
+  estimateTripDurationMin,
   findServiceAreaByName,
   serviceUrl,
 } from '@mova/shared';
@@ -161,8 +164,8 @@ export class CarpoolService {
 
   private async formatTripForMobile(t: TripRow, driverMeta?: { name?: string; phone?: string; rating?: number; kycVerified?: boolean }) {
     const passengers = t.passengers ?? [];
-    const distanceKm = t.distanceKm ?? this.pricing.haversineKm(t.pickupLat, t.pickupLng, t.dropoffLat, t.dropoffLng);
-    const durationMin = t.durationMin ?? Math.ceil((distanceKm / 30) * 60);
+    const distanceKm = t.distanceKm ?? estimateRoadDistanceKm(this.pricing.haversineKm(t.pickupLat, t.pickupLng, t.dropoffLat, t.dropoffLng));
+    const durationMin = t.durationMin ?? estimateTripDurationMin(distanceKm, MARKET_RDC.trip.averageSpeedKmh.carpool);
     const rating = driverMeta?.rating ?? (await this.driverRatingAvg(t.driverId));
     const profile = driverMeta?.kycVerified != null ? null : await this.fetchDriverProfile(t.driverId);
     const kycVerified = driverMeta?.kycVerified ?? profile?.kycStatus === 'APPROVED';
@@ -218,8 +221,8 @@ export class CarpoolService {
   async estimateMobile(fromAddress: string, toAddress: string, seats: number) {
     const pickup = addressToCoords(fromAddress);
     const dropoff = addressToCoords(toAddress);
-    const distanceKm = this.pricing.haversineKm(pickup.lat, pickup.lng, dropoff.lat, dropoff.lng);
-    const durationMin = Math.ceil((distanceKm / 30) * 60);
+    const distanceKm = estimateRoadDistanceKm(this.pricing.haversineKm(pickup.lat, pickup.lng, dropoff.lat, dropoff.lng));
+    const durationMin = estimateTripDurationMin(distanceKm, MARKET_RDC.trip.averageSpeedKmh.carpool);
     const fare = await this.pricing.estimateFare(VehicleType.STANDARD, distanceKm, durationMin);
     const totalPriceCdf = Math.max(fare.estimatedFareCdf, 5000 * seats);
     return {
@@ -366,8 +369,8 @@ export class CarpoolService {
     await this.assertCanPublishCarpool(driverId, actorRole);
     const departureAt = new Date(dto.departureAt);
     if (departureAt <= new Date()) throw new MovaHttpException(MovaErrorCode.SCHEDULED_RIDE_PAST);
-    const distanceKm = this.pricing.haversineKm(dto.pickupLat, dto.pickupLng, dto.dropoffLat, dto.dropoffLng);
-    const durationMin = Math.ceil((distanceKm / 30) * 60);
+    const distanceKm = estimateRoadDistanceKm(this.pricing.haversineKm(dto.pickupLat, dto.pickupLng, dto.dropoffLat, dto.dropoffLng));
+    const durationMin = estimateTripDurationMin(distanceKm, MARKET_RDC.trip.averageSpeedKmh.carpool);
     let vehicleInfo = dto.vehicleInfo;
     if (!vehicleInfo) {
       const profile = await this.fetchDriverProfile(driverId);

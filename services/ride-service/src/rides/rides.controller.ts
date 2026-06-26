@@ -85,6 +85,12 @@ export class RidesController {
     return this.ridesService.getUserRides(req.user.id, role === 'driver' ? 'driver' : 'passenger');
   }
 
+  @Get('active')
+  @ApiOperation({ summary: 'Course active du passager (reprise après fermeture)' })
+  active(@Request() req: { user: { id: string } }) {
+    return this.ridesService.getActiveRide(req.user.id);
+  }
+
   @Post()
   @ApiOperation({ summary: 'Créer une course (statut REQUESTED)' })
   create(@Request() req: { user: { id: string } }, @Body() dto: CreateRideDto) {

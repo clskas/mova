@@ -10,6 +10,8 @@ import {
   MovaHttpException,
   RideCreatedPayload,
   MARKET_RDC,
+  estimateRoadDistanceKm,
+  estimateTripDurationMin,
   serviceUrl,
   rideTypesDriverCanServe,
   toMobileRideStatus,
@@ -71,8 +73,9 @@ export class RidesService {
 
   async estimate(pickupLat: number, pickupLng: number, dropoffLat: number, dropoffLng: number, vehicleType: VehicleType) {
     const { pickupArea, isInterCity } = assertServiceAreaPair(pickupLat, pickupLng, dropoffLat, dropoffLng);
-    const distanceKm = this.pricing.haversineKm(pickupLat, pickupLng, dropoffLat, dropoffLng);
-    const etaMinutes = (distanceKm / 25) * 60;
+    const straightLineKm = this.pricing.haversineKm(pickupLat, pickupLng, dropoffLat, dropoffLng);
+    const distanceKm = estimateRoadDistanceKm(straightLineKm);
+    const etaMinutes = estimateTripDurationMin(distanceKm, MARKET_RDC.trip.averageSpeedKmh.ride);
     const fare = await this.pricing.estimateFare(vehicleType, distanceKm, etaMinutes, pickupArea.name);
     return {
       ...this.pricing.withInterCitySurcharge(fare, isInterCity, distanceKm),
@@ -465,6 +468,16 @@ export class RidesService {
       cancellationFeeFormatted: formatCdf(feeCdf),
       message: feeMessage,
     };
+  }
+
+  /** Course active du passager (REQUESTED → IN_PROGRESS) pour reprise après fermeture de l'app. */
+  async getActiveRide(passengerId: string) {
+    const ride = await this.prisma.ride.findFirst({
+      where: { passengerId, status: { in: ACTIVE_STATUSES } },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (!ride) return { ride: null };
+    return { ride: await this.getRide(ride.id) };
   }
 
   async getRide(rideId: string) {

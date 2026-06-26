@@ -48,6 +48,22 @@ export const MARKET_RDC = {
     },
   },
 
+  /**
+   * Estimation de trajet. La distance réelle par la route dépasse toujours la distance
+   * à vol d'oiseau (rues, sens uniques, détours) : on applique un facteur de détour.
+   * Les vitesses moyennes (km/h) servent à convertir cette distance routière en durée.
+   */
+  trip: {
+    roadDistanceFactor: 1.3,
+    averageSpeedKmh: {
+      ride: 25,
+      delivery: 20,
+      moving: 15,
+      errand: 18,
+      carpool: 30,
+    },
+  },
+
   peakHours: [
     { start: 7, end: 9 },
     { start: 17, end: 19 },
@@ -101,6 +117,23 @@ export const MARKET_RDC = {
     phone: '+243900000000',
   },
 } as const;
+
+/**
+ * Distance routière estimée (km) à partir d'une distance à vol d'oiseau,
+ * via le facteur de détour MARKET_RDC.trip.roadDistanceFactor.
+ */
+export function estimateRoadDistanceKm(straightLineKm: number): number {
+  return Math.round(straightLineKm * MARKET_RDC.trip.roadDistanceFactor * 100) / 100;
+}
+
+/**
+ * Durée estimée (minutes, arrondie au supérieur, min. 1) pour une distance routière
+ * et une vitesse moyenne (km/h).
+ */
+export function estimateTripDurationMin(roadDistanceKm: number, speedKmh: number): number {
+  if (speedKmh <= 0) return 0;
+  return Math.max(1, Math.ceil((roadDistanceKm / speedKmh) * 60));
+}
 
 export function formatCdf(amount: number): string {
   const formatted = new Intl.NumberFormat('fr-CD', {

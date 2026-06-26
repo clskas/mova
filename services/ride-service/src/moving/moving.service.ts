@@ -1,6 +1,6 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { MovingRequestStatus, MovingVehicleCategory, SurchargeType, VehicleType } from '@prisma/client';
-import { MovaErrorCode, MovaHttpException, MOVA_EVENTS, canCancelMoving, formatCdf } from '@mova/shared';
+import { MovaErrorCode, MovaHttpException, MOVA_EVENTS, MARKET_RDC, canCancelMoving, estimateRoadDistanceKm, estimateTripDurationMin, formatCdf } from '@mova/shared';
 import { RedisService } from '@mova/shared';
 import { buildMovingTimeline } from '../deliveries/parcel.util';
 import { assertServiceAreaPair } from '../common/address.util';
@@ -56,8 +56,8 @@ export class MovingService {
       dto.dropoffLng,
     );
     const moving = await this.surcharges.get(SurchargeType.MOVING);
-    const distanceKm = this.pricing.haversineKm(dto.pickupLat, dto.pickupLng, dto.dropoffLat, dto.dropoffLng);
-    const durationMin = (distanceKm / 15) * 60;
+    const distanceKm = estimateRoadDistanceKm(this.pricing.haversineKm(dto.pickupLat, dto.pickupLng, dto.dropoffLat, dto.dropoffLng));
+    const durationMin = estimateTripDurationMin(distanceKm, MARKET_RDC.trip.averageSpeedKmh.moving);
     const fare = await this.pricing.estimateFare(VehicleType.STANDARD, distanceKm, durationMin, pickupArea.name);
     const withInterCity = this.pricing.withInterCitySurcharge(fare, isInterCity, distanceKm);
     const perM3 = moving.perUnitCdf ?? 8000;

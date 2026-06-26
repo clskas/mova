@@ -823,6 +823,21 @@ class ApiClient {
     };
   }
 
+  /// Course active du passager (null si aucune) — permet de reprendre après fermeture de l'app.
+  Future<Result<Map<String, dynamic>?>> getActiveRide() async {
+    if (isMockMode) return const Success(null);
+    final result = await get('/rides/active');
+    switch (result) {
+      case Success(:final data):
+        final ride = data['ride'];
+        if (ride is Map<String, dynamic>) return Success(ride);
+        if (ride is Map) return Success(Map<String, dynamic>.from(ride));
+        return const Success(null);
+      case Failure(:final error):
+        return Failure(error);
+    }
+  }
+
   /// Course terminée non payée (null si aucune).
   Future<Result<Map<String, dynamic>?>> getUnpaidRide() async {
     if (isMockMode) return const Success(null);

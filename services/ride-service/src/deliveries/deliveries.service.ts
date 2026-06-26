@@ -1,6 +1,6 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { DeliveryStatus, DeliveryType, Prisma, SurchargeType, TrackingReferenceType, VehicleType, WeightCategory } from '@prisma/client';
-import { driverEligibleForParcelWeight, INTERNAL_API_KEY, MARKET_RDC, MOVA_EVENTS, MovaErrorCode, MovaHttpException, canCancelDelivery, formatCdf, normalizeVehicleType, resolveCityFromCoords, serviceUrl, VehicleTypeValue } from '@mova/shared';
+import { driverEligibleForParcelWeight, INTERNAL_API_KEY, MARKET_RDC, MOVA_EVENTS, MovaErrorCode, MovaHttpException, canCancelDelivery, estimateRoadDistanceKm, estimateTripDurationMin, formatCdf, normalizeVehicleType, resolveCityFromCoords, serviceUrl, VehicleTypeValue } from '@mova/shared';
 import { RedisService } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { PricingService } from '../rides/pricing.service';
@@ -114,8 +114,8 @@ export class DeliveriesService {
       dto.dropoffLng,
     );
     const weightCategory = this.resolveWeightCategory(dto);
-    const distanceKm = this.pricing.haversineKm(dto.pickupLat, dto.pickupLng, dto.dropoffLat, dto.dropoffLng);
-    const durationMin = (distanceKm / 20) * 60;
+    const distanceKm = estimateRoadDistanceKm(this.pricing.haversineKm(dto.pickupLat, dto.pickupLng, dto.dropoffLat, dto.dropoffLng));
+    const durationMin = estimateTripDurationMin(distanceKm, MARKET_RDC.trip.averageSpeedKmh.delivery);
     const fare = await this.pricing.estimateFare(VehicleType.STANDARD, distanceKm, durationMin, pickupArea.name);
     const withInterCity = this.pricing.withInterCitySurcharge(fare, isInterCity, distanceKm);
     const multiplier = this.weightMultiplier(weightCategory, dto.weightKg);
@@ -241,8 +241,8 @@ export class DeliveriesService {
     }
     const foodSurcharge = await this.surcharges.get(SurchargeType.DELIVERY_FOOD);
     const { subtotalCdf: itemsSubtotal } = this.resolveFoodItemsSubtotalCdf(restaurant.menuItems, dto.items);
-    const distanceKm = this.pricing.haversineKm(restaurant.lat, restaurant.lng, dto.deliveryLat, dto.deliveryLng);
-    const durationMin = (distanceKm / 20) * 60;
+    const distanceKm = estimateRoadDistanceKm(this.pricing.haversineKm(restaurant.lat, restaurant.lng, dto.deliveryLat, dto.deliveryLng));
+    const durationMin = estimateTripDurationMin(distanceKm, MARKET_RDC.trip.averageSpeedKmh.delivery);
     const fare = await this.pricing.estimateFare(VehicleType.MOTO_TAXI, distanceKm, durationMin);
     const deliveryFeeCdf = Math.max(foodSurcharge.baseFeeCdf || FOOD_DELIVERY_BASE_CDF, Math.ceil(fare.estimatedFareCdf * foodSurcharge.multiplier));
     const subtotalWithDelivery = itemsSubtotal + deliveryFeeCdf;
@@ -328,8 +328,8 @@ export class DeliveriesService {
       const r = restaurants.find((x) => x.id === order.restaurantId)!;
       const { subtotalCdf } = this.resolveFoodItemsSubtotalCdf(r.menuItems, order.items as CreateFoodDeliveryDto['items']);
       itemsSubtotalCdf += subtotalCdf;
-      const distanceKm = this.pricing.haversineKm(r.lat, r.lng, dto.deliveryLat, dto.deliveryLng);
-      const durationMin = (distanceKm / 20) * 60;
+      const distanceKm = estimateRoadDistanceKm(this.pricing.haversineKm(r.lat, r.lng, dto.deliveryLat, dto.deliveryLng));
+      const durationMin = estimateTripDurationMin(distanceKm, MARKET_RDC.trip.averageSpeedKmh.delivery);
       if (distanceKm > maxDistanceKm) maxDistanceKm = distanceKm;
       if (durationMin > maxDurationMin) maxDurationMin = durationMin;
     }
@@ -656,8 +656,8 @@ export class DeliveriesService {
           }, 0);
         }
         if (deliveryLat != null && deliveryLng != null) {
-          distanceKm = this.pricing.haversineKm(r.lat, r.lng, deliveryLat, deliveryLng);
-          const travelMin = Math.ceil((distanceKm / 20) * 60);
+          distanceKm = estimateRoadDistanceKm(this.pricing.haversineKm(r.lat, r.lng, deliveryLat, deliveryLng));
+          const travelMin = estimateTripDurationMin(distanceKm, MARKET_RDC.trip.averageSpeedKmh.delivery);
           deliveryEtaMin = Math.max(20, travelMin + 15);
         }
         return { ...r, menuItems: this.publicMenuItems(r.menuItems), deliveryEtaMin, distanceKm, minMenuPriceCdf };

@@ -61,6 +61,7 @@ describe('RidesService', () => {
 
   it('creates ride in REQUESTED status without auto-matching', async () => {
     prisma.ride.findFirst.mockResolvedValue(null);
+    prisma.ride.findMany.mockResolvedValue([]);
     prisma.ride.create.mockResolvedValue({
       id: 'ride-1',
       passengerId: 'p1',

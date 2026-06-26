@@ -13,6 +13,8 @@ import '../../core/widgets/mova_service_icons.dart';
 import '../../core/widgets/passenger_service_icons.dart';
 import '../../core/widgets/service_area_selector.dart';
 import '../booking/booking_screen.dart';
+import '../booking/matching_screen.dart';
+import '../booking/tracking_screen.dart';
 import '../carpool/carpool_screen.dart';
 import '../delivery/delivery_hub_screen.dart';
 import '../rides/scheduled_ride_screen.dart';
@@ -35,12 +37,14 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObserver {
   Map<String, dynamic>? _user;
+  Map<String, dynamic>? _activeRide;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _loadUser();
+    _loadActiveRide();
   }
 
   @override
@@ -57,6 +61,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
       ref.read(apiClientProvider).checkHealth(resetFailures: true);
       ServiceAreaGps.sync(ref);
       _loadUser(forceRefresh: true);
+      _loadActiveRide();
     }
   }
 
@@ -68,6 +73,52 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     if (result case Success(:final data)) {
       setState(() => _user = data);
     }
+  }
+
+  Future<void> _loadActiveRide() async {
+    final api = ref.read(apiClientProvider);
+    final result = await api.getActiveRide();
+    if (!mounted) return;
+    if (result case Success(:final data)) {
+      setState(() => _activeRide = data);
+    }
+  }
+
+  void _resumeActiveRide() {
+    final ride = _activeRide;
+    if (ride == null) return;
+    final api = ref.read(apiClientProvider);
+    final rideId = ride['id']?.toString();
+    if (rideId == null || rideId.isEmpty) return;
+    final fare = (ride['estimatedFareCdf'] ?? ride['totalCdf'] ?? 0) as int;
+    final Widget screen;
+    if (api.rideHasDriver(ride)) {
+      screen = TrackingScreen(rideId: rideId, estimatedFareCdf: fare);
+    } else {
+      screen = MatchingScreen(
+        rideId: rideId,
+        pickupAddress: ride['pickupAddress']?.toString() ?? 'Départ',
+        dropoffAddress: ride['dropoffAddress']?.toString() ?? 'Destination',
+        estimatedFareCdf: fare,
+      );
+    }
+    Navigator.push(context, MaterialPageRoute(builder: (_) => screen))
+        .then((_) => _loadActiveRide());
+  }
+
+  String _activeRideLabel() {
+    final ride = _activeRide;
+    if (ride == null) return '';
+    final api = ref.read(apiClientProvider);
+    if (api.rideHasDriver(ride)) {
+      final status = ride['status']?.toString().toUpperCase() ?? '';
+      return switch (status) {
+        'IN_PROGRESS' => 'Course en cours — suivez votre trajet',
+        'DRIVER_ARRIVED' => 'Votre chauffeur est arrivé',
+        _ => 'Chauffeur en route',
+      };
+    }
+    return 'Recherche d\'un chauffeur en cours…';
   }
 
   String _greeting() {
@@ -229,7 +280,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
         vertical: 16,
       ),
       child: RefreshIndicator(
-        onRefresh: () => _loadUser(forceRefresh: true),
+        onRefresh: () async {
+          await _loadUser(forceRefresh: true);
+          await _loadActiveRide();
+        },
         child: SingleChildScrollView(
           physics: kMovaScrollPhysics,
           child: Column(
@@ -245,6 +299,63 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                   child: Text(
                     'Compte suspendu — contactez le support MOVA.',
                     style: TextStyle(color: MovaColors.orange, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ),
+            ),
+          if (_activeRide != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Material(
+                color: MovaColors.violet,
+                borderRadius: BorderRadius.circular(14),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(14),
+                  onTap: _resumeActiveRide,
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.directions_car, color: MovaColors.white),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Course en cours',
+                                style: TextStyle(
+                                  color: MovaColors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                _activeRideLabel(),
+                                style: const TextStyle(color: MovaColors.white, fontSize: 13),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: MovaColors.white,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: const Text(
+                            'Reprendre',
+                            style: TextStyle(
+                              color: MovaColors.violet,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),

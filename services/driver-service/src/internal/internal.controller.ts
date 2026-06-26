@@ -84,10 +84,10 @@ export class InternalController {
   }
   @Patch('drivers/:userId/rating') updateRating(@Param('userId') userId: string, @Body() dto: RatingDto) { return this.drivers.updateRating(userId, dto.ratingAvg); }
   @Patch('drivers/:userId/location') updateLocation(@Param('userId') userId: string, @Body() dto: { lat: number; lng: number }) { return this.drivers.updateLocation(userId, dto.lat, dto.lng); }
-  @Get('incidents') listIncidents() { return this.incidents.list(); }
   @Get('incidents/by-reference') incidentsByReference(@Query('referenceType') referenceType: string, @Query('referenceId') referenceId: string) {
     return this.incidents.findOpenByReference(referenceType, referenceId);
   }
+  @Get('incidents') listIncidents() { return this.incidents.list(); }
   @Post('incidents') createIncident(@Body() dto: CreateIncidentDto) {
     return this.incidents.create({
       userId: dto.userId,

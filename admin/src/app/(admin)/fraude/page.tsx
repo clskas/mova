@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   createFraudIncident,
   fetchFraudAlerts,
@@ -50,12 +51,14 @@ function SummaryStat({ label, value, accent }: { label: string; value: number; a
 }
 
 export default function FraudePage() {
+  const router = useRouter();
   const { canWrite } = useAdmin();
   const writable = canWrite("fraude");
   const [days, setDays] = useState("30");
   const [data, setData] = useState<FraudAlertsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [creating, setCreating] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -76,12 +79,20 @@ export default function FraudePage() {
   }, [load]);
 
   async function openIncident(alert: FraudAlert) {
-    setCreating(`${alert.entityType}:${alert.entityId}`);
+    const key = `${alert.entityType}:${alert.entityId}`;
+    setCreating(key);
+    setError(null);
+    setSuccess(null);
     try {
-      await createFraudIncident(alert);
-      await load();
+      const result = await createFraudIncident(alert);
+      if (result.created || result.alreadyExists) {
+        setSuccess(result.message);
+        router.push("/litiges");
+        return;
+      }
+      setError(result.message || "Échec création du litige");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Échec création incident");
+      setError(e instanceof Error ? e.message : "Échec création du litige");
     } finally {
       setCreating(null);
     }
@@ -103,6 +114,11 @@ export default function FraudePage() {
       />
 
       {error && <ErrorBanner message={error} onRetry={load} />}
+      {success && (
+        <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          {success}
+        </div>
+      )}
 
       {loading ? (
         <LoadingState />
@@ -171,11 +187,18 @@ export default function FraudePage() {
                           </p>
                         )}
                       </div>
-                      {writable && !alert.incidentCreated && (
+                      {alert.incidentCreated ? (
+                        <Link
+                          href="/litiges"
+                          className="inline-flex items-center justify-center rounded-xl bg-[#6C63FF] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#5a52e0]"
+                        >
+                          Voir le litige
+                        </Link>
+                      ) : writable ? (
                         <BtnPrimary onClick={() => openIncident(alert)} disabled={creating === key}>
-                          {creating === key ? "Création…" : "Ouvrir un litige"}
+                          {creating === key ? "Ouverture…" : "Ouvrir un litige"}
                         </BtnPrimary>
-                      )}
+                      ) : null}
                     </div>
                   </Card>
                 );

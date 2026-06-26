@@ -234,6 +234,13 @@ export type FraudAlertsResponse = {
   alerts: FraudAlert[];
 };
 
+export type FraudIncidentResult = {
+  created: boolean;
+  alreadyExists: boolean;
+  incidentId?: string;
+  message: string;
+};
+
 export type DeliveryOverview = {
   id: string;
   type?: string;
@@ -855,7 +862,12 @@ function mockFor<T>(path: string, init?: RequestInit): T {
     ] as T;
   }
   if (path.includes("/fraud/incident") && method === "POST") {
-    return true as T;
+    return {
+      created: true,
+      alreadyExists: false,
+      incidentId: "inc-fraud-demo",
+      message: "Litige ouvert avec succès.",
+    } as T;
   }
   if (path.includes("/fraud/alerts")) {
     return {
@@ -1443,7 +1455,7 @@ export async function fetchFraudAlerts(days = 30, autoCreate = true): Promise<Fr
 }
 
 export async function createFraudIncident(alert: Pick<FraudAlert, "entityId" | "entityType" | "reasons" | "score">) {
-  return apiFetch("/api/admin/fraud/incident", {
+  return apiFetch<FraudIncidentResult>("/api/admin/fraud/incident", {
     method: "POST",
     body: JSON.stringify({
       entityId: alert.entityId,

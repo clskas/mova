@@ -65,6 +65,20 @@ export type FraudAlertsResponse = {
   alerts: FraudAlert[];
 };
 
+export type FraudIncidentResult = {
+  created: boolean;
+  alreadyExists: boolean;
+  incidentId?: string;
+  message: string;
+};
+
+type DriverIncidentRow = {
+  id: string;
+  referenceType?: string | null;
+  referenceId?: string | null;
+  status?: string;
+};
+
 /** Poids de scoring anti-contournement (ajustables). */
 const WEIGHT_CANCELLATION = 10;
 const WEIGHT_UNPAID = 15;
@@ -190,15 +204,24 @@ export class FraudService {
       .filter((a) => a.score > 0)
       .sort((a, b) => b.score - a.score);
 
+    const openRefs = await this.loadOpenFraudReferences();
+    for (const alert of alerts) {
+      if (openRefs.has(this.referenceId(alert.entityType, alert.entityId))) {
+        alert.incidentCreated = true;
+      }
+    }
+
     let incidentsCreated = 0;
     if (autoCreate) {
       for (const alert of alerts) {
-        if (alert.score < threshold) continue;
+        if (alert.score < threshold || alert.incidentCreated) continue;
         try {
-          const created = await this.ensureIncident(alert);
-          if (created) {
+          const result = await this.ensureIncident(alert);
+          if (result.created) {
             alert.incidentCreated = true;
             incidentsCreated += 1;
+          } else if (result.alreadyExists) {
+            alert.incidentCreated = true;
           }
         } catch (e) {
           this.logger.warn(`Auto-incident fraude échoué pour ${alert.entityType}:${alert.entityId}: ${(e as Error).message}`);
@@ -225,7 +248,7 @@ export class FraudService {
   }
 
   /** Crée un incident FRAUD pour l'alerte si aucun n'est déjà ouvert (idempotent). */
-  async createIncident(alert: Pick<FraudAlert, 'entityId' | 'entityType' | 'reasons'> & { score?: number }) {
+  async createIncident(alert: Pick<FraudAlert, 'entityId' | 'entityType' | 'reasons'> & { score?: number }): Promise<FraudIncidentResult> {
     return this.ensureIncident({
       entityId: alert.entityId,
       entityType: alert.entityType,
@@ -234,13 +257,43 @@ export class FraudService {
     });
   }
 
-  private async ensureIncident(alert: { entityId: string; entityType: 'DRIVER' | 'PASSENGER'; reasons: string[]; score: number }): Promise<boolean> {
-    const referenceId = `${alert.entityType}:${alert.entityId}`;
-    const existing = await this.fetchJson<unknown[]>(
+  private referenceId(entityType: string, entityId: string) {
+    return `${entityType}:${entityId}`;
+  }
+
+  private async loadOpenFraudReferences(): Promise<Set<string>> {
+    const incidents = await this.fetchJson<DriverIncidentRow[]>('driver', '/internal/incidents').catch(() => []);
+    return new Set(
+      incidents
+        .filter((i) => i.referenceType === 'FRAUD_AUTO' && i.status === 'OPEN' && i.referenceId)
+        .map((i) => i.referenceId as string),
+    );
+  }
+
+  private async findOpenIncident(referenceId: string): Promise<DriverIncidentRow | null> {
+    const existing = await this.fetchJson<DriverIncidentRow[]>(
       'driver',
       `/internal/incidents/by-reference?referenceType=FRAUD_AUTO&referenceId=${encodeURIComponent(referenceId)}`,
     ).catch(() => []);
-    if (Array.isArray(existing) && existing.length > 0) return false;
+    return Array.isArray(existing) && existing.length > 0 ? existing[0] : null;
+  }
+
+  private async ensureIncident(alert: {
+    entityId: string;
+    entityType: 'DRIVER' | 'PASSENGER';
+    reasons: string[];
+    score: number;
+  }): Promise<FraudIncidentResult> {
+    const referenceId = this.referenceId(alert.entityType, alert.entityId);
+    const open = await this.findOpenIncident(referenceId);
+    if (open) {
+      return {
+        created: false,
+        alreadyExists: true,
+        incidentId: open.id,
+        message: 'Un litige est déjà ouvert pour cette alerte.',
+      };
+    }
 
     const label = alert.entityType === 'DRIVER' ? 'Chauffeur/livreur' : 'Client';
     const description = `Alerte anti-contournement (score ${alert.score}). ${label} suspecté. ${alert.reasons.join(' ; ')}`;
@@ -255,6 +308,16 @@ export class FraudService {
         referenceId,
       }),
     });
-    return res.ok;
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      throw new Error(body || `Création incident échouée (${res.status})`);
+    }
+    const row = (await res.json()) as { id?: string };
+    return {
+      created: true,
+      alreadyExists: false,
+      incidentId: row.id,
+      message: 'Litige ouvert avec succès.',
+    };
   }
 }

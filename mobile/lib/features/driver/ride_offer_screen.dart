@@ -2,10 +2,12 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/api/api_client.dart';
 import '../../core/config/market_config.dart';
 import '../../core/error/result.dart';
+import '../../core/geo/geo_utils.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_widgets.dart';
 import 'active_ride_screen.dart';
@@ -29,12 +31,15 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
   bool _loading = false;
   String? _error;
   Timer? _timer;
+  double? _pickupDistanceKm;
+  int? _pickupEtaMin;
 
   String get _rideId => widget.offer['id']?.toString() ?? '';
 
   @override
   void initState() {
     super.initState();
+    _resolvePickupProximity();
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted) return;
       if (_countdown <= 0) {
@@ -44,6 +49,47 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
       }
       setState(() => _countdown--);
     });
+  }
+
+  /// Distance/ETA chauffeur → client (point de prise en charge).
+  /// Priorité au calcul backend (distanceToPickupKm), sinon GPS local.
+  Future<void> _resolvePickupProximity() async {
+    final backendKm = (widget.offer['distanceToPickupKm'] as num?)?.toDouble();
+    if (backendKm != null && backendKm > 0) {
+      setState(() {
+        _pickupDistanceKm = backendKm;
+        _pickupEtaMin = GeoUtils.etaMinutesFromDistanceKm(backendKm);
+      });
+      return;
+    }
+    final pickupLat = (widget.offer['pickupLat'] as num?)?.toDouble();
+    final pickupLng = (widget.offer['pickupLng'] as num?)?.toDouble();
+    if (pickupLat == null || pickupLng == null) return;
+    try {
+      if (!await Geolocator.isLocationServiceEnabled()) return;
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        return;
+      }
+      final pos = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 8),
+        ),
+      );
+      if (!mounted) return;
+      final km = GeoUtils.haversineKm(pos.latitude, pos.longitude, pickupLat, pickupLng);
+      setState(() {
+        _pickupDistanceKm = km;
+        _pickupEtaMin = GeoUtils.etaMinutesFromDistanceKm(km);
+      });
+    } catch (_) {
+      /* GPS indisponible — on n'affiche simplement pas la proximité */
+    }
   }
 
   @override
@@ -186,7 +232,7 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
                         crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
                           Text(
-                            '${distance.toStringAsFixed(1)} km',
+                            'Trajet ${distance.toStringAsFixed(1)} km',
                             style: const TextStyle(color: Colors.white70, fontSize: 15),
                           ),
                           Text(
@@ -196,6 +242,37 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
                             overflow: TextOverflow.ellipsis,
                           ),
                         ],
+                      ),
+                    ],
+                    if (_pickupDistanceKm != null) ...[
+                      const SizedBox(height: 14),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: MovaColors.orange.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: MovaColors.orange.withValues(alpha: 0.5)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.directions_car, color: MovaColors.orange, size: 20),
+                            const SizedBox(width: 8),
+                            Flexible(
+                              child: Text(
+                                'Client à ${_pickupDistanceKm!.toStringAsFixed(1)} km'
+                                '${_pickupEtaMin != null ? ' · ~$_pickupEtaMin min' : ''}',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                     const SizedBox(height: 32),

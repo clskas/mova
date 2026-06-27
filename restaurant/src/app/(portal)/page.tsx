@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { PortalShell } from "@/components/PortalShell";
 import {
   confirmOrder,
@@ -27,29 +27,93 @@ function formatItems(items: unknown): string {
     .join(", ");
 }
 
+/** Bip sonore via Web Audio (aucun fichier requis). */
+function playNewOrderChime() {
+  try {
+    const Ctx =
+      window.AudioContext ??
+      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!Ctx) return;
+    const ctx = new Ctx();
+    const notes = [880, 1175];
+    notes.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = freq;
+      const start = ctx.currentTime + i * 0.18;
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.exponentialRampToValueAtTime(0.25, start + 0.03);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.32);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(start);
+      osc.stop(start + 0.34);
+    });
+    setTimeout(() => void ctx.close(), 1200);
+  } catch {
+    /* audio indisponible — silencieux */
+  }
+}
+
 export default function OrdersPage() {
   const [profile, setProfile] = useState<RestaurantProfile | null>(null);
   const [orders, setOrders] = useState<RestaurantOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const seenPendingIds = useRef<Set<string> | null>(null);
+
+  const notifyNewOrders = useCallback((newOrders: RestaurantOrder[]) => {
+    if (newOrders.length === 0) return;
+    playNewOrderChime();
+    if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+      const first = newOrders[0];
+      new Notification("Nouvelle commande MOVA", {
+        body:
+          newOrders.length > 1
+            ? `${newOrders.length} nouvelles commandes à confirmer`
+            : `Commande #${first.id.slice(0, 8)} · ${formatCdf(first.estimatedPriceCdf)}`,
+        tag: "mova-new-order",
+      });
+    }
+  }, []);
 
   const load = useCallback(async () => {
     setError(null);
     try {
       const [p, o] = await Promise.all([fetchProfile(), fetchOrders()]);
       setProfile(p);
-      setOrders(o.orders ?? []);
+      const list = o.orders ?? [];
+      setOrders(list);
+
+      const pendingIds = list.filter((x) => x.status === "PENDING").map((x) => x.id);
+      if (seenPendingIds.current === null) {
+        // Premier chargement : on initialise sans alerter.
+        seenPendingIds.current = new Set(pendingIds);
+      } else {
+        const fresh = list.filter(
+          (x) => x.status === "PENDING" && !seenPendingIds.current!.has(x.id),
+        );
+        notifyNewOrders(fresh);
+        seenPendingIds.current = new Set(pendingIds);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur de chargement");
     } finally {
       setLoading(false);
     }
+  }, [notifyNewOrders]);
+
+  useEffect(() => {
+    if (typeof Notification !== "undefined" && Notification.permission === "default") {
+      Notification.requestPermission().catch(() => undefined);
+    }
   }, []);
 
   useEffect(() => {
     load();
-    const timer = setInterval(load, 12000);
+    const timer = setInterval(load, 10000);
     return () => clearInterval(timer);
   }, [load]);
 
@@ -76,7 +140,7 @@ export default function OrdersPage() {
       <div className="space-y-6">
         <div>
           <h2 className="text-xl font-bold">Commandes en cours</h2>
-          <p className="text-sm text-gray-500">Actualisation automatique toutes les 12 secondes</p>
+          <p className="text-sm text-gray-500">Actualisation automatique · alerte sonore à chaque nouvelle commande</p>
         </div>
 
         {error && (

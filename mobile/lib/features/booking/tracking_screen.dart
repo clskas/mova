@@ -77,6 +77,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
   LatLng? _driverPos;
   List<LatLng> _routeTrace = [];
   int _etaMinutes = 5;
+  double? _driverDistanceKm;
   bool _loading = true;
   bool _waitingDriver = false;
   bool _cancelling = false;
@@ -126,6 +127,17 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
 
   List<Map<String, dynamic>> get _timelineSteps => computeRideTimeline(_status);
 
+  /// Libellé d'attente passager : distance + ETA du chauffeur, contextualisé par statut.
+  String _etaLabel() {
+    final km = _driverDistanceKm;
+    final dist = (km != null && km > 0) ? ' · ${km.toStringAsFixed(1)} km' : '';
+    return switch (_status.toUpperCase()) {
+      'IN_PROGRESS' => 'Arrivée à destination : ~$_etaMinutes min$dist',
+      'DRIVER_ARRIVED' => 'Votre chauffeur est arrivé',
+      _ => 'Chauffeur à ~$_etaMinutes min$dist',
+    };
+  }
+
   bool get _canCancel => CancelEligibility.ride(_ride ?? {'status': _status});
 
   bool get _needsPayment {
@@ -135,10 +147,12 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
   }
 
   void _updateEtaFromRide(Map<String, dynamic> data) {
+    final backendKm = (data['driverDistanceKm'] as num?)?.toDouble();
+    if (backendKm != null && backendKm > 0) _driverDistanceKm = backendKm;
     final apiEta = (data['etaMinutes'] as num?)?.toInt();
     if (apiEta != null && apiEta > 0) {
       _etaMinutes = apiEta;
-      return;
+      if (_driverDistanceKm != null) return;
     }
     final driverLat = (data['driver']?['lat'] as num?)?.toDouble();
     final driverLng = (data['driver']?['lng'] as num?)?.toDouble();
@@ -148,12 +162,15 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
       final targetLat = (inProgress ? data['dropoffLat'] : data['pickupLat']) as num?;
       final targetLng = (inProgress ? data['dropoffLng'] : data['pickupLng']) as num?;
       if (targetLat != null && targetLng != null) {
-        _etaMinutes = GeoUtils.driverEtaMinutes(
+        _driverDistanceKm = GeoUtils.haversineKm(
           driverLat,
           driverLng,
           targetLat.toDouble(),
           targetLng.toDouble(),
         );
+        if (apiEta == null || apiEta <= 0) {
+          _etaMinutes = GeoUtils.etaMinutesFromDistanceKm(_driverDistanceKm!);
+        }
       }
     }
   }
@@ -165,12 +182,13 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
     final targetLat = (inProgress ? _ride!['dropoffLat'] : _ride!['pickupLat']) as num?;
     final targetLng = (inProgress ? _ride!['dropoffLng'] : _ride!['pickupLng']) as num?;
     if (targetLat == null || targetLng == null) return;
-    _etaMinutes = GeoUtils.driverEtaMinutes(
+    _driverDistanceKm = GeoUtils.haversineKm(
       driverPos.latitude,
       driverPos.longitude,
       targetLat.toDouble(),
       targetLng.toDouble(),
     );
+    _etaMinutes = GeoUtils.etaMinutesFromDistanceKm(_driverDistanceKm!);
   }
 
   Map<String, dynamic>? _normalizeDriver(Map<String, dynamic>? raw) {
@@ -743,13 +761,21 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  const Icon(Icons.schedule, color: MovaColors.violet),
+                                  Icon(
+                                    _status.toUpperCase() == 'IN_PROGRESS'
+                                        ? Icons.flag_outlined
+                                        : Icons.directions_car,
+                                    color: MovaColors.violet,
+                                  ),
                                   const SizedBox(width: 8),
-                                  Text(
-                                    'Arrivée estimée : $_etaMinutes min',
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 16,
+                                  Flexible(
+                                    child: Text(
+                                      _etaLabel(),
+                                      textAlign: TextAlign.center,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 16,
+                                      ),
                                     ),
                                   ),
                                 ],

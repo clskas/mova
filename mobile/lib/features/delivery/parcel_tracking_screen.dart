@@ -114,8 +114,13 @@ class _ParcelTrackingScreenState extends ConsumerState<ParcelTrackingScreen> {
       if (result case Success(:final data)) {
         final map = data is Map ? Map<String, dynamic>.from(data) : null;
         if (map != null && mounted) {
-          setState(() => _delivery = map);
-          pin = map['deliveryPin']?.toString() ?? pin;
+          final delivery = map['delivery'] is Map
+              ? Map<String, dynamic>.from(map['delivery'] as Map)
+              : map;
+          setState(() => _delivery = delivery);
+          pin = delivery['deliveryPin']?.toString() ??
+              map['deliveryPin']?.toString() ??
+              pin;
         }
       }
     }

@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import '../../core/geo/geo_utils.dart';
 
 /// Alertes chauffeur : vibration, son système et notification tray (y compris arrière-plan).
 class DriverJobAlertService {
@@ -108,15 +109,24 @@ class DriverJobAlertService {
 
   static String rideOfferMessage(Map<String, dynamic> offer) {
     final pickup = offer['pickupAddress']?.toString() ?? 'près de vous';
-    final fare = offer['estimatedFareCdf'];
-    if (fare != null) return 'Course disponible · $pickup · $fare FC';
-    return 'Nouvelle course disponible · $pickup';
+    final driverNet = offer['driverNetCdf'] ?? offer['estimatedFareCdf'];
+    final pickupKm = (offer['distanceToPickupKm'] as num?)?.toDouble();
+    final dist = pickupKm != null ? ' · ${GeoUtils.formatDistanceKm(pickupKm)}' : '';
+    if (driverNet != null) return 'Course · $pickup$dist · $driverNet FC';
+    return 'Nouvelle course disponible · $pickup$dist';
   }
 
   static String deliveryOfferMessage(Map<String, dynamic> offer) {
     final kind = offer['type']?.toString() ?? offer['deliveryType']?.toString() ?? 'Livraison';
     final pickup = offer['pickupAddress']?.toString() ?? '';
-    if (pickup.isNotEmpty) return '$kind · $pickup';
-    return 'Nouvelle livraison disponible';
+    final driverNet = offer['driverNetCdf'] ?? offer['estimatedPriceCdf'];
+    final pickupKm = (offer['distanceToPickupKm'] as num?)?.toDouble();
+    final tripKm = (offer['tripDistanceKm'] as num?)?.toDouble() ?? (offer['distanceKm'] as num?)?.toDouble();
+    final parts = <String>[kind];
+    if (pickup.isNotEmpty) parts.add(pickup);
+    if (pickupKm != null) parts.add('à ${GeoUtils.formatDistanceKm(pickupKm)}');
+    if (tripKm != null) parts.add('trajet ${GeoUtils.formatDistanceKm(tripKm)}');
+    if (driverNet != null) parts.add('$driverNet FC');
+    return parts.join(' · ');
   }
 }

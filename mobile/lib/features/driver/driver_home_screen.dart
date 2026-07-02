@@ -14,6 +14,7 @@ import '../../core/auth/session.dart';
 import '../../core/offline/connectivity_service.dart';
 import '../../core/location/service_area_gps.dart';
 import '../../core/error/result.dart';
+import '../../core/geo/geo_utils.dart';
 import '../../core/widgets/service_area_selector.dart';
 import '../help/driver_help_screen.dart';
 import '../carpool/carpool_screen.dart';
@@ -1200,7 +1201,14 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                     ),
                     const SizedBox(height: 8),
                     ..._rideOffers.take(5).map((offer) {
-                      final fare = (offer['estimatedFareCdf'] ?? offer['priceCdf']) as num?;
+                      final driverNet = (offer['driverNetCdf'] ?? offer['estimatedFareCdf'] ?? offer['priceCdf']) as num?;
+                      final pickupKm = (offer['distanceToPickupKm'] as num?)?.toDouble();
+                      final tripKm = (offer['tripDistanceKm'] as num?)?.toDouble() ??
+                          (offer['distanceKm'] as num?)?.toDouble();
+                      final distParts = <String>[
+                        if (pickupKm != null) 'Vous → client ${GeoUtils.formatDistanceKm(pickupKm)}',
+                        if (tripKm != null) 'Trajet ${GeoUtils.formatDistanceKm(tripKm)}',
+                      ];
                       return ListTile(
                         contentPadding: EdgeInsets.zero,
                         title: Text(
@@ -1209,18 +1217,20 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                           overflow: TextOverflow.ellipsis,
                         ),
                         subtitle: Text(
-                          '→ ${offer['dropoffAddress']?.toString() ?? ''}',
-                          maxLines: 1,
+                          distParts.isNotEmpty
+                              ? '${distParts.join(' · ')}\n→ ${offer['dropoffAddress']?.toString() ?? ''}'
+                              : '→ ${offer['dropoffAddress']?.toString() ?? ''}',
+                          maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            if (fare != null)
+                            if (driverNet != null)
                               Padding(
                                 padding: const EdgeInsets.only(right: 4),
                                 child: Text(
-                                  MarketConfig.formatCdf(fare.toInt()),
+                                  MarketConfig.formatCdf(driverNet.toInt()),
                                   style: const TextStyle(
                                     fontWeight: FontWeight.bold,
                                     color: MovaColors.green,
@@ -1269,10 +1279,17 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                     ),
                     const SizedBox(height: 8),
                     ..._deliveryOffers.take(5).map((offer) {
-                      final fare = (offer['estimatedPriceCdf'] ?? offer['priceCdf']) as num?;
+                      final driverNet = (offer['driverNetCdf'] ?? offer['estimatedPriceCdf'] ?? offer['priceCdf']) as num?;
+                      final pickupKm = (offer['distanceToPickupKm'] as num?)?.toDouble();
+                      final tripKm = (offer['tripDistanceKm'] as num?)?.toDouble() ??
+                          (offer['distanceKm'] as num?)?.toDouble();
                       final type = offer['type']?.toString() ?? 'PARCEL';
                       final typeLabel = type == 'ERRAND' ? 'Courses' : type;
                       final assigned = offer['alreadyAssigned'] == true;
+                      final distParts = <String>[
+                        if (pickupKm != null) 'Vous → colis ${GeoUtils.formatDistanceKm(pickupKm)}',
+                        if (tripKm != null) 'Livraison ${GeoUtils.formatDistanceKm(tripKm)}',
+                      ];
                       return ListTile(
                         contentPadding: EdgeInsets.zero,
                         title: Text(
@@ -1285,13 +1302,15 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                           overflow: TextOverflow.ellipsis,
                         ),
                         subtitle: Text(
-                          '→ ${offer['dropoffAddress']?.toString() ?? offer['deliveryAddress']?.toString() ?? ''}',
-                          maxLines: 1,
+                          distParts.isNotEmpty
+                              ? '${distParts.join(' · ')}\n→ ${offer['dropoffAddress']?.toString() ?? offer['deliveryAddress']?.toString() ?? ''}'
+                              : '→ ${offer['dropoffAddress']?.toString() ?? offer['deliveryAddress']?.toString() ?? ''}',
+                          maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        trailing: fare != null
+                        trailing: driverNet != null
                             ? Text(
-                                MarketConfig.formatCdf(fare.toInt()),
+                                MarketConfig.formatCdf(driverNet.toInt()),
                                 style: const TextStyle(
                                   fontWeight: FontWeight.bold,
                                   color: MovaColors.violet,

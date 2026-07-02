@@ -16,6 +16,7 @@ import { RedisService } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { WalletService } from '../wallet/wallet.service';
 import { DriverPayoutService } from '../payouts/driver-payout.service';
+import { FoodDeliveryPayoutService } from '../payouts/food-delivery-payout.service';
 import { AirtelMoneyProvider, MockPaymentProvider, MpesaProvider, OrangeMoneyProvider } from './payment-providers';
 import { PaymentProvider } from './payment-provider.interface';
 
@@ -35,6 +36,7 @@ export class PaymentsService {
     private config: ConfigService,
     private walletService: WalletService,
     private driverPayouts: DriverPayoutService,
+    private foodPayouts: FoodDeliveryPayoutService,
     private redis: RedisService,
     mock: MockPaymentProvider,
     orange: OrangeMoneyProvider,
@@ -108,6 +110,10 @@ export class PaymentsService {
 
   private async creditDriverAfterServicePayment(referenceType: string, referenceId: string) {
     try {
+      if (referenceType.toUpperCase() === 'DELIVERY') {
+        const foodResult = await this.foodPayouts.creditFoodDeliverySettlement(referenceId);
+        if (foodResult.handled) return;
+      }
       const res = await fetch(
         serviceUrl('ride', `/internal/services/${referenceType.toUpperCase()}/${referenceId}/payout`),
         { headers: { 'x-internal-api-key': INTERNAL_API_KEY } },
@@ -373,6 +379,20 @@ export class PaymentsService {
       };
     }
     return result;
+  }
+
+  async getServicePaymentStatus(referenceType: string, referenceId: string) {
+    const type = referenceType.toUpperCase();
+    const payment = await this.prisma.servicePayment.findUnique({
+      where: { referenceType_referenceId: { referenceType: type, referenceId } },
+    });
+    const isPaid = payment?.status === PaymentStatus.COMPLETED;
+    return {
+      referenceType: type,
+      referenceId,
+      isPaid,
+      paymentStatus: payment?.status ?? null,
+    };
   }
 
   async findPassengerUnpaidRide(passengerId: string) {

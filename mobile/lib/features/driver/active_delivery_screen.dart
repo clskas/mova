@@ -134,7 +134,7 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
     }
   }
 
-  Future<void> _advanceStatus(String nextStatus, String successMessage, {int? purchaseTotalCdf}) async {
+  Future<void> _advanceStatus(String nextStatus, String successMessage, {int? purchaseTotalCdf, String? deliveryPin}) async {
     setState(() {
       _loading = true;
       _error = null;
@@ -147,7 +147,7 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
         if (purchaseTotalCdf != null) 'purchaseTotalCdf': purchaseTotalCdf,
       });
     } else {
-      result = await api.updateDeliveryStatus(_deliveryId, nextStatus);
+      result = await api.updateDeliveryStatus(_deliveryId, nextStatus, deliveryPin: deliveryPin);
     }
     if (!mounted) return;
     setState(() => _loading = false);
@@ -195,16 +195,34 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
       await _completeErrandWithPurchase();
       return;
     }
+    if (_nextAction == 'DELIVERED') {
+      final pin = await DriverCashPinDialog.show(
+        context,
+        title: 'Confirmer la livraison',
+        label: 'Code PIN du destinataire',
+      );
+      if (pin == null || pin.isEmpty || !mounted) return;
+      await _advanceStatus(
+        'DELIVERED',
+        'Livraison terminée',
+        deliveryPin: pin,
+      );
+      return;
+    }
     if (_nextAction != null) {
       await _advanceStatus(
         _nextAction!,
-        _nextAction == 'DELIVERED' ? 'Livraison terminée' : 'Statut mis à jour',
+        'Statut mis à jour',
       );
     }
   }
 
   Future<void> _confirmCash() async {
-    final pin = await DriverCashPinDialog.show(context);
+    final pin = await DriverCashPinDialog.show(
+      context,
+      title: 'Confirmer paiement espèces',
+      label: 'Code PIN du client',
+    );
     if (pin == null || pin.isEmpty || !mounted) return;
     setState(() => _loading = true);
     final api = ref.read(apiClientProvider);
@@ -282,7 +300,7 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
     }
     return switch (_status) {
       'PICKED_UP' => 'En route vers le client',
-      'IN_TRANSIT' => 'Marquer comme livré',
+      'IN_TRANSIT' => 'Marquer comme livré (PIN destinataire)',
       _ => 'Actualiser',
     };
   }

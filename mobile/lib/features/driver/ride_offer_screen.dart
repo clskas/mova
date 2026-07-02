@@ -152,6 +152,7 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
     final fare = widget.offer['estimatedFareCdf'] as int? ??
         widget.offer['priceCdf'] as int? ??
         0;
+    final driverNet = widget.offer['driverNetCdf'] as int? ?? fare;
     final distance = widget.offer['tripDistanceKm'] as num? ?? widget.offer['distanceKm'] as num?;
     final pickup = widget.offer['pickupAddress']?.toString() ?? 'Point de départ';
     final dropoff = widget.offer['dropoffAddress']?.toString() ?? 'Destination';
@@ -213,7 +214,7 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
                     ),
                     const SizedBox(height: 32),
                     Text(
-                      MarketConfig.formatCdf(fare),
+                      MarketConfig.formatCdf(driverNet),
                       style: const TextStyle(
                         color: MovaColors.green,
                         fontSize: 42,
@@ -222,6 +223,10 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       textAlign: TextAlign.center,
+                    ),
+                    Text(
+                      'Revenu estimé',
+                      style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 13),
                     ),
                     if (distance != null) ...[
                       const SizedBox(height: 4),
@@ -232,7 +237,7 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
                         crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
                           Text(
-                            'Trajet ${distance.toStringAsFixed(1)} km',
+                            'Trajet ${GeoUtils.formatDistanceKm(distance.toDouble())}',
                             style: const TextStyle(color: Colors.white70, fontSize: 15),
                           ),
                           Text(
@@ -260,7 +265,7 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
                             const SizedBox(width: 8),
                             Flexible(
                               child: Text(
-                                'Client à ${_pickupDistanceKm!.toStringAsFixed(1)} km'
+                                'Client à ${GeoUtils.formatDistanceKm(_pickupDistanceKm!)}'
                                 '${_pickupEtaMin != null ? ' · ~$_pickupEtaMin min' : ''}',
                                 style: const TextStyle(
                                   color: Colors.white,

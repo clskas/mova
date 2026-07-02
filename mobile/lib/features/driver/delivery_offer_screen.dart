@@ -2,12 +2,16 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:latlong2/latlong.dart';
 import '../../core/api/api_client.dart';
 import '../../core/config/market_config.dart';
 import '../../core/error/result.dart';
+import '../../core/geo/geo_utils.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
+import '../booking/widgets/mova_ride_map.dart';
 
 class DeliveryOfferScreen extends ConsumerStatefulWidget {
   const DeliveryOfferScreen({super.key, required this.offer});
@@ -23,6 +27,9 @@ class _DeliveryOfferScreenState extends ConsumerState<DeliveryOfferScreen> {
   bool _loading = false;
   String? _error;
   Timer? _timer;
+  double? _pickupDistanceKm;
+  int? _pickupEtaMin;
+  LatLng? _driverPosition;
 
   String get _deliveryId => widget.offer['id']?.toString() ?? '';
 
@@ -36,9 +43,26 @@ class _DeliveryOfferScreenState extends ConsumerState<DeliveryOfferScreen> {
     };
   }
 
+  LatLng? get _pickupPoint {
+    final lat = (widget.offer['pickupLat'] as num?)?.toDouble();
+    final lng = (widget.offer['pickupLng'] as num?)?.toDouble();
+    if (lat == null || lng == null) return null;
+    return LatLng(lat, lng);
+  }
+
+  LatLng? get _dropoffPoint {
+    final lat = (widget.offer['dropoffLat'] as num?)?.toDouble() ??
+        (widget.offer['deliveryLat'] as num?)?.toDouble();
+    final lng = (widget.offer['dropoffLng'] as num?)?.toDouble() ??
+        (widget.offer['deliveryLng'] as num?)?.toDouble();
+    if (lat == null || lng == null) return null;
+    return LatLng(lat, lng);
+  }
+
   @override
   void initState() {
     super.initState();
+    _resolvePickupProximity();
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted) return;
       if (_countdown <= 0) {
@@ -48,6 +72,47 @@ class _DeliveryOfferScreenState extends ConsumerState<DeliveryOfferScreen> {
       }
       setState(() => _countdown--);
     });
+  }
+
+  Future<void> _resolvePickupProximity() async {
+    final backendKm = (widget.offer['distanceToPickupKm'] as num?)?.toDouble();
+    if (backendKm != null && backendKm >= 0) {
+      setState(() {
+        _pickupDistanceKm = backendKm;
+        _pickupEtaMin = GeoUtils.etaMinutesFromDistanceKm(backendKm);
+      });
+    }
+
+    final pickup = _pickupPoint;
+    if (pickup == null) return;
+    try {
+      if (!await Geolocator.isLocationServiceEnabled()) return;
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        return;
+      }
+      final pos = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 8),
+        ),
+      );
+      if (!mounted) return;
+      final km = GeoUtils.haversineKm(pos.latitude, pos.longitude, pickup.latitude, pickup.longitude);
+      setState(() {
+        _driverPosition = LatLng(pos.latitude, pos.longitude);
+        if (_pickupDistanceKm == null) {
+          _pickupDistanceKm = km;
+          _pickupEtaMin = GeoUtils.etaMinutesFromDistanceKm(km);
+        }
+      });
+    } catch (_) {
+      /* GPS indisponible */
+    }
   }
 
   @override
@@ -66,7 +131,7 @@ class _DeliveryOfferScreenState extends ConsumerState<DeliveryOfferScreen> {
     if (!mounted) return;
     setState(() => _loading = false);
     switch (result) {
-      case Success(:final data):
+      case Success():
         _timer?.cancel();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -81,16 +146,42 @@ class _DeliveryOfferScreenState extends ConsumerState<DeliveryOfferScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final price = widget.offer['estimatedPriceCdf'] as int? ??
+    final driverNet = widget.offer['driverNetCdf'] as int? ??
+        widget.offer['estimatedPriceCdf'] as int? ??
         widget.offer['priceCdf'] as int? ??
         0;
-    final distance = widget.offer['distanceKm'];
+    final tripKm = (widget.offer['tripDistanceKm'] as num?)?.toDouble() ??
+        (widget.offer['distanceKm'] as num?)?.toDouble();
+    final pickup = _pickupPoint;
+    final dropoff = _dropoffPoint;
 
     return MovaScreen(
       title: 'Nouvelle livraison',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (pickup != null && dropoff != null) ...[
+            ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: MovaRideMap(
+                height: 200,
+                pickup: pickup,
+                dropoff: dropoff,
+                driver: _driverPosition,
+                approachTarget: pickup,
+                pickupLabel: MovaRideMap.mapLabel(
+                  widget.offer['pickupAddress']?.toString(),
+                  fallback: 'Prise en charge',
+                ),
+                dropoffLabel: MovaRideMap.mapLabel(
+                  widget.offer['dropoffAddress']?.toString() ??
+                      widget.offer['deliveryAddress']?.toString(),
+                  fallback: 'Livraison',
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
           MovaCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -149,7 +240,7 @@ class _DeliveryOfferScreenState extends ConsumerState<DeliveryOfferScreen> {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  MarketConfig.formatCdf(price),
+                  MarketConfig.formatCdf(driverNet),
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     color: MovaColors.green,
@@ -158,11 +249,27 @@ class _DeliveryOfferScreenState extends ConsumerState<DeliveryOfferScreen> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                if (distance != null)
-                  Text(
-                    'À $distance km',
-                    style: const TextStyle(color: MovaColors.textSecondary),
+                Text(
+                  'Votre revenu estimé (après commission MOVA)',
+                  style: TextStyle(color: MovaColors.textSecondary.withValues(alpha: 0.9), fontSize: 12),
+                ),
+                const SizedBox(height: 10),
+                if (_pickupDistanceKm != null)
+                  _distanceRow(
+                    Icons.near_me,
+                    'Vous → prise en charge',
+                    GeoUtils.formatDistanceKm(_pickupDistanceKm!),
+                    _pickupEtaMin,
                   ),
+                if (tripKm != null) ...[
+                  const SizedBox(height: 6),
+                  _distanceRow(
+                    Icons.route,
+                    'Trajet livraison',
+                    GeoUtils.formatDistanceKm(tripKm),
+                    GeoUtils.etaMinutesFromDistanceKm(tripKm),
+                  ),
+                ],
               ],
             ),
           ),
@@ -191,6 +298,21 @@ class _DeliveryOfferScreenState extends ConsumerState<DeliveryOfferScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _distanceRow(IconData icon, String label, String distance, int? etaMin) {
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: MovaColors.orange),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            '$label : $distance${etaMin != null ? ' · ~$etaMin min' : ''}',
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+          ),
+        ),
+      ],
     );
   }
 }

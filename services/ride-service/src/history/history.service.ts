@@ -3,7 +3,7 @@ import { ScheduledRideStatus } from '@prisma/client';
 import { toRideSummary } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { formatParcelDelivery } from '../deliveries/parcel.util';
-import { fetchRidePaymentStatuses } from '../common/payment-status.util';
+import { fetchRidePaymentStatuses, fetchServicePaymentStatus } from '../common/payment-status.util';
 
 export type HistoryType = 'RIDE' | 'PARCEL' | 'FOOD' | 'EXPRESS' | 'ERRAND' | 'SCHEDULED' | 'CARPOOL' | 'RENTAL' | 'MOVING';
 
@@ -206,6 +206,9 @@ export class HistoryService {
         take: fetchPerType,
       });
       for (const m of movings) {
+        const payment =
+          m.status === 'COMPLETED' ? await fetchServicePaymentStatus('MOVING', m.id) : { isPaid: false };
+        const isPaid = payment.isPaid;
         items.push({
           type: 'MOVING',
           id: m.id,
@@ -213,7 +216,8 @@ export class HistoryService {
           title: `${m.pickupAddress} → ${m.dropoffAddress}`,
           priceCdf: m.estimatedPriceCdf,
           createdAt: m.createdAt.toISOString(),
-          paymentReady: m.status === 'COMPLETED',
+          paymentReady: m.status === 'COMPLETED' && !isPaid,
+          isPaid: m.status === 'COMPLETED' ? isPaid : undefined,
           meta: {
             volumeM3: m.volumeM3,
             distanceKm: m.distanceKm,

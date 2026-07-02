@@ -6,6 +6,13 @@ export type RidePaymentStatus = {
   paymentStatus: string | null;
 };
 
+export type ServicePaymentStatus = {
+  referenceType: string;
+  referenceId: string;
+  isPaid: boolean;
+  paymentStatus: string | null;
+};
+
 export async function fetchRidePaymentStatus(rideId: string): Promise<RidePaymentStatus> {
   try {
     const res = await fetch(serviceUrl('payment', `/internal/rides/${rideId}/payment-status`), {
@@ -17,6 +24,25 @@ export async function fetchRidePaymentStatus(rideId: string): Promise<RidePaymen
     return (await res.json()) as RidePaymentStatus;
   } catch {
     return { rideId, isPaid: false, paymentStatus: null };
+  }
+}
+
+export async function fetchServicePaymentStatus(
+  referenceType: string,
+  referenceId: string,
+): Promise<ServicePaymentStatus> {
+  const type = referenceType.toUpperCase();
+  try {
+    const res = await fetch(
+      serviceUrl('payment', `/internal/services/${type}/${referenceId}/payment-status`),
+      { headers: { 'x-internal-api-key': INTERNAL_API_KEY } },
+    );
+    if (!res.ok) {
+      return { referenceType: type, referenceId, isPaid: false, paymentStatus: null };
+    }
+    return (await res.json()) as ServicePaymentStatus;
+  } catch {
+    return { referenceType: type, referenceId, isPaid: false, paymentStatus: null };
   }
 }
 

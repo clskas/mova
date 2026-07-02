@@ -1,13 +1,24 @@
 import 'package:flutter/material.dart';
 
-/// Saisie du code PIN passager pour confirmer un paiement espèces (chauffeur).
+/// Saisie du code PIN passager (livraison ou paiement espèces).
 class DriverCashPinDialog extends StatefulWidget {
-  const DriverCashPinDialog({super.key});
+  const DriverCashPinDialog({
+    super.key,
+    this.title = 'Confirmer espèces',
+    this.label = 'Code PIN passager',
+  });
 
-  static Future<String?> show(BuildContext context) {
+  final String title;
+  final String label;
+
+  static Future<String?> show(
+    BuildContext context, {
+    String title = 'Confirmer espèces',
+    String label = 'Code PIN passager',
+  }) {
     return showDialog<String>(
       context: context,
-      builder: (_) => const DriverCashPinDialog(),
+      builder: (_) => DriverCashPinDialog(title: title, label: label),
     );
   }
 
@@ -33,13 +44,13 @@ class _DriverCashPinDialogState extends State<DriverCashPinDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Confirmer espèces'),
+      title: Text(widget.title),
       content: TextField(
         controller: _controller,
         keyboardType: TextInputType.number,
         maxLength: 4,
         autofocus: true,
-        decoration: const InputDecoration(labelText: 'Code PIN passager'),
+        decoration: InputDecoration(labelText: widget.label),
       ),
       actions: [
         TextButton(

@@ -18,6 +18,20 @@ abstract final class GeoUtils {
     return minutes < 1 ? 1 : minutes;
   }
 
+  /// Affiche en mètres si < 1 km, sinon en km avec une décimale.
+  static String formatDistanceKm(double distanceKm) {
+    if (distanceKm < 1) {
+      final meters = (distanceKm * 1000).round();
+      return '$meters m';
+    }
+    return '${distanceKm.toStringAsFixed(1)} km';
+  }
+
+  static String formatDistanceLabel(double distanceKm, {String prefix = ''}) {
+    final formatted = formatDistanceKm(distanceKm);
+    return prefix.isEmpty ? formatted : '$prefix$formatted';
+  }
+
   static int driverEtaMinutes(double driverLat, double driverLng, double targetLat, double targetLng) {
     final km = haversineKm(driverLat, driverLng, targetLat, targetLng);
     return etaMinutesFromDistanceKm(km);

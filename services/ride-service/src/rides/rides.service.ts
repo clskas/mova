@@ -22,6 +22,8 @@ import {
 } from '@mova/shared';
 import { RedisService } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
+import { parseOrderPlacedMetadata, computeFoodSettlementPools } from '../deliveries/food-delivery-settlement.util';
+import { deliveryDriverGross } from '../deliveries/delivery-driver-gross.util';
 import { PricingService } from './pricing.service';
 import { CommissionService } from './commission.service';
 import { MatchingService } from '../matching/matching.service';
@@ -325,6 +327,8 @@ export class RidesService {
       include: { events: { where: { event: { in: ['SEARCH_ATTEMPT', 'DRIVER_REJECTED'] } } } },
     });
 
+    const rideRule = await this.commission.get(CommissionServiceType.RIDE);
+
     const offers = rides
       .filter((ride) => {
         const rejected = ride.events.some(
@@ -348,11 +352,14 @@ export class RidesService {
           ride.pickupLat,
           ride.pickupLng,
         );
+        const fare = ride.estimatedFareCdf ?? 0;
+        const driverNetCdf = this.commission.splitGross(fare, rideRule.platformPercent).driverNetCdf;
         return {
           ...this.formatRideDetail({ ...ride, distanceKm: tripKm }),
           distanceKm: tripKm,
           tripDistanceKm: tripKm,
           distanceToPickupKm,
+          driverNetCdf: Math.round(driverNetCdf),
           searchRadiusKm: radiusKm,
           _withinRadius: distanceToPickupKm <= radiusKm,
         };
@@ -756,24 +763,93 @@ export class RidesService {
     estimatedPriceCdf: number | null;
     items: unknown;
   }) {
-    const gross = d.finalPriceCdf ?? d.estimatedPriceCdf ?? 0;
-    if (d.type !== DeliveryType.FOOD) return gross;
-    const items = d.items;
-    if (!Array.isArray(items)) return Math.max(3000, gross);
-    let itemsTotal = 0;
-    for (const entry of items) {
-      if (entry && typeof entry === 'object' && 'restaurantId' in entry && Array.isArray((entry as { items?: unknown }).items)) {
-        for (const sub of (entry as { items: { unitPriceCdf?: number; priceCdf?: number; quantity?: number }[] }).items) {
-          const qty = sub.quantity ?? 1;
-          itemsTotal += (sub.unitPriceCdf ?? sub.priceCdf ?? 0) * qty;
-        }
-      } else {
-        const row = entry as { unitPriceCdf?: number; priceCdf?: number; quantity?: number };
-        const qty = row.quantity ?? 1;
-        itemsTotal += (row.unitPriceCdf ?? row.priceCdf ?? 0) * qty;
-      }
+    return deliveryDriverGross(d);
+  }
+
+  async getFoodDeliverySettlement(deliveryId: string) {
+    const d = await this.prisma.delivery.findUnique({
+      where: { id: deliveryId },
+      include: { events: { orderBy: { createdAt: 'asc' } }, restaurant: true },
+    });
+    const empty = (deliveryType: string | null = null) => ({
+      referenceType: 'DELIVERY' as const,
+      referenceId: deliveryId,
+      deliveryType,
+      totalPaidCdf: 0,
+      platformFeeCdf: 0,
+      driver: null as { userId: string; grossCdf: number; netCdf: number; platformFeeCdf: number } | null,
+      restaurants: [] as {
+        restaurantId: string;
+        ownerUserId: string | null;
+        grossCdf: number;
+        netCdf: number;
+        platformFeeCdf: number;
+      }[],
+    });
+    if (!d) return empty();
+    if (d.type !== DeliveryType.FOOD) return empty(d.type);
+    if (d.status !== DeliveryStatus.DELIVERED) return empty('FOOD');
+
+    const totalPaidCdf = d.finalPriceCdf ?? d.estimatedPriceCdf ?? 0;
+    const metadata = parseOrderPlacedMetadata(d.events);
+    const pools = computeFoodSettlementPools({ totalPaidCdf, items: d.items, metadata });
+    const [foodRule, deliveryRule] = await Promise.all([
+      this.commission.get(CommissionServiceType.FOOD),
+      this.commission.get(CommissionServiceType.DELIVERY),
+    ]);
+
+    const restaurantIds = [
+      ...new Set(
+        [...pools.shares.map((s) => s.restaurantId), d.restaurantId].filter((id): id is string => Boolean(id)),
+      ),
+    ];
+    const restaurantRows = restaurantIds.length
+      ? await this.prisma.restaurant.findMany({ where: { id: { in: restaurantIds } } })
+      : d.restaurant
+        ? [d.restaurant]
+        : [];
+
+    const restaurants: {
+      restaurantId: string;
+      ownerUserId: string | null;
+      grossCdf: number;
+      netCdf: number;
+      platformFeeCdf: number;
+    }[] = [];
+    let restaurantPlatformTotal = 0;
+    for (const share of pools.shares) {
+      const restaurantId = share.restaurantId ?? d.restaurantId;
+      if (!restaurantId || share.itemsGrossCdf <= 0) continue;
+      const row = restaurantRows.find((r) => r.id === restaurantId);
+      const scaledGross = share.itemsGrossCdf * pools.scale;
+      const split = this.commission.splitGross(scaledGross, foodRule.platformPercent);
+      restaurantPlatformTotal += split.platformFeeCdf;
+      restaurants.push({
+        restaurantId,
+        ownerUserId: row?.ownerUserId ?? null,
+        grossCdf: Math.round(scaledGross),
+        netCdf: Math.round(split.driverNetCdf),
+        platformFeeCdf: split.platformFeeCdf,
+      });
     }
-    return Math.max(3000, gross - itemsTotal);
+
+    const driverSplit = this.commission.splitGross(pools.deliveryNetPool, deliveryRule.platformPercent);
+    return {
+      referenceType: 'DELIVERY' as const,
+      referenceId: deliveryId,
+      deliveryType: 'FOOD' as const,
+      totalPaidCdf,
+      platformFeeCdf: restaurantPlatformTotal + driverSplit.platformFeeCdf,
+      driver: d.driverId
+        ? {
+            userId: d.driverId,
+            grossCdf: Math.round(pools.deliveryNetPool),
+            netCdf: Math.round(driverSplit.driverNetCdf),
+            platformFeeCdf: driverSplit.platformFeeCdf,
+          }
+        : null,
+      restaurants,
+    };
   }
 
   async getRidePayout(rideId: string) {
@@ -796,6 +872,15 @@ export class RidesService {
         const d = await this.prisma.delivery.findUnique({ where: { id: referenceId } });
         if (!d || d.status !== DeliveryStatus.DELIVERED || !d.driverId) {
           return { referenceType: type, referenceId, driverId: d?.driverId ?? null, driverNetCdf: 0 };
+        }
+        if (d.type === DeliveryType.FOOD) {
+          const settlement = await this.getFoodDeliverySettlement(referenceId);
+          return {
+            referenceType: type,
+            referenceId,
+            driverId: settlement.driver?.userId ?? d.driverId,
+            driverNetCdf: settlement.driver?.netCdf ?? 0,
+          };
         }
         const rule = await this.commission.get(CommissionServiceType.DELIVERY);
         const gross = this.deliveryDriverGross(d);
@@ -954,29 +1039,73 @@ export class RidesService {
   }
 
   async getDriverEarnings(driverUserId: string) {
-    const [rides, deliveries, rideRule, deliveryRule] = await Promise.all([
+    const [rides, deliveries, movings, errands, rentals, carpools, scheduled, rideRule, deliveryRule, movingRule, errandRule, rentalRule, carpoolRule] =
+      await Promise.all([
       this.prisma.ride.findMany({ where: { driverId: driverUserId, status: RideStatus.COMPLETED } }),
       this.prisma.delivery.findMany({ where: { driverId: driverUserId, status: DeliveryStatus.DELIVERED } }),
+      this.prisma.movingRequest.findMany({ where: { driverId: driverUserId, status: MovingRequestStatus.COMPLETED } }),
+      this.prisma.errandOrder.findMany({ where: { driverId: driverUserId, status: ErrandOrderStatus.COMPLETED } }),
+      this.prisma.rentalInquiry.findMany({
+        where: { driverId: driverUserId, status: { in: [RentalInquiryStatus.IN_PROGRESS, RentalInquiryStatus.RETURNED] } },
+      }),
+      this.prisma.carpoolTrip.findMany({ where: { driverId: driverUserId, status: 'COMPLETED' } }),
+      this.prisma.scheduledRide.findMany({ where: { driverId: driverUserId, status: ScheduledRideStatus.COMPLETED } }),
       this.commission.get(CommissionServiceType.RIDE),
       this.commission.get(CommissionServiceType.DELIVERY),
+      this.commission.get(CommissionServiceType.MOVING),
+      this.commission.get(CommissionServiceType.ERRAND),
+      this.commission.get(CommissionServiceType.RENTAL),
+      this.commission.get(CommissionServiceType.CARPOOL),
     ]);
     const now = new Date();
     const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const startOfWeek = new Date(startOfDay);
     startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const rideNet = (gross: number) => this.commission.splitGross(gross, rideRule.platformPercent).driverNetCdf;
-    const deliveryNet = (gross: number) => this.commission.splitGross(gross, deliveryRule.platformPercent).driverNetCdf;
+    const net = (gross: number, pct: number) => this.commission.splitGross(gross, pct).driverNetCdf;
 
     const sumRides = (from: Date) =>
       rides
         .filter((r) => r.completedAt && r.completedAt >= from)
-        .reduce((a, r) => a + rideNet(r.finalFareCdf ?? r.estimatedFareCdf ?? 0), 0);
+        .reduce((a, r) => a + net(r.finalFareCdf ?? r.estimatedFareCdf ?? 0, rideRule.platformPercent), 0);
     const sumDeliveries = (from: Date) =>
       deliveries
         .filter((d) => d.deliveredAt && d.deliveredAt >= from)
-        .reduce((a, d) => a + deliveryNet(this.deliveryDriverGross(d)), 0);
-    const sumAll = (from: Date) => sumRides(from) + sumDeliveries(from);
+        .reduce((a, d) => a + net(this.deliveryDriverGross(d), deliveryRule.platformPercent), 0);
+    const sumMovings = (from: Date) =>
+      movings
+        .filter((m) => m.completedAt && m.completedAt >= from)
+        .reduce((a, m) => a + net(m.estimatedPriceCdf, movingRule.platformPercent), 0);
+    const sumErrands = (from: Date) =>
+      errands
+        .filter((e) => e.completedAt && e.completedAt >= from)
+        .reduce(
+          (a, e) => a + net((e.finalPriceCdf ?? e.estimatedPriceCdf) + (e.purchaseTotalCdf ?? 0), errandRule.platformPercent),
+          0,
+        );
+    const sumRentals = (from: Date) =>
+      rentals
+        .filter((r) => r.updatedAt >= from)
+        .reduce((a, r) => a + net(r.totalCdf ?? r.estimatedPriceCdf ?? 0, rentalRule.platformPercent), 0);
+    const sumCarpools = (from: Date) =>
+      carpools
+        .filter((t) => t.updatedAt >= from)
+        .reduce((a, t) => {
+          const booked = t.seatsTotal - t.seatsAvailable;
+          return a + net(t.pricePerSeatCdf * Math.max(booked, 1), carpoolRule.platformPercent);
+        }, 0);
+    const sumScheduled = (from: Date) =>
+      scheduled
+        .filter((s) => s.updatedAt >= from)
+        .reduce((a, s) => a + net(s.estimatedPriceCdf, rideRule.platformPercent), 0);
+    const sumAll = (from: Date) =>
+      sumRides(from) +
+      sumDeliveries(from) +
+      sumMovings(from) +
+      sumErrands(from) +
+      sumRentals(from) +
+      sumCarpools(from) +
+      sumScheduled(from);
 
     return {
       totalCdf: sumAll(new Date(0)),
@@ -985,12 +1114,16 @@ export class RidesService {
       monthCdf: sumAll(startOfMonth),
       rideCount: rides.length,
       deliveryCount: deliveries.length,
+      movingCount: movings.length,
       todayRideCount: rides.filter((r) => r.completedAt && r.completedAt >= startOfDay).length,
       todayDeliveryCount: deliveries.filter((d) => d.deliveredAt && d.deliveredAt >= startOfDay).length,
+      todayMovingCount: movings.filter((m) => m.completedAt && m.completedAt >= startOfDay).length,
       rideEarningsCdf: sumRides(new Date(0)),
       deliveryEarningsCdf: sumDeliveries(new Date(0)),
+      movingEarningsCdf: sumMovings(new Date(0)),
       commissionPercent: rideRule.platformPercent,
       deliveryCommissionPercent: deliveryRule.platformPercent,
+      movingCommissionPercent: movingRule.platformPercent,
       currency: 'CDF',
     };
   }

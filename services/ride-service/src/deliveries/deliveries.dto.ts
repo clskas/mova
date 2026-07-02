@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsArray, IsEnum, IsNumber, IsOptional, IsString, IsUUID, Max, Min, ValidateNested } from 'class-validator';
 import { DeliveryStatus, WeightCategory } from '@prisma/client';
@@ -77,4 +77,8 @@ export class RateDeliveryDto {
 
 export class UpdateDeliveryStatusDto {
   @ApiProperty({ enum: DeliveryStatus }) @IsEnum(DeliveryStatus) status: DeliveryStatus;
+  @ApiPropertyOptional({ description: 'Code PIN destinataire — requis pour marquer DELIVERED (chauffeur)' })
+  @IsOptional()
+  @IsString()
+  deliveryPin?: string;
 }

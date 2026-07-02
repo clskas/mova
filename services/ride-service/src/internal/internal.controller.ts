@@ -92,6 +92,11 @@ export class InternalController {
     return this.rides.getServicePayout(referenceType, referenceId);
   }
 
+  @Get('services/DELIVERY/:referenceId/food-settlement')
+  foodDeliverySettlement(@Param('referenceId') referenceId: string) {
+    return this.rides.getFoodDeliverySettlement(referenceId);
+  }
+
   @Get('rides')
   listRides(
     @Query('status') status?: string,

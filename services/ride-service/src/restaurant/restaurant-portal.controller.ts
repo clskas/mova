@@ -30,6 +30,12 @@ export class RestaurantPortalController {
     return this.portal.listOrders(req.user.id, status);
   }
 
+  @Get('earnings')
+  @ApiOperation({ summary: 'Solde et ventes repas créditées' })
+  earnings(@Request() req: { user: { id: string } }) {
+    return this.portal.getEarnings(req.user.id);
+  }
+
   @Post('orders/:id/confirm')
   @ApiOperation({ summary: 'Accepter une commande (PENDING → RESTAURANT_CONFIRMED)' })
   confirm(@Request() req: { user: { id: string } }, @Param('id') id: string) {

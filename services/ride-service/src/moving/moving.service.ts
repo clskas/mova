@@ -5,6 +5,7 @@ import { RedisService } from '@mova/shared';
 import { buildMovingTimeline } from '../deliveries/parcel.util';
 import { assertServiceAreaPair } from '../common/address.util';
 import { fetchAuthUserBrief } from '../common/internal-lookup.util';
+import { fetchServicePaymentStatus } from '../common/payment-status.util';
 import { assertDriverCanReceiveJobs, assertDriverEligibleForMoving } from '../common/driver-eligibility.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { PricingService } from '../rides/pricing.service';
@@ -116,7 +117,7 @@ export class MovingService {
     });
   }
 
-  private formatMovingDetail(request: {
+  private async formatMovingDetail(request: {
     id: string;
     status: MovingRequestStatus;
     completedAt: Date | null;
@@ -129,13 +130,20 @@ export class MovingService {
     const timeline = buildMovingTimeline(request.status, request.completedAt);
     const photoUrls = Array.isArray(request.photoUrls) ? (request.photoUrls as string[]) : [];
     const vehicleCategory = request.vehicleCategory as MovingVehicleCategory | undefined;
+    const payment =
+      request.status === MovingRequestStatus.COMPLETED
+        ? await fetchServicePaymentStatus('MOVING', request.id)
+        : { isPaid: false, paymentStatus: null };
+    const isPaid = payment.isPaid;
     return {
       ...request,
       photoUrls,
       vehicleCategoryLabel: vehicleCategory ? this.vehicleCategoryLabel(vehicleCategory) : undefined,
       timeline,
       tracking: timeline,
-      paymentReady: request.status === MovingRequestStatus.COMPLETED,
+      paymentReady: request.status === MovingRequestStatus.COMPLETED && !isPaid,
+      isPaid,
+      paymentStatus: payment.paymentStatus,
       completionPin: request.completionPin ?? undefined,
       itemsNotes: request.itemsNotes ?? undefined,
       priceCdf: request.estimatedPriceCdf,
@@ -150,7 +158,7 @@ export class MovingService {
     const request = await this.prisma.movingRequest.findUnique({ where: { id } });
     if (!request) throw new MovaHttpException(MovaErrorCode.MOVING_NOT_FOUND, HttpStatus.NOT_FOUND);
     if (request.userId !== userId) throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
-    return this.formatMovingDetail(request);
+    return await this.formatMovingDetail(request);
   }
 
   async getForParticipant(id: string, userId: string) {
@@ -159,7 +167,7 @@ export class MovingService {
     if (request.userId !== userId && request.driverId !== userId) {
       throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
     }
-    return this.formatMovingDetail(request);
+    return await this.formatMovingDetail(request);
   }
 
   async updateStatusByDriver(id: string, driverId: string, status: MovingRequestStatus) {

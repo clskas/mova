@@ -917,8 +917,15 @@ class ApiClient {
     };
   }
 
-  Future<Result<Map<String, dynamic>>> updateDeliveryStatus(String deliveryId, String status) async {
-    final result = await patch('/deliveries/$deliveryId/status', {'status': status});
+  Future<Result<Map<String, dynamic>>> updateDeliveryStatus(
+    String deliveryId,
+    String status, {
+    String? deliveryPin,
+  }) async {
+    final result = await patch('/deliveries/$deliveryId/status', {
+      'status': status,
+      if (deliveryPin != null && deliveryPin.isNotEmpty) 'deliveryPin': deliveryPin,
+    });
     return switch (result) {
       Success(:final data) => Success(data['delivery'] as Map<String, dynamic>? ?? data),
       Failure(:final error) => Failure(error),

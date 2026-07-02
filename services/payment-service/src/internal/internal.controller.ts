@@ -104,6 +104,14 @@ export class InternalController {
     return this.payments.getRidePaymentStatuses(body.rideIds ?? []);
   }
 
+  @Get('services/:referenceType/:referenceId/payment-status')
+  getServicePaymentStatus(
+    @Param('referenceType') referenceType: string,
+    @Param('referenceId') referenceId: string,
+  ) {
+    return this.payments.getServicePaymentStatus(referenceType, referenceId);
+  }
+
   @Get('subscription-plans')
   listPlans(@Query('activeOnly') activeOnly?: string) {
     return this.subscriptions.listPlans(activeOnly === 'true');

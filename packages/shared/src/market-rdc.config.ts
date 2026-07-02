@@ -64,6 +64,13 @@ export const MARKET_RDC = {
     },
   },
 
+  /** Livraison repas — plafonds pour éviter des frais absurdes (restaurants hors zone). */
+  delivery: {
+    maxFoodDeliveryDistanceKm: 30,
+    maxFoodDeliveryFeeCdf: 20_000,
+    restaurantListRadiusKm: 50,
+  },
+
   peakHours: [
     { start: 7, end: 9 },
     { start: 17, end: 19 },

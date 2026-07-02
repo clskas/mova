@@ -268,6 +268,7 @@ export class ErrandsService {
     ]);
 
     const radiusKm = MARKET_RDC.matching.maxRadiusKm;
+    const errandRule = await this.commission.get(CommissionServiceType.ERRAND);
     const assignedOffers = assignedErrands.map((order) => {
       const tripKm = tripDistanceKm(
         order.pickupLat,
@@ -279,12 +280,15 @@ export class ErrandsService {
       const distanceToPickupKm = hasGps
         ? tripDistanceKm(profile.currentLat!, profile.currentLng!, order.pickupLat, order.pickupLng)
         : 0;
+      const gross = (order.finalPriceCdf ?? order.estimatedPriceCdf) + (order.purchaseTotalCdf ?? 0);
+      const driverNetCdf = Math.round(this.commission.splitGross(gross, errandRule.platformPercent).driverNetCdf);
       return {
         ...this.formatErrand(order),
         offerType: 'ERRAND',
         alreadyAssigned: true,
         tripDistanceKm: tripKm,
         distanceToPickupKm,
+        driverNetCdf,
       };
     });
 
@@ -307,11 +311,14 @@ export class ErrandsService {
           order.pickupLat,
           order.pickupLng,
         );
+        const gross = (order.finalPriceCdf ?? order.estimatedPriceCdf) + (order.purchaseTotalCdf ?? 0);
+        const driverNetCdf = Math.round(this.commission.splitGross(gross, errandRule.platformPercent).driverNetCdf);
         return {
           ...this.formatErrand(order),
           offerType: 'ERRAND',
           tripDistanceKm: tripKm,
           distanceToPickupKm,
+          driverNetCdf,
           _withinRadius: distanceToPickupKm <= radiusKm,
         };
       })

@@ -6,9 +6,10 @@ import '../location/service_area_prefs.dart';
 import '../location/service_areas.dart';
 
 class ServiceAreaSelector extends ConsumerWidget {
-  const ServiceAreaSelector({super.key, this.compact = false});
+  const ServiceAreaSelector({super.key, this.compact = false, this.sheetTitle});
 
   final bool compact;
+  final String? sheetTitle;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -63,7 +64,7 @@ class ServiceAreaSelector extends ConsumerWidget {
               Padding(
                 padding: const EdgeInsets.all(16),
                 child: Text(
-                  'Choisir votre ville préférée',
+                  sheetTitle ?? 'Choisir votre ville préférée',
                   style: Theme.of(ctx).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                 ),
               ),

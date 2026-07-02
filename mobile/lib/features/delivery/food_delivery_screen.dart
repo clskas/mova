@@ -8,9 +8,12 @@ import '../../core/geo/geo_utils.dart';
 import '../../core/location/location_service.dart';
 import '../../core/location/service_area_location.dart';
 import '../../core/theme/mova_colors.dart';
+import '../../core/location/service_area_prefs.dart';
+import '../../core/location/service_areas.dart';
 import '../../core/widgets/destination_coord_panel.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
+import '../../core/widgets/service_area_selector.dart';
 import 'food_tracking_screen.dart';
 
 class FoodDeliveryScreen extends ConsumerStatefulWidget {
@@ -46,8 +49,12 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
   String? _validationError;
   String _searchQuery = '';
   bool _loadingGps = false;
-  double _deliveryLat = ServiceAreaLocation.centerFor('kinshasa').latitude;
-  double _deliveryLng = ServiceAreaLocation.centerFor('kinshasa').longitude;
+  String _deliveryCityId = ServiceAreas.fallbackArea.id;
+  double _deliveryLat = ServiceAreas.fallbackArea.center.latitude;
+  double _deliveryLng = ServiceAreas.fallbackArea.center.longitude;
+
+  String get _deliveryCityName =>
+      ServiceAreas.byId(_deliveryCityId)?.name ?? ServiceAreas.fallbackArea.name;
 
   @override
   void initState() {
@@ -55,8 +62,38 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
     if (widget.initialDeliveryAddress != null) {
       _addressController.text = widget.initialDeliveryAddress!;
     }
-    _loadRestaurants();
-    _resolveDeliveryCoords();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _bootstrapDeliveryLocation());
+  }
+
+  Future<void> _bootstrapDeliveryLocation() async {
+    final area = ref.read(selectedServiceAreaProvider);
+    _applyDeliveryCity(area, updateAddress: false, reload: false);
+    await _loadRestaurants();
+    await _resolveDeliveryCoords(reloadAfter: true);
+  }
+
+  void _applyDeliveryCity(ServiceArea area, {bool updateAddress = true, bool reload = true}) {
+    setState(() {
+      _deliveryCityId = area.id;
+      _deliveryLat = area.center.latitude;
+      _deliveryLng = area.center.longitude;
+      if (updateAddress &&
+          (_addressController.text.trim().isEmpty ||
+              _addressController.text.trim() == 'Ma position')) {
+        _addressController.text = 'Centre-ville, ${area.name}';
+      }
+      _estimatedTotal = null;
+    });
+    if (reload) {
+      _loadRestaurants();
+    }
+  }
+
+  Future<void> _syncCityPreference(String areaId) async {
+    final prefs = await ref.read(serviceAreaPrefsProvider.future);
+    if (prefs.selectedAreaId == areaId) return;
+    await prefs.setSelectedAreaId(areaId);
+    ref.invalidate(serviceAreaPrefsProvider);
   }
 
   List<Map<String, dynamic>> _parseRestaurants(Map<String, dynamic> data) {
@@ -86,8 +123,10 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
       result.position,
       address: result.label,
     );
+    final detected = ServiceAreas.byCoords(coords) ?? ServiceAreas.nearest(coords);
     setState(() {
       _loadingGps = false;
+      _deliveryCityId = detected.id;
       _deliveryLat = coords.latitude;
       _deliveryLng = coords.longitude;
       _addressController.text = ServiceAreaLocation.isInBounds(result.position)
@@ -95,6 +134,7 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
           : LocationService.coordsLabel(coords);
       _estimatedTotal = null;
     });
+    await _syncCityPreference(detected.id);
     await _loadRestaurants();
   }
 
@@ -111,7 +151,7 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
     _loadRestaurants();
   }
 
-  Future<void> _resolveDeliveryCoords() async {
+  Future<void> _resolveDeliveryCoords({bool reloadAfter = false}) async {
     final result = await LocationService.getCurrentLocation();
     if (!mounted) return;
     if (result != null) {
@@ -119,11 +159,20 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
         result.position,
         address: result.label,
       );
+      final detected = ServiceAreas.byCoords(coords) ?? ServiceAreas.nearest(coords);
       setState(() {
+        _deliveryCityId = detected.id;
         _deliveryLat = coords.latitude;
         _deliveryLng = coords.longitude;
+        if (_addressController.text.trim().isEmpty ||
+            _addressController.text.trim() == 'Ma position') {
+          _addressController.text = ServiceAreaLocation.isInBounds(result.position)
+              ? result.label
+              : LocationService.coordsLabel(coords);
+        }
       });
-      await _loadRestaurants();
+      await _syncCityPreference(detected.id);
+      if (reloadAfter) await _loadRestaurants();
     }
   }
 
@@ -490,6 +539,7 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
     final params = <String, String>{
       'deliveryLat': '$_deliveryLat',
       'deliveryLng': '$_deliveryLng',
+      'deliveryCity': _deliveryCityName,
       if (_filterCuisine.trim().isNotEmpty) 'cuisine': _filterCuisine.trim(),
       if (_filterMaxEta > 0) 'maxEtaMin': _filterMaxEta.round().toString(),
       if (_filterMaxPrice > 0) 'maxPriceCdf': _filterMaxPrice.round().toString(),
@@ -696,11 +746,11 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
           }).toList();
 
     if (_restaurants.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 24),
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 24),
         child: Text(
-          'Aucun restaurant disponible pour le moment.',
-          style: TextStyle(color: MovaColors.textSecondary),
+          'Aucun restaurant disponible à $_deliveryCityName pour le moment.',
+          style: const TextStyle(color: MovaColors.textSecondary),
           textAlign: TextAlign.center,
         ),
       );
@@ -709,6 +759,20 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        const Align(
+          alignment: Alignment.centerLeft,
+          child: ServiceAreaSelector(sheetTitle: 'Ville de livraison'),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'Restaurants à $_deliveryCityName',
+          style: const TextStyle(
+            color: MovaColors.textSecondary,
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 12),
         TextField(
           decoration: const InputDecoration(
             labelText: 'Rechercher un restaurant',
@@ -1101,6 +1165,11 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<ServiceArea>(selectedServiceAreaProvider, (previous, next) {
+      if (previous?.id == next.id) return;
+      _applyDeliveryCity(next);
+    });
+
     return MovaScreen(
       title: 'Livraison repas',
       child: _loading

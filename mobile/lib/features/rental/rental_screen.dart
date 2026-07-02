@@ -288,11 +288,16 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
     final id = v['id']?.toString() ?? '';
     final selected = _compareIds.contains(id);
     final imageUrl = MarketConfig.resolveMediaUrl(v['imageUrl']?.toString() ?? '');
+    final isAvailable = v['isAvailable'] != false;
+    final availabilityLabel = v['availabilityLabel']?.toString() ?? (isAvailable ? 'Disponible' : 'En location');
+    final availabilityColor = isAvailable ? MovaColors.green : MovaColors.orange;
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: MovaCard(
-        onTap: () => _openDetail(v),
-        child: Column(
+        onTap: isAvailable ? () => _openDetail(v) : null,
+        child: Opacity(
+          opacity: isAvailable ? 1 : 0.72,
+          child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Row(
@@ -328,12 +333,12 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
                         margin: const EdgeInsets.only(top: 4),
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: MovaColors.green.withValues(alpha: 0.15),
+                          color: availabilityColor.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(4),
                         ),
-                        child: const Text(
-                          'Disponible',
-                          style: TextStyle(fontSize: 10, color: MovaColors.green, fontWeight: FontWeight.w600),
+                        child: Text(
+                          availabilityLabel,
+                          style: TextStyle(fontSize: 10, color: availabilityColor, fontWeight: FontWeight.w600),
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -383,6 +388,7 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
               ),
             ),
           ],
+        ),
         ),
       ),
     );

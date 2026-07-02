@@ -273,7 +273,8 @@ export class RentalService {
     };
   }
 
-  private mapVehicle(row: {
+  private mapVehicle(
+    row: {
     id: string;
     name: string;
     make: string | null;
@@ -294,8 +295,11 @@ export class RentalService {
     mileageUnlimited: boolean;
     limitedMileageFeeCdf: number;
     imageUrl: string | null;
-  }) {
+  },
+    unavailableIds?: Set<string>,
+  ) {
     const features = Array.isArray(row.features) ? row.features : [];
+    const isAvailable = !unavailableIds?.has(row.id);
     return {
       id: row.id,
       name: row.name,
@@ -319,7 +323,41 @@ export class RentalService {
       mileageUnlimited: row.mileageUnlimited,
       limitedMileageFeeCdf: row.limitedMileageFeeCdf,
       imageUrl: row.imageUrl ?? `https://placehold.co/600x400/6C63FF/white?text=${encodeURIComponent(row.name)}`,
+      isAvailable,
+      availabilityLabel: isAvailable ? 'Disponible' : 'En location',
     };
+  }
+
+  private async getUnavailableVehicleIds(now = new Date()): Promise<Set<string>> {
+    const rows = await this.prisma.rentalInquiry.findMany({
+      where: {
+        vehicleId: { not: null },
+        status: { in: [RentalInquiryStatus.CONFIRMED, RentalInquiryStatus.IN_PROGRESS] },
+        startDate: { lte: now },
+        endDate: { gte: now },
+      },
+      select: { vehicleId: true },
+    });
+    return new Set(rows.map((r) => r.vehicleId).filter((id): id is string => Boolean(id)));
+  }
+
+  private async assertVehicleAvailableForDates(vehicleId: string, startDate: Date, endDate: Date) {
+    const conflict = await this.prisma.rentalInquiry.findFirst({
+      where: {
+        vehicleId,
+        status: { in: [RentalInquiryStatus.CONFIRMED, RentalInquiryStatus.IN_PROGRESS] },
+        startDate: { lte: endDate },
+        endDate: { gte: startDate },
+      },
+      select: { id: true },
+    });
+    if (conflict) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        undefined,
+        'Ce véhicule est déjà réservé pour ces dates.',
+      );
+    }
   }
 
   private mapAddOnOptions(features: unknown) {
@@ -387,8 +425,9 @@ export class RentalService {
       where,
       orderBy: this.buildSort(query.sort),
     });
+    const unavailableIds = await this.getUnavailableVehicleIds();
     return {
-      data: rows.map((r) => this.mapVehicle(r)),
+      data: rows.map((r) => this.mapVehicle(r, unavailableIds)),
       currency: MARKET_RDC.currency,
       filters: {
         categories: ['ECONOMY', 'SUV', 'PREMIUM', 'VAN'],
@@ -408,8 +447,9 @@ export class RentalService {
     if (!vehicle || !vehicle.isActive) {
       throw new MovaHttpException(MovaErrorCode.RENTAL_VEHICLE_NOT_FOUND, HttpStatus.NOT_FOUND);
     }
+    const unavailableIds = await this.getUnavailableVehicleIds();
     return {
-      vehicle: this.mapVehicle(vehicle),
+      vehicle: this.mapVehicle(vehicle, unavailableIds),
       options: {
         insuranceTiers: MARKET_RDC.rental.insuranceTiers,
         addOns: this.mapAddOnOptions(vehicle.features),
@@ -554,6 +594,7 @@ export class RentalService {
     const quoteResult = await this.quote(dto);
     const startDate = new Date(dto.startDate);
     const endDate = new Date(dto.endDate);
+    await this.assertVehicleAvailableForDates(dto.vehicleId, startDate, endDate);
     const vehicle = await this.prisma.rentalVehicle.findUnique({ where: { id: dto.vehicleId } });
     const logistics = this.parsePassengerLogistics(dto);
     const inquiry = await this.prisma.rentalInquiry.create({

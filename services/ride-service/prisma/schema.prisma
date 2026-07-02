@@ -585,6 +585,7 @@ enum CommissionServiceType {
   RENTAL
   CARPOOL
   ERRAND
+  FOOD
 }
 
 model PlatformCommission {

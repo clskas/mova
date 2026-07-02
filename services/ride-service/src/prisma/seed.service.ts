@@ -177,6 +177,12 @@ const PLATFORM_COMMISSIONS = [
     perItemFeeCdf: 1500,
     description: 'Courses & commissions',
   },
+  {
+    serviceType: CommissionServiceType.FOOD,
+    platformPercent: 12,
+    driverPercent: 88,
+    description: 'Ventes repas — restaurants partenaires',
+  },
 ];
 
 @Injectable()

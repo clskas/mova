@@ -51,6 +51,7 @@ export class DeliveriesController {
   restaurants(
     @Query('deliveryLat') deliveryLat?: string,
     @Query('deliveryLng') deliveryLng?: string,
+    @Query('deliveryCity') deliveryCity?: string,
     @Query('cuisine') cuisine?: string,
     @Query('maxEtaMin') maxEtaMin?: string,
     @Query('maxPriceCdf') maxPriceCdf?: string,
@@ -68,6 +69,7 @@ export class DeliveriesController {
       eta != null && !Number.isNaN(eta) ? eta : undefined,
       price != null && !Number.isNaN(price) ? price : undefined,
       distance != null && !Number.isNaN(distance) ? distance : undefined,
+      deliveryCity?.trim() || undefined,
     );
   }
 
@@ -191,7 +193,7 @@ export class DeliveriesController {
   @Patch(':id/status')
   @ApiOperation({ summary: 'Mettre à jour statut livraison' })
   status(@Request() req: { user: { id: string } }, @Param('id') id: string, @Body() dto: UpdateDeliveryStatusDto) {
-    return this.deliveriesService.updateStatus(id, dto.status, req.user.id);
+    return this.deliveriesService.updateStatus(id, dto.status, req.user.id, dto.deliveryPin);
   }
 
   @Post(':id/rate')

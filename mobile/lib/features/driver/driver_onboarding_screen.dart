@@ -424,8 +424,10 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
         if (!mounted) return;
         switch (result) {
           case Success():
-            setState(() => _uploadingDoc = null);
-            await _load();
+            setState(() {
+              _uploadingDoc = null;
+              _markDocUploaded(type, url);
+            });
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$label enregistré')));
             }
@@ -449,6 +451,29 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
       if (item is Map && item['type'] == type) return item['uploaded'] == true;
     }
     return false;
+  }
+
+  void _markDocUploaded(String type, String url) {
+    final kyc = Map<String, dynamic>.from(_state?['kyc'] as Map? ?? {});
+    final checklist = <Map<String, dynamic>>[];
+    for (final item in (kyc['checklist'] as List?) ?? []) {
+      if (item is Map) checklist.add(Map<String, dynamic>.from(item));
+    }
+    var found = false;
+    for (var i = 0; i < checklist.length; i++) {
+      if (checklist[i]['type']?.toString() == type) {
+        checklist[i] = {...checklist[i], 'type': type, 'uploaded': true, 'url': url};
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      checklist.add({'type': type, 'uploaded': true, 'url': url, 'required': true});
+    }
+    kyc['checklist'] = checklist;
+    final required = checklist.where((i) => i['required'] == true);
+    kyc['requiredComplete'] = required.isNotEmpty && required.every((i) => i['uploaded'] == true);
+    _state = {...?_state, 'kyc': kyc};
   }
 
   Future<void> _next() async {

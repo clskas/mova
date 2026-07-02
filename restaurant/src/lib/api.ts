@@ -76,6 +76,23 @@ export function fetchOrders(status?: string) {
   return apiFetch<{ restaurant: { id: string; name: string }; orders: RestaurantOrder[] }>(`/api/restaurant/orders${q}`);
 }
 
+export type RestaurantEarnings = {
+  restaurant: { id: string; name: string };
+  balanceCdf: number;
+  formattedBalance: string;
+  recentFoodSales: {
+    id: string;
+    amountCdf: number;
+    description?: string;
+    reference?: string;
+    createdAt: string;
+  }[];
+};
+
+export function fetchEarnings() {
+  return apiFetch<RestaurantEarnings>("/api/restaurant/earnings");
+}
+
 export function confirmOrder(id: string) {
   return apiFetch(`/api/restaurant/orders/${id}/confirm`, { method: "POST" });
 }

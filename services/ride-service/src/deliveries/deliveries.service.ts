@@ -1,5 +1,5 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { DeliveryStatus, DeliveryType, Prisma, SurchargeType, TrackingReferenceType, VehicleType, WeightCategory } from '@prisma/client';
+import { DeliveryStatus, DeliveryType, Prisma, SurchargeType, TrackingReferenceType, VehicleType, WeightCategory, CommissionServiceType } from '@prisma/client';
 import { driverEligibleForParcelWeight, INTERNAL_API_KEY, MARKET_RDC, MOVA_EVENTS, MovaErrorCode, MovaHttpException, canCancelDelivery, estimateRoadDistanceKm, estimateTripDurationMin, formatCdf, normalizeVehicleType, resolveCityFromCoords, serviceUrl, VehicleTypeValue } from '@mova/shared';
 import { RedisService } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
@@ -19,6 +19,8 @@ import { assertDriverCanReceiveJobs, assertDriverEligibleForParcel, driverCanRec
 import { TrackingService } from '../tracking/tracking.service';
 import { MatchingService } from '../matching/matching.service';
 import { notifyNearbyDrivers } from '../common/driver-job-alert.util';
+import { CommissionService } from '../rides/commission.service';
+import { deliveryDriverGross } from './delivery-driver-gross.util';
 
 const WEIGHT_MULTIPLIERS: Record<WeightCategory, number> = {
   [WeightCategory.DOCUMENTS]: 1.0,
@@ -35,6 +37,9 @@ const WEIGHT_KG_MULTIPLIERS: { maxKg: number; category: WeightCategory; multipli
 ];
 
 const FOOD_DELIVERY_BASE_CDF = 3000;
+const MAX_FOOD_DELIVERY_DISTANCE_KM = 30;
+const MAX_FOOD_DELIVERY_FEE_CDF = 20_000;
+const RESTAURANT_LIST_RADIUS_KM = 50;
 
 type MenuSize = { label?: string; name?: string; priceCdf?: number; unitPriceCdf?: number };
 type MenuOption = { label?: string; name?: string; priceCdf?: number; unitPriceCdf?: number };
@@ -56,6 +61,7 @@ export class DeliveriesService {
     private redis: RedisService,
     private trackingService: TrackingService,
     private matching: MatchingService,
+    private commission: CommissionService,
   ) {}
 
   private async alertDeliveryOffer(delivery: {
@@ -233,6 +239,44 @@ export class DeliveriesService {
     return { subtotalCdf: subtotal, normalizedItems: normalized };
   }
 
+  /** Frais et distance livraison repas — même ville, distance plafonnée, frais plafonnés. */
+  private async computeFoodDeliveryQuote(
+    restaurantLat: number,
+    restaurantLng: number,
+    deliveryLat: number,
+    deliveryLng: number,
+  ) {
+    const restaurantCity = resolveCityFromCoords(restaurantLat, restaurantLng).toLowerCase();
+    const deliveryCity = resolveCityFromCoords(deliveryLat, deliveryLng).toLowerCase();
+    if (restaurantCity !== deliveryCity) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        undefined,
+        'Ce restaurant ne livre pas dans votre ville. Choisissez un restaurant de votre zone.',
+      );
+    }
+    const distanceKm = estimateRoadDistanceKm(
+      this.pricing.haversineKm(restaurantLat, restaurantLng, deliveryLat, deliveryLng),
+    );
+    const maxKm = MAX_FOOD_DELIVERY_DISTANCE_KM;
+    if (distanceKm > maxKm) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        undefined,
+        `Livraison hors zone (${maxKm} km max depuis le restaurant).`,
+      );
+    }
+    const durationMin = estimateTripDurationMin(distanceKm, MARKET_RDC.trip.averageSpeedKmh.delivery);
+    const foodSurcharge = await this.surcharges.get(SurchargeType.DELIVERY_FOOD);
+    const fare = await this.pricing.estimateFare(VehicleType.MOTO_TAXI, distanceKm, durationMin);
+    const rawFee = Math.max(
+      foodSurcharge.baseFeeCdf || FOOD_DELIVERY_BASE_CDF,
+      Math.ceil(fare.estimatedFareCdf * foodSurcharge.multiplier),
+    );
+    const cap = MAX_FOOD_DELIVERY_FEE_CDF;
+    return { distanceKm, durationMin, deliveryFeeCdf: Math.min(rawFee, cap) };
+  }
+
   async estimateFood(dto: CreateFoodDeliveryDto) {
     const restaurant = await this.prisma.restaurant.findUnique({ where: { id: dto.restaurantId } });
     if (!restaurant || !restaurant.isActive) throw new MovaHttpException(MovaErrorCode.RESTAURANT_NOT_FOUND, HttpStatus.NOT_FOUND);
@@ -241,10 +285,12 @@ export class DeliveriesService {
     }
     const foodSurcharge = await this.surcharges.get(SurchargeType.DELIVERY_FOOD);
     const { subtotalCdf: itemsSubtotal } = this.resolveFoodItemsSubtotalCdf(restaurant.menuItems, dto.items);
-    const distanceKm = estimateRoadDistanceKm(this.pricing.haversineKm(restaurant.lat, restaurant.lng, dto.deliveryLat, dto.deliveryLng));
-    const durationMin = estimateTripDurationMin(distanceKm, MARKET_RDC.trip.averageSpeedKmh.delivery);
-    const fare = await this.pricing.estimateFare(VehicleType.MOTO_TAXI, distanceKm, durationMin);
-    const deliveryFeeCdf = Math.max(foodSurcharge.baseFeeCdf || FOOD_DELIVERY_BASE_CDF, Math.ceil(fare.estimatedFareCdf * foodSurcharge.multiplier));
+    const { distanceKm, durationMin, deliveryFeeCdf } = await this.computeFoodDeliveryQuote(
+      restaurant.lat,
+      restaurant.lng,
+      dto.deliveryLat,
+      dto.deliveryLng,
+    );
     const subtotalWithDelivery = itemsSubtotal + deliveryFeeCdf;
     const promoApplied = await this.applyFoodPromo(subtotalWithDelivery, dto.promoCode, false);
     return {
@@ -294,7 +340,13 @@ export class DeliveriesService {
       data: {
         deliveryId: delivery.id,
         event: 'ORDER_PLACED',
-        metadata: { items: normalizedItems, promoCode: promoApplied.promoCode, discountCdf: promoApplied.discountCdf } as unknown as Prisma.InputJsonValue,
+        metadata: {
+          items: normalizedItems,
+          itemsSubtotalCdf: estimate.itemsSubtotalCdf,
+          deliveryFeeCdf: estimate.deliveryFeeCdf,
+          promoCode: promoApplied.promoCode,
+          discountCdf: promoApplied.discountCdf,
+        } as unknown as Prisma.InputJsonValue,
       },
     });
     await this.redis.publish(MOVA_EVENTS.DELIVERY_CREATED, {
@@ -320,23 +372,22 @@ export class DeliveriesService {
       throw new MovaHttpException(MovaErrorCode.RESTAURANT_NOT_FOUND, HttpStatus.NOT_FOUND);
     }
 
+    const foodSurcharge = await this.surcharges.get(SurchargeType.DELIVERY_FOOD);
     let itemsSubtotalCdf = 0;
     let maxDistanceKm = 0;
     let maxDurationMin = 0;
+    let deliveryFeeCdf = foodSurcharge.baseFeeCdf || FOOD_DELIVERY_BASE_CDF;
 
     for (const order of dto.orders) {
       const r = restaurants.find((x) => x.id === order.restaurantId)!;
       const { subtotalCdf } = this.resolveFoodItemsSubtotalCdf(r.menuItems, order.items as CreateFoodDeliveryDto['items']);
       itemsSubtotalCdf += subtotalCdf;
-      const distanceKm = estimateRoadDistanceKm(this.pricing.haversineKm(r.lat, r.lng, dto.deliveryLat, dto.deliveryLng));
-      const durationMin = estimateTripDurationMin(distanceKm, MARKET_RDC.trip.averageSpeedKmh.delivery);
-      if (distanceKm > maxDistanceKm) maxDistanceKm = distanceKm;
-      if (durationMin > maxDurationMin) maxDurationMin = durationMin;
+      const quote = await this.computeFoodDeliveryQuote(r.lat, r.lng, dto.deliveryLat, dto.deliveryLng);
+      if (quote.distanceKm > maxDistanceKm) maxDistanceKm = quote.distanceKm;
+      if (quote.durationMin > maxDurationMin) maxDurationMin = quote.durationMin;
+      deliveryFeeCdf = Math.max(deliveryFeeCdf, quote.deliveryFeeCdf);
     }
 
-    const foodSurcharge = await this.surcharges.get(SurchargeType.DELIVERY_FOOD);
-    const fare = await this.pricing.estimateFare(VehicleType.MOTO_TAXI, maxDistanceKm, maxDurationMin);
-    const deliveryFeeCdf = Math.max(foodSurcharge.baseFeeCdf || FOOD_DELIVERY_BASE_CDF, Math.ceil(fare.estimatedFareCdf * foodSurcharge.multiplier));
     const subtotalWithDelivery = itemsSubtotalCdf + deliveryFeeCdf;
     const promoApplied = await this.applyFoodPromo(subtotalWithDelivery, dto.promoCode, false);
 
@@ -400,7 +451,13 @@ export class DeliveriesService {
       data: {
         deliveryId: delivery.id,
         event: 'ORDER_PLACED',
-        metadata: { orders: normalizedOrders.map((o) => ({ restaurantId: o.restaurant.id, restaurantName: o.restaurant.name, items: o.items })), promoCode: promoApplied.promoCode, discountCdf: promoApplied.discountCdf } as unknown as Prisma.InputJsonValue,
+        metadata: {
+          orders: normalizedOrders.map((o) => ({ restaurantId: o.restaurant.id, restaurantName: o.restaurant.name, items: o.items })),
+          itemsSubtotalCdf: estimate.itemsSubtotalCdf,
+          deliveryFeeCdf: estimate.deliveryFeeCdf,
+          promoCode: promoApplied.promoCode,
+          discountCdf: promoApplied.discountCdf,
+        } as unknown as Prisma.InputJsonValue,
       },
     });
 
@@ -616,6 +673,7 @@ export class DeliveriesService {
     maxEtaMin?: number,
     maxPriceCdf?: number,
     maxDistanceKm?: number,
+    deliveryCity?: string,
   ) {
     const rows = await this.prisma.restaurant.findMany({
       where: {
@@ -630,17 +688,19 @@ export class DeliveriesService {
     });
 
     /** Rayon livraison repas autour du point de livraison (km). */
-    const DELIVERY_RADIUS_KM = 50;
+    const DELIVERY_RADIUS_KM = RESTAURANT_LIST_RADIUS_KM;
 
+    const cityKey = deliveryCity?.trim().toLowerCase();
     let scoped = rows;
-    if (deliveryLat != null && deliveryLng != null) {
-      const deliveryCity = resolveCityFromCoords(deliveryLat, deliveryLng).toLowerCase();
+    if (cityKey) {
+      scoped = rows.filter((r) => resolveCityFromCoords(r.lat, r.lng).toLowerCase() === cityKey);
+    } else if (deliveryLat != null && deliveryLng != null) {
+      const resolvedDeliveryCity = resolveCityFromCoords(deliveryLat, deliveryLng).toLowerCase();
       scoped = rows.filter((r) => {
         const restaurantCity = resolveCityFromCoords(r.lat, r.lng).toLowerCase();
-        if (restaurantCity === deliveryCity) return true;
+        if (restaurantCity === resolvedDeliveryCity) return true;
         return this.pricing.haversineKm(r.lat, r.lng, deliveryLat, deliveryLng) <= DELIVERY_RADIUS_KM;
       });
-      if (scoped.length === 0) scoped = rows;
     }
 
     const data = scoped
@@ -722,6 +782,7 @@ export class DeliveriesService {
     });
 
     const radiusKm = MARKET_RDC.matching.maxRadiusKm;
+    const deliveryRule = await this.commission.get(CommissionServiceType.DELIVERY);
     const driverTypes = (profile.vehicles ?? [])
       .filter((v) => v.isActive !== false)
       .map((v) => {
@@ -744,11 +805,16 @@ export class DeliveriesService {
           : Number.POSITIVE_INFINITY;
         const pickupCity = resolveCityFromCoords(pickupLat, pickupLng).toLowerCase();
         const formatted = formatParcelDelivery(d as Parameters<typeof formatParcelDelivery>[0]);
+        const driverGross = deliveryDriverGross(d);
+        const driverNetCdf = Math.round(
+          this.commission.splitGross(driverGross, deliveryRule.platformPercent).driverNetCdf,
+        );
         return {
           ...formatted,
           distanceKm: tripKm,
           tripDistanceKm: tripKm,
           distanceToPickupKm,
+          driverNetCdf,
           pickupCity,
           offerType: 'DELIVERY',
           type: d.type,
@@ -802,7 +868,7 @@ export class DeliveriesService {
     return { delivery: formatted, success: true };
   }
 
-  async updateStatus(id: string, status: DeliveryStatus, userId: string) {
+  async updateStatus(id: string, status: DeliveryStatus, userId: string, deliveryPin?: string) {
     const delivery = await this.prisma.delivery.findUnique({ where: { id } });
     if (!delivery) throw new MovaHttpException(MovaErrorCode.DELIVERY_NOT_FOUND, HttpStatus.NOT_FOUND);
     if (delivery.userId !== userId && delivery.driverId !== userId) {
@@ -816,6 +882,17 @@ export class DeliveriesService {
         HttpStatus.FORBIDDEN,
         'Seul l\'annulation est autorisée depuis l\'application passager.',
       );
+    }
+    if (isDriver && status === DeliveryStatus.DELIVERED) {
+      const expectedPin = String(delivery.deliveryPin ?? '').trim();
+      const providedPin = String(deliveryPin ?? '').trim();
+      if (!expectedPin || providedPin !== expectedPin) {
+        throw new MovaHttpException(
+          MovaErrorCode.VALIDATION_ERROR,
+          undefined,
+          'Code PIN de livraison incorrect. Demandez le code au destinataire.',
+        );
+      }
     }
     const allowed: Record<DeliveryStatus, DeliveryStatus[]> = {
       [DeliveryStatus.PENDING]: [DeliveryStatus.PICKED_UP, DeliveryStatus.CANCELLED],

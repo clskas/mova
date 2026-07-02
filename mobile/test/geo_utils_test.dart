@@ -13,6 +13,12 @@ void main() {
     expect(GeoUtils.etaMinutesFromDistanceKm(0.1), 1);
   });
 
+  test('formatDistanceKm uses meters below 1 km', () {
+    expect(GeoUtils.formatDistanceKm(0.45), '450 m');
+    expect(GeoUtils.formatDistanceKm(0.999), '999 m');
+    expect(GeoUtils.formatDistanceKm(1.2), '1.2 km');
+  });
+
   test('driverEtaMinutes computes pickup ETA', () {
     final eta = GeoUtils.driverEtaMinutes(-4.32, 15.31, -4.33, 15.32);
     expect(eta, greaterThanOrEqualTo(1));

@@ -139,8 +139,9 @@ class _MovingTrackingScreenState extends ConsumerState<MovingTrackingScreen> {
 
   void _maybeGoToPayment() {
     if (_paymentNavigated || !mounted || _totalCdf <= 0) return;
+    if (_request?['isPaid'] == true) return;
     final paymentReady = _request?['paymentReady'] == true ||
-        _request?['status']?.toString() == 'COMPLETED';
+        (_request?['status']?.toString() == 'COMPLETED' && _request?['isPaid'] != true);
     if (!paymentReady) return;
     _paymentNavigated = true;
     _openPayment();
@@ -150,6 +151,8 @@ class _MovingTrackingScreenState extends ConsumerState<MovingTrackingScreen> {
   Widget build(BuildContext context) {
     final price = _request?['estimatedPriceCdf'] as int? ?? widget.estimatedPrice;
     final status = _request?['status']?.toString() ?? 'PENDING';
+    final isPaid = _request?['isPaid'] == true;
+    final paymentReady = _request?['paymentReady'] == true;
 
     return MovaScreen(
       title: 'Suivi déménagement',
@@ -189,9 +192,20 @@ class _MovingTrackingScreenState extends ConsumerState<MovingTrackingScreen> {
                         ),
                       ),
                       Text(
-                        historyStatusLabel(status),
-                        style: const TextStyle(color: MovaColors.violet, fontWeight: FontWeight.w600),
+                        isPaid ? 'Payé' : historyStatusLabel(status),
+                        style: TextStyle(
+                          color: isPaid ? MovaColors.green : MovaColors.violet,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
+                      if (paymentReady && !isPaid) ...[
+                        const SizedBox(height: 12),
+                        MovaButton(
+                          label: 'Payer le déménagement',
+                          icon: Icons.payment,
+                          onPressed: _openPayment,
+                        ),
+                      ],
                       const SizedBox(height: 8),
                       const Text(
                         'Un administrateur MOVA valide votre demande, assigne une équipe/camion, '

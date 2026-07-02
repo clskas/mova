@@ -1,6 +1,6 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { DeliveryStatus, DeliveryType, Prisma } from '@prisma/client';
-import { MOVA_EVENTS, MovaErrorCode, MovaHttpException } from '@mova/shared';
+import { MOVA_EVENTS, MovaErrorCode, MovaHttpException, INTERNAL_API_KEY, serviceUrl } from '@mova/shared';
 import { RedisService } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { formatParcelDelivery } from '../deliveries/parcel.util';
@@ -53,6 +53,25 @@ export class RestaurantPortalService {
     };
   }
 
+  private deliveryIncludesRestaurant(items: unknown, restaurantId: string): boolean {
+    if (!Array.isArray(items)) return false;
+    return items.some((entry) => {
+      if (!entry || typeof entry !== 'object') return false;
+      const row = entry as { restaurantId?: string };
+      return row.restaurantId === restaurantId;
+    });
+  }
+
+  private orderItemsForRestaurant(items: unknown, restaurantId: string) {
+    if (!Array.isArray(items)) return items;
+    const multi = this.deliveryIncludesRestaurant(items, restaurantId);
+    if (!multi) return items;
+    const block = items.find(
+      (entry) => entry && typeof entry === 'object' && (entry as { restaurantId?: string }).restaurantId === restaurantId,
+    ) as { items?: unknown } | undefined;
+    return block?.items ?? items;
+  }
+
   async listOrders(ownerUserId: string, status?: string) {
     const restaurant = await this.getRestaurantForOwner(ownerUserId);
     const statuses = status
@@ -66,21 +85,25 @@ export class RestaurantPortalService {
         ];
     const rows = await this.prisma.delivery.findMany({
       where: {
-        restaurantId: restaurant.id,
         type: DeliveryType.FOOD,
         status: { in: statuses as DeliveryStatus[] },
+        OR: [{ restaurantId: restaurant.id }, { restaurantId: null }],
       },
       orderBy: { createdAt: 'desc' },
-      take: 50,
+      take: 100,
       include: { events: { orderBy: { createdAt: 'asc' } } },
     });
+    const scoped = rows.filter(
+      (d) => d.restaurantId === restaurant.id || this.deliveryIncludesRestaurant(d.items, restaurant.id),
+    );
     return {
       restaurant: { id: restaurant.id, name: restaurant.name },
-      orders: rows.map((d) => this.formatOrder(d)),
+      orders: scoped.slice(0, 50).map((d) => this.formatOrder(d, restaurant.id)),
     };
   }
 
-  private formatOrder(d: {
+  private formatOrder(
+    d: {
     id: string;
     status: DeliveryStatus;
     items: unknown;
@@ -88,16 +111,21 @@ export class RestaurantPortalService {
     estimatedPriceCdf: number;
     createdAt: Date;
     driverId: string | null;
-  }) {
+    restaurantId?: string | null;
+  },
+    restaurantId?: string,
+  ) {
+    const items = restaurantId ? this.orderItemsForRestaurant(d.items, restaurantId) : d.items;
     return {
       id: d.id,
       status: d.status,
       statusLabel: this.statusLabel(d.status),
-      items: d.items,
+      items,
       deliveryAddress: d.deliveryAddress,
       estimatedPriceCdf: d.estimatedPriceCdf,
       createdAt: d.createdAt.toISOString(),
       driverAssigned: Boolean(d.driverId),
+      multiRestaurant: Boolean(restaurantId && !d.restaurantId && this.deliveryIncludesRestaurant(d.items, restaurantId)),
     };
   }
 
@@ -121,11 +149,13 @@ export class RestaurantPortalService {
       where: { id: deliveryId },
       include: { restaurant: true, events: { orderBy: { createdAt: 'asc' } } },
     });
-    if (!delivery || delivery.restaurantId !== restaurant.id) {
+    if (!delivery || delivery.type !== DeliveryType.FOOD) {
       throw new MovaHttpException(MovaErrorCode.DELIVERY_NOT_FOUND, HttpStatus.NOT_FOUND);
     }
-    if (delivery.type !== DeliveryType.FOOD) {
-      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Commande repas uniquement.');
+    const ownsOrder =
+      delivery.restaurantId === restaurant.id || this.deliveryIncludesRestaurant(delivery.items, restaurant.id);
+    if (!ownsOrder) {
+      throw new MovaHttpException(MovaErrorCode.DELIVERY_NOT_FOUND, HttpStatus.NOT_FOUND);
     }
     return { delivery, restaurant };
   }
@@ -165,6 +195,41 @@ export class RestaurantPortalService {
     });
     await this.publishStatus(updated, DeliveryStatus.CANCELLED);
     return { order: this.formatOrder(updated), delivery: formatParcelDelivery(updated) };
+  }
+
+  async getEarnings(ownerUserId: string) {
+    const restaurant = await this.getRestaurantForOwner(ownerUserId);
+    try {
+      const res = await fetch(serviceUrl('payment', `/internal/wallets/${ownerUserId}`), {
+        headers: { 'x-internal-api-key': INTERNAL_API_KEY },
+      });
+      if (!res.ok) {
+        throw new MovaHttpException(MovaErrorCode.INTERNAL_ERROR, HttpStatus.BAD_GATEWAY, 'Portefeuille indisponible.');
+      }
+      const wallet = (await res.json()) as {
+        balanceCdf?: number;
+        formattedBalance?: string;
+        transactions?: { id: string; amountCdf: number; type: string; description?: string; reference?: string; createdAt: string }[];
+      };
+      const foodCredits = (wallet.transactions ?? []).filter(
+        (tx) => tx.type === 'CREDIT' && String(tx.description ?? '').startsWith('Vente repas'),
+      );
+      return {
+        restaurant: { id: restaurant.id, name: restaurant.name },
+        balanceCdf: wallet.balanceCdf ?? 0,
+        formattedBalance: wallet.formattedBalance ?? `${wallet.balanceCdf ?? 0} FC`,
+        recentFoodSales: foodCredits.map((tx) => ({
+          id: tx.id,
+          amountCdf: tx.amountCdf,
+          description: tx.description,
+          reference: tx.reference,
+          createdAt: tx.createdAt,
+        })),
+      };
+    } catch (e) {
+      if (e instanceof MovaHttpException) throw e;
+      throw new MovaHttpException(MovaErrorCode.INTERNAL_ERROR, HttpStatus.BAD_GATEWAY, 'Portefeuille indisponible.');
+    }
   }
 
   async getMenu(ownerUserId: string) {

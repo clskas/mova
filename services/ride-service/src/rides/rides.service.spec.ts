@@ -55,7 +55,7 @@ describe('RidesService', () => {
   };
 
   const tripShare = { generateCompletionPin: jest.fn().mockReturnValue('4321'), generateToken: jest.fn().mockReturnValue('abc'), shareExpiresAt: jest.fn().mockReturnValue(new Date()), buildShareUrl: jest.fn().mockReturnValue('http://localhost:3000/api/public/trips/abc') };
-  const service = new RidesService(prisma as never, pricing as never, matching as never, redis as never, trackingGateway as never, trackingService as never, commission as never, tripShare as never);
+  const service = new RidesService(prisma as never, pricing as never, matching as never, redis as never, trackingGateway as never, trackingService as never, commission as never, tripShare as never, { peek: jest.fn(), redeem: jest.fn(), applyDiscount: jest.fn((p: number) => p) } as never);
 
   beforeEach(() => jest.clearAllMocks());
 

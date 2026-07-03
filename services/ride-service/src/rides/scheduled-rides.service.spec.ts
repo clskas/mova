@@ -16,7 +16,14 @@ describe('ScheduledRidesService', () => {
 
   const redis = { publish: jest.fn().mockResolvedValue(undefined) };
   const tripShare = { generateCompletionPin: jest.fn().mockReturnValue('1234') };
-  const service = new ScheduledRidesService(prisma as never, pricing, redis as never, tripShare as never);
+  const matching = { findDrivers: jest.fn().mockResolvedValue([]) };
+  const rides = { createScheduledLinkedRide: jest.fn() };
+  const promo = {
+    peek: jest.fn(),
+    redeem: jest.fn(),
+    applyDiscount: jest.fn((price: number) => price),
+  };
+  const service = new ScheduledRidesService(prisma as never, pricing, redis as never, tripShare as never, matching as never, rides as never, promo as never);
 
   beforeEach(() => jest.clearAllMocks());
 

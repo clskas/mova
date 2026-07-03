@@ -12,6 +12,8 @@ import { PricingService } from '../rides/pricing.service';
 import { SurchargeService } from '../rides/surcharge.service';
 import { TripShareService } from '../share/trip-share.service';
 import { CreateMovingDto, EstimateMovingDto } from './moving.dto';
+import { applyPromoCode } from '../common/promo-apply.util';
+import { PromoService } from '../rides/surcharge.service';
 
 @Injectable()
 export class MovingService {
@@ -21,6 +23,7 @@ export class MovingService {
     private surcharges: SurchargeService,
     private redis: RedisService,
     private tripShare: TripShareService,
+    private promo: PromoService,
   ) {}
 
   private validateCoords(dto: EstimateMovingDto) {
@@ -49,7 +52,7 @@ export class MovingService {
     );
   }
 
-  async estimate(dto: EstimateMovingDto) {
+  async estimate(dto: EstimateMovingDto, redeemPromo = false) {
     const { pickupArea, dropoffArea, isInterCity } = assertServiceAreaPair(
       dto.pickupLat,
       dto.pickupLng,
@@ -64,12 +67,18 @@ export class MovingService {
     const perM3 = moving.perUnitCdf ?? 8000;
     const volumeFee = Math.ceil(dto.volumeM3 * perM3);
     const vehicleMultiplier = this.vehicleCategoryMultiplier(dto.vehicleCategory);
-    const estimatedPriceCdf = Math.ceil(
+    const beforePromo = Math.ceil(
       (withInterCity.estimatedFareCdf * moving.multiplier + moving.baseFeeCdf + volumeFee) * vehicleMultiplier,
     );
+    const promoApplied = await applyPromoCode(this.promo, beforePromo, dto.promoCode, redeemPromo, {
+      context: { serviceType: 'MOVING' },
+    });
+    const estimatedPriceCdf = promoApplied.estimatedPriceCdf;
     return {
       estimatedPriceCdf,
       formatted: formatCdf(estimatedPriceCdf),
+      discountCdf: promoApplied.discountCdf,
+      promoCode: promoApplied.promoCode,
       currency: 'CDF',
       city: pickupArea.name,
       pickupCity: pickupArea.name,
@@ -86,7 +95,7 @@ export class MovingService {
   }
 
   async create(userId: string, dto: CreateMovingDto) {
-    const estimate = await this.estimate(dto);
+    const estimate = await this.estimate(dto, true);
     const request = await this.prisma.movingRequest.create({
       data: {
         userId,
@@ -100,6 +109,8 @@ export class MovingService {
         dropoffLng: dto.dropoffLng,
         dropoffAddress: dto.dropoffAddress.trim(),
         estimatedPriceCdf: estimate.estimatedPriceCdf,
+        promoCode: estimate.promoCode,
+        discountCdf: estimate.discountCdf || undefined,
         distanceKm: estimate.distanceKm,
         durationMin: estimate.durationMin,
         photoUrls: dto.photoUrls?.length ? dto.photoUrls : undefined,

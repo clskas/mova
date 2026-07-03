@@ -38,8 +38,8 @@ Gardez le **GPS activé** et l'application au premier plan pendant la mission.
 | Course immédiate | Taxi / moto-taxi depuis une demande passager |
 | Colis & express | Enlèvement et livraison avec suivi statut |
 | Repas | Récupération restaurant → livraison client |
-| Planifiée | Trajet confirmé à l'avance (J+7 max) |
-| Courses & commissions | Achats pour le compte du passager (ERRAND) |
+| Planifiée | Trajet confirmé à l'avance (J+7 max) — rappels, auto-assignation, course GPS au démarrage |
+| Courses & commissions | Achats pour le compte du passager — **photo preuve** obligatoire avant clôture |
 | Covoiturage | Publier un trajet partagé (KYC approuvé) depuis **Publier un covoiturage** |
 | Déménagement | Mission assignée — mise à jour des statuts depuis l'app |
 
@@ -51,6 +51,21 @@ Gardez le **GPS activé** et l'application au premier plan pendant la mission.
 | Type d'engin en attente | Véhicule VIP/Confort non validé | Attendre validation admin |
 | Compte suspendu | Statut utilisateur | Admin → Utilisateurs → ACTIVE |
 | Pas d'offres | Hors ligne ou indisponible | Activer **En ligne** |
+
+## Courses & commissions (ERRAND)
+
+1. Une **alerte** vous signale les nouvelles demandes à proximité.
+2. Acceptez la mission depuis **Livraisons / offres**.
+3. Communiquez avec le passager via le **chat** si un article est indisponible.
+4. Avant de marquer la course **terminée**, prenez une **photo preuve d'achat** (ticket ou reçu).
+5. Saisissez le **montant total des achats** en CDF à la clôture.
+
+## Réservation planifiée
+
+1. Les missions à venir apparaissent dans **Missions assignées** ou via les offres planifiées.
+2. Vous pouvez vous porter **volontaire** sur un créneau non encore assigné (**Me porter volontaire**).
+3. Vous recevrez des rappels la veille et une heure avant le départ.
+4. Au **démarrage**, une course GPS est ouverte pour le suivi en direct (comme une course taxi classique).
 
 ## Covoiturage (conducteur)
 

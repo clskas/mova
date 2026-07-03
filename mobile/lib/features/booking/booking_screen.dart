@@ -16,6 +16,7 @@ import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
+import '../../widgets/promo_code_field.dart';
 import 'matching_screen.dart';
 import 'tracking_screen.dart';
 import 'widgets/mova_ride_map.dart';
@@ -31,6 +32,7 @@ class BookingScreen extends ConsumerStatefulWidget {
 class _BookingScreenState extends ConsumerState<BookingScreen> {
   final _pickupController = TextEditingController(text: 'Ma position');
   final _destinationController = TextEditingController();
+  final _promoController = TextEditingController();
 
   String _vehicleType = 'MOTO_TAXI';
   LatLng _pickup = ServiceAreaLocation.defaultCenter;
@@ -48,6 +50,16 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   String? _error;
   String? _validationError;
   bool _showSuggestions = false;
+  List<Map<String, dynamic>> _poiPlaces = [];
+  String? _poiCategoryFilter;
+
+  static const _poiFilters = [
+    (null, 'Tous'),
+    ('MARKET', 'Marchés'),
+    ('HOSPITAL', 'Hôpitaux'),
+    ('UNIVERSITY', 'Universités'),
+    ('PHARMACY', 'Pharmacies'),
+  ];
 
   @override
   void initState() {
@@ -57,6 +69,21 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
       WidgetsBinding.instance.addPostFrameCallback((_) => _useMyLocation());
     }
     WidgetsBinding.instance.addPostFrameCallback((_) => _checkUnpaidRide());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadNearbyPoi());
+  }
+
+  Future<void> _loadNearbyPoi() async {
+    final city = ServiceAreas.cityNameForCoords(_pickup);
+    final result = await ref.read(apiClientProvider).geoPlaces(
+      city: city,
+      lat: _pickup.latitude,
+      lng: _pickup.longitude,
+      radiusKm: 8,
+    );
+    if (!mounted) return;
+    if (result case Success(:final data)) {
+      setState(() => _poiPlaces = data);
+    }
   }
 
   Future<void> _checkUnpaidRide() async {
@@ -102,6 +129,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
     _destinationController.removeListener(_onDestinationChanged);
     _pickupController.dispose();
     _destinationController.dispose();
+    _promoController.dispose();
     super.dispose();
   }
 
@@ -291,6 +319,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
       'dropoffLat': dropoff.latitude,
       'dropoffLng': dropoff.longitude,
       'vehicleType': MarketConfig.apiVehicleType(vehicleType),
+      if (_promoController.text.trim().isNotEmpty) 'promoCode': _promoController.text.trim(),
     };
   }
 
@@ -477,10 +506,28 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
           dropoffEditable: true,
           pickupLabel: _pickupController.text,
           dropoffLabel: _destinationController.text,
+          places: _poiPlaces,
+          placesCategoryFilter: _poiCategoryFilter,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: _poiFilters.map((f) {
+                  final selected = _poiCategoryFilter == f.$1;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8, bottom: 8),
+                    child: FilterChip(
+                      label: Text(f.$2),
+                      selected: selected,
+                      onSelected: (_) => setState(() => _poiCategoryFilter = f.$1),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
             TextField(
                     controller: _pickupController,
                     decoration: InputDecoration(
@@ -658,6 +705,13 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                     const SizedBox(height: 12),
                     MovaErrorBanner(message: _validationError!),
                   ],
+                  PromoCodeField(
+                    controller: _promoController,
+                    onChanged: () => setState(() {
+                      _estimates = {};
+                      _selectedEstimate = null;
+                    }),
+                  ),
                   if (_error != null) ...[
                     const SizedBox(height: 12),
                     MovaErrorBanner(message: _error!, onRetry: _fetchAllEstimates),

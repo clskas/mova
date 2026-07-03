@@ -12,9 +12,12 @@ function toVehicleType(value: unknown): VehicleType {
 /** Contrat mobile — courses & commissions via /deliveries/errand/* */
 export class MobileErrandEstimateDto {
   @ApiPropertyOptional() @IsOptional() @IsString() @MinLength(3) pickupAddress?: string;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() pickupLat?: number;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() pickupLng?: number;
   @ApiProperty() @IsString() @MinLength(3) deliveryAddress!: string;
   @ApiProperty({ type: [String] }) @IsArray() @IsString({ each: true }) items!: string[];
   @ApiPropertyOptional() @IsOptional() @IsNumber() budgetCdf?: number;
+  @ApiPropertyOptional() @IsOptional() @IsString() promoCode?: string;
 }
 
 export class MobileErrandCreateDto extends MobileErrandEstimateDto {
@@ -52,4 +55,5 @@ export class MobileScheduledEstimateDto {
   @ApiPropertyOptional() @IsOptional() @IsNumber() pickupLng?: number;
   @ApiPropertyOptional() @IsOptional() @IsNumber() dropoffLat?: number;
   @ApiPropertyOptional() @IsOptional() @IsNumber() dropoffLng?: number;
+  @ApiPropertyOptional() @IsOptional() @IsString() promoCode?: string;
 }

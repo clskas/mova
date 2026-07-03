@@ -18,6 +18,7 @@ export class EstimateRideDto {
   @Transform(({ value }) => toVehicleType(value))
   @IsEnum(VehicleType)
   vehicleType: VehicleType;
+  @ApiProperty({ required: false }) @IsOptional() @IsString() promoCode?: string;
 }
 
 export class CreateRideDto extends EstimateRideDto {

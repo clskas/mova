@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { PortalShell } from "@/components/PortalShell";
-import { fetchEarnings, fetchProfile, formatCdf, type RestaurantEarnings, type RestaurantProfile } from "@/lib/api";
+import { fetchEarnings, fetchProfile, formatCdf, downloadOrderReceiptPdf, type RestaurantEarnings, type RestaurantProfile } from "@/lib/api";
 
 export default function EarningsPage() {
   const [profile, setProfile] = useState<RestaurantProfile | null>(null);
@@ -65,6 +65,15 @@ export default function EarningsPage() {
                         <p className="text-xs text-gray-500">
                           {sale.createdAt ? new Date(sale.createdAt).toLocaleString("fr-CD") : "—"}
                         </p>
+                        {sale.reference && (
+                          <button
+                            type="button"
+                            onClick={() => downloadOrderReceiptPdf(sale.reference!).catch((e) => alert(e.message))}
+                            className="text-xs text-[#6C63FF] underline mt-1"
+                          >
+                            Télécharger reçu partenaire
+                          </button>
+                        )}
                       </div>
                       <span className="text-sm font-semibold text-green-700">+{formatCdf(sale.amountCdf)}</span>
                     </li>

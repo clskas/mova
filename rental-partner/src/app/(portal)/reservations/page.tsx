@@ -7,6 +7,7 @@ import {
   fetchProfile,
   formatCdf,
   formatDate,
+  downloadBookingReceiptPdf,
   updateBookingLogistics,
   updateBookingStatus,
   type PartnerBooking,
@@ -261,6 +262,15 @@ export default function ReservationsPage() {
                         </button>
                       )}
                     </div>
+                  )}
+                  {closed && (
+                    <button
+                      type="button"
+                      onClick={() => downloadBookingReceiptPdf(b.id).catch((e) => alert(e.message))}
+                      className="text-xs text-[#6C63FF] underline"
+                    >
+                      Télécharger reçu partenaire
+                    </button>
                   )}
                 </li>
               );

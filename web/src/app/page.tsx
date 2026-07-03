@@ -26,6 +26,8 @@ import { MovingView } from "@/components/MovingView";
 import { RentalView } from "@/components/RentalView";
 import { ErrandsView } from "@/components/ErrandsView";
 import { HistoryView } from "@/components/HistoryView";
+import { ReceiptView } from "@/components/ReceiptView";
+import { ReceiptsListView } from "@/components/ReceiptsListView";
 import { HelpView } from "@/components/HelpView";
 import { WalletView } from "@/components/WalletView";
 import { ScheduledRidesView } from "@/components/ScheduledRidesView";
@@ -42,6 +44,8 @@ type View =
   | "rental"
   | "errands"
   | "history"
+  | "receipts"
+  | "receipt"
   | "help"
   | "wallet"
   | "scheduled"
@@ -57,6 +61,12 @@ function greeting(): string {
 function HomeContent() {
   const [view, setView] = useState<View>("home");
   const [mock, setMock] = useState(false);
+  const [receiptRef, setReceiptRef] = useState<{ type: string; id: string } | null>(null);
+
+  const openReceipt = (type: string, id: string) => {
+    setReceiptRef({ type, id });
+    setView("receipt");
+  };
 
   useEffect(() => {
     checkGatewayHealth().then((ok) => setMock(!ok));
@@ -129,7 +139,24 @@ function HomeContent() {
         {view === "wallet" && <WalletView onBack={() => setView("home")} mock={mock} />}
         {view === "scheduled" && <ScheduledRidesView onBack={() => setView("home")} mock={mock} />}
         {view === "carpool" && <CarpoolView onBack={() => setView("home")} mock={mock} />}
-        {view === "history" && <HistoryView onBack={() => setView("home")} mock={mock} />}
+        {view === "history" && (
+          <HistoryView
+            onBack={() => setView("home")}
+            onOpenReceipts={() => setView("receipts")}
+            onOpenReceipt={openReceipt}
+            mock={mock}
+          />
+        )}
+        {view === "receipts" && (
+          <ReceiptsListView onBack={() => setView("history")} onOpenReceipt={openReceipt} />
+        )}
+        {view === "receipt" && receiptRef && (
+          <ReceiptView
+            referenceType={receiptRef.type}
+            referenceId={receiptRef.id}
+            onBack={() => setView("receipts")}
+          />
+        )}
         {view === "help" && <HelpView onBack={() => setView("home")} />}
       </main>
     </div>

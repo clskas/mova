@@ -1,4 +1,5 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
+import { PlaceOfInterestCategory } from '@prisma/client';
 import {
   DRC_SERVICE_AREAS,
   findServiceAreaByName,
@@ -9,20 +10,30 @@ import {
   MovaHttpException,
 } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
+import { PoiImportService } from './poi-import.service';
 
 type AutocompleteResult = {
-  source: 'commune' | 'mapbox';
+  source: 'commune' | 'mapbox' | 'poi';
   label: string;
   address: string;
   lat: number;
   lng: number;
   commune: string | null;
   city: string;
+  category?: string;
+  poiId?: string;
 };
 
 @Injectable()
-export class GeoService {
-  constructor(private prisma: PrismaService) {}
+export class GeoService implements OnModuleInit {
+  constructor(
+    private prisma: PrismaService,
+    private poiImport: PoiImportService,
+  ) {}
+
+  async onModuleInit() {
+    void this.poiImport.ensureSeeded().catch(() => undefined);
+  }
 
   listServiceAreas() {
     return getActiveServiceAreas().map((a) => ({
@@ -279,8 +290,80 @@ export class GeoService {
           // Mapbox optional — communes fallback only
         }
       }
+
+      const pois = await this.prisma.placeOfInterest.findMany({
+        where: {
+          city: cityName,
+          name: { contains: q, mode: 'insensitive' },
+        },
+        orderBy: { name: 'asc' },
+        take: 8,
+      });
+      results.push(
+        ...pois.map((p) => ({
+          source: 'poi' as const,
+          label: `${p.name}, ${cityName}`,
+          address: p.address ?? `${p.name}, ${cityName}, RDC`,
+          lat: p.lat,
+          lng: p.lng,
+          commune: null,
+          city: cityName,
+          category: p.category,
+          poiId: p.id,
+        })),
+      );
     }
 
-    return results.slice(0, 10);
+    return results.slice(0, 12);
+  }
+
+  async listPlaces(opts: {
+    city?: string;
+    category?: PlaceOfInterestCategory;
+    lat?: number;
+    lng?: number;
+    radiusKm?: number;
+    limit?: number;
+  }) {
+    const limit = Math.min(opts.limit ?? 50, 100);
+    const where: Record<string, unknown> = {};
+    if (opts.city) where.city = opts.city;
+    if (opts.category) where.category = opts.category;
+
+    const rows = await this.prisma.placeOfInterest.findMany({
+      where,
+      orderBy: { name: 'asc' },
+      take: limit * 3,
+    });
+
+    if (opts.lat != null && opts.lng != null) {
+      const radiusKm = opts.radiusKm ?? 5;
+      const filtered = rows
+        .map((p) => ({
+          ...p,
+          distanceKm: this.haversineKm(opts.lat!, opts.lng!, p.lat, p.lng),
+        }))
+        .filter((p) => p.distanceKm <= radiusKm)
+        .sort((a, b) => a.distanceKm - b.distanceKm)
+        .slice(0, limit);
+      return filtered.map(({ distanceKm, ...p }) => ({ ...p, distanceKm: Math.round(distanceKm * 100) / 100 }));
+    }
+
+    return rows.slice(0, limit);
+  }
+
+  async importPois(city = 'Kinshasa', useOverpass = false) {
+    if (useOverpass) return this.poiImport.importFromOverpass(city);
+    return this.poiImport.seedKinshasa();
+  }
+
+  private haversineKm(lat1: number, lng1: number, lat2: number, lng2: number) {
+    const R = 6371;
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLng = ((lng2 - lng1) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   }
 }

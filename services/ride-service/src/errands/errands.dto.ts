@@ -15,6 +15,7 @@ export class CreateErrandOrderDto {
   @ApiProperty() @IsNumber() dropoffLat!: number;
   @ApiProperty() @IsNumber() dropoffLng!: number;
   @ApiPropertyOptional() @IsOptional() @IsNumber() budgetCdf?: number;
+  @ApiPropertyOptional() @IsOptional() @IsString() promoCode?: string;
 }
 
 export class UpdateErrandStatusDto {
@@ -26,4 +27,13 @@ export class UpdateErrandStatusDto {
   @IsOptional()
   @IsNumber()
   purchaseTotalCdf?: number;
+
+  @ApiPropertyOptional({ description: 'URL photo preuve d\'achat (obligatoire pour COMPLETED)' })
+  @IsOptional()
+  @IsString()
+  proofPhotoUrl?: string;
+}
+
+export class UpdateErrandProofDto {
+  @ApiProperty() @IsString() proofPhotoUrl!: string;
 }

@@ -42,6 +42,7 @@ export class RentalQuoteDto {
   @IsIn(['BASIC', 'STANDARD', 'PREMIUM'])
   insuranceTier?: string;
   @ApiPropertyOptional() @IsOptional() @IsObject() addOns?: RentalAddOnsDto;
+  @ApiPropertyOptional() @IsOptional() @IsString() promoCode?: string;
 }
 
 /** @deprecated Alias — utiliser RentalQuoteDto */
@@ -64,6 +65,7 @@ export class CreateRentalInquiryDto {
   @ApiPropertyOptional() @IsOptional() @IsObject() addOns?: RentalAddOnsDto;
   @ApiPropertyOptional() @IsOptional() @IsString() contactPhone?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() notes?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() promoCode?: string;
 }
 
 export class CreateRentalBookingDto extends RentalQuoteDto {

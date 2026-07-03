@@ -3,6 +3,7 @@ import { RidesController } from './rides.controller';
 import { RidesService } from './rides.service';
 import { ScheduledRidesService } from './scheduled-rides.service';
 import { RideSearchScheduler } from './ride-search.scheduler';
+import { ScheduledRidesScheduler } from './scheduled-rides.scheduler';
 import { PricingService } from './pricing.service';
 import { PricingAdminService } from './pricing-admin.service';
 import { CommissionService } from './commission.service';
@@ -17,7 +18,7 @@ import { FraudService } from '../fraud/fraud.service';
 @Module({
   imports: [MatchingModule, WebsocketModule, TrackingModule, ShareModule],
   controllers: [RidesController],
-  providers: [RidesService, ScheduledRidesService, RideSearchScheduler, PricingService, PricingAdminService, CommissionService, SurchargeService, PromoService, RideChatService, FraudService],
-  exports: [RidesService, ScheduledRidesService, PricingService, PricingAdminService, CommissionService, SurchargeService, PromoService, ShareModule, FraudService],
+  providers: [RidesService, ScheduledRidesService, RideSearchScheduler, ScheduledRidesScheduler, PricingService, PricingAdminService, CommissionService, SurchargeService, PromoService, RideChatService, FraudService],
+  exports: [RidesService, ScheduledRidesService, PricingService, PricingAdminService, CommissionService, SurchargeService, PromoService, ShareModule, FraudService, RideChatService],
 })
 export class RidesModule {}

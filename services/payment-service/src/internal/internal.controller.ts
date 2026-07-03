@@ -89,6 +89,36 @@ export class InternalController {
     return this.wallet.withdrawToMobileMoney(userId, dto.amountCdf, dto.provider, dto.phone);
   }
 
+  @Post('wallets/:userId/hold')
+  hold(
+    @Param('userId') userId: string,
+    @Body() body: { amountCdf: number; referenceType: string; referenceId: string; description?: string },
+  ) {
+    return this.wallet.holdFunds(userId, body.amountCdf, body.referenceType, body.referenceId, body.description);
+  }
+
+  @Post('wallets/:userId/debit')
+  debit(
+    @Param('userId') userId: string,
+    @Body() body: { amountCdf: number; description: string; reference?: string },
+  ) {
+    return this.wallet.internalDebit(userId, body.amountCdf, body.description, body.reference);
+  }
+
+  @Post('wallets/holds/:referenceType/:referenceId/release')
+  releaseHold(@Param('referenceType') referenceType: string, @Param('referenceId') referenceId: string) {
+    return this.wallet.releaseHold(referenceType, referenceId);
+  }
+
+  @Post('wallets/holds/:referenceType/:referenceId/capture')
+  captureHold(
+    @Param('referenceType') referenceType: string,
+    @Param('referenceId') referenceId: string,
+    @Body() body: { captureAmountCdf?: number },
+  ) {
+    return this.wallet.captureHold(referenceType, referenceId, body.captureAmountCdf);
+  }
+
   @Post('driver-payouts/sync/:userId')
   syncDriverPayouts(@Param('userId') userId: string) {
     return this.driverPayouts.syncDriverPayouts(userId);
@@ -97,6 +127,19 @@ export class InternalController {
   @Get('rides/:rideId/payment-status')
   getRidePaymentStatus(@Param('rideId') rideId: string) {
     return this.payments.getRidePaymentStatus(rideId);
+  }
+
+  @Get('rides/:rideId/payment-detail')
+  getRidePaymentDetail(@Param('rideId') rideId: string) {
+    return this.payments.getRidePaymentDetail(rideId);
+  }
+
+  @Get('services/:referenceType/:referenceId/payment-detail')
+  getServicePaymentDetail(
+    @Param('referenceType') referenceType: string,
+    @Param('referenceId') referenceId: string,
+  ) {
+    return this.payments.getServicePaymentDetail(referenceType, referenceId);
   }
 
   @Post('rides/payment-status')

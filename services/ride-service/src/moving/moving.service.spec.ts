@@ -28,7 +28,7 @@ describe('MovingService', () => {
 
   const tripShare = { generateCompletionPin: jest.fn().mockReturnValue('1234') };
 
-  const service = new MovingService(prisma as never, pricing, surcharges as never, redis as never, tripShare as never);
+  const service = new MovingService(prisma as never, pricing, surcharges as never, redis as never, tripShare as never, { peek: jest.fn(), redeem: jest.fn(), applyDiscount: jest.fn((p: number) => p) } as never);
 
   const dto = {
     volumeM3: 5,

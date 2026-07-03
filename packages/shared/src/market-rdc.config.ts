@@ -90,6 +90,22 @@ export const MARKET_RDC = {
     perKmSurchargeCdf: 500,
   },
 
+  /** Courses planifiées — rappels, assignation auto, frais annulation tardive. */
+  scheduled: {
+    autoAssignHoursBefore: 2,
+    lateCancelHoursBefore: 24,
+    lateCancelFeePct: 50,
+  },
+
+  /** Courses & commissions — estimation achats par catégorie. */
+  errand: {
+    categoryEstimates: {
+      PHARMACY: { perItemCdf: 8_000, label: 'Pharmacie' },
+      MARKET: { perItemCdf: 3_000, label: 'Marché' },
+      OTHER: { perItemCdf: 5_000, label: 'Autre' },
+    },
+  },
+
   /** Location véhicule — assurance, options et remises. */
   rental: {
     weeklyDiscountPct: 10,

@@ -25,6 +25,8 @@ export class WalletService {
     return {
       ...wallet,
       formattedBalance: formatCdf(wallet!.balanceCdf),
+      availableBalanceCdf: wallet!.balanceCdf - (wallet!.heldBalanceCdf ?? 0),
+      heldBalanceCdf: wallet!.heldBalanceCdf ?? 0,
       currency: 'CDF',
     };
   }
@@ -56,12 +58,124 @@ export class WalletService {
 
   async debit(userId: string, amountCdf: number, description: string, reference?: string) {
     const wallet = await this.getWallet(userId);
-    if (wallet.balanceCdf < amountCdf) throw new MovaHttpException(MovaErrorCode.PAYMENT_INSUFFICIENT_BALANCE);
+    const available = wallet.balanceCdf - (wallet.heldBalanceCdf ?? 0);
+    if (available < amountCdf) throw new MovaHttpException(MovaErrorCode.PAYMENT_INSUFFICIENT_BALANCE);
     const updated = await this.prisma.wallet.update({ where: { id: wallet.id }, data: { balanceCdf: { decrement: amountCdf } } });
     await this.prisma.walletTransaction.create({
       data: { walletId: wallet.id, amountCdf: -amountCdf, type: 'DEBIT', description, reference },
     });
     return updated;
+  }
+
+  async holdFunds(
+    userId: string,
+    amountCdf: number,
+    referenceType: string,
+    referenceId: string,
+    description?: string,
+  ) {
+    if (amountCdf <= 0) throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Montant de séquestre invalide.');
+    const wallet = await this.getWallet(userId);
+    const available = wallet.balanceCdf - (wallet.heldBalanceCdf ?? 0);
+    if (available < amountCdf) throw new MovaHttpException(MovaErrorCode.PAYMENT_INSUFFICIENT_BALANCE);
+
+    const existing = await this.prisma.walletHold.findUnique({
+      where: { referenceType_referenceId: { referenceType, referenceId } },
+    });
+    if (existing?.status === 'ACTIVE') {
+      return { holdId: existing.id, amountCdf: existing.amountCdf, status: existing.status };
+    }
+
+    const hold = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.walletHold.create({
+        data: { walletId: wallet.id, amountCdf, referenceType, referenceId, status: 'ACTIVE' },
+      });
+      await tx.wallet.update({
+        where: { id: wallet.id },
+        data: { heldBalanceCdf: { increment: amountCdf } },
+      });
+      await tx.walletTransaction.create({
+        data: {
+          walletId: wallet.id,
+          amountCdf: 0,
+          type: 'HOLD',
+          description: description ?? `Séquestre ${referenceType} ${referenceId}`,
+          reference: `${referenceType}:${referenceId}`,
+        },
+      });
+      return created;
+    });
+    return { holdId: hold.id, amountCdf: hold.amountCdf, status: hold.status };
+  }
+
+  async releaseHold(referenceType: string, referenceId: string) {
+    const hold = await this.prisma.walletHold.findUnique({
+      where: { referenceType_referenceId: { referenceType, referenceId } },
+    });
+    if (!hold || hold.status !== 'ACTIVE') return { released: false };
+    await this.prisma.$transaction(async (tx) => {
+      await tx.walletHold.update({ where: { id: hold.id }, data: { status: 'RELEASED' } });
+      await tx.wallet.update({
+        where: { id: hold.walletId },
+        data: { heldBalanceCdf: { decrement: hold.amountCdf } },
+      });
+      await tx.walletTransaction.create({
+        data: {
+          walletId: hold.walletId,
+          amountCdf: 0,
+          type: 'HOLD_RELEASE',
+          description: `Libération séquestre ${referenceType} ${referenceId}`,
+          reference: `${referenceType}:${referenceId}`,
+        },
+      });
+    });
+    return { released: true, amountCdf: hold.amountCdf };
+  }
+
+  async captureHold(referenceType: string, referenceId: string, captureAmountCdf?: number) {
+    const hold = await this.prisma.walletHold.findUnique({
+      where: { referenceType_referenceId: { referenceType, referenceId } },
+    });
+    if (!hold || hold.status !== 'ACTIVE') return { captured: false };
+    const capture = Math.min(captureAmountCdf ?? hold.amountCdf, hold.amountCdf);
+    const releaseRemainder = hold.amountCdf - capture;
+    await this.prisma.$transaction(async (tx) => {
+      await tx.walletHold.update({ where: { id: hold.id }, data: { status: 'CAPTURED' } });
+      await tx.wallet.update({
+        where: { id: hold.walletId },
+        data: {
+          heldBalanceCdf: { decrement: hold.amountCdf },
+          balanceCdf: { decrement: capture },
+        },
+      });
+      if (capture > 0) {
+        await tx.walletTransaction.create({
+          data: {
+            walletId: hold.walletId,
+            amountCdf: -capture,
+            type: 'DEBIT',
+            description: `Débit séquestre ${referenceType} ${referenceId}`,
+            reference: `${referenceType}:${referenceId}`,
+          },
+        });
+      }
+      if (releaseRemainder > 0) {
+        await tx.walletTransaction.create({
+          data: {
+            walletId: hold.walletId,
+            amountCdf: 0,
+            type: 'HOLD_RELEASE',
+            description: `Reliquat séquestre ${referenceType} ${referenceId}`,
+            reference: `${referenceType}:${referenceId}`,
+          },
+        });
+      }
+    });
+    return { captured: true, amountCdf: capture };
+  }
+
+  async internalDebit(userId: string, amountCdf: number, description: string, reference?: string) {
+    return this.debit(userId, amountCdf, description, reference);
   }
 
   async topUp(userId: string, amountCdf: number, provider: string) {

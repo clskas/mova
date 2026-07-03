@@ -10,6 +10,7 @@ import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import '../rating/rating_screen.dart';
+import '../billing/receipt_screen.dart';
 
 const _paymentMethods = [
   ('WALLET', 'Portefeuille MOVA', Icons.account_balance_wallet, MovaColors.violet),
@@ -189,14 +190,25 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
-              builder: (_) => RatingScreen(rideId: widget.rideId!),
+              builder: (_) => ReceiptScreen(
+                rideId: widget.rideId,
+                showRatingAfter: true,
+              ),
             ),
           );
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Paiement effectué avec succès')),
           );
-          Navigator.of(context).popUntil((r) => r.isFirst);
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ReceiptScreen(
+                serviceType: widget.serviceType,
+                serviceId: widget.serviceId,
+              ),
+            ),
+          );
         }
       case Failure(:final error):
         setState(() => _error = error.message);

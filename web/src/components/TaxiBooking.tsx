@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { apiFetch, formatCdf } from "@/lib/api";
+import { PromoCodeInput, promoPayload } from "./PromoCodeInput";
 
 const VEHICLES = [
   { id: "MOTO_TAXI", label: "Moto-taxi", icon: "🏍️" },
@@ -15,14 +16,24 @@ export function TaxiBooking({ onBack, mock }: Props) {
   const [destination, setDestination] = useState("");
   const [vehicleType, setVehicleType] = useState("MOTO_TAXI");
   const [estimate, setEstimate] = useState<number | null>(null);
+  const [promoCode, setPromoCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
 
   async function handleEstimate() {
     if (!destination) return;
     setLoading(true);
-    const q = `pickupLat=-4.3217&pickupLng=15.3125&dropoffLat=-4.35&dropoffLng=15.35&vehicleType=${vehicleType}`;
-    const data = await apiFetch<{ priceCdf?: number; estimatedFareCdf?: number }>(`/api/rides/estimate?${q}`, undefined, { useMock: mock });
+    const data = await apiFetch<{ priceCdf?: number; estimatedFareCdf?: number }>("/api/rides/estimate", {
+      method: "POST",
+      body: JSON.stringify({
+        pickupLat: -4.3217,
+        pickupLng: 15.3125,
+        dropoffLat: -4.35,
+        dropoffLng: 15.35,
+        vehicleType,
+        ...promoPayload(promoCode),
+      }),
+    }, { useMock: mock });
     setEstimate(data.priceCdf ?? data.estimatedFareCdf ?? 8500);
     setLoading(false);
   }
@@ -39,6 +50,7 @@ export function TaxiBooking({ onBack, mock }: Props) {
         dropoffLat: -4.35,
         dropoffLng: 15.35,
         vehicleType,
+        ...promoPayload(promoCode),
       }),
     }, { useMock: mock });
     setConfirmed(true);
@@ -84,6 +96,8 @@ export function TaxiBooking({ onBack, mock }: Props) {
           <span>{v.icon} {v.label}</span>
         </label>
       ))}
+
+      <PromoCodeInput value={promoCode} onChange={(v) => { setPromoCode(v); setEstimate(null); }} />
 
       {estimate != null && (
         <div className="bg-white rounded-xl p-4 shadow-sm">

@@ -10,11 +10,16 @@ import {
   RentalVehicleQueryDto,
 } from './rental.dto';
 import { RentalService } from './rental.service';
+import { RentalChatService } from '../chat/rental-chat.service';
+import { SendRideChatDto } from '../chat/ride-chat.dto';
 
 @ApiTags('rental')
 @Controller('rental')
 export class RentalController {
-  constructor(private rentalService: RentalService) {}
+  constructor(
+    private rentalService: RentalService,
+    private rentalChatService: RentalChatService,
+  ) {}
 
   @Get('vehicles')
   @ApiOperation({ summary: 'Catalogue véhicules avec filtres et tri (public)' })
@@ -126,5 +131,21 @@ export class RentalController {
   @ApiOperation({ summary: 'Soumettre demande de location véhicule' })
   create(@Request() req: { user: { id: string } }, @Body() dto: CreateRentalInquiryDto) {
     return this.rentalService.create(req.user.id, dto);
+  }
+
+  @Get('inquiries/:id/chat')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Messages chat location véhicule' })
+  listChat(@Request() req: { user: { id: string } }, @Param('id') id: string) {
+    return this.rentalChatService.listMessages(id, req.user.id);
+  }
+
+  @Post('inquiries/:id/chat')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Envoyer un message chat location' })
+  sendChat(@Request() req: { user: { id: string } }, @Param('id') id: string, @Body() dto: SendRideChatDto) {
+    return this.rentalChatService.sendMessage(id, req.user.id, dto.text);
   }
 }

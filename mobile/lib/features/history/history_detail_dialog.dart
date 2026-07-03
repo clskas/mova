@@ -10,6 +10,8 @@ import '../../core/theme/mova_colors.dart';
 import '../moving/moving_tracking_screen.dart';
 import '../rides/scheduled_ride_screen.dart';
 import '../booking/tracking_screen.dart';
+import '../billing/billing_util.dart';
+import '../billing/receipt_screen.dart';
 
 String historyStatusLabel(String? status) => switch (status) {
       'COMPLETED' => 'Terminé',
@@ -267,6 +269,23 @@ Future<void> showHistoryDetailDialog(
               );
             },
             child: const Text('Mes réservations'),
+          ),
+        if (historyItemHasReceipt(item))
+          FilledButton.icon(
+            onPressed: () {
+              Navigator.pop(ctx);
+              final billingType = historyToBillingType(type);
+              if (billingType == 'RIDE') {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => ReceiptScreen(rideId: id)));
+              } else {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => ReceiptScreen(serviceType: billingType, serviceId: id)),
+                );
+              }
+            },
+            icon: const Icon(Icons.receipt_long),
+            label: const Text('Voir le reçu'),
           ),
       ],
     ),

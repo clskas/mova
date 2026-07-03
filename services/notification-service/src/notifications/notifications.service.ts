@@ -4,11 +4,13 @@ import {
   DeliveryCreatedPayload,
   DeliveryStatusUpdatedPayload,
   DriverJobAlertPayload,
+  ErrandCreatedPayload,
   IncidentCreatedPayload,
   PaymentCompletedPayload,
   RentalBookingPayload,
   RideCreatedPayload,
   RideStatusSmsPayload,
+  ScheduledReminderPayload,
   ServiceAssignedPayload,
   ServiceStatusUpdatedPayload,
 } from '@mova/shared';
@@ -41,6 +43,8 @@ export class NotificationsService implements OnModuleInit {
       MOVA_EVENTS.INCIDENT_CREATED,
       MOVA_EVENTS.RIDE_STATUS_SMS,
       MOVA_EVENTS.DRIVER_JOB_ALERT,
+      MOVA_EVENTS.SCHEDULED_REMINDER,
+      MOVA_EVENTS.ERRAND_CREATED,
     ];
     this.redis.sub.subscribe(...channels, (err) => {
       if (err) {
@@ -62,6 +66,8 @@ export class NotificationsService implements OnModuleInit {
         if (channel === MOVA_EVENTS.INCIDENT_CREATED) await this.onIncidentCreated(data as IncidentCreatedPayload);
         if (channel === MOVA_EVENTS.RIDE_STATUS_SMS) await this.onRideStatusSms(data as RideStatusSmsPayload);
         if (channel === MOVA_EVENTS.DRIVER_JOB_ALERT) await this.onDriverJobAlert(data as DriverJobAlertPayload);
+        if (channel === MOVA_EVENTS.SCHEDULED_REMINDER) await this.onScheduledReminder(data as ScheduledReminderPayload);
+        if (channel === MOVA_EVENTS.ERRAND_CREATED) await this.onErrandCreated(data as ErrandCreatedPayload);
       } catch (e) {
         this.logger.error('Event handler error', e);
       }
@@ -169,6 +175,41 @@ export class NotificationsService implements OnModuleInit {
       jobKind: payload.jobKind,
     });
     this.logger.log(`driver.job.alert push ${payload.jobKind} → ${userIds.length} chauffeur(s)`);
+  }
+
+  async onScheduledReminder(payload: ScheduledReminderPayload) {
+    const when = payload.reminderKind === 'DAY_BEFORE' ? 'demain' : 'dans 1 heure';
+    const title = `Rappel course planifiée`;
+    const body = `Votre course ${when} : ${payload.summary}`;
+    await this.create(payload.passengerId, title, body, 'SCHEDULED_REMINDER', payload);
+    await this.pushToDrivers([payload.passengerId], title, body, {
+      type: 'SCHEDULED_REMINDER',
+      referenceId: payload.scheduledRideId,
+    });
+    if (payload.passengerPhone) {
+      await this.sms.sendMessage(payload.passengerPhone, `MOVA — ${body}`);
+    }
+    if (payload.driverId) {
+      await this.create(payload.driverId, title, body, 'SCHEDULED_REMINDER_DRIVER', payload);
+      await this.pushToDrivers([payload.driverId], title, body, {
+        type: 'SCHEDULED_REMINDER',
+        referenceId: payload.scheduledRideId,
+      });
+      if (payload.driverPhone) {
+        await this.sms.sendMessage(payload.driverPhone, `MOVA chauffeur — ${body}`);
+      }
+    }
+    this.logger.log(`scheduled.reminder ${payload.reminderKind} for ${payload.scheduledRideId}`);
+  }
+
+  async onErrandCreated(payload: ErrandCreatedPayload) {
+    await this.create(
+      payload.userId,
+      'Course enregistrée',
+      `Votre commande courses & commissions est en attente d'un livreur (${payload.pickupAddress}).`,
+      'ERRAND_CREATED',
+      payload,
+    );
   }
 
   async onRentalBooking(payload: RentalBookingPayload) {

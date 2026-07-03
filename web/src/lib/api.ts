@@ -256,3 +256,86 @@ function mockFor<T>(path: string, init?: RequestInit): T {
 export function formatCdf(amount: number): string {
   return `${amount.toLocaleString('fr-CD')} FC`;
 }
+
+export type ReceiptSummary = {
+  referenceType: string;
+  referenceId: string;
+  historyType?: string;
+  title: string;
+  amountCdf: number;
+  status: string;
+  createdAt: string;
+  receiptNumber: string;
+  serviceTypeLabel: string;
+};
+
+export type MovaReceipt = {
+  receiptNumber: string;
+  documentType: 'RECEIPT' | 'INVOICE';
+  serviceTypeLabel: string;
+  serviceLabel: string;
+  lines: { label: string; amountCdf: number; kind?: string }[];
+  totalCdf: number;
+  customer?: { email?: string; name?: string; phone?: string };
+  payment?: { methodLabel?: string; status?: string } | null;
+};
+
+function billingPath(type: string, id: string) {
+  return `/api/billing/${type.toUpperCase()}/${id}`;
+}
+
+export function fetchReceiptHistory(limit = 30) {
+  return apiFetch<{ data: ReceiptSummary[] }>(`/api/billing/history?limit=${limit}`);
+}
+
+export function fetchReceipt(referenceType: string, referenceId: string) {
+  return apiFetch<MovaReceipt>(billingPath(referenceType, referenceId));
+}
+
+export async function fetchReceiptPdfBlob(referenceType: string, referenceId: string): Promise<Blob> {
+  const res = await fetch(`${API_BASE}${billingPath(referenceType, referenceId)}/pdf`, {
+    headers: authHeaders(),
+  });
+  if (!res.ok) throw new ApiError(`PDF ${res.status}`, res.status);
+  return res.blob();
+}
+
+export function sendReceiptEmail(referenceType: string, referenceId: string, email?: string) {
+  return apiFetch<{ success: boolean; sentTo?: string }>(`${billingPath(referenceType, referenceId)}/email`, {
+    method: 'POST',
+    body: JSON.stringify(email ? { email } : {}),
+  });
+}
+
+export function shareReceiptInChat(referenceType: string, referenceId: string) {
+  return apiFetch<{ success: boolean }>(`${billingPath(referenceType, referenceId)}/share-chat`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+}
+
+export function historyToBillingType(type?: string): string {
+  if (type === 'PARCEL' || type === 'FOOD' || type === 'EXPRESS') return 'DELIVERY';
+  return (type ?? 'RIDE').toUpperCase();
+}
+
+export function historyItemHasReceipt(status?: string, type?: string, isPaid?: boolean): boolean {
+  switch (type) {
+    case 'RIDE':
+      return status === 'COMPLETED' && isPaid === true;
+    case 'PARCEL':
+    case 'FOOD':
+    case 'EXPRESS':
+      return status === 'DELIVERED';
+    case 'ERRAND':
+    case 'MOVING':
+    case 'CARPOOL':
+      return status === 'COMPLETED';
+    case 'RENTAL':
+      return ['CONFIRMED', 'IN_PROGRESS', 'RETURNED', 'CLOSED'].includes(status ?? '');
+    case 'SCHEDULED':
+      return status === 'COMPLETED';
+    default:
+      return false;
+  }
+}

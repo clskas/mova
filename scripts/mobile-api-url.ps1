@@ -43,8 +43,20 @@ function Test-MovaDeviceGateway {
 
     if (-not $DeviceId) { return $false }
 
-    $code = adb -s $DeviceId shell "curl -s -m 10 -o /dev/null -w '%{http_code}' ${GatewayBase}/health" 2>$null
-    return "$code".Trim() -eq '200'
+    $adbCmd = "curl -s -m 5 -o /dev/null -w '%{http_code}' ${GatewayBase}/health"
+    $job = Start-Job -ScriptBlock {
+        param($id, $cmd)
+        & adb -s $id shell $cmd 2>$null
+    } -ArgumentList $DeviceId, $adbCmd
+    $done = Wait-Job $job -Timeout 12
+    if (-not $done) {
+        Stop-Job $job -Force -ErrorAction SilentlyContinue
+        Remove-Job $job -Force -ErrorAction SilentlyContinue
+        return $false
+    }
+    $code = (Receive-Job $job).Trim()
+    Remove-Job $job -Force -ErrorAction SilentlyContinue
+    return "$code" -eq '200'
 }
 
 function Set-MovaAdbReverse {
@@ -84,24 +96,7 @@ function Get-MovaMobileApiUrls {
     $lanWsUrl = "http://${lanIp}:3000"
 
     if ($UsbReverse) {
-        $useLan = $false
-        if ($DeviceId -and (Test-MovaDeviceGateway -DeviceId $DeviceId -GatewayBase 'http://127.0.0.1:3000')) {
-            Write-Host "USB reverse OK sur $DeviceId (127.0.0.1:3000)" -ForegroundColor DarkGray
-        } elseif ($DeviceId -and (Test-MovaDeviceGateway -DeviceId $DeviceId -GatewayBase $lanWsUrl)) {
-            Write-Host "adb reverse inactif - bascule LAN $lanIp sur $DeviceId" -ForegroundColor Yellow
-            $useLan = $true
-        } elseif ($DeviceId) {
-            Write-Host "Passerelle injoignable depuis $DeviceId (reverse + LAN). Secours LAN compile dans l app." -ForegroundColor Yellow
-        }
-
-        if ($useLan) {
-            return @{
-                ApiUrl           = $lanApiUrl
-                WsUrl            = $lanWsUrl
-                ApiFallbackUrl   = 'http://127.0.0.1:3000/api'
-            }
-        }
-
+        # Ne pas bloquer sur curl via adb shell (souvent lent / absent sur l'appareil).
         return @{
             ApiUrl           = 'http://127.0.0.1:3000/api'
             WsUrl            = 'http://127.0.0.1:3000'

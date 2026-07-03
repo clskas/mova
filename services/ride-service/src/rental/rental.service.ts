@@ -11,6 +11,8 @@ import {
   RentalQuoteDto,
   RentalVehicleQueryDto,
 } from './rental.dto';
+import { applyPromoCode } from '../common/promo-apply.util';
+import { PromoService } from '../rides/surcharge.service';
 
 type RentalAddOns = { childSeat?: boolean; gps?: boolean; extraDriver?: boolean };
 
@@ -75,7 +77,7 @@ type RentalLogisticsFields = {
 
 @Injectable()
 export class RentalService {
-  constructor(private prisma: PrismaService, private redis: RedisService) {}
+  constructor(private prisma: PrismaService, private redis: RedisService, private promo: PromoService) {}
 
   private normalizeCategory(raw?: string): string | undefined {
     if (!raw) return undefined;
@@ -574,7 +576,7 @@ export class RentalService {
     };
   }
 
-  async quote(dto: RentalQuoteDto) {
+  async quote(dto: RentalQuoteDto, redeemPromo = false) {
     const vehicle = await this.prisma.rentalVehicle.findUnique({ where: { id: dto.vehicleId } });
     if (!vehicle || !vehicle.isActive) {
       throw new MovaHttpException(MovaErrorCode.RENTAL_VEHICLE_NOT_FOUND, HttpStatus.NOT_FOUND);
@@ -582,7 +584,24 @@ export class RentalService {
     const startDate = new Date(dto.startDate);
     const endDate = new Date(dto.endDate);
     this.validateDates(startDate, endDate);
-    return this.computeQuote(vehicle, dto, startDate, endDate);
+    const base = await this.computeQuote(vehicle, dto, startDate, endDate);
+    if (!dto.promoCode?.trim()) {
+      return { ...base, promoCode: null as string | null, discountCdf: 0 };
+    }
+    const promoApplied = await applyPromoCode(this.promo, base.breakdown.subtotalCdf, dto.promoCode, redeemPromo, {
+      context: { serviceType: 'RENTAL', rentalOwnerUserId: vehicle.ownerUserId ?? undefined },
+      parts: { rentalSubtotalCdf: base.breakdown.subtotalCdf },
+    });
+    const totalCdf = promoApplied.estimatedPriceCdf + base.depositCdf;
+    return {
+      ...base,
+      totalCdf,
+      estimatedPriceCdf: totalCdf,
+      formatted: formatCdf(totalCdf),
+      discountCdf: promoApplied.discountCdf,
+      promoCode: promoApplied.promoCode,
+      breakdown: { ...base.breakdown, subtotalCdf: promoApplied.estimatedPriceCdf, discountCdf: promoApplied.discountCdf },
+    };
   }
 
   /** @deprecated Alias quote */
@@ -591,7 +610,7 @@ export class RentalService {
   }
 
   async createBooking(userId: string, dto: CreateRentalBookingDto) {
-    const quoteResult = await this.quote(dto);
+    const quoteResult = await this.quote(dto, true);
     const startDate = new Date(dto.startDate);
     const endDate = new Date(dto.endDate);
     await this.assertVehicleAvailableForDates(dto.vehicleId, startDate, endDate);
@@ -616,6 +635,8 @@ export class RentalService {
         notes: dto.notes,
         estimatedPriceCdf: quoteResult.totalCdf,
         totalCdf: quoteResult.totalCdf,
+        promoCode: quoteResult.promoCode,
+        discountCdf: quoteResult.discountCdf || undefined,
         logisticsMode: logistics.logisticsMode,
         passengerDriverName: logistics.passengerDriverName,
         passengerDriverPhone: logistics.passengerDriverPhone,

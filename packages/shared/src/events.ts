@@ -12,6 +12,8 @@ export const MOVA_EVENTS = {
   RENTAL_BOOKING: 'rental.booking',
   INCIDENT_CREATED: 'incident.created',
   DRIVER_JOB_ALERT: 'driver.job.alert',
+  SCHEDULED_REMINDER: 'scheduled.reminder',
+  ERRAND_CREATED: 'errand.created',
 } as const;
 
 export type MovaEventName = (typeof MOVA_EVENTS)[keyof typeof MOVA_EVENTS];
@@ -128,4 +130,24 @@ export interface RentalBookingPayload {
   priceCdf?: number | null;
   status: string;
   logisticsSummary?: string;
+}
+
+export interface ScheduledReminderPayload {
+  scheduledRideId: string;
+  passengerId: string;
+  driverId?: string;
+  passengerPhone?: string;
+  driverPhone?: string;
+  reminderKind: 'DAY_BEFORE' | 'HOUR_BEFORE';
+  scheduledAt: string;
+  summary: string;
+}
+
+export interface ErrandCreatedPayload {
+  errandId: string;
+  userId: string;
+  pickupAddress: string;
+  pickupLat: number;
+  pickupLng: number;
+  estimatedPriceCdf: number;
 }

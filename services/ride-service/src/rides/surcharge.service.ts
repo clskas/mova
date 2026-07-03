@@ -1,6 +1,7 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { SurchargeType } from '@prisma/client';
 import { MovaErrorCode, MovaHttpException } from '@mova/shared';
+import { assertPromoApplicable, PromoApplyContext } from '../common/promo-context.util';
 import { PrismaService } from '../prisma/prisma.service';
 
 const DEFAULTS: Record<SurchargeType, { baseFeeCdf: number; multiplier: number; perUnitCdf?: number }> = {
@@ -39,7 +40,7 @@ export class PromoService {
     return Math.max(0, priceCdf - discount);
   }
 
-  async peek(code: string) {
+  async peek(code: string, context?: PromoApplyContext) {
     const promo = await this.prisma.promoCode.findUnique({ where: { code: code.trim().toUpperCase() } });
     if (!promo || !promo.isActive) throw new MovaHttpException(MovaErrorCode.PROMO_NOT_FOUND, HttpStatus.NOT_FOUND);
     if (promo.validUntil && promo.validUntil < new Date()) {
@@ -48,11 +49,12 @@ export class PromoService {
     if (promo.maxUses != null && promo.usedCount >= promo.maxUses) {
       throw new MovaHttpException(MovaErrorCode.PROMO_INVALID, HttpStatus.BAD_REQUEST);
     }
+    assertPromoApplicable(promo, context);
     return promo;
   }
 
-  async redeem(code: string) {
-    const promo = await this.peek(code);
+  async redeem(code: string, context?: PromoApplyContext) {
+    const promo = await this.peek(code, context);
     await this.prisma.promoCode.update({ where: { id: promo.id }, data: { usedCount: { increment: 1 } } });
     return promo;
   }

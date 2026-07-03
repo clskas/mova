@@ -46,6 +46,7 @@ class _DriverScheduledMissionScreenState extends ConsumerState<DriverScheduledMi
   Map<String, dynamic>? _ride;
   bool _loading = true;
   bool _saving = false;
+  bool _volunteering = false;
   String? _error;
 
   String get _status => _ride?['status']?.toString() ?? widget.initialMission?['status']?.toString() ?? 'CONFIRMED';
@@ -96,6 +97,21 @@ class _DriverScheduledMissionScreenState extends ConsumerState<DriverScheduledMi
         if (nextStatus != 'COMPLETED') {
           await _load();
         }
+      case Failure(:final error):
+        setState(() => _error = error.message);
+    }
+  }
+
+  Future<void> _volunteer() async {
+    setState(() => _volunteering = true);
+    final result = await ref.read(apiClientProvider).volunteerScheduledRide(widget.rideId);
+    if (!mounted) return;
+    setState(() => _volunteering = false);
+    switch (result) {
+      case Success():
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Candidature enregistrée pour ce créneau')),
+        );
       case Failure(:final error):
         setState(() => _error = error.message);
     }
@@ -241,6 +257,15 @@ class _DriverScheduledMissionScreenState extends ConsumerState<DriverScheduledMi
               ),
             ),
             const SizedBox(height: 12),
+            if (_status == 'SCHEDULED' && (_ride?['driverId'] == null))
+              MovaButton(
+                label: 'Me porter volontaire',
+                isSecondary: true,
+                icon: Icons.how_to_reg_outlined,
+                isLoading: _volunteering,
+                onPressed: _volunteering ? null : _volunteer,
+              ),
+            if (_status == 'SCHEDULED' && (_ride?['driverId'] == null)) const SizedBox(height: 8),
             if (_canStart || _status == 'IN_PROGRESS') ...[
               MovaButton(
                 label: _status == 'IN_PROGRESS' ? 'Itinéraire arrivée' : 'Itinéraire départ',

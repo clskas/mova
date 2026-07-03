@@ -17,6 +17,7 @@ import '../../core/widgets/destination_coord_panel.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
+import '../../widgets/promo_code_field.dart';
 import '../booking/widgets/mova_ride_map.dart';
 import 'parcel_tracking_screen.dart';
 
@@ -46,6 +47,7 @@ class ParcelDeliveryScreen extends ConsumerStatefulWidget {
 class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
   final _pickupController = TextEditingController(text: 'Ma position');
   final _dropoffController = TextEditingController();
+  final _promoController = TextEditingController();
   final _picker = ImagePicker();
 
   String _weightCategory = 'DOCUMENTS';
@@ -87,6 +89,7 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
     _dropoffController.removeListener(_onDropoffChanged);
     _pickupController.dispose();
     _dropoffController.dispose();
+    _promoController.dispose();
     super.dispose();
   }
 
@@ -255,6 +258,7 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
       'pickupLng': _pickup.longitude,
       'dropoffLat': dropoff.latitude,
       'dropoffLng': dropoff.longitude,
+      if (_promoController.text.trim().isNotEmpty) 'promoCode': _promoController.text.trim(),
     };
     if (includePhoto && _photoFile != null) {
       payload['photoUrl'] = _photoFile!.path;
@@ -598,6 +602,10 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
                     const SizedBox(height: 16),
                     MovaErrorBanner(message: _validationError!),
                   ],
+                  PromoCodeField(
+                    controller: _promoController,
+                    onChanged: () => setState(() => _estimatedPrice = null),
+                  ),
                   if (_error != null) ...[
                     const SizedBox(height: 16),
                     MovaErrorBanner(message: _error!, onRetry: _estimate),

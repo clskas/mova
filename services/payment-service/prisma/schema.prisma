@@ -56,15 +56,33 @@ model ServicePayment {
 }
 
 model Wallet {
-  id         String   @id @default(uuid())
-  userId     String   @unique
-  balanceCdf Int      @default(0)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  balanceCdf      Int      @default(0)
+  heldBalanceCdf  Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   transactions WalletTransaction[]
+  holds        WalletHold[]
 
   @@map("wallets")
+}
+
+model WalletHold {
+  id            String   @id @default(uuid())
+  walletId      String
+  wallet        Wallet   @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  amountCdf     Int
+  referenceType String
+  referenceId   String
+  status        String   @default("ACTIVE")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([referenceType, referenceId])
+  @@index([walletId, status])
+  @@map("wallet_holds")
 }
 
 model WalletTransaction {

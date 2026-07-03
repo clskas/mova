@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { apiFetch, formatCdf } from "@/lib/api";
+import { PromoCodeInput, promoPayload } from "./PromoCodeInput";
 
 type Props = { onBack: () => void; mock: boolean };
 
@@ -12,6 +13,7 @@ export function ErrandsView({ onBack, mock }: Props) {
   const [items, setItems] = useState<string[]>([]);
   const [budget, setBudget] = useState("");
   const [estimate, setEstimate] = useState<number | null>(null);
+  const [promoCode, setPromoCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState(false);
@@ -34,6 +36,7 @@ export function ErrandsView({ onBack, mock }: Props) {
     items,
     description: items.join(", "),
     budgetCdf: budget ? Number(budget) : undefined,
+    ...promoPayload(promoCode),
   });
 
   async function handleEstimate() {
@@ -105,6 +108,7 @@ export function ErrandsView({ onBack, mock }: Props) {
         </ul>
       )}
       <input className="w-full rounded-xl border-0 bg-white p-3 shadow-sm" placeholder="Budget articles (FC, optionnel)" value={budget} onChange={(e) => setBudget(e.target.value)} type="number" />
+      <PromoCodeInput value={promoCode} onChange={(v) => { setPromoCode(v); setEstimate(null); }} />
       {estimate != null && (
         <div className="bg-white rounded-xl p-4 shadow-sm">
           <p className="text-gray-500 text-sm">Frais de service estimés</p>

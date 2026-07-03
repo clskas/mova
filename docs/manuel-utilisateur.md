@@ -30,7 +30,13 @@
 
 Voir [Admin — Niveaux d'accès par rôle](user-manual/admin.md#niveaux-daccès-par-rôle) pour le détail des menus et permissions.
 
-## Nouveautés récentes (juin 2026)
+## Nouveautés récentes (juillet 2026)
+
+- **POI sur carte** : marchés, hôpitaux, universités, pharmacies (import OSM / seed Kinshasa) ; filtres sur l'écran taxi.
+- **Courses & commissions v3** : autocomplétion point de retrait, alerte chauffeur à la création, séquestre wallet (budget max), photo preuve obligatoire, chat passager–livreur, estimation achats par catégorie.
+- **Réservation planifiée v2** : rappels J-1 et H-1 (push + SMS), assignation auto 2 h avant, course GPS liée au démarrage, frais d'annulation tardive (50 %), file des chauffeurs volontaires.
+
+## Nouveautés (juin 2026)
 
 - **Splash animé** : écran d'accueil mobile (**4 s par service**, ~32 s, tap sur l'écran) — contenu **Passager** vs **Chauffeur** distinct.
 - **Ville GPS** : sélection automatique de la ville MOVA à l'ouverture (mobile).

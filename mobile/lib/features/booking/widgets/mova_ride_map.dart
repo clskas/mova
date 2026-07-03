@@ -22,12 +22,18 @@ class MovaRideMap extends StatefulWidget {
     this.dropoffEditable = false,
     this.pickupLabel,
     this.dropoffLabel,
+    this.places,
+    this.placesCategoryFilter,
   });
 
   final LatLng pickup;
   final LatLng? dropoff;
   final LatLng? driver;
   final List<LatLng>? routeTrace;
+  /// POI affichés sur la carte (marchés, hôpitaux, etc.).
+  final List<Map<String, dynamic>>? places;
+  /// Filtre catégorie POI (`MARKET`, `HOSPITAL`, …) — null = toutes.
+  final String? placesCategoryFilter;
   /// Cible d'approche (pickup puis dropoff) — ligne pointillée chauffeur → cible.
   final LatLng? approachTarget;
   /// Recentre la caméra quand le chauffeur se déplace (suivi temps réel).
@@ -268,6 +274,7 @@ class _MovaRideMapState extends State<MovaRideMap> {
                       ),
                     ),
                   ),
+                ..._poiMarkers(),
               ],
             ),
           ],
@@ -298,6 +305,41 @@ class _MovaRideMapState extends State<MovaRideMap> {
         ],
       ),
     );
+  }
+
+  List<Marker> _poiMarkers() {
+    final places = widget.places;
+    if (places == null || places.isEmpty) return const [];
+    final filter = widget.placesCategoryFilter;
+    final out = <Marker>[];
+    for (final p in places) {
+      if (filter != null && p['category']?.toString() != filter) continue;
+      final lat = (p['lat'] as num?)?.toDouble();
+      final lng = (p['lng'] as num?)?.toDouble();
+      if (lat == null || lng == null) continue;
+      out.add(
+        Marker(
+          point: LatLng(lat, lng),
+          width: 30,
+          height: 30,
+          child: Icon(_poiIcon(p['category']?.toString()), color: const Color(0xFFE67E22), size: 22),
+        ),
+      );
+    }
+    return out;
+  }
+
+  static IconData _poiIcon(String? category) {
+    return switch (category) {
+      'MARKET' => Icons.store_mall_directory_outlined,
+      'HOSPITAL' => Icons.local_hospital_outlined,
+      'UNIVERSITY' => Icons.school_outlined,
+      'PHARMACY' => Icons.local_pharmacy_outlined,
+      'SCHOOL' => Icons.menu_book_outlined,
+      'GOVERNMENT' => Icons.account_balance_outlined,
+      'TRANSPORT' => Icons.directions_bus_outlined,
+      _ => Icons.place_outlined,
+    };
   }
 }
 

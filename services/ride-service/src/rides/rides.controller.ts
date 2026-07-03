@@ -24,7 +24,14 @@ export class RidesController {
   @Post('estimate')
   @ApiOperation({ summary: 'Estimer tarif (CDF, Kinshasa)' })
   estimate(@Body() dto: EstimateRideDto) {
-    return this.ridesService.estimate(dto.pickupLat, dto.pickupLng, dto.dropoffLat, dto.dropoffLng, dto.vehicleType);
+    return this.ridesService.estimate(
+      dto.pickupLat,
+      dto.pickupLng,
+      dto.dropoffLat,
+      dto.dropoffLng,
+      dto.vehicleType,
+      dto.promoCode,
+    );
   }
 
   @Post('scheduled/estimate')
@@ -65,6 +72,18 @@ export class RidesController {
     @Body('status') status: ScheduledRideStatus,
   ) {
     return this.scheduledRidesService.updateStatusByDriver(id, req.user.id, status);
+  }
+
+  @Post('scheduled/:id/volunteer')
+  @ApiOperation({ summary: 'Chauffeur volontaire pour créneau planifié' })
+  volunteerScheduled(@Request() req: { user: { id: string } }, @Param('id') id: string) {
+    return this.scheduledRidesService.volunteer(id, req.user.id);
+  }
+
+  @Post('scheduled/:id/volunteer/withdraw')
+  @ApiOperation({ summary: 'Retirer sa candidature volontaire' })
+  withdrawVolunteer(@Request() req: { user: { id: string } }, @Param('id') id: string) {
+    return this.scheduledRidesService.withdrawVolunteer(id, req.user.id);
   }
 
   @Post('scheduled/:id/cancel')

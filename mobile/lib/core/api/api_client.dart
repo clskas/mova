@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'dart:io' show File;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
@@ -778,6 +779,25 @@ class ApiClient {
     return const Failure(NetworkFailure());
   }
 
+  Future<Result<Uint8List>> getBytes(String path) async {
+    await ensureReady();
+    if (_isOffline && !_mockMode) {
+      return const Failure(OfflineFailure('Document indisponible hors ligne.'));
+    }
+    try {
+      final response = await _client
+          .get(Uri.parse('${MarketConfig.effectiveApiBaseUrl}$path'), headers: _headers)
+          .timeout(const Duration(seconds: 45));
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        _markGatewayReachable();
+        return Success(response.bodyBytes);
+      }
+      return Failure(ServerFailure('Téléchargement impossible (${response.statusCode})'));
+    } catch (_) {
+      return const Failure(NetworkFailure());
+    }
+  }
+
   Future<Result<List<Map<String, dynamic>>>> geoAutocomplete(String query, {String? city}) async {
     if (query.trim().length < 2) return const Success([]);
     await ensureReady();
@@ -879,6 +899,61 @@ class ApiClient {
       Success(:final data) => Success(Map<String, dynamic>.from(data as Map)),
       Failure(:final error) => Failure(error),
     };
+  }
+
+  Future<Result<List<Map<String, dynamic>>>> getErrandChatMessages(String errandId) async {
+    final result = await get('/errands/$errandId/chat');
+    return switch (result) {
+      Success(:final data) => Success(
+          List<Map<String, dynamic>>.from(data['messages'] as List? ?? []),
+        ),
+      Failure(:final error) => Failure(error),
+    };
+  }
+
+  Future<Result<Map<String, dynamic>>> sendErrandChatMessage(String errandId, String text) async {
+    final result = await post('/errands/$errandId/chat', {'text': text});
+    return switch (result) {
+      Success(:final data) => Success(Map<String, dynamic>.from(data as Map)),
+      Failure(:final error) => Failure(error),
+    };
+  }
+
+  Future<Result<List<Map<String, dynamic>>>> geoPlaces({
+    String? city,
+    String? category,
+    double? lat,
+    double? lng,
+    double radiusKm = 5,
+  }) async {
+    final params = <String>[
+      if (city != null) 'city=$city',
+      if (category != null) 'category=$category',
+      if (lat != null) 'lat=$lat',
+      if (lng != null) 'lng=$lng',
+      'radiusKm=$radiusKm',
+    ].join('&');
+    final result = await get('/geo/places?$params');
+    return switch (result) {
+      Success(:final data) => Success(
+          data is List
+              ? List<Map<String, dynamic>>.from(data)
+              : List<Map<String, dynamic>>.from(data as List? ?? []),
+        ),
+      Failure(:final error) => Failure(error),
+    };
+  }
+
+  Future<Result<Map<String, dynamic>>> uploadErrandProofPhoto(String errandId, String photoUrl) async {
+    final result = await patch('/errands/$errandId/proof-photo', {'proofPhotoUrl': photoUrl});
+    return switch (result) {
+      Success(:final data) => Success(Map<String, dynamic>.from(data as Map)),
+      Failure(:final error) => Failure(error),
+    };
+  }
+
+  Future<Result<Map<String, dynamic>>> volunteerScheduledRide(String scheduledId) async {
+    return post('/rides/scheduled/$scheduledId/volunteer', {});
   }
 
   Future<Result<Map<String, dynamic>>> searchDrivers(String rideId) async {
@@ -1178,6 +1253,53 @@ class ApiClient {
         status == 'DRIVER_ARRIVED' ||
         status == 'IN_PROGRESS' ||
         status == 'COMPLETED';
+  }
+
+  String _billingPath(String referenceType, String referenceId) =>
+      '/billing/${referenceType.toUpperCase()}/$referenceId';
+
+  Future<Result<Map<String, dynamic>>> getReceipt(String referenceType, String referenceId) async {
+    final result = await get(_billingPath(referenceType, referenceId));
+    return switch (result) {
+      Success(:final data) => Success(data is Map<String, dynamic> ? data : Map<String, dynamic>.from(data as Map)),
+      Failure(:final error) => Failure(error),
+    };
+  }
+
+  Future<Result<Uint8List>> getReceiptPdf(String referenceType, String referenceId) {
+    return getBytes('${_billingPath(referenceType, referenceId)}/pdf');
+  }
+
+  Future<Result<Uint8List>> getReceiptThermalPdf(String referenceType, String referenceId) {
+    return getBytes('${_billingPath(referenceType, referenceId)}/thermal.pdf');
+  }
+
+  Future<Result<Map<String, dynamic>>> getReceiptThermal(String referenceType, String referenceId) async {
+    final result = await get('${_billingPath(referenceType, referenceId)}/thermal');
+    return switch (result) {
+      Success(:final data) => Success(data is Map<String, dynamic> ? data : Map<String, dynamic>.from(data as Map)),
+      Failure(:final error) => Failure(error),
+    };
+  }
+
+  Future<Result<Map<String, dynamic>>> getReceiptHistory({int limit = 50}) async {
+    final result = await get('/billing/history?limit=$limit');
+    return switch (result) {
+      Success(:final data) => Success(data is Map<String, dynamic> ? data : Map<String, dynamic>.from(data as Map)),
+      Failure(:final error) => Failure(error),
+    };
+  }
+
+  Future<Result<Map<String, dynamic>>> sendReceiptEmail(
+    String referenceType,
+    String referenceId, {
+    String? email,
+  }) {
+    return post('${_billingPath(referenceType, referenceId)}/email', {if (email != null) 'email': email});
+  }
+
+  Future<Result<Map<String, dynamic>>> shareReceiptInChat(String referenceType, String referenceId) {
+    return post('${_billingPath(referenceType, referenceId)}/share-chat', {});
   }
 }
 

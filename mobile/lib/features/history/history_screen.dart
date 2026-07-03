@@ -11,6 +11,7 @@ import '../delivery/food_delivery_screen.dart';
 import '../delivery/parcel_delivery_screen.dart';
 import '../../core/widgets/offline_shell.dart';
 import 'history_detail_dialog.dart';
+import '../billing/receipts_list_screen.dart';
 
 class HistoryScreen extends ConsumerStatefulWidget {
   const HistoryScreen({super.key});
@@ -439,6 +440,16 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
   Widget build(BuildContext context) {
     return MovaScreen(
       title: 'Historique',
+      actions: [
+        IconButton(
+          tooltip: 'Mes reçus',
+          icon: const Icon(Icons.receipt_long_outlined),
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const ReceiptsListScreen()),
+          ),
+        ),
+      ],
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

@@ -1,6 +1,6 @@
 # MOVA Passager
 
-**Version :** 1.0 — Juin 2026  
+**Version :** 1.1 — Juillet 2026  
 **Marché :** République Démocratique du Congo (Kinshasa)
 
 ## Bienvenue sur MOVA
@@ -36,6 +36,8 @@ Les services **Wallet MOVA** et **Historique** sont en bas de la grille. Vous y 
 4. Appuyez sur **Estimer le prix**, puis **Confirmer la course**.
 5. Suivez votre chauffeur en temps réel sur l'écran de suivi.
 6. Une **ligne bleue** sur la carte représente le trajet déjà parcouru (trace GPS), en plus de la position actuelle du chauffeur.
+7. Sous la carte, utilisez les **filtres POI** (Marchés, Hôpitaux, Universités, Pharmacies) pour afficher les points d'intérêt à proximité.
+8. L'autocomplétion de destination inclut les **lieux MOVA** (marchés, hôpitaux, etc.) en plus des communes.
 
 ## 3. Livraison colis
 
@@ -53,6 +55,9 @@ Les services **Wallet MOVA** et **Historique** sont en bas de la grille. Vous y 
 3. Choisissez date et heure (jusqu'à J+7).
 4. Indiquez la destination et le véhicule souhaité.
 5. Confirmez la réservation.
+6. Vous recevrez des **rappels** la veille et une heure avant le départ (notification et SMS).
+7. Un chauffeur est assigné automatiquement environ **2 heures** avant l'heure prévue (ou manuellement par l'équipe MOVA).
+8. **Annulation tardive** (moins de 24 h avant le départ, chauffeur déjà confirmé) : des frais de **50 %** du tarif estimé peuvent être retenus sur votre portefeuille.
 
 ## 5. Livraison repas
 
@@ -65,9 +70,14 @@ Les services **Wallet MOVA** et **Historique** sont en bas de la grille. Vous y 
 ## 6. Courses & commissions
 
 1. Appuyez sur **Courses & commissions**.
-2. Listez vos articles à acheter ou la commission à effectuer.
-3. Indiquez l'adresse de livraison.
-4. Estimez le prix et envoyez la liste au livreur.
+2. Indiquez le **point de retrait** (commerce, pharmacie, marché) — utilisez l'autocomplétion pour sélectionner un lieu connu.
+3. Listez vos articles à acheter.
+4. Indiquez l'adresse de livraison (ou **Ma position**).
+5. Optionnel : renseignez un **budget achats max** — le montant est **bloqué** sur votre portefeuille MOVA jusqu'à la fin de la course.
+6. Estimez le prix (frais de service + estimation achats selon le type de commerce).
+7. Envoyez la liste : un livreur proche reçoit une **alerte**.
+8. Une fois le livreur assigné, utilisez le **chat** pour préciser un article indisponible.
+9. À la fin, payez les frais de service et le montant réel des achats.
 
 ## 7. Covoiturage
 

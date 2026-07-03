@@ -9,6 +9,9 @@ export type OrderPlacedMetadata = {
   itemsSubtotalCdf?: number;
   deliveryFeeCdf?: number;
   discountCdf?: number;
+  absorbedBy?: string;
+  partnerDiscountCdf?: number;
+  platformDiscountCdf?: number;
 };
 
 function sumLineItems(items: unknown): number {
@@ -48,6 +51,9 @@ export function parseOrderPlacedMetadata(events: { event: string; metadata: unkn
     itemsSubtotalCdf: meta.itemsSubtotalCdf != null ? Number(meta.itemsSubtotalCdf) : undefined,
     deliveryFeeCdf: meta.deliveryFeeCdf != null ? Number(meta.deliveryFeeCdf) : undefined,
     discountCdf: meta.discountCdf != null ? Number(meta.discountCdf) : undefined,
+    absorbedBy: meta.absorbedBy != null ? String(meta.absorbedBy) : undefined,
+    partnerDiscountCdf: meta.partnerDiscountCdf != null ? Number(meta.partnerDiscountCdf) : undefined,
+    platformDiscountCdf: meta.platformDiscountCdf != null ? Number(meta.platformDiscountCdf) : undefined,
   };
 }
 

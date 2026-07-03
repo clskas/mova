@@ -1,6 +1,10 @@
-import { Body, Controller, Get, Param, Patch, Post, Request, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Get, Param, Patch, Post, Request, Res, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiProduces, ApiTags } from '@nestjs/swagger';
+import { Response } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { PartnerPromoDto } from '../promo/partner-promo.dto';
+import { PartnerPromoService } from '../promo/partner-promo.service';
+import { PartnerBillingService } from '../billing/partner-billing.service';
 import { CreatePartnerVehicleDto, PartnerBookingActionDto, PartnerLogisticsDto, UploadPartnerVehiclePhotoDto } from './rental-partner-portal.dto';
 import { RentalPartnerPortalService } from './rental-partner-portal.service';
 import { RentalPartnerRoleGuard } from './rental-partner-role.guard';
@@ -10,7 +14,11 @@ import { RentalPartnerRoleGuard } from './rental-partner-role.guard';
 @UseGuards(JwtAuthGuard, RentalPartnerRoleGuard)
 @ApiBearerAuth()
 export class RentalPartnerPortalController {
-  constructor(private portal: RentalPartnerPortalService) {}
+  constructor(
+    private portal: RentalPartnerPortalService,
+    private partnerPromo: PartnerPromoService,
+    private partnerBilling: PartnerBillingService,
+  ) {}
 
   @Get('profile')
   @ApiOperation({ summary: 'Profil partenaire location' })
@@ -76,5 +84,47 @@ export class RentalPartnerPortalController {
     @Body() dto: PartnerLogisticsDto,
   ) {
     return this.portal.updateLogistics(req.user.id, id, dto);
+  }
+
+  @Get('promos')
+  @ApiOperation({ summary: 'Codes promo du loueur' })
+  listPromos(@Request() req: { user: { id: string } }) {
+    return this.partnerPromo.listRentalPromos(req.user.id);
+  }
+
+  @Post('promos')
+  @ApiOperation({ summary: 'Créer un code promo location' })
+  createPromo(@Request() req: { user: { id: string } }, @Body() dto: PartnerPromoDto) {
+    return this.partnerPromo.createRentalPromo(req.user.id, dto);
+  }
+
+  @Patch('promos/:id')
+  @ApiOperation({ summary: 'Modifier un code promo location' })
+  updatePromo(
+    @Request() req: { user: { id: string } },
+    @Param('id') id: string,
+    @Body() dto: Partial<PartnerPromoDto>,
+  ) {
+    return this.partnerPromo.updateRentalPromo(req.user.id, id, dto);
+  }
+
+  @Get('bookings/:id/receipt')
+  @ApiOperation({ summary: 'Reçu partenaire réservation (JSON)' })
+  bookingReceipt(@Request() req: { user: { id: string } }, @Param('id') id: string) {
+    return this.partnerBilling.buildRentalPartnerReceipt(req.user.id, id);
+  }
+
+  @Get('bookings/:id/receipt/pdf')
+  @ApiOperation({ summary: 'Reçu partenaire réservation (PDF)' })
+  @ApiProduces('application/pdf')
+  async bookingReceiptPdf(
+    @Request() req: { user: { id: string } },
+    @Param('id') id: string,
+    @Res() res: Response,
+  ) {
+    const { buffer, filename } = await this.partnerBilling.getRentalPdf(req.user.id, id);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+    res.send(buffer);
   }
 }

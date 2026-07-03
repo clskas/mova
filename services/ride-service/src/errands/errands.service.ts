@@ -1,5 +1,5 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { CommissionServiceType, ErrandOrder, ErrandOrderStatus, TrackingReferenceType, VehicleType } from '@prisma/client';
+import { CommissionServiceType, ErrandCategory, ErrandOrder, ErrandOrderStatus, TrackingReferenceType, VehicleType } from '@prisma/client';
 import { MARKET_RDC, MovaErrorCode, MovaHttpException, MOVA_EVENTS, canCancelErrand, estimateRoadDistanceKm, estimateTripDurationMin } from '@mova/shared';
 import { RedisService } from '@mova/shared';
 import { addressToCoords, DEFAULT_PICKUP } from '../common/address.util';
@@ -10,13 +10,19 @@ import {
 } from '../common/driver-eligibility.util';
 import { tripDistanceKm } from '../common/geo.util';
 import { fetchAuthUserBrief } from '../common/internal-lookup.util';
+import { notifyNearbyDrivers } from '../common/driver-job-alert.util';
+import { captureWalletHold, holdWalletFunds, releaseWalletHold } from '../common/wallet-hold.util';
 import { buildErrandTimeline } from '../deliveries/parcel.util';
+import { MatchingService } from '../matching/matching.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { PricingService } from '../rides/pricing.service';
 import { CommissionService } from '../rides/commission.service';
 import { TrackingService } from '../tracking/tracking.service';
 import { TripShareService } from '../share/trip-share.service';
 import { CreateErrandOrderDto } from './errands.dto';
+import { estimatePurchaseByCategory, inferErrandCategory } from './errand-category.util';
+import { applyPromoCode } from '../common/promo-apply.util';
+import { PromoService } from '../rides/surcharge.service';
 
 export type ErrandItemRow = { label: string; qty?: number; estimatedCdf?: number };
 
@@ -29,6 +35,8 @@ export class ErrandsService {
     private redis: RedisService,
     private trackingService: TrackingService,
     private tripShare: TripShareService,
+    private matching: MatchingService,
+    private promo: PromoService,
   ) {}
 
   private async errandFees() {
@@ -55,22 +63,32 @@ export class ErrandsService {
     return order.description.split(', ').filter(Boolean).map((label) => ({ label, qty: 1 }));
   }
 
-  async estimate(dto: CreateErrandOrderDto, itemCount = 0) {
+  async estimate(dto: CreateErrandOrderDto, itemCount = 0, category?: ErrandCategory, redeemPromo = false) {
     const { baseCdf } = await this.errandFees();
     const distanceKm = estimateRoadDistanceKm(this.pricing.haversineKm(dto.pickupLat, dto.pickupLng, dto.dropoffLat, dto.dropoffLng));
     const durationMin = estimateTripDurationMin(distanceKm, MARKET_RDC.trip.averageSpeedKmh.errand);
     const fare = await this.pricing.estimateFare(VehicleType.STANDARD, distanceKm, durationMin);
     const { itemCdf } = await this.errandFees();
     const itemsFee = itemCount * itemCdf;
-    const estimatedPriceCdf = Math.ceil(fare.estimatedFareCdf + baseCdf + itemsFee);
+    const resolvedCategory = category ?? inferErrandCategory(dto.pickupAddress, dto.description.split(', '));
+    const estimatedPurchaseCdf = estimatePurchaseByCategory(resolvedCategory, itemCount);
+    const serviceFeeCdf = Math.ceil(fare.estimatedFareCdf + baseCdf + itemsFee);
+    const promoApplied = await applyPromoCode(this.promo, serviceFeeCdf, dto.promoCode, redeemPromo, {
+      context: { serviceType: 'ERRAND' },
+    });
     return {
-      estimatedPriceCdf,
-      formatted: `${estimatedPriceCdf.toLocaleString('fr-CD')} FC`,
+      estimatedPriceCdf: promoApplied.estimatedPriceCdf,
+      formatted: `${promoApplied.estimatedPriceCdf.toLocaleString('fr-CD')} FC`,
       distanceKm,
       durationMin,
       errandFeeCdf: baseCdf,
       itemsFeeCdf: itemsFee,
       budgetCdf: dto.budgetCdf,
+      category: resolvedCategory,
+      estimatedPurchaseCdf,
+      categoryLabel: MARKET_RDC.errand.categoryEstimates[resolvedCategory]?.label ?? 'Autre',
+      discountCdf: promoApplied.discountCdf,
+      promoCode: promoApplied.promoCode,
     };
   }
 
@@ -83,11 +101,22 @@ export class ErrandsService {
     return { label: DEFAULT_PICKUP.label, lat: DEFAULT_PICKUP.lat, lng: DEFAULT_PICKUP.lng };
   }
 
-  /** Compatibilité mobile: { deliveryAddress, items[], pickupAddress?, budgetCdf? } */
-  async estimateMobile(deliveryAddress: string, items: string[], pickupAddress?: string, budgetCdf?: number) {
+  /** Compatibilité mobile: { deliveryAddress, items[], pickupAddress?, pickupLat?, pickupLng?, budgetCdf? } */
+  async estimateMobile(
+    deliveryAddress: string,
+    items: string[],
+    pickupAddress?: string,
+    budgetCdf?: number,
+    pickupLat?: number,
+    pickupLng?: number,
+    promoCode?: string,
+  ) {
     const parsed = this.parseMobileItems(items, budgetCdf);
-    const pickup = this.resolvePickup(pickupAddress);
+    const pickup = pickupLat != null && pickupLng != null
+      ? { label: pickupAddress?.trim() || 'Point de retrait', lat: pickupLat, lng: pickupLng }
+      : this.resolvePickup(pickupAddress);
     const dropoff = addressToCoords(deliveryAddress);
+    const category = inferErrandCategory(pickup.label, parsed.items.map((i) => i.label));
     const dto: CreateErrandOrderDto = {
       description: parsed.description,
       pickupAddress: pickup.label,
@@ -97,21 +126,44 @@ export class ErrandsService {
       dropoffLat: dropoff.lat,
       dropoffLng: dropoff.lng,
       budgetCdf: parsed.budget ?? undefined,
+      promoCode,
     };
-    const estimate = await this.estimate(dto, parsed.items.length);
+    const estimate = await this.estimate(dto, parsed.items.length, category);
     return { ...estimate, currency: 'CDF', items: parsed.items };
+  }
+
+  private async alertErrandOffer(order: ErrandOrder) {
+    await notifyNearbyDrivers(this.redis, this.matching, {
+      jobKind: 'DELIVERY_OFFER',
+      referenceId: order.id,
+      pickupLat: order.pickupLat,
+      pickupLng: order.pickupLng,
+      pickupAddress: order.pickupAddress,
+      title: 'Nouvelle course & commissions',
+      body: `Retrait · ${order.pickupAddress}`,
+      data: { deliveryType: 'ERRAND', category: order.category },
+    }).catch(() => undefined);
+  }
+
+  private async maybeHoldBudget(userId: string, orderId: string, budgetCdf?: number | null) {
+    if (!budgetCdf || budgetCdf <= 0) return null;
+    await holdWalletFunds(userId, budgetCdf, 'ERRAND', orderId, `Séquestre budget course ${orderId}`);
+    return budgetCdf;
   }
 
   async create(userId: string, dto: CreateErrandOrderDto, structuredItems?: ErrandItemRow[]) {
     const itemCount = structuredItems?.length ?? 0;
-    const estimate = await this.estimate(dto, itemCount);
+    const category = inferErrandCategory(dto.pickupAddress, dto.description.split(', '));
+    const estimate = await this.estimate(dto, itemCount, category, true);
     const order = await this.prisma.errandOrder.create({
       data: {
         userId,
         status: ErrandOrderStatus.PENDING,
+        category,
         description: dto.description,
         items: structuredItems?.length ? structuredItems : undefined,
         budgetCdf: dto.budgetCdf,
+        estimatedPurchaseCdf: estimate.estimatedPurchaseCdf,
         pickupAddress: dto.pickupAddress,
         pickupLat: dto.pickupLat,
         pickupLng: dto.pickupLng,
@@ -119,11 +171,30 @@ export class ErrandsService {
         dropoffLat: dto.dropoffLat,
         dropoffLng: dto.dropoffLng,
         estimatedPriceCdf: estimate.estimatedPriceCdf,
+        promoCode: estimate.promoCode,
+        discountCdf: estimate.discountCdf || undefined,
         distanceKm: estimate.distanceKm,
         durationMin: estimate.durationMin,
       },
     });
-    return { order, estimate };
+    const walletHoldCdf = await this.maybeHoldBudget(userId, order.id, dto.budgetCdf).catch((err) => {
+      void this.prisma.errandOrder.delete({ where: { id: order.id } }).catch(() => undefined);
+      throw err;
+    });
+    if (walletHoldCdf) {
+      await this.prisma.errandOrder.update({ where: { id: order.id }, data: { walletHoldCdf } });
+    }
+    const finalOrder = await this.prisma.errandOrder.findUniqueOrThrow({ where: { id: order.id } });
+    await this.alertErrandOffer(finalOrder);
+    await this.redis.publish(MOVA_EVENTS.ERRAND_CREATED, {
+      errandId: finalOrder.id,
+      userId,
+      pickupAddress: finalOrder.pickupAddress,
+      pickupLat: finalOrder.pickupLat,
+      pickupLng: finalOrder.pickupLng,
+      estimatedPriceCdf: finalOrder.estimatedPriceCdf,
+    });
+    return { order: finalOrder, estimate };
   }
 
   async createMobile(
@@ -134,9 +205,14 @@ export class ErrandsService {
     deliveryLng?: number,
     pickupAddress?: string,
     budgetCdf?: number,
+    pickupLat?: number,
+    pickupLng?: number,
+    promoCode?: string,
   ) {
     const parsed = this.parseMobileItems(items, budgetCdf);
-    const pickup = this.resolvePickup(pickupAddress);
+    const pickup = pickupLat != null && pickupLng != null
+      ? { label: pickupAddress?.trim() || 'Point de retrait', lat: pickupLat, lng: pickupLng }
+      : this.resolvePickup(pickupAddress);
     const dropoff = deliveryLat != null && deliveryLng != null ? { lat: deliveryLat, lng: deliveryLng } : addressToCoords(deliveryAddress);
     const dto: CreateErrandOrderDto = {
       description: parsed.description,
@@ -147,6 +223,7 @@ export class ErrandsService {
       dropoffLat: dropoff.lat,
       dropoffLng: dropoff.lng,
       budgetCdf: parsed.budget ?? undefined,
+      promoCode,
     };
     const { order, estimate } = await this.create(userId, dto, parsed.items);
     return {
@@ -154,10 +231,13 @@ export class ErrandsService {
         id: order.id,
         status: order.status,
         type: 'ERRAND',
+        category: order.category,
         deliveryAddress,
         items: parsed.items.map((i) => i.label),
         structuredItems: parsed.items,
         budgetCdf: order.budgetCdf,
+        walletHoldCdf: order.walletHoldCdf,
+        estimatedPurchaseCdf: order.estimatedPurchaseCdf,
         priceCdf: estimate.estimatedPriceCdf,
         estimatedPriceCdf: estimate.estimatedPriceCdf,
         createdAt: order.createdAt.toISOString(),
@@ -202,6 +282,9 @@ export class ErrandsService {
       items: structuredItems.map((i) => i.label),
       structuredItems,
       budgetCdf: order.budgetCdf,
+      walletHoldCdf: order.walletHoldCdf,
+      estimatedPurchaseCdf: order.estimatedPurchaseCdf,
+      category: order.category,
       purchaseTotalCdf: order.purchaseTotalCdf,
       finalPriceCdf: serviceFeeCdf,
       serviceFeeCdf,
@@ -386,7 +469,13 @@ export class ErrandsService {
     return rows.map((o) => this.formatErrand(o));
   }
 
-  async updateStatusByDriver(id: string, driverId: string, status: ErrandOrderStatus, purchaseTotalCdf?: number) {
+  async updateStatusByDriver(
+    id: string,
+    driverId: string,
+    status: ErrandOrderStatus,
+    purchaseTotalCdf?: number,
+    proofPhotoUrl?: string,
+  ) {
     const order = await this.prisma.errandOrder.findUnique({ where: { id } });
     if (!order) throw new MovaHttpException(MovaErrorCode.ERRAND_NOT_FOUND, HttpStatus.NOT_FOUND);
     if (order.driverId !== driverId) {
@@ -405,6 +494,16 @@ export class ErrandsService {
     if (status === ErrandOrderStatus.IN_PROGRESS) {
       await assertDriverCanReceiveJobs(driverId);
     }
+    if (status === ErrandOrderStatus.COMPLETED) {
+      const proof = proofPhotoUrl?.trim() || order.proofPhotoUrl;
+      if (!proof) {
+        throw new MovaHttpException(
+          MovaErrorCode.ERRAND_INVALID_STATUS,
+          HttpStatus.BAD_REQUEST,
+          'Photo preuve d\'achat obligatoire avant complétion.',
+        );
+      }
+    }
     const updates: Record<string, unknown> = { status };
     if (status === ErrandOrderStatus.COMPLETED) {
       updates.completedAt = new Date();
@@ -412,8 +511,13 @@ export class ErrandsService {
       if (purchaseTotalCdf != null && purchaseTotalCdf >= 0) {
         updates.purchaseTotalCdf = Math.round(purchaseTotalCdf);
       }
+      if (proofPhotoUrl?.trim()) updates.proofPhotoUrl = proofPhotoUrl.trim();
     }
     const updated = await this.prisma.errandOrder.update({ where: { id }, data: updates });
+    if (status === ErrandOrderStatus.COMPLETED && updated.walletHoldCdf) {
+      const captureAmount = (updated.purchaseTotalCdf ?? 0) + (updated.finalPriceCdf ?? updated.estimatedPriceCdf);
+      await captureWalletHold('ERRAND', updated.id, Math.min(captureAmount, updated.walletHoldCdf)).catch(() => undefined);
+    }
     const formatted = this.formatErrand(updated);
     await this.redis.publish(MOVA_EVENTS.SERVICE_STATUS_UPDATED, {
       serviceType: 'ERRAND',
@@ -427,6 +531,19 @@ export class ErrandsService {
       timeline: formatted.timeline,
       paymentReady: status === ErrandOrderStatus.COMPLETED,
     };
+  }
+
+  async uploadProofPhoto(id: string, driverId: string, proofPhotoUrl: string) {
+    const order = await this.prisma.errandOrder.findUnique({ where: { id } });
+    if (!order) throw new MovaHttpException(MovaErrorCode.ERRAND_NOT_FOUND, HttpStatus.NOT_FOUND);
+    if (order.driverId !== driverId) {
+      throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
+    }
+    const updated = await this.prisma.errandOrder.update({
+      where: { id },
+      data: { proofPhotoUrl: proofPhotoUrl.trim() },
+    });
+    return this.formatErrand(updated);
   }
 
   async listForAdmin(take = 50) {
@@ -555,6 +672,11 @@ export class ErrandsService {
     return this.prisma.errandOrder.update({
       where: { id },
       data: { status: ErrandOrderStatus.CANCELLED, cancelledAt: new Date() },
+    }).then(async (updated) => {
+      if (updated.walletHoldCdf) {
+        await releaseWalletHold('ERRAND', updated.id).catch(() => undefined);
+      }
+      return updated;
     });
   }
 

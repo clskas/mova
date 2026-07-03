@@ -37,6 +37,8 @@ import { fetchAuthUserBrief } from '../common/internal-lookup.util';
 import { TripShareService } from '../share/trip-share.service';
 import { publishDriverJobAlert } from '../common/driver-job-alert.util';
 import { fetchRidePaymentStatus, fetchRidePaymentStatuses } from '../common/payment-status.util';
+import { applyPromoCode } from '../common/promo-apply.util';
+import { PromoService } from './surcharge.service';
 
 const ACTIVE_STATUSES: RideStatus[] = [
   RideStatus.REQUESTED,
@@ -67,20 +69,39 @@ export class RidesService {
     private trackingService: TrackingService,
     private commission: CommissionService,
     private tripShare: TripShareService,
+    private promo: PromoService,
   ) {}
 
   private emitStatusChange(rideId: string, status: RideStatus) {
     this.trackingGateway.broadcastRideStatus(rideId, toMobileRideStatus(status));
   }
 
-  async estimate(pickupLat: number, pickupLng: number, dropoffLat: number, dropoffLng: number, vehicleType: VehicleType) {
+  async estimate(
+    pickupLat: number,
+    pickupLng: number,
+    dropoffLat: number,
+    dropoffLng: number,
+    vehicleType: VehicleType,
+    promoCode?: string,
+    redeemPromo = false,
+  ) {
     const { pickupArea, isInterCity } = assertServiceAreaPair(pickupLat, pickupLng, dropoffLat, dropoffLng);
     const straightLineKm = this.pricing.haversineKm(pickupLat, pickupLng, dropoffLat, dropoffLng);
     const distanceKm = estimateRoadDistanceKm(straightLineKm);
     const etaMinutes = estimateTripDurationMin(distanceKm, MARKET_RDC.trip.averageSpeedKmh.ride);
     const fare = await this.pricing.estimateFare(vehicleType, distanceKm, etaMinutes, pickupArea.name);
+    const base = this.pricing.withInterCitySurcharge(fare, isInterCity, distanceKm);
+    const promoApplied = await applyPromoCode(this.promo, base.totalCdf, promoCode, redeemPromo, {
+      context: { serviceType: 'RIDE' },
+    });
     return {
-      ...this.pricing.withInterCitySurcharge(fare, isInterCity, distanceKm),
+      ...base,
+      estimatedFareCdf: promoApplied.estimatedPriceCdf,
+      totalCdf: promoApplied.estimatedPriceCdf,
+      estimatedPriceCdf: promoApplied.estimatedPriceCdf,
+      formatted: formatCdf(promoApplied.estimatedPriceCdf),
+      discountCdf: promoApplied.discountCdf,
+      promoCode: promoApplied.promoCode,
       isInterCity,
       pickupCity: pickupArea.name,
     };
@@ -96,6 +117,7 @@ export class RidesService {
       vehicleType: VehicleType;
       pickupAddress?: string;
       dropoffAddress?: string;
+      promoCode?: string;
     },
   ) {
     const active = await this.prisma.ride.findFirst({
@@ -107,7 +129,15 @@ export class RidesService {
 
     assertServiceAreaPair(data.pickupLat, data.pickupLng, data.dropoffLat, data.dropoffLng);
 
-    const estimate = await this.estimate(data.pickupLat, data.pickupLng, data.dropoffLat, data.dropoffLng, data.vehicleType);
+    const estimate = await this.estimate(
+      data.pickupLat,
+      data.pickupLng,
+      data.dropoffLat,
+      data.dropoffLng,
+      data.vehicleType,
+      data.promoCode,
+      true,
+    );
     const distanceKm = tripDistanceKm(
       data.pickupLat,
       data.pickupLng,
@@ -127,6 +157,8 @@ export class RidesService {
         dropoffLng: data.dropoffLng,
         dropoffAddress: data.dropoffAddress,
         estimatedFareCdf: estimate.totalCdf,
+        promoCode: estimate.promoCode,
+        discountCdf: estimate.discountCdf ?? undefined,
         distanceKm,
         durationMin: estimate.etaMinutes,
       },
@@ -146,6 +178,48 @@ export class RidesService {
       estimate,
       nextStep: 'POST /api/rides/:id/search',
     };
+  }
+
+  /** Course liée à une réservation planifiée — chauffeur déjà assigné, statut IN_PROGRESS. */
+  async createScheduledLinkedRide(data: {
+    passengerId: string;
+    driverId: string;
+    vehicleType: VehicleType;
+    pickupLat: number;
+    pickupLng: number;
+    pickupAddress?: string;
+    dropoffLat: number;
+    dropoffLng: number;
+    dropoffAddress?: string;
+    estimatedFareCdf: number;
+    distanceKm?: number;
+    durationMin?: number;
+  }) {
+    const completionPin = this.tripShare.generateCompletionPin();
+    const ride = await this.prisma.ride.create({
+      data: {
+        passengerId: data.passengerId,
+        driverId: data.driverId,
+        status: RideStatus.IN_PROGRESS,
+        vehicleType: data.vehicleType,
+        pickupLat: data.pickupLat,
+        pickupLng: data.pickupLng,
+        pickupAddress: data.pickupAddress,
+        dropoffLat: data.dropoffLat,
+        dropoffLng: data.dropoffLng,
+        dropoffAddress: data.dropoffAddress,
+        estimatedFareCdf: data.estimatedFareCdf,
+        finalFareCdf: data.estimatedFareCdf,
+        distanceKm: data.distanceKm,
+        durationMin: data.durationMin,
+        acceptedAt: new Date(),
+        startedAt: new Date(),
+        completionPin,
+      },
+    });
+    await this.prisma.rideEvent.create({ data: { rideId: ride.id, event: RideStatus.IN_PROGRESS } });
+    this.emitStatusChange(ride.id, RideStatus.IN_PROGRESS);
+    return ride;
   }
 
   async searchDrivers(rideId: string, passengerId: string) {
@@ -834,12 +908,19 @@ export class RidesService {
     }
 
     const driverSplit = this.commission.splitGross(pools.deliveryNetPool, deliveryRule.platformPercent);
+    const partnerDiscount = metadata.partnerDiscountCdf ?? 0;
+    const platformDiscount = metadata.platformDiscountCdf ?? 0;
+    if (partnerDiscount > 0 && restaurants.length > 0) {
+      const targetId = d.restaurantId ?? restaurants[0]?.restaurantId;
+      const target = restaurants.find((r) => r.restaurantId === targetId) ?? restaurants[0];
+      target.netCdf = Math.max(0, target.netCdf - partnerDiscount);
+    }
     return {
       referenceType: 'DELIVERY' as const,
       referenceId: deliveryId,
       deliveryType: 'FOOD' as const,
       totalPaidCdf,
-      platformFeeCdf: restaurantPlatformTotal + driverSplit.platformFeeCdf,
+      platformFeeCdf: Math.max(0, restaurantPlatformTotal + driverSplit.platformFeeCdf - platformDiscount),
       driver: d.driverId
         ? {
             userId: d.driverId,

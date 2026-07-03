@@ -137,4 +137,61 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
   broadcastRideChat(payload: { rideId: string; senderId: string; senderRole: string; text: string; ts: number }) {
     this.server.to(`ride:${payload.rideId}`).emit('ride:chat', payload);
   }
+
+  @SubscribeMessage('errand:chat')
+  handleErrandChat(@ConnectedSocket() client: Socket, @MessageBody() data: { errandId: string; senderId?: string; senderRole?: string; text: string; ts?: number }) {
+    if (!data?.errandId || !data.text?.trim()) return { ok: false };
+    client.join(`errand:${data.errandId}`);
+    const payload = {
+      errandId: data.errandId,
+      senderId: data.senderId ?? 'unknown',
+      senderRole: data.senderRole ?? 'unknown',
+      text: data.text.trim(),
+      ts: data.ts ?? Date.now(),
+    };
+    this.broadcastErrandChat(payload);
+    return { ok: true };
+  }
+
+  broadcastErrandChat(payload: { errandId: string; senderId: string; senderRole: string; text: string; ts: number }) {
+    this.server.to(`errand:${payload.errandId}`).emit('errand:chat', payload);
+  }
+
+  @SubscribeMessage('delivery:chat')
+  handleDeliveryChat(@ConnectedSocket() client: Socket, @MessageBody() data: { deliveryId: string; senderId?: string; senderRole?: string; text: string; ts?: number }) {
+    if (!data?.deliveryId || !data.text?.trim()) return { ok: false };
+    client.join(`delivery:${data.deliveryId}`);
+    const payload = {
+      deliveryId: data.deliveryId,
+      senderId: data.senderId ?? 'unknown',
+      senderRole: data.senderRole ?? 'unknown',
+      text: data.text.trim(),
+      ts: data.ts ?? Date.now(),
+    };
+    this.broadcastDeliveryChat(payload);
+    return { ok: true };
+  }
+
+  broadcastDeliveryChat(payload: { deliveryId: string; senderId: string; senderRole: string; text: string; ts: number }) {
+    this.server.to(`delivery:${payload.deliveryId}`).emit('delivery:chat', payload);
+  }
+
+  @SubscribeMessage('rental:chat')
+  handleRentalChat(@ConnectedSocket() client: Socket, @MessageBody() data: { inquiryId: string; senderId?: string; senderRole?: string; text: string; ts?: number }) {
+    if (!data?.inquiryId || !data.text?.trim()) return { ok: false };
+    client.join(`rental:${data.inquiryId}`);
+    const payload = {
+      inquiryId: data.inquiryId,
+      senderId: data.senderId ?? 'unknown',
+      senderRole: data.senderRole ?? 'unknown',
+      text: data.text.trim(),
+      ts: data.ts ?? Date.now(),
+    };
+    this.broadcastRentalChat(payload);
+    return { ok: true };
+  }
+
+  broadcastRentalChat(payload: { inquiryId: string; senderId: string; senderRole: string; text: string; ts: number }) {
+    this.server.to(`rental:${payload.inquiryId}`).emit('rental:chat', payload);
+  }
 }

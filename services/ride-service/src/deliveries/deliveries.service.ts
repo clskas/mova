@@ -21,6 +21,7 @@ import { MatchingService } from '../matching/matching.service';
 import { notifyNearbyDrivers } from '../common/driver-job-alert.util';
 import { CommissionService } from '../rides/commission.service';
 import { deliveryDriverGross } from './delivery-driver-gross.util';
+import { applyPromoCode, formatPromoValidation } from '../common/promo-apply.util';
 
 const WEIGHT_MULTIPLIERS: Record<WeightCategory, number> = {
   [WeightCategory.DOCUMENTS]: 1.0,
@@ -111,7 +112,7 @@ export class DeliveriesService {
     return base;
   }
 
-  async estimateParcel(dto: CreateParcelDeliveryDto) {
+  async estimateParcel(dto: CreateParcelDeliveryDto, redeemPromo = false) {
     this.validateParcelDto(dto);
     const { pickupArea, dropoffArea, isInterCity } = assertServiceAreaPair(
       dto.pickupLat,
@@ -125,7 +126,11 @@ export class DeliveriesService {
     const fare = await this.pricing.estimateFare(VehicleType.STANDARD, distanceKm, durationMin, pickupArea.name);
     const withInterCity = this.pricing.withInterCitySurcharge(fare, isInterCity, distanceKm);
     const multiplier = this.weightMultiplier(weightCategory, dto.weightKg);
-    const estimatedPriceCdf = Math.ceil(withInterCity.estimatedFareCdf * multiplier);
+    const beforePromo = Math.ceil(withInterCity.estimatedFareCdf * multiplier);
+    const promoApplied = await applyPromoCode(this.promo, beforePromo, dto.promoCode, redeemPromo, {
+      context: { serviceType: 'PARCEL' },
+    });
+    const estimatedPriceCdf = promoApplied.estimatedPriceCdf;
     const pickupCommune = detectCommune(dto.pickupLat, dto.pickupLng, dto.pickupAddress);
     const dropoffCommune = detectCommune(dto.dropoffLat, dto.dropoffLng, dto.dropoffAddress);
     return {
@@ -137,6 +142,8 @@ export class DeliveriesService {
       priceCdf: estimatedPriceCdf,
       formatted: formatCdf(estimatedPriceCdf),
       formattedPrice: formatCdf(estimatedPriceCdf),
+      discountCdf: promoApplied.discountCdf,
+      promoCode: promoApplied.promoCode,
       currency: 'CDF',
       city: pickupArea.name,
       pickupCity: pickupArea.name,
@@ -157,7 +164,7 @@ export class DeliveriesService {
   }
 
   async createParcel(userId: string, dto: CreateParcelDeliveryDto) {
-    const estimate = await this.estimateParcel(dto);
+    const estimate = await this.estimateParcel(dto, true);
     const weightCategory = this.resolveWeightCategory(dto);
     const delivery = await this.prisma.delivery.create({
       data: {
@@ -174,6 +181,8 @@ export class DeliveriesService {
         photoUrl: dto.photoUrl,
         weightCategory,
         estimatedPriceCdf: estimate.estimatedPriceCdf,
+        promoCode: estimate.promoCode,
+        discountCdf: estimate.discountCdf || undefined,
         distanceKm: estimate.distanceKm,
         durationMin: estimate.durationMin,
       },
@@ -185,23 +194,22 @@ export class DeliveriesService {
     return { delivery: formatted, estimate };
   }
 
-  private async applyFoodPromo(totalCdf: number, promoCode?: string, redeem = false) {
-    if (!promoCode?.trim()) {
-      return { estimatedPriceCdf: totalCdf, discountCdf: 0, promoCode: null as string | null };
-    }
-    const promoRow = redeem ? await this.promo.redeem(promoCode) : await this.promo.peek(promoCode);
-    const estimatedPriceCdf = this.promo.applyDiscount(totalCdf, promoRow);
-    return { estimatedPriceCdf, discountCdf: totalCdf - estimatedPriceCdf, promoCode: promoRow.code };
+  private async applyFoodPromo(
+    itemsSubtotalCdf: number,
+    deliveryFeeCdf: number,
+    promoCode?: string,
+    redeem = false,
+    restaurantId?: string,
+  ) {
+    return applyPromoCode(this.promo, itemsSubtotalCdf + deliveryFeeCdf, promoCode, redeem, {
+      context: { serviceType: 'FOOD', restaurantId },
+      parts: { itemsSubtotalCdf, deliveryFeeCdf },
+    });
   }
 
-  async validatePromoCode(code: string) {
-    const promo = await this.promo.peek(code);
-    return {
-      code: promo.code,
-      discountPercent: promo.discountPercent,
-      discountCdf: promo.discountCdf,
-      validUntil: promo.validUntil?.toISOString() ?? null,
-    };
+  async validatePromoCode(code: string, restaurantId?: string) {
+    const promo = await this.promo.peek(code, { serviceType: 'FOOD', restaurantId });
+    return formatPromoValidation(promo);
   }
 
   private computeFoodItemUnitPriceCdf(menuItem: MenuItem, size?: string, options?: string[]): number {
@@ -292,7 +300,7 @@ export class DeliveriesService {
       dto.deliveryLng,
     );
     const subtotalWithDelivery = itemsSubtotal + deliveryFeeCdf;
-    const promoApplied = await this.applyFoodPromo(subtotalWithDelivery, dto.promoCode, false);
+    const promoApplied = await this.applyFoodPromo(itemsSubtotal, deliveryFeeCdf, dto.promoCode, false, dto.restaurantId);
     return {
       restaurant: { id: restaurant.id, name: restaurant.name },
       itemsSubtotalCdf: itemsSubtotal,
@@ -315,7 +323,7 @@ export class DeliveriesService {
     if (!dto.items.length) throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR);
     const { subtotalCdf, normalizedItems } = this.resolveFoodItemsSubtotalCdf(restaurant.menuItems, dto.items);
     const estimate = await this.estimateFood({ ...dto, items: normalizedItems });
-    const promoApplied = await this.applyFoodPromo(subtotalCdf + estimate.deliveryFeeCdf, dto.promoCode, true);
+    const promoApplied = await this.applyFoodPromo(subtotalCdf, estimate.deliveryFeeCdf, dto.promoCode, true, dto.restaurantId);
     const delivery = await this.prisma.delivery.create({
       data: {
         userId,
@@ -331,6 +339,8 @@ export class DeliveriesService {
         pickupLng: restaurant.lng,
         pickupAddress: restaurant.address,
         estimatedPriceCdf: promoApplied.estimatedPriceCdf,
+        promoCode: promoApplied.promoCode,
+        discountCdf: promoApplied.discountCdf || undefined,
         distanceKm: estimate.distanceKm,
         durationMin: estimate.durationMin,
       },
@@ -346,6 +356,9 @@ export class DeliveriesService {
           deliveryFeeCdf: estimate.deliveryFeeCdf,
           promoCode: promoApplied.promoCode,
           discountCdf: promoApplied.discountCdf,
+          absorbedBy: promoApplied.settlement?.absorbedBy,
+          partnerDiscountCdf: promoApplied.settlement?.partnerDiscountCdf,
+          platformDiscountCdf: promoApplied.settlement?.platformDiscountCdf,
         } as unknown as Prisma.InputJsonValue,
       },
     });
@@ -389,7 +402,7 @@ export class DeliveriesService {
     }
 
     const subtotalWithDelivery = itemsSubtotalCdf + deliveryFeeCdf;
-    const promoApplied = await this.applyFoodPromo(subtotalWithDelivery, dto.promoCode, false);
+    const promoApplied = await this.applyFoodPromo(itemsSubtotalCdf, deliveryFeeCdf, dto.promoCode, false);
 
     return {
       restaurants: restaurants.map((r) => ({ id: r.id, name: r.name })),
@@ -422,7 +435,7 @@ export class DeliveriesService {
     });
     const itemsSubtotalCdf = normalizedOrders.reduce((sum, o) => sum + o.subtotalCdf, 0);
     const estimate = await this.estimateFoodMulti({ ...dto, orders: normalizedOrders.map((o) => ({ restaurantId: o.restaurant.id, items: o.items })) });
-    const promoApplied = await this.applyFoodPromo(itemsSubtotalCdf + estimate.deliveryFeeCdf, dto.promoCode, true);
+    const promoApplied = await this.applyFoodPromo(itemsSubtotalCdf, estimate.deliveryFeeCdf, dto.promoCode, true);
 
     // Pickup uses first restaurant for now (single delivery entity)
     const first = normalizedOrders[0].restaurant;
@@ -441,6 +454,8 @@ export class DeliveriesService {
         pickupLng: first.lng,
         pickupAddress: first.address,
         estimatedPriceCdf: promoApplied.estimatedPriceCdf,
+        promoCode: promoApplied.promoCode,
+        discountCdf: promoApplied.discountCdf || undefined,
         distanceKm: estimate.distanceKm,
         durationMin: estimate.durationMin,
       },
@@ -473,10 +488,14 @@ export class DeliveriesService {
     return { delivery: formatParcelDelivery(withEvents), estimate: { ...estimate, estimatedPriceCdf: promoApplied.estimatedPriceCdf, discountCdf: promoApplied.discountCdf } };
   }
 
-  async estimateExpress(dto: CreateParcelDeliveryDto) {
-    const parcel = await this.estimateParcel(dto);
+  async estimateExpress(dto: CreateParcelDeliveryDto, redeemPromo = false) {
+    const parcel = await this.estimateParcel({ ...dto, promoCode: undefined });
     const express = await this.surcharges.get(SurchargeType.DELIVERY_EXPRESS);
-    const estimatedPriceCdf = Math.ceil(parcel.estimatedPriceCdf * express.multiplier + express.baseFeeCdf);
+    const beforePromo = Math.ceil(parcel.estimatedPriceCdf * express.multiplier + express.baseFeeCdf);
+    const promoApplied = await applyPromoCode(this.promo, beforePromo, dto.promoCode, redeemPromo, {
+      context: { serviceType: 'EXPRESS' },
+    });
+    const estimatedPriceCdf = promoApplied.estimatedPriceCdf;
     return {
       ...parcel,
       type: 'EXPRESS',
@@ -484,13 +503,15 @@ export class DeliveriesService {
       priceCdf: estimatedPriceCdf,
       formatted: formatCdf(estimatedPriceCdf),
       formattedPrice: formatCdf(estimatedPriceCdf),
-      expressSurchargeCdf: estimatedPriceCdf - parcel.estimatedPriceCdf,
+      discountCdf: promoApplied.discountCdf,
+      promoCode: promoApplied.promoCode,
+      expressSurchargeCdf: beforePromo - parcel.estimatedPriceCdf,
       etaMin: Math.max(15, Math.ceil((parcel.durationMin ?? 30) * 0.6)),
     };
   }
 
   async createExpress(userId: string, dto: CreateParcelDeliveryDto) {
-    const estimate = await this.estimateExpress(dto);
+    const estimate = await this.estimateExpress(dto, true);
     const weightCategory = this.resolveWeightCategory(dto);
     const delivery = await this.prisma.delivery.create({
       data: {
@@ -507,6 +528,8 @@ export class DeliveriesService {
         photoUrl: dto.photoUrl,
         weightCategory,
         estimatedPriceCdf: estimate.estimatedPriceCdf,
+        promoCode: estimate.promoCode,
+        discountCdf: estimate.discountCdf || undefined,
         distanceKm: estimate.distanceKm,
         durationMin: estimate.durationMin,
       },

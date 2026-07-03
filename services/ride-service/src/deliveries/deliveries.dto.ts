@@ -21,6 +21,7 @@ export class CreateParcelDeliveryDto {
   @Min(0.1)
   @Max(50)
   weightKg?: number;
+  @ApiProperty({ required: false }) @IsOptional() @IsString() promoCode?: string;
 }
 
 export class FoodOrderItemDto {
@@ -67,6 +68,9 @@ export class CreateFoodMultiDeliveryDto {
 
 export class ValidatePromoDto {
   @ApiProperty() @IsString() code: string;
+  @ApiProperty({ required: false }) @IsOptional() @IsString() serviceType?: string;
+  @ApiProperty({ required: false }) @IsOptional() @IsString() restaurantId?: string;
+  @ApiProperty({ required: false }) @IsOptional() @IsString() vehicleId?: string;
 }
 
 export class RateDeliveryDto {

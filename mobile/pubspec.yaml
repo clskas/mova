@@ -29,6 +29,10 @@ dependencies:
   geolocator: ^13.0.2
   geocoding: ^3.0.0
   qr_flutter: ^4.1.0
+  printing: ^5.13.4
+  share_plus: ^10.1.4
+  path_provider: ^2.1.5
+  blue_thermal_printer: ^1.2.3
   flutter_local_notifications: ^20.1.0
   flutter_foreground_task: ^9.2.2
   firebase_core: ^4.11.0

@@ -12,6 +12,7 @@ import '../../core/widgets/destination_coord_panel.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
+import '../../widgets/promo_code_field.dart';
 import '../booking/widgets/mova_ride_map.dart';
 import 'parcel_tracking_screen.dart';
 
@@ -26,6 +27,7 @@ class ExpressDeliveryScreen extends ConsumerStatefulWidget {
 class _ExpressDeliveryScreenState extends ConsumerState<ExpressDeliveryScreen> {
   final _pickupController = TextEditingController(text: 'Ma position');
   final _dropoffController = TextEditingController();
+  final _promoController = TextEditingController();
   LatLng _pickup = MovaRideMap.mapDefaultCenter();
   LatLng? _dropoff;
   bool _dropoffFromManualCoords = false;
@@ -39,6 +41,7 @@ class _ExpressDeliveryScreenState extends ConsumerState<ExpressDeliveryScreen> {
   void dispose() {
     _pickupController.dispose();
     _dropoffController.dispose();
+    _promoController.dispose();
     super.dispose();
   }
 
@@ -119,6 +122,7 @@ class _ExpressDeliveryScreenState extends ConsumerState<ExpressDeliveryScreen> {
       'dropoffAddress': _dropoffController.text.trim(),
       'weightCategory': 'SMALL',
       'express': true,
+      if (_promoController.text.trim().isNotEmpty) 'promoCode': _promoController.text.trim(),
     };
   }
 
@@ -321,6 +325,10 @@ class _ExpressDeliveryScreenState extends ConsumerState<ExpressDeliveryScreen> {
                     const SizedBox(height: 16),
                     MovaErrorBanner(message: _validationError!),
                   ],
+                  PromoCodeField(
+                    controller: _promoController,
+                    onChanged: () => setState(() => _estimatedPrice = null),
+                  ),
                   if (_error != null) ...[
                     const SizedBox(height: 16),
                     MovaErrorBanner(message: _error!, onRetry: _estimate),

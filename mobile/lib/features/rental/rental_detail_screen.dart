@@ -7,6 +7,7 @@ import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
+import '../../widgets/promo_code_field.dart';
 import 'rental_addons.dart';
 import 'rental_booking_detail_screen.dart';
 import 'rental_quote_estimator.dart';
@@ -52,6 +53,7 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
   final _pickupController = TextEditingController(text: 'Gombe, Kinshasa');
   final _phoneController = TextEditingController(text: '+243812345678');
   final _notesController = TextEditingController();
+  final _promoController = TextEditingController();
   bool _loading = true;
   bool _submitting = false;
   String? _error;
@@ -78,6 +80,7 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
     _notesController.dispose();
     _passengerDriverNameController.dispose();
     _passengerDriverPhoneController.dispose();
+    _promoController.dispose();
     super.dispose();
   }
 
@@ -124,6 +127,7 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
             'passengerDriverName': _passengerDriverNameController.text.trim(),
           'passengerDriverPhone': MarketConfig.normalizePhone(_passengerDriverPhoneController.text.trim()),
         },
+        if (_promoController.text.trim().isNotEmpty) 'promoCode': _promoController.text.trim(),
       };
 
   Future<void> _fetchQuote() async {
@@ -807,6 +811,10 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
                 ),
               ),
             ],
+            PromoCodeField(
+              controller: _promoController,
+              onChanged: () => setState(() => _quote = null),
+            ),
             if (_error != null) ...[
               const SizedBox(height: 12),
               MovaErrorBanner(message: _error!),

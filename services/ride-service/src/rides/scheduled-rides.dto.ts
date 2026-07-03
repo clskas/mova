@@ -21,6 +21,7 @@ export class CreateScheduledRideDto {
   @ApiProperty() @IsNumber() dropoffLat: number;
   @ApiProperty() @IsNumber() dropoffLng: number;
   @ApiProperty({ required: false }) @IsOptional() @IsString() dropoffAddress?: string;
+  @ApiProperty({ required: false }) @IsOptional() @IsString() promoCode?: string;
 }
 
 export class CancelScheduledRideDto {

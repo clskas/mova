@@ -144,3 +144,55 @@ export async function uploadMenuPhoto(file: File): Promise<string> {
   });
   return result.photoUrl;
 }
+
+export type PartnerPromo = {
+  id: string;
+  code: string;
+  discountPercent?: number | null;
+  discountCdf?: number | null;
+  maxUses?: number | null;
+  usedCount?: number;
+  validUntil?: string | null;
+  isActive?: boolean;
+  scope?: string;
+  absorbedBy?: string;
+  partnerAbsorbPercent?: number | null;
+};
+
+export function fetchPromos() {
+  return apiFetch<{ restaurant?: { id: string; name: string }; promos: PartnerPromo[] }>("/api/restaurant/promos");
+}
+
+export function createPromo(data: {
+  code: string;
+  discountPercent?: number;
+  discountCdf?: number;
+  maxUses?: number;
+  validUntil?: string;
+  scope?: string;
+  absorbedBy?: string;
+  partnerAbsorbPercent?: number;
+}) {
+  return apiFetch<PartnerPromo>("/api/restaurant/promos", { method: "POST", body: JSON.stringify(data) });
+}
+
+export function updatePromo(id: string, data: Partial<{ isActive: boolean; maxUses: number; validUntil: string }>) {
+  return apiFetch<PartnerPromo>(`/api/restaurant/promos/${id}`, { method: "PATCH", body: JSON.stringify(data) });
+}
+
+export async function downloadOrderReceiptPdf(orderId: string) {
+  const res = await fetch(`${API_BASE}/api/restaurant/orders/${orderId}/receipt/pdf`, {
+    headers: authHeaders(),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data?.error?.message ?? data?.message ?? `Erreur ${res.status}`);
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `mova-order-${orderId.slice(0, 8)}.pdf`;
+  a.click();
+  URL.revokeObjectURL(url);
+}

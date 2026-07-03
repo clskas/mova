@@ -17,6 +17,7 @@ import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/destination_coord_panel.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
+import '../../widgets/promo_code_field.dart';
 import '../booking/widgets/mova_ride_map.dart';
 import '../history/history_detail_dialog.dart';
 import 'moving_tracking_screen.dart';
@@ -61,6 +62,7 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
   final _fromController = TextEditingController(text: 'Ma position');
   final _toController = TextEditingController();
   final _itemController = TextEditingController();
+  final _promoController = TextEditingController();
   String _volume = 'APARTMENT';
   String _vehicleCategory = 'CAMION_15M3';
   int _rooms = 2;
@@ -107,6 +109,7 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
     _fromController.dispose();
     _toController.dispose();
     _itemController.dispose();
+    _promoController.dispose();
     super.dispose();
   }
 
@@ -350,6 +353,7 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
       'vehicleCategory': _vehicleCategory,
       if (_items.isNotEmpty) 'itemsNotes': _items.join(', '),
       if (_uploadedPhotoUrls.isNotEmpty) 'photoUrls': _uploadedPhotoUrls,
+      if (_promoController.text.trim().isNotEmpty) 'promoCode': _promoController.text.trim(),
     };
   }
 
@@ -715,6 +719,10 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
             const SizedBox(height: 16),
             MovaErrorBanner(message: _validationError!),
           ],
+          PromoCodeField(
+            controller: _promoController,
+            onChanged: () => setState(() => _estimatedPrice = null),
+          ),
           if (_error != null) ...[
             const SizedBox(height: 16),
             MovaErrorBanner(message: _error!, onRetry: _estimate),

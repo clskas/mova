@@ -13,6 +13,7 @@ export class EstimateMovingDto {
   @ApiProperty() @IsNumber() dropoffLat: number;
   @ApiProperty() @IsNumber() dropoffLng: number;
   @ApiProperty() @IsString() dropoffAddress: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() promoCode?: string;
 }
 
 export class CreateMovingDto extends EstimateMovingDto {

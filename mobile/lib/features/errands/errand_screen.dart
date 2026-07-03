@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/api/api_client.dart';
@@ -7,6 +9,7 @@ import '../../core/location/location_service.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
+import '../../widgets/promo_code_field.dart';
 import 'errand_tracking_screen.dart';
 
 class ErrandScreen extends ConsumerStatefulWidget {
@@ -22,20 +25,30 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
   final _itemController = TextEditingController();
   final List<String> _items = [];
   final _budgetController = TextEditingController();
+  final _promoController = TextEditingController();
   int? _estimatedPrice;
+  int? _estimatedPurchaseCdf;
   bool _loading = false;
   bool _loadingGps = false;
+  bool _loadingPickupSuggestions = false;
+  bool _showPickupSuggestions = false;
+  List<Map<String, dynamic>> _pickupSuggestions = [];
+  double? _pickupLat;
+  double? _pickupLng;
   double? _deliveryLat;
   double? _deliveryLng;
   String? _error;
   String? _validationError;
+  Timer? _pickupDebounce;
 
   @override
   void dispose() {
+    _pickupDebounce?.cancel();
     _pickupController.dispose();
     _dropoffController.dispose();
     _itemController.dispose();
     _budgetController.dispose();
+    _promoController.dispose();
     super.dispose();
   }
 
@@ -78,12 +91,63 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
     final budget = int.tryParse(_budgetController.text.trim());
     return {
       'pickupAddress': _pickupController.text.trim(),
+      if (_pickupLat != null) 'pickupLat': _pickupLat,
+      if (_pickupLng != null) 'pickupLng': _pickupLng,
       'deliveryAddress': _dropoffController.text.trim(),
       'deliveryLat': _deliveryLat ?? MarketConfig.defaultLat,
       'deliveryLng': _deliveryLng ?? MarketConfig.defaultLng,
       'items': List<String>.from(_items),
       if (budget != null && budget > 0) 'budgetCdf': budget,
+      if (_promoController.text.trim().isNotEmpty) 'promoCode': _promoController.text.trim(),
     };
+  }
+
+  void _onPickupChanged(String value) {
+    _pickupDebounce?.cancel();
+    _pickupDebounce = Timer(const Duration(milliseconds: 350), () => _fetchPickupSuggestions(value));
+    setState(() {
+      _estimatedPrice = null;
+      _estimatedPurchaseCdf = null;
+      _pickupLat = null;
+      _pickupLng = null;
+    });
+  }
+
+  Future<void> _fetchPickupSuggestions(String query) async {
+    if (query.trim().length < 2) {
+      setState(() {
+        _pickupSuggestions = [];
+        _showPickupSuggestions = false;
+      });
+      return;
+    }
+    setState(() => _loadingPickupSuggestions = true);
+    final result = await ref.read(apiClientProvider).geoAutocomplete(query.trim());
+    if (!mounted) return;
+    setState(() {
+      _loadingPickupSuggestions = false;
+      switch (result) {
+        case Success(:final data):
+          _pickupSuggestions = data;
+          _showPickupSuggestions = data.isNotEmpty;
+        case Failure():
+          _pickupSuggestions = [];
+          _showPickupSuggestions = false;
+      }
+    });
+  }
+
+  void _selectPickupSuggestion(Map<String, dynamic> suggestion) {
+    final label = suggestion['label']?.toString() ?? suggestion['address']?.toString() ?? '';
+    _pickupController.text = label;
+    setState(() {
+      _pickupLat = (suggestion['lat'] as num?)?.toDouble();
+      _pickupLng = (suggestion['lng'] as num?)?.toDouble();
+      _showPickupSuggestions = false;
+      _pickupSuggestions = [];
+      _estimatedPrice = null;
+      _estimatedPurchaseCdf = null;
+    });
   }
 
   String? _validate() {
@@ -119,6 +183,7 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
       switch (result) {
         case Success(:final data):
           _estimatedPrice = data['estimatedPriceCdf'] as int?;
+          _estimatedPurchaseCdf = data['estimatedPurchaseCdf'] as int?;
         case Failure(:final error):
           _error = error.message;
       }
@@ -180,13 +245,35 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
           const SizedBox(height: 16),
           TextField(
             controller: _pickupController,
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               labelText: 'Point de retrait (commerce)',
-              hintText: 'Ex: Pharmacie du coin, Marché…',
-              prefixIcon: Icon(Icons.store_outlined),
+              hintText: 'Ex: Pharmacie, Marché Central…',
+              prefixIcon: const Icon(Icons.store_outlined),
+              suffixIcon: _loadingPickupSuggestions
+                  ? const Padding(
+                      padding: EdgeInsets.all(12),
+                      child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
+                    )
+                  : null,
             ),
-            onChanged: (_) => setState(() => _estimatedPrice = null),
+            onChanged: _onPickupChanged,
           ),
+          if (_showPickupSuggestions)
+            Card(
+              margin: const EdgeInsets.only(top: 4),
+              child: Column(
+                children: _pickupSuggestions.take(6).map((s) {
+                  final source = s['source']?.toString();
+                  final icon = source == 'poi' ? Icons.place : Icons.location_on_outlined;
+                  return ListTile(
+                    dense: true,
+                    leading: Icon(icon, color: MovaColors.violet, size: 20),
+                    title: Text(s['label']?.toString() ?? '', maxLines: 2, overflow: TextOverflow.ellipsis),
+                    onTap: () => _selectPickupSuggestion(s),
+                  );
+                }).toList(),
+              ),
+            ),
           const SizedBox(height: 12),
           TextField(
             controller: _dropoffController,
@@ -297,11 +384,25 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
                 ],
               ),
             ),
+            if (_estimatedPurchaseCdf != null && _estimatedPurchaseCdf! > 0) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Estimation achats (${_items.length} article(s)) : ${MarketConfig.formatCdf(_estimatedPurchaseCdf!)}',
+                style: theme.textTheme.bodySmall?.copyWith(color: MovaColors.textSecondary),
+              ),
+            ],
           ],
           if (_validationError != null) ...[
             const SizedBox(height: 16),
             MovaErrorBanner(message: _validationError!),
           ],
+          PromoCodeField(
+            controller: _promoController,
+            onChanged: () => setState(() {
+              _estimatedPrice = null;
+              _estimatedPurchaseCdf = null;
+            }),
+          ),
           if (_error != null) ...[
             const SizedBox(height: 16),
             MovaErrorBanner(message: _error!, onRetry: _estimate),

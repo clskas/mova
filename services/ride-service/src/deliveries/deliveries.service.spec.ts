@@ -30,6 +30,7 @@ describe('DeliveriesService', () => {
   const redis = { publish: jest.fn() };
   const trackingService = { getTrace: jest.fn().mockResolvedValue([]) };
   const matching = { findNearbyDrivers: jest.fn().mockResolvedValue([]) };
+  const commission = { get: jest.fn(), splitGross: jest.fn() };
 
   const service = new DeliveriesService(
     prisma as never,
@@ -39,6 +40,7 @@ describe('DeliveriesService', () => {
     redis as never,
     trackingService as never,
     matching as never,
+    commission as never,
   );
 
   beforeEach(() => jest.clearAllMocks());

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { apiFetch, formatCdf } from "@/lib/api";
+import { PromoCodeInput, promoPayload } from "./PromoCodeInput";
 
 const WEIGHT_CATEGORIES = [
   { id: "LIGHT", label: "Léger", hint: "< 1 kg" },
@@ -17,6 +18,7 @@ export function ParcelDelivery({ onBack, mock }: Props) {
   const [dropoff, setDropoff] = useState("");
   const [weightCategory, setWeightCategory] = useState("LIGHT");
   const [estimate, setEstimate] = useState<number | null>(null);
+  const [promoCode, setPromoCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
 
@@ -25,7 +27,7 @@ export function ParcelDelivery({ onBack, mock }: Props) {
     setLoading(true);
     const data = await apiFetch<{ estimatedPriceCdf?: number }>("/api/deliveries/parcel/estimate", {
       method: "POST",
-      body: JSON.stringify({ pickupAddress: pickup, dropoffAddress: dropoff, weightCategory }),
+      body: JSON.stringify({ pickupAddress: pickup, dropoffAddress: dropoff, weightCategory, ...promoPayload(promoCode) }),
     }, { useMock: mock });
     setEstimate(data.estimatedPriceCdf ?? 5000);
     setLoading(false);
@@ -43,6 +45,7 @@ export function ParcelDelivery({ onBack, mock }: Props) {
         pickupLng: 15.3125,
         dropoffLat: -4.35,
         dropoffLng: 15.35,
+        ...promoPayload(promoCode),
       }),
     }, { useMock: mock });
     setConfirmed(true);
@@ -95,6 +98,7 @@ export function ParcelDelivery({ onBack, mock }: Props) {
         </label>
       ))}
 
+      <PromoCodeInput value={promoCode} onChange={(v) => { setPromoCode(v); setEstimate(null); }} className="mb-2" />
       {estimate != null && (
         <div className="bg-white rounded-xl p-4 shadow-sm">
           <p className="text-gray-500 text-sm">Estimation</p>

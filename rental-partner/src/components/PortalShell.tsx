@@ -22,6 +22,7 @@ export function PortalShell({
   const nav = [
     { href: "/", label: "Mes véhicules" },
     { href: "/reservations", label: "Réservations" },
+    { href: "/promos", label: "Codes promo" },
     { href: "/nouveau", label: "Inscrire un véhicule" },
   ];
 

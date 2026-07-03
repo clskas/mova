@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:geolocator/geolocator.dart';
 import '../../core/api/api_client.dart';
 import '../../core/api/ride_socket.dart';
@@ -25,6 +27,7 @@ class ActiveDeliveryScreen extends ConsumerStatefulWidget {
 class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
   late Map<String, dynamic> _delivery;
   bool _loading = false;
+  bool _uploadingProof = false;
   String? _error;
   Timer? _locationTimer;
   String? _userId;
@@ -165,6 +168,12 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
   }
 
   Future<void> _completeErrandWithPurchase() async {
+    if (_delivery['proofPhotoUrl'] == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ajoutez d\'abord une photo preuve d\'achat.')),
+      );
+      return;
+    }
     final controller = TextEditingController(text: '0');
     final purchaseStr = await showDialog<String>(
       context: context,
@@ -188,6 +197,39 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
     if (purchaseStr == null || !mounted) return;
     final purchase = int.tryParse(purchaseStr) ?? 0;
     await _advanceStatus('COMPLETED', 'Courses terminées', purchaseTotalCdf: purchase);
+  }
+
+  Future<void> _uploadProofPhoto() async {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(source: ImageSource.camera, imageQuality: 75);
+    if (picked == null || !mounted) return;
+    setState(() => _uploadingProof = true);
+    final api = ref.read(apiClientProvider);
+    final upload = await api.uploadParcelPhoto(File(picked.path));
+    if (!mounted) return;
+    switch (upload) {
+      case Success(:final data):
+        final photoUrl = data;
+        final patch = await api.uploadErrandProofPhoto(_deliveryId, photoUrl);
+        if (!mounted) return;
+        setState(() => _uploadingProof = false);
+        switch (patch) {
+          case Success(:final data):
+            setState(() {
+              _delivery = data['errand'] as Map<String, dynamic>? ?? data;
+            });
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Photo preuve enregistrée')),
+            );
+          case Failure(:final error):
+            setState(() => _error = error.message);
+        }
+      case Failure(:final error):
+        setState(() {
+          _uploadingProof = false;
+          _error = error.message;
+        });
+    }
   }
 
   Future<void> _handleNextAction() async {
@@ -375,6 +417,15 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
             MovaErrorBanner(message: _error!),
           ],
           const SizedBox(height: 16),
+          if (_isErrand && _status == 'IN_PROGRESS') ...[
+            MovaButton(
+              label: _delivery['proofPhotoUrl'] != null ? 'Photo preuve ajoutée' : 'Photo preuve d\'achat',
+              icon: Icons.camera_alt_outlined,
+              isSecondary: _delivery['proofPhotoUrl'] != null,
+              onPressed: _uploadingProof || _loading ? null : _uploadProofPhoto,
+            ),
+            const SizedBox(height: 8),
+          ],
           if (_nextAction != null && !_awaitingCashConfirm)
             MovaButton(
               label: _actionLabel,

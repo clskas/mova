@@ -6,13 +6,19 @@ import { ErrandsService } from '../errands/errands.service';
 import { CreateFoodDeliveryDto, CreateFoodMultiDeliveryDto, CreateParcelDeliveryDto, RateDeliveryDto, UpdateDeliveryStatusDto, ValidatePromoDto } from './deliveries.dto';
 import { MobileErrandCreateDto, MobileErrandEstimateDto } from './deliveries-mobile.dto';
 import { DeliveriesService } from './deliveries.service';
+import { DeliveryChatService } from '../chat/delivery-chat.service';
+import { SendRideChatDto } from '../chat/ride-chat.dto';
 
 @ApiTags('deliveries')
 @Controller('deliveries')
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth()
 export class DeliveriesController {
-  constructor(private deliveriesService: DeliveriesService, private errandsService: ErrandsService) {}
+  constructor(
+    private deliveriesService: DeliveriesService,
+    private errandsService: ErrandsService,
+    private deliveryChatService: DeliveryChatService,
+  ) {}
 
   @Post('upload-photo')
   @ApiOperation({ summary: 'Alias téléversement photo colis' })
@@ -23,7 +29,15 @@ export class DeliveriesController {
   @Post('errand/estimate')
   @ApiOperation({ summary: 'Estimer course/commission (contrat mobile)' })
   estimateErrand(@Body() dto: MobileErrandEstimateDto) {
-    return this.errandsService.estimateMobile(dto.deliveryAddress, dto.items ?? [], dto.pickupAddress, dto.budgetCdf);
+    return this.errandsService.estimateMobile(
+      dto.deliveryAddress,
+      dto.items ?? [],
+      dto.pickupAddress,
+      dto.budgetCdf,
+      dto.pickupLat,
+      dto.pickupLng,
+      dto.promoCode,
+    );
   }
 
   @Post('errand')
@@ -37,6 +51,9 @@ export class DeliveriesController {
       dto.deliveryLng,
       dto.pickupAddress,
       dto.budgetCdf,
+      dto.pickupLat,
+      dto.pickupLng,
+      dto.promoCode,
     );
   }
 
@@ -200,5 +217,17 @@ export class DeliveriesController {
   @ApiOperation({ summary: 'Noter restaurant et livreur après livraison repas' })
   rate(@Request() req: { user: { id: string } }, @Param('id') id: string, @Body() dto: RateDeliveryDto) {
     return this.deliveriesService.rateDelivery(id, req.user.id, dto);
+  }
+
+  @Get(':id/chat')
+  @ApiOperation({ summary: 'Messages chat livraison' })
+  listChat(@Request() req: { user: { id: string } }, @Param('id') id: string) {
+    return this.deliveryChatService.listMessages(id, req.user.id);
+  }
+
+  @Post(':id/chat')
+  @ApiOperation({ summary: 'Envoyer un message chat livraison' })
+  sendChat(@Request() req: { user: { id: string } }, @Param('id') id: string, @Body() dto: SendRideChatDto) {
+    return this.deliveryChatService.sendMessage(id, req.user.id, dto.text);
   }
 }

@@ -231,6 +231,32 @@ async function main() {
     if (existing) await prisma.rentalVehicle.update({ where: { id: existing.id }, data: v });
     else await prisma.rentalVehicle.create({ data: v });
   }
+
+  const chezFlore = await prisma.restaurant.findFirst({ where: { name: 'Chez Flore' } });
+  if (chezFlore) {
+    await prisma.promoCode.upsert({
+      where: { code: 'CHEZ-FLORE10' },
+      create: {
+        code: 'CHEZ-FLORE10',
+        discountPercent: 10,
+        maxUses: 500,
+        validUntil: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+        ownerType: 'RESTAURANT',
+        scope: 'FOOD_MENU_ONLY',
+        absorbedBy: 'PARTNER',
+        restaurantId: chezFlore.id,
+      },
+      update: {
+        discountPercent: 10,
+        isActive: true,
+        ownerType: 'RESTAURANT',
+        scope: 'FOOD_MENU_ONLY',
+        absorbedBy: 'PARTNER',
+        restaurantId: chezFlore.id,
+      },
+    });
+  }
+
   console.log('Ride service seed complete');
 }
 main().finally(() => prisma.$disconnect());

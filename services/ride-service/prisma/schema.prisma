@@ -145,6 +145,8 @@ model Ride {
   dropoffAddress   String?
   estimatedFareCdf Int?
   finalFareCdf     Int?
+  promoCode        String?
+  discountCdf      Int?
   distanceKm       Float?
   durationMin      Float?
   acceptedAt       DateTime?
@@ -213,6 +215,7 @@ model Restaurant {
   updatedAt         DateTime @updatedAt
 
   deliveries Delivery[]
+  promoCodes       PromoCode[]
 
   @@index([ownerUserId])
   @@map("restaurants")
@@ -241,6 +244,8 @@ model Delivery {
   deliveryPin       String?
   estimatedPriceCdf Int
   finalPriceCdf     Int?
+  promoCode         String?
+  discountCdf       Int?
   distanceKm        Float?
   durationMin       Float?
   pickedUpAt        DateTime?
@@ -284,32 +289,51 @@ model DeliveryRating {
 }
 
 model ScheduledRide {
-  id                String              @id @default(uuid())
-  passengerId       String
-  driverId          String?
-  status            ScheduledRideStatus @default(SCHEDULED)
-  vehicleType       VehicleType
-  scheduledAt       DateTime
-  pickupLat         Float
-  pickupLng         Float
-  pickupAddress     String?
-  dropoffLat        Float
-  dropoffLng        Float
-  dropoffAddress    String?
-  estimatedPriceCdf Int
-  distanceKm        Float?
-  durationMin       Float?
-  cancelledAt       DateTime?
-  cancelReason      String?
-  rideId            String?
-  completionPin     String?
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
+  id                       String              @id @default(uuid())
+  passengerId              String
+  driverId                 String?
+  status                   ScheduledRideStatus @default(SCHEDULED)
+  vehicleType              VehicleType
+  scheduledAt              DateTime
+  pickupLat                Float
+  pickupLng                Float
+  pickupAddress            String?
+  dropoffLat               Float
+  dropoffLng               Float
+  dropoffAddress           String?
+  estimatedPriceCdf        Int
+  promoCode                String?
+  discountCdf              Int?
+  distanceKm               Float?
+  durationMin              Float?
+  cancelledAt              DateTime?
+  cancelReason             String?
+  cancellationFeeCdf       Int?
+  rideId                   String?
+  completionPin            String?
+  reminderDayBeforeSentAt  DateTime?
+  reminderHourBeforeSentAt DateTime?
+  autoAssignAttemptedAt    DateTime?
+  createdAt                DateTime            @default(now())
+  updatedAt                DateTime            @updatedAt
+  volunteers               ScheduledDriverVolunteer[]
 
   @@index([passengerId])
   @@index([scheduledAt])
   @@index([status])
   @@map("scheduled_rides")
+}
+
+model ScheduledDriverVolunteer {
+  id              String        @id @default(uuid())
+  scheduledRideId String
+  scheduledRide   ScheduledRide @relation(fields: [scheduledRideId], references: [id], onDelete: Cascade)
+  driverId        String
+  createdAt       DateTime      @default(now())
+
+  @@unique([scheduledRideId, driverId])
+  @@index([scheduledRideId])
+  @@map("scheduled_driver_volunteers")
 }
 
 enum CarpoolStatus {
@@ -326,6 +350,23 @@ enum ErrandOrderStatus {
   IN_PROGRESS
   COMPLETED
   CANCELLED
+}
+
+enum ErrandCategory {
+  PHARMACY
+  MARKET
+  OTHER
+}
+
+enum PlaceOfInterestCategory {
+  MARKET
+  HOSPITAL
+  UNIVERSITY
+  PHARMACY
+  SCHOOL
+  GOVERNMENT
+  TRANSPORT
+  OTHER
 }
 
 enum RentalInquiryStatus {
@@ -427,10 +468,13 @@ model ErrandOrder {
   id                String            @id @default(uuid())
   userId            String
   status            ErrandOrderStatus @default(PENDING)
+  category          ErrandCategory    @default(OTHER)
   description       String
   items             Json?
   budgetCdf         Int?
+  walletHoldCdf     Int?
   purchaseTotalCdf  Int?
+  estimatedPurchaseCdf Int?
   finalPriceCdf     Int?
   proofPhotoUrl     String?
   completionPin     String?
@@ -441,6 +485,8 @@ model ErrandOrder {
   dropoffLat        Float
   dropoffLng        Float
   estimatedPriceCdf Int
+  promoCode         String?
+  discountCdf       Int?
   distanceKm        Float?
   durationMin       Float?
   driverId          String?
@@ -452,6 +498,24 @@ model ErrandOrder {
   @@index([userId])
   @@index([status])
   @@map("errand_orders")
+}
+
+model PlaceOfInterest {
+  id        String                  @id @default(uuid())
+  osmId     String?                 @unique
+  name      String
+  category  PlaceOfInterestCategory
+  lat       Float
+  lng       Float
+  city      String
+  address   String?
+  source    String                  @default("OSM")
+  createdAt DateTime                @default(now())
+  updatedAt DateTime                @updatedAt
+
+  @@index([city, category])
+  @@index([lat, lng])
+  @@map("places_of_interest")
 }
 
 model TripShareLink {
@@ -527,6 +591,8 @@ model RentalInquiry {
   notes             String?
   estimatedPriceCdf Int?
   totalCdf          Int?
+  promoCode         String?
+  discountCdf       Int?
   logisticsMode           RentalLogisticsMode @default(SELF_PASSENGER)
   passengerDriverName     String?
   passengerDriverPhone    String?
@@ -555,6 +621,8 @@ model MovingRequest {
   dropoffLng        Float
   dropoffAddress    String
   estimatedPriceCdf Int
+  promoCode         String?
+  discountCdf       Int?
   distanceKm        Float?
   durationMin       Float?
   driverId          String?
@@ -618,19 +686,47 @@ model ServiceSurcharge {
 }
 
 model PromoCode {
-  id              String    @id @default(uuid())
-  code            String    @unique
-  discountPercent Int?
-  discountCdf     Int?
-  maxUses         Int?
-  usedCount       Int       @default(0)
-  validFrom       DateTime  @default(now())
-  validUntil      DateTime?
-  isActive        Boolean   @default(true)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id                   String          @id @default(uuid())
+  code                 String          @unique
+  discountPercent      Int?
+  discountCdf          Int?
+  maxUses              Int?
+  usedCount            Int             @default(0)
+  validFrom            DateTime        @default(now())
+  validUntil           DateTime?
+  isActive             Boolean         @default(true)
+  ownerType            PromoOwnerType  @default(PLATFORM)
+  scope                PromoScope      @default(ALL_PASSENGER_SERVICES)
+  absorbedBy           PromoAbsorbedBy @default(PLATFORM)
+  partnerAbsorbPercent Int?
+  restaurantId         String?
+  restaurant           Restaurant?     @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  rentalOwnerUserId    String?
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
 
+  @@index([restaurantId])
+  @@index([rentalOwnerUserId])
   @@map("promo_codes")
+}
+
+enum PromoOwnerType {
+  PLATFORM
+  RESTAURANT
+  RENTAL_OWNER
+}
+
+enum PromoScope {
+  ALL_PASSENGER_SERVICES
+  FOOD_MENU_ONLY
+  FOOD_ORDER
+  RENTAL_SUBTOTAL
+}
+
+enum PromoAbsorbedBy {
+  PLATFORM
+  PARTNER
+  SHARED
 }
 
 enum TrackingReferenceType {
@@ -663,4 +759,43 @@ model RideChatMessage {
 
   @@index([rideId, createdAt])
   @@map("ride_chat_messages")
+}
+
+model ErrandChatMessage {
+  id         String   @id @default(uuid())
+  errandId   String
+  senderId   String
+  senderRole String
+  text       String
+  ts         BigInt
+  createdAt  DateTime @default(now())
+
+  @@index([errandId, createdAt])
+  @@map("errand_chat_messages")
+}
+
+model DeliveryChatMessage {
+  id         String   @id @default(uuid())
+  deliveryId String
+  senderId   String
+  senderRole String
+  text       String
+  ts         BigInt
+  createdAt  DateTime @default(now())
+
+  @@index([deliveryId, createdAt])
+  @@map("delivery_chat_messages")
+}
+
+model RentalChatMessage {
+  id         String   @id @default(uuid())
+  inquiryId  String
+  senderId   String
+  senderRole String
+  text       String
+  ts         BigInt
+  createdAt  DateTime @default(now())
+
+  @@index([inquiryId, createdAt])
+  @@map("rental_chat_messages")
 }

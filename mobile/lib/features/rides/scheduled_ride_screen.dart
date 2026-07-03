@@ -16,6 +16,7 @@ import '../../core/location/destination_coords.dart';
 import '../../core/widgets/destination_coord_panel.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
+import '../../widgets/promo_code_field.dart';
 import '../booking/payment_screen.dart';
 import '../history/history_detail_dialog.dart';
 
@@ -28,6 +29,7 @@ class ScheduledRideScreen extends ConsumerStatefulWidget {
 
 class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
   final _destinationController = TextEditingController();
+  final _promoController = TextEditingController();
   DateTime _scheduledAt = DateTime.now().add(const Duration(hours: 2));
   String _vehicleType = 'MOTO_TAXI';
   LatLng _pickup = LatLng(MarketConfig.defaultLat, MarketConfig.defaultLng);
@@ -80,6 +82,7 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
       'dropoffAddress': _destinationController.text.trim(),
       'vehicleType': MarketConfig.apiVehicleType(_vehicleType),
       'scheduledAt': _scheduledAt.toIso8601String(),
+      if (_promoController.text.trim().isNotEmpty) 'promoCode': _promoController.text.trim(),
     };
   }
 
@@ -100,6 +103,7 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
     _pollTimer?.cancel();
     _destinationController.removeListener(_onDestinationChanged);
     _destinationController.dispose();
+    _promoController.dispose();
     super.dispose();
   }
 
@@ -768,6 +772,10 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
             const SizedBox(height: 16),
             MovaErrorBanner(message: _validationError!),
           ],
+          PromoCodeField(
+            controller: _promoController,
+            onChanged: () => setState(() => _estimatedPrice = null),
+          ),
           if (_error != null) ...[
             const SizedBox(height: 16),
             MovaErrorBanner(message: _error!, onRetry: _estimate),

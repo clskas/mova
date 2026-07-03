@@ -17,6 +17,7 @@ Ce document décrit **comment tester MOVA** :
 | [C2. Suivi GPS & traces](#c2-suivi-gps--traces-de-route) | Carte admin + polyline mobile |
 | [C3. RBAC admin par rôle](#c3-rbac-admin--test-par-niveau-daccès) | 5 comptes staff |
 | [C4. SOS, ERRAND v2, Cash/SMS](#c4-sos-errand-v2-cashsms) | Nouveautés juin 2026 |
+| [C5. POI, ERRAND v3, Planifiées v2](#c5-poi-errand-v3-réservations-planifiées-v2) | Juillet 2026 |
 | [D. Dépannage](#d-dépannage-rapide) | Problèmes fréquents |
 
 ---
@@ -291,11 +292,15 @@ Sans `-UsbReverse` : le PC et le téléphone doivent être sur le **même Wi‑F
 | 0 | Splash | Attendre ou **toucher l'écran** | Animation services passager ; puis OTP |
 | 1 | Accueil | Ville GPS + cartes services | Ville la plus proche ; grille sans overflow |
 | 2 | Commander une course | Saisir départ / arrivée, estimer | Prix en CDF affiché |
+| 2a | Carte taxi — POI | Chips **Marchés / Hôpitaux / Universités / Pharmacies** | Marqueurs orange sur la carte ; filtre par catégorie |
+| 2b | Autocomplétion POI | Taper « Marché Central » ou « Pharmacie » | Suggestions `source: poi` dans la liste |
 | 2b | Suivi course | Pendant course active | Carte : position chauffeur + **polyline** (trajet parcouru) |
 | 3 | Location véhicule | Onglet **Rechercher** → filtres → **Rechercher** | Catalogue (ex. 5 véhicules Kinshasa), pas d’overflow |
 | 4 | Location véhicule | Ouvrir un véhicule → réserver | Réservation ou devis OK |
 | 5 | Mes locations | Onglet **Mes locations** | Liste (vide ou réservations) |
 | 6 | Livraison / Food | Commander puis suivre | Carte avec trace GPS si livraison en cours |
+| 6b | Courses & commissions | Point retrait : autocomplétion POI ; budget wallet ; chat livreur | Push chauffeur à la création ; séquestre si budget ; photo preuve côté chauffeur |
+| 6c | Réservation planifiée | Créer J+1 ou J+2 ; annuler &lt; 24 h si confirmée | Avertissement frais 50 % ; rappels J-1 / H-1 (logs notification) |
 | 7 | Portefeuille | Consulter solde | Affichage sans erreur |
 | 8 | Aide | Ouvrir | Bouton **Déconnexion** visible |
 | 9 | Déconnexion | Se déconnecter | Retour écran login |
@@ -359,6 +364,8 @@ cd c:\Users\Administrator\Mova
 | 4 | Course entrante | Depuis passager, commander une course | Offre reçue sur chauffeur |
 | 5 | Accepter course | Accepter l’offre | Course en cours ; GPS envoyé (WebSocket + REST) |
 | 5b | Livraison active | Accepter colis/repas | Position envoyée ~toutes les 12 s |
+| 5c | ERRAND | Accepter course & commissions → **Photo preuve** puis terminer | Complétion refusée sans photo ; montant achats saisi à la fin |
+| 5d | Planifiée | Mission SCHEDULED → **Me porter volontaire** ou attendre auto-assign | Démarrage crée une Ride liée (`linkedRideId`) pour GPS live |
 | 6 | Gains | Consulter gains | Montants affichés |
 | 7 | KYC / documents | Upload permis, carte grise | Badges OCR si service configuré ; ne pas repasser en PENDING si déjà APPROVED |
 | 8 | Type d’engin | Si véhicule VIP/Confort en attente | Blocage **canOperate** tant que admin n’a pas validé le type |
@@ -500,10 +507,15 @@ Invoke-RestMethod http://localhost:3003/health
 | 1 | `GET /api/wallet` | JWT utilisateur | `balanceCdf` |
 | 2 | `GET /api/wallet/transactions` | JWT | Historique |
 | 3 | `POST /api/wallet/topup` | JWT | `{ "amountCdf": 5000, "provider": "MOCK" }` |
+| 4 | Séquestre ERRAND | Internal | `POST /internal/wallets/:userId/hold` (auto si `budgetCdf` sur commande) |
 
 ```powershell
 $passToken = Get-MovaToken "+243900000010"
 Invoke-RestMethod http://localhost:3000/api/wallet -Headers @{ Authorization = "Bearer $passToken" }
+# Recharger avant test séquestre ERRAND :
+Invoke-RestMethod -Uri http://localhost:3000/api/wallet/topup -Method POST `
+  -Headers @{ Authorization = "Bearer $passToken" } -ContentType "application/json" `
+  -Body '{"amountCdf":100000,"provider":"MOCK"}'
 ```
 
 > Dev : `MOCK_PAYMENTS=true` dans Docker — pas de vrai Mobile Money.
@@ -562,6 +574,10 @@ Invoke-RestMethod http://localhost:3022/health
 
 ```powershell
 Invoke-RestMethod "http://localhost:3000/api/geo/autocomplete?q=gombe&city=Kinshasa"
+Invoke-RestMethod "http://localhost:3000/api/geo/autocomplete?q=marché&city=Kinshasa"   # inclut POI
+Invoke-RestMethod "http://localhost:3000/api/geo/places?city=Kinshasa&category=MARKET"
+Invoke-RestMethod "http://localhost:3000/api/geo/places?city=Kinshasa&lat=-4.32&lng=15.31&radiusKm=5"
+Invoke-RestMethod -Uri "http://localhost:3000/api/geo/places/import" -Method POST          # seed Kinshasa
 Invoke-RestMethod "http://localhost:3000/api/geo/communes?city=Kinshasa"
 Invoke-RestMethod "http://localhost:3000/api/geo/service-areas"
 ```
@@ -810,6 +826,77 @@ Invoke-RestMethod -Uri "http://localhost:3000/api/incidents" -Method POST `
 
 ---
 
+## C5. POI, ERRAND v3, Réservations planifiées v2
+
+Fonctionnalités **juillet 2026** — à valider en mock avant production.
+
+### C5.1 Cartographie / POI (P2)
+
+| # | Test | Action | Résultat attendu |
+|---|------|--------|------------------|
+| 1 | Seed POI | `POST /api/geo/places/import` (ou démarrage ride-service) | ≥ 15 POI Kinshasa en base |
+| 2 | API liste | `GET /api/geo/places?city=Kinshasa&category=HOSPITAL` | Hôpitaux (Mama Yemo, etc.) |
+| 3 | Autocomplétion | Passager → Taxi ou ERRAND → taper « Marché » | Suggestions avec icône lieu / `source: poi` |
+| 4 | Carte taxi | Écran commande → chips **Marchés, Hôpitaux…** | Marqueurs orange filtrés sur `MovaRideMap` |
+
+### C5.2 Courses & commissions (complet)
+
+**Code promo test :** `MOVA10` (−10 %, créé au seed / migration juillet 2026). Valable sur **tous les services payants** (taxi, repas, colis, express, ERRAND, planifiées, déménagement, location). Endpoint validation : `POST /api/promo/validate` avec `{ "code": "MOVA10" }`.
+
+| # | Priorité | Test | Résultat attendu |
+|---|----------|------|------------------|
+| 1 | P0 | Créer commande ERRAND (passager) | Push + alerte sonore chauffeur proche (`DELIVERY_OFFER`) |
+| 2 | P0 | Autocomplétion **point de retrait** | Coordonnées POI / adresse appliquées |
+| 3 | P1 | Budget max + wallet rechargé | Séquestre `walletHoldCdf` ; libération si annulation |
+| 4 | P1 | Chauffeur : **Photo preuve** avant « Terminer » | `COMPLETED` refusé sans `proofPhotoUrl` |
+| 5 | P1 | Chat passager ↔ livreur (après assignation) | `GET/POST /api/errands/:id/chat` |
+| 6 | P2 | Estimation achats | Affichage estimation par catégorie (pharmacie vs marché) |
+
+**Comptes suggérés :** passager `+243900000010` (recharger wallet) ; chauffeur `+243900000023` (KYC ✅).
+
+```powershell
+$passToken = Get-MovaToken "+243900000010"
+# Estimation ERRAND mobile
+Invoke-RestMethod -Uri http://localhost:3000/api/deliveries/errand/estimate -Method POST `
+  -Headers @{ Authorization = "Bearer $passToken" } -ContentType "application/json" `
+  -Body '{"pickupAddress":"Pharmacie Gombe","deliveryAddress":"Gombe","items":["Paracétamol"],"budgetCdf":50000}'
+```
+
+### C5.3 Réservation planifiée (complet)
+
+| # | Priorité | Test | Résultat attendu |
+|---|----------|------|------------------|
+| 1 | P0 | Créer réservation J+1 (passager) | Enregistrement OK |
+| 2 | P0 | Attendre fenêtre rappel (ou avancer `scheduledAt` en base) | Push + SMS mock J-1 / H-1 (`SCHEDULED_REMINDER` dans logs notification) |
+| 3 | P0 | Auto-assign ~2 h avant | Statut **CONFIRMED** + chauffeur assigné (scheduler 1 min) |
+| 4 | P1 | Chauffeur démarre → **IN_PROGRESS** | `linkedRideId` renseigné ; trace GPS sur course liée |
+| 5 | P1 | Annulation tardive (&lt; 24 h, CONFIRMED) | Frais 50 % débités du wallet passager |
+| 6 | P2 | Chauffeur → **Me porter volontaire** | Candidature prioritaire à l'auto-assign |
+
+```powershell
+# Volontaire (chauffeur)
+$driverToken = Get-MovaToken "+243900000023" -Role "DRIVER"
+Invoke-RestMethod -Uri "http://localhost:3000/api/rides/scheduled/SCHEDULED_ID/volunteer" -Method POST `
+  -Headers @{ Authorization = "Bearer $driverToken" }
+```
+
+**Admin :** `/planifiees` — assignation manuelle toujours possible.
+
+### Scénario E2E recommandé (juillet 2026)
+
+| Étape | App | Action |
+|-------|-----|--------|
+| 1 | Docker | `migrate:all` + `seed:admin-demo` |
+| 2 | Passager | Recharger wallet 100 000 FC |
+| 3 | Passager | ERRAND : retrait « Marché Central », articles, budget 50 000 FC |
+| 4 | Chauffeur | Accepter offre, chat, photo preuve, compléter |
+| 5 | Passager | Payer ; vérifier séquestre capturé |
+| 6 | Passager | Réservation planifiée J+1 |
+| 7 | Chauffeur | Se porter volontaire sur la mission |
+| 8 | Admin | `/planifiees` + trace GPS après démarrage |
+
+---
+
 ## D. Dépannage rapide
 
 | Problème | Piste |
@@ -828,6 +915,10 @@ Invoke-RestMethod -Uri "http://localhost:3000/api/incidents" -Method POST `
 | Catalogue location vide | `GET /api/rental/vehicles?city=Kinshasa` ; `npm run seed:rides` |
 | Trace GPS vide sur admin | Chauffeur en mission ? Attendre 8+ s entre points ; vérifier WebSocket `WS_URL` |
 | Chauffeur bloqué malgré KYC OK | Vérifier **validation type d’engin** (VIP/Confort) dans `/chauffeurs` → Détail |
+| ERRAND : solde insuffisant pour budget | Recharger wallet passager (`POST /api/wallet/topup`) |
+| Photo preuve ERRAND refusée | Chauffeur doit joindre photo avant « Terminer » |
+| POI absents sur carte | `POST /api/geo/places/import` ou redémarrer ride-service (seed auto) |
+| Planifiée sans chauffeur | Chauffeur **volontaire** ou attendre auto-assign 2 h avant ; admin `/planifiees` |
 | ride-service seul en panne | `docker compose up -d --build ride-service` |
 
 ### Commandes utiles

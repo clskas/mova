@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { apiFetch, formatCdf } from "@/lib/api";
+import { apiFetch, formatCdf, historyItemHasReceipt, historyToBillingType } from "@/lib/api";
 
 type Ride = { id: string; pickupAddress?: string; dropoffAddress?: string; priceCdf?: number; status?: string };
 type Delivery = {
@@ -23,7 +23,12 @@ type Scheduled = {
   status?: string;
 };
 
-type Props = { onBack: () => void; mock?: boolean };
+type Props = {
+  onBack: () => void;
+  onOpenReceipts: () => void;
+  onOpenReceipt: (referenceType: string, referenceId: string) => void;
+  mock?: boolean;
+};
 
 const STATUS_LABELS: Record<string, string> = {
   COMPLETED: "Terminé",
@@ -33,7 +38,7 @@ const STATUS_LABELS: Record<string, string> = {
   CANCELLED: "Annulé",
 };
 
-export function HistoryView({ onBack, mock = false }: Props) {
+export function HistoryView({ onBack, onOpenReceipts, onOpenReceipt, mock = false }: Props) {
   const [tab, setTab] = useState<"rides" | "deliveries" | "scheduled">("rides");
   const [rides, setRides] = useState<Ride[]>([]);
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
@@ -113,7 +118,16 @@ export function HistoryView({ onBack, mock = false }: Props) {
   return (
     <div className="space-y-4">
       <button onClick={onBack} className="text-sm text-[#6C63FF]">← Accueil</button>
-      <h2 className="text-lg font-semibold">Historique</h2>
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-lg font-semibold">Historique</h2>
+        <button
+          type="button"
+          onClick={onOpenReceipts}
+          className="text-xs px-3 py-1.5 rounded-lg border border-[#6C63FF] text-[#6C63FF]"
+        >
+          Mes reçus
+        </button>
+      </div>
       {fromCache && (
         <p className="text-xs text-[#FF6B35] bg-orange-50 rounded-lg py-2 px-3">
           Serveur indisponible — données en cache
@@ -142,17 +156,26 @@ export function HistoryView({ onBack, mock = false }: Props) {
           {tab === "rides" && (rides.length === 0 ? (
             <p className="text-center text-gray-500 py-8">Aucune course</p>
           ) : rides.map((r) => (
-            <div key={r.id} className="bg-white rounded-xl p-4 shadow-sm">
+            <div key={r.id} className="bg-white rounded-xl p-4 shadow-sm space-y-2">
               <p className="font-medium truncate">{r.pickupAddress} → {r.dropoffAddress}</p>
               <p className="text-[#6C63FF]">{formatCdf(r.priceCdf ?? 0)}</p>
               <p className="text-xs text-gray-400">{STATUS_LABELS[r.status ?? ""] ?? r.status}</p>
+              {historyItemHasReceipt(r.status, "RIDE", (r as { isPaid?: boolean }).isPaid) && (
+                <button
+                  type="button"
+                  onClick={() => onOpenReceipt("RIDE", r.id)}
+                  className="text-xs text-[#6C63FF] underline"
+                >
+                  Voir le reçu
+                </button>
+              )}
             </div>
           )))}
 
           {tab === "deliveries" && (deliveries.length === 0 ? (
             <p className="text-center text-gray-500 py-8">Aucune livraison</p>
           ) : deliveries.map((d) => (
-            <div key={d.id} className="bg-white rounded-xl p-4 shadow-sm">
+            <div key={d.id} className="bg-white rounded-xl p-4 shadow-sm space-y-2">
               <p className="font-medium truncate">
                 {d.type === "FOOD"
                   ? `🍽️ ${d.restaurantName} → ${d.deliveryAddress}`
@@ -160,19 +183,37 @@ export function HistoryView({ onBack, mock = false }: Props) {
               </p>
               <p className="text-[#00D4A1]">{formatCdf(d.priceCdf ?? 0)}</p>
               <p className="text-xs text-gray-400">{STATUS_LABELS[d.status ?? ""] ?? d.status}</p>
+              {historyItemHasReceipt(d.status, d.type ?? "PARCEL") && (
+                <button
+                  type="button"
+                  onClick={() => onOpenReceipt(historyToBillingType(d.type), d.id)}
+                  className="text-xs text-[#6C63FF] underline"
+                >
+                  Voir le reçu
+                </button>
+              )}
             </div>
           )))}
 
           {tab === "scheduled" && (scheduled.length === 0 ? (
             <p className="text-center text-gray-500 py-8">Aucune réservation planifiée</p>
           ) : scheduled.map((s) => (
-            <div key={s.id} className="bg-white rounded-xl p-4 shadow-sm">
+            <div key={s.id} className="bg-white rounded-xl p-4 shadow-sm space-y-2">
               <p className="font-medium truncate">{s.pickupAddress} → {s.dropoffAddress}</p>
               <p className="text-sm text-gray-500">
                 {s.scheduledAt ? new Date(s.scheduledAt).toLocaleString("fr-CD") : ""}
               </p>
               <p className="text-[#6C63FF]">{formatCdf(s.priceCdf ?? 0)}</p>
               <p className="text-xs text-gray-400">{STATUS_LABELS[s.status ?? ""] ?? s.status}</p>
+              {historyItemHasReceipt(s.status, "SCHEDULED") && (
+                <button
+                  type="button"
+                  onClick={() => onOpenReceipt("SCHEDULED", s.id)}
+                  className="text-xs text-[#6C63FF] underline"
+                >
+                  Voir le reçu
+                </button>
+              )}
             </div>
           )))}
         </div>

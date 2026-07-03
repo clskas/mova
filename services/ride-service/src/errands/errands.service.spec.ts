@@ -22,14 +22,27 @@ describe('ErrandsService', () => {
   } as unknown as CommissionService;
 
   const prisma = {
-    errandOrder: { create: jest.fn(), findMany: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
+    errandOrder: {
+      create: jest.fn(),
+      findMany: jest.fn(),
+      findUnique: jest.fn(),
+      findUniqueOrThrow: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn().mockResolvedValue(undefined),
+    },
   };
 
   const redis = { publish: jest.fn().mockResolvedValue(1) };
   const trackingService = { getTrace: jest.fn().mockResolvedValue([]) };
   const tripShare = { generateCompletionPin: jest.fn().mockReturnValue('1234') };
 
-  const service = new ErrandsService(prisma as never, pricing, commission, redis as never, trackingService as never, tripShare as never);
+  const matching = { findDrivers: jest.fn().mockResolvedValue([]) };
+  const promo = {
+    peek: jest.fn(),
+    redeem: jest.fn(),
+    applyDiscount: jest.fn((price: number) => price),
+  };
+  const service = new ErrandsService(prisma as never, pricing, commission, redis as never, trackingService as never, tripShare as never, matching as never, promo as never);
 
   const dto = {
     description: 'Acheter pain et lait',
@@ -48,7 +61,9 @@ describe('ErrandsService', () => {
   });
 
   it('crée une commande courses avec statut PENDING', async () => {
-    prisma.errandOrder.create.mockResolvedValue({ id: 'e1', status: 'PENDING', ...dto });
+    const order = { id: 'e1', status: 'PENDING', category: 'OTHER', pickupAddress: dto.pickupAddress, pickupLat: dto.pickupLat, pickupLng: dto.pickupLng, estimatedPriceCdf: 10500, ...dto };
+    prisma.errandOrder.create.mockResolvedValue(order);
+    prisma.errandOrder.findUniqueOrThrow.mockResolvedValue(order);
     const result = await service.create('user-1', dto);
     expect(result.order.status).toBe('PENDING');
     expect(prisma.errandOrder.create).toHaveBeenCalled();

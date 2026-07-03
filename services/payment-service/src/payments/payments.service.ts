@@ -395,6 +395,37 @@ export class PaymentsService {
     };
   }
 
+  private formatPaymentDetail(payment: {
+    method: PaymentMethod;
+    status: PaymentStatus;
+    amountCdf: number;
+    providerRef: string | null;
+    updatedAt: Date;
+  }) {
+    return {
+      method: payment.method,
+      status: payment.status,
+      amountCdf: payment.amountCdf,
+      providerRef: payment.providerRef,
+      paidAt: payment.status === PaymentStatus.COMPLETED ? payment.updatedAt.toISOString() : null,
+    };
+  }
+
+  async getRidePaymentDetail(rideId: string) {
+    const payment = await this.prisma.payment.findUnique({ where: { rideId } });
+    if (!payment) return null;
+    return this.formatPaymentDetail(payment);
+  }
+
+  async getServicePaymentDetail(referenceType: string, referenceId: string) {
+    const type = referenceType.toUpperCase();
+    const payment = await this.prisma.servicePayment.findUnique({
+      where: { referenceType_referenceId: { referenceType: type, referenceId } },
+    });
+    if (!payment) return null;
+    return this.formatPaymentDetail(payment);
+  }
+
   async findPassengerUnpaidRide(passengerId: string) {
     try {
       const res = await fetch(serviceUrl('ride', `/internal/passengers/${passengerId}/unpaid-ride`), {

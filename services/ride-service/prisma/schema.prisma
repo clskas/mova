@@ -369,6 +369,12 @@ enum PlaceOfInterestCategory {
   OTHER
 }
 
+enum PoiSuggestionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 enum RentalInquiryStatus {
   PENDING
   CONFIRMED
@@ -516,6 +522,29 @@ model PlaceOfInterest {
   @@index([city, category])
   @@index([lat, lng])
   @@map("places_of_interest")
+}
+
+model PoiSuggestion {
+  id              String                  @id @default(uuid())
+  userId          String
+  name            String
+  category        PlaceOfInterestCategory
+  lat             Float
+  lng             Float
+  city            String
+  address         String?
+  notes           String?
+  status          PoiSuggestionStatus     @default(PENDING)
+  rejectionReason String?
+  reviewedBy      String?
+  reviewedAt      DateTime?
+  publishedPoiId  String?
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+
+  @@index([status, createdAt])
+  @@index([userId, status])
+  @@map("poi_suggestions")
 }
 
 model TripShareLink {

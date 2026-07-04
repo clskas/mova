@@ -1,6 +1,6 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { MovingRequestStatus, MovingVehicleCategory, SurchargeType, VehicleType } from '@prisma/client';
-import { MovaErrorCode, MovaHttpException, MOVA_EVENTS, MARKET_RDC, canCancelMoving, estimateRoadDistanceKm, estimateTripDurationMin, formatCdf } from '@mova/shared';
+import { MovaErrorCode, MovaHttpException, MOVA_EVENTS, MARKET_RDC, canCancelMoving, estimateTripDurationMin, formatCdf } from '@mova/shared';
 import { RedisService } from '@mova/shared';
 import { buildMovingTimeline } from '../deliveries/parcel.util';
 import { assertServiceAreaPair } from '../common/address.util';
@@ -14,6 +14,7 @@ import { TripShareService } from '../share/trip-share.service';
 import { CreateMovingDto, EstimateMovingDto } from './moving.dto';
 import { applyPromoCode } from '../common/promo-apply.util';
 import { PromoService } from '../rides/surcharge.service';
+import { RoutingService } from '../geo/routing.service';
 
 @Injectable()
 export class MovingService {
@@ -24,6 +25,7 @@ export class MovingService {
     private redis: RedisService,
     private tripShare: TripShareService,
     private promo: PromoService,
+    private routing: RoutingService,
   ) {}
 
   private validateCoords(dto: EstimateMovingDto) {
@@ -60,8 +62,9 @@ export class MovingService {
       dto.dropoffLng,
     );
     const moving = await this.surcharges.get(SurchargeType.MOVING);
-    const distanceKm = estimateRoadDistanceKm(this.pricing.haversineKm(dto.pickupLat, dto.pickupLng, dto.dropoffLat, dto.dropoffLng));
-    const durationMin = estimateTripDurationMin(distanceKm, MARKET_RDC.trip.averageSpeedKmh.moving);
+    const route = await this.routing.resolveRoadDistance(dto.pickupLat, dto.pickupLng, dto.dropoffLat, dto.dropoffLng);
+    const distanceKm = route.distanceKm;
+    const durationMin = route.durationMin ?? estimateTripDurationMin(distanceKm, MARKET_RDC.trip.averageSpeedKmh.moving);
     const fare = await this.pricing.estimateFare(VehicleType.STANDARD, distanceKm, durationMin, pickupArea.name);
     const withInterCity = this.pricing.withInterCitySurcharge(fare, isInterCity, distanceKm);
     const perM3 = moving.perUnitCdf ?? 8000;

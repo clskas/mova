@@ -18,6 +18,7 @@ import { CarpoolService } from '../carpool/carpool.service';
 import { DeliveriesService } from '../deliveries/deliveries.service';
 import { ErrandsService } from '../errands/errands.service';
 import { GeoService } from '../geo/geo.service';
+import { PoiSuggestionsService } from '../geo/poi-suggestions.service';
 import { MovingService } from '../moving/moving.service';
 import { PaymentInfoService } from './payment-info.service';
 import { PricingAdminService } from '../rides/pricing-admin.service';
@@ -39,6 +40,7 @@ export class InternalController {
     private pricingAdmin: PricingAdminService,
     private paymentInfo: PaymentInfoService,
     private geo: GeoService,
+    private poiSuggestions: PoiSuggestionsService,
     private carpool: CarpoolService,
     private moving: MovingService,
     private rental: RentalService,
@@ -367,6 +369,29 @@ export class InternalController {
   @Delete('cities/:id')
   deleteCity(@Param('id') id: string) {
     return this.geo.deleteCity(id);
+  }
+
+  @Get('poi-suggestions')
+  listPoiSuggestions(
+    @Query('status') status?: string,
+    @Query('skip') skip?: string,
+    @Query('take') take?: string,
+  ) {
+    return this.poiSuggestions.listForAdmin({
+      status: status as 'PENDING' | 'APPROVED' | 'REJECTED' | undefined,
+      skip: Number(skip ?? 0),
+      take: Number(take ?? 50),
+    });
+  }
+
+  @Post('poi-suggestions/:id/approve')
+  approvePoiSuggestion(@Param('id') id: string, @Body() body: { reviewedBy?: string }) {
+    return this.poiSuggestions.approve(id, body);
+  }
+
+  @Post('poi-suggestions/:id/reject')
+  rejectPoiSuggestion(@Param('id') id: string, @Body() body: { reason?: string; reviewedBy?: string }) {
+    return this.poiSuggestions.reject(id, body);
   }
 
   @Get('carpool')

@@ -10,7 +10,6 @@ import {
   MovaHttpException,
   RideCreatedPayload,
   MARKET_RDC,
-  estimateRoadDistanceKm,
   estimateTripDurationMin,
   serviceUrl,
   rideTypesDriverCanServe,
@@ -32,6 +31,7 @@ import { TrackingGateway } from '../websocket/tracking.gateway';
 import { TrackingService } from '../tracking/tracking.service';
 import { assertServiceAreaPair, assertServiceAreaCoords } from '../common/address.util';
 import { tripDistanceKm } from '../common/geo.util';
+import { RoutingService } from '../geo/routing.service';
 import { assertDriverCanReceiveJobs, assertDriverEligibleForRide, driverCanReceiveJobs, fetchDriverProfileSnapshot } from '../common/driver-eligibility.util';
 import { fetchAuthUserBrief } from '../common/internal-lookup.util';
 import { TripShareService } from '../share/trip-share.service';
@@ -70,6 +70,7 @@ export class RidesService {
     private commission: CommissionService,
     private tripShare: TripShareService,
     private promo: PromoService,
+    private routing: RoutingService,
   ) {}
 
   private emitStatusChange(rideId: string, status: RideStatus) {
@@ -86,9 +87,10 @@ export class RidesService {
     redeemPromo = false,
   ) {
     const { pickupArea, isInterCity } = assertServiceAreaPair(pickupLat, pickupLng, dropoffLat, dropoffLng);
-    const straightLineKm = this.pricing.haversineKm(pickupLat, pickupLng, dropoffLat, dropoffLng);
-    const distanceKm = estimateRoadDistanceKm(straightLineKm);
-    const etaMinutes = estimateTripDurationMin(distanceKm, MARKET_RDC.trip.averageSpeedKmh.ride);
+    const route = await this.routing.resolveRoadDistance(pickupLat, pickupLng, dropoffLat, dropoffLng);
+    const distanceKm = route.distanceKm;
+    const etaMinutes =
+      route.durationMin ?? estimateTripDurationMin(distanceKm, MARKET_RDC.trip.averageSpeedKmh.ride);
     const fare = await this.pricing.estimateFare(vehicleType, distanceKm, etaMinutes, pickupArea.name);
     const base = this.pricing.withInterCitySurcharge(fare, isInterCity, distanceKm);
     const promoApplied = await applyPromoCode(this.promo, base.totalCdf, promoCode, redeemPromo, {
@@ -104,6 +106,7 @@ export class RidesService {
       promoCode: promoApplied.promoCode,
       isInterCity,
       pickupCity: pickupArea.name,
+      distanceSource: route.source,
     };
   }
 
@@ -138,13 +141,7 @@ export class RidesService {
       data.promoCode,
       true,
     );
-    const distanceKm = tripDistanceKm(
-      data.pickupLat,
-      data.pickupLng,
-      data.dropoffLat,
-      data.dropoffLng,
-      estimate.distanceKm,
-    );
+    const distanceKm = estimate.distanceKm;
     const ride = await this.prisma.ride.create({
       data: {
         passengerId,

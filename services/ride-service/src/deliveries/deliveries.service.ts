@@ -1,6 +1,6 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { DeliveryStatus, DeliveryType, Prisma, SurchargeType, TrackingReferenceType, VehicleType, WeightCategory, CommissionServiceType } from '@prisma/client';
-import { driverEligibleForParcelWeight, INTERNAL_API_KEY, MARKET_RDC, MOVA_EVENTS, MovaErrorCode, MovaHttpException, canCancelDelivery, estimateRoadDistanceKm, estimateTripDurationMin, formatCdf, normalizeVehicleType, resolveCityFromCoords, serviceUrl, VehicleTypeValue } from '@mova/shared';
+import { driverEligibleForParcelWeight, INTERNAL_API_KEY, MARKET_RDC, MOVA_EVENTS, MovaErrorCode, MovaHttpException, canCancelDelivery, estimateTripDurationMin, formatCdf, normalizeVehicleType, resolveCityFromCoords, serviceUrl, VehicleTypeValue } from '@mova/shared';
 import { RedisService } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { PricingService } from '../rides/pricing.service';
@@ -22,6 +22,7 @@ import { notifyNearbyDrivers } from '../common/driver-job-alert.util';
 import { CommissionService } from '../rides/commission.service';
 import { deliveryDriverGross } from './delivery-driver-gross.util';
 import { applyPromoCode, formatPromoValidation } from '../common/promo-apply.util';
+import { RoutingService } from '../geo/routing.service';
 
 const WEIGHT_MULTIPLIERS: Record<WeightCategory, number> = {
   [WeightCategory.DOCUMENTS]: 1.0,
@@ -63,6 +64,7 @@ export class DeliveriesService {
     private trackingService: TrackingService,
     private matching: MatchingService,
     private commission: CommissionService,
+    private routing: RoutingService,
   ) {}
 
   private async alertDeliveryOffer(delivery: {
@@ -121,8 +123,9 @@ export class DeliveriesService {
       dto.dropoffLng,
     );
     const weightCategory = this.resolveWeightCategory(dto);
-    const distanceKm = estimateRoadDistanceKm(this.pricing.haversineKm(dto.pickupLat, dto.pickupLng, dto.dropoffLat, dto.dropoffLng));
-    const durationMin = estimateTripDurationMin(distanceKm, MARKET_RDC.trip.averageSpeedKmh.delivery);
+    const route = await this.routing.resolveRoadDistance(dto.pickupLat, dto.pickupLng, dto.dropoffLat, dto.dropoffLng);
+    const distanceKm = route.distanceKm;
+    const durationMin = route.durationMin ?? estimateTripDurationMin(distanceKm, MARKET_RDC.trip.averageSpeedKmh.delivery);
     const fare = await this.pricing.estimateFare(VehicleType.STANDARD, distanceKm, durationMin, pickupArea.name);
     const withInterCity = this.pricing.withInterCitySurcharge(fare, isInterCity, distanceKm);
     const multiplier = this.weightMultiplier(weightCategory, dto.weightKg);
@@ -263,9 +266,7 @@ export class DeliveriesService {
         'Ce restaurant ne livre pas dans votre ville. Choisissez un restaurant de votre zone.',
       );
     }
-    const distanceKm = estimateRoadDistanceKm(
-      this.pricing.haversineKm(restaurantLat, restaurantLng, deliveryLat, deliveryLng),
-    );
+    const distanceKm = await this.routing.roadDistanceKm(restaurantLat, restaurantLng, deliveryLat, deliveryLng);
     const maxKm = MAX_FOOD_DELIVERY_DISTANCE_KM;
     if (distanceKm > maxKm) {
       throw new MovaHttpException(
@@ -726,8 +727,8 @@ export class DeliveriesService {
       });
     }
 
-    const data = scoped
-      .map((r) => {
+    const data = (await Promise.all(
+      scoped.map(async (r) => {
         let deliveryEtaMin: number | null = null;
         let distanceKm: number | null = null;
         let minMenuPriceCdf = 0;
@@ -739,20 +740,19 @@ export class DeliveriesService {
           }, 0);
         }
         if (deliveryLat != null && deliveryLng != null) {
-          distanceKm = estimateRoadDistanceKm(this.pricing.haversineKm(r.lat, r.lng, deliveryLat, deliveryLng));
+          distanceKm = await this.routing.roadDistanceKm(r.lat, r.lng, deliveryLat, deliveryLng);
           const travelMin = estimateTripDurationMin(distanceKm, MARKET_RDC.trip.averageSpeedKmh.delivery);
           deliveryEtaMin = Math.max(20, travelMin + 15);
         }
         return { ...r, menuItems: this.publicMenuItems(r.menuItems), deliveryEtaMin, distanceKm, minMenuPriceCdf };
-      })
+      }),
+    ))
       .filter((r) => (maxEtaMin != null ? (r.deliveryEtaMin ?? 999) <= maxEtaMin : true))
       .filter((r) => (maxPriceCdf != null ? (r.minMenuPriceCdf ?? 0) <= maxPriceCdf : true))
       .filter((r) => (maxDistanceKm != null ? (r.distanceKm ?? 999) <= maxDistanceKm : true))
       .sort((a, b) => {
         if (deliveryLat == null || deliveryLng == null) return 0;
-        const da = this.pricing.haversineKm(a.lat, a.lng, deliveryLat, deliveryLng);
-        const db = this.pricing.haversineKm(b.lat, b.lng, deliveryLat, deliveryLng);
-        return da - db;
+        return (a.distanceKm ?? 999) - (b.distanceKm ?? 999);
       });
     return { data };
   }

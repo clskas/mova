@@ -1,4 +1,5 @@
-import PDFDocument from 'pdfkit';
+// pdfkit is CJS-only; default import breaks at runtime after tsc (pdfkit_1.default is not a constructor).
+import PDFDocument = require('pdfkit');
 import { MovaReceipt } from './billing.types';
 import { formatCdfReceipt } from './billing-labels.util';
 

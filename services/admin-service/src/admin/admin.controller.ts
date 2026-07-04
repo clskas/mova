@@ -463,6 +463,31 @@ export class AdminController {
     return this.adminService.deleteCity(id);
   }
 
+  @Get('poi-suggestions')
+  @RequirePermissions(AdminPermission.PRICING_READ)
+  @ApiOperation({ summary: 'Suggestions de lieux (POI) en attente' })
+  poiSuggestions(
+    @Query('status') status?: string,
+    @Query('skip') skip?: string,
+    @Query('take') take?: string,
+  ) {
+    return this.adminService.listPoiSuggestions(status, Number(skip ?? 0), Number(take ?? 50));
+  }
+
+  @Post('poi-suggestions/:id/approve')
+  @RequirePermissions(AdminPermission.PRICING_WRITE)
+  @ApiOperation({ summary: 'Publier une suggestion POI' })
+  approvePoiSuggestion(@Param('id') id: string, @Body() body: Record<string, unknown>) {
+    return this.adminService.approvePoiSuggestion(id, body);
+  }
+
+  @Post('poi-suggestions/:id/reject')
+  @RequirePermissions(AdminPermission.PRICING_WRITE)
+  @ApiOperation({ summary: 'Refuser une suggestion POI' })
+  rejectPoiSuggestion(@Param('id') id: string, @Body() body: Record<string, unknown>) {
+    return this.adminService.rejectPoiSuggestion(id, body);
+  }
+
   @Get('carpool')
   @RequirePermissions(AdminPermission.RIDES_READ)
   @ApiOperation({ summary: 'Trajets covoiturage' })

@@ -23,7 +23,11 @@ describe('ScheduledRidesService', () => {
     redeem: jest.fn(),
     applyDiscount: jest.fn((price: number) => price),
   };
-  const service = new ScheduledRidesService(prisma as never, pricing, redis as never, tripShare as never, matching as never, rides as never, promo as never);
+  const routing = {
+    resolveRoadDistance: jest.fn().mockResolvedValue({ distanceKm: 3, source: 'estimated' }),
+    roadDistanceKm: jest.fn().mockResolvedValue(3),
+  };
+  const service = new ScheduledRidesService(prisma as never, pricing, redis as never, tripShare as never, matching as never, rides as never, promo as never, routing as never);
 
   beforeEach(() => jest.clearAllMocks());
 

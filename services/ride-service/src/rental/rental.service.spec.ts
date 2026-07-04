@@ -4,7 +4,7 @@ describe('RentalService', () => {
   const prisma = {
     rentalInquiry: {
       create: jest.fn(),
-      findMany: jest.fn(),
+      findMany: jest.fn().mockResolvedValue([]),
       findUnique: jest.fn(),
       findUniqueOrThrow: jest.fn(),
       update: jest.fn(),
@@ -13,8 +13,13 @@ describe('RentalService', () => {
     rentalVehicle: { findMany: jest.fn(), findUnique: jest.fn() },
   };
   const redis = { publish: jest.fn().mockResolvedValue(1) };
+  const promo = {
+    peek: jest.fn(),
+    redeem: jest.fn(),
+    applyDiscount: jest.fn((price: number) => price),
+  };
 
-  const service = new RentalService(prisma as never, redis as never);
+  const service = new RentalService(prisma as never, redis as never, promo as never);
 
   const baseVehicle = {
     id: 'v1',

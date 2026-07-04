@@ -223,6 +223,13 @@ export class BillingReceiptService {
     const receipt = await this.buildReceipt(userId, referenceType, referenceId);
     const text = buildThermalReceiptText(receipt);
     const escPos = buildEscPosBuffer(text);
+    return { receipt, text, escPos, filename: `${receipt.receiptNumber}-thermal.pdf` };
+  }
+
+  async getThermalPdf(userId: string, referenceType: string, referenceId: string) {
+    const receipt = await this.buildReceipt(userId, referenceType, referenceId);
+    const text = buildThermalReceiptText(receipt);
+    const escPos = buildEscPosBuffer(text);
     const pdfBuffer = await buildThermalPdf(receipt);
     return { receipt, text, escPos, pdfBuffer, filename: `${receipt.receiptNumber}-thermal.pdf` };
   }

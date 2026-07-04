@@ -213,7 +213,8 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
     final headingToPickup = _status == 'DRIVER_ASSIGNED' || _status == 'ACCEPTED';
 
     return MovaScreen(
-      title: 'Course en cours',
+      title: _status == 'COMPLETED' ? 'Course terminée' : 'Course en cours',
+      scrollable: false,
       actions: [
         IconButton(
           icon: const Icon(Icons.chat_bubble_outline),
@@ -336,6 +337,24 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
             ),
           ],
           if (_status == 'COMPLETED') ...[
+            const SizedBox(height: 12),
+            MovaButton(
+              label: 'Chat avec le passager',
+              isSecondary: true,
+              icon: Icons.chat_bubble_outline,
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => RideChatScreen(
+                      rideId: _rideId,
+                      myRole: 'driver',
+                      peerLabel: 'Passager',
+                    ),
+                  ),
+                );
+              },
+            ),
             const SizedBox(height: 12),
             if (!_isPaid)
               MovaButton(

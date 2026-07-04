@@ -1,6 +1,6 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { CommissionServiceType, ErrandCategory, ErrandOrder, ErrandOrderStatus, TrackingReferenceType, VehicleType } from '@prisma/client';
-import { MARKET_RDC, MovaErrorCode, MovaHttpException, MOVA_EVENTS, canCancelErrand, estimateRoadDistanceKm, estimateTripDurationMin } from '@mova/shared';
+import { MARKET_RDC, MovaErrorCode, MovaHttpException, MOVA_EVENTS, canCancelErrand, estimateTripDurationMin } from '@mova/shared';
 import { RedisService } from '@mova/shared';
 import { addressToCoords, DEFAULT_PICKUP } from '../common/address.util';
 import {
@@ -23,6 +23,7 @@ import { CreateErrandOrderDto } from './errands.dto';
 import { estimatePurchaseByCategory, inferErrandCategory } from './errand-category.util';
 import { applyPromoCode } from '../common/promo-apply.util';
 import { PromoService } from '../rides/surcharge.service';
+import { RoutingService } from '../geo/routing.service';
 
 export type ErrandItemRow = { label: string; qty?: number; estimatedCdf?: number };
 
@@ -37,6 +38,7 @@ export class ErrandsService {
     private tripShare: TripShareService,
     private matching: MatchingService,
     private promo: PromoService,
+    private routing: RoutingService,
   ) {}
 
   private async errandFees() {
@@ -65,8 +67,9 @@ export class ErrandsService {
 
   async estimate(dto: CreateErrandOrderDto, itemCount = 0, category?: ErrandCategory, redeemPromo = false) {
     const { baseCdf } = await this.errandFees();
-    const distanceKm = estimateRoadDistanceKm(this.pricing.haversineKm(dto.pickupLat, dto.pickupLng, dto.dropoffLat, dto.dropoffLng));
-    const durationMin = estimateTripDurationMin(distanceKm, MARKET_RDC.trip.averageSpeedKmh.errand);
+    const route = await this.routing.resolveRoadDistance(dto.pickupLat, dto.pickupLng, dto.dropoffLat, dto.dropoffLng);
+    const distanceKm = route.distanceKm;
+    const durationMin = route.durationMin ?? estimateTripDurationMin(distanceKm, MARKET_RDC.trip.averageSpeedKmh.errand);
     const fare = await this.pricing.estimateFare(VehicleType.STANDARD, distanceKm, durationMin);
     const { itemCdf } = await this.errandFees();
     const itemsFee = itemCount * itemCdf;

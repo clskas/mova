@@ -175,10 +175,20 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
     if (!mounted) return;
     setState(() => _actionLoading = false);
     switch (result) {
-      case Success():
+      case Success(:final data):
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Reçu partagé dans le chat')),
         );
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!context.mounted) return;
+          openBillingChat(
+            context,
+            widget.referenceType,
+            data,
+            fallbackRideId: widget.rideId,
+          );
+        });
       case Failure(:final error):
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
     }

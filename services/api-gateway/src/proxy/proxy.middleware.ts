@@ -20,6 +20,7 @@ const ROUTES: Record<string, keyof typeof SERVICE_PORTS> = {
   '/api/express': 'ride',
   '/api/moving': 'ride',
   '/api/geo': 'ride',
+  '/api/poi-suggestions': 'ride',
   '/api/promo': 'ride',
   '/api/billing': 'ride',
   '/api/ratings': 'ride',

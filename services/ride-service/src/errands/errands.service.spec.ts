@@ -42,7 +42,11 @@ describe('ErrandsService', () => {
     redeem: jest.fn(),
     applyDiscount: jest.fn((price: number) => price),
   };
-  const service = new ErrandsService(prisma as never, pricing, commission, redis as never, trackingService as never, tripShare as never, matching as never, promo as never);
+  const routing = {
+    resolveRoadDistance: jest.fn().mockResolvedValue({ distanceKm: 4, source: 'estimated' }),
+    roadDistanceKm: jest.fn().mockResolvedValue(4),
+  };
+  const service = new ErrandsService(prisma as never, pricing, commission, redis as never, trackingService as never, tripShare as never, matching as never, promo as never, routing as never);
 
   const dto = {
     description: 'Acheter pain et lait',

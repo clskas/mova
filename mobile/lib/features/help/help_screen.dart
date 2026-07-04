@@ -9,6 +9,7 @@ import 'help_config.dart';
 import 'legal_screen.dart';
 import 'manual_screen.dart';
 import '../profile/profile_screen.dart';
+import '../geo/suggest_place_screen.dart';
 
 class HelpScreen extends ConsumerWidget {
   const HelpScreen({super.key});
@@ -68,6 +69,13 @@ class HelpScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 16),
+          _HelpLink(
+            icon: Icons.place_outlined,
+            iconColor: MovaColors.green,
+            title: 'Suggérer un lieu',
+            subtitle: 'Marché, pharmacie, arrêt… validation MOVA',
+            onTap: () => _open(context, const SuggestPlaceScreen()),
+          ),
           _HelpLink(
             icon: Icons.person_outline,
             iconColor: MovaColors.violet,

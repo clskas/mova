@@ -7,6 +7,7 @@ import 'contact_support_screen.dart';
 import 'faq_screen.dart';
 import 'help_config.dart';
 import 'legal_screen.dart';
+import '../geo/suggest_place_screen.dart';
 
 /// Centre d'aide minimal pour l'application Chauffeur MOVA.
 class DriverHelpScreen extends ConsumerWidget {
@@ -44,6 +45,13 @@ class DriverHelpScreen extends ConsumerWidget {
             subtitle: 'Consultez vos gains du jour en CDF et l\'historique des prestations.',
           ),
           const Divider(height: 24),
+          ListTile(
+            leading: const Icon(Icons.place_outlined, color: MovaColors.green),
+            title: const Text('Suggérer un lieu', style: TextStyle(fontWeight: FontWeight.w600)),
+            subtitle: const Text('Marché, pharmacie, arrêt…'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => _open(context, const SuggestPlaceScreen()),
+          ),
           ListTile(
             leading: const Icon(Icons.quiz_outlined, color: MovaColors.green),
             title: const Text('FAQ', style: TextStyle(fontWeight: FontWeight.w600)),

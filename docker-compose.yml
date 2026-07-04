@@ -66,6 +66,14 @@ services:
       DRIVER_SERVICE_URL: http://driver-service:3000
       AUTH_SERVICE_URL: http://auth-service:3000
       INTERNAL_API_KEY: mova-internal-dev
+      OSRM_BASE_URL: https://router.project-osrm.org
+      OSRM_ENABLED: 'true'
+      OSRM_TIMEOUT_MS: '5000'
+      NOMINATIM_BASE_URL: https://nominatim.openstreetmap.org
+      NOMINATIM_ENABLED: 'true'
+      NOMINATIM_TIMEOUT_MS: '5000'
+      NOMINATIM_MIN_INTERVAL_MS: '1000'
+      NOMINATIM_USER_AGENT: MOVA-RDC/1.0 (ride-service; https://mova.cd)
       DOCKER: 'true'
       PORT: 3000
     depends_on:

@@ -1,6 +1,6 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { RideStatus, ScheduledRideStatus, VehicleType } from '@prisma/client';
-import { MovaErrorCode, MovaHttpException, MOVA_EVENTS, MARKET_RDC, estimateRoadDistanceKm, estimateTripDurationMin, normalizeVehicleType, resolveCityFromCoords, canCancelScheduledRide, formatCdf } from '@mova/shared';
+import { MovaErrorCode, MovaHttpException, MOVA_EVENTS, MARKET_RDC, estimateTripDurationMin, normalizeVehicleType, resolveCityFromCoords, canCancelScheduledRide, formatCdf } from '@mova/shared';
 import { RedisService } from '@mova/shared';
 import { assertServiceAreaCoords, assertServiceAreaDestination, assertServiceAreaPair, addressToCoords, DEFAULT_PICKUP } from '../common/address.util';
 import { fetchAuthUserBrief } from '../common/internal-lookup.util';
@@ -15,6 +15,7 @@ import { CreateScheduledRideDto } from './scheduled-rides.dto';
 import { MobileScheduledEstimateDto } from '../deliveries/deliveries-mobile.dto';
 import { applyPromoCode } from '../common/promo-apply.util';
 import { PromoService } from './surcharge.service';
+import { RoutingService } from '../geo/routing.service';
 
 const MAX_SCHEDULE_DAYS = 7;
 const MS_HOUR = 60 * 60 * 1000;
@@ -30,6 +31,7 @@ export class ScheduledRidesService {
     private matching: MatchingService,
     private rides: RidesService,
     private promo: PromoService,
+    private routing: RoutingService,
   ) {}
 
   private parseVehicleType(value: string): VehicleType {
@@ -82,8 +84,9 @@ export class ScheduledRidesService {
       dropoffLng: dto.dropoffLng,
       dropoffAddress: dto.dropoffAddress ?? '',
     });
-    const distanceKm = estimateRoadDistanceKm(this.pricing.haversineKm(pickup.lat, pickup.lng, dropoff.lat, dropoff.lng));
-    const durationMin = estimateTripDurationMin(distanceKm, MARKET_RDC.trip.averageSpeedKmh.ride);
+    const route = await this.routing.resolveRoadDistance(pickup.lat, pickup.lng, dropoff.lat, dropoff.lng);
+    const distanceKm = route.distanceKm;
+    const durationMin = route.durationMin ?? estimateTripDurationMin(distanceKm, MARKET_RDC.trip.averageSpeedKmh.ride);
     const city = resolveCityFromCoords(pickup.lat, pickup.lng);
     const vehicleType = this.parseVehicleType(String(dto.vehicleType));
     const fare = await this.pricing.estimateFare(vehicleType, distanceKm, durationMin, city);
@@ -552,8 +555,9 @@ export class ScheduledRidesService {
     this.validateScheduledAt(when);
     const vehicleType = this.parseVehicleType(dto.vehicleType);
     const { pickup, dropoff, isInterCity } = this.resolveScheduledCoords(dto);
-    const distanceKm = estimateRoadDistanceKm(this.pricing.haversineKm(pickup.lat, pickup.lng, dropoff.lat, dropoff.lng));
-    const durationMin = estimateTripDurationMin(distanceKm, MARKET_RDC.trip.averageSpeedKmh.ride);
+    const route = await this.routing.resolveRoadDistance(pickup.lat, pickup.lng, dropoff.lat, dropoff.lng);
+    const distanceKm = route.distanceKm;
+    const durationMin = route.durationMin ?? estimateTripDurationMin(distanceKm, MARKET_RDC.trip.averageSpeedKmh.ride);
     const city = resolveCityFromCoords(pickup.lat, pickup.lng);
     const fare = await this.pricing.estimateFare(vehicleType, distanceKm, durationMin, city);
     const estimate = this.pricing.withInterCitySurcharge(fare, isInterCity, distanceKm);

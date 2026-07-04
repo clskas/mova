@@ -219,6 +219,7 @@ class _RideChatScreenState extends ConsumerState<RideChatScreen> {
   Widget build(BuildContext context) {
     return MovaScreen(
       title: 'Chat — ${widget.peerLabel}',
+      scrollable: false,
       child: Column(
         children: [
           if (_error != null) ...[

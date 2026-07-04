@@ -73,7 +73,7 @@ export class BillingController {
     @Param('referenceId') referenceId: string,
     @Res() res: Response,
   ) {
-    const { pdfBuffer, filename } = await this.billing.getThermal(req.user.id, referenceType, referenceId);
+    const { pdfBuffer, filename } = await this.billing.getThermalPdf(req.user.id, referenceType, referenceId);
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
     res.send(pdfBuffer);

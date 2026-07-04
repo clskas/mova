@@ -15,7 +15,12 @@ describe('CarpoolService', () => {
     carpoolRating: { aggregate: jest.fn(), upsert: jest.fn() },
   };
 
-  const service = new CarpoolService(prisma as never, pricing);
+  const routing = {
+    resolveRoadDistance: jest.fn().mockResolvedValue({ distanceKm: 3, source: 'estimated' }),
+    roadDistanceKm: jest.fn().mockResolvedValue(3),
+  };
+
+  const service = new CarpoolService(prisma as never, pricing, routing as never);
 
   beforeEach(() => {
     jest.clearAllMocks();

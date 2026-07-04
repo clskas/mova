@@ -7,6 +7,7 @@ import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import 'active_ride_screen.dart';
+import '../chat/ride_chat_screen.dart';
 
 class DriverRideHistoryScreen extends ConsumerStatefulWidget {
   const DriverRideHistoryScreen({super.key});
@@ -99,6 +100,26 @@ class _DriverRideHistoryScreenState extends ConsumerState<DriverRideHistoryScree
     return ride['status']?.toString() == 'COMPLETED' && ride['isPaid'] != true;
   }
 
+  bool _canOpenChat(Map<String, dynamic> ride) {
+    final status = ride['status']?.toString() ?? '';
+    return status != 'CANCELLED' && ride['id'] != null;
+  }
+
+  void _openChat(Map<String, dynamic> ride) {
+    final rideId = ride['id']?.toString();
+    if (rideId == null) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => RideChatScreen(
+          rideId: rideId,
+          myRole: 'driver',
+          peerLabel: 'Passager',
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return MovaScreen(
@@ -142,6 +163,12 @@ class _DriverRideHistoryScreenState extends ConsumerState<DriverRideHistoryScree
                                       style: const TextStyle(fontWeight: FontWeight.w600),
                                     ),
                                   ),
+                                  if (_canOpenChat(ride))
+                                    IconButton(
+                                      icon: const Icon(Icons.chat_bubble_outline, color: MovaColors.violet),
+                                      tooltip: 'Chat passager',
+                                      onPressed: () => _openChat(ride),
+                                    ),
                                   if (fare != null)
                                     Text(
                                       MarketConfig.formatCdf(fare.toInt()),

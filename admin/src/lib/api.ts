@@ -1014,6 +1014,44 @@ export async function fetchCommunes(city = "Kinshasa"): Promise<Commune[]> {
   return apiFetch<Commune[]>(`/api/admin/communes?city=${q}`);
 }
 
+export type PoiSuggestion = {
+  id: string;
+  userId: string;
+  name: string;
+  category: string;
+  lat: number;
+  lng: number;
+  city: string;
+  address?: string | null;
+  notes?: string | null;
+  status: "PENDING" | "APPROVED" | "REJECTED";
+  rejectionReason?: string | null;
+  reviewedBy?: string | null;
+  reviewedAt?: string | null;
+  publishedPoiId?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export async function fetchPoiSuggestions(status = "PENDING", skip = 0, take = 50) {
+  const params = new URLSearchParams({ status, skip: String(skip), take: String(take) });
+  return apiFetch<{ items: PoiSuggestion[]; total: number }>(`/api/admin/poi-suggestions?${params}`);
+}
+
+export async function approvePoiSuggestion(id: string, body: Record<string, unknown> = {}) {
+  return apiFetch<{ suggestion: PoiSuggestion; poi: Record<string, unknown>; osm?: { editUrl?: string } }>(
+    `/api/admin/poi-suggestions/${id}/approve`,
+    { method: "POST", body: JSON.stringify(body) },
+  );
+}
+
+export async function rejectPoiSuggestion(id: string, body: { reason?: string } = {}) {
+  return apiFetch<{ suggestion: PoiSuggestion }>(`/api/admin/poi-suggestions/${id}/reject`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
 export async function createCommune(data: { name: string; city: string; lat: number; lng: number }) {
   return apiFetch<Commune>("/api/admin/communes", { method: "POST", body: JSON.stringify(data) });
 }

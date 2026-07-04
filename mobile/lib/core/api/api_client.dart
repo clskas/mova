@@ -919,6 +919,42 @@ class ApiClient {
     };
   }
 
+  Future<Result<List<Map<String, dynamic>>>> getDeliveryChatMessages(String deliveryId) async {
+    final result = await get('/deliveries/$deliveryId/chat');
+    return switch (result) {
+      Success(:final data) => Success(
+          List<Map<String, dynamic>>.from(data['messages'] as List? ?? []),
+        ),
+      Failure(:final error) => Failure(error),
+    };
+  }
+
+  Future<Result<Map<String, dynamic>>> sendDeliveryChatMessage(String deliveryId, String text) async {
+    final result = await post('/deliveries/$deliveryId/chat', {'text': text});
+    return switch (result) {
+      Success(:final data) => Success(Map<String, dynamic>.from(data as Map)),
+      Failure(:final error) => Failure(error),
+    };
+  }
+
+  Future<Result<List<Map<String, dynamic>>>> getRentalChatMessages(String inquiryId) async {
+    final result = await get('/rental/inquiries/$inquiryId/chat');
+    return switch (result) {
+      Success(:final data) => Success(
+          List<Map<String, dynamic>>.from(data['messages'] as List? ?? []),
+        ),
+      Failure(:final error) => Failure(error),
+    };
+  }
+
+  Future<Result<Map<String, dynamic>>> sendRentalChatMessage(String inquiryId, String text) async {
+    final result = await post('/rental/inquiries/$inquiryId/chat', {'text': text});
+    return switch (result) {
+      Success(:final data) => Success(Map<String, dynamic>.from(data as Map)),
+      Failure(:final error) => Failure(error),
+    };
+  }
+
   Future<Result<List<Map<String, dynamic>>>> geoPlaces({
     String? city,
     String? category,
@@ -934,6 +970,42 @@ class ApiClient {
       'radiusKm=$radiusKm',
     ].join('&');
     final result = await get('/geo/places?$params');
+    return switch (result) {
+      Success(:final data) => Success(
+          data is List
+              ? List<Map<String, dynamic>>.from(data)
+              : List<Map<String, dynamic>>.from(data as List? ?? []),
+        ),
+      Failure(:final error) => Failure(error),
+    };
+  }
+
+  Future<Result<Map<String, dynamic>>> submitPoiSuggestion({
+    required String name,
+    required String category,
+    required double lat,
+    required double lng,
+    required String city,
+    String? address,
+    String? notes,
+  }) async {
+    final result = await post('/poi-suggestions', {
+      'name': name,
+      'category': category,
+      'lat': lat,
+      'lng': lng,
+      'city': city,
+      if (address != null) 'address': address,
+      if (notes != null) 'notes': notes,
+    });
+    return switch (result) {
+      Success(:final data) => Success(Map<String, dynamic>.from(data as Map)),
+      Failure(:final error) => Failure(error),
+    };
+  }
+
+  Future<Result<List<Map<String, dynamic>>>> listMyPoiSuggestions() async {
+    final result = await get('/poi-suggestions/mine');
     return switch (result) {
       Success(:final data) => Success(
           data is List

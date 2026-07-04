@@ -21,9 +21,17 @@ export class GeoController {
   }
 
   @Get('autocomplete')
-  @ApiOperation({ summary: 'Autocomplétion adresses par ville (communes + POI + Mapbox)' })
+  @ApiOperation({ summary: 'Autocomplétion adresses par ville (communes + POI + Nominatim OSM)' })
   autocomplete(@Query('q') query?: string, @Query('city') city?: string) {
     return this.geo.autocomplete(query ?? '', city);
+  }
+
+  @Get('reverse')
+  @ApiOperation({ summary: 'Reverse geocoding OSM (Nominatim) : coordonnées → adresse' })
+  reverse(@Query('lat') lat?: string, @Query('lng') lng?: string) {
+    const latN = lat != null ? parseFloat(lat) : NaN;
+    const lngN = lng != null ? parseFloat(lng) : NaN;
+    return this.geo.reverseGeocode(latN, lngN);
   }
 
   @Get('places')

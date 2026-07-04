@@ -89,6 +89,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/fraude", label: "Fraude", section: "fraude" },
   { href: "/planifiees", label: "Planifiées", section: "planifiees" },
   { href: "/parametres", label: "Communes", section: "parametres" },
+  { href: "/lieux", label: "Lieux & POI", section: "parametres" },
   { href: "/locations", label: "Locations", section: "locations" },
   { href: "/catalogue-location", label: "Catalogue location", section: "locations" },
   { href: "/demenagements", label: "Déménagements", section: "demenagements" },

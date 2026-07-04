@@ -2,44 +2,48 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../../core/api/api_client.dart';
 import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
-import '../../core/widgets/mova_widgets.dart';
 import 'ride_chat_screen.dart';
 
-class ErrandChatScreen extends ConsumerStatefulWidget {
-  const ErrandChatScreen({
+class DeliveryChatScreen extends ConsumerStatefulWidget {
+  const DeliveryChatScreen({
     super.key,
-    required this.errandId,
+    required this.deliveryId,
     required this.myRole,
     this.peerLabel = 'Livreur',
   });
 
-  final String errandId;
+  final String deliveryId;
   final String myRole;
   final String peerLabel;
 
   @override
-  ConsumerState<ErrandChatScreen> createState() => _ErrandChatScreenState();
+  ConsumerState<DeliveryChatScreen> createState() => _DeliveryChatScreenState();
 }
 
-class _ErrandChatScreenState extends ConsumerState<ErrandChatScreen> {
+class _DeliveryChatScreenState extends ConsumerState<DeliveryChatScreen> {
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
   final _messages = <RideChatMessage>[];
+  Timer? _pollTimer;
   bool _loading = true;
   bool _sending = false;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
     _load();
+    _pollTimer = Timer.periodic(const Duration(seconds: 4), (_) => _load());
   }
 
   @override
   void dispose() {
+    _pollTimer?.cancel();
     _controller.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -47,11 +51,19 @@ class _ErrandChatScreenState extends ConsumerState<ErrandChatScreen> {
 
   Future<void> _load() async {
     final api = ref.read(apiClientProvider);
-    final result = await api.getErrandChatMessages(widget.errandId);
+    final result = await api.getDeliveryChatMessages(widget.deliveryId);
     if (!mounted) return;
-    setState(() {
-      _loading = false;
-      if (result case Success(:final data)) {
+    if (result case Failure(:final error)) {
+      setState(() {
+        _loading = false;
+        _error = error.message;
+      });
+      return;
+    }
+    if (result case Success(:final data)) {
+      setState(() {
+        _loading = false;
+        _error = null;
         _messages
           ..clear()
           ..addAll(
@@ -66,8 +78,8 @@ class _ErrandChatScreenState extends ConsumerState<ErrandChatScreen> {
               );
             }),
           );
-      }
-    });
+      });
+    }
   }
 
   Future<void> _send() async {
@@ -75,7 +87,7 @@ class _ErrandChatScreenState extends ConsumerState<ErrandChatScreen> {
     if (text.isEmpty || _sending) return;
     setState(() => _sending = true);
     final api = ref.read(apiClientProvider);
-    final result = await api.sendErrandChatMessage(widget.errandId, text);
+    final result = await api.sendDeliveryChatMessage(widget.deliveryId, text);
     if (!mounted) return;
     setState(() => _sending = false);
     switch (result) {
@@ -92,17 +104,8 @@ class _ErrandChatScreenState extends ConsumerState<ErrandChatScreen> {
             ),
           );
         });
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (_scrollController.hasClients) {
-            _scrollController.animateTo(
-              _scrollController.position.maxScrollExtent,
-              duration: const Duration(milliseconds: 200),
-              curve: Curves.easeOut,
-            );
-          }
-        });
-      case Failure():
-        break;
+      case Failure(:final error):
+        setState(() => _error = error.message);
     }
   }
 
@@ -113,6 +116,11 @@ class _ErrandChatScreenState extends ConsumerState<ErrandChatScreen> {
       scrollable: false,
       child: Column(
         children: [
+          if (_error != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 12)),
+            ),
           Expanded(
             child: _loading
                 ? const Center(child: CircularProgressIndicator(color: MovaColors.violet))
@@ -145,10 +153,7 @@ class _ErrandChatScreenState extends ConsumerState<ErrandChatScreen> {
                 Expanded(
                   child: TextField(
                     controller: _controller,
-                    decoration: const InputDecoration(
-                      hintText: 'Votre message…',
-                      isDense: true,
-                    ),
+                    decoration: const InputDecoration(hintText: 'Votre message…', isDense: true),
                     onSubmitted: (_) => _send(),
                   ),
                 ),

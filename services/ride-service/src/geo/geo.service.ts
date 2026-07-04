@@ -10,10 +10,11 @@ import {
   MovaHttpException,
 } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
+import { NominatimService } from './nominatim.service';
 import { PoiImportService } from './poi-import.service';
 
 type AutocompleteResult = {
-  source: 'commune' | 'mapbox' | 'poi';
+  source: 'commune' | 'nominatim' | 'mapbox' | 'poi';
   label: string;
   address: string;
   lat: number;
@@ -29,6 +30,7 @@ export class GeoService implements OnModuleInit {
   constructor(
     private prisma: PrismaService,
     private poiImport: PoiImportService,
+    private nominatim: NominatimService,
   ) {}
 
   async onModuleInit() {
@@ -265,32 +267,6 @@ export class GeoService implements OnModuleInit {
           })),
       );
 
-      if (process.env.MAPBOX_ACCESS_TOKEN) {
-        try {
-          const encoded = encodeURIComponent(`${q}, ${cityName}, RDC`);
-          const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encoded}.json?access_token=${process.env.MAPBOX_ACCESS_TOKEN}&country=cd&limit=5&proximity=${area.centerLng},${area.centerLat}`;
-          const res = await fetch(url);
-          if (res.ok) {
-            const data = await res.json();
-            for (const feature of data.features ?? []) {
-              const [lng, lat] = feature.center ?? [];
-              if (lat == null || lng == null) continue;
-              results.push({
-                source: 'mapbox' as const,
-                label: feature.place_name ?? feature.text,
-                address: feature.place_name ?? feature.text,
-                lat,
-                lng,
-                commune: feature.context?.find((c: { id: string }) => c.id.startsWith('place'))?.text ?? null,
-                city: cityName,
-              });
-            }
-          }
-        } catch {
-          // Mapbox optional — communes fallback only
-        }
-      }
-
       const pois = await this.prisma.placeOfInterest.findMany({
         where: {
           city: cityName,
@@ -312,9 +288,71 @@ export class GeoService implements OnModuleInit {
           poiId: p.id,
         })),
       );
+
+      const nominatimHits = await this.nominatim.search(q, {
+        city: cityName,
+        centerLat: area.centerLat,
+        centerLng: area.centerLng,
+        viewbox: area.bounds,
+        limit: 5,
+      });
+      results.push(
+        ...nominatimHits.map((p) => ({
+          source: 'nominatim' as const,
+          label: p.label,
+          address: p.address,
+          lat: p.lat,
+          lng: p.lng,
+          commune: p.commune,
+          city: p.city ?? cityName,
+        })),
+      );
+
+      if (process.env.MAPBOX_ACCESS_TOKEN && nominatimHits.length === 0) {
+        try {
+          const encoded = encodeURIComponent(`${q}, ${cityName}, RDC`);
+          const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encoded}.json?access_token=${process.env.MAPBOX_ACCESS_TOKEN}&country=cd&limit=5&proximity=${area.centerLng},${area.centerLat}`;
+          const res = await fetch(url);
+          if (res.ok) {
+            const data = await res.json();
+            for (const feature of data.features ?? []) {
+              const [lng, lat] = feature.center ?? [];
+              if (lat == null || lng == null) continue;
+              results.push({
+                source: 'mapbox' as const,
+                label: feature.place_name ?? feature.text,
+                address: feature.place_name ?? feature.text,
+                lat,
+                lng,
+                commune: feature.context?.find((c: { id: string }) => c.id.startsWith('place'))?.text ?? null,
+                city: cityName,
+              });
+            }
+          }
+        } catch {
+          // Mapbox optionnel — Nominatim + communes + POI suffisent
+        }
+      }
     }
 
     return results.slice(0, 12);
+  }
+
+  /** Reverse geocoding OSM (Nominatim) : GPS → libellé adresse. */
+  async reverseGeocode(lat: number, lng: number) {
+    const place = await this.nominatim.reverse(lat, lng);
+    if (!place) {
+      return {
+        label: `${lat.toFixed(5)}, ${lng.toFixed(5)}`,
+        address: `${lat.toFixed(5)}, ${lng.toFixed(5)}`,
+        lat,
+        lng,
+        commune: null as string | null,
+        city: null as string | null,
+        source: 'coords' as const,
+      };
+    }
+    return { ...place, source: 'nominatim' as const };
   }
 
   async listPlaces(opts: {

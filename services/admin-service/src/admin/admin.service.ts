@@ -416,4 +416,18 @@ export class AdminService {
     params.set('take', String(query.take ?? 50));
     return this.fetchJson('payment', `/internal/subscriptions?${params}`);
   }
+
+  listPoiSuggestions(status?: string, skip = 0, take = 50) {
+    const params = new URLSearchParams({ skip: String(skip), take: String(take) });
+    if (status) params.set('status', status);
+    return this.fetchJson('ride', `/internal/poi-suggestions?${params.toString()}`);
+  }
+
+  approvePoiSuggestion(id: string, body: Record<string, unknown> = {}) {
+    return this.proxy('ride', `/internal/poi-suggestions/${id}/approve`, { method: 'POST', body: JSON.stringify(body) });
+  }
+
+  rejectPoiSuggestion(id: string, body: Record<string, unknown> = {}) {
+    return this.proxy('ride', `/internal/poi-suggestions/${id}/reject`, { method: 'POST', body: JSON.stringify(body) });
+  }
 }

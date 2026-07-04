@@ -27,8 +27,12 @@ describe('MovingService', () => {
   const redis = { publish: jest.fn().mockResolvedValue(undefined) };
 
   const tripShare = { generateCompletionPin: jest.fn().mockReturnValue('1234') };
+  const routing = {
+    resolveRoadDistance: jest.fn().mockResolvedValue({ distanceKm: 10, source: 'estimated' }),
+    roadDistanceKm: jest.fn().mockResolvedValue(10),
+  };
 
-  const service = new MovingService(prisma as never, pricing, surcharges as never, redis as never, tripShare as never, { peek: jest.fn(), redeem: jest.fn(), applyDiscount: jest.fn((p: number) => p) } as never);
+  const service = new MovingService(prisma as never, pricing, surcharges as never, redis as never, tripShare as never, { peek: jest.fn(), redeem: jest.fn(), applyDiscount: jest.fn((p: number) => p) } as never, routing as never);
 
   const dto = {
     volumeM3: 5,

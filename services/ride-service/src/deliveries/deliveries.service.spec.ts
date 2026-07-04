@@ -31,6 +31,10 @@ describe('DeliveriesService', () => {
   const trackingService = { getTrace: jest.fn().mockResolvedValue([]) };
   const matching = { findNearbyDrivers: jest.fn().mockResolvedValue([]) };
   const commission = { get: jest.fn(), splitGross: jest.fn() };
+  const routing = {
+    resolveRoadDistance: jest.fn().mockResolvedValue({ distanceKm: 4.5, source: 'estimated' }),
+    roadDistanceKm: jest.fn().mockResolvedValue(4.5),
+  };
 
   const service = new DeliveriesService(
     prisma as never,
@@ -41,6 +45,7 @@ describe('DeliveriesService', () => {
     trackingService as never,
     matching as never,
     commission as never,
+    routing as never,
   );
 
   beforeEach(() => jest.clearAllMocks());

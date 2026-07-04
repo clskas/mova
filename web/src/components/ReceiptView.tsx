@@ -133,7 +133,7 @@ export function ReceiptView({ referenceType, referenceId, onBack }: Props) {
                 onClick={shareChat}
                 className="px-4 py-2 rounded-xl border border-gray-200 text-sm disabled:opacity-60"
               >
-                Partager dans le chat
+                Partager le reçu (API — chat mobile uniquement)
               </button>
             )}
           </div>

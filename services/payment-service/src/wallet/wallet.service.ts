@@ -1,10 +1,45 @@
-import { Injectable } from '@nestjs/common';
-import { MovaErrorCode, MovaHttpException, formatCdf } from '@mova/shared';
+import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import {
+  MOVA_PLATFORM_USER_ID,
+  MovaErrorCode,
+  MovaHttpException,
+  africasTalkingDisburseMobileMoney,
+  africasTalkingInitiateMobileMoney,
+  formatCdf,
+  useAfricasTalkingMobileMoney,
+  type MobileMoneyOperator,
+} from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class WalletService {
-  constructor(private prisma: PrismaService) {}
+  private readonly logger = new Logger(WalletService.name);
+
+  constructor(
+    private prisma: PrismaService,
+    private config: ConfigService,
+  ) {}
+
+  private envGetter = (key: string) => this.config.get<string>(key);
+
+  private isMockPayments() {
+    return this.config.get('MOCK_PAYMENTS') === 'true';
+  }
+
+  private assertMockAllowed() {
+    if (this.config.get('NODE_ENV') === 'production' && this.isMockPayments()) {
+      throw new MovaHttpException(
+        MovaErrorCode.INTERNAL_ERROR,
+        undefined,
+        'MOCK_PAYMENTS interdit en production.',
+      );
+    }
+  }
+
+  async ensurePlatformWallet() {
+    return this.createWallet(MOVA_PLATFORM_USER_ID);
+  }
 
   async createWallet(userId: string) {
     return this.prisma.wallet.upsert({ where: { userId }, create: { userId, balanceCdf: 0 }, update: {} });
@@ -65,6 +100,12 @@ export class WalletService {
       data: { walletId: wallet.id, amountCdf: -amountCdf, type: 'DEBIT', description, reference },
     });
     return updated;
+  }
+
+  async creditPlatformFee(amountCdf: number, description: string, reference: string) {
+    if (amountCdf <= 0) return null;
+    await this.ensurePlatformWallet();
+    return this.credit(MOVA_PLATFORM_USER_ID, amountCdf, description, reference);
   }
 
   async holdFunds(
@@ -178,12 +219,50 @@ export class WalletService {
     return this.debit(userId, amountCdf, description, reference);
   }
 
-  async topUp(userId: string, amountCdf: number, provider: string) {
+  private mapProvider(provider: string): MobileMoneyOperator {
+    const p = provider.trim().toUpperCase();
+    if (p === 'MPESA' || p === 'M-PESA') return 'MPESA';
+    if (p === 'AIRTEL_MONEY' || p === 'AIRTEL') return 'AIRTEL_MONEY';
+    return 'ORANGE_MONEY';
+  }
+
+  async topUp(userId: string, amountCdf: number, provider: string, phone?: string) {
+    if (amountCdf < 500) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Montant minimum : 500 FC.');
+    }
     const ref = `topup_${provider}_${Date.now()}`;
-    const wallet = await this.credit(userId, amountCdf, `Recharge ${provider}`, ref);
+    const operator = this.mapProvider(provider);
+    const useAt = useAfricasTalkingMobileMoney(this.envGetter) && phone?.trim();
+
+    if (useAt) {
+      const mm = await africasTalkingInitiateMobileMoney(this.envGetter, {
+        operator,
+        amountCdf,
+        phone: phone!.trim(),
+        reference: ref,
+      });
+      if (!mm.success) {
+        throw new MovaHttpException(MovaErrorCode.PAYMENT_FAILED, undefined, mm.message ?? 'Recharge Mobile Money échouée.');
+      }
+      const wallet = await this.credit(userId, amountCdf, `Recharge ${provider}`, mm.providerRef ?? ref);
+      return {
+        success: true,
+        simulated: false,
+        message: mm.message ?? `Recharge de ${formatCdf(amountCdf)} effectuée`,
+        amountCdf,
+        provider,
+        balanceCdf: wallet.balanceCdf,
+        formattedBalance: formatCdf(wallet.balanceCdf),
+        providerRef: mm.providerRef,
+      };
+    }
+
+    this.assertMockAllowed();
+    const wallet = await this.credit(userId, amountCdf, `Recharge ${provider} (simulation)`, ref);
     return {
       success: true,
-      message: `Recharge de ${formatCdf(amountCdf)} effectuée`,
+      simulated: true,
+      message: `Recharge simulée de ${formatCdf(amountCdf)} — configurez Africa's Talking pour un vrai Mobile Money.`,
       amountCdf,
       provider,
       balanceCdf: wallet.balanceCdf,
@@ -218,16 +297,50 @@ export class WalletService {
     }
 
     const reference = `withdraw_${normalizedProvider}_${Date.now()}`;
+    const operator = this.mapProvider(normalizedProvider);
+    const useAt = useAfricasTalkingMobileMoney(this.envGetter);
+
+    if (useAt) {
+      const wallet = await this.debit(
+        userId,
+        amountCdf,
+        `Retrait ${normalizedProvider} vers ${normalizedPhone}`,
+        reference,
+      );
+      const mm = await africasTalkingDisburseMobileMoney(this.envGetter, {
+        operator,
+        amountCdf,
+        phone: normalizedPhone,
+        reference,
+      });
+      if (!mm.success) {
+        await this.credit(userId, amountCdf, `Annulation retrait échoué ${reference}`, `rollback_${reference}`);
+        throw new MovaHttpException(MovaErrorCode.PAYMENT_FAILED, undefined, mm.message ?? 'Retrait Mobile Money échoué.');
+      }
+      return {
+        success: true,
+        simulated: false,
+        message: mm.message ?? `Retrait de ${formatCdf(amountCdf)} vers ${normalizedPhone} initié`,
+        amountCdf,
+        provider: normalizedProvider,
+        phone: normalizedPhone,
+        balanceCdf: wallet.balanceCdf,
+        formattedBalance: formatCdf(wallet.balanceCdf),
+        reference: mm.providerRef ?? reference,
+      };
+    }
+
+    this.assertMockAllowed();
     const wallet = await this.debit(
       userId,
       amountCdf,
-      `Retrait ${normalizedProvider} vers ${normalizedPhone}`,
+      `Retrait simulé ${normalizedProvider} vers ${normalizedPhone}`,
       reference,
     );
-
     return {
       success: true,
-      message: `Retrait de ${formatCdf(amountCdf)} vers ${normalizedPhone} en cours`,
+      simulated: true,
+      message: `Retrait simulé de ${formatCdf(amountCdf)} — configurez Africa's Talking pour un vrai virement.`,
       amountCdf,
       provider: normalizedProvider,
       phone: normalizedPhone,
@@ -255,14 +368,27 @@ export class WalletService {
   async overview() {
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
-    const [balanceAgg, transactionsToday, walletCount] = await Promise.all([
+    const [balanceAgg, platformWallet, transactionsToday, walletCount, withdrawToday] = await Promise.all([
       this.prisma.wallet.aggregate({ _sum: { balanceCdf: true } }),
+      this.prisma.wallet.findUnique({ where: { userId: MOVA_PLATFORM_USER_ID } }),
       this.prisma.walletTransaction.count({ where: { createdAt: { gte: startOfDay } } }),
       this.prisma.wallet.count(),
+      this.prisma.walletTransaction.aggregate({
+        where: {
+          createdAt: { gte: startOfDay },
+          type: 'DEBIT',
+          description: { contains: 'Retrait' },
+        },
+        _sum: { amountCdf: true },
+      }),
     ]);
+    const totalBalance = balanceAgg._sum.balanceCdf ?? 0;
+    const platformBalanceCdf = platformWallet?.balanceCdf ?? 0;
     return {
-      totalBalanceCdf: balanceAgg._sum.balanceCdf ?? 0,
-      pendingPayoutsCdf: 0,
+      totalBalanceCdf: totalBalance,
+      platformBalanceCdf,
+      userLiabilitiesCdf: Math.max(0, totalBalance - platformBalanceCdf),
+      pendingPayoutsCdf: Math.abs(withdrawToday._sum.amountCdf ?? 0),
       transactionsToday,
       walletCount,
       currency: 'CDF',

@@ -61,14 +61,11 @@ class ServiceAreaLocation {
         ? areaFor(areaId)
         : (ServiceAreas.byName(address) ??
             (near != null ? ServiceAreas.nearest(near) : ServiceAreas.fallbackArea));
-    var hash = 0;
-    for (final code in address.runes) {
-      hash = (hash + code) % 1000;
+    final lower = address.toLowerCase();
+    if (lower.contains(area.name.toLowerCase())) {
+      return area.center;
     }
-    return LatLng(
-      area.center.latitude - 0.01 - (hash % 50) / 10000,
-      area.center.longitude + 0.01 + ((hash ~/ 50) % 50) / 10000,
-    );
+    return near ?? area.center;
   }
 
   static bool destinationInServiceArea(
@@ -78,7 +75,7 @@ class ServiceAreaLocation {
     String? areaId,
   }) {
     if (coords != null && isInBounds(coords)) return true;
-    if (address.trim().length >= 3) return true;
+    if (fromSuggestion && coords != null) return isInBounds(coords);
     return false;
   }
 

@@ -17,6 +17,7 @@ class TopUpDto {
   @IsOptional()
   @IsEnum(['ORANGE_MONEY', 'MPESA', 'AIRTEL_MONEY', 'MOCK'])
   provider?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() phone?: string;
 }
 
 class PayFromWalletDto {
@@ -50,15 +51,15 @@ export class WalletController {
   }
 
   @Post('top-up')
-  @ApiOperation({ summary: 'Recharger portefeuille (mock Mobile Money)' })
+  @ApiOperation({ summary: 'Recharger portefeuille (Mobile Money ou simulation dev)' })
   topUp(@Request() req: { user: { id: string } }, @Body() dto: TopUpDto) {
-    return this.walletService.topUp(req.user.id, dto.amountCdf, dto.provider ?? 'MOCK');
+    return this.walletService.topUp(req.user.id, dto.amountCdf, dto.provider ?? 'MOCK', dto.phone);
   }
 
   @Post('topup')
   @ApiOperation({ summary: 'Alias recharge portefeuille' })
   topUpAlias(@Request() req: { user: { id: string } }, @Body() dto: TopUpDto) {
-    return this.walletService.topUp(req.user.id, dto.amountCdf, dto.provider ?? 'MOCK');
+    return this.walletService.topUp(req.user.id, dto.amountCdf, dto.provider ?? 'MOCK', dto.phone);
   }
 
   @Post('pay')

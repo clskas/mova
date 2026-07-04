@@ -339,6 +339,9 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
                           deliveryPin: pin,
                           courierName: courier?['name']?.toString(),
                           courierRating: (courier?['rating'] as num?)?.toDouble(),
+                          courierPositionEstimated:
+                              _delivery?['courierPositionEstimated'] == true ||
+                              _delivery?['courierPositionSource']?.toString() == 'estimated',
                           pickupLabel: _delivery?['pickupAddress']?.toString(),
                           dropoffLabel: _delivery?['dropoffAddress']?.toString(),
                         ),

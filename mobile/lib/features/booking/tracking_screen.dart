@@ -198,7 +198,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
       'userId': raw['userId']?.toString(),
       'name': raw['name']?.toString() ??
           'Chauffeur ${raw['userId']?.toString().substring(0, 6) ?? ''}',
-      'rating': (raw['rating'] as num?)?.toDouble() ?? 4.5,
+      'rating': (raw['rating'] as num?)?.toDouble(),
       'phone': raw['phone']?.toString() ?? '',
       'vehicleType': raw['vehicleType']?.toString() ?? vehicle?['type']?.toString() ?? 'Moto-taxi',
       'plateNumber': raw['plateNumber']?.toString() ?? vehicle?['plate']?.toString() ?? '—',
@@ -276,7 +276,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
     _mock = true;
     _driver ??= {
       'name': 'Jean Kabila',
-      'rating': 4.8,
+      'rating': null,
       'phone': '+243812345678',
       'vehicleType': 'Moto-taxi',
       'plateNumber': 'KIN-4521',
@@ -629,7 +629,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
     }
 
     final driverName = _driver?['name']?.toString() ?? 'Chauffeur';
-    final rating = (_driver?['rating'] as num?)?.toDouble() ?? 4.8;
+    final rating = (_driver?['rating'] as num?)?.toDouble();
     final plate = _driver?['plateNumber']?.toString() ?? '—';
     final vehicle = _driver?['vehicleType']?.toString() ??
         _driver?['vehicleModel']?.toString() ??
@@ -711,25 +711,36 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
                                             fontSize: 16,
                                           ),
                                         ),
-                                        Row(
-                                          children: [
-                                            const Icon(Icons.star, color: Colors.amber, size: 16),
-                                            const SizedBox(width: 4),
-                                            Text(rating.toStringAsFixed(1)),
-                                            const SizedBox(width: 8),
-                                            Flexible(
-                                              child: Text(
-                                                '$vehicle · $plate',
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: const TextStyle(
-                                                  color: MovaColors.textSecondary,
-                                                  fontSize: 13,
+                                        if (rating != null)
+                                          Row(
+                                            children: [
+                                              const Icon(Icons.star, color: Colors.amber, size: 16),
+                                              const SizedBox(width: 4),
+                                              Text(rating.toStringAsFixed(1)),
+                                              const SizedBox(width: 8),
+                                              Flexible(
+                                                child: Text(
+                                                  '$vehicle · $plate',
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                  style: const TextStyle(
+                                                    color: MovaColors.textSecondary,
+                                                    fontSize: 13,
+                                                  ),
                                                 ),
                                               ),
+                                            ],
+                                          )
+                                        else
+                                          Text(
+                                            '$vehicle · $plate',
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                              color: MovaColors.textSecondary,
+                                              fontSize: 13,
                                             ),
-                                          ],
-                                        ),
+                                          ),
                                       ],
                                     ),
                                   ),

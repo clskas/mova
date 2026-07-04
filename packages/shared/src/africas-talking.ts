@@ -221,3 +221,89 @@ export async function africasTalkingInitiateMobileMoney(
     };
   }
 }
+
+export type AfricasTalkingMmPayoutResult = AfricasTalkingMmInitResult;
+
+/** Virement Mobile Money B2C (retrait chauffeur / utilisateur). */
+export async function africasTalkingDisburseMobileMoney(
+  get: EnvGetter,
+  params: { operator: MobileMoneyOperator; amountCdf: number; phone: string; reference: string },
+): Promise<AfricasTalkingMmPayoutResult> {
+  if (!isAfricasTalkingConfigured(get)) {
+    return {
+      success: false,
+      transactionId: '',
+      providerRef: '',
+      message: `Africa's Talking non configuré (${AFRICAS_TALKING_ENV_KEYS.username}, ${AFRICAS_TALKING_ENV_KEYS.apiKey}).`,
+    };
+  }
+
+  const productName = get(AFRICAS_TALKING_ENV_KEYS.productName)?.trim();
+  if (!productName) {
+    return {
+      success: false,
+      transactionId: '',
+      providerRef: '',
+      message: `Définissez ${AFRICAS_TALKING_ENV_KEYS.productName} (nom produit Mobile Money Africa's Talking).`,
+    };
+  }
+
+  const username = get(AFRICAS_TALKING_ENV_KEYS.username)!.trim();
+  const apiKey = get(AFRICAS_TALKING_ENV_KEYS.apiKey)!.trim();
+  const provider = africasTalkingMobileMoneyProviderCode(params.operator);
+  const callbackUrl = get(AFRICAS_TALKING_ENV_KEYS.mmCallbackUrl)?.trim();
+
+  try {
+    const payload = {
+      username,
+      productName,
+      provider,
+      phoneNumber: params.phone,
+      currencyCode: 'CDF',
+      amount: params.amountCdf,
+      metadata: { reference: params.reference, operator: params.operator, type: 'payout' },
+      ...(callbackUrl ? { notifyUrl: callbackUrl } : {}),
+    };
+
+    const res = await fetch(`${africasTalkingPaymentsBaseUrl(get)}/mobile/b2c/request`, {
+      method: 'POST',
+      headers: {
+        apiKey,
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const data = (await res.json().catch(() => ({}))) as {
+      status?: string;
+      transactionId?: string;
+      description?: string;
+      errorMessage?: string;
+    };
+
+    if (!res.ok || data.status === 'Failed') {
+      return {
+        success: false,
+        transactionId: '',
+        providerRef: '',
+        message: data.errorMessage ?? data.description ?? `Échec retrait Mobile Money (${res.status})`,
+      };
+    }
+
+    const txId = data.transactionId ?? `at_payout_${params.reference}`;
+    return {
+      success: true,
+      transactionId: txId,
+      providerRef: `at_payout_${txId}`,
+      message: data.description ?? 'Retrait Mobile Money initié',
+    };
+  } catch {
+    return {
+      success: false,
+      transactionId: '',
+      providerRef: '',
+      message: 'Service Mobile Money temporairement indisponible pour le retrait.',
+    };
+  }
+}

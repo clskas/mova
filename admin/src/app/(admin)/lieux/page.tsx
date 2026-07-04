@@ -37,6 +37,68 @@ const CATEGORY_LABELS: Record<string, string> = {
   OTHER: "Autre",
 };
 
+type OsmContribution = {
+  editUrl: string;
+  viewUrl: string;
+  tags: Record<string, string>;
+  instructions: string;
+};
+
+function osmLinks(item: PoiSuggestion): OsmContribution {
+  const fromApi = (item as PoiSuggestion & { osm?: OsmContribution }).osm;
+  if (fromApi?.editUrl) {
+    return {
+      ...fromApi,
+      viewUrl: fromApi.viewUrl ?? `https://www.openstreetmap.org/#map=19/${item.lat}/${item.lng}`,
+    };
+  }
+  const amenity: Record<string, string> = {
+    MARKET: "marketplace",
+    HOSPITAL: "hospital",
+    UNIVERSITY: "university",
+    PHARMACY: "pharmacy",
+    SCHOOL: "school",
+    GOVERNMENT: "townhall",
+    TRANSPORT: "bus_station",
+  };
+  const tags: Record<string, string> = { name: item.name };
+  const tag = amenity[item.category];
+  if (tag) tags.amenity = tag;
+  return {
+    editUrl: `https://www.openstreetmap.org/edit#map=19/${item.lat}/${item.lng}`,
+    viewUrl: `https://www.openstreetmap.org/#map=19/${item.lat}/${item.lng}`,
+    tags,
+    instructions:
+      "Ouvrez l'éditeur OSM, ajoutez un point à ces coordonnées, copiez les tags suggérés. Nominatim indexera le lieu sous 24–48 h.",
+  };
+}
+
+function OsmLinksPanel({ item }: { item: PoiSuggestion }) {
+  const osm = osmLinks(item);
+  const tagLine = Object.entries(osm.tags)
+    .map(([k, v]) => `${k}=${v}`)
+    .join(" · ");
+
+  return (
+    <div className="mt-3 pt-3 border-t border-gray-100 text-xs space-y-2">
+      <p className="text-gray-500">
+        {item.status === "APPROVED"
+          ? "Publié dans l'autocomplétion MOVA. OpenStreetMap est une base séparée — le lieu n'y apparaît que si vous le créez manuellement."
+          : "La carte OSM affiche seulement la position GPS, pas encore le lieu nommé."}
+      </p>
+      <div className="flex flex-wrap gap-3">
+        <a href={osm.viewUrl} target="_blank" rel="noreferrer" className="text-gray-600 underline">
+          Carte OSM (position)
+        </a>
+        <a href={osm.editUrl} target="_blank" rel="noreferrer" className="text-[#6C63FF] underline font-medium">
+          Éditeur OSM — ajouter le lieu
+        </a>
+      </div>
+      <p className="text-gray-400 font-mono break-all">Tags suggérés : {tagLine}</p>
+    </div>
+  );
+}
+
 export default function LieuxPage() {
   const { canWrite } = useAdmin();
   const readOnly = !canWrite("parametres");
@@ -47,7 +109,7 @@ export default function LieuxPage() {
   const [acting, setActing] = useState<string | null>(null);
   const [rejectId, setRejectId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
-  const [osmLink, setOsmLink] = useState<string | null>(null);
+  const [osmModal, setOsmModal] = useState<OsmContribution | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -71,8 +133,16 @@ export default function LieuxPage() {
     setError(null);
     try {
       const result = await approvePoiSuggestion(id);
-      const url = result?.osm?.editUrl as string | undefined;
-      if (url) setOsmLink(url);
+      const item = items.find((i) => i.id === id);
+      const osm = result?.osm as OsmContribution | undefined;
+      if (osm?.editUrl) {
+        setOsmModal({
+          ...osm,
+          viewUrl: osm.viewUrl ?? (item ? `https://www.openstreetmap.org/#map=19/${item.lat}/${item.lng}` : osm.editUrl),
+        });
+      } else if (item) {
+        setOsmModal(osmLinks(item));
+      }
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Échec publication");
@@ -101,8 +171,18 @@ export default function LieuxPage() {
     <div>
       <PageHeader
         title="Lieux & POI"
-        subtitle="Suggestions utilisateurs — validation avant publication dans l'autocomplétion MOVA"
+        subtitle="Validation MOVA — publication dans l'autocomplétion de l'app (distinct d'OpenStreetMap)"
       />
+
+      <Card className="mb-4 bg-violet-50 border-violet-100">
+        <p className="text-sm text-gray-800 leading-relaxed">
+          <strong>Publier</strong> ajoute le lieu dans la base MOVA (recherche d&apos;adresses, carte Taxi).
+          <br />
+          <strong>OpenStreetMap</strong> n&apos;est pas mis à jour automatiquement : le lien « Éditeur OSM » permet à un
+          contributeur de créer le point manuellement. Tant que ce n&apos;est pas fait, « Carte OSM » ne montre que les
+          coordonnées, pas le nom du lieu.
+        </p>
+      </Card>
 
       {error && <ErrorBanner message={error} onRetry={load} />}
 
@@ -130,8 +210,13 @@ export default function LieuxPage() {
           {items.map((item) => (
             <Card key={item.id}>
               <div className="flex flex-wrap justify-between gap-3">
-                <div>
-                  <p className="font-semibold text-lg">{item.name}</p>
+                <div className="flex-1 min-w-[240px]">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-semibold text-lg">{item.name}</p>
+                    {item.status === "APPROVED" && (
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-800">MOVA</span>
+                    )}
+                  </div>
                   <p className="text-sm text-gray-600">
                     {CATEGORY_LABELS[item.category] ?? item.category} · {item.city}
                   </p>
@@ -146,11 +231,12 @@ export default function LieuxPage() {
                   <p className="text-xs text-gray-400 mt-2">
                     Utilisateur {item.userId.slice(0, 8)}… · {new Date(item.createdAt).toLocaleString("fr-CD")}
                   </p>
+                  <OsmLinksPanel item={item} />
                 </div>
                 {item.status === "PENDING" && !readOnly && (
                   <div className="flex flex-col gap-2 min-w-[140px]">
                     <BtnPrimary
-                      label={acting === item.id ? "…" : "Publier"}
+                      label={acting === item.id ? "…" : "Publier dans MOVA"}
                       onClick={() => handleApprove(item.id)}
                       disabled={acting != null}
                     />
@@ -164,14 +250,6 @@ export default function LieuxPage() {
                     >
                       Refuser
                     </button>
-                    <a
-                      href={`https://www.openstreetmap.org/#map=19/${item.lat}/${item.lng}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-xs text-[#6C63FF] underline"
-                    >
-                      Voir sur OSM
-                    </a>
                   </div>
                 )}
               </div>
@@ -191,15 +269,24 @@ export default function LieuxPage() {
         </div>
       </Modal>
 
-      <Modal open={osmLink != null} title="Lieu publié dans MOVA" onClose={() => setOsmLink(null)}>
+      <Modal open={osmModal != null} title="Lieu publié dans MOVA" onClose={() => setOsmModal(null)}>
         <p className="text-sm text-gray-700 mb-3">
-          Le lieu est maintenant visible dans l&apos;autocomplétion MOVA. Pour l&apos;ajouter aussi à OpenStreetMap
-          (Nominatim), ouvrez l&apos;éditeur OSM :
+          Le lieu est visible dans l&apos;app MOVA (autocomplétion et carte). Pour l&apos;ajouter aussi sur
+          OpenStreetMap, ouvrez l&apos;éditeur et créez un point aux coordonnées indiquées :
         </p>
-        {osmLink && (
-          <a href={osmLink} target="_blank" rel="noreferrer" className="text-[#6C63FF] underline break-all">
-            {osmLink}
-          </a>
+        {osmModal && (
+          <>
+            <a href={osmModal.editUrl} target="_blank" rel="noreferrer" className="text-[#6C63FF] underline break-all block mb-3">
+              {osmModal.editUrl}
+            </a>
+            <p className="text-xs text-gray-500 font-mono mb-2">
+              Tags :{" "}
+              {Object.entries(osmModal.tags)
+                .map(([k, v]) => `${k}=${v}`)
+                .join(" · ")}
+            </p>
+            <p className="text-xs text-gray-500">{osmModal.instructions}</p>
+          </>
         )}
       </Modal>
     </div>

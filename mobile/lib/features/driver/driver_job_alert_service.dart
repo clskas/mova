@@ -2,6 +2,8 @@ import 'dart:typed_data';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import '../../core/config/market_config.dart';
+import '../../core/billing/driver_earnings_display.dart';
 import '../../core/geo/geo_utils.dart';
 
 /// Alertes chauffeur : vibration, son système et notification tray (y compris arrière-plan).
@@ -109,24 +111,24 @@ class DriverJobAlertService {
 
   static String rideOfferMessage(Map<String, dynamic> offer) {
     final pickup = offer['pickupAddress']?.toString() ?? 'près de vous';
-    final driverNet = offer['driverNetCdf'] ?? offer['estimatedFareCdf'];
+    final driverNet = DriverEarningsDisplay.netFromMap(offer);
     final pickupKm = (offer['distanceToPickupKm'] as num?)?.toDouble();
     final dist = pickupKm != null ? ' · ${GeoUtils.formatDistanceKm(pickupKm)}' : '';
-    if (driverNet != null) return 'Course · $pickup$dist · $driverNet FC';
+    if (driverNet != null) return 'Course · $pickup$dist · ${MarketConfig.formatCdf(driverNet)}';
     return 'Nouvelle course disponible · $pickup$dist';
   }
 
   static String deliveryOfferMessage(Map<String, dynamic> offer) {
     final kind = offer['type']?.toString() ?? offer['deliveryType']?.toString() ?? 'Livraison';
     final pickup = offer['pickupAddress']?.toString() ?? '';
-    final driverNet = offer['driverNetCdf'] ?? offer['estimatedPriceCdf'];
+    final driverNet = DriverEarningsDisplay.netFromMap(offer);
     final pickupKm = (offer['distanceToPickupKm'] as num?)?.toDouble();
     final tripKm = (offer['tripDistanceKm'] as num?)?.toDouble() ?? (offer['distanceKm'] as num?)?.toDouble();
     final parts = <String>[kind];
     if (pickup.isNotEmpty) parts.add(pickup);
     if (pickupKm != null) parts.add('à ${GeoUtils.formatDistanceKm(pickupKm)}');
     if (tripKm != null) parts.add('trajet ${GeoUtils.formatDistanceKm(tripKm)}');
-    if (driverNet != null) parts.add('$driverNet FC');
+    if (driverNet != null) parts.add(MarketConfig.formatCdf(driverNet));
     return parts.join(' · ');
   }
 }

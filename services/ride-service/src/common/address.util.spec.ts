@@ -1,6 +1,7 @@
 import { MovaErrorCode } from '@mova/shared';
 import { MovaHttpException } from '@mova/shared';
 import {
+  addressToCoords,
   assertKinshasaDestination,
   assertServiceAreaDestination,
   assertServiceAreaPair,
@@ -63,7 +64,13 @@ describe('address.util', () => {
     expect(pair.isInterCity).toBe(false);
   });
 
-  it('rejette des coords hors territoire RDC', () => {
+  it('géocode une commune connue sur tout le territoire (sans zone imposée)', () => {
+    const gombe = addressToCoords('Gombe');
+    expect(gombe.lat).toBeCloseTo(-4.3217, 2);
+    expect(gombe.lng).toBeCloseTo(15.3125, 2);
+  });
+
+  it('rejette des coords hors territoire RDC (texte seul)', () => {
     expect(() => assertKinshasaDestination('Ma position', { lat: 48.8566, lng: 2.3522 })).toThrow(
       MovaHttpException,
     );

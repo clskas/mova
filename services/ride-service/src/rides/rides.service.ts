@@ -566,12 +566,16 @@ export class RidesService {
     if (!ride) throw new MovaHttpException(MovaErrorCode.RIDE_NOT_FOUND, HttpStatus.NOT_FOUND);
     const driver = ride.driverId ? await this.fetchDriverInfo(ride.driverId) : null;
     const detail = this.formatRideDetail(ride);
+    const rideRule = await this.commission.get(CommissionServiceType.RIDE);
+    const gross = ride.finalFareCdf ?? ride.estimatedFareCdf ?? 0;
+    const driverNetCdf = Math.round(this.commission.splitGross(gross, rideRule.platformPercent).driverNetCdf);
     const payment = await fetchRidePaymentStatus(rideId);
     const trackingEta = this.computeTrackingEta(ride, driver);
     const timeline = this.buildRideTimeline(ride.status, ride.events);
     const gpsTrace = await this.trackingService.getTrace(TrackingReferenceType.RIDE, rideId);
     return {
       ...detail,
+      driverNetCdf,
       isPaid: payment.isPaid,
       paymentStatus: payment.paymentStatus,
       paymentReady: detail.paymentReady && !payment.isPaid,
@@ -623,6 +627,7 @@ export class RidesService {
   }
 
   async getUserRides(userId: string, role: 'passenger' | 'driver') {
+    const rideRule = role === 'driver' ? await this.commission.get(CommissionServiceType.RIDE) : null;
     const rides = await this.prisma.ride.findMany({
       where: role === 'passenger' ? { passengerId: userId } : { driverId: userId },
       orderBy: { createdAt: 'desc' },
@@ -631,10 +636,22 @@ export class RidesService {
     const data = await Promise.all(
       rides.map(async (ride) => {
         const summary = toRideSummary(ride);
-        if (ride.status !== RideStatus.COMPLETED) return summary;
+        const driverNetCdf =
+          rideRule != null
+            ? Math.round(
+                this.commission.splitGross(
+                  ride.finalFareCdf ?? ride.estimatedFareCdf ?? 0,
+                  rideRule.platformPercent,
+                ).driverNetCdf,
+              )
+            : undefined;
+        if (ride.status !== RideStatus.COMPLETED) {
+          return driverNetCdf != null ? { ...summary, driverNetCdf } : summary;
+        }
         const payment = await fetchRidePaymentStatus(ride.id);
         return {
           ...summary,
+          ...(driverNetCdf != null ? { driverNetCdf } : {}),
           isPaid: payment.isPaid,
           paymentStatus: payment.paymentStatus,
         };

@@ -156,7 +156,8 @@ class _SuggestPlaceScreenState extends ConsumerState<SuggestPlaceScreen> {
   Widget build(BuildContext context) {
     return MovaScreen(
       title: 'Suggérer un lieu',
-      child: ListView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const Text(
             'Proposez un marché, une pharmacie, un arrêt… Après validation par MOVA, le lieu apparaîtra dans la recherche d\'adresses.',

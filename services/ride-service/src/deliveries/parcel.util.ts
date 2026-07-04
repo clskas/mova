@@ -217,17 +217,18 @@ export function mockCourierLocation(
 export function resolveCourierLocation(
   delivery: Pick<Delivery, 'status' | 'driverId' | 'pickupLat' | 'pickupLng' | 'dropoffLat' | 'dropoffLng'>,
   courier?: CourierProfile | null,
-): { lat: number; lng: number; ts: number } | null {
+): { lat: number; lng: number; ts: number; source: 'gps' | 'pickup' | 'estimated' } | null {
   if (courier?.lat != null && courier?.lng != null) {
-    return { lat: courier.lat, lng: courier.lng, ts: Date.now() };
+    return { lat: courier.lat, lng: courier.lng, ts: Date.now(), source: 'gps' };
   }
   if (delivery.driverId) {
     if (delivery.pickupLat != null && delivery.pickupLng != null) {
-      return { lat: delivery.pickupLat, lng: delivery.pickupLng, ts: Date.now() };
+      return { lat: delivery.pickupLat, lng: delivery.pickupLng, ts: Date.now(), source: 'pickup' };
     }
     return null;
   }
-  return mockCourierLocation(delivery);
+  const mock = mockCourierLocation(delivery);
+  return mock ? { ...mock, source: 'estimated' as const } : null;
 }
 
 export function formatParcelDelivery(
@@ -305,6 +306,8 @@ export function formatParcelDelivery(
     etaMinutes,
     timeline: buildParcelTimeline(delivery, delivery.events),
     courierLocation: courierLoc,
+    courierPositionSource: courierLoc?.source ?? null,
+    courierPositionEstimated: courierLoc?.source === 'estimated',
     courier: courier
       ? {
           userId: courier.userId,

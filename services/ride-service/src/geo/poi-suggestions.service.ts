@@ -209,10 +209,11 @@ export class PoiSuggestionsService {
     if (amenity) tags.amenity = amenity;
 
     return {
+      viewUrl: `https://www.openstreetmap.org/#map=19/${suggestion.lat}/${suggestion.lng}`,
       editUrl: `https://www.openstreetmap.org/edit#map=19/${suggestion.lat}/${suggestion.lng}`,
       tags,
       instructions:
-        'Ouvrez le lien OSM, ajoutez un point (node) ou une zone, renseignez les tags ci-dessus. Après indexation Nominatim, le lieu sera aussi trouvable via la recherche OSM.',
+        'Ouvrez l\'éditeur OSM, ajoutez un point (node) à ces coordonnées, renseignez les tags ci-dessus. Après indexation Nominatim (24–48 h), le lieu sera aussi trouvable via la recherche OSM.',
       note: suggestion.notes ?? undefined,
     };
   }
@@ -252,6 +253,7 @@ export class PoiSuggestionsService {
       publishedPoiId: row.publishedPoiId,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
+      osm: this.buildOsmContribution(row),
     };
   }
 

@@ -8,7 +8,7 @@ import '../../core/api/ride_socket.dart';
 import '../../core/config/market_config.dart';
 import '../../core/error/result.dart';
 import '../../core/geo/maps_launcher.dart';
-import '../../core/theme/mova_colors.dart';
+import '../../core/billing/driver_earnings_display.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import '../chat/ride_chat_screen.dart';
@@ -176,10 +176,12 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
           _locationTimer?.cancel();
           _syncPaymentPolling();
           if (mounted) {
+            final driverNet = _ride['driverNetCdf'] as int? ??
+                (_ride['priceCdf'] as int? ?? _ride['estimatedFareCdf'] as int? ?? 0);
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(
-                  'Course terminée — ${MarketConfig.formatCdf(_ride['priceCdf'] as int? ?? 0)}. '
+                  'Course terminée — revenu estimé ${MarketConfig.formatCdf(driverNet)}. '
                   'En attente du paiement passager.',
                 ),
               ),
@@ -207,7 +209,8 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final fare = _ride['priceCdf'] as int? ?? _ride['estimatedFareCdf'] as int? ?? 0;
+    final gross = DriverEarningsDisplay.grossFromMap(_ride) ?? 0;
+    final driverNet = DriverEarningsDisplay.netFromMap(_ride);
     final nextLabel = _nextActionLabel();
     final nextStatus = _nextStatus();
     final headingToPickup = _status == 'DRIVER_ASSIGNED' || _status == 'ACCEPTED';
@@ -299,8 +302,15 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  MarketConfig.formatCdf(fare),
+                  driverNet != null ? MarketConfig.formatCdf(driverNet) : '—',
                   style: const TextStyle(color: MovaColors.green, fontWeight: FontWeight.bold, fontSize: 20),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  DriverEarningsDisplay.netLabel(net: driverNet, gross: gross > 0 ? gross : null),
+                  style: const TextStyle(color: MovaColors.textSecondary, fontSize: 12),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 4),
                 Text(

@@ -52,6 +52,9 @@ export class PaymentsService {
   }
 
   private getProvider(method: PaymentMethod): PaymentProvider {
+    if (this.config.get('NODE_ENV') === 'production' && this.config.get('MOCK_PAYMENTS') === 'true') {
+      throw new MovaHttpException(MovaErrorCode.INTERNAL_ERROR, undefined, 'MOCK_PAYMENTS interdit en production.');
+    }
     if (method === PaymentMethod.WALLET) return this.providers.get(PaymentMethod.WALLET) ?? new MockPaymentProvider(this.config);
     const provider = this.providers.get(method);
     if (!provider) throw new MovaHttpException(MovaErrorCode.PAYMENT_INVALID_METHOD);
@@ -102,30 +105,74 @@ export class PaymentsService {
     }
   }
 
+  private async settleDriverPayout(
+    referenceType: string,
+    referenceId: string,
+    driverId: string,
+    driverNetCdf: number,
+    grossCdf: number,
+    paymentMethod: PaymentMethod,
+  ) {
+    const platformFee = Math.max(0, Math.round((grossCdf ?? driverNetCdf) - driverNetCdf));
+    if (paymentMethod !== PaymentMethod.CASH) {
+      await this.driverPayouts.creditPayout(driverId, {
+        referenceType: referenceType.toUpperCase(),
+        referenceId,
+        driverNetCdf,
+      });
+    }
+    if (platformFee > 0) {
+      await this.walletService.creditPlatformFee(
+        platformFee,
+        paymentMethod === PaymentMethod.CASH
+          ? `Commission espèces ${referenceType} ${referenceId}`
+          : `Commission MOVA ${referenceType} ${referenceId}`,
+        `PLATFORM_FEE:${referenceType}:${referenceId}`,
+      );
+    }
+  }
+
   private async creditDriverAfterRidePayment(rideId: string) {
     const payout = await this.driverPayouts.fetchRidePayout(rideId);
     if (!payout?.driverId || payout.driverNetCdf <= 0) return;
-    await this.driverPayouts.creditRidePayoutFromPayment(rideId, payout.driverId, payout.driverNetCdf);
+    const payment = await this.prisma.payment.findUnique({ where: { rideId } });
+    const method = payment?.method ?? PaymentMethod.WALLET;
+    await this.settleDriverPayout(
+      'RIDE',
+      rideId,
+      payout.driverId,
+      payout.driverNetCdf,
+      payout.grossCdf ?? payout.driverNetCdf,
+      method,
+    );
   }
 
   private async creditDriverAfterServicePayment(referenceType: string, referenceId: string) {
+    const type = referenceType.toUpperCase();
     try {
-      if (referenceType.toUpperCase() === 'DELIVERY') {
+      if (type === 'DELIVERY') {
         const foodResult = await this.foodPayouts.creditFoodDeliverySettlement(referenceId);
         if (foodResult.handled) return;
       }
       const res = await fetch(
-        serviceUrl('ride', `/internal/services/${referenceType.toUpperCase()}/${referenceId}/payout`),
+        serviceUrl('ride', `/internal/services/${type}/${referenceId}/payout`),
         { headers: { 'x-internal-api-key': INTERNAL_API_KEY } },
       );
       if (!res.ok) return;
-      const payout = (await res.json()) as { driverId?: string; driverNetCdf?: number };
+      const payout = (await res.json()) as { driverId?: string; driverNetCdf?: number; grossCdf?: number };
       if (!payout?.driverId || (payout.driverNetCdf ?? 0) <= 0) return;
-      await this.driverPayouts.creditPayout(payout.driverId, {
-        referenceType: referenceType.toUpperCase(),
-        referenceId,
-        driverNetCdf: payout.driverNetCdf ?? 0,
+      const payment = await this.prisma.servicePayment.findUnique({
+        where: { referenceType_referenceId: { referenceType: type, referenceId } },
       });
+      const method = payment?.method ?? PaymentMethod.WALLET;
+      await this.settleDriverPayout(
+        type,
+        referenceId,
+        payout.driverId,
+        payout.driverNetCdf ?? 0,
+        payout.grossCdf ?? payout.driverNetCdf ?? 0,
+        method,
+      );
     } catch (e) {
       this.logger.warn(`creditDriverAfterServicePayment ${referenceType}/${referenceId} failed`, e);
     }
@@ -439,17 +486,14 @@ export class PaymentsService {
     }
   }
 
-  /** Course terminée — paiement espèces en attente de confirmation PIN (chauffeur). */
+  /** Paiements espèces en attente de confirmation PIN (chauffeur) — courses et services. */
   async findDriverPendingCashRide(driverUserId: string) {
-    const pending = await this.prisma.payment.findMany({
-      where: {
-        method: PaymentMethod.CASH,
-        status: PaymentStatus.PENDING,
-      },
+    const ridePending = await this.prisma.payment.findMany({
+      where: { method: PaymentMethod.CASH, status: PaymentStatus.PENDING },
       orderBy: { createdAt: 'desc' },
       take: 15,
     });
-    for (const payment of pending) {
+    for (const payment of ridePending) {
       const rideId = payment.rideId;
       if (!rideId) continue;
       try {
@@ -458,6 +502,8 @@ export class PaymentsService {
         if (this.resolveRideStatus(ride) !== 'COMPLETED') continue;
         return {
           rideId,
+          referenceType: 'RIDE',
+          referenceId: rideId,
           pendingCash: true,
           paymentMethod: 'CASH',
           amountCdf: payment.amountCdf,
@@ -475,6 +521,36 @@ export class PaymentsService {
         continue;
       }
     }
+
+    const servicePending = await this.prisma.servicePayment.findMany({
+      where: { method: PaymentMethod.CASH, status: PaymentStatus.PENDING },
+      orderBy: { createdAt: 'desc' },
+      take: 15,
+    });
+    for (const payment of servicePending) {
+      try {
+        const info = await this.fetchServicePaymentInfo(payment.referenceType, payment.referenceId);
+        if (info.driverId !== driverUserId) continue;
+        return {
+          referenceType: payment.referenceType,
+          referenceId: payment.referenceId,
+          pendingCash: true,
+          paymentMethod: 'CASH',
+          amountCdf: payment.amountCdf,
+          service: {
+            id: payment.referenceId,
+            type: payment.referenceType,
+            title: info.title ?? payment.referenceType,
+            amountCdf: payment.amountCdf,
+            isPaid: false,
+            paymentStatus: payment.status,
+          },
+        };
+      } catch {
+        continue;
+      }
+    }
+
     return { ride: null, pendingCash: false };
   }
 }

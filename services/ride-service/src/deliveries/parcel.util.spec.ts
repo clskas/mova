@@ -33,10 +33,10 @@ describe('parcel.util', () => {
       dropoffLng: 15.32,
     };
     const withGps = resolveCourierLocation(delivery, { userId: 'driver-1', lat: -4.325, lng: 15.315 });
-    expect(withGps).toEqual({ lat: -4.325, lng: 15.315, ts: expect.any(Number) });
+    expect(withGps).toEqual({ lat: -4.325, lng: 15.315, ts: expect.any(Number), source: 'gps' });
 
     const noGps = resolveCourierLocation(delivery, { userId: 'driver-1', lat: null, lng: null });
-    expect(noGps).toEqual({ lat: -4.32, lng: 15.31, ts: expect.any(Number) });
+    expect(noGps).toEqual({ lat: -4.32, lng: 15.31, ts: expect.any(Number), source: 'pickup' });
 
     const unassigned = resolveCourierLocation({ ...delivery, driverId: null }, null);
     const expected = mockCourierLocation({
@@ -46,7 +46,7 @@ describe('parcel.util', () => {
       dropoffLat: delivery.dropoffLat,
       dropoffLng: delivery.dropoffLng,
     });
-    expect(unassigned).toMatchObject({ lat: expected.lat, lng: expected.lng });
+    expect(unassigned).toMatchObject({ lat: expected.lat, lng: expected.lng, source: 'estimated' });
     expect(unassigned?.ts).toEqual(expect.any(Number));
   });
 

@@ -8,6 +8,7 @@ import '../../core/api/api_client.dart';
 import '../../core/config/market_config.dart';
 import '../../core/error/result.dart';
 import '../../core/geo/geo_utils.dart';
+import '../../core/billing/driver_earnings_display.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_widgets.dart';
 import 'active_ride_screen.dart';
@@ -149,10 +150,8 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final fare = widget.offer['estimatedFareCdf'] as int? ??
-        widget.offer['priceCdf'] as int? ??
-        0;
-    final driverNet = widget.offer['driverNetCdf'] as int? ?? fare;
+    final gross = DriverEarningsDisplay.grossFromMap(widget.offer) ?? 0;
+    final driverNet = DriverEarningsDisplay.netFromMap(widget.offer);
     final distance = widget.offer['tripDistanceKm'] as num? ?? widget.offer['distanceKm'] as num?;
     final pickup = widget.offer['pickupAddress']?.toString() ?? 'Point de départ';
     final dropoff = widget.offer['dropoffAddress']?.toString() ?? 'Destination';
@@ -214,7 +213,7 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
                     ),
                     const SizedBox(height: 32),
                     Text(
-                      MarketConfig.formatCdf(driverNet),
+                      driverNet != null ? MarketConfig.formatCdf(driverNet) : '—',
                       style: const TextStyle(
                         color: MovaColors.green,
                         fontSize: 42,
@@ -225,7 +224,7 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
                       textAlign: TextAlign.center,
                     ),
                     Text(
-                      'Revenu estimé',
+                      DriverEarningsDisplay.netLabel(net: driverNet, gross: gross > 0 ? gross : null),
                       style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 13),
                     ),
                     if (distance != null) ...[

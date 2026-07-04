@@ -231,6 +231,7 @@ class _CarpoolDetailScreenState extends ConsumerState<CarpoolDetailScreen> {
     final currentStep = _timelineIndex(trip?['timelineStep']?.toString());
     final seatsLeft = trip?['availableSeats'] as int? ?? 0;
     final kyc = trip?['kycVerified'] == true;
+    final rating = trip?['driverRating']?.toString();
     final showBook = !_isDriver && !_isPassenger && seatsLeft > 0;
 
     return MovaScreen(
@@ -298,7 +299,9 @@ class _CarpoolDetailScreenState extends ConsumerState<CarpoolDetailScreen> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          '${trip['driverName']} · ★ ${trip['driverRating'] ?? '4.5'}',
+                          rating != null
+                              ? '${trip['driverName']} · ★ $rating'
+                              : trip['driverName']?.toString() ?? 'Conducteur',
                           style: const TextStyle(fontWeight: FontWeight.w600),
                         ),
                       ),

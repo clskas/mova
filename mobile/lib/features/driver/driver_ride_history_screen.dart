@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/api/api_client.dart';
 import '../../core/config/market_config.dart';
 import '../../core/error/result.dart';
-import '../../core/theme/mova_colors.dart';
+import '../../core/billing/driver_earnings_display.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import 'active_ride_screen.dart';
@@ -144,7 +144,8 @@ class _DriverRideHistoryScreenState extends ConsumerState<DriverRideHistoryScree
                       separatorBuilder: (_, __) => const SizedBox(height: 8),
                       itemBuilder: (context, index) {
                         final ride = _rides[index];
-                        final fare = (ride['priceCdf'] ?? ride['estimatedFareCdf']) as num?;
+                        final gross = (ride['priceCdf'] ?? ride['estimatedFareCdf']) as num?;
+                        final driverNet = DriverEarningsDisplay.netFromMap(ride);
                         final date = ride['completedAt']?.toString() ??
                             ride['createdAt']?.toString() ??
                             '';
@@ -169,13 +170,26 @@ class _DriverRideHistoryScreenState extends ConsumerState<DriverRideHistoryScree
                                       tooltip: 'Chat passager',
                                       onPressed: () => _openChat(ride),
                                     ),
-                                  if (fare != null)
-                                    Text(
-                                      MarketConfig.formatCdf(fare.toInt()),
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        color: MovaColors.green,
-                                      ),
+                                  if (driverNet != null)
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.end,
+                                      children: [
+                                        Text(
+                                          MarketConfig.formatCdf(driverNet.toInt()),
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            color: MovaColors.green,
+                                          ),
+                                        ),
+                                        if (gross != null && driverNet.toInt() < gross.toInt())
+                                          Text(
+                                            'net',
+                                            style: const TextStyle(
+                                              fontSize: 11,
+                                              color: MovaColors.textSecondary,
+                                            ),
+                                          ),
+                                      ],
                                     ),
                                 ],
                               ),

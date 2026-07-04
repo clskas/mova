@@ -8,7 +8,8 @@ describe('SubscriptionsService', () => {
     userSubscription: { findMany: jest.fn() },
   };
 
-  const service = new SubscriptionsService(prisma as never);
+  const wallet = { debit: jest.fn().mockResolvedValue({ balanceCdf: 0 }) };
+  const service = new SubscriptionsService(prisma as never, wallet as never);
 
   beforeEach(() => jest.clearAllMocks());
 

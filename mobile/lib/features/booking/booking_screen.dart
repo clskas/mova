@@ -19,6 +19,7 @@ import '../../core/widgets/mova_widgets.dart';
 import '../../widgets/promo_code_field.dart';
 import 'matching_screen.dart';
 import 'tracking_screen.dart';
+import '../geo/suggest_place_screen.dart';
 import 'widgets/mova_ride_map.dart';
 import 'widgets/vehicle_selector.dart';
 
@@ -496,6 +497,18 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
       title: 'Taxi / Moto-taxi',
       scrollable: false,
       padding: EdgeInsets.zero,
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.add_location_alt_outlined),
+          tooltip: 'Suggérer un lieu',
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const SuggestPlaceScreen()),
+            );
+          },
+        ),
+      ],
       child: MovaMapFormLayout(
         maxMapHeight: 190,
         mapBuilder: (height) => MovaRideMap(
@@ -515,7 +528,8 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
-                children: _poiFilters.map((f) {
+                children: [
+                  ..._poiFilters.map((f) {
                   final selected = _poiCategoryFilter == f.$1;
                   return Padding(
                     padding: const EdgeInsets.only(right: 8, bottom: 8),
@@ -525,7 +539,18 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                       onSelected: (_) => setState(() => _poiCategoryFilter = f.$1),
                     ),
                   );
-                }).toList(),
+                }),
+                  ActionChip(
+                    avatar: const Icon(Icons.add_location_alt_outlined, size: 18, color: MovaColors.green),
+                    label: const Text('Suggérer un lieu'),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const SuggestPlaceScreen()),
+                      );
+                    },
+                  ),
+                ],
               ),
             ),
             TextField(

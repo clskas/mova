@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { PlaceOfInterestCategory } from '@prisma/client';
 import {
   DRC_SERVICE_AREAS,
@@ -27,6 +27,8 @@ type AutocompleteResult = {
 
 @Injectable()
 export class GeoService implements OnModuleInit {
+  private readonly logger = new Logger(GeoService.name);
+
   constructor(
     private prisma: PrismaService,
     private poiImport: PoiImportService,
@@ -34,7 +36,9 @@ export class GeoService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
-    void this.poiImport.ensureSeeded().catch(() => undefined);
+    void this.poiImport.ensureSeeded().catch((err: unknown) => {
+      this.logger.warn(`POI seed skipped: ${err instanceof Error ? err.message : String(err)}`);
+    });
   }
 
   listServiceAreas() {

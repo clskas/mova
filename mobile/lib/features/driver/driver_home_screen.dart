@@ -7,6 +7,7 @@ import 'package:geolocator/geolocator.dart';
 import '../../core/config/market_config.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
+import '../../core/billing/driver_earnings_display.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/cache/profile_cache.dart';
 import '../../core/api/api_client.dart';
@@ -1201,7 +1202,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                     ),
                     const SizedBox(height: 8),
                     ..._rideOffers.take(5).map((offer) {
-                      final driverNet = (offer['driverNetCdf'] ?? offer['estimatedFareCdf'] ?? offer['priceCdf']) as num?;
+                      final driverNet = DriverEarningsDisplay.netFromMap(offer);
                       final pickupKm = (offer['distanceToPickupKm'] as num?)?.toDouble();
                       final tripKm = (offer['tripDistanceKm'] as num?)?.toDouble() ??
                           (offer['distanceKm'] as num?)?.toDouble();
@@ -1230,7 +1231,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                               Padding(
                                 padding: const EdgeInsets.only(right: 4),
                                 child: Text(
-                                  MarketConfig.formatCdf(driverNet.toInt()),
+                                  MarketConfig.formatCdf(driverNet),
                                   style: const TextStyle(
                                     fontWeight: FontWeight.bold,
                                     color: MovaColors.green,
@@ -1279,7 +1280,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                     ),
                     const SizedBox(height: 8),
                     ..._deliveryOffers.take(5).map((offer) {
-                      final driverNet = (offer['driverNetCdf'] ?? offer['estimatedPriceCdf'] ?? offer['priceCdf']) as num?;
+                      final driverNet = DriverEarningsDisplay.netFromMap(offer);
                       final pickupKm = (offer['distanceToPickupKm'] as num?)?.toDouble();
                       final tripKm = (offer['tripDistanceKm'] as num?)?.toDouble() ??
                           (offer['distanceKm'] as num?)?.toDouble();
@@ -1310,7 +1311,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                         ),
                         trailing: driverNet != null
                             ? Text(
-                                MarketConfig.formatCdf(driverNet.toInt()),
+                                MarketConfig.formatCdf(driverNet),
                                 style: const TextStyle(
                                   fontWeight: FontWeight.bold,
                                   color: MovaColors.violet,

@@ -971,11 +971,7 @@ class ApiClient {
     ].join('&');
     final result = await get('/geo/places?$params');
     return switch (result) {
-      Success(:final data) => Success(
-          data is List
-              ? List<Map<String, dynamic>>.from(data)
-              : List<Map<String, dynamic>>.from(data as List? ?? []),
-        ),
+      Success(:final data) => Success(_extractList(data)),
       Failure(:final error) => Failure(error),
     };
   }
@@ -1007,13 +1003,20 @@ class ApiClient {
   Future<Result<List<Map<String, dynamic>>>> listMyPoiSuggestions() async {
     final result = await get('/poi-suggestions/mine');
     return switch (result) {
-      Success(:final data) => Success(
-          data is List
-              ? List<Map<String, dynamic>>.from(data)
-              : List<Map<String, dynamic>>.from(data as List? ?? []),
-        ),
+      Success(:final data) => Success(_extractList(data)),
       Failure(:final error) => Failure(error),
     };
+  }
+
+  List<Map<String, dynamic>> _extractList(dynamic data) {
+    if (data is List) {
+      return List<Map<String, dynamic>>.from(data);
+    }
+    if (data is Map) {
+      final raw = data['data'] ?? data['items'] ?? data['suggestions'];
+      if (raw is List) return List<Map<String, dynamic>>.from(raw);
+    }
+    return [];
   }
 
   Future<Result<Map<String, dynamic>>> uploadErrandProofPhoto(String errandId, String photoUrl) async {

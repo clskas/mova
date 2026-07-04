@@ -352,7 +352,7 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
     final perSeat = ride['pricePerSeatCdf'] as int? ?? 0;
     final seats = ride['availableSeats'] as int? ?? 1;
     final driver = ride['driverName']?.toString() ?? 'Conducteur';
-    final rating = ride['driverRating']?.toString() ?? '4.5';
+    final rating = ride['driverRating']?.toString();
     final kyc = ride['kycVerified'] == true;
     final eta = ride['etaLabel']?.toString() ?? '';
 
@@ -391,7 +391,9 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
               children: [
                 Expanded(
                   child: Text(
-                    '$driver · ★ $rating · $seats pl.',
+                    rating != null
+                        ? '$driver · ★ $rating · $seats pl.'
+                        : '$driver · $seats pl.',
                     style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,

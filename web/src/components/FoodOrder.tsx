@@ -9,7 +9,7 @@ type Restaurant = {
   id: string;
   name: string;
   cuisine: string;
-  rating: number;
+  rating?: number;
   deliveryMinCdf?: number;
   items: MenuItem[];
 };
@@ -21,11 +21,16 @@ function normalizeRestaurant(raw: Record<string, unknown>): Restaurant {
     name: item.name,
     priceCdf: item.priceCdf ?? item.unitPriceCdf ?? 0,
   }));
+  const rawRating = raw.rating;
+  const rating =
+    rawRating != null && rawRating !== '' && !Number.isNaN(Number(rawRating))
+      ? Number(rawRating)
+      : undefined;
   return {
     id: String(raw.id ?? ""),
     name: String(raw.name ?? ""),
     cuisine: String(raw.cuisine ?? ""),
-    rating: Number(raw.rating ?? 4.5),
+    rating,
     deliveryMinCdf: Number(raw.deliveryMinCdf ?? 3500),
     items,
   };
@@ -123,7 +128,10 @@ export function FoodOrder({ onBack, mock }: Props) {
             <span className="text-2xl">🍴</span>
             <div className="flex-1 min-w-0">
               <p className="font-semibold truncate">{r.name}</p>
-              <p className="text-xs text-gray-500">{r.cuisine} · ⭐ {r.rating}</p>
+              <p className="text-xs text-gray-500">
+                {r.cuisine}
+                {r.rating != null ? ` · ⭐ ${r.rating}` : ''}
+              </p>
               <p className="text-xs text-[#6C63FF]">Livraison dès {formatCdf(r.deliveryMinCdf ?? 3500)}</p>
             </div>
           </button>

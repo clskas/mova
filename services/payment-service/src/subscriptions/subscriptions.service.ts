@@ -1,11 +1,15 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { SubscriptionStatus, SubscriptionTarget } from '@prisma/client';
-import { MovaErrorCode, MovaHttpException } from '@mova/shared';
+import { MovaErrorCode, MovaHttpException, formatCdf } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
+import { WalletService } from '../wallet/wallet.service';
 
 @Injectable()
 export class SubscriptionsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private wallet: WalletService,
+  ) {}
 
   listPlans(activeOnly = false) {
     return this.prisma.subscriptionPlan.findMany({
@@ -76,5 +80,36 @@ export class SubscriptionsService {
       include: { plan: true },
     });
     return subs.find((s) => !target || s.plan.target === target) ?? null;
+  }
+
+  async subscribe(userId: string, planId: string) {
+    const plan = await this.getPlan(planId);
+    if (!plan.isActive) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, HttpStatus.BAD_REQUEST, 'Ce plan n\'est plus disponible.');
+    }
+    const existing = await this.getActiveSubscription(userId, plan.target);
+    if (existing) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        HttpStatus.CONFLICT,
+        'Vous avez déjà un abonnement actif pour ce profil.',
+      );
+    }
+    await this.wallet.debit(userId, plan.monthlyPriceCdf, `Abonnement ${plan.name}`, `SUBSCRIBE:${plan.id}`);
+    const endsAt = new Date();
+    endsAt.setMonth(endsAt.getMonth() + 1);
+    const sub = await this.prisma.userSubscription.create({
+      data: {
+        userId,
+        planId: plan.id,
+        status: SubscriptionStatus.ACTIVE,
+        endsAt,
+      },
+      include: { plan: true },
+    });
+    return {
+      subscription: sub,
+      message: `Abonnement ${plan.name} activé pour ${formatCdf(plan.monthlyPriceCdf)} / mois.`,
+    };
   }
 }

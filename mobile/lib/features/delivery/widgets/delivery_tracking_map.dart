@@ -17,6 +17,7 @@ class DeliveryTrackingMap extends StatelessWidget {
     this.deliveryPin,
     this.courierName,
     this.courierRating,
+    this.courierPositionEstimated = false,
     this.pickupLabel,
     this.dropoffLabel,
   });
@@ -29,6 +30,7 @@ class DeliveryTrackingMap extends StatelessWidget {
   final String? deliveryPin;
   final String? courierName;
   final double? courierRating;
+  final bool courierPositionEstimated;
   final String? pickupLabel;
   final String? dropoffLabel;
 
@@ -158,10 +160,26 @@ class DeliveryTrackingMap extends StatelessWidget {
                             Text(courierRating!.toStringAsFixed(1)),
                           ],
                         ),
+                      if (courierPositionEstimated)
+                        const Padding(
+                          padding: EdgeInsets.only(top: 4),
+                          child: Text(
+                            'Position estimée (GPS indisponible)',
+                            style: TextStyle(fontSize: 11, color: MovaColors.textSecondary),
+                          ),
+                        ),
                     ],
                   ),
                 ),
               ],
+            ),
+          ),
+        ] else if (courierPositionEstimated) ...[
+          const SizedBox(height: 8),
+          const MovaCard(
+            child: Text(
+              'Position du coursier estimée — le GPS sera affiché dès qu\'il sera disponible.',
+              style: TextStyle(fontSize: 12, color: MovaColors.textSecondary),
             ),
           ),
         ],

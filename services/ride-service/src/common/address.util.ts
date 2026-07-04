@@ -91,22 +91,44 @@ export function addressToCoordsForArea(
   address: string,
   areaId?: string,
 ): { lat: number; lng: number } {
-  const area = getServiceArea(areaId ?? '') ?? fallbackServiceArea();
   const lower = address.toLowerCase();
-  for (const district of getCommunesForArea(area.id)) {
-    if (lower.includes(district.name.toLowerCase())) {
-      return { lat: district.lat, lng: district.lng };
+
+  const coordsInArea = (area: ServiceArea): { lat: number; lng: number } | null => {
+    for (const district of getCommunesForArea(area.id)) {
+      if (lower.includes(district.name.toLowerCase())) {
+        return { lat: district.lat, lng: district.lng };
+      }
+    }
+    if (lower.includes(area.name.toLowerCase())) {
+      return { lat: area.centerLat, lng: area.centerLng };
+    }
+    return null;
+  };
+
+  if (areaId) {
+    const scoped = getServiceArea(areaId);
+    if (scoped) {
+      const hit = coordsInArea(scoped);
+      if (hit) return hit;
     }
   }
-  if (lower.includes(area.name.toLowerCase())) {
-    return { lat: area.centerLat, lng: area.centerLng };
+
+  const byName = findServiceAreaByName(address);
+  if (byName) {
+    const hit = coordsInArea(byName);
+    if (hit) return hit;
   }
-  let hash = 0;
-  for (const c of address) hash = (hash + c.charCodeAt(0)) % 1000;
-  return {
-    lat: area.centerLat - 0.01 - (hash % 50) / 10000,
-    lng: area.centerLng + 0.01 + (Math.floor(hash / 50) % 50) / 10000,
-  };
+
+  for (const area of DRC_SERVICE_AREAS) {
+    const hit = coordsInArea(area);
+    if (hit) return hit;
+  }
+
+  throw new MovaHttpException(
+    MovaErrorCode.VALIDATION_ERROR,
+    undefined,
+    'Adresse non reconnue — utilisez le GPS ou l\'autocomplétion MOVA.',
+  );
 }
 
 export const DEFAULT_PICKUP = MARKET_RDC.mapCenter;

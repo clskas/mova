@@ -10,6 +10,7 @@ import 'legal_screen.dart';
 import 'manual_screen.dart';
 import '../profile/profile_screen.dart';
 import '../geo/suggest_place_screen.dart';
+import '../subscriptions/subscriptions_screen.dart';
 
 class HelpScreen extends ConsumerWidget {
   const HelpScreen({super.key});
@@ -69,6 +70,13 @@ class HelpScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 16),
+          _HelpLink(
+            icon: Icons.workspace_premium_outlined,
+            iconColor: MovaColors.violet,
+            title: 'MOVA Plus',
+            subtitle: 'Abonnements passager — réduction de frais',
+            onTap: () => _open(context, const SubscriptionsScreen()),
+          ),
           _HelpLink(
             icon: Icons.place_outlined,
             iconColor: MovaColors.green,

@@ -23,6 +23,7 @@ export class EmailService {
   constructor(private config: ConfigService) {}
 
   private isMock() {
+    if (this.config.get('NODE_ENV') === 'production') return false;
     return this.config.get('MOCK_EMAIL') !== 'false';
   }
 

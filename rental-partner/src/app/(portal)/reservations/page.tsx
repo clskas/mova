@@ -1,12 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { PortalShell } from "@/components/PortalShell";
+import { usePartnerLiveRegister } from "@/components/PartnerLiveProvider";
 import {
+  confirmBookingCash,
   fetchBookings,
-  fetchProfile,
   formatCdf,
   formatDate,
+  formatDateTime,
   downloadBookingReceiptPdf,
   updateBookingLogistics,
   updateBookingStatus,
@@ -21,6 +22,7 @@ function statusBadge(status?: string, label?: string) {
     CONFIRMED: "bg-green-100 text-green-800",
     IN_PROGRESS: "bg-indigo-100 text-indigo-800",
     RETURNED: "bg-gray-100 text-gray-700",
+    PAID: "bg-emerald-100 text-emerald-800",
     CLOSED: "bg-red-100 text-red-800",
   };
   const cls = styles[status ?? ""] ?? "bg-gray-100 text-gray-600";
@@ -101,8 +103,70 @@ function LogisticsEditor({ booking, busy, onSave }: { booking: PartnerBooking; b
   );
 }
 
+function CashPinConfirm({
+  booking,
+  busy,
+  onDone,
+}: {
+  booking: PartnerBooking;
+  busy: boolean;
+  onDone: () => void;
+}) {
+  const [pin, setPin] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [localError, setLocalError] = useState<string | null>(null);
+
+  if (!booking.canConfirmCash && booking.status !== "RETURNED") return null;
+  if (booking.isPaid || booking.status === "PAID") return null;
+
+  async function submit() {
+    if (pin.trim().length < 4) {
+      setLocalError("Saisissez le code PIN communiqué par le passager.");
+      return;
+    }
+    setSaving(true);
+    setLocalError(null);
+    try {
+      await confirmBookingCash(booking.id, pin.trim());
+      setPin("");
+      onDone();
+    } catch (e) {
+      setLocalError(e instanceof Error ? e.message : "Code PIN incorrect.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 space-y-2 text-sm">
+      <p className="font-medium text-emerald-900">Paiement espèces</p>
+      <p className="text-xs text-emerald-800">
+        Demandez au passager son code PIN MOVA, puis saisissez-le pour confirmer la réception du montant.
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <input
+          className="rounded-lg border border-emerald-200 px-3 py-2 text-sm tracking-widest font-mono flex-1 min-w-[140px]"
+          placeholder="Code PIN"
+          inputMode="numeric"
+          maxLength={8}
+          value={pin}
+          onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
+        />
+        <button
+          type="button"
+          disabled={busy || saving}
+          onClick={submit}
+          className="px-4 py-2 rounded-lg text-sm bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
+        >
+          {saving ? "…" : "Confirmer paiement"}
+        </button>
+      </div>
+      {localError && <p className="text-xs text-red-600">{localError}</p>}
+    </div>
+  );
+}
+
 export default function ReservationsPage() {
-  const [profile, setProfile] = useState<{ name?: string } | null>(null);
   const [bookings, setBookings] = useState<PartnerBooking[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -111,8 +175,7 @@ export default function ReservationsPage() {
   const load = useCallback(async () => {
     setError(null);
     try {
-      const [p, result] = await Promise.all([fetchProfile(), fetchBookings()]);
-      setProfile(p);
+      const result = await fetchBookings();
       setBookings(Array.isArray(result.data) ? result.data : []);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur de chargement");
@@ -124,6 +187,8 @@ export default function ReservationsPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  usePartnerLiveRegister(load);
 
   async function act(id: string, action: "acknowledge" | "confirm" | "decline" | "start" | "return") {
     setBusyId(id);
@@ -139,8 +204,7 @@ export default function ReservationsPage() {
   }
 
   return (
-    <PortalShell partnerName={profile?.name}>
-      <div className="space-y-6">
+    <div className="space-y-6">
         <div>
           <h2 className="text-xl font-semibold">Réservations</h2>
           <p className="text-sm text-gray-500">
@@ -164,14 +228,22 @@ export default function ReservationsPage() {
               const contacted = b.status === "CONTACTED";
               const confirmed = b.status === "CONFIRMED";
               const inProgress = b.status === "IN_PROGRESS";
-              const closed = b.status === "CLOSED" || b.status === "RETURNED";
+              const returned = b.status === "RETURNED";
+              const paid = b.status === "PAID" || b.isPaid;
+              const closed = b.status === "CLOSED" || paid;
+              const amount = b.displayAmountCdf ?? b.ownerNetCdf ?? b.priceCdf;
+              const amountLabel = b.displayAmountLabel ?? "Votre gain net";
+              const dateRange =
+                b.rentalPeriod === "HOURLY"
+                  ? `${formatDateTime(b.startDate)} → ${formatDateTime(b.endDate)}`
+                  : `${formatDate(b.startDate)} → ${formatDate(b.endDate)}`;
               return (
                 <li key={b.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-3">
                   <div className="flex items-start justify-between gap-3 flex-wrap">
                     <div>
                       <h3 className="font-semibold">{b.vehicleName ?? "Véhicule"}</h3>
                       <p className="text-sm text-gray-500">
-                        {formatDate(b.startDate)} → {formatDate(b.endDate)}
+                        {dateRange}
                         {b.pickupCity && (
                           <span className="block text-xs mt-0.5">
                             {b.pickupCity}
@@ -188,8 +260,13 @@ export default function ReservationsPage() {
                       <span className="text-gray-500">Passager :</span> {b.passengerName ?? b.passengerPhone ?? "—"}
                     </p>
                     <p>
-                      <span className="text-gray-500">Montant est. :</span> {formatCdf(b.priceCdf ?? undefined)}
+                      <span className="text-gray-500">{amountLabel} :</span> {formatCdf(amount ?? undefined)}
                     </p>
+                    {b.remainingLabel && (inProgress || returned) && (
+                      <p>
+                        <span className="text-gray-500">Temps restant :</span> {b.remainingLabel}
+                      </p>
+                    )}
                     <p className="sm:col-span-2">
                       <span className="text-gray-500">Logistique :</span> {b.logisticsModeLabel ?? b.logisticsMode ?? "—"}
                       {b.needsMovaLogistics && " · MOVA assignera un chauffeur après votre confirmation"}
@@ -203,13 +280,15 @@ export default function ReservationsPage() {
 
                   <LogisticsEditor booking={b} busy={busyId === b.id} onSave={load} />
 
-                  {b.nextStepHint && !closed && (
+                  <CashPinConfirm booking={b} busy={busyId === b.id} onDone={load} />
+
+                  {b.nextStepHint && b.status !== "CLOSED" && !paid && (
                     <p className="text-xs text-indigo-800 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2">
                       {b.nextStepHint}
                     </p>
                   )}
 
-                  {!closed && (
+                  {!closed && !returned && (
                     <div className="flex flex-wrap gap-2 pt-1">
                       {pending && (
                         <button
@@ -263,7 +342,7 @@ export default function ReservationsPage() {
                       )}
                     </div>
                   )}
-                  {closed && (
+                  {(paid || b.status === "CLOSED" || b.status === "RETURNED") && (
                     <button
                       type="button"
                       onClick={() => downloadBookingReceiptPdf(b.id).catch((e) => alert(e.message))}
@@ -278,6 +357,6 @@ export default function ReservationsPage() {
           </ul>
         )}
       </div>
-    </PortalShell>
+    </div>
   );
 }

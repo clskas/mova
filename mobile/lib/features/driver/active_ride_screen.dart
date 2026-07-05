@@ -9,6 +9,7 @@ import '../../core/config/market_config.dart';
 import '../../core/error/result.dart';
 import '../../core/geo/maps_launcher.dart';
 import '../../core/billing/driver_earnings_display.dart';
+import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import '../chat/ride_chat_screen.dart';
@@ -237,9 +238,10 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
         ),
         IconButton(icon: const Icon(Icons.refresh), onPressed: _refreshRide),
       ],
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
+      child: MovaFlexScroll(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
           if (headingToPickup)
             Container(
               decoration: BoxDecoration(
@@ -382,6 +384,7 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
             ),
           ],
         ],
+        ),
       ),
     );
   }

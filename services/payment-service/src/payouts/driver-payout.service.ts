@@ -103,7 +103,7 @@ export class DriverPayoutService {
     });
   }
 
-  async fetchRidePayout(rideId: string): Promise<{ driverId?: string; driverNetCdf: number } | null> {
+  async fetchRidePayout(rideId: string): Promise<{ driverId?: string; driverNetCdf: number; grossCdf?: number } | null> {
     try {
       const res = await fetch(serviceUrl('ride', `/internal/rides/${rideId}/payout`), {
         headers: { 'x-internal-api-key': INTERNAL_API_KEY },

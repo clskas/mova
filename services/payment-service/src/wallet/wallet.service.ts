@@ -231,6 +231,23 @@ export class WalletService {
       throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Montant minimum : 500 FC.');
     }
     const ref = `topup_${provider}_${Date.now()}`;
+    const providerKey = provider.trim().toUpperCase();
+
+    if (providerKey === 'MOCK') {
+      this.assertMockAllowed();
+      const wallet = await this.credit(userId, amountCdf, 'Recharge test MOVA (simulation)', ref);
+      return {
+        success: true,
+        simulated: true,
+        message: `Recharge test de ${formatCdf(amountCdf)} — crédit instantané (mode simulation).`,
+        amountCdf,
+        provider: 'MOCK',
+        balanceCdf: wallet.balanceCdf,
+        formattedBalance: formatCdf(wallet.balanceCdf),
+        providerRef: ref,
+      };
+    }
+
     const operator = this.mapProvider(provider);
     const useAt = useAfricasTalkingMobileMoney(this.envGetter) && phone?.trim();
 

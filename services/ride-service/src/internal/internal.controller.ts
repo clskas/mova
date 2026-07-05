@@ -453,6 +453,11 @@ export class InternalController {
     return this.rental.adminAssignDriver(id, driverId);
   }
 
+  @Post('rental-inquiries/:id/mark-paid')
+  markRentalPaid(@Param('id') id: string) {
+    return this.rental.markPaid(id);
+  }
+
   @Get('rental-vehicles')
   listRentalVehicles() {
     return this.rental.listVehiclesAdmin();

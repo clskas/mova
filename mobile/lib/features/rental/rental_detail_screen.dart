@@ -109,8 +109,12 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
 
   Map<String, dynamic> _quotePayload() => {
         'vehicleId': widget.vehicleId,
-        'startDate': DateTime(_startDate.year, _startDate.month, _startDate.day).toIso8601String(),
-        'endDate': DateTime(_endDate.year, _endDate.month, _endDate.day).toIso8601String(),
+        'startDate': _hourlyMode
+            ? _startDate.toIso8601String()
+            : DateTime(_startDate.year, _startDate.month, _startDate.day).toIso8601String(),
+        'endDate': _hourlyMode
+            ? _endDate.toIso8601String()
+            : DateTime(_endDate.year, _endDate.month, _endDate.day).toIso8601String(),
         'pickupCity': _pickupCity,
         'returnCity': _returnCity,
         'rentalPeriod': _rentalPeriod,
@@ -204,6 +208,10 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
   }
 
   Future<void> _pickDate({required bool isStart}) async {
+    if (_hourlyMode) {
+      await _pickDateTime(isStart: isStart);
+      return;
+    }
     final date = await showDatePicker(
       context: context,
       initialDate: isStart ? _startDate : _endDate,
@@ -213,27 +221,105 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
     if (date == null || !mounted) return;
     setState(() {
       if (isStart) {
-        _startDate = date;
-        if (!_endDate.isAfter(_startDate)) _endDate = _startDate.add(const Duration(days: 1));
+        _startDate = DateTime(date.year, date.month, date.day);
+        if (!_endDate.isAfter(_startDate)) {
+          _endDate = _startDate.add(const Duration(days: 1));
+        }
       } else {
-        _endDate = date;
+        _endDate = DateTime(date.year, date.month, date.day);
       }
       _ensureRentalPeriod();
       _quote = null;
     });
   }
 
+  Future<void> _pickDateTime({required bool isStart}) async {
+    final initial = isStart ? _startDate : _endDate;
+    final date = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 90)),
+    );
+    if (date == null || !mounted) return;
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(initial),
+    );
+    if (time == null || !mounted) return;
+    final picked = DateTime(date.year, date.month, date.day, time.hour, time.minute);
+    setState(() {
+      if (isStart) {
+        _startDate = picked;
+        if (!_endDate.isAfter(_startDate)) {
+          _endDate = _startDate.add(
+            Duration(hours: RentalQuoteEstimator.defaultHourlyDurationHours),
+          );
+        }
+      } else {
+        _endDate = picked;
+      }
+      _ensureRentalPeriod();
+      _quote = null;
+    });
+  }
+
+  bool get _hourlyMode => _rentalPeriod == 'HOURLY';
+
   int get _rentalDays => RentalQuoteEstimator.rentalDays(_startDate, _endDate);
 
-  bool get _weeklyEligible => _rentalDays >= 7;
+  int get _rentalHours => RentalQuoteEstimator.rentalHours(_startDate, _endDate);
+
+  bool get _weeklyEligible => !_hourlyMode && _rentalDays >= 7;
 
   bool get _gpsBuiltIn =>
       RentalAddons.vehicleHasBuiltInGps(_vehicle?['features'] as List<dynamic>?);
 
   void _ensureRentalPeriod() {
-    if (!_weeklyEligible && _rentalPeriod == 'WEEKLY') {
+    if (_hourlyMode) {
+      if (_rentalHours > RentalQuoteEstimator.maxHourlyDurationHours) {
+        _rentalPeriod = 'DAILY';
+        _normalizeToDateOnly();
+      }
+    } else if (!_weeklyEligible && _rentalPeriod == 'WEEKLY') {
       _rentalPeriod = 'DAILY';
     }
+  }
+
+  void _normalizeToDateOnly() {
+    _startDate = DateTime(_startDate.year, _startDate.month, _startDate.day);
+    _endDate = DateTime(_endDate.year, _endDate.month, _endDate.day);
+    if (!_endDate.isAfter(_startDate)) {
+      _endDate = _startDate.add(const Duration(days: 1));
+    }
+  }
+
+  void _applyHourlyDefaults() {
+    final tomorrow = DateTime.now().add(const Duration(days: 1));
+    _startDate = DateTime(tomorrow.year, tomorrow.month, tomorrow.day, 9, 0);
+    _endDate = _startDate.add(Duration(hours: RentalQuoteEstimator.defaultHourlyDurationHours));
+  }
+
+  void _onPeriodChanged(String period) {
+    setState(() {
+      _rentalPeriod = period;
+      if (period == 'HOURLY') {
+        _applyHourlyDefaults();
+      } else {
+        _normalizeToDateOnly();
+        if (period == 'WEEKLY' && !_weeklyEligible) _rentalPeriod = 'DAILY';
+      }
+      _quote = null;
+    });
+  }
+
+  String _formatRentalDateTime(DateTime dt) {
+    if (_hourlyMode) {
+      final h = dt.hour.toString().padLeft(2, '0');
+      final m = dt.minute.toString().padLeft(2, '0');
+      return '${dt.day}/${dt.month}/${dt.year} · $h:$m';
+    }
+    return '${dt.day}/${dt.month}/${dt.year}';
   }
 
   RentalQuoteEstimate? get _previewEstimate {
@@ -241,6 +327,7 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
     if (v == null || _step < 1) return null;
     return RentalQuoteEstimator.estimate(
       dailyRateCdf: v['dailyRateCdf'] as int? ?? 0,
+      hourlyRateCdf: v['hourlyRateCdf'] as int?,
       depositCdf: v['depositCdf'] as int? ?? 0,
       startDate: _startDate,
       endDate: _endDate,
@@ -267,7 +354,12 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
       Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text('Location (${estimate.days} j)', style: const TextStyle(fontWeight: FontWeight.w600)),
+          Text(
+            estimate.hourlyMode
+                ? 'Location (${estimate.hours} h)'
+                : 'Location (${estimate.days} j)',
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
           Text(MarketConfig.formatCdf(estimate.rentalFeeCdf + estimate.weeklyDiscountCdf)),
         ],
       ),
@@ -479,7 +571,7 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
             ),
           ],
           Text(
-            '${MarketConfig.formatCdf(v['dailyRateCdf'] as int? ?? 0)}/jour · Caution ${MarketConfig.formatCdf(v['depositCdf'] as int? ?? 0)}',
+            '${MarketConfig.formatCdf(v['dailyRateCdf'] as int? ?? 0)}/jour · ${MarketConfig.formatCdf(v['hourlyRateCdf'] as int? ?? RentalQuoteEstimator.resolveHourlyRateCdf(dailyRateCdf: v['dailyRateCdf'] as int? ?? 0))}/h · Caution ${MarketConfig.formatCdf(v['depositCdf'] as int? ?? 0)}',
             style: const TextStyle(color: MovaColors.green, fontWeight: FontWeight.w600),
           ),
           if (_step == 0) ...[
@@ -521,7 +613,7 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text('Prise en charge', style: theme.textTheme.labelMedium),
-                        Text('${_startDate.day}/${_startDate.month}/${_startDate.year}'),
+                        Text(_formatRentalDateTime(_startDate)),
                       ],
                     ),
                   ),
@@ -534,7 +626,7 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text('Retour', style: theme.textTheme.labelMedium),
-                        Text('${_endDate.day}/${_endDate.month}/${_endDate.year}'),
+                        Text(_formatRentalDateTime(_endDate)),
                       ],
                     ),
                   ),
@@ -578,38 +670,33 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
               _livePreviewCard(preview),
               const SizedBox(height: 12),
             ],
-            if (_weeklyEligible)
-              SizedBox(
-                width: double.infinity,
-                child: SegmentedButton<String>(
-                  segments: [
-                    const ButtonSegment(value: 'DAILY', label: Text('Journée')),
+            SizedBox(
+              width: double.infinity,
+              child: SegmentedButton<String>(
+                segments: [
+                  const ButtonSegment(value: 'HOURLY', label: Text('Heure')),
+                  const ButtonSegment(value: 'DAILY', label: Text('Journée')),
+                  if (_weeklyEligible)
                     ButtonSegment(
                       value: 'WEEKLY',
                       label: Text('Semaine (-${RentalQuoteEstimator.weeklyDiscountPct} %)'),
                     ),
-                  ],
-                  selected: {_rentalPeriod},
-                  onSelectionChanged: (s) => setState(() {
-                    _rentalPeriod = s.first;
-                    _quote = null;
-                  }),
-                ),
-              )
-            else ...[
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                decoration: BoxDecoration(
-                  color: MovaColors.violet.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  'Tarif à la journée · remise semaine à partir de 7 jours ($_rentalDays j sélectionné${_rentalDays > 1 ? 's' : ''})',
-                  style: theme.textTheme.bodySmall?.copyWith(color: MovaColors.violet),
-                ),
+                ],
+                selected: {_rentalPeriod},
+                onSelectionChanged: (s) => _onPeriodChanged(s.first),
               ),
-            ],
+            ),
+            const SizedBox(height: 8),
+            if (_hourlyMode)
+              Text(
+                'Location courte durée · 1 à ${RentalQuoteEstimator.maxHourlyDurationHours} h ($_rentalHours h sélectionnée${_rentalHours > 1 ? 's' : ''})',
+                style: theme.textTheme.bodySmall?.copyWith(color: MovaColors.violet),
+              )
+            else if (!_weeklyEligible)
+              Text(
+                'Tarif à la journée · remise semaine à partir de 7 jours ($_rentalDays j sélectionné${_rentalDays > 1 ? 's' : ''})',
+                style: theme.textTheme.bodySmall?.copyWith(color: MovaColors.violet),
+              ),
             const SizedBox(height: 12),
             Text('Assurance', style: theme.textTheme.titleSmall),
             ...['BASIC', 'STANDARD', 'PREMIUM'].map((tier) {

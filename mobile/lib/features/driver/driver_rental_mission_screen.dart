@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/api/api_client.dart';
 import '../../core/config/market_config.dart';
 import '../../core/error/result.dart';
+import '../../core/geo/maps_launcher.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
@@ -185,7 +186,14 @@ class _DriverRentalMissionScreenState extends ConsumerState<DriverRentalMissionS
                   ],
                   const SizedBox(height: 8),
                   Text('Lieu', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
-                  Text(pickup, style: const TextStyle(fontWeight: FontWeight.w600)),
+                  Text(pickup, style: const TextStyle(fontWeight: FontWeight.w600), maxLines: 3, overflow: TextOverflow.ellipsis),
+                  const SizedBox(height: 8),
+                  MovaButton(
+                    label: 'Navigation vers le lieu',
+                    icon: Icons.directions,
+                    isSecondary: true,
+                    onPressed: () => MapsLauncher.openAddressSearch(pickup),
+                  ),
                   if (returnCity != null && returnCity.isNotEmpty && returnCity != pickup) ...[
                     const SizedBox(height: 4),
                     Text('Retour : $returnCity', style: const TextStyle(fontSize: 13)),

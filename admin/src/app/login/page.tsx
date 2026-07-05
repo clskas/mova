@@ -75,7 +75,7 @@ export default function LoginPage() {
         <div className="relative z-10">
           <div className="flex items-center gap-3">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/icon.png" alt="" width={44} height={44} className="rounded-xl shadow-lg" />
+            <img src="/icon.svg" alt="" width={44} height={44} className="rounded-xl shadow-lg" />
             <div>
               <p className="text-xl font-semibold tracking-tight">MOVA Admin</p>
               <p className="text-sm text-white/60">Console d&apos;administration</p>

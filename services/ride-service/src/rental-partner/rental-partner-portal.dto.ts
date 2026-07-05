@@ -46,6 +46,12 @@ export class CreatePartnerVehicleDto {
   @Min(1)
   dailyRateCdf!: number;
 
+  @ApiPropertyOptional({ example: 12000, description: 'Tarif horaire (FC). Calculé automatiquement si omis.' })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  hourlyRateCdf?: number;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsInt()
@@ -86,6 +92,12 @@ export class PartnerBookingActionDto {
   @ApiProperty({ enum: ['acknowledge', 'confirm', 'decline', 'start', 'return'] })
   @IsIn(['acknowledge', 'confirm', 'decline', 'start', 'return'])
   action!: 'acknowledge' | 'confirm' | 'decline' | 'start' | 'return';
+}
+
+export class PartnerConfirmCashDto {
+  @ApiProperty({ example: '123456', description: 'Code PIN communiqué par le passager' })
+  @IsString()
+  pin!: string;
 }
 
 export class PartnerLogisticsDto {

@@ -33,7 +33,7 @@ export class RentalQuoteDto {
   @ApiProperty() @IsUUID() vehicleId!: string;
   @ApiProperty() @IsDateString() startDate!: string;
   @ApiProperty() @IsDateString() endDate!: string;
-  @ApiPropertyOptional({ enum: ['DAILY', 'WEEKLY'] }) @IsOptional() @IsIn(['DAILY', 'WEEKLY']) rentalPeriod?: string;
+  @ApiPropertyOptional({ enum: ['HOURLY', 'DAILY', 'WEEKLY'] }) @IsOptional() @IsIn(['HOURLY', 'DAILY', 'WEEKLY']) rentalPeriod?: string;
   @ApiPropertyOptional({ example: 'Kinshasa' }) @IsOptional() @IsString() pickupCity?: string;
   @ApiPropertyOptional({ example: 'Kinshasa' }) @IsOptional() @IsString() returnCity?: string;
   @ApiPropertyOptional({ enum: ['UNLIMITED', 'LIMITED'] }) @IsOptional() @IsIn(['UNLIMITED', 'LIMITED']) mileageType?: string;
@@ -53,7 +53,7 @@ export class CreateRentalInquiryDto {
   @ApiPropertyOptional() @IsOptional() @IsString() vehicleType?: string;
   @ApiProperty() @IsDateString() startDate!: string;
   @ApiProperty() @IsDateString() endDate!: string;
-  @ApiPropertyOptional({ enum: ['DAILY', 'WEEKLY'] }) @IsOptional() @IsIn(['DAILY', 'WEEKLY']) rentalPeriod?: string;
+  @ApiPropertyOptional({ enum: ['HOURLY', 'DAILY', 'WEEKLY'] }) @IsOptional() @IsIn(['HOURLY', 'DAILY', 'WEEKLY']) rentalPeriod?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() pickupCity?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() returnCity?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() pickupAddress?: string;

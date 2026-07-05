@@ -24,7 +24,16 @@ import 'widgets/mova_ride_map.dart';
 import 'widgets/vehicle_selector.dart';
 
 class BookingScreen extends ConsumerStatefulWidget {
-  const BookingScreen({super.key});
+  const BookingScreen({
+    super.key,
+    this.initialPickupAddress,
+    this.initialDropoffAddress,
+    this.initialVehicleType,
+  });
+
+  final String? initialPickupAddress;
+  final String? initialDropoffAddress;
+  final String? initialVehicleType;
 
   @override
   ConsumerState<BookingScreen> createState() => _BookingScreenState();
@@ -41,6 +50,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   bool _dropoffFromSuggestion = false;
   bool _dropoffFromManualCoords = false;
   Map<String, VehicleEstimate> _estimates = {};
+  Map<String, Map<String, dynamic>> _estimateDetails = {};
   Map<String, dynamic>? _selectedEstimate;
   List<Map<String, dynamic>> _suggestions = [];
   Timer? _debounce;
@@ -51,6 +61,12 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   String? _error;
   String? _validationError;
   bool _showSuggestions = false;
+  bool _pickupFromGps = true;
+  bool _pickupFromSuggestion = false;
+  List<Map<String, dynamic>> _pickupSuggestions = [];
+  bool _showPickupSuggestions = false;
+  bool _loadingPickupSuggestions = false;
+  Timer? _pickupDebounce;
   List<Map<String, dynamic>> _poiPlaces = [];
   String? _poiCategoryFilter;
 
@@ -66,7 +82,18 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   void initState() {
     super.initState();
     _destinationController.addListener(_onDestinationChanged);
-    if (!movaDisableAutoGps) {
+    _pickupController.addListener(_onPickupChanged);
+    if (widget.initialPickupAddress != null && widget.initialPickupAddress!.trim().isNotEmpty) {
+      _pickupController.text = widget.initialPickupAddress!.trim();
+      _pickupFromGps = false;
+    }
+    if (widget.initialDropoffAddress != null && widget.initialDropoffAddress!.trim().isNotEmpty) {
+      _destinationController.text = widget.initialDropoffAddress!.trim();
+    }
+    if (widget.initialVehicleType != null && widget.initialVehicleType!.trim().isNotEmpty) {
+      _vehicleType = widget.initialVehicleType!.trim();
+    }
+    if (!movaDisableAutoGps && widget.initialPickupAddress == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _useMyLocation());
     }
     WidgetsBinding.instance.addPostFrameCallback((_) => _checkUnpaidRide());
@@ -127,11 +154,74 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   @override
   void dispose() {
     _debounce?.cancel();
+    _pickupDebounce?.cancel();
     _destinationController.removeListener(_onDestinationChanged);
+    _pickupController.removeListener(_onPickupChanged);
     _pickupController.dispose();
     _destinationController.dispose();
     _promoController.dispose();
     super.dispose();
+  }
+
+  void _onPickupChanged() {
+    _pickupDebounce?.cancel();
+    _pickupDebounce = Timer(const Duration(milliseconds: 350), _fetchPickupSuggestions);
+    setState(() {
+      _pickupFromGps = false;
+      _pickupFromSuggestion = false;
+      _validationError = null;
+      _selectedEstimate = null;
+      _estimates = {};
+    });
+  }
+
+  Future<void> _fetchPickupSuggestions() async {
+    final query = _pickupController.text.trim();
+    if (query.length < 2 || query == 'Ma position') {
+      setState(() {
+        _pickupSuggestions = [];
+        _showPickupSuggestions = false;
+      });
+      return;
+    }
+    setState(() => _loadingPickupSuggestions = true);
+    final api = ref.read(apiClientProvider);
+    final nearCity = ServiceAreas.cityNameForCoords(_pickup);
+    final result = await api.geoAutocomplete(query, city: nearCity);
+    if (!mounted) return;
+    setState(() {
+      _loadingPickupSuggestions = false;
+      switch (result) {
+        case Success(:final data):
+          _pickupSuggestions = data;
+          _showPickupSuggestions = data.isNotEmpty;
+        case Failure():
+          _pickupSuggestions = [];
+          _showPickupSuggestions = false;
+      }
+    });
+  }
+
+  void _selectPickupSuggestion(Map<String, dynamic> suggestion) {
+    final label = suggestion['label']?.toString() ??
+        suggestion['address']?.toString() ??
+        '';
+    final lat = (suggestion['lat'] as num?)?.toDouble();
+    final lng = (suggestion['lng'] as num?)?.toDouble();
+    if (lat == null || lng == null) return;
+    setState(() {
+      _pickup = ServiceAreaLocation.ensureInServiceArea(LatLng(lat, lng), address: label);
+      _pickupController.text = label;
+      _pickupFromSuggestion = true;
+      _pickupFromGps = false;
+      _showPickupSuggestions = false;
+      _pickupSuggestions = [];
+      _selectedEstimate = null;
+      _estimates = {};
+    });
+    if (_destinationController.text.trim().isNotEmpty) {
+      _fetchAllEstimates();
+    }
   }
 
   void _onDestinationChanged() {
@@ -168,6 +258,8 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
         address: result.label,
       );
       _pickupController.text = result.label;
+      _pickupFromGps = true;
+      _pickupFromSuggestion = false;
       _selectedEstimate = null;
       _estimates = {};
     });
@@ -252,10 +344,50 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   }
 
   Future<String?> _resolveCoords() async {
-    _pickup = ServiceAreaLocation.ensureInServiceArea(
-      _pickup,
-      address: _pickupController.text,
-    );
+    if (!_pickupFromGps) {
+      if (_pickupFromSuggestion && ServiceAreaLocation.isInBounds(_pickup)) {
+        _pickup = ServiceAreaLocation.ensureInServiceArea(
+          _pickup,
+          address: _pickupController.text,
+        );
+      } else {
+        var resolved = ServiceAreaLocation.coordsFromAddress(
+          _pickupController.text,
+          near: _pickup,
+        );
+        if (!ServiceAreaLocation.isInBounds(resolved)) {
+          final api = ref.read(apiClientProvider);
+          final result = await api.geoAutocomplete(
+            _pickupController.text.trim(),
+            city: ServiceAreas.cityNameForCoords(_pickup),
+          );
+          if (result case Success(:final data) when data.isNotEmpty) {
+            final s = data.first;
+            resolved = LatLng(
+              (s['lat'] as num?)?.toDouble() ?? MarketConfig.defaultLat,
+              (s['lng'] as num?)?.toDouble() ?? MarketConfig.defaultLng,
+            );
+            if (ServiceAreaLocation.isInBounds(resolved)) {
+              _pickup = resolved;
+              _pickupFromSuggestion = true;
+            } else {
+              return 'Point de départ hors zone MOVA.';
+            }
+          } else {
+            return 'Adresse de départ introuvable — choisissez une suggestion ou utilisez le GPS.';
+          }
+        }
+        _pickup = ServiceAreaLocation.ensureInServiceArea(
+          resolved,
+          address: _pickupController.text,
+        );
+      }
+    } else {
+      _pickup = ServiceAreaLocation.ensureInServiceArea(
+        _pickup,
+        address: _pickupController.text,
+      );
+    }
 
     if (_dropoffFromManualCoords && _dropoff != null && ServiceAreaLocation.isInBounds(_dropoff!)) {
       return null;
@@ -382,6 +514,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
             final price = (data['estimatedFareCdf'] ?? data['estimatedPriceCdf']) as int?;
             final enriched = Map<String, dynamic>.from(data);
             estimates[type] = VehicleEstimate(vehicleType: type, priceCdf: price);
+            _estimateDetails[type] = enriched;
             if (type == _vehicleType) selectedData = enriched;
           case Failure(:final error):
             estimates[type] = VehicleEstimate(vehicleType: type);
@@ -409,10 +542,20 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   }
 
   Future<void> _onVehicleSelected(String type) async {
-    setState(() => _vehicleType = type);
+    setState(() {
+      _vehicleType = type;
+      _selectedEstimate = _estimateDetails[type];
+    });
     if (_destinationController.text.trim().isNotEmpty) {
       await _fetchAllEstimates();
     }
+  }
+
+  String _selectedVehicleLabel() {
+    for (final v in MarketConfig.vehicleTypes) {
+      if (v.id == _vehicleType) return v.label;
+    }
+    return _vehicleType;
   }
 
   Future<void> _confirmRide() async {
@@ -536,7 +679,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                     child: FilterChip(
                       label: Text(f.$2),
                       selected: selected,
-                      onSelected: (_) => setState(() => _poiCategoryFilter = f.$1),
+                      onSelected: (selected) => setState(() => _poiCategoryFilter = selected ? f.$1 : null),
                     ),
                   );
                 }),
@@ -559,7 +702,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                       labelText: 'Départ',
                       hintText: 'Point de prise en charge',
                       prefixIcon: const Icon(Icons.my_location, color: MovaColors.green),
-                      suffixIcon: _loadingGps
+                      suffixIcon: _loadingGps || _loadingPickupSuggestions
                           ? const Padding(
                               padding: EdgeInsets.all(12),
                               child: SizedBox(
@@ -574,8 +717,27 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                               onPressed: _loadingGps ? null : _useMyLocation,
                             ),
                     ),
-                    onChanged: (_) => setState(() => _validationError = null),
+                    onTap: () => setState(() => _showPickupSuggestions = _pickupSuggestions.isNotEmpty),
                   ),
+                  if (_showPickupSuggestions && _pickupSuggestions.isNotEmpty)
+                    MovaCard(
+                      margin: const EdgeInsets.only(top: 4),
+                      padding: EdgeInsets.zero,
+                      child: Column(
+                        children: _pickupSuggestions.map((s) {
+                          final label = s['label']?.toString() ?? s['address']?.toString() ?? '';
+                          return Material(
+                            color: Colors.transparent,
+                            child: ListTile(
+                              dense: true,
+                              leading: const Icon(Icons.trip_origin, size: 20, color: MovaColors.green),
+                              title: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
+                              onTap: () => _selectPickupSuggestion(s),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
                   const SizedBox(height: 12),
                   TextField(
                     controller: _destinationController,
@@ -628,6 +790,34 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                     estimates: _estimates,
                     onSelected: _onVehicleSelected,
                   ),
+                  if (_estimates.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    Text(
+                      'Tarifs par type de véhicule',
+                      style: theme.textTheme.labelLarge?.copyWith(color: MovaColors.textSecondary),
+                    ),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: MarketConfig.vehicleTypes.map((option) {
+                        final estimate = _estimates[option.id];
+                        final isSelected = _vehicleType == option.id;
+                        final price = estimate?.priceCdf;
+                        return FilterChip(
+                          label: Text(
+                            price != null
+                                ? '${option.label} · ${MarketConfig.formatCdf(price)}'
+                                : option.label,
+                          ),
+                          selected: isSelected,
+                          onSelected: (_) => _onVehicleSelected(option.id),
+                          selectedColor: MovaColors.violet.withValues(alpha: 0.15),
+                          checkmarkColor: MovaColors.violet,
+                        );
+                      }).toList(),
+                    ),
+                  ],
                   if (_selectedEstimate != null && total != null) ...[
                     const SizedBox(height: 16),
                     MovaCard(
@@ -636,8 +826,11 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                         children: [
                           Row(
                             children: [
-                              const Expanded(
-                                child: Text('Estimation', style: TextStyle(fontSize: 16)),
+                              Expanded(
+                                child: Text(
+                                  'Estimation · ${_selectedVehicleLabel()}',
+                                  style: const TextStyle(fontSize: 16),
+                                ),
                               ),
                               Flexible(
                                 child: Text(
@@ -667,6 +860,12 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                             'Durée',
                             (_selectedEstimate!['durationFareCdf'] as num?)?.toInt(),
                           ),
+                          if (((_selectedEstimate!['discountCdf'] as num?)?.toInt() ?? 0) > 0) ...[
+                            _breakdownRow(
+                              'Code promo${_selectedEstimate!['promoCode'] != null ? ' (${_selectedEstimate!['promoCode']})' : ''}',
+                              -((_selectedEstimate!['discountCdf'] as num).toInt()),
+                            ),
+                          ],
                           if (distance != null || duration != null) ...[
                             const Divider(height: 16),
                             Row(

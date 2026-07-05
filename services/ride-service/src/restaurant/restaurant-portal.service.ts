@@ -364,7 +364,7 @@ export class RestaurantPortalService {
   }
 
   private async publishStatus(
-    delivery: { id: string; userId: string; type: DeliveryType; restaurant?: { name: string } | null },
+    delivery: { id: string; userId: string; type: DeliveryType; restaurant?: { name: string; ownerUserId?: string | null } | null },
     status: DeliveryStatus,
   ) {
     await this.redis.publish(MOVA_EVENTS.DELIVERY_STATUS_UPDATED, {
@@ -373,6 +373,7 @@ export class RestaurantPortalService {
       type: delivery.type,
       status,
       restaurantName: delivery.restaurant?.name,
+      restaurantOwnerUserId: delivery.restaurant?.ownerUserId ?? undefined,
     });
   }
 }

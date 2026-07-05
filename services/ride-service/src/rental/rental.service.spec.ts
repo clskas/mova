@@ -87,6 +87,26 @@ describe('RentalService', () => {
     expect(result.totalCdf).toBe(75000 * 2 + 150000);
   });
 
+  it('calcule un devis horaire', async () => {
+    const start = new Date();
+    start.setDate(start.getDate() + 1);
+    start.setHours(9, 0, 0, 0);
+    const end = new Date(start);
+    end.setHours(13, 0, 0, 0);
+    prisma.rentalVehicle.findUnique.mockResolvedValue(baseVehicle);
+    const result = await service.quote({
+      vehicleId: 'v1',
+      startDate: start.toISOString(),
+      endDate: end.toISOString(),
+      rentalPeriod: 'HOURLY',
+    });
+    expect(result.rentalPeriod).toBe('HOURLY');
+    expect(result.hours).toBe(4);
+    expect(result.days).toBe(0);
+    expect(result.breakdown.rentalFeeCdf).toBe(Math.ceil(75000 / 8) * 4);
+    expect(result.breakdown.weeklyDiscountCdf).toBe(0);
+  });
+
   it('applique remise hebdomadaire', async () => {
     const start = new Date();
     start.setDate(start.getDate() + 1);

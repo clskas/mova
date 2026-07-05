@@ -85,11 +85,14 @@ export const ADMIN_ROLE_PERMISSIONS: Record<UserRole, AdminPermission[]> = {
     AdminPermission.KYC_READ,
     AdminPermission.KYC_WRITE,
     AdminPermission.RIDES_READ,
+    AdminPermission.RIDES_WRITE,
     AdminPermission.INCIDENTS_READ,
     AdminPermission.INCIDENTS_WRITE,
     AdminPermission.FRAUD_READ,
     AdminPermission.DELIVERIES_READ,
+    AdminPermission.DELIVERIES_WRITE,
     AdminPermission.SCHEDULED_READ,
+    AdminPermission.SCHEDULED_WRITE,
     AdminPermission.PRICING_READ,
   ],
   [UserRole.FINANCE]: [
@@ -108,6 +111,8 @@ export const ADMIN_ROLE_PERMISSIONS: Record<UserRole, AdminPermission[]> = {
     AdminPermission.RESTAURANTS_READ,
     AdminPermission.RESTAURANTS_WRITE,
     AdminPermission.PRICING_READ,
+    AdminPermission.SCHEDULED_READ,
+    AdminPermission.SCHEDULED_WRITE,
   ],
 };
 

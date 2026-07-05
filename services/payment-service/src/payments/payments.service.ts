@@ -150,6 +150,9 @@ export class PaymentsService {
   private async creditDriverAfterServicePayment(referenceType: string, referenceId: string) {
     const type = referenceType.toUpperCase();
     try {
+      if (type === 'RENTAL') {
+        await this.syncRentalPaidStatus(referenceId);
+      }
       if (type === 'DELIVERY') {
         const foodResult = await this.foodPayouts.creditFoodDeliverySettlement(referenceId);
         if (foodResult.handled) return;
@@ -175,6 +178,20 @@ export class PaymentsService {
       );
     } catch (e) {
       this.logger.warn(`creditDriverAfterServicePayment ${referenceType}/${referenceId} failed`, e);
+    }
+  }
+
+  private async syncRentalPaidStatus(referenceId: string) {
+    try {
+      const res = await fetch(
+        serviceUrl('ride', `/internal/rental-inquiries/${referenceId}/mark-paid`),
+        { method: 'POST', headers: { 'x-internal-api-key': INTERNAL_API_KEY } },
+      );
+      if (!res.ok) {
+        this.logger.warn(`syncRentalPaidStatus ${referenceId}: HTTP ${res.status}`);
+      }
+    } catch (e) {
+      this.logger.warn(`syncRentalPaidStatus ${referenceId} failed`, e);
     }
   }
 
@@ -255,6 +272,22 @@ export class PaymentsService {
       this.logger.error(`fetchServicePaymentInfo ${referenceType}/${referenceId} unreachable`, e);
       throw new MovaHttpException(MovaErrorCode.NOT_FOUND, HttpStatus.BAD_GATEWAY);
     }
+  }
+
+  async getServicePaymentPreview(referenceType: string, referenceId: string, userId: string) {
+    const type = referenceType.toUpperCase();
+    const info = await this.fetchServicePaymentInfo(type, referenceId);
+    if (info.userId !== userId) {
+      throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
+    }
+    return {
+      referenceType: type,
+      referenceId,
+      amountCdf: info.amountCdf,
+      paymentReady: info.paymentReady,
+      cashPin: info.cashPin ?? null,
+      title: info.title ?? null,
+    };
   }
 
   async payService(

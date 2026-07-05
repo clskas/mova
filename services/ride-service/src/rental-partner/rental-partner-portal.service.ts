@@ -1,6 +1,6 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { RentalInquiryStatus, RentalVehicleApprovalStatus } from '@prisma/client';
-import { MovaErrorCode, MovaHttpException } from '@mova/shared';
+import { MovaErrorCode, MovaHttpException, serviceUrl } from '@mova/shared';
 import { fetchAuthUserBrief } from '../common/internal-lookup.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { RentalService } from '../rental/rental.service';
@@ -65,18 +65,23 @@ export class RentalPartnerPortalService {
     if (!existing) {
       throw new MovaHttpException(MovaErrorCode.RENTAL_VEHICLE_NOT_FOUND, HttpStatus.NOT_FOUND);
     }
-    if (existing.approvalStatus === RentalVehicleApprovalStatus.APPROVED) {
-      throw new MovaHttpException(
-        MovaErrorCode.VALIDATION_ERROR,
-        undefined,
-        'Véhicule déjà publié — contactez MOVA pour modifier.',
-      );
-    }
     return this.rental.updateVehicleForOwner(ownerUserId, id, dto);
   }
 
   async uploadVehiclePhoto(ownerUserId: string, imageBase64: string, mimeType?: string) {
     return this.uploads.uploadVehiclePhoto(imageBase64, mimeType);
+  }
+
+  getVehicle(ownerUserId: string, id: string) {
+    return this.getVehicleForOwner(ownerUserId, id);
+  }
+
+  async getVehicleForOwner(ownerUserId: string, id: string) {
+    return this.rental.getVehicleForOwner(ownerUserId, id);
+  }
+
+  async deleteVehicle(ownerUserId: string, id: string) {
+    return this.rental.deleteVehicleForOwner(ownerUserId, id);
   }
 
   listBookings(ownerUserId: string) {
@@ -93,5 +98,33 @@ export class RentalPartnerPortalService {
 
   updateLogistics(ownerUserId: string, id: string, dto: PartnerLogisticsDto) {
     return this.rental.ownerUpdateLogistics(ownerUserId, id, dto);
+  }
+
+  async confirmCashPayment(ownerUserId: string, bookingId: string, pin: string, authHeader?: string) {
+    const booking = await this.rental.ownerGetBooking(ownerUserId, bookingId);
+    if (booking.status !== RentalInquiryStatus.RETURNED) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        undefined,
+        'Le paiement espèces est disponible après le retour du véhicule.',
+      );
+    }
+    const res = await fetch(
+      serviceUrl('payment', `/payments/services/RENTAL/${bookingId}/cash/confirm`),
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(authHeader ? { Authorization: authHeader } : {}),
+        },
+        body: JSON.stringify({ pin }),
+      },
+    );
+    const data = (await res.json().catch(() => ({}))) as { error?: { message?: string }; message?: string };
+    if (!res.ok) {
+      const msg = data?.error?.message ?? data?.message ?? 'Confirmation impossible.';
+      throw new MovaHttpException(MovaErrorCode.PAYMENT_FAILED, res.status as HttpStatus, msg);
+    }
+    return this.rental.ownerGetBooking(ownerUserId, bookingId);
   }
 }

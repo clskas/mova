@@ -2,6 +2,7 @@
 class RentalQuoteEstimate {
   const RentalQuoteEstimate({
     required this.days,
+    required this.hours,
     required this.rentalPeriod,
     required this.rentalFeeCdf,
     required this.weeklyDiscountCdf,
@@ -17,6 +18,7 @@ class RentalQuoteEstimate {
   });
 
   final int days;
+  final int hours;
   final String rentalPeriod;
   final int rentalFeeCdf;
   final int weeklyDiscountCdf;
@@ -31,6 +33,7 @@ class RentalQuoteEstimate {
   final int unlimitedMileageSurchargeCdf;
 
   bool get weeklyEligible => days >= 7;
+  bool get hourlyMode => rentalPeriod == 'HOURLY';
 }
 
 class RentalQuoteEstimator {
@@ -40,6 +43,11 @@ class RentalQuoteEstimator {
   static const interCitySurchargeCdf = 15000;
   static const unlimitedMileageSurchargeCdf = 15000;
   static const limitedMileageKmPerDay = 100;
+  static const limitedMileageKmPerHour = 15;
+  static const hoursPerDayForHourlyRate = 8;
+  static const minHourlyDurationHours = 1;
+  static const maxHourlyDurationHours = 23;
+  static const defaultHourlyDurationHours = 4;
 
   static const insuranceSurchargePct = {
     'BASIC': 0,
@@ -60,8 +68,19 @@ class RentalQuoteEstimator {
     return diff < 1 ? 1 : diff;
   }
 
+  static int rentalHours(DateTime start, DateTime end) {
+    final diffMs = end.difference(start).inMilliseconds;
+    return diffMs <= 0 ? 1 : (diffMs / (3600 * 1000)).ceil();
+  }
+
+  static int resolveHourlyRateCdf({required int dailyRateCdf, int? hourlyRateCdf}) {
+    if (hourlyRateCdf != null && hourlyRateCdf > 0) return hourlyRateCdf;
+    return (dailyRateCdf / hoursPerDayForHourlyRate).ceil();
+  }
+
   static RentalQuoteEstimate estimate({
     required int dailyRateCdf,
+    int? hourlyRateCdf,
     required int depositCdf,
     required DateTime startDate,
     required DateTime endDate,
@@ -76,17 +95,26 @@ class RentalQuoteEstimator {
     bool gpsBuiltIn = false,
     int? vehicleUnlimitedMileageSurchargeCdf,
   }) {
-    final days = rentalDays(startDate, endDate);
-    var period = rentalPeriod;
-    if (period == 'WEEKLY' && days < 7) {
-      period = 'DAILY';
-    }
-
-    var rentalFeeCdf = dailyRateCdf * days;
+    var period = rentalPeriod.toUpperCase();
+    var days = 0;
+    var hours = 0;
+    var rentalFeeCdf = 0;
     var weeklyDiscountCdf = 0;
-    if (period == 'WEEKLY' && days >= 7) {
-      weeklyDiscountCdf = (rentalFeeCdf * weeklyDiscountPct / 100).round();
-      rentalFeeCdf -= weeklyDiscountCdf;
+
+    if (period == 'HOURLY') {
+      hours = rentalHours(startDate, endDate);
+      final rate = resolveHourlyRateCdf(dailyRateCdf: dailyRateCdf, hourlyRateCdf: hourlyRateCdf);
+      rentalFeeCdf = rate * hours;
+    } else {
+      days = rentalDays(startDate, endDate);
+      if (period == 'WEEKLY' && days < 7) {
+        period = 'DAILY';
+      }
+      rentalFeeCdf = dailyRateCdf * days;
+      if (period == 'WEEKLY' && days >= 7) {
+        weeklyDiscountCdf = (rentalFeeCdf * weeklyDiscountPct / 100).round();
+        rentalFeeCdf -= weeklyDiscountCdf;
+      }
     }
 
     final insuranceFeeByTier = <String, int>{};
@@ -115,6 +143,7 @@ class RentalQuoteEstimator {
 
     return RentalQuoteEstimate(
       days: days,
+      hours: hours,
       rentalPeriod: period,
       rentalFeeCdf: rentalFeeCdf,
       weeklyDiscountCdf: weeklyDiscountCdf,

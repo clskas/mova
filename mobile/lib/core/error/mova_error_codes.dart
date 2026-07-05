@@ -1,4 +1,5 @@
 import 'result.dart';
+import 'user_friendly_error.dart';
 
 /// Messages MOVA alignés sur packages/shared/src/mova-error-codes.ts
 const movaErrorMessages = <String, String>{
@@ -55,14 +56,15 @@ MovaFailure failureFromApiResponse(int statusCode, Map<String, dynamic> body) {
         if (code == 'MOVA_RIDE_003') return NoDriversFailure(mapped);
         if (code.startsWith('MOVA_PAY_')) return PaymentFailure(mapped);
         if (code == 'MOVA_VAL_001') {
-          return ValidationFailure(apiMessage ?? mapped);
+          return ValidationFailure(sanitizeUserMessage(apiMessage, fallback: mapped));
         }
-        return ServerFailure(apiMessage ?? mapped);
+        return ServerFailure(sanitizeUserMessage(apiMessage, fallback: mapped));
       }
     }
     if (apiMessage != null && apiMessage.isNotEmpty) {
-      if (statusCode == 401) return AuthFailure(apiMessage);
-      return ServerFailure(apiMessage);
+      final friendly = sanitizeUserMessage(apiMessage);
+      if (statusCode == 401) return AuthFailure(friendly);
+      return ServerFailure(friendly);
     }
   }
 

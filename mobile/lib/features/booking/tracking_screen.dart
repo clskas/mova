@@ -16,6 +16,7 @@ import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import '../chat/ride_chat_screen.dart';
+import '../passenger/passenger_alert_service.dart';
 import 'payment_screen.dart';
 import 'widgets/mova_ride_map.dart';
 
@@ -72,6 +73,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
   Map<String, dynamic>? _ride;
   Map<String, dynamic>? _driver;
   String _status = 'ACCEPTED';
+  String? _lastAlertedStatus;
   LatLng _pickup = MovaRideMap.mapDefaultCenter();
   LatLng? _dropoff;
   LatLng? _driverPos;
@@ -233,7 +235,12 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
 
   void _applyRideData(Map<String, dynamic> data, ApiClient api) {
     _ride = data;
-    _status = data['status']?.toString() ?? 'ACCEPTED';
+    final newStatus = data['status']?.toString() ?? 'ACCEPTED';
+    if (newStatus != _status) {
+      PassengerAlertService.notifyRideStatus(newStatus);
+      _lastAlertedStatus = newStatus;
+    }
+    _status = newStatus;
     _driver = _normalizeDriver(data['driver'] as Map<String, dynamic>?);
     _pickup = LatLng(
       (data['pickupLat'] as num?)?.toDouble() ?? MarketConfig.defaultLat,
@@ -299,7 +306,12 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
       if (result case Success(:final data)) {
         setState(() {
           _ride = data;
-          _status = data['status']?.toString() ?? _status;
+          final newStatus = data['status']?.toString() ?? _status;
+          if (newStatus != _status && newStatus != _lastAlertedStatus) {
+            PassengerAlertService.notifyRideStatus(newStatus);
+            _lastAlertedStatus = newStatus;
+          }
+          _status = newStatus;
           _driver ??= _normalizeDriver(data['driver'] as Map<String, dynamic>?);
           final driverLat = (data['driver']?['lat'] as num?)?.toDouble();
           final driverLng = (data['driver']?['lng'] as num?)?.toDouble();

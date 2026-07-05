@@ -49,6 +49,13 @@ abstract final class MapsLauncher {
     }
   }
 
+  static Future<bool> openAddressSearch(String address) async {
+    final query = address.trim();
+    if (query.isEmpty) return false;
+    final uri = Uri.https('www.google.com', '/maps/search/', {'api': '1', 'query': query});
+    return _tryLaunch(uri, LaunchMode.externalApplication);
+  }
+
   static Future<bool> openDirections({
     required double destinationLat,
     required double destinationLng,

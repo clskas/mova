@@ -80,7 +80,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
   @override
   Widget build(BuildContext context) {
     return MovaScreen(
-      title: 'Connexion MOVA',
+      title: 'MOVA Passager',
       centerContent: true,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,

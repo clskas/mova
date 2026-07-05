@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
@@ -16,7 +15,6 @@ import '../../core/offline/connectivity_service.dart';
 import '../../core/location/service_area_gps.dart';
 import '../../core/error/result.dart';
 import '../../core/geo/geo_utils.dart';
-import '../../core/widgets/service_area_selector.dart';
 import '../help/driver_help_screen.dart';
 import '../carpool/carpool_screen.dart';
 import 'active_delivery_screen.dart';
@@ -32,6 +30,8 @@ import 'driver_moving_mission_screen.dart';
 import 'driver_push_service.dart';
 import 'driver_rental_mission_screen.dart';
 import 'driver_scheduled_mission_screen.dart';
+
+enum _DriverMenuAction { history, carpool, dossier, help, incident, logout }
 
 class DriverHomeScreen extends ConsumerStatefulWidget {
   const DriverHomeScreen({super.key});
@@ -782,45 +782,110 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
             MaterialPageRoute(builder: (_) => const EarningsScreen()),
           ),
         ),
-        IconButton(
-          icon: const Icon(Icons.help_outline),
-          tooltip: 'Aide',
-          onPressed: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const DriverHelpScreen()),
-          ),
-        ),
-        IconButton(
-          icon: const Icon(Icons.badge_outlined),
-          tooltip: 'Mon dossier',
-          onPressed: () async {
-            await Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const DriverOnboardingScreen(canSkipToHome: true)),
-            );
-            if (mounted) await _loadProfile(clearCache: true);
-          },
-        ),
-        IconButton(
-          icon: const Icon(Icons.logout),
-          tooltip: 'Déconnexion',
-          onPressed: () async {
-            final confirm = await showDialog<bool>(
-              context: context,
-              builder: (ctx) => AlertDialog(
-                title: const Text('Déconnexion'),
-                content: const Text('Voulez-vous vous déconnecter ?'),
-                actions: [
-                  TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
-                  TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Déconnexion')),
-                ],
-              ),
-            );
-            if (confirm == true) {
-              if (!context.mounted) return;
-              await logoutDriver(context, ref);
+        PopupMenuButton<_DriverMenuAction>(
+          tooltip: 'Menu',
+          onSelected: (action) async {
+            switch (action) {
+              case _DriverMenuAction.history:
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const DriverRideHistoryScreen()),
+                );
+              case _DriverMenuAction.carpool:
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const CarpoolScreen(forDriver: true)),
+                );
+              case _DriverMenuAction.dossier:
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const DriverOnboardingScreen(canSkipToHome: true)),
+                );
+                if (mounted) await _loadProfile(clearCache: true);
+              case _DriverMenuAction.help:
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const DriverHelpScreen()),
+                );
+              case _DriverMenuAction.incident:
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const IncidentScreen()),
+                );
+              case _DriverMenuAction.logout:
+                final confirm = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('Déconnexion'),
+                    content: const Text('Voulez-vous vous déconnecter ?'),
+                    actions: [
+                      TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
+                      TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Déconnexion')),
+                    ],
+                  ),
+                );
+                if (confirm == true && context.mounted) {
+                  await logoutDriver(context, ref);
+                }
             }
           },
+          itemBuilder: (context) => const [
+            PopupMenuItem(
+              value: _DriverMenuAction.history,
+              child: ListTile(
+                leading: Icon(Icons.history),
+                title: Text('Historique'),
+                contentPadding: EdgeInsets.zero,
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+            PopupMenuItem(
+              value: _DriverMenuAction.carpool,
+              child: ListTile(
+                leading: Icon(Icons.people_alt_outlined),
+                title: Text('Covoiturage'),
+                contentPadding: EdgeInsets.zero,
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+            PopupMenuItem(
+              value: _DriverMenuAction.dossier,
+              child: ListTile(
+                leading: Icon(Icons.badge_outlined),
+                title: Text('Mon dossier'),
+                contentPadding: EdgeInsets.zero,
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+            PopupMenuItem(
+              value: _DriverMenuAction.help,
+              child: ListTile(
+                leading: Icon(Icons.help_outline),
+                title: Text('Aide'),
+                contentPadding: EdgeInsets.zero,
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+            PopupMenuItem(
+              value: _DriverMenuAction.incident,
+              child: ListTile(
+                leading: Icon(Icons.report_problem_outlined),
+                title: Text('Signaler un incident'),
+                contentPadding: EdgeInsets.zero,
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+            PopupMenuDivider(),
+            PopupMenuItem(
+              value: _DriverMenuAction.logout,
+              child: ListTile(
+                leading: Icon(Icons.logout),
+                title: Text('Déconnexion'),
+                contentPadding: EdgeInsets.zero,
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+          ],
         ),
       ],
       child: RefreshIndicator(
@@ -834,11 +899,6 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
             MovaErrorBanner(message: _profileError!, onRetry: () => _loadProfile(clearCache: true)),
             const SizedBox(height: 12),
           ],
-          const Align(
-            alignment: Alignment.centerLeft,
-            child: ServiceAreaSelector(compact: true),
-          ),
-          const SizedBox(height: 12),
           if (_kycStatus != null && _kycStatus != 'APPROVED') ...[
             MovaCard(
               child: Row(
@@ -954,29 +1014,14 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
             const SizedBox(height: 8),
             MovaErrorBanner(message: _availabilityError!),
           ],
-          const SizedBox(height: 12),
-          MovaCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Row(
-                  children: [
-                    Icon(Icons.info_outline, size: 18, color: MovaColors.violet),
-                    SizedBox(width: 8),
-                    Text('Offres reçues en ligne', style: TextStyle(fontWeight: FontWeight.w600)),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  '• Courses taxi : proches de votre GPS, dans le rayon de recherche, véhicule compatible.\n'
-                  '• Livraisons & courses/commissions : colis, repas, express et achats en attente, dans un rayon de 15 km.\n'
-                  '• Réservations planifiées, déménagements et locations logistiques : assignés par l’admin — ouvrez une mission pour démarrer / terminer.\n'
-                  '• Covoiturage : publiez votre trajet via le bouton ci-dessous.',
-                  style: TextStyle(fontSize: 12, color: MovaColors.textSecondary, height: 1.4),
-                ),
-              ],
+          if (_available) ...[
+            const SizedBox(height: 8),
+            Text(
+              'En ligne — courses et livraisons près de votre position GPS.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12, color: MovaColors.textSecondary.withValues(alpha: 0.9)),
             ),
-          ),
+          ],
           if (_assignedMissions.isNotEmpty) ...[
             const SizedBox(height: 16),
             MovaCard(
@@ -1356,103 +1401,6 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
               const SizedBox(height: 12),
             ],
           ],
-          MovaButton(
-            label: 'Publier un covoiturage',
-            isSecondary: true,
-            icon: Icons.people_alt_outlined,
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => const CarpoolScreen(forDriver: true),
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          if (kDebugMode) ...[
-            MovaButton(
-              label: 'Tester son & vibration',
-              isSecondary: true,
-              icon: Icons.notifications_active_outlined,
-              onPressed: () async {
-                await DriverJobAlertService.notify(
-                  title: 'MOVA Chauffeur',
-                  body: 'Test alerte — course disponible · Gombe · 8500 FC',
-                  payload: 'debug:alert',
-                );
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Alerte envoyée (sans Firebase)')),
-                  );
-                }
-              },
-            ),
-            const SizedBox(height: 8),
-            MovaButton(
-              label: 'Simulation (debug)',
-              isSecondary: true,
-              icon: Icons.bug_report_outlined,
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => RideOfferScreen(
-                    offer: {
-                      'id': 'debug-offer',
-                      'pickupAddress': 'Gombe',
-                      'dropoffAddress': 'Limete',
-                      'pickupLat': -4.32,
-                      'pickupLng': 15.31,
-                      'estimatedFareCdf': 8500,
-                      'distanceKm': 3.2,
-                    },
-                    vehicleId: _vehicleId,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-          ],
-          MovaButton(
-            label: 'Mes courses',
-            isSecondary: true,
-            icon: Icons.history,
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const DriverRideHistoryScreen()),
-            ),
-          ),
-          const SizedBox(height: 8),
-          MovaButton(
-            label: 'Mes revenus',
-            isSecondary: true,
-            icon: Icons.account_balance_wallet,
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const EarningsScreen()),
-            ),
-          ),
-          const SizedBox(height: 8),
-          MovaButton(
-            label: 'Documents KYC',
-            isSecondary: true,
-            icon: Icons.upload_file,
-            onPressed: () async {
-              await Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const DriverOnboardingScreen(canSkipToHome: true)),
-              );
-              if (mounted) await _loadProfile(clearCache: true);
-            },
-          ),
-          const SizedBox(height: 8),
-          MovaButton(
-            label: 'Signaler un incident',
-            isSecondary: true,
-            icon: Icons.report_problem,
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const IncidentScreen()),
-            ),
-          ),
           SizedBox(height: MediaQuery.paddingOf(context).bottom + 16),
         ],
           ),

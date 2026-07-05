@@ -381,6 +381,7 @@ enum RentalInquiryStatus {
   CONTACTED
   IN_PROGRESS
   RETURNED
+  PAID
   CLOSED
 }
 
@@ -570,6 +571,7 @@ model RentalVehicle {
   city                 String   @default("Kinshasa")
   seats                Int
   dailyRateCdf         Int
+  hourlyRateCdf        Int?
   depositCdf           Int      @default(50000)
   weeklyDiscountPct    Int      @default(10)
   rating               Float    @default(4.5)
@@ -628,6 +630,7 @@ model RentalInquiry {
   ownerDriverName         String?
   ownerDriverPhone        String?
   driverId                String?
+  completionPin           String?
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
 

@@ -18,6 +18,7 @@ import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import '../../widgets/promo_code_field.dart';
 import '../booking/payment_screen.dart';
+import '../booking/tracking_screen.dart';
 import '../history/history_detail_dialog.dart';
 
 class ScheduledRideScreen extends ConsumerStatefulWidget {
@@ -38,6 +39,8 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
   bool _dropoffFromManualCoords = false;
   List<Map<String, dynamic>> _suggestions = [];
   int? _estimatedPrice;
+  int? _discountCdf;
+  String? _appliedPromoCode;
   bool _loading = false;
   bool _loadingGps = false;
   bool _loadingSuggestions = false;
@@ -280,7 +283,7 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
 
   Future<void> _showScheduledDetail(Map<String, dynamic> ride) async {
     final id = ride['id']?.toString() ?? '';
-    Map<String, dynamic>? live = ride;
+    Map<String, dynamic> live = ride;
     if (id.isNotEmpty) {
       final api = ref.read(apiClientProvider);
       final result = await api.get('/rides/scheduled/$id');
@@ -289,9 +292,9 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
       }
     }
     if (!mounted) return;
-    final status = live?['status']?.toString() ?? 'SCHEDULED';
+    final status = live['status']?.toString() ?? 'SCHEDULED';
     final timeline = scheduledTimelineSteps(status);
-    final scheduledRaw = live?['scheduledAt']?.toString();
+    final scheduledRaw = live['scheduledAt']?.toString();
     final when = scheduledRaw != null ? _formatDateTime(DateTime.parse(scheduledRaw)) : '—';
 
     await showDialog<void>(
@@ -305,16 +308,16 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
             children: [
               Text('Réf. ${_shortRef(id)}', style: const TextStyle(color: MovaColors.violet, fontSize: 12)),
               const SizedBox(height: 8),
-              Text(live?['dropoffAddress']?.toString() ?? 'Destination',
+              Text(live['dropoffAddress']?.toString() ?? 'Destination',
                   style: const TextStyle(fontWeight: FontWeight.w600)),
-              Text('Départ : ${live?['pickupAddress'] ?? 'Ma position'}',
+              Text('Départ : ${live['pickupAddress'] ?? 'Ma position'}',
                   style: const TextStyle(fontSize: 13, color: MovaColors.textSecondary)),
               Text('Date : $when', style: const TextStyle(fontSize: 13)),
               Text(
                 historyStatusLabel(status),
                 style: const TextStyle(color: MovaColors.violet, fontWeight: FontWeight.w600),
               ),
-              Text(MarketConfig.formatCdf(live?['estimatedPriceCdf'] as int? ?? 0)),
+              Text(MarketConfig.formatCdf(live['estimatedPriceCdf'] as int? ?? 0)),
               const SizedBox(height: 12),
               const Text(
                 'MOVA confirme la réservation et assigne un chauffeur avant l\'heure prévue. '
@@ -345,6 +348,25 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Fermer')),
+          if (status == 'IN_PROGRESS' &&
+              (live['linkedRideId'] ?? live['rideId'])?.toString().isNotEmpty == true)
+            FilledButton.icon(
+              onPressed: () {
+                final trackId = (live['linkedRideId'] ?? live['rideId']).toString();
+                Navigator.pop(ctx);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => TrackingScreen(
+                      rideId: trackId,
+                      estimatedFareCdf: live?['estimatedPriceCdf'] as int? ?? live?['priceCdf'] as int? ?? 0,
+                    ),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.map_outlined),
+              label: const Text('Suivre en direct'),
+            ),
           if (status == 'COMPLETED' && id.isNotEmpty)
             FilledButton(
               onPressed: () {
@@ -355,8 +377,8 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
                     builder: (_) => PaymentScreen(
                       serviceType: 'SCHEDULED',
                       serviceId: id,
-                      amountCdf: live?['estimatedPriceCdf'] as int? ?? live?['priceCdf'] as int? ?? 0,
-                      completionPin: live?['completionPin']?.toString(),
+                      amountCdf: live['estimatedPriceCdf'] as int? ?? live['priceCdf'] as int? ?? 0,
+                      completionPin: live['completionPin']?.toString(),
                     ),
                   ),
                 );
@@ -461,6 +483,8 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
       switch (result) {
         case Success(:final data):
           _estimatedPrice = (data['estimatedPriceCdf'] ?? data['estimatedFareCdf']) as int?;
+          _discountCdf = (data['discountCdf'] as num?)?.toInt();
+          _appliedPromoCode = data['promoCode']?.toString();
         case Failure(:final error):
           _error = error.message;
       }
@@ -612,6 +636,27 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
                         historyStatusLabel(map['status']?.toString()),
                         style: const TextStyle(color: MovaColors.violet, fontWeight: FontWeight.w600, fontSize: 13),
                       ),
+                      if (map['status']?.toString() == 'IN_PROGRESS' &&
+                          (map['linkedRideId'] ?? map['rideId'])?.toString().isNotEmpty == true)
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton.icon(
+                            onPressed: () {
+                              final trackId = (map['linkedRideId'] ?? map['rideId']).toString();
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => TrackingScreen(
+                                    rideId: trackId,
+                                    estimatedFareCdf: map['estimatedPriceCdf'] as int? ?? map['priceCdf'] as int? ?? 0,
+                                  ),
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.map_outlined, size: 18),
+                            label: const Text('Suivre en direct'),
+                          ),
+                        ),
                       if (id.isNotEmpty && CancelEligibility.scheduled(map))
                         Align(
                           alignment: Alignment.centerRight,
@@ -752,18 +797,30 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
           if (_estimatedPrice != null) ...[
             const SizedBox(height: 16),
             MovaCard(
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Text('Estimation', style: TextStyle(fontSize: 16)),
-                  Text(
-                    MarketConfig.formatCdf(_estimatedPrice!),
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: MovaColors.green,
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Estimation', style: TextStyle(fontSize: 16)),
+                      Text(
+                        MarketConfig.formatCdf(_estimatedPrice!),
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: MovaColors.green,
+                        ),
+                      ),
+                    ],
                   ),
+                  if ((_discountCdf ?? 0) > 0) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      'Code promo${_appliedPromoCode != null ? ' $_appliedPromoCode' : ''} : −${MarketConfig.formatCdf(_discountCdf!)}',
+                      style: const TextStyle(color: MovaColors.green, fontSize: 13),
+                    ),
+                  ],
                 ],
               ),
             ),

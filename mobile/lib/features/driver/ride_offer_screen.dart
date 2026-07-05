@@ -45,12 +45,18 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
       if (!mounted) return;
       if (_countdown <= 0) {
         _timer?.cancel();
-        Navigator.pop(context);
+        _expireOffer();
         return;
       }
       setState(() => _countdown--);
     });
   }
+
+  Future<void> _expireOffer() async {
+    if (_rideId.isNotEmpty) {
+      await ref.read(apiClientProvider).rejectRide(_rideId);
+    }
+    if (mounted) Navigator.pop(context);
 
   /// Distance/ETA chauffeur → client (point de prise en charge).
   /// Priorité au calcul backend (distanceToPickupKm), sinon GPS local.

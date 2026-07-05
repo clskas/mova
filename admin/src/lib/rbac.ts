@@ -62,10 +62,10 @@ const ROLE_SECTIONS: Record<AdminRole, AdminSection[]> = {
 /** Sections où l'utilisateur peut modifier des données. */
 const ROLE_WRITE: Record<AdminRole, AdminSection[]> = {
   SUPER_ADMIN: ALL_SECTIONS,
-  ADMIN: ALL_SECTIONS,
-  SUPPORT: ["kyc", "litiges", "livraisons", "planifiees", "locations", "demenagements", "covoiturage"],
+  ADMIN: ALL_SECTIONS.filter((s) => s !== "portefeuille"),
+  SUPPORT: ["kyc", "litiges", "courses", "livraisons", "planifiees", "locations", "demenagements", "covoiturage"],
   FINANCE: ["tarifs", "abonnements", "portefeuille"],
-  CONTENT: ["restaurants", "tarifs", "parametres", "locations"],
+  CONTENT: ["restaurants", "locations"],
 };
 
 export type NavItem = {

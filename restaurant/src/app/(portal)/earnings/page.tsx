@@ -1,11 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { PortalShell } from "@/components/PortalShell";
-import { fetchEarnings, fetchProfile, formatCdf, downloadOrderReceiptPdf, type RestaurantEarnings, type RestaurantProfile } from "@/lib/api";
+import { fetchEarnings, formatCdf, downloadOrderReceiptPdf, type RestaurantEarnings } from "@/lib/api";
 
 export default function EarningsPage() {
-  const [profile, setProfile] = useState<RestaurantProfile | null>(null);
   const [earnings, setEarnings] = useState<RestaurantEarnings | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -13,8 +11,7 @@ export default function EarningsPage() {
   const load = useCallback(async () => {
     setError(null);
     try {
-      const [p, e] = await Promise.all([fetchProfile(), fetchEarnings()]);
-      setProfile(p);
+      const e = await fetchEarnings();
       setEarnings(e);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur");
@@ -28,8 +25,7 @@ export default function EarningsPage() {
   }, [load]);
 
   return (
-    <PortalShell restaurantName={profile?.name}>
-      <div className="space-y-6">
+    <div className="space-y-6">
         <div>
           <h2 className="text-xl font-semibold text-[#1A1A2E]">Revenus repas</h2>
           <p className="text-sm text-gray-600 mt-1">
@@ -83,7 +79,6 @@ export default function EarningsPage() {
             </section>
           </>
         )}
-      </div>
-    </PortalShell>
+    </div>
   );
 }

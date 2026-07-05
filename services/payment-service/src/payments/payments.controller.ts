@@ -50,6 +50,16 @@ export class PaymentsController {
     return this.paymentsService.confirmCashService(referenceType, referenceId, req.user.id, pin);
   }
 
+  @Get('services/:referenceType/:referenceId/info')
+  @ApiOperation({ summary: 'Aperçu paiement service (montant, PIN espèces)' })
+  getServicePaymentInfo(
+    @Request() req: { user: { id: string } },
+    @Param('referenceType') referenceType: string,
+    @Param('referenceId') referenceId: string,
+  ) {
+    return this.paymentsService.getServicePaymentPreview(referenceType, referenceId, req.user.id);
+  }
+
   @Post('services/:referenceType/:referenceId')
   @ApiOperation({ summary: 'Payer un service terminé (livraison, course, déménagement, location, covoiturage)' })
   payService(

@@ -74,7 +74,7 @@ function ShellInner({ children }: { children: React.ReactNode }) {
         <div className="p-5 border-b border-white/10">
           <div className="flex items-center gap-3">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/icon.png" alt="" width={36} height={36} className="rounded-lg" />
+            <img src="/icon.svg" alt="" width={36} height={36} className="rounded-lg" />
             <div>
               <p className="font-semibold">MOVA Admin</p>
               <p className="text-xs opacity-60">Couverture nationale RDC</p>

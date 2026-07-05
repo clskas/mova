@@ -2,15 +2,39 @@ import { Logger } from '@nestjs/common';
 import { ConnectedSocket, MessageBody, OnGatewayConnection, OnGatewayDisconnect, SubscribeMessage, WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
 import { TrackingReferenceType } from '@prisma/client';
 import { INTERNAL_API_KEY, serviceUrl } from '@mova/shared';
+import { JwtService } from '@nestjs/jwt';
 import { Server, Socket } from 'socket.io';
 import { TrackingService } from '../tracking/tracking.service';
+
+export type PartnerRentalLivePayload = {
+  type: 'rental' | 'booking-status';
+  kind?: string;
+  inquiryId: string;
+  status: string;
+};
+
+export type PartnerVehicleLivePayload = {
+  vehicleId: string;
+  action: 'created' | 'updated' | 'deleted' | 'reviewed';
+  approvalStatus?: string;
+  isActive?: boolean;
+};
+
+export type RestaurantLivePayload = {
+  type: 'order' | 'order-status';
+  deliveryId: string;
+  status: string;
+};
 
 @WebSocketGateway({ cors: { origin: '*' }, namespace: '/tracking' })
 export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer() server: Server;
   private readonly logger = new Logger(TrackingGateway.name);
 
-  constructor(private tracking: TrackingService) {}
+  constructor(
+    private tracking: TrackingService,
+    private jwt: JwtService,
+  ) {}
 
   handleConnection(client: Socket) {
     this.logger.log(`Client connected: ${client.id}`);
@@ -193,5 +217,44 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
 
   broadcastRentalChat(payload: { inquiryId: string; senderId: string; senderRole: string; text: string; ts: number }) {
     this.server.to(`rental:${payload.inquiryId}`).emit('rental:chat', payload);
+  }
+
+  @SubscribeMessage('partner:subscribe')
+  handlePartnerSubscribe(@ConnectedSocket() client: Socket) {
+    const userId = this.resolveSocketUserId(client);
+    if (!userId) return { subscribed: false };
+    client.join(`partner:${userId}`);
+    return { subscribed: true, userId };
+  }
+
+  broadcastPartnerRentalEvent(ownerUserId: string, payload: PartnerRentalLivePayload) {
+    this.server.to(`partner:${ownerUserId}`).emit('partner:rental', payload);
+  }
+
+  broadcastPartnerVehicleEvent(ownerUserId: string, payload: PartnerVehicleLivePayload) {
+    this.server.to(`partner:${ownerUserId}`).emit('partner:vehicle', payload);
+  }
+
+  @SubscribeMessage('restaurant:subscribe')
+  handleRestaurantSubscribe(@ConnectedSocket() client: Socket) {
+    const userId = this.resolveSocketUserId(client);
+    if (!userId) return { subscribed: false };
+    client.join(`restaurant:${userId}`);
+    return { subscribed: true, userId };
+  }
+
+  broadcastRestaurantEvent(ownerUserId: string, payload: RestaurantLivePayload) {
+    this.server.to(`restaurant:${ownerUserId}`).emit('restaurant:order', payload);
+  }
+
+  private resolveSocketUserId(client: Socket): string | null {
+    const token = client.handshake.auth?.token;
+    if (typeof token !== 'string' || !token.trim()) return null;
+    try {
+      const decoded = this.jwt.verify<{ sub?: string }>(token);
+      return decoded.sub ?? null;
+    } catch {
+      return null;
+    }
   }
 }

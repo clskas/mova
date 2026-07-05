@@ -12,6 +12,7 @@ export type VehicleFormState = {
   city: string;
   seats: string;
   dailyRateCdf: string;
+  hourlyRateCdf: string;
   depositCdf: string;
   ownerName: string;
   ownerContactPhone: string;
@@ -28,6 +29,7 @@ export const EMPTY_VEHICLE_FORM: VehicleFormState = {
   city: "Kinshasa",
   seats: "5",
   dailyRateCdf: "",
+  hourlyRateCdf: "",
   depositCdf: "100000",
   ownerName: "",
   ownerContactPhone: "",
@@ -52,16 +54,25 @@ type Props = {
   error: string | null;
   submitLabel: string;
   onPhotoError?: (msg: string) => void;
+  lockIdentityFields?: boolean;
 };
 
-export function VehicleForm({ form, onChange, onSubmit, saving, error, submitLabel, onPhotoError }: Props) {
+export function VehicleForm({ form, onChange, onSubmit, saving, error, submitLabel, onPhotoError, lockIdentityFields }: Props) {
+  const locked = lockIdentityFields === true;
+  const lockedClass = locked ? `${inputClass} bg-gray-50 text-gray-500 cursor-not-allowed` : inputClass;
   return (
     <form onSubmit={onSubmit} className="bg-white rounded-2xl border shadow-sm p-6 space-y-4">
+      {locked && (
+        <p className="text-sm text-indigo-700 bg-indigo-50 rounded-xl px-3 py-2">
+          Véhicule publié : seuls tarifs, photo, équipements et caution sont modifiables.
+        </p>
+      )}
       <label className="block text-sm">
         <span className="text-gray-600">Nom affiché *</span>
         <input
           required
-          className={inputClass}
+          readOnly={locked}
+          className={locked ? lockedClass : inputClass}
           value={form.name}
           onChange={(e) => onChange({ ...form, name: e.target.value })}
           placeholder="Ex. Toyota RAV4 2022"
@@ -70,18 +81,19 @@ export function VehicleForm({ form, onChange, onSubmit, saving, error, submitLab
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="block text-sm">
           <span className="text-gray-600">Marque</span>
-          <input className={inputClass} value={form.make} onChange={(e) => onChange({ ...form, make: e.target.value })} />
+          <input readOnly={locked} className={locked ? lockedClass : inputClass} value={form.make} onChange={(e) => onChange({ ...form, make: e.target.value })} />
         </label>
         <label className="block text-sm">
           <span className="text-gray-600">Modèle</span>
-          <input className={inputClass} value={form.model} onChange={(e) => onChange({ ...form, model: e.target.value })} />
+          <input readOnly={locked} className={locked ? lockedClass : inputClass} value={form.model} onChange={(e) => onChange({ ...form, model: e.target.value })} />
         </label>
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="block text-sm">
           <span className="text-gray-600">Catégorie *</span>
           <select
-            className={inputClass}
+            disabled={locked}
+            className={locked ? lockedClass : inputClass}
             value={form.category}
             onChange={(e) => onChange({ ...form, category: e.target.value })}
           >
@@ -95,7 +107,8 @@ export function VehicleForm({ form, onChange, onSubmit, saving, error, submitLab
         <label className="block text-sm">
           <span className="text-gray-600">Transmission</span>
           <select
-            className={inputClass}
+            disabled={locked}
+            className={locked ? lockedClass : inputClass}
             value={form.transmission}
             onChange={(e) => onChange({ ...form, transmission: e.target.value })}
           >
@@ -107,7 +120,7 @@ export function VehicleForm({ form, onChange, onSubmit, saving, error, submitLab
       <div className="grid gap-4 sm:grid-cols-3">
         <label className="block text-sm">
           <span className="text-gray-600">Ville</span>
-          <select className={inputClass} value={form.city} onChange={(e) => onChange({ ...form, city: e.target.value })}>
+          <select disabled={locked} className={locked ? lockedClass : inputClass} value={form.city} onChange={(e) => onChange({ ...form, city: e.target.value })}>
             {MOVA_CITIES.map((c) => (
               <option key={c} value={c}>
                 {c}
@@ -117,7 +130,7 @@ export function VehicleForm({ form, onChange, onSubmit, saving, error, submitLab
         </label>
         <label className="block text-sm">
           <span className="text-gray-600">Places</span>
-          <input className={inputClass} value={form.seats} onChange={(e) => onChange({ ...form, seats: e.target.value })} />
+          <input readOnly={locked} className={locked ? lockedClass : inputClass} value={form.seats} onChange={(e) => onChange({ ...form, seats: e.target.value })} />
         </label>
         <label className="block text-sm">
           <span className="text-gray-600">Tarif / jour (FC) *</span>
@@ -131,6 +144,17 @@ export function VehicleForm({ form, onChange, onSubmit, saving, error, submitLab
           />
         </label>
       </div>
+      <label className="block text-sm">
+        <span className="text-gray-600">Tarif / heure (FC)</span>
+        <input
+          type="number"
+          min={1}
+          className={inputClass}
+          value={form.hourlyRateCdf}
+          onChange={(e) => onChange({ ...form, hourlyRateCdf: e.target.value })}
+          placeholder="Optionnel — calculé depuis le tarif jour si vide"
+        />
+      </label>
       <label className="block text-sm">
         <span className="text-gray-600">Caution (FC)</span>
         <input className={inputClass} value={form.depositCdf} onChange={(e) => onChange({ ...form, depositCdf: e.target.value })} />
@@ -171,6 +195,7 @@ export function vehicleFormPayload(form: VehicleFormState) {
     city: form.city.trim() || "Kinshasa",
     seats: Number(form.seats) || 5,
     dailyRateCdf: Number(form.dailyRateCdf),
+    ...(form.hourlyRateCdf.trim() ? { hourlyRateCdf: Number(form.hourlyRateCdf) } : {}),
     depositCdf: Number(form.depositCdf) || 100000,
     ownerName: form.ownerName.trim() || undefined,
     ownerContactPhone: form.ownerContactPhone.trim() || undefined,

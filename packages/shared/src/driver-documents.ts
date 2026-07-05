@@ -136,7 +136,11 @@ export function evaluateDriverDocuments(
   };
 }
 
-export function formatRentalRemaining(endDate: Date | string, now = new Date()): {
+export function formatRentalRemaining(
+  endDate: Date | string,
+  now = new Date(),
+  opts?: { rentalPeriod?: string },
+): {
   remainingMs: number;
   remainingDays: number;
   remainingHours: number;
@@ -145,21 +149,32 @@ export function formatRentalRemaining(endDate: Date | string, now = new Date()):
 } {
   const end = endDate instanceof Date ? endDate : new Date(endDate);
   const remainingMs = Math.max(0, end.getTime() - now.getTime());
-  const remainingDays = Math.ceil(remainingMs / MS_PER_DAY);
+  const remainingDays = Math.max(0, Math.floor(remainingMs / MS_PER_DAY));
   const remainingHours = Math.ceil(remainingMs / (60 * 60 * 1000));
   const isActive = remainingMs > 0;
+  const hourlyMode = opts?.rentalPeriod === 'HOURLY';
+  const underOneDay = remainingMs < MS_PER_DAY;
 
   let remainingLabel: string;
   if (remainingMs <= 0) {
     remainingLabel = 'Location terminée';
-  } else if (remainingDays >= 2) {
-    remainingLabel = `${remainingDays} jour${remainingDays > 1 ? 's' : ''} restant${remainingDays > 1 ? 's' : ''}`;
-  } else if (remainingHours >= 2) {
-    remainingLabel = `${remainingHours} heure${remainingHours > 1 ? 's' : ''} restante${remainingHours > 1 ? 's' : ''}`;
+  } else if (hourlyMode || underOneDay) {
+    if (remainingHours >= 2) {
+      remainingLabel = `${remainingHours} heure${remainingHours > 1 ? 's' : ''} restante${remainingHours > 1 ? 's' : ''}`;
+    } else {
+      const minutes = Math.max(1, Math.ceil(remainingMs / 60_000));
+      remainingLabel = `${minutes} minute${minutes > 1 ? 's' : ''} restante${minutes > 1 ? 's' : ''}`;
+    }
   } else {
-    const minutes = Math.max(1, Math.ceil(remainingMs / 60_000));
-    remainingLabel = `${minutes} minute${minutes > 1 ? 's' : ''} restante${minutes > 1 ? 's' : ''}`;
+    const days = Math.max(1, remainingDays);
+    remainingLabel = `${days} jour${days > 1 ? 's' : ''} restant${days > 1 ? 's' : ''}`;
   }
 
-  return { remainingMs, remainingDays, remainingHours, remainingLabel, isActive };
+  return {
+    remainingMs,
+    remainingDays: Math.max(0, Math.ceil(remainingMs / MS_PER_DAY)),
+    remainingHours,
+    remainingLabel,
+    isActive,
+  };
 }

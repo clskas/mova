@@ -9,7 +9,6 @@ import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
-import '../rating/rating_screen.dart';
 import '../billing/receipt_screen.dart';
 
 const _paymentMethods = [
@@ -80,6 +79,19 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
 
   Future<void> _loadPaymentDetails() async {
     final api = ref.read(apiClientProvider);
+    if (widget.serviceType != null && widget.serviceId != null) {
+      final preview = await api.getServicePaymentInfo(widget.serviceType!, widget.serviceId!);
+      if (preview case Success(:final data)) {
+        final pin = data['cashPin']?.toString();
+        final amount = data['amountCdf'] as int?;
+        if (mounted) {
+          setState(() {
+            if (amount != null && amount > 0) _amountCdf = amount;
+            if (pin != null && pin.isNotEmpty) _cashPin = pin;
+          });
+        }
+      }
+    }
     final pin = await api.resolveCashPin(
       rideId: widget.rideId,
       serviceType: widget.serviceType,
@@ -179,7 +191,15 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
           if (widget.rideId != null) {
             Navigator.pushReplacement(
               context,
-              MaterialPageRoute(builder: (_) => RatingScreen(rideId: widget.rideId!)),
+              MaterialPageRoute(
+                builder: (_) => ReceiptScreen(
+                  rideId: widget.rideId,
+                  showRatingAfter: true,
+                  pendingCash: true,
+                  completionPin: _cashPin ?? widget.completionPin,
+                  amountCdf: _amountCdf,
+                ),
+              ),
             );
           } else {
             Navigator.of(context).popUntil((r) => r.isFirst);

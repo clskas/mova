@@ -1,4 +1,5 @@
 import { authHeaders } from "./auth";
+import { sanitizeUserMessage } from "./user-messages";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
 
@@ -23,7 +24,11 @@ export type PartnerBooking = {
   pickupAddress?: string | null;
   startDate?: string;
   endDate?: string;
+  rentalPeriod?: string;
   priceCdf?: number | null;
+  displayAmountCdf?: number | null;
+  displayAmountLabel?: string;
+  ownerNetCdf?: number | null;
   notes?: string | null;
   createdAt?: string;
   driverId?: string | null;
@@ -36,6 +41,10 @@ export type PartnerBooking = {
   ownerDriverName?: string | null;
   ownerDriverPhone?: string | null;
   nextStepHint?: string | null;
+  remainingLabel?: string | null;
+  paymentReady?: boolean;
+  canConfirmCash?: boolean;
+  isPaid?: boolean;
 };
 
 export type PartnerVehicle = {
@@ -47,6 +56,7 @@ export type PartnerVehicle = {
   categoryLabel?: string;
   city?: string;
   dailyRateCdf: number;
+  hourlyRateCdf?: number | null;
   depositCdf?: number;
   seats?: number;
   transmission?: string;
@@ -60,6 +70,16 @@ export type PartnerVehicle = {
   createdAt?: string;
 };
 
+function extractErrorMessage(data: Record<string, unknown>, status: number): string {
+  const err = data?.error;
+  if (err && typeof err === "object" && err !== null && "message" in err) {
+    const raw = (err as { message?: unknown }).message;
+    if (Array.isArray(raw)) return sanitizeUserMessage(raw.join(", "));
+    return sanitizeUserMessage(raw);
+  }
+  return sanitizeUserMessage(data?.message ?? `Erreur ${status}`);
+}
+
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     ...init,
@@ -69,10 +89,9 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
       ...(init?.headers ?? {}),
     },
   });
-  const data = await res.json().catch(() => ({}));
+  const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   if (!res.ok) {
-    const msg = data?.error?.message ?? data?.message ?? `Erreur ${res.status}`;
-    throw new Error(msg);
+    throw new Error(extractErrorMessage(data, res.status));
   }
   return data as T;
 }
@@ -104,6 +123,10 @@ export function fetchVehicles() {
   return apiFetch<PartnerVehicle[]>("/api/rental-partner/vehicles");
 }
 
+export function fetchVehicle(id: string) {
+  return apiFetch<PartnerVehicle>(`/api/rental-partner/vehicles/${id}`);
+}
+
 export function submitVehicle(data: Record<string, unknown>) {
   return apiFetch<PartnerVehicle>("/api/rental-partner/vehicles", {
     method: "POST",
@@ -118,6 +141,12 @@ export function updateVehicle(id: string, data: Record<string, unknown>) {
   });
 }
 
+export function deleteVehicle(id: string) {
+  return apiFetch<{ id: string; isActive: boolean; message?: string }>(`/api/rental-partner/vehicles/${id}`, {
+    method: "DELETE",
+  });
+}
+
 export async function uploadVehiclePhoto(file: File): Promise<string> {
   const bytes = await file.arrayBuffer();
   const base64 = arrayBufferToBase64(bytes);
@@ -126,7 +155,7 @@ export async function uploadVehiclePhoto(file: File): Promise<string> {
     method: "POST",
     body: JSON.stringify({ imageBase64: base64, mimeType }),
   });
-  if (!result.photoUrl) throw new Error("URL photo manquante");
+  if (!result.photoUrl) throw new Error("Impossible d'enregistrer la photo.");
   return result.photoUrl;
 }
 
@@ -145,6 +174,13 @@ export function updateBookingStatus(id: string, action: "acknowledge" | "confirm
   });
 }
 
+export function confirmBookingCash(id: string, pin: string) {
+  return apiFetch<PartnerBooking>(`/api/rental-partner/bookings/${id}/cash/confirm`, {
+    method: "POST",
+    body: JSON.stringify({ pin }),
+  });
+}
+
 export function updateBookingLogistics(
   id: string,
   data: { logisticsMode: "SELF_PASSENGER" | "OWNER_DRIVER"; ownerDriverName?: string; ownerDriverPhone?: string },
@@ -158,6 +194,17 @@ export function updateBookingLogistics(
 export function formatDate(iso?: string) {
   if (!iso) return "—";
   return new Date(iso).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+export function formatDateTime(iso?: string) {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleString("fr-FR", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 export type PartnerPromo = {
@@ -199,8 +246,8 @@ export async function downloadBookingReceiptPdf(bookingId: string) {
     headers: authHeaders(),
   });
   if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data?.error?.message ?? data?.message ?? `Erreur ${res.status}`);
+    const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    throw new Error(extractErrorMessage(data, res.status));
   }
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);

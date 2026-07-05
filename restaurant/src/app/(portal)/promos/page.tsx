@@ -1,10 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { PortalShell } from "@/components/PortalShell";
 import {
   createPromo,
-  fetchProfile,
   fetchPromos,
   formatCdf,
   updatePromo,
@@ -33,7 +31,6 @@ const emptyForm = () => ({
 });
 
 export default function PromosPage() {
-  const [restaurantName, setRestaurantName] = useState<string>();
   const [promos, setPromos] = useState<PartnerPromo[]>([]);
   const [form, setForm] = useState(emptyForm);
   const [loading, setLoading] = useState(true);
@@ -44,8 +41,7 @@ export default function PromosPage() {
   const load = useCallback(async () => {
     setError(null);
     try {
-      const [profile, data] = await Promise.all([fetchProfile(), fetchPromos()]);
-      setRestaurantName(profile.name);
+      const data = await fetchPromos();
       setPromos(data.promos ?? []);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur de chargement");
@@ -93,8 +89,7 @@ export default function PromosPage() {
   }
 
   return (
-    <PortalShell restaurantName={restaurantName}>
-      <div className="space-y-6">
+    <div className="space-y-6">
         <div>
           <h2 className="text-xl font-semibold text-[#1A1A2E]">Codes promo</h2>
           <p className="text-sm text-gray-600 mt-1">
@@ -229,7 +224,6 @@ export default function PromosPage() {
             </ul>
           )}
         </section>
-      </div>
-    </PortalShell>
+    </div>
   );
 }

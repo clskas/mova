@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { PortalShell } from "@/components/PortalShell";
+import { useRestaurantLiveRegister } from "@/components/RestaurantLiveProvider";
 import {
   confirmOrder,
   fetchOrders,
@@ -113,9 +113,11 @@ export default function OrdersPage() {
 
   useEffect(() => {
     load();
-    const timer = setInterval(load, 10000);
+    const timer = setInterval(load, 30000);
     return () => clearInterval(timer);
   }, [load]);
+
+  useRestaurantLiveRegister(load);
 
   async function act(id: string, action: "confirm" | "ready" | "reject") {
     setBusyId(id);
@@ -136,11 +138,10 @@ export default function OrdersPage() {
   const active = orders.filter((o) => !["DELIVERED", "CANCELLED", "PENDING"].includes(o.status));
 
   return (
-    <PortalShell restaurantName={profile?.name}>
-      <div className="space-y-6">
+    <div className="space-y-6">
         <div>
           <h2 className="text-xl font-bold">Commandes en cours</h2>
-          <p className="text-sm text-gray-500">Actualisation automatique · alerte sonore à chaque nouvelle commande</p>
+          <p className="text-sm text-gray-500">Temps réel + actualisation de secours toutes les 30 s · alerte sonore à chaque nouvelle commande</p>
         </div>
 
         {error && (
@@ -186,7 +187,7 @@ export default function OrdersPage() {
           </>
         )}
       </div>
-    </PortalShell>
+    </div>
   );
 }
 

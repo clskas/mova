@@ -3,10 +3,12 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { clearToken } from "@/lib/auth";
+import { useRestaurantLiveConnected } from "@/components/RestaurantLiveProvider";
 
 export function PortalShell({ children, restaurantName }: { children: React.ReactNode; restaurantName?: string }) {
   const pathname = usePathname();
   const router = useRouter();
+  const liveConnected = useRestaurantLiveConnected();
 
   function logout() {
     clearToken();
@@ -26,7 +28,14 @@ export function PortalShell({ children, restaurantName }: { children: React.Reac
       <header className="bg-white border-b border-orange-100 px-4 py-3 flex items-center justify-between gap-4">
         <div>
           <p className="text-xs text-orange-600 font-medium uppercase tracking-wide">MOVA Partenaire</p>
-          <h1 className="font-semibold text-lg text-[#1A1A2E]">{restaurantName ?? "Restaurant"}</h1>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="font-semibold text-lg text-[#1A1A2E]">{restaurantName ?? "Restaurant"}</h1>
+            {liveConnected && (
+              <span className="text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                En direct
+              </span>
+            )}
+          </div>
         </div>
         <nav className="flex items-center gap-2">
           {nav.map((item) => (

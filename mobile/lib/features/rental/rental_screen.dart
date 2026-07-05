@@ -512,7 +512,7 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
             ),
           ),
           Text(
-            'Louez un véhicule à la journée ou à la semaine.',
+            'Louez un véhicule à l\'heure, à la journée ou à la semaine.',
             style: theme.textTheme.bodyMedium?.copyWith(color: MovaColors.textSecondary),
           ),
           const SizedBox(height: 12),
@@ -601,7 +601,10 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
               return FilterChip(
                 label: Text(c.$2),
                 selected: selected,
-                onSelected: (_) => setState(() => _category = c.$1),
+                onSelected: (selected) {
+                  setState(() => _category = selected ? c.$1 : '');
+                  _search();
+                },
               );
             }).toList(),
           ),
@@ -650,7 +653,10 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
                       DropdownMenuItem(value: 'AUTO', child: Text('Automatique')),
                       DropdownMenuItem(value: 'MANUAL', child: Text('Manuelle')),
                     ],
-                    onChanged: (v) => setState(() => _transmission = v ?? ''),
+                    onChanged: (v) {
+                      setState(() => _transmission = v ?? '');
+                      _search();
+                    },
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -664,7 +670,10 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
                       DropdownMenuItem(value: 'rating', child: Text('Note')),
                       DropdownMenuItem(value: 'category', child: Text('Catégorie')),
                     ],
-                    onChanged: (v) => setState(() => _sortBy = v ?? 'price_asc'),
+                    onChanged: (v) {
+                      setState(() => _sortBy = v ?? 'price_asc');
+                      _search();
+                    },
                   ),
                 ),
               ];
@@ -680,7 +689,10 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
                         DropdownMenuItem(value: 'AUTO', child: Text('Automatique')),
                         DropdownMenuItem(value: 'MANUAL', child: Text('Manuelle')),
                       ],
-                      onChanged: (v) => setState(() => _transmission = v ?? ''),
+                      onChanged: (v) {
+                      setState(() => _transmission = v ?? '');
+                      _search();
+                    },
                     ),
                     const SizedBox(height: 8),
                     DropdownButtonFormField<String>(
@@ -692,7 +704,10 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
                         DropdownMenuItem(value: 'rating', child: Text('Note')),
                         DropdownMenuItem(value: 'category', child: Text('Catégorie')),
                       ],
-                      onChanged: (v) => setState(() => _sortBy = v ?? 'price_asc'),
+                      onChanged: (v) {
+                      setState(() => _sortBy = v ?? 'price_asc');
+                      _search();
+                    },
                     ),
                   ],
                 );
@@ -846,9 +861,14 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
                     ),
                   ),
                 ],
-                if (inq['totalCdf'] != null || inq['estimatedPriceCdf'] != null)
+                if (inq['displayAmountCdf'] != null || inq['totalCdf'] != null || inq['estimatedPriceCdf'] != null)
                   Text(
-                    MarketConfig.formatCdf(inq['totalCdf'] as int? ?? inq['estimatedPriceCdf'] as int? ?? 0),
+                    MarketConfig.formatCdf(
+                      inq['displayAmountCdf'] as int? ??
+                          inq['totalCdf'] as int? ??
+                          inq['estimatedPriceCdf'] as int? ??
+                          0,
+                    ),
                     style: const TextStyle(color: MovaColors.green, fontWeight: FontWeight.w600),
                   ),
                 const SizedBox(height: 8),

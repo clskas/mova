@@ -145,24 +145,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final userLabel = _userLabel();
     final suspended = _user?['status']?.toString() == 'SUSPENDED';
 
     return MovaScreen(
-      titleWidget: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const MovaBrandIcon(size: 26),
-          const SizedBox(width: 8),
-          Text(
-            'MOVA',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-          ),
-        ],
-      ),
+      title: 'MOVA Passager',
       actions: [
         IconButton(
           icon: const Icon(Icons.person_outline),

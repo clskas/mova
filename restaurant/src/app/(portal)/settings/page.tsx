@@ -1,11 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { PortalShell } from "@/components/PortalShell";
-import { fetchProfile, updateMenuSettings, updateRestaurantLocation, type RestaurantProfile } from "@/lib/api";
+import { fetchProfile, updateMenuSettings, updateRestaurantLocation } from "@/lib/api";
 
 export default function SettingsPage() {
-  const [profile, setProfile] = useState<RestaurantProfile | null>(null);
   const [accepting, setAccepting] = useState(true);
   const [prepTime, setPrepTime] = useState(25);
   const [promo, setPromo] = useState("");
@@ -21,7 +19,6 @@ export default function SettingsPage() {
   const load = useCallback(async () => {
     try {
       const p = await fetchProfile();
-      setProfile(p);
       setAccepting(p.isAcceptingOrders ?? true);
       setPrepTime(p.prepTimeMin ?? 25);
       setPromo("");
@@ -96,8 +93,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <PortalShell restaurantName={profile?.name}>
-      <div className="max-w-lg space-y-6">
+    <div className="max-w-lg space-y-6">
         <h2 className="text-xl font-bold">Paramètres</h2>
         {loading ? (
           <p className="text-gray-400">Chargement…</p>
@@ -185,7 +181,6 @@ export default function SettingsPage() {
             </p>
           </div>
         )}
-      </div>
-    </PortalShell>
+    </div>
   );
 }

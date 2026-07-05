@@ -1177,20 +1177,33 @@ class ApiClient {
       return null;
     }
     if (serviceType == null || serviceId == null) return null;
+
+    final preview = await getServicePaymentInfo(serviceType, serviceId);
+    if (preview case Success(:final data)) {
+      final pin = data['cashPin']?.toString();
+      if (pin != null && pin.isNotEmpty) return pin;
+    }
+
     final path = switch (serviceType.toUpperCase()) {
       'DELIVERY' => '/deliveries/$serviceId',
       'ERRAND' => '/errands/$serviceId',
       'MOVING' => '/moving/$serviceId',
+      'RENTAL' => '/rental/bookings/$serviceId',
       _ => null,
     };
     if (path == null) return null;
-    final result = await get(path);
+    final result = await get(path, skipCache: true);
     if (result case Success(:final data)) {
       final map = data is Map
           ? Map<String, dynamic>.from(data)
           : (data is Map<String, dynamic> ? data : null);
       if (map == null) return null;
-      final nested = map['order'] ?? map['delivery'] ?? map['moving'] ?? map['request'];
+      final nested = map['order'] ??
+          map['delivery'] ??
+          map['moving'] ??
+          map['request'] ??
+          map['inquiry'] ??
+          map['booking'];
       final source = nested is Map ? Map<String, dynamic>.from(nested) : map;
       return source['completionPin']?.toString() ?? source['deliveryPin']?.toString();
     }
@@ -1242,6 +1255,17 @@ class ApiClient {
       'referenceType': rideId != null ? 'RIDE' : null,
       'referenceId': rideId,
     });
+  }
+
+  Future<Result<Map<String, dynamic>>> getServicePaymentInfo(String referenceType, String referenceId) async {
+    final result = await get(
+      '/payments/services/${referenceType.toUpperCase()}/$referenceId/info',
+      skipCache: true,
+    );
+    return switch (result) {
+      Success(:final data) => Success(data is Map<String, dynamic> ? data : Map<String, dynamic>.from(data as Map)),
+      Failure(:final error) => Failure(error),
+    };
   }
 
   Future<Result<Map<String, dynamic>>> payService(
@@ -1334,7 +1358,7 @@ class ApiClient {
       '/billing/${referenceType.toUpperCase()}/$referenceId';
 
   Future<Result<Map<String, dynamic>>> getReceipt(String referenceType, String referenceId) async {
-    final result = await get(_billingPath(referenceType, referenceId));
+    final result = await get(_billingPath(referenceType, referenceId), skipCache: true);
     return switch (result) {
       Success(:final data) => Success(data is Map<String, dynamic> ? data : Map<String, dynamic>.from(data as Map)),
       Failure(:final error) => Failure(error),

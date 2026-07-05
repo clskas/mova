@@ -115,6 +115,31 @@ describe('formatRentalRemaining', () => {
     expect(result.remainingLabel).toMatch(/jour/);
   });
 
+  it('formats hours remaining for hourly rentals', () => {
+    const end = new Date('2026-06-16T18:00:00Z');
+    const now = new Date('2026-06-16T12:00:00Z');
+    const result = formatRentalRemaining(end, now, { rentalPeriod: 'HOURLY' });
+    expect(result.isActive).toBe(true);
+    expect(result.remainingLabel).toMatch(/heure/);
+    expect(result.remainingLabel).not.toMatch(/jour/);
+  });
+
+  it('formats hours when less than 24h remain on daily rental', () => {
+    const end = new Date('2026-06-16T20:00:00Z');
+    const now = new Date('2026-06-16T12:00:00Z');
+    const result = formatRentalRemaining(end, now, { rentalPeriod: 'DAILY' });
+    expect(result.isActive).toBe(true);
+    expect(result.remainingLabel).toMatch(/heure/);
+    expect(result.remainingLabel).not.toMatch(/jour/);
+  });
+
+  it('formats one day when between 24h and 48h remain', () => {
+    const end = new Date('2026-06-17T14:00:00Z');
+    const now = new Date('2026-06-16T12:00:00Z');
+    const result = formatRentalRemaining(end, now, { rentalPeriod: 'DAILY' });
+    expect(result.remainingLabel).toMatch(/1 jour/);
+  });
+
   it('returns terminated label when past end date', () => {
     const result = formatRentalRemaining('2026-06-10T00:00:00Z', new Date('2026-06-16T12:00:00Z'));
     expect(result.isActive).toBe(false);

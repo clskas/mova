@@ -9,6 +9,8 @@ import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import '../delivery/food_delivery_screen.dart';
 import '../delivery/parcel_delivery_screen.dart';
+import '../booking/booking_screen.dart';
+import '../rating/rating_screen.dart';
 import '../../core/widgets/offline_shell.dart';
 import 'history_detail_dialog.dart';
 import '../billing/receipts_list_screen.dart';
@@ -87,6 +89,9 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
       };
 
   Widget _rideTile(Map<String, dynamic> item) {
+    final meta = item['meta'] as Map<String, dynamic>? ?? {};
+    final status = item['status']?.toString() ?? '';
+    final id = item['id']?.toString() ?? '';
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: MovaCard(
@@ -116,6 +121,43 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
               rideHistoryStatusLabel(item),
               style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
             ),
+            if (status == 'COMPLETED' && id.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  MovaButton(
+                    label: 'Commander à nouveau',
+                    isSecondary: true,
+                    icon: Icons.replay,
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => BookingScreen(
+                            initialPickupAddress: meta['pickupAddress']?.toString(),
+                            initialDropoffAddress: meta['dropoffAddress']?.toString(),
+                            initialVehicleType: meta['vehicleType']?.toString(),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  MovaButton(
+                    label: 'Noter le chauffeur',
+                    isSecondary: true,
+                    icon: Icons.star_outline,
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => RatingScreen(rideId: id)),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ],
           ],
         ),
       ),

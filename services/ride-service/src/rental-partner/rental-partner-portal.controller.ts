@@ -1,11 +1,11 @@
-import { Body, Controller, Get, Param, Patch, Post, Request, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Request, Res, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiProduces, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PartnerPromoDto } from '../promo/partner-promo.dto';
 import { PartnerPromoService } from '../promo/partner-promo.service';
 import { PartnerBillingService } from '../billing/partner-billing.service';
-import { CreatePartnerVehicleDto, PartnerBookingActionDto, PartnerLogisticsDto, UploadPartnerVehiclePhotoDto } from './rental-partner-portal.dto';
+import { CreatePartnerVehicleDto, PartnerBookingActionDto, PartnerConfirmCashDto, PartnerLogisticsDto, UploadPartnerVehiclePhotoDto } from './rental-partner-portal.dto';
 import { RentalPartnerPortalService } from './rental-partner-portal.service';
 import { RentalPartnerRoleGuard } from './rental-partner-role.guard';
 
@@ -48,6 +48,18 @@ export class RentalPartnerPortalController {
     return this.portal.updateVehicle(req.user.id, id, dto);
   }
 
+  @Get('vehicles/:id')
+  @ApiOperation({ summary: 'Détail véhicule partenaire' })
+  getVehicle(@Request() req: { user: { id: string } }, @Param('id') id: string) {
+    return this.portal.getVehicle(req.user.id, id);
+  }
+
+  @Delete('vehicles/:id')
+  @ApiOperation({ summary: 'Retirer un véhicule du catalogue' })
+  deleteVehicle(@Request() req: { user: { id: string } }, @Param('id') id: string) {
+    return this.portal.deleteVehicle(req.user.id, id);
+  }
+
   @Post('vehicle-photo')
   @ApiOperation({ summary: 'Téléverser photo véhicule (base64)' })
   photo(@Request() req: { user: { id: string } }, @Body() dto: UploadPartnerVehiclePhotoDto) {
@@ -84,6 +96,16 @@ export class RentalPartnerPortalController {
     @Body() dto: PartnerLogisticsDto,
   ) {
     return this.portal.updateLogistics(req.user.id, id, dto);
+  }
+
+  @Post('bookings/:id/cash/confirm')
+  @ApiOperation({ summary: 'Confirmer paiement espèces avec le PIN passager' })
+  confirmCash(
+    @Request() req: { user: { id: string }; headers: { authorization?: string } },
+    @Param('id') id: string,
+    @Body() dto: PartnerConfirmCashDto,
+  ) {
+    return this.portal.confirmCashPayment(req.user.id, id, dto.pin, req.headers.authorization);
   }
 
   @Get('promos')

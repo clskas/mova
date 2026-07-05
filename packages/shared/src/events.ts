@@ -10,6 +10,7 @@ export const MOVA_EVENTS = {
   SERVICE_ASSIGNED: 'service.assigned',
   SERVICE_STATUS_UPDATED: 'service.status.updated',
   RENTAL_BOOKING: 'rental.booking',
+  RENTAL_PARTNER_VEHICLE: 'rental.partner.vehicle',
   INCIDENT_CREATED: 'incident.created',
   DRIVER_JOB_ALERT: 'driver.job.alert',
   SCHEDULED_REMINDER: 'scheduled.reminder',
@@ -76,6 +77,7 @@ export interface DeliveryStatusUpdatedPayload {
   type: string;
   status: string;
   restaurantName?: string;
+  restaurantOwnerUserId?: string;
 }
 
 export interface ServiceAssignedPayload {
@@ -150,4 +152,12 @@ export interface ErrandCreatedPayload {
   pickupLat: number;
   pickupLng: number;
   estimatedPriceCdf: number;
+}
+
+export interface RentalPartnerVehiclePayload {
+  vehicleId: string;
+  ownerUserId: string;
+  action: 'created' | 'updated' | 'deleted' | 'reviewed';
+  approvalStatus?: string;
+  isActive?: boolean;
 }

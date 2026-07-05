@@ -26,7 +26,7 @@ ThemeData buildMovaTheme() {
       backgroundColor: MovaColors.midnight,
       foregroundColor: MovaColors.white,
       elevation: 0,
-      centerTitle: false,
+      centerTitle: true,
       titleTextStyle: GoogleFonts.plusJakartaSans(
         fontSize: 18,
         fontWeight: FontWeight.w700,

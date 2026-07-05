@@ -224,6 +224,43 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
           const SizedBox(height: 24),
           Text('Recharger avec', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 12),
+          MovaCard(
+            margin: const EdgeInsets.only(bottom: 8),
+            onTap: _topUpLoading
+                ? null
+                : () async {
+                    final phone =
+                        await ref.read(apiClientProvider).loadUserPhone() ?? '+243900000010';
+                    await _topUp('MOCK', 50000, phone);
+                  },
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: MovaColors.violet.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.science_outlined, color: MovaColors.violet),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Recharge test (simulation)', style: TextStyle(fontWeight: FontWeight.w600)),
+                      Text(
+                        '+50 000 FC instantanés — mode MOCK_PAYMENTS',
+                        style: TextStyle(fontSize: 12, color: MovaColors.textSecondary),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.bolt, color: MovaColors.green),
+              ],
+            ),
+          ),
           ...MarketConfig.mobileMoneyProviders.map((p) => MovaCard(
                 margin: const EdgeInsets.only(bottom: 8),
                 onTap: _topUpLoading ? null : () => _showTopUpSheet(p),

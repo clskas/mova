@@ -1,10 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { PortalShell } from "@/components/PortalShell";
 import {
   fetchMenu,
-  fetchProfile,
   formatCdf,
   mediaUrl,
   saveMenu,
@@ -21,7 +19,6 @@ const emptyDraft = (): MenuItem => ({
 });
 
 export default function MenuPage() {
-  const [restaurantName, setRestaurantName] = useState<string>();
   const [items, setItems] = useState<MenuItem[]>([]);
   const [draft, setDraft] = useState<MenuItem>(emptyDraft);
   const [editIndex, setEditIndex] = useState<number | null>(null);
@@ -36,8 +33,7 @@ export default function MenuPage() {
   const load = useCallback(async () => {
     setError(null);
     try {
-      const [profile, menu] = await Promise.all([fetchProfile(), fetchMenu()]);
-      setRestaurantName(profile.name);
+      const menu = await fetchMenu();
       setItems(menu.menuItems ?? []);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur de chargement");
@@ -131,7 +127,7 @@ export default function MenuPage() {
   }
 
   return (
-    <PortalShell restaurantName={restaurantName}>
+    <>
       <input
         ref={fileRef}
         type="file"
@@ -275,6 +271,6 @@ export default function MenuPage() {
           </div>
         )}
       </div>
-    </PortalShell>
+    </>
   );
 }

@@ -1,5 +1,5 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { DeliveryType } from '@prisma/client';
+import { DeliveryType, RentalInquiryStatus } from '@prisma/client';
 import { INTERNAL_API_KEY, MovaErrorCode, MovaHttpException, serviceUrl } from '@mova/shared';
 import { fetchAuthUserBrief } from '../common/internal-lookup.util';
 import { PaymentInfoService } from '../internal/payment-info.service';
@@ -87,6 +87,20 @@ export class BillingReceiptService {
     if (info.userId !== userId) {
       throw new MovaHttpException(MovaErrorCode.AUTH_FORBIDDEN, HttpStatus.FORBIDDEN, 'Accès refusé à ce document.');
     }
+    if (referenceType.toUpperCase() === 'RENTAL') {
+      const allowed = new Set<string>([
+        RentalInquiryStatus.RETURNED,
+        RentalInquiryStatus.PAID,
+        RentalInquiryStatus.CLOSED,
+      ]);
+      if (!allowed.has(info.status)) {
+        throw new MovaHttpException(
+          MovaErrorCode.VALIDATION_ERROR,
+          undefined,
+          'Le reçu est disponible après restitution du véhicule.',
+        );
+      }
+    }
     return info;
   }
 
@@ -101,12 +115,13 @@ export class BillingReceiptService {
         ? this.mapPayment(await this.fetchRidePaymentDetail(referenceId))
         : this.mapPayment(await this.fetchPaymentDetail(type, referenceId));
 
-    const lines = await this.buildLines(type, referenceId, info.amountCdf);
+    const paid = payment?.status === 'COMPLETED';
+    const totalCdf = paid && payment ? payment.amountCdf : info.amountCdf;
+    const lines = await this.buildLines(type, referenceId, totalCdf);
     const discountCdf = lines.filter((l) => l.kind === 'discount').reduce((s, l) => s + Math.abs(l.amountCdf), 0);
-    const subtotalCdf = info.amountCdf + discountCdf;
+    const subtotalCdf = totalCdf + discountCdf;
     const promoCode = await this.resolvePromoCode(type, referenceId);
 
-    const paid = payment?.status === 'COMPLETED';
     return {
       receiptNumber: receiptNumberFrom(type, referenceId),
       documentType: paid ? 'RECEIPT' : 'INVOICE',
@@ -119,12 +134,14 @@ export class BillingReceiptService {
       lines,
       subtotalCdf,
       discountCdf,
-      totalCdf: info.amountCdf,
+      totalCdf,
       currency: 'CDF',
       promoCode,
       payment,
       footerNote: paid
-        ? 'Ce document atteste du paiement de votre prestation MOVA.'
+        ? type === 'RENTAL'
+          ? 'Ce document atteste du paiement. La caution indiquée est remboursée après restitution du véhicule.'
+          : 'Ce document atteste du paiement de votre prestation MOVA.'
         : 'Facture pro forma — en attente de paiement.',
     };
   }
@@ -194,11 +211,8 @@ export class BillingReceiptService {
     } else if (type === 'MOVING') {
       lines.push({ label: 'Déménagement', amountCdf: totalCdf, kind: 'item' });
     } else if (type === 'RENTAL') {
-      const r = await this.prisma.rentalInquiry.findUnique({ where: { id }, include: { vehicle: true } });
-      lines.push({ label: r?.vehicle?.name ?? 'Location véhicule', amountCdf: totalCdf + (r?.discountCdf ?? 0), kind: 'item' });
-      if (r?.discountCdf && r.discountCdf > 0) {
-        lines.push({ label: `Remise${r.promoCode ? ` (${r.promoCode})` : ''}`, amountCdf: r.discountCdf, kind: 'discount' });
-      }
+      lines.push(...(await this.buildRentalLines(id, totalCdf)));
+      return lines;
     } else if (type === 'SCHEDULED') {
       const s = await this.prisma.scheduledRide.findUnique({ where: { id } });
       lines.push({ label: 'Course planifiée', amountCdf: totalCdf + (s?.discountCdf ?? 0), kind: 'item' });
@@ -210,6 +224,57 @@ export class BillingReceiptService {
     }
 
     lines.push({ label: 'Total à payer', amountCdf: totalCdf, kind: 'total' });
+    return lines;
+  }
+
+  private rentalDays(startDate: Date, endDate: Date): number {
+    return Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / (24 * 3600 * 1000)));
+  }
+
+  private rentalHours(startDate: Date, endDate: Date): number {
+    return Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / (3600 * 1000)));
+  }
+
+  private async buildRentalLines(id: string, totalCdf: number): Promise<ReceiptLine[]> {
+    const r = await this.prisma.rentalInquiry.findUnique({ where: { id }, include: { vehicle: true } });
+    if (!r) {
+      return [
+        { label: 'Location véhicule', amountCdf: totalCdf, kind: 'item' },
+        { label: 'Total payé', amountCdf: totalCdf, kind: 'total' },
+      ];
+    }
+    const depositCdf = r.vehicle?.depositCdf ?? 0;
+    const discountCdf = r.discountCdf ?? 0;
+    const days = this.rentalDays(r.startDate, r.endDate);
+    const hours = r.rentalPeriod === 'HOURLY' ? this.rentalHours(r.startDate, r.endDate) : 0;
+    const vehicleLabel = r.vehicle?.name ?? r.vehicleType ?? 'Location véhicule';
+    const rentalPortionCdf = Math.max(0, totalCdf - depositCdf);
+    const durationLabel =
+      r.rentalPeriod === 'HOURLY'
+        ? `${hours} heure${hours > 1 ? 's' : ''}`
+        : `${days} jour${days > 1 ? 's' : ''}`;
+    const lines: ReceiptLine[] = [
+      {
+        label: `${vehicleLabel} · ${durationLabel}`,
+        amountCdf: rentalPortionCdf + discountCdf,
+        kind: 'item',
+      },
+    ];
+    if (depositCdf > 0) {
+      lines.push({
+        label: 'Caution remboursable (restituée à la fin)',
+        amountCdf: depositCdf,
+        kind: 'fee',
+      });
+    }
+    if (discountCdf > 0) {
+      lines.push({
+        label: `Remise${r.promoCode ? ` (${r.promoCode})` : ''}`,
+        amountCdf: discountCdf,
+        kind: 'discount',
+      });
+    }
+    lines.push({ label: 'Total payé', amountCdf: totalCdf, kind: 'total' });
     return lines;
   }
 

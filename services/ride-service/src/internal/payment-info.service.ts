@@ -8,6 +8,7 @@ import {
 } from '@prisma/client';
 import { MovaErrorCode, MovaHttpException, fromMobileRideStatus } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
+import { RentalService } from '../rental/rental.service';
 
 export type ServiceReferenceType = 'RIDE' | 'DELIVERY' | 'ERRAND' | 'MOVING' | 'RENTAL' | 'CARPOOL' | 'SCHEDULED';
 
@@ -25,7 +26,10 @@ export interface ServicePaymentInfo {
 
 @Injectable()
 export class PaymentInfoService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private rental: RentalService,
+  ) {}
 
   async getPaymentInfo(referenceType: string, referenceId: string): Promise<ServicePaymentInfo> {
     const type = referenceType.toUpperCase() as ServiceReferenceType;
@@ -118,18 +122,18 @@ export class PaymentInfoService {
   }
 
   private async rentalInfo(bookingId: string): Promise<ServicePaymentInfo> {
-    const inquiry = await this.prisma.rentalInquiry.findUnique({ where: { id: bookingId }, include: { vehicle: true } });
+    let inquiry = await this.prisma.rentalInquiry.findUnique({ where: { id: bookingId }, include: { vehicle: true } });
     if (!inquiry) throw new MovaHttpException(MovaErrorCode.RENTAL_INQUIRY_NOT_FOUND, HttpStatus.NOT_FOUND);
-    const ready =
-      inquiry.status === RentalInquiryStatus.IN_PROGRESS || inquiry.status === RentalInquiryStatus.RETURNED;
+    inquiry = await this.rental.ensureCompletionPinForPayment(inquiry);
     return {
       referenceType: 'RENTAL',
       referenceId: bookingId,
       userId: inquiry.userId,
       amountCdf: inquiry.totalCdf ?? inquiry.estimatedPriceCdf ?? 0,
       status: inquiry.status,
-      paymentReady: ready,
-      driverId: inquiry.driverId,
+      paymentReady: inquiry.status === RentalInquiryStatus.RETURNED,
+      driverId: inquiry.driverId ?? inquiry.vehicle?.ownerUserId ?? null,
+      cashPin: inquiry.completionPin,
       title: inquiry.vehicle?.name ?? inquiry.vehicleType,
     };
   }

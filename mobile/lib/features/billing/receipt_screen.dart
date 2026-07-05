@@ -22,12 +22,18 @@ class ReceiptScreen extends ConsumerStatefulWidget {
     this.serviceType,
     this.serviceId,
     this.showRatingAfter = false,
+    this.pendingCash = false,
+    this.completionPin,
+    this.amountCdf,
   }) : assert(rideId != null || (serviceType != null && serviceId != null));
 
   final String? rideId;
   final String? serviceType;
   final String? serviceId;
   final bool showRatingAfter;
+  final bool pendingCash;
+  final String? completionPin;
+  final int? amountCdf;
 
   String get referenceType => rideId != null ? 'RIDE' : serviceType!.toUpperCase();
   String get referenceId => rideId ?? serviceId!;
@@ -56,6 +62,13 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
   }
 
   Future<void> _load() async {
+    if (widget.pendingCash) {
+      setState(() {
+        _loading = false;
+        _error = null;
+      });
+      return;
+    }
     setState(() {
       _loading = true;
       _error = null;
@@ -213,9 +226,61 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
     final docLabel = receipt?['documentType'] == 'INVOICE' ? 'Facture' : 'Reçu de paiement';
 
     return MovaScreen(
-      title: docLabel,
+      title: widget.pendingCash ? 'Paiement espèces' : docLabel,
       child: _loading
           ? const Center(child: CircularProgressIndicator())
+          : widget.pendingCash
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    MovaCard(
+                      child: Column(
+                        children: [
+                          const Icon(Icons.payments_outlined, size: 48, color: MovaColors.green),
+                          const SizedBox(height: 12),
+                          Text(
+                            MarketConfig.formatCdf(widget.amountCdf ?? 0),
+                            style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: MovaColors.green),
+                          ),
+                          const SizedBox(height: 12),
+                          const Text(
+                            'Paiement espèces en attente',
+                            style: TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Remettez l\'argent au chauffeur, puis communiquez-lui le code ci-dessous. '
+                            'Le reçu sera disponible après confirmation.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: MovaColors.textSecondary, fontSize: 13),
+                          ),
+                          if (widget.completionPin != null && widget.completionPin!.isNotEmpty) ...[
+                            const SizedBox(height: 16),
+                            Text(
+                              widget.completionPin!,
+                              style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, letterSpacing: 8),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    MovaButton(label: 'Retour à l\'accueil', onPressed: _continue),
+                    if (widget.showRatingAfter && widget.rideId != null) ...[
+                      const SizedBox(height: 8),
+                      MovaButton(
+                        label: 'Noter le chauffeur',
+                        isSecondary: true,
+                        onPressed: () {
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(builder: (_) => RatingScreen(rideId: widget.rideId!)),
+                          );
+                        },
+                      ),
+                    ],
+                  ],
+                )
           : _error != null
               ? MovaErrorBanner(message: _error!, onRetry: _load)
               : Column(
@@ -233,11 +298,18 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
                           Text(receipt?['serviceTypeLabel']?.toString() ?? ''),
                           Text(receipt?['serviceLabel']?.toString() ?? '', style: const TextStyle(color: MovaColors.textSecondary)),
                           const Divider(height: 24),
-                          ...lines.map((line) {
+                          ...lines.where((line) {
                             final row = line is Map ? line : {};
+                            final amount = row['amountCdf'] as int? ?? 0;
+                            final kind = row['kind']?.toString();
+                            if (kind == 'item' && amount == 0) return false;
+                            return true;
+                          }).map((line) {
+                            final row = line is Map ? Map<String, dynamic>.from(line as Map) : <String, dynamic>{};
                             final label = row['label']?.toString() ?? '';
                             final amount = row['amountCdf'] as int? ?? 0;
                             final isDiscount = row['kind'] == 'discount';
+                            final isTotal = row['kind'] == 'total';
                             return Padding(
                               padding: const EdgeInsets.symmetric(vertical: 4),
                               child: Row(
@@ -246,8 +318,8 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
                                   Text(
                                     '${isDiscount ? '−' : ''}${MarketConfig.formatCdf(amount.abs())}',
                                     style: TextStyle(
-                                      fontWeight: row['kind'] == 'total' ? FontWeight.bold : FontWeight.normal,
-                                      color: row['kind'] == 'total' ? MovaColors.green : null,
+                                      fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
+                                      color: isTotal ? MovaColors.green : null,
                                     ),
                                   ),
                                 ],

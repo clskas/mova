@@ -108,6 +108,13 @@ export const MARKET_RDC = {
 
   /** Location véhicule — assurance, options et remises. */
   rental: {
+    /** Durée location à l'heure (moins de 24 h). */
+    minHourlyDurationHours: 1,
+    maxHourlyDurationHours: 23,
+    defaultHourlyDurationHours: 4,
+    /** Tarif horaire par défaut = tarif journalier ÷ ce diviseur (ex. 8 h équivalent journée). */
+    hoursPerDayForHourlyRate: 8,
+    limitedMileageKmPerHour: 15,
     weeklyDiscountPct: 10,
     defaultWeeklyDiscountPct: 10,
     insuranceTiers: {

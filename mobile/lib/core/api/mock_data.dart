@@ -796,14 +796,17 @@ abstract final class MockData {
   static Map<String, dynamic> rentalEstimate(Map<String, dynamic> body) {
     final start = DateTime.parse(body['startDate']?.toString() ?? DateTime.now().toIso8601String());
     final end = DateTime.parse(body['endDate']?.toString() ?? start.add(const Duration(days: 1)).toIso8601String());
-    final days = end.difference(start).inDays.clamp(1, 30);
+    final period = body['rentalPeriod']?.toString().toUpperCase() ?? 'DAILY';
+    final days = period == 'HOURLY' ? 0 : end.difference(start).inDays.clamp(1, 30);
+    final hours = period == 'HOURLY' ? end.difference(start).inHours.clamp(1, 23) : 0;
     final vehicleId = body['vehicleId']?.toString();
     final vehicle = rentalVehicles().firstWhere(
       (v) => v['id'] == vehicleId,
       orElse: () => rentalVehicles().first,
     );
     var daily = vehicle['dailyRateCdf'] as int? ?? 45000;
-    var rentalFee = daily * days;
+    var hourly = vehicle['hourlyRateCdf'] as int? ?? (daily / 8).ceil();
+    var rentalFee = period == 'HOURLY' ? hourly * hours : daily * days;
     var weeklyDiscount = 0;
     if (body['rentalPeriod'] == 'WEEKLY' && days >= 7) {
       weeklyDiscount = (rentalFee * 0.1).round();
@@ -828,6 +831,8 @@ abstract final class MockData {
     final total = subtotal + deposit;
     return {
       'days': days,
+      'hours': hours,
+      'rentalPeriod': period,
       'rentalFeeCdf': rentalFee,
       'depositCdf': deposit,
       'estimatedPriceCdf': total,

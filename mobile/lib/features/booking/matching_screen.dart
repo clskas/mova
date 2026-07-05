@@ -10,6 +10,7 @@ import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import 'tracking_screen.dart';
+import '../passenger/passenger_alert_service.dart';
 
 class MatchingScreen extends ConsumerStatefulWidget {
   const MatchingScreen({
@@ -41,6 +42,7 @@ class _MatchingScreenState extends ConsumerState<MatchingScreen>
   DateTime? _lastSearchAt;
   Timer? _pollTimer;
   Timer? _rescanTimer;
+  String? _cancelFeeLabel;
 
   @override
   void initState() {
@@ -49,7 +51,21 @@ class _MatchingScreenState extends ConsumerState<MatchingScreen>
       vsync: this,
       duration: const Duration(milliseconds: 1500),
     )..repeat();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _search());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _search();
+      _loadCancelInfo();
+    });
+  }
+
+  Future<void> _loadCancelInfo() async {
+    final api = ref.read(apiClientProvider);
+    final result = await api.getRide(widget.rideId);
+    if (!mounted) return;
+    if (result case Success(:final data)) {
+      setState(() {
+        _cancelFeeLabel = data['cancellationFeeFormatted']?.toString();
+      });
+    }
   }
 
   @override
@@ -146,6 +162,10 @@ class _MatchingScreenState extends ConsumerState<MatchingScreen>
   }
 
   void _goToTracking() {
+    PassengerAlertService.notify(
+      title: 'Chauffeur trouvé',
+      body: 'Votre chauffeur est en route.',
+    );
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
@@ -162,9 +182,12 @@ class _MatchingScreenState extends ConsumerState<MatchingScreen>
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Annuler la course ?'),
-        content: const Text(
-          'Annulation gratuite avant l\'arrivée du chauffeur. '
-          'Des frais de 2 000 FC peuvent s\'appliquer après acceptation.',
+        content: Text(
+          _cancelFeeLabel != null && _cancelFeeLabel!.isNotEmpty
+              ? 'Annulation gratuite avant l\'arrivée du chauffeur. '
+                  'Des frais de $_cancelFeeLabel peuvent s\'appliquer après acceptation.'
+              : 'Annulation gratuite avant l\'arrivée du chauffeur. '
+                  'Des frais peuvent s\'appliquer après acceptation.',
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Non')),

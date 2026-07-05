@@ -15,7 +15,7 @@ const RECEIPT_ELIGIBLE: Partial<Record<HistoryType, (status: string, item: { isP
   EXPRESS: (s) => s === 'DELIVERED',
   ERRAND: (s) => s === 'COMPLETED',
   MOVING: (s, i) => s === 'COMPLETED' && (i.isPaid === true || i.isPaid === undefined),
-  RENTAL: (s) => ['CONFIRMED', 'IN_PROGRESS', 'RETURNED', 'CLOSED'].includes(s),
+  RENTAL: (s) => ['CONFIRMED', 'IN_PROGRESS', 'RETURNED', 'PAID', 'CLOSED'].includes(s),
   SCHEDULED: (s) => s === 'COMPLETED',
   CARPOOL: (s) => s === 'COMPLETED',
 };

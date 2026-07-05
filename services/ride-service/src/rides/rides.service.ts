@@ -1016,7 +1016,13 @@ export class RidesService {
       }
       case 'RENTAL': {
         const r = await this.prisma.rentalInquiry.findUnique({ where: { id: referenceId } });
-        if (!r || !r.driverId || (r.status !== RentalInquiryStatus.RETURNED && r.status !== RentalInquiryStatus.IN_PROGRESS)) {
+        if (
+          !r ||
+          !r.driverId ||
+          (r.status !== RentalInquiryStatus.RETURNED &&
+            r.status !== RentalInquiryStatus.PAID &&
+            r.status !== RentalInquiryStatus.IN_PROGRESS)
+        ) {
           return { referenceType: type, referenceId, driverId: r?.driverId ?? null, driverNetCdf: 0 };
         }
         const rule = await this.commission.get(CommissionServiceType.RENTAL);

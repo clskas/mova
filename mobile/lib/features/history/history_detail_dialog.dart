@@ -9,7 +9,9 @@ import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
 import '../moving/moving_tracking_screen.dart';
 import '../rides/scheduled_ride_screen.dart';
+import '../booking/booking_screen.dart';
 import '../booking/tracking_screen.dart';
+import '../rating/rating_screen.dart';
 import '../billing/billing_util.dart';
 import '../billing/receipt_screen.dart';
 
@@ -241,6 +243,34 @@ Future<void> showHistoryDetailDialog(
             },
             child: const Text('Payer la course'),
           ),
+        if (type == 'RIDE' && status == 'COMPLETED' && id.isNotEmpty)
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => BookingScreen(
+                    initialPickupAddress: meta['pickupAddress']?.toString(),
+                    initialDropoffAddress: meta['dropoffAddress']?.toString(),
+                    initialVehicleType: meta['vehicleType']?.toString(),
+                  ),
+                ),
+              );
+            },
+            child: const Text('Commander à nouveau'),
+          ),
+        if (type == 'RIDE' && status == 'COMPLETED' && id.isNotEmpty)
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => RatingScreen(rideId: id)),
+              );
+            },
+            child: const Text('Noter le chauffeur'),
+          ),
         if (type == 'MOVING' && id.isNotEmpty)
           TextButton(
             onPressed: () {
@@ -269,6 +299,25 @@ Future<void> showHistoryDetailDialog(
               );
             },
             child: const Text('Mes réservations'),
+          ),
+        if (type == 'SCHEDULED' &&
+            status == 'IN_PROGRESS' &&
+            (live?['linkedRideId'] ?? live?['rideId'])?.toString().isNotEmpty == true)
+          FilledButton(
+            onPressed: () {
+              final trackId = (live?['linkedRideId'] ?? live?['rideId']).toString();
+              Navigator.pop(ctx);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => TrackingScreen(
+                    rideId: trackId,
+                    estimatedFareCdf: item['priceCdf'] as int? ?? live?['estimatedPriceCdf'] as int? ?? 0,
+                  ),
+                ),
+              );
+            },
+            child: const Text('Suivre en direct'),
           ),
         if (historyItemHasReceipt(item))
           FilledButton.icon(

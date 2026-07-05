@@ -192,7 +192,7 @@ export class HistoryService {
           id: r.id,
           status: r.status,
           title: r.vehicle?.name ?? r.vehicleType,
-          priceCdf: r.estimatedPriceCdf ?? 0,
+          priceCdf: r.totalCdf ?? r.estimatedPriceCdf ?? 0,
           createdAt: r.createdAt.toISOString(),
           meta: { startDate: r.startDate.toISOString(), endDate: r.endDate.toISOString() },
         });

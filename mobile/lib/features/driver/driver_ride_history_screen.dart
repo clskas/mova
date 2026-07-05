@@ -4,6 +4,7 @@ import '../../core/api/api_client.dart';
 import '../../core/config/market_config.dart';
 import '../../core/error/result.dart';
 import '../../core/billing/driver_earnings_display.dart';
+import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import 'active_ride_screen.dart';

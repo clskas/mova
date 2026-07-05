@@ -1,10 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { PortalShell } from "@/components/PortalShell";
+import { usePartnerLiveRegister } from "@/components/PartnerLiveProvider";
 import {
   createPromo,
-  fetchProfile,
   fetchPromos,
   formatCdf,
   updatePromo,
@@ -27,7 +26,6 @@ const emptyForm = () => ({
 });
 
 export default function PromosPage() {
-  const [partnerName, setPartnerName] = useState<string>();
   const [promos, setPromos] = useState<PartnerPromo[]>([]);
   const [form, setForm] = useState(emptyForm);
   const [loading, setLoading] = useState(true);
@@ -38,8 +36,7 @@ export default function PromosPage() {
   const load = useCallback(async () => {
     setError(null);
     try {
-      const [profile, data] = await Promise.all([fetchProfile(), fetchPromos()]);
-      setPartnerName(profile.name ?? "Partenaire location");
+      const data = await fetchPromos();
       setPromos(data.promos ?? []);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur de chargement");
@@ -51,6 +48,8 @@ export default function PromosPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  usePartnerLiveRegister(load);
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -86,8 +85,7 @@ export default function PromosPage() {
   }
 
   return (
-    <PortalShell partnerName={partnerName}>
-      <div className="space-y-6">
+    <div className="space-y-6">
         <div>
           <h2 className="text-xl font-semibold text-[#1A1A2E]">Codes promo location</h2>
           <p className="text-sm text-gray-600 mt-1">
@@ -209,7 +207,6 @@ export default function PromosPage() {
             </ul>
           )}
         </section>
-      </div>
-    </PortalShell>
+    </div>
   );
 }

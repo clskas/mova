@@ -11,6 +11,7 @@ import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import '../booking/payment_screen.dart';
+import '../billing/receipt_screen.dart';
 
 class RentalBookingDetailScreen extends ConsumerStatefulWidget {
   const RentalBookingDetailScreen({
@@ -202,15 +203,21 @@ class _RentalBookingDetailScreenState extends ConsumerState<RentalBookingDetailS
       );
     }
 
-    final total = b['totalCdf'] as int? ?? b['estimatedPriceCdf'] as int? ?? b['priceCdf'] as int? ?? 0;
+    final total = b['displayAmountCdf'] as int? ??
+        b['totalCdf'] as int? ??
+        b['estimatedPriceCdf'] as int? ??
+        b['priceCdf'] as int? ??
+        0;
     final ownerPhone = b['ownerContactPhone']?.toString();
     final statusLabel = b['statusLabel']?.toString() ?? b['status']?.toString() ?? 'En attente';
     final status = b['status']?.toString().toUpperCase();
+    final isPaid = b['isPaid'] == true || status == 'PAID';
     final canConfirmHandover = b['canConfirmHandover'] == true || status == 'CONFIRMED';
     final canCancel = CancelEligibility.rental(b);
-    final paymentReady = b['paymentReady'] == true || status == 'RETURNED';
+    final paymentReady =
+        !isPaid && (b['paymentReady'] == true || status == 'RETURNED');
     final statusColor = switch (status) {
-      'CONFIRMED' || 'IN_PROGRESS' || 'RETURNED' => MovaColors.green,
+      'CONFIRMED' || 'IN_PROGRESS' || 'RETURNED' || 'PAID' => MovaColors.green,
       'CONTACTED' => MovaColors.violet,
       'CLOSED' => Colors.red.shade700,
       _ => MovaColors.textSecondary,
@@ -253,7 +260,10 @@ class _RentalBookingDetailScreenState extends ConsumerState<RentalBookingDetailS
                   style: const TextStyle(color: MovaColors.textSecondary),
                 ),
                 if (b['remainingLabel'] != null &&
-                    (status == 'CONFIRMED' || status == 'IN_PROGRESS' || status == 'RETURNED')) ...[
+                    (status == 'CONFIRMED' ||
+                        status == 'IN_PROGRESS' ||
+                        status == 'RETURNED' ||
+                        status == 'PAID')) ...[
                   const SizedBox(height: 6),
                   Row(
                     children: [
@@ -346,6 +356,25 @@ class _RentalBookingDetailScreenState extends ConsumerState<RentalBookingDetailS
                       serviceType: 'RENTAL',
                       serviceId: widget.bookingId,
                       amountCdf: total,
+                      completionPin: b['completionPin']?.toString(),
+                    ),
+                  ),
+                ).then((_) => _loadBooking());
+              },
+            ),
+          ],
+          if (isPaid) ...[
+            const SizedBox(height: 16),
+            MovaButton(
+              label: 'Voir le reçu',
+              icon: Icons.receipt_long_outlined,
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ReceiptScreen(
+                      serviceType: 'RENTAL',
+                      serviceId: widget.bookingId,
                     ),
                   ),
                 );

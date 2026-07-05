@@ -957,6 +957,7 @@ export class DeliveriesService {
       type: delivery.type,
       status,
       restaurantName: updated.restaurant?.name,
+      restaurantOwnerUserId: updated.restaurant?.ownerUserId ?? undefined,
     });
     if (status === DeliveryStatus.READY_FOR_PICKUP && !updated.driverId) {
       await this.alertDeliveryOffer(updated);
@@ -1089,6 +1090,7 @@ export class DeliveriesService {
       type: delivery.type,
       status: updated.status,
       restaurantName: updated.restaurant?.name,
+      restaurantOwnerUserId: updated.restaurant?.ownerUserId ?? undefined,
     });
     return { delivery: formatted, driverId: updated.driverId, status: updated.status };
   }
@@ -1122,6 +1124,7 @@ export class DeliveriesService {
       type: delivery.type,
       status,
       restaurantName: updated.restaurant?.name,
+      restaurantOwnerUserId: updated.restaurant?.ownerUserId ?? undefined,
     });
     if (status === DeliveryStatus.READY_FOR_PICKUP && !updated.driverId) {
       await this.alertDeliveryOffer(updated);

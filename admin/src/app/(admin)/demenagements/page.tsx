@@ -5,11 +5,13 @@ import {
   assignMovingDriver,
   cancelMovingRequest,
   fetchDriversForAssignment,
+  fetchGpsTrace,
   fetchMovingRequests,
   formatCdf,
   formatDate,
   updateMovingStatus,
   type AdminDriver,
+  type GpsPoint,
   type MovingRequest,
 } from "@/lib/api";
 import { filterDriversForMoving } from "@/lib/driver-assignment";
@@ -17,6 +19,8 @@ import { useAdmin } from "@/components/AdminProvider";
 import { AssignDriverPanel } from "@/components/AssignDriverPanel";
 import { ContactBlock } from "@/components/ContactActions";
 import { DriverVehiclePreview } from "@/components/DriverVehiclePreview";
+import { GpsTraceMap } from "@/components/GpsTraceMap";
+import { useLiveGpsTrace } from "@/hooks/useLiveGpsTrace";
 import {
   BtnDanger,
   BtnPrimary,
@@ -54,6 +58,38 @@ export default function DemenagementsPage() {
   const [rowAssign, setRowAssign] = useState<Record<string, string>>({});
   const [assigningId, setAssigningId] = useState<string | null>(null);
   const [cancelTarget, setCancelTarget] = useState<MovingRequest | null>(null);
+  const [gpsTrace, setGpsTrace] = useState<GpsPoint[]>([]);
+
+  const movingActive =
+    !!selected?.status && !["COMPLETED", "CANCELLED"].includes(selected.status);
+  const { points: liveTrace, livePosition, socketLive } = useLiveGpsTrace({
+    type: "moving",
+    id: selected?.id,
+    active: movingActive,
+    seed: gpsTrace,
+  });
+
+  useEffect(() => {
+    if (!selected?.id) {
+      setGpsTrace([]);
+      return;
+    }
+    let cancelled = false;
+    const loadTrace = async () => {
+      try {
+        const trace = await fetchGpsTrace("moving", selected.id).catch(() => ({ points: [] as GpsPoint[] }));
+        if (!cancelled) setGpsTrace(trace.points ?? []);
+      } catch {
+        if (!cancelled) setGpsTrace([]);
+      }
+    };
+    loadTrace();
+    const timer = movingActive ? setInterval(loadTrace, 15000) : undefined;
+    return () => {
+      cancelled = true;
+      if (timer) clearInterval(timer);
+    };
+  }, [selected?.id, selected?.status, movingActive]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -233,6 +269,22 @@ export default function DemenagementsPage() {
                 driver={drivers.find((d) => d.userId === selected.driverId)}
                 title="Engin assigné au déménagement"
               />
+            )}
+
+            <GpsTraceMap
+              title="Trace GPS équipe déménagement"
+              points={movingActive ? liveTrace : gpsTrace}
+              livePosition={movingActive ? livePosition : null}
+              pickupLabel={selected.pickupAddress}
+              dropoffLabel={selected.dropoffAddress}
+              live={movingActive}
+            />
+            {movingActive && (
+              <p className="text-xs text-gray-500">
+                {socketLive
+                  ? "Suivi WebSocket actif — position mise à jour en direct."
+                  : "Connexion temps réel en cours… actualisation HTTP toutes les 15 s."}
+              </p>
             )}
 
             {!readOnly && (

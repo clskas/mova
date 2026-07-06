@@ -68,7 +68,7 @@ class _DeliveryOfferScreenState extends ConsumerState<DeliveryOfferScreen> {
       if (!mounted) return;
       if (_countdown <= 0) {
         _timer?.cancel();
-        Navigator.pop(context);
+        _reject();
         return;
       }
       setState(() => _countdown--);
@@ -120,6 +120,14 @@ class _DeliveryOfferScreenState extends ConsumerState<DeliveryOfferScreen> {
   void dispose() {
     _timer?.cancel();
     super.dispose();
+  }
+
+  Future<void> _reject() async {
+    _timer?.cancel();
+    if (_deliveryId.isNotEmpty) {
+      await ref.read(apiClientProvider).rejectDelivery(_deliveryId);
+    }
+    if (mounted) Navigator.pop(context);
   }
 
   Future<void> _accept() async {
@@ -295,7 +303,7 @@ class _DeliveryOfferScreenState extends ConsumerState<DeliveryOfferScreen> {
           MovaButton(
             label: 'Refuser',
             isSecondary: true,
-            onPressed: _loading ? null : () => Navigator.pop(context),
+            onPressed: _loading ? null : _reject,
           ),
         ],
       ),

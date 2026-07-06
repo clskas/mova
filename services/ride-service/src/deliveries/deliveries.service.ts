@@ -546,6 +546,47 @@ export class DeliveriesService {
     return this.updateStatus(id, DeliveryStatus.CANCELLED, userId);
   }
 
+  private static readonly ACTIVE_PASSENGER_STATUSES: DeliveryStatus[] = [
+    DeliveryStatus.PENDING,
+    DeliveryStatus.RESTAURANT_CONFIRMED,
+    DeliveryStatus.READY_FOR_PICKUP,
+    DeliveryStatus.PICKED_UP,
+    DeliveryStatus.IN_TRANSIT,
+  ];
+
+  /** Livraison active du passager pour reprise après fermeture de l'app. */
+  async getActiveDelivery(passengerId: string) {
+    const delivery = await this.prisma.delivery.findFirst({
+      where: {
+        userId: passengerId,
+        status: { in: DeliveriesService.ACTIVE_PASSENGER_STATUSES },
+      },
+      orderBy: { createdAt: 'desc' },
+      include: { restaurant: true, events: { orderBy: { createdAt: 'asc' } } },
+    });
+    if (!delivery) return { delivery: null };
+    const courier = delivery.driverId ? await this.fetchCourierProfile(delivery.driverId) : null;
+    return { delivery: formatParcelDelivery(delivery, courier) };
+  }
+
+  async rejectDelivery(deliveryId: string, driverUserId: string) {
+    const delivery = await this.prisma.delivery.findUnique({ where: { id: deliveryId } });
+    if (!delivery) throw new MovaHttpException(MovaErrorCode.DELIVERY_NOT_FOUND, HttpStatus.NOT_FOUND);
+    if (delivery.driverId) {
+      throw new MovaHttpException(MovaErrorCode.DELIVERY_INVALID_STATUS);
+    }
+    const rejectable =
+      (delivery.type !== DeliveryType.FOOD && delivery.status === DeliveryStatus.PENDING) ||
+      (delivery.type === DeliveryType.FOOD && delivery.status === DeliveryStatus.READY_FOR_PICKUP);
+    if (!rejectable) {
+      throw new MovaHttpException(MovaErrorCode.DELIVERY_INVALID_STATUS);
+    }
+    await this.prisma.deliveryEvent.create({
+      data: { deliveryId, event: 'DRIVER_REJECTED', metadata: { driverUserId } },
+    });
+    return { success: true, deliveryId };
+  }
+
   async getRestaurant(id: string) {
     const restaurant = await this.prisma.restaurant.findUnique({ where: { id } });
     if (!restaurant || !restaurant.isActive) throw new MovaHttpException(MovaErrorCode.RESTAURANT_NOT_FOUND, HttpStatus.NOT_FOUND);
@@ -801,6 +842,7 @@ export class DeliveriesService {
       take: 30,
       include: {
         restaurant: { select: { id: true, name: true, cuisine: true, lat: true, lng: true, address: true } },
+        events: { where: { event: 'DRIVER_REJECTED' } },
       },
     });
 
@@ -817,6 +859,14 @@ export class DeliveriesService {
       })
       .filter((t): t is VehicleTypeValue => t != null);
     const offers = deliveries
+      .filter((d) => {
+        const rejected = d.events.some(
+          (e) =>
+            e.event === 'DRIVER_REJECTED' &&
+            (e.metadata as { driverUserId?: string })?.driverUserId === driverUserId,
+        );
+        return !rejected;
+      })
       .map((d) => {
         const pickupLat = d.pickupLat ?? d.restaurant?.lat ?? 0;
         const pickupLng = d.pickupLng ?? d.restaurant?.lng ?? 0;

@@ -17,16 +17,19 @@ import '../booking/matching_screen.dart';
 import '../booking/tracking_screen.dart';
 import '../carpool/carpool_screen.dart';
 import '../delivery/delivery_hub_screen.dart';
+import '../delivery/food_tracking_screen.dart';
+import '../delivery/parcel_tracking_screen.dart';
 import '../rides/scheduled_ride_screen.dart';
 import '../moving/moving_screen.dart';
 import '../rental/rental_screen.dart';
+import '../subscriptions/subscriptions_screen.dart';
 import '../wallet/wallet_screen.dart';
 import '../help/help_screen.dart';
 import '../profile/profile_screen.dart';
 import '../history/history_screen.dart';
 import 'service_card.dart';
 
-enum _HomeMenuAction { wallet, history, help, logout }
+enum _HomeMenuAction { wallet, subscriptions, history, help, logout }
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -38,6 +41,7 @@ class HomeScreen extends ConsumerStatefulWidget {
 class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObserver {
   Map<String, dynamic>? _user;
   Map<String, dynamic>? _activeRide;
+  Map<String, dynamic>? _activeDelivery;
 
   @override
   void initState() {
@@ -45,6 +49,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     WidgetsBinding.instance.addObserver(this);
     _loadUser();
     _loadActiveRide();
+    _loadActiveDelivery();
   }
 
   @override
@@ -62,6 +67,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
       ServiceAreaGps.sync(ref);
       _loadUser(forceRefresh: true);
       _loadActiveRide();
+      _loadActiveDelivery();
     }
   }
 
@@ -73,6 +79,54 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     if (result case Success(:final data)) {
       setState(() => _user = data);
     }
+  }
+
+  Future<void> _loadActiveDelivery() async {
+    final api = ref.read(apiClientProvider);
+    final result = await api.getActiveDelivery();
+    if (!mounted) return;
+    if (result case Success(:final data)) {
+      setState(() => _activeDelivery = data);
+    }
+  }
+
+  void _resumeActiveDelivery() {
+    final delivery = _activeDelivery;
+    if (delivery == null) return;
+    final id = delivery['id']?.toString();
+    if (id == null || id.isEmpty) return;
+    final type = delivery['type']?.toString().toUpperCase() ?? 'PARCEL';
+    final Widget screen;
+    if (type == 'FOOD') {
+      screen = FoodTrackingScreen(
+        orderId: id,
+        restaurantName: delivery['restaurantName']?.toString() ??
+            delivery['restaurant']?['name']?.toString() ??
+            'Restaurant',
+        totalCdf: (delivery['priceCdf'] ?? delivery['estimatedPriceCdf'] ?? 0) as int,
+        deliveryAddress: delivery['dropoffAddress']?.toString() ??
+            delivery['deliveryAddress']?.toString(),
+      );
+    } else {
+      screen = ParcelTrackingScreen(parcelId: id);
+    }
+    Navigator.push(context, MaterialPageRoute(builder: (_) => screen))
+        .then((_) => _loadActiveDelivery());
+  }
+
+  String _activeDeliveryLabel() {
+    final delivery = _activeDelivery;
+    if (delivery == null) return '';
+    final status = delivery['status']?.toString().toUpperCase() ?? '';
+    final type = delivery['type']?.toString().toUpperCase() ?? '';
+    final prefix = type == 'FOOD' ? 'Commande repas' : 'Livraison';
+    return switch (status) {
+      'IN_TRANSIT' => '$prefix — livreur en route',
+      'PICKED_UP' => '$prefix — colis pris en charge',
+      'READY_FOR_PICKUP' => '$prefix — prête pour le livreur',
+      'RESTAURANT_CONFIRMED' => '$prefix — en préparation',
+      _ => '$prefix en cours',
+    };
   }
 
   Future<void> _loadActiveRide() async {
@@ -162,6 +216,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
             switch (action) {
               case _HomeMenuAction.wallet:
                 _open(context, const WalletScreen());
+              case _HomeMenuAction.subscriptions:
+                _open(context, const SubscriptionsScreen());
               case _HomeMenuAction.history:
                 _open(context, const HistoryScreen());
               case _HomeMenuAction.help:
@@ -189,6 +245,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
               child: ListTile(
                 leading: Icon(Icons.account_balance_wallet_outlined),
                 title: Text('Wallet'),
+                contentPadding: EdgeInsets.zero,
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+            PopupMenuItem(
+              value: _HomeMenuAction.subscriptions,
+              child: ListTile(
+                leading: Icon(Icons.card_membership_outlined),
+                title: Text('MOVA Plus'),
                 contentPadding: EdgeInsets.zero,
                 visualDensity: VisualDensity.compact,
               ),
@@ -270,6 +335,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
         onRefresh: () async {
           await _loadUser(forceRefresh: true);
           await _loadActiveRide();
+          await _loadActiveDelivery();
         },
         child: SingleChildScrollView(
           physics: kMovaScrollPhysics,
@@ -336,7 +402,64 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                             'Reprendre',
                             style: TextStyle(
                               color: MovaColors.violet,
-                              fontWeight: FontWeight.bold,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          if (_activeDelivery != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Material(
+                color: MovaColors.orange,
+                borderRadius: BorderRadius.circular(14),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(14),
+                  onTap: _resumeActiveDelivery,
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.local_shipping_outlined, color: MovaColors.white),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Livraison en cours',
+                                style: TextStyle(
+                                  color: MovaColors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                _activeDeliveryLabel(),
+                                style: const TextStyle(color: MovaColors.white, fontSize: 13),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: MovaColors.white,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: const Text(
+                            'Reprendre',
+                            style: TextStyle(
+                              color: MovaColors.orange,
+                              fontWeight: FontWeight.w600,
                               fontSize: 13,
                             ),
                           ),

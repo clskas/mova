@@ -313,6 +313,12 @@ class ApiClient {
     if (path == '/deliveries/offers' && method == 'GET') {
       return Success({'offers': MockData.deliveryOffers()});
     }
+    if (path == '/deliveries/active' && method == 'GET') {
+      return const Success({'delivery': null});
+    }
+    if (RegExp(r'^/deliveries/[^/]+/reject$').hasMatch(path) && method == 'POST') {
+      return const Success({'success': true});
+    }
     if (path.contains('/deliveries/history') ||
         (path.startsWith('/deliveries/') && method == 'GET' && !path.contains('restaurants'))) {
       final id = path.split('/').last.split('?').first;
@@ -357,6 +363,12 @@ class ApiClient {
     if (path == '/deliveries/food' && method == 'POST') {
       return Success({'delivery': MockData.createFoodOrder(body ?? {}), 'order': MockData.createFoodOrder(body ?? {})});
     }
+    if (path == '/deliveries/food/multi' && method == 'POST') {
+      return Success({'delivery': MockData.createFoodMultiOrder(body ?? {}), 'order': MockData.createFoodMultiOrder(body ?? {})});
+    }
+    if (path.contains('/deliveries/food/multi/estimate')) {
+      return Success(MockData.foodMultiEstimate(body ?? {}));
+    }
     if (path.contains('/deliveries/food/estimate')) {
       return Success(MockData.foodEstimate(body ?? {}));
     }
@@ -377,6 +389,18 @@ class ApiClient {
     }
     if (path == '/wallet') {
       return Success(MockData.wallet());
+    }
+    if (path.contains('/subscriptions/plans')) {
+      return Success(MockData.subscriptionPlans());
+    }
+    if (path.contains('/subscriptions/mine')) {
+      return Success(MockData.subscriptionMine());
+    }
+    if (path.contains('/subscriptions/subscribe') && method == 'POST') {
+      return Success(MockData.subscribePlan(body?['planId']?.toString() ?? 'plan-basic'));
+    }
+    if (path.contains('/subscriptions/cancel') && method == 'POST') {
+      return const Success({'success': true, 'status': 'CANCELLED'});
     }
     if (path.contains('/wallet/top-up') || path.contains('/wallet/topup')) {
       return Success(MockData.walletTopUp(body ?? {}));
@@ -858,6 +882,21 @@ class ApiClient {
     }
   }
 
+  /// Livraison active du passager (null si aucune).
+  Future<Result<Map<String, dynamic>?>> getActiveDelivery() async {
+    if (isMockMode) return const Success(null);
+    final result = await get('/deliveries/active');
+    switch (result) {
+      case Success(:final data):
+        final delivery = data['delivery'];
+        if (delivery is Map<String, dynamic>) return Success(delivery);
+        if (delivery is Map) return Success(Map<String, dynamic>.from(delivery));
+        return const Success(null);
+      case Failure(:final error):
+        return Failure(error);
+    }
+  }
+
   /// Course terminée non payée (null si aucune).
   Future<Result<Map<String, dynamic>?>> getUnpaidRide() async {
     if (isMockMode) return const Success(null);
@@ -1065,6 +1104,10 @@ class ApiClient {
       Success(:final data) => Success(data['delivery'] as Map<String, dynamic>? ?? data),
       Failure(:final error) => Failure(error),
     };
+  }
+
+  Future<Result<Map<String, dynamic>>> rejectDelivery(String deliveryId) async {
+    return post('/deliveries/$deliveryId/reject', {});
   }
 
   Future<Result<Map<String, dynamic>>> updateDeliveryStatus(

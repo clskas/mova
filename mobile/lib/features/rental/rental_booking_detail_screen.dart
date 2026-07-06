@@ -12,6 +12,7 @@ import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import '../booking/payment_screen.dart';
 import '../billing/receipt_screen.dart';
+import '../chat/rental_chat_screen.dart';
 
 class RentalBookingDetailScreen extends ConsumerStatefulWidget {
   const RentalBookingDetailScreen({
@@ -333,6 +334,25 @@ class _RentalBookingDetailScreenState extends ConsumerState<RentalBookingDetailS
               onPressed: () => _callOwner(ownerPhone),
               icon: const Icon(Icons.phone_outlined),
               label: Text('Propriétaire · $ownerPhone'),
+            ),
+          ],
+          if (b['inquiryId'] != null) ...[
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => RentalChatScreen(
+                      inquiryId: b['inquiryId'].toString(),
+                      myRole: 'passenger',
+                      peerLabel: 'Loueur',
+                    ),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.chat_bubble_outline),
+              label: const Text('Contacter le loueur'),
             ),
           ],
           if (canConfirmHandover) ...[

@@ -513,6 +513,27 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
     return _vehicleId;
   }
 
+  Future<void> _rejectDeliveryOffer(Map<String, dynamic> offer) async {
+    final id = offer['id']?.toString() ?? '';
+    if (id.isEmpty) return;
+    final api = ref.read(apiClientProvider);
+    final result = await api.rejectDelivery(id);
+    if (!mounted) return;
+    if (result case Success()) {
+      _dismissedOffers.add('delivery:$id');
+      await _refreshRideOffers();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Livraison refusée')),
+        );
+      }
+    } else if (result case Failure(:final error)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message)),
+      );
+    }
+  }
+
   Future<void> _rejectRideOffer(Map<String, dynamic> offer) async {
     final id = offer['id']?.toString() ?? '';
     if (id.isEmpty) return;
@@ -1354,15 +1375,29 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        trailing: driverNet != null
-                            ? Text(
-                                MarketConfig.formatCdf(driverNet),
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: MovaColors.violet,
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (driverNet != null)
+                              Padding(
+                                padding: const EdgeInsets.only(right: 4),
+                                child: Text(
+                                  MarketConfig.formatCdf(driverNet),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: MovaColors.violet,
+                                  ),
                                 ),
-                              )
-                            : const Icon(Icons.chevron_right),
+                              ),
+                            if (!assigned)
+                              IconButton(
+                                icon: const Icon(Icons.close, color: MovaColors.error, size: 20),
+                                tooltip: 'Refuser',
+                                onPressed: () => _rejectDeliveryOffer(offer),
+                              ),
+                            const Icon(Icons.chevron_right, size: 20),
+                          ],
+                        ),
                         onTap: () async {
                           final id = offer['id']?.toString() ?? '';
                           if (id.isEmpty) return;

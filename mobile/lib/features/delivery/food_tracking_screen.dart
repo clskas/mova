@@ -10,8 +10,10 @@ import '../../core/services/cancel_eligibility.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
+import '../passenger/passenger_alert_service.dart';
 import '../booking/payment_screen.dart';
 import '../booking/widgets/mova_ride_map.dart';
+import '../chat/delivery_chat_screen.dart';
 import 'widgets/delivery_tracking_map.dart';
 
 class FoodTrackingScreen extends ConsumerStatefulWidget {
@@ -40,6 +42,7 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
   bool _ratingInProgress = false;
   String? _error;
   Timer? _pollTimer;
+  String? _lastStatus;
 
   @override
   void initState() {
@@ -74,6 +77,11 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
             _delivery = {...delivery, 'gpsTrace': data['gpsTrace']};
           } else {
             _delivery = delivery;
+          }
+          final newStatus = _delivery?['status']?.toString();
+          if (newStatus != null && newStatus != _lastStatus) {
+            _lastStatus = newStatus;
+            PassengerAlertService.notifyDeliveryStatus(newStatus);
           }
           _error = null;
           _maybeGoToPayment();
@@ -425,6 +433,26 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      if (courier != null || _delivery?['driverId'] != null) ...[
+                        MovaButton(
+                          label: 'Contacter le livreur',
+                          isSecondary: true,
+                          icon: Icons.chat_bubble_outline,
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => DeliveryChatScreen(
+                                  deliveryId: widget.orderId,
+                                  myRole: 'passenger',
+                                  peerLabel: courier?['name']?.toString() ?? 'Livreur',
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 8),
+                      ],
                       if (_canCancel)
                         MovaButton(
                           label: 'Annuler la commande',

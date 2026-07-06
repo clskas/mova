@@ -17,7 +17,7 @@ function appendPoint(points: GpsPoint[], lat: number, lng: number): GpsPoint[] {
 }
 
 type Options = {
-  type: "ride" | "delivery";
+  type: "ride" | "delivery" | "errand" | "moving";
   id: string | null | undefined;
   active: boolean;
   seed?: GpsPoint[];

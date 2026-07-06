@@ -174,6 +174,12 @@ export class DeliveriesController {
     }
   }
 
+  @Get('active')
+  @ApiOperation({ summary: 'Livraison active du passager (reprise après fermeture app)' })
+  active(@Request() req: { user: { id: string } }) {
+    return this.deliveriesService.getActiveDelivery(req.user.id);
+  }
+
   @Get('history')
   @ApiOperation({ summary: 'Historique livraisons (passager ou chauffeur via ?role=driver)' })
   async history(@Request() req: { user: { id: string } }, @Query('role') role?: string) {
@@ -192,6 +198,12 @@ export class DeliveriesController {
   @ApiOperation({ summary: 'Annuler livraison' })
   cancel(@Request() req: { user: { id: string } }, @Param('id') id: string) {
     return this.deliveriesService.cancelDelivery(id, req.user.id);
+  }
+
+  @Post(':id/reject')
+  @ApiOperation({ summary: 'Refuser une offre livraison (chauffeur)' })
+  reject(@Request() req: { user: { id: string } }, @Param('id') id: string) {
+    return this.deliveriesService.rejectDelivery(id, req.user.id);
   }
 
   @Get(':id')

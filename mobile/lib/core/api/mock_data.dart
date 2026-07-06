@@ -1032,4 +1032,73 @@ abstract final class MockData {
       },
     };
   }
+
+  static Map<String, dynamic> foodMultiEstimate(Map<String, dynamic> body) {
+    final orders = body['orders'] as List? ?? [];
+    var subtotal = 0;
+    for (final order in orders) {
+      final items = (order as Map?)?['items'] as List? ?? [];
+      subtotal += items.fold<int>(0, (sum, item) {
+        final map = item as Map<String, dynamic>;
+        return sum +
+            ((map['unitPriceCdf'] as int? ?? map['priceCdf'] as int? ?? 0) *
+                (map['quantity'] as int? ?? 1));
+      });
+    }
+    final deliveryFee = 3500 + (orders.length > 1 ? 1500 * (orders.length - 1) : 0);
+    return {
+      'estimatedPriceCdf': subtotal + deliveryFee,
+      'itemsSubtotalCdf': subtotal,
+      'deliveryFeeCdf': deliveryFee,
+      'currency': 'CDF',
+    };
+  }
+
+  static Map<String, dynamic> createFoodMultiOrder(Map<String, dynamic> body) {
+    final estimate = foodMultiEstimate(body);
+    return {
+      'id': 'food-multi-${DateTime.now().millisecondsSinceEpoch}',
+      'status': 'RESTAURANT_CONFIRMED',
+      'type': 'FOOD',
+      ...body,
+      'priceCdf': estimate['estimatedPriceCdf'],
+      'restaurantName': 'Multi-restaurants',
+    };
+  }
+
+  static Map<String, dynamic> subscriptionPlans() => {
+        'data': [
+          {
+            'id': 'plan-basic',
+            'code': 'PASSENGER_BASIC',
+            'name': 'MOVA Plus',
+            'monthlyPriceCdf': 15000,
+            'feeReductionPercent': 10,
+            'priorityMatching': false,
+            'description': 'Réduction 10 % sur les frais de service',
+          },
+          {
+            'id': 'plan-premium',
+            'code': 'PASSENGER_PREMIUM',
+            'name': 'MOVA Premium',
+            'monthlyPriceCdf': 35000,
+            'feeReductionPercent': 20,
+            'priorityMatching': true,
+            'description': 'Priorité matching + 20 % de réduction',
+          },
+        ],
+      };
+
+  static Map<String, dynamic> subscriptionMine() => {};
+
+  static Map<String, dynamic> subscribePlan(String planId) => {
+        'subscription': {
+          'id': 'sub-${DateTime.now().millisecondsSinceEpoch}',
+          'planId': planId,
+          'status': 'ACTIVE',
+          'startedAt': DateTime.now().toIso8601String(),
+          'renewsAt': DateTime.now().add(const Duration(days: 30)).toIso8601String(),
+        },
+        'success': true,
+      };
 }

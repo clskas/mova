@@ -78,4 +78,19 @@ class PassengerAlertService {
         break;
     }
   }
+
+  static Future<void> notifyDeliveryStatus(String status) async {
+    switch (status.toUpperCase()) {
+      case 'PICKED_UP':
+        await notify(title: 'Colis pris en charge', body: 'Votre livreur a récupéré votre commande.');
+      case 'IN_TRANSIT':
+        await notify(title: 'Livreur en route', body: 'Votre livraison arrive bientôt.');
+      case 'DELIVERED':
+        await notify(title: 'Livraison terminée', body: 'Merci d\'avoir utilisé MOVA !');
+      case 'READY_FOR_PICKUP':
+        await notify(title: 'Commande prête', body: 'Un livreur va prendre en charge votre commande.');
+      default:
+        break;
+    }
+  }
 }

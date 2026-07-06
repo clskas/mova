@@ -48,7 +48,12 @@ class _SubscriptionsScreenState extends ConsumerState<SubscriptionsScreen> {
         }
       }
       if (mineResult case Success(:final data)) {
-        _active = data is Map<String, dynamic> ? data : null;
+        if (data is Map<String, dynamic>) {
+          _active = data['subscription'] is Map ? data : (data['plan'] != null ? data : null);
+        } else if (data is Map) {
+          final map = Map<String, dynamic>.from(data);
+          _active = map['subscription'] is Map ? map : (map['plan'] != null ? map : null);
+        }
       }
       if (plansResult case Failure(:final error)) _error = error.message;
     });

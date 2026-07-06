@@ -21,6 +21,32 @@ import {
 } from "@/components/ui";
 import { GpsCoordButton } from "@/components/GpsCoordButton";
 
+type MenuItem = {
+  name: string;
+  priceCdf: number;
+  unitPriceCdf?: number;
+  description?: string;
+  isAvailable?: boolean;
+};
+
+function parseMenuItems(raw: unknown): MenuItem[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((e) => e && typeof e === "object")
+    .map((e) => {
+      const item = e as Record<string, unknown>;
+      const price = Number(item.priceCdf ?? item.unitPriceCdf ?? 0);
+      return {
+        name: String(item.name ?? ""),
+        priceCdf: price,
+        unitPriceCdf: price,
+        description: item.description ? String(item.description) : undefined,
+        isAvailable: item.isAvailable !== false,
+      };
+    })
+    .filter((item) => item.name.trim().length > 0);
+}
+
 export default function RestaurantsPage() {
   const { canWrite } = useAdmin();
   const readOnly = !canWrite("restaurants");
@@ -39,6 +65,8 @@ export default function RestaurantsPage() {
   const [deleteTarget, setDeleteTarget] = useState<Restaurant | null>(null);
   const [saving, setSaving] = useState(false);
   const [partnerUsers, setPartnerUsers] = useState<AdminUser[]>([]);
+  const [menuTarget, setMenuTarget] = useState<Restaurant | null>(null);
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
 
   const partnerOptions = useMemo(
     () => [
@@ -145,6 +173,47 @@ export default function RestaurantsPage() {
     }
   }
 
+  function openMenuEditor(r: Restaurant) {
+    setMenuTarget(r);
+    setMenuItems(parseMenuItems(r.menuItems));
+  }
+
+  function addMenuItem() {
+    setMenuItems((items) => [...items, { name: "", priceCdf: 0, unitPriceCdf: 0, isAvailable: true }]);
+  }
+
+  function updateMenuItem(index: number, patch: Partial<MenuItem>) {
+    setMenuItems((items) => items.map((item, i) => (i === index ? { ...item, ...patch } : item)));
+  }
+
+  function removeMenuItem(index: number) {
+    setMenuItems((items) => items.filter((_, i) => i !== index));
+  }
+
+  async function saveMenu() {
+    if (!menuTarget || readOnly) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const normalized = menuItems
+        .filter((item) => item.name.trim())
+        .map((item) => ({
+          name: item.name.trim(),
+          priceCdf: item.priceCdf,
+          unitPriceCdf: item.priceCdf,
+          description: item.description?.trim() || undefined,
+          isAvailable: item.isAvailable !== false,
+        }));
+      await saveRestaurant({ menuItems: normalized }, menuTarget.id);
+      setMenuTarget(null);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erreur menu");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <PageHeader
@@ -222,6 +291,7 @@ export default function RestaurantsPage() {
                 <th className="p-3">Statut</th>
                 <th className="p-3">Compte partenaire</th>
                 <th className="p-3">Note</th>
+                {!readOnly && <th className="p-3">Menu</th>}
                 {!readOnly && <th className="p-3"></th>}
               </tr>
             </thead>
@@ -243,6 +313,13 @@ export default function RestaurantsPage() {
                     {partnerLabel(r.ownerUserId)}
                   </td>
                   <td className="p-3">{r.rating?.toFixed(1) ?? "—"}</td>
+                  {!readOnly && (
+                    <td className="p-3">
+                      <BtnGhost onClick={() => openMenuEditor(r)}>
+                        Menu ({parseMenuItems(r.menuItems).length})
+                      </BtnGhost>
+                    </td>
+                  )}
                   {!readOnly && (
                     <td className="p-3 flex gap-2">
                       <BtnGhost onClick={() => setEditTarget({ ...r })}>Modifier</BtnGhost>
@@ -302,6 +379,49 @@ export default function RestaurantsPage() {
               </p>
             </div>
             <BtnPrimary onClick={handleUpdate} disabled={saving}>{saving ? "Enregistrement…" : "Enregistrer"}</BtnPrimary>
+          </div>
+        )}
+      </Modal>
+
+      <Modal open={!!menuTarget} onClose={() => setMenuTarget(null)} title={`Menu — ${menuTarget?.name ?? ""}`} wide>
+        {menuTarget && (
+          <div className="space-y-4">
+            {menuItems.length === 0 ? (
+              <p className="text-sm text-gray-500">Aucun plat. Ajoutez des articles au menu.</p>
+            ) : (
+              <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-1">
+                {menuItems.map((item, index) => (
+                  <div key={index} className="grid gap-2 sm:grid-cols-[1fr_120px_auto] items-end border-b pb-3">
+                    <label>
+                      <FieldLabel>Nom du plat</FieldLabel>
+                      <TextInput
+                        value={item.name}
+                        onChange={(v) => updateMenuItem(index, { name: v })}
+                        placeholder="Ex. Poulet moambe"
+                      />
+                    </label>
+                    <label>
+                      <FieldLabel>Prix (FC)</FieldLabel>
+                      <TextInput
+                        value={String(item.priceCdf || "")}
+                        onChange={(v) => {
+                          const n = Number.parseInt(v, 10);
+                          updateMenuItem(index, { priceCdf: Number.isFinite(n) ? n : 0, unitPriceCdf: Number.isFinite(n) ? n : 0 });
+                        }}
+                        type="number"
+                      />
+                    </label>
+                    <BtnDanger onClick={() => removeMenuItem(index)}>Retirer</BtnDanger>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="flex flex-wrap gap-2">
+              <BtnGhost onClick={addMenuItem}>+ Ajouter un plat</BtnGhost>
+              <BtnPrimary onClick={saveMenu} disabled={saving}>
+                {saving ? "Enregistrement…" : "Enregistrer le menu"}
+              </BtnPrimary>
+            </div>
           </div>
         )}
       </Modal>

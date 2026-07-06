@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   deactivateUser as deactivateUserApi,
   fetchUsers,
@@ -43,11 +43,15 @@ export default function UtilisateursPage() {
   const [saving, setSaving] = useState(false);
   const [deactivateTarget, setDeactivateTarget] = useState<AdminUser | null>(null);
 
+  const [page, setPage] = useState(0);
+  const pageSize = 50;
+  const [searchQuery, setSearchQuery] = useState("");
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const { data, total: count } = await fetchUsers(0, 100);
+      const { data, total: count } = await fetchUsers(page * pageSize, pageSize, searchQuery.trim() || undefined);
       setUsers(data);
       setTotal(count);
     } catch (e) {
@@ -55,21 +59,16 @@ export default function UtilisateursPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [page, searchQuery]);
 
   useEffect(() => { load(); }, [load]);
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return users;
-    return users.filter(
-      (u) =>
-        formatUserName(u).toLowerCase().includes(q) ||
-        u.phone?.toLowerCase().includes(q) ||
-        u.role?.toLowerCase().includes(q) ||
-        u.status?.toLowerCase().includes(q)
-    );
-  }, [users, search]);
+  function applySearch() {
+    setPage(0);
+    setSearchQuery(search.trim());
+  }
+
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   function openDetail(u: AdminUser) {
     setSelected(u);
@@ -127,12 +126,16 @@ export default function UtilisateursPage() {
       />
       {error && <div className="mb-4"><ErrorBanner message={error} onRetry={load} /></div>}
       <div className="space-y-4">
-        <SearchInput value={search} onChange={setSearch} placeholder="Rechercher par nom, téléphone ou rôle…" />
+        <div className="flex flex-wrap gap-2 items-end">
+          <SearchInput value={search} onChange={setSearch} placeholder="Rechercher par nom, téléphone ou rôle…" />
+          <BtnPrimary onClick={applySearch}>Rechercher</BtnPrimary>
+        </div>
         {loading ? (
           <LoadingState />
-        ) : filtered.length === 0 ? (
+        ) : users.length === 0 ? (
           <EmptyState message="Aucun utilisateur trouvé" />
         ) : (
+          <>
           <Card className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -145,7 +148,7 @@ export default function UtilisateursPage() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((u) => (
+                {users.map((u) => (
                   <tr key={u.id} className="border-b hover:bg-gray-50">
                     <td className="p-3 font-medium">{formatUserName(u)}</td>
                     <td className="p-3">{u.phone ?? "—"}</td>
@@ -161,6 +164,18 @@ export default function UtilisateursPage() {
               </tbody>
             </table>
           </Card>
+          <div className="flex items-center justify-between text-sm text-gray-600">
+            <span>Page {page + 1} / {totalPages} · {total} utilisateur(s)</span>
+            <div className="flex gap-2">
+              <BtnPrimary onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={page === 0}>
+                Précédent
+              </BtnPrimary>
+              <BtnPrimary onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1}>
+                Suivant
+              </BtnPrimary>
+            </div>
+          </div>
+          </>
         )}
       </div>
 

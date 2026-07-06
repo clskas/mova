@@ -4,12 +4,14 @@ import { useCallback, useEffect, useState } from "react";
 import {
   adjustWallet,
   apiFetch,
+  fetchUserWallet,
   fetchWalletOverview,
   fetchWalletTransactions,
   formatCdf,
   formatDate,
   normalizeMetrics,
   type AdminMetrics,
+  type UserWalletDetail,
   type WalletOverview,
   type WalletTransaction,
 } from "@/lib/api";
@@ -40,6 +42,9 @@ export default function PortefeuillePage() {
   const [adjustType, setAdjustType] = useState<"CREDIT" | "DEBIT">("CREDIT");
   const [adjustDesc, setAdjustDesc] = useState("");
   const [saving, setSaving] = useState(false);
+  const [lookupUserId, setLookupUserId] = useState("");
+  const [userWalletDetail, setUserWalletDetail] = useState<UserWalletDetail | null>(null);
+  const [lookupLoading, setLookupLoading] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -61,6 +66,23 @@ export default function PortefeuillePage() {
   }, [userId]);
 
   useEffect(() => { load(); }, [load]);
+
+  async function loadUserWalletDetail() {
+    const id = lookupUserId.trim();
+    if (!id) return;
+    setLookupLoading(true);
+    setError(null);
+    try {
+      const detail = await fetchUserWallet(id);
+      setUserWalletDetail(detail);
+      setAdjustUserId(id);
+    } catch (e) {
+      setUserWalletDetail(null);
+      setError(e instanceof Error ? e.message : "Portefeuille introuvable");
+    } finally {
+      setLookupLoading(false);
+    }
+  }
 
   async function submitAdjust() {
     if (!adjustUserId.trim() || !adjustAmount.trim()) return;
@@ -107,6 +129,27 @@ export default function PortefeuillePage() {
               </Card>
             ))}
           </div>
+
+          <Card className="p-5 space-y-3">
+            <h2 className="font-semibold">Détail portefeuille utilisateur</h2>
+            <div className="flex flex-wrap gap-2 items-end">
+              <label className="flex-1 min-w-[200px]">
+                <FieldLabel>ID utilisateur</FieldLabel>
+                <TextInput value={lookupUserId} onChange={setLookupUserId} placeholder="UUID utilisateur" />
+              </label>
+              <BtnPrimary onClick={loadUserWalletDetail} disabled={lookupLoading}>
+                {lookupLoading ? "Chargement…" : "Consulter"}
+              </BtnPrimary>
+            </div>
+            {userWalletDetail && (
+              <div className="rounded-xl bg-violet-50 border border-violet-100 p-4 text-sm">
+                <p><span className="text-gray-500">Utilisateur:</span> <span className="font-mono text-xs">{userWalletDetail.userId}</span></p>
+                <p className="mt-1 text-lg font-bold text-[#6C63FF]">
+                  Solde: {formatCdf(userWalletDetail.balanceCdf ?? 0)}
+                </p>
+              </div>
+            )}
+          </Card>
 
           {!readOnly && (
             <Card className="p-5 space-y-4">

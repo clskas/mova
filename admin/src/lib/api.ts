@@ -1669,6 +1669,17 @@ export async function fetchWalletOverview(): Promise<WalletOverview> {
   return apiFetch<WalletOverview>("/api/admin/wallet/overview");
 }
 
+export type UserWalletDetail = {
+  userId: string;
+  balanceCdf?: number;
+  currency?: string;
+  transactionCount?: number;
+};
+
+export async function fetchUserWallet(userId: string): Promise<UserWalletDetail> {
+  return apiFetch<UserWalletDetail>(`/api/admin/wallet/${userId}`);
+}
+
 export function assertAdminRole(role?: string | null): role is AdminRole {
   return isAdminRole(role);
 }

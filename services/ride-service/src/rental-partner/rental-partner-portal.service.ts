@@ -110,7 +110,7 @@ export class RentalPartnerPortalService {
       );
     }
     const res = await fetch(
-      serviceUrl('payment', `/payments/services/RENTAL/${bookingId}/cash/confirm`),
+      serviceUrl('payment', `/api/payments/services/RENTAL/${bookingId}/cash/confirm`),
       {
         method: 'POST',
         headers: {

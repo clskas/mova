@@ -147,12 +147,24 @@ class SyncQueue {
     }
   }
 
-  /// Chemins éligibles à la mise en file (créations / recharges / profil).
+  /// Chemins éligibles à la mise en file (créations / recharges / profil / chauffeur).
   static bool shouldQueue(String method, String path) {
     if (method == 'PATCH' && path == '/users/me') return true;
+    if (method == 'PATCH') {
+      if (RegExp(r'^/rides/[^/]+/status$').hasMatch(path)) return true;
+      if (RegExp(r'^/deliveries/[^/]+/status$').hasMatch(path)) return true;
+      return false;
+    }
+    if (method == 'POST') {
+      if (RegExp(r'^/rides/[^/]+/accept$').hasMatch(path)) return true;
+      if (RegExp(r'^/rides/[^/]+/reject$').hasMatch(path)) return true;
+      if (RegExp(r'^/deliveries/[^/]+/accept$').hasMatch(path)) return true;
+      if (RegExp(r'^/deliveries/[^/]+/reject$').hasMatch(path)) return true;
+      if (path == '/drivers/location') return true;
+      if (RegExp(r'^/tracking/[^/]+/[^/]+/points$').hasMatch(path)) return true;
+    }
     if (method != 'POST') return false;
     if (path.contains('/auth/')) return false;
-    if (RegExp(r'^/rides/[^/]+/').hasMatch(path)) return false;
     if (path.contains('/payments/')) return false;
     if (path.contains('/uploads/')) return false;
     if (path.contains('/estimate')) return false;
@@ -252,6 +264,25 @@ class SyncQueue {
     }
     if (path == '/users/me') {
       return {...body, ...meta};
+    }
+    if (RegExp(r'^/rides/[^/]+/accept$').hasMatch(path)) {
+      final rideId = path.split('/')[2];
+      return {'ride': {'id': rideId, 'status': 'ACCEPTED', ...meta}, 'success': true, ...meta};
+    }
+    if (RegExp(r'^/rides/[^/]+/reject$').hasMatch(path) ||
+        RegExp(r'^/deliveries/[^/]+/reject$').hasMatch(path)) {
+      return {'success': true, ...meta};
+    }
+    if (RegExp(r'^/deliveries/[^/]+/accept$').hasMatch(path)) {
+      final deliveryId = path.split('/')[2];
+      return {'delivery': {'id': deliveryId, 'status': 'PICKED_UP', ...meta}, 'success': true, ...meta};
+    }
+    if (RegExp(r'^/rides/[^/]+/status$').hasMatch(path) ||
+        RegExp(r'^/deliveries/[^/]+/status$').hasMatch(path)) {
+      return {'status': body['status'], 'success': true, ...meta};
+    }
+    if (path == '/drivers/location') {
+      return {'success': true, ...meta};
     }
     return {'id': localId, ...meta};
   }

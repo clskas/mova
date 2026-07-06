@@ -135,6 +135,13 @@ export default function LivraisonsPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (!loading && !saving) load();
+    }, 15000);
+    return () => clearInterval(timer);
+  }, [load, loading, saving]);
+
   function openDetail(d: DeliveryOverview) {
     setSelected(d);
     setNewStatus(d.status ?? "PENDING");

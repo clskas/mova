@@ -253,10 +253,20 @@ export class CarpoolService {
       instantBooking?: boolean;
       vehicleInfo?: string;
       actorRole?: string;
+      fromLat?: number;
+      fromLng?: number;
+      toLat?: number;
+      toLng?: number;
     },
   ) {
-    const pickup = addressToCoords(fromAddress);
-    const dropoff = addressToCoords(toAddress);
+    const pickup =
+      opts?.fromLat != null && opts?.fromLng != null
+        ? { lat: opts.fromLat, lng: opts.fromLng }
+        : addressToCoords(fromAddress);
+    const dropoff =
+      opts?.toLat != null && opts?.toLng != null
+        ? { lat: opts.toLat, lng: opts.toLng }
+        : addressToCoords(toAddress);
     const estimate = await this.estimateMobile(fromAddress, toAddress, seats);
     const when = departureAt ? new Date(departureAt) : new Date(Date.now() + 3600000);
     const dto: CreateCarpoolTripDto = {
@@ -301,12 +311,36 @@ export class CarpoolService {
     return { data };
   }
 
-  async searchMobile(fromAddress: string, toAddress: string, date?: string, sort?: 'price' | 'departure' | 'rating') {
-    const result = await this.search({ from: fromAddress, to: toAddress, date, sort });
+  async searchMobile(
+    fromAddress: string,
+    toAddress: string,
+    date?: string,
+    sort?: 'price' | 'departure' | 'rating',
+    coords?: { fromLat?: number; fromLng?: number; toLat?: number; toLng?: number },
+  ) {
+    const result = await this.search({
+      from: fromAddress,
+      to: toAddress,
+      date,
+      sort,
+      fromLat: coords?.fromLat,
+      fromLng: coords?.fromLng,
+      toLat: coords?.toLat,
+      toLng: coords?.toLng,
+    });
     return { data: result.data };
   }
 
-  async search(query: { from?: string; to?: string; date?: string; sort?: 'price' | 'departure' | 'rating' }) {
+  async search(query: {
+    from?: string;
+    to?: string;
+    date?: string;
+    sort?: 'price' | 'departure' | 'rating';
+    fromLat?: number;
+    fromLng?: number;
+    toLat?: number;
+    toLng?: number;
+  }) {
     const fromCity = query.from?.trim();
     const toCity = query.to?.trim();
     let dateStart: Date | undefined;
@@ -350,8 +384,14 @@ export class CarpoolService {
     }
 
     if (query.from && query.to) {
-      const pickup = addressToCoords(query.from);
-      const dropoff = addressToCoords(query.to);
+      const pickup =
+        query.fromLat != null && query.fromLng != null
+          ? { lat: query.fromLat, lng: query.fromLng }
+          : addressToCoords(query.from);
+      const dropoff =
+        query.toLat != null && query.toLng != null
+          ? { lat: query.toLat, lng: query.toLng }
+          : addressToCoords(query.to);
       filtered = filtered.filter((t) => {
         const pickupDist = this.pricing.haversineKm(pickup.lat, pickup.lng, t.pickupLat, t.pickupLng);
         const dropoffDist = this.pricing.haversineKm(dropoff.lat, dropoff.lng, t.dropoffLat, t.dropoffLng);

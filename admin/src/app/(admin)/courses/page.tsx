@@ -117,6 +117,13 @@ export default function CoursesPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (!loading && !saving) load();
+    }, 15000);
+    return () => clearInterval(timer);
+  }, [load, loading, saving]);
+
   async function saveStatus() {
     if (!selected || !newStatus || newStatus === selected.status) return;
     setSaving(true);

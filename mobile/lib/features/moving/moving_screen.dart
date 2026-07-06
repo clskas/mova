@@ -319,7 +319,7 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
     });
     final api = ref.read(apiClientProvider);
     await api.checkHealth();
-    final result = await api.uploadParcelPhoto(File(localPath));
+    final result = await api.uploadMovingPhoto(File(localPath));
     if (!mounted) return;
     setState(() => _uploadingPhoto = false);
     switch (result) {

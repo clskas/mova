@@ -34,4 +34,10 @@ export class SubscriptionsController {
   subscribe(@Request() req: { user: { id: string } }, @Body() dto: SubscribeDto) {
     return this.subscriptions.subscribe(req.user.id, dto.planId);
   }
+
+  @Post('cancel')
+  @ApiOperation({ summary: 'Annuler mon abonnement actif' })
+  cancel(@Request() req: { user: { id: string } }) {
+    return this.subscriptions.cancel(req.user.id);
+  }
 }

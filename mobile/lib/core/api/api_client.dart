@@ -339,6 +339,9 @@ class ApiClient {
     if (path.contains('/uploads/parcel-photo') && method == 'POST') {
       return Success({'photoUrl': 'mock://parcel-photo', 'cloudinaryMockUrl': 'mock://cloudinary'});
     }
+    if (path.contains('/uploads/moving-photo') && method == 'POST') {
+      return Success({'photoUrl': 'mock://moving-photo', 'cloudinaryMockUrl': 'mock://moving-photo'});
+    }
     if (path.contains('/deliveries/parcel/photo') && method == 'POST') {
       return Success({'url': 'mock://parcel-photo', 'photoUrl': 'mock://parcel-photo'});
     }
@@ -400,7 +403,7 @@ class ApiClient {
       return Success(MockData.subscribePlan(body?['planId']?.toString() ?? 'plan-basic'));
     }
     if (path.contains('/subscriptions/cancel') && method == 'POST') {
-      return const Success({'success': true, 'status': 'CANCELLED'});
+      return Success(MockData.cancelSubscription());
     }
     if (path.contains('/wallet/top-up') || path.contains('/wallet/topup')) {
       return Success(MockData.walletTopUp(body ?? {}));
@@ -469,6 +472,9 @@ class ApiClient {
     }
     if (path.contains('/carpool/estimate')) {
       return Success(MockData.carpoolEstimate(body ?? {}));
+    }
+    if (path == '/carpool/search' && method == 'POST') {
+      return Success({'data': MockData.carpoolRides(), 'count': MockData.carpoolRides().length});
     }
     if (path.contains('/carpool/search') && method == 'GET') {
       return Success({'data': MockData.carpoolRides(), 'count': MockData.carpoolRides().length});
@@ -1332,6 +1338,37 @@ class ApiClient {
 
   Future<Result<Map<String, dynamic>>> cancelErrand(String errandId) async {
     return post('/errands/$errandId/cancel', {});
+  }
+
+  /// Upload photo déménagement — retourne l'URL `/api/uploads/moving/...`.
+  Future<Result<String>> uploadMovingPhoto(File file) async {
+    await ensureReady();
+    final bytes = await file.readAsBytes();
+    if (bytes.length > 3 * 1024 * 1024) {
+      return const Failure(ServerFailure('Photo trop volumineuse (max 3 Mo).'));
+    }
+    final mock = _mockFor('POST', '/uploads/moving-photo', {});
+    if (mock != null) {
+      return switch (mock) {
+        Success(:final data) => Success(
+            data['photoUrl']?.toString() ?? data['url']?.toString() ?? 'mock://moving-photo',
+          ),
+        Failure(:final error) => Failure(error),
+      };
+    }
+    final result = await post('/uploads/moving-photo', {
+      'imageBase64': base64Encode(bytes),
+      'mimeType': 'image/jpeg',
+    });
+    return switch (result) {
+      Success(:final data) => Success(
+          data['photoUrl']?.toString() ??
+              data['cloudinaryMockUrl']?.toString() ??
+              data['url']?.toString() ??
+              '',
+        ),
+      Failure(:final error) => Failure(error),
+    };
   }
 
   /// Upload photo colis (base64) — retourne l'URL à passer à `photoUrl`.

@@ -35,6 +35,10 @@ export class CarpoolController {
         instantBooking: dto.instantBooking,
         vehicleInfo: dto.vehicleInfo,
         actorRole: req.user.role,
+        fromLat: dto.fromLat,
+        fromLng: dto.fromLng,
+        toLat: dto.toLat,
+        toLng: dto.toLng,
       },
     );
   }
@@ -53,7 +57,12 @@ export class CarpoolController {
   @Post('search')
   @ApiOperation({ summary: 'Rechercher trajets covoiturage (contrat mobile)' })
   searchPost(@Body() dto: MobileCarpoolAddressDto & { date?: string; sort?: 'price' | 'departure' | 'rating' }) {
-    return this.carpoolService.searchMobile(dto.fromAddress, dto.toAddress, dto.date, dto.sort);
+    return this.carpoolService.searchMobile(dto.fromAddress, dto.toAddress, dto.date, dto.sort, {
+      fromLat: dto.fromLat,
+      fromLng: dto.fromLng,
+      toLat: dto.toLat,
+      toLng: dto.toLng,
+    });
   }
 
   @Post('estimate')

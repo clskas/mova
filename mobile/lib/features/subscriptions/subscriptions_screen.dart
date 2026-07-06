@@ -48,15 +48,35 @@ class _SubscriptionsScreenState extends ConsumerState<SubscriptionsScreen> {
         }
       }
       if (mineResult case Success(:final data)) {
-        if (data is Map<String, dynamic>) {
-          _active = data['subscription'] is Map ? data : (data['plan'] != null ? data : null);
+        if (data is Map<String, dynamic> && data['plan'] != null) {
+          _active = data;
         } else if (data is Map) {
           final map = Map<String, dynamic>.from(data);
-          _active = map['subscription'] is Map ? map : (map['plan'] != null ? map : null);
+          if (map['plan'] != null) {
+            _active = map;
+          } else if (map['subscription'] is Map && (map['subscription'] as Map)['plan'] != null) {
+            _active = map;
+          }
         }
       }
       if (plansResult case Failure(:final error)) _error = error.message;
     });
+  }
+
+  Future<void> _cancel() async {
+    setState(() => _acting = 'cancel');
+    final result = await ref.read(apiClientProvider).post('/subscriptions/cancel', {});
+    if (!mounted) return;
+    setState(() => _acting = null);
+    switch (result) {
+      case Success(:final data):
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(data['message']?.toString() ?? 'Abonnement annulé')),
+        );
+        await _load();
+      case Failure(:final error):
+        setState(() => _error = error.message);
+    }
   }
 
   Future<void> _subscribe(String planId) async {
@@ -90,13 +110,25 @@ class _SubscriptionsScreenState extends ConsumerState<SubscriptionsScreen> {
             const SizedBox(height: 12),
             MovaErrorBanner(message: _error!, onRetry: _load),
           ],
-          if (_active != null && _active!['plan'] != null) ...[
+          if (_active != null && (_active!['plan'] != null || (_active!['subscription'] as Map?)?['plan'] != null)) ...[
             const SizedBox(height: 16),
             MovaCard(
-              child: Text(
-                'Abonnement actif : ${(_active!['plan'] as Map)['name']} — '
-                '${MarketConfig.formatCdf((_active!['plan'] as Map)['monthlyPriceCdf'] as int? ?? 0)} / mois',
-                style: const TextStyle(fontWeight: FontWeight.w600, color: MovaColors.green),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Abonnement actif : ${((_active!['plan'] ?? (_active!['subscription'] as Map?)?['plan']) as Map)['name']} — '
+                    '${MarketConfig.formatCdf(((_active!['plan'] ?? (_active!['subscription'] as Map?)?['plan']) as Map)['monthlyPriceCdf'] as int? ?? 0)} / mois',
+                    style: const TextStyle(fontWeight: FontWeight.w600, color: MovaColors.green),
+                  ),
+                  const SizedBox(height: 12),
+                  MovaButton(
+                    label: _acting == 'cancel' ? '…' : 'Annuler l\'abonnement',
+                    isSecondary: true,
+                    isLoading: _acting == 'cancel',
+                    onPressed: _acting != null ? null : _cancel,
+                  ),
+                ],
               ),
             ),
           ],

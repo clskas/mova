@@ -1101,4 +1101,10 @@ abstract final class MockData {
         },
         'success': true,
       };
+
+  static Map<String, dynamic> cancelSubscription() => {
+        'success': true,
+        'message': 'Abonnement annulé',
+        'subscription': {'status': 'CANCELLED'},
+      };
 }

@@ -16,6 +16,8 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 }
 
 /// Enregistre le token FCM (si Firebase configuré) pour les push même app fermée.
+/// Copiez `android/app/google-services.json.example` vers `google-services.json`
+/// après création du projet Firebase (package `cd.mova.mova.driver`).
 class DriverPushService {
   DriverPushService._();
 

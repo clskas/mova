@@ -45,6 +45,10 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
   bool _loadingMine = false;
   String? _error;
   String? _validationError;
+  double? _fromLat;
+  double? _fromLng;
+  double? _toLat;
+  double? _toLng;
 
   @override
   void initState() {
@@ -111,6 +115,37 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
     return (total / seats).ceil();
   }
 
+  Future<void> _resolveRouteCoords() async {
+    final api = ref.read(apiClientProvider);
+    Future<void> resolve(String address, void Function(double lat, double lng) apply) async {
+      final result = await api.geoAutocomplete(address.trim());
+      if (result case Success(:final data)) {
+        final raw = data['suggestions'] as List? ?? data['data'] as List? ?? [];
+        if (raw.isNotEmpty) {
+          final first = raw.first as Map<String, dynamic>;
+          final lat = (first['lat'] as num?)?.toDouble();
+          final lng = (first['lng'] as num?)?.toDouble();
+          if (lat != null && lng != null) apply(lat, lng);
+        }
+      }
+    }
+    await resolve(_fromController.text, (lat, lng) {
+      _fromLat = lat;
+      _fromLng = lng;
+    });
+    await resolve(_toController.text, (lat, lng) {
+      _toLat = lat;
+      _toLng = lng;
+    });
+  }
+
+  Map<String, dynamic> _routeCoordPayload() => {
+        if (_fromLat != null && _fromLng != null) 'fromLat': _fromLat,
+        if (_fromLat != null && _fromLng != null) 'fromLng': _fromLng,
+        if (_toLat != null && _toLng != null) 'toLat': _toLat,
+        if (_toLat != null && _toLng != null) 'toLng': _toLng,
+      };
+
   Future<void> _search() async {
     if (_toController.text.trim().isEmpty) {
       setState(() => _validationError = 'Indiquez la destination.');
@@ -123,12 +158,15 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
       _validationError = null;
     });
     final api = ref.read(apiClientProvider);
+    await _resolveRouteCoords();
     final dateStr = DateTime(_searchDate.year, _searchDate.month, _searchDate.day).toIso8601String();
-    final result = await api.get(
-      '/carpool/search?from=${Uri.encodeComponent(_fromController.text.trim())}'
-      '&to=${Uri.encodeComponent(_toController.text.trim())}'
-      '&date=$dateStr&sort=$_sortBy',
-    );
+    final result = await api.post('/carpool/search', {
+      'fromAddress': _fromController.text.trim(),
+      'toAddress': _toController.text.trim(),
+      'date': dateStr,
+      'sort': _sortBy,
+      ..._routeCoordPayload(),
+    });
     setState(() {
       _loading = false;
       _loadingList = false;
@@ -209,10 +247,12 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
       _validationError = null;
     });
     final api = ref.read(apiClientProvider);
+    await _resolveRouteCoords();
     final result = await api.post('/carpool/estimate', {
       'fromAddress': _fromController.text.trim(),
       'toAddress': _toController.text.trim(),
       'seats': seats,
+      ..._routeCoordPayload(),
     });
     setState(() {
       _loading = false;
@@ -255,6 +295,7 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
       _validationError = null;
     });
     final api = ref.read(apiClientProvider);
+    await _resolveRouteCoords();
     final result = await api.post('/carpool/rides', {
       'fromAddress': _fromController.text.trim(),
       'toAddress': _toController.text.trim(),
@@ -265,6 +306,7 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
       if (_notesController.text.trim().isNotEmpty) 'notes': _notesController.text.trim(),
       'ladiesOnly': _ladiesOnly,
       'instantBooking': _instantBooking,
+      ..._routeCoordPayload(),
     });
     setState(() => _loading = false);
     switch (result) {

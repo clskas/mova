@@ -5,7 +5,7 @@ import { mkdir, writeFile } from 'fs/promises';
 import { join } from 'path';
 
 const MAX_BYTES = 5 * 1024 * 1024;
-type UploadCategory = 'parcels' | 'menu' | 'vehicles';
+type UploadCategory = 'parcels' | 'menu' | 'vehicles' | 'moving';
 
 @Injectable()
 export class UploadsService {
@@ -19,6 +19,10 @@ export class UploadsService {
 
   async uploadVehiclePhoto(base64: string, mimeType = 'image/jpeg') {
     return this.uploadImage('vehicles', base64, mimeType);
+  }
+
+  async uploadMovingPhoto(base64: string, mimeType = 'image/jpeg') {
+    return this.uploadImage('moving', base64, mimeType);
   }
 
   private async uploadImage(category: UploadCategory, base64: string, mimeType = 'image/jpeg') {

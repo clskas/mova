@@ -43,6 +43,12 @@ export class UploadsController {
     return this.uploadsService.uploadVehiclePhoto(dto.imageBase64, dto.mimeType);
   }
 
+  @Post('moving-photo')
+  @ApiOperation({ summary: 'Téléverser photo déménagement (inventaire)' })
+  uploadMovingPhoto(@Body() dto: UploadParcelPhotoDto) {
+    return this.uploadsService.uploadMovingPhoto(dto.imageBase64, dto.mimeType);
+  }
+
   @Get('parcels/:filename')
   @ApiOperation({ summary: 'Télécharger une photo colis stockée localement' })
   serveParcelPhoto(@Param('filename') filename: string, @Res() res: Response) {
@@ -61,7 +67,13 @@ export class UploadsController {
     return this.serveUploadedFile('vehicles', filename, res);
   }
 
-  private serveUploadedFile(category: 'parcels' | 'menu' | 'vehicles', filename: string, res: Response) {
+  @Get('moving/:filename')
+  @ApiOperation({ summary: 'Télécharger une photo déménagement stockée localement' })
+  serveMovingPhoto(@Param('filename') filename: string, @Res() res: Response) {
+    return this.serveUploadedFile('moving', filename, res);
+  }
+
+  private serveUploadedFile(category: 'parcels' | 'menu' | 'vehicles' | 'moving', filename: string, res: Response) {
     const safe = filename.replace(/[^a-zA-Z0-9._-]/g, '');
     const filePath = join(process.cwd(), 'uploads', category, safe);
     if (!existsSync(filePath)) throw new NotFoundException('Fichier introuvable');

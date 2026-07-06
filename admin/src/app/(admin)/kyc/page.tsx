@@ -59,6 +59,13 @@ export default function KycPage() {
   useEffect(() => { load(); }, [load]);
 
   useEffect(() => {
+    const timer = setInterval(() => {
+      if (!loading) load();
+    }, 15000);
+    return () => clearInterval(timer);
+  }, [load, loading]);
+
+  useEffect(() => {
     if (!preview?.url) {
       setPreviewBlobUrl(null);
       return;

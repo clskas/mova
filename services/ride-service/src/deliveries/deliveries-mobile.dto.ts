@@ -28,6 +28,10 @@ export class MobileErrandCreateDto extends MobileErrandEstimateDto {
 export class MobileCarpoolAddressDto {
   @ApiProperty() @IsString() fromAddress!: string;
   @ApiProperty() @IsString() toAddress!: string;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() fromLat?: number;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() fromLng?: number;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() toLat?: number;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() toLng?: number;
 }
 
 export class MobileCarpoolEstimateDto extends MobileCarpoolAddressDto {

@@ -236,10 +236,11 @@ export default function LieuxPage() {
                 {item.status === "PENDING" && !readOnly && (
                   <div className="flex flex-col gap-2 min-w-[140px]">
                     <BtnPrimary
-                      label={acting === item.id ? "…" : "Publier dans MOVA"}
                       onClick={() => handleApprove(item.id)}
                       disabled={acting != null}
-                    />
+                    >
+                      {acting === item.id ? "…" : "Publier dans MOVA"}
+                    </BtnPrimary>
                     <button
                       type="button"
                       className="text-sm text-red-600 underline"
@@ -260,12 +261,14 @@ export default function LieuxPage() {
 
       <Modal open={rejectId != null} title="Refuser la suggestion" onClose={() => setRejectId(null)}>
         <FieldLabel>Motif (optionnel)</FieldLabel>
-        <TextInput value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} placeholder="Doublon, lieu inexistant…" />
+        <TextInput value={rejectReason} onChange={setRejectReason} placeholder="Doublon, lieu inexistant…" />
         <div className="flex gap-2 mt-4 justify-end">
           <button type="button" className="px-4 py-2 text-sm" onClick={() => setRejectId(null)}>
             Annuler
           </button>
-          <BtnPrimary label="Confirmer le refus" onClick={handleReject} disabled={acting != null} />
+          <BtnPrimary onClick={handleReject} disabled={acting != null}>
+            Confirmer le refus
+          </BtnPrimary>
         </div>
       </Modal>
 

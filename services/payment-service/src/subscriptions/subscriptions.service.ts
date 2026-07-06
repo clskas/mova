@@ -112,4 +112,21 @@ export class SubscriptionsService {
       message: `Abonnement ${plan.name} activé pour ${formatCdf(plan.monthlyPriceCdf)} / mois.`,
     };
   }
+
+  async cancel(userId: string) {
+    const sub = await this.getActiveSubscription(userId);
+    if (!sub) {
+      throw new MovaHttpException(MovaErrorCode.SUBSCRIPTION_NOT_FOUND, HttpStatus.NOT_FOUND, 'Aucun abonnement actif.');
+    }
+    const updated = await this.prisma.userSubscription.update({
+      where: { id: sub.id },
+      data: { status: SubscriptionStatus.CANCELLED, endsAt: new Date() },
+      include: { plan: true },
+    });
+    return {
+      subscription: updated,
+      success: true,
+      message: `Abonnement ${updated.plan.name} annulé.`,
+    };
+  }
 }

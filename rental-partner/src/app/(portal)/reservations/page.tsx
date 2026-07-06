@@ -356,7 +356,6 @@ export default function ReservationsPage() {
             })}
           </ul>
         )}
-      </div>
     </div>
   );
 }

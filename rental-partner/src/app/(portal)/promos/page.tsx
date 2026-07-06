@@ -16,12 +16,14 @@ const ABSORBED_LABELS: Record<string, string> = {
   SHARED: "Partagé",
 };
 
+type PromoAbsorbedBy = "PARTNER" | "PLATFORM" | "SHARED";
+
 const emptyForm = () => ({
   code: "",
   discountPercent: 10,
   maxUses: 50,
   validUntil: "",
-  absorbedBy: "PARTNER" as const,
+  absorbedBy: "PARTNER" as PromoAbsorbedBy,
   partnerAbsorbPercent: 50,
 });
 
@@ -143,7 +145,9 @@ export default function PromosPage() {
               Qui absorbe la remise ?
               <select
                 value={form.absorbedBy}
-                onChange={(e) => setForm((f) => ({ ...f, absorbedBy: e.target.value as typeof f.absorbedBy }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, absorbedBy: e.target.value as PromoAbsorbedBy }))
+                }
                 className="mt-1 w-full border rounded-lg px-3 py-2"
               >
                 <option value="PARTNER">Loueur (vous)</option>

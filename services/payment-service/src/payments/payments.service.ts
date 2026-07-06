@@ -261,10 +261,12 @@ export class PaymentsService {
         userId: string;
         amountCdf: number;
         paymentReady: boolean;
+        status?: string;
         referenceType: string;
         referenceId: string;
         title?: string;
         driverId?: string | null;
+        ownerUserId?: string | null;
         cashPin?: string | null;
       }>;
     } catch (e) {
@@ -272,6 +274,16 @@ export class PaymentsService {
       this.logger.error(`fetchServicePaymentInfo ${referenceType}/${referenceId} unreachable`, e);
       throw new MovaHttpException(MovaErrorCode.NOT_FOUND, HttpStatus.BAD_GATEWAY);
     }
+  }
+
+  private servicePaymentNotReadyMessage(type: string, status?: string): string {
+    if (type === 'RENTAL') {
+      if (status && status !== 'RETURNED' && status !== 'PAID') {
+        return 'Le paiement sera disponible après le retour du véhicule. Demandez au partenaire de cliquer « Véhicule rendu » dans le portail location.';
+      }
+      return 'La location n\'est pas encore prête pour le paiement.';
+    }
+    return 'Le service n\'est pas prêt pour le paiement.';
   }
 
   async getServicePaymentPreview(referenceType: string, referenceId: string, userId: string) {
@@ -303,7 +315,13 @@ export class PaymentsService {
 
     const info = await this.fetchServicePaymentInfo(type, referenceId);
     if (info.userId !== userId) throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
-    if (!info.paymentReady) throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Le service n\'est pas prêt pour le paiement.');
+    if (!info.paymentReady) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        undefined,
+        this.servicePaymentNotReadyMessage(type, info.status),
+      );
+    }
     const amountCdf = amountOverride ?? info.amountCdf;
     if (amountCdf <= 0) throw new MovaHttpException(MovaErrorCode.PAYMENT_FAILED);
     const paymentPhone = this.resolvePaymentPhone(method, phone);
@@ -366,11 +384,19 @@ export class PaymentsService {
     if (type === 'RIDE') return this.confirmCashRide(referenceId, driverUserId, pin);
 
     const info = await this.fetchServicePaymentInfo(type, referenceId);
-    if (info.driverId !== driverUserId) {
+    const actorAllowed =
+      type === 'RENTAL'
+        ? [info.driverId, info.ownerUserId].filter(Boolean).includes(driverUserId)
+        : info.driverId === driverUserId;
+    if (!actorAllowed) {
       throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
     }
     if (!info.paymentReady) {
-      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Le service n\'est pas prêt pour le paiement.');
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        undefined,
+        this.servicePaymentNotReadyMessage(type, info.status),
+      );
     }
     const expectedPin = String(info.cashPin ?? '').trim();
     if (!expectedPin || String(pin).trim() !== expectedPin) {
@@ -397,6 +423,63 @@ export class PaymentsService {
       method: 'CASH',
     });
     await this.creditDriverAfterServicePayment(type, referenceId);
+    return { success: true, payment, message: 'Paiement espèces confirmé' };
+  }
+
+  /** Confirmation espèces location par le loueur (sans paiement CASH préalable côté passager). */
+  async confirmRentalCashByPartner(referenceId: string, ownerUserId: string, pin: string) {
+    const type = 'RENTAL';
+    const info = await this.fetchServicePaymentInfo(type, referenceId);
+    const ownerId = info.ownerUserId ?? info.driverId;
+    if (!ownerId || ownerId !== ownerUserId) {
+      throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
+    }
+    if (!info.paymentReady) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        undefined,
+        this.servicePaymentNotReadyMessage(type, info.status),
+      );
+    }
+    const expectedPin = String(info.cashPin ?? '').trim();
+    if (!expectedPin || String(pin).trim() !== expectedPin) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Code PIN incorrect.');
+    }
+    const existing = await this.prisma.servicePayment.findUnique({
+      where: { referenceType_referenceId: { referenceType: type, referenceId } },
+    });
+    if (existing?.status === PaymentStatus.COMPLETED) {
+      await this.syncRentalPaidStatus(referenceId);
+      return { success: true, payment: existing, message: 'Paiement déjà confirmé' };
+    }
+    const refKey = `${type}:${referenceId}`;
+    const payment = await this.prisma.servicePayment.upsert({
+      where: { referenceType_referenceId: { referenceType: type, referenceId } },
+      create: {
+        referenceType: type,
+        referenceId,
+        userId: info.userId,
+        amountCdf: info.amountCdf,
+        method: PaymentMethod.CASH,
+        status: PaymentStatus.COMPLETED,
+        providerRef: `cash_partner_${refKey}`,
+      },
+      update: {
+        status: PaymentStatus.COMPLETED,
+        method: PaymentMethod.CASH,
+        amountCdf: info.amountCdf,
+        providerRef: `cash_partner_${refKey}`,
+      },
+    });
+    await this.publishPaymentCompleted({
+      referenceType: type,
+      referenceId,
+      userId: info.userId,
+      amountCdf: info.amountCdf,
+      method: 'CASH',
+    });
+    await this.creditDriverAfterServicePayment(type, referenceId);
+    await this.syncRentalPaidStatus(referenceId);
     return { success: true, payment, message: 'Paiement espèces confirmé' };
   }
 

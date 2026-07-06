@@ -50,6 +50,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   String _method = 'WALLET';
   bool _loading = false;
   bool _loadingPin = true;
+  bool _paymentReady = true;
   String? _error;
   String? _cashPin;
   late int _amountCdf;
@@ -84,10 +85,16 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       if (preview case Success(:final data)) {
         final pin = data['cashPin']?.toString();
         final amount = data['amountCdf'] as int?;
+        final ready = data['paymentReady'] != false;
         if (mounted) {
           setState(() {
             if (amount != null && amount > 0) _amountCdf = amount;
             if (pin != null && pin.isNotEmpty) _cashPin = pin;
+            _paymentReady = ready;
+            if (!ready && widget.serviceType == 'RENTAL') {
+              _error =
+                  'Le paiement sera disponible après le retour du véhicule. Le partenaire doit cliquer « Véhicule rendu ».';
+            }
           });
         }
       }
@@ -142,6 +149,11 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   }
 
   Future<void> _pay() async {
+    if (!_paymentReady) {
+      setState(() => _error =
+          'Le paiement sera disponible après le retour du véhicule. Le partenaire doit cliquer « Véhicule rendu ».');
+      return;
+    }
     if (_method == 'CASH' && (_cashPin == null || _cashPin!.isEmpty)) {
       setState(() => _error = 'Code PIN espèces indisponible. Réessayez dans un instant.');
       await _loadPaymentDetails();
@@ -389,7 +401,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
             label: 'Payer ${MarketConfig.formatCdf(_amountCdf)}',
             isLoading: _loading,
             icon: Icons.lock_outline,
-            onPressed: _loading ? null : _pay,
+            onPressed: _loading || !_paymentReady ? null : _pay,
           ),
         ],
       ),

@@ -105,7 +105,7 @@ export class RentalPartnerPortalController {
     @Param('id') id: string,
     @Body() dto: PartnerConfirmCashDto,
   ) {
-    return this.portal.confirmCashPayment(req.user.id, id, dto.pin, req.headers.authorization);
+    return this.portal.confirmCashPayment(req.user.id, id, dto.pin);
   }
 
   @Get('promos')

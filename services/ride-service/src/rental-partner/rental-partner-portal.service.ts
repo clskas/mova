@@ -1,6 +1,6 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { RentalInquiryStatus, RentalVehicleApprovalStatus } from '@prisma/client';
-import { MovaErrorCode, MovaHttpException, serviceUrl } from '@mova/shared';
+import { MovaErrorCode, MovaHttpException, INTERNAL_API_KEY, serviceUrl } from '@mova/shared';
 import { fetchAuthUserBrief } from '../common/internal-lookup.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { RentalService } from '../rental/rental.service';
@@ -100,7 +100,7 @@ export class RentalPartnerPortalService {
     return this.rental.ownerUpdateLogistics(ownerUserId, id, dto);
   }
 
-  async confirmCashPayment(ownerUserId: string, bookingId: string, pin: string, authHeader?: string) {
+  async confirmCashPayment(ownerUserId: string, bookingId: string, pin: string) {
     const booking = await this.rental.ownerGetBooking(ownerUserId, bookingId);
     if (booking.status !== RentalInquiryStatus.RETURNED) {
       throw new MovaHttpException(
@@ -110,14 +110,14 @@ export class RentalPartnerPortalService {
       );
     }
     const res = await fetch(
-      serviceUrl('payment', `/api/payments/services/RENTAL/${bookingId}/cash/confirm`),
+      serviceUrl('payment', `/internal/services/RENTAL/${bookingId}/cash/confirm-partner`),
       {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(authHeader ? { Authorization: authHeader } : {}),
+          'x-internal-api-key': INTERNAL_API_KEY,
         },
-        body: JSON.stringify({ pin }),
+        body: JSON.stringify({ ownerUserId, pin }),
       },
     );
     const data = (await res.json().catch(() => ({}))) as { error?: { message?: string }; message?: string };

@@ -155,6 +155,14 @@ export class InternalController {
     return this.payments.getServicePaymentStatus(referenceType, referenceId);
   }
 
+  @Post('services/RENTAL/:referenceId/cash/confirm-partner')
+  confirmRentalCashByPartner(
+    @Param('referenceId') referenceId: string,
+    @Body() body: { ownerUserId: string; pin: string },
+  ) {
+    return this.payments.confirmRentalCashByPartner(referenceId, body.ownerUserId, body.pin);
+  }
+
   @Get('subscription-plans')
   listPlans(@Query('activeOnly') activeOnly?: string) {
     return this.subscriptions.listPlans(activeOnly === 'true');

@@ -21,6 +21,7 @@ export interface ServicePaymentInfo {
   paymentReady: boolean;
   title?: string;
   driverId?: string | null;
+  ownerUserId?: string | null;
   cashPin?: string | null;
 }
 
@@ -133,6 +134,7 @@ export class PaymentInfoService {
       status: inquiry.status,
       paymentReady: inquiry.status === RentalInquiryStatus.RETURNED,
       driverId: inquiry.driverId ?? inquiry.vehicle?.ownerUserId ?? null,
+      ownerUserId: inquiry.vehicle?.ownerUserId ?? null,
       cashPin: inquiry.completionPin,
       title: inquiry.vehicle?.name ?? inquiry.vehicleType,
     };

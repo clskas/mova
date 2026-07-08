@@ -362,16 +362,150 @@ export class AdminService {
   listWalletTransactions(skip = 0, take = 50, userId?: string) {
     const params = new URLSearchParams({ skip: String(skip), take: String(take) });
     if (userId) params.set('userId', userId);
-    return this.fetchJson('payment', `/internal/transactions?${params}`);
+    return this.enrichWalletTransactions(params);
+  }
+  private formatUserDisplayName(user: {
+    firstName?: string | null;
+    lastName?: string | null;
+    phone?: string;
+    publicId?: string;
+  }) {
+    const name = [user.firstName, user.lastName].filter(Boolean).join(' ').trim();
+    return name || user.phone || user.publicId || '—';
+  }
+  private async fetchUserDisplayNames(userIds: string[]) {
+    const map = new Map<string, string>();
+    await Promise.all(
+      userIds.map(async (id) => {
+        try {
+          const user = await this.fetchJson<{
+            firstName?: string | null;
+            lastName?: string | null;
+            phone?: string;
+            publicId?: string;
+          }>('auth', `/internal/users/${id}`);
+          map.set(id, this.formatUserDisplayName(user));
+        } catch {
+          map.set(id, `${id.slice(0, 8)}…`);
+        }
+      }),
+    );
+    return map;
+  }
+  private async enrichWalletTransactions(params: URLSearchParams) {
+    const page = await this.fetchJson<{
+      data: Array<{
+        id: string;
+        amountCdf: number;
+        type: string;
+        description?: string;
+        reference?: string | null;
+        createdAt?: string;
+        wallet?: { userId: string; balanceCdf?: number };
+      }>;
+      total: number;
+      skip: number;
+      take: number;
+      currency?: string;
+    }>('payment', `/internal/transactions?${params}`);
+    const userIds = [...new Set(page.data.map((t) => t.wallet?.userId).filter((id): id is string => Boolean(id)))];
+    const names = await this.fetchUserDisplayNames(userIds);
+    return {
+      ...page,
+      data: page.data.map((t) => ({
+        ...t,
+        wallet: t.wallet
+          ? {
+              ...t.wallet,
+              userName: names.get(t.wallet.userId) ?? null,
+            }
+          : undefined,
+      })),
+    };
   }
   getWalletOverview() {
     return this.fetchJson('payment', '/internal/wallets/overview');
   }
   getWallet(userId: string) {
-    return this.fetchJson('payment', `/internal/wallets/${userId}`);
+    return this.fetchJson<{ userId: string; balanceCdf?: number; [key: string]: unknown }>('payment', `/internal/wallets/${userId}`).then(
+      async (wallet) => {
+        try {
+          const user = await this.fetchJson<{
+            firstName?: string | null;
+            lastName?: string | null;
+            phone?: string;
+            publicId?: string;
+          }>('auth', `/internal/users/${userId}`);
+          return { ...wallet, userName: this.formatUserDisplayName(user) };
+        } catch {
+          return wallet;
+        }
+      },
+    );
   }
   adjustWallet(userId: string, body: { amountCdf: number; type: 'CREDIT' | 'DEBIT'; description: string }) {
     return this.proxy('payment', `/internal/wallets/${userId}/adjust`, { method: 'POST', body: JSON.stringify(body) });
+  }
+  withdrawWallet(userId: string, body: { amountCdf: number; provider: string; phone: string }) {
+    return this.proxy('payment', `/internal/wallets/${userId}/withdraw`, { method: 'POST', body: JSON.stringify(body) });
+  }
+  async listCashDebts(driverUserId?: string) {
+    const params = new URLSearchParams();
+    if (driverUserId) params.set('driverUserId', driverUserId);
+    const qs = params.toString();
+    const overview = await this.fetchJson<{
+      totalOpenCdf: number;
+      openDebtCount: number;
+      debtorCount: number;
+      platformFeeCdf: number;
+      restaurantShareCdf: number;
+      partnerShareCdf: number;
+      debtors: Array<{
+        driverUserId: string;
+        totalCdf: number;
+        platformFeeCdf: number;
+        restaurantShareCdf: number;
+        partnerShareCdf: number;
+        openCount: number;
+      }>;
+      debts: Array<{
+        id: string;
+        driverUserId: string;
+        referenceType: string;
+        referenceId: string;
+        category: string;
+        amountCdf: number;
+        description?: string | null;
+        beneficiaryUserId?: string | null;
+        createdAt: string;
+      }>;
+    }>('payment', `/internal/cash-debts${qs ? `?${qs}` : ''}`);
+
+    const userIds = [
+      ...new Set([
+        ...overview.debtors.map((d) => d.driverUserId),
+        ...overview.debts.map((d) => d.driverUserId),
+      ]),
+    ];
+    const names = await this.fetchUserDisplayNames(userIds);
+
+    return {
+      ...overview,
+      debtors: overview.debtors.map((d) => ({
+        ...d,
+        driverName: names.get(d.driverUserId) ?? null,
+      })),
+      debts: overview.debts.map((d) => ({
+        ...d,
+        driverName: names.get(d.driverUserId) ?? null,
+      })),
+    };
+  }
+  settleCashDebt(debtId: string, settlementRef?: string) {
+    return this.proxy('payment', `/internal/cash-debts/${debtId}/settle`, {
+      method: 'POST',
+      body: JSON.stringify({ settlementRef }),
+    });
   }
 
   listSurcharges() {

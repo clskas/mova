@@ -58,6 +58,12 @@ export class RidesController {
     return this.scheduledRidesService.listForDriver(req.user.id);
   }
 
+  @Get('scheduled/offers')
+  @ApiOperation({ summary: 'Créneaux planifiés ouverts — candidature volontaire chauffeur' })
+  listScheduledOffers(@Request() req: { user: { id: string } }) {
+    return this.scheduledRidesService.listOffersForDriver(req.user.id);
+  }
+
   @Get('scheduled/:id')
   @ApiOperation({ summary: 'Détail réservation planifiée (passager ou chauffeur assigné)' })
   getScheduled(@Request() req: { user: { id: string } }, @Param('id') id: string) {

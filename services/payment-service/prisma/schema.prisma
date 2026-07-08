@@ -110,6 +110,37 @@ enum SubscriptionStatus {
   EXPIRED
 }
 
+enum CashDebtCategory {
+  PLATFORM_FEE
+  RESTAURANT_SHARE
+  PARTNER_SHARE
+}
+
+enum CashDebtStatus {
+  OPEN
+  SETTLED
+}
+
+model DriverCashDebt {
+  id                String           @id @default(uuid())
+  driverUserId      String
+  referenceType     String
+  referenceId       String
+  category          CashDebtCategory
+  amountCdf         Int
+  status            CashDebtStatus   @default(OPEN)
+  beneficiaryUserId String?
+  description       String?
+  reference         String           @unique
+  settledAt         DateTime?
+  settlementRef     String?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  @@index([driverUserId, status])
+  @@map("driver_cash_debts")
+}
+
 model SubscriptionPlan {
   id                  String             @id @default(uuid())
   code                String             @unique

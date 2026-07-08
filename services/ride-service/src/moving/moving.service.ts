@@ -1,5 +1,5 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { MovingRequestStatus, MovingVehicleCategory, SurchargeType, VehicleType } from '@prisma/client';
+import { CommissionServiceType, MovingRequestStatus, MovingVehicleCategory, SurchargeType, VehicleType } from '@prisma/client';
 import { MovaErrorCode, MovaHttpException, MOVA_EVENTS, MARKET_RDC, canCancelMoving, estimateTripDurationMin, formatCdf } from '@mova/shared';
 import { RedisService } from '@mova/shared';
 import { buildMovingTimeline } from '../deliveries/parcel.util';
@@ -9,6 +9,7 @@ import { fetchServicePaymentStatus } from '../common/payment-status.util';
 import { assertDriverCanReceiveJobs, assertDriverEligibleForMoving } from '../common/driver-eligibility.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { PricingService } from '../rides/pricing.service';
+import { CommissionService } from '../rides/commission.service';
 import { SurchargeService } from '../rides/surcharge.service';
 import { TripShareService } from '../share/trip-share.service';
 import { CreateMovingDto, EstimateMovingDto } from './moving.dto';
@@ -26,6 +27,7 @@ export class MovingService {
     private tripShare: TripShareService,
     private promo: PromoService,
     private routing: RoutingService,
+    private commission: CommissionService,
   ) {}
 
   private validateCoords(dto: EstimateMovingDto) {
@@ -77,6 +79,10 @@ export class MovingService {
       context: { serviceType: 'MOVING' },
     });
     const estimatedPriceCdf = promoApplied.estimatedPriceCdf;
+    const transportBeforeVehicle = Math.ceil(
+      withInterCity.estimatedFareCdf * moving.multiplier + moving.baseFeeCdf,
+    );
+    const beforeVehicle = transportBeforeVehicle + volumeFee;
     return {
       estimatedPriceCdf,
       formatted: formatCdf(estimatedPriceCdf),
@@ -91,7 +97,17 @@ export class MovingService {
       vehicleCategory: dto.vehicleCategory,
       vehicleCategoryLabel: this.vehicleCategoryLabel(dto.vehicleCategory),
       volumeFeeCdf: volumeFee,
-      baseFeeCdf: moving.baseFeeCdf,
+      transportFareCdf: transportBeforeVehicle,
+      serviceBaseFeeCdf: moving.baseFeeCdf,
+      vehicleSurchargeCdf: Math.max(0, beforePromo - beforeVehicle),
+      passengerTotalCdf: estimatedPriceCdf,
+      priceBreakdown: {
+        transportFareCdf: transportBeforeVehicle,
+        volumeFeeCdf: volumeFee,
+        baseFareCdf: moving.baseFeeCdf,
+        weightSurchargeCdf: Math.max(0, beforePromo - beforeVehicle),
+        totalCdf: estimatedPriceCdf,
+      },
       distanceKm,
       durationMin,
     };
@@ -131,16 +147,67 @@ export class MovingService {
     });
   }
 
-  private async formatMovingDetail(request: {
-    id: string;
-    status: MovingRequestStatus;
-    completedAt: Date | null;
-    estimatedPriceCdf: number;
-    photoUrls: unknown;
-    itemsNotes?: string | null;
-    completionPin?: string | null;
-    [key: string]: unknown;
-  }) {
+  private async buildMovingPricingFields(
+    request: {
+      driverId?: string | null;
+      estimatedPriceCdf: number;
+      volumeM3: number;
+      vehicleCategory?: MovingVehicleCategory | null;
+      discountCdf?: number | null;
+    },
+    viewerUserId?: string,
+  ) {
+    const movingSurcharge = await this.surcharges.get(SurchargeType.MOVING);
+    const perM3 = movingSurcharge.perUnitCdf ?? 8000;
+    const volumeFeeCdf = Math.ceil(request.volumeM3 * perM3);
+    const passengerTotalCdf = request.estimatedPriceCdf;
+    const fields: Record<string, unknown> = {
+      type: 'MOVING',
+      passengerTotalCdf,
+      volumeFeeCdf,
+      serviceBaseFeeCdf: movingSurcharge.baseFeeCdf,
+      transportFareCdf: Math.max(
+        0,
+        passengerTotalCdf + (request.discountCdf ?? 0) - volumeFeeCdf - movingSurcharge.baseFeeCdf,
+      ),
+      discountCdf: request.discountCdf ?? 0,
+      priceBreakdown: {
+        transportFareCdf: Math.max(
+          0,
+          passengerTotalCdf + (request.discountCdf ?? 0) - volumeFeeCdf - movingSurcharge.baseFeeCdf,
+        ),
+        volumeFeeCdf,
+        baseFareCdf: movingSurcharge.baseFeeCdf,
+        totalCdf: passengerTotalCdf,
+      },
+    };
+    if (viewerUserId && request.driverId === viewerUserId) {
+      const rule = await this.commission.get(CommissionServiceType.MOVING);
+      fields.driverGrossCdf = passengerTotalCdf;
+      fields.driverNetCdf = Math.round(
+        this.commission.splitGross(passengerTotalCdf, rule.platformPercent).driverNetCdf,
+      );
+    }
+    return fields;
+  }
+
+  private async formatMovingDetail(
+    request: {
+      id: string;
+      status: MovingRequestStatus;
+      completedAt: Date | null;
+      estimatedPriceCdf: number;
+      photoUrls: unknown;
+      itemsNotes?: string | null;
+      completionPin?: string | null;
+      driverId?: string | null;
+      volumeM3: number;
+      vehicleCategory?: MovingVehicleCategory | null;
+      discountCdf?: number | null;
+      [key: string]: unknown;
+    },
+    viewerUserId?: string,
+  ) {
     const timeline = buildMovingTimeline(request.status, request.completedAt);
     const photoUrls = Array.isArray(request.photoUrls) ? (request.photoUrls as string[]) : [];
     const vehicleCategory = request.vehicleCategory as MovingVehicleCategory | undefined;
@@ -149,14 +216,17 @@ export class MovingService {
         ? await fetchServicePaymentStatus('MOVING', request.id)
         : { isPaid: false, paymentStatus: null };
     const isPaid = payment.isPaid;
+    const pricing = await this.buildMovingPricingFields(request, viewerUserId);
     return {
       ...request,
+      ...pricing,
       photoUrls,
       vehicleCategoryLabel: vehicleCategory ? this.vehicleCategoryLabel(vehicleCategory) : undefined,
       timeline,
       tracking: timeline,
       paymentReady: request.status === MovingRequestStatus.COMPLETED && !isPaid,
       isPaid,
+      paymentReferenceId: request.id,
       paymentStatus: payment.paymentStatus,
       completionPin: request.completionPin ?? undefined,
       itemsNotes: request.itemsNotes ?? undefined,
@@ -172,7 +242,7 @@ export class MovingService {
     const request = await this.prisma.movingRequest.findUnique({ where: { id } });
     if (!request) throw new MovaHttpException(MovaErrorCode.MOVING_NOT_FOUND, HttpStatus.NOT_FOUND);
     if (request.userId !== userId) throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
-    return await this.formatMovingDetail(request);
+    return await this.formatMovingDetail(request, userId);
   }
 
   async getForParticipant(id: string, userId: string) {
@@ -181,7 +251,7 @@ export class MovingService {
     if (request.userId !== userId && request.driverId !== userId) {
       throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
     }
-    return await this.formatMovingDetail(request);
+    return await this.formatMovingDetail(request, userId);
   }
 
   async updateStatusByDriver(id: string, driverId: string, status: MovingRequestStatus) {
@@ -204,7 +274,12 @@ export class MovingService {
       await assertDriverCanReceiveJobs(driverId);
     }
     const updates: Record<string, unknown> = { status };
-    if (status === MovingRequestStatus.COMPLETED) updates.completedAt = new Date();
+    if (status === MovingRequestStatus.COMPLETED) {
+      updates.completedAt = new Date();
+      if (!request.completionPin) {
+        updates.completionPin = this.tripShare.generateCompletionPin();
+      }
+    }
     const updated = await this.prisma.movingRequest.update({ where: { id }, data: updates });
     await this.redis.publish(MOVA_EVENTS.SERVICE_STATUS_UPDATED, {
       serviceType: 'MOVING',
@@ -213,7 +288,7 @@ export class MovingService {
       status: updated.status,
     });
     return {
-      moving: updated,
+      moving: await this.formatMovingDetail(updated, driverId),
       timeline: buildMovingTimeline(updated.status, updated.completedAt),
       paymentReady: status === MovingRequestStatus.COMPLETED,
     };
@@ -356,17 +431,24 @@ export class MovingService {
       take: 20,
     });
     return {
-      data: rows.map((r) => ({
-        id: r.id,
-        type: 'MOVING',
-        label: 'Déménagement',
-        status: r.status,
-        pickupAddress: r.pickupAddress,
-        dropoffAddress: r.dropoffAddress,
-        volumeM3: r.volumeM3,
-        priceCdf: r.estimatedPriceCdf,
-        createdAt: r.createdAt.toISOString(),
-      })),
+      data: await Promise.all(
+        rows.map(async (r) => {
+          const pricing = await this.buildMovingPricingFields(r, driverId);
+          return {
+            id: r.id,
+            type: 'MOVING',
+            label: 'Déménagement',
+            status: r.status,
+            pickupAddress: r.pickupAddress,
+            dropoffAddress: r.dropoffAddress,
+            volumeM3: r.volumeM3,
+            vehicleCategory: r.vehicleCategory,
+            priceCdf: r.estimatedPriceCdf,
+            createdAt: r.createdAt.toISOString(),
+            ...pricing,
+          };
+        }),
+      ),
     };
   }
 }

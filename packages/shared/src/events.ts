@@ -4,6 +4,8 @@ export const MOVA_EVENTS = {
   RIDE_COMPLETED: 'ride.completed',
   RIDE_STATUS_SMS: 'ride.status.sms',
   PAYMENT_COMPLETED: 'payment.completed',
+  RIDE_CASH_PENDING: 'ride.cash.pending',
+  SERVICE_CASH_PENDING: 'service.cash.pending',
   DRIVER_RATING_UPDATED: 'driver.rating.updated',
   DELIVERY_CREATED: 'delivery.created',
   DELIVERY_STATUS_UPDATED: 'delivery.status.updated',
@@ -47,6 +49,21 @@ export interface PaymentCompletedPayload {
   userId: string;
   amountCdf: number;
   method: string;
+}
+
+export interface RideCashPendingPayload {
+  rideId: string;
+  driverId?: string;
+  passengerId?: string;
+  amountCdf: number;
+}
+
+export interface ServiceCashPendingPayload {
+  referenceType: string;
+  referenceId: string;
+  driverId?: string;
+  userId?: string;
+  amountCdf: number;
 }
 
 export interface IncidentCreatedPayload {

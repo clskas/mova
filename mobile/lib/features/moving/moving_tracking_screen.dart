@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/api/api_client.dart';
+import '../../core/billing/service_price_display.dart';
 import '../../core/config/market_config.dart';
 import '../../core/error/result.dart';
 import '../../core/services/cancel_eligibility.dart';
@@ -119,7 +120,9 @@ class _MovingTrackingScreenState extends ConsumerState<MovingTrackingScreen> {
   }
 
   int get _totalCdf =>
-      _request?['estimatedPriceCdf'] as int? ?? widget.estimatedPrice;
+      _request?['passengerTotalCdf'] as int? ??
+      _request?['estimatedPriceCdf'] as int? ??
+      widget.estimatedPrice;
 
   Future<void> _openPayment() async {
     if (!mounted || _totalCdf <= 0) return;
@@ -149,7 +152,6 @@ class _MovingTrackingScreenState extends ConsumerState<MovingTrackingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final price = _request?['estimatedPriceCdf'] as int? ?? widget.estimatedPrice;
     final status = _request?['status']?.toString() ?? 'PENDING';
     final isPaid = _request?['isPaid'] == true;
     final paymentReady = _request?['paymentReady'] == true;
@@ -183,14 +185,11 @@ class _MovingTrackingScreenState extends ConsumerState<MovingTrackingScreen> {
                         overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 8),
-                      Text(
-                        MarketConfig.formatCdf(price),
-                        style: const TextStyle(
-                          color: MovaColors.green,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 18,
+                      if (_request != null)
+                        ServicePriceDisplay.passengerCard(
+                          {..._request!, 'type': 'MOVING'},
+                          totalLabel: 'Total déménagement',
                         ),
-                      ),
                       Text(
                         isPaid ? 'Payé' : historyStatusLabel(status),
                         style: TextStyle(
@@ -271,15 +270,6 @@ class _MovingTrackingScreenState extends ConsumerState<MovingTrackingScreen> {
                     isLoading: _cancelling,
                     isSecondary: true,
                     onPressed: _cancelling ? null : _cancelMoving,
-                  ),
-                ],
-                if (_request?['paymentReady'] == true ||
-                    _request?['status']?.toString() == 'COMPLETED') ...[
-                  const SizedBox(height: 16),
-                  MovaButton(
-                    label: 'Payer le déménagement',
-                    icon: Icons.payment_outlined,
-                    onPressed: _openPayment,
                   ),
                 ],
                 const SizedBox(height: 24),

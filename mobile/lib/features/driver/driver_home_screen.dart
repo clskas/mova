@@ -10,6 +10,7 @@ import '../../core/billing/driver_earnings_display.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/cache/profile_cache.dart';
 import '../../core/api/api_client.dart';
+import '../../core/api/ride_socket.dart';
 import '../../core/auth/session.dart';
 import '../../core/offline/connectivity_service.dart';
 import '../../core/location/service_area_gps.dart';
@@ -30,6 +31,7 @@ import 'driver_moving_mission_screen.dart';
 import 'driver_push_service.dart';
 import 'driver_rental_mission_screen.dart';
 import 'driver_scheduled_mission_screen.dart';
+import '../delivery/delivery_payment_state.dart';
 
 enum _DriverMenuAction { history, carpool, dossier, help, incident, logout }
 
@@ -47,19 +49,27 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
   Map<String, dynamic>? _profile;
   Map<String, dynamic>? _activeRide;
   Map<String, dynamic>? _pendingCashRide;
+  Map<String, dynamic>? _pendingCashDelivery;
   Map<String, dynamic>? _activeDelivery;
+  bool _cashDeliveryPromptOpen = false;
   String? _availabilityError;
   String? _vehicleId;
   Timer? _offerPollTimer;
+  Timer? _cashPollTimer;
   Timer? _locationTimer;
   Timer? _profilePollTimer;
   Timer? _assignmentsPollTimer;
   final Set<String> _dismissedOffers = {};
+  // Offres ignorées temporairement (time-out sans réponse) : clé -> instant de mise en veille.
+  // Elles réapparaissent automatiquement après [_offerSnoozeDuration].
+  final Map<String, DateTime> _snoozedOffers = {};
+  static const Duration _offerSnoozeDuration = Duration(seconds: 90);
   String? _profileError;
   bool _showingOffer = false;
   List<Map<String, dynamic>> _rideOffers = [];
   List<Map<String, dynamic>> _deliveryOffers = [];
   List<Map<String, dynamic>> _assignedMissions = [];
+  List<Map<String, dynamic>> _scheduledOffers = [];
   final Set<String> _knownMissionKeys = {};
   final Set<String> _knownOfferKeys = {};
   bool _missionAlertsSeeded = false;
@@ -77,6 +87,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _offerPollTimer?.cancel();
+    _cashPollTimer?.cancel();
     _locationTimer?.cancel();
     _profilePollTimer?.cancel();
     _assignmentsPollTimer?.cancel();
@@ -119,6 +130,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
       _loadActiveDelivery(),
       _loadAssignments(),
     ]);
+    await _connectDriverCashInbox();
     await DriverJobAlertService.init();
     await DriverPushService.init(ref.read(apiClientProvider));
     if (mounted) {
@@ -140,6 +152,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
     final api = ref.read(apiClientProvider);
     final movingResult = await api.get('/moving/assignments', skipCache: true);
     final scheduledResult = await api.get('/rides/scheduled/assignments', skipCache: true);
+    final scheduledOffersResult = await api.get('/rides/scheduled/offers', skipCache: true);
     final errandResult = await api.get('/deliveries/assignments', skipCache: true);
     final rentalResult = await api.get('/rental/assignments', skipCache: true);
     if (!mounted) return;
@@ -151,6 +164,10 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
     if (scheduledResult case Success(:final data)) {
       final rows = (data['data'] as List? ?? []).cast<Map<String, dynamic>>();
       missions.addAll(rows);
+    }
+    var scheduledOffers = <Map<String, dynamic>>[];
+    if (scheduledOffersResult case Success(:final data)) {
+      scheduledOffers = (data['data'] as List? ?? []).cast<Map<String, dynamic>>();
     }
     if (errandResult case Success(:final data)) {
       final rows = (data['data'] as List? ?? []).cast<Map<String, dynamic>>();
@@ -175,7 +192,10 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
       final key = DriverJobAlertService.missionKey(m);
       return key.length > 1 && !_knownMissionKeys.contains(key);
     }).toList();
-    setState(() => _assignedMissions = missions);
+    setState(() {
+      _assignedMissions = missions;
+      _scheduledOffers = scheduledOffers;
+    });
     _knownMissionKeys
       ..clear()
       ..addAll(missions.map(DriverJobAlertService.missionKey).where((k) => k.length > 1));
@@ -385,10 +405,70 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
     if (!mounted) return;
     switch (result) {
       case Success(:final data):
-        setState(() => _pendingCashRide = data);
+        if (data == null) {
+          setState(() => _pendingCashRide = null);
+          return;
+        }
+        final kind = data['_cashKind']?.toString().toUpperCase();
+        if (kind == 'RIDE') {
+          setState(() => _pendingCashRide = data);
+          return;
+        }
+        if (kind == 'DELIVERY' || kind == 'ERRAND') {
+          await _hydratePendingCashDelivery(data);
+        }
       case Failure():
         setState(() => _pendingCashRide = null);
     }
+  }
+
+  Future<void> _hydratePendingCashDelivery(Map<String, dynamic> stub) async {
+    final id = stub['id']?.toString();
+    if (id == null || id.isEmpty || !mounted) return;
+    final isErrand = stub['_cashKind']?.toString() == 'ERRAND' || stub['type']?.toString() == 'ERRAND';
+    final api = ref.read(apiClientProvider);
+    final detail = await api.get(isErrand ? '/errands/$id' : '/deliveries/$id');
+    if (!mounted) return;
+    if (detail case Success(:final data)) {
+      final merged = mergeDeliveryApiPayload(Map<String, dynamic>.from(data));
+      setState(() {
+        _pendingCashDelivery = merged;
+        if (_activeDelivery == null || _activeDelivery!['id']?.toString() == id) {
+          _activeDelivery = merged;
+        }
+      });
+      await _connectDeliveryCashSocket(merged);
+      _maybeAutoOpenDeliveryCash(merged);
+    }
+  }
+
+  Future<void> _connectDriverCashInbox() async {
+    final api = ref.read(apiClientProvider);
+    if (api.isMockMode) return;
+    final userId = _profile?['userId']?.toString();
+    if (userId == null || userId.isEmpty || !mounted) return;
+    final token = await api.authToken();
+    if (!mounted) return;
+    ref.read(rideSocketProvider).connectDriverInbox(
+      userId: userId,
+      token: token,
+      onCashPending: (payload) {
+        final deliveryId = payload['deliveryId']?.toString();
+        if (deliveryId == null || deliveryId.isEmpty) return;
+        _loadPendingCashRide();
+        _loadActiveDelivery();
+        final target = _pendingCashDelivery ?? _activeDelivery;
+        if (target != null && target['id']?.toString() == deliveryId) {
+          _maybeAutoOpenDeliveryCash(target);
+        } else {
+          _hydratePendingCashDelivery({
+            '_cashKind': payload['referenceType']?.toString() ?? 'DELIVERY',
+            'id': deliveryId,
+            'type': payload['referenceType']?.toString() ?? 'DELIVERY',
+          });
+        }
+      },
+    );
   }
 
   Future<void> _openPendingCashRide() async {
@@ -434,22 +514,131 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
     final api = ref.read(apiClientProvider);
     final result = await api.get('/deliveries/history?role=driver');
     if (!mounted) return;
-    if (result case Success(:final data)) {
-      final deliveries = (data['data'] as List? ?? []).cast<Map<String, dynamic>>();
-      final active = deliveries.where((d) {
-        final s = d['status']?.toString() ?? '';
-        final type = d['type']?.toString() ?? '';
-        if (type == 'ERRAND') {
-          return s == 'ASSIGNED' || s == 'IN_PROGRESS';
-        }
-        return s == 'PICKED_UP' || s == 'IN_TRANSIT';
-      }).toList();
-      if (active.isNotEmpty) {
-        setState(() => _activeDelivery = active.first);
-      } else {
-        setState(() => _activeDelivery = null);
+    final List<Map<String, dynamic>> deliveries;
+    switch (result) {
+      case Success(:final data):
+        deliveries = (data['data'] as List? ?? []).cast<Map<String, dynamic>>();
+      case Failure():
+        return;
+    }
+    Map<String, dynamic>? candidate;
+    for (final raw in deliveries) {
+      final map = Map<String, dynamic>.from(raw);
+      if (_deliveryInProgress(map) || _deliveryAwaitingPayment(map)) {
+        candidate = map;
+        break;
       }
     }
+
+    if (candidate == null) {
+      setState(() {
+        _activeDelivery = null;
+        _pendingCashDelivery = null;
+      });
+      return;
+    }
+
+    final id = candidate['id']?.toString();
+    if (id == null || id.isEmpty) return;
+    final isErrand = candidate['type']?.toString() == 'ERRAND';
+    final detail = await api.get(isErrand ? '/errands/$id' : '/deliveries/$id');
+    if (!mounted) return;
+    if (detail case Success(:final data)) {
+      final merged = mergeDeliveryApiPayload(Map<String, dynamic>.from(data));
+      final inProgress = _deliveryInProgress(merged);
+      final cashPending = _deliveryCashPending(merged);
+      setState(() {
+        _activeDelivery = inProgress || cashPending ? merged : null;
+        _pendingCashDelivery = cashPending ? merged : null;
+      });
+      if (_deliveryAwaitingPayment(merged)) {
+        await _connectDeliveryCashSocket(merged);
+      }
+      if (cashPending) {
+        _maybeAutoOpenDeliveryCash(merged);
+      }
+    }
+  }
+
+  bool _deliveryInProgress(Map<String, dynamic> delivery) {
+    final status = delivery['status']?.toString().toUpperCase() ?? '';
+    final type = delivery['type']?.toString().toUpperCase() ?? '';
+    if (type == 'ERRAND') {
+      return status == 'ASSIGNED' || status == 'IN_PROGRESS';
+    }
+    return status == 'READY_FOR_PICKUP' ||
+        status == 'PICKED_UP' ||
+        status == 'IN_TRANSIT';
+  }
+
+  bool _deliveryAwaitingPayment(Map<String, dynamic> delivery) {
+    if (deliveryIsPaid(delivery)) return false;
+    final status = delivery['status']?.toString().toUpperCase() ?? '';
+    final type = delivery['type']?.toString().toUpperCase() ?? '';
+    return type == 'ERRAND' ? status == 'COMPLETED' : status == 'DELIVERED';
+  }
+
+  bool _deliveryCashPending(Map<String, dynamic> delivery) {
+    if (!_deliveryAwaitingPayment(delivery)) return false;
+    return delivery['paymentStatus']?.toString().toUpperCase() == 'PENDING';
+  }
+
+  Future<void> _connectDeliveryCashSocket(Map<String, dynamic> delivery) async {
+    final api = ref.read(apiClientProvider);
+    if (api.isMockMode) return;
+    final id = delivery['id']?.toString();
+    if (id == null || id.isEmpty || !mounted) return;
+    final token = await api.authToken();
+    if (!mounted) return;
+    final isErrand = delivery['type']?.toString() == 'ERRAND';
+    final driverUserId = _profile?['userId']?.toString();
+    ref.read(rideSocketProvider).connectDelivery(
+      deliveryId: id,
+      token: token,
+      referenceType: isErrand ? 'ERRAND' : 'DELIVERY',
+      driverUserId: driverUserId,
+      onCashPending: (payload) {
+        final deliveryId = payload['deliveryId']?.toString();
+        if (deliveryId != null && deliveryId != id) return;
+        final target = _pendingCashDelivery ?? _activeDelivery ?? delivery;
+        _maybeAutoOpenDeliveryCash(target);
+      },
+    );
+  }
+
+  void _maybeAutoOpenDeliveryCash(Map<String, dynamic> delivery) {
+    if (!mounted || _cashDeliveryPromptOpen || _showingOffer) return;
+    if (!_deliveryCashPending(delivery) && !(_deliveryAwaitingPayment(delivery) && !_deliveryInProgress(delivery))) {
+      return;
+    }
+    _cashDeliveryPromptOpen = true;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ActiveDeliveryScreen(
+          delivery: delivery,
+          autoOpenCashPin: true,
+        ),
+      ),
+    ).then((_) {
+      _cashDeliveryPromptOpen = false;
+      _loadActiveDelivery();
+    });
+  }
+
+  Future<void> _openPendingCashDelivery() async {
+    final delivery = _pendingCashDelivery ?? _activeDelivery;
+    if (delivery == null || !mounted) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ActiveDeliveryScreen(
+          delivery: delivery,
+          autoOpenCashPin: deliveryCashPaymentPending(delivery),
+        ),
+      ),
+    );
+    if (mounted) await _loadActiveDelivery();
   }
 
   Future<bool> _ensureGpsPosition() async {
@@ -489,14 +678,24 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
 
   void _startPolling() {
     _offerPollTimer?.cancel();
+    _cashPollTimer?.cancel();
     _pollOffers();
     _offerPollTimer = Timer.periodic(const Duration(seconds: 3), (_) => _pollOffers());
+    _cashPollTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (!_available || !mounted || _showingOffer) return;
+      _loadPendingCashRide();
+      if (_pendingCashDelivery != null ||
+          (_activeDelivery != null && _deliveryAwaitingPayment(_activeDelivery!))) {
+        _loadActiveDelivery();
+      }
+    });
     _startLocationUpdates();
     _refreshRideOffers();
   }
 
   void _stopPolling() {
     _offerPollTimer?.cancel();
+    _cashPollTimer?.cancel();
     _stopLocationUpdates();
   }
 
@@ -559,7 +758,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
     final id = offer['id']?.toString() ?? '';
     if (id.isEmpty) return;
     _showingOffer = true;
-    await Navigator.push(
+    final result = await Navigator.push<String?>(
       context,
       MaterialPageRoute(
         builder: (_) => RideOfferScreen(
@@ -568,10 +767,26 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
         ),
       ),
     );
-    _dismissedOffers.add('ride:$id');
+    if (result == 'timeout') {
+      // Pas de réponse : ne pas masquer définitivement, re-proposer plus tard.
+      _snoozedOffers['ride:$id'] = DateTime.now();
+    } else {
+      // Refus explicite ou acceptation : masquer définitivement pour cette session.
+      _dismissedOffers.add('ride:$id');
+    }
     _showingOffer = false;
     await _loadActiveRide();
     await _refreshRideOffers();
+  }
+
+  /// Une offre est-elle actuellement masquée (refus définitif ou veille temporaire) ?
+  bool _isOfferHidden(String key) {
+    if (_dismissedOffers.contains(key)) return true;
+    final snoozedAt = _snoozedOffers[key];
+    if (snoozedAt == null) return false;
+    if (DateTime.now().difference(snoozedAt) < _offerSnoozeDuration) return true;
+    _snoozedOffers.remove(key);
+    return false;
   }
 
   Future<void> _syncKnownOfferKeys(Iterable<String> keys, {required List<Map<String, dynamic>> newOffers}) async {
@@ -698,7 +913,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
 
     for (final offer in rides) {
       final id = offer['id']?.toString() ?? '';
-      if (id.isEmpty || _dismissedOffers.contains('ride:$id')) continue;
+      if (id.isEmpty || _isOfferHidden('ride:$id')) continue;
       await _openRideOffer(offer);
       return;
     }
@@ -1043,6 +1258,77 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
               style: TextStyle(fontSize: 12, color: MovaColors.textSecondary.withValues(alpha: 0.9)),
             ),
           ],
+          if (_scheduledOffers.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            MovaCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.event_available, size: 18, color: MovaColors.orange),
+                      SizedBox(width: 8),
+                      Text('Créneaux planifiés', style: TextStyle(fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Candidature volontaire — MOVA assigne avant le départ.',
+                    style: TextStyle(fontSize: 12, color: MovaColors.textSecondary),
+                  ),
+                  const SizedBox(height: 8),
+                  ..._scheduledOffers.map((offer) {
+                    final when = offer['scheduledAt']?.toString();
+                    final whenLabel = when != null
+                        ? (DateTime.tryParse(when)?.toLocal().toString().substring(0, 16) ?? when)
+                        : '';
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: InkWell(
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => DriverScheduledMissionScreen(
+                              rideId: offer['id']?.toString() ?? '',
+                              initialMission: offer,
+                            ),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.schedule, size: 18, color: MovaColors.orange),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '${offer['pickupAddress'] ?? ''} → ${offer['dropoffAddress'] ?? ''}',
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13),
+                                  ),
+                                  if (whenLabel.isNotEmpty)
+                                    Text(whenLabel, style: const TextStyle(fontSize: 11, color: MovaColors.textSecondary)),
+                                  if (offer['driverNetCdf'] != null)
+                                    Text(
+                                      'Gain net ~${MarketConfig.formatCdf(offer['driverNetCdf'] as int)}',
+                                      style: const TextStyle(fontSize: 11, color: MovaColors.green),
+                                    ),
+                                ],
+                              ),
+                            ),
+                            if (offer['volunteered'] == true)
+                              const Icon(Icons.how_to_reg, color: MovaColors.green, size: 20),
+                          ],
+                        ),
+                      ),
+                    );
+                  }),
+                ],
+              ),
+            ),
+          ],
           if (_assignedMissions.isNotEmpty) ...[
             const SizedBox(height: 16),
             MovaCard(
@@ -1174,6 +1460,41 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                         ),
                         const Text(
                           'Appuyez pour saisir le code PIN du passager',
+                          style: TextStyle(color: MovaColors.textSecondary, fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right),
+                ],
+              ),
+            ),
+          ],
+          if (_pendingCashDelivery != null) ...[
+            const SizedBox(height: 16),
+            MovaCard(
+              onTap: _openPendingCashDelivery,
+              child: Row(
+                children: [
+                  const Icon(Icons.payments_outlined, color: MovaColors.orange),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Paiement livraison espèces',
+                          style: TextStyle(fontWeight: FontWeight.bold, color: MovaColors.orange),
+                        ),
+                        Text(
+                          _pendingCashDelivery!['pickupAddress']?.toString() ??
+                              _pendingCashDelivery!['dropoffAddress']?.toString() ??
+                              'Livraison terminée',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const Text(
+                          'Appuyez pour saisir le code PIN du client',
                           style: TextStyle(color: MovaColors.textSecondary, fontSize: 12),
                         ),
                       ],

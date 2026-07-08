@@ -198,12 +198,65 @@ abstract final class MockData {
 
   static Map<String, dynamic> payService(String refType, String refId, Map<String, dynamic> body) => {
         'success': true,
-        'referenceType': refType,
+        'amountCdf': body['amountCdf'] ?? 3000,
+        'currency': 'CDF',
+        'referenceType': refType.toUpperCase(),
         'referenceId': refId,
         'method': body['method'] ?? 'WALLET',
-        'amountCdf': body['amountCdf'] ?? 8500,
-        'status': 'COMPLETED',
       };
+
+  static Map<String, dynamic> servicePaymentInfo(String refType, String refId) {
+    final type = refType.toUpperCase();
+    if (type == 'CARPOOL') {
+      return {
+        'referenceType': 'CARPOOL',
+        'referenceId': refId,
+        'amountCdf': 3000,
+        'paymentReady': true,
+        'cashPin': null,
+        'title': 'Covoiturage',
+      };
+    }
+    if (type == 'SCHEDULED') {
+      return {
+        'referenceType': 'SCHEDULED',
+        'referenceId': refId,
+        'amountCdf': 25000,
+        'paymentReady': true,
+        'cashPin': '1234',
+        'title': 'Réservation planifiée',
+      };
+    }
+    if (type == 'RENTAL') {
+      return {
+        'referenceType': 'RENTAL',
+        'referenceId': refId,
+        'amountCdf': 320000,
+        'paymentReady': refId.contains('returned') || refId == 'booking-returned',
+        'cashPin': '5678',
+        'title': 'Location véhicule',
+      };
+    }
+    if (type == 'MOVING') {
+      final completed = refId.contains('completed') || refId == 'moving-completed';
+      return {
+        'referenceType': 'MOVING',
+        'referenceId': refId,
+        'amountCdf': 220000,
+        'paymentReady': completed,
+        'cashPin': completed ? '4321' : null,
+        'title': 'Déménagement',
+      };
+    }
+    return {
+      'referenceType': type,
+      'referenceId': refId,
+      'amountCdf': 10000,
+      'paymentReady': true,
+      'cashPin': null,
+      'title': type,
+    };
+  }
 
   static List<Map<String, dynamic>> rideHistory() => [
         {
@@ -504,31 +557,100 @@ abstract final class MockData {
     };
   }
 
-  static Map<String, dynamic> scheduledRideEstimate(Map<String, dynamic> body) => {
-        'estimatedPriceCdf': estimate({'vehicleType': body['vehicleType'] ?? 'STANDARD'})['estimatedFareCdf'],
-        'currency': 'CDF',
-      };
-
   static Map<String, dynamic> scheduledEstimate(Map<String, dynamic> body) =>
       scheduledRideEstimate(body);
 
+  static Map<String, dynamic> scheduledRideEstimate(Map<String, dynamic> body) {
+    final est = estimate({'vehicleType': body['vehicleType'] ?? 'STANDARD'});
+    final fare = est['estimatedFareCdf'] as int? ?? 0;
+    return {
+      'estimatedPriceCdf': fare,
+      'currency': 'CDF',
+      'distanceKm': 8.5,
+      'durationMin': 22,
+      'isInterCity': false,
+      'type': 'SCHEDULED',
+      'passengerTotalCdf': fare,
+      'priceBreakdown': {
+        'baseFareCdf': 3000,
+        'distanceFareCdf': (fare * 0.55).round(),
+        'durationFareCdf': (fare * 0.25).round(),
+      },
+      'lateCancelPolicy':
+          'Annulation gratuite jusqu\'à 24 h avant le départ. Au-delà : 50 % du tarif estimé.',
+    };
+  }
+
   static Map<String, dynamic> createScheduledRide(Map<String, dynamic> body) => {
         'id': 'sched-${DateTime.now().millisecondsSinceEpoch}',
-        'status': 'CONFIRMED',
+        'status': 'SCHEDULED',
         'type': 'SCHEDULED',
         ...body,
+        'scheduledAt': body['scheduledAt'] ?? DateTime.now().add(const Duration(days: 2)).toIso8601String(),
+        'estimatedPriceCdf': scheduledRideEstimate(body)['estimatedPriceCdf'],
         'priceCdf': scheduledRideEstimate(body)['estimatedPriceCdf'],
+        'canCancel': true,
       };
+
+  static Map<String, dynamic> scheduledRideDetail(String id) => {
+        'id': id,
+        'status': 'CONFIRMED',
+        'type': 'SCHEDULED',
+        'pickupAddress': 'Gombe, Kinshasa',
+        'dropoffAddress': 'Aéroport N\'Djili',
+        'vehicleType': 'STANDARD',
+        'scheduledAt': DateTime.now().add(const Duration(days: 2)).toIso8601String(),
+        'estimatedPriceCdf': 25000,
+        'priceCdf': 25000,
+        'passengerTotalCdf': 25000,
+        'canCancel': true,
+        'driverId': 'driver-mock-1',
+        'completionPin': '1234',
+      };
+
+  static List<Map<String, dynamic>> scheduledOffers() => [
+        {
+          'id': 'sched-offer-1',
+          'type': 'SCHEDULED',
+          'label': 'Course planifiée',
+          'status': 'SCHEDULED',
+          'pickupAddress': 'Bandalungwa',
+          'dropoffAddress': 'Limete',
+          'scheduledAt': DateTime.now().add(const Duration(days: 1, hours: 3)).toIso8601String(),
+          'vehicleType': 'MOTO_TAXI',
+          'priceCdf': 12000,
+          'driverNetCdf': 10200,
+          'volunteered': false,
+        },
+      ];
+
+  static List<Map<String, dynamic>> scheduledAssignments() => [
+        {
+          'id': 'sched-assign-1',
+          'type': 'SCHEDULED',
+          'label': 'Course planifiée',
+          'status': 'CONFIRMED',
+          'pickupAddress': 'Gombe',
+          'dropoffAddress': 'Aéroport N\'Djili',
+          'scheduledAt': DateTime.now().add(const Duration(hours: 5)).toIso8601String(),
+          'vehicleType': 'STANDARD',
+          'priceCdf': 25000,
+          'driverNetCdf': 21250,
+        },
+      ];
 
   static List<Map<String, dynamic>> scheduledRides() => [
         {
           'id': 'sched-1',
-          'status': 'CONFIRMED',
+          'status': 'SCHEDULED',
           'type': 'SCHEDULED',
+          'pickupAddress': 'Gombe, Kinshasa',
           'dropoffAddress': 'Aéroport N\'Djili',
           'vehicleType': 'STANDARD',
           'scheduledAt': DateTime.now().add(const Duration(days: 2)).toIso8601String(),
+          'estimatedPriceCdf': 25000,
           'priceCdf': 25000,
+          'canCancel': true,
         },
       ];
 
@@ -634,6 +756,37 @@ abstract final class MockData {
           'createdAt': DateTime.now().add(const Duration(days: 1)).toIso8601String(),
           'meta': {'scheduledAt': DateTime.now().add(const Duration(days: 1)).toIso8601String()},
         },
+        {
+          'type': 'RENTAL',
+          'id': 'booking-returned',
+          'status': 'RETURNED',
+          'title': 'Toyota RAV4',
+          'priceCdf': 320000,
+          'paymentReady': true,
+          'isPaid': false,
+          'createdAt': DateTime.now().subtract(const Duration(days: 2)).toIso8601String(),
+          'meta': {
+            'startDate': DateTime.now().subtract(const Duration(days: 5)).toIso8601String(),
+            'endDate': DateTime.now().subtract(const Duration(days: 2)).toIso8601String(),
+            'paymentReferenceId': 'booking-returned',
+          },
+        },
+        {
+          'type': 'MOVING',
+          'id': 'moving-completed',
+          'status': 'COMPLETED',
+          'title': 'Bandal → Gombe',
+          'priceCdf': 220000,
+          'paymentReady': true,
+          'isPaid': false,
+          'createdAt': DateTime.now().subtract(const Duration(days: 3)).toIso8601String(),
+          'meta': {
+            'pickupAddress': 'Bandal, Kinshasa',
+            'dropoffAddress': 'Gombe, Kinshasa',
+            'volumeM3': 10,
+            'paymentReferenceId': 'moving-completed',
+          },
+        },
       ];
 
   static List<Map<String, dynamic>> rentalVehicles() => [
@@ -704,6 +857,8 @@ abstract final class MockData {
   static List<Map<String, dynamic>> carpoolRides() => [
         {
           'id': 'carpool-1',
+          'status': 'MATCHED',
+          'type': 'CARPOOL',
           'fromAddress': 'Gombe, Kinshasa',
           'toAddress': 'Limete, Kinshasa',
           'fromCity': 'Kinshasa',
@@ -716,6 +871,7 @@ abstract final class MockData {
           'driverRating': 4.8,
           'kycVerified': true,
           'availableSeats': 2,
+          'seatsTotal': 4,
           'pricePerSeatCdf': 3000,
           'totalPriceCdf': 12000,
           'distanceKm': 5.2,
@@ -723,15 +879,18 @@ abstract final class MockData {
           'etaLabel': '~18 min · 5.2 km',
           'departureAt': DateTime.now().add(const Duration(hours: 4)).toIso8601String(),
           'passengerCount': 1,
+          'bookedSeats': 1,
           'timelineStep': 'Places réservées',
           'contactPhone': '+243 *** 123',
+          'canCancel': true,
           'passengers': [
-            {'id': 'p1', 'userId': 'user-abc', 'seats': 1, 'label': 'Passager abc'},
+            {'id': 'booking-mock-1', 'userId': 'passenger-mock-1', 'seats': 1, 'label': 'Marie Passagère'},
           ],
         },
         {
           'id': 'carpool-2',
-          'fromAddress': 'Kinshasa Centre',
+          'status': 'OPEN',
+          'type': 'CARPOOL',
           'toAddress': 'Aéroport N\'Djili',
           'fromCity': 'Kinshasa',
           'toCity': 'Kinshasa',
@@ -874,25 +1033,50 @@ abstract final class MockData {
     };
   }
 
+  static Map<String, dynamic> rentalInquiryDetail(String id, {String status = 'CONFIRMED'}) {
+    final vehicle = rentalVehicles()[1];
+    final total = 320000;
+    final deposit = vehicle['depositCdf'] as int? ?? 150000;
+    final driverNet = 26400;
+    return {
+      'id': id,
+      'type': 'RENTAL',
+      'vehicleType': vehicle['category'],
+      'status': status,
+      'logisticsMode': 'MOVA_DRIVER',
+      'logisticsModeLabel': 'Livraison par un chauffeur MOVA',
+      'startDate': DateTime.now().add(const Duration(days: 1)).toIso8601String(),
+      'endDate': DateTime.now().add(const Duration(days: 3)).toIso8601String(),
+      'pickupAddress': 'Gombe, Kinshasa',
+      'pickupCity': 'Kinshasa',
+      'returnCity': 'Kinshasa',
+      'totalCdf': total,
+      'priceCdf': total,
+      'passengerTotalCdf': total,
+      'depositCdf': deposit,
+      'rentalSubtotalCdf': total - deposit,
+      'driverGrossCdf': 30000,
+      'driverNetCdf': driverNet,
+      'displayAmountCdf': driverNet,
+      'displayAmountLabel': 'Rémunération logistique',
+      'contactPhone': '+243900000010',
+      'vehicleName': vehicle['name'],
+      'vehicle': vehicle,
+      'timeline': [
+        {'status': 'CONFIRMED', 'label': 'Confirmée', 'completed': true, 'current': status == 'CONFIRMED'},
+        {'status': 'IN_PROGRESS', 'label': 'En cours', 'completed': status != 'CONFIRMED', 'current': status == 'IN_PROGRESS'},
+        {'status': 'RETURNED', 'label': 'Retournée', 'completed': status == 'RETURNED' || status == 'PAID', 'current': status == 'RETURNED'},
+      ],
+      'paymentReady': status == 'RETURNED',
+      'isPaid': status == 'PAID',
+      'paymentReferenceId': id,
+      'completionPin': status == 'RETURNED' || status == 'PAID' ? '5678' : null,
+      'canCancel': status == 'CONFIRMED',
+    };
+  }
+
   static List<Map<String, dynamic>> rentalInquiries() => [
-        {
-          'id': 'rental-1',
-          'vehicleType': 'SUV',
-          'status': 'PENDING',
-          'startDate': DateTime.now().add(const Duration(days: 3)).toIso8601String(),
-          'endDate': DateTime.now().add(const Duration(days: 5)).toIso8601String(),
-          'pickupAddress': 'Gombe, Kinshasa',
-          'pickupCity': 'Kinshasa',
-          'returnCity': 'Kinshasa',
-          'totalCdf': 320000,
-          'timeline': [
-            {'status': 'PENDING', 'label': 'Demande', 'completed': true, 'current': true},
-            {'status': 'CONFIRMED', 'label': 'Confirmée', 'completed': false, 'current': false},
-            {'status': 'IN_PROGRESS', 'label': 'En cours', 'completed': false, 'current': false},
-            {'status': 'RETURNED', 'label': 'Retournée', 'completed': false, 'current': false},
-          ],
-          'vehicle': rentalVehicles()[1],
-        },
+        rentalInquiryDetail('rental-1', status: 'PENDING'),
       ];
 
   static Map<String, dynamic> createRentalInquiry(Map<String, dynamic> body) {
@@ -947,22 +1131,10 @@ abstract final class MockData {
 
   static List<Map<String, dynamic>> rentalBookings() => [
         {
-          'id': 'booking-1',
-          'vehicleType': 'SUV',
-          'status': 'PENDING',
-          'startDate': DateTime.now().add(const Duration(days: 3)).toIso8601String(),
-          'endDate': DateTime.now().add(const Duration(days: 5)).toIso8601String(),
-          'pickupAddress': 'Gombe, Kinshasa',
-          'pickupCity': 'Kinshasa',
-          'returnCity': 'Kinshasa',
-          'totalCdf': 320000,
-          'timeline': [
-            {'status': 'PENDING', 'label': 'Demande', 'completed': true, 'current': true},
-            {'status': 'CONFIRMED', 'label': 'Confirmée', 'completed': false, 'current': false},
-            {'status': 'IN_PROGRESS', 'label': 'En cours', 'completed': false, 'current': false},
-            {'status': 'RETURNED', 'label': 'Retournée', 'completed': false, 'current': false},
-          ],
-          'vehicle': rentalVehicles()[1],
+          ...rentalInquiryDetail('booking-1', status: 'CONFIRMED'),
+        },
+        {
+          ...rentalInquiryDetail('booking-returned', status: 'RETURNED'),
         },
       ];
 
@@ -993,20 +1165,53 @@ abstract final class MockData {
     };
   }
 
-  static Map<String, dynamic> movingDetail(String id) => {
-        'id': id,
-        'status': 'PENDING',
-        'pickupAddress': 'Bandal, Kinshasa',
-        'dropoffAddress': 'Gombe, Kinshasa',
-        'volumeM3': 10,
-        'estimatedPriceCdf': 220000,
-        'timeline': [
-          {'label': 'Demande enregistrée', 'done': true},
-          {'label': 'Devis confirmé', 'done': false},
-          {'label': 'Équipe en route', 'done': false},
-          {'label': 'Déménagement terminé', 'done': false},
-        ],
-      };
+  static Map<String, dynamic> movingDetail(String id, {String status = 'PENDING'}) {
+    final price = 220000;
+    final volumeFee = 80000;
+    final isCompleted = status == 'COMPLETED';
+    final isAssigned = status == 'ASSIGNED' || status == 'IN_PROGRESS' || isCompleted;
+    return {
+      'id': id,
+      'type': 'MOVING',
+      'status': status,
+      'pickupAddress': 'Bandal, Kinshasa',
+      'dropoffAddress': 'Gombe, Kinshasa',
+      'pickupLat': -4.35,
+      'pickupLng': 15.31,
+      'dropoffLat': -4.32,
+      'dropoffLng': 15.31,
+      'volumeM3': 10,
+      'vehicleCategory': 'CAMION_15M3',
+      'vehicleCategoryLabel': 'Camion ~15 m³',
+      'estimatedPriceCdf': price,
+      'passengerTotalCdf': price,
+      'priceCdf': price,
+      'volumeFeeCdf': volumeFee,
+      'serviceBaseFeeCdf': 15000,
+      'transportFareCdf': price - volumeFee - 15000,
+      'priceBreakdown': {
+        'transportFareCdf': price - volumeFee - 15000,
+        'volumeFeeCdf': volumeFee,
+        'baseFareCdf': 15000,
+        'totalCdf': price,
+      },
+      if (isAssigned) 'driverId': 'driver-mock-1',
+      if (isAssigned) 'driverNetCdf': 187000,
+      if (isAssigned) 'driverGrossCdf': price,
+      'paymentReady': isCompleted,
+      'isPaid': false,
+      'paymentReferenceId': id,
+      'completionPin': isCompleted ? '4321' : null,
+      'canCancel': status == 'PENDING' || status == 'ASSIGNED',
+      'timeline': [
+        {'label': 'Demande enregistrée', 'done': true},
+        {'label': 'Équipe assignée', 'done': isAssigned},
+        {'label': 'Déménagement en cours', 'done': status == 'IN_PROGRESS' || isCompleted},
+        {'label': 'Déménagement terminé', 'done': isCompleted},
+      ],
+      'photoUrls': ['mock://moving-photo-1'],
+    };
+  }
 
   static Map<String, dynamic> mobileErrandEstimate(Map<String, dynamic> body) {
     final items = body['items'] as List? ?? [];
@@ -1075,7 +1280,12 @@ abstract final class MockData {
             'monthlyPriceCdf': 15000,
             'feeReductionPercent': 10,
             'priorityMatching': false,
-            'description': 'Réduction 10 % sur les frais de service',
+            'description': 'L\'essentiel pour payer moins sur vos trajets du quotidien',
+            'benefits': [
+              '−10 % sur les frais de service MOVA',
+              'Courses, livraisons, déménagement, planifiées',
+              'Sans engagement — résiliable à tout moment',
+            ],
           },
           {
             'id': 'plan-premium',
@@ -1084,7 +1294,14 @@ abstract final class MockData {
             'monthlyPriceCdf': 35000,
             'feeReductionPercent': 20,
             'priorityMatching': true,
-            'description': 'Priorité matching + 20 % de réduction',
+            'isPopular': true,
+            'description': 'Priorité chauffeur + meilleure réduction — comme Uber One',
+            'benefits': [
+              '−20 % sur les frais de service MOVA',
+              'Priorité de matching chauffeur / livreur',
+              'Support prioritaire',
+              'Idéal pour 8+ commandes par mois',
+            ],
           },
         ],
       };
@@ -1098,7 +1315,38 @@ abstract final class MockData {
           'status': 'ACTIVE',
           'startedAt': DateTime.now().toIso8601String(),
           'renewsAt': DateTime.now().add(const Duration(days: 30)).toIso8601String(),
+          'plan': planId == 'plan-premium'
+              ? {
+                  'id': 'plan-premium',
+                  'name': 'MOVA Premium',
+                  'monthlyPriceCdf': 35000,
+                  'feeReductionPercent': 20,
+                  'priorityMatching': true,
+                }
+              : {
+                  'id': 'plan-basic',
+                  'name': 'MOVA Plus',
+                  'monthlyPriceCdf': 15000,
+                  'feeReductionPercent': 10,
+                  'priorityMatching': false,
+                },
         },
+        'plan': planId == 'plan-premium'
+            ? {
+                'id': 'plan-premium',
+                'name': 'MOVA Premium',
+                'monthlyPriceCdf': 35000,
+                'feeReductionPercent': 20,
+                'priorityMatching': true,
+              }
+            : {
+                'id': 'plan-basic',
+                'name': 'MOVA Plus',
+                'monthlyPriceCdf': 15000,
+                'feeReductionPercent': 10,
+                'priorityMatching': false,
+              },
+        'message': 'Abonnement activé — les réductions s\'appliquent automatiquement.',
         'success': true,
       };
 

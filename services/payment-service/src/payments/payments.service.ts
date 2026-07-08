@@ -1,11 +1,12 @@
 import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { PaymentMethod, PaymentStatus } from '@prisma/client';
+import { CashDebtCategory, PaymentMethod, PaymentStatus } from '@prisma/client';
 import {
   MOVA_EVENTS,
   MovaErrorCode,
   MovaHttpException,
   PaymentCompletedPayload,
+  RideCashPendingPayload,
   INTERNAL_API_KEY,
   fromMobileRideStatus,
   normalizePhoneRdc,
@@ -17,6 +18,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { WalletService } from '../wallet/wallet.service';
 import { DriverPayoutService } from '../payouts/driver-payout.service';
 import { FoodDeliveryPayoutService } from '../payouts/food-delivery-payout.service';
+import { DriverDebtLedgerService } from '../ledger/driver-debt-ledger.service';
 import { AirtelMoneyProvider, MockPaymentProvider, MpesaProvider, OrangeMoneyProvider } from './payment-providers';
 import { PaymentProvider } from './payment-provider.interface';
 
@@ -37,6 +39,7 @@ export class PaymentsService {
     private walletService: WalletService,
     private driverPayouts: DriverPayoutService,
     private foodPayouts: FoodDeliveryPayoutService,
+    private debtLedger: DriverDebtLedgerService,
     private redis: RedisService,
     mock: MockPaymentProvider,
     orange: OrangeMoneyProvider,
@@ -105,6 +108,35 @@ export class PaymentsService {
     }
   }
 
+  private async publishRideCashPending(payload: RideCashPendingPayload) {
+    try {
+      this.logger.log(`Publishing RIDE_CASH_PENDING for ride ${payload.rideId} (driver ${payload.driverId ?? 'n/a'})`);
+      await this.redis.publish(MOVA_EVENTS.RIDE_CASH_PENDING, payload);
+    } catch (e) {
+      this.logger.warn(`Redis publish RIDE_CASH_PENDING failed for ride ${payload.rideId}`, e);
+    }
+  }
+
+  private async publishServiceCashPending(payload: {
+    referenceType: string;
+    referenceId: string;
+    driverId?: string;
+    userId?: string;
+    amountCdf: number;
+  }) {
+    try {
+      this.logger.log(
+        `Publishing SERVICE_CASH_PENDING for ${payload.referenceType}/${payload.referenceId} (driver ${payload.driverId ?? 'n/a'})`,
+      );
+      await this.redis.publish(MOVA_EVENTS.SERVICE_CASH_PENDING, payload);
+    } catch (e) {
+      this.logger.warn(
+        `Redis publish SERVICE_CASH_PENDING failed for ${payload.referenceType}/${payload.referenceId}`,
+        e,
+      );
+    }
+  }
+
   private async settleDriverPayout(
     referenceType: string,
     referenceId: string,
@@ -130,6 +162,16 @@ export class PaymentsService {
         `PLATFORM_FEE:${referenceType}:${referenceId}`,
       );
     }
+    if (paymentMethod === PaymentMethod.CASH && platformFee > 0) {
+      await this.debtLedger.recordDebt({
+        driverUserId: driverId,
+        referenceType,
+        referenceId,
+        category: CashDebtCategory.PLATFORM_FEE,
+        amountCdf: platformFee,
+        description: `Commission espèces à reverser — ${referenceType} ${referenceId.slice(0, 8)}`,
+      });
+    }
   }
 
   private async creditDriverAfterRidePayment(rideId: string) {
@@ -154,7 +196,11 @@ export class PaymentsService {
         await this.syncRentalPaidStatus(referenceId);
       }
       if (type === 'DELIVERY') {
-        const foodResult = await this.foodPayouts.creditFoodDeliverySettlement(referenceId);
+        const foodPayment = await this.prisma.servicePayment.findUnique({
+          where: { referenceType_referenceId: { referenceType: type, referenceId } },
+        });
+        const foodMethod = foodPayment?.method ?? PaymentMethod.WALLET;
+        const foodResult = await this.foodPayouts.creditFoodDeliverySettlement(referenceId, foodMethod);
         if (foodResult.handled) return;
       }
       const res = await fetch(
@@ -215,6 +261,12 @@ export class PaymentsService {
     if (this.resolveRideStatus(ride) !== 'COMPLETED') {
       throw new MovaHttpException(MovaErrorCode.RIDE_INVALID_STATUS);
     }
+    // Idempotence : ne jamais rétrograder un paiement déjà réglé (ex. cash confirmé
+    // par le chauffeur) en re-créant un PENDING lors d'un double clic « Payer ».
+    const existingPayment = await this.prisma.payment.findUnique({ where: { rideId } });
+    if (existingPayment?.status === PaymentStatus.COMPLETED) {
+      return { success: true, payment: existingPayment, alreadyPaid: true, message: 'Course déjà payée' };
+    }
     const amountCdf = amountOverride ?? ride.finalFareCdf ?? ride.estimatedFareCdf ?? ride.priceCdf ?? 0;
     if (amountCdf <= 0) throw new MovaHttpException(MovaErrorCode.PAYMENT_FAILED);
     const paymentPhone = this.resolvePaymentPhone(method, phone);
@@ -235,6 +287,14 @@ export class PaymentsService {
         where: { rideId },
         create: { rideId, userId, amountCdf, method, status: PaymentStatus.PENDING, providerRef: `cash_pending_${rideId}` },
         update: { status: PaymentStatus.PENDING, method, amountCdf },
+      });
+      // Notifie le chauffeur en temps réel pour ouvrir automatiquement la
+      // confirmation du PIN espèces (relayé par ride-service au socket).
+      await this.publishRideCashPending({
+        rideId,
+        driverId: ride.driverId ?? undefined,
+        passengerId: ride.passengerId ?? undefined,
+        amountCdf,
       });
       return {
         success: true,
@@ -343,6 +403,13 @@ export class PaymentsService {
         where: { referenceType_referenceId: { referenceType: type, referenceId } },
         create: { referenceType: type, referenceId, userId, amountCdf, method, status: PaymentStatus.PENDING, providerRef: `cash_pending_${refKey}` },
         update: { status: PaymentStatus.PENDING, method, amountCdf },
+      });
+      await this.publishServiceCashPending({
+        referenceType: type,
+        referenceId,
+        driverId: info.driverId ?? undefined,
+        userId,
+        amountCdf,
       });
       return { success: true, payment, pendingCash: true, message: 'Paiement espèces en attente — communiquez le code PIN au livreur.', amountCdf, currency: 'CDF' };
     }
@@ -555,7 +622,32 @@ export class PaymentsService {
       referenceId,
       isPaid,
       paymentStatus: payment?.status ?? null,
+      paymentMethod: payment?.method ?? null,
     };
+  }
+
+  async getServicePaymentStatuses(referenceType: string, referenceIds: string[]) {
+    const type = referenceType.toUpperCase();
+    const unique = [...new Set(referenceIds.filter(Boolean))];
+    const payments = await this.prisma.servicePayment.findMany({
+      where: { referenceType: type, referenceId: { in: unique } },
+    });
+    const byId = new Map(payments.map((p) => [p.referenceId, p]));
+    const result: Record<
+      string,
+      { referenceType: string; referenceId: string; isPaid: boolean; paymentStatus: string | null; paymentMethod: string | null }
+    > = {};
+    for (const referenceId of unique) {
+      const payment = byId.get(referenceId);
+      result[referenceId] = {
+        referenceType: type,
+        referenceId,
+        isPaid: payment?.status === PaymentStatus.COMPLETED,
+        paymentStatus: payment?.status ?? null,
+        paymentMethod: payment?.method ?? null,
+      };
+    }
+    return result;
   }
 
   private formatPaymentDetail(payment: {
@@ -668,5 +760,13 @@ export class PaymentsService {
     }
 
     return { ride: null, pendingCash: false };
+  }
+
+  getDriverCashDebtSummary(driverUserId: string) {
+    return this.debtLedger.getSummary(driverUserId);
+  }
+
+  settleDriverCashDebtFromWallet(driverUserId: string) {
+    return this.debtLedger.settleFromWallet(driverUserId);
   }
 }

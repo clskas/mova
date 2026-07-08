@@ -4,16 +4,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 import '../../core/api/api_client.dart';
+import '../../core/billing/service_price_display.dart';
 import '../../core/config/market_config.dart';
 import '../../core/error/result.dart';
+import '../../core/home/active_shipments_refresh.dart';
 import '../../core/services/cancel_eligibility.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import '../passenger/passenger_alert_service.dart';
 import '../booking/payment_screen.dart';
-import '../booking/widgets/mova_ride_map.dart';
 import '../chat/delivery_chat_screen.dart';
+import 'delivery_live_tracking.dart';
+import 'delivery_payment_state.dart';
 import 'widgets/delivery_tracking_map.dart';
 
 class FoodTrackingScreen extends ConsumerStatefulWidget {
@@ -43,10 +46,19 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
   String? _error;
   Timer? _pollTimer;
   String? _lastStatus;
+  bool _lastIsPaid = false;
+  late final DeliveryLiveTracking _liveTracking;
 
   @override
   void initState() {
     super.initState();
+    _liveTracking = DeliveryLiveTracking(
+      deliveryId: widget.orderId,
+      ref: ref,
+      setState: setState,
+      mounted: () => mounted,
+      onPaymentCompleted: _handlePaymentCompleted,
+    );
     _load();
     _pollTimer = Timer.periodic(const Duration(seconds: 5), (_) => _load(silent: true));
   }
@@ -54,7 +66,54 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
   @override
   void dispose() {
     _pollTimer?.cancel();
+    _liveTracking.dispose();
     super.dispose();
+  }
+
+  void _handlePaymentCompleted(Map<String, dynamic> payload) {
+    if (!mounted) return;
+    final wasPaid = deliveryIsPaid(_delivery);
+    final method = payload['method']?.toString() ?? _delivery?['paymentMethod']?.toString();
+    setState(() {
+      _delivery = {
+        ...?_delivery,
+        'isPaid': true,
+        'paymentStatus': payload['paymentStatus']?.toString() ?? 'COMPLETED',
+        if (method != null) 'paymentMethod': method,
+        'paymentReady': false,
+      };
+      _lastIsPaid = true;
+    });
+    if (!wasPaid) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(paymentConfirmedMessage(method: method))),
+      );
+    }
+  }
+
+  void _applyDeliveryPayload(Map<String, dynamic> data) {
+    final merged = mergeDeliveryApiPayload(data);
+    final hadPrevious = _delivery != null;
+    final wasPaid = _lastIsPaid;
+    final isPaid = deliveryIsPaid(merged);
+    _delivery = merged;
+    final newStatus = _delivery?['status']?.toString();
+    if (newStatus != null && newStatus != _lastStatus) {
+      _lastStatus = newStatus;
+      PassengerAlertService.notifyDeliveryStatus(newStatus);
+    }
+    if (hadPrevious && isPaid && !wasPaid) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            paymentConfirmedMessage(method: merged['paymentMethod']?.toString()),
+          ),
+        ),
+      );
+    }
+    _lastIsPaid = isPaid;
+    _maybeGoToPayment();
+    unawaited(_liveTracking.syncWithDelivery(_delivery));
   }
 
   Future<void> _load({bool silent = false}) async {
@@ -72,19 +131,8 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
       _loading = silent ? _loading : false;
       switch (result) {
         case Success(:final data):
-          final delivery = data['delivery'] as Map<String, dynamic>? ?? data;
-          if (data['gpsTrace'] != null) {
-            _delivery = {...delivery, 'gpsTrace': data['gpsTrace']};
-          } else {
-            _delivery = delivery;
-          }
-          final newStatus = _delivery?['status']?.toString();
-          if (newStatus != null && newStatus != _lastStatus) {
-            _lastStatus = newStatus;
-            PassengerAlertService.notifyDeliveryStatus(newStatus);
-          }
+          _applyDeliveryPayload(data);
           _error = null;
-          _maybeGoToPayment();
         case Failure(:final error):
           if (!silent) _error = error.message;
       }
@@ -109,21 +157,33 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
 
   String get _statusLabel {
     final fromApi = _delivery?['statusLabel']?.toString();
-    if (fromApi != null && fromApi.isNotEmpty) return fromApi;
     final status = _delivery?['status']?.toString();
-    return switch (status) {
-      'PENDING' => 'En attente du restaurant',
-      'RESTAURANT_CONFIRMED' => 'En préparation',
-      'READY_FOR_PICKUP' => 'Prête — livreur en route',
-      'PICKED_UP' => 'Livreur assigné',
-      'IN_TRANSIT' => 'En livraison',
-      'DELIVERED' => 'Livré',
-      'CANCELLED' => 'Annulée',
-      _ => 'En cours',
-    };
+    final base = (fromApi != null && fromApi.isNotEmpty)
+        ? fromApi
+        : switch (status) {
+            'PENDING' => 'En attente du restaurant',
+            'RESTAURANT_CONFIRMED' => 'En préparation',
+            'READY_FOR_PICKUP' => 'Prête — livreur en route',
+            'PICKED_UP' => 'Livreur assigné',
+            'IN_TRANSIT' => 'En livraison',
+            'DELIVERED' => 'Livré',
+            'CANCELLED' => 'Annulée',
+            _ => 'En cours',
+          };
+    if (deliveryIsPaid(_delivery)) return '$base · Payée';
+    if (deliveryCashPaymentPending(_delivery)) return '$base · Paiement espèces en attente';
+    if (_paymentDue) return '$base · Paiement en attente';
+    return base;
   }
 
   bool get _canCancel => CancelEligibility.delivery(_delivery);
+
+  bool get _canChatRestaurant {
+    final status = _delivery?['status']?.toString();
+    return status != null && status != 'CANCELLED' && status != 'DELIVERED';
+  }
+
+  bool get _hasCourier => _delivery?['driverId'] != null || _delivery?['courier'] != null;
 
   Future<bool> _showFoodRatingPrompt() async {
     final api = ref.read(apiClientProvider);
@@ -228,9 +288,12 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
   }
 
   bool get _paymentDue {
+    if (deliveryIsPaid(_delivery)) return false;
     final status = _delivery?['status']?.toString();
     return _delivery?['paymentReady'] == true || status == 'DELIVERED';
   }
+
+  bool get _cashPaymentPending => deliveryCashPaymentPending(_delivery);
 
   Future<void> _openPayment() async {
     if (!mounted) return;
@@ -288,6 +351,8 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
     setState(() => _cancelling = false);
     switch (result) {
       case Success():
+        refreshActiveShipmentsHome(ref);
+        if (!mounted) return;
         Navigator.popUntil(context, (r) => r.isFirst);
       case Failure(:final error):
         setState(() => _error = error.message);
@@ -310,10 +375,8 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
   @override
   Widget build(BuildContext context) {
     final courier = _delivery?['courier'] as Map<String, dynamic>?;
-    final courierLoc = DeliveryTrackingMap.parseLocation(
-      _delivery?['courierLocation'] as Map<String, dynamic>?,
-    );
-    final eta = DeliveryTrackingMap.etaFromDelivery(_delivery);
+    final courierLoc = _liveTracking.effectiveCourier(_delivery);
+    final eta = _liveTracking.effectiveEta(_delivery);
     final pin = _delivery?['deliveryPin']?.toString();
 
     return MovaScreen(
@@ -338,18 +401,66 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
                           MovaErrorBanner(message: _error!, onRetry: _load),
                           const SizedBox(height: 12),
                         ],
+                        if (_cashPaymentPending && pin != null && pin.isNotEmpty) ...[
+                          MovaCard(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                const Text(
+                                  'Paiement espèces en attente',
+                                  style: TextStyle(fontWeight: FontWeight.w600),
+                                ),
+                                const SizedBox(height: 4),
+                                const Text(
+                                  'Remettez le montant au livreur et communiquez-lui ce code PIN :',
+                                  style: TextStyle(color: MovaColors.textSecondary, fontSize: 12),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  pin,
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    fontSize: 28,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 6,
+                                    color: MovaColors.green,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                        ],
+                        if (deliveryIsPaid(_delivery)) ...[
+                          MovaCard(
+                            child: Row(
+                              children: [
+                                const Icon(Icons.check_circle, color: MovaColors.green),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    _delivery?['paymentMethod']?.toString().toUpperCase() == 'CASH'
+                                        ? 'Commande payée (espèces confirmées)'
+                                        : 'Commande payée',
+                                    style: const TextStyle(fontWeight: FontWeight.w600),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                        ],
                         DeliveryTrackingMap(
                           pickup: _pickup,
                           dropoff: _dropoff,
                           courier: courierLoc,
-                          routeTrace: MovaRideMap.parseGpsTrace(_delivery?['gpsTrace']),
+                          routeTrace: _liveTracking.effectiveTrace(_delivery),
                           etaMinutes: eta,
                           deliveryPin: pin,
                           courierName: courier?['name']?.toString(),
                           courierRating: (courier?['rating'] as num?)?.toDouble(),
-                          courierPositionEstimated:
-                              _delivery?['courierPositionEstimated'] == true ||
-                              _delivery?['courierPositionSource']?.toString() == 'estimated',
+                          courierPositionEstimated: _liveTracking.effectiveEstimated(_delivery),
+                          followCourier: _liveTracking.shouldFollowCourier(_delivery),
                           pickupLabel: _delivery?['pickupAddress']?.toString(),
                           dropoffLabel: _delivery?['dropoffAddress']?.toString(),
                         ),
@@ -377,14 +488,10 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ],
-                              const SizedBox(height: 8),
-                              Text(
-                                MarketConfig.formatCdf(_totalCdf),
-                                style: const TextStyle(
-                                  color: MovaColors.green,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 18,
-                                ),
+                              const SizedBox(height: 12),
+                              ServicePriceDisplay.passengerCard(
+                                _delivery,
+                                totalLabel: 'Total commande',
                               ),
                               Text(
                                 _statusLabel,
@@ -433,12 +540,33 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      if (courier != null || _delivery?['driverId'] != null) ...[
+                      if (_canChatRestaurant) ...[
+                        MovaButton(
+                          label: 'Contacter le restaurant',
+                          isSecondary: true,
+                          icon: Icons.storefront_outlined,
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => DeliveryChatScreen(
+                                  deliveryId: widget.orderId,
+                                  myRole: 'passenger',
+                                  peerLabel: widget.restaurantName,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+                      if (_hasCourier) ...[
                         MovaButton(
                           label: 'Contacter le livreur',
                           isSecondary: true,
                           icon: Icons.chat_bubble_outline,
                           onPressed: () {
+                            final courier = _delivery?['courier'] as Map<String, dynamic>?;
                             Navigator.push(
                               context,
                               MaterialPageRoute(

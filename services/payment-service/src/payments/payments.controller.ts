@@ -70,4 +70,16 @@ export class PaymentsController {
   ) {
     return this.paymentsService.payService(referenceType, referenceId, req.user.id, dto.method, dto.phone, dto.amountCdf);
   }
+
+  @Get('cash-debts/summary')
+  @ApiOperation({ summary: 'Dettes espèces ouvertes (chauffeur/livreur)' })
+  getCashDebtSummary(@Request() req: { user: { id: string } }) {
+    return this.paymentsService.getDriverCashDebtSummary(req.user.id);
+  }
+
+  @Post('cash-debts/settle')
+  @ApiOperation({ summary: 'Régler les dettes espèces depuis le portefeuille' })
+  settleCashDebts(@Request() req: { user: { id: string } }) {
+    return this.paymentsService.settleDriverCashDebtFromWallet(req.user.id);
+  }
 }

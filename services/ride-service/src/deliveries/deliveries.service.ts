@@ -9,6 +9,7 @@ import { CreateFoodDeliveryDto, CreateFoodMultiDeliveryDto, CreateParcelDelivery
 import { assertServiceAreaPair } from '../common/address.util';
 import { tripDistanceKm } from '../common/geo.util';
 import { fetchAuthUserBrief } from '../common/internal-lookup.util';
+import { fetchServicePaymentStatus } from '../common/payment-status.util';
 import {
   buildParcelTimeline,
   detectCommune,
@@ -21,6 +22,7 @@ import { MatchingService } from '../matching/matching.service';
 import { notifyNearbyDrivers } from '../common/driver-job-alert.util';
 import { CommissionService } from '../rides/commission.service';
 import { deliveryDriverGross } from './delivery-driver-gross.util';
+import { parseFoodItemShares, parseOrderPlacedMetadata } from './food-delivery-settlement.util';
 import { applyPromoCode, formatPromoValidation } from '../common/promo-apply.util';
 import { RoutingService } from '../geo/routing.service';
 
@@ -250,24 +252,19 @@ export class DeliveriesService {
     return { subtotalCdf: subtotal, normalizedItems: normalized };
   }
 
-  /** Frais et distance livraison repas — même ville, distance plafonnée, frais plafonnés. */
+  /** Frais et distance livraison repas — distance routière (inter-villes autorisée). */
   private async computeFoodDeliveryQuote(
     restaurantLat: number,
     restaurantLng: number,
     deliveryLat: number,
     deliveryLng: number,
   ) {
+    assertServiceAreaPair(restaurantLat, restaurantLng, deliveryLat, deliveryLng);
+    const distanceKm = await this.routing.roadDistanceKm(restaurantLat, restaurantLng, deliveryLat, deliveryLng);
     const restaurantCity = resolveCityFromCoords(restaurantLat, restaurantLng).toLowerCase();
     const deliveryCity = resolveCityFromCoords(deliveryLat, deliveryLng).toLowerCase();
-    if (restaurantCity !== deliveryCity) {
-      throw new MovaHttpException(
-        MovaErrorCode.VALIDATION_ERROR,
-        undefined,
-        'Ce restaurant ne livre pas dans votre ville. Choisissez un restaurant de votre zone.',
-      );
-    }
-    const distanceKm = await this.routing.roadDistanceKm(restaurantLat, restaurantLng, deliveryLat, deliveryLng);
-    const maxKm = MAX_FOOD_DELIVERY_DISTANCE_KM;
+    const isInterCity = restaurantCity !== deliveryCity;
+    const maxKm = isInterCity ? 200 : MAX_FOOD_DELIVERY_DISTANCE_KM;
     if (distanceKm > maxKm) {
       throw new MovaHttpException(
         MovaErrorCode.VALIDATION_ERROR,
@@ -473,6 +470,9 @@ export class DeliveriesService {
           deliveryFeeCdf: estimate.deliveryFeeCdf,
           promoCode: promoApplied.promoCode,
           discountCdf: promoApplied.discountCdf,
+          absorbedBy: promoApplied.settlement?.absorbedBy,
+          partnerDiscountCdf: promoApplied.settlement?.partnerDiscountCdf,
+          platformDiscountCdf: promoApplied.settlement?.platformDiscountCdf,
         } as unknown as Prisma.InputJsonValue,
       },
     });
@@ -546,6 +546,75 @@ export class DeliveriesService {
     return this.updateStatus(id, DeliveryStatus.CANCELLED, userId);
   }
 
+  private async enrichDeliveryPayment<T extends { paymentReady?: boolean }>(formatted: T, deliveryId: string) {
+    const payment = await fetchServicePaymentStatus('DELIVERY', deliveryId);
+    return {
+      ...formatted,
+      isPaid: payment.isPaid,
+      paymentStatus: payment.paymentStatus,
+      paymentMethod: payment.paymentMethod ?? null,
+      paymentReady: Boolean(formatted.paymentReady) && !payment.isPaid,
+    };
+  }
+
+  /** Décomposition prix passager + revenu net livreur (style Glovo/Uber). */
+  private enrichPassengerPricingFields(
+    delivery: {
+      type: DeliveryType;
+      items: unknown;
+      finalPriceCdf: number | null;
+      estimatedPriceCdf: number | null;
+      discountCdf: number | null;
+      events?: { event: string; metadata: unknown }[];
+    },
+    formatted: Record<string, unknown>,
+  ) {
+    const totalCdf = delivery.finalPriceCdf ?? delivery.estimatedPriceCdf ?? 0;
+    const enriched: Record<string, unknown> = {
+      ...formatted,
+      passengerTotalCdf: totalCdf,
+    };
+    if (delivery.type === DeliveryType.FOOD) {
+      const meta = parseOrderPlacedMetadata(delivery.events);
+      const shares = parseFoodItemShares(delivery.items);
+      const itemsGross = shares.reduce((sum, share) => sum + share.itemsGrossCdf, 0);
+      const itemsSubtotalCdf = meta.itemsSubtotalCdf ?? itemsGross;
+      const discountCdf = delivery.discountCdf ?? 0;
+      const deliveryFeeCdf =
+        meta.deliveryFeeCdf ?? Math.max(0, totalCdf + discountCdf - itemsSubtotalCdf);
+      enriched.itemsSubtotalCdf = itemsSubtotalCdf;
+      enriched.deliveryFeeCdf = deliveryFeeCdf;
+      enriched.discountCdf = discountCdf;
+    }
+    return enriched;
+  }
+
+  private async enrichDeliveryForViewer(
+    delivery: {
+      type: DeliveryType;
+      driverId: string | null;
+      items: unknown;
+      finalPriceCdf: number | null;
+      estimatedPriceCdf: number | null;
+      discountCdf: number | null;
+      events?: { event: string; metadata: unknown }[];
+    },
+    formatted: Record<string, unknown>,
+    viewerUserId?: string,
+  ) {
+    let result = this.enrichPassengerPricingFields(delivery, formatted);
+    if (viewerUserId && delivery.driverId === viewerUserId) {
+      const driverGross = deliveryDriverGross(delivery);
+      const rule = await this.commission.get(CommissionServiceType.DELIVERY);
+      result = {
+        ...result,
+        driverGrossCdf: driverGross,
+        driverNetCdf: Math.round(this.commission.splitGross(driverGross, rule.platformPercent).driverNetCdf),
+      };
+    }
+    return result;
+  }
+
   private static readonly ACTIVE_PASSENGER_STATUSES: DeliveryStatus[] = [
     DeliveryStatus.PENDING,
     DeliveryStatus.RESTAURANT_CONFIRMED,
@@ -566,7 +635,15 @@ export class DeliveriesService {
     });
     if (!delivery) return { delivery: null };
     const courier = delivery.driverId ? await this.fetchCourierProfile(delivery.driverId) : null;
-    return { delivery: formatParcelDelivery(delivery, courier) };
+    const formatted = await this.enrichDeliveryPayment(
+      await this.enrichDeliveryForViewer(
+        delivery,
+        formatParcelDelivery(delivery, courier),
+        passengerId,
+      ),
+      delivery.id,
+    );
+    return { delivery: formatted };
   }
 
   async rejectDelivery(deliveryId: string, driverUserId: string) {
@@ -619,7 +696,10 @@ export class DeliveriesService {
       throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
     }
     const courier = delivery.driverId ? await this.fetchCourierProfile(delivery.driverId) : null;
-    const formatted = formatParcelDelivery(delivery, courier);
+    const formatted = await this.enrichDeliveryPayment(
+      await this.enrichDeliveryForViewer(delivery, formatParcelDelivery(delivery, courier), userId),
+      id,
+    );
     const gpsTrace = await this.trackingService.getTrace(TrackingReferenceType.DELIVERY, id);
     return {
       delivery: formatted,
@@ -629,6 +709,9 @@ export class DeliveriesService {
       etaMinutes: formatted.etaMinutes,
       deliveryPin: formatted.deliveryPin,
       paymentReady: formatted.paymentReady,
+      isPaid: formatted.isPaid,
+      paymentStatus: formatted.paymentStatus,
+      paymentMethod: formatted.paymentMethod,
       gpsTrace,
       rated: await this.prisma.deliveryRating.findUnique({
         where: { deliveryId_fromUserId: { deliveryId: id, fromUserId: userId } },
@@ -937,7 +1020,10 @@ export class DeliveriesService {
       data: { deliveryId, event: 'ASSIGNED', metadata: { driverUserId } },
     });
     const courier = await this.fetchCourierProfile(driverUserId);
-    const formatted = formatParcelDelivery(updated, courier);
+    const formatted = await this.enrichDeliveryPayment(
+      await this.enrichDeliveryForViewer(delivery, formatParcelDelivery(updated, courier), driverUserId),
+      deliveryId,
+    );
     return { delivery: formatted, success: true };
   }
 
@@ -999,7 +1085,10 @@ export class DeliveriesService {
     const updated = await this.prisma.delivery.update({ where: { id }, data: updates, include: { events: { orderBy: { createdAt: 'asc' } }, restaurant: true } });
     await this.prisma.deliveryEvent.create({ data: { deliveryId: id, event: status, metadata: { updatedBy: userId } } });
     const courier = updated.driverId ? await this.fetchCourierProfile(updated.driverId) : null;
-    const formatted = formatParcelDelivery(updated, courier);
+    const formatted = await this.enrichDeliveryPayment(
+      await this.enrichDeliveryForViewer(updated, formatParcelDelivery(updated, courier), userId),
+      id,
+    );
     const statusLabel = this.deliveryStatusLabel(updated.type, status);
     await this.redis.publish(MOVA_EVENTS.DELIVERY_STATUS_UPDATED, {
       deliveryId: id,
@@ -1012,7 +1101,13 @@ export class DeliveriesService {
     if (status === DeliveryStatus.READY_FOR_PICKUP && !updated.driverId) {
       await this.alertDeliveryOffer(updated);
     }
-    return { delivery: formatted, paymentReady: status === DeliveryStatus.DELIVERED, statusLabel };
+    return {
+      delivery: formatted,
+      paymentReady: formatted.paymentReady,
+      isPaid: formatted.isPaid,
+      paymentStatus: formatted.paymentStatus,
+      statusLabel,
+    };
   }
 
   private deliveryStatusLabel(type: DeliveryType, status: DeliveryStatus): string {
@@ -1166,7 +1261,7 @@ export class DeliveriesService {
       data: { deliveryId: id, event: status, metadata: { updatedBy: 'admin' } },
     });
     const courier = updated.driverId ? await this.fetchCourierProfile(updated.driverId) : null;
-    const formatted = formatParcelDelivery(updated, courier);
+    const formatted = await this.enrichDeliveryPayment(formatParcelDelivery(updated, courier), id);
     const statusLabel = this.deliveryStatusLabel(updated.type, status);
     await this.redis.publish(MOVA_EVENTS.DELIVERY_STATUS_UPDATED, {
       deliveryId: id,
@@ -1179,7 +1274,13 @@ export class DeliveriesService {
     if (status === DeliveryStatus.READY_FOR_PICKUP && !updated.driverId) {
       await this.alertDeliveryOffer(updated);
     }
-    return { delivery: formatted, paymentReady: status === DeliveryStatus.DELIVERED, statusLabel };
+    return {
+      delivery: formatted,
+      paymentReady: formatted.paymentReady,
+      isPaid: formatted.isPaid,
+      paymentStatus: formatted.paymentStatus,
+      statusLabel,
+    };
   }
 
   async deleteRestaurant(id: string) {

@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { GeoModule } from '../geo/geo.module';
 import { MatchingModule } from '../matching/matching.module';
 import { RidesModule } from '../rides/rides.module';
 import { TrackingModule } from '../tracking/tracking.module';
@@ -9,7 +10,7 @@ import { ErrandsController } from './errands.controller';
 import { ErrandsService } from './errands.service';
 
 @Module({
-  imports: [RidesModule, TrackingModule, ShareModule, MatchingModule, WebsocketModule],
+  imports: [GeoModule, RidesModule, TrackingModule, ShareModule, MatchingModule, WebsocketModule],
   controllers: [ErrandsController],
   providers: [ErrandsService, ErrandChatService],
   exports: [ErrandsService, ErrandChatService],

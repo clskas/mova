@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/api/api_client.dart';
-import '../../core/config/market_config.dart';
+import '../../core/billing/service_price_display.dart';
 import '../../core/error/result.dart';
 import '../../core/geo/maps_launcher.dart';
 import '../../core/theme/mova_colors.dart';
@@ -53,6 +53,9 @@ class _DriverMovingMissionScreenState extends ConsumerState<DriverMovingMissionS
       switch (result) {
         case Success(:final data):
           _moving = data['moving'] as Map<String, dynamic>? ?? data;
+          if (_moving != null && _moving!['type'] == null) {
+            _moving = {..._moving!, 'type': 'MOVING'};
+          }
           _error = null;
         case Failure(:final error):
           _error = error.message;
@@ -73,7 +76,14 @@ class _DriverMovingMissionScreenState extends ConsumerState<DriverMovingMissionS
     setState(() => _saving = false);
     switch (result) {
       case Success(:final data):
-        setState(() => _moving = data['moving'] as Map<String, dynamic>? ?? _moving);
+        setState(() {
+          final moving = data['moving'] as Map<String, dynamic>? ?? data;
+          _moving = {
+            ...?_moving,
+            ...moving,
+            'type': 'MOVING',
+          };
+        });
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(successMessage)));
         if (nextStatus != 'COMPLETED') {
           await _load();
@@ -144,7 +154,6 @@ class _DriverMovingMissionScreenState extends ConsumerState<DriverMovingMissionS
     final pickup = _moving?['pickupAddress']?.toString() ?? widget.initialMission?['pickupAddress']?.toString() ?? '—';
     final dropoff = _moving?['dropoffAddress']?.toString() ?? widget.initialMission?['dropoffAddress']?.toString() ?? '—';
     final volume = _moving?['volumeM3'] ?? widget.initialMission?['volumeM3'];
-    final price = _moving?['priceCdf'] ?? _moving?['estimatedPriceCdf'] ?? widget.initialMission?['priceCdf'];
 
     return MovaScreen(
       title: 'Mission déménagement',
@@ -180,16 +189,13 @@ class _DriverMovingMissionScreenState extends ConsumerState<DriverMovingMissionS
                     const SizedBox(height: 8),
                     Text('Volume : $volume m³'),
                   ],
-                  if (price != null) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      MarketConfig.formatCdf(price is int ? price : int.tryParse(price.toString()) ?? 0),
-                      style: const TextStyle(fontWeight: FontWeight.bold, color: MovaColors.green),
-                    ),
-                  ],
                 ],
               ),
             ),
+            if (_moving != null) ...[
+              const SizedBox(height: 12),
+              ServicePriceDisplay.driverMissionCard({..._moving!, 'type': 'MOVING'}),
+            ],
             const SizedBox(height: 12),
             MovaCard(
               child: Column(

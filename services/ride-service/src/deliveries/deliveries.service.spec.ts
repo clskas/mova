@@ -217,4 +217,53 @@ describe('DeliveriesService', () => {
     const result = await service.listRestaurants(-4.3217, 15.3125);
     expect(result.data.map((r) => r.name)).toEqual(['Chez Flore', 'Limoncello']);
   });
+
+  it('filtre restaurants par cuisine, ETA, prix et distance', async () => {
+    const restaurants = [
+      {
+        id: 'r1',
+        name: 'Chez Flore',
+        cuisine: 'Congolais',
+        address: 'Gombe',
+        lat: -4.3105,
+        lng: 15.3032,
+        rating: 4.6,
+        imageUrl: null,
+        menuItems: [{ name: 'Poulet', unitPriceCdf: 8000 }],
+      },
+      {
+        id: 'r2',
+        name: 'Limoncello',
+        cuisine: 'Italien',
+        address: 'Malepe',
+        lat: -4.335,
+        lng: 15.29,
+        rating: 4.5,
+        imageUrl: null,
+        menuItems: [{ name: 'Pizza', unitPriceCdf: 15000 }],
+      },
+    ];
+    prisma.restaurant.findMany.mockImplementation(({ where }: { where?: { cuisine?: { contains?: string } } }) => {
+      const cuisine = where?.cuisine?.contains?.toLowerCase();
+      const rows = cuisine
+        ? restaurants.filter((r) => r.cuisine.toLowerCase().includes(cuisine))
+        : restaurants;
+      return Promise.resolve(rows);
+    });
+
+    const byCuisine = await service.listRestaurants(-4.3217, 15.3125, 'Italien');
+    expect(byCuisine.data.map((r) => r.name)).toEqual(['Limoncello']);
+
+    const byPrice = await service.listRestaurants(-4.3217, 15.3125, undefined, undefined, 10000);
+    expect(byPrice.data.map((r) => r.name)).toEqual(['Chez Flore']);
+
+    const byEta = await service.listRestaurants(-4.3217, 15.3125, undefined, 25);
+    expect(byEta.data).toHaveLength(0);
+
+    const byDistance = await service.listRestaurants(-4.3217, 15.3125, undefined, undefined, undefined, 2);
+    expect(byDistance.data).toHaveLength(0);
+
+    const byDistanceWide = await service.listRestaurants(-4.3217, 15.3125, undefined, undefined, undefined, 10);
+    expect(byDistanceWide.data).toHaveLength(2);
+  });
 });

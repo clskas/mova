@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { usePartnerLiveRegister } from "@/components/PartnerLiveProvider";
+import { ChatPanel } from "@/components/ChatPanel";
 import {
   confirmBookingCash,
   fetchBookings,
@@ -172,6 +173,7 @@ export default function ReservationsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [chatBookingId, setChatBookingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
@@ -215,6 +217,14 @@ export default function ReservationsPage() {
         </div>
 
         {error && <p className="text-sm text-red-600 bg-red-50 rounded-xl p-3">{error}</p>}
+
+        {chatBookingId && (
+          <ChatPanel
+            inquiryId={chatBookingId}
+            peerLabel="Client"
+            onClose={() => setChatBookingId(null)}
+          />
+        )}
 
         {loading ? (
           <p className="text-gray-500">Chargement…</p>
@@ -342,6 +352,15 @@ export default function ReservationsPage() {
                         </button>
                       )}
                     </div>
+                  )}
+                  {b.status !== "CLOSED" && (
+                    <button
+                      type="button"
+                      onClick={() => setChatBookingId(b.id)}
+                      className="px-3 py-1.5 rounded-lg text-sm border border-gray-300 text-gray-700 hover:bg-gray-50"
+                    >
+                      Chat client
+                    </button>
                   )}
                   {(paid || b.status === "CLOSED" || b.status === "RETURNED") && (
                     <button

@@ -278,6 +278,10 @@ class ApiClient {
       final id = path.split('/').last;
       return Success(MockData.payRide(id, body ?? {}));
     }
+    if (RegExp(r'^/payments/services/[^/]+/[^/]+/info$').hasMatch(path) && method == 'GET') {
+      final parts = path.split('/');
+      return Success(MockData.servicePaymentInfo(parts[3], parts[4]));
+    }
     if (RegExp(r'^/payments/services/[^/]+/[^/]+$').hasMatch(path) && method == 'POST') {
       final parts = path.split('/');
       final refType = parts[3];
@@ -375,20 +379,52 @@ class ApiClient {
     if (path.contains('/deliveries/food/estimate')) {
       return Success(MockData.foodEstimate(body ?? {}));
     }
+    if (RegExp(r'^/rides/scheduled/offers$').hasMatch(path) && method == 'GET') {
+      return Success({'data': MockData.scheduledOffers()});
+    }
+    if (RegExp(r'^/rides/scheduled/assignments$').hasMatch(path) && method == 'GET') {
+      return Success({'data': MockData.scheduledAssignments()});
+    }
+    if (RegExp(r'^/rides/scheduled/[^/]+/volunteer/withdraw$').hasMatch(path) && method == 'POST') {
+      return const Success({'success': true});
+    }
+    if (RegExp(r'^/rides/scheduled/[^/]+/volunteer$').hasMatch(path) && method == 'POST') {
+      return const Success({'success': true, 'scheduledRideId': 'sched-offer-1'});
+    }
+    if (RegExp(r'^/rides/scheduled/[^/]+/driver-status$').hasMatch(path) && method == 'PATCH') {
+      final id = path.split('/')[3];
+      final status = body?['status']?.toString() ?? 'IN_PROGRESS';
+      return Success({
+        'scheduledRide': {
+          ...MockData.scheduledRideDetail(id),
+          'status': status,
+          if (status == 'IN_PROGRESS') 'linkedRideId': 'ride-linked-$id',
+        },
+        'type': 'SCHEDULED',
+        'driverNetCdf': 21250,
+      });
+    }
+    if (RegExp(r'^/rides/scheduled/[^/]+$').hasMatch(path) && method == 'GET') {
+      final id = path.split('/').last;
+      return Success({
+        ...MockData.scheduledRideDetail(id),
+        'scheduledRide': MockData.scheduledRideDetail(id),
+      });
+    }
+    if (path == '/rides/scheduled' && method == 'GET') {
+      return Success(MockData.scheduledRides());
+    }
+    if (path.contains('/rides/scheduled/estimate')) {
+      return Success(MockData.scheduledEstimate(body ?? {}));
+    }
     if (path == '/rides/scheduled' && method == 'POST') {
       return Success({'scheduledRide': MockData.createScheduledRide(body ?? {}), 'ride': MockData.createScheduledRide(body ?? {})});
     }
     if (path == '/rides/scheduled-inquiries' && method == 'POST') {
       return Success({'inquiry': MockData.createScheduledInquiry(body ?? {})});
     }
-    if (path.contains('/rides/scheduled/estimate')) {
-      return Success(MockData.scheduledEstimate(body ?? {}));
-    }
     if (RegExp(r'^/rides/scheduled/[^/]+/cancel$').hasMatch(path) && method == 'POST') {
       return const Success({'success': true, 'status': 'CANCELLED'});
-    }
-    if (path.contains('/rides/scheduled')) {
-      return Success({'data': MockData.scheduledRides()});
     }
     if (path == '/wallet') {
       return Success(MockData.wallet());
@@ -480,10 +516,22 @@ class ApiClient {
       return Success({'data': MockData.carpoolRides(), 'count': MockData.carpoolRides().length});
     }
     if (path == '/carpool/mine' && method == 'GET') {
+      final booked = MockData.carpoolRides().first;
       return Success({
         'asDriver': [MockData.createCarpoolRide({'driverName': 'Vous'})],
         'asPassenger': [
-          {'bookingId': 'b1', 'seats': 1, 'trip': MockData.carpoolRides().first},
+          {
+            'bookingId': 'booking-mock-1',
+            'seats': 1,
+            'trip': {
+              ...booked,
+              'mySeats': 1,
+              'myBookingId': 'booking-mock-1',
+              'paymentReferenceId': 'booking-mock-1',
+              'myTotalCdf': booked['pricePerSeatCdf'],
+              'isViewerPassenger': true,
+            },
+          },
         ],
       });
     }
@@ -497,14 +545,30 @@ class ApiClient {
       return Success({'trip': MockData.createCarpoolRide(body ?? {}), 'ride': MockData.createCarpoolRide(body ?? {})});
     }
     if (path.contains('/carpool/') && (path.endsWith('/join') || path.endsWith('/book'))) {
+      final tripId = path.split('/')[2];
+      final seats = body?['seats'] as int? ?? 1;
+      final base = MockData.carpoolRides().firstWhere(
+        (t) => t['id'] == tripId,
+        orElse: () => MockData.createCarpoolRide({'id': tripId}),
+      );
+      final perSeat = base['pricePerSeatCdf'] as int? ?? 3000;
       return Success({
         'success': true,
+        'trip': {
+          ...base,
+          'mySeats': seats,
+          'myBookingId': 'booking-mock-new',
+          'paymentReferenceId': 'booking-mock-new',
+          'myTotalCdf': perSeat * seats,
+          'isViewerPassenger': true,
+        },
         'confirmation': {
-          'tripId': path.split('/')[2],
-          'seats': body?['seats'] ?? 1,
-          'totalCdf': 3000,
-          'driverName': 'Paul M.',
-          'contactPhone': '+243 *** 123',
+          'tripId': tripId,
+          'seats': seats,
+          'totalCdf': perSeat * seats,
+          'driverName': base['driverName'] ?? 'Paul M.',
+          'contactPhone': '+243900000001',
+          'departureAt': base['departureAt'],
         },
       });
     }
@@ -542,12 +606,20 @@ class ApiClient {
         (t) => t['id'] == id,
         orElse: () => MockData.createCarpoolRide({'id': id}),
       );
+      final passengers = (trip['passengers'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+      final isPassenger = passengers.any((p) => p['userId'] == 'passenger-mock-1');
       return Success({
         'trip': {
           ...trip,
-          'passengers': [
-            {'id': 'p1', 'userId': 'user-demo', 'seats': 1, 'label': 'Passager demo'},
-          ],
+          if (isPassenger) ...{
+            'mySeats': passengers.firstWhere((p) => p['userId'] == 'passenger-mock-1')['seats'] ?? 1,
+            'myBookingId': passengers.firstWhere((p) => p['userId'] == 'passenger-mock-1')['id'],
+            'paymentReferenceId': passengers.firstWhere((p) => p['userId'] == 'passenger-mock-1')['id'],
+            'myTotalCdf': (trip['pricePerSeatCdf'] as int? ?? 0) *
+                (passengers.firstWhere((p) => p['userId'] == 'passenger-mock-1')['seats'] as int? ?? 1),
+            'isViewerPassenger': true,
+            'contactPhone': '+243900000001',
+          },
         },
       });
     }
@@ -591,11 +663,22 @@ class ApiClient {
       final updated = Map<String, dynamic>.from(booking)..['status'] = 'IN_PROGRESS'..['statusLabel'] = 'En cours';
       return Success({'inquiry': updated, 'booking': updated});
     }
+    if (path == '/rental/inquiries' && method == 'GET') {
+      return Success({'data': MockData.rentalInquiries(), 'inquiries': MockData.rentalInquiries()});
+    }
+    if (RegExp(r'^/rental/inquiries/[^/]+/driver-status$').hasMatch(path) && method == 'PATCH') {
+      final id = path.split('/')[3];
+      final next = body?['status']?.toString() ?? 'IN_PROGRESS';
+      final inquiry = MockData.rentalInquiryDetail(id, status: next);
+      return Success({'inquiry': inquiry, 'rental': inquiry});
+    }
+    if (RegExp(r'^/rental/inquiries/[^/]+$').hasMatch(path) && method == 'GET') {
+      final id = path.split('/')[3];
+      final inquiry = MockData.rentalInquiryDetail(id, status: 'CONFIRMED');
+      return Success({'inquiry': inquiry, 'rental': inquiry});
+    }
     if (path == '/rental/inquiries' && method == 'POST') {
       return Success(MockData.createRentalInquiry(body ?? {}));
-    }
-    if (path.contains('/rental/inquiries')) {
-      return Success({'data': MockData.rentalInquiries(), 'inquiries': MockData.rentalInquiries()});
     }
     if (path.contains('/moving/estimate')) {
       return Success(MockData.movingEstimate(body ?? {}));
@@ -603,9 +686,27 @@ class ApiClient {
     if (path == '/moving' && method == 'POST') {
       return Success(MockData.createMovingRequest(body ?? {}));
     }
+    if (path == '/moving/assignments' && method == 'GET') {
+      return Success({
+        'data': [
+          {
+            ...MockData.movingDetail('moving-assigned-1', status: 'ASSIGNED'),
+            'label': 'Déménagement',
+          },
+        ],
+      });
+    }
+    if (RegExp(r'^/moving/[^/]+/driver-status$').hasMatch(path) && method == 'PATCH') {
+      final id = path.split('/')[2];
+      final next = body?['status']?.toString() ?? 'IN_PROGRESS';
+      final moving = MockData.movingDetail(id, status: next);
+      return Success({'moving': moving, 'timeline': moving['timeline']});
+    }
     if (RegExp(r'^/moving/[^/]+$').hasMatch(path) && method == 'GET') {
       final id = path.split('/').last;
-      return Success({'moving': MockData.movingDetail(id)});
+      final status = id.contains('completed') ? 'COMPLETED' : id.contains('assigned') ? 'ASSIGNED' : 'PENDING';
+      final moving = MockData.movingDetail(id, status: status);
+      return Success({'moving': moving, ...moving});
     }
     if (path.contains('/moving/') && path.endsWith('/cancel') && method == 'POST') {
       return Success({'status': 'CANCELLED', 'cancelled': true});
@@ -888,15 +989,40 @@ class ApiClient {
     }
   }
 
+  /// Livraison ou course active du passager (null si aucune).
+  Future<Result<Map<String, dynamic>>> getActiveShipments() async {
+    if (isMockMode) return const Success({});
+    final result = await get('/deliveries/active');
+    switch (result) {
+      case Success(:final data):
+        return Success(Map<String, dynamic>.from(data));
+      case Failure(:final error):
+        return Failure(error);
+    }
+  }
+
   /// Livraison active du passager (null si aucune).
   Future<Result<Map<String, dynamic>?>> getActiveDelivery() async {
-    if (isMockMode) return const Success(null);
-    final result = await get('/deliveries/active');
+    final result = await getActiveShipments();
     switch (result) {
       case Success(:final data):
         final delivery = data['delivery'];
         if (delivery is Map<String, dynamic>) return Success(delivery);
         if (delivery is Map) return Success(Map<String, dynamic>.from(delivery));
+        return const Success(null);
+      case Failure(:final error):
+        return Failure(error);
+    }
+  }
+
+  /// Course & commissions active (null si aucune).
+  Future<Result<Map<String, dynamic>?>> getActiveErrand() async {
+    final result = await getActiveShipments();
+    switch (result) {
+      case Success(:final data):
+        final errand = data['errand'];
+        if (errand is Map<String, dynamic>) return Success(errand);
+        if (errand is Map) return Success(Map<String, dynamic>.from(errand));
         return const Success(null);
       case Failure(:final error):
         return Failure(error);
@@ -913,19 +1039,78 @@ class ApiClient {
     };
   }
 
-  /// Course terminée — espèces en attente de PIN chauffeur (null si aucune).
+  /// Paiement espèces en attente de PIN chauffeur — course ou livraison (null si aucun).
   Future<Result<Map<String, dynamic>?>> getDriverPendingCashRide() async {
     if (isMockMode) return const Success(null);
     final result = await get('/payments/rides/pending-cash');
     switch (result) {
       case Success(:final data):
-        final ride = data['ride'];
-        if (ride is Map<String, dynamic>) return Success(ride);
-        if (ride is Map) return Success(Map<String, dynamic>.from(ride));
+        if (data['pendingCash'] != true) return const Success(null);
+        final refType = data['referenceType']?.toString().toUpperCase() ?? '';
+        if (refType == 'RIDE') {
+          final ride = data['ride'];
+          if (ride is Map<String, dynamic>) {
+            return Success({...ride, '_cashKind': 'RIDE'});
+          }
+          if (ride is Map) {
+            return Success({...Map<String, dynamic>.from(ride), '_cashKind': 'RIDE'});
+          }
+        }
+        if (refType == 'DELIVERY' || refType == 'ERRAND') {
+          final refId = data['referenceId']?.toString() ??
+              (data['service'] is Map ? data['service']['id']?.toString() : null);
+          if (refId != null && refId.isNotEmpty) {
+            return Success({
+              '_cashKind': refType,
+              'id': refId,
+              'type': refType == 'ERRAND' ? 'ERRAND' : (data['service']?['type'] ?? 'DELIVERY'),
+              'paymentStatus': 'PENDING',
+              'paymentMethod': 'CASH',
+              'isPaid': false,
+              'amountCdf': data['amountCdf'] ?? data['service']?['amountCdf'],
+            });
+          }
+        }
         return const Success(null);
       case Failure(:final error):
         return Failure(error);
     }
+  }
+
+  /// Dettes espèces ouvertes (commission MOVA + parts restaurant/partenaire).
+  Future<Result<Map<String, dynamic>>> getCashDebtSummary() async {
+    if (isMockMode) {
+      return const Success({
+        'totalOpenCdf': 0,
+        'openCount': 0,
+        'byCategory': {
+          'platformFeeCdf': 0,
+          'restaurantShareCdf': 0,
+          'partnerShareCdf': 0,
+        },
+        'debts': <Map<String, dynamic>>[],
+      });
+    }
+    final result = await get('/payments/cash-debts/summary');
+    return switch (result) {
+      Success(:final data) => Success(Map<String, dynamic>.from(data as Map)),
+      Failure(:final error) => Failure(error),
+    };
+  }
+
+  /// Régler toutes les dettes espèces depuis le portefeuille chauffeur.
+  Future<Result<Map<String, dynamic>>> settleCashDebts() async {
+    if (isMockMode) {
+      return const Success({
+        'settled': false,
+        'message': 'Aucune dette espèces ouverte',
+      });
+    }
+    final result = await post('/payments/cash-debts/settle', {});
+    return switch (result) {
+      Success(:final data) => Success(Map<String, dynamic>.from(data as Map)),
+      Failure(:final error) => Failure(error),
+    };
   }
 
   Future<Result<List<Map<String, dynamic>>>> getRideChatMessages(String rideId) async {
@@ -1338,6 +1523,17 @@ class ApiClient {
 
   Future<Result<Map<String, dynamic>>> cancelErrand(String errandId) async {
     return post('/errands/$errandId/cancel', {});
+  }
+
+  Future<Result<Map<String, dynamic>>> rateErrand(
+    String errandId, {
+    required int courierScore,
+    String? comment,
+  }) async {
+    return post('/errands/$errandId/rate', {
+      'courierScore': courierScore,
+      if (comment != null && comment.trim().isNotEmpty) 'comment': comment.trim(),
+    });
   }
 
   /// Upload photo déménagement — retourne l'URL `/api/uploads/moving/...`.

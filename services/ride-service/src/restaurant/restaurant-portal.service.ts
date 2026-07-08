@@ -8,6 +8,7 @@ import { UploadsService } from '../uploads/uploads.service';
 import { MenuItemDto, UpdateRestaurantLocationDto, UpdateRestaurantMenuDto } from './restaurant-portal.dto';
 import { MatchingService } from '../matching/matching.service';
 import { notifyNearbyDrivers } from '../common/driver-job-alert.util';
+import { fetchServicePaymentStatuses } from '../common/payment-status.util';
 
 type StoredMenuItem = {
   name: string;
@@ -96,10 +97,24 @@ export class RestaurantPortalService {
     const scoped = rows.filter(
       (d) => d.restaurantId === restaurant.id || this.deliveryIncludesRestaurant(d.items, restaurant.id),
     );
+    const paymentStatuses = await fetchServicePaymentStatuses(
+      'DELIVERY',
+      scoped.slice(0, 50).map((d) => d.id),
+    );
     return {
       restaurant: { id: restaurant.id, name: restaurant.name },
-      orders: scoped.slice(0, 50).map((d) => this.formatOrder(d, restaurant.id)),
+      orders: scoped.slice(0, 50).map((d) => this.formatOrder(d, restaurant.id, paymentStatuses[d.id])),
     };
+  }
+
+  private paymentStatusLabel(
+    status: DeliveryStatus,
+    payment?: { isPaid?: boolean; paymentStatus?: string | null; paymentMethod?: string | null },
+  ): string | null {
+    if (payment?.isPaid) return 'Payée';
+    if (status !== DeliveryStatus.DELIVERED) return null;
+    if (payment?.paymentStatus === 'PENDING' && payment?.paymentMethod === 'CASH') return 'Espèces en attente';
+    return 'En attente de paiement';
   }
 
   private formatOrder(
@@ -114,6 +129,7 @@ export class RestaurantPortalService {
     restaurantId?: string | null;
   },
     restaurantId?: string,
+    payment?: { isPaid?: boolean; paymentStatus?: string | null; paymentMethod?: string | null },
   ) {
     const items = restaurantId ? this.orderItemsForRestaurant(d.items, restaurantId) : d.items;
     return {
@@ -126,6 +142,10 @@ export class RestaurantPortalService {
       createdAt: d.createdAt.toISOString(),
       driverAssigned: Boolean(d.driverId),
       multiRestaurant: Boolean(restaurantId && !d.restaurantId && this.deliveryIncludesRestaurant(d.items, restaurantId)),
+      isPaid: payment?.isPaid ?? false,
+      paymentStatus: payment?.paymentStatus ?? null,
+      paymentMethod: payment?.paymentMethod ?? null,
+      paymentStatusLabel: this.paymentStatusLabel(d.status, payment),
     };
   }
 

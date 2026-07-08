@@ -10,6 +10,7 @@ import '../../core/theme/mova_colors.dart';
 import '../moving/moving_tracking_screen.dart';
 import '../rides/scheduled_ride_screen.dart';
 import '../booking/booking_screen.dart';
+import '../booking/payment_screen.dart';
 import '../booking/tracking_screen.dart';
 import '../rating/rating_screen.dart';
 import '../billing/billing_util.dart';
@@ -24,6 +25,9 @@ String historyStatusLabel(String? status) => switch (status) {
       'CANCELLED' => 'Annulé',
       'ACCEPTED' => 'Accepté',
       'IN_PROGRESS' => 'En cours',
+      'RETURNED' => 'Retournée',
+      'PAID' => 'Payée',
+      'CLOSED' => 'Annulée',
       'ASSIGNED' => 'Équipe assignée',
       'PENDING' => 'En attente',
       'DRIVER_ASSIGNED' => 'Chauffeur assigné',
@@ -33,6 +37,17 @@ String historyStatusLabel(String? status) => switch (status) {
 /// Course taxi : distingue terminée / payée / à payer.
 String rideHistoryStatusLabel(Map<String, dynamic> item) {
   final status = item['status']?.toString();
+  final type = item['type']?.toString();
+  if (type == 'RENTAL' && status == 'RETURNED') {
+    if (item['isPaid'] == true) return 'Retournée · Payée';
+    if (item['paymentReady'] == true) return 'Retournée · À payer';
+    return 'Retournée';
+  }
+  if (type == 'MOVING' && status == 'COMPLETED') {
+    if (item['isPaid'] == true) return 'Terminé · Payé';
+    if (item['paymentReady'] == true) return 'Terminé · À payer';
+    return 'Terminé';
+  }
   if (status != 'COMPLETED') return historyStatusLabel(status);
   if (item['isPaid'] == true) return 'Terminée · Payée';
   if (item['paymentReady'] == true) return 'Terminée · À payer';
@@ -121,7 +136,23 @@ Future<void> showHistoryDetailDialog(
     final api = ref.read(apiClientProvider);
     final result = await api.get('/rides/scheduled/$id');
     if (result case Success(:final data)) {
-      live = data is Map<String, dynamic> ? data : null;
+      live = data['scheduledRide'] as Map<String, dynamic>? ??
+          (data is Map<String, dynamic> ? data : null);
+    }
+  } else if (type == 'CARPOOL' && id.isNotEmpty) {
+    final api = ref.read(apiClientProvider);
+    final result = await api.get('/carpool/$id');
+    if (result case Success(:final data)) {
+      live = data['trip'] as Map<String, dynamic>? ?? (data is Map<String, dynamic> ? data : null);
+    }
+  } else if (type == 'RENTAL' && id.isNotEmpty) {
+    final api = ref.read(apiClientProvider);
+    final result = await api.get('/rental/bookings/$id');
+    if (result case Success(:final data)) {
+      final raw = data is Map<String, dynamic> ? data : Map<String, dynamic>.from(data as Map);
+      live = raw['inquiry'] as Map<String, dynamic>? ??
+          raw['booking'] as Map<String, dynamic>? ??
+          raw;
     }
   }
 
@@ -289,6 +320,32 @@ Future<void> showHistoryDetailDialog(
             },
             child: const Text('Suivi complet'),
           ),
+        if (type == 'MOVING' &&
+            status == 'COMPLETED' &&
+            id.isNotEmpty &&
+            (live?['paymentReady'] == true || item['paymentReady'] == true) &&
+            live?['isPaid'] != true &&
+            item['isPaid'] != true)
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => PaymentScreen(
+                    serviceType: 'MOVING',
+                    serviceId: id,
+                    amountCdf: live?['passengerTotalCdf'] as int? ??
+                        live?['estimatedPriceCdf'] as int? ??
+                        item['priceCdf'] as int? ??
+                        0,
+                    completionPin: live?['completionPin']?.toString(),
+                  ),
+                ),
+              );
+            },
+            child: const Text('Payer'),
+          ),
         if (type == 'SCHEDULED')
           TextButton(
             onPressed: () {
@@ -299,6 +356,87 @@ Future<void> showHistoryDetailDialog(
               );
             },
             child: const Text('Mes réservations'),
+          ),
+        if (type == 'SCHEDULED' &&
+            status == 'COMPLETED' &&
+            id.isNotEmpty &&
+            (live?['paymentReady'] == true || item['paymentReady'] == true) &&
+            live?['isPaid'] != true &&
+            item['isPaid'] != true)
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => PaymentScreen(
+                    serviceType: 'SCHEDULED',
+                    serviceId: id,
+                    amountCdf: live?['estimatedPriceCdf'] as int? ??
+                        live?['priceCdf'] as int? ??
+                        item['priceCdf'] as int? ??
+                        0,
+                    completionPin: live?['completionPin']?.toString(),
+                  ),
+                ),
+              );
+            },
+            child: const Text('Payer'),
+          ),
+        if (type == 'CARPOOL' &&
+            status == 'COMPLETED' &&
+            meta['role'] == 'passenger' &&
+            (live?['paymentReady'] == true || item['paymentReady'] == true) &&
+            live?['isPaid'] != true &&
+            item['isPaid'] != true)
+          FilledButton(
+            onPressed: () {
+              final paymentRef =
+                  live?['paymentReferenceId']?.toString() ?? meta['paymentReferenceId']?.toString() ?? id;
+              final seats = live?['mySeats'] as int? ?? meta['seats'] as int? ?? 1;
+              final perSeat = live?['pricePerSeatCdf'] as int? ?? 0;
+              Navigator.pop(ctx);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => PaymentScreen(
+                    serviceType: 'CARPOOL',
+                    serviceId: paymentRef,
+                    amountCdf: live?['myTotalCdf'] as int? ??
+                        item['priceCdf'] as int? ??
+                        (perSeat * seats),
+                  ),
+                ),
+              );
+            },
+            child: const Text('Payer'),
+          ),
+        if (type == 'RENTAL' &&
+            status == 'RETURNED' &&
+            id.isNotEmpty &&
+            (live?['paymentReady'] == true || item['paymentReady'] == true) &&
+            live?['isPaid'] != true &&
+            item['isPaid'] != true)
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => PaymentScreen(
+                    serviceType: 'RENTAL',
+                    serviceId: id,
+                    amountCdf: live?['totalCdf'] as int? ??
+                        live?['priceCdf'] as int? ??
+                        live?['passengerTotalCdf'] as int? ??
+                        item['priceCdf'] as int? ??
+                        0,
+                    completionPin: live?['completionPin']?.toString(),
+                  ),
+                ),
+              );
+            },
+            child: const Text('Payer'),
           ),
         if (type == 'SCHEDULED' &&
             status == 'IN_PROGRESS' &&

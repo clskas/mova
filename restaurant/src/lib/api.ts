@@ -31,6 +31,10 @@ export type RestaurantOrder = {
   estimatedPriceCdf?: number;
   createdAt?: string;
   driverAssigned?: boolean;
+  isPaid?: boolean;
+  paymentStatus?: string | null;
+  paymentMethod?: string | null;
+  paymentStatusLabel?: string | null;
 };
 
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
@@ -195,4 +199,33 @@ export async function downloadOrderReceiptPdf(orderId: string) {
   a.download = `mova-order-${orderId.slice(0, 8)}.pdf`;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+export type ChatMessagePayload = {
+  id?: string;
+  text?: string;
+  senderRole?: string;
+  ts?: number;
+};
+
+export function fetchDeliveryChat(deliveryId: string) {
+  return apiFetch<{ deliveryId: string; messages: ChatMessagePayload[] }>(`/api/restaurant/orders/${deliveryId}/chat`);
+}
+
+export function sendDeliveryChat(deliveryId: string, text: string) {
+  return apiFetch<ChatMessagePayload>(`/api/restaurant/orders/${deliveryId}/chat`, {
+    method: "POST",
+    body: JSON.stringify({ text }),
+  });
+}
+
+export function fetchRentalChat(inquiryId: string) {
+  return apiFetch<{ inquiryId?: string; messages: ChatMessagePayload[] }>(`/api/rental/inquiries/${inquiryId}/chat`);
+}
+
+export function sendRentalChat(inquiryId: string, text: string) {
+  return apiFetch<ChatMessagePayload>(`/api/rental/inquiries/${inquiryId}/chat`, {
+    method: "POST",
+    body: JSON.stringify({ text }),
+  });
 }

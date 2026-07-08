@@ -11,6 +11,8 @@ final rideSocketProvider = Provider((ref) => RideSocket());
 class RideSocket {
   io.Socket? _socket;
   String? _rideId;
+  String? _referenceType;
+  String? _driverUserId;
   String? _token;
   bool isConnected = false;
   bool connectionFailed = false;
@@ -21,11 +23,15 @@ class RideSocket {
   void Function(Map<String, dynamic> payload)? _onLocation;
   void Function(Map<String, dynamic> payload)? _onStatus;
   void Function(Map<String, dynamic> payload)? _onChat;
+  void Function(Map<String, dynamic> payload)? _onCashPending;
+  void Function(Map<String, dynamic> payload)? _onPaymentCompleted;
   void Function()? _onConnected;
   void Function()? _onDisconnected;
   final List<Completer<bool>> _connectWaiters = [];
 
   set onChat(void Function(Map<String, dynamic> payload)? handler) => _onChat = handler;
+  set onCashPending(void Function(Map<String, dynamic> payload)? handler) => _onCashPending = handler;
+  set onPaymentCompleted(void Function(Map<String, dynamic> payload)? handler) => _onPaymentCompleted = handler;
 
   /// Retire les callbacks sans couper la connexion (écran fermé).
   void clearHandlers({bool chatOnly = false}) {
@@ -36,6 +42,8 @@ class RideSocket {
     _onLocation = null;
     _onStatus = null;
     _onChat = null;
+    _onCashPending = null;
+    _onPaymentCompleted = null;
     _onConnected = null;
     _onDisconnected = null;
   }
@@ -70,20 +78,23 @@ class RideSocket {
     void Function(Map<String, dynamic> payload)? onLocation,
     void Function(Map<String, dynamic> payload)? onStatus,
     void Function(Map<String, dynamic> payload)? onChat,
+    void Function(Map<String, dynamic> payload)? onPaymentCompleted,
     void Function()? onConnected,
     void Function()? onDisconnected,
     bool forceReconnect = false,
   }) {
     _rideId = rideId;
+    _referenceType = null;
     if (token != null && token.isNotEmpty) _token = token;
     if (onLocation != null) _onLocation = onLocation;
     if (onStatus != null) _onStatus = onStatus;
     if (onChat != null) _onChat = onChat;
+    if (onPaymentCompleted != null) _onPaymentCompleted = onPaymentCompleted;
     if (onConnected != null) _onConnected = onConnected;
     if (onDisconnected != null) _onDisconnected = onDisconnected;
 
     if (!forceReconnect && _socket?.connected == true) {
-      _socket?.emit('ride:subscribe', {'rideId': rideId});
+      _emitSubscribe();
       isConnected = true;
       connectionFailed = false;
       _onConnected?.call();
@@ -97,6 +108,21 @@ class RideSocket {
     _reconnectAttempt = 0;
     connectionFailed = false;
     _openSocket();
+  }
+
+  void _emitSubscribe() {
+    if (_socket?.connected != true) return;
+    if (_driverUserId != null && _driverUserId!.isNotEmpty) {
+      _socket?.emit('driver:subscribe', {'userId': _driverUserId});
+    }
+    if (_rideId == null) return;
+    if (_referenceType == 'DELIVERY' || _referenceType == 'ERRAND') {
+      _socket?.emit('delivery:subscribe', {'deliveryId': _rideId});
+      return;
+    }
+    if (_referenceType != 'DRIVER') {
+      _socket?.emit('ride:subscribe', {'rideId': _rideId});
+    }
   }
 
   void _openSocket() {
@@ -125,7 +151,7 @@ class RideSocket {
           connectionFailed = false;
           _reconnectAttempt = 0;
           if (_rideId != null) {
-            _socket?.emit('ride:subscribe', {'rideId': _rideId});
+            _emitSubscribe();
           }
           _onConnected?.call();
           _completeConnectWaiters(true);
@@ -145,6 +171,36 @@ class RideSocket {
         ..on('ride:chat', (data) {
           if (data is Map) {
             _onChat?.call(Map<String, dynamic>.from(data));
+          }
+        })
+        ..on('delivery:chat', (data) {
+          if (data is Map) {
+            _onChat?.call(Map<String, dynamic>.from(data));
+          }
+        })
+        ..on('errand:chat', (data) {
+          if (data is Map) {
+            _onChat?.call(Map<String, dynamic>.from(data));
+          }
+        })
+        ..on('ride:cash-pending', (data) {
+          if (data is Map) {
+            _onCashPending?.call(Map<String, dynamic>.from(data));
+          }
+        })
+        ..on('delivery:cash-pending', (data) {
+          if (data is Map) {
+            _onCashPending?.call(Map<String, dynamic>.from(data));
+          }
+        })
+        ..on('delivery:payment-completed', (data) {
+          if (data is Map) {
+            _onPaymentCompleted?.call(Map<String, dynamic>.from(data));
+          }
+        })
+        ..on('ride:payment-completed', (data) {
+          if (data is Map) {
+            _onPaymentCompleted?.call(Map<String, dynamic>.from(data));
           }
         })
         ..onConnectError((_) {
@@ -187,6 +243,8 @@ class RideSocket {
     _socket?.dispose();
     _socket = null;
     _rideId = null;
+    _referenceType = null;
+    _driverUserId = null;
     isConnected = false;
     connectionFailed = false;
     _reconnectAttempt = 0;
@@ -208,19 +266,65 @@ class RideSocket {
     });
   }
 
+  void connectDriverInbox({
+    required String userId,
+    String? token,
+    void Function(Map<String, dynamic> payload)? onCashPending,
+    void Function()? onConnected,
+    void Function()? onDisconnected,
+  }) {
+    _driverUserId = userId;
+    _referenceType = 'DRIVER';
+    if (token != null && token.isNotEmpty) _token = token;
+    if (onCashPending != null) _onCashPending = onCashPending;
+    if (onConnected != null) _onConnected = onConnected;
+    if (onDisconnected != null) _onDisconnected = onDisconnected;
+
+    if (_socket?.connected == true) {
+      _emitSubscribe();
+      isConnected = true;
+      connectionFailed = false;
+      _onConnected?.call();
+      _completeConnectWaiters(true);
+      return;
+    }
+
+    resetFailure();
+    _reconnectAttempt = 0;
+    connectionFailed = false;
+    _openSocket();
+  }
+
   void connectDelivery({
     required String deliveryId,
     String? token,
     String? referenceType,
+    String? driverUserId,
     void Function(Map<String, dynamic> payload)? onLocation,
+    void Function(Map<String, dynamic> payload)? onPaymentCompleted,
+    void Function(Map<String, dynamic> payload)? onCashPending,
     void Function()? onConnected,
     void Function()? onDisconnected,
   }) {
     _rideId = deliveryId;
+    _referenceType = referenceType ?? 'DELIVERY';
+    if (driverUserId != null && driverUserId.isNotEmpty) _driverUserId = driverUserId;
     if (token != null && token.isNotEmpty) _token = token;
     if (onLocation != null) _onLocation = onLocation;
+    if (onPaymentCompleted != null) _onPaymentCompleted = onPaymentCompleted;
+    if (onCashPending != null) _onCashPending = onCashPending;
     if (onConnected != null) _onConnected = onConnected;
     if (onDisconnected != null) _onDisconnected = onDisconnected;
+
+    if (_socket?.connected == true) {
+      _emitSubscribe();
+      isConnected = true;
+      connectionFailed = false;
+      _onConnected?.call();
+      _completeConnectWaiters(true);
+      return;
+    }
+
     resetFailure();
     _reconnectAttempt = 0;
     connectionFailed = false;

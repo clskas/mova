@@ -92,7 +92,9 @@ services:
       DATABASE_URL: postgresql://mova:mova@postgres:5432/mova_payments
       REDIS_URL: redis://redis:6379
       JWT_SECRET: dev_secret
-      # Dev local : paiements simulés. Production : MOCK_PAYMENTS=false + clés Orange/M-Pesa/Airtel
+      # Dev local : paiements simulés. Production : NODE_ENV=production + MOCK_PAYMENTS=false + clés Orange/M-Pesa/Airtel
+      # MOCK_PAYMENTS=true n'est autorisé qu'en dehors de NODE_ENV=production (garde anti-mock en prod).
+      NODE_ENV: development
       MOCK_PAYMENTS: 'true'
       RIDE_SERVICE_URL: http://ride-service:3000
       INTERNAL_API_KEY: mova-internal-dev

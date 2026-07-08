@@ -1,8 +1,9 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { CommissionServiceType, ErrandCategory, ErrandOrder, ErrandOrderStatus, TrackingReferenceType, VehicleType } from '@prisma/client';
-import { MARKET_RDC, MovaErrorCode, MovaHttpException, MOVA_EVENTS, canCancelErrand, estimateTripDurationMin } from '@mova/shared';
+import { INTERNAL_API_KEY, MARKET_RDC, MovaErrorCode, MovaHttpException, MOVA_EVENTS, canCancelErrand, estimateTripDurationMin, serviceUrl } from '@mova/shared';
 import { RedisService } from '@mova/shared';
-import { addressToCoords, DEFAULT_PICKUP } from '../common/address.util';
+import { DEFAULT_PICKUP } from '../common/address.util';
+import { fetchServicePaymentStatus } from '../common/payment-status.util';
 import {
   assertDriverCanReceiveJobs,
   driverCanReceiveJobs,
@@ -23,6 +24,7 @@ import { CreateErrandOrderDto } from './errands.dto';
 import { estimatePurchaseByCategory, inferErrandCategory } from './errand-category.util';
 import { applyPromoCode } from '../common/promo-apply.util';
 import { PromoService } from '../rides/surcharge.service';
+import { GeoService } from '../geo/geo.service';
 import { RoutingService } from '../geo/routing.service';
 
 export type ErrandItemRow = { label: string; qty?: number; estimatedCdf?: number };
@@ -39,6 +41,7 @@ export class ErrandsService {
     private matching: MatchingService,
     private promo: PromoService,
     private routing: RoutingService,
+    private geo: GeoService,
   ) {}
 
   private async errandFees() {
@@ -95,13 +98,36 @@ export class ErrandsService {
     };
   }
 
-  private resolvePickup(pickupAddress?: string) {
+  private async resolvePickup(pickupAddress?: string, pickupLat?: number, pickupLng?: number) {
+    if (pickupLat != null && pickupLng != null) {
+      return {
+        label: pickupAddress?.trim() || 'Point de retrait',
+        lat: pickupLat,
+        lng: pickupLng,
+      };
+    }
     const label = pickupAddress?.trim();
     if (label) {
-      const coords = addressToCoords(label);
+      const coords = await this.geo.forwardGeocode(label);
       return { label, lat: coords.lat, lng: coords.lng };
     }
     return { label: DEFAULT_PICKUP.label, lat: DEFAULT_PICKUP.lat, lng: DEFAULT_PICKUP.lng };
+  }
+
+  private async resolveDropoff(
+    deliveryAddress: string,
+    deliveryLat?: number,
+    deliveryLng?: number,
+    near?: { lat: number; lng: number },
+  ) {
+    if (deliveryLat != null && deliveryLng != null) {
+      return { lat: deliveryLat, lng: deliveryLng };
+    }
+    return this.geo.forwardGeocode(deliveryAddress, {
+      nearLat: near?.lat,
+      nearLng: near?.lng,
+      city: near ? undefined : undefined,
+    });
   }
 
   /** Compatibilité mobile: { deliveryAddress, items[], pickupAddress?, pickupLat?, pickupLng?, budgetCdf? } */
@@ -113,12 +139,12 @@ export class ErrandsService {
     pickupLat?: number,
     pickupLng?: number,
     promoCode?: string,
+    deliveryLat?: number,
+    deliveryLng?: number,
   ) {
     const parsed = this.parseMobileItems(items, budgetCdf);
-    const pickup = pickupLat != null && pickupLng != null
-      ? { label: pickupAddress?.trim() || 'Point de retrait', lat: pickupLat, lng: pickupLng }
-      : this.resolvePickup(pickupAddress);
-    const dropoff = addressToCoords(deliveryAddress);
+    const pickup = await this.resolvePickup(pickupAddress, pickupLat, pickupLng);
+    const dropoff = await this.resolveDropoff(deliveryAddress, deliveryLat, deliveryLng, pickup);
     const category = inferErrandCategory(pickup.label, parsed.items.map((i) => i.label));
     const dto: CreateErrandOrderDto = {
       description: parsed.description,
@@ -213,10 +239,8 @@ export class ErrandsService {
     promoCode?: string,
   ) {
     const parsed = this.parseMobileItems(items, budgetCdf);
-    const pickup = pickupLat != null && pickupLng != null
-      ? { label: pickupAddress?.trim() || 'Point de retrait', lat: pickupLat, lng: pickupLng }
-      : this.resolvePickup(pickupAddress);
-    const dropoff = deliveryLat != null && deliveryLng != null ? { lat: deliveryLat, lng: deliveryLng } : addressToCoords(deliveryAddress);
+    const pickup = await this.resolvePickup(pickupAddress, pickupLat, pickupLng);
+    const dropoff = await this.resolveDropoff(deliveryAddress, deliveryLat, deliveryLng, pickup);
     const dto: CreateErrandOrderDto = {
       description: parsed.description,
       pickupAddress: pickup.label,
@@ -269,6 +293,18 @@ export class ErrandsService {
     }));
   }
 
+  private async enrichErrandPayment<T extends { paymentReady?: boolean }>(formatted: T, errandId: string, rated = false) {
+    const payment = await fetchServicePaymentStatus('ERRAND', errandId);
+    return {
+      ...formatted,
+      isPaid: payment.isPaid,
+      paymentStatus: payment.paymentStatus,
+      paymentMethod: payment.paymentMethod ?? null,
+      paymentReady: Boolean(formatted.paymentReady) && !payment.isPaid,
+      rated,
+    };
+  }
+
   private formatErrand(order: ErrandOrder, extra?: Record<string, unknown>) {
     const structuredItems = this.itemsFromOrder(order);
     const timeline = buildErrandTimeline(order.status, order.completedAt);
@@ -316,15 +352,103 @@ export class ErrandsService {
     };
   }
 
+  async getActiveErrand(passengerId: string) {
+    const activeOrder = await this.prisma.errandOrder.findFirst({
+      where: {
+        userId: passengerId,
+        status: {
+          in: [ErrandOrderStatus.PENDING, ErrandOrderStatus.ASSIGNED, ErrandOrderStatus.IN_PROGRESS],
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    const order =
+      activeOrder ??
+      (await this.prisma.errandOrder.findFirst({
+        where: { userId: passengerId, status: ErrandOrderStatus.COMPLETED },
+        orderBy: { completedAt: 'desc' },
+      }));
+    if (!order) return { errand: null };
+    const rated = !!(await this.prisma.errandRating.findUnique({
+      where: { errandId_fromUserId: { errandId: order.id, fromUserId: passengerId } },
+    }));
+    const formatted = await this.enrichErrandPayment(this.formatErrand(order), order.id, rated);
+    const isActive =
+      order.status === ErrandOrderStatus.PENDING ||
+      order.status === ErrandOrderStatus.ASSIGNED ||
+      order.status === ErrandOrderStatus.IN_PROGRESS;
+    if (!isActive && (formatted.isPaid || !formatted.paymentReady)) {
+      return { errand: null };
+    }
+    return { errand: formatted };
+  }
+
+  async rejectErrand(errandId: string, driverUserId: string) {
+    const order = await this.prisma.errandOrder.findUnique({ where: { id: errandId } });
+    if (!order) throw new MovaHttpException(MovaErrorCode.ERRAND_NOT_FOUND, HttpStatus.NOT_FOUND);
+    if (order.driverId) {
+      throw new MovaHttpException(MovaErrorCode.ERRAND_INVALID_STATUS);
+    }
+    if (order.status !== ErrandOrderStatus.PENDING) {
+      throw new MovaHttpException(MovaErrorCode.ERRAND_INVALID_STATUS);
+    }
+    return { success: true, errandId, driverUserId };
+  }
+
+  async rateErrand(id: string, userId: string, courierScore: number, comment?: string) {
+    const order = await this.prisma.errandOrder.findUnique({ where: { id } });
+    if (!order) throw new MovaHttpException(MovaErrorCode.ERRAND_NOT_FOUND, HttpStatus.NOT_FOUND);
+    if (order.userId !== userId) throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
+    if (order.status !== ErrandOrderStatus.COMPLETED) {
+      throw new MovaHttpException(MovaErrorCode.ERRAND_INVALID_STATUS);
+    }
+    const existing = await this.prisma.errandRating.findUnique({
+      where: { errandId_fromUserId: { errandId: id, fromUserId: userId } },
+    });
+    if (existing) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Course déjà notée.');
+    }
+    const rating = await this.prisma.errandRating.create({
+      data: {
+        errandId: id,
+        fromUserId: userId,
+        courierScore,
+        comment,
+      },
+    });
+    if (order.driverId) {
+      await fetch(serviceUrl('driver', `/internal/drivers/${order.driverId}/rating`), {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'x-internal-api-key': INTERNAL_API_KEY },
+        body: JSON.stringify({ ratingAvg: courierScore }),
+      }).catch(() => undefined);
+    }
+    return rating;
+  }
+
   async get(id: string, userId: string) {
     const order = await this.prisma.errandOrder.findUnique({ where: { id } });
     if (!order) throw new MovaHttpException(MovaErrorCode.ERRAND_NOT_FOUND, HttpStatus.NOT_FOUND);
     if (order.userId !== userId && order.driverId !== userId) {
       throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
     }
+    const rated = !!(await this.prisma.errandRating.findUnique({
+      where: { errandId_fromUserId: { errandId: id, fromUserId: order.userId } },
+    }));
+    const formatted = await this.enrichErrandPayment(this.formatErrand(order), id, rated);
+    let enriched: typeof formatted & { driverGrossCdf?: number; driverNetCdf?: number } = formatted;
+    if (order.driverId === userId) {
+      const errandRule = await this.commission.get(CommissionServiceType.ERRAND);
+      const gross = (order.finalPriceCdf ?? order.estimatedPriceCdf) + (order.purchaseTotalCdf ?? 0);
+      enriched = {
+        ...formatted,
+        driverGrossCdf: gross,
+        driverNetCdf: Math.round(this.commission.splitGross(gross, errandRule.platformPercent).driverNetCdf),
+      };
+    }
     return {
-      ...this.formatErrand(order),
-      errand: this.formatErrand(order),
+      ...enriched,
+      errand: enriched,
       order,
       gpsTrace: await this.trackingService.getTrace(TrackingReferenceType.ERRAND, id),
     };
@@ -663,7 +787,11 @@ export class ErrandsService {
   }
 
   async cancel(id: string, userId: string) {
-    const order = await this.get(id, userId);
+    const order = await this.prisma.errandOrder.findUnique({ where: { id } });
+    if (!order) throw new MovaHttpException(MovaErrorCode.ERRAND_NOT_FOUND, HttpStatus.NOT_FOUND);
+    if (order.userId !== userId) {
+      throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
+    }
     const cancelEligibility = canCancelErrand({ status: order.status });
     if (!cancelEligibility.canCancel) {
       throw new MovaHttpException(
@@ -672,15 +800,14 @@ export class ErrandsService {
         cancelEligibility.cancelBlockReason,
       );
     }
-    return this.prisma.errandOrder.update({
+    const updated = await this.prisma.errandOrder.update({
       where: { id },
       data: { status: ErrandOrderStatus.CANCELLED, cancelledAt: new Date() },
-    }).then(async (updated) => {
-      if (updated.walletHoldCdf) {
-        await releaseWalletHold('ERRAND', updated.id).catch(() => undefined);
-      }
-      return updated;
     });
+    if (updated.walletHoldCdf) {
+      await releaseWalletHold('ERRAND', updated.id).catch(() => undefined);
+    }
+    return { success: true, errand: this.formatErrand(updated) };
   }
 
   async updateStatus(id: string, userId: string, status: ErrandOrderStatus) {

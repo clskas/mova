@@ -37,3 +37,8 @@ export class UpdateErrandStatusDto {
 export class UpdateErrandProofDto {
   @ApiProperty() @IsString() proofPhotoUrl!: string;
 }
+
+export class RateErrandDto {
+  @ApiProperty({ minimum: 1, maximum: 5 }) @IsNumber() courierScore!: number;
+  @ApiPropertyOptional() @IsOptional() @IsString() comment?: string;
+}

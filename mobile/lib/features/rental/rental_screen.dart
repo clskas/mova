@@ -615,7 +615,10 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
             items: _fuelOptions
                 .map((f) => DropdownMenuItem<String?>(value: f.$1.isEmpty ? null : f.$1, child: Text(f.$2)))
                 .toList(),
-            onChanged: (v) => setState(() => _fuel = v ?? ''),
+            onChanged: (v) {
+              setState(() => _fuel = v ?? '');
+              _search();
+            },
           ),
           const SizedBox(height: 8),
           LayoutBuilder(

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 import '../../core/api/api_client.dart';
+import '../../core/billing/service_price_display.dart';
+import '../../core/billing/driver_earnings_display.dart';
 import '../../core/config/market_config.dart';
 import '../../core/error/result.dart';
 import '../../core/services/cancel_eligibility.dart';
@@ -11,6 +13,7 @@ import '../../core/widgets/mova_widgets.dart';
 import '../booking/payment_screen.dart';
 import '../booking/widgets/mova_ride_map.dart';
 import 'carpool_contact.dart';
+import 'carpool_join_confirmation_screen.dart';
 
 enum CarpoolViewerRole { guest, driver, passenger }
 
@@ -47,6 +50,7 @@ class _CarpoolDetailScreenState extends ConsumerState<CarpoolDetailScreen> {
     super.initState();
     if (widget.initialTrip != null) {
       _trip = widget.initialTrip;
+      _rated = widget.initialTrip?['hasRated'] == true;
       _loading = false;
     }
     _loadTrip();
@@ -71,6 +75,7 @@ class _CarpoolDetailScreenState extends ConsumerState<CarpoolDetailScreen> {
       switch (result) {
         case Success(:final data):
           _trip = data['trip'] as Map<String, dynamic>? ?? data;
+          _rated = _trip?['hasRated'] == true;
           _error = null;
         case Failure(:final error):
           _error = error.message;
@@ -95,32 +100,34 @@ class _CarpoolDetailScreenState extends ConsumerState<CarpoolDetailScreen> {
   }
 
   bool get _canPay {
-    final s = _status?.toUpperCase();
-    return _isPassenger && s == 'COMPLETED';
+    if (!_isPassenger || _trip?['isPaid'] == true) return false;
+    return _trip?['paymentReady'] == true || _status?.toUpperCase() == 'COMPLETED';
   }
 
   Future<void> _openPayment() async {
     final trip = _trip;
     if (trip == null) return;
-    final seats = (trip['mySeats'] as int?) ?? (trip['bookedSeats'] as int?) ?? 1;
+    final seats = (trip['mySeats'] as int?) ?? 1;
     final pricePerSeat = trip['pricePerSeatCdf'] as int? ?? 0;
-    final amount = pricePerSeat * seats;
+    final amount = trip['myTotalCdf'] as int? ?? (pricePerSeat * seats);
     if (amount <= 0) return;
+    final paymentRef = trip['paymentReferenceId']?.toString() ?? widget.tripId;
     await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => PaymentScreen(
           serviceType: 'CARPOOL',
-          serviceId: widget.tripId,
+          serviceId: paymentRef,
           amountCdf: amount,
         ),
       ),
     );
+    _loadTrip();
   }
 
   bool get _canRate {
     final s = _status?.toUpperCase();
-    return _isPassenger && s == 'COMPLETED' && !_rated;
+    return _isPassenger && s == 'COMPLETED' && !_rated && _trip?['hasRated'] != true;
   }
 
   int _timelineIndex(String? step) {
@@ -129,6 +136,8 @@ class _CarpoolDetailScreenState extends ConsumerState<CarpoolDetailScreen> {
   }
 
   Future<void> _book() async {
+    final trip = _trip;
+    if (trip == null) return;
     setState(() => _actionLoading = true);
     final api = ref.read(apiClientProvider);
     final result = await api.post('/carpool/${widget.tripId}/book', {'seats': _bookSeats});
@@ -136,9 +145,22 @@ class _CarpoolDetailScreenState extends ConsumerState<CarpoolDetailScreen> {
     setState(() => _actionLoading = false);
     switch (result) {
       case Success():
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Réservation confirmée')),
-        );
+        if (mounted) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => CarpoolJoinConfirmationScreen(
+                tripId: widget.tripId,
+                fromAddress: trip['fromAddress']?.toString() ?? '',
+                toAddress: trip['toAddress']?.toString() ?? '',
+                driverName: trip['driverName']?.toString() ?? 'Conducteur',
+                pricePerSeatCdf: trip['pricePerSeatCdf'] as int? ?? 0,
+                seats: _bookSeats,
+                departureAt: trip['departureAt']?.toString(),
+              ),
+            ),
+          );
+        }
         _loadTrip();
       case Failure(:final error):
         setState(() => _error = error.message);
@@ -320,21 +342,57 @@ class _CarpoolDetailScreenState extends ConsumerState<CarpoolDetailScreen> {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  _Timeline(currentStep: currentStep, steps: _timelineSteps),
+                  if (_status?.toUpperCase() == 'CANCELLED')
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.red.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.cancel_outlined, color: Colors.red, size: 20),
+                          SizedBox(width: 8),
+                          Expanded(child: Text('Trajet annulé', style: TextStyle(color: Colors.red))),
+                        ],
+                      ),
+                    )
+                  else
+                    _Timeline(currentStep: currentStep, steps: _timelineSteps),
                   const SizedBox(height: 16),
+                  if (_isDriver && DriverEarningsDisplay.netFromMap(trip) != null)
+                    ServicePriceDisplay.driverMissionCard({...trip, 'type': 'CARPOOL'})
+                  else if (_isDriver)
+                    const SizedBox.shrink()
+                  else if (showBook)
+                    ServicePriceDisplay.carpoolBookingCard(
+                      pricePerSeatCdf: trip['pricePerSeatCdf'] as int? ?? 0,
+                      seats: _bookSeats,
+                      totalLabel: 'Total réservation',
+                    )
+                  else if (_isPassenger && (trip['mySeats'] as int? ?? 0) > 0)
+                    ServicePriceDisplay.carpoolBookingCard(
+                      pricePerSeatCdf: trip['pricePerSeatCdf'] as int? ?? 0,
+                      seats: trip['mySeats'] as int? ?? 1,
+                      totalLabel: 'Votre réservation',
+                    )
+                  else
+                    ServicePriceDisplay.passengerCard(
+                      {...trip, 'type': 'CARPOOL'},
+                      totalLabel: 'Prix par place',
+                      seats: 1,
+                    ),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      '$seatsLeft place${seatsLeft > 1 ? 's' : ''} restante${seatsLeft > 1 ? 's' : ''}',
+                      style: const TextStyle(color: MovaColors.textSecondary),
+                    ),
+                  ),
                   MovaCard(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          MarketConfig.formatCdf(trip['pricePerSeatCdf'] as int? ?? 0),
-                          style: const TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                            color: MovaColors.green,
-                          ),
-                        ),
-                        Text('par place · $seatsLeft place${seatsLeft > 1 ? 's' : ''} restante${seatsLeft > 1 ? 's' : ''}'),
                         if (trip['meetingPoint'] != null) ...[
                           const SizedBox(height: 8),
                           Text('Point de rendez-vous : ${trip['meetingPoint']}'),

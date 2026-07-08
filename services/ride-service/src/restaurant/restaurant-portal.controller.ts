@@ -5,6 +5,8 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PartnerPromoDto } from '../promo/partner-promo.dto';
 import { PartnerPromoService } from '../promo/partner-promo.service';
 import { PartnerBillingService } from '../billing/partner-billing.service';
+import { DeliveryChatService } from '../chat/delivery-chat.service';
+import { SendRideChatDto } from '../chat/ride-chat.dto';
 import { RejectOrderDto, UpdateRestaurantLocationDto, UpdateRestaurantMenuDto, UploadMenuPhotoDto } from './restaurant-portal.dto';
 import { RestaurantPortalService } from './restaurant-portal.service';
 import { RestaurantRoleGuard } from './restaurant-role.guard';
@@ -18,6 +20,7 @@ export class RestaurantPortalController {
     private portal: RestaurantPortalService,
     private partnerPromo: PartnerPromoService,
     private partnerBilling: PartnerBillingService,
+    private deliveryChat: DeliveryChatService,
   ) {}
 
   @Get('menu')
@@ -60,6 +63,18 @@ export class RestaurantPortalController {
   @ApiOperation({ summary: 'Refuser / annuler une commande' })
   reject(@Request() req: { user: { id: string } }, @Param('id') id: string, @Body() dto: RejectOrderDto) {
     return this.portal.rejectOrder(id, req.user.id, dto.reason);
+  }
+
+  @Get('orders/:id/chat')
+  @ApiOperation({ summary: 'Messages chat commande (client / livreur)' })
+  orderChatList(@Request() req: { user: { id: string } }, @Param('id') id: string) {
+    return this.deliveryChat.listMessages(id, req.user.id);
+  }
+
+  @Post('orders/:id/chat')
+  @ApiOperation({ summary: 'Envoyer un message chat commande' })
+  orderChatSend(@Request() req: { user: { id: string } }, @Param('id') id: string, @Body() dto: SendRideChatDto) {
+    return this.deliveryChat.sendMessage(id, req.user.id, dto.text);
   }
 
   @Patch('menu')

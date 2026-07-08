@@ -5,9 +5,11 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
 const WS_BASE = API_BASE.replace(/\/api\/?$/, "");
 
 export type RestaurantLivePayload = {
-  type: "order" | "order-status";
+  type: "order" | "order-status" | "order-payment";
   deliveryId: string;
   status: string;
+  isPaid?: boolean;
+  paymentStatus?: string | null;
 };
 
 export type RestaurantSocketHandlers = {

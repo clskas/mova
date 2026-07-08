@@ -3,6 +3,7 @@ import { Prisma, RentalInquiryStatus, RentalLogisticsMode, RentalVehicleApproval
 import { MARKET_RDC, MOVA_EVENTS, MovaErrorCode, MovaHttpException, canCancelRentalBooking, formatCdf, formatRentalRemaining, shouldChargeGpsAddOn, vehicleHasBuiltInGps, type RentalBookingEventKind } from '@mova/shared';
 import { RedisService } from '@mova/shared';
 import { fetchAuthUserBrief } from '../common/internal-lookup.util';
+import { fetchServicePaymentStatus } from '../common/payment-status.util';
 import { assertDriverCanReceiveJobs, assertDriverEligibleForRentalLogistics } from '../common/driver-eligibility.util';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -159,9 +160,20 @@ export class RentalService {
     return Math.ceil(vehicle.dailyRateCdf / MARKET_RDC.rental.hoursPerDayForHourlyRate);
   }
 
-  private computeOwnerNetCdf(grossCdf: number | null | undefined): number | null {
+  private computeOwnerNetCdf(grossCdf: number | null | undefined, depositCdf = 0): number | null {
     if (grossCdf == null || grossCdf <= 0) return null;
-    return grossCdf - Math.round(grossCdf * RENTAL_OWNER_COMMISSION_PCT);
+    const subtotal = Math.max(0, grossCdf - depositCdf);
+    if (subtotal <= 0) return null;
+    return subtotal - Math.round(subtotal * RENTAL_OWNER_COMMISSION_PCT);
+  }
+
+  private computeLogisticsGrossCdf(): number {
+    return MARKET_RDC.interCity.baseSurchargeCdf * 2;
+  }
+
+  private computeDriverLogisticsNetCdf(): number {
+    const gross = this.computeLogisticsGrossCdf();
+    return gross - Math.round(gross * RENTAL_OWNER_COMMISSION_PCT);
   }
 
   private isPartnerOwned(inquiry: { vehicle?: { ownerUserId: string | null } | null }): boolean {
@@ -326,7 +338,8 @@ export class RentalService {
   }) {
     const passenger = await fetchAuthUserBrief(inquiry.userId);
     const grossCdf = inquiry.totalCdf ?? inquiry.estimatedPriceCdf;
-    const ownerNetCdf = this.computeOwnerNetCdf(grossCdf);
+    const depositCdf = (inquiry as { vehicle?: { depositCdf?: number } | null }).vehicle?.depositCdf ?? 0;
+    const ownerNetCdf = this.computeOwnerNetCdf(grossCdf, depositCdf);
     const showRemaining =
       inquiry.status === RentalInquiryStatus.CONFIRMED ||
       inquiry.status === RentalInquiryStatus.IN_PROGRESS ||
@@ -829,6 +842,7 @@ export class RentalService {
       ownerName: string | null;
       ownerContactPhone: string | null;
       ownerBadge: string | null;
+      depositCdf?: number;
     } | null;
   },
     audience: 'passenger' | 'owner' | 'admin' | 'driver' = 'passenger',
@@ -858,19 +872,40 @@ export class RentalService {
       startDate: inquiry.startDate,
     });
     const grossCdf = inquiry.totalCdf ?? inquiry.estimatedPriceCdf;
+    const depositCdf = inquiry.vehicle?.depositCdf ?? 0;
+    const rentalSubtotalCdf = Math.max(0, (grossCdf ?? 0) - depositCdf);
+    const driverLogisticsNet =
+      audience === 'driver' && inquiry.driverId && this.needsMovaLogistics(inquiry.logisticsMode)
+        ? this.computeDriverLogisticsNetCdf()
+        : null;
+    const driverLogisticsGross =
+      driverLogisticsNet != null ? this.computeLogisticsGrossCdf() : null;
     const displayAmountCdf =
       audience === 'owner'
-        ? this.computeOwnerNetCdf(grossCdf) ?? grossCdf
-        : grossCdf;
+        ? this.computeOwnerNetCdf(grossCdf, depositCdf) ?? grossCdf
+        : audience === 'driver'
+          ? driverLogisticsNet ?? grossCdf
+          : grossCdf;
     const displayAmountLabel =
-      audience === 'owner' ? 'Votre gain net' : audience === 'driver' ? 'Rémunération mission' : 'Total à payer';
+      audience === 'owner'
+        ? 'Votre gain net'
+        : audience === 'driver'
+          ? 'Rémunération logistique'
+          : 'Total à payer';
     return {
       ...inquiry,
+      type: 'RENTAL',
       ...this.mapLogisticsFields(inquiry),
       priceCdf: grossCdf,
+      depositCdf,
+      rentalSubtotalCdf,
+      passengerTotalCdf: grossCdf,
       displayAmountCdf,
       displayAmountLabel,
-      ownerNetCdf: audience === 'owner' ? this.computeOwnerNetCdf(grossCdf) : undefined,
+      ownerNetCdf:
+        audience === 'owner' ? this.computeOwnerNetCdf(grossCdf, depositCdf) : undefined,
+      driverGrossCdf: driverLogisticsGross ?? undefined,
+      driverNetCdf: driverLogisticsNet ?? undefined,
       ownerContactPhone: ownerContact,
       ownerName: inquiry.vehicle?.ownerName,
       ownerBadge: inquiry.vehicle?.ownerBadge,
@@ -888,11 +923,41 @@ export class RentalService {
       remainingActive: remaining?.isActive ?? false,
       paymentReady: inquiry.status === RentalInquiryStatus.RETURNED,
       isPaid: inquiry.status === RentalInquiryStatus.PAID,
+      paymentReferenceId: inquiry.id,
       completionPin:
         inquiry.status === RentalInquiryStatus.RETURNED || inquiry.status === RentalInquiryStatus.PAID
           ? inquiry.completionPin
           : undefined,
     };
+  }
+
+  private async enrichInquiryWithPayment(
+    inquiry: {
+      id: string;
+      status: RentalInquiryStatus;
+      completionPin?: string | null;
+      [key: string]: unknown;
+    },
+    audience: 'passenger' | 'owner' | 'admin' | 'driver' = 'passenger',
+  ) {
+    const withPin =
+      inquiry.status === RentalInquiryStatus.RETURNED || inquiry.status === RentalInquiryStatus.PAID
+        ? await this.ensureCompletionPinForPayment(inquiry)
+        : inquiry;
+    const enriched = this.enrichInquiry(
+      withPin as Parameters<RentalService['enrichInquiry']>[0],
+      audience,
+    ) as Record<string, unknown>;
+    if (
+      inquiry.status === RentalInquiryStatus.RETURNED ||
+      inquiry.status === RentalInquiryStatus.PAID
+    ) {
+      const payment = await fetchServicePaymentStatus('RENTAL', inquiry.id);
+      const isPaid = payment.isPaid || inquiry.status === RentalInquiryStatus.PAID;
+      enriched.isPaid = isPaid;
+      enriched.paymentReady = inquiry.status === RentalInquiryStatus.RETURNED && !isPaid;
+    }
+    return enriched;
   }
 
   private buildTimeline(current: RentalInquiryStatus) {
@@ -1054,11 +1119,14 @@ export class RentalService {
     });
     const started = await Promise.all(rows.map((r) => this.maybeAutoStartInquiry(r)));
     return {
-      data: started.map((r) => ({
-        ...this.enrichInquiry(r),
-        paymentReady: r.status === RentalInquiryStatus.RETURNED,
-        currency: MARKET_RDC.currency,
-      })),
+      data: await Promise.all(
+        started.map((r) =>
+          this.enrichInquiryWithPayment(r, 'passenger').then((inquiry) => ({
+            ...inquiry,
+            currency: MARKET_RDC.currency,
+          })),
+        ),
+      ),
     };
   }
 
@@ -1243,7 +1311,7 @@ export class RentalService {
     if (inquiry.userId !== userId) throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
     const started = await this.maybeAutoStartInquiry(inquiry);
     const withPin = await this.ensureCompletionPinForPayment(started);
-    return this.enrichInquiry(withPin);
+    return this.enrichInquiryWithPayment(withPin, 'passenger');
   }
 
   async getForParticipant(id: string, userId: string) {
@@ -1255,7 +1323,7 @@ export class RentalService {
     const started = await this.maybeAutoStartInquiry(inquiry);
     const audience =
       inquiry.driverId === userId ? 'driver' : inquiry.userId === userId ? 'passenger' : 'admin';
-    return this.enrichInquiry(started, audience);
+    return this.enrichInquiryWithPayment(started, audience);
   }
 
   async listForDriver(driverId: string) {
@@ -1269,22 +1337,31 @@ export class RentalService {
       include: { vehicle: true },
     });
     return {
-      data: rows.map((r) => ({
-        id: r.id,
-        type: 'RENTAL',
-        label: 'Location véhicule',
-        status: r.status,
-        pickupAddress: r.pickupAddress ?? r.pickupCity ?? '—',
-        dropoffAddress: r.returnCity ?? r.pickupCity ?? '—',
-        pickupCity: r.pickupCity,
-        returnCity: r.returnCity,
-        vehicleName: r.vehicle?.name ?? r.vehicleType,
-        contactPhone: r.contactPhone,
-        startDate: r.startDate.toISOString(),
-        endDate: r.endDate.toISOString(),
-        priceCdf: r.totalCdf ?? r.estimatedPriceCdf,
-        createdAt: r.createdAt.toISOString(),
-      })),
+      data: rows.map((r) => {
+        const gross = r.totalCdf ?? r.estimatedPriceCdf ?? 0;
+        const driverNet =
+          r.logisticsMode === RentalLogisticsMode.MOVA_DRIVER ? this.computeDriverLogisticsNetCdf() : null;
+        return {
+          id: r.id,
+          type: 'RENTAL',
+          label: 'Location véhicule',
+          status: r.status,
+          pickupAddress: r.pickupAddress ?? r.pickupCity ?? '—',
+          dropoffAddress: r.returnCity ?? r.pickupCity ?? '—',
+          pickupCity: r.pickupCity,
+          returnCity: r.returnCity,
+          vehicleName: r.vehicle?.name ?? r.vehicleType,
+          contactPhone: r.contactPhone,
+          startDate: r.startDate.toISOString(),
+          endDate: r.endDate.toISOString(),
+          priceCdf: gross,
+          passengerTotalCdf: gross,
+          driverNetCdf: driverNet ?? undefined,
+          driverGrossCdf: driverNet != null ? this.computeLogisticsGrossCdf() : undefined,
+          logisticsModeLabel: LOGISTICS_LABELS[r.logisticsMode],
+          createdAt: r.createdAt.toISOString(),
+        };
+      }),
     };
   }
 
@@ -1309,7 +1386,8 @@ export class RentalService {
     if (status === RentalInquiryStatus.IN_PROGRESS) {
       await assertDriverCanReceiveJobs(driverId);
       const updated = await this.transitionToInProgress(inquiry);
-      return { rental: this.enrichInquiry(updated), inquiry: this.enrichInquiry(updated) };
+      const enriched = await this.enrichInquiryWithPayment(updated, 'driver');
+      return { rental: enriched, inquiry: enriched };
     }
     const updated = await this.prisma.rentalInquiry.update({
       where: { id },
@@ -1325,7 +1403,8 @@ export class RentalService {
       userId: updated.userId,
       status: updated.status,
     });
-    return { rental: this.enrichInquiry(updated), inquiry: this.enrichInquiry(updated) };
+    const enriched = await this.enrichInquiryWithPayment(updated, 'driver');
+    return { rental: enriched, inquiry: enriched };
   }
 
   async markPaid(id: string) {

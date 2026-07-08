@@ -257,3 +257,21 @@ export async function downloadBookingReceiptPdf(bookingId: string) {
   a.click();
   URL.revokeObjectURL(url);
 }
+
+export type ChatMessagePayload = {
+  id?: string;
+  text?: string;
+  senderRole?: string;
+  ts?: number;
+};
+
+export function fetchRentalChat(inquiryId: string) {
+  return apiFetch<{ inquiryId?: string; messages: ChatMessagePayload[] }>(`/api/rental/inquiries/${inquiryId}/chat`);
+}
+
+export function sendRentalChat(inquiryId: string, text: string) {
+  return apiFetch<ChatMessagePayload>(`/api/rental/inquiries/${inquiryId}/chat`, {
+    method: "POST",
+    body: JSON.stringify({ text }),
+  });
+}

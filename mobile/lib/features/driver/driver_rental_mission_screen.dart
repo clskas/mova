@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/api/api_client.dart';
-import '../../core/config/market_config.dart';
+import '../../core/billing/service_price_display.dart';
 import '../../core/error/result.dart';
 import '../../core/geo/maps_launcher.dart';
 import '../../core/theme/mova_colors.dart';
@@ -155,7 +155,6 @@ class _DriverRentalMissionScreenState extends ConsumerState<DriverRentalMissionS
     final returnCity = _inquiry?['returnCity']?.toString() ?? widget.initialMission?['returnCity']?.toString();
     final logistics = _inquiry?['logisticsModeLabel']?.toString();
     final contactPhone = _inquiry?['contactPhone']?.toString() ?? widget.initialMission?['contactPhone']?.toString();
-    final price = _inquiry?['priceCdf'] ?? _inquiry?['totalCdf'] ?? widget.initialMission?['priceCdf'];
     final period = _formatPeriod();
     final steps = rentalTimelineSteps(_status);
 
@@ -202,13 +201,6 @@ class _DriverRentalMissionScreenState extends ConsumerState<DriverRentalMissionS
                     const SizedBox(height: 8),
                     Text('Logistique : $logistics', style: const TextStyle(fontSize: 13)),
                   ],
-                  if (price != null) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      MarketConfig.formatCdf(price is int ? price : int.tryParse(price.toString()) ?? 0),
-                      style: const TextStyle(fontWeight: FontWeight.bold, color: MovaColors.green),
-                    ),
-                  ],
                   if (contactPhone != null && contactPhone.isNotEmpty) ...[
                     const SizedBox(height: 12),
                     MovaButton(
@@ -220,6 +212,10 @@ class _DriverRentalMissionScreenState extends ConsumerState<DriverRentalMissionS
                 ],
               ),
             ),
+            if (_inquiry != null) ...[
+              const SizedBox(height: 12),
+              ServicePriceDisplay.driverMissionCard({..._inquiry!, 'type': 'RENTAL'}),
+            ],
             const SizedBox(height: 12),
             MovaCard(
               child: Column(

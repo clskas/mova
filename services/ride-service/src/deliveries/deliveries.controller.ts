@@ -37,6 +37,8 @@ export class DeliveriesController {
       dto.pickupLat,
       dto.pickupLng,
       dto.promoCode,
+      dto.deliveryLat,
+      dto.deliveryLng,
     );
   }
 
@@ -175,9 +177,13 @@ export class DeliveriesController {
   }
 
   @Get('active')
-  @ApiOperation({ summary: 'Livraison active du passager (reprise après fermeture app)' })
-  active(@Request() req: { user: { id: string } }) {
-    return this.deliveriesService.getActiveDelivery(req.user.id);
+  @ApiOperation({ summary: 'Livraison ou course active du passager (reprise après fermeture app)' })
+  async active(@Request() req: { user: { id: string } }) {
+    const [delivery, errand] = await Promise.all([
+      this.deliveriesService.getActiveDelivery(req.user.id),
+      this.errandsService.getActiveErrand(req.user.id),
+    ]);
+    return { ...delivery, errand: errand.errand };
   }
 
   @Get('history')
@@ -201,9 +207,16 @@ export class DeliveriesController {
   }
 
   @Post(':id/reject')
-  @ApiOperation({ summary: 'Refuser une offre livraison (chauffeur)' })
-  reject(@Request() req: { user: { id: string } }, @Param('id') id: string) {
-    return this.deliveriesService.rejectDelivery(id, req.user.id);
+  @ApiOperation({ summary: 'Refuser une offre livraison ou course/commission (chauffeur)' })
+  async reject(@Request() req: { user: { id: string } }, @Param('id') id: string) {
+    try {
+      return await this.deliveriesService.rejectDelivery(id, req.user.id);
+    } catch (error) {
+      if (error instanceof MovaHttpException && error.code === MovaErrorCode.DELIVERY_NOT_FOUND) {
+        return this.errandsService.rejectErrand(id, req.user.id);
+      }
+      throw error;
+    }
   }
 
   @Get(':id')

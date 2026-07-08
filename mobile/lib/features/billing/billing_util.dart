@@ -29,13 +29,13 @@ bool historyItemHasReceipt(Map<String, dynamic> item) {
     case 'ERRAND':
       return status == 'COMPLETED';
     case 'MOVING':
-      return status == 'COMPLETED';
+      return status == 'COMPLETED' && item['isPaid'] == true;
     case 'RENTAL':
-      return ['CONFIRMED', 'IN_PROGRESS', 'RETURNED', 'CLOSED'].contains(status);
+      return status == 'PAID' || (status == 'RETURNED' && item['isPaid'] == true);
     case 'SCHEDULED':
-      return status == 'COMPLETED';
+      return status == 'COMPLETED' && item['isPaid'] == true;
     case 'CARPOOL':
-      return status == 'COMPLETED';
+      return status == 'COMPLETED' && item['isPaid'] == true;
     default:
       return false;
   }

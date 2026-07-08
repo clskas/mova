@@ -70,9 +70,43 @@ class MovaRideMap extends StatefulWidget {
       final lat = (item['lat'] as num?)?.toDouble();
       final lng = (item['lng'] as num?)?.toDouble();
       if (lat == null || lng == null) continue;
+      if (!_isFiniteCoord(lat, lng)) continue;
       out.add(LatLng(lat, lng));
     }
     return out;
+  }
+
+  static bool isFiniteCoord(double lat, double lng) => _isFiniteCoord(lat, lng);
+
+  static bool _isFiniteCoord(double lat, double lng) =>
+      lat.isFinite && lng.isFinite && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+
+  static LatLngBounds safeBounds(List<LatLng> points) {
+    final valid = points.where((p) => _isFiniteCoord(p.latitude, p.longitude)).toList();
+    if (valid.isEmpty) {
+      final c = mapDefaultCenter();
+      return LatLngBounds(LatLng(c.latitude - 0.01, c.longitude - 0.01), LatLng(c.latitude + 0.01, c.longitude + 0.01));
+    }
+    if (valid.length == 1) {
+      final p = valid.first;
+      const pad = 0.012;
+      return LatLngBounds(
+        LatLng(p.latitude - pad, p.longitude - pad),
+        LatLng(p.latitude + pad, p.longitude + pad),
+      );
+    }
+    var bounds = LatLngBounds.fromPoints(valid);
+    final spanLat = (bounds.north - bounds.south).abs();
+    final spanLng = (bounds.east - bounds.west).abs();
+    if (spanLat < 0.0005 || spanLng < 0.0005) {
+      final mid = valid.first;
+      const pad = 0.012;
+      bounds = LatLngBounds(
+        LatLng(mid.latitude - pad, mid.longitude - pad),
+        LatLng(mid.latitude + pad, mid.longitude + pad),
+      );
+    }
+    return bounds;
   }
 
   @override
@@ -125,14 +159,15 @@ class _MovaRideMapState extends State<MovaRideMap> {
     final pickup = widget.pickup;
     final dropoff = widget.dropoff;
     final driver = widget.driver;
+    if (!MovaRideMap.isFiniteCoord(pickup.latitude, pickup.longitude)) return;
     if (driver != null && widget.followDriver) {
       _followDriverCamera(driver);
       return;
     }
-    if (dropoff != null) {
+    if (dropoff != null && MovaRideMap.isFiniteCoord(dropoff.latitude, dropoff.longitude)) {
       final points = [pickup, dropoff, if (driver != null) driver];
       _mapController.fitCamera(
-        CameraFit.bounds(bounds: LatLngBounds.fromPoints(points), padding: const EdgeInsets.all(48)),
+        CameraFit.bounds(bounds: MovaRideMap.safeBounds(points), padding: const EdgeInsets.all(48)),
       );
     } else {
       _mapController.move(pickup, 15);
@@ -140,6 +175,7 @@ class _MovaRideMapState extends State<MovaRideMap> {
   }
 
   void _followDriverCamera(LatLng driver) {
+    if (!MovaRideMap.isFiniteCoord(driver.latitude, driver.longitude)) return;
     final points = <LatLng>[
       driver,
       widget.approachTarget ?? widget.pickup,
@@ -148,7 +184,7 @@ class _MovaRideMapState extends State<MovaRideMap> {
     ];
     _mapController.fitCamera(
       CameraFit.bounds(
-        bounds: LatLngBounds.fromPoints(points),
+        bounds: MovaRideMap.safeBounds(points),
         padding: const EdgeInsets.all(52),
       ),
     );
@@ -168,8 +204,13 @@ class _MovaRideMapState extends State<MovaRideMap> {
     final pickup = widget.pickup;
     final dropoff = widget.dropoff;
     final driver = widget.driver;
-    final points = [pickup, if (dropoff != null) dropoff, if (driver != null) driver];
-    final bounds = LatLngBounds.fromPoints(points);
+    final points = [
+      pickup,
+      if (dropoff != null) dropoff,
+      if (driver != null) driver,
+    ].where((p) => MovaRideMap.isFiniteCoord(p.latitude, p.longitude)).toList();
+    final bounds = MovaRideMap.safeBounds(points.isEmpty ? [MovaRideMap.mapDefaultCenter()] : points);
+    final initialCenter = points.isNotEmpty ? points.first : MovaRideMap.mapDefaultCenter();
 
     return SizedBox(
       height: widget.height,
@@ -183,7 +224,7 @@ class _MovaRideMapState extends State<MovaRideMap> {
             child: FlutterMap(
               mapController: _mapController,
               options: MapOptions(
-                initialCenter: driver ?? pickup,
+                initialCenter: driver ?? initialCenter,
                 initialZoom: 14,
                 initialCameraFit: points.length > 1
                     ? CameraFit.bounds(bounds: bounds, padding: const EdgeInsets.all(48))

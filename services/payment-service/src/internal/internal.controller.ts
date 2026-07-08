@@ -8,6 +8,7 @@ import { WalletService } from '../wallet/wallet.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { DriverPayoutService } from '../payouts/driver-payout.service';
 import { PaymentsService } from '../payments/payments.service';
+import { DriverDebtLedgerService } from '../ledger/driver-debt-ledger.service';
 
 class CreateWalletDto {
   @IsString() userId: string;
@@ -53,6 +54,7 @@ export class InternalController {
     private subscriptions: SubscriptionsService,
     private driverPayouts: DriverPayoutService,
     private payments: PaymentsService,
+    private debtLedger: DriverDebtLedgerService,
   ) {}
 
   @Post('wallets')
@@ -155,6 +157,11 @@ export class InternalController {
     return this.payments.getServicePaymentStatus(referenceType, referenceId);
   }
 
+  @Post('services/payment-status')
+  getServicePaymentStatuses(@Body() body: { referenceType?: string; referenceIds?: string[] }) {
+    return this.payments.getServicePaymentStatuses(body.referenceType ?? 'DELIVERY', body.referenceIds ?? []);
+  }
+
   @Post('services/RENTAL/:referenceId/cash/confirm-partner')
   confirmRentalCashByPartner(
     @Param('referenceId') referenceId: string,
@@ -191,5 +198,20 @@ export class InternalController {
       skip: Number(skip ?? 0),
       take: Number(take ?? 50),
     });
+  }
+
+  @Get('drivers/:userId/cash-debts')
+  getDriverCashDebts(@Param('userId') userId: string) {
+    return this.debtLedger.getSummary(userId);
+  }
+
+  @Get('cash-debts')
+  listCashDebts(@Query('driverUserId') driverUserId?: string) {
+    return this.debtLedger.getAdminOverview(driverUserId);
+  }
+
+  @Post('cash-debts/:debtId/settle')
+  settleCashDebt(@Param('debtId') debtId: string, @Body() body: { settlementRef?: string }) {
+    return this.debtLedger.adminSettleDebt(debtId, body.settlementRef);
   }
 }

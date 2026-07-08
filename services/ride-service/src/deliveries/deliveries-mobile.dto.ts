@@ -14,6 +14,8 @@ export class MobileErrandEstimateDto {
   @ApiPropertyOptional() @IsOptional() @IsString() @MinLength(3) pickupAddress?: string;
   @ApiPropertyOptional() @IsOptional() @IsNumber() pickupLat?: number;
   @ApiPropertyOptional() @IsOptional() @IsNumber() pickupLng?: number;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() deliveryLat?: number;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() deliveryLng?: number;
   @ApiProperty() @IsString() @MinLength(3) deliveryAddress!: string;
   @ApiProperty({ type: [String] }) @IsArray() @IsString({ each: true }) items!: string[];
   @ApiPropertyOptional() @IsOptional() @IsNumber() budgetCdf?: number;

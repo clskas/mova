@@ -1,5 +1,5 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { CarpoolStatus, VehicleType } from '@prisma/client';
+import { CarpoolStatus, CommissionServiceType, VehicleType } from '@prisma/client';
 import {
   canCancelCarpoolTrip,
   INTERNAL_API_KEY,
@@ -12,8 +12,10 @@ import {
   serviceUrl,
 } from '@mova/shared';
 import { addressToCoords, DEFAULT_PICKUP } from '../common/address.util';
+import { fetchServicePaymentStatus } from '../common/payment-status.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { PricingService } from '../rides/pricing.service';
+import { CommissionService } from '../rides/commission.service';
 import { RoutingService } from '../geo/routing.service';
 import { CreateCarpoolTripDto } from './carpool.dto';
 
@@ -47,7 +49,12 @@ type TripRow = {
 
 @Injectable()
 export class CarpoolService {
-  constructor(private prisma: PrismaService, private pricing: PricingService, private routing: RoutingService) {}
+  constructor(
+    private prisma: PrismaService,
+    private pricing: PricingService,
+    private routing: RoutingService,
+    private commission: CommissionService,
+  ) {}
 
   private maskPhone(phone?: string): string {
     if (!phone || phone.length < 6) return '+243 *** ***';
@@ -162,8 +169,47 @@ export class CarpoolService {
     return null;
   }
 
-  private async formatTripForMobile(t: TripRow, driverMeta?: { name?: string; phone?: string; rating?: number; kycVerified?: boolean }) {
+  private async enrichCarpoolPricing(
+    t: TripRow & { passengers?: { seats?: number }[] },
+    formatted: Record<string, unknown>,
+    viewerUserId?: string,
+  ) {
+    const bookedSeats = (t.passengers ?? []).reduce((sum, p) => sum + (p.seats ?? 1), 0);
+    const pricePerSeat = (t.pricePerSeatCdf ?? 0) as number;
+    const bookedRevenue = pricePerSeat * bookedSeats;
+    const enriched: Record<string, unknown> = {
+      ...formatted,
+      type: 'CARPOOL',
+      bookedSeats,
+      passengerTotalCdf: bookedRevenue > 0 ? bookedRevenue : formatted.totalPriceCdf,
+    };
+    if (viewerUserId && t.driverId === viewerUserId && bookedRevenue > 0) {
+      const rule = await this.commission.get(CommissionServiceType.CARPOOL);
+      enriched.driverGrossCdf = bookedRevenue;
+      enriched.driverNetCdf = Math.round(
+        this.commission.splitGross(bookedRevenue, rule.platformPercent).driverNetCdf,
+      );
+    }
+    return enriched;
+  }
+
+  private async formatTripForMobile(
+    t: TripRow,
+    driverMeta?: { name?: string; phone?: string; rating?: number; kycVerified?: boolean },
+    viewerUserId?: string,
+  ) {
     const passengers = t.passengers ?? [];
+    const passengerRows = await Promise.all(
+      passengers.map(async (p) => {
+        const user = await this.fetchUserBrief(p.userId);
+        return {
+          id: p.id,
+          userId: p.userId,
+          seats: p.seats,
+          label: user?.name ?? `Passager ${p.userId.slice(0, 6)}`,
+        };
+      }),
+    );
     const distanceKm =
       t.distanceKm ??
       (await this.routing.roadDistanceKm(t.pickupLat, t.pickupLng, t.dropoffLat, t.dropoffLng));
@@ -172,12 +218,18 @@ export class CarpoolService {
     const profile = driverMeta?.kycVerified != null ? null : await this.fetchDriverProfile(t.driverId);
     const kycVerified = driverMeta?.kycVerified ?? profile?.kycStatus === 'APPROVED';
     const driverName = driverMeta?.name ?? `Conducteur ${(t.driverId ?? 'unknown').slice(0, 6)}`;
-    const contactPhone = this.maskPhone(driverMeta?.phone);
+    const driverPhoneRaw = driverMeta?.phone ?? profile?.user?.phone;
+    const myPassenger = viewerUserId ? passengers.find((p) => p.userId === viewerUserId) : undefined;
+    const contactPhone =
+      myPassenger && driverPhoneRaw
+        ? driverPhoneRaw
+        : this.maskPhone(driverPhoneRaw);
     const driverVehicle = this.pickDriverVehicle(profile);
 
-    return {
+    const base = {
       id: t.id,
       status: t.status,
+      type: 'CARPOOL',
       fromAddress: t.pickupAddress ?? t.fromCity ?? 'Kinshasa',
       toAddress: t.dropoffAddress ?? t.toCity ?? 'Kinshasa',
       fromCity: t.fromCity ?? this.resolveCity(t.pickupAddress ?? ''),
@@ -207,17 +259,41 @@ export class CarpoolService {
       vehicleType: driverVehicle?.type ?? null,
       vehiclePlate: driverVehicle?.plateNumber ?? null,
       passengerCount: passengers.length,
-      passengers: passengers.map((p) => ({
-        id: p.id,
-        userId: p.userId,
-        seats: p.seats,
-        label: `Passager ${p.userId.slice(0, 6)}`,
-      })),
+      passengers: passengerRows,
       timelineStep: this.timelineStep(t.status, passengers.length),
       contactPhone,
       contactAction: 'Contacter le conducteur',
       ...canCancelCarpoolTrip({ status: t.status, departureAt: t.departureAt }),
     };
+    const priced = await this.enrichCarpoolPricing(t, base, viewerUserId);
+    if (!viewerUserId) return priced;
+
+    const enriched: Record<string, unknown> = { ...priced };
+    if (myPassenger) {
+      enriched.isViewerPassenger = true;
+      enriched.mySeats = myPassenger.seats;
+      enriched.myBookingId = myPassenger.id;
+      enriched.paymentReferenceId = myPassenger.id;
+      enriched.myTotalCdf = (t.pricePerSeatCdf ?? 0) * myPassenger.seats;
+      enriched.passengerTotalCdf = enriched.myTotalCdf;
+      if (t.status === CarpoolStatus.COMPLETED) {
+        const payment = await fetchServicePaymentStatus('CARPOOL', myPassenger.id);
+        enriched.isPaid = payment.isPaid;
+        enriched.paymentReady = true;
+        const existingRating = await this.prisma.carpoolRating.findUnique({
+          where: { tripId_fromUserId: { tripId: t.id, fromUserId: viewerUserId } },
+        });
+        enriched.hasRated = !!existingRating;
+      } else {
+        enriched.isPaid = false;
+        enriched.paymentReady = false;
+        enriched.hasRated = false;
+      }
+    }
+    if (t.driverId === viewerUserId) {
+      enriched.isViewerDriver = true;
+    }
+    return enriched;
   }
 
   async estimateMobile(fromAddress: string, toAddress: string, seats: number) {
@@ -494,12 +570,16 @@ export class CarpoolService {
     });
     const driverUser = await this.fetchUserBrief(trip.driverId);
     const driverProfile = await this.fetchDriverProfile(trip.driverId);
-    const formatted = await this.formatTripForMobile(updated, {
-      name: driverUser?.name,
-      phone: driverUser?.phone,
-      rating: driverProfile?.ratingAvg,
-      kycVerified: driverProfile?.kycStatus === 'APPROVED',
-    });
+    const formatted = await this.formatTripForMobile(
+      updated,
+      {
+        name: driverUser?.name,
+        phone: driverUser?.phone,
+        rating: driverProfile?.ratingAvg,
+        kycVerified: driverProfile?.kycStatus === 'APPROVED',
+      },
+      userId,
+    );
     return {
       trip: formatted,
       passenger,
@@ -528,18 +608,18 @@ export class CarpoolService {
       orderBy: { createdAt: 'desc' },
       take: 20,
     });
-    const driverTrips = await Promise.all(asDriver.map((t) => this.formatTripForMobile(t)));
+    const driverTrips = await Promise.all(asDriver.map((t) => this.formatTripForMobile(t, undefined, userId)));
     const passengerTrips = await Promise.all(
       asPassenger.map(async (p) => ({
         bookingId: p.id,
         seats: p.seats,
-        trip: await this.formatTripForMobile(p.trip),
+        trip: await this.formatTripForMobile(p.trip, undefined, userId),
       })),
     );
     return { asDriver: driverTrips, asPassenger: passengerTrips };
   }
 
-  async get(id: string) {
+  async get(id: string, viewerUserId?: string) {
     const trip = await this.prisma.carpoolTrip.findUnique({
       where: { id },
       include: { passengers: { select: { id: true, userId: true, seats: true, createdAt: true } } },
@@ -548,13 +628,16 @@ export class CarpoolService {
     const driverUser = await this.fetchUserBrief(trip.driverId);
     const driverProfile = await this.fetchDriverProfile(trip.driverId);
     return {
-      trip: await this.formatTripForMobile(trip, {
-        name: driverUser?.name,
-        phone: driverUser?.phone,
-        rating: driverProfile?.ratingAvg,
-        kycVerified: driverProfile?.kycStatus === 'APPROVED',
-      }),
-      raw: trip,
+      trip: await this.formatTripForMobile(
+        trip,
+        {
+          name: driverUser?.name,
+          phone: driverUser?.phone,
+          rating: driverProfile?.ratingAvg,
+          kycVerified: driverProfile?.kycStatus === 'APPROVED',
+        },
+        viewerUserId,
+      ),
     };
   }
 
@@ -602,7 +685,7 @@ export class CarpoolService {
       },
       include: { passengers: true },
     });
-    return { trip: await this.formatTripForMobile(updated), cancelled: true };
+    return { trip: await this.formatTripForMobile(updated, undefined, userId), cancelled: true };
   }
 
   async rateTrip(tripId: string, fromUserId: string, score: number, comment?: string) {
@@ -621,17 +704,35 @@ export class CarpoolService {
   }
 
   async startTrip(tripId: string, userId: string) {
-    const trip = await this.prisma.carpoolTrip.findUnique({ where: { id: tripId } });
+    const trip = await this.prisma.carpoolTrip.findUnique({
+      where: { id: tripId },
+      include: { passengers: true },
+    });
     if (!trip) throw new MovaHttpException(MovaErrorCode.CARPOOL_NOT_FOUND, HttpStatus.NOT_FOUND);
     if (trip.driverId !== userId) throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
     if (trip.status !== CarpoolStatus.MATCHED && trip.status !== CarpoolStatus.OPEN) {
       throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Le trajet ne peut pas démarrer dans cet état.');
     }
-    return this.prisma.carpoolTrip.update({
+    if (trip.passengers.length < 1) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        undefined,
+        'Au moins un passager est requis pour démarrer le trajet.',
+      );
+    }
+    const updated = await this.prisma.carpoolTrip.update({
       where: { id: tripId },
       data: { status: CarpoolStatus.IN_PROGRESS },
       include: { passengers: true },
     });
+    const driverUser = await this.fetchUserBrief(userId);
+    return {
+      trip: await this.formatTripForMobile(
+        updated,
+        { name: driverUser?.name, phone: driverUser?.phone },
+        userId,
+      ),
+    };
   }
 
   async completeTrip(tripId: string, userId: string) {
@@ -646,7 +747,13 @@ export class CarpoolService {
       data: { status: CarpoolStatus.COMPLETED },
       include: { passengers: true },
     });
-    return { trip: updated, paymentReady: true };
+    const driverUser = await this.fetchUserBrief(userId);
+    const formatted = await this.formatTripForMobile(
+      updated,
+      { name: driverUser?.name, phone: driverUser?.phone },
+      userId,
+    );
+    return { trip: formatted, paymentReady: true };
   }
 
   async listForAdmin(take = 50) {

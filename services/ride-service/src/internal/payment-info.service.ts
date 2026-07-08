@@ -140,21 +140,43 @@ export class PaymentInfoService {
     };
   }
 
-  private async carpoolInfo(tripId: string, userId?: string): Promise<ServicePaymentInfo> {
+  private async carpoolInfo(referenceId: string): Promise<ServicePaymentInfo> {
+    const booking = await this.prisma.carpoolPassenger.findUnique({
+      where: { id: referenceId },
+      include: { trip: true },
+    });
+    if (booking) {
+      const trip = booking.trip;
+      return {
+        referenceType: 'CARPOOL',
+        referenceId,
+        userId: booking.userId,
+        amountCdf: trip.pricePerSeatCdf * booking.seats,
+        status: trip.status,
+        paymentReady: trip.status === 'COMPLETED',
+        driverId: trip.driverId,
+        title: `${trip.pickupAddress ?? 'Départ'} → ${trip.dropoffAddress ?? 'Arrivée'}`,
+      };
+    }
+
     const trip = await this.prisma.carpoolTrip.findUnique({
-      where: { id: tripId },
+      where: { id: referenceId },
       include: { passengers: true },
     });
     if (!trip) throw new MovaHttpException(MovaErrorCode.CARPOOL_NOT_FOUND, HttpStatus.NOT_FOUND);
-    const passenger = userId ? trip.passengers.find((p) => p.userId === userId) : trip.passengers[0];
-    const payerId = userId ?? passenger?.userId ?? trip.driverId;
-    const seats = passenger?.seats ?? 1;
-    const amountCdf = trip.pricePerSeatCdf * seats;
+    const passenger = trip.passengers[0];
+    if (!passenger) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        undefined,
+        'Aucune réservation passager pour ce trajet.',
+      );
+    }
     return {
       referenceType: 'CARPOOL',
-      referenceId: tripId,
-      userId: payerId,
-      amountCdf,
+      referenceId: passenger.id,
+      userId: passenger.userId,
+      amountCdf: trip.pricePerSeatCdf * passenger.seats,
       status: trip.status,
       paymentReady: trip.status === 'COMPLETED',
       driverId: trip.driverId,

@@ -8,6 +8,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/api/api_client.dart';
 import '../../core/api/ride_socket.dart';
+import '../../core/billing/service_price_display.dart';
 import '../../core/config/market_config.dart';
 import '../../core/error/result.dart';
 import '../../core/services/cancel_eligibility.dart';
@@ -142,10 +143,22 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
 
   bool get _canCancel => CancelEligibility.ride(_ride ?? {'status': _status});
 
+  /// Paiement espèces déjà initié par le passager, en attente de la
+  /// confirmation du PIN par le chauffeur (statut backend PENDING).
+  /// Dans ce cas on ne redemande plus au client de payer.
+  bool get _cashPaymentPending {
+    if (_status.toUpperCase() != 'COMPLETED') return false;
+    if (_ride?['isPaid'] == true) return false;
+    return _ride?['paymentStatus']?.toString().toUpperCase() == 'PENDING';
+  }
+
   bool get _needsPayment {
     final s = _status.toUpperCase();
     if (s != 'COMPLETED') return _mock;
-    return _ride?['isPaid'] != true;
+    if (_ride?['isPaid'] == true) return false;
+    // Cash déjà réglé côté passager → attente confirmation chauffeur, pas de relance.
+    if (_cashPaymentPending) return false;
+    return true;
   }
 
   void _updateEtaFromRide(Map<String, dynamic> data) {
@@ -234,7 +247,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
   }
 
   void _applyRideData(Map<String, dynamic> data, ApiClient api) {
-    _ride = data;
+    _ride = data['type'] == null ? {...data, 'type': 'RIDE'} : data;
     final newStatus = data['status']?.toString() ?? 'ACCEPTED';
     if (newStatus != _status) {
       PassengerAlertService.notifyRideStatus(newStatus);
@@ -260,7 +273,9 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
     _updateEtaFromRide(data);
 
     final terminal = ['COMPLETED', 'CANCELLED'].contains(_status.toUpperCase());
-    if (!api.isMockMode && !terminal) {
+    final paymentPending =
+        _ride?['isPaid'] != true && _ride?['paymentStatus']?.toString().toUpperCase() == 'PENDING';
+    if (!api.isMockMode && (!terminal || paymentPending)) {
       _connectSocket();
     }
 
@@ -380,6 +395,30 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
         });
         if (status == 'COMPLETED') _triggerAutoPayment();
         if (status == 'CANCELLED') Navigator.pop(context);
+      },
+      onPaymentCompleted: (payload) {
+        if (!mounted) return;
+        final wasPaid = _ride?['isPaid'] == true;
+        final method = payload['method']?.toString() ?? _ride?['paymentMethod']?.toString();
+        setState(() {
+          _ride = {
+            ...?_ride,
+            'isPaid': true,
+            'paymentStatus': payload['paymentStatus']?.toString() ?? 'COMPLETED',
+            if (method != null) 'paymentMethod': method,
+          };
+        });
+        if (!wasPaid) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                method?.toUpperCase() == 'CASH'
+                    ? 'Paiement espèces confirmé par le chauffeur'
+                    : 'Paiement confirmé',
+              ),
+            ),
+          );
+        }
       },
     );
   }
@@ -804,6 +843,15 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
                                 ],
                               ),
                             ),
+                            if (_ride != null) ...[
+                              const SizedBox(height: 12),
+                              ServicePriceDisplay.passengerCard(
+                                _ride!,
+                                totalLabel: _status.toUpperCase() == 'COMPLETED'
+                                    ? 'Total course'
+                                    : 'Tarif estimé',
+                              ),
+                            ],
                             const SizedBox(height: 16),
                             Text('Statut', style: Theme.of(context).textTheme.titleSmall),
                             const SizedBox(height: 8),
@@ -857,6 +905,35 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
                                 label: 'Payer la course',
                                 icon: Icons.payment_outlined,
                                 onPressed: _goToPayment,
+                              ),
+                            ] else if (_cashPaymentPending) ...[
+                              const SizedBox(height: 8),
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: MovaColors.orange.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: MovaColors.orange.withValues(alpha: 0.3),
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.schedule,
+                                        color: MovaColors.orange, size: 20),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Text(
+                                        'Paiement espèces en attente — communiquez le code PIN au chauffeur pour finaliser.',
+                                        style: const TextStyle(
+                                          color: MovaColors.orange,
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ],
                           ],

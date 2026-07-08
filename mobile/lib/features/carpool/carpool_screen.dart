@@ -120,9 +120,9 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
     Future<void> resolve(String address, void Function(double lat, double lng) apply) async {
       final result = await api.geoAutocomplete(address.trim());
       if (result case Success(:final data)) {
-        final raw = data['suggestions'] as List? ?? data['data'] as List? ?? [];
+        final raw = data;
         if (raw.isNotEmpty) {
-          final first = raw.first as Map<String, dynamic>;
+          final first = raw.first;
           final lat = (first['lat'] as num?)?.toDouble();
           final lng = (first['lng'] as num?)?.toDouble();
           if (lat != null && lng != null) apply(lat, lng);
@@ -362,6 +362,7 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
                 toAddress: ride['toAddress']?.toString() ?? '',
                 driverName: driver,
                 pricePerSeatCdf: perSeat,
+                seats: seats,
                 departureAt: ride['departureAt']?.toString(),
               ),
             ),
@@ -419,7 +420,7 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
                 const SizedBox(width: 8),
                 Flexible(
                   child: Text(
-                    MarketConfig.formatCdf(perSeat),
+                    '${MarketConfig.formatCdf(perSeat)}/place',
                     textAlign: TextAlign.end,
                     style: const TextStyle(fontWeight: FontWeight.bold, color: MovaColors.green, fontSize: 16),
                   ),
@@ -734,7 +735,7 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
                 overflow: TextOverflow.ellipsis,
               ),
               subtitle: Text(
-                '${trip['driverName']} · ${MarketConfig.formatCdf(trip['pricePerSeatCdf'] as int? ?? 0)} · $step',
+                '${trip['driverName']} · ${MarketConfig.formatCdf((trip['pricePerSeatCdf'] as int? ?? 0) * (trip['mySeats'] as int? ?? 1))} · $step',
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),

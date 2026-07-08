@@ -11,7 +11,31 @@ export type ServicePaymentStatus = {
   referenceId: string;
   isPaid: boolean;
   paymentStatus: string | null;
+  paymentMethod?: string | null;
 };
+
+export async function fetchServicePaymentStatuses(
+  referenceType: string,
+  referenceIds: string[],
+): Promise<Record<string, ServicePaymentStatus>> {
+  const type = referenceType.toUpperCase();
+  const unique = [...new Set(referenceIds.filter(Boolean))];
+  if (unique.length === 0) return {};
+  try {
+    const res = await fetch(serviceUrl('payment', '/internal/services/payment-status'), {
+      method: 'POST',
+      headers: {
+        'x-internal-api-key': INTERNAL_API_KEY,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ referenceType: type, referenceIds: unique }),
+    });
+    if (!res.ok) return {};
+    return (await res.json()) as Record<string, ServicePaymentStatus>;
+  } catch {
+    return {};
+  }
+}
 
 export async function fetchRidePaymentStatus(rideId: string): Promise<RidePaymentStatus> {
   try {

@@ -52,11 +52,13 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
     });
   }
 
+  /// Le compte à rebours a expiré sans réponse du chauffeur.
+  /// On ne rejette PAS la course (pas de DRIVER_REJECTED permanent) afin
+  /// qu'elle puisse être re-proposée plus tard. On renvoie 'timeout' pour
+  /// que le tableau de bord ne fasse qu'une mise en veille temporaire.
   Future<void> _expireOffer() async {
-    if (_rideId.isNotEmpty) {
-      await ref.read(apiClientProvider).rejectRide(_rideId);
-    }
-    if (mounted) Navigator.pop(context);
+    if (mounted) Navigator.pop(context, 'timeout');
+  }
 
   /// Distance/ETA chauffeur → client (point de prise en charge).
   /// Priorité au calcul backend (distanceToPickupKm), sinon GPS local.
@@ -138,7 +140,7 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
     switch (result) {
       case Success():
         _timer?.cancel();
-        Navigator.pop(context);
+        Navigator.pop(context, 'rejected');
       case Failure(:final error):
         setState(() => _error = error.message);
     }
@@ -230,7 +232,11 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
                       textAlign: TextAlign.center,
                     ),
                     Text(
-                      DriverEarningsDisplay.netLabel(net: driverNet, gross: gross > 0 ? gross : null),
+                      DriverEarningsDisplay.serviceNetLabel(
+                        data: widget.offer,
+                        type: widget.offer['type']?.toString() ?? 'RIDE',
+                        passengerTotal: gross > 0 ? gross : null,
+                      ),
                       style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 13),
                     ),
                     if (distance != null) ...[

@@ -452,6 +452,40 @@ export type WalletOverview = {
   transactionsToday?: number;
 };
 
+export type CashDebtor = {
+  driverUserId: string;
+  driverName?: string | null;
+  totalCdf: number;
+  platformFeeCdf: number;
+  restaurantShareCdf: number;
+  partnerShareCdf: number;
+  openCount: number;
+};
+
+export type CashDebtLine = {
+  id: string;
+  driverUserId: string;
+  driverName?: string | null;
+  referenceType: string;
+  referenceId: string;
+  category: string;
+  amountCdf: number;
+  description?: string | null;
+  beneficiaryUserId?: string | null;
+  createdAt: string;
+};
+
+export type CashDebtsOverview = {
+  totalOpenCdf: number;
+  openDebtCount: number;
+  debtorCount: number;
+  platformFeeCdf: number;
+  restaurantShareCdf: number;
+  partnerShareCdf: number;
+  debtors: CashDebtor[];
+  debts: CashDebtLine[];
+};
+
 export type Commune = {
   id: string;
   name: string;
@@ -1111,7 +1145,7 @@ export type WalletTransaction = {
   description?: string;
   reference?: string | null;
   createdAt?: string;
-  wallet?: { userId: string; balanceCdf?: number };
+  wallet?: { userId: string; userName?: string | null; balanceCdf?: number };
 };
 
 export type WalletTransactionsPage = {
@@ -1363,6 +1397,30 @@ export async function adjustWallet(
   data: { amountCdf: number; type: "CREDIT" | "DEBIT"; description: string },
 ) {
   return apiFetch(`/api/admin/wallet/${userId}/adjust`, { method: "POST", body: JSON.stringify(data) });
+}
+
+export async function withdrawWallet(
+  userId: string,
+  data: { amountCdf: number; provider: string; phone: string },
+) {
+  return apiFetch<{ success?: boolean; message?: string; balanceCdf?: number; reference?: string }>(
+    `/api/admin/wallet/${userId}/withdraw`,
+    { method: "POST", body: JSON.stringify(data) },
+  );
+}
+
+export async function fetchCashDebts(driverUserId?: string): Promise<CashDebtsOverview> {
+  const params = new URLSearchParams();
+  if (driverUserId) params.set("driverUserId", driverUserId);
+  const qs = params.toString();
+  return apiFetch<CashDebtsOverview>(`/api/admin/wallet/cash-debts${qs ? `?${qs}` : ""}`);
+}
+
+export async function settleCashDebt(debtId: string, settlementRef?: string) {
+  return apiFetch(`/api/admin/wallet/cash-debts/${debtId}/settle`, {
+    method: "POST",
+    body: JSON.stringify({ settlementRef }),
+  });
 }
 
 export async function updateUser(id: string, data: Partial<AdminUser>) {
@@ -1671,6 +1729,7 @@ export async function fetchWalletOverview(): Promise<WalletOverview> {
 
 export type UserWalletDetail = {
   userId: string;
+  userName?: string;
   balanceCdf?: number;
   currency?: string;
   transactionCount?: number;

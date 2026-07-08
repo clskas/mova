@@ -75,7 +75,9 @@ class CancelEligibility {
   static bool _carpoolFallback(Map<String, dynamic>? data) {
     if (data == null) return false;
     final status = data['status']?.toString().toUpperCase();
-    if (status == null || status == 'CANCELLED' || status == 'COMPLETED') return false;
+    if (status == null || status == 'CANCELLED' || status == 'COMPLETED' || status == 'IN_PROGRESS') {
+      return false;
+    }
     final departure = data['departureAt']?.toString();
     if (departure == null) return true;
     try {

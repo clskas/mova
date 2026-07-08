@@ -343,6 +343,7 @@ export class BillingReceiptService {
       `${receipt.serviceTypeLabel} — ${receipt.totalCdf.toLocaleString('fr-CD')} FC`,
       receipt.payment ? `Paiement : ${receipt.payment.methodLabel} (${receipt.payment.status})` : 'En attente de paiement',
       `Réf. ${referenceId.slice(0, 8)}…`,
+      `[mova-receipt:${type}:${referenceId}]`,
     ].join('\n');
 
     if (type === 'RIDE' || type === 'SCHEDULED') {

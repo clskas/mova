@@ -9,6 +9,7 @@ import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
+import 'chat_receipt.dart';
 
 class RideChatMessage {
   RideChatMessage({
@@ -280,27 +281,13 @@ class _RideChatScreenState extends ConsumerState<RideChatScreen> {
                     itemCount: _messages.length,
                     itemBuilder: (context, index) {
                       final m = _messages[index];
-                      return Align(
-                        alignment: m.isMine ? Alignment.centerRight : Alignment.centerLeft,
-                        child: Container(
-                          margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          constraints: BoxConstraints(
-                            maxWidth: MediaQuery.sizeOf(context).width * 0.78,
-                          ),
-                          decoration: BoxDecoration(
-                            color: m.isMine
-                                ? MovaColors.violet.withValues(alpha: 0.15)
-                                : MovaColors.cloud,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: m.isMine
-                                  ? MovaColors.violet.withValues(alpha: 0.3)
-                                  : MovaColors.textSecondary.withValues(alpha: 0.25),
-                            ),
-                          ),
-                          child: Text(m.text),
-                        ),
+                      return buildChatMessageBubble(
+                        context: context,
+                        text: m.text,
+                        isMine: m.isMine,
+                        fallbackReceiptType: 'RIDE',
+                        fallbackReceiptId: widget.rideId,
+                        maxWidthFactor: 0.78,
                       );
                     },
                   ),

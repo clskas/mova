@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { ScheduledRideStatus } from '@prisma/client';
+import { RentalInquiryStatus, ScheduledRideStatus } from '@prisma/client';
 import { toRideSummary } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { formatParcelDelivery } from '../deliveries/parcel.util';
@@ -151,6 +151,11 @@ export class HistoryService {
         take: fetchPerType,
       });
       for (const p of asPassenger) {
+        const payment =
+          p.trip.status === 'COMPLETED'
+            ? await fetchServicePaymentStatus('CARPOOL', p.id)
+            : { isPaid: false };
+        const isPaid = payment.isPaid;
         items.push({
           type: 'CARPOOL',
           id: p.trip.id,
@@ -158,7 +163,9 @@ export class HistoryService {
           title: `${p.trip.pickupAddress ?? 'Départ'} → ${p.trip.dropoffAddress ?? 'Arrivée'}`,
           priceCdf: p.trip.pricePerSeatCdf * p.seats,
           createdAt: p.createdAt.toISOString(),
-          meta: { role: 'passenger', seats: p.seats },
+          paymentReady: p.trip.status === 'COMPLETED' && !isPaid,
+          isPaid,
+          meta: { role: 'passenger', seats: p.seats, paymentReferenceId: p.id },
         });
       }
       const asDriver = await this.prisma.carpoolTrip.findMany({
@@ -187,6 +194,11 @@ export class HistoryService {
         include: { vehicle: { select: { name: true, category: true } } },
       });
       for (const r of rentals) {
+        const payment =
+          r.status === RentalInquiryStatus.RETURNED || r.status === RentalInquiryStatus.PAID
+            ? await fetchServicePaymentStatus('RENTAL', r.id)
+            : { isPaid: false };
+        const isPaid = payment.isPaid || r.status === RentalInquiryStatus.PAID;
         items.push({
           type: 'RENTAL',
           id: r.id,
@@ -194,7 +206,13 @@ export class HistoryService {
           title: r.vehicle?.name ?? r.vehicleType,
           priceCdf: r.totalCdf ?? r.estimatedPriceCdf ?? 0,
           createdAt: r.createdAt.toISOString(),
-          meta: { startDate: r.startDate.toISOString(), endDate: r.endDate.toISOString() },
+          paymentReady: r.status === RentalInquiryStatus.RETURNED && !isPaid,
+          isPaid,
+          meta: {
+            startDate: r.startDate.toISOString(),
+            endDate: r.endDate.toISOString(),
+            paymentReferenceId: r.id,
+          },
         });
       }
     }
@@ -224,6 +242,7 @@ export class HistoryService {
             pickupAddress: m.pickupAddress,
             dropoffAddress: m.dropoffAddress,
             photoUrls: Array.isArray(m.photoUrls) ? m.photoUrls : [],
+            paymentReferenceId: m.id,
           },
         });
       }

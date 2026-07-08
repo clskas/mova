@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -10,6 +11,7 @@ import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import '../billing/receipt_screen.dart';
+import 'widgets/cash_pin_confirm_dialog.dart';
 
 const _paymentMethods = [
   ('WALLET', 'Portefeuille MOVA', Icons.account_balance_wallet, MovaColors.violet),
@@ -29,6 +31,7 @@ class PaymentScreen extends ConsumerStatefulWidget {
     this.serviceId,
     required this.amountCdf,
     this.completionPin,
+    this.promptCashPinOnSelect,
   }) : assert(rideId != null || (serviceType != null && serviceId != null));
 
   /// Course taxi — utilise POST /payments/rides/:id
@@ -40,6 +43,9 @@ class PaymentScreen extends ConsumerStatefulWidget {
 
   final int amountCdf;
   final String? completionPin;
+
+  /// Ouvre automatiquement la fenêtre PIN espèces à la sélection (livraisons).
+  final bool? promptCashPinOnSelect;
 
   @override
   ConsumerState<PaymentScreen> createState() => _PaymentScreenState();
@@ -54,6 +60,16 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   String? _error;
   String? _cashPin;
   late int _amountCdf;
+  bool _cashPinDialogShown = false;
+
+  bool get _shouldPromptCashPin =>
+      widget.promptCashPinOnSelect ?? widget.serviceType != null;
+
+  String get _cashPeerLabel {
+    final type = widget.serviceType?.toUpperCase();
+    if (type == 'RIDE') return 'chauffeur';
+    return 'livreur';
+  }
 
   @override
   void initState() {
@@ -121,6 +137,34 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       _cashPin = pin ?? _cashPin;
       _loadingPin = false;
     });
+    await _maybePromptCashPin();
+  }
+
+  void _onMethodSelected(String method) {
+    setState(() => _method = method);
+    if (method == 'CASH') {
+      unawaited(_maybePromptCashPin());
+    }
+  }
+
+  Future<void> _maybePromptCashPin() async {
+    if (!_shouldPromptCashPin || _method != 'CASH' || _cashPinDialogShown || _loadingPin) return;
+    final pin = _cashPin;
+    if (pin == null || pin.isEmpty) return;
+    _cashPinDialogShown = true;
+    if (!mounted) return;
+    final confirmed = await showCashPinConfirmDialog(
+      context,
+      pin: pin,
+      amountCdf: _amountCdf,
+      peerLabel: _cashPeerLabel,
+    );
+    if (!mounted) return;
+    if (confirmed) {
+      await _pay(skipCashPrompt: true);
+    } else {
+      setState(() => _cashPinDialogShown = false);
+    }
   }
 
   bool get _needsPhone => _mobileMoneyMethods.contains(_method);
@@ -148,7 +192,11 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     return 'MOVA-${id.replaceAll('-', '').substring(0, 8).toUpperCase()}';
   }
 
-  Future<void> _pay() async {
+  Future<void> _pay({bool skipCashPrompt = false}) async {
+    if (!skipCashPrompt && _method == 'CASH' && _shouldPromptCashPin) {
+      await _maybePromptCashPin();
+      return;
+    }
     if (!_paymentReady) {
       setState(() => _error =
           'Le paiement sera disponible après le retour du véhicule. Le partenaire doit cliquer « Véhicule rendu ».');
@@ -197,7 +245,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
         if (_method == 'CASH' && data['pendingCash'] == true) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Paiement espèces en attente — communiquez le code PIN au chauffeur.'),
+              content: Text('Paiement espèces en attente — communiquez le code PIN au livreur.'),
             ),
           );
           if (widget.rideId != null) {
@@ -210,6 +258,21 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                   pendingCash: true,
                   completionPin: _cashPin ?? widget.completionPin,
                   amountCdf: _amountCdf,
+                ),
+              ),
+            );
+          } else if (widget.serviceType != null && widget.serviceId != null) {
+            final isErrand = widget.serviceType!.toUpperCase() == 'ERRAND';
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ReceiptScreen(
+                  serviceType: widget.serviceType,
+                  serviceId: widget.serviceId,
+                  pendingCash: true,
+                  completionPin: _cashPin ?? widget.completionPin,
+                  amountCdf: _amountCdf,
+                  showRatingAfter: isErrand,
                 ),
               ),
             );
@@ -229,21 +292,28 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
             ),
           );
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Paiement effectué avec succès')),
-          );
+          final isErrand = widget.serviceType?.toUpperCase() == 'ERRAND';
+          if (!isErrand) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Paiement effectué avec succès')),
+            );
+          }
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
               builder: (_) => ReceiptScreen(
                 serviceType: widget.serviceType,
                 serviceId: widget.serviceId,
+                showRatingAfter: isErrand,
               ),
             ),
           );
         }
       case Failure(:final error):
-        setState(() => _error = error.message);
+        setState(() {
+          _error = error.message;
+          _cashPinDialogShown = false;
+        });
     }
   }
 
@@ -284,7 +354,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                   ),
                   const SizedBox(height: 4),
                   const Text(
-                    'Remettez l\'argent au chauffeur, puis communiquez-lui ce code. '
+                    'Remettez l\'argent au livreur, puis communiquez-lui ce code. '
                     'Il le saisit dans son app pour confirmer le paiement.',
                     textAlign: TextAlign.center,
                     style: TextStyle(color: MovaColors.textSecondary, fontSize: 12),
@@ -312,7 +382,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
             return Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: MovaCard(
-                onTap: () => setState(() => _method = id),
+                onTap: () => _onMethodSelected(id),
                 child: Row(
                   children: [
                     Icon(icon, color: color),
@@ -321,7 +391,9 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                     Radio<String>(
                       value: id,
                       groupValue: _method,
-                      onChanged: (v) => setState(() => _method = v!),
+                      onChanged: (v) {
+                        if (v != null) _onMethodSelected(v);
+                      },
                       activeColor: MovaColors.violet,
                     ),
                   ],

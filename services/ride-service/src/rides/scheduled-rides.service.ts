@@ -1,8 +1,8 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { RideStatus, ScheduledRideStatus, VehicleType } from '@prisma/client';
+import { CommissionServiceType, RideStatus, ScheduledRideStatus, VehicleType } from '@prisma/client';
 import { MovaErrorCode, MovaHttpException, MOVA_EVENTS, MARKET_RDC, estimateTripDurationMin, normalizeVehicleType, resolveCityFromCoords, canCancelScheduledRide, formatCdf } from '@mova/shared';
 import { RedisService } from '@mova/shared';
-import { assertServiceAreaCoords, assertServiceAreaDestination, assertServiceAreaPair, addressToCoords, DEFAULT_PICKUP } from '../common/address.util';
+import { assertServiceAreaCoords, assertServiceAreaDestination, assertServiceAreaPair, DEFAULT_PICKUP } from '../common/address.util';
 import { fetchAuthUserBrief } from '../common/internal-lookup.util';
 import { assertDriverCanReceiveJobs, assertDriverEligibleForRide } from '../common/driver-eligibility.util';
 import { debitWallet } from '../common/wallet-hold.util';
@@ -10,11 +10,13 @@ import { MatchingService } from '../matching/matching.service';
 import { TripShareService } from '../share/trip-share.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { PricingService } from './pricing.service';
+import { CommissionService } from './commission.service';
 import { RidesService } from './rides.service';
 import { CreateScheduledRideDto } from './scheduled-rides.dto';
 import { MobileScheduledEstimateDto } from '../deliveries/deliveries-mobile.dto';
 import { applyPromoCode } from '../common/promo-apply.util';
 import { PromoService } from './surcharge.service';
+import { GeoService } from '../geo/geo.service';
 import { RoutingService } from '../geo/routing.service';
 
 const MAX_SCHEDULE_DAYS = 7;
@@ -32,6 +34,8 @@ export class ScheduledRidesService {
     private rides: RidesService,
     private promo: PromoService,
     private routing: RoutingService,
+    private geo: GeoService,
+    private commission: CommissionService,
   ) {}
 
   private parseVehicleType(value: string): VehicleType {
@@ -42,7 +46,7 @@ export class ScheduledRidesService {
     }
   }
 
-  private resolveScheduledCoords(dto: {
+  private async resolveScheduledCoords(dto: {
     pickupLat?: number;
     pickupLng?: number;
     dropoffLat?: number;
@@ -61,7 +65,10 @@ export class ScheduledRidesService {
     const dropoff =
       dto.dropoffLat != null && dto.dropoffLng != null
         ? { lat: dto.dropoffLat, lng: dto.dropoffLng }
-        : addressToCoords(dto.dropoffAddress);
+        : await this.geo.forwardGeocode(dto.dropoffAddress, {
+            nearLat: pickup.lat,
+            nearLng: pickup.lng,
+          });
     const { isInterCity } = assertServiceAreaPair(pickup.lat, pickup.lng, dropoff.lat, dropoff.lng);
     return { pickup, dropoff, isInterCity };
   }
@@ -77,7 +84,7 @@ export class ScheduledRidesService {
   async create(passengerId: string, dto: CreateScheduledRideDto) {
     const scheduledAt = new Date(dto.scheduledAt);
     this.validateScheduledAt(scheduledAt);
-    const { pickup, dropoff, isInterCity } = this.resolveScheduledCoords({
+    const { pickup, dropoff, isInterCity } = await this.resolveScheduledCoords({
       pickupLat: dto.pickupLat,
       pickupLng: dto.pickupLng,
       dropoffLat: dto.dropoffLat,
@@ -152,6 +159,7 @@ export class ScheduledRidesService {
       : 0;
     return {
       ...ride,
+      type: 'SCHEDULED',
       scheduledAt: ride.scheduledAt.toISOString(),
       createdAt: ride.createdAt.toISOString(),
       updatedAt: ride.updatedAt.toISOString(),
@@ -180,7 +188,19 @@ export class ScheduledRidesService {
     if (ride.passengerId !== userId && ride.driverId !== userId) {
       throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
     }
-    return ride;
+    const formatted = this.formatScheduledForMobile(ride);
+    const gross = ride.estimatedPriceCdf ?? 0;
+    const enriched: Record<string, unknown> = {
+      ...formatted,
+      type: 'SCHEDULED',
+      passengerTotalCdf: gross,
+    };
+    if (ride.driverId === userId) {
+      const rule = await this.commission.get(CommissionServiceType.RIDE);
+      enriched.driverGrossCdf = gross;
+      enriched.driverNetCdf = Math.round(this.commission.splitGross(gross, rule.platformPercent).driverNetCdf);
+    }
+    return { ...enriched, scheduledRide: enriched };
   }
 
   async updateStatusByDriver(id: string, driverId: string, status: ScheduledRideStatus) {
@@ -227,7 +247,7 @@ export class ScheduledRidesService {
       userId: updated.passengerId,
       status: updated.status,
     });
-    return { scheduledRide: updated };
+    return this.getForParticipant(updated.id, driverId);
   }
 
   async cancel(id: string, passengerId: string, reason?: string) {
@@ -513,7 +533,36 @@ export class ScheduledRidesService {
   async adminUpdateStatus(id: string, status: ScheduledRideStatus) {
     const ride = await this.prisma.scheduledRide.findUnique({ where: { id } });
     if (!ride) throw new MovaHttpException(MovaErrorCode.SCHEDULED_RIDE_NOT_FOUND, HttpStatus.NOT_FOUND);
-    const updated = await this.prisma.scheduledRide.update({ where: { id }, data: { status } });
+    if (ride.status === status) return ride;
+    const allowed: Record<ScheduledRideStatus, ScheduledRideStatus[]> = {
+      [ScheduledRideStatus.SCHEDULED]: [ScheduledRideStatus.CONFIRMED, ScheduledRideStatus.CANCELLED],
+      [ScheduledRideStatus.CONFIRMED]: [ScheduledRideStatus.IN_PROGRESS, ScheduledRideStatus.CANCELLED],
+      [ScheduledRideStatus.IN_PROGRESS]: [ScheduledRideStatus.COMPLETED, ScheduledRideStatus.CANCELLED],
+      [ScheduledRideStatus.COMPLETED]: [],
+      [ScheduledRideStatus.CANCELLED]: [],
+    };
+    if (!allowed[ride.status]?.includes(status)) {
+      throw new MovaHttpException(MovaErrorCode.SCHEDULED_RIDE_INVALID_STATUS);
+    }
+    const updates: { status: ScheduledRideStatus; rideId?: string } = { status };
+    if (status === ScheduledRideStatus.IN_PROGRESS && !ride.rideId && ride.driverId) {
+      const linked = await this.rides.createScheduledLinkedRide({
+        passengerId: ride.passengerId,
+        driverId: ride.driverId,
+        vehicleType: ride.vehicleType,
+        pickupLat: ride.pickupLat,
+        pickupLng: ride.pickupLng,
+        pickupAddress: ride.pickupAddress ?? undefined,
+        dropoffLat: ride.dropoffLat,
+        dropoffLng: ride.dropoffLng,
+        dropoffAddress: ride.dropoffAddress ?? undefined,
+        estimatedFareCdf: ride.estimatedPriceCdf,
+        distanceKm: ride.distanceKm ?? undefined,
+        durationMin: ride.durationMin ?? undefined,
+      });
+      updates.rideId = linked.id;
+    }
+    const updated = await this.prisma.scheduledRide.update({ where: { id }, data: updates });
     if (updated.status !== ride.status) {
       await this.redis.publish(MOVA_EVENTS.SERVICE_STATUS_UPDATED, {
         serviceType: 'SCHEDULED',
@@ -534,8 +583,52 @@ export class ScheduledRidesService {
       orderBy: { scheduledAt: 'asc' },
       take: 20,
     });
+    const rule = await this.commission.get(CommissionServiceType.RIDE);
     return {
-      data: rows.map((r) => ({
+      data: rows.map((r) => {
+        const gross = r.estimatedPriceCdf ?? 0;
+        return {
+          id: r.id,
+          type: 'SCHEDULED',
+          label: 'Course planifiée',
+          status: r.status,
+          pickupAddress: r.pickupAddress,
+          dropoffAddress: r.dropoffAddress,
+          scheduledAt: r.scheduledAt.toISOString(),
+          vehicleType: r.vehicleType,
+          priceCdf: r.estimatedPriceCdf,
+          driverNetCdf: Math.round(this.commission.splitGross(gross, rule.platformPercent).driverNetCdf),
+        };
+      }),
+    };
+  }
+
+  /** Créneaux planifiés sans chauffeur — candidature volontaire (style Uber Reserve pool). */
+  async listOffersForDriver(driverId: string) {
+    const rows = await this.prisma.scheduledRide.findMany({
+      where: {
+        driverId: null,
+        status: ScheduledRideStatus.SCHEDULED,
+        scheduledAt: { gt: new Date() },
+      },
+      orderBy: { scheduledAt: 'asc' },
+      take: 30,
+    });
+    const volunteered = await this.prisma.scheduledDriverVolunteer.findMany({
+      where: { driverId, scheduledRideId: { in: rows.map((r) => r.id) } },
+      select: { scheduledRideId: true },
+    });
+    const volunteeredIds = new Set(volunteered.map((v) => v.scheduledRideId));
+    const rule = await this.commission.get(CommissionServiceType.RIDE);
+    const data: Array<Record<string, unknown>> = [];
+    for (const r of rows) {
+      try {
+        await assertDriverEligibleForRide(driverId, r.vehicleType);
+      } catch {
+        continue;
+      }
+      const gross = r.estimatedPriceCdf ?? 0;
+      data.push({
         id: r.id,
         type: 'SCHEDULED',
         label: 'Course planifiée',
@@ -545,8 +638,11 @@ export class ScheduledRidesService {
         scheduledAt: r.scheduledAt.toISOString(),
         vehicleType: r.vehicleType,
         priceCdf: r.estimatedPriceCdf,
-      })),
-    };
+        driverNetCdf: Math.round(this.commission.splitGross(gross, rule.platformPercent).driverNetCdf),
+        volunteered: volunteeredIds.has(r.id),
+      });
+    }
+    return { data };
   }
 
   /** Compatibilité mobile — coords pickup/dropoff optionnelles (zones MOVA nationales). */
@@ -554,7 +650,7 @@ export class ScheduledRidesService {
     const when = new Date(dto.scheduledAt);
     this.validateScheduledAt(when);
     const vehicleType = this.parseVehicleType(dto.vehicleType);
-    const { pickup, dropoff, isInterCity } = this.resolveScheduledCoords(dto);
+    const { pickup, dropoff, isInterCity } = await this.resolveScheduledCoords(dto);
     const route = await this.routing.resolveRoadDistance(pickup.lat, pickup.lng, dropoff.lat, dropoff.lng);
     const distanceKm = route.distanceKm;
     const durationMin = route.durationMin ?? estimateTripDurationMin(distanceKm, MARKET_RDC.trip.averageSpeedKmh.ride);
@@ -573,6 +669,17 @@ export class ScheduledRidesService {
       distanceKm,
       durationMin,
       isInterCity,
+      type: 'SCHEDULED',
+      passengerTotalCdf: promoApplied.estimatedPriceCdf,
+      priceBreakdown: {
+        baseFareCdf: estimate.baseFareCdf,
+        distanceFareCdf: estimate.distanceFareCdf,
+        durationFareCdf: estimate.durationFareCdf,
+        surchargeCdf: estimate.surchargeCdf,
+      },
+      lateCancelPolicy:
+        `Annulation gratuite jusqu'à ${MARKET_RDC.scheduled.lateCancelHoursBefore} h avant le départ. ` +
+        `Au-delà : ${MARKET_RDC.scheduled.lateCancelFeePct} % du tarif estimé.`,
     };
   }
 }

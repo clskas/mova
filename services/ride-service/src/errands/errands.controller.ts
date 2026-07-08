@@ -3,7 +3,7 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ErrandChatService } from '../chat/errand-chat.service';
 import { SendRideChatDto } from '../chat/ride-chat.dto';
-import { CreateErrandOrderDto, UpdateErrandProofDto, UpdateErrandStatusDto } from './errands.dto';
+import { CreateErrandOrderDto, RateErrandDto, UpdateErrandProofDto, UpdateErrandStatusDto } from './errands.dto';
 import { ErrandsService } from './errands.service';
 
 @ApiTags('errands')
@@ -44,6 +44,12 @@ export class ErrandsController {
   @ApiOperation({ summary: 'Annuler commande courses' })
   cancel(@Request() req: { user: { id: string } }, @Param('id') id: string) {
     return this.errandsService.cancel(id, req.user.id);
+  }
+
+  @Post(':id/rate')
+  @ApiOperation({ summary: 'Noter le livreur après course/commission' })
+  rate(@Request() req: { user: { id: string } }, @Param('id') id: string, @Body() dto: RateErrandDto) {
+    return this.errandsService.rateErrand(id, req.user.id, dto.courierScore, dto.comment);
   }
 
   @Patch(':id/status')

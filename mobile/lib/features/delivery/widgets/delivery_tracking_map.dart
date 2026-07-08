@@ -18,6 +18,7 @@ class DeliveryTrackingMap extends StatelessWidget {
     this.courierName,
     this.courierRating,
     this.courierPositionEstimated = false,
+    this.followCourier = false,
     this.pickupLabel,
     this.dropoffLabel,
   });
@@ -31,6 +32,7 @@ class DeliveryTrackingMap extends StatelessWidget {
   final String? courierName;
   final double? courierRating;
   final bool courierPositionEstimated;
+  final bool followCourier;
   final String? pickupLabel;
   final String? dropoffLabel;
 
@@ -71,6 +73,7 @@ class DeliveryTrackingMap extends StatelessWidget {
           dropoff: dropoff,
           driver: courier,
           routeTrace: routeTrace,
+          followDriver: followCourier,
           height: 180,
           driverIcon: Icons.delivery_dining,
           pickupLabel: pickupLabel,

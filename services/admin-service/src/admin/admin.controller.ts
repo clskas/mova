@@ -611,6 +611,20 @@ export class AdminController {
     return this.adminService.listWalletTransactions(Number(skip ?? 0), Number(take ?? 50), userId);
   }
 
+  @Get('wallet/cash-debts')
+  @RequirePermissions(AdminPermission.WALLETS_READ)
+  @ApiOperation({ summary: 'Dettes espèces ouvertes (créances plateforme)' })
+  cashDebts(@Query('driverUserId') driverUserId?: string) {
+    return this.adminService.listCashDebts(driverUserId);
+  }
+
+  @Post('wallet/cash-debts/:debtId/settle')
+  @RequirePermissions(AdminPermission.WALLETS_WRITE)
+  @ApiOperation({ summary: 'Marquer une dette espèces comme réglée' })
+  settleCashDebt(@Param('debtId') debtId: string, @Body() body: { settlementRef?: string }) {
+    return this.adminService.settleCashDebt(debtId, body.settlementRef);
+  }
+
   @Get('wallet/:userId')
   @RequirePermissions(AdminPermission.WALLETS_READ)
   @ApiOperation({ summary: 'Portefeuille utilisateur' })
@@ -626,6 +640,16 @@ export class AdminController {
     @Body() body: { amountCdf: number; type: 'CREDIT' | 'DEBIT'; description: string },
   ) {
     return this.adminService.adjustWallet(userId, body);
+  }
+
+  @Post('wallet/:userId/withdraw')
+  @RequirePermissions(AdminPermission.WALLETS_WRITE)
+  @ApiOperation({ summary: 'Retrait Mobile Money (admin)' })
+  withdrawWallet(
+    @Param('userId') userId: string,
+    @Body() body: { amountCdf: number; provider: string; phone: string },
+  ) {
+    return this.adminService.withdrawWallet(userId, body);
   }
 
   @Get('surcharges')

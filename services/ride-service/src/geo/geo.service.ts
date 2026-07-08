@@ -8,7 +8,9 @@ import {
   getServiceArea,
   MovaErrorCode,
   MovaHttpException,
+  resolveCityFromCoords,
 } from '@mova/shared';
+import { addressToCoords } from '../common/address.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { NominatimService } from './nominatim.service';
 import { PoiImportService } from './poi-import.service';
@@ -342,6 +344,58 @@ export class GeoService implements OnModuleInit {
     return results.slice(0, 12);
   }
 
+  /** Géocodage texte → coordonnées (communes MOVA puis Nominatim / Mapbox). */
+  async forwardGeocode(
+    address: string,
+    opts?: { city?: string; nearLat?: number; nearLng?: number },
+  ): Promise<{ lat: number; lng: number }> {
+    const trimmed = address.trim();
+    if (trimmed.length < 2) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        undefined,
+        'Adresse non reconnue — utilisez le GPS ou l\'autocomplétion MOVA.',
+      );
+    }
+
+    try {
+      return addressToCoords(trimmed);
+    } catch {
+      // Continue avec Nominatim / POI
+    }
+
+    const city =
+      opts?.city ??
+      (opts?.nearLat != null && opts?.nearLng != null
+        ? resolveCityFromCoords(opts.nearLat, opts.nearLng)
+        : undefined);
+    const area =
+      (city ? findServiceAreaByName(city) ?? getServiceArea(city) : null) ??
+      (opts?.nearLat != null && opts?.nearLng != null
+        ? DRC_SERVICE_AREAS.find((a) => {
+            const b = a.bounds;
+            return (
+              opts.nearLat! >= b.minLat &&
+              opts.nearLat! <= b.maxLat &&
+              opts.nearLng! >= b.minLng &&
+              opts.nearLng! <= b.maxLng
+            );
+          })
+        : null) ??
+      getActiveServiceAreas()[0];
+
+    const suggestions = await this.autocomplete(trimmed, area?.name);
+    if (suggestions.length > 0) {
+      return { lat: suggestions[0].lat, lng: suggestions[0].lng };
+    }
+
+    throw new MovaHttpException(
+      MovaErrorCode.VALIDATION_ERROR,
+      undefined,
+      'Adresse non reconnue — utilisez le GPS ou l\'autocomplétion MOVA.',
+    );
+  }
+
   /** Reverse geocoding OSM (Nominatim) : GPS → libellé adresse. */
   async reverseGeocode(lat: number, lng: number) {
     const place = await this.nominatim.reverse(lat, lng);
@@ -369,8 +423,11 @@ export class GeoService implements OnModuleInit {
   }) {
     const limit = Math.min(opts.limit ?? 50, 100);
     const where: Record<string, unknown> = {};
-    if (opts.city) where.city = opts.city;
     if (opts.category) where.category = opts.category;
+    // Avec GPS : recherche par rayon (pas de filtre ville strict — évite les POI manquants si la commune diffère).
+    if (opts.city && (opts.lat == null || opts.lng == null)) {
+      where.city = opts.city;
+    }
 
     const rows = await this.prisma.placeOfInterest.findMany({
       where,

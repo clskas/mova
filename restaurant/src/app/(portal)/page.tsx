@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRestaurantLiveRegister } from "@/components/RestaurantLiveProvider";
+import { ChatPanel } from "@/components/ChatPanel";
 import {
   confirmOrder,
   fetchOrders,
@@ -62,7 +63,19 @@ export default function OrdersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [chatOrderId, setChatOrderId] = useState<string | null>(null);
+  const [chatPeerLabel, setChatPeerLabel] = useState("Client");
   const seenPendingIds = useRef<Set<string> | null>(null);
+
+  function openChat(orderId: string, peerLabel: string) {
+    setChatOrderId(orderId);
+    setChatPeerLabel(peerLabel);
+  }
+
+  function closeChat() {
+    setChatOrderId(null);
+    setChatPeerLabel("Client");
+  }
 
   const notifyNewOrders = useCallback((newOrders: RestaurantOrder[]) => {
     if (newOrders.length === 0) return;
@@ -148,6 +161,16 @@ export default function OrdersPage() {
           <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-4 text-sm">{error}</div>
         )}
 
+        {chatOrderId && (
+          <ChatPanel
+            referenceId={chatOrderId}
+            kind="delivery"
+            peerLabel={chatPeerLabel}
+            subtitle="Messages visibles par client, livreur et restaurant"
+            onClose={closeChat}
+          />
+        )}
+
         {loading ? (
           <p className="text-gray-400 py-12 text-center">Chargement…</p>
         ) : (
@@ -161,7 +184,15 @@ export default function OrdersPage() {
               ) : (
                 <div className="space-y-3">
                   {pending.map((o) => (
-                    <OrderCard key={o.id} order={o} busy={busyId === o.id} onConfirm={() => act(o.id, "confirm")} onReject={() => act(o.id, "reject")} />
+                    <OrderCard
+                      key={o.id}
+                      order={o}
+                      busy={busyId === o.id}
+                      onConfirm={() => act(o.id, "confirm")}
+                      onReject={() => act(o.id, "reject")}
+                      onChatClient={() => openChat(o.id, "Client")}
+                      onChatDriver={o.driverAssigned ? () => openChat(o.id, "Livreur") : undefined}
+                    />
                   ))}
                 </div>
               )}
@@ -179,6 +210,8 @@ export default function OrdersPage() {
                       order={o}
                       busy={busyId === o.id}
                       onReady={o.status === "RESTAURANT_CONFIRMED" ? () => act(o.id, "ready") : undefined}
+                      onChatClient={() => openChat(o.id, "Client")}
+                      onChatDriver={o.driverAssigned ? () => openChat(o.id, "Livreur") : undefined}
                     />
                   ))}
                 </div>
@@ -196,12 +229,16 @@ function OrderCard({
   onConfirm,
   onReject,
   onReady,
+  onChatClient,
+  onChatDriver,
 }: {
   order: RestaurantOrder;
   busy: boolean;
   onConfirm?: () => void;
   onReject?: () => void;
   onReady?: () => void;
+  onChatClient?: () => void;
+  onChatDriver?: () => void;
 }) {
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 md:p-5">
@@ -213,6 +250,15 @@ function OrderCard({
         <span className="text-xs px-2 py-1 rounded-full bg-orange-50 text-orange-800 font-medium">
           {order.statusLabel ?? order.status}
         </span>
+        {order.paymentStatusLabel && (
+          <span
+            className={`text-xs px-2 py-1 rounded-full font-medium ${
+              order.isPaid ? "bg-green-50 text-green-700" : "bg-amber-50 text-amber-800"
+            }`}
+          >
+            {order.paymentStatusLabel}
+          </span>
+        )}
       </div>
       <p className="text-sm text-gray-800 mb-1">{formatItems(order.items)}</p>
       <p className="text-sm text-gray-500 mb-1">Livraison : {order.deliveryAddress ?? "—"}</p>
@@ -246,6 +292,26 @@ function OrderCard({
             className="px-4 py-2 rounded-xl border border-red-200 text-red-600 text-sm disabled:opacity-60"
           >
             Refuser
+          </button>
+        )}
+        {onChatClient && !["DELIVERED", "CANCELLED"].includes(order.status) && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onChatClient}
+            className="px-4 py-2 rounded-xl border border-[#6C63FF]/30 text-[#6C63FF] text-sm disabled:opacity-60"
+          >
+            Chat client
+          </button>
+        )}
+        {onChatDriver && !["DELIVERED", "CANCELLED"].includes(order.status) && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onChatDriver}
+            className="px-4 py-2 rounded-xl border border-emerald-300 text-emerald-700 text-sm disabled:opacity-60"
+          >
+            Chat livreur
           </button>
         )}
         {order.driverAssigned && (

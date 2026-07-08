@@ -102,8 +102,8 @@ export class CarpoolController {
 
   @Get(':id')
   @ApiOperation({ summary: 'Détail trajet covoiturage' })
-  get(@Param('id') id: string) {
-    return this.carpoolService.get(id);
+  get(@Request() req: { user: { id: string } }, @Param('id') id: string) {
+    return this.carpoolService.get(id, req.user.id);
   }
 
   @Post(':id/book')

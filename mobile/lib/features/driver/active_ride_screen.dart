@@ -33,10 +33,18 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
   String? _userId;
   double? _currentLat;
   double? _currentLng;
+  bool _cashDialogOpen = false;
 
   String get _rideId => _ride['id']?.toString() ?? '';
   String get _status => _ride['status']?.toString() ?? 'DRIVER_ASSIGNED';
   bool get _isPaid => _ride['isPaid'] == true;
+
+  /// Le passager a initié un paiement espèces (statut backend PENDING) :
+  /// le chauffeur doit confirmer le PIN.
+  bool get _cashPending =>
+      _status == 'COMPLETED' &&
+      !_isPaid &&
+      _ride['paymentStatus']?.toString().toUpperCase() == 'PENDING';
 
   @override
   void initState() {
@@ -75,6 +83,17 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
       rideId: _rideId,
       token: token,
     );
+    // Le passager a réglé en espèces → ouvrir automatiquement la saisie du PIN.
+    socket.onCashPending = (payload) {
+      final rideId = payload['rideId']?.toString();
+      if (rideId != null && rideId != _rideId) return;
+      _autoOpenCashConfirm();
+    };
+  }
+
+  void _autoOpenCashConfirm() {
+    if (!mounted || _cashDialogOpen || _isPaid) return;
+    _confirmCash(auto: true);
   }
 
   Future<void> _refreshRide() async {
@@ -84,6 +103,9 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
     if (result case Success(:final data)) {
       setState(() => _ride = data);
       _syncPaymentPolling();
+      // Fallback fiable si l'événement socket a été manqué : dès que le
+      // paiement espèces passe en attente, ouvrir la confirmation du PIN.
+      if (_cashPending) _autoOpenCashConfirm();
     }
   }
 
@@ -309,7 +331,11 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  DriverEarningsDisplay.netLabel(net: driverNet, gross: gross > 0 ? gross : null),
+                  DriverEarningsDisplay.serviceNetLabel(
+                    data: _ride,
+                    type: 'RIDE',
+                    passengerTotal: gross > 0 ? gross : null,
+                  ),
                   style: const TextStyle(color: MovaColors.textSecondary, fontSize: 12),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
@@ -389,8 +415,14 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
     );
   }
 
-  Future<void> _confirmCash() async {
-    final pin = await DriverCashPinDialog.show(context);
+  Future<void> _confirmCash({bool auto = false}) async {
+    if (_cashDialogOpen) return;
+    _cashDialogOpen = true;
+    final pin = await DriverCashPinDialog.show(
+      context,
+      title: auto ? 'Le passager paie en espèces' : 'Confirmer espèces',
+    );
+    _cashDialogOpen = false;
     if (pin == null || pin.isEmpty || !mounted) return;
     setState(() => _loading = true);
     final api = ref.read(apiClientProvider);

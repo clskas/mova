@@ -7,6 +7,7 @@ import '../../core/api/api_client.dart';
 import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
+import 'chat_receipt.dart';
 import 'ride_chat_screen.dart';
 
 class DeliveryChatScreen extends ConsumerStatefulWidget {
@@ -130,18 +131,13 @@ class _DeliveryChatScreenState extends ConsumerState<DeliveryChatScreen> {
                     itemCount: _messages.length,
                     itemBuilder: (context, i) {
                       final m = _messages[i];
-                      return Align(
-                        alignment: m.isMine ? Alignment.centerRight : Alignment.centerLeft,
-                        child: Container(
-                          margin: const EdgeInsets.only(bottom: 8),
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.75),
-                          decoration: BoxDecoration(
-                            color: m.isMine ? MovaColors.violet.withValues(alpha: 0.15) : Colors.grey.shade200,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(m.text),
-                        ),
+                      return buildChatMessageBubble(
+                        context: context,
+                        text: m.text,
+                        isMine: m.isMine,
+                        senderRoleLabel: m.isMine ? null : deliveryChatRoleLabel(m.senderRole),
+                        fallbackReceiptType: 'DELIVERY',
+                        fallbackReceiptId: widget.deliveryId,
                       );
                     },
                   ),

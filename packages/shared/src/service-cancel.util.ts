@@ -60,6 +60,9 @@ export function canCancelCarpoolTrip(params: {
   if (params.status === 'COMPLETED' || params.status === 'CANCELLED') {
     return blocked('Ce trajet est déjà terminé ou annulé.');
   }
+  if (params.status === 'IN_PROGRESS') {
+    return blocked('Le trajet est en cours — annulation impossible.');
+  }
   const departure = new Date(params.departureAt);
   if (!Number.isNaN(departure.getTime()) && departure.getTime() <= Date.now()) {
     return blocked('Le départ est passé — annulation impossible.');

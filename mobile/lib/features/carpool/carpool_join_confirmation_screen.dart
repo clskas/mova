@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/api/api_client.dart';
-import '../../core/config/market_config.dart';
+import '../../core/billing/service_price_display.dart';
 import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
@@ -16,6 +16,7 @@ class CarpoolJoinConfirmationScreen extends ConsumerStatefulWidget {
     required this.toAddress,
     required this.driverName,
     required this.pricePerSeatCdf,
+    this.seats = 1,
     this.departureAt,
   });
 
@@ -24,6 +25,7 @@ class CarpoolJoinConfirmationScreen extends ConsumerStatefulWidget {
   final String toAddress;
   final String driverName;
   final int pricePerSeatCdf;
+  final int seats;
   final String? departureAt;
 
   @override
@@ -110,13 +112,10 @@ class _CarpoolJoinConfirmationScreenState extends ConsumerState<CarpoolJoinConfi
                 Text('Conducteur : ${widget.driverName}'),
                 if (departure.isNotEmpty) Text('Départ : $departure'),
                 const SizedBox(height: 8),
-                Text(
-                  MarketConfig.formatCdf(widget.pricePerSeatCdf),
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: MovaColors.green,
-                    fontSize: 18,
-                  ),
+                ServicePriceDisplay.carpoolBookingCard(
+                  pricePerSeatCdf: widget.pricePerSeatCdf,
+                  seats: widget.seats,
+                  totalLabel: 'Total réservation',
                 ),
                 Text(
                   'Réf. ${widget.tripId}',

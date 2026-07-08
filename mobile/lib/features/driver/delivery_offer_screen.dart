@@ -9,6 +9,7 @@ import '../../core/config/market_config.dart';
 import '../../core/error/result.dart';
 import '../../core/geo/geo_utils.dart';
 import '../../core/billing/driver_earnings_display.dart';
+import '../../core/billing/service_price_display.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
@@ -156,7 +157,6 @@ class _DeliveryOfferScreenState extends ConsumerState<DeliveryOfferScreen> {
   @override
   Widget build(BuildContext context) {
     final driverNet = DriverEarningsDisplay.netFromMap(widget.offer);
-    final gross = DriverEarningsDisplay.grossFromMap(widget.offer);
     final tripKm = (widget.offer['tripDistanceKm'] as num?)?.toDouble() ??
         (widget.offer['distanceKm'] as num?)?.toDouble();
     final pickup = _pickupPoint;
@@ -258,7 +258,11 @@ class _DeliveryOfferScreenState extends ConsumerState<DeliveryOfferScreen> {
                 ),
                 Text(
                   driverNet != null
-                      ? DriverEarningsDisplay.netLabel(net: driverNet, gross: gross)
+                      ? DriverEarningsDisplay.deliveryNetLabel(
+                          data: widget.offer,
+                          type: widget.offer['type']?.toString(),
+                          passengerTotal: ServicePriceDisplay.totalForPassenger(widget.offer),
+                        )
                       : 'Revenu net indisponible',
                   style: TextStyle(color: MovaColors.textSecondary.withValues(alpha: 0.9), fontSize: 12),
                 ),

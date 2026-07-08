@@ -575,6 +575,8 @@ export class RidesService {
     const gpsTrace = await this.trackingService.getTrace(TrackingReferenceType.RIDE, rideId);
     return {
       ...detail,
+      type: 'RIDE',
+      passengerTotalCdf: gross,
       driverNetCdf,
       isPaid: payment.isPaid,
       paymentStatus: payment.paymentStatus,
@@ -904,42 +906,53 @@ export class RidesService {
       netCdf: number;
       platformFeeCdf: number;
     }[] = [];
-    let restaurantPlatformTotal = 0;
+    // Modèle par absorption : la remise est supportée uniquement par la partie qui la finance
+    // (restaurant si PARTNER, MOVA si PLATFORM, les deux si SHARED). Le livreur n'absorbe jamais
+    // la promo. On part des montants bruts (sans mise à l'échelle proportionnelle) et la commission
+    // plateforme est le résidu, garantissant : restaurants + livreur + plateforme = montant payé.
+    const partnerDiscount = metadata.partnerDiscountCdf ?? 0;
+
     for (const share of pools.shares) {
       const restaurantId = share.restaurantId ?? d.restaurantId;
       if (!restaurantId || share.itemsGrossCdf <= 0) continue;
       const row = restaurantRows.find((r) => r.id === restaurantId);
-      const scaledGross = share.itemsGrossCdf * pools.scale;
-      const split = this.commission.splitGross(scaledGross, foodRule.platformPercent);
-      restaurantPlatformTotal += split.platformFeeCdf;
+      const gross = share.itemsGrossCdf;
+      const split = this.commission.splitGross(gross, foodRule.platformPercent);
       restaurants.push({
         restaurantId,
         ownerUserId: row?.ownerUserId ?? null,
-        grossCdf: Math.round(scaledGross),
+        grossCdf: Math.round(gross),
         netCdf: Math.round(split.driverNetCdf),
         platformFeeCdf: split.platformFeeCdf,
       });
     }
 
-    const driverSplit = this.commission.splitGross(pools.deliveryNetPool, deliveryRule.platformPercent);
-    const partnerDiscount = metadata.partnerDiscountCdf ?? 0;
-    const platformDiscount = metadata.platformDiscountCdf ?? 0;
+    // La remise partenaire réduit le net du restaurant concerné (imputée au 1er si multi-restaurants).
     if (partnerDiscount > 0 && restaurants.length > 0) {
       const targetId = d.restaurantId ?? restaurants[0]?.restaurantId;
       const target = restaurants.find((r) => r.restaurantId === targetId) ?? restaurants[0];
       target.netCdf = Math.max(0, target.netCdf - partnerDiscount);
     }
+
+    const deliveryGross = pools.deliveryFeeGross;
+    const driverSplit = this.commission.splitGross(deliveryGross, deliveryRule.platformPercent);
+    const driverNet = Math.round(driverSplit.driverNetCdf);
+    const restaurantNetTotal = restaurants.reduce((sum, r) => sum + r.netCdf, 0);
+    // Commission plateforme = résidu (absorbe automatiquement une remise PLATFORM/SHARED,
+    // car totalPaidCdf est déjà net de la promo tandis que restaurants/livreur sont au brut).
+    const platformFeeCdf = Math.max(0, totalPaidCdf - restaurantNetTotal - driverNet);
+
     return {
       referenceType: 'DELIVERY' as const,
       referenceId: deliveryId,
       deliveryType: 'FOOD' as const,
       totalPaidCdf,
-      platformFeeCdf: Math.max(0, restaurantPlatformTotal + driverSplit.platformFeeCdf - platformDiscount),
+      platformFeeCdf,
       driver: d.driverId
         ? {
             userId: d.driverId,
-            grossCdf: Math.round(pools.deliveryNetPool),
-            netCdf: Math.round(driverSplit.driverNetCdf),
+            grossCdf: Math.round(deliveryGross),
+            netCdf: driverNet,
             platformFeeCdf: driverSplit.platformFeeCdf,
           }
         : null,
@@ -975,6 +988,7 @@ export class RidesService {
             referenceId,
             driverId: settlement.driver?.userId ?? d.driverId,
             driverNetCdf: settlement.driver?.netCdf ?? 0,
+            grossCdf: settlement.driver?.grossCdf ?? settlement.driver?.netCdf ?? 0,
           };
         }
         const rule = await this.commission.get(CommissionServiceType.DELIVERY);
@@ -984,6 +998,7 @@ export class RidesService {
           referenceId,
           driverId: d.driverId,
           driverNetCdf: this.commission.splitGross(gross, rule.platformPercent).driverNetCdf,
+          grossCdf: gross,
         };
       }
       case 'ERRAND': {
@@ -998,6 +1013,7 @@ export class RidesService {
           referenceId,
           driverId: o.driverId,
           driverNetCdf: this.commission.splitGross(gross, rule.platformPercent).driverNetCdf,
+          grossCdf: gross,
         };
       }
       case 'MOVING': {
@@ -1012,41 +1028,50 @@ export class RidesService {
           referenceId,
           driverId: m.driverId,
           driverNetCdf: this.commission.splitGross(gross, rule.platformPercent).driverNetCdf,
+          grossCdf: gross,
         };
       }
       case 'RENTAL': {
-        const r = await this.prisma.rentalInquiry.findUnique({ where: { id: referenceId } });
+        const r = await this.prisma.rentalInquiry.findUnique({
+          where: { id: referenceId },
+          include: { vehicle: true },
+        });
         if (
           !r ||
           !r.driverId ||
-          (r.status !== RentalInquiryStatus.RETURNED &&
-            r.status !== RentalInquiryStatus.PAID &&
-            r.status !== RentalInquiryStatus.IN_PROGRESS)
+          r.logisticsMode !== 'MOVA_DRIVER' ||
+          (r.status !== RentalInquiryStatus.RETURNED && r.status !== RentalInquiryStatus.PAID)
         ) {
           return { referenceType: type, referenceId, driverId: r?.driverId ?? null, driverNetCdf: 0 };
         }
         const rule = await this.commission.get(CommissionServiceType.RENTAL);
-        const gross = r.totalCdf ?? r.estimatedPriceCdf ?? 0;
+        const gross = MARKET_RDC.interCity.baseSurchargeCdf * 2;
         return {
           referenceType: type,
           referenceId,
           driverId: r.driverId,
           driverNetCdf: this.commission.splitGross(gross, rule.platformPercent).driverNetCdf,
+          grossCdf: gross,
         };
       }
       case 'CARPOOL': {
-        const t = await this.prisma.carpoolTrip.findUnique({ where: { id: referenceId } });
+        const booking = await this.prisma.carpoolPassenger.findUnique({
+          where: { id: referenceId },
+          include: { trip: true },
+        });
+        const t = booking?.trip ?? (await this.prisma.carpoolTrip.findUnique({ where: { id: referenceId } }));
         if (!t || t.status !== 'COMPLETED' || !t.driverId) {
           return { referenceType: type, referenceId, driverId: t?.driverId ?? null, driverNetCdf: 0 };
         }
         const rule = await this.commission.get(CommissionServiceType.CARPOOL);
-        const booked = t.seatsTotal - t.seatsAvailable;
-        const gross = t.pricePerSeatCdf * Math.max(booked, 1);
+        const seats = booking?.seats ?? Math.max(t.seatsTotal - t.seatsAvailable, 1);
+        const gross = t.pricePerSeatCdf * seats;
         return {
           referenceType: type,
           referenceId,
           driverId: t.driverId,
           driverNetCdf: this.commission.splitGross(gross, rule.platformPercent).driverNetCdf,
+          grossCdf: gross,
         };
       }
       case 'SCHEDULED': {
@@ -1061,6 +1086,7 @@ export class RidesService {
           referenceId,
           driverId: s.driverId,
           driverNetCdf: this.commission.splitGross(gross, rule.platformPercent).driverNetCdf,
+          grossCdf: gross,
         };
       }
       default:
@@ -1076,7 +1102,11 @@ export class RidesService {
       this.prisma.movingRequest.findMany({ where: { driverId: driverUserId, status: MovingRequestStatus.COMPLETED } }),
       this.prisma.errandOrder.findMany({ where: { driverId: driverUserId, status: ErrandOrderStatus.COMPLETED } }),
       this.prisma.rentalInquiry.findMany({
-        where: { driverId: driverUserId, status: { in: [RentalInquiryStatus.IN_PROGRESS, RentalInquiryStatus.RETURNED] } },
+        where: {
+          driverId: driverUserId,
+          logisticsMode: 'MOVA_DRIVER',
+          status: { in: [RentalInquiryStatus.RETURNED, RentalInquiryStatus.PAID] },
+        },
       }),
       this.prisma.carpoolTrip.findMany({ where: { driverId: driverUserId, status: 'COMPLETED' } }),
       this.prisma.scheduledRide.findMany({ where: { driverId: driverUserId, status: ScheduledRideStatus.COMPLETED } }),
@@ -1117,7 +1147,7 @@ export class RidesService {
       ...rentals.map((r) => ({
         referenceType: 'RENTAL',
         referenceId: r.id,
-        driverNetCdf: rideNet(r.totalCdf ?? r.estimatedPriceCdf ?? 0, rentalRule.platformPercent),
+        driverNetCdf: rideNet(MARKET_RDC.interCity.baseSurchargeCdf * 2, rentalRule.platformPercent),
         completedAt: r.updatedAt.toISOString(),
       })),
       ...carpools.map((t) => {
@@ -1147,7 +1177,11 @@ export class RidesService {
       this.prisma.movingRequest.findMany({ where: { driverId: driverUserId, status: MovingRequestStatus.COMPLETED } }),
       this.prisma.errandOrder.findMany({ where: { driverId: driverUserId, status: ErrandOrderStatus.COMPLETED } }),
       this.prisma.rentalInquiry.findMany({
-        where: { driverId: driverUserId, status: { in: [RentalInquiryStatus.IN_PROGRESS, RentalInquiryStatus.RETURNED] } },
+        where: {
+          driverId: driverUserId,
+          logisticsMode: 'MOVA_DRIVER',
+          status: { in: [RentalInquiryStatus.RETURNED, RentalInquiryStatus.PAID] },
+        },
       }),
       this.prisma.carpoolTrip.findMany({ where: { driverId: driverUserId, status: 'COMPLETED' } }),
       this.prisma.scheduledRide.findMany({ where: { driverId: driverUserId, status: ScheduledRideStatus.COMPLETED } }),
@@ -1187,7 +1221,7 @@ export class RidesService {
     const sumRentals = (from: Date) =>
       rentals
         .filter((r) => r.updatedAt >= from)
-        .reduce((a, r) => a + net(r.totalCdf ?? r.estimatedPriceCdf ?? 0, rentalRule.platformPercent), 0);
+        .reduce((a, _r) => a + net(MARKET_RDC.interCity.baseSurchargeCdf * 2, rentalRule.platformPercent), 0);
     const sumCarpools = (from: Date) =>
       carpools
         .filter((t) => t.updatedAt >= from)

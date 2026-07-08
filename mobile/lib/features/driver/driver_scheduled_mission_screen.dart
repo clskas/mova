@@ -1,32 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/api/api_client.dart';
-import '../../core/config/market_config.dart';
+import '../../core/billing/service_price_display.dart';
 import '../../core/error/result.dart';
 import '../../core/geo/maps_launcher.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
+import '../history/history_detail_dialog.dart';
 import 'widgets/driver_cash_pin_dialog.dart';
-
-List<Map<String, dynamic>> scheduledTimelineSteps(String? status) {
-  const steps = [
-    ('SCHEDULED', 'Réservation enregistrée'),
-    ('CONFIRMED', 'Chauffeur confirmé'),
-    ('IN_PROGRESS', 'Course en cours'),
-    ('COMPLETED', 'Course terminée'),
-  ];
-  if (status == 'CANCELLED') {
-    return [{'label': 'Course annulée', 'done': true}];
-  }
-  final order = steps.map((s) => s.$1).toList();
-  final idx = order.indexOf(status ?? 'SCHEDULED');
-  return steps
-      .asMap()
-      .entries
-      .map((e) => {'label': e.value.$2, 'done': idx >= 0 && e.key <= idx})
-      .toList();
-}
 
 class DriverScheduledMissionScreen extends ConsumerStatefulWidget {
   const DriverScheduledMissionScreen({
@@ -72,6 +54,9 @@ class _DriverScheduledMissionScreenState extends ConsumerState<DriverScheduledMi
       switch (result) {
         case Success(:final data):
           _ride = data['scheduledRide'] as Map<String, dynamic>? ?? data;
+          if (_ride != null && _ride!['type'] == null) {
+            _ride = {..._ride!, 'type': 'SCHEDULED'};
+          }
           _error = null;
         case Failure(:final error):
           _error = error.message;
@@ -92,7 +77,14 @@ class _DriverScheduledMissionScreenState extends ConsumerState<DriverScheduledMi
     setState(() => _saving = false);
     switch (result) {
       case Success(:final data):
-        setState(() => _ride = data['scheduledRide'] as Map<String, dynamic>? ?? _ride);
+        setState(() {
+          final ride = data['scheduledRide'] as Map<String, dynamic>? ?? data;
+          _ride = {
+            ...?_ride,
+            ...ride,
+            'type': 'SCHEDULED',
+          };
+        });
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(successMessage)));
         if (nextStatus != 'COMPLETED') {
           await _load();
@@ -180,7 +172,6 @@ class _DriverScheduledMissionScreenState extends ConsumerState<DriverScheduledMi
 
     final pickup = _ride?['pickupAddress']?.toString() ?? widget.initialMission?['pickupAddress']?.toString() ?? '—';
     final dropoff = _ride?['dropoffAddress']?.toString() ?? widget.initialMission?['dropoffAddress']?.toString() ?? '—';
-    final price = _ride?['priceCdf'] ?? _ride?['estimatedPriceCdf'] ?? widget.initialMission?['priceCdf'];
     final vehicleType = _ride?['vehicleType'] ?? widget.initialMission?['vehicleType'];
     final scheduledAt = _formatScheduledAt();
 
@@ -219,16 +210,13 @@ class _DriverScheduledMissionScreenState extends ConsumerState<DriverScheduledMi
                     const SizedBox(height: 8),
                     Text('Véhicule : $vehicleType'),
                   ],
-                  if (price != null) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      MarketConfig.formatCdf(price is int ? price : int.tryParse(price.toString()) ?? 0),
-                      style: const TextStyle(fontWeight: FontWeight.bold, color: MovaColors.green),
-                    ),
-                  ],
                 ],
               ),
             ),
+            if (_ride != null) ...[
+              const SizedBox(height: 12),
+              ServicePriceDisplay.driverMissionCard({..._ride!, 'type': 'SCHEDULED'}),
+            ],
             const SizedBox(height: 12),
             MovaCard(
               child: Column(
@@ -257,7 +245,7 @@ class _DriverScheduledMissionScreenState extends ConsumerState<DriverScheduledMi
               ),
             ),
             const SizedBox(height: 12),
-            if (_status == 'SCHEDULED' && (_ride?['driverId'] == null))
+            if (_status == 'SCHEDULED' && (_ride?['driverId'] == null) && widget.initialMission?['volunteered'] != true)
               MovaButton(
                 label: 'Me porter volontaire',
                 isSecondary: true,
@@ -265,7 +253,17 @@ class _DriverScheduledMissionScreenState extends ConsumerState<DriverScheduledMi
                 isLoading: _volunteering,
                 onPressed: _volunteering ? null : _volunteer,
               ),
-            if (_status == 'SCHEDULED' && (_ride?['driverId'] == null)) const SizedBox(height: 8),
+            if (_status == 'SCHEDULED' && (_ride?['driverId'] == null) && widget.initialMission?['volunteered'] != true)
+              const SizedBox(height: 8),
+            if (widget.initialMission?['volunteered'] == true) ...[
+              const Padding(
+                padding: EdgeInsets.only(bottom: 8),
+                child: Text(
+                  'Candidature enregistrée — MOVA vous notifiera si vous êtes assigné.',
+                  style: TextStyle(fontSize: 12, color: MovaColors.green),
+                ),
+              ),
+            ],
             if (_canStart || _status == 'IN_PROGRESS') ...[
               MovaButton(
                 label: _status == 'IN_PROGRESS' ? 'Itinéraire arrivée' : 'Itinéraire départ',

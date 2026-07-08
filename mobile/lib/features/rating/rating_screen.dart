@@ -6,10 +6,20 @@ import '../../core/widgets/mova_widgets.dart';
 import '../../core/api/api_client.dart';
 
 class RatingScreen extends ConsumerStatefulWidget {
-  const RatingScreen({super.key, required this.rideId, this.driverId});
+  const RatingScreen({
+    super.key,
+    this.rideId,
+    this.errandId,
+    this.driverId,
+    this.peerLabel,
+  }) : assert(rideId != null || errandId != null);
 
-  final String rideId;
+  final String? rideId;
+  final String? errandId;
   final String? driverId;
+  final String? peerLabel;
+
+  bool get isErrand => errandId != null;
 
   @override
   ConsumerState<RatingScreen> createState() => _RatingScreenState();
@@ -18,17 +28,17 @@ class RatingScreen extends ConsumerStatefulWidget {
 class _RatingScreenState extends ConsumerState<RatingScreen> {
   int _score = 5;
   bool _loading = false;
-  bool _loadingRide = true;
+  bool _loadingContext = true;
   String? _error;
   String? _driverId;
-  String? _driverName;
+  String? _peerName;
   final _commentController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _driverId = widget.driverId;
-    _loadRide();
+    _loadContext();
   }
 
   @override
@@ -37,43 +47,70 @@ class _RatingScreenState extends ConsumerState<RatingScreen> {
     super.dispose();
   }
 
-  Future<void> _loadRide() async {
+  Future<void> _loadContext() async {
     if (_driverId != null) {
-      setState(() => _loadingRide = false);
+      setState(() => _loadingContext = false);
       return;
     }
     final api = ref.read(apiClientProvider);
-    final result = await api.getRide(widget.rideId);
+    if (widget.isErrand) {
+      final result = await api.get('/errands/${widget.errandId}');
+      if (!mounted) return;
+      setState(() {
+        _loadingContext = false;
+        if (result case Success(:final data)) {
+          final order = data['errand'] as Map<String, dynamic>? ?? data;
+          _driverId = order['driverId']?.toString();
+          final courier = order['courier'] as Map<String, dynamic>?;
+          _peerName = courier?['name']?.toString() ?? widget.peerLabel;
+        }
+      });
+      return;
+    }
+    final result = await api.getRide(widget.rideId!);
     if (!mounted) return;
     setState(() {
-      _loadingRide = false;
+      _loadingContext = false;
       if (result case Success(:final data)) {
         _driverId = data['driverId']?.toString();
         final driver = data['driver'] as Map<String, dynamic>?;
-        _driverName = driver?['name']?.toString();
+        _peerName = driver?['name']?.toString();
       }
     });
   }
 
   Future<void> _submit() async {
-    final toUserId = _driverId;
-    if (toUserId == null || toUserId.isEmpty) {
-      setState(() => _error = 'Chauffeur introuvable pour cette course.');
-      return;
-    }
-
     setState(() {
       _loading = true;
       _error = null;
     });
     final api = ref.read(apiClientProvider);
-    final result = await api.post('/ratings', {
-      'rideId': widget.rideId,
-      'toUserId': toUserId,
-      'score': _score,
-      if (_commentController.text.trim().isNotEmpty)
-        'comment': _commentController.text.trim(),
-    });
+    final comment = _commentController.text.trim();
+
+    final Result<Map<String, dynamic>> result;
+    if (widget.isErrand) {
+      result = await api.rateErrand(
+        widget.errandId!,
+        courierScore: _score,
+        comment: comment.isNotEmpty ? comment : null,
+      );
+    } else {
+      final toUserId = _driverId;
+      if (toUserId == null || toUserId.isEmpty) {
+        setState(() {
+          _loading = false;
+          _error = 'Chauffeur introuvable pour cette course.';
+        });
+        return;
+      }
+      result = await api.post('/ratings', {
+        'rideId': widget.rideId,
+        'toUserId': toUserId,
+        'score': _score,
+        if (comment.isNotEmpty) 'comment': comment,
+      });
+    }
+
     if (!mounted) return;
     setState(() => _loading = false);
 
@@ -88,20 +125,29 @@ class _RatingScreenState extends ConsumerState<RatingScreen> {
     }
   }
 
+  String get _title => widget.isErrand ? 'Noter le livreur' : 'Noter la course';
+
+  String get _prompt {
+    final label = widget.isErrand ? 'livraison' : 'course';
+    final peer = _peerName ?? widget.peerLabel;
+    if (peer != null) {
+      return 'Comment était votre $label avec $peer ?';
+    }
+    return widget.isErrand ? 'Comment était votre livreur ?' : 'Comment était votre course ?';
+  }
+
   @override
   Widget build(BuildContext context) {
     return MovaScreen(
-      title: 'Noter la course',
-      child: _loadingRide
+      title: _title,
+      child: _loadingContext
           ? const Center(child: CircularProgressIndicator())
           : Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const SizedBox(height: 16),
                 Text(
-                  _driverName != null
-                      ? 'Comment était votre course avec $_driverName ?'
-                      : 'Comment était votre course ?',
+                  _prompt,
                   textAlign: TextAlign.center,
                   style: const TextStyle(fontSize: 18),
                 ),

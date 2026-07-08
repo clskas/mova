@@ -21,9 +21,11 @@ export type PartnerVehicleLivePayload = {
 };
 
 export type RestaurantLivePayload = {
-  type: 'order' | 'order-status';
+  type: 'order' | 'order-status' | 'order-payment';
   deliveryId: string;
   status: string;
+  isPaid?: boolean;
+  paymentStatus?: string | null;
 };
 
 @WebSocketGateway({ cors: { origin: '*' }, namespace: '/tracking' })
@@ -114,6 +116,14 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
     );
   }
 
+  @SubscribeMessage('driver:subscribe')
+  handleDriverSubscribe(@ConnectedSocket() client: Socket, @MessageBody() data: { userId: string }) {
+    if (data.userId) {
+      client.join(`driver:${data.userId}`);
+    }
+    return { subscribed: data.userId };
+  }
+
   @SubscribeMessage('ride:subscribe')
   handleRideSubscribe(@ConnectedSocket() client: Socket, @MessageBody() data: { rideId: string }) {
     client.join(`ride:${data.rideId}`);
@@ -139,6 +149,67 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
 
   broadcastRideStatus(rideId: string, status: string) {
     this.server.to(`ride:${rideId}`).emit('ride:status', { rideId, status });
+  }
+
+  /** Notifie la room de la course qu'un paiement espèces est en attente de confirmation PIN. */
+  broadcastRideCashPending(rideId: string, payload: { amountCdf?: number }) {
+    const adapter = (this.server as unknown as { adapter?: { rooms?: Map<string, Set<string>> } }).adapter;
+    const clients = adapter?.rooms?.get(`ride:${rideId}`)?.size ?? 0;
+    this.logger.log(`emit ride:cash-pending to room ride:${rideId} (${clients} client(s))`);
+    this.server.to(`ride:${rideId}`).emit('ride:cash-pending', { rideId, ...payload, ts: Date.now() });
+  }
+
+  broadcastDeliveryCashPending(
+    deliveryId: string,
+    payload: { amountCdf?: number; referenceType?: string; driverId?: string },
+  ) {
+    const adapter = (this.server as unknown as { adapter?: { rooms?: Map<string, Set<string>> } }).adapter;
+    const clients = adapter?.rooms?.get(`delivery:${deliveryId}`)?.size ?? 0;
+    this.logger.log(`emit delivery:cash-pending to room delivery:${deliveryId} (${clients} client(s))`);
+    const eventPayload = {
+      deliveryId,
+      referenceType: payload.referenceType ?? 'DELIVERY',
+      amountCdf: payload.amountCdf,
+      ts: Date.now(),
+    };
+    this.server.to(`delivery:${deliveryId}`).emit('delivery:cash-pending', eventPayload);
+    if (payload.driverId) {
+      const driverClients = adapter?.rooms?.get(`driver:${payload.driverId}`)?.size ?? 0;
+      this.logger.log(`emit delivery:cash-pending to room driver:${payload.driverId} (${driverClients} client(s))`);
+      this.server.to(`driver:${payload.driverId}`).emit('delivery:cash-pending', eventPayload);
+    }
+  }
+
+  broadcastDeliveryPaymentCompleted(
+    deliveryId: string,
+    payload: { isPaid?: boolean; paymentStatus?: string; method?: string },
+  ) {
+    const adapter = (this.server as unknown as { adapter?: { rooms?: Map<string, Set<string>> } }).adapter;
+    const clients = adapter?.rooms?.get(`delivery:${deliveryId}`)?.size ?? 0;
+    this.logger.log(`emit delivery:payment-completed to room delivery:${deliveryId} (${clients} client(s))`);
+    this.server.to(`delivery:${deliveryId}`).emit('delivery:payment-completed', {
+      deliveryId,
+      isPaid: payload.isPaid ?? true,
+      paymentStatus: payload.paymentStatus ?? 'COMPLETED',
+      method: payload.method,
+      ts: Date.now(),
+    });
+  }
+
+  broadcastRidePaymentCompleted(
+    rideId: string,
+    payload: { isPaid?: boolean; paymentStatus?: string; method?: string },
+  ) {
+    const adapter = (this.server as unknown as { adapter?: { rooms?: Map<string, Set<string>> } }).adapter;
+    const clients = adapter?.rooms?.get(`ride:${rideId}`)?.size ?? 0;
+    this.logger.log(`emit ride:payment-completed to room ride:${rideId} (${clients} client(s))`);
+    this.server.to(`ride:${rideId}`).emit('ride:payment-completed', {
+      rideId,
+      isPaid: payload.isPaid ?? true,
+      paymentStatus: payload.paymentStatus ?? 'COMPLETED',
+      method: payload.method,
+      ts: Date.now(),
+    });
   }
 
   @SubscribeMessage('ride:chat')
@@ -217,6 +288,13 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
 
   broadcastRentalChat(payload: { inquiryId: string; senderId: string; senderRole: string; text: string; ts: number }) {
     this.server.to(`rental:${payload.inquiryId}`).emit('rental:chat', payload);
+  }
+
+  @SubscribeMessage('rental:subscribe')
+  handleRentalSubscribe(@ConnectedSocket() client: Socket, @MessageBody() data: { inquiryId: string }) {
+    if (!data?.inquiryId) return { subscribed: false };
+    client.join(`rental:${data.inquiryId}`);
+    return { subscribed: data.inquiryId };
   }
 
   @SubscribeMessage('partner:subscribe')

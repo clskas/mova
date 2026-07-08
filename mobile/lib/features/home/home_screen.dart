@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/api/api_client.dart';
 import '../../core/auth/session.dart';
 import '../../core/error/result.dart';
+import '../../core/home/active_shipments_refresh.dart';
 import '../../core/location/service_area_gps.dart';
 import '../../core/offline/connectivity_service.dart';
 import '../../core/theme/mova_colors.dart';
@@ -22,6 +23,7 @@ import '../delivery/parcel_tracking_screen.dart';
 import '../rides/scheduled_ride_screen.dart';
 import '../moving/moving_screen.dart';
 import '../rental/rental_screen.dart';
+import '../errands/errand_tracking_screen.dart';
 import '../subscriptions/subscriptions_screen.dart';
 import '../wallet/wallet_screen.dart';
 import '../help/help_screen.dart';
@@ -42,6 +44,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
   Map<String, dynamic>? _user;
   Map<String, dynamic>? _activeRide;
   Map<String, dynamic>? _activeDelivery;
+  Map<String, dynamic>? _activeErrand;
 
   @override
   void initState() {
@@ -83,11 +86,64 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
 
   Future<void> _loadActiveDelivery() async {
     final api = ref.read(apiClientProvider);
-    final result = await api.getActiveDelivery();
+    final result = await api.getActiveShipments();
     if (!mounted) return;
     if (result case Success(:final data)) {
-      setState(() => _activeDelivery = data);
+      final delivery = data['delivery'];
+      final errand = data['errand'];
+      setState(() {
+        _activeDelivery = delivery is Map<String, dynamic>
+            ? delivery
+            : delivery is Map
+                ? Map<String, dynamic>.from(delivery)
+                : null;
+        _activeErrand = errand is Map<String, dynamic>
+            ? errand
+            : errand is Map
+                ? Map<String, dynamic>.from(errand)
+                : null;
+      });
     }
+  }
+
+  void _resumeActiveErrand() {
+    final errand = _activeErrand;
+    if (errand == null) return;
+    final id = errand['id']?.toString();
+    if (id == null || id.isEmpty) return;
+    final items = (errand['items'] as List?)?.map((e) => e.toString()).toList() ?? const <String>[];
+    final total = errand['totalPriceCdf'] as int? ??
+        errand['priceCdf'] as int? ??
+        ((errand['estimatedPriceCdf'] as int? ?? 0) + (errand['purchaseTotalCdf'] as int? ?? 0));
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ErrandTrackingScreen(
+          errandId: id,
+          deliveryAddress: errand['deliveryAddress']?.toString() ??
+              errand['dropoffAddress']?.toString() ??
+              'Livraison',
+          items: items,
+          totalCdf: total,
+        ),
+      ),
+    ).then((_) => _loadActiveDelivery());
+  }
+
+  String _activeErrandLabel() {
+    final errand = _activeErrand;
+    if (errand == null) return '';
+    final status = errand['status']?.toString().toUpperCase() ?? '';
+    if (status == 'COMPLETED' && errand['isPaid'] != true) {
+      return 'Courses & commissions — paiement en attente';
+    }
+    return switch (status) {
+      'IN_PROGRESS' => 'Courses & commissions — achats en cours',
+      'ASSIGNED' => 'Courses & commissions — livreur assigné',
+      'PENDING' => 'Courses & commissions — recherche livreur',
+      'COMPLETED' => 'Courses & commissions — terminée',
+      _ => 'Courses & commissions en cours',
+    };
   }
 
   void _resumeActiveDelivery() {
@@ -199,6 +255,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(activeShipmentsRefreshTickProvider, (_, __) => _loadActiveDelivery());
+
     final userLabel = _userLabel();
     final suspended = _user?['status']?.toString() == 'SUSPENDED';
 
@@ -402,6 +460,63 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                             'Reprendre',
                             style: TextStyle(
                               color: MovaColors.violet,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          if (_activeErrand != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Material(
+                color: MovaColors.green,
+                borderRadius: BorderRadius.circular(14),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(14),
+                  onTap: _resumeActiveErrand,
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.shopping_bag_outlined, color: MovaColors.white),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Courses en cours',
+                                style: TextStyle(
+                                  color: MovaColors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                _activeErrandLabel(),
+                                style: const TextStyle(color: MovaColors.white, fontSize: 13),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: MovaColors.white,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: const Text(
+                            'Reprendre',
+                            style: TextStyle(
+                              color: MovaColors.green,
                               fontWeight: FontWeight.w600,
                               fontSize: 13,
                             ),

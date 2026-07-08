@@ -222,6 +222,12 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
     if (_destinationController.text.trim().isNotEmpty) {
       _fetchAllEstimates();
     }
+    _loadNearbyPoi();
+  }
+
+  int get _visiblePoiCount {
+    if (_poiCategoryFilter == null) return _poiPlaces.length;
+    return _poiPlaces.where((p) => p['category']?.toString() == _poiCategoryFilter).length;
   }
 
   void _onDestinationChanged() {
@@ -266,6 +272,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
     if (_destinationController.text.trim().isNotEmpty) {
       await _fetchAllEstimates();
     }
+    await _loadNearbyPoi();
   }
 
   Future<void> _fetchSuggestions() async {
@@ -679,7 +686,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                     child: FilterChip(
                       label: Text(f.$2),
                       selected: selected,
-                      onSelected: (selected) => setState(() => _poiCategoryFilter = selected ? f.$1 : null),
+                      onSelected: (on) => setState(() => _poiCategoryFilter = on ? f.$1 : null),
                     ),
                   );
                 }),
@@ -694,6 +701,15 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                     },
                   ),
                 ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(
+                _poiPlaces.isEmpty
+                    ? 'Lieux d\'intérêt : aucun repère à proximité (rayon 8 km). Essayez Kinshasa ou suggérez un lieu.'
+                    : 'Lieux sur la carte : $_visiblePoiCount affiché(s) — filtrent les marqueurs orange uniquement.',
+                style: const TextStyle(fontSize: 11, color: MovaColors.textSecondary),
               ),
             ),
             TextField(
@@ -790,34 +806,6 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                     estimates: _estimates,
                     onSelected: _onVehicleSelected,
                   ),
-                  if (_estimates.isNotEmpty) ...[
-                    const SizedBox(height: 10),
-                    Text(
-                      'Tarifs par type de véhicule',
-                      style: theme.textTheme.labelLarge?.copyWith(color: MovaColors.textSecondary),
-                    ),
-                    const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: MarketConfig.vehicleTypes.map((option) {
-                        final estimate = _estimates[option.id];
-                        final isSelected = _vehicleType == option.id;
-                        final price = estimate?.priceCdf;
-                        return FilterChip(
-                          label: Text(
-                            price != null
-                                ? '${option.label} · ${MarketConfig.formatCdf(price)}'
-                                : option.label,
-                          ),
-                          selected: isSelected,
-                          onSelected: (_) => _onVehicleSelected(option.id),
-                          selectedColor: MovaColors.violet.withValues(alpha: 0.15),
-                          checkmarkColor: MovaColors.violet,
-                        );
-                      }).toList(),
-                    ),
-                  ],
                   if (_selectedEstimate != null && total != null) ...[
                     const SizedBox(height: 16),
                     MovaCard(
@@ -929,6 +917,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                     const SizedBox(height: 12),
                     MovaErrorBanner(message: _validationError!),
                   ],
+                  const SizedBox(height: 16),
                   PromoCodeField(
                     controller: _promoController,
                     onChanged: () => setState(() {

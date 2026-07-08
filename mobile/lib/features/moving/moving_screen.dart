@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:latlong2/latlong.dart';
 import '../../core/api/api_client.dart';
+import '../../core/billing/service_price_display.dart';
 import '../../core/config/market_config.dart';
 import '../../core/error/result.dart';
 import '../../core/location/destination_coords.dart';
@@ -82,6 +83,7 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
 
   bool _uploadingPhoto = false;
   int? _estimatedPrice;
+  Map<String, dynamic>? _estimateBreakdown;
   double? _distanceKm;
   bool _loading = false;
   bool _loadingRequests = true;
@@ -118,6 +120,7 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
     _debounce = Timer(const Duration(milliseconds: 350), _fetchSuggestions);
     setState(() {
       _estimatedPrice = null;
+      _estimateBreakdown = null;
       _distanceKm = null;
       _dropoff = null;
       _dropoffFromManualCoords = false;
@@ -164,6 +167,7 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
       _showSuggestions = false;
       _suggestions = [];
       _estimatedPrice = null;
+      _estimateBreakdown = null;
       _dropoffFromManualCoords = false;
     });
   }
@@ -189,6 +193,7 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
       _fromController.text =
           ServiceAreaLocation.isInBounds(result.position) ? result.label : 'Ma position';
       _estimatedPrice = null;
+      _estimateBreakdown = null;
       _distanceKm = null;
     });
   }
@@ -200,6 +205,7 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
       _showSuggestions = false;
       _suggestions = [];
       _estimatedPrice = null;
+      _estimateBreakdown = null;
       _dropoffFromManualCoords = true;
     });
   }
@@ -289,6 +295,7 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
     }
     _vehicleCategory = recommendedVehicleForVolume(_volumeM3());
     _estimatedPrice = null;
+    _estimateBreakdown = null;
     _distanceKm = null;
   }
 
@@ -299,6 +306,7 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
       _items.add(text);
       _itemController.clear();
       _estimatedPrice = null;
+      _estimateBreakdown = null;
     });
   }
 
@@ -306,6 +314,7 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
     setState(() {
       _items.removeAt(index);
       _estimatedPrice = null;
+      _estimateBreakdown = null;
     });
   }
 
@@ -384,6 +393,7 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
       switch (result) {
         case Success(:final data):
           _estimatedPrice = data['estimatedPriceCdf'] as int?;
+          _estimateBreakdown = Map<String, dynamic>.from(data);
           _distanceKm = (data['distanceKm'] as num?)?.toDouble();
         case Failure(:final error):
           _error = error.message;
@@ -481,6 +491,7 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
                   ),
                   onChanged: (_) => setState(() {
                     _estimatedPrice = null;
+                    _estimateBreakdown = null;
                     _distanceKm = null;
                   }),
                 ),
@@ -555,6 +566,7 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
                 _rooms = v.round();
                 _vehicleCategory = recommendedVehicleForVolume(_volumeM3());
                 _estimatedPrice = null;
+                _estimateBreakdown = null;
                 _distanceKm = null;
               }),
             ),
@@ -572,6 +584,7 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
                 _officeDesks = v.round();
                 _vehicleCategory = recommendedVehicleForVolume(_volumeM3());
                 _estimatedPrice = null;
+                _estimateBreakdown = null;
                 _distanceKm = null;
               }),
             ),
@@ -614,6 +627,7 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
               onChanged: (val) => setState(() {
                 _vehicleCategory = val!;
                 _estimatedPrice = null;
+                _estimateBreakdown = null;
               }),
             );
           }),
@@ -645,6 +659,7 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
                   onRemove: () => setState(() {
                     _photos.removeAt(i);
                     _estimatedPrice = null;
+                    _estimateBreakdown = null;
                   }),
                 ),
               ),
@@ -685,35 +700,16 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
           }),
           if (_estimatedPrice != null) ...[
             const SizedBox(height: 16),
-            MovaCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Expanded(child: Text('Estimation (camion + trajet + volume)')),
-                      Text(
-                        MarketConfig.formatCdf(_estimatedPrice!),
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: MovaColors.green,
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (_distanceKm != null) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      'Distance : ${_distanceKm!.toStringAsFixed(1)} km — le prix tient compte du trajet, '
-                      'du volume (${_volumeM3()} m³) et du camion choisi.',
-                      style: theme.textTheme.bodySmall?.copyWith(color: MovaColors.textSecondary),
-                    ),
-                  ],
-                ],
-              ),
+            ServicePriceDisplay.movingEstimateCard(
+              _estimateBreakdown ?? {'estimatedPriceCdf': _estimatedPrice, 'type': 'MOVING'},
             ),
+            if (_distanceKm != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Distance : ${_distanceKm!.toStringAsFixed(1)} km — volume ${_volumeM3()} m³',
+                style: theme.textTheme.bodySmall?.copyWith(color: MovaColors.textSecondary),
+              ),
+            ],
           ],
           if (_validationError != null) ...[
             const SizedBox(height: 16),
@@ -721,7 +717,10 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
           ],
           PromoCodeField(
             controller: _promoController,
-            onChanged: () => setState(() => _estimatedPrice = null),
+            onChanged: () => setState(() {
+              _estimatedPrice = null;
+              _estimateBreakdown = null;
+            }),
           ),
           if (_error != null) ...[
             const SizedBox(height: 16),

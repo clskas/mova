@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:latlong2/latlong.dart';
 import '../../core/api/api_client.dart';
+import '../../core/billing/service_price_display.dart';
 import '../../core/config/market_config.dart';
 import '../../core/error/result.dart';
 import '../../core/location/service_area_location.dart';
@@ -56,6 +57,7 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
   bool _dropoffFromManualCoords = false;
   File? _photoFile;
   int? _estimatedPrice;
+  Map<String, dynamic>? _priceBreakdown;
   double? _distanceKm;
   double? _durationMin;
   List<Map<String, dynamic>> _suggestions = [];
@@ -359,6 +361,9 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
       switch (result) {
         case Success(:final data):
           _estimatedPrice = data['estimatedPriceCdf'] as int?;
+          _priceBreakdown = data['priceBreakdown'] is Map
+              ? Map<String, dynamic>.from(data['priceBreakdown'] as Map)
+              : null;
           _distanceKm = (data['distanceKm'] as num?)?.toDouble();
           _durationMin = (data['durationMin'] as num?)?.toDouble();
         case Failure(:final error):
@@ -552,51 +557,29 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
                   ],
                   if (_estimatedPrice != null) ...[
                     const SizedBox(height: 16),
-                    MovaCard(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                    ServicePriceDisplay.estimateCard(
+                      totalCdf: _estimatedPrice!,
+                      discountCdf: null,
+                      priceBreakdown: _priceBreakdown,
+                      totalLabel: 'Frais de livraison',
+                    ),
+                    if (_distanceKm != null || _durationMin != null) ...[
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 4,
+                        runSpacing: 4,
                         children: [
-                          Row(
-                            children: [
-                              const Expanded(
-                                child: Text('Estimation', style: TextStyle(fontSize: 16)),
-                              ),
-                              Flexible(
-                                child: Text(
-                                  MarketConfig.formatCdf(_estimatedPrice!),
-                                  style: const TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.bold,
-                                    color: MovaColors.green,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  textAlign: TextAlign.end,
-                                ),
-                              ),
-                            ],
-                          ),
-                          if (_distanceKm != null || _durationMin != null) ...[
-                            const SizedBox(height: 8),
-                            Wrap(
-                              spacing: 4,
-                              runSpacing: 4,
-                              crossAxisAlignment: WrapCrossAlignment.center,
-                              children: [
-                                if (_distanceKm != null) ...[
-                                  const Icon(Icons.straighten, size: 16, color: MovaColors.textSecondary),
-                                  Text('${_distanceKm!.toStringAsFixed(1)} km'),
-                                ],
-                                if (_durationMin != null) ...[
-                                  const Icon(Icons.schedule, size: 16, color: MovaColors.textSecondary),
-                                  Text('${_durationMin!.ceil()} min'),
-                                ],
-                              ],
-                            ),
+                          if (_distanceKm != null) ...[
+                            const Icon(Icons.straighten, size: 16, color: MovaColors.textSecondary),
+                            Text('${_distanceKm!.toStringAsFixed(1)} km'),
+                          ],
+                          if (_durationMin != null) ...[
+                            const Icon(Icons.schedule, size: 16, color: MovaColors.textSecondary),
+                            Text('${_durationMin!.ceil()} min'),
                           ],
                         ],
                       ),
-                    ),
+                    ],
                   ],
                   if (_validationError != null) ...[
                     const SizedBox(height: 16),

@@ -6,6 +6,7 @@ import 'package:printing/printing.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../core/api/api_client.dart';
+import '../../core/api/ride_socket.dart';
 import '../../core/config/market_config.dart';
 import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
@@ -13,6 +14,7 @@ import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import '../../core/billing/bluetooth_print_service.dart';
 import '../rating/rating_screen.dart';
+import '../delivery/delivery_payment_state.dart';
 import 'billing_util.dart';
 
 class ReceiptScreen extends ConsumerStatefulWidget {
@@ -46,23 +48,69 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
   Map<String, dynamic>? _receipt;
   bool _loading = true;
   bool _actionLoading = false;
+  bool _cashStillPending = false;
   String? _error;
   final _emailController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
+    _cashStillPending = widget.pendingCash;
     _load();
+    if (widget.pendingCash) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _listenCashConfirmation());
+    }
   }
 
   @override
   void dispose() {
+    if (widget.pendingCash) {
+      ref.read(rideSocketProvider).clearHandlers();
+    }
     _emailController.dispose();
     super.dispose();
   }
 
+  Future<void> _listenCashConfirmation() async {
+    final api = ref.read(apiClientProvider);
+    if (api.isMockMode || !mounted) return;
+    final token = await api.authToken();
+    if (!mounted) return;
+    final socket = ref.read(rideSocketProvider);
+    final onPayment = _onCashConfirmed;
+    if (widget.referenceType == 'DELIVERY') {
+      socket.connectDelivery(
+        deliveryId: widget.referenceId,
+        token: token,
+        onPaymentCompleted: onPayment,
+      );
+      return;
+    }
+    socket.connect(
+      rideId: widget.referenceId,
+      token: token,
+      onPaymentCompleted: onPayment,
+    );
+  }
+
+  void _onCashConfirmed(Map<String, dynamic> payload) {
+    if (!mounted || !_cashStillPending) return;
+    setState(() => _cashStillPending = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          paymentConfirmedMessage(
+            method: payload['method']?.toString() ?? 'CASH',
+            isDelivery: widget.referenceType == 'DELIVERY',
+          ),
+        ),
+      ),
+    );
+    _load();
+  }
+
   Future<void> _load() async {
-    if (widget.pendingCash) {
+    if (_cashStillPending) {
       setState(() {
         _loading = false;
         _error = null;
@@ -215,6 +263,15 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
       );
       return;
     }
+    if (widget.showRatingAfter &&
+        widget.serviceType?.toUpperCase() == 'ERRAND' &&
+        widget.serviceId != null) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => RatingScreen(errandId: widget.serviceId!)),
+      );
+      return;
+    }
     Navigator.of(context).popUntil((r) => r.isFirst);
   }
 
@@ -226,10 +283,10 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
     final docLabel = receipt?['documentType'] == 'INVOICE' ? 'Facture' : 'Reçu de paiement';
 
     return MovaScreen(
-      title: widget.pendingCash ? 'Paiement espèces' : docLabel,
+      title: _cashStillPending ? 'Paiement espèces' : docLabel,
       child: _loading
           ? const Center(child: CircularProgressIndicator())
-          : widget.pendingCash
+          : _cashStillPending
               ? Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [

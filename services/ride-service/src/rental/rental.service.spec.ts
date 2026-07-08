@@ -18,8 +18,9 @@ describe('RentalService', () => {
     redeem: jest.fn(),
     applyDiscount: jest.fn((price: number) => price),
   };
+  const tripShare = { generateCompletionPin: jest.fn().mockReturnValue('1234') };
 
-  const service = new RentalService(prisma as never, redis as never, promo as never);
+  const service = new RentalService(prisma as never, redis as never, promo as never, tripShare as never);
 
   const baseVehicle = {
     id: 'v1',

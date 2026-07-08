@@ -43,8 +43,13 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
   double _filterMaxPrice = 0;
   double _filterMaxDistance = 0;
   bool _loading = true;
+  // Rafraîchissement léger (changement de filtre) : on garde le panneau à l'écran
+  // et on affiche seulement un indicateur discret, sans recharger toute la page.
+  bool _refreshing = false;
   bool _ordering = false;
   int? _estimatedTotal;
+  int? _estimatedDeliveryFee;
+  int? _estimatedDiscount;
   String? _error;
   String? _validationError;
   String _searchQuery = '';
@@ -83,6 +88,8 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
         _addressController.text = 'Centre-ville, ${area.name}';
       }
       _estimatedTotal = null;
+      _estimatedDeliveryFee = null;
+      _estimatedDiscount = null;
     });
     if (reload) {
       _loadRestaurants();
@@ -133,6 +140,8 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
           ? result.label
           : LocationService.coordsLabel(coords);
       _estimatedTotal = null;
+      _estimatedDeliveryFee = null;
+      _estimatedDiscount = null;
     });
     await _syncCityPreference(detected.id);
     await _loadRestaurants();
@@ -147,6 +156,8 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
         _addressController.text = label;
       }
       _estimatedTotal = null;
+      _estimatedDeliveryFee = null;
+      _estimatedDiscount = null;
     });
     _loadRestaurants();
   }
@@ -217,6 +228,43 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
 
   int _itemPrice(Map<String, dynamic> item) =>
       item['unitPriceCdf'] as int? ?? item['priceCdf'] as int? ?? 0;
+
+  /// Prix unitaire effectif d'un plat, suppléments compris — reproduit exactement
+  /// la logique serveur (`computeFoodItemUnitPriceCdf`) : une taille sélectionnée
+  /// remplace le prix de base, chaque option ajoute son supplément.
+  int _effectiveUnitPrice(
+    Map<String, dynamic> item, {
+    String? size,
+    List<String> options = const [],
+  }) {
+    var total = _itemPrice(item);
+
+    if (size != null && size.trim().isNotEmpty) {
+      final sizes = (item['sizes'] as List?)?.cast<Map<String, dynamic>>() ?? const [];
+      for (final s in sizes) {
+        final label = (s['label'] ?? s['name'])?.toString();
+        if (label == size) {
+          final sPrice = (s['priceCdf'] ?? s['unitPriceCdf']) as int?;
+          if (sPrice != null && sPrice > 0) total = sPrice;
+          break;
+        }
+      }
+    }
+
+    if (options.isNotEmpty) {
+      final opts = (item['options'] as List?)?.cast<Map<String, dynamic>>() ?? const [];
+      for (final selected in options) {
+        for (final o in opts) {
+          final label = (o['label'] ?? o['name'])?.toString();
+          if (label == selected) {
+            total += (o['priceCdf'] ?? o['unitPriceCdf'] ?? 0) as int;
+            break;
+          }
+        }
+      }
+    }
+    return total < 0 ? 0 : total;
+  }
 
   int _itemQtyInCart(String restaurantId, String itemName) {
     return _cart.entries
@@ -318,12 +366,16 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
           final key = _cartKey(restaurantId, name, size: selectedSize, options: selectedOptions.toList());
           _cart[key] = (_cart[key] ?? 0) + 1;
           _estimatedTotal = null;
+      _estimatedDeliveryFee = null;
+      _estimatedDiscount = null;
         });
       }
     } else {
       setState(() {
         _cart[baseKey] = (_cart[baseKey] ?? 0) + 1;
         _estimatedTotal = null;
+      _estimatedDeliveryFee = null;
+      _estimatedDiscount = null;
       });
     }
   }
@@ -529,9 +581,29 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
     );
   }
 
-  Future<void> _loadRestaurants() async {
+  bool get _hasActiveRestaurantFilters =>
+      _filterCuisine.trim().isNotEmpty ||
+      _filterMaxEta > 0 ||
+      _filterMaxPrice > 0 ||
+      _filterMaxDistance > 0;
+
+  Future<void> _resetRestaurantFilters() async {
     setState(() {
-      _loading = true;
+      _filterCuisine = '';
+      _filterMaxEta = 0;
+      _filterMaxPrice = 0;
+      _filterMaxDistance = 0;
+    });
+    await _loadRestaurants(background: true);
+  }
+
+  Future<void> _loadRestaurants({bool background = false}) async {
+    setState(() {
+      if (background) {
+        _refreshing = true;
+      } else {
+        _loading = true;
+      }
       _error = null;
     });
     final api = ref.read(apiClientProvider);
@@ -547,8 +619,10 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
     };
     final qs = params.entries.map((e) => '${Uri.encodeQueryComponent(e.key)}=${Uri.encodeQueryComponent(e.value)}').join('&');
     final result = await api.get('/deliveries/restaurants?$qs');
+    if (!mounted) return;
     setState(() {
       _loading = false;
+      _refreshing = false;
       switch (result) {
         case Success(:final data):
           _restaurants = _parseRestaurants(data);
@@ -606,7 +680,8 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
       if (restaurant.isEmpty) continue;
       final items = _menuItems(restaurant);
       final item = items.firstWhere((i) => _itemKey(i) == parsed.itemName, orElse: () => {});
-      total += _itemPrice(item) * entry.value;
+      total += _effectiveUnitPrice(item, size: parsed.size, options: parsed.options) *
+          entry.value;
     }
     return total;
   }
@@ -626,7 +701,7 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
       items.add({
         'name': parsed.itemName,
         'quantity': e.value,
-        'unitPriceCdf': _itemPrice(item),
+        'unitPriceCdf': _effectiveUnitPrice(item, size: parsed.size, options: parsed.options),
         if (parsed.size != null) 'size': parsed.size,
         if (parsed.options.isNotEmpty) 'options': parsed.options,
       });
@@ -685,6 +760,8 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
       switch (result) {
         case Success(:final data):
           _estimatedTotal = data['estimatedPriceCdf'] as int?;
+          _estimatedDeliveryFee = data['deliveryFeeCdf'] as int?;
+          _estimatedDiscount = data['discountCdf'] as int?;
         case Failure(:final error):
           _error = error.message;
       }
@@ -745,17 +822,6 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
             return name.contains(query) || cuisine.contains(query);
           }).toList();
 
-    if (_restaurants.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 24),
-        child: Text(
-          'Aucun restaurant disponible à $_deliveryCityName pour le moment.',
-          style: const TextStyle(color: MovaColors.textSecondary),
-          textAlign: TextAlign.center,
-        ),
-      );
-    }
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -781,56 +847,94 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
           ),
           onChanged: (v) => setState(() => _searchQuery = v),
         ),
-        const SizedBox(height: 10),
-        DropdownButtonFormField<String>(
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Text(
+              'Filtres livraison',
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+            if (_refreshing)
+              const Padding(
+                padding: EdgeInsets.only(left: 8),
+                child: SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            const Spacer(),
+            if (_hasActiveRestaurantFilters)
+              TextButton(
+                onPressed: _refreshing ? null : _resetRestaurantFilters,
+                child: const Text('Réinitialiser'),
+              ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        DropdownButtonFormField<String?>(
           value: _filterCuisine.isEmpty ? null : _filterCuisine,
           decoration: const InputDecoration(
             labelText: 'Cuisine',
             isDense: true,
           ),
           items: [
-            const DropdownMenuItem(value: '', child: Text('Toutes')),
-            ..._restaurants
-                .map((r) => r['cuisine']?.toString() ?? '')
-                .where((c) => c.trim().isNotEmpty)
-                .toSet()
-                .map((c) => DropdownMenuItem(value: c, child: Text(c))),
+            const DropdownMenuItem<String?>(value: null, child: Text('Toutes')),
+            ...{
+              // La cuisine sélectionnée doit rester présente même si la liste filtrée
+              // ne la contient plus, sinon le Dropdown lève une assertion (valeur orpheline).
+              if (_filterCuisine.trim().isNotEmpty) _filterCuisine.trim(),
+              ..._restaurants
+                  .map((r) => r['cuisine']?.toString() ?? '')
+                  .where((c) => c.trim().isNotEmpty),
+            }.map((c) => DropdownMenuItem(value: c, child: Text(c))),
           ],
           onChanged: (v) async {
             setState(() => _filterCuisine = v ?? '');
-            await _loadRestaurants();
+            await _loadRestaurants(background: true);
           },
         ),
         const SizedBox(height: 8),
-        Text('Max ETA: ${_filterMaxEta <= 0 ? '—' : '${_filterMaxEta.round()} min'}',
-            style: const TextStyle(fontSize: 12, color: MovaColors.textSecondary)),
+        Text(
+          'Délai max (ETA, min. 20 min): ${_filterMaxEta <= 0 ? 'aucun' : '${_filterMaxEta.round()} min'}',
+          style: const TextStyle(fontSize: 12, color: MovaColors.textSecondary),
+        ),
         Slider(
           value: _filterMaxEta,
           min: 0,
           max: 90,
           divisions: 18,
-          onChanged: (v) => setState(() => _filterMaxEta = v),
-          onChangeEnd: (_) => _loadRestaurants(),
+          label: _filterMaxEta <= 0 ? 'Aucun' : '${_filterMaxEta.round()} min',
+          // Le backend applique un plancher de 20 min sur l'ETA livraison : toute valeur
+          // 1–19 min exclurait tous les restaurants. On la ramène donc à 20 min.
+          onChanged: (v) => setState(() => _filterMaxEta = v <= 0 ? 0 : (v < 20 ? 20 : v)),
+          onChangeEnd: (_) => _loadRestaurants(background: true),
         ),
-        Text('Prix max: ${_filterMaxPrice <= 0 ? '—' : MarketConfig.formatCdf(_filterMaxPrice.round())}',
-            style: const TextStyle(fontSize: 12, color: MovaColors.textSecondary)),
+        Text(
+          'Prix max (plat le moins cher): ${_filterMaxPrice <= 0 ? 'aucun' : MarketConfig.formatCdf(_filterMaxPrice.round())}',
+          style: const TextStyle(fontSize: 12, color: MovaColors.textSecondary),
+        ),
         Slider(
           value: _filterMaxPrice,
           min: 0,
           max: 50000,
           divisions: 20,
+          label: _filterMaxPrice <= 0 ? 'Aucun' : MarketConfig.formatCdf(_filterMaxPrice.round()),
           onChanged: (v) => setState(() => _filterMaxPrice = v),
-          onChangeEnd: (_) => _loadRestaurants(),
+          onChangeEnd: (_) => _loadRestaurants(background: true),
         ),
-        Text('Distance max: ${_filterMaxDistance <= 0 ? '—' : '${_filterMaxDistance.toStringAsFixed(1)} km'}',
-            style: const TextStyle(fontSize: 12, color: MovaColors.textSecondary)),
+        Text(
+          'Distance max: ${_filterMaxDistance <= 0 ? 'aucune' : '${_filterMaxDistance.toStringAsFixed(1)} km'}',
+          style: const TextStyle(fontSize: 12, color: MovaColors.textSecondary),
+        ),
         Slider(
           value: _filterMaxDistance,
           min: 0,
           max: 10,
           divisions: 20,
+          label: _filterMaxDistance <= 0 ? 'Aucune' : '${_filterMaxDistance.toStringAsFixed(1)} km',
           onChanged: (v) => setState(() => _filterMaxDistance = v),
-          onChangeEnd: (_) => _loadRestaurants(),
+          onChangeEnd: (_) => _loadRestaurants(background: true),
         ),
         const SizedBox(height: 12),
         Text(
@@ -838,11 +942,15 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
           style: Theme.of(context).textTheme.titleSmall,
         ),
         if (filtered.isEmpty)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 24),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 24),
             child: Text(
-              'Aucun restaurant ne correspond à votre recherche.',
-              style: TextStyle(color: MovaColors.textSecondary),
+              _restaurants.isEmpty
+                  ? (_hasActiveRestaurantFilters
+                      ? 'Aucun restaurant ne correspond aux filtres (cuisine, délai, prix ou distance). Ajustez ou réinitialisez les filtres ci-dessus.'
+                      : 'Aucun restaurant disponible à $_deliveryCityName pour le moment.')
+                  : 'Aucun restaurant ne correspond à votre recherche.',
+              style: const TextStyle(color: MovaColors.textSecondary),
               textAlign: TextAlign.center,
             ),
           ),
@@ -854,6 +962,8 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
               onTap: () => setState(() {
                 _selectedRestaurant = r;
                 _estimatedTotal = null;
+      _estimatedDeliveryFee = null;
+      _estimatedDiscount = null;
               }),
               child: Row(
                 children: [
@@ -958,6 +1068,8 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
                 _selectedRestaurant = null;
                 _cart.clear();
                 _estimatedTotal = null;
+      _estimatedDeliveryFee = null;
+      _estimatedDiscount = null;
               }),
             ),
             Expanded(
@@ -1099,7 +1211,7 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
               children: [
                 Row(
                   children: [
-                    const Expanded(child: Text('Sous-total')),
+                    const Expanded(child: Text('Sous-total articles')),
                     Flexible(
                       child: Text(
                         MarketConfig.formatCdf(_cartSubtotal),
@@ -1111,6 +1223,35 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
                   ],
                 ),
                 if (_estimatedTotal != null) ...[
+                  if (_estimatedDeliveryFee != null) ...[
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        const Expanded(child: Text('Frais de livraison')),
+                        Flexible(
+                          child: Text(
+                            MarketConfig.formatCdf(_estimatedDeliveryFee!),
+                            textAlign: TextAlign.end,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                  if (_estimatedDiscount != null && _estimatedDiscount! > 0) ...[
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        const Expanded(child: Text('Réduction')),
+                        Flexible(
+                          child: Text(
+                            '- ${MarketConfig.formatCdf(_estimatedDiscount!)}',
+                            style: const TextStyle(color: MovaColors.green),
+                            textAlign: TextAlign.end,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                   const Divider(height: 16),
                   Row(
                     children: [

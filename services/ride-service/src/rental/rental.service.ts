@@ -1182,15 +1182,50 @@ export class RentalService {
     return this.enrichInquiry(updated);
   }
 
-  async ownerListBookings(ownerUserId: string) {
+  async ownerListBookings(
+    ownerUserId: string,
+    query?: { status?: string; vehicleId?: string; from?: string; to?: string; q?: string; skip?: number; take?: number },
+  ) {
+    const statuses = query?.status
+      ? query.status.split(',').map((s) => s.trim()).filter(Boolean)
+      : undefined;
+    const from = query?.from ? new Date(query.from) : undefined;
+    const to = query?.to ? new Date(query.to) : undefined;
+    const q = query?.q?.trim().toLowerCase();
+    const skip = Math.max(query?.skip ?? 0, 0);
+    const take = Math.min(Math.max(query?.take ?? 50, 1), 100);
+
     const rows = await this.prisma.rentalInquiry.findMany({
-      where: { vehicle: { ownerUserId } },
+      where: {
+        vehicle: { ownerUserId, ...(query?.vehicleId ? { id: query.vehicleId } : {}) },
+        ...(statuses?.length ? { status: { in: statuses as RentalInquiryStatus[] } } : {}),
+        ...(from || to
+          ? {
+              createdAt: {
+                ...(from ? { gte: from } : {}),
+                ...(to ? { lte: to } : {}),
+              },
+            }
+          : {}),
+      },
       orderBy: { createdAt: 'desc' },
-      take: 50,
+      take: 200,
       include: { vehicle: true },
     });
-    const started = await Promise.all(rows.map((r) => this.maybeAutoStartInquiry(r)));
-    return { data: await Promise.all(started.map((r) => this.enrichOwnerBooking(r))) };
+    let filtered = rows;
+    if (q) {
+      filtered = rows.filter((r) => {
+        const hay = `${r.id} ${r.pickupCity ?? ''} ${r.returnCity ?? ''} ${r.pickupAddress ?? ''} ${r.vehicle?.name ?? ''}`.toLowerCase();
+        return hay.includes(q);
+      });
+    }
+    const total = filtered.length;
+    const page = filtered.slice(skip, skip + take);
+    const started = await Promise.all(page.map((r) => this.maybeAutoStartInquiry(r)));
+    return {
+      data: await Promise.all(started.map((r) => this.enrichOwnerBooking(r))),
+      pagination: { skip, take, total },
+    };
   }
 
   async ownerGetBooking(ownerUserId: string, id: string) {

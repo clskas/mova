@@ -1,5 +1,5 @@
-const CACHE = "mova-resto-v1";
-const SHELL = ["/", "/login", "/manifest.webmanifest"];
+const CACHE = "mova-resto-v2";
+const SHELL = ["/", "/login", "/dashboard", "/earnings", "/menu", "/promos", "/settings", "/manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(

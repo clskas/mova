@@ -3,15 +3,17 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/api/api_client.dart';
 import '../../core/config/market_config.dart';
 import '../../core/error/result.dart';
+import '../../core/media/image_pick_util.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import 'driver_home_screen.dart';
 
-/// Parcours d'enregistrement chauffeur — 6 étapes inspirées du processus MOVA / Uber.
+/// Parcours d'enregistrement chauffeur — 6 étapes MOVA.
 class DriverOnboardingScreen extends ConsumerStatefulWidget {
   const DriverOnboardingScreen({super.key, this.canSkipToHome = false});
 
@@ -49,6 +51,10 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
   bool _trainingCompleted = false;
   bool _isEditingDossier = false;
 
+  static const _stepStorageKey = 'driver_onboarding_step';
+  static const double _fieldGap = 12;
+  static const double _docGap = 12;
+
   static const _steps = [
     'Identité',
     'Permis',
@@ -67,6 +73,28 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
     ('TECHNICAL_INSPECTION', 'Visite technique'),
     ('CRIMINAL_RECORD', 'Casier judiciaire (optionnel)'),
   ];
+
+  Future<void> _restoreOnboardingStep() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getInt(_stepStorageKey);
+    if (saved == null || saved < 0 || saved >= _steps.length) return;
+    if (!mounted) return;
+    setState(() => _step = saved);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_pageController.hasClients) return;
+      _pageController.jumpToPage(saved);
+    });
+  }
+
+  Future<void> _persistOnboardingStep() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_stepStorageKey, _step);
+  }
+
+  Future<void> _clearOnboardingStep() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_stepStorageKey);
+  }
 
   @override
   void initState() {
@@ -107,6 +135,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
           _state = data;
           _loading = false;
         });
+        await _restoreOnboardingStep();
         final done = data['profile']?['onboardingCompleted'] == true;
         if (done && !widget.canSkipToHome && mounted) {
           Navigator.of(context).pushReplacement(
@@ -238,7 +267,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
     required String label,
   }) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: _fieldGap),
       child: InkWell(
         onTap: () => _pickDate(controller),
         borderRadius: BorderRadius.circular(8),
@@ -292,10 +321,15 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
   }
 
   Future<void> _uploadVehiclePhoto() async {
+    await _persistOnboardingStep();
     final source = await _pickDocSource();
-    if (source == null) return;
-    final file = await _picker.pickImage(source: source, imageQuality: 80);
-    if (file == null) return;
+    if (source == null || !mounted) return;
+    final file = await pickMovaImage(_picker, source);
+    if (file == null) {
+      if (mounted) showImagePickError(context);
+      return;
+    }
+    if (!mounted) return;
     setState(() {
       _uploadingDoc = 'VEHICLE_PHOTO';
       _error = null;
@@ -384,6 +418,8 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
     setState(() => _loading = false);
     switch (result) {
       case Success():
+        await _clearOnboardingStep();
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Dossier envoyé — validation MOVA sous 24-48 h.'),
@@ -399,10 +435,15 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
   }
 
   Future<void> _uploadDoc(String type, String label) async {
+    await _persistOnboardingStep();
     final source = await _pickDocSource();
-    if (source == null) return;
-    final file = await _picker.pickImage(source: source, imageQuality: 80);
-    if (file == null) return;
+    if (source == null || !mounted) return;
+    final file = await pickMovaImage(_picker, source);
+    if (file == null) {
+      if (mounted) showImagePickError(context);
+      return;
+    }
+    if (!mounted) return;
     setState(() {
       _uploadingDoc = type;
       _error = null;
@@ -504,6 +545,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
           _step += 1;
           _loading = false;
         });
+        await _persistOnboardingStep();
         _pageController.nextPage(duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
       } else {
         await _finishOnboarding();
@@ -519,6 +561,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
   void _back() {
     if (_step == 0) return;
     setState(() => _step -= 1);
+    _persistOnboardingStep();
     _pageController.previousPage(duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
   }
 
@@ -554,28 +597,28 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
                     style: const TextStyle(fontWeight: FontWeight.bold, color: MovaColors.violet),
                   ),
                 if (_state?['kyc'] != null) ...[
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 8),
                   Text(
                     'Documents : ${_state!['kyc']['checklist'] is List ? (_state!['kyc']['checklist'] as List).where((i) => i is Map && i['required'] == true && i['uploaded'] == true).length : 0}/6 obligatoires',
                     style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
                   ),
                 ],
-                const SizedBox(height: 8),
+                const SizedBox(height: 12),
                 LinearProgressIndicator(
                   value: (_step + 1) / _steps.length,
                   backgroundColor: MovaColors.cloud,
                   color: MovaColors.violet,
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 8),
                 Text(
                   'Étape ${_step + 1}/${_steps.length} — ${_steps[_step]}',
                   style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
                 ),
                 if (_error != null) ...[
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
                   MovaErrorBanner(message: _error!),
                 ],
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
                 Expanded(
                   child: PageView(
                     controller: _pageController,
@@ -590,6 +633,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
                     ],
                   ),
                 ),
+                const SizedBox(height: 16),
                 Row(
                   children: [
                     if (_step > 0)
@@ -600,7 +644,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
                           onPressed: _loading ? null : _back,
                         ),
                       ),
-                    if (_step > 0) const SizedBox(width: 8),
+                    if (_step > 0) const SizedBox(width: 12),
                     Expanded(
                       child: MovaButton(
                         label: _step == _steps.length - 1
@@ -619,22 +663,23 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
 
   Widget _stepPersonal() {
     return ListView(
+      padding: const EdgeInsets.only(bottom: 24),
       children: [
         const Text('Informations personnelles', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-        const SizedBox(height: 8),
+        const SizedBox(height: 10),
         const Text(
-          'Comme sur Uber : votre identifiant MOVA (DRV-…) sera visible par le support.',
+          'Votre identifiant MOVA (DRV-…) sera visible par le support client.',
           style: TextStyle(color: MovaColors.textSecondary, fontSize: 13),
         ),
-        const SizedBox(height: 12),
-        TextField(controller: _firstName, decoration: const InputDecoration(labelText: 'Prénom')),
-        const SizedBox(height: 8),
-        TextField(controller: _lastName, decoration: const InputDecoration(labelText: 'Nom')),
-        const SizedBox(height: 8),
-        TextField(controller: _email, decoration: const InputDecoration(labelText: 'Email')),
-        const SizedBox(height: 8),
-        TextField(controller: _idNumber, decoration: const InputDecoration(labelText: 'N° carte d\'identité / passeport')),
         const SizedBox(height: 16),
+        TextField(controller: _firstName, decoration: const InputDecoration(labelText: 'Prénom')),
+        const SizedBox(height: _fieldGap),
+        TextField(controller: _lastName, decoration: const InputDecoration(labelText: 'Nom')),
+        const SizedBox(height: _fieldGap),
+        TextField(controller: _email, decoration: const InputDecoration(labelText: 'Email')),
+        const SizedBox(height: _fieldGap),
+        TextField(controller: _idNumber, decoration: const InputDecoration(labelText: 'N° carte d\'identité / passeport')),
+        const SizedBox(height: 20),
         _docButton('ID_PHOTO', 'Carte d\'identité / passeport'),
         _docButton('SELFIE', 'Photo récente (profil)'),
       ],
@@ -643,10 +688,11 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
 
   Widget _stepLicense() {
     return ListView(
+      padding: const EdgeInsets.only(bottom: 24),
       children: [
         const Text('Permis de conduire', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
         if (_renewalPending) ...[
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           const MovaCard(
             child: Text(
               'Renouvellement en attente : après modification des dates, MOVA doit valider vos nouveaux justificatifs avant que vous puissiez repasser en ligne.',
@@ -655,16 +701,16 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
           ),
         ],
         if (_isEditingDossier) ...[
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           const Text(
             'Si vous changez une date, téléversez à nouveau le permis correspondant. L\'admin comparera le document avec la date saisie.',
             style: TextStyle(color: MovaColors.textSecondary, fontSize: 13),
           ),
         ],
-        const SizedBox(height: 12),
+        const SizedBox(height: 16),
         TextField(controller: _licenseNumber, decoration: const InputDecoration(labelText: 'N° permis')),
         _datePickerField(controller: _licenseExpiry, label: 'Date d\'expiration du permis'),
-        const SizedBox(height: 8),
+        const SizedBox(height: 12),
         _docButton('DRIVERS_LICENSE', 'Photographier le permis'),
       ],
     );
@@ -672,15 +718,16 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
 
   Widget _stepVehicle() {
     return ListView(
+      padding: const EdgeInsets.only(bottom: 24),
       children: [
         const Text('Véhicule', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-        const SizedBox(height: 12),
+        const SizedBox(height: 16),
         TextField(controller: _plate, decoration: const InputDecoration(labelText: 'Plaque d\'immatriculation')),
-        const SizedBox(height: 8),
+        const SizedBox(height: _fieldGap),
         TextField(controller: _make, decoration: const InputDecoration(labelText: 'Marque')),
-        const SizedBox(height: 8),
+        const SizedBox(height: _fieldGap),
         TextField(controller: _model, decoration: const InputDecoration(labelText: 'Modèle')),
-        const SizedBox(height: 8),
+        const SizedBox(height: _fieldGap),
         DropdownButtonFormField<String>(
           value: _vehicleType,
           decoration: const InputDecoration(labelText: 'Type'),
@@ -694,19 +741,19 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
           ],
           onChanged: (v) => setState(() => _vehicleType = v ?? 'STANDARD'),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: _fieldGap),
         _datePickerField(controller: _insuranceExpiry, label: 'Assurance expire le'),
         _datePickerField(controller: _inspectionExpiry, label: 'Visite technique expire le'),
         if (_isEditingDossier) ...[
-          const SizedBox(height: 4),
+          const SizedBox(height: 8),
           const Text(
             'En cas de changement, renvoyez les photos assurance et visite technique.',
             style: TextStyle(color: MovaColors.textSecondary, fontSize: 12),
           ),
         ],
-        const SizedBox(height: 8),
+        const SizedBox(height: 12),
         const Text('Photo de l\'engin', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-        const SizedBox(height: 8),
+        const SizedBox(height: 12),
         if (_vehicleImageUrl != null && _vehicleImageUrl!.isNotEmpty)
           ClipRRect(
             borderRadius: BorderRadius.circular(12),
@@ -740,7 +787,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
               ],
             ),
           ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 12),
         OutlinedButton.icon(
           onPressed: _uploadingDoc == 'VEHICLE_PHOTO' ? null : _uploadVehiclePhoto,
           icon: _uploadingDoc == 'VEHICLE_PHOTO'
@@ -748,7 +795,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
               : const Icon(Icons.photo_camera_outlined),
           label: Text(_vehicleImageUrl != null && _vehicleImageUrl!.isNotEmpty ? 'Changer la photo' : 'Prendre une photo'),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 20),
         _docButton('VEHICLE_REGISTRATION', 'Carte grise'),
         _docButton('VEHICLE_INSURANCE', 'Assurance'),
         _docButton('TECHNICAL_INSPECTION', 'Visite technique'),
@@ -758,20 +805,23 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
 
   Widget _stepCompliance() {
     return ListView(
+      padding: const EdgeInsets.only(bottom: 24),
       children: [
         const Text('Sécurité & conformité', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-        const SizedBox(height: 12),
-        _docButton('CRIMINAL_RECORD', 'Casier judiciaire (recommandé)'),
         const SizedBox(height: 16),
+        _docButton('CRIMINAL_RECORD', 'Casier judiciaire (recommandé)'),
+        const SizedBox(height: 20),
         CheckboxListTile(
           value: _trainingCompleted,
           onChanged: (v) => setState(() => _trainingCompleted = v ?? false),
+          contentPadding: const EdgeInsets.symmetric(vertical: 4),
           title: const Text('J\'ai suivi la formation sécurité MOVA (utilisation app, règles route)'),
           controlAffinity: ListTileControlAffinity.leading,
         ),
         CheckboxListTile(
           value: _charterAccepted,
           onChanged: (v) => setState(() => _charterAccepted = v ?? false),
+          contentPadding: const EdgeInsets.symmetric(vertical: 4),
           title: const Text('J\'accepte la charte de bonne conduite MOVA'),
           controlAffinity: ListTileControlAffinity.leading,
         ),
@@ -781,9 +831,10 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
 
   Widget _stepPayout() {
     return ListView(
+      padding: const EdgeInsets.only(bottom: 24),
       children: [
         const Text('Informations financières', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-        const SizedBox(height: 12),
+        const SizedBox(height: 16),
         DropdownButtonFormField<String>(
           value: _payoutProvider,
           decoration: const InputDecoration(labelText: 'Mobile Money'),
@@ -794,7 +845,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
           ],
           onChanged: (v) => setState(() => _payoutProvider = v ?? 'ORANGE_MONEY'),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: _fieldGap),
         TextField(
           controller: _payoutPhone,
           decoration: const InputDecoration(labelText: 'Numéro de retrait (+243…)'),
@@ -807,22 +858,25 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
   Widget _stepActivation() {
     final kycStatus = _state?['profile']?['kycStatus']?.toString() ?? 'PENDING';
     return ListView(
+      padding: const EdgeInsets.only(bottom: 24),
       children: [
         const Text('Activation', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-        const SizedBox(height: 12),
+        const SizedBox(height: 16),
         MovaCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text('Récapitulatif', style: TextStyle(fontWeight: FontWeight.w600)),
-              const SizedBox(height: 8),
+              const SizedBox(height: 12),
               Text('Identifiant : ${_state?['publicId'] ?? '—'}'),
+              const SizedBox(height: 6),
               Text('Documents requis : ${_state?['kyc']?['requiredComplete'] == true ? 'Complets' : 'Incomplets'}'),
+              const SizedBox(height: 6),
               Text('Statut KYC : $kycStatus'),
             ],
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 20),
         const Text(
           'Après validation par l\'équipe MOVA, vous recevrez un code PIN à 6 chiffres pour activer votre compte et accepter des courses.',
           style: TextStyle(color: MovaColors.textSecondary),
@@ -834,7 +888,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
   Widget _docButton(String type, String label) {
     final done = _docUploaded(type);
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: _docGap),
       child: MovaButton(
         label: done ? '$label ✓' : label,
         isSecondary: true,

@@ -466,8 +466,8 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'Comme sur Uber Freight ou Dolly : volume + trajet + camion adapté. '
-            'L\'estimation inclut la distance, le volume (m³) et le type d\'engin.',
+            'Indiquez le volume, le trajet et le type d\'engin. '
+            'L\'estimation inclut la distance, le volume (m³) et le type de camion.',
             style: theme.textTheme.bodyMedium?.copyWith(color: MovaColors.textSecondary),
           ),
           const SizedBox(height: 16),

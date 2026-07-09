@@ -81,7 +81,6 @@ class ServicePriceDisplay {
   static Widget driverMissionCard(Map<String, dynamic> data) {
     final type = data['type']?.toString().toUpperCase();
     final net = DriverEarningsDisplay.netFromMap(data);
-    final clientTotal = data['passengerTotalCdf'] as int? ?? totalForPassenger(data);
     final serviceFee = data['serviceFeeCdf'] as int? ?? data['estimatedPriceCdf'] as int? ?? 0;
     final purchase = data['purchaseTotalCdf'] as int? ?? 0;
 
@@ -99,24 +98,15 @@ class ServicePriceDisplay {
           ),
           const SizedBox(height: 4),
           Text(
-            DriverEarningsDisplay.serviceNetLabel(
-              data: data,
-              type: type,
-              passengerTotal: clientTotal,
-            ),
+            DriverEarningsDisplay.serviceNetLabel(data: data, type: type),
             style: const TextStyle(color: MovaColors.textSecondary, fontSize: 12),
           ),
           if (type == 'FOOD' && data['driverGrossCdf'] is num) ...[
             const SizedBox(height: 8),
             Text(
-              'Frais livraison : ${MarketConfig.formatCdf((data['driverGrossCdf'] as num).round())}',
+              'Base frais livraison : ${MarketConfig.formatCdf((data['driverGrossCdf'] as num).round())}',
               style: const TextStyle(color: MovaColors.textSecondary, fontSize: 12),
             ),
-            if (clientTotal > 0)
-              Text(
-                'Le client règle ${MarketConfig.formatCdf(clientTotal)} (plats + livraison)',
-                style: const TextStyle(color: MovaColors.textSecondary, fontSize: 12),
-              ),
           ],
           if (type == 'ERRAND' && (serviceFee > 0 || purchase > 0)) ...[
             const SizedBox(height: 8),

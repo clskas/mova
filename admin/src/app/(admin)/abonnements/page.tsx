@@ -129,10 +129,9 @@ export default function AbonnementsPage() {
       <Card className="p-4 bg-violet-50 border-violet-100 text-sm text-gray-700 space-y-2">
         <p className="font-semibold text-[#6C63FF]">Pourquoi les abonnements MOVA Plus ?</p>
         <p>
-          Sur le modèle d&apos;Uber One / Bolt Plus, un abonnement mensuel en CDF fidélise les passagers
-          réguliers (trajets domicile-travail, livraisons récurrentes) : réduction sur les frais de service,
-          priorité d&apos;assignation chauffeur en heure de pointe à Kinshasa et autres villes, et revenus
-          prévisibles pour la plateforme malgré la volatilité du franc congolais.
+          Un abonnement mensuel en CDF fidélise les passagers réguliers (trajets domicile-travail,
+          livraisons récurrentes) : réduction sur les frais de service, priorité d&apos;assignation
+          chauffeur en heure de pointe et revenus prévisibles pour la plateforme.
         </p>
       </Card>
 

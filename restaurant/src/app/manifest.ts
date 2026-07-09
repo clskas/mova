@@ -4,8 +4,8 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "MOVA Restaurant",
     short_name: "MOVA Resto",
-    description: "Portail partenaire — commandes repas MOVA RDC",
-    start_url: "/",
+    description: "Portail partenaire restaurant — commandes, menu et revenus MOVA RDC",
+    start_url: "/dashboard",
     scope: "/",
     display: "standalone",
     orientation: "portrait",
@@ -13,6 +13,11 @@ export default function manifest(): MetadataRoute.Manifest {
     theme_color: "#FF6B35",
     lang: "fr",
     categories: ["food", "business"],
+    shortcuts: [
+      { name: "Commandes", url: "/", icons: [{ src: "/icon.svg", sizes: "any" }] },
+      { name: "Revenus", url: "/earnings", icons: [{ src: "/icon.svg", sizes: "any" }] },
+      { name: "Menu", url: "/menu", icons: [{ src: "/icon.svg", sizes: "any" }] },
+    ],
     icons: [
       {
         src: "/icon.svg",

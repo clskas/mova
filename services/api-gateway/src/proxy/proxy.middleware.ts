@@ -26,6 +26,7 @@ const ROUTES: Record<string, keyof typeof SERVICE_PORTS> = {
   '/api/ratings': 'ride',
   '/api/uploads': 'ride',
   '/api/public': 'ride',
+  '/api/publicites': 'ride',
   '/api/payments': 'payment',
   '/api/wallet': 'payment',
   '/api/subscriptions': 'payment',

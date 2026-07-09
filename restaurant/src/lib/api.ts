@@ -2,6 +2,10 @@ import { authHeaders } from "./auth";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
 
+export function getApiBase() {
+  return API_BASE;
+}
+
 export type MenuItem = {
   name: string;
   unitPriceCdf: number;
@@ -75,9 +79,47 @@ export function fetchMenu() {
   return apiFetch<{ restaurantId: string; menuItems: MenuItem[] }>("/api/restaurant/menu");
 }
 
-export function fetchOrders(status?: string) {
-  const q = status ? `?status=${encodeURIComponent(status)}` : "";
-  return apiFetch<{ restaurant: { id: string; name: string }; orders: RestaurantOrder[] }>(`/api/restaurant/orders${q}`);
+export function fetchOrders(params?: {
+  status?: string;
+  from?: string;
+  to?: string;
+  q?: string;
+  skip?: number;
+  take?: number;
+}) {
+  const sp = new URLSearchParams();
+  if (params?.status) sp.set("status", params.status);
+  if (params?.from) sp.set("from", params.from);
+  if (params?.to) sp.set("to", params.to);
+  if (params?.q) sp.set("q", params.q);
+  if (params?.skip != null) sp.set("skip", String(params.skip));
+  if (params?.take != null) sp.set("take", String(params.take));
+  const q = sp.toString() ? `?${sp.toString()}` : "";
+  return apiFetch<{
+    restaurant: { id: string; name: string };
+    orders: RestaurantOrder[];
+    pagination?: { skip: number; take: number; total: number };
+  }>(`/api/restaurant/orders${q}`);
+}
+
+export type RestaurantDashboard = {
+  restaurant: { id: string; name: string; isAcceptingOrders?: boolean; prepTimeMin?: number };
+  kpis: {
+    pendingOrders: number;
+    activeOrders: number;
+    deliveredTodayCount: number;
+    deliveredTodayGrossCdf: number;
+    balanceCdf: number;
+    formattedBalance: string;
+    revenueTodayCdf: number;
+    revenueMonthCdf: number;
+    totalSalesCount: number;
+  };
+  recentOrders: RestaurantOrder[];
+};
+
+export function fetchDashboard() {
+  return apiFetch<RestaurantDashboard>("/api/restaurant/dashboard");
 }
 
 export type RestaurantEarnings = {
@@ -95,6 +137,17 @@ export type RestaurantEarnings = {
 
 export function fetchEarnings() {
   return apiFetch<RestaurantEarnings>("/api/restaurant/earnings");
+}
+
+export function fetchEarningsReport(params?: { from?: string; to?: string; q?: string; skip?: number; take?: number }) {
+  const sp = new URLSearchParams();
+  if (params?.from) sp.set("from", params.from);
+  if (params?.to) sp.set("to", params.to);
+  if (params?.q) sp.set("q", params.q);
+  if (params?.skip != null) sp.set("skip", String(params.skip));
+  if (params?.take != null) sp.set("take", String(params.take));
+  const q = sp.toString() ? `?${sp.toString()}` : "";
+  return apiFetch<import("./partner-reports").PartnerEarningsReport>(`/api/restaurant/earnings/report${q}`);
 }
 
 export function confirmOrder(id: string) {
@@ -228,4 +281,24 @@ export function sendRentalChat(inquiryId: string, text: string) {
     method: "POST",
     body: JSON.stringify({ text }),
   });
+}
+
+export type Publicite = {
+  id: string;
+  titre: string;
+  imageUrl: string;
+  lien?: string | null;
+  description?: string | null;
+};
+
+export async function fetchActivePublicites(cible?: string): Promise<Publicite[]> {
+  const q = cible ? `?cible=${encodeURIComponent(cible)}` : "";
+  try {
+    const res = await fetch(`${API_BASE}/api/publicites${q}`);
+    if (!res.ok) return [];
+    const body = (await res.json()) as { data?: Publicite[] };
+    return Array.isArray(body.data) ? body.data : [];
+  } catch {
+    return [];
+  }
 }

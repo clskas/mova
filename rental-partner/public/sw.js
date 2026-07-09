@@ -1,5 +1,5 @@
-const CACHE = "mova-rental-partner-v1";
-const SHELL = ["/", "/login", "/vehicules", "/vehicules/nouveau", "/reservations", "/promos", "/manifest.webmanifest"];
+const CACHE = "mova-rental-partner-v2";
+const SHELL = ["/", "/login", "/vehicules", "/vehicules/nouveau", "/reservations", "/revenus", "/promos", "/manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL).catch(() => undefined)));

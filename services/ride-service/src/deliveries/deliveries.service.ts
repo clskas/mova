@@ -646,7 +646,7 @@ export class DeliveriesService {
     return { delivery: formatted };
   }
 
-  async rejectDelivery(deliveryId: string, driverUserId: string) {
+  async rejectDelivery(deliveryId: string, driverUserId: string, reason: string = 'explicit') {
     const delivery = await this.prisma.delivery.findUnique({ where: { id: deliveryId } });
     if (!delivery) throw new MovaHttpException(MovaErrorCode.DELIVERY_NOT_FOUND, HttpStatus.NOT_FOUND);
     if (delivery.driverId) {
@@ -659,7 +659,11 @@ export class DeliveriesService {
       throw new MovaHttpException(MovaErrorCode.DELIVERY_INVALID_STATUS);
     }
     await this.prisma.deliveryEvent.create({
-      data: { deliveryId, event: 'DRIVER_REJECTED', metadata: { driverUserId } },
+      data: {
+        deliveryId,
+        event: 'DRIVER_REJECTED',
+        metadata: { driverUserId, reason: reason === 'timeout' ? 'timeout' : 'explicit' },
+      },
     });
     return { success: true, deliveryId };
   }
@@ -943,11 +947,14 @@ export class DeliveriesService {
       .filter((t): t is VehicleTypeValue => t != null);
     const offers = deliveries
       .filter((d) => {
-        const rejected = d.events.some(
-          (e) =>
-            e.event === 'DRIVER_REJECTED' &&
-            (e.metadata as { driverUserId?: string })?.driverUserId === driverUserId,
-        );
+        const rejected = d.events.some((e) => {
+          if (e.event !== 'DRIVER_REJECTED') return false;
+          const meta = e.metadata as { driverUserId?: string; reason?: string };
+          if (meta?.driverUserId !== driverUserId) return false;
+          if (meta.reason === 'explicit') return true;
+          const ageMs = Date.now() - e.createdAt.getTime();
+          return ageMs < 90_000;
+        });
         return !rejected;
       })
       .map((d) => {
@@ -1127,9 +1134,44 @@ export class DeliveriesService {
     return status;
   }
 
-  async listForAdmin(take = 50) {
+  async listForAdmin(opts: {
+    status?: string;
+    type?: string;
+    from?: string;
+    to?: string;
+    search?: string;
+    skip?: number;
+    take?: number;
+  } = {}) {
+    const where: Prisma.DeliveryWhereInput = {};
+    if (opts.status) where.status = opts.status as DeliveryStatus;
+    if (opts.type && opts.type !== 'ERRAND') where.type = opts.type as DeliveryType;
+    if (opts.from || opts.to) {
+      where.createdAt = {};
+      if (opts.from) where.createdAt.gte = new Date(opts.from);
+      if (opts.to) {
+        const toDate = new Date(opts.to);
+        toDate.setHours(23, 59, 59, 999);
+        where.createdAt.lte = toDate;
+      }
+    }
+    const search = opts.search?.trim();
+    if (search) {
+      where.OR = [
+        { pickupAddress: { contains: search, mode: 'insensitive' } },
+        { dropoffAddress: { contains: search, mode: 'insensitive' } },
+        { deliveryAddress: { contains: search, mode: 'insensitive' } },
+        { id: { contains: search, mode: 'insensitive' } },
+        { driverId: { contains: search, mode: 'insensitive' } },
+        { userId: { contains: search, mode: 'insensitive' } },
+        { restaurant: { name: { contains: search, mode: 'insensitive' } } },
+      ];
+    }
+    const take = Math.min(opts.take ?? 50, 100);
     const rows = await this.prisma.delivery.findMany({
+      where,
       orderBy: { createdAt: 'desc' },
+      skip: opts.skip ?? 0,
       take,
       include: { restaurant: { select: { name: true } } },
     });

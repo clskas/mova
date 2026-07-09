@@ -636,6 +636,27 @@ export class DriversService {
     };
   }
 
+  async getEarningsActivity(
+    userId: string,
+    query: { from?: string; to?: string; type?: string; skip?: number; take?: number },
+  ) {
+    const params = new URLSearchParams();
+    if (query.from) params.set('from', query.from);
+    if (query.to) params.set('to', query.to);
+    if (query.type) params.set('type', query.type);
+    params.set('skip', String(query.skip ?? 0));
+    params.set('take', String(Math.min(query.take ?? 50, 100)));
+
+    const url = serviceUrl('ride', `/internal/rides/driver/${userId}/payout-items?${params.toString()}`);
+    try {
+      const res = await fetch(url, { headers: { 'x-internal-api-key': INTERNAL_API_KEY } });
+      if (!res.ok) return { items: [], pagination: { total: 0, skip: 0, take: 50 }, summary: { netCdf: 0, count: 0 } };
+      return res.json();
+    } catch {
+      return { items: [], pagination: { total: 0, skip: 0, take: 50 }, summary: { netCdf: 0, count: 0 } };
+    }
+  }
+
   async withdraw(userId: string, amountCdf: number) {
     const profile = await this.getOrCreateProfile(userId);
     const payoutPhone = profile?.payoutPhone?.trim();

@@ -232,7 +232,6 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final gross = DriverEarningsDisplay.grossFromMap(_ride) ?? 0;
     final driverNet = DriverEarningsDisplay.netFromMap(_ride);
     final nextLabel = _nextActionLabel();
     final nextStatus = _nextStatus();
@@ -334,7 +333,6 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
                   DriverEarningsDisplay.serviceNetLabel(
                     data: _ride,
                     type: 'RIDE',
-                    passengerTotal: gross > 0 ? gross : null,
                   ),
                   style: const TextStyle(color: MovaColors.textSecondary, fontSize: 12),
                   maxLines: 2,
@@ -418,27 +416,25 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
   Future<void> _confirmCash({bool auto = false}) async {
     if (_cashDialogOpen) return;
     _cashDialogOpen = true;
+    final api = ref.read(apiClientProvider);
     final pin = await DriverCashPinDialog.show(
       context,
       title: auto ? 'Le passager paie en espèces' : 'Confirmer espèces',
+      validate: (enteredPin) async {
+        final result = await api.confirmCashRide(_rideId, enteredPin);
+        return switch (result) {
+          Success() => (ok: true, message: null),
+          Failure(:final error) => (ok: false, message: error.message),
+        };
+      },
     );
     _cashDialogOpen = false;
     if (pin == null || pin.isEmpty || !mounted) return;
-    setState(() => _loading = true);
-    final api = ref.read(apiClientProvider);
-    final result = await api.confirmCashRide(_rideId, pin);
+    await _refreshRide();
     if (!mounted) return;
-    setState(() => _loading = false);
-    switch (result) {
-      case Success():
-        await _refreshRide();
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Paiement espèces confirmé')),
-        );
-      case Failure(:final error):
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
-    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Paiement espèces confirmé')),
+    );
   }
 
   String _statusLabel(String status) => switch (status) {

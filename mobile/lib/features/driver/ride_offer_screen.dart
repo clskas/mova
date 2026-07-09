@@ -158,7 +158,6 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final gross = DriverEarningsDisplay.grossFromMap(widget.offer) ?? 0;
     final driverNet = DriverEarningsDisplay.netFromMap(widget.offer);
     final distance = widget.offer['tripDistanceKm'] as num? ?? widget.offer['distanceKm'] as num?;
     final pickup = widget.offer['pickupAddress']?.toString() ?? 'Point de départ';
@@ -235,7 +234,6 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
                       DriverEarningsDisplay.serviceNetLabel(
                         data: widget.offer,
                         type: widget.offer['type']?.toString() ?? 'RIDE',
-                        passengerTotal: gross > 0 ? gross : null,
                       ),
                       style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 13),
                     ),

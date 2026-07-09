@@ -335,7 +335,9 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Annuler la commande ?'),
-        content: const Text('Votre commande sera annulée si le livreur n\'a pas encore pris en charge.'),
+        content: const Text(
+          'Annulation possible uniquement tant que le restaurant n\'a pas confirmé votre commande.',
+        ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Non')),
           TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Oui, annuler')),

@@ -200,8 +200,24 @@ export class AdminService {
     return this.proxy('ride', `/internal/rides/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status, reason }) });
   }
 
-  listDeliveries(take = 50) {
-    return this.fetchJson('ride', `/internal/deliveries?take=${take}`);
+  listDeliveries(query: {
+    status?: string;
+    type?: string;
+    from?: string;
+    to?: string;
+    search?: string;
+    skip?: number;
+    take?: number;
+  } = {}) {
+    const params = new URLSearchParams();
+    if (query.status) params.set('status', query.status);
+    if (query.type) params.set('type', query.type);
+    if (query.from) params.set('from', query.from);
+    if (query.to) params.set('to', query.to);
+    if (query.search?.trim()) params.set('search', query.search.trim());
+    params.set('skip', String(query.skip ?? 0));
+    params.set('take', String(query.take ?? 50));
+    return this.fetchJson('ride', `/internal/deliveries?${params}`);
   }
   getDelivery(id: string) {
     return this.fetchJson('ride', `/internal/deliveries/${id}`);
@@ -240,6 +256,19 @@ export class AdminService {
   }
   deleteRestaurant(id: string) {
     return this.proxy('ride', `/internal/restaurants/${id}`, { method: 'DELETE' });
+  }
+
+  listPublicites() {
+    return this.fetchJson('ride', '/internal/publicites');
+  }
+  createPublicite(body: Record<string, unknown>) {
+    return this.proxy('ride', '/internal/publicites', { method: 'POST', body: JSON.stringify(body) });
+  }
+  updatePublicite(id: string, body: Record<string, unknown>) {
+    return this.proxy('ride', `/internal/publicites/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
+  }
+  deletePublicite(id: string) {
+    return this.proxy('ride', `/internal/publicites/${id}`, { method: 'DELETE' });
   }
 
   listPricingRules(city?: string) {

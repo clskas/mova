@@ -54,6 +54,27 @@ export async function checkGatewayHealth(): Promise<boolean> {
   }
 }
 
+export type Publicite = {
+  id: string;
+  titre: string;
+  imageUrl: string;
+  lien?: string | null;
+  description?: string | null;
+  cible?: string;
+};
+
+export async function fetchActivePublicites(cible?: string): Promise<Publicite[]> {
+  const q = cible ? `?cible=${encodeURIComponent(cible)}` : '';
+  try {
+    const res = await fetch(`${API_BASE}/api/publicites${q}`);
+    if (!res.ok) return [];
+    const body = (await res.json()) as { data?: Publicite[] };
+    return Array.isArray(body.data) ? body.data : [];
+  } catch {
+    return [];
+  }
+}
+
 function mockFor<T>(path: string, init?: RequestInit): T {
   const method = init?.method ?? 'GET';
 

@@ -1,9 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { usePartnerLiveRegister } from "@/components/PartnerLiveProvider";
 import { ChatPanel } from "@/components/ChatPanel";
 import {
+  alertNewRentalBooking,
+  notifyPartnerAlert,
+  requestPartnerNotificationPermission,
+} from "@/lib/partner-alerts";
   confirmBookingCash,
   fetchBookings,
   formatCdf,
@@ -169,23 +174,77 @@ function CashPinConfirm({
 }
 
 export default function ReservationsPage() {
+  const searchParams = useSearchParams();
   const [bookings, setBookings] = useState<PartnerBooking[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [chatBookingId, setChatBookingId] = useState<string | null>(null);
+  const [filterStatus, setFilterStatus] = useState("");
+  const [filterFrom, setFilterFrom] = useState("");
+  const [filterTo, setFilterTo] = useState("");
+  const [filterQ, setFilterQ] = useState("");
+  const [paginationTotal, setPaginationTotal] = useState<number | null>(null);
+  const seenPendingIds = useRef<Set<string> | null>(null);
+
+  useEffect(() => {
+    requestPartnerNotificationPermission();
+  }, []);
+
+  useEffect(() => {
+    const status = searchParams.get("status");
+    if (status) {
+      setFilterStatus(status);
+      setLoading(true);
+    }
+  }, [searchParams]);
 
   const load = useCallback(async () => {
     setError(null);
     try {
-      const result = await fetchBookings();
+      const result = await fetchBookings({
+        status: filterStatus || undefined,
+        from: filterFrom || undefined,
+        to: filterTo || undefined,
+        q: filterQ.trim() || undefined,
+        take: 50,
+      });
       setBookings(Array.isArray(result.data) ? result.data : []);
+      setPaginationTotal(result.pagination?.total ?? null);
+
+      if (!filterStatus && !filterFrom && !filterTo && !filterQ.trim()) {
+        const pendingIds = (Array.isArray(result.data) ? result.data : [])
+          .filter((b) => b.status === "PENDING")
+          .map((b) => b.id);
+        if (seenPendingIds.current === null) {
+          seenPendingIds.current = new Set(pendingIds);
+        } else {
+          const fresh = (Array.isArray(result.data) ? result.data : []).filter(
+            (b) => b.status === "PENDING" && !seenPendingIds.current!.has(b.id),
+          );
+          if (fresh.length === 1) {
+            const b = fresh[0];
+            alertNewRentalBooking(
+              b.id,
+              `${b.vehicleName ?? "Véhicule"} · ${b.passengerName ?? "Passager"}`,
+            );
+          } else if (fresh.length > 1) {
+            notifyPartnerAlert({
+              key: `rentals-batch:${fresh[0].id}`,
+              title: "Nouvelles réservations MOVA",
+              body: `${fresh.length} demandes à confirmer`,
+              tag: "mova-new-rental",
+            });
+          }
+          seenPendingIds.current = new Set(pendingIds);
+        }
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur de chargement");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [filterStatus, filterFrom, filterTo, filterQ]);
 
   useEffect(() => {
     load();
@@ -215,6 +274,55 @@ export default function ReservationsPage() {
             passager l&apos;a demandé.
           </p>
         </div>
+
+        <section className="rounded-xl border border-gray-100 bg-white p-4 space-y-3">
+          <h3 className="text-sm font-medium text-gray-700">Recherche avancée</h3>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            <select
+              className="rounded-lg border border-gray-200 px-3 py-2 text-sm"
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+            >
+              <option value="">Tous statuts</option>
+              <option value="PENDING">En attente</option>
+              <option value="CONTACTED">Prise en charge</option>
+              <option value="CONFIRMED">Confirmée</option>
+              <option value="IN_PROGRESS">En cours</option>
+              <option value="RETURNED">Retournée</option>
+              <option value="PAID">Payée</option>
+            </select>
+            <input type="date" className="rounded-lg border border-gray-200 px-3 py-2 text-sm" value={filterFrom} onChange={(e) => setFilterFrom(e.target.value)} />
+            <input type="date" className="rounded-lg border border-gray-200 px-3 py-2 text-sm" value={filterTo} onChange={(e) => setFilterTo(e.target.value)} />
+            <input
+              className="rounded-lg border border-gray-200 px-3 py-2 text-sm lg:col-span-2"
+              placeholder="Passager, véhicule, ville…"
+              value={filterQ}
+              onChange={(e) => setFilterQ(e.target.value)}
+            />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={() => { setLoading(true); load(); }} className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-sm">
+              Filtrer
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setFilterStatus("");
+                setFilterFrom("");
+                setFilterTo("");
+                setFilterQ("");
+                setLoading(true);
+                setTimeout(() => load(), 0);
+              }}
+              className="px-4 py-2 rounded-xl border text-sm"
+            >
+              Réinitialiser
+            </button>
+            {paginationTotal != null && (
+              <span className="text-xs text-gray-500 self-center">{paginationTotal} résultat(s)</span>
+            )}
+          </div>
+        </section>
 
         {error && <p className="text-sm text-red-600 bg-red-50 rounded-xl p-3">{error}</p>}
 

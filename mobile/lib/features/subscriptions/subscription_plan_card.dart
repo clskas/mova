@@ -4,7 +4,7 @@ import '../../core/config/market_config.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_widgets.dart';
 
-/// Carte plan d'abonnement — style Uber One / Glovo Plus.
+/// Carte plan d'abonnement MOVA Plus.
 class SubscriptionPlanCard extends StatelessWidget {
   const SubscriptionPlanCard({
     super.key,
@@ -41,7 +41,7 @@ class SubscriptionPlanCard extends StatelessWidget {
   static int estimatedMonthlySavings(Map<String, dynamic> plan) {
     final reduction = plan['feeReductionPercent'] as int? ?? 0;
     if (reduction <= 0) return 0;
-    // Estimation type Uber One : ~8 commandes/mois, frais service moyen 2 500 CDF
+    // Estimation : ~8 commandes/mois, frais service moyen 2 500 CDF
     const avgOrdersPerMonth = 8;
     const avgServiceFeeCdf = 2500;
     return ((avgOrdersPerMonth * avgServiceFeeCdf * reduction) / 100).round();

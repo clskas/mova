@@ -3,6 +3,10 @@ import { sanitizeUserMessage } from "./user-messages";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
 
+export function getApiBase() {
+  return API_BASE;
+}
+
 export type PartnerProfile = {
   userId: string;
   name?: string;
@@ -119,8 +123,13 @@ export function fetchProfile() {
   return apiFetch<PartnerProfile>("/api/rental-partner/profile");
 }
 
-export function fetchVehicles() {
-  return apiFetch<PartnerVehicle[]>("/api/rental-partner/vehicles");
+export function fetchVehicles(params?: { q?: string; status?: string; city?: string }) {
+  const sp = new URLSearchParams();
+  if (params?.q) sp.set("q", params.q);
+  if (params?.status) sp.set("status", params.status);
+  if (params?.city) sp.set("city", params.city);
+  const q = sp.toString() ? `?${sp.toString()}` : "";
+  return apiFetch<PartnerVehicle[]>(`/api/rental-partner/vehicles${q}`);
 }
 
 export function fetchVehicle(id: string) {
@@ -159,8 +168,67 @@ export async function uploadVehiclePhoto(file: File): Promise<string> {
   return result.photoUrl;
 }
 
-export function fetchBookings() {
-  return apiFetch<{ data: PartnerBooking[] }>("/api/rental-partner/bookings");
+export function fetchBookings(params?: {
+  status?: string;
+  vehicleId?: string;
+  from?: string;
+  to?: string;
+  q?: string;
+  skip?: number;
+  take?: number;
+}) {
+  const sp = new URLSearchParams();
+  if (params?.status) sp.set("status", params.status);
+  if (params?.vehicleId) sp.set("vehicleId", params.vehicleId);
+  if (params?.from) sp.set("from", params.from);
+  if (params?.to) sp.set("to", params.to);
+  if (params?.q) sp.set("q", params.q);
+  if (params?.skip != null) sp.set("skip", String(params.skip));
+  if (params?.take != null) sp.set("take", String(params.take));
+  const q = sp.toString() ? `?${sp.toString()}` : "";
+  return apiFetch<{ data: PartnerBooking[]; pagination?: { skip: number; take: number; total: number } }>(
+    `/api/rental-partner/bookings${q}`,
+  );
+}
+
+export type PartnerEarnings = {
+  balanceCdf: number;
+  formattedBalance: string;
+  recentCredits: { id: string; amountCdf: number; description?: string; reference?: string; createdAt: string }[];
+};
+
+export function fetchEarnings() {
+  return apiFetch<PartnerEarnings>("/api/rental-partner/earnings");
+}
+
+export function fetchEarningsReport(params?: { from?: string; to?: string; q?: string; skip?: number; take?: number }) {
+  const sp = new URLSearchParams();
+  if (params?.from) sp.set("from", params.from);
+  if (params?.to) sp.set("to", params.to);
+  if (params?.q) sp.set("q", params.q);
+  if (params?.skip != null) sp.set("skip", String(params.skip));
+  if (params?.take != null) sp.set("take", String(params.take));
+  const q = sp.toString() ? `?${sp.toString()}` : "";
+  return apiFetch<import("./partner-reports").PartnerEarningsReport>(`/api/rental-partner/earnings/report${q}`);
+}
+
+export type RentalDashboard = {
+  partnerName: string;
+  kpis: {
+    balanceCdf: number;
+    formattedBalance: string;
+    revenueTodayCdf: number;
+    revenueMonthCdf: number;
+    pendingBookings: number;
+    activeBookings: number;
+    completedMonthCount: number;
+    vehicleCounts: { pending?: number; approved?: number; rejected?: number };
+  };
+  recentBookings: PartnerBooking[];
+};
+
+export function fetchDashboard() {
+  return apiFetch<RentalDashboard>("/api/rental-partner/dashboard");
 }
 
 export function fetchBooking(id: string) {
@@ -274,4 +342,24 @@ export function sendRentalChat(inquiryId: string, text: string) {
     method: "POST",
     body: JSON.stringify({ text }),
   });
+}
+
+export type Publicite = {
+  id: string;
+  titre: string;
+  imageUrl: string;
+  lien?: string | null;
+  description?: string | null;
+};
+
+export async function fetchActivePublicites(cible?: string): Promise<Publicite[]> {
+  const q = cible ? `?cible=${encodeURIComponent(cible)}` : "";
+  try {
+    const res = await fetch(`${API_BASE}/api/publicites${q}`);
+    if (!res.ok) return [];
+    const body = (await res.json()) as { data?: Publicite[] };
+    return Array.isArray(body.data) ? body.data : [];
+  } catch {
+    return [];
+  }
 }

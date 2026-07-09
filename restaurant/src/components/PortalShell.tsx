@@ -16,6 +16,7 @@ export function PortalShell({ children, restaurantName }: { children: React.Reac
   }
 
   const nav = [
+    { href: "/dashboard", label: "Tableau de bord" },
     { href: "/", label: "Commandes" },
     { href: "/menu", label: "Menu" },
     { href: "/promos", label: "Codes promo" },
@@ -43,7 +44,9 @@ export function PortalShell({ children, restaurantName }: { children: React.Reac
               key={item.href}
               href={item.href}
               className={`px-3 py-1.5 rounded-lg text-sm ${
-                pathname === item.href ? "bg-orange-100 text-orange-800 font-medium" : "text-gray-600 hover:bg-gray-100"
+                pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href))
+                  ? "bg-orange-100 text-orange-800 font-medium"
+                  : "text-gray-600 hover:bg-gray-100"
               }`}
             >
               {item.label}

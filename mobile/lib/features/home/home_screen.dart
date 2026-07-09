@@ -12,6 +12,7 @@ import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import '../../core/widgets/mova_service_icons.dart';
 import '../../core/widgets/passenger_service_icons.dart';
+import '../../core/widgets/publicite_carousel.dart';
 import '../../core/widgets/service_area_selector.dart';
 import '../booking/booking_screen.dart';
 import '../booking/matching_screen.dart';
@@ -45,6 +46,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
   Map<String, dynamic>? _activeRide;
   Map<String, dynamic>? _activeDelivery;
   Map<String, dynamic>? _activeErrand;
+  List<Map<String, dynamic>> _publicites = const [];
 
   @override
   void initState() {
@@ -53,6 +55,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     _loadUser();
     _loadActiveRide();
     _loadActiveDelivery();
+    _loadPublicites();
   }
 
   @override
@@ -71,6 +74,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
       _loadUser(forceRefresh: true);
       _loadActiveRide();
       _loadActiveDelivery();
+      _loadPublicites();
+    }
+  }
+
+  Future<void> _loadPublicites() async {
+    final api = ref.read(apiClientProvider);
+    final result = await api.getPublicites(cible: 'PASSENGER');
+    if (!mounted) return;
+    if (result case Success(:final data)) {
+      setState(() => _publicites = data);
     }
   }
 
@@ -590,6 +603,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
             greeting: userLabel.isNotEmpty ? '${_greeting()}, $userLabel 👋' : '${_greeting()} 👋',
             subtitle: 'Mobilité partout en RDC — choisissez un service',
           ),
+          if (_publicites.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            PubliciteCarousel(items: _publicites),
+          ],
           const SizedBox(height: 12),
           const Align(alignment: Alignment.centerLeft, child: ServiceAreaSelector(compact: true)),
           const SizedBox(height: 20),

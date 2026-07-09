@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import type { Socket } from "socket.io-client";
 import { getToken } from "@/lib/auth";
+import { alertNewRentalBooking, initPartnerAudioUnlock, requestPartnerNotificationPermission } from "@/lib/partner-alerts";
 import { connectPartnerSocket } from "@/lib/partner-socket";
 
 const POLL_MS = 30_000;
@@ -38,11 +39,18 @@ export function PartnerLiveProvider({ children }: { children: React.ReactNode })
     let pollId: number | null = null;
 
     if (typeof window !== "undefined") {
+      initPartnerAudioUnlock();
+      requestPartnerNotificationPermission();
       pollId = window.setInterval(triggerRefresh, POLL_MS);
       socket = connectPartnerSocket({
         onConnect: () => setConnected(true),
         onDisconnect: () => setConnected(false),
-        onRentalEvent: triggerRefresh,
+        onRentalEvent: (payload) => {
+          if (payload.type === "rental" && payload.status === "PENDING") {
+            alertNewRentalBooking(payload.inquiryId);
+          }
+          triggerRefresh();
+        },
         onVehicleEvent: triggerRefresh,
       });
     }

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { AuthGate } from "@/components/AuthGate";
 import { PortalShell } from "@/components/PortalShell";
+import { PwaInstallBanner } from "@/components/PwaInstallBanner";
 import { RestaurantLiveProvider } from "@/components/RestaurantLiveProvider";
 import { fetchProfile } from "@/lib/api";
 
@@ -21,7 +22,12 @@ function RestaurantPortalFrame({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  return <PortalShell restaurantName={restaurantName}>{children}</PortalShell>;
+  return (
+    <PortalShell restaurantName={restaurantName}>
+      {children}
+      <PwaInstallBanner />
+    </PortalShell>
+  );
 }
 
 export default function PortalLayout({ children }: { children: React.ReactNode }) {

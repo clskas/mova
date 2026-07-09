@@ -32,18 +32,25 @@ export default function VehiclesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [filterQ, setFilterQ] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
+  const [filterCity, setFilterCity] = useState("");
 
   const load = useCallback(async () => {
     setError(null);
     try {
-      const list = await fetchVehicles();
+      const list = await fetchVehicles({
+        q: filterQ.trim() || undefined,
+        status: filterStatus || undefined,
+        city: filterCity.trim() || undefined,
+      });
       setVehicles(Array.isArray(list) ? list : []);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Impossible de charger vos véhicules.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [filterQ, filterStatus, filterCity]);
 
   useEffect(() => {
     load();
@@ -79,6 +86,36 @@ export default function VehiclesPage() {
           + Ajouter un véhicule
         </Link>
       </div>
+
+      <section className="rounded-xl border border-gray-100 bg-white p-4 space-y-3">
+        <div className="grid gap-3 sm:grid-cols-3">
+          <input
+            className="rounded-lg border border-gray-200 px-3 py-2 text-sm"
+            placeholder="Rechercher (marque, modèle…)"
+            value={filterQ}
+            onChange={(e) => setFilterQ(e.target.value)}
+          />
+          <select
+            className="rounded-lg border border-gray-200 px-3 py-2 text-sm"
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+          >
+            <option value="">Tous statuts</option>
+            <option value="PENDING">En attente MOVA</option>
+            <option value="APPROVED">Publié</option>
+            <option value="REJECTED">Refusé</option>
+          </select>
+          <input
+            className="rounded-lg border border-gray-200 px-3 py-2 text-sm"
+            placeholder="Ville"
+            value={filterCity}
+            onChange={(e) => setFilterCity(e.target.value)}
+          />
+        </div>
+        <button type="button" onClick={() => { setLoading(true); load(); }} className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-sm">
+          Filtrer
+        </button>
+      </section>
 
       {error && <p className="text-sm text-red-600 bg-red-50 rounded-xl p-3">{error}</p>}
 

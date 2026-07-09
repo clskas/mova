@@ -148,7 +148,7 @@ class _SubscriptionsScreenState extends ConsumerState<SubscriptionsScreen> {
                 ),
                 SizedBox(height: 8),
                 Text(
-                  'Comme Uber One ou Glovo Plus : réductions automatiques sur les frais de service, '
+                  'Réductions automatiques sur les frais de service MOVA, '
                   'sans code promo à saisir. Idéal si vous utilisez MOVA plusieurs fois par semaine.',
                   style: TextStyle(color: MovaColors.textSecondary, height: 1.4, fontSize: 13),
                 ),

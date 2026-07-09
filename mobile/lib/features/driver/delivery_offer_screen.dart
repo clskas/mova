@@ -9,7 +9,6 @@ import '../../core/config/market_config.dart';
 import '../../core/error/result.dart';
 import '../../core/geo/geo_utils.dart';
 import '../../core/billing/driver_earnings_display.dart';
-import '../../core/billing/service_price_display.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
@@ -69,7 +68,7 @@ class _DeliveryOfferScreenState extends ConsumerState<DeliveryOfferScreen> {
       if (!mounted) return;
       if (_countdown <= 0) {
         _timer?.cancel();
-        _reject();
+        _expireOffer();
         return;
       }
       setState(() => _countdown--);
@@ -123,12 +122,18 @@ class _DeliveryOfferScreenState extends ConsumerState<DeliveryOfferScreen> {
     super.dispose();
   }
 
+  /// Pas de réponse : ne pas rejeter côté serveur — la livraison sera reproposée plus tard.
+  Future<void> _expireOffer() async {
+    _timer?.cancel();
+    if (mounted) Navigator.pop(context, 'timeout');
+  }
+
   Future<void> _reject() async {
     _timer?.cancel();
     if (_deliveryId.isNotEmpty) {
       await ref.read(apiClientProvider).rejectDelivery(_deliveryId);
     }
-    if (mounted) Navigator.pop(context);
+    if (mounted) Navigator.pop(context, 'rejected');
   }
 
   Future<void> _accept() async {
@@ -261,7 +266,6 @@ class _DeliveryOfferScreenState extends ConsumerState<DeliveryOfferScreen> {
                       ? DriverEarningsDisplay.deliveryNetLabel(
                           data: widget.offer,
                           type: widget.offer['type']?.toString(),
-                          passengerTotal: ServicePriceDisplay.totalForPassenger(widget.offer),
                         )
                       : 'Revenu net indisponible',
                   style: TextStyle(color: MovaColors.textSecondary.withValues(alpha: 0.9), fontSize: 12),

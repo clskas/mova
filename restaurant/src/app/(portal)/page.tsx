@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useRestaurantLiveRegister } from "@/components/RestaurantLiveProvider";
 import { ChatPanel } from "@/components/ChatPanel";
 import {
@@ -28,36 +29,14 @@ function formatItems(items: unknown): string {
     .join(", ");
 }
 
-/** Bip sonore via Web Audio (aucun fichier requis). */
-function playNewOrderChime() {
-  try {
-    const Ctx =
-      window.AudioContext ??
-      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!Ctx) return;
-    const ctx = new Ctx();
-    const notes = [880, 1175];
-    notes.forEach((freq, i) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = "sine";
-      osc.frequency.value = freq;
-      const start = ctx.currentTime + i * 0.18;
-      gain.gain.setValueAtTime(0.0001, start);
-      gain.gain.exponentialRampToValueAtTime(0.25, start + 0.03);
-      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.32);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start(start);
-      osc.stop(start + 0.34);
-    });
-    setTimeout(() => void ctx.close(), 1200);
-  } catch {
-    /* audio indisponible — silencieux */
-  }
-}
+import {
+  alertNewRestaurantOrder,
+  notifyPartnerAlert,
+  requestPartnerNotificationPermission,
+} from "@/lib/partner-alerts";
 
 export default function OrdersPage() {
+  const searchParams = useSearchParams();
   const [profile, setProfile] = useState<RestaurantProfile | null>(null);
   const [orders, setOrders] = useState<RestaurantOrder[]>([]);
   const [loading, setLoading] = useState(true);
@@ -65,7 +44,26 @@ export default function OrdersPage() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [chatOrderId, setChatOrderId] = useState<string | null>(null);
   const [chatPeerLabel, setChatPeerLabel] = useState("Client");
+  const [filterStatus, setFilterStatus] = useState("");
+  const [filterFrom, setFilterFrom] = useState("");
+  const [filterTo, setFilterTo] = useState("");
+  const [filterQ, setFilterQ] = useState("");
+  const [filtersActive, setFiltersActive] = useState(false);
+  const [paginationTotal, setPaginationTotal] = useState<number | null>(null);
   const seenPendingIds = useRef<Set<string> | null>(null);
+
+  useEffect(() => {
+    const status = searchParams.get("status") ?? "";
+    const from = searchParams.get("from") ?? "";
+    const to = searchParams.get("to") ?? "";
+    if (status || from || to) {
+      setFilterStatus(status);
+      setFilterFrom(from);
+      setFilterTo(to);
+      setFiltersActive(true);
+      setLoading(true);
+    }
+  }, [searchParams]);
 
   function openChat(orderId: string, peerLabel: string) {
     setChatOrderId(orderId);
@@ -79,14 +77,18 @@ export default function OrdersPage() {
 
   const notifyNewOrders = useCallback((newOrders: RestaurantOrder[]) => {
     if (newOrders.length === 0) return;
-    playNewOrderChime();
-    if (typeof Notification !== "undefined" && Notification.permission === "granted") {
-      const first = newOrders[0];
-      new Notification("Nouvelle commande MOVA", {
-        body:
-          newOrders.length > 1
-            ? `${newOrders.length} nouvelles commandes à confirmer`
-            : `Commande #${first.id.slice(0, 8)} · ${formatCdf(first.estimatedPriceCdf)}`,
+    const first = newOrders[0];
+    const body =
+      newOrders.length > 1
+        ? `${newOrders.length} nouvelles commandes à confirmer`
+        : `Commande #${first.id.slice(0, 8)} · ${formatCdf(first.estimatedPriceCdf)}`;
+    if (newOrders.length === 1) {
+      alertNewRestaurantOrder(first.id, body);
+    } else {
+      notifyPartnerAlert({
+        key: `orders-batch:${first.id}`,
+        title: "Nouvelles commandes MOVA",
+        body,
         tag: "mova-new-order",
       });
     }
@@ -95,33 +97,46 @@ export default function OrdersPage() {
   const load = useCallback(async () => {
     setError(null);
     try {
-      const [p, o] = await Promise.all([fetchProfile(), fetchOrders()]);
+      const [p, o] = await Promise.all([
+        fetchProfile(),
+        fetchOrders(
+          filtersActive
+            ? {
+                status: filterStatus || undefined,
+                from: filterFrom || undefined,
+                to: filterTo || undefined,
+                q: filterQ.trim() || undefined,
+                take: 50,
+              }
+            : undefined,
+        ),
+      ]);
       setProfile(p);
       const list = o.orders ?? [];
       setOrders(list);
+      setPaginationTotal(o.pagination?.total ?? null);
 
-      const pendingIds = list.filter((x) => x.status === "PENDING").map((x) => x.id);
-      if (seenPendingIds.current === null) {
-        // Premier chargement : on initialise sans alerter.
-        seenPendingIds.current = new Set(pendingIds);
-      } else {
-        const fresh = list.filter(
-          (x) => x.status === "PENDING" && !seenPendingIds.current!.has(x.id),
-        );
-        notifyNewOrders(fresh);
-        seenPendingIds.current = new Set(pendingIds);
+      if (!filtersActive) {
+        const pendingIds = list.filter((x) => x.status === "PENDING").map((x) => x.id);
+        if (seenPendingIds.current === null) {
+          seenPendingIds.current = new Set(pendingIds);
+        } else {
+          const fresh = list.filter(
+            (x) => x.status === "PENDING" && !seenPendingIds.current!.has(x.id),
+          );
+          notifyNewOrders(fresh);
+          seenPendingIds.current = new Set(pendingIds);
+        }
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur de chargement");
     } finally {
       setLoading(false);
     }
-  }, [notifyNewOrders]);
+  }, [notifyNewOrders, filtersActive, filterStatus, filterFrom, filterTo, filterQ]);
 
   useEffect(() => {
-    if (typeof Notification !== "undefined" && Notification.permission === "default") {
-      Notification.requestPermission().catch(() => undefined);
-    }
+    requestPartnerNotificationPermission();
   }, []);
 
   useEffect(() => {
@@ -154,8 +169,60 @@ export default function OrdersPage() {
     <div className="space-y-6">
         <div>
           <h2 className="text-xl font-bold">Commandes en cours</h2>
-          <p className="text-sm text-gray-500">Temps réel + actualisation de secours toutes les 30 s · alerte sonore à chaque nouvelle commande</p>
+          <p className="text-sm text-gray-500">Gérez vos commandes en temps réel</p>
         </div>
+
+        <section className="rounded-xl border border-gray-100 bg-white p-4 space-y-3">
+          <h3 className="text-sm font-medium text-gray-700">Recherche avancée</h3>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            <select
+              className="rounded-lg border border-gray-200 px-3 py-2 text-sm"
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+            >
+              <option value="">Tous statuts</option>
+              <option value="PENDING">En attente</option>
+              <option value="RESTAURANT_CONFIRMED">Confirmée</option>
+              <option value="READY_FOR_PICKUP">Prête</option>
+              <option value="DELIVERED">Livrée</option>
+              <option value="CANCELLED">Annulée</option>
+            </select>
+            <input type="date" className="rounded-lg border border-gray-200 px-3 py-2 text-sm" value={filterFrom} onChange={(e) => setFilterFrom(e.target.value)} />
+            <input type="date" className="rounded-lg border border-gray-200 px-3 py-2 text-sm" value={filterTo} onChange={(e) => setFilterTo(e.target.value)} />
+            <input
+              className="rounded-lg border border-gray-200 px-3 py-2 text-sm lg:col-span-2"
+              placeholder="N° commande, adresse…"
+              value={filterQ}
+              onChange={(e) => setFilterQ(e.target.value)}
+            />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => { setFiltersActive(true); setLoading(true); }}
+              className="px-4 py-2 rounded-xl bg-orange-600 text-white text-sm"
+            >
+              Filtrer
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setFilterStatus("");
+                setFilterFrom("");
+                setFilterTo("");
+                setFilterQ("");
+                setFiltersActive(false);
+                setLoading(true);
+              }}
+              className="px-4 py-2 rounded-xl border text-sm"
+            >
+              Réinitialiser
+            </button>
+            {filtersActive && paginationTotal != null && (
+              <span className="text-xs text-gray-500 self-center">{paginationTotal} résultat(s)</span>
+            )}
+          </div>
+        </section>
 
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-4 text-sm">{error}</div>
@@ -173,6 +240,28 @@ export default function OrdersPage() {
 
         {loading ? (
           <p className="text-gray-400 py-12 text-center">Chargement…</p>
+        ) : filtersActive ? (
+          <section>
+            <h3 className="font-semibold text-gray-700 mb-3">Résultats filtrés ({orders.length})</h3>
+            {orders.length === 0 ? (
+              <p className="text-gray-400 text-sm bg-white rounded-xl p-6 border">Aucune commande ne correspond aux critères</p>
+            ) : (
+              <div className="space-y-3">
+                {orders.map((o) => (
+                  <OrderCard
+                    key={o.id}
+                    order={o}
+                    busy={busyId === o.id}
+                    onConfirm={o.status === "PENDING" ? () => act(o.id, "confirm") : undefined}
+                    onReject={o.status === "PENDING" ? () => act(o.id, "reject") : undefined}
+                    onReady={o.status === "RESTAURANT_CONFIRMED" ? () => act(o.id, "ready") : undefined}
+                    onChatClient={() => openChat(o.id, "Client")}
+                    onChatDriver={o.driverAssigned ? () => openChat(o.id, "Livreur") : undefined}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
         ) : (
           <>
             <section>

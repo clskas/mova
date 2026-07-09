@@ -25,6 +25,7 @@ export function PortalShell({
     { href: "/", label: "Tableau de bord" },
     { href: "/vehicules", label: "Véhicules" },
     { href: "/reservations", label: "Réservations" },
+    { href: "/revenus", label: "Revenus" },
     { href: "/promos", label: "Codes promo" },
   ];
 

@@ -94,21 +94,22 @@ class _DriverMovingMissionScreenState extends ConsumerState<DriverMovingMissionS
   }
 
   Future<void> _confirmCash() async {
-    final pin = await DriverCashPinDialog.show(context);
+    final api = ref.read(apiClientProvider);
+    final pin = await DriverCashPinDialog.show(
+      context,
+      validate: (enteredPin) async {
+        final result = await api.confirmCashService('MOVING', widget.movingId, enteredPin);
+        return switch (result) {
+          Success() => (ok: true, message: null),
+          Failure(:final error) => (ok: false, message: error.message),
+        };
+      },
+    );
     if (pin == null || pin.isEmpty || !mounted) return;
-    setState(() => _saving = true);
-    final result = await ref.read(apiClientProvider).confirmCashService('MOVING', widget.movingId, pin);
-    if (!mounted) return;
-    setState(() => _saving = false);
-    switch (result) {
-      case Success():
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Paiement espèces confirmé')),
-        );
-        Navigator.pop(context, true);
-      case Failure(:final error):
-        setState(() => _error = error.message);
-    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Paiement espèces confirmé')),
+    );
+    Navigator.pop(context, true);
   }
 
   Future<void> _openMaps({required bool toPickup}) async {

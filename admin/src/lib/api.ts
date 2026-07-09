@@ -326,6 +326,23 @@ export type Restaurant = {
   ownerUserId?: string | null;
 };
 
+export type PubliciteCible = "TOUS" | "PASSENGER" | "DRIVER" | "RESTAURANT" | "RENTAL_PARTNER";
+
+export type Publicite = {
+  id: string;
+  titre: string;
+  imageUrl: string;
+  lien?: string | null;
+  description?: string | null;
+  cible: PubliciteCible;
+  isActive: boolean;
+  dateDebut: string;
+  dateFin?: string | null;
+  sortOrder?: number;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
 export type PricingRule = {
   id?: string;
   vehicleType: string;
@@ -1381,6 +1398,27 @@ export async function fetchDelivery(id: string) {
   return apiFetch<DeliveryOverview>(`/api/admin/deliveries/${id}`);
 }
 
+export async function fetchDeliveries(opts?: {
+  status?: string;
+  type?: string;
+  from?: string;
+  to?: string;
+  search?: string;
+  skip?: number;
+  take?: number;
+}): Promise<DeliveryOverview[]> {
+  const params = new URLSearchParams();
+  if (opts?.status) params.set("status", opts.status);
+  if (opts?.type) params.set("type", opts.type);
+  if (opts?.from) params.set("from", opts.from);
+  if (opts?.to) params.set("to", opts.to);
+  if (opts?.search?.trim()) params.set("search", opts.search.trim());
+  params.set("skip", String(opts?.skip ?? 0));
+  params.set("take", String(opts?.take ?? 50));
+  const data = await apiFetch<DeliveryOverview[]>(`/api/admin/deliveries?${params}`);
+  return Array.isArray(data) ? data : [];
+}
+
 export async function deletePricingRule(vehicleType: string, city?: string) {
   const q = city ? `?city=${encodeURIComponent(city)}` : "";
   return apiFetch(`/api/admin/pricing-rules/${vehicleType}${q}`, { method: "DELETE" });
@@ -1571,6 +1609,22 @@ export async function saveRestaurant(data: Partial<Restaurant>, id?: string) {
 
 export async function deleteRestaurant(id: string) {
   return apiFetch(`/api/admin/restaurants/${id}`, { method: "DELETE" });
+}
+
+export async function fetchPublicites(): Promise<Publicite[]> {
+  const raw = await apiFetch<Publicite[]>("/api/admin/publicites");
+  return Array.isArray(raw) ? raw : [];
+}
+
+export async function savePublicite(data: Partial<Publicite>, id?: string) {
+  if (id) {
+    return apiFetch<Publicite>(`/api/admin/publicites/${id}`, { method: "PATCH", body: JSON.stringify(data) });
+  }
+  return apiFetch<Publicite>("/api/admin/publicites", { method: "POST", body: JSON.stringify(data) });
+}
+
+export async function deletePublicite(id: string) {
+  return apiFetch(`/api/admin/publicites/${id}`, { method: "DELETE" });
 }
 
 export async function fetchCurrentUser(): Promise<AdminSessionUser> {

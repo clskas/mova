@@ -18,7 +18,8 @@ export type AdminSection =
   | "parametres"
   | "locations"
   | "demenagements"
-  | "covoiturage";
+  | "covoiturage"
+  | "publicites";
 
 export const ADMIN_ROLES: AdminRole[] = ["SUPER_ADMIN", "ADMIN", "SUPPORT", "FINANCE", "CONTENT"];
 
@@ -48,6 +49,7 @@ const ALL_SECTIONS: AdminSection[] = [
   "locations",
   "demenagements",
   "covoiturage",
+  "publicites",
 ];
 
 /** Sections visibles dans le menu par rôle. */
@@ -56,7 +58,7 @@ const ROLE_SECTIONS: Record<AdminRole, AdminSection[]> = {
   ADMIN: ALL_SECTIONS,
   SUPPORT: ["utilisateurs", "chauffeurs", "kyc", "litiges", "fraude", "courses", "livraisons", "planifiees", "locations", "demenagements", "covoiturage"],
   FINANCE: ["dashboard", "portefeuille", "tarifs", "abonnements"],
-  CONTENT: ["restaurants", "tarifs", "parametres", "locations"],
+  CONTENT: ["restaurants", "tarifs", "parametres", "locations", "publicites"],
 };
 
 /** Sections où l'utilisateur peut modifier des données. */
@@ -65,7 +67,7 @@ const ROLE_WRITE: Record<AdminRole, AdminSection[]> = {
   ADMIN: ALL_SECTIONS.filter((s) => s !== "portefeuille"),
   SUPPORT: ["kyc", "litiges", "courses", "livraisons", "planifiees", "locations", "demenagements", "covoiturage"],
   FINANCE: ["tarifs", "abonnements", "portefeuille"],
-  CONTENT: ["restaurants", "locations"],
+  CONTENT: ["restaurants", "locations", "publicites"],
 };
 
 export type NavItem = {
@@ -82,6 +84,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/courses", label: "Courses", section: "courses" },
   { href: "/livraisons", label: "Livraisons", section: "livraisons" },
   { href: "/restaurants", label: "Restaurants", section: "restaurants" },
+  { href: "/publicites", label: "Publicités", section: "publicites" },
   { href: "/tarifs", label: "Tarifs", section: "tarifs" },
   { href: "/abonnements", label: "Abonnements", section: "abonnements" },
   { href: "/portefeuille", label: "Portefeuille", section: "portefeuille" },

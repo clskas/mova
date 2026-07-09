@@ -1,5 +1,5 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { CommissionServiceType, ErrandCategory, ErrandOrder, ErrandOrderStatus, TrackingReferenceType, VehicleType } from '@prisma/client';
+import { CommissionServiceType, ErrandCategory, ErrandOrder, ErrandOrderStatus, Prisma, TrackingReferenceType, VehicleType } from '@prisma/client';
 import { INTERNAL_API_KEY, MARKET_RDC, MovaErrorCode, MovaHttpException, MOVA_EVENTS, canCancelErrand, estimateTripDurationMin, serviceUrl } from '@mova/shared';
 import { RedisService } from '@mova/shared';
 import { DEFAULT_PICKUP } from '../common/address.util';
@@ -673,9 +673,41 @@ export class ErrandsService {
     return this.formatErrand(updated);
   }
 
-  async listForAdmin(take = 50) {
+  async listForAdmin(opts: {
+    status?: string;
+    from?: string;
+    to?: string;
+    search?: string;
+    skip?: number;
+    take?: number;
+  } = {}) {
+    const where: Prisma.ErrandOrderWhereInput = {};
+    if (opts.status) where.status = opts.status as ErrandOrderStatus;
+    if (opts.from || opts.to) {
+      where.createdAt = {};
+      if (opts.from) where.createdAt.gte = new Date(opts.from);
+      if (opts.to) {
+        const toDate = new Date(opts.to);
+        toDate.setHours(23, 59, 59, 999);
+        where.createdAt.lte = toDate;
+      }
+    }
+    const search = opts.search?.trim();
+    if (search) {
+      where.OR = [
+        { pickupAddress: { contains: search, mode: 'insensitive' } },
+        { dropoffAddress: { contains: search, mode: 'insensitive' } },
+        { description: { contains: search, mode: 'insensitive' } },
+        { id: { contains: search, mode: 'insensitive' } },
+        { driverId: { contains: search, mode: 'insensitive' } },
+        { userId: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+    const take = Math.min(opts.take ?? 50, 100);
     const rows = await this.prisma.errandOrder.findMany({
+      where,
       orderBy: { createdAt: 'desc' },
+      skip: opts.skip ?? 0,
       take,
     });
     return Promise.all(

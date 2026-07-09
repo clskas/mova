@@ -632,7 +632,7 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
           ),
           const SizedBox(height: 4),
           const Text(
-            'Comme Uber Reserve : programmez un trajet jusqu\'à 7 jours à l\'avance. '
+            'Programmez un trajet jusqu\'à 7 jours à l\'avance. '
             'MOVA assigne un chauffeur avant l\'heure — rappels J-1 et H-1.',
             style: TextStyle(color: MovaColors.textSecondary, height: 1.3),
           ),

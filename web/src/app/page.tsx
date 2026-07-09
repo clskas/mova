@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { checkGatewayHealth } from "@/lib/api";
+import { checkGatewayHealth, fetchActivePublicites, type Publicite } from "@/lib/api";
 import { OtpGate } from "@/components/OtpGate";
+import { PubliciteCarousel } from "@/components/PubliciteCarousel";
 import { ServiceCard } from "@/components/ServiceCard";
 import {
   CalendarIcon,
@@ -62,6 +63,7 @@ function HomeContent() {
   const [view, setView] = useState<View>("home");
   const [mock, setMock] = useState(false);
   const [receiptRef, setReceiptRef] = useState<{ type: string; id: string } | null>(null);
+  const [publicites, setPublicites] = useState<Publicite[]>([]);
 
   const openReceipt = (type: string, id: string) => {
     setReceiptRef({ type, id });
@@ -70,6 +72,7 @@ function HomeContent() {
 
   useEffect(() => {
     checkGatewayHealth().then((ok) => setMock(!ok));
+    fetchActivePublicites("PASSENGER").then(setPublicites);
   }, []);
 
   return (
@@ -112,6 +115,8 @@ function HomeContent() {
               <p className="text-[#6C63FF] font-medium">La mobilité, simplement.</p>
               <p className="text-sm text-gray-500">Choisissez un service pour continuer</p>
             </div>
+
+            <PubliciteCarousel items={publicites} />
 
             <div className="grid grid-cols-2 gap-3">
               <ServiceCard icon={<TaxiIcon color="#6C63FF" />} title="Taxi / Moto-taxi" subtitle="Course immédiate" color="#6C63FF" onClick={() => setView("taxi")} />

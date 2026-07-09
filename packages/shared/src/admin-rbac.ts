@@ -29,6 +29,8 @@ export enum AdminPermission {
   SUBSCRIPTIONS_WRITE = 'subscriptions:write',
   WALLETS_READ = 'wallets:read',
   WALLETS_WRITE = 'wallets:write',
+  PUBLICITES_READ = 'publicites:read',
+  PUBLICITES_WRITE = 'publicites:write',
 }
 
 export const ADMIN_PANEL_ROLES: UserRole[] = [
@@ -77,6 +79,8 @@ export const ADMIN_ROLE_PERMISSIONS: Record<UserRole, AdminPermission[]> = {
     AdminPermission.SUBSCRIPTIONS_READ,
     AdminPermission.SUBSCRIPTIONS_WRITE,
     AdminPermission.WALLETS_READ,
+    AdminPermission.PUBLICITES_READ,
+    AdminPermission.PUBLICITES_WRITE,
   ],
   [UserRole.SUPPORT]: [
     AdminPermission.METRICS_READ,
@@ -113,6 +117,8 @@ export const ADMIN_ROLE_PERMISSIONS: Record<UserRole, AdminPermission[]> = {
     AdminPermission.PRICING_READ,
     AdminPermission.SCHEDULED_READ,
     AdminPermission.SCHEDULED_WRITE,
+    AdminPermission.PUBLICITES_READ,
+    AdminPermission.PUBLICITES_WRITE,
   ],
 };
 

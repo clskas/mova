@@ -2,6 +2,14 @@ import { HttpStatus, Injectable } from '@nestjs/common';
 import { RentalInquiryStatus, RentalVehicleApprovalStatus } from '@prisma/client';
 import { MovaErrorCode, MovaHttpException, INTERNAL_API_KEY, serviceUrl } from '@mova/shared';
 import { fetchAuthUserBrief } from '../common/internal-lookup.util';
+import {
+  fetchPartnerWallet,
+  filterPartnerTransactions,
+  startOfDay,
+  startOfMonth,
+  sumTransactionAmounts,
+} from '../common/partner-wallet.util';
+import { PartnerBillingService } from '../billing/partner-billing.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RentalService } from '../rental/rental.service';
 import { UploadsService } from '../uploads/uploads.service';
@@ -13,7 +21,98 @@ export class RentalPartnerPortalService {
     private prisma: PrismaService,
     private rental: RentalService,
     private uploads: UploadsService,
+    private partnerBilling: PartnerBillingService,
   ) {}
+
+  async getDashboard(ownerUserId: string) {
+    const profile = await this.getProfile(ownerUserId);
+    const wallet = await fetchPartnerWallet(ownerUserId);
+    const monthStart = startOfMonth();
+    const todayStart = startOfDay();
+    const rentalCredits = filterPartnerTransactions(wallet.transactions, 'Revenu location');
+    const revenueMonthCdf = sumTransactionAmounts(
+      filterPartnerTransactions(wallet.transactions, 'Revenu location', { from: monthStart }),
+    );
+    const revenueTodayCdf = sumTransactionAmounts(
+      filterPartnerTransactions(wallet.transactions, 'Revenu location', { from: todayStart }),
+    );
+    const activeBookings = await this.prisma.rentalInquiry.count({
+      where: {
+        vehicle: { ownerUserId },
+        status: { in: [RentalInquiryStatus.CONFIRMED, RentalInquiryStatus.IN_PROGRESS] },
+      },
+    });
+    const completedMonth = await this.prisma.rentalInquiry.count({
+      where: {
+        vehicle: { ownerUserId },
+        status: { in: [RentalInquiryStatus.RETURNED, RentalInquiryStatus.CLOSED, RentalInquiryStatus.PAID] },
+        createdAt: { gte: monthStart },
+      },
+    });
+    const recentBookings = await this.listBookings(ownerUserId, { take: 5 });
+    return {
+      ...profile,
+      kpis: {
+        balanceCdf: wallet.balanceCdf,
+        formattedBalance: wallet.formattedBalance,
+        revenueTodayCdf,
+        revenueMonthCdf,
+        activeBookings,
+        completedMonth,
+        totalRentalSales: rentalCredits.length,
+      },
+      recentBookings: recentBookings.data,
+    };
+  }
+
+  async getEarnings(ownerUserId: string) {
+    const user = await fetchAuthUserBrief(ownerUserId);
+    const wallet = await fetchPartnerWallet(ownerUserId);
+    const rentalCredits = filterPartnerTransactions(wallet.transactions, 'Revenu location');
+    return {
+      partnerName: user?.name ?? 'Partenaire',
+      balanceCdf: wallet.balanceCdf,
+      formattedBalance: wallet.formattedBalance,
+      recentRentalSales: rentalCredits.slice(0, 20).map((tx) => ({
+        id: tx.id,
+        amountCdf: tx.amountCdf,
+        description: tx.description,
+        reference: tx.reference,
+        createdAt: tx.createdAt,
+      })),
+    };
+  }
+
+  async getEarningsReport(
+    ownerUserId: string,
+    query?: { from?: string; to?: string; q?: string; skip?: number; take?: number },
+  ) {
+    const user = await fetchAuthUserBrief(ownerUserId);
+    const name = user?.name ?? 'Partenaire location';
+    return this.partnerBilling.getPartnerEarningsReport(ownerUserId, 'rental', name, query);
+  }
+
+  async getEarningsReportCsv(ownerUserId: string, query?: { from?: string; to?: string; q?: string }) {
+    const user = await fetchAuthUserBrief(ownerUserId);
+    const name = user?.name ?? 'Partenaire location';
+    const report = await this.partnerBilling.getPartnerEarningsReport(ownerUserId, 'rental', name, {
+      ...query,
+      take: 500,
+    });
+    return this.partnerBilling.buildPartnerStatementCsv('rental', name, report);
+  }
+
+  async getEarningsReportPdf(ownerUserId: string, query?: { from?: string; to?: string; q?: string }) {
+    const user = await fetchAuthUserBrief(ownerUserId);
+    const name = user?.name ?? 'Partenaire location';
+    const { buffer, filename } = await this.partnerBilling.getPartnerStatementPdf(
+      ownerUserId,
+      'rental',
+      name,
+      query,
+    );
+    return { buffer, filename };
+  }
 
   async getProfile(ownerUserId: string) {
     const user = await fetchAuthUserBrief(ownerUserId);
@@ -42,12 +141,27 @@ export class RentalPartnerPortalService {
     };
   }
 
-  async listVehicles(ownerUserId: string) {
+  async listVehicles(ownerUserId: string, query?: { q?: string; status?: string; city?: string }) {
+    const q = query?.q?.trim().toLowerCase();
+    const city = query?.city?.trim();
+    const status = query?.status?.trim().toUpperCase();
     const rows = await this.prisma.rentalVehicle.findMany({
-      where: { ownerUserId },
+      where: {
+        ownerUserId,
+        ...(city ? { city: { contains: city, mode: 'insensitive' } } : {}),
+        ...(status && Object.values(RentalVehicleApprovalStatus).includes(status as RentalVehicleApprovalStatus)
+          ? { approvalStatus: status as RentalVehicleApprovalStatus }
+          : {}),
+      },
       orderBy: [{ createdAt: 'desc' }],
     });
-    return rows.map((r) => this.rental.mapVehicleForAdmin(r));
+    const filtered = q
+      ? rows.filter((r) => {
+          const hay = `${r.name} ${r.make ?? ''} ${r.model ?? ''} ${r.city ?? ''} ${r.category}`.toLowerCase();
+          return hay.includes(q);
+        })
+      : rows;
+    return filtered.map((r) => this.rental.mapVehicleForAdmin(r));
   }
 
   async createVehicle(ownerUserId: string, dto: CreatePartnerVehicleDto) {
@@ -84,8 +198,11 @@ export class RentalPartnerPortalService {
     return this.rental.deleteVehicleForOwner(ownerUserId, id);
   }
 
-  listBookings(ownerUserId: string) {
-    return this.rental.ownerListBookings(ownerUserId);
+  listBookings(
+    ownerUserId: string,
+    query?: { status?: string; vehicleId?: string; from?: string; to?: string; q?: string; skip?: number; take?: number },
+  ) {
+    return this.rental.ownerListBookings(ownerUserId, query);
   }
 
   getBooking(ownerUserId: string, id: string) {

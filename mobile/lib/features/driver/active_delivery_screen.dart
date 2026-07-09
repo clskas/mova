@@ -298,17 +298,30 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
       return;
     }
     if (_nextAction == 'DELIVERED') {
+      final api = ref.read(apiClientProvider);
       final pin = await DriverCashPinDialog.show(
         context,
         title: 'Confirmer la livraison',
         label: 'Code PIN du destinataire',
+        validate: (enteredPin) async {
+          final result = await api.updateDeliveryStatus(
+            _deliveryId,
+            'DELIVERED',
+            deliveryPin: enteredPin,
+          );
+          return switch (result) {
+            Success() => (ok: true, message: null),
+            Failure(:final error) => (ok: false, message: error.message),
+          };
+        },
       );
       if (pin == null || pin.isEmpty || !mounted) return;
-      await _advanceStatus(
-        'DELIVERED',
-        'Livraison terminée',
-        deliveryPin: pin,
+      await _refresh();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Livraison terminée')),
       );
+      if (_cashPending) _autoOpenCashConfirm();
       return;
     }
     if (_nextAction != null) {
@@ -322,29 +335,27 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
   Future<void> _confirmCash({bool auto = false}) async {
     if (_cashDialogOpen) return;
     _cashDialogOpen = true;
+    final api = ref.read(apiClientProvider);
+    final refType = _isErrand ? 'ERRAND' : 'DELIVERY';
     final pin = await DriverCashPinDialog.show(
       context,
       title: 'Confirmer paiement espèces',
       label: 'Code PIN du client',
+      validate: (enteredPin) async {
+        final result = await api.confirmCashService(refType, _deliveryId, enteredPin);
+        return switch (result) {
+          Success() => (ok: true, message: null),
+          Failure(:final error) => (ok: false, message: error.message),
+        };
+      },
     );
     _cashDialogOpen = false;
     if (pin == null || pin.isEmpty || !mounted) return;
-    setState(() => _loading = true);
-    final api = ref.read(apiClientProvider);
-    final refType = _isErrand ? 'ERRAND' : 'DELIVERY';
-    final result = await api.confirmCashService(refType, _deliveryId, pin);
-    if (!mounted) return;
-    setState(() => _loading = false);
-    switch (result) {
-      case Success():
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Paiement espèces confirmé')),
-        );
-        await _refresh();
-        if (!auto && mounted) Navigator.pop(context, true);
-      case Failure(:final error):
-        setState(() => _error = error.message);
-    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Paiement espèces confirmé')),
+    );
+    await _refresh();
+    if (!auto && mounted) Navigator.pop(context, true);
   }
 
   bool get _awaitingCashConfirm {

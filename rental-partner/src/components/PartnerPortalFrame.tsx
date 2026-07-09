@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { PortalShell } from "@/components/PortalShell";
+import { PwaInstallBanner } from "@/components/PwaInstallBanner";
 import { fetchProfile } from "@/lib/api";
 
 export function PartnerPortalFrame({ children }: { children: React.ReactNode }) {
@@ -19,5 +20,10 @@ export function PartnerPortalFrame({ children }: { children: React.ReactNode }) 
     };
   }, []);
 
-  return <PortalShell partnerName={partnerName}>{children}</PortalShell>;
+  return (
+    <PortalShell partnerName={partnerName}>
+      {children}
+      <PwaInstallBanner />
+    </PortalShell>
+  );
 }

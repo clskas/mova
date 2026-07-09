@@ -2,6 +2,13 @@ import { HttpStatus, Injectable } from '@nestjs/common';
 import { DeliveryStatus, DeliveryType, Prisma } from '@prisma/client';
 import { MOVA_EVENTS, MovaErrorCode, MovaHttpException, INTERNAL_API_KEY, serviceUrl } from '@mova/shared';
 import { RedisService } from '@mova/shared';
+import {
+  fetchPartnerWallet,
+  filterPartnerTransactions,
+  startOfDay,
+  startOfMonth,
+  sumTransactionAmounts,
+} from '../common/partner-wallet.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { formatParcelDelivery } from '../deliveries/parcel.util';
 import { UploadsService } from '../uploads/uploads.service';
@@ -9,6 +16,7 @@ import { MenuItemDto, UpdateRestaurantLocationDto, UpdateRestaurantMenuDto } fro
 import { MatchingService } from '../matching/matching.service';
 import { notifyNearbyDrivers } from '../common/driver-job-alert.util';
 import { fetchServicePaymentStatuses } from '../common/payment-status.util';
+import { PartnerBillingService } from '../billing/partner-billing.service';
 
 type StoredMenuItem = {
   name: string;
@@ -25,7 +33,36 @@ export class RestaurantPortalService {
     private redis: RedisService,
     private uploads: UploadsService,
     private matching: MatchingService,
+    private partnerBilling: PartnerBillingService,
   ) {}
+
+  async getEarningsReport(
+    ownerUserId: string,
+    query?: { from?: string; to?: string; q?: string; skip?: number; take?: number },
+  ) {
+    const restaurant = await this.getRestaurantForOwner(ownerUserId);
+    return this.partnerBilling.getPartnerEarningsReport(ownerUserId, 'restaurant', restaurant.name, query);
+  }
+
+  async getEarningsReportCsv(ownerUserId: string, query?: { from?: string; to?: string; q?: string }) {
+    const restaurant = await this.getRestaurantForOwner(ownerUserId);
+    const report = await this.partnerBilling.getPartnerEarningsReport(ownerUserId, 'restaurant', restaurant.name, {
+      ...query,
+      take: 500,
+    });
+    return this.partnerBilling.buildPartnerStatementCsv('restaurant', restaurant.name, report);
+  }
+
+  async getEarningsReportPdf(ownerUserId: string, query?: { from?: string; to?: string; q?: string }) {
+    const restaurant = await this.getRestaurantForOwner(ownerUserId);
+    const { buffer, filename } = await this.partnerBilling.getPartnerStatementPdf(
+      ownerUserId,
+      'restaurant',
+      restaurant.name,
+      query,
+    );
+    return { buffer, filename };
+  }
 
   async getRestaurantForOwner(ownerUserId: string) {
     const restaurant = await this.prisma.restaurant.findFirst({
@@ -73,10 +110,14 @@ export class RestaurantPortalService {
     return block?.items ?? items;
   }
 
-  async listOrders(ownerUserId: string, status?: string) {
+  async listOrders(
+    ownerUserId: string,
+    query?: { status?: string; from?: string; to?: string; q?: string; skip?: number; take?: number },
+  ) {
     const restaurant = await this.getRestaurantForOwner(ownerUserId);
-    const statuses = status
-      ? status.split(',').map((s) => s.trim()).filter(Boolean)
+    const statusParam = query?.status;
+    const statuses = statusParam
+      ? statusParam.split(',').map((s) => s.trim()).filter(Boolean)
       : [
           DeliveryStatus.PENDING,
           DeliveryStatus.RESTAURANT_CONFIRMED,
@@ -84,26 +125,49 @@ export class RestaurantPortalService {
           DeliveryStatus.PICKED_UP,
           DeliveryStatus.IN_TRANSIT,
         ];
+    const from = query?.from ? new Date(query.from) : undefined;
+    const to = query?.to ? new Date(query.to) : undefined;
+    const q = query?.q?.trim().toLowerCase();
+    const skip = Math.max(query?.skip ?? 0, 0);
+    const take = Math.min(Math.max(query?.take ?? 50, 1), 100);
+
     const rows = await this.prisma.delivery.findMany({
       where: {
         type: DeliveryType.FOOD,
         status: { in: statuses as DeliveryStatus[] },
         OR: [{ restaurantId: restaurant.id }, { restaurantId: null }],
+        ...(from || to
+          ? {
+              createdAt: {
+                ...(from ? { gte: from } : {}),
+                ...(to ? { lte: to } : {}),
+              },
+            }
+          : {}),
       },
       orderBy: { createdAt: 'desc' },
-      take: 100,
+      take: 200,
       include: { events: { orderBy: { createdAt: 'asc' } } },
     });
-    const scoped = rows.filter(
+    let scoped = rows.filter(
       (d) => d.restaurantId === restaurant.id || this.deliveryIncludesRestaurant(d.items, restaurant.id),
     );
+    if (q) {
+      scoped = scoped.filter((d) => {
+        const hay = `${d.id} ${d.deliveryAddress ?? ''} ${JSON.stringify(d.items ?? '')}`.toLowerCase();
+        return hay.includes(q);
+      });
+    }
+    const total = scoped.length;
+    const page = scoped.slice(skip, skip + take);
     const paymentStatuses = await fetchServicePaymentStatuses(
       'DELIVERY',
-      scoped.slice(0, 50).map((d) => d.id),
+      page.map((d) => d.id),
     );
     return {
       restaurant: { id: restaurant.id, name: restaurant.name },
-      orders: scoped.slice(0, 50).map((d) => this.formatOrder(d, restaurant.id, paymentStatuses[d.id])),
+      orders: page.map((d) => this.formatOrder(d, restaurant.id, paymentStatuses[d.id])),
+      pagination: { skip, take, total },
     };
   }
 
@@ -217,39 +281,92 @@ export class RestaurantPortalService {
     return { order: this.formatOrder(updated), delivery: formatParcelDelivery(updated) };
   }
 
+  async getDashboard(ownerUserId: string) {
+    const restaurant = await this.getRestaurantForOwner(ownerUserId);
+    const todayStart = startOfDay();
+    const monthStart = startOfMonth();
+    const [pendingOrders, activeOrders, deliveredToday, wallet] = await Promise.all([
+      this.prisma.delivery.count({
+        where: {
+          type: DeliveryType.FOOD,
+          status: DeliveryStatus.PENDING,
+          OR: [{ restaurantId: restaurant.id }, { restaurantId: null }],
+        },
+      }),
+      this.prisma.delivery.count({
+        where: {
+          type: DeliveryType.FOOD,
+          status: {
+            in: [
+              DeliveryStatus.RESTAURANT_CONFIRMED,
+              DeliveryStatus.READY_FOR_PICKUP,
+              DeliveryStatus.PICKED_UP,
+              DeliveryStatus.IN_TRANSIT,
+            ],
+          },
+          OR: [{ restaurantId: restaurant.id }, { restaurantId: null }],
+        },
+      }),
+      this.prisma.delivery.findMany({
+        where: {
+          type: DeliveryType.FOOD,
+          status: DeliveryStatus.DELIVERED,
+          restaurantId: restaurant.id,
+          createdAt: { gte: todayStart },
+        },
+        select: { finalPriceCdf: true, estimatedPriceCdf: true },
+      }),
+      fetchPartnerWallet(ownerUserId),
+    ]);
+    const foodCredits = filterPartnerTransactions(wallet.transactions, 'Vente repas');
+    const revenueTodayCdf = sumTransactionAmounts(
+      filterPartnerTransactions(wallet.transactions, 'Vente repas', { from: todayStart }),
+    );
+    const revenueMonthCdf = sumTransactionAmounts(
+      filterPartnerTransactions(wallet.transactions, 'Vente repas', { from: monthStart }),
+    );
+    const recent = await this.listOrders(ownerUserId, { take: 5 });
+    return {
+      restaurant: {
+        id: restaurant.id,
+        name: restaurant.name,
+        isAcceptingOrders: restaurant.isAcceptingOrders,
+        prepTimeMin: restaurant.prepTimeMin,
+      },
+      kpis: {
+        pendingOrders,
+        activeOrders,
+        deliveredTodayCount: deliveredToday.length,
+        deliveredTodayGrossCdf: deliveredToday.reduce(
+          (s, d) => s + (d.finalPriceCdf ?? d.estimatedPriceCdf ?? 0),
+          0,
+        ),
+        balanceCdf: wallet.balanceCdf,
+        formattedBalance: wallet.formattedBalance,
+        revenueTodayCdf,
+        revenueMonthCdf,
+        totalSalesCount: foodCredits.length,
+      },
+      recentOrders: recent.orders,
+    };
+  }
+
   async getEarnings(ownerUserId: string) {
     const restaurant = await this.getRestaurantForOwner(ownerUserId);
-    try {
-      const res = await fetch(serviceUrl('payment', `/internal/wallets/${ownerUserId}`), {
-        headers: { 'x-internal-api-key': INTERNAL_API_KEY },
-      });
-      if (!res.ok) {
-        throw new MovaHttpException(MovaErrorCode.INTERNAL_ERROR, HttpStatus.BAD_GATEWAY, 'Portefeuille indisponible.');
-      }
-      const wallet = (await res.json()) as {
-        balanceCdf?: number;
-        formattedBalance?: string;
-        transactions?: { id: string; amountCdf: number; type: string; description?: string; reference?: string; createdAt: string }[];
-      };
-      const foodCredits = (wallet.transactions ?? []).filter(
-        (tx) => tx.type === 'CREDIT' && String(tx.description ?? '').startsWith('Vente repas'),
-      );
-      return {
-        restaurant: { id: restaurant.id, name: restaurant.name },
-        balanceCdf: wallet.balanceCdf ?? 0,
-        formattedBalance: wallet.formattedBalance ?? `${wallet.balanceCdf ?? 0} FC`,
-        recentFoodSales: foodCredits.map((tx) => ({
-          id: tx.id,
-          amountCdf: tx.amountCdf,
-          description: tx.description,
-          reference: tx.reference,
-          createdAt: tx.createdAt,
-        })),
-      };
-    } catch (e) {
-      if (e instanceof MovaHttpException) throw e;
-      throw new MovaHttpException(MovaErrorCode.INTERNAL_ERROR, HttpStatus.BAD_GATEWAY, 'Portefeuille indisponible.');
-    }
+    const wallet = await fetchPartnerWallet(ownerUserId);
+    const foodCredits = filterPartnerTransactions(wallet.transactions, 'Vente repas');
+    return {
+      restaurant: { id: restaurant.id, name: restaurant.name },
+      balanceCdf: wallet.balanceCdf,
+      formattedBalance: wallet.formattedBalance,
+      recentFoodSales: foodCredits.slice(0, 20).map((tx) => ({
+        id: tx.id,
+        amountCdf: tx.amountCdf,
+        description: tx.description,
+        reference: tx.reference,
+        createdAt: tx.createdAt,
+      })),
+    };
   }
 
   async getMenu(ownerUserId: string) {

@@ -1094,7 +1094,10 @@ export class RidesService {
     }
   }
 
-  async getDriverPayoutItems(driverUserId: string) {
+  async getDriverPayoutItems(
+    driverUserId: string,
+    opts?: { from?: Date; to?: Date; referenceType?: string; skip?: number; take?: number },
+  ) {
     const [rides, deliveries, movings, errands, rentals, carpools, scheduled, rideRule, deliveryRule, movingRule, errandRule, rentalRule, carpoolRule] =
       await Promise.all([
       this.prisma.ride.findMany({ where: { driverId: driverUserId, status: RideStatus.COMPLETED } }),
@@ -1123,31 +1126,42 @@ export class RidesService {
       ...rides.map((r) => ({
         referenceType: 'RIDE',
         referenceId: r.id,
-        driverNetCdf: rideNet(r.finalFareCdf ?? r.estimatedFareCdf ?? 0, rideRule.platformPercent),
+        label: `${r.pickupAddress ?? 'Départ'} → ${r.dropoffAddress ?? 'Arrivée'}`,
+        driverNetCdf: Math.round(rideNet(r.finalFareCdf ?? r.estimatedFareCdf ?? 0, rideRule.platformPercent)),
         completedAt: r.completedAt?.toISOString() ?? null,
       })),
       ...deliveries.map((d) => ({
         referenceType: 'DELIVERY',
         referenceId: d.id,
-        driverNetCdf: rideNet(this.deliveryDriverGross(d), deliveryRule.platformPercent),
+        label:
+          d.type === 'FOOD'
+            ? `Repas · ${d.pickupAddress ?? d.dropoffAddress ?? 'Livraison'}`
+            : `${d.type ?? 'Livraison'} · ${d.pickupAddress ?? ''} → ${d.dropoffAddress ?? d.deliveryAddress ?? ''}`,
+        driverNetCdf: Math.round(rideNet(this.deliveryDriverGross(d), deliveryRule.platformPercent)),
         completedAt: d.deliveredAt?.toISOString() ?? null,
+        deliveryType: d.type,
       })),
       ...movings.map((m) => ({
         referenceType: 'MOVING',
         referenceId: m.id,
-        driverNetCdf: rideNet(m.estimatedPriceCdf, movingRule.platformPercent),
+        label: `Déménagement · ${m.pickupAddress ?? m.dropoffAddress ?? ''}`,
+        driverNetCdf: Math.round(rideNet(m.estimatedPriceCdf, movingRule.platformPercent)),
         completedAt: m.completedAt?.toISOString() ?? null,
       })),
       ...errands.map((e) => ({
         referenceType: 'ERRAND',
         referenceId: e.id,
-        driverNetCdf: rideNet((e.finalPriceCdf ?? e.estimatedPriceCdf) + (e.purchaseTotalCdf ?? 0), errandRule.platformPercent),
+        label: e.description?.toString() ?? 'Courses & commissions',
+        driverNetCdf: Math.round(
+          rideNet((e.finalPriceCdf ?? e.estimatedPriceCdf) + (e.purchaseTotalCdf ?? 0), errandRule.platformPercent),
+        ),
         completedAt: e.completedAt?.toISOString() ?? null,
       })),
       ...rentals.map((r) => ({
         referenceType: 'RENTAL',
         referenceId: r.id,
-        driverNetCdf: rideNet(MARKET_RDC.interCity.baseSurchargeCdf * 2, rentalRule.platformPercent),
+        label: `Location · ${r.pickupAddress ?? r.pickupCity ?? ''}`,
+        driverNetCdf: Math.round(rideNet(MARKET_RDC.interCity.baseSurchargeCdf * 2, rentalRule.platformPercent)),
         completedAt: r.updatedAt.toISOString(),
       })),
       ...carpools.map((t) => {
@@ -1155,18 +1169,50 @@ export class RidesService {
         return {
           referenceType: 'CARPOOL',
           referenceId: t.id,
-          driverNetCdf: rideNet(t.pricePerSeatCdf * Math.max(booked, 1), carpoolRule.platformPercent),
+          label: `Covoiturage · ${t.fromCity ?? t.pickupAddress ?? ''} → ${t.toCity ?? t.dropoffAddress ?? ''}`,
+          driverNetCdf: Math.round(rideNet(t.pricePerSeatCdf * Math.max(booked, 1), carpoolRule.platformPercent)),
           completedAt: t.updatedAt.toISOString(),
         };
       }),
       ...scheduled.map((s) => ({
         referenceType: 'SCHEDULED',
         referenceId: s.id,
-        driverNetCdf: rideNet(s.estimatedPriceCdf, rideRule.platformPercent),
+        label: `Planifiée · ${s.pickupAddress ?? ''} → ${s.dropoffAddress ?? ''}`,
+        driverNetCdf: Math.round(rideNet(s.estimatedPriceCdf, rideRule.platformPercent)),
         completedAt: s.updatedAt.toISOString(),
       })),
-    ];
-    return { items };
+    ]
+      .filter((item) => {
+        if (!item.completedAt) return false;
+        const at = new Date(item.completedAt);
+        if (opts?.from && at < opts.from) return false;
+        if (opts?.to) {
+          const end = new Date(opts.to);
+          end.setHours(23, 59, 59, 999);
+          if (at > end) return false;
+        }
+        if (opts?.referenceType && opts.referenceType !== 'ALL') {
+          const t = opts.referenceType.toUpperCase();
+          if (t === 'RIDE' && item.referenceType !== 'RIDE' && item.referenceType !== 'SCHEDULED') return false;
+          if (t === 'DELIVERY' && item.referenceType !== 'DELIVERY' && item.referenceType !== 'ERRAND') return false;
+          if (t === 'MISSION') {
+            const missionTypes = new Set(['MOVING', 'RENTAL', 'CARPOOL']);
+            if (!missionTypes.has(item.referenceType)) return false;
+          } else if (t !== 'RIDE' && t !== 'DELIVERY' && item.referenceType !== t) return false;
+        }
+        return true;
+      })
+      .sort((a, b) => new Date(b.completedAt!).getTime() - new Date(a.completedAt!).getTime());
+
+    const totalNet = items.reduce((sum, i) => sum + (i.driverNetCdf ?? 0), 0);
+    const skip = Math.max(0, opts?.skip ?? 0);
+    const take = Math.min(Math.max(1, opts?.take ?? 50), 100);
+
+    return {
+      items: items.slice(skip, skip + take),
+      pagination: { total: items.length, skip, take },
+      summary: { netCdf: Math.round(totalNet), count: items.length },
+    };
   }
 
   async getDriverEarnings(driverUserId: string) {

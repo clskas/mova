@@ -6,6 +6,7 @@ import 'package:geolocator/geolocator.dart';
 import '../../core/config/market_config.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
+import '../../core/widgets/publicite_carousel.dart';
 import '../../core/billing/driver_earnings_display.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/cache/profile_cache.dart';
@@ -21,6 +22,7 @@ import '../carpool/carpool_screen.dart';
 import 'active_delivery_screen.dart';
 import 'active_ride_screen.dart';
 import 'driver_onboarding_screen.dart';
+import 'driver_earnings_screen.dart';
 import 'kyc_screen.dart';
 import 'driver_ride_history_screen.dart';
 import 'ride_offer_screen.dart';
@@ -33,7 +35,7 @@ import 'driver_rental_mission_screen.dart';
 import 'driver_scheduled_mission_screen.dart';
 import '../delivery/delivery_payment_state.dart';
 
-enum _DriverMenuAction { history, carpool, dossier, help, incident, logout }
+enum _DriverMenuAction { earnings, history, carpool, dossier, help, incident, logout }
 
 class DriverHomeScreen extends ConsumerStatefulWidget {
   const DriverHomeScreen({super.key});
@@ -64,12 +66,16 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
   // Elles réapparaissent automatiquement après [_offerSnoozeDuration].
   final Map<String, DateTime> _snoozedOffers = {};
   static const Duration _offerSnoozeDuration = Duration(seconds: 90);
+  static const double _sectionGap = 20;
+  static const double _cardLineGap = 8;
+  static const double _listItemGap = 14;
   String? _profileError;
   bool _showingOffer = false;
   List<Map<String, dynamic>> _rideOffers = [];
   List<Map<String, dynamic>> _deliveryOffers = [];
   List<Map<String, dynamic>> _assignedMissions = [];
   List<Map<String, dynamic>> _scheduledOffers = [];
+  List<Map<String, dynamic>> _publicites = const [];
   final Set<String> _knownMissionKeys = {};
   final Set<String> _knownOfferKeys = {};
   bool _missionAlertsSeeded = false;
@@ -129,6 +135,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
       _loadPendingCashRide(),
       _loadActiveDelivery(),
       _loadAssignments(),
+      _loadPublicites(),
     ]);
     await _connectDriverCashInbox();
     await DriverJobAlertService.init();
@@ -388,7 +395,17 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
       _loadActiveRide(),
       _loadPendingCashRide(),
       _loadActiveDelivery(),
+      _loadPublicites(),
     ]);
+  }
+
+  Future<void> _loadPublicites() async {
+    final api = ref.read(apiClientProvider);
+    final result = await api.getPublicites(cible: 'DRIVER');
+    if (!mounted) return;
+    if (result case Success(:final data)) {
+      setState(() => _publicites = data);
+    }
   }
 
   Future<void> _loadEarnings() async {
@@ -712,6 +729,32 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
     return _vehicleId;
   }
 
+  Future<void> _openDeliveryOfferPopup(Map<String, dynamic> offer) async {
+    final id = offer['id']?.toString() ?? '';
+    if (id.isEmpty) return;
+    _showingOffer = true;
+    final result = await Navigator.push<dynamic>(
+      context,
+      MaterialPageRoute(builder: (_) => DeliveryOfferScreen(offer: offer)),
+    );
+    _showingOffer = false;
+    if (!mounted) return;
+    if (result == 'timeout' || result == null) {
+      _snoozedOffers['delivery:$id'] = DateTime.now();
+    } else if (result == 'rejected') {
+      _dismissedOffers.add('delivery:$id');
+    } else if (result is Map<String, dynamic>) {
+      _dismissedOffers.add('delivery:$id');
+      setState(() => _activeDelivery = result);
+      await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => ActiveDeliveryScreen(delivery: result)),
+      );
+      await _loadActiveDelivery();
+    }
+    await _refreshRideOffers();
+  }
+
   Future<void> _rejectDeliveryOffer(Map<String, dynamic> offer) async {
     final id = offer['id']?.toString() ?? '';
     if (id.isEmpty) return;
@@ -920,27 +963,12 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
 
     for (final offer in deliveries) {
       final id = offer['id']?.toString() ?? '';
-      if (id.isEmpty || _dismissedOffers.contains('delivery:$id')) continue;
+      if (id.isEmpty || _isOfferHidden('delivery:$id')) continue;
       if (offer['alreadyAssigned'] == true) {
         if (mounted) setState(() => _activeDelivery = offer);
         continue;
       }
-      _showingOffer = true;
-      if (!mounted) return;
-      final accepted = await Navigator.push<Map<String, dynamic>?>(
-        context,
-        MaterialPageRoute(builder: (_) => DeliveryOfferScreen(offer: offer)),
-      );
-      _dismissedOffers.add('delivery:$id');
-      _showingOffer = false;
-      if (accepted != null && mounted) {
-        setState(() => _activeDelivery = accepted);
-        await Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => ActiveDeliveryScreen(delivery: accepted)),
-        );
-        await _loadActiveDelivery();
-      }
+      await _openDeliveryOfferPopup(offer);
       return;
     }
   }
@@ -1022,6 +1050,11 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
           tooltip: 'Menu',
           onSelected: (action) async {
             switch (action) {
+              case _DriverMenuAction.earnings:
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const EarningsScreen()),
+                );
               case _DriverMenuAction.history:
                 await Navigator.push(
                   context,
@@ -1066,6 +1099,15 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
             }
           },
           itemBuilder: (context) => const [
+            PopupMenuItem(
+              value: _DriverMenuAction.earnings,
+              child: ListTile(
+                leading: Icon(Icons.account_balance_wallet_outlined),
+                title: Text('Revenus'),
+                contentPadding: EdgeInsets.zero,
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
             PopupMenuItem(
               value: _DriverMenuAction.history,
               child: ListTile(
@@ -1133,7 +1175,11 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
         children: [
           if (_profileError != null) ...[
             MovaErrorBanner(message: _profileError!, onRetry: () => _loadProfile(clearCache: true)),
-            const SizedBox(height: 12),
+            const SizedBox(height: _sectionGap),
+          ],
+          if (_publicites.isNotEmpty) ...[
+            PubliciteCarousel(items: _publicites),
+            const SizedBox(height: _sectionGap),
           ],
           if (_kycStatus != null && _kycStatus != 'APPROVED') ...[
             MovaCard(
@@ -1158,7 +1204,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                 ],
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: _sectionGap),
           ],
           if (_kycStatus == 'APPROVED' && (_documentsRenewalPending || !_documentsCanOperate)) ...[
             MovaCard(
@@ -1181,7 +1227,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                 ],
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: _sectionGap),
           ],
           if (_kycStatus == 'APPROVED' &&
               _documentsCanOperate &&
@@ -1213,6 +1259,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text('Disponibilité'),
+                      const SizedBox(height: 6),
                       Text(
                         _available ? 'En ligne' : 'Hors ligne',
                         style: TextStyle(
@@ -1247,11 +1294,11 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
             ),
           ),
           if (_availabilityError != null) ...[
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
             MovaErrorBanner(message: _availabilityError!),
           ],
           if (_available) ...[
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
             Text(
               'En ligne — courses et livraisons près de votre position GPS.',
               textAlign: TextAlign.center,
@@ -1259,7 +1306,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
             ),
           ],
           if (_scheduledOffers.isNotEmpty) ...[
-            const SizedBox(height: 16),
+            const SizedBox(height: _sectionGap),
             MovaCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1271,19 +1318,19 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                       Text('Créneaux planifiés', style: TextStyle(fontWeight: FontWeight.w600)),
                     ],
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 12),
                   const Text(
                     'Candidature volontaire — MOVA assigne avant le départ.',
                     style: TextStyle(fontSize: 12, color: MovaColors.textSecondary),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
                   ..._scheduledOffers.map((offer) {
                     final when = offer['scheduledAt']?.toString();
                     final whenLabel = when != null
                         ? (DateTime.tryParse(when)?.toLocal().toString().substring(0, 16) ?? when)
                         : '';
                     return Padding(
-                      padding: const EdgeInsets.only(top: 8),
+                      padding: const EdgeInsets.only(top: _listItemGap),
                       child: InkWell(
                         onTap: () => Navigator.push(
                           context,
@@ -1308,13 +1355,17 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                                     overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13),
                                   ),
-                                  if (whenLabel.isNotEmpty)
+                                  if (whenLabel.isNotEmpty) ...[
+                                    const SizedBox(height: 4),
                                     Text(whenLabel, style: const TextStyle(fontSize: 11, color: MovaColors.textSecondary)),
-                                  if (offer['driverNetCdf'] != null)
+                                  ],
+                                  if (offer['driverNetCdf'] != null) ...[
+                                    const SizedBox(height: 4),
                                     Text(
                                       'Gain net ~${MarketConfig.formatCdf(offer['driverNetCdf'] as int)}',
                                       style: const TextStyle(fontSize: 11, color: MovaColors.green),
                                     ),
+                                  ],
                                 ],
                               ),
                             ),
@@ -1330,7 +1381,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
             ),
           ],
           if (_assignedMissions.isNotEmpty) ...[
-            const SizedBox(height: 16),
+            const SizedBox(height: _sectionGap),
             MovaCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1342,7 +1393,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                       Text('Missions assignées', style: TextStyle(fontWeight: FontWeight.w600)),
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
                   ..._assignedMissions.map((m) {
                     final icon = switch (m['type']?.toString()) {
                       'MOVING' => Icons.local_shipping,
@@ -1359,12 +1410,12 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                             ? '\n${DateTime.tryParse(m['scheduledAt'].toString())?.toLocal().toString().substring(0, 16) ?? ''}'
                             : '';
                     return Padding(
-                      padding: const EdgeInsets.only(top: 8),
+                      padding: const EdgeInsets.only(top: _listItemGap),
                       child: InkWell(
                         onTap: _missionIsActionable(m) ? () => _openAssignedMission(m) : null,
                         borderRadius: BorderRadius.circular(8),
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -1378,21 +1429,25 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                                       m['label']?.toString() ?? 'Mission',
                                       style: const TextStyle(fontWeight: FontWeight.w600),
                                     ),
+                                    const SizedBox(height: 4),
                                     Text(
                                       '$subtitle$extra',
                                       style: const TextStyle(fontSize: 12, color: MovaColors.textSecondary),
                                       maxLines: 3,
                                       overflow: TextOverflow.ellipsis,
                                     ),
+                                    const SizedBox(height: 4),
                                     Text(
                                       _missionStatusLabel(m['status']?.toString()),
                                       style: const TextStyle(fontSize: 11, color: MovaColors.violet, fontWeight: FontWeight.w600),
                                     ),
-                                    if (_missionIsActionable(m))
+                                    if (_missionIsActionable(m)) ...[
+                                      const SizedBox(height: 4),
                                       const Text(
                                         'Appuyer pour gérer la mission',
                                         style: TextStyle(fontSize: 11, color: MovaColors.green),
                                       ),
+                                    ],
                                   ],
                                 ),
                               ),
@@ -1409,36 +1464,41 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
             ),
           ],
           if (_earnings != null) ...[
-            const SizedBox(height: 16),
+            const SizedBox(height: _sectionGap),
             MovaCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text('Revenus du jour'),
+                  const SizedBox(height: _cardLineGap),
                   Text(
                     MarketConfig.formatCdf(_earnings!['todayCdf'] as int? ?? 0),
                     style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: MovaColors.green),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  if (_earnings!['withdrawableCdf'] != null)
+                  if (_earnings!['withdrawableCdf'] != null) ...[
+                    const SizedBox(height: _cardLineGap),
                     Text(
                       'Solde retrait : ${MarketConfig.formatCdf(_earnings!['withdrawableCdf'] as int? ?? 0)}',
                       style: const TextStyle(color: MovaColors.green, fontWeight: FontWeight.w600, fontSize: 13),
                     ),
-                  if (_earnings!['rideCount'] != null || _earnings!['deliveryCount'] != null)
+                  ],
+                  if (_earnings!['rideCount'] != null || _earnings!['deliveryCount'] != null) ...[
+                    const SizedBox(height: _cardLineGap),
                     Text(
                       '${_earnings!['rideCount'] ?? 0} courses · ${_earnings!['deliveryCount'] ?? 0} livraisons',
                       style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
+                  ],
                 ],
               ),
             ),
           ],
           if (_pendingCashRide != null) ...[
-            const SizedBox(height: 16),
+            const SizedBox(height: _sectionGap),
             MovaCard(
               onTap: _openPendingCashRide,
               child: Row(
@@ -1453,11 +1513,13 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                           'Paiement espèces en attente',
                           style: TextStyle(fontWeight: FontWeight.bold, color: MovaColors.orange),
                         ),
+                        const SizedBox(height: _cardLineGap),
                         Text(
                           _pendingCashRide!['pickupAddress']?.toString() ?? 'Course terminée',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
+                        const SizedBox(height: 4),
                         const Text(
                           'Appuyez pour saisir le code PIN du passager',
                           style: TextStyle(color: MovaColors.textSecondary, fontSize: 12),
@@ -1471,7 +1533,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
             ),
           ],
           if (_pendingCashDelivery != null) ...[
-            const SizedBox(height: 16),
+            const SizedBox(height: _sectionGap),
             MovaCard(
               onTap: _openPendingCashDelivery,
               child: Row(
@@ -1486,6 +1548,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                           'Paiement livraison espèces',
                           style: TextStyle(fontWeight: FontWeight.bold, color: MovaColors.orange),
                         ),
+                        const SizedBox(height: _cardLineGap),
                         Text(
                           _pendingCashDelivery!['pickupAddress']?.toString() ??
                               _pendingCashDelivery!['dropoffAddress']?.toString() ??
@@ -1493,6 +1556,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
+                        const SizedBox(height: 4),
                         const Text(
                           'Appuyez pour saisir le code PIN du client',
                           style: TextStyle(color: MovaColors.textSecondary, fontSize: 12),
@@ -1506,7 +1570,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
             ),
           ],
           if (_activeRide != null) ...[
-            const SizedBox(height: 16),
+            const SizedBox(height: _sectionGap),
             MovaCard(
               onTap: () => Navigator.push(
                 context,
@@ -1524,6 +1588,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text('Course active', style: TextStyle(fontWeight: FontWeight.bold)),
+                        const SizedBox(height: _cardLineGap),
                         Text(
                           _activeRide!['pickupAddress']?.toString() ?? '',
                           maxLines: 1,
@@ -1538,7 +1603,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
             ),
           ],
           if (_activeDelivery != null) ...[
-            const SizedBox(height: 16),
+            const SizedBox(height: _sectionGap),
             MovaCard(
               onTap: () => Navigator.push(
                 context,
@@ -1553,6 +1618,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text('Livraison active', style: TextStyle(fontWeight: FontWeight.bold)),
+                        const SizedBox(height: _cardLineGap),
                         Text(
                           _activeDelivery!['pickupAddress']?.toString() ?? '',
                           maxLines: 1,
@@ -1566,7 +1632,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
               ),
             ),
           ],
-          const SizedBox(height: 16),
+          const SizedBox(height: _sectionGap),
           if (_available && _activeRide == null && _activeDelivery == null) ...[
             if (_offersError != null) ...[
               MovaErrorBanner(message: _offersError!, onRetry: _refreshRideOffers),
@@ -1587,7 +1653,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                         ),
                       ],
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 12),
                     ..._rideOffers.take(5).map((offer) {
                       final driverNet = DriverEarningsDisplay.netFromMap(offer);
                       final pickupKm = (offer['distanceToPickupKm'] as num?)?.toDouble();
@@ -1598,7 +1664,8 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                         if (tripKm != null) 'Trajet ${GeoUtils.formatDistanceKm(tripKm)}',
                       ];
                       return ListTile(
-                        contentPadding: EdgeInsets.zero,
+                        contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 0),
+                        minVerticalPadding: 12,
                         title: Text(
                           offer['pickupAddress']?.toString() ?? 'Course',
                           maxLines: 1,
@@ -1639,7 +1706,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                   ],
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: _sectionGap),
             ] else if (_rideOffers.isEmpty && _deliveryOffers.isEmpty)
               const Padding(
                 padding: EdgeInsets.only(bottom: 12),
@@ -1665,8 +1732,14 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                         ),
                       ],
                     ),
-                    const SizedBox(height: 8),
-                    ..._deliveryOffers.take(5).map((offer) {
+                    const SizedBox(height: 12),
+                    ..._deliveryOffers
+                        .where((offer) {
+                          final id = offer['id']?.toString() ?? '';
+                          return id.isEmpty || !_dismissedOffers.contains('delivery:$id');
+                        })
+                        .take(5)
+                        .map((offer) {
                       final driverNet = DriverEarningsDisplay.netFromMap(offer);
                       final pickupKm = (offer['distanceToPickupKm'] as num?)?.toDouble();
                       final tripKm = (offer['tripDistanceKm'] as num?)?.toDouble() ??
@@ -1679,7 +1752,8 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                         if (tripKm != null) 'Livraison ${GeoUtils.formatDistanceKm(tripKm)}',
                       ];
                       return ListTile(
-                        contentPadding: EdgeInsets.zero,
+                        contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 0),
+                        minVerticalPadding: 12,
                         title: Text(
                           assigned
                               ? 'Mission assignée — ${type == 'ERRAND' ? (offer['description']?.toString() ?? 'Courses & commissions') : (offer['pickupAddress']?.toString() ?? 'Livraison $typeLabel')}'
@@ -1732,22 +1806,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                             await _refreshRideOffers();
                             return;
                           }
-                          _showingOffer = true;
-                          final accepted = await Navigator.push<Map<String, dynamic>?>(
-                            context,
-                            MaterialPageRoute(builder: (_) => DeliveryOfferScreen(offer: offer)),
-                          );
-                          _dismissedOffers.add('delivery:$id');
-                          _showingOffer = false;
-                          if (accepted != null && mounted) {
-                            setState(() => _activeDelivery = accepted);
-                            await Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (_) => ActiveDeliveryScreen(delivery: accepted)),
-                            );
-                            await _loadActiveDelivery();
-                          }
-                          await _refreshRideOffers();
+                          _openDeliveryOfferPopup(offer);
                         },
                       );
                     }),
@@ -1757,7 +1816,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
               const SizedBox(height: 12),
             ],
           ],
-          SizedBox(height: MediaQuery.paddingOf(context).bottom + 16),
+          SizedBox(height: MediaQuery.paddingOf(context).bottom + 24),
         ],
           ),
         ),

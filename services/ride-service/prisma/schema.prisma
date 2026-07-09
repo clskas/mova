@@ -845,3 +845,29 @@ model RentalChatMessage {
   @@index([inquiryId, createdAt])
   @@map("rental_chat_messages")
 }
+
+enum PubliciteCible {
+  TOUS
+  PASSENGER
+  DRIVER
+  RESTAURANT
+  RENTAL_PARTNER
+}
+
+model Publicite {
+  id          String         @id @default(uuid())
+  titre       String
+  imageUrl    String
+  lien        String?
+  description String?
+  cible       PubliciteCible @default(TOUS)
+  isActive    Boolean        @default(true)
+  dateDebut   DateTime
+  dateFin     DateTime?
+  sortOrder   Int            @default(0)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@index([isActive, dateDebut, dateFin])
+  @@map("publicites")
+}

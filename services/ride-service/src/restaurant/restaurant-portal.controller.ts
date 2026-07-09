@@ -35,16 +35,82 @@ export class RestaurantPortalController {
     return this.portal.getProfile(req.user.id);
   }
 
+  @Get('dashboard')
+  @ApiOperation({ summary: 'Tableau de bord partenaire restaurant' })
+  dashboard(@Request() req: { user: { id: string } }) {
+    return this.portal.getDashboard(req.user.id);
+  }
+
   @Get('orders')
   @ApiOperation({ summary: 'Commandes repas du restaurant' })
-  orders(@Request() req: { user: { id: string } }, @Query('status') status?: string) {
-    return this.portal.listOrders(req.user.id, status);
+  orders(
+    @Request() req: { user: { id: string } },
+    @Query('status') status?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('q') q?: string,
+    @Query('skip') skip?: string,
+    @Query('take') take?: string,
+  ) {
+    return this.portal.listOrders(req.user.id, {
+      status,
+      from,
+      to,
+      q,
+      skip: skip != null ? Number(skip) : undefined,
+      take: take != null ? Number(take) : undefined,
+    });
   }
 
   @Get('earnings')
   @ApiOperation({ summary: 'Solde et ventes repas créditées' })
   earnings(@Request() req: { user: { id: string } }) {
     return this.portal.getEarnings(req.user.id);
+  }
+
+  @Get('earnings/report')
+  @ApiOperation({ summary: 'Rapport financier filtré (JSON)' })
+  earningsReport(
+    @Request() req: { user: { id: string } },
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('q') q?: string,
+    @Query('skip') skip?: string,
+    @Query('take') take?: string,
+  ) {
+    return this.portal.getEarningsReport(req.user.id, { from, to, q, skip: skip != null ? Number(skip) : undefined, take: take != null ? Number(take) : undefined });
+  }
+
+  @Get('earnings/report/csv')
+  @ApiOperation({ summary: 'Rapport financier (CSV)' })
+  @ApiProduces('text/csv')
+  async earningsReportCsv(
+    @Request() req: { user: { id: string } },
+    @Res() res: Response,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('q') q?: string,
+  ) {
+    const csv = await this.portal.getEarningsReportCsv(req.user.id, { from, to, q });
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="mova-restaurant-rapport.csv"`);
+    res.send(csv);
+  }
+
+  @Get('earnings/report/pdf')
+  @ApiOperation({ summary: 'Rapport financier (PDF)' })
+  @ApiProduces('application/pdf')
+  async earningsReportPdf(
+    @Request() req: { user: { id: string } },
+    @Res() res: Response,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('q') q?: string,
+  ) {
+    const { buffer, filename } = await this.portal.getEarningsReportPdf(req.user.id, { from, to, q });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+    res.send(buffer);
   }
 
   @Post('orders/:id/confirm')

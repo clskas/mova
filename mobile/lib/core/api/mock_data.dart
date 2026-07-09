@@ -1295,7 +1295,7 @@ abstract final class MockData {
             'feeReductionPercent': 20,
             'priorityMatching': true,
             'isPopular': true,
-            'description': 'Priorité chauffeur + meilleure réduction — comme Uber One',
+            'description': 'Priorité chauffeur et réduction maximale sur les frais MOVA',
             'benefits': [
               '−20 % sur les frais de service MOVA',
               'Priorité de matching chauffeur / livreur',

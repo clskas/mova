@@ -208,9 +208,13 @@ export class DeliveriesController {
 
   @Post(':id/reject')
   @ApiOperation({ summary: 'Refuser une offre livraison ou course/commission (chauffeur)' })
-  async reject(@Request() req: { user: { id: string } }, @Param('id') id: string) {
+  async reject(
+    @Request() req: { user: { id: string } },
+    @Param('id') id: string,
+    @Body() body?: { reason?: string },
+  ) {
     try {
-      return await this.deliveriesService.rejectDelivery(id, req.user.id);
+      return await this.deliveriesService.rejectDelivery(id, req.user.id, body?.reason);
     } catch (error) {
       if (error instanceof MovaHttpException && error.code === MovaErrorCode.DELIVERY_NOT_FOUND) {
         return this.errandsService.rejectErrand(id, req.user.id);

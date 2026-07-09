@@ -1,17 +1,19 @@
 import '../config/market_config.dart';
 
 /// Affichage cohérent des revenus chauffeur (net après commission MOVA).
+/// Le chauffeur ne voit jamais le montant total payé par le passager.
 class DriverEarningsDisplay {
   DriverEarningsDisplay._();
 
   static int? netFromMap(Map<String, dynamic> data) {
-    final net = data['driverNetCdf'];
+    final net = data['driverNetCdf'] ?? data['displayAmountCdf'];
     if (net is num && net > 0) return net.round();
     return null;
   }
 
   static int? grossFromMap(Map<String, dynamic> data) {
-    final gross = data['priceCdf'] ??
+    final gross = data['driverGrossCdf'] ??
+        data['priceCdf'] ??
         data['estimatedFareCdf'] ??
         data['estimatedPriceCdf'] ??
         data['finalFareCdf'];
@@ -25,62 +27,46 @@ class DriverEarningsDisplay {
     return '—';
   }
 
-  static String netLabel({int? net, int? gross}) {
+  static String netLabel({int? net}) {
     if (net == null) return 'Revenu net indisponible';
-    if (gross != null && net < gross) {
-      return 'Votre revenu net (course ${MarketConfig.formatCdf(gross)} pour le passager)';
-    }
     return 'Votre revenu net (après commission MOVA)';
   }
 
-  /// Libellé contextuel livraison — le livreur ne voit que sa part, pas le panier client.
   static String deliveryNetLabel({
     required Map<String, dynamic> data,
     String? type,
-    int? passengerTotal,
-  }) => serviceNetLabel(data: data, type: type, passengerTotal: passengerTotal);
+  }) =>
+      serviceNetLabel(data: data, type: type);
 
-  /// Libellé revenu net pour tout service MOVA.
   static String serviceNetLabel({
     required Map<String, dynamic> data,
     String? type,
-    int? passengerTotal,
   }) {
     final net = netFromMap(data);
     if (net == null) return 'Revenu net indisponible';
-    final normalized = type?.toUpperCase();
-    final clientTotal = passengerTotal ?? data['passengerTotalCdf'] as int? ?? grossFromMap(data);
-    if (normalized == 'FOOD') {
-      if (clientTotal != null && clientTotal > 0) {
-        return 'Votre gain livraison (client : ${MarketConfig.formatCdf(clientTotal)} au total)';
-      }
-      return 'Votre gain sur les frais de livraison uniquement';
-    }
-    if (normalized == 'ERRAND') {
-      return 'Votre revenu net (course + remboursement achats)';
-    }
-    if (normalized == 'MOVING') {
-      if (clientTotal != null && clientTotal > 0) {
-        return 'Votre revenu net (devis ${MarketConfig.formatCdf(clientTotal)} pour le client)';
-      }
-      return 'Votre revenu net (après commission MOVA)';
-    }
-    if (normalized == 'CARPOOL') {
-      return 'Votre gain sur les places réservées';
-    }
-    if (normalized == 'RENTAL') {
-      if (clientTotal != null && clientTotal > 0) {
-        return 'Votre rémunération logistique (location ${MarketConfig.formatCdf(clientTotal)} pour le client)';
-      }
-      return 'Votre rémunération logistique MOVA';
-    }
-    if (normalized == 'SCHEDULED' || normalized == 'RIDE') {
-      return netLabel(net: net, gross: clientTotal);
-    }
-    final gross = data['driverGrossCdf'] as int? ?? grossFromMap(data);
-    if (gross != null && net < gross) {
-      return 'Votre revenu net (livraison ${MarketConfig.formatCdf(gross)} pour le client)';
-    }
-    return netLabel(net: net, gross: gross);
+    final normalized = type?.toUpperCase() ?? data['type']?.toString().toUpperCase();
+    return switch (normalized) {
+      'FOOD' => 'Gain livraison repas (frais de course uniquement)',
+      'ERRAND' => 'Revenu net (course + remboursement achats)',
+      'MOVING' => 'Revenu net déménagement',
+      'CARPOOL' => 'Gain sur les places réservées',
+      'RENTAL' => 'Rémunération logistique MOVA',
+      'SCHEDULED' => 'Revenu net course planifiée',
+      'PARCEL' || 'EXPRESS' || 'DELIVERY' => 'Revenu net livraison',
+      _ => netLabel(net: net),
+    };
+  }
+
+  static String activityTypeLabel(String? type) {
+    return switch (type?.toUpperCase()) {
+      'RIDE' => 'Course',
+      'DELIVERY' => 'Livraison',
+      'ERRAND' => 'Courses & commissions',
+      'MOVING' => 'Déménagement',
+      'RENTAL' => 'Location logistique',
+      'CARPOOL' => 'Covoiturage',
+      'SCHEDULED' => 'Course planifiée',
+      _ => 'Mission',
+    };
   }
 }

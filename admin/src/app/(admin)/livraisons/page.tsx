@@ -2,13 +2,14 @@
 
 import { useCallback, useEffect, useState } from "react";
 import {
-  apiFetch,
   assignDeliveryDriver,
   cancelDelivery,
+  fetchDeliveries,
   fetchDriversForAssignment,
   fetchDelivery,
   fetchGpsTrace,
   formatCdf,
+  formatDate,
   updateDeliveryStatus,
   type AdminDriver,
   type DeliveryOverview,
@@ -22,6 +23,7 @@ import { GpsTraceMap } from "@/components/GpsTraceMap";
 import { useLiveGpsTrace } from "@/hooks/useLiveGpsTrace";
 import {
   BtnDanger,
+  BtnPrimary,
   Card,
   ConfirmDialog,
   EmptyState,
@@ -31,8 +33,18 @@ import {
   Modal,
   PageHeader,
   SelectInput,
+  SearchInput,
   StatusBadge,
+  TextInput,
 } from "@/components/ui";
+
+const TYPE_OPTIONS = [
+  { value: "", label: "Tous les types" },
+  { value: "PARCEL", label: "Colis" },
+  { value: "FOOD", label: "Repas" },
+  { value: "EXPRESS", label: "Express" },
+  { value: "ERRAND", label: "Courses & commissions" },
+];
 
 const DELIVERY_STATUSES = [
   { value: "PENDING", label: "En attente restaurant" },
@@ -52,6 +64,12 @@ const ERRAND_STATUSES = [
   { value: "CANCELLED", label: "Annulé" },
 ];
 
+const FILTER_STATUSES = [
+  { value: "", label: "Tous les statuts" },
+  ...DELIVERY_STATUSES,
+  ...ERRAND_STATUSES.filter((s) => !DELIVERY_STATUSES.some((d) => d.value === s.value)),
+];
+
 function deliveryTypeLabel(type?: string) {
   return type === "ERRAND" ? "Courses & commissions" : (type ?? "—");
 }
@@ -62,6 +80,12 @@ export default function LivraisonsPage() {
   const canAssign = canWrite("livraisons");
   const [deliveries, setDeliveries] = useState<DeliveryOverview[]>([]);
   const [drivers, setDrivers] = useState<AdminDriver[]>([]);
+  const [status, setStatus] = useState("");
+  const [type, setType] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [search, setSearch] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<DeliveryOverview | null>(null);
@@ -121,17 +145,27 @@ export default function LivraisonsPage() {
     setError(null);
     try {
       const [data, driverList] = await Promise.all([
-        apiFetch<DeliveryOverview[]>("/api/admin/deliveries"),
+        fetchDeliveries({
+          status: status || undefined,
+          type: type || undefined,
+          from: dateFrom || undefined,
+          to: dateTo || undefined,
+          search: searchQuery || undefined,
+        }),
         fetchDriversForAssignment(),
       ]);
-      setDeliveries(Array.isArray(data) ? data : []);
+      setDeliveries(data);
       setDrivers(driverList);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur de chargement");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [status, type, dateFrom, dateTo, searchQuery]);
+
+  function applySearch() {
+    setSearchQuery(search.trim());
+  }
 
   useEffect(() => { load(); }, [load]);
 
@@ -225,10 +259,37 @@ export default function LivraisonsPage() {
         </p>
       )}
       {error && <ErrorBanner message={error} onRetry={load} />}
+      <div className="flex flex-wrap gap-3 mb-4 items-end">
+        <div className="w-44">
+          <FieldLabel>Type</FieldLabel>
+          <SelectInput value={type} onChange={setType} options={TYPE_OPTIONS} />
+        </div>
+        <div className="w-52">
+          <FieldLabel>Statut</FieldLabel>
+          <SelectInput value={status} onChange={setStatus} options={FILTER_STATUSES} />
+        </div>
+        <div className="w-40">
+          <FieldLabel>Du</FieldLabel>
+          <TextInput type="date" value={dateFrom} onChange={setDateFrom} />
+        </div>
+        <div className="w-40">
+          <FieldLabel>Au</FieldLabel>
+          <TextInput type="date" value={dateTo} onChange={setDateTo} />
+        </div>
+        <div className="flex-1 min-w-[14rem]">
+          <FieldLabel>Recherche</FieldLabel>
+          <SearchInput
+            value={search}
+            onChange={setSearch}
+            placeholder="ID, adresse, restaurant, client ou coursier…"
+          />
+        </div>
+        <BtnPrimary onClick={applySearch}>Rechercher</BtnPrimary>
+      </div>
       {loading ? (
         <LoadingState />
       ) : deliveries.length === 0 ? (
-        <EmptyState message="Aucune livraison" />
+        <EmptyState message="Aucune livraison trouvée" />
       ) : (
         <Card className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -239,6 +300,7 @@ export default function LivraisonsPage() {
                 <th className="p-3">Statut</th>
                 <th className="p-3">Coursier</th>
                 <th className="p-3">Prix</th>
+                <th className="p-3">Date</th>
                 <th className="p-3"></th>
               </tr>
             </thead>
@@ -256,6 +318,7 @@ export default function LivraisonsPage() {
                   <td className="p-3"><StatusBadge status={d.status} /></td>
                   <td className="p-3">{d.driverName ?? (d.driverId ? "Assigné" : "—")}</td>
                   <td className="p-3 text-[#6C63FF]">{formatCdf(d.priceCdf)}</td>
+                  <td className="p-3 text-gray-500">{d.createdAt ? formatDate(d.createdAt) : "—"}</td>
                   <td className="p-3">
                     <button type="button" onClick={() => openDetail(d)} className="text-[#6C63FF] hover:underline">
                       Gérer

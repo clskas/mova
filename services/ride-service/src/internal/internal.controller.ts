@@ -27,6 +27,7 @@ import { ScheduledRidesService } from '../rides/scheduled-rides.service';
 import { RidesService } from '../rides/rides.service';
 import { FraudService } from '../fraud/fraud.service';
 import { TrackingService } from '../tracking/tracking.service';
+import { PublicitesService } from '../publicites/publicites.service';
 
 @ApiTags('internal')
 @Controller('internal')
@@ -46,6 +47,7 @@ export class InternalController {
     private rental: RentalService,
     private tracking: TrackingService,
     private fraud: FraudService,
+    private publicites: PublicitesService,
   ) {}
 
   @Get('fraud/signals')
@@ -80,8 +82,21 @@ export class InternalController {
   }
 
   @Get('rides/driver/:userId/payout-items')
-  driverPayoutItems(@Param('userId') userId: string) {
-    return this.rides.getDriverPayoutItems(userId);
+  driverPayoutItems(
+    @Param('userId') userId: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('type') type?: string,
+    @Query('skip') skip?: string,
+    @Query('take') take?: string,
+  ) {
+    return this.rides.getDriverPayoutItems(userId, {
+      from: from ? new Date(from) : undefined,
+      to: to ? new Date(to) : undefined,
+      referenceType: type,
+      skip: Number(skip ?? 0),
+      take: Number(take ?? 50),
+    });
   }
 
   @Get('rides/:id/payout')
@@ -131,15 +146,41 @@ export class InternalController {
   }
 
   @Get('deliveries')
-  async listDeliveries(@Query('take') take?: string) {
-    const limit = Number(take ?? 50);
+  async listDeliveries(
+    @Query('status') status?: string,
+    @Query('type') type?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('search') search?: string,
+    @Query('skip') skip?: string,
+    @Query('take') take?: string,
+  ) {
+    const opts = {
+      status,
+      type,
+      from,
+      to,
+      search,
+      skip: Number(skip ?? 0),
+      take: Number(take ?? 50),
+    };
+    const limit = Math.min(opts.take, 100);
+
+    if (type === 'ERRAND') {
+      return this.errands.listForAdmin({ status, from, to, search, skip: opts.skip, take: limit });
+    }
+    if (type && type !== 'ERRAND') {
+      return this.deliveries.listForAdmin({ ...opts, take: limit });
+    }
+
+    const fetchEach = limit + opts.skip;
     const [deliveries, errands] = await Promise.all([
-      this.deliveries.listForAdmin(limit),
-      this.errands.listForAdmin(limit),
+      this.deliveries.listForAdmin({ status, from, to, search, skip: 0, take: fetchEach }),
+      this.errands.listForAdmin({ status, from, to, search, skip: 0, take: fetchEach }),
     ]);
     return [...deliveries, ...errands]
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-      .slice(0, limit);
+      .slice(opts.skip, opts.skip + limit);
   }
 
   @Get('deliveries/:id')
@@ -228,6 +269,26 @@ export class InternalController {
   @Delete('restaurants/:id')
   deleteRestaurant(@Param('id') id: string) {
     return this.deliveries.deleteRestaurant(id);
+  }
+
+  @Get('publicites')
+  listPublicites() {
+    return this.publicites.listAdmin();
+  }
+
+  @Post('publicites')
+  createPublicite(@Body() body: Record<string, unknown>) {
+    return this.publicites.create(body);
+  }
+
+  @Patch('publicites/:id')
+  updatePublicite(@Param('id') id: string, @Body() body: Record<string, unknown>) {
+    return this.publicites.update(id, body);
+  }
+
+  @Delete('publicites/:id')
+  deletePublicite(@Param('id') id: string) {
+    return this.publicites.remove(id);
   }
 
   @Get('pricing-rules')

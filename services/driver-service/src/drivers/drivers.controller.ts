@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Patch, Post, Request, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Patch, Post, Query, Request, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { IsBoolean, IsNumber } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
@@ -58,6 +58,25 @@ export class DriversController {
   @Get('earnings')
   earnings(@Request() req: { user: { id: string } }) {
     return this.driversService.getEarnings(req.user.id);
+  }
+
+  @Get('earnings/activity')
+  @ApiOperation({ summary: 'Historique des gains chauffeur (filtres période / type)' })
+  earningsActivity(
+    @Request() req: { user: { id: string } },
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('type') type?: string,
+    @Query('skip') skip?: string,
+    @Query('take') take?: string,
+  ) {
+    return this.driversService.getEarningsActivity(req.user.id, {
+      from,
+      to,
+      type,
+      skip: Number(skip ?? 0),
+      take: Number(take ?? 50),
+    });
   }
 
   @Post('withdraw')

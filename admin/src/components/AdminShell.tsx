@@ -21,6 +21,7 @@ import {
   RidesIcon,
   SettingsIcon,
   SubscriptionIcon,
+  PublicitesIcon,
   UsersIcon,
   WalletIcon,
 } from "@/components/AdminIcons";
@@ -37,6 +38,7 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   "/courses": RidesIcon,
   "/livraisons": DeliveriesIcon,
   "/restaurants": RestaurantsIcon,
+  "/publicites": PublicitesIcon,
   "/tarifs": PricingIcon,
   "/abonnements": SubscriptionIcon,
   "/portefeuille": WalletIcon,

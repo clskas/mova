@@ -206,7 +206,11 @@ const RENTAL_VEHICLES = [
 ];
 async function main() {
   for (const c of KINSHASA_COMMUNES) {
-    await prisma.commune.upsert({ where: { name: c.name }, create: { name: c.name, lat: c.lat, lng: c.lng }, update: { lat: c.lat, lng: c.lng } });
+    await prisma.commune.upsert({
+      where: { name_city: { name: c.name, city: 'Kinshasa' } },
+      create: { name: c.name, city: 'Kinshasa', lat: c.lat, lng: c.lng },
+      update: { lat: c.lat, lng: c.lng },
+    });
   }
   for (const r of PRICING_RULES) {
     await prisma.pricingRule.upsert({

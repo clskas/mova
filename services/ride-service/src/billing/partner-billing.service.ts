@@ -2,6 +2,11 @@ import { HttpStatus, Injectable } from '@nestjs/common';
 import { DeliveryStatus, DeliveryType } from '@prisma/client';
 import { MovaErrorCode, MovaHttpException } from '@mova/shared';
 import { fetchAuthUserBrief } from '../common/internal-lookup.util';
+import {
+  fetchPartnerWallet,
+  filterPartnerTransactions,
+  sumTransactionAmounts,
+} from '../common/partner-wallet.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { HistoryService, HistoryType } from '../history/history.service';
 import { receiptNumberFrom, SERVICE_TYPE_LABELS } from './billing-labels.util';
@@ -140,6 +145,116 @@ export class PartnerBillingService {
     const receipt = await this.buildRentalPartnerReceipt(ownerUserId, inquiryId);
     const buffer = await buildReceiptPdf(receipt);
     return { receipt, buffer, filename: `${receipt.receiptNumber}-partner.pdf` };
+  }
+
+  private partnerTxPrefix(partnerType: 'restaurant' | 'rental') {
+    return partnerType === 'restaurant' ? 'Vente repas' : 'Revenu location';
+  }
+
+  async getPartnerEarningsReport(
+    ownerUserId: string,
+    partnerType: 'restaurant' | 'rental',
+    partnerName: string,
+    query?: { from?: string; to?: string; q?: string; skip?: number; take?: number },
+  ) {
+    const wallet = await fetchPartnerWallet(ownerUserId);
+    const prefix = this.partnerTxPrefix(partnerType);
+    const from = query?.from ? new Date(query.from) : undefined;
+    const to = query?.to ? new Date(query.to) : undefined;
+    const filtered = filterPartnerTransactions(wallet.transactions, prefix, { from, to, q: query?.q });
+    const skip = Math.max(query?.skip ?? 0, 0);
+    const take = Math.min(Math.max(query?.take ?? 50, 1), 200);
+    const page = filtered.slice(skip, skip + take);
+    return {
+      partnerType,
+      partnerName,
+      balanceCdf: wallet.balanceCdf,
+      formattedBalance: wallet.formattedBalance,
+      periodTotalCdf: sumTransactionAmounts(filtered),
+      periodCount: filtered.length,
+      from: from?.toISOString() ?? null,
+      to: to?.toISOString() ?? null,
+      data: page.map((tx) => ({
+        id: tx.id,
+        amountCdf: tx.amountCdf,
+        description: tx.description,
+        reference: tx.reference,
+        createdAt: tx.createdAt,
+      })),
+      pagination: { skip, take, total: filtered.length },
+    };
+  }
+
+  buildPartnerStatementCsv(
+    partnerType: 'restaurant' | 'rental',
+    partnerName: string,
+    report: Awaited<ReturnType<PartnerBillingService['getPartnerEarningsReport']>>,
+  ) {
+    const label = partnerType === 'restaurant' ? 'Restaurant' : 'Partenaire location';
+    const lines = [
+      `MOVA — Rapport financier ${label}`,
+      `Partenaire;${partnerName.replace(/;/g, ',')}`,
+      `Généré;${new Date().toISOString()}`,
+      report.from ? `Du;${report.from}` : '',
+      report.to ? `Au;${report.to}` : '',
+      '',
+      `Solde actuel;${report.balanceCdf}`,
+      `Total période;${report.periodTotalCdf}`,
+      `Nombre d'opérations;${report.periodCount}`,
+      '',
+      'Date;Montant FC;Référence;Description',
+      ...report.data.map((row) =>
+        [
+          row.createdAt,
+          row.amountCdf,
+          (row.reference ?? '').replace(/;/g, ','),
+          (row.description ?? '').replace(/;/g, ','),
+        ].join(';'),
+      ),
+    ];
+    return lines.filter(Boolean).join('\n');
+  }
+
+  async getPartnerStatementPdf(
+    ownerUserId: string,
+    partnerType: 'restaurant' | 'rental',
+    partnerName: string,
+    query?: { from?: string; to?: string; q?: string },
+  ) {
+    const report = await this.getPartnerEarningsReport(ownerUserId, partnerType, partnerName, {
+      ...query,
+      skip: 0,
+      take: 500,
+    });
+    const serviceLabel = partnerType === 'restaurant' ? 'Rapport revenus restaurant' : 'Rapport revenus location';
+    const lines: ReceiptLine[] = [
+      { label: 'Solde actuel', amountCdf: report.balanceCdf, kind: 'item' },
+      { label: 'Total période filtrée', amountCdf: report.periodTotalCdf, kind: 'item' },
+      { label: `Opérations (${report.periodCount})`, amountCdf: report.periodTotalCdf, kind: 'total' },
+    ];
+    const receipt: MovaReceipt = {
+      receiptNumber: `MOVA-${partnerType.toUpperCase()}-${Date.now()}`,
+      documentType: 'RECEIPT',
+      issuedAt: new Date().toISOString(),
+      referenceType: partnerType === 'restaurant' ? 'DELIVERY' : 'RENTAL',
+      referenceId: ownerUserId,
+      serviceLabel: partnerName,
+      serviceTypeLabel: serviceLabel,
+      customer: { name: partnerName },
+      lines,
+      subtotalCdf: report.periodTotalCdf,
+      discountCdf: 0,
+      totalCdf: report.periodTotalCdf,
+      currency: 'CDF',
+      payment: null,
+      footerNote: `Détail : ${report.data.length} ligne(s) sur ${report.periodCount} dans la période.`,
+    };
+    const buffer = await buildReceiptPdf(receipt);
+    return {
+      report,
+      buffer,
+      filename: `mova-${partnerType}-rapport-${new Date().toISOString().slice(0, 10)}.pdf`,
+    };
   }
 }
 

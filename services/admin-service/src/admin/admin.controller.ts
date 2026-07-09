@@ -235,8 +235,24 @@ export class AdminController {
   @Get('deliveries')
   @RequirePermissions(AdminPermission.DELIVERIES_READ)
   @ApiOperation({ summary: 'Vue livraisons' })
-  deliveries() {
-    return this.adminService.listDeliveries();
+  deliveries(
+    @Query('status') status?: string,
+    @Query('type') type?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('search') search?: string,
+    @Query('skip') skip?: string,
+    @Query('take') take?: string,
+  ) {
+    return this.adminService.listDeliveries({
+      status,
+      type,
+      from,
+      to,
+      search,
+      skip: Number(skip ?? 0),
+      take: Number(take ?? 50),
+    });
   }
 
   @Get('deliveries/:id')
@@ -328,6 +344,34 @@ export class AdminController {
   @ApiOperation({ summary: 'Supprimer restaurant (soft)' })
   deleteRestaurant(@Param('id') id: string) {
     return this.adminService.deleteRestaurant(id);
+  }
+
+  @Get('publicites')
+  @RequirePermissions(AdminPermission.PUBLICITES_READ)
+  @ApiOperation({ summary: 'Liste des publicités' })
+  publicites() {
+    return this.adminService.listPublicites();
+  }
+
+  @Post('publicites')
+  @RequirePermissions(AdminPermission.PUBLICITES_WRITE)
+  @ApiOperation({ summary: 'Créer une publicité' })
+  createPublicite(@Body() body: Record<string, unknown>) {
+    return this.adminService.createPublicite(body);
+  }
+
+  @Patch('publicites/:id')
+  @RequirePermissions(AdminPermission.PUBLICITES_WRITE)
+  @ApiOperation({ summary: 'Modifier une publicité' })
+  updatePublicite(@Param('id') id: string, @Body() body: Record<string, unknown>) {
+    return this.adminService.updatePublicite(id, body);
+  }
+
+  @Delete('publicites/:id')
+  @RequirePermissions(AdminPermission.PUBLICITES_WRITE)
+  @ApiOperation({ summary: 'Supprimer une publicité' })
+  deletePublicite(@Param('id') id: string) {
+    return this.adminService.deletePublicite(id);
   }
 
   @Get('pricing-rules')

@@ -53,8 +53,10 @@ class CancelEligibility {
     if (status == null || status == 'CANCELLED' || status == 'DELIVERED' || status == 'IN_TRANSIT') {
       return false;
     }
-    if (type == 'FOOD' && status == 'PICKED_UP') return false;
-    if (type != 'FOOD' && (status == 'PICKED_UP')) return false;
+    if (type == 'FOOD') {
+      return status == 'PENDING';
+    }
+    if (type != 'FOOD' && status == 'PICKED_UP') return false;
     return status == 'PENDING' ||
         status == 'RESTAURANT_CONFIRMED' ||
         status == 'READY_FOR_PICKUP';

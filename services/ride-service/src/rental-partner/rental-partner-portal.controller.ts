@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Request, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Request, Res, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiProduces, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -26,10 +26,21 @@ export class RentalPartnerPortalController {
     return this.portal.getProfile(req.user.id);
   }
 
+  @Get('dashboard')
+  @ApiOperation({ summary: 'Tableau de bord partenaire location' })
+  dashboard(@Request() req: { user: { id: string } }) {
+    return this.portal.getDashboard(req.user.id);
+  }
+
   @Get('vehicles')
   @ApiOperation({ summary: 'Mes véhicules soumis' })
-  vehicles(@Request() req: { user: { id: string } }) {
-    return this.portal.listVehicles(req.user.id);
+  vehicles(
+    @Request() req: { user: { id: string } },
+    @Query('q') q?: string,
+    @Query('status') status?: string,
+    @Query('city') city?: string,
+  ) {
+    return this.portal.listVehicles(req.user.id, { q, status, city });
   }
 
   @Post('vehicles')
@@ -68,8 +79,82 @@ export class RentalPartnerPortalController {
 
   @Get('bookings')
   @ApiOperation({ summary: 'Réservations sur mes véhicules' })
-  bookings(@Request() req: { user: { id: string } }) {
-    return this.portal.listBookings(req.user.id);
+  bookings(
+    @Request() req: { user: { id: string } },
+    @Query('status') status?: string,
+    @Query('vehicleId') vehicleId?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('q') q?: string,
+    @Query('skip') skip?: string,
+    @Query('take') take?: string,
+  ) {
+    return this.portal.listBookings(req.user.id, {
+      status,
+      vehicleId,
+      from,
+      to,
+      q,
+      skip: skip != null ? Number(skip) : undefined,
+      take: take != null ? Number(take) : undefined,
+    });
+  }
+
+  @Get('earnings')
+  @ApiOperation({ summary: 'Solde et revenus location crédités' })
+  earnings(@Request() req: { user: { id: string } }) {
+    return this.portal.getEarnings(req.user.id);
+  }
+
+  @Get('earnings/report')
+  @ApiOperation({ summary: 'Rapport financier filtré (JSON)' })
+  earningsReport(
+    @Request() req: { user: { id: string } },
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('q') q?: string,
+    @Query('skip') skip?: string,
+    @Query('take') take?: string,
+  ) {
+    return this.portal.getEarningsReport(req.user.id, {
+      from,
+      to,
+      q,
+      skip: skip != null ? Number(skip) : undefined,
+      take: take != null ? Number(take) : undefined,
+    });
+  }
+
+  @Get('earnings/report/csv')
+  @ApiOperation({ summary: 'Rapport financier (CSV)' })
+  @ApiProduces('text/csv')
+  async earningsReportCsv(
+    @Request() req: { user: { id: string } },
+    @Res() res: Response,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('q') q?: string,
+  ) {
+    const csv = await this.portal.getEarningsReportCsv(req.user.id, { from, to, q });
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="mova-location-rapport.csv"');
+    res.send(csv);
+  }
+
+  @Get('earnings/report/pdf')
+  @ApiOperation({ summary: 'Rapport financier (PDF)' })
+  @ApiProduces('application/pdf')
+  async earningsReportPdf(
+    @Request() req: { user: { id: string } },
+    @Res() res: Response,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('q') q?: string,
+  ) {
+    const { buffer, filename } = await this.portal.getEarningsReportPdf(req.user.id, { from, to, q });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+    res.send(buffer);
   }
 
   @Get('bookings/:id')

@@ -1,6 +1,6 @@
 import 'dart:convert';
-import 'dart:typed_data';
 import 'dart:io' show File;
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -15,6 +15,10 @@ import '../error/user_friendly_error.dart';
 import '../offline/connectivity_service.dart';
 import '../offline/sync_queue.dart';
 import 'mock_data.dart';
+
+Uint8List _readFileBytesSync(String path) => File(path).readAsBytesSync();
+
+Future<Uint8List> _readUploadBytes(File file) => compute(_readFileBytesSync, file.path);
 
 final apiClientProvider = Provider((ref) {
   return ApiClient(
@@ -412,7 +416,7 @@ class ApiClient {
       });
     }
     if (path == '/rides/scheduled' && method == 'GET') {
-      return Success(MockData.scheduledRides());
+      return Success({'data': MockData.scheduledRides()});
     }
     if (path.contains('/rides/scheduled/estimate')) {
       return Success(MockData.scheduledEstimate(body ?? {}));
@@ -446,6 +450,21 @@ class ApiClient {
     }
     if (path == '/history' || path.startsWith('/history?')) {
       return Success({'data': MockData.unifiedHistory(), 'currency': 'CDF', 'city': 'Kinshasa'});
+    }
+    if (path.contains('/drivers/earnings/activity')) {
+      return Success({
+        'items': [
+          {
+            'referenceType': 'RIDE',
+            'referenceId': 'demo-ride-1',
+            'label': 'Gombe → Lingwala',
+            'driverNetCdf': 8500,
+            'completedAt': DateTime.now().toIso8601String(),
+          },
+        ],
+        'pagination': {'total': 1, 'skip': 0, 'take': 50},
+        'summary': {'netCdf': 8500, 'count': 1},
+      });
     }
     if (path.contains('/drivers/earnings')) {
       return Success(MockData.earnings());
@@ -1297,8 +1316,30 @@ class ApiClient {
     };
   }
 
-  Future<Result<Map<String, dynamic>>> rejectDelivery(String deliveryId) async {
-    return post('/deliveries/$deliveryId/reject', {});
+  Future<Result<Map<String, dynamic>>> rejectDelivery(String deliveryId, {String reason = 'explicit'}) async {
+    return post('/deliveries/$deliveryId/reject', {'reason': reason});
+  }
+
+  /// Historique des gains chauffeur (période + type de mission).
+  Future<Result<Map<String, dynamic>>> getDriverEarningsActivity({
+    String? from,
+    String? to,
+    String? type,
+    int skip = 0,
+    int take = 50,
+  }) async {
+    final params = <String>[];
+    if (from != null && from.isNotEmpty) params.add('from=$from');
+    if (to != null && to.isNotEmpty) params.add('to=$to');
+    if (type != null && type.isNotEmpty) params.add('type=$type');
+    params.add('skip=$skip');
+    params.add('take=$take');
+    final path = '/drivers/earnings/activity?${params.join('&')}';
+    final result = await get(path);
+    return switch (result) {
+      Success(:final data) => Success(Map<String, dynamic>.from(data as Map)),
+      Failure(:final error) => Failure(error),
+    };
   }
 
   Future<Result<Map<String, dynamic>>> updateDeliveryStatus(
@@ -1539,7 +1580,7 @@ class ApiClient {
   /// Upload photo déménagement — retourne l'URL `/api/uploads/moving/...`.
   Future<Result<String>> uploadMovingPhoto(File file) async {
     await ensureReady();
-    final bytes = await file.readAsBytes();
+    final bytes = await _readUploadBytes(file);
     if (bytes.length > 3 * 1024 * 1024) {
       return const Failure(ServerFailure('Photo trop volumineuse (max 3 Mo).'));
     }
@@ -1570,7 +1611,7 @@ class ApiClient {
   /// Upload photo colis (base64) — retourne l'URL à passer à `photoUrl`.
   Future<Result<String>> uploadParcelPhoto(File file) async {
     await ensureReady();
-    final bytes = await file.readAsBytes();
+    final bytes = await _readUploadBytes(file);
     if (bytes.length > 3 * 1024 * 1024) {
       return const Failure(ServerFailure('Photo trop volumineuse (max 3 Mo).'));
     }
@@ -1601,7 +1642,7 @@ class ApiClient {
   /// Upload photo véhicule — retourne l'URL `/api/uploads/vehicles/...`.
   Future<Result<String>> uploadVehiclePhoto(File file) async {
     await ensureReady();
-    final bytes = await file.readAsBytes();
+    final bytes = await _readUploadBytes(file);
     if (bytes.length > 3 * 1024 * 1024) {
       return const Failure(ServerFailure('Photo trop volumineuse (max 3 Mo).'));
     }
@@ -1675,6 +1716,22 @@ class ApiClient {
 
   Future<Result<Map<String, dynamic>>> shareReceiptInChat(String referenceType, String referenceId) {
     return post('${_billingPath(referenceType, referenceId)}/share-chat', {});
+  }
+
+  /// Publicités actives (passager, chauffeur, etc.) — endpoint public.
+  Future<Result<List<Map<String, dynamic>>>> getPublicites({String? cible}) async {
+    final q = cible != null && cible.isNotEmpty ? '?cible=${Uri.encodeComponent(cible)}' : '';
+    final result = await get('/publicites$q');
+    return switch (result) {
+      Success(:final data) => () {
+          final list = data is Map ? data['data'] : null;
+          if (list is List) {
+            return Success(list.map((e) => Map<String, dynamic>.from(e as Map)).toList());
+          }
+          return const Success<List<Map<String, dynamic>>>([]);
+        }(),
+      Failure(:final error) => Failure(error),
+    };
   }
 }
 

@@ -179,3 +179,13 @@ export function CarpoolIcon({ className }: IconProps) {
     </Svg>
   );
 }
+
+export function PublicitesIcon({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <path d="M4 6h16v10H4z" />
+      <path d="M8 10h8M8 13h5" />
+      <path d="M7 4h10" />
+    </Svg>
+  );
+}

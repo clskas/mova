@@ -31,6 +31,7 @@
     "seed:admin": "powershell -ExecutionPolicy Bypass -File scripts/seed-admin.ps1",
     "seed:staff-roles": "npm run prisma:seed-staff-roles --prefix services/auth-service",
     "seed:admin-demo": "powershell -ExecutionPolicy Bypass -File scripts/seed-admin-demo.ps1",
+    "seed:test-data": "powershell -ExecutionPolicy Bypass -File scripts/seed-test-data.ps1",
     "mobile:run:passenger": "powershell -ExecutionPolicy Bypass -File scripts/run-mobile-passenger.ps1",
     "mobile:run:driver": "powershell -ExecutionPolicy Bypass -File scripts/run-mobile-driver.ps1"
   }

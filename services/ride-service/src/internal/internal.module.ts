@@ -10,9 +10,10 @@ import { MovingModule } from '../moving/moving.module';
 import { RentalModule } from '../rental/rental.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { TrackingModule } from '../tracking/tracking.module';
+import { PublicitesModule } from '../publicites/publicites.module';
 
 @Module({
-  imports: [PrismaModule, RidesModule, DeliveriesModule, ErrandsModule, GeoModule, CarpoolModule, MovingModule, RentalModule, TrackingModule],
+  imports: [PrismaModule, RidesModule, DeliveriesModule, ErrandsModule, GeoModule, CarpoolModule, MovingModule, RentalModule, TrackingModule, PublicitesModule],
   controllers: [InternalController],
   providers: [PaymentInfoService],
   exports: [PaymentInfoService],

@@ -66,6 +66,7 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
   @override
   void dispose() {
     _pollTimer?.cancel();
+    _pollTimer = null;
     _liveTracking.dispose();
     super.dispose();
   }
@@ -117,7 +118,7 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
   }
 
   Future<void> _load({bool silent = false}) async {
-    if (widget.orderId.isEmpty) return;
+    if (!mounted || widget.orderId.isEmpty) return;
     if (!silent) {
       setState(() {
         _loading = true;

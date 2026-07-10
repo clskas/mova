@@ -1,15 +1,49 @@
-import { Body, Controller, Post } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Post, Request, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
-import { RequestOtpDto, VerifyOtpDto } from './auth.dto';
+import {
+  LoginOptionsDto,
+  PinLoginDto,
+  RequestOtpDto,
+  SetupLocalPinDto,
+  VerifyOtpDto,
+} from './auth.dto';
+import { JwtAuthGuard } from './jwt-auth.guard';
+
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
   constructor(private authService: AuthService) {}
+
   @Post('otp/request')
   @ApiOperation({ summary: 'Demander un code OTP' })
-  requestOtp(@Body() dto: RequestOtpDto) { return this.authService.requestOtp(dto.phone); }
+  requestOtp(@Body() dto: RequestOtpDto) {
+    return this.authService.requestOtp(dto.phone);
+  }
+
   @Post('otp/verify')
   @ApiOperation({ summary: 'Vérifier OTP et obtenir JWT' })
-  verifyOtp(@Body() dto: VerifyOtpDto) { return this.authService.verifyOtp(dto.phone, dto.code, dto.role); }
+  verifyOtp(@Body() dto: VerifyOtpDto) {
+    return this.authService.verifyOtp(dto.phone, dto.code, dto.role);
+  }
+
+  @Post('login/options')
+  @ApiOperation({ summary: 'Options de connexion (PIN local ou SMS)' })
+  loginOptions(@Body() dto: LoginOptionsDto) {
+    return this.authService.getLoginOptions(dto.phone, dto.role);
+  }
+
+  @Post('pin/login')
+  @ApiOperation({ summary: 'Connexion par code PIN local (sans SMS)' })
+  pinLogin(@Body() dto: PinLoginDto) {
+    return this.authService.loginWithPin(dto.phone, dto.pin, dto.role);
+  }
+
+  @Post('pin/setup')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Configurer ou réinitialiser le code PIN local' })
+  setupPin(@Request() req: { user: { id: string } }, @Body() dto: SetupLocalPinDto) {
+    return this.authService.setupLocalPin(req.user.id, dto.pin, dto.confirmPin);
+  }
 }

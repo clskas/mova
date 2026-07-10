@@ -17,6 +17,7 @@ abstract final class MockData {
     final last4 = digits.length >= 4 ? digits.substring(digits.length - 4) : digits;
     return {
       'accessToken': 'mock-jwt-token',
+      'pinConfigured': _mockPinConfigured[phone] == true,
       'user': {
         'id': isDriver ? 'driver-mock-1' : 'passenger-mock-1',
         'phone': phone,
@@ -26,6 +27,26 @@ abstract final class MockData {
         'name': isDriver ? 'Jean Chauffeur' : 'Marie Passagère',
       },
     };
+  }
+
+  static final Map<String, bool> _mockPinConfigured = {};
+
+  static Map<String, dynamic> loginOptions(String phone) => {
+        'success': true,
+        'phone': phone,
+        'pinEnabled': _mockPinConfigured[phone] == true,
+      };
+
+  static Map<String, dynamic> pinLogin(String phone, String pin, {String? role}) {
+    if (_mockPinConfigured[phone] != true || pin != '847291') {
+      return {'success': false, 'message': 'Code PIN incorrect'};
+    }
+    return verifyOtp(phone, '123456', role: role);
+  }
+
+  static Map<String, dynamic> setupPin(String phone) {
+    _mockPinConfigured[phone] = true;
+    return {'success': true, 'message': 'Code PIN enregistré', 'pinConfigured': true};
   }
 
   static Map<String, dynamic> _mockPassengerProfile = {

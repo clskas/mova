@@ -246,6 +246,20 @@ class ApiClient {
     if (path.contains('/auth/otp/request')) {
       return Success(MockData.otpRequest(body?['phone']?.toString() ?? '+243812345678'));
     }
+    if (path.contains('/auth/login/options')) {
+      return Success(MockData.loginOptions(body?['phone']?.toString() ?? '+243812345678'));
+    }
+    if (path.contains('/auth/pin/login')) {
+      return Success(MockData.pinLogin(
+        body?['phone']?.toString() ?? '+243812345678',
+        body?['pin']?.toString() ?? '',
+        role: body?['role']?.toString(),
+      ));
+    }
+    if (path.contains('/auth/pin/setup')) {
+      final phone = await loadUserPhone();
+      return Success(MockData.setupPin(phone ?? '+243812345678'));
+    }
     if (path.contains('/auth/otp/verify')) {
       return Success(MockData.verifyOtp(
         body?['phone']?.toString() ?? '+243812345678',

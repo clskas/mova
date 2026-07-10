@@ -1,7 +1,7 @@
 import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { UserRole, UserStatus } from '@prisma/client';
+import { User, UserRole, UserStatus } from '@prisma/client';
 import * as crypto from 'crypto';
 import {
   MOVA_EVENTS,
@@ -18,6 +18,11 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '@mova/shared';
 import { SmsService } from './sms.providers';
+import { hashLocalPin, isValidLocalPin, verifyLocalPin } from './local-pin.util';
+
+const PIN_FAIL_PREFIX = 'auth:pin:fail:';
+const PIN_FAIL_MAX = 5;
+const PIN_FAIL_TTL_SEC = 15 * 60;
 
 @Injectable()
 export class AuthService {
@@ -57,6 +62,70 @@ export class AuthService {
       phone: normalized,
       ...(isMock ? { mockCode: code } : {}),
     };
+  }
+
+  async getLoginOptions(phone: string, role?: UserRole) {
+    const normalized = this.normalizePhoneOrThrow(phone);
+    const user = await this.prisma.user.findUnique({ where: { phone: normalized } });
+    if (!user || !user.localPinHash) {
+      return { success: true, phone: normalized, pinEnabled: false };
+    }
+    try {
+      this.assertRoleAccess(user, role);
+    } catch {
+      return { success: true, phone: normalized, pinEnabled: false };
+    }
+    return { success: true, phone: normalized, pinEnabled: true };
+  }
+
+  async loginWithPin(phone: string, pin: string, role?: UserRole) {
+    const normalized = this.normalizePhoneOrThrow(phone);
+    await this.assertPinNotLocked(normalized);
+    const user = await this.prisma.user.findUnique({ where: { phone: normalized } });
+    if (!user?.localPinHash) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_PIN_NOT_SET,
+        HttpStatus.BAD_REQUEST,
+        'Aucun code PIN configuré. Connectez-vous par SMS.',
+      );
+    }
+    this.assertRoleAccess(user, role);
+    if (!verifyLocalPin(pin, user.localPinHash)) {
+      await this.registerPinFailure(normalized);
+      throw new MovaHttpException(MovaErrorCode.AUTH_INVALID_PIN, HttpStatus.UNAUTHORIZED);
+    }
+    await this.clearPinFailures(normalized);
+    if (user.status === UserStatus.SUSPENDED) {
+      throw new MovaHttpException(MovaErrorCode.AUTH_FORBIDDEN, HttpStatus.FORBIDDEN, 'Compte suspendu. Contactez le support MOVA.');
+    }
+    return this.buildAuthResponse(user, { isNew: false });
+  }
+
+  async setupLocalPin(userId: string, pin: string, confirmPin: string) {
+    if (pin !== confirmPin) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        HttpStatus.BAD_REQUEST,
+        'Les codes PIN ne correspondent pas.',
+      );
+    }
+    if (!isValidLocalPin(pin)) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        HttpStatus.BAD_REQUEST,
+        'Choisissez un code PIN à 6 chiffres plus sécurisé (évitez 123456 ou chiffres identiques).',
+      );
+    }
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new MovaHttpException(MovaErrorCode.USER_NOT_FOUND, HttpStatus.NOT_FOUND);
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        localPinHash: hashLocalPin(pin),
+        localPinSetAt: new Date(),
+      },
+    });
+    return { success: true, message: 'Code PIN enregistré', pinConfigured: true };
   }
 
   private async provisionUser(userId: string, role: UserRole) {
@@ -102,6 +171,27 @@ export class AuthService {
         body: JSON.stringify({ userId: user.id }),
       });
     }
+    this.assertRoleAccess(user, role);
+    if (user.status === UserStatus.SUSPENDED) {
+      throw new MovaHttpException(MovaErrorCode.AUTH_FORBIDDEN, HttpStatus.FORBIDDEN, 'Compte suspendu. Contactez le support MOVA.');
+    }
+    await this.clearPinFailures(normalized);
+    return this.buildAuthResponse(user, { isNew });
+  }
+
+  async validateUser(userId: string) {
+    return this.prisma.user.findUnique({ where: { id: userId } });
+  }
+
+  private normalizePhoneOrThrow(phone: string) {
+    const normalized = normalizePhoneRdc(phone);
+    if (!validatePhoneRdc(normalized)) {
+      throw new MovaHttpException(MovaErrorCode.AUTH_INVALID_PHONE, HttpStatus.BAD_REQUEST);
+    }
+    return normalized;
+  }
+
+  private assertRoleAccess(user: User, role?: UserRole) {
     const staffRoles: UserRole[] = [
       UserRole.SUPER_ADMIN,
       UserRole.ADMIN,
@@ -144,9 +234,9 @@ export class AuthService {
         'Compte restaurant — utilisez le portail MOVA Restaurant.',
       );
     }
-    if (user.status === UserStatus.SUSPENDED) {
-      throw new MovaHttpException(MovaErrorCode.AUTH_FORBIDDEN, HttpStatus.FORBIDDEN, 'Compte suspendu. Contactez le support MOVA.');
-    }
+  }
+
+  private buildAuthResponse(user: User, options: { isNew: boolean }) {
     const token = this.jwt.sign({
       sub: user.id,
       phone: user.phone,
@@ -156,7 +246,8 @@ export class AuthService {
     return {
       success: true,
       accessToken: token,
-      isNew,
+      isNew: options.isNew,
+      pinConfigured: Boolean(user.localPinHash),
       user: {
         id: user.id,
         phone: user.phone,
@@ -170,7 +261,30 @@ export class AuthService {
     };
   }
 
-  async validateUser(userId: string) {
-    return this.prisma.user.findUnique({ where: { id: userId } });
+  private async assertPinNotLocked(phone: string) {
+    const key = `${PIN_FAIL_PREFIX}${phone}`;
+    const raw = await this.redis.client.get(key);
+    const fails = raw ? Number.parseInt(raw, 10) : 0;
+    if (fails >= PIN_FAIL_MAX) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_PIN_LOCKED,
+        HttpStatus.TOO_MANY_REQUESTS,
+        'Trop de tentatives PIN. Réessayez dans 15 minutes ou connectez-vous par SMS.',
+      );
+    }
+  }
+
+  private async registerPinFailure(phone: string) {
+    const key = `${PIN_FAIL_PREFIX}${phone}`;
+    const raw = await this.redis.client.get(key);
+    const fails = (raw ? Number.parseInt(raw, 10) : 0) + 1;
+    await this.redis.client.set(key, String(fails), 'EX', PIN_FAIL_TTL_SEC);
+    if (fails >= PIN_FAIL_MAX) {
+      this.logger.warn(`PIN locked for ${maskPhoneRdc(phone)} after ${fails} failures`);
+    }
+  }
+
+  private async clearPinFailures(phone: string) {
+    await this.redis.client.del(`${PIN_FAIL_PREFIX}${phone}`);
   }
 }

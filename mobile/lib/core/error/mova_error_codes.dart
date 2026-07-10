@@ -7,6 +7,10 @@ const movaErrorMessages = <String, String>{
   'MOVA_AUTH_002': 'Code OTP expiré. Demandez un nouveau code.',
   'MOVA_AUTH_003': 'Non autorisé. Veuillez vous connecter.',
   'MOVA_AUTH_004': 'Numéro de téléphone invalide. Format: +243XXXXXXXXX',
+  'MOVA_AUTH_005': 'Accès refusé. Permissions insuffisantes pour cette action.',
+  'MOVA_AUTH_006': 'Code PIN incorrect. Réessayez ou connectez-vous par SMS.',
+  'MOVA_AUTH_007': 'Trop de tentatives PIN. Réessayez dans 15 minutes ou connectez-vous par SMS.',
+  'MOVA_AUTH_008': 'Aucun code PIN configuré. Connectez-vous par SMS.',
   'MOVA_RIDE_001': 'Course introuvable.',
   'MOVA_RIDE_002': 'Statut de course invalide pour cette action.',
   'MOVA_RIDE_003':

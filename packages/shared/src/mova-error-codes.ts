@@ -4,6 +4,9 @@ export enum MovaErrorCode {
   AUTH_UNAUTHORIZED = 'MOVA_AUTH_003',
   AUTH_INVALID_PHONE = 'MOVA_AUTH_004',
   AUTH_FORBIDDEN = 'MOVA_AUTH_005',
+  AUTH_INVALID_PIN = 'MOVA_AUTH_006',
+  AUTH_PIN_LOCKED = 'MOVA_AUTH_007',
+  AUTH_PIN_NOT_SET = 'MOVA_AUTH_008',
 
   RIDE_NOT_FOUND = 'MOVA_RIDE_001',
   RIDE_INVALID_STATUS = 'MOVA_RIDE_002',
@@ -61,6 +64,9 @@ export const MOVA_ERROR_MESSAGES: Record<MovaErrorCode, string> = {
   [MovaErrorCode.AUTH_UNAUTHORIZED]: 'Non autorisé. Veuillez vous connecter.',
   [MovaErrorCode.AUTH_INVALID_PHONE]: 'Numéro de téléphone invalide. Format: +243XXXXXXXXX',
   [MovaErrorCode.AUTH_FORBIDDEN]: 'Accès refusé. Permissions insuffisantes pour cette action.',
+  [MovaErrorCode.AUTH_INVALID_PIN]: 'Code PIN incorrect. Réessayez ou connectez-vous par SMS.',
+  [MovaErrorCode.AUTH_PIN_LOCKED]: 'Trop de tentatives PIN. Réessayez dans 15 minutes ou connectez-vous par SMS.',
+  [MovaErrorCode.AUTH_PIN_NOT_SET]: 'Aucun code PIN configuré. Connectez-vous par SMS.',
 
   [MovaErrorCode.RIDE_NOT_FOUND]: 'Course introuvable.',
   [MovaErrorCode.RIDE_INVALID_STATUS]: 'Statut de course invalide pour cette action.',

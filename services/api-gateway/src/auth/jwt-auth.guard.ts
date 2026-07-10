@@ -1,7 +1,13 @@
 import { ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 
-const PUBLIC_PATHS = ['/api/auth/otp/request', '/api/auth/otp/verify', '/health'];
+const PUBLIC_PATHS = [
+  '/api/auth/otp/request',
+  '/api/auth/otp/verify',
+  '/api/auth/login/options',
+  '/api/auth/pin/login',
+  '/health',
+];
 
 function isPublicPath(path: string, method?: string): boolean {
   if (PUBLIC_PATHS.some((p) => path.startsWith(p))) return true;

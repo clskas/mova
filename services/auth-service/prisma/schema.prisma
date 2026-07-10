@@ -35,6 +35,8 @@ model User {
   role      UserRole   @default(PASSENGER)
   status    UserStatus @default(ACTIVE)
   avatarUrl String?
+  localPinHash String?
+  localPinSetAt DateTime?
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
 

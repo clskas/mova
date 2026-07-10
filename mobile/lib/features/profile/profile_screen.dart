@@ -82,10 +82,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     }
   }
 
+  bool _isValidEmail(String email) =>
+      RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email);
+
   Future<void> _save() async {
+    final firstName = _firstName.text.trim();
+    final lastName = _lastName.text.trim();
     final email = _email.text.trim();
-    if (email.isNotEmpty && !email.contains('@')) {
-      setState(() => _error = 'Adresse e-mail invalide.');
+    if (email.isNotEmpty && !_isValidEmail(email)) {
+      setState(() => _error = 'Adresse e-mail invalide (ex. nom@domaine.com).');
       return;
     }
 
@@ -95,9 +100,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     });
     final api = ref.read(apiClientProvider);
     final result = await api.updateUserProfile(
-      firstName: _firstName.text.trim().isEmpty ? null : _firstName.text.trim(),
-      lastName: _lastName.text.trim().isEmpty ? null : _lastName.text.trim(),
-      email: email.isEmpty ? null : email,
+      firstName: firstName,
+      lastName: lastName,
+      email: email,
     );
     if (!mounted) return;
     setState(() => _saving = false);
@@ -105,10 +110,28 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     switch (result) {
       case Success(:final data):
         final offline = data['offline'] == true;
-        setState(() {
-          _applyProfile(data, offline: offline);
-          _offlinePending = offline;
-        });
+        if (!offline) {
+          final refresh = await api.getCurrentUser(forceRefresh: true);
+          if (!mounted) return;
+          switch (refresh) {
+            case Success(:final data):
+              setState(() {
+                _applyProfile(data);
+                _offlinePending = false;
+              });
+            case Failure():
+              setState(() {
+                _applyProfile(data);
+                _offlinePending = false;
+              });
+          }
+        } else {
+          setState(() {
+            _applyProfile(data, offline: true);
+            _offlinePending = true;
+          });
+        }
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(

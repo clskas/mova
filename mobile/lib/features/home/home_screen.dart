@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api/api_client.dart';
 import '../../core/auth/session.dart';
+import '../../core/config/passenger_copy.dart';
 import '../../core/error/result.dart';
 import '../../core/home/active_shipments_refresh.dart';
 import '../../core/location/service_area_gps.dart';
@@ -255,15 +256,24 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
   }
 
+  Future<void> _openProfile(BuildContext context) async {
+    await Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileScreen()));
+    if (!mounted) return;
+    await _loadUser(forceRefresh: true);
+  }
+
   String _userLabel() {
     final first = _user?['firstName']?.toString().trim();
     final last = _user?['lastName']?.toString().trim();
     if (first != null && first.isNotEmpty) {
       return last != null && last.isNotEmpty ? '$first $last' : first;
     }
-    final phone = _user?['phone']?.toString();
-    if (phone != null && phone.isNotEmpty) return phone;
     return '';
+  }
+
+  String _welcomeGreeting(String userLabel) {
+    if (userLabel.isEmpty) return PassengerCopy.homeTagline;
+    return '${_greeting()}, $userLabel 👋';
   }
 
   @override
@@ -279,7 +289,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
         IconButton(
           icon: const Icon(Icons.person_outline),
           tooltip: 'Mon profil',
-          onPressed: () => _open(context, const ProfileScreen()),
+          onPressed: () => _openProfile(context),
         ),
         PopupMenuButton<_HomeMenuAction>(
           tooltip: 'Plus',
@@ -600,8 +610,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
             ),
           const SizedBox(height: 16),
           MovaWelcomeBanner(
-            greeting: userLabel.isNotEmpty ? '${_greeting()}, $userLabel 👋' : '${_greeting()} 👋',
-            subtitle: 'Mobilité partout en RDC — choisissez un service',
+            greeting: _welcomeGreeting(userLabel),
+            subtitle: userLabel.isNotEmpty ? PassengerCopy.homeTagline : '',
           ),
           if (_publicites.isNotEmpty) ...[
             const SizedBox(height: 12),

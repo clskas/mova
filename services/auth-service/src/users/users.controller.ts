@@ -1,13 +1,17 @@
 import { Body, Controller, Get, Patch, Request, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { IsEmail, IsOptional, IsString } from 'class-validator';
+import { IsEmail, IsOptional, IsString, ValidateIf } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { UsersService } from './users.service';
 class UpdateProfileDto {
   @ApiProperty({ required: false }) @IsOptional() @IsString() firstName?: string;
   @ApiProperty({ required: false }) @IsOptional() @IsString() lastName?: string;
-  @ApiProperty({ required: false }) @IsOptional() @IsEmail() email?: string;
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @ValidateIf((_, value) => value != null && value !== '')
+  @IsEmail()
+  email?: string;
 }
 @ApiTags('users')
 @Controller('users')

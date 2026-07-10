@@ -33,7 +33,11 @@ export class UsersService {
   }
 
   async updateProfile(id: string, data: { firstName?: string; lastName?: string; email?: string }) {
-    const user = await this.prisma.user.update({ where: { id }, data });
+    const patch: { firstName?: string | null; lastName?: string | null; email?: string | null } = {};
+    if (data.firstName !== undefined) patch.firstName = data.firstName.trim() || null;
+    if (data.lastName !== undefined) patch.lastName = data.lastName.trim() || null;
+    if (data.email !== undefined) patch.email = data.email.trim() || null;
+    const user = await this.prisma.user.update({ where: { id }, data: patch });
     return this.enrichUser(user);
   }
 

@@ -194,15 +194,17 @@ class MovaWelcomeBanner extends StatelessWidget {
                         letterSpacing: -0.3,
                       ),
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  subtitle,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: MovaColors.white.withValues(alpha: 0.85),
-                      ),
-                ),
+                if (subtitle.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    subtitle,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: MovaColors.white.withValues(alpha: 0.85),
+                        ),
+                  ),
+                ],
               ],
             ),
           ),

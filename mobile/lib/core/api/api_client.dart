@@ -869,7 +869,11 @@ class ApiClient {
         final data = _decodeBody(response.body);
         if (response.statusCode >= 200 && response.statusCode < 300) {
           _markGatewayReachable();
-          return Success(_normalizeSuccess(data));
+          final normalized = _normalizeSuccess(data);
+          if (path == '/users/me') {
+            await UserProfileCache.save(normalized);
+          }
+          return Success(normalized);
         }
         if (data is Map<String, dynamic>) {
           return _failureFromResponse(response.statusCode, data);
@@ -1478,14 +1482,15 @@ class ApiClient {
   }
 
   Future<Result<Map<String, dynamic>>> updateUserProfile({
-    String? firstName,
-    String? lastName,
-    String? email,
+    required String firstName,
+    required String lastName,
+    required String email,
   }) async {
-    final body = <String, dynamic>{};
-    if (firstName != null) body['firstName'] = firstName;
-    if (lastName != null) body['lastName'] = lastName;
-    if (email != null) body['email'] = email;
+    final body = <String, dynamic>{
+      'firstName': firstName,
+      'lastName': lastName,
+      'email': email,
+    };
 
     final result = await patch('/users/me', body);
     if (result case Success(:final data)) {

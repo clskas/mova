@@ -1237,8 +1237,10 @@ abstract final class MockData {
   static Map<String, dynamic> mobileErrandEstimate(Map<String, dynamic> body) {
     final items = body['items'] as List? ?? [];
     final base = errandEstimate({'description': items.join(', ')})['estimatedPriceCdf'] as int;
+    final serviceFee = base + (items.length * 1500);
     return {
-      'estimatedPriceCdf': base + (items.length * 1500),
+      'estimatedPriceCdf': serviceFee,
+      'estimatedPurchaseCdf': 15000 + (items.length * 2500),
       'currency': 'CDF',
     };
   }

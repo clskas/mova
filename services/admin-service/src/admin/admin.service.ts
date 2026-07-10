@@ -537,6 +537,24 @@ export class AdminService {
     });
   }
 
+  confirmCashDebtByCode(code: string, confirmedBy?: string) {
+    return this.proxy('payment', '/internal/cash-debts/confirm-cash', {
+      method: 'POST',
+      body: JSON.stringify({ code, confirmedBy }),
+    });
+  }
+
+  getDebtPolicy() {
+    return this.proxy('payment', '/internal/debt-policy', { method: 'GET' });
+  }
+
+  updateDebtPolicy(body: { maxOpenDebtCdf?: number; blockOffers?: boolean; isActive?: boolean }) {
+    return this.proxy('payment', '/internal/debt-policy', {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    });
+  }
+
   listSurcharges() {
     return this.fetchJson('ride', '/internal/surcharges');
   }

@@ -9,6 +9,8 @@ import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import '../delivery/food_delivery_screen.dart';
 import '../delivery/parcel_delivery_screen.dart';
+import '../errands/errand_tracking_screen.dart';
+import '../delivery/parcel_tracking_screen.dart';
 import '../booking/booking_screen.dart';
 import '../rating/rating_screen.dart';
 import '../../core/widgets/offline_shell.dart';
@@ -164,6 +166,53 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
     );
   }
 
+  bool _isActiveErrand(String? status) {
+    final s = status?.toUpperCase() ?? '';
+    return s == 'PENDING' || s == 'ASSIGNED' || s == 'IN_PROGRESS';
+  }
+
+  void _openErrandTracking(Map<String, dynamic> item) {
+    final id = item['id']?.toString();
+    if (id == null || id.isEmpty) return;
+    final meta = item['meta'] as Map<String, dynamic>? ?? {};
+    final items = (meta['items'] as List?)?.map((e) => e.toString()).toList() ??
+        (item['title']?.toString().isNotEmpty == true
+            ? [item['title'].toString()]
+            : <String>[]);
+    final total = (item['priceCdf'] as num?)?.toInt() ??
+        (meta['totalPriceCdf'] as num?)?.toInt() ??
+        (meta['estimatedPriceCdf'] as num?)?.toInt() ??
+        0;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ErrandTrackingScreen(
+          errandId: id,
+          deliveryAddress: meta['deliveryAddress']?.toString() ??
+              meta['dropoffAddress']?.toString() ??
+              item['title']?.toString() ??
+              '',
+          items: items,
+          totalCdf: total,
+        ),
+      ),
+    );
+  }
+
+  void _openParcelTracking(Map<String, dynamic> item) {
+    final id = item['id']?.toString();
+    if (id == null || id.isEmpty) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => ParcelTrackingScreen(parcelId: id)),
+    );
+  }
+
+  bool _isActiveDelivery(String? status) {
+    final s = status?.toUpperCase() ?? '';
+    return s != 'DELIVERED' && s != 'COMPLETED' && s != 'CANCELLED';
+  }
+
   Widget _unifiedTile(Map<String, dynamic> item) {
     final type = item['type']?.toString();
     if (type == 'RIDE') return _rideTile(item);
@@ -214,6 +263,15 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
               _statusLabel(item['status']?.toString()),
               style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
             ),
+            if (_isActiveDelivery(item['status']?.toString())) ...[
+              const SizedBox(height: 8),
+              MovaButton(
+                label: 'Suivre la livraison',
+                isSecondary: true,
+                icon: Icons.map_outlined,
+                onPressed: () => _openParcelTracking(item),
+              ),
+            ],
             if ((item['status']?.toString() ?? '') == 'DELIVERED') ...[
               const SizedBox(height: 8),
               MovaButton(
@@ -424,6 +482,15 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
               _statusLabel(item['status']?.toString()),
               style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
             ),
+            if (_isActiveErrand(item['status']?.toString())) ...[
+              const SizedBox(height: 8),
+              MovaButton(
+                label: 'Suivre la course',
+                isSecondary: true,
+                icon: Icons.map_outlined,
+                onPressed: () => _openErrandTracking(item),
+              ),
+            ],
           ],
         ),
       ),

@@ -7,6 +7,7 @@ import '../../core/api/api_client.dart';
 import '../../core/config/market_config.dart';
 import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
+import '../errands/errand_tracking_screen.dart';
 import '../moving/moving_tracking_screen.dart';
 import '../rides/scheduled_ride_screen.dart';
 import '../booking/booking_screen.dart';
@@ -153,6 +154,17 @@ Future<void> showHistoryDetailDialog(
       live = raw['inquiry'] as Map<String, dynamic>? ??
           raw['booking'] as Map<String, dynamic>? ??
           raw;
+    }
+  } else if (type == 'ERRAND' && id.isNotEmpty) {
+    final api = ref.read(apiClientProvider);
+    final result = await api.get('/errands/$id');
+    if (result case Success(:final data)) {
+      live = data['errand'] as Map<String, dynamic>? ??
+          (data is Map<String, dynamic> ? data : Map<String, dynamic>.from(data as Map));
+      final rawTimeline = live['timeline'] as List? ?? live['tracking'] as List?;
+      if (rawTimeline != null && rawTimeline.isNotEmpty) {
+        timeline = rawTimeline.cast<Map<String, dynamic>>();
+      }
     }
   }
 
@@ -314,6 +326,33 @@ Future<void> showHistoryDetailDialog(
                     fromAddress: meta['pickupAddress']?.toString() ?? '',
                     toAddress: meta['dropoffAddress']?.toString() ?? '',
                     estimatedPrice: item['priceCdf'] as int? ?? 0,
+                  ),
+                ),
+              );
+            },
+            child: const Text('Suivi complet'),
+          ),
+        if (type == 'ERRAND' && id.isNotEmpty)
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              final items = (live?['items'] as List?)?.map((e) => e.toString()).toList() ??
+                  (meta['items'] as List?)?.map((e) => e.toString()).toList() ??
+                  <String>[];
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ErrandTrackingScreen(
+                    errandId: id,
+                    deliveryAddress: live?['deliveryAddress']?.toString() ??
+                        live?['dropoffAddress']?.toString() ??
+                        meta['deliveryAddress']?.toString() ??
+                        item['title']?.toString() ??
+                        '',
+                    items: items,
+                    totalCdf: (live?['totalPriceCdf'] as num?)?.toInt() ??
+                        (item['priceCdf'] as num?)?.toInt() ??
+                        0,
                   ),
                 ),
               );

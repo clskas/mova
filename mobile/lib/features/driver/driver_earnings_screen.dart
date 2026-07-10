@@ -9,6 +9,7 @@ import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import 'driver_onboarding_screen.dart';
+import 'cash_debt_cash_payment_screen.dart';
 
 enum _EarningsPeriod { today, week, month, custom }
 
@@ -26,6 +27,7 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
   Map<String, dynamic>? _cashDebt;
   Map<String, dynamic>? _activity;
   final _amountController = TextEditingController(text: '5000');
+  final _searchController = TextEditingController();
   String? _error;
   bool _loading = true;
   bool _loadingActivity = false;
@@ -62,6 +64,7 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
   @override
   void dispose() {
     _amountController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -133,6 +136,7 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
       from: _fmtDate(range.from),
       to: _fmtDate(range.to),
       type: _apiTypeFilter(),
+      q: _searchController.text.trim().isEmpty ? null : _searchController.text.trim(),
     );
     if (!mounted) return;
     setState(() {
@@ -167,6 +171,33 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
   int get _periodNetCdf => _asInt(_activity?['summary']?['netCdf']);
 
   int get _periodCount => _asInt(_activity?['summary']?['count']);
+
+  Future<void> _openCashDebtCashPayment() async {
+    final total = _openCashDebtCdf;
+    if (total <= 0) return;
+    final api = ref.read(apiClientProvider);
+    Map<String, dynamic>? initial;
+    final existing = await api.getActiveCashDebtCashRequest();
+    if (existing case Success(:final data) when data != null) {
+      initial = data;
+    }
+    if (!mounted) return;
+    final settled = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CashDebtCashPaymentScreen(initialRequest: initial),
+      ),
+    );
+    if (settled == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Paiement espèces confirmé — dettes soldées'),
+          backgroundColor: MovaColors.green,
+        ),
+      );
+      await _load();
+    }
+  }
 
   Future<void> _settleCashDebts() async {
     final total = _openCashDebtCdf;
@@ -487,6 +518,13 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
             isLoading: _settlingDebt,
             onPressed: _settlingDebt || _withdrawing ? null : _settleCashDebts,
           ),
+          const SizedBox(height: 8),
+          MovaButton(
+            label: 'Payer en espèces au guichet',
+            icon: Icons.payments_outlined,
+            isSecondary: true,
+            onPressed: _settlingDebt || _withdrawing ? null : _openCashDebtCashPayment,
+          ),
         ],
       ),
     );
@@ -532,6 +570,24 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
                           ),
                         ),
                         const SizedBox(height: 10),
+                        TextField(
+                          controller: _searchController,
+                          decoration: InputDecoration(
+                            labelText: 'Rechercher (adresse, référence…)',
+                            prefixIcon: const Icon(Icons.search),
+                            suffixIcon: _searchController.text.isNotEmpty
+                                ? IconButton(
+                                    icon: const Icon(Icons.clear),
+                                    onPressed: () {
+                                      _searchController.clear();
+                                      _loadActivity();
+                                    },
+                                  )
+                                : null,
+                          ),
+                          onSubmitted: (_) => _loadActivity(),
+                        ),
+                        const SizedBox(height: 10),
                         SingleChildScrollView(
                           scrollDirection: Axis.horizontal,
                           child: Row(
@@ -542,6 +598,19 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
                               _serviceChip('Missions', _ServiceFilter.mission),
                             ],
                           ),
+                        ),
+                        const SizedBox(height: 10),
+                        TextField(
+                          controller: _searchController,
+                          decoration: InputDecoration(
+                            labelText: 'Rechercher (adresse, référence…)',
+                            prefixIcon: const Icon(Icons.search),
+                            suffixIcon: IconButton(
+                              icon: const Icon(Icons.search),
+                              onPressed: _loadingActivity ? null : _loadActivity,
+                            ),
+                          ),
+                          onSubmitted: (_) => _loadActivity(),
                         ),
                         const SizedBox(height: 16),
                         _cashDebtSection(),

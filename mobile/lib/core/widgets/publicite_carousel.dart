@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../config/market_config.dart';
@@ -23,7 +22,6 @@ class PubliciteCarousel extends StatefulWidget {
 }
 
 class _PubliciteCarouselState extends State<PubliciteCarousel> {
-  static const _dismissKey = 'mova_publicites_dismissed';
   static const _gradient = LinearGradient(
     begin: Alignment.centerLeft,
     end: Alignment.centerRight,
@@ -33,13 +31,11 @@ class _PubliciteCarouselState extends State<PubliciteCarousel> {
   late final PageController _controller;
   Timer? _timer;
   int _index = 0;
-  Set<String> _dismissed = {};
 
   @override
   void initState() {
     super.initState();
     _controller = PageController();
-    _loadDismissed();
     _startAutoScroll();
   }
 
@@ -53,34 +49,12 @@ class _PubliciteCarouselState extends State<PubliciteCarousel> {
     }
   }
 
-  List<Map<String, dynamic>> get _visible =>
-      widget.items.where((i) => !_dismissed.contains(i['id']?.toString())).toList();
-
-  Future<void> _loadDismissed() async {
-    final prefs = await SharedPreferences.getInstance();
-    final list = prefs.getStringList(_dismissKey) ?? [];
-    if (!mounted) return;
-    setState(() => _dismissed = list.toSet());
-    _startAutoScroll();
-  }
-
-  Future<void> _dismiss(String id) async {
-    final next = {..._dismissed, id};
-    setState(() => _dismissed = next);
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setStringList(_dismissKey, next.toList());
-    if (_index >= _visible.length && _visible.isNotEmpty) {
-      setState(() => _index = 0);
-      if (_controller.hasClients) _controller.jumpToPage(0);
-    }
-  }
-
   void _startAutoScroll() {
     _timer?.cancel();
-    if (_visible.length <= 1) return;
+    if (widget.items.length <= 1) return;
     _timer = Timer.periodic(widget.interval, (_) {
-      if (!mounted || !_controller.hasClients || _visible.length < 2) return;
-      final next = (_index + 1) % _visible.length;
+      if (!mounted || !_controller.hasClients || widget.items.length < 2) return;
+      final next = (_index + 1) % widget.items.length;
       _controller.animateToPage(next, duration: const Duration(milliseconds: 450), curve: Curves.easeInOut);
     });
   }
@@ -134,7 +108,7 @@ class _PubliciteCarouselState extends State<PubliciteCarousel> {
                   Positioned(
                     top: 10,
                     right: 10,
-                    child: _CloseButton(onTap: () => Navigator.pop(ctx)),
+                    child: _DialogCloseButton(onTap: () => Navigator.pop(ctx)),
                   ),
                 ],
               ),
@@ -178,7 +152,6 @@ class _PubliciteCarouselState extends State<PubliciteCarousel> {
   }
 
   Widget _buildSlide(Map<String, dynamic> item) {
-    final id = item['id']?.toString() ?? '';
     final imageUrl = MarketConfig.resolveMediaUrl(item['imageUrl']?.toString() ?? '');
     final titre = item['titre']?.toString() ?? 'Publicité';
     final description = item['description']?.toString();
@@ -197,53 +170,48 @@ class _PubliciteCarouselState extends State<PubliciteCarousel> {
               borderRadius: BorderRadius.circular(24),
               boxShadow: const [BoxShadow(color: Color(0x33000000), blurRadius: 10, offset: Offset(0, 4))],
             ),
-            child: Stack(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 14, 44, 14),
-                  child: Row(
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(16),
-                        child: Container(
-                          width: 72,
-                          height: 72,
-                          color: Colors.white.withValues(alpha: 0.15),
-                          child: imageUrl.isNotEmpty
-                              ? Image.network(imageUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.image_outlined, color: Colors.white70))
-                              : const Icon(Icons.campaign_outlined, color: Colors.white70),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              titre,
-                              textAlign: TextAlign.center,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.white, height: 1.2),
-                            ),
-                            if (description != null && description.isNotEmpty) ...[
-                              const SizedBox(height: 6),
-                              Text(
-                                description,
-                                textAlign: TextAlign.center,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.9), height: 1.3),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ],
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+              child: Row(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      width: 72,
+                      height: 72,
+                      color: Colors.white.withValues(alpha: 0.15),
+                      child: imageUrl.isNotEmpty
+                          ? Image.network(imageUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.image_outlined, color: Colors.white70))
+                          : const Icon(Icons.campaign_outlined, color: Colors.white70),
+                    ),
                   ),
-                ),
-                Positioned(top: 10, right: 10, child: _CloseButton(onTap: () => _dismiss(id))),
-              ],
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          titre,
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.white, height: 1.2),
+                        ),
+                        if (description != null && description.isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          Text(
+                            description,
+                            textAlign: TextAlign.center,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.9), height: 1.3),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -253,8 +221,7 @@ class _PubliciteCarouselState extends State<PubliciteCarousel> {
 
   @override
   Widget build(BuildContext context) {
-    final visible = _visible;
-    if (visible.isEmpty) return const SizedBox.shrink();
+    if (widget.items.isEmpty) return const SizedBox.shrink();
 
     return Column(
       children: [
@@ -262,16 +229,16 @@ class _PubliciteCarouselState extends State<PubliciteCarousel> {
           height: widget.height,
           child: PageView.builder(
             controller: _controller,
-            itemCount: visible.length,
+            itemCount: widget.items.length,
             onPageChanged: (i) => setState(() => _index = i),
-            itemBuilder: (context, i) => _buildSlide(visible[i]),
+            itemBuilder: (context, i) => _buildSlide(widget.items[i]),
           ),
         ),
-        if (visible.length > 1) ...[
+        if (widget.items.length > 1) ...[
           const SizedBox(height: 12),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
-            children: List.generate(visible.length, (i) {
+            children: List.generate(widget.items.length, (i) {
               final active = i == _index;
               return GestureDetector(
                 onTap: () => _controller.animateToPage(i, duration: const Duration(milliseconds: 300), curve: Curves.easeOut),
@@ -294,8 +261,8 @@ class _PubliciteCarouselState extends State<PubliciteCarousel> {
   }
 }
 
-class _CloseButton extends StatelessWidget {
-  const _CloseButton({required this.onTap});
+class _DialogCloseButton extends StatelessWidget {
+  const _DialogCloseButton({required this.onTap});
 
   final VoidCallback onTap;
 

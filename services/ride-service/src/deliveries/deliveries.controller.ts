@@ -154,7 +154,13 @@ export class DeliveriesController {
       if (!left.alreadyAssigned && right.alreadyAssigned) return 1;
       return ((left.distanceToPickupKm as number) ?? 999) - ((right.distanceToPickupKm as number) ?? 999);
     });
-    return { offers, documentsBlocked: deliveries.documentsBlocked };
+    return {
+      offers,
+      documentsBlocked: deliveries.documentsBlocked,
+      debtBlocked: deliveries.debtBlocked ?? errands.debtBlocked ?? false,
+      openDebtCdf: deliveries.openDebtCdf ?? errands.openDebtCdf,
+      debtThresholdCdf: deliveries.debtThresholdCdf ?? errands.debtThresholdCdf,
+    };
   }
 
   @Get('assignments')

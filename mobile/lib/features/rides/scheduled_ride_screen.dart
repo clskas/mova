@@ -35,6 +35,7 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
   DateTime _scheduledAt = DateTime.now().add(const Duration(hours: 2));
   String _vehicleType = 'MOTO_TAXI';
   LatLng _pickup = LatLng(MarketConfig.defaultLat, MarketConfig.defaultLng);
+  String _pickupLabel = 'Ma position';
   LatLng? _dropoff;
   bool _dropoffFromSuggestion = false;
   bool _dropoffFromManualCoords = false;
@@ -83,7 +84,7 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
       'pickupLng': _pickup.longitude,
       'dropoffLat': dropoff.latitude,
       'dropoffLng': dropoff.longitude,
-      'pickupAddress': 'Ma position',
+      'pickupAddress': _pickupLabel,
       'dropoffAddress': _destinationController.text.trim(),
       'vehicleType': MarketConfig.apiVehicleType(_vehicleType),
       'scheduledAt': _scheduledAt.toIso8601String(),
@@ -208,6 +209,9 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
           result.position,
           address: result.label,
         );
+        _pickupLabel = ServiceAreaLocation.isInBounds(result.position)
+            ? result.label
+            : 'Ma position';
         _estimatedPrice = null;
         _estimateBreakdown = null;
       } else if (!silent) {
@@ -220,7 +224,7 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
   Future<String?> _resolveCoords() async {
     _pickup = ServiceAreaLocation.ensureInServiceArea(
       _pickup,
-      address: 'Ma position',
+      address: _pickupLabel,
     );
     if (_dropoffFromManualCoords && _dropoff != null && ServiceAreaLocation.isInBounds(_dropoff!)) {
       return null;
@@ -796,7 +800,7 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
             onDropoffTap: _onMapDropoffTap,
             dropoffEditable: true,
             height: 180,
-            pickupLabel: 'Ma position',
+            pickupLabel: _pickupLabel,
             dropoffLabel: _destinationController.text,
           ),
           const SizedBox(height: 12),
@@ -806,7 +810,7 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
                 child: Text(
                   _loadingGps
                       ? 'Localisation…'
-                      : 'Départ : Ma position',
+                      : 'Départ : $_pickupLabel',
                   style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
                 ),
               ),

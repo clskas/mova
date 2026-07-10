@@ -33,6 +33,7 @@ import { assertServiceAreaPair, assertServiceAreaCoords } from '../common/addres
 import { tripDistanceKm } from '../common/geo.util';
 import { RoutingService } from '../geo/routing.service';
 import { assertDriverCanReceiveJobs, assertDriverEligibleForRide, driverCanReceiveJobs, fetchDriverProfileSnapshot } from '../common/driver-eligibility.util';
+import { fetchDriverDebtStatus } from '../common/driver-debt.util';
 import { fetchAuthUserBrief } from '../common/internal-lookup.util';
 import { TripShareService } from '../share/trip-share.service';
 import { publishDriverJobAlert } from '../common/driver-job-alert.util';
@@ -377,6 +378,16 @@ export class RidesService {
 
   async getDriverOffers(driverUserId: string) {
     const profile = await fetchDriverProfileSnapshot(driverUserId);
+    const debtStatus = await fetchDriverDebtStatus(driverUserId);
+    if (debtStatus.debtBlocked) {
+      return {
+        offers: [] as Record<string, unknown>[],
+        documentsBlocked: false,
+        debtBlocked: true,
+        openDebtCdf: debtStatus.openDebtCdf,
+        debtThresholdCdf: debtStatus.debtThresholdCdf,
+      };
+    }
     if (!profile?.isAvailable || !driverCanReceiveJobs(profile)) {
       return { offers: [] as Record<string, unknown>[], documentsBlocked: profile?.documentsStatus?.canOperate === false };
     }
@@ -1096,7 +1107,7 @@ export class RidesService {
 
   async getDriverPayoutItems(
     driverUserId: string,
-    opts?: { from?: Date; to?: Date; referenceType?: string; skip?: number; take?: number },
+    opts?: { from?: Date; to?: Date; referenceType?: string; q?: string; skip?: number; take?: number },
   ) {
     const [rides, deliveries, movings, errands, rentals, carpools, scheduled, rideRule, deliveryRule, movingRule, errandRule, rentalRule, carpoolRule] =
       await Promise.all([
@@ -1199,6 +1210,10 @@ export class RidesService {
             const missionTypes = new Set(['MOVING', 'RENTAL', 'CARPOOL']);
             if (!missionTypes.has(item.referenceType)) return false;
           } else if (t !== 'RIDE' && t !== 'DELIVERY' && item.referenceType !== t) return false;
+        }
+        if (opts?.q?.trim()) {
+          const hay = `${item.label ?? ''} ${item.referenceId ?? ''}`.toLowerCase();
+          if (!hay.includes(opts.q.trim().toLowerCase())) return false;
         }
         return true;
       })

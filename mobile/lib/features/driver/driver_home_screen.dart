@@ -693,9 +693,15 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
     _locationTimer?.cancel();
   }
 
+  void _resetOfferTracking() {
+    _knownOfferKeys.clear();
+    _offerAlertsSeeded = false;
+  }
+
   void _startPolling() {
     _offerPollTimer?.cancel();
     _cashPollTimer?.cancel();
+    _resetOfferTracking();
     _pollOffers();
     _offerPollTimer = Timer.periodic(const Duration(seconds: 3), (_) => _pollOffers());
     _cashPollTimer = Timer.periodic(const Duration(seconds: 5), (_) {
@@ -707,7 +713,6 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
       }
     });
     _startLocationUpdates();
-    _refreshRideOffers();
   }
 
   void _stopPolling() {
@@ -914,24 +919,27 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
     if (!_available || _activeRide != null || _activeDelivery != null || _showingOffer || !mounted) return;
     final api = ref.read(apiClientProvider);
 
-    final rideResult = await api.getDriverOffers();
-    final deliveryResult = await api.getDeliveryOffers();
+    final rideResult = await api.getDriverOffersRaw();
+    final deliveryResult = await api.getDeliveryOffersRaw();
     if (!mounted || _showingOffer) return;
 
-    final rides = switch (rideResult) {
+    final ridePayload = switch (rideResult) {
       Success(:final data) => data,
       Failure() => null,
     };
-    if (rides == null) {
+    if (ridePayload == null) {
       if (rideResult case Failure(:final error)) {
         setState(() => _offersError = error.message);
       }
       return;
     }
-    final deliveries = switch (deliveryResult) {
+    final rides = List<Map<String, dynamic>>.from(ridePayload['offers'] as List? ?? []);
+    final deliveryPayload = switch (deliveryResult) {
       Success(:final data) => data,
-      Failure() => <Map<String, dynamic>>[],
+      Failure() => <String, dynamic>{'offers': <Map<String, dynamic>>[]},
     };
+    final deliveries = List<Map<String, dynamic>>.from(deliveryPayload['offers'] as List? ?? []);
+    final blockMessage = _offerBlockMessage(ridePayload, deliveryPayload);
     final keys = _collectOfferKeys(rides, deliveries);
     final newOffers = <Map<String, dynamic>>[];
     for (final o in rides) {
@@ -951,7 +959,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
     setState(() {
       _rideOffers = rides;
       _deliveryOffers = deliveries;
-      _offersError = null;
+      _offersError = blockMessage;
     });
 
     for (final offer in rides) {
@@ -1012,6 +1020,19 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
       case Failure(:final error):
         setState(() => _availabilityError = error.message);
     }
+  }
+
+  String? _offerBlockMessage(Map<String, dynamic> ridePayload, Map<String, dynamic> deliveryPayload) {
+    if (ridePayload['debtBlocked'] == true || deliveryPayload['debtBlocked'] == true) {
+      final debt = ridePayload['openDebtCdf'] ?? deliveryPayload['openDebtCdf'];
+      final threshold = ridePayload['debtThresholdCdf'] ?? deliveryPayload['debtThresholdCdf'];
+      return 'Dette espèces ($debt FC) au-dessus du seuil ($threshold FC). Réglez votre dette pour recevoir des missions.';
+    }
+    if (ridePayload['documentsBlocked'] == true || deliveryPayload['documentsBlocked'] == true) {
+      return _documentsBlockReason ??
+          'Documents expirés ou incomplets — mettez à jour votre enregistrement.';
+    }
+    return null;
   }
 
   String? get _kycStatus => _profile?['kycStatus']?.toString();

@@ -533,9 +533,34 @@ export class RentalService {
       where,
       orderBy: this.buildSort(query.sort),
     });
+    let availableRows = rows;
+    if (query.startDate && query.endDate) {
+      const startDate = new Date(query.startDate);
+      const endDate = new Date(query.endDate);
+      if (!Number.isNaN(startDate.getTime()) && !Number.isNaN(endDate.getTime()) && endDate > startDate) {
+        const conflicts = await this.prisma.rentalInquiry.findMany({
+          where: {
+            vehicleId: { in: rows.map((r) => r.id) },
+            status: { in: [RentalInquiryStatus.CONFIRMED, RentalInquiryStatus.IN_PROGRESS] },
+            startDate: { lte: endDate },
+            endDate: { gte: startDate },
+          },
+          select: { vehicleId: true },
+        });
+        const blocked = new Set(conflicts.map((c) => c.vehicleId).filter((id): id is string => Boolean(id)));
+        availableRows = rows.filter((r) => !blocked.has(r.id));
+      }
+    }
+    if (query.fuel?.trim()) {
+      const fuelNeedle = query.fuel.trim().toLowerCase();
+      availableRows = availableRows.filter((r) => {
+        const features = Array.isArray(r.features) ? (r.features as string[]) : [];
+        return features.some((f) => String(f).toLowerCase().includes(fuelNeedle));
+      });
+    }
     const unavailableIds = await this.getUnavailableVehicleIds();
     return {
-      data: rows.map((r) => this.mapVehicle(r, unavailableIds)),
+      data: availableRows.map((r) => this.mapVehicle(r, unavailableIds)),
       currency: MARKET_RDC.currency,
       filters: {
         categories: ['ECONOMY', 'SUV', 'PREMIUM', 'VAN'],

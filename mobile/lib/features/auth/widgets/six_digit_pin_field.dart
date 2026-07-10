@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../../core/theme/mova_colors.dart';
+import '../../../core/theme/mova_colors.dart';
 
 /// Champ de saisie d'un code à 6 chiffres (PIN ou OTP).
 class SixDigitPinField extends StatelessWidget {

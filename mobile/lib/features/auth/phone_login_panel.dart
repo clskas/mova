@@ -36,6 +36,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
 
   PhoneLoginStep _step = PhoneLoginStep.phone;
   bool _loading = false;
+  bool _forgotPinRecovery = false;
   String? _error;
   String? _mockHint;
   String? _normalizedPhone;
@@ -45,6 +46,34 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
     super.initState();
     if (widget.phoneHint != '+243') {
       _phoneController.text = widget.phoneHint;
+    }
+    _restoreSavedPhone();
+  }
+
+  Future<void> _restoreSavedPhone() async {
+    final api = ref.read(apiClientProvider);
+    final savedPhone = await api.loadUserPhone();
+    if (!mounted || savedPhone == null || savedPhone.isEmpty) return;
+    _phoneController.text = savedPhone;
+    _normalizedPhone = savedPhone;
+    setState(() => _loading = true);
+    final result = await api.post('/auth/login/options', {
+      'phone': savedPhone,
+      'role': widget.appRole,
+    });
+    if (!mounted) return;
+    switch (result) {
+      case Success(:final data):
+        if (data['pinEnabled'] == true) {
+          setState(() {
+            _loading = false;
+            _step = PhoneLoginStep.pin;
+          });
+        } else {
+          setState(() => _loading = false);
+        }
+      case Failure():
+        setState(() => _loading = false);
     }
   }
 
@@ -84,6 +113,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
         if (pinEnabled) {
           setState(() {
             _loading = false;
+            _forgotPinRecovery = false;
             _step = PhoneLoginStep.pin;
           });
         } else {
@@ -195,6 +225,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
 
   void _switchToSms() {
     setState(() {
+      _forgotPinRecovery = true;
       _step = PhoneLoginStep.otp;
       _error = null;
       _pinController.clear();
@@ -205,6 +236,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
   void _backToPhone() {
     setState(() {
       _step = PhoneLoginStep.phone;
+      _forgotPinRecovery = false;
       _error = null;
       _mockHint = null;
       _codeController.clear();
@@ -245,12 +277,20 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
             alignment: Alignment.centerRight,
             child: TextButton(
               onPressed: _loading ? null : _switchToSms,
-              child: const Text('Connexion par SMS'),
+              child: const Text('Code PIN oublié ?'),
             ),
           ),
         ],
         if (_step == PhoneLoginStep.otp) ...[
           const SizedBox(height: 16),
+          if (_forgotPinRecovery) ...[
+            Text(
+              'Un code SMS vous permet de vous reconnecter et de définir un nouveau PIN.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: MovaColors.textSecondary.withValues(alpha: 0.9), fontSize: 13),
+            ),
+            const SizedBox(height: 12),
+          ],
           SixDigitPinField(
             controller: _codeController,
             label: 'Code OTP reçu par SMS',

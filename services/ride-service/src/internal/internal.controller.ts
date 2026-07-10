@@ -87,6 +87,7 @@ export class InternalController {
     @Query('from') from?: string,
     @Query('to') to?: string,
     @Query('type') type?: string,
+    @Query('q') q?: string,
     @Query('skip') skip?: string,
     @Query('take') take?: string,
   ) {
@@ -94,6 +95,7 @@ export class InternalController {
       from: from ? new Date(from) : undefined,
       to: to ? new Date(to) : undefined,
       referenceType: type,
+      q,
       skip: Number(skip ?? 0),
       take: Number(take ?? 50),
     });

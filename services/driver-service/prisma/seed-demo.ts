@@ -58,6 +58,9 @@ async function upsertDriver(
   },
 ) {
   const now = new Date();
+  const documentExpiry = new Date(now);
+  documentExpiry.setUTCFullYear(documentExpiry.getUTCFullYear() + 2);
+  const approved = data.kycStatus === KycStatus.APPROVED;
   const profile = await prisma.driverProfile.upsert({
     where: { userId },
     create: {
@@ -74,6 +77,13 @@ async function upsertDriver(
       payoutProvider: 'ORANGE_MONEY',
       activationPin: data.activationPin ?? null,
       activationPinVerifiedAt: data.activationPinVerified ? now : null,
+      ...(approved
+        ? {
+            licenseExpiry: documentExpiry,
+            insuranceExpiry: documentExpiry,
+            technicalInspectionExpiry: documentExpiry,
+          }
+        : {}),
     },
     update: {
       licenseNumber: data.license,
@@ -88,6 +98,14 @@ async function upsertDriver(
         : {}),
       ...(data.activationPin ? { activationPin: data.activationPin } : {}),
       ...(data.activationPinVerified ? { activationPinVerifiedAt: now } : {}),
+      ...(approved
+        ? {
+            licenseExpiry: documentExpiry,
+            insuranceExpiry: documentExpiry,
+            technicalInspectionExpiry: documentExpiry,
+            documentsRenewalPending: false,
+          }
+        : {}),
     },
   });
   const existingVehicle = await prisma.vehicle.findFirst({
@@ -103,7 +121,15 @@ async function upsertDriver(
         plateNumber: data.plate,
         color: 'Noir',
         isActive: true,
+        ...(approved
+          ? { typeApprovalStatus: KycStatus.APPROVED, typeApprovedAt: now }
+          : {}),
       },
+    });
+  } else if (approved) {
+    await prisma.vehicle.update({
+      where: { id: existingVehicle.id },
+      data: { typeApprovalStatus: KycStatus.APPROVED, typeApprovedAt: now, typeApprovalNotes: null },
     });
   }
   if (data.kycStatus === KycStatus.PENDING) {
@@ -128,13 +154,22 @@ async function ensureExtraVehicle(
   prisma: PrismaClient,
   userId: string,
   data: { plate: string; make: string; model: string; type: VehicleType },
+  approved = false,
 ) {
   const profile = await prisma.driverProfile.findUnique({ where: { userId } });
   if (!profile) return;
   const existing = await prisma.vehicle.findFirst({
     where: { driverProfileId: profile.id, type: data.type },
   });
-  if (existing) return;
+  if (existing) {
+    if (approved && existing.typeApprovalStatus !== KycStatus.APPROVED) {
+      await prisma.vehicle.update({
+        where: { id: existing.id },
+        data: { typeApprovalStatus: KycStatus.APPROVED, typeApprovedAt: new Date(), typeApprovalNotes: null },
+      });
+    }
+    return;
+  }
   await prisma.vehicle.create({
     data: {
       driverProfileId: profile.id,
@@ -144,6 +179,7 @@ async function ensureExtraVehicle(
       plateNumber: data.plate,
       color: 'Noir',
       isActive: true,
+      ...(approved ? { typeApprovalStatus: KycStatus.APPROVED, typeApprovedAt: new Date() } : {}),
     },
   });
 }
@@ -171,19 +207,42 @@ async function main() {
       activationPin: approved ? '123456' : undefined,
       activationPinVerified: approved,
     });
+    if (d.phone === '+243900000023') {
+      await ensureExtraVehicle(
+        prisma,
+        userId,
+        {
+          plate: 'CD-STD-023',
+          make: 'Toyota',
+          model: 'Corolla',
+          type: VehicleType.STANDARD,
+        },
+        approved,
+      );
+    }
     if (d.phone === '+243900000020') {
-      await ensureExtraVehicle(prisma, userId, {
-        plate: 'CD-MOTO-020',
-        make: 'Honda',
-        model: 'CB125',
-        type: VehicleType.MOTO_TAXI,
-      });
-      await ensureExtraVehicle(prisma, userId, {
-        plate: 'CD-COMF-020',
-        make: 'Toyota',
-        model: 'Camry',
-        type: VehicleType.COMFORT,
-      });
+      await ensureExtraVehicle(
+        prisma,
+        userId,
+        {
+          plate: 'CD-MOTO-020',
+          make: 'Honda',
+          model: 'CB125',
+          type: VehicleType.MOTO_TAXI,
+        },
+        approved,
+      );
+      await ensureExtraVehicle(
+        prisma,
+        userId,
+        {
+          plate: 'CD-COMF-020',
+          make: 'Toyota',
+          model: 'Camry',
+          type: VehicleType.COMFORT,
+        },
+        approved,
+      );
     }
     synced++;
   }

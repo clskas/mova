@@ -67,6 +67,7 @@ export class DriversController {
     @Query('from') from?: string,
     @Query('to') to?: string,
     @Query('type') type?: string,
+    @Query('q') q?: string,
     @Query('skip') skip?: string,
     @Query('take') take?: string,
   ) {
@@ -74,6 +75,7 @@ export class DriversController {
       from,
       to,
       type,
+      q,
       skip: Number(skip ?? 0),
       take: Number(take ?? 50),
     });

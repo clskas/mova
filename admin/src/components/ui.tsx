@@ -197,7 +197,27 @@ export function FieldLabel({ children }: { children: React.ReactNode }) {
   return <span className="block text-sm text-gray-600 mb-1">{children}</span>;
 }
 
-export function TextInput({ value, onChange, type = "text", placeholder, className = "", disabled }: { value: string; onChange: (v: string) => void; type?: string; placeholder?: string; className?: string; disabled?: boolean }) {
+export function TextInput({
+  value,
+  onChange,
+  type = "text",
+  placeholder,
+  className = "",
+  disabled,
+  inputMode,
+  maxLength,
+  autoComplete,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  type?: string;
+  placeholder?: string;
+  className?: string;
+  disabled?: boolean;
+  inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"];
+  maxLength?: number;
+  autoComplete?: string;
+}) {
   return (
     <input
       type={type}
@@ -206,6 +226,9 @@ export function TextInput({ value, onChange, type = "text", placeholder, classNa
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
       disabled={disabled}
+      inputMode={inputMode}
+      maxLength={maxLength}
+      autoComplete={autoComplete}
     />
   );
 }

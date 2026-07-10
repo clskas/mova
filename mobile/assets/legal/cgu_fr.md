@@ -67,6 +67,7 @@ Le chauffeur/livreur s'engage à :
 - Disposer des documents légaux requis
 - Respecter le code de la route
 - Traiter les passagers et colis avec diligence
+- Régler les dettes espèces (commissions MOVA) accumulées lors des paiements cash ; au-delà du seuil configuré par MOVA, l'accès aux nouvelles courses peut être suspendu jusqu'au règlement
 
 ## 6. Données personnelles
 

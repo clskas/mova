@@ -1,11 +1,15 @@
 import 'dart:async';
 
+import 'package:latlong2/latlong.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/api/api_client.dart';
 import '../../core/billing/service_price_display.dart';
-import '../../core/error/result.dart';
+import '../../core/location/destination_coords.dart';
 import '../../core/location/location_service.dart';
+import '../../core/location/service_area_location.dart';
+import '../../core/location/service_areas.dart';
+import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
@@ -21,7 +25,7 @@ class ErrandScreen extends ConsumerStatefulWidget {
 
 class _ErrandScreenState extends ConsumerState<ErrandScreen> {
   final _pickupController = TextEditingController(text: 'Commerce / pharmacie, Gombe');
-  final _dropoffController = TextEditingController(text: 'Ma position');
+  final _dropoffController = TextEditingController();
   final _itemController = TextEditingController();
   final List<String> _items = [];
   final _budgetController = TextEditingController();
@@ -78,17 +82,33 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
   String _buildDescription() => _items.join(', ');
 
   Future<void> _useMyLocation() async {
-    setState(() => _loadingGps = true);
+    setState(() {
+      _loadingGps = true;
+      _validationError = null;
+    });
     final result = await LocationService.getCurrentLocation();
     if (!mounted) return;
+    if (result == null) {
+      setState(() {
+        _loadingGps = false;
+        _validationError =
+            'Impossible d\'obtenir votre position. Activez le GPS et autorisez la localisation.';
+      });
+      return;
+    }
+    final coords = ServiceAreaLocation.ensureInServiceArea(
+      result.position,
+      address: result.label,
+    );
     setState(() {
       _loadingGps = false;
-      if (result != null) {
-        _dropoffController.text = result.label;
-        _deliveryLat = result.position.latitude;
-        _deliveryLng = result.position.longitude;
-        _estimatedPrice = null;
-      }
+      _dropoffController.text = ServiceAreaLocation.isInBounds(result.position)
+          ? result.label
+          : LocationService.coordsLabel(coords);
+      _deliveryLat = coords.latitude;
+      _deliveryLng = coords.longitude;
+      _estimatedPrice = null;
+      _estimatedPurchaseCdf = null;
     });
   }
 
@@ -102,9 +122,107 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
       if (_deliveryLat != null) 'deliveryLat': _deliveryLat,
       if (_deliveryLng != null) 'deliveryLng': _deliveryLng,
       'items': List<String>.from(_items),
+      'description': _buildDescription(),
       if (budget != null && budget > 0) 'budgetCdf': budget,
       if (_promoController.text.trim().isNotEmpty) 'promoCode': _promoController.text.trim(),
     };
+  }
+
+  int? _readCdf(dynamic value) => (value as num?)?.toInt();
+
+  Map<String, dynamic> _unwrapEstimate(Map<String, dynamic> data) {
+    final nested = data['estimate'];
+    if (nested is Map) return Map<String, dynamic>.from(nested);
+    return data;
+  }
+
+  Future<String?> _resolveAddressCoords({
+    required String address,
+    required double? lat,
+    required double? lng,
+    required bool isDelivery,
+    double? nearLat,
+    double? nearLng,
+  }) async {
+    if (lat != null && lng != null) return null;
+    final text = address.trim();
+    if (text.isEmpty) {
+      return isDelivery
+          ? 'Indiquez le lieu de livraison (nom du quartier ou adresse).'
+          : 'Indiquez l\'adresse du commerce ou point de retrait.';
+    }
+    if (text == 'Ma position') {
+      if (isDelivery) {
+        final result = await LocationService.getCurrentLocation();
+        if (result != null) {
+          final coords = ServiceAreaLocation.ensureInServiceArea(
+            result.position,
+            address: result.label,
+          );
+          _deliveryLat = coords.latitude;
+          _deliveryLng = coords.longitude;
+          if (_dropoffController.text.trim() == 'Ma position') {
+            _dropoffController.text = ServiceAreaLocation.isInBounds(result.position)
+                ? result.label
+                : LocationService.coordsLabel(coords);
+          }
+          return null;
+        }
+      }
+      return 'Activez le GPS avec le bouton cible ou saisissez un nom de lieu.';
+    }
+    final fromTextCoords = DestinationCoords.parseText(text);
+    if (fromTextCoords != null && ServiceAreaLocation.isInBounds(fromTextCoords)) {
+      if (isDelivery) {
+        _deliveryLat = fromTextCoords.latitude;
+        _deliveryLng = fromTextCoords.longitude;
+      } else {
+        _pickupLat = fromTextCoords.latitude;
+        _pickupLng = fromTextCoords.longitude;
+      }
+      return null;
+    }
+    final api = ref.read(apiClientProvider);
+    final city = nearLat != null && nearLng != null
+        ? ServiceAreas.cityNameForCoords(LatLng(nearLat, nearLng))
+        : ServiceAreas.fallbackArea.name;
+    final result = await api.geoAutocomplete(text, city: city);
+    if (result case Success(:final data) when data.isNotEmpty) {
+      final s = data.first;
+      final resolvedLat = (s['lat'] as num?)?.toDouble();
+      final resolvedLng = (s['lng'] as num?)?.toDouble();
+      if (resolvedLat != null && resolvedLng != null) {
+        if (isDelivery) {
+          _deliveryLat = resolvedLat;
+          _deliveryLng = resolvedLng;
+        } else {
+          _pickupLat = resolvedLat;
+          _pickupLng = resolvedLng;
+        }
+        return null;
+      }
+    }
+    return isDelivery
+        ? 'Lieu de livraison non reconnu — saisissez un nom de quartier (ex. Gombe, Limete) ou utilisez le GPS.'
+        : 'Adresse de retrait non reconnue — saisissez un nom de lieu ou choisissez une suggestion.';
+  }
+
+  Future<String?> _ensureAddressCoords() async {
+    final pickupError = await _resolveAddressCoords(
+      address: _pickupController.text,
+      lat: _pickupLat,
+      lng: _pickupLng,
+      isDelivery: false,
+    );
+    if (pickupError != null) return pickupError;
+    return _resolveAddressCoords(
+      address: _dropoffController.text,
+      lat: _deliveryLat,
+      lng: _deliveryLng,
+      isDelivery: true,
+      nearLat: _pickupLat,
+      nearLng: _pickupLng,
+    );
   }
 
   void _onPickupChanged(String value) {
@@ -209,10 +327,7 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
       return 'Indiquez l\'adresse du commerce ou point de retrait.';
     }
     if (_dropoffController.text.trim().isEmpty) {
-      return 'Indiquez l\'adresse de livraison.';
-    }
-    if (_buildDescription().length < 5) {
-      return 'Décrivez vos achats (minimum 5 caractères).';
+      return 'Indiquez le lieu de livraison (nom du quartier ou adresse).';
     }
     return null;
   }
@@ -228,6 +343,15 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
       _error = null;
       _validationError = null;
     });
+    final coordError = await _ensureAddressCoords();
+    if (!mounted) return;
+    if (coordError != null) {
+      setState(() {
+        _loading = false;
+        _validationError = coordError;
+      });
+      return;
+    }
     final api = ref.read(apiClientProvider);
     await api.checkHealth();
     final result = await api.post('/deliveries/errand/estimate', _errandPayload());
@@ -235,8 +359,12 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
       _loading = false;
       switch (result) {
         case Success(:final data):
-          _estimatedPrice = data['estimatedPriceCdf'] as int?;
-          _estimatedPurchaseCdf = data['estimatedPurchaseCdf'] as int?;
+          final estimate = _unwrapEstimate(data);
+          _estimatedPrice = _readCdf(estimate['estimatedPriceCdf'] ?? estimate['serviceFeeCdf']);
+          _estimatedPurchaseCdf = _readCdf(estimate['estimatedPurchaseCdf']);
+          if (_estimatedPrice == null) {
+            _error = 'Estimation indisponible — réessayez dans un instant.';
+          }
         case Failure(:final error):
           _error = error.message;
       }
@@ -254,6 +382,15 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
       _error = null;
       _validationError = null;
     });
+    final coordError = await _ensureAddressCoords();
+    if (!mounted) return;
+    if (coordError != null) {
+      setState(() {
+        _loading = false;
+        _validationError = coordError;
+      });
+      return;
+    }
     final api = ref.read(apiClientProvider);
     await api.checkHealth();
     final result = await api.post('/deliveries/errand', _errandPayload());
@@ -330,8 +467,12 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
           const SizedBox(height: 12),
           TextField(
             controller: _dropoffController,
+            textInputAction: TextInputAction.done,
             decoration: InputDecoration(
-              labelText: 'Adresse de livraison',
+              labelText: 'Lieu de livraison',
+              hintText: 'Ex: Gombe, Bandal, Limete…',
+              helperText: 'Saisissez un nom de lieu ou utilisez Ma position',
+              helperMaxLines: 2,
               prefixIcon: const Icon(Icons.home_outlined),
               suffixIcon: _loadingDropoffSuggestions
                   ? const Padding(

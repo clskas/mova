@@ -214,4 +214,44 @@ export class InternalController {
   settleCashDebt(@Param('debtId') debtId: string, @Body() body: { settlementRef?: string }) {
     return this.debtLedger.adminSettleDebt(debtId, body.settlementRef);
   }
+
+  @Post('cash-debts/confirm-cash')
+  confirmCashDebtByCode(@Body() body: { code: string; confirmedBy?: string }) {
+    return this.debtLedger.confirmCashPaymentRequest(body.code, body.confirmedBy);
+  }
+
+  @Get('wallets/:userId/transactions')
+  searchWalletTransactions(
+    @Param('userId') userId: string,
+    @Query('descriptionPrefix') descriptionPrefix?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('q') q?: string,
+    @Query('skip') skip?: string,
+    @Query('take') take?: string,
+  ) {
+    return this.wallet.searchPartnerTransactions(userId, {
+      descriptionPrefix,
+      from: from ? new Date(from) : undefined,
+      to: to ? new Date(to) : undefined,
+      q,
+      skip: Number(skip ?? 0),
+      take: Number(take ?? 50),
+    });
+  }
+
+  @Get('debt-policy')
+  getDebtPolicy() {
+    return this.debtLedger.getPolicy();
+  }
+
+  @Patch('debt-policy')
+  updateDebtPolicy(@Body() body: { maxOpenDebtCdf?: number; blockOffers?: boolean; isActive?: boolean }) {
+    return this.debtLedger.updatePolicy(body);
+  }
+
+  @Get('drivers/:userId/debt-status')
+  getDriverDebtStatus(@Param('userId') userId: string) {
+    return this.debtLedger.getDebtStatus(userId);
+  }
 }

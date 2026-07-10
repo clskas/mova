@@ -169,6 +169,23 @@ export class NotificationsService implements OnModuleInit {
   async onDriverJobAlert(payload: DriverJobAlertPayload) {
     const userIds = [...new Set(payload.driverUserIds ?? [])];
     if (userIds.length === 0) return;
+    for (const userId of userIds) {
+      await this.create(userId, payload.title, payload.body, payload.jobKind, {
+        referenceId: payload.referenceId,
+        jobKind: payload.jobKind,
+        pickupAddress: payload.pickupAddress,
+        pickupLat: payload.pickupLat,
+        pickupLng: payload.pickupLng,
+        ...(payload.data ?? {}),
+      });
+    }
+    const fcmReady = this.fcm.isConfigured();
+    if (!fcmReady) {
+      this.logger.warn(
+        `driver.job.alert ${payload.jobKind} → ${userIds.length} chauffeur(s) (FCM non configuré — alerte via polling app)`,
+      );
+      return;
+    }
     await this.pushToDrivers(userIds, payload.title, payload.body, {
       type: payload.jobKind,
       referenceId: payload.referenceId,

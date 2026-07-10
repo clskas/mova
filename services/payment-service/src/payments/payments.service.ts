@@ -769,4 +769,16 @@ export class PaymentsService {
   settleDriverCashDebtFromWallet(driverUserId: string) {
     return this.debtLedger.settleFromWallet(driverUserId);
   }
+
+  createCashDebtCashRequest(driverUserId: string) {
+    return this.debtLedger.createCashPaymentRequest(driverUserId);
+  }
+
+  getActiveCashDebtCashRequest(driverUserId: string) {
+    return this.debtLedger.getActiveCashPaymentRequest(driverUserId);
+  }
+
+  getCashDebtCashRequestStatus(driverUserId: string, requestId: string) {
+    return this.debtLedger.getCashPaymentRequestStatus(driverUserId, requestId);
+  }
 }

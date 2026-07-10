@@ -121,6 +121,30 @@ enum CashDebtStatus {
   SETTLED
 }
 
+enum CashDebtCashRequestStatus {
+  PENDING
+  CONFIRMED
+  EXPIRED
+  CANCELLED
+}
+
+model DriverCashDebtCashRequest {
+  id            String                    @id @default(uuid())
+  driverUserId  String                    @map("driver_user_id")
+  amountCdf     Int                       @map("amount_cdf")
+  code          String                    @unique
+  status        CashDebtCashRequestStatus @default(PENDING)
+  expiresAt     DateTime                  @map("expires_at")
+  confirmedAt   DateTime?                 @map("confirmed_at")
+  confirmedBy   String?                   @map("confirmed_by")
+  settlementRef String?                   @map("settlement_ref")
+  createdAt     DateTime                  @default(now()) @map("created_at")
+  updatedAt     DateTime                  @updatedAt @map("updated_at")
+
+  @@index([driverUserId, status])
+  @@map("driver_cash_debt_cash_requests")
+}
+
 model DriverCashDebt {
   id                String           @id @default(uuid())
   driverUserId      String
@@ -139,6 +163,16 @@ model DriverCashDebt {
 
   @@index([driverUserId, status])
   @@map("driver_cash_debts")
+}
+
+model DriverDebtPolicy {
+  id             String   @id @default("default")
+  maxOpenDebtCdf Int      @default(50000) @map("max_open_debt_cdf")
+  blockOffers    Boolean  @default(true) @map("block_offers")
+  isActive       Boolean  @default(true) @map("is_active")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@map("driver_debt_policies")
 }
 
 model SubscriptionPlan {

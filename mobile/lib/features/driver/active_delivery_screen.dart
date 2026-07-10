@@ -382,8 +382,19 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
     );
   }
 
+  bool get _navigateToPickup {
+    if (_isErrand) return _status == 'ASSIGNED';
+    return _status == 'READY_FOR_PICKUP' || _status == 'PENDING';
+  }
+
+  String get _navigationLabel {
+    if (!_navigateToPickup) return 'Navigation — client';
+    if (_isFood) return 'Navigation — restaurant';
+    return 'Navigation — prendre colis';
+  }
+
   Future<void> _openMaps() async {
-    final toPickup = _status == 'PICKED_UP';
+    final toPickup = _navigateToPickup;
     final lat = (toPickup
             ? _delivery['pickupLat']
             : (_delivery['dropoffLat'] ?? _delivery['deliveryLat']))
@@ -561,7 +572,7 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
           ],
           const SizedBox(height: 8),
           MovaButton(
-            label: _status == 'PICKED_UP' ? 'Navigation — restaurant' : 'Ouvrir la navigation',
+            label: _navigationLabel,
             isSecondary: true,
             icon: Icons.map_outlined,
             onPressed: _loading ? null : _openMaps,

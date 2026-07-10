@@ -10,6 +10,7 @@ import {
   serviceUrl,
   VehicleTypeValue,
 } from '@mova/shared';
+import { fetchDriverDebtStatus } from './driver-debt.util';
 
 export type DriverProfileSnapshot = {
   isAvailable?: boolean;
@@ -52,6 +53,14 @@ export async function assertDriverCanReceiveJobs(userId: string): Promise<Driver
       MovaErrorCode.DRIVER_DOCUMENTS_EXPIRED,
       HttpStatus.FORBIDDEN,
       profile.documentsStatus?.blockReason,
+    );
+  }
+  const debtStatus = await fetchDriverDebtStatus(userId);
+  if (debtStatus.debtBlocked) {
+    throw new MovaHttpException(
+      MovaErrorCode.VALIDATION_ERROR,
+      HttpStatus.FORBIDDEN,
+      `Dette espèces (${debtStatus.openDebtCdf} FC) au-dessus du seuil (${debtStatus.debtThresholdCdf} FC). Réglez votre dette pour recevoir des courses.`,
     );
   }
   return profile;

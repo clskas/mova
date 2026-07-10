@@ -569,10 +569,29 @@ export class DriversService {
 
   private async applyKycApproval(userId: string) {
     const pin = this.generateActivationPin();
+    const now = new Date();
+    const defaultExpiry = new Date(now);
+    defaultExpiry.setUTCFullYear(defaultExpiry.getUTCFullYear() + 2);
+    const existing = await this.prisma.driverProfile.findUnique({ where: { userId } });
     await this.prisma.driverProfile.upsert({
       where: { userId },
-      create: { userId, kycStatus: KycStatus.APPROVED, activationPin: pin, activationPinVerifiedAt: null },
-      update: { kycStatus: KycStatus.APPROVED, activationPin: pin, activationPinVerifiedAt: null },
+      create: {
+        userId,
+        kycStatus: KycStatus.APPROVED,
+        activationPin: pin,
+        activationPinVerifiedAt: null,
+        licenseExpiry: defaultExpiry,
+        insuranceExpiry: defaultExpiry,
+        technicalInspectionExpiry: defaultExpiry,
+      },
+      update: {
+        kycStatus: KycStatus.APPROVED,
+        activationPin: pin,
+        activationPinVerifiedAt: null,
+        ...(existing?.licenseExpiry == null ? { licenseExpiry: defaultExpiry } : {}),
+        ...(existing?.insuranceExpiry == null ? { insuranceExpiry: defaultExpiry } : {}),
+        ...(existing?.technicalInspectionExpiry == null ? { technicalInspectionExpiry: defaultExpiry } : {}),
+      },
     });
     await fetch(serviceUrl('auth', `/internal/users/${userId}`), {
       method: 'PATCH',
@@ -580,7 +599,13 @@ export class DriversService {
       body: JSON.stringify({ status: 'ACTIVE' }),
     }).catch((e) => this.logger.warn(`Could not activate auth user ${userId}`, e));
     const profile = await this.prisma.driverProfile.findUnique({ where: { userId } });
-    if (profile) await this.ensureDefaultVehicle(profile.id);
+    if (profile) {
+      await this.ensureDefaultVehicle(profile.id);
+      await this.prisma.vehicle.updateMany({
+        where: { driverProfileId: profile.id, isActive: true, typeApprovalStatus: KycStatus.PENDING },
+        data: { typeApprovalStatus: KycStatus.APPROVED, typeApprovedAt: now, typeApprovalNotes: null },
+      });
+    }
     return pin;
   }
 
@@ -638,12 +663,13 @@ export class DriversService {
 
   async getEarningsActivity(
     userId: string,
-    query: { from?: string; to?: string; type?: string; skip?: number; take?: number },
+    query: { from?: string; to?: string; type?: string; q?: string; skip?: number; take?: number },
   ) {
     const params = new URLSearchParams();
     if (query.from) params.set('from', query.from);
     if (query.to) params.set('to', query.to);
     if (query.type) params.set('type', query.type);
+    if (query.q) params.set('q', query.q);
     params.set('skip', String(query.skip ?? 0));
     params.set('take', String(Math.min(query.take ?? 50, 100)));
 

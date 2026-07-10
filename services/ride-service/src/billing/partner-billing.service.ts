@@ -3,6 +3,7 @@ import { DeliveryStatus, DeliveryType } from '@prisma/client';
 import { MovaErrorCode, MovaHttpException } from '@mova/shared';
 import { fetchAuthUserBrief } from '../common/internal-lookup.util';
 import {
+  fetchPartnerTransactions,
   fetchPartnerWallet,
   filterPartnerTransactions,
   sumTransactionAmounts,
@@ -157,31 +158,37 @@ export class PartnerBillingService {
     partnerName: string,
     query?: { from?: string; to?: string; q?: string; skip?: number; take?: number },
   ) {
-    const wallet = await fetchPartnerWallet(ownerUserId);
     const prefix = this.partnerTxPrefix(partnerType);
     const from = query?.from ? new Date(query.from) : undefined;
     const to = query?.to ? new Date(query.to) : undefined;
-    const filtered = filterPartnerTransactions(wallet.transactions, prefix, { from, to, q: query?.q });
     const skip = Math.max(query?.skip ?? 0, 0);
-    const take = Math.min(Math.max(query?.take ?? 50, 1), 200);
-    const page = filtered.slice(skip, skip + take);
+    const take = Math.min(Math.max(query?.take ?? 50, 1), 500);
+    const wallet = await fetchPartnerTransactions(ownerUserId, {
+      descriptionPrefix: prefix,
+      from,
+      to,
+      q: query?.q,
+      skip,
+      take,
+    });
+    const filtered = wallet.data;
     return {
       partnerType,
       partnerName,
       balanceCdf: wallet.balanceCdf,
       formattedBalance: wallet.formattedBalance,
-      periodTotalCdf: sumTransactionAmounts(filtered),
-      periodCount: filtered.length,
+      periodTotalCdf: wallet.periodTotalCdf ?? filtered.reduce((sum, tx) => sum + (tx.amountCdf ?? 0), 0),
+      periodCount: wallet.pagination.total,
       from: from?.toISOString() ?? null,
       to: to?.toISOString() ?? null,
-      data: page.map((tx) => ({
+      data: filtered.map((tx) => ({
         id: tx.id,
         amountCdf: tx.amountCdf,
         description: tx.description,
         reference: tx.reference,
         createdAt: tx.createdAt,
       })),
-      pagination: { skip, take, total: filtered.length },
+      pagination: wallet.pagination,
     };
   }
 

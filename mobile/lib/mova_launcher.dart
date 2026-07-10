@@ -5,9 +5,8 @@ import 'core/offline/mova_app_lifecycle.dart';
 import 'core/offline/sync_queue.dart';
 import 'core/theme/mova_theme.dart';
 import 'core/widgets/offline_shell.dart';
-import 'features/auth/otp_screen.dart';
+import 'features/auth/auth_session_gate.dart';
 import 'features/driver/driver_job_alert_service.dart';
-import 'features/driver/driver_otp_screen.dart';
 import 'features/passenger/passenger_alert_service.dart';
 import 'features/splash/mova_splash_screen.dart';
 
@@ -51,7 +50,7 @@ class _MovaPassengerAppState extends ConsumerState<MovaPassengerApp>
         theme: buildMovaTheme(),
         home: MovaSplashScreen(
           role: MovaSplashRole.passenger,
-          nextScreen: const OtpScreen(),
+          nextScreen: const AuthSessionGate(role: AuthSessionRole.passenger),
         ),
         debugShowCheckedModeBanner: false,
         builder: (context, child) => MovaOfflineShell(child: child),
@@ -77,7 +76,7 @@ class _MovaDriverAppState extends ConsumerState<MovaDriverApp>
         theme: buildMovaTheme(),
         home: MovaSplashScreen(
           role: MovaSplashRole.driver,
-          nextScreen: const DriverOtpScreen(),
+          nextScreen: const AuthSessionGate(role: AuthSessionRole.driver),
         ),
         debugShowCheckedModeBanner: false,
         builder: (context, child) => MovaOfflineShell(child: child),

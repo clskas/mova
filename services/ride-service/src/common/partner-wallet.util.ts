@@ -41,6 +41,46 @@ export async function fetchPartnerWallet(ownerUserId: string): Promise<PartnerWa
   }
 }
 
+export async function fetchPartnerTransactions(
+  ownerUserId: string,
+  opts?: { descriptionPrefix: string; from?: Date; to?: Date; q?: string; skip?: number; take?: number },
+): Promise<{
+  balanceCdf: number;
+  formattedBalance: string;
+  data: PartnerWalletTransaction[];
+  pagination: { skip: number; take: number; total: number };
+  periodTotalCdf?: number;
+}> {
+  const params = new URLSearchParams();
+  if (opts?.descriptionPrefix) params.set('descriptionPrefix', opts.descriptionPrefix);
+  if (opts?.from) params.set('from', opts.from.toISOString());
+  if (opts?.to) params.set('to', opts.to.toISOString());
+  if (opts?.q) params.set('q', opts.q);
+  params.set('skip', String(opts?.skip ?? 0));
+  params.set('take', String(opts?.take ?? 50));
+  const res = await fetch(
+    serviceUrl('payment', `/internal/wallets/${ownerUserId}/transactions?${params.toString()}`),
+    { headers: { 'x-internal-api-key': INTERNAL_API_KEY } },
+  );
+  if (!res.ok) {
+    throw new MovaHttpException(MovaErrorCode.INTERNAL_ERROR, HttpStatus.BAD_GATEWAY, 'Historique portefeuille indisponible.');
+  }
+  const body = (await res.json()) as {
+    balanceCdf?: number;
+    formattedBalance?: string;
+    data?: PartnerWalletTransaction[];
+    pagination?: { skip: number; take: number; total: number };
+    periodTotalCdf?: number;
+  };
+  return {
+    balanceCdf: body.balanceCdf ?? 0,
+    formattedBalance: body.formattedBalance ?? `${body.balanceCdf ?? 0} FC`,
+    data: body.data ?? [],
+    pagination: body.pagination ?? { skip: 0, take: 50, total: body.data?.length ?? 0 },
+    periodTotalCdf: body.periodTotalCdf,
+  };
+}
+
 export function filterPartnerTransactions(
   transactions: PartnerWalletTransaction[],
   descriptionPrefix: string,

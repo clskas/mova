@@ -5,6 +5,7 @@ import {
   adjustWallet,
   apiFetch,
   fetchCashDebts,
+  fetchDebtPolicy,
   fetchUser,
   fetchUsers,
   fetchUserWallet,
@@ -15,10 +16,12 @@ import {
   formatUserName,
   normalizeMetrics,
   settleCashDebt,
+  confirmCashDebtByCode,
   withdrawWallet,
   type AdminMetrics,
   type AdminUser,
   type CashDebtsOverview,
+  type DriverDebtPolicy,
   type UserWalletDetail,
   type WalletOverview,
   type WalletTransaction,
@@ -81,7 +84,13 @@ export default function PortefeuillePage() {
   const [withdrawing, setWithdrawing] = useState(false);
   const [withdrawSuccess, setWithdrawSuccess] = useState<string | null>(null);
   const [cashDebts, setCashDebts] = useState<CashDebtsOverview | null>(null);
+  const [debtPolicy, setDebtPolicy] = useState<DriverDebtPolicy | null>(null);
+  const [debtThresholdInput, setDebtThresholdInput] = useState("50000");
+  const [debtPolicySaving, setDebtPolicySaving] = useState(false);
   const [settlingDebtId, setSettlingDebtId] = useState<string | null>(null);
+  const [cashConfirmCode, setCashConfirmCode] = useState("");
+  const [cashConfirmLoading, setCashConfirmLoading] = useState(false);
+  const [cashConfirmSuccess, setCashConfirmSuccess] = useState<string | null>(null);
 
   const activeUserId = selectedUser?.id ?? (filterUserId.trim() || "");
 
@@ -96,17 +105,20 @@ export default function PortefeuillePage() {
     setError(null);
     try {
       const userId = filterUserId.trim() || selectedUser?.id || undefined;
-      const [m, w, tx, debts] = await Promise.all([
+      const [m, w, tx, debts, policy] = await Promise.all([
         apiFetch<AdminMetrics>("/api/admin/metrics"),
         fetchWalletOverview(),
         fetchWalletTransactions(userId, 0, 200),
         fetchCashDebts(userId),
+        fetchDebtPolicy(),
       ]);
       setMetrics(m);
       setWallet(w);
       setTransactions(tx.data ?? []);
       setTxTotal(tx.total ?? tx.data?.length ?? 0);
       setCashDebts(debts);
+      setDebtPolicy(policy);
+      setDebtThresholdInput(String(policy.maxOpenDebtCdf ?? 50000));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur de chargement");
     } finally {
@@ -234,6 +246,34 @@ export default function PortefeuillePage() {
       setError(e instanceof Error ? e.message : "Échec du règlement");
     } finally {
       setSettlingDebtId(null);
+    }
+  }
+
+  async function submitConfirmCashDebt() {
+    const code = cashConfirmCode.replace(/\s/g, "").trim();
+    if (!/^\d{6}$/.test(code)) {
+      setError("Saisissez le code à 6 chiffres affiché sur l'app chauffeur.");
+      return;
+    }
+    setCashConfirmLoading(true);
+    setError(null);
+    setCashConfirmSuccess(null);
+    try {
+      const result = await confirmCashDebtByCode(code);
+      if (!result.confirmed) {
+        setError(result.message ?? "Code invalide ou expiré");
+        return;
+      }
+      setCashConfirmSuccess(
+        result.message ??
+          `Paiement confirmé${result.amountCdf != null ? ` — ${formatCdf(result.amountCdf)}` : ""}.`,
+      );
+      setCashConfirmCode("");
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Échec de la confirmation");
+    } finally {
+      setCashConfirmLoading(false);
     }
   }
 
@@ -413,6 +453,110 @@ export default function PortefeuillePage() {
               Sélectionnez un utilisateur ci-dessus pour effectuer un retrait ou un ajustement manuel.
             </Card>
           )}
+
+          <section className="space-y-3">
+            <Card className="p-5 space-y-4">
+              <div>
+                <h2 className="font-semibold">Seuil dette espèces chauffeurs</h2>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Au-delà du seuil, les chauffeurs/livreurs ne reçoivent plus les notifications de courses tant que la dette n&apos;est pas réglée.
+                </p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+                <div>
+                  <FieldLabel>Seuil maximum (FC)</FieldLabel>
+                  <TextInput
+                    type="number"
+                    value={debtThresholdInput}
+                    onChange={(v) => setDebtThresholdInput(v)}
+                    disabled={readOnly || debtPolicySaving}
+                  />
+                </div>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={debtPolicy?.blockOffers ?? true}
+                    disabled={readOnly || debtPolicySaving}
+                    onChange={(e) =>
+                      setDebtPolicy((p) =>
+                        p ? { ...p, blockOffers: e.target.checked } : { id: "default", maxOpenDebtCdf: 50000, blockOffers: e.target.checked, isActive: true },
+                      )
+                    }
+                  />
+                  Bloquer les offres
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={debtPolicy?.isActive ?? true}
+                    disabled={readOnly || debtPolicySaving}
+                    onChange={(e) =>
+                      setDebtPolicy((p) =>
+                        p ? { ...p, isActive: e.target.checked } : { id: "default", maxOpenDebtCdf: 50000, blockOffers: true, isActive: e.target.checked },
+                      )
+                    }
+                  />
+                  Politique active
+                </label>
+              </div>
+              {!readOnly && (
+                <BtnPrimary
+                  disabled={debtPolicySaving}
+                  onClick={async () => {
+                    setDebtPolicySaving(true);
+                    try {
+                      const maxOpenDebtCdf = Math.max(0, Number(debtThresholdInput) || 0);
+                      const updated = await updateDebtPolicy({
+                        maxOpenDebtCdf,
+                        blockOffers: debtPolicy?.blockOffers ?? true,
+                        isActive: debtPolicy?.isActive ?? true,
+                      });
+                      setDebtPolicy(updated);
+                      setDebtThresholdInput(String(updated.maxOpenDebtCdf));
+                    } catch (e) {
+                      setError(e instanceof Error ? e.message : "Erreur enregistrement seuil");
+                    } finally {
+                      setDebtPolicySaving(false);
+                    }
+                  }}
+                >
+                  {debtPolicySaving ? "Enregistrement…" : "Enregistrer le seuil"}
+                </BtnPrimary>
+              )}
+            </Card>
+
+            {!readOnly && (
+              <Card className="p-5 space-y-4">
+                <div>
+                  <h2 className="font-semibold">Confirmer paiement espèces chauffeur</h2>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Le chauffeur paie au guichet MOVA et affiche un code à 6 chiffres (ou QR) dans Revenus → Payer en espèces.
+                  </p>
+                </div>
+                {cashConfirmSuccess && (
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                    {cashConfirmSuccess}
+                  </div>
+                )}
+                <div className="flex flex-wrap items-end gap-3">
+                  <div className="min-w-[12rem] flex-1">
+                    <FieldLabel>Code chauffeur (6 chiffres)</FieldLabel>
+                    <TextInput
+                      inputMode="numeric"
+                      maxLength={6}
+                      placeholder="123456"
+                      value={cashConfirmCode}
+                      onChange={(v) => setCashConfirmCode(v.replace(/\D/g, "").slice(0, 6))}
+                      disabled={cashConfirmLoading}
+                    />
+                  </div>
+                  <BtnPrimary onClick={submitConfirmCashDebt} disabled={cashConfirmLoading}>
+                    {cashConfirmLoading ? "Validation…" : "Valider le paiement"}
+                  </BtnPrimary>
+                </div>
+              </Card>
+            )}
+          </section>
 
           <section className="space-y-3">
             <div className="flex flex-wrap items-end justify-between gap-2">

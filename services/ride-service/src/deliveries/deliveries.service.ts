@@ -17,9 +17,10 @@ import {
   generateDeliveryPin,
 } from './parcel.util';
 import { assertDriverCanReceiveJobs, assertDriverEligibleForParcel, driverCanReceiveJobs, fetchDriverProfileSnapshot } from '../common/driver-eligibility.util';
+import { fetchDriverDebtStatus } from '../common/driver-debt.util';
 import { TrackingService } from '../tracking/tracking.service';
 import { MatchingService } from '../matching/matching.service';
-import { notifyNearbyDrivers } from '../common/driver-job-alert.util';
+import { notifyNearbyDrivers, DELIVERY_ALERT_VEHICLE_TYPES } from '../common/driver-job-alert.util';
 import { CommissionService } from '../rides/commission.service';
 import { deliveryDriverGross } from './delivery-driver-gross.util';
 import { parseFoodItemShares, parseOrderPlacedMetadata } from './food-delivery-settlement.util';
@@ -91,6 +92,7 @@ export class DeliveriesService {
       pickupAddress: pickup,
       title: 'Nouvelle livraison MOVA',
       body: `${label} · ${pickup}`,
+      vehicleTypes: DELIVERY_ALERT_VEHICLE_TYPES,
       data: { deliveryType: delivery.type },
     }).catch(() => undefined);
   }
@@ -906,6 +908,16 @@ export class DeliveriesService {
 
   async getDriverOffers(driverUserId: string) {
     const profile = await fetchDriverProfileSnapshot(driverUserId);
+    const debtStatus = await fetchDriverDebtStatus(driverUserId);
+    if (debtStatus.debtBlocked) {
+      return {
+        offers: [] as Record<string, unknown>[],
+        documentsBlocked: false,
+        debtBlocked: true,
+        openDebtCdf: debtStatus.openDebtCdf,
+        debtThresholdCdf: debtStatus.debtThresholdCdf,
+      };
+    }
     if (!profile?.isAvailable || !driverCanReceiveJobs(profile)) {
       return { offers: [] as Record<string, unknown>[], documentsBlocked: profile?.documentsStatus?.canOperate === false };
     }

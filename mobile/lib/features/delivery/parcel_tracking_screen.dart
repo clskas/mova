@@ -170,6 +170,7 @@ class _ParcelTrackingScreenState extends ConsumerState<ParcelTrackingScreen> {
 
   bool get _paymentDue {
     if (deliveryIsPaid(_delivery)) return false;
+    if (_cashPaymentPending) return false;
     final status = _delivery?['status']?.toString();
     return _delivery?['paymentReady'] == true || status == 'DELIVERED';
   }
@@ -211,7 +212,7 @@ class _ParcelTrackingScreenState extends ConsumerState<ParcelTrackingScreen> {
   }
 
   void _maybeGoToPayment() {
-    if (_paymentNavigated || !mounted || !_paymentDue) return;
+    if (_paymentNavigated || !mounted || !_paymentDue || _cashPaymentPending) return;
     _paymentNavigated = true;
     _openPayment();
   }

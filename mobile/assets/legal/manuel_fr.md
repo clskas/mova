@@ -131,7 +131,11 @@ Pendant une **course**, **livraison colis**, **repas**, **express** ou **course 
 
 La trace se construit au fur et à mesure du déplacement. En cas de faible réseau, la position peut être retardée ; la trace se complète à la reconnexion.
 
-## 15. Aide et support
+## 15. Dette espèces (chauffeurs / livreurs)
+
+Après des courses payées en **espèces**, MOVA enregistre la commission due. Réglez la dette depuis **Revenus → Dette espèces**. Si le total dépasse le seuil fixé par MOVA, vous ne recevez plus de nouvelles offres tant que la dette n'est pas soldée.
+
+## 16. Aide et support
 
 - **WhatsApp :** +243 900 000 000
 - **E-mail :** support@mova.cd

@@ -37,13 +37,20 @@ class _ExpressDeliveryScreenState extends ConsumerState<ExpressDeliveryScreen> {
   bool _dropoffFromManualCoords = false;
   bool _dropoffFromSuggestion = false;
   List<Map<String, dynamic>> _suggestions = [];
+  List<Map<String, dynamic>> _pickupSuggestions = [];
   Timer? _debounce;
+  Timer? _pickupDebounce;
   bool _loadingSuggestions = false;
+  bool _loadingPickupSuggestions = false;
   bool _showSuggestions = false;
+  bool _showPickupSuggestions = false;
+  bool _pickupFromSuggestion = false;
+  bool _pickupFromGps = false;
   int? _estimatedPrice;
   Map<String, dynamic>? _priceBreakdown;
   bool _loading = false;
   bool _loadingGps = false;
+  bool _loadingDropoffGps = false;
   String? _error;
   String? _validationError;
 
@@ -57,6 +64,7 @@ class _ExpressDeliveryScreenState extends ConsumerState<ExpressDeliveryScreen> {
   @override
   void dispose() {
     _debounce?.cancel();
+    _pickupDebounce?.cancel();
     _dropoffController.removeListener(_onDropoffChanged);
     _pickupController.dispose();
     _dropoffController.dispose();
@@ -64,12 +72,66 @@ class _ExpressDeliveryScreenState extends ConsumerState<ExpressDeliveryScreen> {
     super.dispose();
   }
 
+  void _onPickupChanged() {
+    _pickupDebounce?.cancel();
+    _pickupDebounce = Timer(const Duration(milliseconds: 350), _fetchPickupSuggestions);
+    setState(() {
+      _estimatedPrice = null;
+      _pickupFromSuggestion = false;
+      _pickupFromGps = false;
+    });
+  }
+
+  Future<void> _fetchPickupSuggestions() async {
+    final query = _pickupController.text.trim();
+    if (query.length < 2 || query == 'Ma position') {
+      setState(() {
+        _pickupSuggestions = [];
+        _showPickupSuggestions = false;
+      });
+      return;
+    }
+    setState(() => _loadingPickupSuggestions = true);
+    final api = ref.read(apiClientProvider);
+    final result = await api.geoAutocomplete(query, city: ServiceAreas.cityNameForCoords(_pickup));
+    if (!mounted) return;
+    setState(() {
+      _loadingPickupSuggestions = false;
+      switch (result) {
+        case Success(:final data):
+          _pickupSuggestions = data;
+          _showPickupSuggestions = data.isNotEmpty;
+        case Failure():
+          _pickupSuggestions = [];
+          _showPickupSuggestions = false;
+      }
+    });
+  }
+
+  void _selectPickupSuggestion(Map<String, dynamic> suggestion) {
+    final label = suggestion['label']?.toString() ?? suggestion['address']?.toString() ?? '';
+    _pickupController.text = label;
+    _pickup = ServiceAreaLocation.ensureInServiceArea(
+      LatLng(
+        (suggestion['lat'] as num?)?.toDouble() ?? MarketConfig.defaultLat,
+        (suggestion['lng'] as num?)?.toDouble() ?? MarketConfig.defaultLng,
+      ),
+      address: label,
+    );
+    setState(() {
+      _showPickupSuggestions = false;
+      _pickupSuggestions = [];
+      _estimatedPrice = null;
+      _pickupFromSuggestion = true;
+      _pickupFromGps = false;
+    });
+  }
+
   void _onDropoffChanged() {
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 350), _fetchSuggestions);
     setState(() {
       _estimatedPrice = null;
-      _dropoff = null;
       _dropoffFromManualCoords = false;
       _dropoffFromSuggestion = false;
     });
@@ -143,14 +205,39 @@ class _ExpressDeliveryScreenState extends ConsumerState<ExpressDeliveryScreen> {
   }
 
   Future<String?> _resolveCoords() async {
-    final pickupFromText = DestinationCoords.parseText(_pickupController.text);
+    final pickupText = _pickupController.text.trim();
+    final pickupFromText = DestinationCoords.parseText(pickupText);
     if (pickupFromText != null && ServiceAreaLocation.isInBounds(pickupFromText)) {
       _pickup = pickupFromText;
-    } else {
+    } else if ((_pickupFromGps || _pickupFromSuggestion) && ServiceAreaLocation.isInBounds(_pickup)) {
+      // Coordonnées déjà fixées par GPS ou autocomplétion.
+    } else if (pickupText.isNotEmpty && pickupText != 'Ma position') {
+      final api = ref.read(apiClientProvider);
+      final pickupResult = await api.geoAutocomplete(
+        pickupText,
+        city: ServiceAreas.cityNameForCoords(_pickup),
+      );
+      if (pickupResult case Success(:final data) when data.isNotEmpty) {
+        final s = data.first;
+        _pickup = ServiceAreaLocation.ensureInServiceArea(
+          LatLng(
+            (s['lat'] as num?)?.toDouble() ?? MarketConfig.defaultLat,
+            (s['lng'] as num?)?.toDouble() ?? MarketConfig.defaultLng,
+          ),
+          address: pickupText,
+        );
+        _pickupFromSuggestion = true;
+        _pickupFromGps = false;
+      } else {
+        return 'Adresse d\'enlèvement non reconnue — utilisez le GPS, l\'autocomplétion MOVA ou les coordonnées.';
+      }
+    } else if (ServiceAreaLocation.isInBounds(_pickup)) {
       _pickup = ServiceAreaLocation.ensureInServiceArea(
         _pickup,
-        address: _pickupController.text,
+        address: pickupText.isEmpty ? 'Ma position' : pickupText,
       );
+    } else {
+      return 'Impossible de déterminer l\'enlèvement. Activez le GPS ou choisissez une adresse dans la liste.';
     }
 
     if (_dropoffFromManualCoords && _dropoff != null && ServiceAreaLocation.isInBounds(_dropoff!)) {
@@ -237,8 +324,44 @@ class _ExpressDeliveryScreenState extends ConsumerState<ExpressDeliveryScreen> {
         _pickupController.text = ServiceAreaLocation.isInBounds(result.position)
             ? result.label
             : 'Ma position';
+        _pickupFromSuggestion = false;
+        _pickupFromGps = true;
         _estimatedPrice = null;
       }
+    });
+  }
+
+  Future<void> _useMyLocationForDropoff() async {
+    setState(() {
+      _loadingDropoffGps = true;
+      _validationError = null;
+    });
+    final result = await LocationService.getCurrentLocation();
+    if (!mounted) return;
+    if (result == null) {
+      setState(() {
+        _loadingDropoffGps = false;
+        _validationError =
+            'Impossible d\'obtenir votre position. Activez le GPS et autorisez la localisation.';
+      });
+      return;
+    }
+    final coords = ServiceAreaLocation.ensureInServiceArea(
+      result.position,
+      address: result.label,
+    );
+    final label = ServiceAreaLocation.isInBounds(result.position)
+        ? result.label
+        : LocationService.coordsLabel(coords);
+    DestinationFieldSync.setText(_dropoffController, _onDropoffChanged, label);
+    setState(() {
+      _loadingDropoffGps = false;
+      _dropoff = coords;
+      _dropoffFromManualCoords = true;
+      _dropoffFromSuggestion = false;
+      _showSuggestions = false;
+      _suggestions = [];
+      _estimatedPrice = null;
     });
   }
 
@@ -271,7 +394,7 @@ class _ExpressDeliveryScreenState extends ConsumerState<ExpressDeliveryScreen> {
       _loading = false;
       switch (result) {
         case Success(:final data):
-          _estimatedPrice = data['estimatedPriceCdf'] as int?;
+          _estimatedPrice = (data['estimatedPriceCdf'] as num?)?.toInt();
           _priceBreakdown = data['priceBreakdown'] is Map
               ? Map<String, dynamic>.from(data['priceBreakdown'] as Map)
               : null;
@@ -354,6 +477,7 @@ class _ExpressDeliveryScreenState extends ConsumerState<ExpressDeliveryScreen> {
                     controller: _pickupController,
                     decoration: InputDecoration(
                       labelText: 'Enlèvement',
+                      hintText: 'Ma position ou nom du lieu (ex: Marché Central)',
                       prefixIcon: const Icon(Icons.upload_outlined),
                       suffixIcon: _loadingGps
                           ? const Padding(
@@ -369,16 +493,35 @@ class _ExpressDeliveryScreenState extends ConsumerState<ExpressDeliveryScreen> {
                               onPressed: _loadingGps ? null : _useMyLocation,
                             ),
                     ),
-                    onChanged: (_) => setState(() => _estimatedPrice = null),
+                    onChanged: (_) => _onPickupChanged(),
                   ),
+                  if (_showPickupSuggestions && _pickupSuggestions.isNotEmpty)
+                    MovaCard(
+                      margin: const EdgeInsets.only(top: 4),
+                      padding: EdgeInsets.zero,
+                      child: Column(
+                        children: _pickupSuggestions.map((s) {
+                          final label = s['label']?.toString() ?? s['address']?.toString() ?? '';
+                          return ListTile(
+                            dense: true,
+                            leading: const Icon(Icons.location_on_outlined, size: 20),
+                            title: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
+                            onTap: () => _selectPickupSuggestion(s),
+                          );
+                        }).toList(),
+                      ),
+                    ),
                   const SizedBox(height: 12),
                   TextField(
                     controller: _dropoffController,
+                    textInputAction: TextInputAction.done,
                     decoration: InputDecoration(
-                      labelText: 'Livraison',
+                      labelText: 'Adresse de livraison',
                       hintText: 'Ex: Gombe, Limete, Boikene…',
+                      helperText: 'Saisissez l\'adresse ou utilisez le GPS',
+                      helperMaxLines: 2,
                       prefixIcon: const Icon(Icons.place_outlined),
-                      suffixIcon: _loadingSuggestions
+                      suffixIcon: _loadingDropoffGps || _loadingSuggestions
                           ? const Padding(
                               padding: EdgeInsets.all(12),
                               child: SizedBox(
@@ -387,9 +530,12 @@ class _ExpressDeliveryScreenState extends ConsumerState<ExpressDeliveryScreen> {
                                 child: CircularProgressIndicator(strokeWidth: 2),
                               ),
                             )
-                          : null,
+                          : IconButton(
+                              icon: const Icon(Icons.gps_fixed, color: MovaColors.orange),
+                              tooltip: 'Ma position',
+                              onPressed: _useMyLocationForDropoff,
+                            ),
                     ),
-                    onTap: () => setState(() => _showSuggestions = _suggestions.isNotEmpty),
                   ),
                   if (_showSuggestions && _suggestions.isNotEmpty)
                     MovaCard(

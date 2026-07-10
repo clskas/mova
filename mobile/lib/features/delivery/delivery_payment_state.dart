@@ -1,6 +1,8 @@
 /// Fusionne les champs paiement renvoyés à la racine de l'API livraison.
 Map<String, dynamic> mergeDeliveryApiPayload(Map<String, dynamic> data) {
-  final delivery = data['delivery'] as Map<String, dynamic>? ?? data;
+  final delivery = data['delivery'] as Map<String, dynamic>? ??
+      data['errand'] as Map<String, dynamic>? ??
+      data;
   return {
     ...delivery,
     if (data['gpsTrace'] != null) 'gpsTrace': data['gpsTrace'],
@@ -20,7 +22,10 @@ Map<String, dynamic> mergeDeliveryApiPayload(Map<String, dynamic> data) {
   };
 }
 
-bool deliveryIsPaid(Map<String, dynamic>? delivery) => delivery?['isPaid'] == true;
+bool deliveryIsPaid(Map<String, dynamic>? delivery) {
+  if (delivery?['isPaid'] == true) return true;
+  return delivery?['paymentStatus']?.toString().toUpperCase() == 'COMPLETED';
+}
 
 bool deliveryCashPaymentPending(Map<String, dynamic>? delivery) =>
     !deliveryIsPaid(delivery) &&

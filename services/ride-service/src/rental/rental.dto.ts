@@ -21,6 +21,9 @@ export class RentalVehicleQueryDto {
   @IsOptional()
   @IsIn(['price_asc', 'price_desc', 'rating', 'category'])
   sort?: string;
+  @ApiPropertyOptional() @IsOptional() @IsDateString() startDate?: string;
+  @ApiPropertyOptional() @IsOptional() @IsDateString() endDate?: string;
+  @ApiPropertyOptional({ example: 'ESSENCE' }) @IsOptional() @IsString() fuel?: string;
 }
 
 export class RentalAddOnsDto {

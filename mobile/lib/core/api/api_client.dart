@@ -91,11 +91,13 @@ class ApiClient {
     await prefs.setString('auth_token', token);
   }
 
-  Future<void> clearToken() async {
+  Future<void> clearToken({bool keepPhone = false}) async {
     _token = null;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('auth_token');
-    await prefs.remove('user_phone');
+    if (!keepPhone) {
+      await prefs.remove('user_phone');
+    }
     await ProfileCache.clear();
     await UserProfileCache.clear();
     await WalletCache.clear();
@@ -257,8 +259,7 @@ class ApiClient {
       ));
     }
     if (path.contains('/auth/pin/setup')) {
-      final phone = await loadUserPhone();
-      return Success(MockData.setupPin(phone ?? '+243812345678'));
+      return Success(MockData.setupPin('+243812345678'));
     }
     if (path.contains('/auth/otp/verify')) {
       return Success(MockData.verifyOtp(
@@ -1146,6 +1147,52 @@ class ApiClient {
     };
   }
 
+  /// Génère un code + QR pour payer la dette espèces au guichet MOVA.
+  Future<Result<Map<String, dynamic>>> createCashDebtCashRequest() async {
+    if (isMockMode) {
+      return Success({
+        'created': true,
+        'requestId': 'mock-cash-debt',
+        'code': '123456',
+        'amountCdf': 5000,
+        'openCount': 1,
+        'expiresAt': DateTime.now().add(const Duration(hours: 2)).toIso8601String(),
+        'qrPayload': '{"type":"MOVA_CASH_DEBT","code":"123456","amountCdf":5000}',
+      });
+    }
+    final result = await post('/payments/cash-debts/cash-request', {});
+    return switch (result) {
+      Success(:final data) => Success(Map<String, dynamic>.from(data as Map)),
+      Failure(:final error) => Failure(error),
+    };
+  }
+
+  /// Demande de paiement espèces en cours (si non expirée).
+  Future<Result<Map<String, dynamic>?>> getActiveCashDebtCashRequest() async {
+    if (isMockMode) return const Success(null);
+    final result = await get('/payments/cash-debts/cash-request');
+    return switch (result) {
+      Success(:final data) => Success(
+          data == null || (data is Map && data.isEmpty)
+              ? null
+              : Map<String, dynamic>.from(data as Map),
+        ),
+      Failure(:final error) => Failure(error),
+    };
+  }
+
+  /// Statut d'une demande de paiement espèces (polling).
+  Future<Result<Map<String, dynamic>>> getCashDebtCashRequestStatus(String requestId) async {
+    if (isMockMode) {
+      return const Success({'found': true, 'status': 'PENDING'});
+    }
+    final result = await get('/payments/cash-debts/cash-request/$requestId/status');
+    return switch (result) {
+      Success(:final data) => Success(Map<String, dynamic>.from(data as Map)),
+      Failure(:final error) => Failure(error),
+    };
+  }
+
   Future<Result<List<Map<String, dynamic>>>> getRideChatMessages(String rideId) async {
     final result = await get('/rides/$rideId/chat');
     return switch (result) {
@@ -1302,8 +1349,16 @@ class ApiClient {
     return post('/rides/$rideId/cancel', {if (reason != null) 'reason': reason});
   }
 
-  Future<Result<List<Map<String, dynamic>>>> getDriverOffers() async {
+  Future<Result<Map<String, dynamic>>> getDriverOffersRaw() async {
     final result = await get('/rides/offers');
+    return switch (result) {
+      Success(:final data) => Success(Map<String, dynamic>.from(data as Map)),
+      Failure(:final error) => Failure(error),
+    };
+  }
+
+  Future<Result<List<Map<String, dynamic>>>> getDriverOffers() async {
+    final result = await getDriverOffersRaw();
     return switch (result) {
       Success(:final data) => Success(
           List<Map<String, dynamic>>.from(data['offers'] as List? ?? []),
@@ -1312,8 +1367,16 @@ class ApiClient {
     };
   }
 
-  Future<Result<List<Map<String, dynamic>>>> getDeliveryOffers() async {
+  Future<Result<Map<String, dynamic>>> getDeliveryOffersRaw() async {
     final result = await get('/deliveries/offers');
+    return switch (result) {
+      Success(:final data) => Success(Map<String, dynamic>.from(data as Map)),
+      Failure(:final error) => Failure(error),
+    };
+  }
+
+  Future<Result<List<Map<String, dynamic>>>> getDeliveryOffers() async {
+    final result = await getDeliveryOffersRaw();
     return switch (result) {
       Success(:final data) => Success(
           List<Map<String, dynamic>>.from(data['offers'] as List? ?? []),
@@ -1339,6 +1402,7 @@ class ApiClient {
     String? from,
     String? to,
     String? type,
+    String? q,
     int skip = 0,
     int take = 50,
   }) async {
@@ -1346,6 +1410,7 @@ class ApiClient {
     if (from != null && from.isNotEmpty) params.add('from=$from');
     if (to != null && to.isNotEmpty) params.add('to=$to');
     if (type != null && type.isNotEmpty) params.add('type=$type');
+    if (q != null && q.isNotEmpty) params.add('q=${Uri.encodeComponent(q)}');
     params.add('skip=$skip');
     params.add('take=$take');
     final path = '/drivers/earnings/activity?${params.join('&')}';

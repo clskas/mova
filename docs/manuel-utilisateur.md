@@ -32,6 +32,11 @@ Voir [Admin — Niveaux d'accès par rôle](user-manual/admin.md#niveaux-daccès
 
 ## Nouveautés récentes (juillet 2026)
 
+- **Seuil dette espèces chauffeurs** (admin → Portefeuille) : blocage des notifications de courses si la dette cash dépasse le seuil ; règlement depuis Revenus chauffeur.
+- **Rapports financiers partenaires** : historique portefeuille complet (filtres date, recherche, export CSV/PDF).
+- **Livraisons colis/express** : saisie du lieu d'enlèvement par géocodage (en plus du GPS) ; libellé navigation « prendre colis » côté livreur.
+- **Revenus chauffeur** : recherche par adresse ou référence dans l'historique d'activité.
+- **Location véhicule** : filtres dates de location et carburant pris en compte côté API.
 - **POI sur carte** : marchés, hôpitaux, universités, pharmacies (import OSM / seed Kinshasa) ; filtres sur l'écran taxi.
 - **Courses & commissions v3** : autocomplétion point de retrait, alerte chauffeur à la création, séquestre wallet (budget max), photo preuve obligatoire, chat passager–livreur, estimation achats par catégorie.
 - **Réservation planifiée v2** : rappels J-1 et H-1 (push + SMS), assignation auto 2 h avant, course GPS liée au démarrage, frais d'annulation tardive (50 %), file des chauffeurs volontaires.

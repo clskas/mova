@@ -92,7 +92,7 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
       _estimatedDiscount = null;
     });
     if (reload) {
-      _loadRestaurants();
+      _loadRestaurants(background: _restaurants.isNotEmpty);
     }
   }
 
@@ -144,7 +144,7 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
       _estimatedDiscount = null;
     });
     await _syncCityPreference(detected.id);
-    await _loadRestaurants();
+    await _loadRestaurants(background: true);
   }
 
   void _setDeliveryFromCoords(LatLng coords, String label) {
@@ -159,7 +159,40 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
       _estimatedDeliveryFee = null;
       _estimatedDiscount = null;
     });
-    _loadRestaurants();
+    _loadRestaurants(background: true);
+  }
+
+  Widget _buildDeliveryAddressField() {
+    return TextField(
+      controller: _addressController,
+      textInputAction: TextInputAction.done,
+      decoration: InputDecoration(
+        labelText: 'Adresse de livraison',
+        hintText: 'Ex: Gombe, Bandal, Limete…',
+        helperText: 'Saisissez l\'adresse complète ou utilisez le GPS',
+        helperMaxLines: 2,
+        prefixIcon: const Icon(Icons.delivery_dining),
+        suffixIcon: _loadingGps
+            ? const Padding(
+                padding: EdgeInsets.all(12),
+                child: SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              )
+            : IconButton(
+                icon: const Icon(Icons.gps_fixed, color: MovaColors.violet),
+                tooltip: 'Ma position',
+                onPressed: _loadingGps ? null : _useMyLocationForDelivery,
+              ),
+      ),
+      onChanged: (_) => setState(() {
+        _estimatedTotal = null;
+        _estimatedDeliveryFee = null;
+        _estimatedDiscount = null;
+      }),
+    );
   }
 
   Future<void> _resolveDeliveryCoords({bool reloadAfter = false}) async {
@@ -839,6 +872,8 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
           ),
         ),
         const SizedBox(height: 12),
+        _buildDeliveryAddressField(),
+        const SizedBox(height: 12),
         TextField(
           decoration: const InputDecoration(
             labelText: 'Rechercher un restaurant',
@@ -1169,28 +1204,7 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
         }),
         if (_cart.isNotEmpty) ...[
           const SizedBox(height: 16),
-          TextField(
-            controller: _addressController,
-            decoration: InputDecoration(
-              labelText: 'Adresse de livraison',
-              prefixIcon: const Icon(Icons.delivery_dining),
-              suffixIcon: _loadingGps
-                  ? const Padding(
-                      padding: EdgeInsets.all(12),
-                      child: SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                    )
-                  : IconButton(
-                      icon: const Icon(Icons.gps_fixed, color: MovaColors.violet),
-                      tooltip: 'Ma position',
-                      onPressed: _loadingGps ? null : _useMyLocationForDelivery,
-                    ),
-            ),
-            onChanged: (_) => setState(() => _estimatedTotal = null),
-          ),
+          _buildDeliveryAddressField(),
           DestinationCoordPanel(
             initialLat: _deliveryLat,
             initialLng: _deliveryLng,

@@ -163,6 +163,9 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
       if (_category.isNotEmpty) 'category': _category,
       if (_transmission.isNotEmpty) 'transmission': _transmission,
       if (_sortBy.isNotEmpty) 'sort': _sortBy,
+      if (_fuel.isNotEmpty) 'fuel': _fuel,
+      'startDate': _startDate.toIso8601String(),
+      'endDate': _endDate.toIso8601String(),
       if (minPrice != null) 'minPrice': '$minPrice',
       if (maxPrice != null) 'maxPrice': '$maxPrice',
     };
@@ -179,7 +182,7 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
       _loading = false;
       switch (result) {
         case Success(:final data):
-          _vehicles = _parseVehicles(data).where(_matchesFuel).toList();
+          _vehicles = _parseVehicles(data);
           _error = null;
         case Failure(:final error):
           _error = error.message;

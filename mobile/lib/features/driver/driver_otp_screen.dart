@@ -9,7 +9,7 @@ import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import 'driver_onboarding_screen.dart';
 import 'driver_home_screen.dart';
-import 'phone_login_panel.dart';
+import '../auth/phone_login_panel.dart';
 
 class DriverOtpScreen extends ConsumerWidget {
   const DriverOtpScreen({super.key});

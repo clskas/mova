@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Request, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiProperty, ApiTags } from '@nestjs/swagger';
 import { AdminPermission } from '@mova/shared';
 import { IsBoolean, IsOptional, IsString } from 'class-validator';
@@ -667,6 +667,27 @@ export class AdminController {
   @ApiOperation({ summary: 'Marquer une dette espèces comme réglée' })
   settleCashDebt(@Param('debtId') debtId: string, @Body() body: { settlementRef?: string }) {
     return this.adminService.settleCashDebt(debtId, body.settlementRef);
+  }
+
+  @Post('wallet/cash-debts/confirm-cash')
+  @RequirePermissions(AdminPermission.WALLETS_WRITE)
+  @ApiOperation({ summary: 'Confirmer un paiement espèces chauffeur via code à 6 chiffres' })
+  confirmCashDebtByCode(@Request() req: { user: { id: string } }, @Body() body: { code: string }) {
+    return this.adminService.confirmCashDebtByCode(body.code, req.user.id);
+  }
+
+  @Get('wallet/debt-policy')
+  @RequirePermissions(AdminPermission.WALLETS_READ)
+  @ApiOperation({ summary: 'Seuil de dette espèces chauffeurs' })
+  debtPolicy() {
+    return this.adminService.getDebtPolicy();
+  }
+
+  @Patch('wallet/debt-policy')
+  @RequirePermissions(AdminPermission.WALLETS_WRITE)
+  @ApiOperation({ summary: 'Configurer le seuil de dette espèces chauffeurs' })
+  updateDebtPolicy(@Body() body: { maxOpenDebtCdf?: number; blockOffers?: boolean; isActive?: boolean }) {
+    return this.adminService.updateDebtPolicy(body);
   }
 
   @Get('wallet/:userId')

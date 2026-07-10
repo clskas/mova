@@ -9,9 +9,10 @@ import {
   driverCanReceiveJobs,
   fetchDriverProfileSnapshot,
 } from '../common/driver-eligibility.util';
+import { fetchDriverDebtStatus } from '../common/driver-debt.util';
 import { tripDistanceKm } from '../common/geo.util';
 import { fetchAuthUserBrief } from '../common/internal-lookup.util';
-import { notifyNearbyDrivers } from '../common/driver-job-alert.util';
+import { notifyNearbyDrivers, DELIVERY_ALERT_VEHICLE_TYPES } from '../common/driver-job-alert.util';
 import { captureWalletHold, holdWalletFunds, releaseWalletHold } from '../common/wallet-hold.util';
 import { buildErrandTimeline } from '../deliveries/parcel.util';
 import { MatchingService } from '../matching/matching.service';
@@ -170,6 +171,7 @@ export class ErrandsService {
       pickupAddress: order.pickupAddress,
       title: 'Nouvelle course & commissions',
       body: `Retrait · ${order.pickupAddress}`,
+      vehicleTypes: DELIVERY_ALERT_VEHICLE_TYPES,
       data: { deliveryType: 'ERRAND', category: order.category },
     }).catch(() => undefined);
   }
@@ -456,6 +458,15 @@ export class ErrandsService {
 
   async getDriverOffers(driverUserId: string) {
     const profile = await fetchDriverProfileSnapshot(driverUserId);
+    const debtStatus = await fetchDriverDebtStatus(driverUserId);
+    if (debtStatus.debtBlocked) {
+      return {
+        offers: [] as Record<string, unknown>[],
+        debtBlocked: true,
+        openDebtCdf: debtStatus.openDebtCdf,
+        debtThresholdCdf: debtStatus.debtThresholdCdf,
+      };
+    }
     if (!profile?.isAvailable || !driverCanReceiveJobs(profile)) {
       return { offers: [] as Record<string, unknown>[] };
     }

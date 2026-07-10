@@ -2,6 +2,17 @@ import { VehicleType } from '@prisma/client';
 import { DriverJobAlertPayload, DriverJobKind, MOVA_EVENTS } from '@mova/shared';
 import { RedisService } from '@mova/shared';
 import { MatchingService } from '../matching/matching.service';
+import { filterDriversNotDebtBlocked } from './driver-debt.util';
+
+/** Types d'engins à notifier pour colis, express, courses/commissions, etc. */
+export const DELIVERY_ALERT_VEHICLE_TYPES: VehicleType[] = [
+  VehicleType.MOTO_TAXI,
+  VehicleType.STANDARD,
+  VehicleType.COMFORT,
+  VehicleType.VIP,
+  VehicleType.UTILITAIRE,
+  VehicleType.CAMION,
+];
 
 export async function publishDriverJobAlert(
   redis: RedisService,
@@ -32,7 +43,7 @@ export async function notifyNearbyDrivers(
     const drivers = await matching.findDrivers(opts.pickupLat, opts.pickupLng, vehicleType, 0);
     for (const d of drivers) seen.add(d.userId);
   }
-  const driverUserIds = [...seen];
+  const driverUserIds = await filterDriversNotDebtBlocked([...seen]);
   if (driverUserIds.length === 0) return;
   await publishDriverJobAlert(redis, {
     jobKind: opts.jobKind,

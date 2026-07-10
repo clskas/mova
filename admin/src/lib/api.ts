@@ -1461,6 +1461,39 @@ export async function settleCashDebt(debtId: string, settlementRef?: string) {
   });
 }
 
+export async function confirmCashDebtByCode(code: string) {
+  return apiFetch<{ confirmed: boolean; message?: string; driverUserId?: string; amountCdf?: number }>(
+    "/api/admin/wallet/cash-debts/confirm-cash",
+    {
+      method: "POST",
+      body: JSON.stringify({ code }),
+    },
+  );
+}
+
+export type DriverDebtPolicy = {
+  id: string;
+  maxOpenDebtCdf: number;
+  blockOffers: boolean;
+  isActive: boolean;
+  updatedAt?: string;
+};
+
+export async function fetchDebtPolicy(): Promise<DriverDebtPolicy> {
+  return apiFetch<DriverDebtPolicy>("/api/admin/wallet/debt-policy");
+}
+
+export async function updateDebtPolicy(data: {
+  maxOpenDebtCdf?: number;
+  blockOffers?: boolean;
+  isActive?: boolean;
+}) {
+  return apiFetch<DriverDebtPolicy>("/api/admin/wallet/debt-policy", {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
 export async function updateUser(id: string, data: Partial<AdminUser>) {
   return apiFetch<AdminUser>(`/api/admin/users/${id}`, { method: "PATCH", body: JSON.stringify(data) });
 }

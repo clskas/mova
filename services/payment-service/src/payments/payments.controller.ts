@@ -82,4 +82,25 @@ export class PaymentsController {
   settleCashDebts(@Request() req: { user: { id: string } }) {
     return this.paymentsService.settleDriverCashDebtFromWallet(req.user.id);
   }
+
+  @Post('cash-debts/cash-request')
+  @ApiOperation({ summary: 'Générer un code/QR pour payer la dette espèces au guichet MOVA' })
+  createCashDebtCashRequest(@Request() req: { user: { id: string } }) {
+    return this.paymentsService.createCashDebtCashRequest(req.user.id);
+  }
+
+  @Get('cash-debts/cash-request')
+  @ApiOperation({ summary: 'Demande de paiement espèces en cours (chauffeur)' })
+  getCashDebtCashRequest(@Request() req: { user: { id: string } }) {
+    return this.paymentsService.getActiveCashDebtCashRequest(req.user.id);
+  }
+
+  @Get('cash-debts/cash-request/:requestId/status')
+  @ApiOperation({ summary: 'Statut d\'une demande de paiement espèces' })
+  getCashDebtCashRequestStatus(
+    @Request() req: { user: { id: string } },
+    @Param('requestId') requestId: string,
+  ) {
+    return this.paymentsService.getCashDebtCashRequestStatus(req.user.id, requestId);
+  }
 }

@@ -45,7 +45,7 @@ export default function EarningsPage() {
           from: from || undefined,
           to: to || undefined,
           q: q.trim() || undefined,
-          take: 100,
+          take: 200,
         }),
       ]);
       setEarnings(e);

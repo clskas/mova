@@ -82,6 +82,69 @@ export class WalletService {
     return { data: transactions, total, limit: take, offset: skip, currency: 'CDF' };
   }
 
+  async searchPartnerTransactions(
+    userId: string,
+    opts?: {
+      descriptionPrefix?: string;
+      from?: Date;
+      to?: Date;
+      q?: string;
+      skip?: number;
+      take?: number;
+    },
+  ) {
+    const wallet = await this.getWallet(userId);
+    const take = Math.min(Math.max(opts?.take ?? 50, 1), 500);
+    const skip = Math.max(opts?.skip ?? 0, 0);
+    const q = opts?.q?.trim().toLowerCase();
+    const where = {
+      walletId: wallet.id,
+      type: 'CREDIT' as const,
+      ...(opts?.descriptionPrefix ? { description: { startsWith: opts.descriptionPrefix } } : {}),
+      ...(opts?.from || opts?.to
+        ? {
+            createdAt: {
+              ...(opts.from ? { gte: opts.from } : {}),
+              ...(opts.to ? { lte: opts.to } : {}),
+            },
+          }
+        : {}),
+      ...(q
+        ? {
+            OR: [
+              { description: { contains: q, mode: 'insensitive' as const } },
+              { reference: { contains: q, mode: 'insensitive' as const } },
+            ],
+          }
+        : {}),
+    };
+    const [transactions, total, aggregate] = await Promise.all([
+      this.prisma.walletTransaction.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        take,
+        skip,
+      }),
+      this.prisma.walletTransaction.count({ where }),
+      this.prisma.walletTransaction.aggregate({ where, _sum: { amountCdf: true } }),
+    ]);
+    return {
+      balanceCdf: wallet.balanceCdf,
+      formattedBalance: formatCdf(wallet.balanceCdf),
+      periodTotalCdf: aggregate._sum.amountCdf ?? 0,
+      data: transactions.map((tx) => ({
+        id: tx.id,
+        amountCdf: tx.amountCdf,
+        type: tx.type,
+        description: tx.description ?? undefined,
+        reference: tx.reference ?? undefined,
+        createdAt: tx.createdAt.toISOString(),
+      })),
+      pagination: { skip, take, total },
+      currency: 'CDF',
+    };
+  }
+
   async credit(userId: string, amountCdf: number, description: string, reference?: string) {
     const wallet = await this.getWallet(userId);
     const updated = await this.prisma.wallet.update({ where: { id: wallet.id }, data: { balanceCdf: { increment: amountCdf } } });

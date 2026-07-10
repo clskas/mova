@@ -482,10 +482,12 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
               _statusLabel(item['status']?.toString()),
               style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
             ),
-            if (_isActiveErrand(item['status']?.toString())) ...[
+            if (item['id']?.toString().isNotEmpty == true) ...[
               const SizedBox(height: 8),
               MovaButton(
-                label: 'Suivre la course',
+                label: _isActiveErrand(item['status']?.toString())
+                    ? 'Suivre la course'
+                    : 'Voir le suivi',
                 isSecondary: true,
                 icon: Icons.map_outlined,
                 onPressed: () => _openErrandTracking(item),

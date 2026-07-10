@@ -12,7 +12,7 @@ import {
   resolveCityFromCoords,
   canCancelDelivery,
 } from '@mova/shared';
-import { Delivery, DeliveryEvent, DeliveryStatus, DeliveryType } from '@prisma/client';
+import { Delivery, DeliveryEvent, DeliveryStatus, DeliveryType, ErrandOrder, ErrandOrderStatus } from '@prisma/client';
 import { computeDriverEta } from '../matching/eta.util';
 import { tripDistanceKm } from '../common/geo.util';
 
@@ -190,6 +190,77 @@ export type CourierProfile = {
   lat?: number | null;
   lng?: number | null;
 };
+
+export function mockErrandCourierLocation(
+  order: Pick<ErrandOrder, 'status' | 'pickupLat' | 'pickupLng' | 'dropoffLat' | 'dropoffLng'>,
+): { lat: number; lng: number; ts: number } | null {
+  if (!order.pickupLat || !order.pickupLng || !order.dropoffLat || !order.dropoffLng) return null;
+  if (order.status === ErrandOrderStatus.COMPLETED || order.status === ErrandOrderStatus.CANCELLED) return null;
+  const progress =
+    order.status === ErrandOrderStatus.PENDING
+      ? 0.1
+      : order.status === ErrandOrderStatus.ASSIGNED
+        ? 0.25
+        : order.status === ErrandOrderStatus.IN_PROGRESS
+          ? 0.65
+          : 0.4;
+  return {
+    lat: order.pickupLat + (order.dropoffLat - order.pickupLat) * progress,
+    lng: order.pickupLng + (order.dropoffLng - order.pickupLng) * progress,
+    ts: Date.now(),
+  };
+}
+
+export function resolveErrandCourierLocation(
+  order: Pick<ErrandOrder, 'status' | 'driverId' | 'pickupLat' | 'pickupLng' | 'dropoffLat' | 'dropoffLng'>,
+  courier?: CourierProfile | null,
+): { lat: number; lng: number; ts: number; source: 'gps' | 'pickup' | 'estimated' } | null {
+  if (courier?.lat != null && courier?.lng != null) {
+    return { lat: courier.lat, lng: courier.lng, ts: Date.now(), source: 'gps' };
+  }
+  if (order.driverId && order.pickupLat != null && order.pickupLng != null) {
+    return { lat: order.pickupLat, lng: order.pickupLng, ts: Date.now(), source: 'pickup' };
+  }
+  const mock = mockErrandCourierLocation(order);
+  return mock ? { ...mock, source: 'estimated' as const } : null;
+}
+
+export function enrichErrandTrackingFields(
+  order: ErrandOrder,
+  formatted: Record<string, unknown>,
+  courier?: CourierProfile | null,
+) {
+  const courierLoc = resolveErrandCourierLocation(order, courier);
+  let etaMinutes: number | null = null;
+  if (
+    courierLoc &&
+    order.dropoffLat != null &&
+    order.dropoffLng != null &&
+    order.status !== ErrandOrderStatus.COMPLETED &&
+    order.status !== ErrandOrderStatus.CANCELLED
+  ) {
+    etaMinutes = computeDeliveryEtaMinutes(courierLoc.lat, courierLoc.lng, order.dropoffLat, order.dropoffLng);
+  } else if (order.durationMin != null && order.status === ErrandOrderStatus.PENDING) {
+    etaMinutes = Math.max(15, Math.ceil(order.durationMin + 10));
+  }
+  return {
+    ...formatted,
+    deliveryLat: order.dropoffLat,
+    deliveryLng: order.dropoffLng,
+    courierLocation: courierLoc,
+    courierPositionSource: courierLoc?.source ?? null,
+    courierPositionEstimated: courierLoc?.source === 'estimated',
+    etaMinutes,
+    courier: courier
+      ? {
+          userId: courier.userId,
+          name: courier.name ?? `Livreur ${courier.userId.slice(0, 6)}`,
+          rating: courier.rating ?? 4.5,
+          phone: courier.phone ?? '',
+        }
+      : null,
+  };
+}
 
 /** Position mock coursier (interpolation selon statut) — uniquement sans livreur assigné */
 export function mockCourierLocation(

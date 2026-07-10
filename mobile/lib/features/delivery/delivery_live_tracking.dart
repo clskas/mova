@@ -26,6 +26,7 @@ class DeliveryLiveTracking {
     required this.ref,
     required this.setState,
     required this.mounted,
+    this.referenceType = 'DELIVERY',
     this.onPaymentCompleted,
   });
 
@@ -33,6 +34,7 @@ class DeliveryLiveTracking {
   final WidgetRef ref;
   final void Function(VoidCallback fn) setState;
   final bool Function() mounted;
+  final String referenceType;
   void Function(Map<String, dynamic> payload)? onPaymentCompleted;
 
   LatLng? liveCourierPos;
@@ -80,6 +82,7 @@ class DeliveryLiveTracking {
     socket.connectDelivery(
       deliveryId: deliveryId,
       token: token,
+      referenceType: referenceType,
       onLocation: (payload) {
         final lat = payload['lat'] as num?;
         final lng = payload['lng'] as num?;

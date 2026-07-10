@@ -14,7 +14,7 @@ import { tripDistanceKm } from '../common/geo.util';
 import { fetchAuthUserBrief } from '../common/internal-lookup.util';
 import { notifyNearbyDrivers, DELIVERY_ALERT_VEHICLE_TYPES } from '../common/driver-job-alert.util';
 import { captureWalletHold, holdWalletFunds, releaseWalletHold } from '../common/wallet-hold.util';
-import { buildErrandTimeline } from '../deliveries/parcel.util';
+import { buildErrandTimeline, enrichErrandTrackingFields } from '../deliveries/parcel.util';
 import { MatchingService } from '../matching/matching.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { PricingService } from '../rides/pricing.service';
@@ -262,6 +262,13 @@ export class ErrandsService {
         type: 'ERRAND',
         category: order.category,
         deliveryAddress,
+        pickupAddress: order.pickupAddress,
+        pickupLat: order.pickupLat,
+        pickupLng: order.pickupLng,
+        dropoffLat: order.dropoffLat,
+        dropoffLng: order.dropoffLng,
+        deliveryLat: order.dropoffLat,
+        deliveryLng: order.dropoffLng,
         items: parsed.items.map((i) => i.label),
         structuredItems: parsed.items,
         budgetCdf: order.budgetCdf,
@@ -305,6 +312,25 @@ export class ErrandsService {
       paymentReady: Boolean(formatted.paymentReady) && !payment.isPaid,
       rated,
     };
+  }
+
+  private async fetchCourierProfile(userId: string) {
+    const profile = await fetchDriverProfileSnapshot(userId);
+    if (!profile) return null;
+    const user = await fetchAuthUserBrief(userId);
+    return {
+      userId,
+      name: user?.name ?? `Livreur ${userId.slice(0, 6)}`,
+      phone: user?.phone ?? '',
+      rating: profile.ratingAvg ?? 4.5,
+      lat: profile.currentLat,
+      lng: profile.currentLng,
+    };
+  }
+
+  private async enrichErrandWithTracking<T extends Record<string, unknown>>(order: ErrandOrder, formatted: T) {
+    const courier = order.driverId ? await this.fetchCourierProfile(order.driverId) : null;
+    return enrichErrandTrackingFields(order, formatted, courier) as unknown as T;
   }
 
   private formatErrand(order: ErrandOrder, extra?: Record<string, unknown>) {
@@ -374,7 +400,11 @@ export class ErrandsService {
     const rated = !!(await this.prisma.errandRating.findUnique({
       where: { errandId_fromUserId: { errandId: order.id, fromUserId: passengerId } },
     }));
-    const formatted = await this.enrichErrandPayment(this.formatErrand(order), order.id, rated);
+    const formatted = await this.enrichErrandPayment(
+      await this.enrichErrandWithTracking(order, this.formatErrand(order)),
+      order.id,
+      rated,
+    );
     const isActive =
       order.status === ErrandOrderStatus.PENDING ||
       order.status === ErrandOrderStatus.ASSIGNED ||
@@ -437,7 +467,11 @@ export class ErrandsService {
     const rated = !!(await this.prisma.errandRating.findUnique({
       where: { errandId_fromUserId: { errandId: id, fromUserId: order.userId } },
     }));
-    const formatted = await this.enrichErrandPayment(this.formatErrand(order), id, rated);
+    const formatted = await this.enrichErrandPayment(
+      await this.enrichErrandWithTracking(order, this.formatErrand(order)),
+      id,
+      rated,
+    );
     let enriched: typeof formatted & { driverGrossCdf?: number; driverNetCdf?: number } = formatted;
     if (order.driverId === userId) {
       const errandRule = await this.commission.get(CommissionServiceType.ERRAND);

@@ -12,11 +12,11 @@ import '../../core/services/cancel_eligibility.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
-import '../booking/widgets/mova_ride_map.dart';
 import '../booking/payment_screen.dart';
 import '../chat/errand_chat_screen.dart';
 import '../delivery/delivery_live_tracking.dart';
 import '../delivery/delivery_payment_state.dart';
+import '../delivery/widgets/delivery_tracking_map.dart';
 
 class ErrandTrackingScreen extends ConsumerStatefulWidget {
   const ErrandTrackingScreen({
@@ -59,6 +59,7 @@ class _ErrandTrackingScreenState extends ConsumerState<ErrandTrackingScreen> {
     super.initState();
     _liveTracking = DeliveryLiveTracking(
       deliveryId: widget.errandId,
+      referenceType: 'ERRAND',
       ref: ref,
       setState: setState,
       mounted: () => mounted,
@@ -338,208 +339,285 @@ class _ErrandTrackingScreenState extends ConsumerState<ErrandTrackingScreen> {
     }
   }
 
+  String _statusLabel(String? status) {
+    final base = switch (status?.toUpperCase()) {
+      'PENDING' => 'Commande enregistrée',
+      'ASSIGNED' => 'Coursier assigné',
+      'IN_PROGRESS' => 'Courses en cours',
+      'COMPLETED' => 'Courses livrées',
+      'CANCELLED' => 'Commande annulée',
+      _ => status ?? '',
+    };
+    if (deliveryIsPaid(_order)) return '$base · Payée';
+    if (_cashPaymentPending) return '$base · Paiement espèces en attente';
+    if (_paymentDue) return '$base · Paiement en attente';
+    return base;
+  }
+
+  LatLng get _pickup => LatLng(
+        (_order?['pickupLat'] as num?)?.toDouble() ?? MarketConfig.defaultLat,
+        (_order?['pickupLng'] as num?)?.toDouble() ?? MarketConfig.defaultLng,
+      );
+
+  LatLng? get _dropoff {
+    final lat = (_order?['dropoffLat'] ?? _order?['deliveryLat']) as num?;
+    final lng = (_order?['dropoffLng'] ?? _order?['deliveryLng']) as num?;
+    if (lat == null || lng == null) return null;
+    return LatLng(lat.toDouble(), lng.toDouble());
+  }
+
   @override
   Widget build(BuildContext context) {
+    final courier = _order?['courier'] as Map<String, dynamic>?;
+    final courierLoc = _liveTracking.effectiveCourier(_order);
+    final eta = _liveTracking.effectiveEta(_order);
     final pin = _order?['completionPin']?.toString();
     final proofUrl = _order?['proofPhotoUrl']?.toString();
-    final courierPos = _liveTracking.effectiveCourier(_order);
-    final followCourier = _liveTracking.shouldFollowCourier(_order);
 
     return MovaScreen(
       title: 'Suivi courses',
+      scrollable: false,
+      padding: EdgeInsets.zero,
       actions: [
         IconButton(icon: const Icon(Icons.refresh), onPressed: () => _load()),
       ],
       child: _loading && _order == null
           ? const Center(child: CircularProgressIndicator())
-          : Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (_error != null) ...[
-                  MovaErrorBanner(message: _error!, onRetry: _load),
-                  const SizedBox(height: 12),
-                ],
-                if (_cashPaymentPending && pin != null && pin.isNotEmpty) ...[
-                  MovaCard(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        const Text(
-                          'Paiement espèces en attente',
-                          style: TextStyle(fontWeight: FontWeight.w600),
-                        ),
-                        const SizedBox(height: 4),
-                        const Text(
-                          'Remettez le montant au livreur et communiquez-lui ce code PIN :',
-                          style: TextStyle(color: MovaColors.textSecondary, fontSize: 12),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          pin,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 6,
-                            color: MovaColors.green,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                ],
-                if (deliveryIsPaid(_order)) ...[
-                  MovaCard(
-                    child: Row(
-                      children: [
-                        const Icon(Icons.check_circle, color: MovaColors.green),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            _order?['paymentMethod']?.toString().toUpperCase() == 'CASH'
-                                ? 'Course payée (espèces confirmées)'
-                                : 'Course payée',
-                            style: const TextStyle(fontWeight: FontWeight.w600),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                ],
-                if (_order != null) ...[
-                  MovaRideMap(
-                    pickup: LatLng(
-                      (_order!['pickupLat'] as num?)?.toDouble() ?? MarketConfig.defaultLat,
-                      (_order!['pickupLng'] as num?)?.toDouble() ?? MarketConfig.defaultLng,
-                    ),
-                    dropoff: LatLng(
-                      (_order!['dropoffLat'] as num?)?.toDouble() ?? MarketConfig.defaultLat,
-                      (_order!['dropoffLng'] as num?)?.toDouble() ?? MarketConfig.defaultLng,
-                    ),
-                    driver: courierPos,
-                    followDriver: followCourier,
-                    driverIcon: Icons.delivery_dining,
-                    routeTrace: _liveTracking.effectiveTrace(_order),
-                    height: 160,
-                    pickupLabel: _order!['pickupAddress']?.toString(),
-                    dropoffLabel: _order!['dropoffAddress']?.toString(),
-                  ),
-                  const SizedBox(height: 12),
-                ],
-                MovaCard(
+          : _error != null && _order == null
+              ? Padding(
+                  padding: const EdgeInsets.all(16),
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'Course #${widget.errandId.length > 8 ? widget.errandId.substring(0, 8) : widget.errandId}',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      MovaErrorBanner(message: _error!, onRetry: _load),
+                      const SizedBox(height: 16),
+                      MovaButton(
+                        label: 'Retour',
+                        isSecondary: true,
+                        icon: Icons.arrow_back,
+                        onPressed: () => Navigator.pop(context),
                       ),
-                      const SizedBox(height: 4),
-                      Text(widget.deliveryAddress, maxLines: 2, overflow: TextOverflow.ellipsis),
-                      if (widget.items.isNotEmpty) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          widget.items.join(', '),
-                          style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
-                          maxLines: 3,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                      const SizedBox(height: 12),
-                      ServicePriceDisplay.passengerCard(_order, totalLabel: 'Total à payer'),
                     ],
                   ),
-                ),
-                const SizedBox(height: 20),
-                Text('Statuts', style: Theme.of(context).textTheme.titleSmall),
-                const SizedBox(height: 12),
-                ..._timeline.map((step) {
-                  final done = step['done'] == true;
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: Row(
-                      children: [
-                        Icon(
-                          done ? Icons.check_circle : Icons.radio_button_unchecked,
-                          color: done ? MovaColors.green : MovaColors.textSecondary,
-                          size: 22,
+                )
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            if (_error != null) ...[
+                              MovaErrorBanner(message: _error!, onRetry: _load),
+                              const SizedBox(height: 12),
+                            ],
+                            if (_cashPaymentPending && pin != null && pin.isNotEmpty) ...[
+                              MovaCard(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  children: [
+                                    const Text(
+                                      'Paiement espèces en attente',
+                                      style: TextStyle(fontWeight: FontWeight.w600),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    const Text(
+                                      'Remettez le montant au livreur et communiquez-lui ce code PIN :',
+                                      style: TextStyle(color: MovaColors.textSecondary, fontSize: 12),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      pin,
+                                      textAlign: TextAlign.center,
+                                      style: const TextStyle(
+                                        fontSize: 28,
+                                        fontWeight: FontWeight.bold,
+                                        letterSpacing: 6,
+                                        color: MovaColors.green,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                            ],
+                            if (deliveryIsPaid(_order)) ...[
+                              MovaCard(
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.check_circle, color: MovaColors.green),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        _order?['paymentMethod']?.toString().toUpperCase() == 'CASH'
+                                            ? 'Course payée (espèces confirmées)'
+                                            : 'Course payée',
+                                        style: const TextStyle(fontWeight: FontWeight.w600),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                            ],
+                            DeliveryTrackingMap(
+                              pickup: _pickup,
+                              dropoff: _dropoff,
+                              courier: courierLoc,
+                              routeTrace: _liveTracking.effectiveTrace(_order),
+                              etaMinutes: eta,
+                              deliveryPin: pin,
+                              courierName: courier?['name']?.toString(),
+                              courierRating: (courier?['rating'] as num?)?.toDouble(),
+                              courierPositionEstimated: _liveTracking.effectiveEstimated(_order),
+                              followCourier: _liveTracking.shouldFollowCourier(_order),
+                              pickupLabel: _order?['pickupAddress']?.toString(),
+                              dropoffLabel: _order?['dropoffAddress']?.toString() ??
+                                  _order?['deliveryAddress']?.toString() ??
+                                  widget.deliveryAddress,
+                            ),
+                            const SizedBox(height: 12),
+                            MovaCard(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Course #${widget.errandId.length > 8 ? widget.errandId.substring(0, 8) : widget.errandId}',
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '${_order?['pickupAddress'] ?? 'Retrait'} → '
+                                    '${_order?['dropoffAddress'] ?? _order?['deliveryAddress'] ?? widget.deliveryAddress}',
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  if (widget.items.isNotEmpty) ...[
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      widget.items.join(', '),
+                                      style: const TextStyle(
+                                        color: MovaColors.textSecondary,
+                                        fontSize: 13,
+                                      ),
+                                      maxLines: 3,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    _statusLabel(_order?['status']?.toString()),
+                                    style: const TextStyle(
+                                      color: MovaColors.orange,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  ServicePriceDisplay.passengerCard(_order, totalLabel: 'Total à payer'),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+                            Text('Statuts', style: Theme.of(context).textTheme.titleSmall),
+                            const SizedBox(height: 12),
+                            ..._timeline.map((step) {
+                              final done = step['done'] == true;
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      done ? Icons.check_circle : Icons.radio_button_unchecked,
+                                      color: done ? MovaColors.green : MovaColors.textSecondary,
+                                      size: 22,
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(child: Text(step['label']?.toString() ?? '')),
+                                  ],
+                                ),
+                              );
+                            }),
+                            if (_order?['status']?.toString() == 'COMPLETED') ...[
+                              const SizedBox(height: 16),
+                              MovaCard(
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      proofUrl != null
+                                          ? Icons.photo_camera_outlined
+                                          : Icons.verified_outlined,
+                                      color: MovaColors.green,
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Text(
+                                        proofUrl != null
+                                            ? 'Preuve d\'achat enregistrée'
+                                            : 'Livraison confirmée',
+                                        style: const TextStyle(fontWeight: FontWeight.w600),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(child: Text(step['label']?.toString() ?? '')),
-                      ],
+                      ),
                     ),
-                  );
-                }),
-                if (_order?['status']?.toString() == 'COMPLETED' ||
-                    _order?['status']?.toString() == 'DELIVERED') ...[
-                  const SizedBox(height: 16),
-                  MovaCard(
-                    child: Row(
-                      children: [
-                        Icon(
-                          proofUrl != null ? Icons.photo_camera_outlined : Icons.verified_outlined,
-                          color: MovaColors.green,
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            proofUrl != null
-                                ? 'Preuve d\'achat enregistrée'
-                                : 'Livraison confirmée',
-                            style: const TextStyle(fontWeight: FontWeight.w600),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if (_order?['driverId'] != null)
+                            MovaButton(
+                              label: 'Contacter le livreur',
+                              isSecondary: true,
+                              icon: Icons.chat_bubble_outline,
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => ErrandChatScreen(
+                                      errandId: widget.errandId,
+                                      myRole: 'passenger',
+                                      peerLabel: courier?['name']?.toString() ?? 'Livreur',
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          if (_order?['driverId'] != null) const SizedBox(height: 8),
+                          if (_canCancel)
+                            MovaButton(
+                              label: 'Annuler la course',
+                              isSecondary: true,
+                              isLoading: _cancelling,
+                              icon: Icons.cancel_outlined,
+                              onPressed: _cancelling ? null : _cancelErrand,
+                            ),
+                          if (_canCancel) const SizedBox(height: 8),
+                          if (_paymentDue) ...[
+                            MovaButton(
+                              label: 'Payer la course',
+                              icon: Icons.payment_outlined,
+                              onPressed: _openPayment,
+                            ),
+                            const SizedBox(height: 8),
+                          ],
+                          MovaButton(
+                            label: 'Retour à l\'accueil',
+                            isSecondary: true,
+                            icon: Icons.home_outlined,
+                            onPressed: () => Navigator.popUntil(context, (r) => r.isFirst),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                ],
-                const SizedBox(height: 24),
-                if (_order?['driverId'] != null)
-                  MovaButton(
-                    label: 'Contacter le livreur',
-                    isSecondary: true,
-                    icon: Icons.chat_bubble_outline,
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => ErrandChatScreen(
-                            errandId: widget.errandId,
-                            myRole: 'passenger',
-                            peerLabel: 'Livreur',
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                if (_order?['driverId'] != null) const SizedBox(height: 8),
-                if (_canCancel)
-                  MovaButton(
-                    label: 'Annuler la course',
-                    isSecondary: true,
-                    isLoading: _cancelling,
-                    icon: Icons.cancel_outlined,
-                    onPressed: _cancelling ? null : _cancelErrand,
-                  ),
-                if (_canCancel) const SizedBox(height: 8),
-                if (_paymentDue) ...[
-                  MovaButton(
-                    label: 'Payer la course',
-                    icon: Icons.payment_outlined,
-                    onPressed: _openPayment,
-                  ),
-                  const SizedBox(height: 8),
-                ],
-                MovaButton(
-                  label: 'Retour à l\'accueil',
-                  isSecondary: true,
-                  icon: Icons.home_outlined,
-                  onPressed: () => Navigator.popUntil(context, (r) => r.isFirst),
+                  ],
                 ),
-              ],
-            ),
     );
   }
 }

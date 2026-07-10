@@ -13,6 +13,8 @@ import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
+import '../../core/config/market_config.dart';
+import '../booking/widgets/mova_ride_map.dart';
 import '../../widgets/promo_code_field.dart';
 import 'errand_tracking_screen.dart';
 
@@ -321,6 +323,16 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
     });
   }
 
+  LatLng get _pickupPoint => LatLng(
+        _pickupLat ?? MarketConfig.defaultLat,
+        _pickupLng ?? MarketConfig.defaultLng,
+      );
+
+  LatLng? get _dropoffPoint {
+    if (_deliveryLat == null || _deliveryLng == null) return null;
+    return LatLng(_deliveryLat!, _deliveryLng!);
+  }
+
   String? _validate() {
     if (_items.isEmpty) return 'Ajoutez au moins un article à la liste.';
     if (_pickupController.text.trim().isEmpty) {
@@ -423,7 +435,17 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
 
     return MovaScreen(
       title: 'Courses & commissions',
-      child: Column(
+      scrollable: false,
+      padding: EdgeInsets.zero,
+      child: MovaMapFormLayout(
+        mapBuilder: (height) => MovaRideMap(
+          height: height,
+          pickup: _pickupPoint,
+          dropoff: _dropoffPoint,
+          pickupLabel: _pickupController.text.trim().isEmpty ? null : _pickupController.text.trim(),
+          dropoffLabel: _dropoffController.text.trim().isEmpty ? null : _dropoffController.text.trim(),
+        ),
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
@@ -612,6 +634,7 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
                 : (_estimatedPrice == null ? _estimate : _confirm),
           ),
         ],
+        ),
       ),
     );
   }

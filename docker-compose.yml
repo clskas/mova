@@ -13,8 +13,8 @@ services:
       POSTGRES_PASSWORD: mova
       POSTGRES_DB: mova_auth
     ports:
-      # Host 54320 si 5432 déjà pris (Postgres local). Services Docker utilisent postgres:5432.
-      - '54320:5432'
+      # Host 48080 (éviter plages réservées Windows Hyper-V). Services Docker : postgres:5432.
+      - '48080:5432'
     volumes:
       - pg_data:/var/lib/postgresql/data
       - ./docker/postgres/init-databases.sql:/docker-entrypoint-initdb.d/02-init-databases.sql

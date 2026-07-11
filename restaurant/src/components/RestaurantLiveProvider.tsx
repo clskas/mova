@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 import type { Socket } from "socket.io-client";
 import { getToken } from "@/lib/auth";
 import { alertNewRestaurantOrder, initPartnerAudioUnlock, requestPartnerNotificationPermission } from "@/lib/partner-alerts";
+import { registerPartnerWebPush } from "@/lib/partner-web-push";
 import { connectRestaurantSocket } from "@/lib/restaurant-socket";
 
 const POLL_MS = 30_000;
@@ -41,6 +42,7 @@ export function RestaurantLiveProvider({ children }: { children: React.ReactNode
     if (typeof window !== "undefined") {
       initPartnerAudioUnlock();
       requestPartnerNotificationPermission();
+      void registerPartnerWebPush("restaurant");
       pollId = window.setInterval(triggerRefresh, POLL_MS);
       socket = connectRestaurantSocket({
         onConnect: () => setConnected(true),

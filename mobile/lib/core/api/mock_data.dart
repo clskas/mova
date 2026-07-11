@@ -299,58 +299,86 @@ abstract final class MockData {
       ];
 
   static Map<String, dynamic> wallet() => {
-        'balanceCdf': 45000,
+        'balanceCdf': _mockWalletBalance,
         'currency': 'CDF',
         'transactions': walletTransactions(),
       };
 
-  static List<Map<String, dynamic>> walletTransactions() => [
-        {
-          'id': 'tx-1',
-          'type': 'CREDIT',
-          'amountCdf': 20000,
-          'description': 'Recharge Orange Money',
-          'createdAt': DateTime.now().subtract(const Duration(days: 1)).toIso8601String(),
-        },
-        {
-          'id': 'tx-2',
-          'type': 'DEBIT',
-          'amountCdf': -8500,
-          'description': 'Paiement course ride-1',
-          'createdAt': DateTime.now().subtract(const Duration(days: 2)).toIso8601String(),
-        },
-        {
-          'id': 'tx-3',
-          'type': 'CREDIT',
-          'amountCdf': 33500,
-          'description': 'Recharge M-Pesa',
-          'createdAt': DateTime.now().subtract(const Duration(days: 5)).toIso8601String(),
-        },
-      ];
+  static final List<Map<String, dynamic>> _mockWalletTxStore = [];
+
+  static List<Map<String, dynamic>> walletTransactions() =>
+      List<Map<String, dynamic>>.from(_mockWalletTxStore);
+
+  static void _recordMockWalletTx({
+    required String type,
+    required int amountCdf,
+    required String description,
+    String? reference,
+  }) {
+    _mockWalletTxStore.insert(0, {
+      'id': 'tx-mock-${DateTime.now().millisecondsSinceEpoch}',
+      'type': type,
+      'amountCdf': amountCdf,
+      'description': description,
+      if (reference != null) 'reference': reference,
+      'createdAt': DateTime.now().toIso8601String(),
+    });
+  }
 
   static Map<String, dynamic> walletTopUp(Map<String, dynamic> body) {
     final amount = body['amountCdf'] as int? ?? 0;
+    final provider = body['provider']?.toString() ?? 'MOBILE_MONEY';
+    _mockWalletBalance += amount;
+    _recordMockWalletTx(
+      type: 'CREDIT',
+      amountCdf: amount,
+      description: 'Recharge $provider',
+      reference: 'topup_${provider.toLowerCase()}_${DateTime.now().millisecondsSinceEpoch}',
+    );
     return {
       'success': true,
-      'message': 'Recharge de $amount FC en cours (${body['provider'] ?? 'MOBILE_MONEY'})',
+      'message': 'Recharge de $amount FC en cours ($provider)',
       'amountCdf': amount,
-      'balanceCdf': 45000 + amount,
+      'balanceCdf': _mockWalletBalance,
+    };
+  }
+
+  static int _mockWalletBalance = 0;
+
+  static Map<String, dynamic> walletWithdraw(Map<String, dynamic> body) {
+    final amount = body['amountCdf'] as int? ?? 0;
+    final provider = body['provider']?.toString() ?? 'MOBILE_MONEY';
+    final phone = body['phone']?.toString() ?? 'Mobile Money';
+    _mockWalletBalance = (_mockWalletBalance - amount).clamp(0, 999999999);
+    _recordMockWalletTx(
+      type: 'DEBIT',
+      amountCdf: -amount,
+      description: 'Retrait $provider vers $phone',
+      reference: 'withdraw_${provider.toLowerCase()}_${DateTime.now().millisecondsSinceEpoch}',
+    );
+    return {
+      'success': true,
+      'simulated': true,
+      'message': 'Retrait de $amount FC vers ${body['phone'] ?? 'Mobile Money'} (simulation)',
+      'amountCdf': amount,
+      'balanceCdf': _mockWalletBalance,
+      'formattedBalance': '$_mockWalletBalance FC',
     };
   }
 
   static Map<String, dynamic> earnings() => {
-        'todayCdf': 28500,
-        'weekCdf': 142000,
-        'monthCdf': 580000,
-        'totalCdf': 1250000,
-        'rideCount': 42,
-        'deliveryCount': 18,
-        'todayRideCount': 3,
-        'todayDeliveryCount': 2,
-        'rideEarningsCdf': 980000,
-        'deliveryEarningsCdf': 270000,
-        'withdrawableCdf': 450000,
-        'walletBalanceCdf': 450000,
+        'todayCdf': 0,
+        'weekCdf': 0,
+        'monthCdf': 0,
+        'totalCdf': 0,
+        'rideCount': 0,
+        'deliveryCount': 0,
+        'todayRideCount': 0,
+        'todayDeliveryCount': 0,
+        'rideEarningsCdf': 0,
+        'deliveryEarningsCdf': 0,
+        'withdrawableCdf': 0,
+        'walletBalanceCdf': 0,
         'payoutProvider': 'ORANGE_MONEY',
         'payoutPhone': '+243900000020',
         'payoutPhoneMasked': '+243 *** 0020',

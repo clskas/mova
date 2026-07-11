@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { apiFetch, formatCdf } from "@/lib/api";
+import { GeoAutocompleteInput } from "./GeoAutocompleteInput";
 
 type ScheduledRide = {
   id: string;
@@ -103,11 +104,11 @@ export function ScheduledRidesView({ onBack, mock }: Props) {
       {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg p-3">{error}</p>}
 
       <div className="bg-white rounded-xl p-4 shadow-sm space-y-3">
-        <input
-          className="w-full rounded-xl border-0 bg-gray-50 p-3"
+        <GeoAutocompleteInput
           placeholder="Destination"
           value={destination}
-          onChange={(e) => { setDestination(e.target.value); setEstimate(null); }}
+          onChange={(v) => { setDestination(v); setEstimate(null); }}
+          className="w-full rounded-xl border-0 bg-gray-50 p-3"
         />
         <input
           type="datetime-local"

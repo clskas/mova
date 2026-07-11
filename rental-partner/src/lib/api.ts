@@ -201,6 +201,20 @@ export function fetchEarnings() {
   return apiFetch<PartnerEarnings>("/api/rental-partner/earnings");
 }
 
+export type WalletWithdrawResult = {
+  success?: boolean;
+  message?: string;
+  balanceCdf?: number;
+  formattedBalance?: string;
+};
+
+export function withdrawPartnerWallet(data: { amountCdf: number; provider: string; phone: string }) {
+  return apiFetch<WalletWithdrawResult>("/api/wallet/withdraw", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
 export function fetchEarningsReport(params?: { from?: string; to?: string; q?: string; skip?: number; take?: number }) {
   const sp = new URLSearchParams();
   if (params?.from) sp.set("from", params.from);

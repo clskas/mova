@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { apiFetch, formatCdf } from "@/lib/api";
+import { GeoAutocompleteInput } from "./GeoAutocompleteInput";
 
 const VOLUMES = [
   { id: "STUDIO", label: "Studio", m3: 3 },
@@ -82,8 +83,8 @@ export function MovingView({ onBack, mock }: Props) {
       <button type="button" onClick={onBack} className="text-sm text-[#6C63FF]">← Accueil</button>
       <h2 className="text-lg font-semibold">Déménagement</h2>
       {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg py-2 px-3">{error}</p>}
-      <input className="w-full rounded-xl border-0 bg-white p-3 shadow-sm" placeholder="Adresse de départ" value={from} onChange={(e) => setFrom(e.target.value)} />
-      <input className="w-full rounded-xl border-0 bg-white p-3 shadow-sm" placeholder="Adresse d'arrivée" value={to} onChange={(e) => { setTo(e.target.value); setEstimate(null); }} />
+      <GeoAutocompleteInput placeholder="Adresse de départ" value={from} onChange={setFrom} />
+      <GeoAutocompleteInput placeholder="Adresse d'arrivée" value={to} onChange={(v) => { setTo(v); setEstimate(null); }} />
       <p className="text-sm font-medium">Volume estimé</p>
       {VOLUMES.map((v) => (
         <label key={v.id} className="flex items-center gap-3 bg-white rounded-xl p-3 shadow-sm cursor-pointer">

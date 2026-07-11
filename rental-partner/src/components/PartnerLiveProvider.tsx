@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 import type { Socket } from "socket.io-client";
 import { getToken } from "@/lib/auth";
 import { alertNewRentalBooking, initPartnerAudioUnlock, requestPartnerNotificationPermission } from "@/lib/partner-alerts";
+import { registerPartnerWebPush } from "@/lib/partner-web-push";
 import { connectPartnerSocket } from "@/lib/partner-socket";
 
 const POLL_MS = 30_000;
@@ -41,6 +42,7 @@ export function PartnerLiveProvider({ children }: { children: React.ReactNode })
     if (typeof window !== "undefined") {
       initPartnerAudioUnlock();
       requestPartnerNotificationPermission();
+      void registerPartnerWebPush("rental_partner");
       pollId = window.setInterval(triggerRefresh, POLL_MS);
       socket = connectPartnerSocket({
         onConnect: () => setConnected(true),

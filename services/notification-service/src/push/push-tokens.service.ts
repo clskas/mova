@@ -21,4 +21,8 @@ export class PushTokensService {
     });
     return rows.map((r) => r.token);
   }
+
+  async removeToken(token: string) {
+    return this.prisma.pushDevice.deleteMany({ where: { token } });
+  }
 }

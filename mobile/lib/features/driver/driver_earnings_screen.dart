@@ -8,8 +8,9 @@ import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
-import 'driver_onboarding_screen.dart';
 import 'cash_debt_cash_payment_screen.dart';
+import 'driver_onboarding_screen.dart';
+import '../../core/wallet/wallet_movements.dart';
 
 enum _EarningsPeriod { today, week, month, custom }
 
@@ -26,6 +27,9 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
   Map<String, dynamic>? _data;
   Map<String, dynamic>? _cashDebt;
   Map<String, dynamic>? _activity;
+  List<Map<String, dynamic>> _walletMovements = [];
+  int _walletTxTotal = 0;
+  bool _walletTxLoadingMore = false;
   final _amountController = TextEditingController(text: '5000');
   final _searchController = TextEditingController();
   String? _error;
@@ -106,6 +110,7 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
     final results = await Future.wait([
       api.get('/drivers/earnings'),
       api.getCashDebtSummary(),
+      api.get('/wallet/transactions?limit=100&offset=0'),
     ]);
     if (!mounted) return;
     switch (results[0]) {
@@ -123,8 +128,120 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
       case Failure():
         setState(() => _cashDebt = const {'totalOpenCdf': 0, 'openCount': 0, 'debts': []});
     }
+    switch (results[2]) {
+      case Success(:final data):
+        final raw = data['data'] as List? ?? [];
+        setState(() {
+          _walletMovements = raw
+              .cast<Map<String, dynamic>>()
+              .where(WalletMovements.isMobileMoneyMovement)
+              .toList();
+          _walletTxTotal = data['total'] as int? ?? _walletMovements.length;
+        });
+      case Failure():
+        setState(() {
+          _walletMovements = [];
+          _walletTxTotal = 0;
+        });
+    }
     setState(() => _loading = false);
     await _loadActivity();
+  }
+
+  Future<void> _loadMoreWalletMovements() async {
+    if (_walletTxLoadingMore || _walletMovements.length >= _walletTxTotal) return;
+    setState(() => _walletTxLoadingMore = true);
+    final api = ref.read(apiClientProvider);
+    final offset = _walletMovements.length;
+    final result = await api.get('/wallet/transactions?limit=100&offset=$offset');
+    if (!mounted) return;
+    switch (result) {
+      case Success(:final data):
+        final raw = data['data'] as List? ?? [];
+        final batch = raw
+            .cast<Map<String, dynamic>>()
+            .where(WalletMovements.isMobileMoneyMovement)
+            .toList();
+        setState(() {
+          _walletMovements = [..._walletMovements, ...batch];
+          _walletTxTotal = data['total'] as int? ?? _walletMovements.length;
+          _walletTxLoadingMore = false;
+        });
+      case Failure():
+        setState(() => _walletTxLoadingMore = false);
+    }
+  }
+
+  Widget _walletMovementHistory() {
+    if (_walletMovements.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 8),
+        child: Text(
+          'Aucune recharge ou retrait enregistré.',
+          style: TextStyle(color: MovaColors.textSecondary, fontSize: 13),
+        ),
+      );
+    }
+    return Column(
+      children: [
+        ..._walletMovements.map((tx) {
+          final amount = tx['amountCdf'] as int? ?? 0;
+          final isRecharge = WalletMovements.isRecharge(tx);
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: MovaCard(
+              child: Row(
+                children: [
+                  Icon(
+                    isRecharge ? Icons.add_circle_outline : Icons.remove_circle_outline,
+                    color: isRecharge ? MovaColors.green : MovaColors.orange,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          WalletMovements.label(tx),
+                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (tx['createdAt'] != null)
+                          Text(
+                            DateFormat('dd/MM/yyyy HH:mm').format(DateTime.parse(tx['createdAt'].toString())),
+                            style: const TextStyle(color: MovaColors.textSecondary, fontSize: 11),
+                          ),
+                      ],
+                    ),
+                  ),
+                  Text(
+                    '${amount >= 0 ? '+' : ''}${MarketConfig.formatCdf(amount.abs())}',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: amount >= 0 ? MovaColors.green : MovaColors.midnight,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }),
+        if (_walletMovements.length < _walletTxTotal)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: OutlinedButton(
+              onPressed: _walletTxLoadingMore ? null : _loadMoreWalletMovements,
+              child: Text(
+                _walletTxLoadingMore
+                    ? 'Chargement…'
+                    : 'Charger plus (${_walletMovements.length} / $_walletTxTotal)',
+              ),
+            ),
+          ),
+      ],
+    );
   }
 
   Future<void> _loadActivity() async {
@@ -649,6 +766,13 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
                   isLoading: _withdrawing,
                   onPressed: _withdrawing ? null : (_payoutConfigured ? _withdraw : _openDossier),
                 ),
+                const SizedBox(height: 24),
+                const Text(
+                  'Historique recharges & retraits',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                const SizedBox(height: 8),
+                _walletMovementHistory(),
               ],
             ),
     );

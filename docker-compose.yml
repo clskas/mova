@@ -74,6 +74,11 @@ services:
       NOMINATIM_TIMEOUT_MS: '5000'
       NOMINATIM_MIN_INTERVAL_MS: '1000'
       NOMINATIM_USER_AGENT: MOVA-RDC/1.0 (ride-service; https://mova.cd)
+      PHOTON_BASE_URL: https://photon.komoot.io
+      PHOTON_ENABLED: 'true'
+      PHOTON_TIMEOUT_MS: '8000'
+      # Docker Windows : Nominatim/OSRM publics souvent injoignables — Photon en priorité.
+      GEOCODE_PREFER_PHOTON: 'true'
       DOCKER: 'true'
       PORT: 3000
     depends_on:
@@ -129,12 +134,22 @@ services:
       dockerfile: docker/notification.Dockerfile
     ports:
       - '3005:3000'
+    env_file:
+      - config/external-apis.env
     environment:
       DATABASE_URL: postgresql://mova:mova@postgres:5432/mova_notifications
       REDIS_URL: redis://redis:6379
       JWT_SECRET: dev_secret
+      AUTH_SERVICE_URL: http://auth-service:3000
+      INTERNAL_API_KEY: mova-internal-dev
+      DOCKER: 'true'
       PORT: 3000
       FCM_SERVER_KEY: ${FCM_SERVER_KEY:-}
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-BJFvspWyBgYCoGpExw4DSt53TOajC27s5JK89xA_PuSQg07gLkUtdr5Kwc8ypSNKpy7hNfy0Hfb6EtMMCzYkpSA}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-GFRggspdPXQDjE-IqGb-KFOAy3joP4XDxR92iZbxWt4}
+      VAPID_SUBJECT: mailto:contact@mova.cd
+      PARTNER_SMS_ALERTS: 'true'
+      MOCK_SMS: 'true'
     depends_on:
       postgres:
         condition: service_healthy

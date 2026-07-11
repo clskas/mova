@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { apiFetch, formatCdf } from "@/lib/api";
+import { GeoAutocompleteInput } from "./GeoAutocompleteInput";
 import { PromoCodeInput, promoPayload } from "./PromoCodeInput";
 
 const VEHICLES = [
@@ -77,11 +78,10 @@ export function TaxiBooking({ onBack, mock }: Props) {
       <h2 className="text-lg font-semibold">Taxi / Moto-taxi</h2>
 
       <label className="block text-sm font-medium">Destination</label>
-      <input
-        className="w-full rounded-xl border-0 bg-white p-3 shadow-sm"
+      <GeoAutocompleteInput
         placeholder="Ex: Gombe, Limete, Masina…"
         value={destination}
-        onChange={(e) => { setDestination(e.target.value); setEstimate(null); }}
+        onChange={(v) => { setDestination(v); setEstimate(null); }}
       />
 
       <p className="text-sm font-medium">Type de véhicule</p>

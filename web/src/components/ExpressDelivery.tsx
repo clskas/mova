@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { apiFetch, formatCdf } from "@/lib/api";
+import { GeoAutocompleteInput } from "./GeoAutocompleteInput";
 
 type Props = { onBack: () => void; mock: boolean };
 
@@ -84,17 +85,11 @@ export function ExpressDelivery({ onBack, mock }: Props) {
       <h2 className="text-lg font-semibold">Livraison express</h2>
       <p className="text-sm text-gray-500">Petit colis, livraison prioritaire</p>
       {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg py-2 px-3">{error}</p>}
-      <input
-        className="w-full rounded-xl border-0 bg-white p-3 shadow-sm"
-        placeholder="Adresse d'enlèvement"
-        value={pickup}
-        onChange={(e) => setPickup(e.target.value)}
-      />
-      <input
-        className="w-full rounded-xl border-0 bg-white p-3 shadow-sm"
+      <GeoAutocompleteInput placeholder="Adresse d'enlèvement" value={pickup} onChange={setPickup} />
+      <GeoAutocompleteInput
         placeholder="Adresse de livraison"
         value={dropoff}
-        onChange={(e) => { setDropoff(e.target.value); setEstimate(null); }}
+        onChange={(v) => { setDropoff(v); setEstimate(null); }}
       />
       {estimate != null && (
         <div className="bg-white rounded-xl p-4 shadow-sm">

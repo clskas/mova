@@ -536,10 +536,11 @@ export class DriversService {
     if (!profile.activationPin || profile.activationPin !== pin.trim()) {
       throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Code PIN incorrect.');
     }
-    return this.prisma.driverProfile.update({
+    await this.prisma.driverProfile.update({
       where: { userId },
       data: { activationPinVerifiedAt: new Date() },
     });
+    return this.getProfileWithUser(userId);
   }
 
   async getProfileWithUser(userId: string) {

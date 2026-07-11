@@ -41,3 +41,10 @@ export function roleFromToken(): string | null {
 export function isRestaurantRole(role: string | null): boolean {
   return role === "RESTAURANT";
 }
+
+export function phoneFromToken(): string | null {
+  const token = getToken();
+  if (!token) return null;
+  const payload = decodeJwtPayload(token);
+  return typeof payload?.phone === "string" ? payload.phone : null;
+}

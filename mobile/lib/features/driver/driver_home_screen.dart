@@ -81,6 +81,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
   bool _missionAlertsSeeded = false;
   bool _offerAlertsSeeded = false;
   String? _offersError;
+  bool _activationPinDialogOpen = false;
 
   @override
   void initState() {
@@ -313,7 +314,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
             ),
           );
         }
-        if (data['needsActivationPin'] == true && data['activationPinVerified'] != true) {
+        if (_needsActivationPinPrompt(data)) {
           _maybeShowActivationPin();
         }
         _syncProfilePoll(kycStatus);
@@ -325,58 +326,96 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
     }
   }
 
+  bool _isActivationPinVerified(Map<String, dynamic>? data) {
+    if (data == null) return false;
+    return data['activationPinVerified'] == true || data['activationPinVerifiedAt'] != null;
+  }
+
+  bool _needsActivationPinPrompt(Map<String, dynamic> data) {
+    if (_isActivationPinVerified(data)) return false;
+    return data['needsActivationPin'] == true;
+  }
+
   void _maybeShowActivationPin({bool force = false}) {
-    if (_profile?['activationPinVerified'] == true) return;
+    if (_isActivationPinVerified(_profile)) return;
     if (_profile?['needsActivationPin'] != true && !force) return;
-    if (!mounted) return;
+    if (!mounted || _activationPinDialogOpen) return;
+    _activationPinDialogOpen = true;
     final controller = TextEditingController();
+    var submitting = false;
     showDialog<void>(
       context: context,
       barrierDismissible: !force,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Code PIN d\'activation'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Text(
-              'Entrez le code à 6 chiffres communiqué par MOVA après validation de votre dossier.',
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: controller,
-              keyboardType: TextInputType.number,
-              maxLength: 6,
-              decoration: const InputDecoration(labelText: 'PIN'),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Text('Code PIN d\'activation'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'Entrez le code à 6 chiffres communiqué par MOVA après validation de votre dossier.',
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: controller,
+                keyboardType: TextInputType.number,
+                maxLength: 6,
+                enabled: !submitting,
+                decoration: const InputDecoration(labelText: 'PIN'),
+              ),
+            ],
+          ),
+          actions: [
+            if (!force)
+              TextButton(
+                onPressed: submitting ? null : () => Navigator.of(ctx, rootNavigator: true).pop(),
+                child: const Text('Plus tard'),
+              ),
+            TextButton(
+              onPressed: submitting
+                  ? null
+                  : () async {
+                      setDialogState(() => submitting = true);
+                      final api = ref.read(apiClientProvider);
+                      final result = await api.post('/drivers/activation-pin', {'pin': controller.text.trim()});
+                      if (!ctx.mounted) return;
+                      switch (result) {
+                        case Success(:final data):
+                          if (mounted) {
+                            setState(() {
+                              _profile = {
+                                ...?_profile,
+                                ...data,
+                                'activationPinVerified': true,
+                                'needsActivationPin': false,
+                              };
+                              _profileError = null;
+                            });
+                          }
+                          Navigator.of(ctx, rootNavigator: true).pop();
+                          await _loadProfile(clearCache: true);
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Compte activé — vous pouvez passer en ligne.')),
+                            );
+                          }
+                        case Failure(:final error):
+                          setDialogState(() => submitting = false);
+                          ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(error.message)));
+                      }
+                    },
+              child: submitting
+                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Text('Activer'),
             ),
           ],
         ),
-        actions: [
-          if (!force)
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Plus tard')),
-          TextButton(
-            onPressed: () async {
-              final api = ref.read(apiClientProvider);
-              final result = await api.post('/drivers/activation-pin', {'pin': controller.text.trim()});
-              if (!ctx.mounted) return;
-              switch (result) {
-                case Success():
-                  Navigator.pop(ctx);
-                  await _loadProfile(clearCache: true);
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Compte activé — vous pouvez passer en ligne.')),
-                    );
-                  }
-                case Failure(:final error):
-                  ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(error.message)));
-              }
-            },
-            child: const Text('Activer'),
-          ),
-        ],
       ),
-    );
+    ).whenComplete(() {
+      controller.dispose();
+      _activationPinDialogOpen = false;
+    });
   }
 
   void _syncProfilePoll(String? kycStatus) {

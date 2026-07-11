@@ -709,6 +709,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
         ],
         const SizedBox(height: 16),
         TextField(controller: _licenseNumber, decoration: const InputDecoration(labelText: 'N° permis')),
+        const SizedBox(height: _fieldGap),
         _datePickerField(controller: _licenseExpiry, label: 'Date d\'expiration du permis'),
         const SizedBox(height: 12),
         _docButton('DRIVERS_LICENSE', 'Photographier le permis'),

@@ -448,6 +448,22 @@ class ApiClient {
     if (path == '/wallet') {
       return Success(MockData.wallet());
     }
+    if (path.contains('/wallet/transactions')) {
+      final qIndex = path.indexOf('?');
+      final query = qIndex >= 0 ? path.substring(qIndex + 1) : '';
+      final params = Uri.splitQueryString(query);
+      final limit = int.tryParse(params['limit'] ?? '100') ?? 100;
+      final offset = int.tryParse(params['offset'] ?? '0') ?? 0;
+      final txs = MockData.walletTransactions();
+      final slice = txs.skip(offset).take(limit).toList();
+      return Success({
+        'data': slice,
+        'total': txs.length,
+        'limit': limit,
+        'offset': offset,
+        'currency': 'CDF',
+      });
+    }
     if (path.contains('/subscriptions/plans')) {
       return Success(MockData.subscriptionPlans());
     }
@@ -462,6 +478,9 @@ class ApiClient {
     }
     if (path.contains('/wallet/top-up') || path.contains('/wallet/topup')) {
       return Success(MockData.walletTopUp(body ?? {}));
+    }
+    if (path.contains('/wallet/withdraw') && method == 'POST') {
+      return Success(MockData.walletWithdraw(body ?? {}));
     }
     if (path == '/history' || path.startsWith('/history?')) {
       return Success({'data': MockData.unifiedHistory(), 'currency': 'CDF', 'city': 'Kinshasa'});
@@ -518,10 +537,9 @@ class ApiClient {
     if (path.contains('/drivers/profile') && method == 'GET') {
       return Success(MockData.driverProfile());
     }
-    if (path.contains('/drivers/availability') ||
+    if (        path.contains('/drivers/availability') ||
         path.contains('/drivers/kyc') ||
         path.contains('/drivers/location') ||
-        path.contains('/wallet/withdraw') ||
         path.contains('/ratings') ||
         path.contains('/incidents')) {
       return const Success({'success': true});
@@ -983,15 +1001,30 @@ class ApiClient {
         Failure(:final error) => Failure(error),
       };
     }
-    final result = await get('/geo/autocomplete?q=$encoded$cityParam');
-    return switch (result) {
-      Success(:final data) => Success(
-          List<Map<String, dynamic>>.from(
-            data['suggestions'] as List? ?? data['data'] as List? ?? [],
-          ),
-        ),
-      Failure() => Success(MockData.geoAutocomplete(query)),
-    };
+
+    List<Map<String, dynamic>> parseList(dynamic data) => List<Map<String, dynamic>>.from(
+          data is List
+              ? data
+              : data['suggestions'] as List? ?? data['data'] as List? ?? [],
+        );
+
+    try {
+      final response = await _client
+          .get(
+            Uri.parse('${MarketConfig.effectiveApiBaseUrl}/geo/autocomplete?q=$encoded$cityParam'),
+            headers: _headers,
+          )
+          .timeout(const Duration(seconds: 8));
+      final data = _decodeBody(response.body);
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        _markGatewayReachable();
+        final list = parseList(data);
+        if (list.isNotEmpty) return Success(list);
+      }
+    } catch (_) {
+      // Fallback local ci-dessous
+    }
+    return Success(MockData.geoAutocomplete(query));
   }
 
   Future<Result<Map<String, dynamic>>> createRide(Map<String, dynamic> body) async {

@@ -15,6 +15,8 @@ import {
   printPartnerReport,
   type PartnerEarningsReport,
 } from "@/lib/partner-reports";
+import { PartnerWithdrawPanel } from "@/components/PartnerWithdrawPanel";
+import { WalletMovementHistory } from "@/components/WalletMovementHistory";
 
 export default function RevenusPage() {
   const [earnings, setEarnings] = useState<PartnerEarnings | null>(null);
@@ -25,6 +27,7 @@ export default function RevenusPage() {
   const [to, setTo] = useState("");
   const [q, setQ] = useState("");
   const [exporting, setExporting] = useState(false);
+  const [walletHistoryRefresh, setWalletHistoryRefresh] = useState(0);
 
   const loadReport = useCallback(async () => {
     setError(null);
@@ -86,10 +89,21 @@ export default function RevenusPage() {
       {error && <p className="text-red-600 text-sm">{error}</p>}
 
       {earnings && (
-        <div className="rounded-2xl bg-gradient-to-br from-indigo-500 to-indigo-600 text-white p-6 shadow-md">
-          <p className="text-sm opacity-90">Solde disponible</p>
-          <p className="text-3xl font-bold mt-1">{earnings.formattedBalance}</p>
-        </div>
+        <>
+          <div className="rounded-2xl bg-gradient-to-br from-indigo-500 to-indigo-600 text-white p-6 shadow-md">
+            <p className="text-sm opacity-90">Solde disponible</p>
+            <p className="text-3xl font-bold mt-1">{earnings.formattedBalance}</p>
+          </div>
+          <PartnerWithdrawPanel
+            balanceCdf={earnings.balanceCdf}
+            onWithdrawn={() => {
+              setLoading(true);
+              setWalletHistoryRefresh((n) => n + 1);
+              loadReport();
+            }}
+          />
+          <WalletMovementHistory refreshKey={walletHistoryRefresh} />
+        </>
       )}
 
       <section className="rounded-xl border border-gray-100 bg-white p-4 space-y-3">

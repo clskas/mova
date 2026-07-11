@@ -27,6 +27,8 @@ import {
   type WalletTransaction,
 } from "@/lib/api";
 import { exportWalletTransactionsCsv, printWalletReport } from "@/lib/wallet-reports";
+import { isWalletRecharge, isWalletWithdraw, walletTxLabel } from "@/lib/wallet-movements";
+import { MOVA_PLATFORM_USER_ID, MOVA_PLATFORM_WALLET_LABEL } from "@/lib/platform-wallet";
 import { useAdmin } from "@/components/AdminProvider";
 import {
   BtnGhost,
@@ -91,6 +93,18 @@ export default function PortefeuillePage() {
   const [cashConfirmCode, setCashConfirmCode] = useState("");
   const [cashConfirmLoading, setCashConfirmLoading] = useState(false);
   const [cashConfirmSuccess, setCashConfirmSuccess] = useState<string | null>(null);
+  const [platformTreasury, setPlatformTreasury] = useState<UserWalletDetail | null>(null);
+  const [platformRechargeAmount, setPlatformRechargeAmount] = useState("");
+  const [platformRechargeDesc, setPlatformRechargeDesc] = useState("");
+  const [platformWithdrawAmount, setPlatformWithdrawAmount] = useState("");
+  const [platformWithdrawPhone, setPlatformWithdrawPhone] = useState("");
+  const [platformWithdrawProvider, setPlatformWithdrawProvider] = useState("ORANGE_MONEY");
+  const [platformSaving, setPlatformSaving] = useState(false);
+  const [platformSuccess, setPlatformSuccess] = useState<string | null>(null);
+  const [txFilter, setTxFilter] = useState<"all" | "recharge" | "withdraw">("all");
+  const [txLoadingMore, setTxLoadingMore] = useState(false);
+
+  const TX_PAGE_SIZE = 100;
 
   const activeUserId = selectedUser?.id ?? (filterUserId.trim() || "");
 
@@ -100,17 +114,27 @@ export default function PortefeuillePage() {
     return undefined;
   }, [selectedUser, filterUserId]);
 
+  const filteredTransactions = useMemo(() => {
+    if (txFilter === "recharge") return transactions.filter(isWalletRecharge);
+    if (txFilter === "withdraw") return transactions.filter(isWalletWithdraw);
+    return transactions;
+  }, [transactions, txFilter]);
+
+  const rechargeCount = useMemo(() => transactions.filter(isWalletRecharge).length, [transactions]);
+  const withdrawCount = useMemo(() => transactions.filter(isWalletWithdraw).length, [transactions]);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const userId = filterUserId.trim() || selectedUser?.id || undefined;
-      const [m, w, tx, debts, policy] = await Promise.all([
+      const [m, w, tx, debts, policy, treasury] = await Promise.all([
         apiFetch<AdminMetrics>("/api/admin/metrics"),
         fetchWalletOverview(),
-        fetchWalletTransactions(userId, 0, 200),
+        fetchWalletTransactions(userId, 0, TX_PAGE_SIZE),
         fetchCashDebts(userId),
         fetchDebtPolicy(),
+        fetchUserWallet(MOVA_PLATFORM_USER_ID).catch(() => null),
       ]);
       setMetrics(m);
       setWallet(w);
@@ -118,6 +142,7 @@ export default function PortefeuillePage() {
       setTxTotal(tx.total ?? tx.data?.length ?? 0);
       setCashDebts(debts);
       setDebtPolicy(policy);
+      setPlatformTreasury(treasury);
       setDebtThresholdInput(String(policy.maxOpenDebtCdf ?? 50000));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur de chargement");
@@ -125,6 +150,22 @@ export default function PortefeuillePage() {
       setLoading(false);
     }
   }, [filterUserId, selectedUser]);
+
+  const loadMoreTransactions = useCallback(async () => {
+    if (txLoadingMore || transactions.length >= txTotal) return;
+    setTxLoadingMore(true);
+    setError(null);
+    try {
+      const userId = filterUserId.trim() || selectedUser?.id || undefined;
+      const tx = await fetchWalletTransactions(userId, transactions.length, TX_PAGE_SIZE);
+      setTransactions((prev) => [...prev, ...(tx.data ?? [])]);
+      setTxTotal(tx.total ?? transactions.length + (tx.data?.length ?? 0));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erreur de chargement");
+    } finally {
+      setTxLoadingMore(false);
+    }
+  }, [filterUserId, selectedUser, transactions.length, txLoadingMore, txTotal]);
 
   useEffect(() => {
     load();
@@ -185,6 +226,49 @@ export default function PortefeuillePage() {
     setUserWalletDetail(null);
     setWithdrawPhone("");
     setWithdrawSuccess(null);
+  }
+
+  async function submitPlatformRecharge() {
+    if (!platformRechargeAmount.trim()) return;
+    setPlatformSaving(true);
+    setError(null);
+    setPlatformSuccess(null);
+    try {
+      const result = await adjustWallet(MOVA_PLATFORM_USER_ID, {
+        amountCdf: Number(platformRechargeAmount),
+        type: "CREDIT",
+        description: platformRechargeDesc.trim() || "Apport trésorerie MOVA (admin)",
+      });
+      setPlatformSuccess(result.message ?? "Trésorerie créditée.");
+      setPlatformRechargeAmount("");
+      setPlatformRechargeDesc("");
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Échec crédit trésorerie");
+    } finally {
+      setPlatformSaving(false);
+    }
+  }
+
+  async function submitPlatformWithdraw() {
+    if (!platformWithdrawAmount.trim() || !platformWithdrawPhone.trim()) return;
+    setPlatformSaving(true);
+    setError(null);
+    setPlatformSuccess(null);
+    try {
+      const result = await withdrawWallet(MOVA_PLATFORM_USER_ID, {
+        amountCdf: Number(platformWithdrawAmount),
+        provider: platformWithdrawProvider,
+        phone: platformWithdrawPhone.trim(),
+      });
+      setPlatformSuccess(result.message ?? "Retrait trésorerie initié.");
+      setPlatformWithdrawAmount("");
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Échec retrait trésorerie");
+    } finally {
+      setPlatformSaving(false);
+    }
   }
 
   async function submitAdjust() {
@@ -280,12 +364,12 @@ export default function PortefeuillePage() {
   const m = normalizeMetrics(metrics);
 
   const cards = [
+    { label: "Trésorerie MOVA", value: `${(wallet.platformBalanceCdf ?? platformTreasury?.balanceCdf ?? 0).toLocaleString("fr-CD")} FC` },
+    { label: "Dettes utilisateurs (wallets)", value: `${(wallet.userLiabilitiesCdf ?? 0).toLocaleString("fr-CD")} FC` },
     { label: "Revenus du jour", value: `${m.revenueTodayCdf.toLocaleString("fr-CD")} FC` },
-    { label: "Solde agrégé wallets", value: `${(wallet.totalBalanceCdf ?? 0).toLocaleString("fr-CD")} FC` },
-    { label: "Paiements en attente", value: `${(wallet.pendingPayoutsCdf ?? 0).toLocaleString("fr-CD")} FC` },
-    { label: "Dettes espèces ouvertes", value: `${(cashDebts?.totalOpenCdf ?? 0).toLocaleString("fr-CD")} FC` },
+    { label: "Solde agrégé (tous wallets)", value: `${(wallet.totalBalanceCdf ?? 0).toLocaleString("fr-CD")} FC` },
+    { label: "Dettes espèces chauffeurs", value: `${(cashDebts?.totalOpenCdf ?? 0).toLocaleString("fr-CD")} FC` },
     { label: "Transactions aujourd'hui", value: wallet.transactionsToday ?? 0 },
-    { label: "Débiteurs (espèces)", value: cashDebts?.debtorCount ?? 0 },
   ];
 
   return (
@@ -312,6 +396,11 @@ export default function PortefeuillePage() {
           {withdrawSuccess}
         </div>
       )}
+      {platformSuccess && (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          {platformSuccess}
+        </div>
+      )}
       {loading ? (
         <LoadingState />
       ) : (
@@ -324,6 +413,101 @@ export default function PortefeuillePage() {
               </Card>
             ))}
           </div>
+
+          <Card className="p-5 space-y-4 border-2 border-violet-200 bg-violet-50/40">
+            <div>
+              <h2 className="font-semibold text-lg">{MOVA_PLATFORM_WALLET_LABEL}</h2>
+              <p className="text-sm text-gray-600 mt-1">
+                Compte virtuel des commissions MOVA. Il se crédite automatiquement à chaque paiement (wallet ou espèces).
+                Les espèces collectées chez les chauffeurs se régularisent au guichet — voir section « Confirmer paiement espèces ».
+              </p>
+            </div>
+            <div className="grid sm:grid-cols-2 gap-4 text-sm">
+              <div className="rounded-xl bg-white border p-4">
+                <p className="text-gray-500">Solde trésorerie</p>
+                <p className="text-2xl font-bold text-[#6C63FF] mt-1">
+                  {formatCdf(wallet.platformBalanceCdf ?? platformTreasury?.balanceCdf ?? 0)}
+                </p>
+              </div>
+              <div className="rounded-xl bg-white border p-4">
+                <p className="text-gray-500">Passif utilisateurs (à honorer)</p>
+                <p className="text-2xl font-bold text-amber-700 mt-1">
+                  {formatCdf(wallet.userLiabilitiesCdf ?? 0)}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">Somme des wallets passagers, chauffeurs et partenaires</p>
+              </div>
+            </div>
+            <p className="text-xs text-gray-500 font-mono">
+              ID compte : {MOVA_PLATFORM_USER_ID}
+            </p>
+            {!readOnly && (
+              <div className="grid lg:grid-cols-2 gap-6 pt-2">
+                <div className="space-y-3">
+                  <h3 className="font-medium">Recharger la trésorerie (apport virtuel)</h3>
+                  <p className="text-xs text-gray-500">
+                    Injecte des fonds virtuels (float initial, correction comptable). En production, cela reflète un dépôt réel sur le compte MOVA.
+                  </p>
+                  <label>
+                    <FieldLabel>Montant CDF</FieldLabel>
+                    <TextInput
+                      value={platformRechargeAmount}
+                      onChange={setPlatformRechargeAmount}
+                      type="number"
+                      placeholder="100000"
+                    />
+                  </label>
+                  <label>
+                    <FieldLabel>Motif</FieldLabel>
+                    <TextInput
+                      value={platformRechargeDesc}
+                      onChange={setPlatformRechargeDesc}
+                      placeholder="Apport capital / float Mobile Money"
+                    />
+                  </label>
+                  <BtnPrimary onClick={submitPlatformRecharge} disabled={platformSaving || !platformRechargeAmount.trim()}>
+                    {platformSaving ? "En cours…" : "Créditer la trésorerie"}
+                  </BtnPrimary>
+                </div>
+                <div className="space-y-3">
+                  <h3 className="font-medium">Retirer vers Mobile Money (sortie réelle)</h3>
+                  <p className="text-xs text-gray-500">
+                    Transfère des fonds du compte trésorerie MOVA vers un numéro Orange / M-Pesa / Airtel (compte société).
+                  </p>
+                  <label>
+                    <FieldLabel>Montant CDF</FieldLabel>
+                    <TextInput
+                      value={platformWithdrawAmount}
+                      onChange={setPlatformWithdrawAmount}
+                      type="number"
+                      placeholder="50000"
+                    />
+                  </label>
+                  <label>
+                    <FieldLabel>Opérateur</FieldLabel>
+                    <SelectInput
+                      value={platformWithdrawProvider}
+                      onChange={setPlatformWithdrawProvider}
+                      options={MOBILE_MONEY_PROVIDERS}
+                    />
+                  </label>
+                  <label>
+                    <FieldLabel>Numéro compte MOVA (+243…)</FieldLabel>
+                    <TextInput
+                      value={platformWithdrawPhone}
+                      onChange={setPlatformWithdrawPhone}
+                      placeholder="+243812345678"
+                    />
+                  </label>
+                  <BtnPrimary
+                    onClick={submitPlatformWithdraw}
+                    disabled={platformSaving || !platformWithdrawAmount.trim() || !platformWithdrawPhone.trim()}
+                  >
+                    {platformSaving ? "Retrait…" : "Retirer de la trésorerie"}
+                  </BtnPrimary>
+                </div>
+              </div>
+            )}
+          </Card>
 
           <Card className="p-5 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -378,6 +562,18 @@ export default function PortefeuillePage() {
                 <p className="mt-1 text-lg font-bold text-[#6C63FF]">
                   Solde: {formatCdf(userWalletDetail.balanceCdf ?? 0)}
                 </p>
+                {activeUserId && (
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                    <div className="rounded-lg bg-white/80 px-3 py-2">
+                      <p className="text-gray-500">Recharges</p>
+                      <p className="font-semibold text-emerald-700">{rechargeCount}</p>
+                    </div>
+                    <div className="rounded-lg bg-white/80 px-3 py-2">
+                      <p className="text-gray-500">Retraits</p>
+                      <p className="font-semibold text-amber-800">{withdrawCount}</p>
+                    </div>
+                  </div>
+                )}
                 {cashDebts && cashDebts.totalOpenCdf > 0 && (
                   <p className="mt-2 text-amber-800 font-semibold">
                     Dette espèces à la plateforme : {formatCdf(cashDebts.totalOpenCdf)}
@@ -702,6 +898,26 @@ export default function PortefeuillePage() {
               </BtnGhost>
               <BtnPrimary onClick={load}>Actualiser</BtnPrimary>
             </div>
+            <div className="flex flex-wrap gap-2 mb-3">
+              {([
+                ["all", `Toutes (${transactions.length})`],
+                ["recharge", `Recharges (${rechargeCount})`],
+                ["withdraw", `Retraits (${withdrawCount})`],
+              ] as const).map(([id, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setTxFilter(id)}
+                  className={`px-3 py-1 rounded-full text-xs font-medium border ${
+                    txFilter === id
+                      ? "bg-[#6C63FF] text-white border-[#6C63FF]"
+                      : "bg-white text-gray-600 border-gray-200"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
             <Card className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -715,14 +931,14 @@ export default function PortefeuillePage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {transactions.length === 0 ? (
+                  {filteredTransactions.length === 0 ? (
                     <tr>
                       <td colSpan={6} className="p-4 text-gray-500">
                         Aucune transaction{filterLabel ? " pour ce filtre" : ""}.
                       </td>
                     </tr>
                   ) : (
-                    transactions.map((t) => (
+                    filteredTransactions.map((t) => (
                       <tr key={t.id} className="border-b">
                         <td className="p-3 text-gray-500">{formatDate(t.createdAt)}</td>
                         <td className="p-3 font-medium">{t.wallet?.userName ?? "—"}</td>
@@ -731,13 +947,22 @@ export default function PortefeuillePage() {
                           <StatusBadge status={t.type} />
                         </td>
                         <td className="p-3">{formatCdf(Math.abs(t.amountCdf))}</td>
-                        <td className="p-3">{t.description ?? "—"}</td>
+                        <td className="p-3">{walletTxLabel(t)}</td>
                       </tr>
                     ))
                   )}
                 </tbody>
               </table>
             </Card>
+            {transactions.length < txTotal && (
+              <div className="mt-3 flex justify-center">
+                <BtnGhost onClick={loadMoreTransactions} disabled={txLoadingMore}>
+                  {txLoadingMore
+                    ? "Chargement…"
+                    : `Charger plus (${transactions.length} / ${txTotal})`}
+                </BtnGhost>
+              </div>
+            )}
           </section>
         </>
       )}

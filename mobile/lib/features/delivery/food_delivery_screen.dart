@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
@@ -54,6 +56,11 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
   String? _validationError;
   String _searchQuery = '';
   bool _loadingGps = false;
+  bool _loadingAddressSuggestions = false;
+  bool _showAddressSuggestions = false;
+  bool _addressCoordsResolved = false;
+  List<Map<String, dynamic>> _addressSuggestions = [];
+  Timer? _addressDebounce;
   String _deliveryCityId = ServiceAreas.fallbackArea.id;
   double _deliveryLat = ServiceAreas.fallbackArea.center.latitude;
   double _deliveryLng = ServiceAreas.fallbackArea.center.longitude;
@@ -67,7 +74,73 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
     if (widget.initialDeliveryAddress != null) {
       _addressController.text = widget.initialDeliveryAddress!;
     }
+    _addressController.addListener(_onAddressChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) => _bootstrapDeliveryLocation());
+  }
+
+  void _onAddressChanged() {
+    _addressDebounce?.cancel();
+    _addressDebounce = Timer(const Duration(milliseconds: 350), _fetchAddressSuggestions);
+    setState(() {
+      _estimatedTotal = null;
+      _estimatedDeliveryFee = null;
+      _estimatedDiscount = null;
+      _addressCoordsResolved = false;
+    });
+  }
+
+  Future<void> _fetchAddressSuggestions() async {
+    final query = _addressController.text.trim();
+    if (query.length < 2 || query == 'Ma position') {
+      setState(() {
+        _addressSuggestions = [];
+        _showAddressSuggestions = false;
+      });
+      return;
+    }
+    setState(() => _loadingAddressSuggestions = true);
+    final api = ref.read(apiClientProvider);
+    final result = await api.geoAutocomplete(query, city: _deliveryCityName);
+    if (!mounted) return;
+    setState(() {
+      _loadingAddressSuggestions = false;
+      switch (result) {
+        case Success(:final data):
+          _addressSuggestions = data;
+          _showAddressSuggestions = data.isNotEmpty;
+        case Failure():
+          _addressSuggestions = [];
+          _showAddressSuggestions = false;
+      }
+    });
+  }
+
+  void _selectAddressSuggestion(Map<String, dynamic> suggestion) {
+    final label = suggestion['label']?.toString() ?? suggestion['address']?.toString() ?? '';
+    _addressController.removeListener(_onAddressChanged);
+    _addressController.text = label;
+    _addressController.addListener(_onAddressChanged);
+    final coords = ServiceAreaLocation.ensureInServiceArea(
+      LatLng(
+        (suggestion['lat'] as num?)?.toDouble() ?? _deliveryLat,
+        (suggestion['lng'] as num?)?.toDouble() ?? _deliveryLng,
+      ),
+      address: label,
+    );
+    final detected = ServiceAreas.byCoords(coords) ?? ServiceAreas.nearest(coords);
+    setState(() {
+      _deliveryCityId = detected.id;
+      _deliveryLat = coords.latitude;
+      _deliveryLng = coords.longitude;
+      _showAddressSuggestions = false;
+      _addressSuggestions = [];
+      _addressCoordsResolved = true;
+      _estimatedTotal = null;
+      _estimatedDeliveryFee = null;
+      _estimatedDiscount = null;
+    });
+    _syncCityPreference(detected.id);
+    _loadRestaurants(background: true);
   }
 
   Future<void> _bootstrapDeliveryLocation() async {
@@ -142,56 +215,57 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
       _estimatedTotal = null;
       _estimatedDeliveryFee = null;
       _estimatedDiscount = null;
+      _addressCoordsResolved = true;
     });
     await _syncCityPreference(detected.id);
     await _loadRestaurants(background: true);
   }
 
-  void _setDeliveryFromCoords(LatLng coords, String label) {
-    final safe = ServiceAreaLocation.ensureInServiceArea(coords, address: label);
-    setState(() {
-      _deliveryLat = safe.latitude;
-      _deliveryLng = safe.longitude;
-      if (_addressController.text.trim().isEmpty || _addressController.text == 'Ma position') {
-        _addressController.text = label;
-      }
-      _estimatedTotal = null;
-      _estimatedDeliveryFee = null;
-      _estimatedDiscount = null;
-    });
-    _loadRestaurants(background: true);
-  }
-
   Widget _buildDeliveryAddressField() {
-    return TextField(
-      controller: _addressController,
-      textInputAction: TextInputAction.done,
-      decoration: InputDecoration(
-        labelText: 'Adresse de livraison',
-        hintText: 'Ex: Gombe, Bandal, Limete…',
-        helperText: 'Saisissez l\'adresse complète ou utilisez le GPS',
-        helperMaxLines: 2,
-        prefixIcon: const Icon(Icons.delivery_dining),
-        suffixIcon: _loadingGps
-            ? const Padding(
-                padding: EdgeInsets.all(12),
-                child: SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-              )
-            : IconButton(
-                icon: const Icon(Icons.gps_fixed, color: MovaColors.violet),
-                tooltip: 'Ma position',
-                onPressed: _loadingGps ? null : _useMyLocationForDelivery,
-              ),
-      ),
-      onChanged: (_) => setState(() {
-        _estimatedTotal = null;
-        _estimatedDeliveryFee = null;
-        _estimatedDiscount = null;
-      }),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        TextField(
+          controller: _addressController,
+          textInputAction: TextInputAction.done,
+          decoration: InputDecoration(
+            labelText: 'Adresse de livraison',
+            hintText: 'Ex: Gombe, Bandal, Limete…',
+            helperText: 'Saisissez un nom de lieu — suggestions géocodées',
+            helperMaxLines: 2,
+            prefixIcon: const Icon(Icons.delivery_dining),
+            suffixIcon: _loadingGps || _loadingAddressSuggestions
+                ? const Padding(
+                    padding: EdgeInsets.all(12),
+                    child: SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  )
+                : IconButton(
+                    icon: const Icon(Icons.gps_fixed, color: MovaColors.violet),
+                    tooltip: 'Ma position',
+                    onPressed: _loadingGps ? null : _useMyLocationForDelivery,
+                  ),
+          ),
+        ),
+        if (_showAddressSuggestions && _addressSuggestions.isNotEmpty)
+          Card(
+            margin: const EdgeInsets.only(top: 4),
+            child: Column(
+              children: _addressSuggestions.take(6).map((s) {
+                final label = s['label']?.toString() ?? s['address']?.toString() ?? '';
+                return ListTile(
+                  dense: true,
+                  leading: const Icon(Icons.location_on_outlined, size: 20),
+                  title: Text(label, maxLines: 2, overflow: TextOverflow.ellipsis),
+                  onTap: () => _selectAddressSuggestion(s),
+                );
+              }).toList(),
+            ),
+          ),
+      ],
     );
   }
 
@@ -220,8 +294,43 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
     }
   }
 
+  Future<String?> _resolveDeliveryAddress() async {
+    if (_addressCoordsResolved) return null;
+    final text = _addressController.text.trim();
+    if (text.isEmpty) return 'Indiquez l\'adresse de livraison.';
+    if (text == 'Ma position') {
+      await _resolveDeliveryCoords(reloadAfter: true);
+      return null;
+    }
+    final api = ref.read(apiClientProvider);
+    final result = await api.geoAutocomplete(text, city: _deliveryCityName);
+    if (result case Success(:final data) when data.isNotEmpty) {
+      _selectAddressSuggestion(data.first);
+      return null;
+    }
+    return 'Lieu non reconnu — choisissez une suggestion (ex. Gombe, Limete) ou utilisez le GPS.';
+  }
+
+  void _setDeliveryFromCoords(LatLng coords, String label) {
+    final safe = ServiceAreaLocation.ensureInServiceArea(coords, address: label);
+    setState(() {
+      _deliveryLat = safe.latitude;
+      _deliveryLng = safe.longitude;
+      _addressCoordsResolved = true;
+      if (_addressController.text.trim().isEmpty || _addressController.text == 'Ma position') {
+        _addressController.text = label;
+      }
+      _estimatedTotal = null;
+      _estimatedDeliveryFee = null;
+      _estimatedDiscount = null;
+    });
+    _loadRestaurants(background: true);
+  }
+
   @override
   void dispose() {
+    _addressDebounce?.cancel();
+    _addressController.removeListener(_onAddressChanged);
     _addressController.dispose();
     _promoController.dispose();
     super.dispose();
@@ -779,6 +888,11 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
       setState(() => _validationError = 'Indiquez l\'adresse de livraison.');
       return;
     }
+    final geoError = await _resolveDeliveryAddress();
+    if (geoError != null) {
+      setState(() => _validationError = geoError);
+      return;
+    }
     setState(() {
       _ordering = true;
       _error = null;
@@ -808,6 +922,11 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
     }
     if (_addressController.text.trim().isEmpty) {
       setState(() => _validationError = 'Indiquez l\'adresse de livraison.');
+      return;
+    }
+    final geoError = await _resolveDeliveryAddress();
+    if (geoError != null) {
+      setState(() => _validationError = geoError);
       return;
     }
     setState(() {

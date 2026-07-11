@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { apiFetch, formatCdf } from "@/lib/api";
+import { GeoAutocompleteInput } from "./GeoAutocompleteInput";
 
 type Vehicle = { id: string; name: string; category?: string; pricePerDayCdf?: number; dailyRateCdf?: number };
 
@@ -110,7 +111,7 @@ export function RentalView({ onBack, mock }: Props) {
       )}
       <label className="block text-sm font-medium">Durée (jours)</label>
       <input type="number" min={1} max={30} className="w-full rounded-xl border-0 bg-white p-3 shadow-sm" value={days} onChange={(e) => { setDays(Number(e.target.value)); setEstimate(null); }} />
-      <input className="w-full rounded-xl border-0 bg-white p-3 shadow-sm" placeholder="Lieu de prise en charge" value={pickup} onChange={(e) => setPickup(e.target.value)} />
+      <GeoAutocompleteInput placeholder="Lieu de prise en charge" value={pickup} onChange={setPickup} />
       <input className="w-full rounded-xl border-0 bg-white p-3 shadow-sm" placeholder="Téléphone" value={phone} onChange={(e) => setPhone(e.target.value)} />
       {estimate != null && (
         <div className="bg-white rounded-xl p-4 shadow-sm">

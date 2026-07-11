@@ -465,8 +465,13 @@ export type AdminSessionUser = {
 
 export type WalletOverview = {
   totalBalanceCdf?: number;
+  /** Solde du compte trésorerie MOVA (commissions virtuelles). */
+  platformBalanceCdf?: number;
+  /** Somme des soldes utilisateurs (passagers, chauffeurs, partenaires). */
+  userLiabilitiesCdf?: number;
   pendingPayoutsCdf?: number;
   transactionsToday?: number;
+  walletCount?: number;
 };
 
 export type CashDebtor = {

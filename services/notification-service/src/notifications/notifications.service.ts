@@ -19,6 +19,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { SmsService } from '../sms/sms.service';
 import { FcmPushService } from '../push/fcm-push.service';
 import { PushTokensService } from '../push/push-tokens.service';
+import { WebPushService } from '../push/web-push.service';
+import { fetchAuthUserBrief } from '../common/user-lookup.util';
 
 @Injectable()
 export class NotificationsService implements OnModuleInit {
@@ -28,6 +30,7 @@ export class NotificationsService implements OnModuleInit {
     private redis: RedisService,
     private sms: SmsService,
     private fcm: FcmPushService,
+    private webPush: WebPushService,
     private pushTokens: PushTokensService,
   ) {}
 
@@ -81,6 +84,35 @@ export class NotificationsService implements OnModuleInit {
     await this.fcm.sendToTokens(tokens, { title, body, data });
   }
 
+  /** Web Push + SMS optionnel pour portails restaurant / location. */
+  private async alertPartner(options: {
+    ownerUserId: string;
+    appFlavor: 'restaurant' | 'rental_partner';
+    title: string;
+    body: string;
+    tag: string;
+    portalPath?: string;
+    smsBody?: string;
+  }) {
+    const sent = await this.webPush.sendToUsers([options.ownerUserId], options.appFlavor, {
+      title: options.title,
+      body: options.body,
+      tag: options.tag,
+      url: options.portalPath ?? '/',
+    });
+    if (sent > 0) {
+      this.logger.log(`partner web push ${options.appFlavor} → ${options.ownerUserId} (${sent})`);
+    } else if (!this.webPush.isConfigured()) {
+      this.logger.debug(`partner web push skipped (VAPID non configuré) ${options.appFlavor}`);
+    }
+
+    if (process.env.PARTNER_SMS_ALERTS !== 'true') return;
+    const owner = await fetchAuthUserBrief(options.ownerUserId);
+    if (!owner?.phone) return;
+    const smsText = options.smsBody ?? `MOVA — ${options.title}. ${options.body}`;
+    await this.sms.sendMessage(owner.phone, smsText);
+  }
+
   async create(userId: string, title: string, body: string, type: string, data?: object) {
     return this.prisma.notification.create({ data: { userId, title, body, type, data: data ?? {} } });
   }
@@ -116,13 +148,24 @@ export class NotificationsService implements OnModuleInit {
       payload,
     );
     if (payload.restaurantOwnerUserId) {
+      const title = 'Nouvelle commande repas';
+      const body = `Commande reçue${label}. Ouvrez le portail restaurant pour confirmer.`;
       await this.create(
         payload.restaurantOwnerUserId,
-        'Nouvelle commande repas',
-        `Commande reçue${label}. Ouvrez le portail restaurant pour confirmer.`,
+        title,
+        body,
         'RESTAURANT_ORDER',
         payload,
       );
+      await this.alertPartner({
+        ownerUserId: payload.restaurantOwnerUserId,
+        appFlavor: 'restaurant',
+        title,
+        body,
+        tag: `order-${payload.deliveryId}`,
+        portalPath: '/',
+        smsBody: `MOVA Restaurant — Nouvelle commande${label}. Connectez-vous au portail pour confirmer.`,
+      });
       this.logger.log(`restaurant order notification for ${payload.deliveryId}`);
     }
   }
@@ -259,6 +302,17 @@ export class NotificationsService implements OnModuleInit {
         break;
     }
     await this.create(payload.ownerUserId, title, body, 'RENTAL_BOOKING', payload);
+    if (payload.kind === 'NEW_BOOKING') {
+      await this.alertPartner({
+        ownerUserId: payload.ownerUserId,
+        appFlavor: 'rental_partner',
+        title,
+        body,
+        tag: `rental-${payload.inquiryId}`,
+        portalPath: '/reservations',
+        smsBody: `MOVA Location — ${passenger} demande ${payload.vehicleName}. Ouvrez le portail partenaire.`,
+      });
+    }
     this.logger.log(`rental.booking ${payload.kind} for owner ${payload.ownerUserId}`);
   }
 

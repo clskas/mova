@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { apiFetch, formatCdf } from "@/lib/api";
+import { GeoAutocompleteInput } from "./GeoAutocompleteInput";
 
 type MenuItem = { id: string; name: string; priceCdf: number };
 type ApiMenuItem = { id?: string; name: string; priceCdf?: number; unitPriceCdf?: number };
@@ -162,12 +163,7 @@ export function FoodOrder({ onBack, mock }: Props) {
 
       {cartTotal > 0 && (
         <>
-          <input
-            className="w-full rounded-xl border-0 bg-white p-3 shadow-sm"
-            placeholder="Adresse de livraison"
-            value={address}
-            onChange={(e) => setAddress(e.target.value)}
-          />
+          <GeoAutocompleteInput placeholder="Adresse de livraison" value={address} onChange={setAddress} />
           <div className="bg-white rounded-xl p-4 shadow-sm space-y-1 text-sm">
             <div className="flex justify-between"><span>Sous-total</span><span>{formatCdf(cartTotal)}</span></div>
             <div className="flex justify-between"><span>Livraison</span><span>{formatCdf(deliveryFee)}</span></div>

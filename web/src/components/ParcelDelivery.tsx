@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { apiFetch, formatCdf } from "@/lib/api";
+import { GeoAutocompleteInput } from "./GeoAutocompleteInput";
 import { PromoCodeInput, promoPayload } from "./PromoCodeInput";
 
 const WEIGHT_CATEGORIES = [
@@ -71,17 +72,11 @@ export function ParcelDelivery({ onBack, mock }: Props) {
       <button onClick={onBack} className="text-sm text-[#6C63FF]">← Accueil</button>
       <h2 className="text-lg font-semibold">Livraison colis</h2>
 
-      <input
-        className="w-full rounded-xl border-0 bg-white p-3 shadow-sm"
-        placeholder="Adresse d'enlèvement"
-        value={pickup}
-        onChange={(e) => setPickup(e.target.value)}
-      />
-      <input
-        className="w-full rounded-xl border-0 bg-white p-3 shadow-sm"
+      <GeoAutocompleteInput placeholder="Adresse d'enlèvement" value={pickup} onChange={setPickup} />
+      <GeoAutocompleteInput
         placeholder="Adresse de livraison"
         value={dropoff}
-        onChange={(e) => { setDropoff(e.target.value); setEstimate(null); }}
+        onChange={(v) => { setDropoff(v); setEstimate(null); }}
       />
 
       <p className="text-sm font-medium">Catégorie de poids</p>

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { apiFetch, formatCdf } from "@/lib/api";
+import { GeoAutocompleteInput } from "./GeoAutocompleteInput";
 import { PromoCodeInput, promoPayload } from "./PromoCodeInput";
 
 type Props = { onBack: () => void; mock: boolean };
@@ -91,8 +92,8 @@ export function ErrandsView({ onBack, mock }: Props) {
       <button type="button" onClick={onBack} className="text-sm text-[#6C63FF]">← Accueil</button>
       <h2 className="text-lg font-semibold">Courses & commissions</h2>
       {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg py-2 px-3">{error}</p>}
-      <input className="w-full rounded-xl border-0 bg-white p-3 shadow-sm" placeholder="Où acheter" value={pickup} onChange={(e) => setPickup(e.target.value)} />
-      <input className="w-full rounded-xl border-0 bg-white p-3 shadow-sm" placeholder="Livraison à" value={dropoff} onChange={(e) => setDropoff(e.target.value)} />
+      <GeoAutocompleteInput placeholder="Où acheter" value={pickup} onChange={setPickup} />
+      <GeoAutocompleteInput placeholder="Livraison à" value={dropoff} onChange={setDropoff} />
       <div className="flex gap-2">
         <input className="flex-1 rounded-xl border-0 bg-white p-3 shadow-sm" placeholder="Article (ex: pain, lait…)" value={itemInput} onChange={(e) => setItemInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addItem()} />
         <button type="button" onClick={addItem} className="px-4 bg-gray-100 rounded-xl text-sm font-medium">+</button>

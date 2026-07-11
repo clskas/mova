@@ -63,6 +63,48 @@ export type Publicite = {
   cible?: string;
 };
 
+export type GeoSuggestion = {
+  label: string;
+  address?: string;
+  lat: number;
+  lng: number;
+  city?: string;
+};
+
+export async function fetchGeoAutocomplete(query: string, city = 'Kinshasa'): Promise<GeoSuggestion[]> {
+  const q = query.trim();
+  if (q.length < 2) return [];
+  const localFallback = (): GeoSuggestion[] => {
+    const districts = ['Gombe', 'Limete', 'Bandalungwa', 'Masina', 'Kintambo', 'Ngaliema', 'Kalamu', 'Ngaliema'];
+    return districts
+      .filter((d) => d.toLowerCase().includes(q.toLowerCase()))
+      .slice(0, 8)
+      .map((d) => ({
+        label: `${d}, ${city}`,
+        address: `${d}, ${city}, RDC`,
+        lat: -4.3217,
+        lng: 15.3125,
+        city,
+      }));
+  };
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+    const res = await fetch(
+      `${API_BASE}/api/geo/autocomplete?q=${encodeURIComponent(q)}&city=${encodeURIComponent(city)}`,
+      { signal: controller.signal },
+    );
+    clearTimeout(timer);
+    if (!res.ok) return localFallback();
+    const body = await res.json();
+    const list = Array.isArray(body) ? body : (body as { data?: GeoSuggestion[] }).data ?? [];
+    const filtered = list.filter((s) => s?.lat != null && s?.lng != null);
+    return filtered.length > 0 ? filtered : localFallback();
+  } catch {
+    return localFallback();
+  }
+}
+
 export async function fetchActivePublicites(cible?: string): Promise<Publicite[]> {
   const q = cible ? `?cible=${encodeURIComponent(cible)}` : '';
   try {
@@ -73,6 +115,26 @@ export async function fetchActivePublicites(cible?: string): Promise<Publicite[]
   } catch {
     return [];
   }
+}
+
+const mockWalletTxStore: {
+  id: string;
+  type: string;
+  amountCdf: number;
+  description: string;
+  reference?: string;
+  createdAt: string;
+}[] = [];
+
+function recordMockWalletTx(type: string, amountCdf: number, description: string, reference?: string) {
+  mockWalletTxStore.unshift({
+    id: `tx-mock-${Date.now()}`,
+    type,
+    amountCdf,
+    description,
+    reference,
+    createdAt: new Date().toISOString(),
+  });
 }
 
 function mockFor<T>(path: string, init?: RequestInit): T {
@@ -158,6 +220,19 @@ function mockFor<T>(path: string, init?: RequestInit): T {
   if (path.includes('/errands') && method === 'POST') {
     return { order: { id: `errand-${Date.now()}`, status: 'PENDING' } } as T;
   }
+  if (path.includes('/geo/autocomplete')) {
+    const q = new URL(path, 'http://local').searchParams.get('q')?.toLowerCase() ?? '';
+    const districts = ['Gombe', 'Limete', 'Bandalungwa', 'Masina', 'Kintambo', 'Ngaliema'];
+    return districts
+      .filter((d) => d.toLowerCase().includes(q))
+      .map((d) => ({
+        label: `${d}, Kinshasa`,
+        address: `${d}, Kinshasa, RDC`,
+        lat: -4.3217,
+        lng: 15.3125,
+        city: 'Kinshasa',
+      })) as T;
+  }
   if (path.includes('/deliveries/restaurants')) {
     return {
       data: [
@@ -212,15 +287,29 @@ function mockFor<T>(path: string, init?: RequestInit): T {
   if (path.includes('/wallet/top-up') || path.includes('/wallet/topup')) {
     const body = init?.body ? JSON.parse(init.body as string) : {};
     const amount = body.amountCdf ?? 10000;
-    return { success: true, balanceCdf: 50000 + amount, message: `Recharge de ${amount} FC` } as T;
+    const provider = body.provider ?? 'MOCK';
+    recordMockWalletTx('CREDIT', amount, `Recharge ${provider}`, `topup_${String(provider).toLowerCase()}_${Date.now()}`);
+    return { success: true, balanceCdf: amount, message: `Recharge de ${amount} FC` } as T;
+  }
+  if (path.includes('/wallet/withdraw') && method === 'POST') {
+    const body = init?.body ? JSON.parse(init.body as string) : {};
+    const amount = body.amountCdf ?? 0;
+    const provider = body.provider ?? 'MOBILE_MONEY';
+    const phone = body.phone ?? 'Mobile Money';
+    recordMockWalletTx('DEBIT', -amount, `Retrait ${provider} vers ${phone}`, `withdraw_${String(provider).toLowerCase()}_${Date.now()}`);
+    return { success: true, balanceCdf: 0, message: `Retrait de ${amount} FC` } as T;
+  }
+  if (path.includes('/wallet/transactions')) {
+    const url = new URL(path, 'http://mock.local');
+    const limit = Math.min(Math.max(parseInt(url.searchParams.get('limit') ?? '100', 10) || 100, 1), 100);
+    const offset = Math.max(parseInt(url.searchParams.get('offset') ?? '0', 10) || 0, 0);
+    const slice = mockWalletTxStore.slice(offset, offset + limit);
+    return { data: slice, total: mockWalletTxStore.length, limit, offset } as T;
   }
   if (path.includes('/wallet')) {
     return {
-      balanceCdf: 50000,
-      transactions: [
-        { type: 'CREDIT', amountCdf: 10000, description: 'Recharge Orange Money', createdAt: new Date().toISOString() },
-        { type: 'DEBIT', amountCdf: -3500, description: 'Course taxi', createdAt: new Date(Date.now() - 86400000).toISOString() },
-      ],
+      balanceCdf: mockWalletTxStore.reduce((s, t) => s + t.amountCdf, 0),
+      transactions: mockWalletTxStore,
     } as T;
   }
   if (path.includes('/carpool/estimate') && method === 'POST') {

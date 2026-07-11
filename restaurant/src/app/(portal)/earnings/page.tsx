@@ -17,6 +17,8 @@ import {
   printPartnerReport,
   type PartnerEarningsReport,
 } from "@/lib/partner-reports";
+import { PartnerWithdrawPanel } from "@/components/PartnerWithdrawPanel";
+import { WalletMovementHistory } from "@/components/WalletMovementHistory";
 
 export default function EarningsPage() {
   const searchParams = useSearchParams();
@@ -28,6 +30,7 @@ export default function EarningsPage() {
   const [to, setTo] = useState("");
   const [q, setQ] = useState("");
   const [exporting, setExporting] = useState(false);
+  const [walletHistoryRefresh, setWalletHistoryRefresh] = useState(0);
 
   useEffect(() => {
     const from = searchParams.get("from");
@@ -96,13 +99,24 @@ export default function EarningsPage() {
       {error && <p className="text-red-600 text-sm">{error}</p>}
 
       {earnings && (
-        <div className="rounded-2xl bg-gradient-to-br from-orange-500 to-orange-600 text-white p-6 shadow-md">
-          <p className="text-sm opacity-90">Solde disponible</p>
-          <p className="text-3xl font-bold mt-1">{earnings.formattedBalance}</p>
-          <p className="text-xs opacity-80 mt-2">
-            Les frais de livraison et la commission plateforme sont versés au livreur et à MOVA.
-          </p>
-        </div>
+        <>
+          <div className="rounded-2xl bg-gradient-to-br from-orange-500 to-orange-600 text-white p-6 shadow-md">
+            <p className="text-sm opacity-90">Solde disponible</p>
+            <p className="text-3xl font-bold mt-1">{earnings.formattedBalance}</p>
+            <p className="text-xs opacity-80 mt-2">
+              Les frais de livraison et la commission plateforme sont versés au livreur et à MOVA.
+            </p>
+          </div>
+          <PartnerWithdrawPanel
+            balanceCdf={earnings.balanceCdf}
+            onWithdrawn={() => {
+              setLoading(true);
+              setWalletHistoryRefresh((n) => n + 1);
+              load();
+            }}
+          />
+          <WalletMovementHistory refreshKey={walletHistoryRefresh} />
+        </>
       )}
 
       <section className="rounded-xl border border-gray-100 bg-white p-4 space-y-3">

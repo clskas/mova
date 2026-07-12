@@ -278,9 +278,11 @@ class ApiClient {
       return Success(MockData.estimate(body ?? {}));
     }
     if (path.contains('/geo/autocomplete')) {
-      final q = Uri.parse('http://x$path').queryParameters['q'] ??
+      final uri = Uri.parse('http://x$path');
+      final q = uri.queryParameters['q'] ??
           path.split('q=').last.split('&').first;
-      return Success({'suggestions': MockData.geoAutocomplete(q)});
+      final city = uri.queryParameters['city'];
+      return Success({'suggestions': MockData.geoAutocomplete(q, city: city)});
     }
     if (path.contains('/geo/communes')) {
       return Success({'data': MockData.communes()});
@@ -988,16 +990,19 @@ class ApiClient {
   Future<Result<List<Map<String, dynamic>>>> geoAutocomplete(String query, {String? city}) async {
     if (query.trim().length < 2) return const Success([]);
     await ensureReady();
-    final encoded = Uri.encodeQueryComponent(query.trim());
+    final trimmed = query.trim();
+    final encoded = Uri.encodeQueryComponent(trimmed);
     final cityParam = city != null ? '&city=${Uri.encodeQueryComponent(city)}' : '';
     final mock = _mockFor('GET', '/geo/autocomplete?q=$encoded$cityParam', null);
     if (mock != null) {
       return switch (mock) {
-        Success(:final data) => Success(
+        Success(:final data) => Success(_mergeGeoSuggestions(
             List<Map<String, dynamic>>.from(
               data['suggestions'] as List? ?? data['data'] as List? ?? [],
             ),
-          ),
+            trimmed,
+            city: city,
+          )),
         Failure(:final error) => Failure(error),
       };
     }
@@ -1008,23 +1013,75 @@ class ApiClient {
               : data['suggestions'] as List? ?? data['data'] as List? ?? [],
         );
 
-    try {
+    List<String> apiBases() {
+      final bases = <String>[];
+      for (final gateway in MarketConfig.gatewayProbeBases) {
+        final api = gateway.endsWith('/api') ? gateway : '$gateway/api';
+        if (!bases.contains(api)) bases.add(api);
+      }
+      final active = MarketConfig.effectiveApiBaseUrl;
+      if (!bases.contains(active)) bases.insert(0, active);
+      return bases;
+    }
+
+    Future<List<Map<String, dynamic>>> fetchOnce(String apiBase, String? cityName) async {
+      final cParam = cityName != null ? '&city=${Uri.encodeQueryComponent(cityName)}' : '';
       final response = await _client
           .get(
-            Uri.parse('${MarketConfig.effectiveApiBaseUrl}/geo/autocomplete?q=$encoded$cityParam'),
+            Uri.parse('$apiBase/geo/autocomplete?q=$encoded$cParam'),
             headers: _headers,
           )
           .timeout(const Duration(seconds: 8));
       final data = _decodeBody(response.body);
       if (response.statusCode >= 200 && response.statusCode < 300) {
         _markGatewayReachable();
-        final list = parseList(data);
-        if (list.isNotEmpty) return Success(list);
+        return parseList(data);
       }
-    } catch (_) {
-      // Fallback local ci-dessous
+      return [];
     }
-    return Success(MockData.geoAutocomplete(query));
+
+    Future<List<Map<String, dynamic>>> fetchBest(String apiBase) async {
+      final cityAttempts = <String?>[if (city != null) city, null];
+      for (final cityName in cityAttempts) {
+        try {
+          final list = await fetchOnce(apiBase, cityName);
+          if (list.isNotEmpty) return list;
+        } catch (_) {}
+      }
+      return [];
+    }
+
+    final remoteLists = await Future.wait(
+      apiBases().map((apiBase) => fetchBest(apiBase)),
+    );
+    for (final list in remoteLists) {
+      if (list.isNotEmpty) {
+        return Success(_mergeGeoSuggestions(list, trimmed, city: city));
+      }
+    }
+
+    return Success(_mergeGeoSuggestions([], trimmed, city: city));
+  }
+
+  List<Map<String, dynamic>> _mergeGeoSuggestions(
+    List<Map<String, dynamic>> remote,
+    String query, {
+    String? city,
+  }) {
+    final seen = <String>{};
+    final merged = <Map<String, dynamic>>[];
+    void addAll(Iterable<Map<String, dynamic>> items) {
+      for (final item in items) {
+        final label = item['label']?.toString() ?? item['address']?.toString() ?? '';
+        if (label.isEmpty || seen.contains(label)) continue;
+        seen.add(label);
+        merged.add(item);
+      }
+    }
+
+    addAll(remote);
+    addAll(MockData.geoAutocomplete(query, city: city));
+    return merged.take(12).toList();
   }
 
   Future<Result<Map<String, dynamic>>> createRide(Map<String, dynamic> body) async {

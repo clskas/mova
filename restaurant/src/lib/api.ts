@@ -33,6 +33,10 @@ export type RestaurantOrder = {
   items?: unknown;
   deliveryAddress?: string;
   estimatedPriceCdf?: number;
+  itemsSubtotalCdf?: number;
+  partnerNetCdf?: number;
+  partnerDiscountCdf?: number;
+  promoCode?: string | null;
   createdAt?: string;
   driverAssigned?: boolean;
   isPaid?: boolean;

@@ -83,8 +83,6 @@ export class PartnerPromoService {
     if (scope !== PromoScope.FOOD_MENU_ONLY && scope !== PromoScope.FOOD_ORDER) {
       throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Périmètre repas invalide.');
     }
-    const absorbedBy = data.absorbedBy ?? PromoAbsorbedBy.PARTNER;
-    this.assertSharedPercent(absorbedBy, data.partnerAbsorbPercent);
     const row = await this.prisma.promoCode.create({
       data: {
         code,
@@ -94,8 +92,8 @@ export class PartnerPromoService {
         validUntil: this.parseValidUntil(data.validUntil),
         ownerType: PromoOwnerType.RESTAURANT,
         scope,
-        absorbedBy,
-        partnerAbsorbPercent: absorbedBy === PromoAbsorbedBy.SHARED ? data.partnerAbsorbPercent : null,
+        absorbedBy: PromoAbsorbedBy.PARTNER,
+        partnerAbsorbPercent: null,
         restaurantId: restaurant.id,
       },
     });
@@ -114,8 +112,6 @@ export class PartnerPromoService {
     if (data.discountPercent != null || data.discountCdf != null) {
       this.validateDiscount({ code: existing.code, ...data });
     }
-    const absorbedBy = data.absorbedBy ?? existing.absorbedBy;
-    this.assertSharedPercent(absorbedBy, data.partnerAbsorbPercent ?? existing.partnerAbsorbPercent ?? undefined);
     const row = await this.prisma.promoCode.update({
       where: { id },
       data: {
@@ -124,15 +120,8 @@ export class PartnerPromoService {
         ...(data.maxUses !== undefined ? { maxUses: data.maxUses } : {}),
         ...(data.validUntil !== undefined ? { validUntil: this.parseValidUntil(data.validUntil) } : {}),
         ...(data.scope !== undefined ? { scope: data.scope } : {}),
-        ...(data.absorbedBy !== undefined ? { absorbedBy: data.absorbedBy } : {}),
-        ...(data.partnerAbsorbPercent !== undefined || data.absorbedBy !== undefined
-          ? {
-              partnerAbsorbPercent:
-                absorbedBy === PromoAbsorbedBy.SHARED
-                  ? (data.partnerAbsorbPercent ?? existing.partnerAbsorbPercent)
-                  : null,
-            }
-          : {}),
+        absorbedBy: PromoAbsorbedBy.PARTNER,
+        partnerAbsorbPercent: null,
         ...(data.isActive !== undefined ? { isActive: data.isActive } : {}),
       },
     });
@@ -150,8 +139,6 @@ export class PartnerPromoService {
   async createRentalPromo(ownerUserId: string, data: PartnerPromoInput) {
     this.validateDiscount(data);
     const code = this.normalizeCode(data.code);
-    const absorbedBy = data.absorbedBy ?? PromoAbsorbedBy.PARTNER;
-    this.assertSharedPercent(absorbedBy, data.partnerAbsorbPercent);
     const row = await this.prisma.promoCode.create({
       data: {
         code,
@@ -161,8 +148,8 @@ export class PartnerPromoService {
         validUntil: this.parseValidUntil(data.validUntil),
         ownerType: PromoOwnerType.RENTAL_OWNER,
         scope: PromoScope.RENTAL_SUBTOTAL,
-        absorbedBy,
-        partnerAbsorbPercent: absorbedBy === PromoAbsorbedBy.SHARED ? data.partnerAbsorbPercent : null,
+        absorbedBy: PromoAbsorbedBy.PARTNER,
+        partnerAbsorbPercent: null,
         rentalOwnerUserId: ownerUserId,
       },
     });
@@ -177,8 +164,6 @@ export class PartnerPromoService {
     if (data.discountPercent != null || data.discountCdf != null) {
       this.validateDiscount({ code: existing.code, ...data });
     }
-    const absorbedBy = data.absorbedBy ?? existing.absorbedBy;
-    this.assertSharedPercent(absorbedBy, data.partnerAbsorbPercent ?? existing.partnerAbsorbPercent ?? undefined);
     const row = await this.prisma.promoCode.update({
       where: { id },
       data: {
@@ -186,15 +171,8 @@ export class PartnerPromoService {
         ...(data.discountCdf !== undefined ? { discountCdf: data.discountCdf } : {}),
         ...(data.maxUses !== undefined ? { maxUses: data.maxUses } : {}),
         ...(data.validUntil !== undefined ? { validUntil: this.parseValidUntil(data.validUntil) } : {}),
-        ...(data.absorbedBy !== undefined ? { absorbedBy: data.absorbedBy } : {}),
-        ...(data.partnerAbsorbPercent !== undefined || data.absorbedBy !== undefined
-          ? {
-              partnerAbsorbPercent:
-                absorbedBy === PromoAbsorbedBy.SHARED
-                  ? (data.partnerAbsorbPercent ?? existing.partnerAbsorbPercent)
-                  : null,
-            }
-          : {}),
+        absorbedBy: PromoAbsorbedBy.PARTNER,
+        partnerAbsorbPercent: null,
         ...(data.isActive !== undefined ? { isActive: data.isActive } : {}),
       },
     });

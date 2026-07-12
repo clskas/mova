@@ -22,7 +22,7 @@ import { CommissionService } from '../rides/commission.service';
 import { TrackingService } from '../tracking/tracking.service';
 import { TripShareService } from '../share/trip-share.service';
 import { CreateErrandOrderDto } from './errands.dto';
-import { estimatePurchaseByCategory, inferErrandCategory } from './errand-category.util';
+import { ErrandCategoryEstimateService } from './errand-category-estimate.service';
 import { applyPromoCode } from '../common/promo-apply.util';
 import { PromoService } from '../rides/surcharge.service';
 import { GeoService } from '../geo/geo.service';
@@ -43,6 +43,7 @@ export class ErrandsService {
     private promo: PromoService,
     private routing: RoutingService,
     private geo: GeoService,
+    private errandCategories: ErrandCategoryEstimateService,
   ) {}
 
   private async errandFees() {
@@ -77,8 +78,9 @@ export class ErrandsService {
     const fare = await this.pricing.estimateFare(VehicleType.STANDARD, distanceKm, durationMin);
     const { itemCdf } = await this.errandFees();
     const itemsFee = itemCount * itemCdf;
-    const resolvedCategory = category ?? inferErrandCategory(dto.pickupAddress, dto.description.split(', '));
-    const estimatedPurchaseCdf = estimatePurchaseByCategory(resolvedCategory, itemCount);
+    const resolvedCategory =
+      category ?? (await this.errandCategories.inferCategory(dto.pickupAddress, dto.description.split(', ')));
+    const estimatedPurchaseCdf = await this.errandCategories.estimatePurchase(resolvedCategory, itemCount);
     const serviceFeeCdf = Math.ceil(fare.estimatedFareCdf + baseCdf + itemsFee);
     const promoApplied = await applyPromoCode(this.promo, serviceFeeCdf, dto.promoCode, redeemPromo, {
       context: { serviceType: 'ERRAND' },
@@ -93,7 +95,7 @@ export class ErrandsService {
       budgetCdf: dto.budgetCdf,
       category: resolvedCategory,
       estimatedPurchaseCdf,
-      categoryLabel: MARKET_RDC.errand.categoryEstimates[resolvedCategory]?.label ?? 'Autre',
+      categoryLabel: await this.errandCategories.categoryLabel(resolvedCategory),
       discountCdf: promoApplied.discountCdf,
       promoCode: promoApplied.promoCode,
     };
@@ -146,7 +148,7 @@ export class ErrandsService {
     const parsed = this.parseMobileItems(items, budgetCdf);
     const pickup = await this.resolvePickup(pickupAddress, pickupLat, pickupLng);
     const dropoff = await this.resolveDropoff(deliveryAddress, deliveryLat, deliveryLng, pickup);
-    const category = inferErrandCategory(pickup.label, parsed.items.map((i) => i.label));
+    const category = await this.errandCategories.inferCategory(pickup.label, parsed.items.map((i) => i.label));
     const dto: CreateErrandOrderDto = {
       description: parsed.description,
       pickupAddress: pickup.label,
@@ -184,7 +186,7 @@ export class ErrandsService {
 
   async create(userId: string, dto: CreateErrandOrderDto, structuredItems?: ErrandItemRow[]) {
     const itemCount = structuredItems?.length ?? 0;
-    const category = inferErrandCategory(dto.pickupAddress, dto.description.split(', '));
+    const category = await this.errandCategories.inferCategory(dto.pickupAddress, dto.description.split(', '));
     const estimate = await this.estimate(dto, itemCount, category, true);
     const order = await this.prisma.errandOrder.create({
       data: {

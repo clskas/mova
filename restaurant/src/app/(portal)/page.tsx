@@ -14,6 +14,7 @@ import {
   type RestaurantOrder,
   type RestaurantProfile,
 } from "@/lib/api";
+import { PartnerAmountLine } from "@/components/PartnerAmountLine";
 
 function formatItems(items: unknown): string {
   if (!Array.isArray(items)) return "—";
@@ -81,7 +82,7 @@ export default function OrdersPage() {
     const body =
       newOrders.length > 1
         ? `${newOrders.length} nouvelles commandes à confirmer`
-        : `Commande #${first.id.slice(0, 8)} · ${formatCdf(first.estimatedPriceCdf)}`;
+        : `Commande #${first.id.slice(0, 8)} · Votre part ${formatCdf(first.partnerNetCdf ?? first.itemsSubtotalCdf)}`;
     if (newOrders.length === 1) {
       alertNewRestaurantOrder(first.id, body);
     } else {
@@ -351,7 +352,14 @@ function OrderCard({
       </div>
       <p className="text-sm text-gray-800 mb-1">{formatItems(order.items)}</p>
       <p className="text-sm text-gray-500 mb-1">Livraison : {order.deliveryAddress ?? "—"}</p>
-      <p className="text-sm font-medium text-[#6C63FF] mb-4">{formatCdf(order.estimatedPriceCdf)}</p>
+      <div className="mb-4">
+        <PartnerAmountLine
+          subtotalCdf={order.itemsSubtotalCdf}
+          partnerNetCdf={order.partnerNetCdf}
+          partnerDiscountCdf={order.partnerDiscountCdf}
+          promoCode={order.promoCode}
+        />
+      </div>
       <div className="flex flex-wrap gap-2">
         {onConfirm && (
           <button

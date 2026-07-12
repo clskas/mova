@@ -14,6 +14,7 @@ class ServiceAreaPrefs {
 
   ServiceArea get selectedArea =>
       (selectedAreaId != null ? ServiceAreas.byId(selectedAreaId!) : null) ??
+      ServiceAreas.byId('kinshasa') ??
       ServiceAreas.fallbackArea;
 
   Future<void> setSelectedAreaId(String areaId) async {
@@ -30,6 +31,6 @@ final selectedServiceAreaProvider = Provider<ServiceArea>((ref) {
   final prefsAsync = ref.watch(serviceAreaPrefsProvider);
   return prefsAsync.maybeWhen(
     data: (prefs) => prefs.selectedArea,
-    orElse: () => ServiceAreas.fallbackArea,
+    orElse: () => ServiceAreas.byId('kinshasa') ?? ServiceAreas.fallbackArea,
   );
 });

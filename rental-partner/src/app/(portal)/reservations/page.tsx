@@ -20,6 +20,7 @@ import {
   updateBookingStatus,
   type PartnerBooking,
 } from "@/lib/api";
+import { PartnerAmountLine } from "@/components/PartnerAmountLine";
 
 function statusBadge(status?: string, label?: string) {
   const text = label ?? status ?? "—";
@@ -351,8 +352,6 @@ export default function ReservationsPage() {
               const returned = b.status === "RETURNED";
               const paid = b.status === "PAID" || b.isPaid;
               const closed = b.status === "CLOSED" || paid;
-              const amount = b.displayAmountCdf ?? b.ownerNetCdf ?? b.priceCdf;
-              const amountLabel = b.displayAmountLabel ?? "Votre gain net";
               const dateRange =
                 b.rentalPeriod === "HOURLY"
                   ? `${formatDateTime(b.startDate)} → ${formatDateTime(b.endDate)}`
@@ -379,9 +378,14 @@ export default function ReservationsPage() {
                     <p>
                       <span className="text-gray-500">Passager :</span> {b.passengerName ?? b.passengerPhone ?? "—"}
                     </p>
-                    <p>
-                      <span className="text-gray-500">{amountLabel} :</span> {formatCdf(amount ?? undefined)}
-                    </p>
+                    <div className="sm:col-span-2">
+                      <PartnerAmountLine
+                        subtotalCdf={b.subtotalGrossCdf ?? undefined}
+                        partnerNetCdf={b.ownerNetCdf ?? b.displayAmountCdf ?? undefined}
+                        partnerDiscountCdf={b.partnerDiscountCdf ?? undefined}
+                        promoCode={b.promoCode}
+                      />
+                    </div>
                     {b.remainingLabel && (inProgress || returned) && (
                       <p>
                         <span className="text-gray-500">Temps restant :</span> {b.remainingLabel}

@@ -71,37 +71,108 @@ export type GeoSuggestion = {
   city?: string;
 };
 
-export async function fetchGeoAutocomplete(query: string, city = 'Kinshasa'): Promise<GeoSuggestion[]> {
+const RDC_SERVICE_AREAS = [
+  { name: 'Kinshasa', province: 'Kinshasa', lat: -4.3217, lng: 15.3125, districts: ['Gombe', 'Limete', 'Bandalungwa', 'Masina', 'Kintambo', 'Ngaliema'] },
+  { name: 'Lubumbashi', province: 'Haut-Katanga', lat: -11.6647, lng: 27.4794, districts: ['Centre-ville', 'Kenya', 'Kamalondo'] },
+  { name: 'Goma', province: 'Nord-Kivu', lat: -1.6788, lng: 29.2175, districts: ['Centre', 'Himbi'] },
+  { name: 'Bukavu', province: 'Sud-Kivu', lat: -2.4908, lng: 28.8428 },
+  { name: 'Kisangani', province: 'Tshopo', lat: 0.5153, lng: 25.191 },
+  { name: 'Mbuji-Mayi', province: 'Kasaï-Oriental', lat: -6.136, lng: 23.5898 },
+  { name: 'Kananga', province: 'Kasaï-Central', lat: -5.8962, lng: 22.4167 },
+  { name: 'Matadi', province: 'Kongo Central', lat: -5.8167, lng: 13.45 },
+  { name: 'Kolwezi', province: 'Lualaba', lat: -10.7167, lng: 25.4667 },
+  { name: 'Mbandaka', province: 'Équateur', lat: 0.0478, lng: 18.2603 },
+] as const;
+
+function localGeoFallback(query: string, city?: string): GeoSuggestion[] {
+  const q = query.toLowerCase();
+  const seen = new Set<string>();
+  const out: GeoSuggestion[] = [];
+  const push = (item: GeoSuggestion) => {
+    const label = item.label || item.address || '';
+    if (!label || seen.has(label)) return;
+    seen.add(label);
+    out.push(item);
+  };
+
+  const focusName = city?.toLowerCase();
+  const areasOrdered = [
+    ...RDC_SERVICE_AREAS.filter((a) => focusName && a.name.toLowerCase() === focusName),
+    ...RDC_SERVICE_AREAS.filter((a) => !focusName || a.name.toLowerCase() !== focusName),
+  ];
+
+  for (const area of areasOrdered) {
+    for (const d of 'districts' in area ? area.districts : []) {
+      if (d.toLowerCase().includes(q)) {
+        push({
+          label: `${d}, ${area.name}`,
+          address: `${d}, ${area.name}, RDC`,
+          lat: area.lat,
+          lng: area.lng,
+          city: area.name,
+        });
+      }
+    }
+  }
+
+  if (out.length < 8) {
+    for (const area of RDC_SERVICE_AREAS) {
+      if (area.name.toLowerCase().includes(q)) {
+        push({
+          label: `${area.name}, RDC`,
+          address: `${area.name}, ${area.province}, RDC`,
+          lat: area.lat,
+          lng: area.lng,
+          city: area.name,
+        });
+      }
+    }
+  }
+
+  return out.slice(0, 12);
+}
+
+export async function fetchGeoAutocomplete(query: string, city?: string): Promise<GeoSuggestion[]> {
   const q = query.trim();
   if (q.length < 2) return [];
-  const localFallback = (): GeoSuggestion[] => {
-    const districts = ['Gombe', 'Limete', 'Bandalungwa', 'Masina', 'Kintambo', 'Ngaliema', 'Kalamu', 'Ngaliema'];
-    return districts
-      .filter((d) => d.toLowerCase().includes(q.toLowerCase()))
-      .slice(0, 8)
-      .map((d) => ({
-        label: `${d}, ${city}`,
-        address: `${d}, ${city}, RDC`,
-        lat: -4.3217,
-        lng: 15.3125,
-        city,
-      }));
-  };
-  try {
+
+  async function fetchForCity(targetCity?: string): Promise<GeoSuggestion[]> {
+    const cityParam = targetCity ? `&city=${encodeURIComponent(targetCity)}` : '';
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 8000);
-    const res = await fetch(
-      `${API_BASE}/api/geo/autocomplete?q=${encodeURIComponent(q)}&city=${encodeURIComponent(city)}`,
-      { signal: controller.signal },
-    );
-    clearTimeout(timer);
-    if (!res.ok) return localFallback();
-    const body = await res.json();
-    const list = Array.isArray(body) ? body : (body as { data?: GeoSuggestion[] }).data ?? [];
-    const filtered = list.filter((s) => s?.lat != null && s?.lng != null);
-    return filtered.length > 0 ? filtered : localFallback();
+    try {
+      const res = await fetch(
+        `${API_BASE}/api/geo/autocomplete?q=${encodeURIComponent(q)}${cityParam}`,
+        { signal: controller.signal },
+      );
+      clearTimeout(timer);
+      if (!res.ok) return [];
+      const body = await res.json();
+      const list = Array.isArray(body) ? body : (body as { data?: GeoSuggestion[] }).data ?? [];
+      return list.filter((s) => s?.lat != null && s?.lng != null);
+    } catch {
+      clearTimeout(timer);
+      return [];
+    }
+  }
+
+  try {
+    let list = city ? await fetchForCity(city) : [];
+    if (list.length === 0) {
+      list = await fetchForCity();
+    }
+    const fallback = localGeoFallback(q, city);
+    const seen = new Set<string>();
+    const merged: GeoSuggestion[] = [];
+    for (const item of [...list, ...fallback]) {
+      const label = item.label || item.address || '';
+      if (!label || seen.has(label)) continue;
+      seen.add(label);
+      merged.push(item);
+    }
+    return merged.slice(0, 12);
   } catch {
-    return localFallback();
+    return localGeoFallback(q, city);
   }
 }
 
@@ -221,17 +292,10 @@ function mockFor<T>(path: string, init?: RequestInit): T {
     return { order: { id: `errand-${Date.now()}`, status: 'PENDING' } } as T;
   }
   if (path.includes('/geo/autocomplete')) {
-    const q = new URL(path, 'http://local').searchParams.get('q')?.toLowerCase() ?? '';
-    const districts = ['Gombe', 'Limete', 'Bandalungwa', 'Masina', 'Kintambo', 'Ngaliema'];
-    return districts
-      .filter((d) => d.toLowerCase().includes(q))
-      .map((d) => ({
-        label: `${d}, Kinshasa`,
-        address: `${d}, Kinshasa, RDC`,
-        lat: -4.3217,
-        lng: 15.3125,
-        city: 'Kinshasa',
-      })) as T;
+    const params = new URL(path, 'http://local').searchParams;
+    const q = params.get('q')?.toLowerCase() ?? '';
+    const city = params.get('city') ?? undefined;
+    return localGeoFallback(q, city) as T;
   }
   if (path.includes('/deliveries/restaurants')) {
     return {

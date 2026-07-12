@@ -1,4 +1,5 @@
 import { PlaceOfInterestCategory } from '@prisma/client';
+import { getActiveServiceAreas } from '@mova/shared';
 
 export type PoiSeedRow = {
   osmId: string;
@@ -45,3 +46,67 @@ export const OSM_TAG_TO_CATEGORY: Record<string, PlaceOfInterestCategory> = {
   bus_station: 'TRANSPORT',
   train_station: 'TRANSPORT',
 };
+
+/** POI de base pour chaque ville MOVA (31 villes hors Kinshasa détaillée). */
+export function buildRegionalPoiSeed(): PoiSeedRow[] {
+  const rows: PoiSeedRow[] = [...KINSHASA_POI_SEED];
+  const seenOsm = new Set(rows.map((r) => r.osmId));
+
+  for (const area of getActiveServiceAreas()) {
+    if (area.id === 'kinshasa') continue;
+    const slug = area.id.replace(/-/g, '');
+    const templates: Array<Omit<PoiSeedRow, 'city' | 'osmId'> & { suffix: string }> = [
+      {
+        suffix: 'market',
+        name: `Marché ${area.name}`,
+        category: 'MARKET',
+        lat: area.centerLat + 0.004,
+        lng: area.centerLng + 0.003,
+        address: `Centre-ville, ${area.name}`,
+      },
+      {
+        suffix: 'hospital',
+        name: `Hôpital Général ${area.name}`,
+        category: 'HOSPITAL',
+        lat: area.centerLat - 0.003,
+        lng: area.centerLng + 0.002,
+        address: `${area.name}, ${area.province}`,
+      },
+      {
+        suffix: 'university',
+        name: `Université de ${area.name}`,
+        category: 'UNIVERSITY',
+        lat: area.centerLat + 0.002,
+        lng: area.centerLng - 0.004,
+        address: `${area.name}, ${area.province}`,
+      },
+      {
+        suffix: 'pharmacy',
+        name: `Pharmacie Centre ${area.name}`,
+        category: 'PHARMACY',
+        lat: area.centerLat,
+        lng: area.centerLng,
+        address: `Centre-ville, ${area.name}`,
+      },
+    ];
+
+    for (const tpl of templates) {
+      const osmId = `mova-${slug}-${tpl.suffix}`;
+      if (seenOsm.has(osmId)) continue;
+      seenOsm.add(osmId);
+      rows.push({
+        osmId,
+        name: tpl.name,
+        category: tpl.category,
+        lat: tpl.lat,
+        lng: tpl.lng,
+        city: area.name,
+        address: tpl.address,
+      });
+    }
+  }
+
+  return rows;
+}
+
+export const ALL_POI_SEED = buildRegionalPoiSeed();

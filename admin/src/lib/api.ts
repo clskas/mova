@@ -365,6 +365,15 @@ export type DeliveryPricingRule = {
   isActive?: boolean;
 };
 
+export type ErrandCategoryEstimate = {
+  category: string;
+  label: string;
+  perItemCdf: number;
+  keywordPattern?: string | null;
+  sortOrder?: number;
+  isActive?: boolean;
+};
+
 export type ServiceSurcharge = {
   id: string;
   type: string;
@@ -844,6 +853,16 @@ function mockFor<T>(path: string, init?: RequestInit): T {
       { category: "PARCEL", baseFeeCdf: 0, multiplier: 1.0, description: "Colis — tarif course Standard + poids", isActive: true },
       { category: "FOOD", baseFeeCdf: 3000, multiplier: 1.0, description: "Livraison repas — frais de base CDF", isActive: true },
       { category: "EXPRESS", baseFeeCdf: 0, multiplier: 1.35, description: "Livraison express — majoration 35%", isActive: true },
+    ] as T;
+  }
+  if (path.includes("/errand-category-estimates") && method !== "GET") {
+    return { category: body.category ?? path.split("/").pop(), ...body } as T;
+  }
+  if (path.includes("/errand-category-estimates")) {
+    return [
+      { category: "PHARMACY", label: "Pharmacie", perItemCdf: 8000, keywordPattern: "pharmac|medic", sortOrder: 1, isActive: true },
+      { category: "MARKET", label: "Marché", perItemCdf: 3000, keywordPattern: "marché|market", sortOrder: 2, isActive: true },
+      { category: "OTHER", label: "Autre", perItemCdf: 5000, keywordPattern: null, sortOrder: 3, isActive: true },
     ] as T;
   }
   if (path.includes("/subscription-plans") && method === "POST") {
@@ -1690,6 +1709,31 @@ export async function updateDeliveryPricingRule(category: string, data: Partial<
   return apiFetch<DeliveryPricingRule>(`/api/admin/delivery-pricing-rules/${category}`, {
     method: "PATCH",
     body: JSON.stringify(data),
+  });
+}
+
+export async function fetchErrandCategoryEstimates(): Promise<ErrandCategoryEstimate[]> {
+  const raw = await apiFetch<ErrandCategoryEstimate[]>("/api/admin/errand-category-estimates");
+  return Array.isArray(raw) ? raw : [];
+}
+
+export async function createErrandCategoryEstimate(data: ErrandCategoryEstimate) {
+  return apiFetch<ErrandCategoryEstimate>("/api/admin/errand-category-estimates", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateErrandCategoryEstimate(category: string, data: Partial<ErrandCategoryEstimate>) {
+  return apiFetch<ErrandCategoryEstimate>(`/api/admin/errand-category-estimates/${category}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteErrandCategoryEstimate(category: string) {
+  return apiFetch<ErrandCategoryEstimate>(`/api/admin/errand-category-estimates/${category}`, {
+    method: "DELETE",
   });
 }
 

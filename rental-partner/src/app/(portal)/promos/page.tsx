@@ -10,21 +10,11 @@ import {
   type PartnerPromo,
 } from "@/lib/api";
 
-const ABSORBED_LABELS: Record<string, string> = {
-  PARTNER: "Loueur (vous)",
-  PLATFORM: "MOVA",
-  SHARED: "Partagé",
-};
-
-type PromoAbsorbedBy = "PARTNER" | "PLATFORM" | "SHARED";
-
 const emptyForm = () => ({
   code: "",
   discountPercent: 10,
   maxUses: 50,
   validUntil: "",
-  absorbedBy: "PARTNER" as PromoAbsorbedBy,
-  partnerAbsorbPercent: 50,
 });
 
 export default function PromosPage() {
@@ -64,8 +54,6 @@ export default function PromosPage() {
         discountPercent: form.discountPercent,
         maxUses: form.maxUses,
         validUntil: form.validUntil || undefined,
-        absorbedBy: form.absorbedBy,
-        partnerAbsorbPercent: form.absorbedBy === "SHARED" ? form.partnerAbsorbPercent : undefined,
       });
       setForm(emptyForm());
       setMessage("Code promo créé.");
@@ -91,7 +79,7 @@ export default function PromosPage() {
         <div>
           <h2 className="text-xl font-semibold text-[#1A1A2E]">Codes promo location</h2>
           <p className="text-sm text-gray-600 mt-1">
-            Codes valables uniquement sur vos véhicules en location — pas sur taxi ni autres loueurs.
+            Codes valables uniquement sur vos véhicules. La remise est toujours déduite de votre part — MOVA ne la finance pas.
           </p>
         </div>
 
@@ -141,34 +129,10 @@ export default function PromosPage() {
                 className="mt-1 w-full border rounded-lg px-3 py-2"
               />
             </label>
-            <label className="block text-sm md:col-span-2">
-              Qui absorbe la remise ?
-              <select
-                value={form.absorbedBy}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, absorbedBy: e.target.value as PromoAbsorbedBy }))
-                }
-                className="mt-1 w-full border rounded-lg px-3 py-2"
-              >
-                <option value="PARTNER">Loueur (vous)</option>
-                <option value="PLATFORM">MOVA</option>
-                <option value="SHARED">Partagé</option>
-              </select>
-            </label>
-            {form.absorbedBy === "SHARED" && (
-              <label className="block text-sm md:col-span-2">
-                Part loueur (%)
-                <input
-                  type="number"
-                  min={0}
-                  max={100}
-                  value={form.partnerAbsorbPercent}
-                  onChange={(e) => setForm((f) => ({ ...f, partnerAbsorbPercent: Number(e.target.value) }))}
-                  className="mt-1 w-full border rounded-lg px-3 py-2"
-                />
-              </label>
-            )}
           </div>
+          <p className="text-xs text-gray-500">
+            La remise sera déduite de votre part nette après commission MOVA.
+          </p>
           <button
             type="submit"
             disabled={saving}
@@ -192,8 +156,7 @@ export default function PromosPage() {
                     <p className="font-mono font-semibold">{p.code}</p>
                     <p className="text-sm text-gray-600">
                       {p.discountPercent != null ? `−${p.discountPercent} %` : p.discountCdf != null ? `−${formatCdf(p.discountCdf)}` : "—"}
-                      {" · sous-total location · "}
-                      {ABSORBED_LABELS[p.absorbedBy ?? ""] ?? p.absorbedBy}
+                      {" · sous-total location · À votre charge"}
                       {p.maxUses != null && ` · ${p.usedCount ?? 0}/${p.maxUses}`}
                     </p>
                   </div>

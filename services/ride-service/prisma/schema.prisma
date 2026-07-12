@@ -358,6 +358,19 @@ enum ErrandCategory {
   OTHER
 }
 
+model ErrandCategoryEstimate {
+  category       ErrandCategory @id
+  label          String
+  perItemCdf     Int
+  keywordPattern String?
+  sortOrder      Int            @default(0)
+  isActive       Boolean        @default(true)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@map("errand_category_estimates")
+}
+
 enum PlaceOfInterestCategory {
   MARKET
   HOSPITAL

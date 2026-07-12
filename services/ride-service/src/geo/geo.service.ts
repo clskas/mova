@@ -229,117 +229,150 @@ export class GeoService implements OnModuleInit {
     const q = query.trim();
     if (q.length < 2) return [] as AutocompleteResult[];
 
-    const areas = city
-      ? [findServiceAreaByName(city) ?? getServiceArea(city) ?? DRC_SERVICE_AREAS.find((a) => a.name.toLowerCase() === city.toLowerCase())].filter(Boolean)
-      : getActiveServiceAreas();
+    const matchesQuery = (text: string) => this.textMatchesQuery(text, q);
 
+    const seen = new Set<string>();
     const results: AutocompleteResult[] = [];
 
-    for (const area of areas) {
-      if (!area) continue;
-      const cityName = area.name;
+    const push = (item: AutocompleteResult) => {
+      if (seen.has(item.label)) return;
+      seen.add(item.label);
+      results.push(item);
+    };
 
-      const communes = await this.prisma.commune.findMany({
-        where: { city: cityName, name: { contains: q, mode: 'insensitive' } },
-        orderBy: { name: 'asc' },
-        take: 10,
+    const primaryArea =
+      city != null && city.trim() !== ''
+        ? findServiceAreaByName(city) ??
+          getServiceArea(city) ??
+          DRC_SERVICE_AREAS.find((a) => a.name.toLowerCase() === city.toLowerCase())
+        : undefined;
+
+    const addCommune = (name: string, lat: number, lng: number, cityName: string) => {
+      push({
+        source: 'commune',
+        label: `${name}, ${cityName}`,
+        address: `${name}, ${cityName}, RDC`,
+        lat,
+        lng,
+        commune: name,
+        city: cityName,
       });
+    };
 
-      const seedDistricts = getCommunesForArea(area.id);
-      const seedMatches = seedDistricts
-        .filter((d) => d.name.toLowerCase().includes(q.toLowerCase()))
-        .slice(0, 10);
-
-      results.push(
-        ...communes.map((c) => ({
-          source: 'commune' as const,
-          label: `${c.name}, ${cityName}`,
-          address: `${c.name}, ${cityName}, RDC`,
-          lat: c.lat,
-          lng: c.lng,
-          commune: c.name,
-          city: cityName,
-        })),
-        ...seedMatches
-          .filter((d) => !communes.some((c) => c.name === d.name))
-          .map((d) => ({
-            source: 'commune' as const,
-            label: `${d.name}, ${cityName}`,
-            address: `${d.name}, ${cityName}, RDC`,
-            lat: d.lat,
-            lng: d.lng,
-            commune: d.name,
-            city: cityName,
-          })),
-      );
-
-      const pois = await this.prisma.placeOfInterest.findMany({
-        where: {
-          city: cityName,
-          name: { contains: q, mode: 'insensitive' },
-        },
-        orderBy: { name: 'asc' },
-        take: 8,
+    const addPoi = (p: {
+      id: string;
+      name: string;
+      address: string | null;
+      lat: number;
+      lng: number;
+      city: string;
+      category: PlaceOfInterestCategory;
+    }) => {
+      push({
+        source: 'poi',
+        label: `${p.name}, ${p.city}`,
+        address: p.address ?? `${p.name}, ${p.city}, RDC`,
+        lat: p.lat,
+        lng: p.lng,
+        commune: null,
+        city: p.city,
+        category: p.category,
+        poiId: p.id,
       });
-      results.push(
-        ...pois.map((p) => ({
-          source: 'poi' as const,
-          label: `${p.name}, ${cityName}`,
-          address: p.address ?? `${p.name}, ${cityName}, RDC`,
-          lat: p.lat,
-          lng: p.lng,
-          commune: null,
-          city: cityName,
-          category: p.category,
-          poiId: p.id,
-        })),
-      );
+    };
 
-      // Communes/POI MOVA suffisent — le géocodage externe (Nominatim/Photon) est lent depuis Docker.
-      if (results.length === 0) {
-        const geocodeHits = await this.geocodeWithTimeout(q, {
-          city: cityName,
-          centerLat: area.centerLat,
-          centerLng: area.centerLng,
-          viewbox: area.bounds,
-          limit: 5,
-        }, 6000);
-        results.push(
-          ...geocodeHits.map((p) => ({
+    const addSeedMatches = (areaId: string, cityName: string, existingNames: Set<string>) => {
+      for (const d of getCommunesForArea(areaId)) {
+        if (!d.name.toLowerCase().includes(q.toLowerCase()) || existingNames.has(d.name)) continue;
+        addCommune(d.name, d.lat, d.lng, cityName);
+      }
+    };
+
+    const searchAreas = async (areas: typeof DRC_SERVICE_AREAS) => {
+      for (const area of areas) {
+        const cityName = area.name;
+        const communeNames = new Set<string>();
+
+        const communes = await this.prisma.commune.findMany({
+          where: { city: cityName, name: { contains: q, mode: 'insensitive' } },
+          orderBy: { name: 'asc' },
+          take: 10,
+        });
+        for (const c of communes) {
+          communeNames.add(c.name);
+          addCommune(c.name, c.lat, c.lng, cityName);
+        }
+        addSeedMatches(area.id, cityName, communeNames);
+
+        const pois = await this.prisma.placeOfInterest.findMany({
+          where: { city: cityName },
+          orderBy: { name: 'asc' },
+        });
+        for (const p of pois) {
+          if (matchesQuery(p.name) || (p.address != null && matchesQuery(p.address))) addPoi(p);
+        }
+      }
+    };
+
+    const hasPlaceMatch = () =>
+      results.some((r) => r.source === 'commune' || r.source === 'poi');
+
+    if (primaryArea) {
+      await searchAreas([primaryArea]);
+      if (!hasPlaceMatch()) {
+        const others = getActiveServiceAreas().filter((a) => a.id !== primaryArea.id);
+        await searchAreas(others);
+      }
+    } else {
+      const [communes, pois] = await Promise.all([
+        this.prisma.commune.findMany({
+          where: { name: { contains: q, mode: 'insensitive' } },
+          orderBy: { name: 'asc' },
+          take: 12,
+        }),
+        this.prisma.placeOfInterest.findMany({
+          orderBy: { name: 'asc' },
+        }),
+      ]);
+      const communeNamesByCity = new Map<string, Set<string>>();
+      for (const c of communes) {
+        const names = communeNamesByCity.get(c.city) ?? new Set<string>();
+        names.add(c.name);
+        communeNamesByCity.set(c.city, names);
+        addCommune(c.name, c.lat, c.lng, c.city);
+      }
+      for (const p of pois) {
+        if (matchesQuery(p.name) || (p.address != null && matchesQuery(p.address))) addPoi(p);
+      }
+      for (const area of getActiveServiceAreas()) {
+        addSeedMatches(area.id, area.name, communeNamesByCity.get(area.name) ?? new Set());
+      }
+    }
+
+    if (!hasPlaceMatch()) {
+      const geocodeArea = primaryArea ?? getActiveServiceAreas()[0];
+      if (geocodeArea) {
+        const geocodeHits = await this.geocodeWithTimeout(
+          q,
+          {
+            city: geocodeArea.name,
+            centerLat: geocodeArea.centerLat,
+            centerLng: geocodeArea.centerLng,
+            viewbox: geocodeArea.bounds,
+            limit: 5,
+          },
+          6000,
+        );
+        for (const p of geocodeHits) {
+          push({
             source: p.provider,
             label: p.label,
             address: p.address,
             lat: p.lat,
             lng: p.lng,
             commune: p.commune ?? p.city,
-            city: cityName,
-          })),
-        );
-
-        if (process.env.MAPBOX_ACCESS_TOKEN && geocodeHits.length === 0) {
-          try {
-            const encoded = encodeURIComponent(`${q}, ${cityName}, RDC`);
-            const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encoded}.json?access_token=${process.env.MAPBOX_ACCESS_TOKEN}&country=cd&limit=5&proximity=${area.centerLng},${area.centerLat}`;
-            const res = await fetch(url);
-            if (res.ok) {
-              const data = await res.json();
-              for (const feature of data.features ?? []) {
-                const [lng, lat] = feature.center ?? [];
-                if (lat == null || lng == null) continue;
-                results.push({
-                  source: 'mapbox' as const,
-                  label: feature.place_name ?? feature.text,
-                  address: feature.place_name ?? feature.text,
-                  lat,
-                  lng,
-                  commune: feature.context?.find((c: { id: string }) => c.id.startsWith('place'))?.text ?? null,
-                  city: cityName,
-                });
-              }
-            }
-          } catch {
-            // Mapbox optionnel
-          }
+            city: geocodeArea.name,
+          });
         }
       }
     }
@@ -481,8 +514,24 @@ export class GeoService implements OnModuleInit {
   }
 
   async importPois(city = 'Kinshasa', useOverpass = false) {
-    if (useOverpass) return this.poiImport.importFromOverpass(city);
-    return this.poiImport.seedKinshasa();
+    const target = city.trim();
+    const national = target.toLowerCase() === 'rdc' || target.toLowerCase() === 'all';
+    if (useOverpass && national) return this.poiImport.importAllServiceAreasFromOverpass();
+    if (useOverpass) return this.poiImport.importFromOverpass(target);
+    if (national) return this.poiImport.seedAllServiceAreas();
+    if (city && city.toLowerCase() !== 'kinshasa') return this.poiImport.seedCity(city);
+    return this.poiImport.seedAllServiceAreas();
+  }
+
+  private normalizeSearchText(value: string) {
+    return value
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase();
+  }
+
+  private textMatchesQuery(text: string, query: string) {
+    return this.normalizeSearchText(text).includes(this.normalizeSearchText(query));
   }
 
   private haversineKm(lat1: number, lng1: number, lat2: number, lng2: number) {

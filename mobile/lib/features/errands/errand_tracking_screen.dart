@@ -208,25 +208,18 @@ class _ErrandTrackingScreenState extends ConsumerState<ErrandTrackingScreen> {
           builder: (ctx, setDialogState) {
             return AlertDialog(
               title: const Text('Noter le livreur'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text('Comment s\'est passée votre course & commissions ?'),
-                  const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: List.generate(
-                      5,
-                      (i) => IconButton(
-                        icon: Icon(
-                          i < score ? Icons.star : Icons.star_border,
-                          color: Colors.amber,
-                          size: 32,
-                        ),
-                        onPressed: submitting ? null : () => setDialogState(() => score = i + 1),
-                      ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Text('Comment s\'est passée votre course & commissions ?'),
+                    const SizedBox(height: 12),
+                    MovaStarRating(
+                      score: score,
+                      enabled: !submitting,
+                      onScoreChanged: (v) => setDialogState(() => score = v),
                     ),
-                  ),
                   const SizedBox(height: 8),
                   TextField(
                     enabled: !submitting,
@@ -244,6 +237,7 @@ class _ErrandTrackingScreenState extends ConsumerState<ErrandTrackingScreen> {
                   ],
                 ],
               ),
+            ),
               actions: [
                 TextButton(
                   onPressed: submitting ? null : () => Navigator.pop(ctx, false),

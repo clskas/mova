@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'mova_layout.dart';
+
 /// Scroll fluide utilisé sur tous les écrans MOVA.
 const ScrollPhysics kMovaScrollPhysics = BouncingScrollPhysics(
   parent: AlwaysScrollableScrollPhysics(),
@@ -49,7 +51,17 @@ class MovaScreen extends StatelessWidget {
     return Scaffold(
       resizeToAvoidBottomInset: true,
       appBar: (title != null || titleWidget != null)
-          ? AppBar(title: titleWidget ?? Text(title!), actions: actions)
+          ? AppBar(
+              title: titleWidget ??
+                  (title != null
+                      ? Text(
+                          title!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        )
+                      : null),
+              actions: actions,
+            )
           : null,
       floatingActionButton: floatingActionButton,
       bottomNavigationBar: bottomNavigationBar,
@@ -104,22 +116,30 @@ class MovaMapFormLayout extends StatelessWidget {
   Widget build(BuildContext context) {
     final viewInsets = MediaQuery.viewInsetsOf(context);
     final keyboardOpen = viewInsets.bottom > 0;
+    final compact = MovaLayout.isCompact(context);
+    final veryCompact = MovaLayout.isVeryCompact(context);
 
     return LayoutBuilder(
       builder: (context, constraints) {
+        final effectiveMin = veryCompact ? 64.0 : (compact ? 80.0 : minMapHeight);
+        final effectiveMax = veryCompact ? 96.0 : (compact ? 132.0 : maxMapHeight);
+        final fraction = compact ? 0.18 : mapFraction;
+
         final mapHeight = keyboardOpen
-            ? minMapHeight
-            : (constraints.maxHeight * mapFraction).clamp(minMapHeight, maxMapHeight);
+            ? (veryCompact ? 0.0 : (compact ? 64.0 : minMapHeight))
+            : (constraints.maxHeight * fraction).clamp(effectiveMin, effectiveMax);
+
+        final effectivePadding = MovaLayout.formPadding(context, normal: padding);
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            mapBuilder(mapHeight),
+            if (mapHeight > 0) mapBuilder(mapHeight),
             Expanded(
               child: SingleChildScrollView(
                 physics: kMovaScrollPhysics,
                 keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-                padding: padding.copyWith(bottom: padding.bottom + viewInsets.bottom),
+                padding: effectivePadding.copyWith(bottom: effectivePadding.bottom + viewInsets.bottom),
                 child: child,
               ),
             ),

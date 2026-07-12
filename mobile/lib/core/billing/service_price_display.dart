@@ -168,18 +168,19 @@ class ServicePriceDisplay {
           Row(
             children: [
               Expanded(
-                child: Text(totalLabel, style: const TextStyle(fontWeight: FontWeight.bold)),
+                child: Text(totalLabel, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
               ),
+              const SizedBox(width: 8),
               Flexible(
                 child: Text(
                   MarketConfig.formatCdf(totalCdf),
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     color: MovaColors.green,
-                    fontSize: 18,
+                    fontSize: 16,
                   ),
                   textAlign: TextAlign.end,
-                  maxLines: 1,
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -217,12 +218,17 @@ class ServicePriceDisplay {
           if (serviceFee > 0 || purchase > 0) const Divider(height: 16),
           Row(
             children: [
-              Expanded(child: Text(totalLabel, style: const TextStyle(fontWeight: FontWeight.bold))),
+              Expanded(
+                child: Text(totalLabel, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              ),
+              const SizedBox(width: 8),
               Flexible(
                 child: Text(
                   MarketConfig.formatCdf(total),
-                  style: const TextStyle(fontWeight: FontWeight.bold, color: MovaColors.green, fontSize: 18),
+                  style: const TextStyle(fontWeight: FontWeight.bold, color: MovaColors.green, fontSize: 16),
                   textAlign: TextAlign.end,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
@@ -289,12 +295,20 @@ class ServicePriceDisplay {
           if (perSeat > 0) const Divider(height: 16),
           Row(
             children: [
-              Expanded(child: Text(totalLabel, style: const TextStyle(fontWeight: FontWeight.bold))),
+              Expanded(
+                child: Text(
+                  totalLabel,
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                ),
+              ),
+              const SizedBox(width: 8),
               Flexible(
                 child: Text(
                   MarketConfig.formatCdf(total > 0 ? total : totalForPassenger(data)),
-                  style: const TextStyle(fontWeight: FontWeight.bold, color: MovaColors.green, fontSize: 18),
+                  style: const TextStyle(fontWeight: FontWeight.bold, color: MovaColors.green, fontSize: 16),
                   textAlign: TextAlign.end,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
@@ -321,17 +335,28 @@ class ServicePriceDisplay {
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(child: Text(label, style: const TextStyle(fontSize: 14))),
+          Expanded(
+            flex: 3,
+            child: Text(
+              label,
+              style: const TextStyle(fontSize: 13),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 8),
           Flexible(
+            flex: 2,
             child: Text(
               MarketConfig.formatCdf(amountCdf.abs()) + (amountCdf < 0 ? '' : ''),
               style: TextStyle(
-                fontSize: 14,
+                fontSize: 13,
                 color: valueColor ?? MovaColors.midnight,
               ),
               textAlign: TextAlign.end,
-              maxLines: 1,
+              maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
           ),

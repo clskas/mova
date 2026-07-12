@@ -17,6 +17,8 @@ import { PromoService } from '../rides/surcharge.service';
 import { TripShareService } from '../share/trip-share.service';
 
 type RentalAddOns = { childSeat?: boolean; gps?: boolean; extraDriver?: boolean };
+import { computeRentalPartnerDisplay } from '../billing/partner-display.util';
+
 const RENTAL_OWNER_COMMISSION_PCT = 0.12;
 
 const CATEGORY_ALIASES: Record<string, string> = {
@@ -160,11 +162,17 @@ export class RentalService {
     return Math.ceil(vehicle.dailyRateCdf / MARKET_RDC.rental.hoursPerDayForHourlyRate);
   }
 
-  private computeOwnerNetCdf(grossCdf: number | null | undefined, depositCdf = 0): number | null {
+  private computeOwnerNetCdf(
+    grossCdf: number | null | undefined,
+    depositCdf = 0,
+    partnerDiscountCdf = 0,
+  ): number | null {
     if (grossCdf == null || grossCdf <= 0) return null;
-    const subtotal = Math.max(0, grossCdf - depositCdf);
-    if (subtotal <= 0) return null;
-    return subtotal - Math.round(subtotal * RENTAL_OWNER_COMMISSION_PCT);
+    return computeRentalPartnerDisplay({
+      totalCdf: grossCdf,
+      depositCdf,
+      discountCdf: partnerDiscountCdf,
+    }).partnerNetCdf;
   }
 
   private computeLogisticsGrossCdf(): number {
@@ -327,6 +335,8 @@ export class RentalService {
     notes: string | null;
     totalCdf: number | null;
     estimatedPriceCdf: number | null;
+    discountCdf?: number | null;
+    promoCode?: string | null;
     rentalPeriod: string;
     createdAt: Date;
     logisticsMode: RentalLogisticsMode;
@@ -339,7 +349,15 @@ export class RentalService {
     const passenger = await fetchAuthUserBrief(inquiry.userId);
     const grossCdf = inquiry.totalCdf ?? inquiry.estimatedPriceCdf;
     const depositCdf = (inquiry as { vehicle?: { depositCdf?: number } | null }).vehicle?.depositCdf ?? 0;
-    const ownerNetCdf = this.computeOwnerNetCdf(grossCdf, depositCdf);
+    const partnerDiscountCdf = inquiry.discountCdf ?? 0;
+    const amounts = computeRentalPartnerDisplay({
+      totalCdf: grossCdf,
+      estimatedPriceCdf: inquiry.estimatedPriceCdf,
+      discountCdf: partnerDiscountCdf,
+      depositCdf,
+      promoCode: inquiry.promoCode,
+    });
+    const ownerNetCdf = amounts.partnerNetCdf;
     const showRemaining =
       inquiry.status === RentalInquiryStatus.CONFIRMED ||
       inquiry.status === RentalInquiryStatus.IN_PROGRESS ||
@@ -362,11 +380,14 @@ export class RentalService {
       startDate: inquiry.startDate.toISOString(),
       endDate: inquiry.endDate.toISOString(),
       rentalPeriod: inquiry.rentalPeriod,
+      subtotalGrossCdf: amounts.subtotalGrossCdf,
+      partnerDiscountCdf: amounts.partnerDiscountCdf,
+      promoCode: amounts.promoCode,
       grossCdf,
       ownerNetCdf,
       priceCdf: ownerNetCdf ?? grossCdf,
       displayAmountCdf: ownerNetCdf ?? grossCdf,
-      displayAmountLabel: 'Votre gain net',
+      displayAmountLabel: 'Votre part',
       notes: inquiry.notes,
       createdAt: inquiry.createdAt.toISOString(),
       driverId: inquiry.driverId,
@@ -898,7 +919,15 @@ export class RentalService {
     });
     const grossCdf = inquiry.totalCdf ?? inquiry.estimatedPriceCdf;
     const depositCdf = inquiry.vehicle?.depositCdf ?? 0;
+    const partnerDiscountCdf = (inquiry as { discountCdf?: number | null }).discountCdf ?? 0;
     const rentalSubtotalCdf = Math.max(0, (grossCdf ?? 0) - depositCdf);
+    const ownerDisplay = computeRentalPartnerDisplay({
+      totalCdf: grossCdf,
+      estimatedPriceCdf: inquiry.estimatedPriceCdf,
+      discountCdf: partnerDiscountCdf,
+      depositCdf,
+      promoCode: (inquiry as { promoCode?: string | null }).promoCode,
+    });
     const driverLogisticsNet =
       audience === 'driver' && inquiry.driverId && this.needsMovaLogistics(inquiry.logisticsMode)
         ? this.computeDriverLogisticsNetCdf()
@@ -907,13 +936,13 @@ export class RentalService {
       driverLogisticsNet != null ? this.computeLogisticsGrossCdf() : null;
     const displayAmountCdf =
       audience === 'owner'
-        ? this.computeOwnerNetCdf(grossCdf, depositCdf) ?? grossCdf
+        ? ownerDisplay.partnerNetCdf ?? grossCdf
         : audience === 'driver'
           ? driverLogisticsNet ?? grossCdf
           : grossCdf;
     const displayAmountLabel =
       audience === 'owner'
-        ? 'Votre gain net'
+        ? 'Votre part'
         : audience === 'driver'
           ? 'Rémunération logistique'
           : 'Total à payer';
@@ -923,12 +952,15 @@ export class RentalService {
       ...this.mapLogisticsFields(inquiry),
       priceCdf: grossCdf,
       depositCdf,
-      rentalSubtotalCdf,
+      rentalSubtotalCdf: ownerDisplay.subtotalGrossCdf,
+      subtotalGrossCdf: ownerDisplay.subtotalGrossCdf,
+      partnerDiscountCdf: ownerDisplay.partnerDiscountCdf,
+      promoCode: ownerDisplay.promoCode,
       passengerTotalCdf: grossCdf,
       displayAmountCdf,
       displayAmountLabel,
       ownerNetCdf:
-        audience === 'owner' ? this.computeOwnerNetCdf(grossCdf, depositCdf) : undefined,
+        audience === 'owner' ? ownerDisplay.partnerNetCdf : undefined,
       driverGrossCdf: driverLogisticsGross ?? undefined,
       driverNetCdf: driverLogisticsNet ?? undefined,
       ownerContactPhone: ownerContact,

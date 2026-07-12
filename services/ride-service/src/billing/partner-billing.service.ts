@@ -11,6 +11,12 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { HistoryService, HistoryType } from '../history/history.service';
 import { receiptNumberFrom, SERVICE_TYPE_LABELS } from './billing-labels.util';
+import {
+  computeRestaurantPartnerDisplay,
+  computeRentalPartnerDisplay,
+  RESTAURANT_PLATFORM_PERCENT,
+  RENTAL_PLATFORM_PERCENT,
+} from './partner-display.util';
 import { buildReceiptPdf } from './billing-pdf.util';
 import { MovaReceipt, ReceiptLine } from './billing.types';
 
@@ -42,7 +48,7 @@ export class PartnerBillingService {
     }
     const delivery = await this.prisma.delivery.findUnique({
       where: { id: deliveryId },
-      include: { restaurant: true },
+      include: { restaurant: true, events: { orderBy: { createdAt: 'asc' } } },
     });
     if (!delivery || delivery.type !== DeliveryType.FOOD) {
       throw new MovaHttpException(MovaErrorCode.DELIVERY_NOT_FOUND, HttpStatus.NOT_FOUND);
@@ -77,14 +83,29 @@ export class PartnerBillingService {
   async buildRestaurantOrderReceipt(ownerUserId: string, deliveryId: string): Promise<MovaReceipt> {
     const { delivery, restaurant } = await this.assertRestaurantOrder(ownerUserId, deliveryId);
     const passenger = await fetchAuthUserBrief(delivery.userId);
-    const total = delivery.finalPriceCdf ?? delivery.estimatedPriceCdf;
-    const commissionCdf = Math.round(total * 0.15);
-    const netCdf = total - commissionCdf;
+    const amounts = computeRestaurantPartnerDisplay({
+      items: delivery.items,
+      restaurantId: restaurant.id,
+      events: delivery.events,
+      deliveryDiscountCdf: delivery.discountCdf,
+      deliveryPromoCode: delivery.promoCode,
+    });
     const lines: ReceiptLine[] = [
-      { label: `Commande #${delivery.id.slice(0, 8)}`, amountCdf: total, kind: 'item' },
-      { label: 'Commission MOVA (15 %)', amountCdf: commissionCdf, kind: 'fee' },
-      { label: 'Net partenaire', amountCdf: netCdf, kind: 'total' },
+      { label: `Panier repas #${delivery.id.slice(0, 8)}`, amountCdf: amounts.itemsSubtotalCdf, kind: 'item' },
+      {
+        label: `Commission MOVA (${RESTAURANT_PLATFORM_PERCENT} %)`,
+        amountCdf: amounts.platformFeeCdf,
+        kind: 'fee',
+      },
     ];
+    if (amounts.partnerDiscountCdf > 0) {
+      lines.push({
+        label: `Remise partenaire${amounts.promoCode ? ` (${amounts.promoCode})` : ''}`,
+        amountCdf: amounts.partnerDiscountCdf,
+        kind: 'fee',
+      });
+    }
+    lines.push({ label: 'Votre part (net)', amountCdf: amounts.partnerNetCdf, kind: 'total' });
     return {
       receiptNumber: receiptNumberFrom('DELIVERY', deliveryId),
       documentType: 'RECEIPT',
@@ -95,11 +116,11 @@ export class PartnerBillingService {
       serviceTypeLabel: 'Reçu partenaire restaurant',
       customer: { name: restaurant.name, phone: passenger?.phone },
       lines,
-      subtotalCdf: total,
-      discountCdf: delivery.discountCdf ?? 0,
-      totalCdf: netCdf,
+      subtotalCdf: amounts.itemsSubtotalCdf,
+      discountCdf: amounts.partnerDiscountCdf,
+      totalCdf: amounts.partnerNetCdf,
       currency: 'CDF',
-      promoCode: delivery.promoCode,
+      promoCode: amounts.promoCode,
       payment: null,
       footerNote: 'Document partenaire MOVA — montant net crédité sur votre solde.',
     };
@@ -108,14 +129,30 @@ export class PartnerBillingService {
   async buildRentalPartnerReceipt(ownerUserId: string, inquiryId: string): Promise<MovaReceipt> {
     const inquiry = await this.assertRentalBooking(ownerUserId, inquiryId);
     const passenger = await fetchAuthUserBrief(inquiry.userId);
-    const total = inquiry.totalCdf ?? inquiry.estimatedPriceCdf ?? 0;
-    const commissionCdf = Math.round(total * 0.12);
-    const netCdf = total - commissionCdf;
+    const depositCdf = inquiry.vehicle?.depositCdf ?? 0;
+    const amounts = computeRentalPartnerDisplay({
+      totalCdf: inquiry.totalCdf,
+      estimatedPriceCdf: inquiry.estimatedPriceCdf,
+      discountCdf: inquiry.discountCdf,
+      depositCdf,
+      promoCode: inquiry.promoCode,
+    });
     const lines: ReceiptLine[] = [
-      { label: inquiry.vehicle?.name ?? 'Location véhicule', amountCdf: total, kind: 'item' },
-      { label: 'Commission MOVA (12 %)', amountCdf: commissionCdf, kind: 'fee' },
-      { label: 'Net partenaire', amountCdf: netCdf, kind: 'total' },
+      { label: inquiry.vehicle?.name ?? 'Location véhicule', amountCdf: amounts.subtotalGrossCdf, kind: 'item' },
+      {
+        label: `Commission MOVA (${RENTAL_PLATFORM_PERCENT} %)`,
+        amountCdf: amounts.platformFeeCdf,
+        kind: 'fee',
+      },
     ];
+    if (amounts.partnerDiscountCdf > 0) {
+      lines.push({
+        label: `Remise partenaire${amounts.promoCode ? ` (${amounts.promoCode})` : ''}`,
+        amountCdf: amounts.partnerDiscountCdf,
+        kind: 'fee',
+      });
+    }
+    lines.push({ label: 'Votre part (net)', amountCdf: amounts.partnerNetCdf, kind: 'total' });
     return {
       receiptNumber: receiptNumberFrom('RENTAL', inquiryId),
       documentType: 'RECEIPT',
@@ -126,11 +163,11 @@ export class PartnerBillingService {
       serviceTypeLabel: 'Reçu partenaire location',
       customer: { name: inquiry.vehicle?.ownerName ?? passenger?.name, phone: passenger?.phone },
       lines,
-      subtotalCdf: total,
-      discountCdf: inquiry.discountCdf ?? 0,
-      totalCdf: netCdf,
+      subtotalCdf: amounts.subtotalGrossCdf,
+      discountCdf: amounts.partnerDiscountCdf,
+      totalCdf: amounts.partnerNetCdf,
       currency: 'CDF',
-      promoCode: inquiry.promoCode,
+      promoCode: amounts.promoCode,
       payment: null,
       footerNote: 'Document partenaire MOVA — location véhicule.',
     };

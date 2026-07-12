@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRestaurantLiveRegister } from "@/components/RestaurantLiveProvider";
 import { PubliciteCarousel } from "@/components/PubliciteCarousel";
 import { fetchActivePublicites, fetchDashboard, formatCdf, type Publicite, type RestaurantDashboard } from "@/lib/api";
+import { PartnerAmountLine } from "@/components/PartnerAmountLine";
 
 export default function DashboardPage() {
   const [data, setData] = useState<RestaurantDashboard | null>(null);
@@ -106,7 +107,12 @@ export default function DashboardPage() {
                         <p className="font-medium">#{o.id.slice(0, 8)}</p>
                         <p className="text-xs text-gray-500">{o.statusLabel ?? o.status}</p>
                       </div>
-                      <span className="font-medium text-[#6C63FF]">{formatCdf(o.estimatedPriceCdf)}</span>
+                      <PartnerAmountLine
+                        subtotalCdf={o.itemsSubtotalCdf}
+                        partnerNetCdf={o.partnerNetCdf}
+                        partnerDiscountCdf={o.partnerDiscountCdf}
+                        promoCode={o.promoCode}
+                      />
                     </Link>
                   </li>
                 ))}

@@ -152,19 +152,10 @@ class _RatingScreenState extends ConsumerState<RatingScreen> {
                   style: const TextStyle(fontSize: 18),
                 ),
                 const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: List.generate(
-                    5,
-                    (i) => IconButton(
-                      icon: Icon(
-                        i < _score ? Icons.star : Icons.star_border,
-                        color: Colors.amber,
-                        size: 40,
-                      ),
-                      onPressed: () => setState(() => _score = i + 1),
-                    ),
-                  ),
+                MovaStarRating(
+                  score: _score,
+                  starSize: 40,
+                  onScoreChanged: (v) => setState(() => _score = v),
                 ),
                 const SizedBox(height: 16),
                 TextField(

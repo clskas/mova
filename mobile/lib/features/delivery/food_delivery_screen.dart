@@ -13,6 +13,7 @@ import '../../core/theme/mova_colors.dart';
 import '../../core/location/service_area_prefs.dart';
 import '../../core/location/service_areas.dart';
 import '../../core/widgets/destination_coord_panel.dart';
+import '../../core/widgets/geo_autocomplete_field.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import '../../core/widgets/service_area_selector.dart';
@@ -56,14 +57,10 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
   String? _validationError;
   String _searchQuery = '';
   bool _loadingGps = false;
-  bool _loadingAddressSuggestions = false;
-  bool _showAddressSuggestions = false;
   bool _addressCoordsResolved = false;
-  List<Map<String, dynamic>> _addressSuggestions = [];
-  Timer? _addressDebounce;
-  String _deliveryCityId = ServiceAreas.fallbackArea.id;
-  double _deliveryLat = ServiceAreas.fallbackArea.center.latitude;
-  double _deliveryLng = ServiceAreas.fallbackArea.center.longitude;
+  String _deliveryCityId = 'kinshasa';
+  double _deliveryLat = ServiceAreas.byId('kinshasa')!.center.latitude;
+  double _deliveryLng = ServiceAreas.byId('kinshasa')!.center.longitude;
 
   String get _deliveryCityName =>
       ServiceAreas.byId(_deliveryCityId)?.name ?? ServiceAreas.fallbackArea.name;
@@ -74,13 +71,10 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
     if (widget.initialDeliveryAddress != null) {
       _addressController.text = widget.initialDeliveryAddress!;
     }
-    _addressController.addListener(_onAddressChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) => _bootstrapDeliveryLocation());
   }
 
-  void _onAddressChanged() {
-    _addressDebounce?.cancel();
-    _addressDebounce = Timer(const Duration(milliseconds: 350), _fetchAddressSuggestions);
+  void _onAddressUserInput() {
     setState(() {
       _estimatedTotal = null;
       _estimatedDeliveryFee = null;
@@ -89,37 +83,9 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
     });
   }
 
-  Future<void> _fetchAddressSuggestions() async {
-    final query = _addressController.text.trim();
-    if (query.length < 2 || query == 'Ma position') {
-      setState(() {
-        _addressSuggestions = [];
-        _showAddressSuggestions = false;
-      });
-      return;
-    }
-    setState(() => _loadingAddressSuggestions = true);
-    final api = ref.read(apiClientProvider);
-    final result = await api.geoAutocomplete(query, city: _deliveryCityName);
-    if (!mounted) return;
-    setState(() {
-      _loadingAddressSuggestions = false;
-      switch (result) {
-        case Success(:final data):
-          _addressSuggestions = data;
-          _showAddressSuggestions = data.isNotEmpty;
-        case Failure():
-          _addressSuggestions = [];
-          _showAddressSuggestions = false;
-      }
-    });
-  }
-
-  void _selectAddressSuggestion(Map<String, dynamic> suggestion) {
+  void _onAddressSuggestionSelected(Map<String, dynamic> suggestion) {
     final label = suggestion['label']?.toString() ?? suggestion['address']?.toString() ?? '';
-    _addressController.removeListener(_onAddressChanged);
     _addressController.text = label;
-    _addressController.addListener(_onAddressChanged);
     final coords = ServiceAreaLocation.ensureInServiceArea(
       LatLng(
         (suggestion['lat'] as num?)?.toDouble() ?? _deliveryLat,
@@ -132,8 +98,6 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
       _deliveryCityId = detected.id;
       _deliveryLat = coords.latitude;
       _deliveryLng = coords.longitude;
-      _showAddressSuggestions = false;
-      _addressSuggestions = [];
       _addressCoordsResolved = true;
       _estimatedTotal = null;
       _estimatedDeliveryFee = null;
@@ -222,50 +186,22 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
   }
 
   Widget _buildDeliveryAddressField() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        TextField(
-          controller: _addressController,
-          textInputAction: TextInputAction.done,
-          decoration: InputDecoration(
-            labelText: 'Adresse de livraison',
-            hintText: 'Ex: Gombe, Bandal, Limete…',
-            helperText: 'Saisissez un nom de lieu — suggestions géocodées',
-            helperMaxLines: 2,
-            prefixIcon: const Icon(Icons.delivery_dining),
-            suffixIcon: _loadingGps || _loadingAddressSuggestions
-                ? const Padding(
-                    padding: EdgeInsets.all(12),
-                    child: SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                  )
-                : IconButton(
-                    icon: const Icon(Icons.gps_fixed, color: MovaColors.violet),
-                    tooltip: 'Ma position',
-                    onPressed: _loadingGps ? null : _useMyLocationForDelivery,
-                  ),
-          ),
-        ),
-        if (_showAddressSuggestions && _addressSuggestions.isNotEmpty)
-          Card(
-            margin: const EdgeInsets.only(top: 4),
-            child: Column(
-              children: _addressSuggestions.take(6).map((s) {
-                final label = s['label']?.toString() ?? s['address']?.toString() ?? '';
-                return ListTile(
-                  dense: true,
-                  leading: const Icon(Icons.location_on_outlined, size: 20),
-                  title: Text(label, maxLines: 2, overflow: TextOverflow.ellipsis),
-                  onTap: () => _selectAddressSuggestion(s),
-                );
-              }).toList(),
-            ),
-          ),
-      ],
+    final api = ref.read(apiClientProvider);
+    return GeoAutocompleteField(
+      controller: _addressController,
+      api: api,
+      city: _deliveryCityName,
+      label: 'Adresse de livraison',
+      hint: 'Ex: Gombe, Bandal, Limete…',
+      prefixIcon: Icons.delivery_dining,
+      textInputAction: TextInputAction.done,
+      onUserInput: _onAddressUserInput,
+      onSelected: _onAddressSuggestionSelected,
+      suffixIcon: IconButton(
+        icon: const Icon(Icons.gps_fixed, color: MovaColors.violet),
+        tooltip: 'Ma position',
+        onPressed: _loadingGps ? null : _useMyLocationForDelivery,
+      ),
     );
   }
 
@@ -305,7 +241,7 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
     final api = ref.read(apiClientProvider);
     final result = await api.geoAutocomplete(text, city: _deliveryCityName);
     if (result case Success(:final data) when data.isNotEmpty) {
-      _selectAddressSuggestion(data.first);
+      _onAddressSuggestionSelected(data.first);
       return null;
     }
     return 'Lieu non reconnu — choisissez une suggestion (ex. Gombe, Limete) ou utilisez le GPS.';
@@ -329,8 +265,6 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
 
   @override
   void dispose() {
-    _addressDebounce?.cancel();
-    _addressController.removeListener(_onAddressChanged);
     _addressController.dispose();
     _promoController.dispose();
     super.dispose();

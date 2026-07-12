@@ -62,6 +62,17 @@ class ServiceAreas {
     'Lemba': LatLng(-4.3833, 15.3167),
   };
 
+  static const _lubumbashiDistricts = <String, LatLng>{
+    'Centre-ville': LatLng(-11.6647, 27.4794),
+    'Kenya': LatLng(-11.678, 27.462),
+    'Kamalondo': LatLng(-11.652, 27.498),
+  };
+
+  static const _gomaDistricts = <String, LatLng>{
+    'Centre': LatLng(-1.6788, 29.2175),
+    'Himbi': LatLng(-1.692, 29.205),
+  };
+
   static ServiceArea _box(
     String id,
     String name,
@@ -99,8 +110,8 @@ class ServiceAreas {
 
   static final List<ServiceArea> all = [
     _box('kinshasa', 'Kinshasa', 'Kinshasa', -4.3217, 15.3125, districts: _kinshasaDistricts),
-    _box('lubumbashi', 'Lubumbashi', 'Haut-Katanga', -11.6647, 27.4794),
-    _box('goma', 'Goma', 'Nord-Kivu', -1.6788, 29.2175),
+    _box('lubumbashi', 'Lubumbashi', 'Haut-Katanga', -11.6647, 27.4794, districts: _lubumbashiDistricts),
+    _box('goma', 'Goma', 'Nord-Kivu', -1.6788, 29.2175, districts: _gomaDistricts),
     _box('bukavu', 'Bukavu', 'Sud-Kivu', -2.4908, 28.8428),
     _box('kisangani', 'Kisangani', 'Tshopo', 0.5153, 25.191),
     _box('mbuji-mayi', 'Mbuji-Mayi', 'Kasaï-Oriental', -6.136, 23.5898),
@@ -168,6 +179,17 @@ class ServiceAreas {
   /// Ville MOVA la plus proche des coordonnées (pour libellés et autocomplétion).
   static String cityNameForCoords(LatLng coords) =>
       (byCoords(coords) ?? nearest(coords)).name;
+
+  /// Ville pour l'autocomplétion adresses — zone GPS, ville choisie, ou ville MOVA la plus proche.
+  static String autocompleteCity({
+    required LatLng coords,
+    ServiceArea? preferredArea,
+  }) {
+    final inBounds = byCoords(coords);
+    if (inBounds != null) return inBounds.name;
+    if (preferredArea != null) return preferredArea.name;
+    return nearest(coords).name;
+  }
 
   static ServiceArea nearest(LatLng coords) {
     ServiceArea? best;

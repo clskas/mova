@@ -1,19 +1,18 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 import '../../core/api/api_client.dart';
 import '../../core/config/test_runtime_config.dart';
 import '../../core/location/destination_coords.dart';
-import '../../core/location/destination_field_sync.dart';
 import '../../core/location/location_service.dart';
 import '../../core/widgets/destination_coord_panel.dart';
 import '../../core/location/service_area_location.dart';
+import '../../core/location/service_area_prefs.dart';
 import '../../core/location/service_areas.dart';
 import '../../core/config/market_config.dart';
 import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
+import '../../core/widgets/geo_autocomplete_field.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import '../../widgets/promo_code_field.dart';
@@ -52,21 +51,13 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   Map<String, VehicleEstimate> _estimates = {};
   Map<String, Map<String, dynamic>> _estimateDetails = {};
   Map<String, dynamic>? _selectedEstimate;
-  List<Map<String, dynamic>> _suggestions = [];
-  Timer? _debounce;
   bool _loadingEstimate = false;
   bool _loadingConfirm = false;
-  bool _loadingSuggestions = false;
   bool _loadingGps = false;
   String? _error;
   String? _validationError;
-  bool _showSuggestions = false;
   bool _pickupFromGps = true;
   bool _pickupFromSuggestion = false;
-  List<Map<String, dynamic>> _pickupSuggestions = [];
-  bool _showPickupSuggestions = false;
-  bool _loadingPickupSuggestions = false;
-  Timer? _pickupDebounce;
   List<Map<String, dynamic>> _poiPlaces = [];
   String? _poiCategoryFilter;
 
@@ -81,8 +72,6 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   @override
   void initState() {
     super.initState();
-    _destinationController.addListener(_onDestinationChanged);
-    _pickupController.addListener(_onPickupChanged);
     if (widget.initialPickupAddress != null && widget.initialPickupAddress!.trim().isNotEmpty) {
       _pickupController.text = widget.initialPickupAddress!.trim();
       _pickupFromGps = false;
@@ -153,56 +142,18 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
 
   @override
   void dispose() {
-    _debounce?.cancel();
-    _pickupDebounce?.cancel();
-    _destinationController.removeListener(_onDestinationChanged);
-    _pickupController.removeListener(_onPickupChanged);
     _pickupController.dispose();
     _destinationController.dispose();
     _promoController.dispose();
     super.dispose();
   }
 
-  void _onPickupChanged() {
-    _pickupDebounce?.cancel();
-    _pickupDebounce = Timer(const Duration(milliseconds: 350), _fetchPickupSuggestions);
-    setState(() {
-      _pickupFromGps = false;
-      _pickupFromSuggestion = false;
-      _validationError = null;
-      _selectedEstimate = null;
-      _estimates = {};
-    });
-  }
+  String get _autocompleteCity => ServiceAreas.autocompleteCity(
+        coords: _pickup,
+        preferredArea: ref.read(selectedServiceAreaProvider),
+      );
 
-  Future<void> _fetchPickupSuggestions() async {
-    final query = _pickupController.text.trim();
-    if (query.length < 2 || query == 'Ma position') {
-      setState(() {
-        _pickupSuggestions = [];
-        _showPickupSuggestions = false;
-      });
-      return;
-    }
-    setState(() => _loadingPickupSuggestions = true);
-    final api = ref.read(apiClientProvider);
-    final nearCity = ServiceAreas.cityNameForCoords(_pickup);
-    final result = await api.geoAutocomplete(query, city: nearCity);
-    if (!mounted) return;
-    setState(() {
-      _loadingPickupSuggestions = false;
-      switch (result) {
-        case Success(:final data):
-          _pickupSuggestions = data;
-          _showPickupSuggestions = data.isNotEmpty;
-        case Failure():
-          _pickupSuggestions = [];
-          _showPickupSuggestions = false;
-      }
-    });
-  }
-
-  void _selectPickupSuggestion(Map<String, dynamic> suggestion) {
+  void _onPickupSuggestionSelected(Map<String, dynamic> suggestion) {
     final label = suggestion['label']?.toString() ??
         suggestion['address']?.toString() ??
         '';
@@ -214,8 +165,6 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
       _pickupController.text = label;
       _pickupFromSuggestion = true;
       _pickupFromGps = false;
-      _showPickupSuggestions = false;
-      _pickupSuggestions = [];
       _selectedEstimate = null;
       _estimates = {};
     });
@@ -225,14 +174,17 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
     _loadNearbyPoi();
   }
 
-  int get _visiblePoiCount {
-    if (_poiCategoryFilter == null) return _poiPlaces.length;
-    return _poiPlaces.where((p) => p['category']?.toString() == _poiCategoryFilter).length;
+  void _onPickupUserInput() {
+    setState(() {
+      _pickupFromGps = false;
+      _pickupFromSuggestion = false;
+      _validationError = null;
+      _selectedEstimate = null;
+      _estimates = {};
+    });
   }
 
-  void _onDestinationChanged() {
-    _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 350), _fetchSuggestions);
+  void _onDestinationUserInput() {
     setState(() {
       _selectedEstimate = null;
       _estimates = {};
@@ -240,6 +192,55 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
       _dropoffFromSuggestion = false;
       _dropoffFromManualCoords = false;
     });
+  }
+
+  void _onDestinationSuggestionSelected(Map<String, dynamic> suggestion) {
+    final label = suggestion['label']?.toString() ??
+        suggestion['address']?.toString() ??
+        '';
+    _destinationController.text = label;
+    _dropoff = ServiceAreaLocation.ensureInServiceArea(
+      LatLng(
+        (suggestion['lat'] as num?)?.toDouble() ?? MarketConfig.defaultLat - 0.03,
+        (suggestion['lng'] as num?)?.toDouble() ?? MarketConfig.defaultLng + 0.04,
+      ),
+      address: label,
+    );
+    setState(() {
+      _dropoffFromSuggestion = true;
+      _dropoffFromManualCoords = false;
+    });
+    _fetchAllEstimates();
+  }
+
+  int get _visiblePoiCount {
+    if (_poiCategoryFilter == null) return _poiPlaces.length;
+    return _poiPlaces.where((p) => p['category']?.toString() == _poiCategoryFilter).length;
+  }
+
+  void _setDropoffFromCoords(LatLng coords, String label) {
+    _dropoff = ServiceAreaLocation.ensureInServiceArea(coords, address: label);
+    _destinationController.text = label;
+    setState(() {
+      _dropoffFromSuggestion = false;
+      _dropoffFromManualCoords = true;
+      _selectedEstimate = null;
+      _estimates = {};
+    });
+    _fetchAllEstimates();
+  }
+
+  Future<void> _onMapDropoffTap(LatLng raw) async {
+    if (!ServiceAreaLocation.isInBounds(raw)) {
+      if (mounted) setState(() => _validationError = ServiceAreaLocation.outOfAreaMessage());
+      return;
+    }
+    final coords = raw;
+    _setDropoffFromCoords(coords, LocationService.coordsLabel(coords));
+    final label = await ServiceAreaLocation.labelForCoords(coords);
+    if (!mounted || !_dropoffFromManualCoords) return;
+    _destinationController.text = label;
+    setState(() {});
   }
 
   Future<void> _useMyLocation() async {
@@ -273,81 +274,6 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
       await _fetchAllEstimates();
     }
     await _loadNearbyPoi();
-  }
-
-  Future<void> _fetchSuggestions() async {
-    final query = _destinationController.text.trim();
-    if (query.length < 2) {
-      setState(() {
-        _suggestions = [];
-        _showSuggestions = false;
-      });
-      return;
-    }
-    setState(() => _loadingSuggestions = true);
-    final api = ref.read(apiClientProvider);
-    final nearCity = ServiceAreas.cityNameForCoords(_pickup);
-    final result = await api.geoAutocomplete(query, city: nearCity);
-    if (!mounted) return;
-    setState(() {
-      _loadingSuggestions = false;
-      switch (result) {
-        case Success(:final data):
-          _suggestions = data;
-          _showSuggestions = data.isNotEmpty;
-        case Failure():
-          _suggestions = [];
-          _showSuggestions = false;
-      }
-    });
-  }
-
-  void _selectSuggestion(Map<String, dynamic> suggestion) {
-    final label = suggestion['label']?.toString() ??
-        suggestion['address']?.toString() ??
-        '';
-    DestinationFieldSync.setText(_destinationController, _onDestinationChanged, label);
-    _dropoff = ServiceAreaLocation.ensureInServiceArea(
-      LatLng(
-        (suggestion['lat'] as num?)?.toDouble() ?? MarketConfig.defaultLat - 0.03,
-        (suggestion['lng'] as num?)?.toDouble() ?? MarketConfig.defaultLng + 0.04,
-      ),
-      address: label,
-    );
-    setState(() {
-      _showSuggestions = false;
-      _suggestions = [];
-      _dropoffFromSuggestion = true;
-      _dropoffFromManualCoords = false;
-    });
-    _fetchAllEstimates();
-  }
-
-  void _setDropoffFromCoords(LatLng coords, String label) {
-    _dropoff = ServiceAreaLocation.ensureInServiceArea(coords, address: label);
-    DestinationFieldSync.setText(_destinationController, _onDestinationChanged, label);
-    setState(() {
-      _showSuggestions = false;
-      _suggestions = [];
-      _dropoffFromSuggestion = false;
-      _dropoffFromManualCoords = true;
-      _selectedEstimate = null;
-      _estimates = {};
-    });
-    _fetchAllEstimates();
-  }
-
-  Future<void> _onMapDropoffTap(LatLng raw) async {
-    if (!ServiceAreaLocation.isInBounds(raw)) {
-      if (mounted) setState(() => _validationError = ServiceAreaLocation.outOfAreaMessage());
-      return;
-    }
-    final coords = raw;
-    _setDropoffFromCoords(coords, LocationService.coordsLabel(coords));
-    final label = await ServiceAreaLocation.labelForCoords(coords);
-    if (!mounted || !_dropoffFromManualCoords) return;
-    DestinationFieldSync.setText(_destinationController, _onDestinationChanged, label);
-    setState(() {});
   }
 
   Future<String?> _resolveCoords() async {
@@ -642,6 +568,8 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
     final duration = (_selectedEstimate?['durationMin'] ?? _selectedEstimate?['etaMinutes']) as num?;
     final total = (_selectedEstimate?['estimatedFareCdf'] ??
         _selectedEstimate?['estimatedPriceCdf']) as int?;
+    final api = ref.read(apiClientProvider);
+    final autocompleteCity = _autocompleteCity;
 
     return MovaScreen(
       title: 'Taxi / Moto-taxi',
@@ -712,87 +640,32 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                 style: const TextStyle(fontSize: 11, color: MovaColors.textSecondary),
               ),
             ),
-            TextField(
-                    controller: _pickupController,
-                    decoration: InputDecoration(
-                      labelText: 'Départ',
-                      hintText: 'Point de prise en charge',
-                      prefixIcon: const Icon(Icons.my_location, color: MovaColors.green),
-                      suffixIcon: _loadingGps || _loadingPickupSuggestions
-                          ? const Padding(
-                              padding: EdgeInsets.all(12),
-                              child: SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              ),
-                            )
-                          : IconButton(
-                              icon: const Icon(Icons.gps_fixed, color: MovaColors.violet),
-                              tooltip: 'Ma position',
-                              onPressed: _loadingGps ? null : _useMyLocation,
-                            ),
-                    ),
-                    onTap: () => setState(() => _showPickupSuggestions = _pickupSuggestions.isNotEmpty),
-                  ),
-                  if (_showPickupSuggestions && _pickupSuggestions.isNotEmpty)
-                    MovaCard(
-                      margin: const EdgeInsets.only(top: 4),
-                      padding: EdgeInsets.zero,
-                      child: Column(
-                        children: _pickupSuggestions.map((s) {
-                          final label = s['label']?.toString() ?? s['address']?.toString() ?? '';
-                          return Material(
-                            color: Colors.transparent,
-                            child: ListTile(
-                              dense: true,
-                              leading: const Icon(Icons.trip_origin, size: 20, color: MovaColors.green),
-                              title: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
-                              onTap: () => _selectPickupSuggestion(s),
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                    ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _destinationController,
-                    decoration: InputDecoration(
-                      labelText: 'Destination',
-                      hintText: 'Ex: Gombe, Limete, Masina…',
-                      prefixIcon: const Icon(Icons.place, color: MovaColors.violet),
-                      suffixIcon: _loadingSuggestions
-                          ? const Padding(
-                              padding: EdgeInsets.all(12),
-                              child: SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              ),
-                            )
-                          : null,
-                    ),
-                    onTap: () => setState(() => _showSuggestions = _suggestions.isNotEmpty),
-                  ),
-                  if (_showSuggestions && _suggestions.isNotEmpty)
-                    MovaCard(
-                      margin: const EdgeInsets.only(top: 4),
-                      padding: EdgeInsets.zero,
-                      child: Column(
-                        children: _suggestions.map((s) {
-                          final label = s['label']?.toString() ?? s['address']?.toString() ?? '';
-                          return Material(
-                            color: Colors.transparent,
-                            child: ListTile(
-                              dense: true,
-                              leading: const Icon(Icons.location_on_outlined, size: 20),
-                              title: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
-                              onTap: () => _selectSuggestion(s),
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                    ),
+            GeoAutocompleteField(
+              controller: _pickupController,
+              api: api,
+              city: autocompleteCity,
+              label: 'Départ',
+              hint: 'Point de prise en charge',
+              prefixIcon: Icons.my_location,
+              onUserInput: _onPickupUserInput,
+              onSelected: _onPickupSuggestionSelected,
+              suffixIcon: IconButton(
+                icon: const Icon(Icons.gps_fixed, color: MovaColors.violet),
+                tooltip: 'Ma position',
+                onPressed: _loadingGps ? null : _useMyLocation,
+              ),
+            ),
+            const SizedBox(height: 12),
+            GeoAutocompleteField(
+              controller: _destinationController,
+              api: api,
+              city: autocompleteCity,
+              label: 'Destination',
+              hint: 'Ex: Gombe, Limete, Masina…',
+              prefixIcon: Icons.place,
+              onUserInput: _onDestinationUserInput,
+              onSelected: _onDestinationSuggestionSelected,
+            ),
                   DestinationCoordPanel(
                     initialLat: _dropoff?.latitude,
                     initialLng: _dropoff?.longitude,

@@ -293,6 +293,19 @@ export class AdminService {
     return this.proxy('ride', `/internal/delivery-pricing-rules/${category}`, { method: 'PATCH', body: JSON.stringify(body) });
   }
 
+  listErrandCategoryEstimates() {
+    return this.fetchJson('ride', '/internal/errand-category-estimates');
+  }
+  createErrandCategoryEstimate(body: Record<string, unknown>) {
+    return this.proxy('ride', '/internal/errand-category-estimates', { method: 'POST', body: JSON.stringify(body) });
+  }
+  updateErrandCategoryEstimate(category: string, body: Record<string, unknown>) {
+    return this.proxy('ride', `/internal/errand-category-estimates/${category}`, { method: 'PATCH', body: JSON.stringify(body) });
+  }
+  deleteErrandCategoryEstimate(category: string) {
+    return this.proxy('ride', `/internal/errand-category-estimates/${category}`, { method: 'DELETE' });
+  }
+
   listCommunes(city?: string) {
     return this.fetchJson('ride', `/internal/communes${city ? `?city=${city}` : ''}`);
   }

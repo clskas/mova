@@ -17,6 +17,7 @@ import { MatchingService } from '../matching/matching.service';
 import { notifyNearbyDrivers } from '../common/driver-job-alert.util';
 import { fetchServicePaymentStatuses } from '../common/payment-status.util';
 import { PartnerBillingService } from '../billing/partner-billing.service';
+import { computeRestaurantPartnerDisplay } from '../billing/partner-display.util';
 
 type StoredMenuItem = {
   name: string;
@@ -188,14 +189,24 @@ export class RestaurantPortalService {
     items: unknown;
     deliveryAddress: string | null;
     estimatedPriceCdf: number;
+    discountCdf?: number | null;
+    promoCode?: string | null;
     createdAt: Date;
     driverId: string | null;
     restaurantId?: string | null;
+    events?: { event: string; metadata: unknown }[];
   },
     restaurantId?: string,
     payment?: { isPaid?: boolean; paymentStatus?: string | null; paymentMethod?: string | null },
   ) {
     const items = restaurantId ? this.orderItemsForRestaurant(d.items, restaurantId) : d.items;
+    const amounts = computeRestaurantPartnerDisplay({
+      items: d.items,
+      restaurantId,
+      events: d.events,
+      deliveryDiscountCdf: d.discountCdf,
+      deliveryPromoCode: d.promoCode,
+    });
     return {
       id: d.id,
       status: d.status,
@@ -203,6 +214,10 @@ export class RestaurantPortalService {
       items,
       deliveryAddress: d.deliveryAddress,
       estimatedPriceCdf: d.estimatedPriceCdf,
+      itemsSubtotalCdf: amounts.itemsSubtotalCdf,
+      partnerNetCdf: amounts.partnerNetCdf,
+      partnerDiscountCdf: amounts.partnerDiscountCdf,
+      promoCode: amounts.promoCode,
       createdAt: d.createdAt.toISOString(),
       driverAssigned: Boolean(d.driverId),
       multiRestaurant: Boolean(restaurantId && !d.restaurantId && this.deliveryIncludesRestaurant(d.items, restaurantId)),

@@ -1,4 +1,7 @@
+import 'package:latlong2/latlong.dart';
+
 import '../config/market_config.dart';
+import '../location/service_areas.dart';
 
 abstract final class MockData {
   static Map<String, dynamic> otpRequest(String phone) => {
@@ -116,19 +119,107 @@ abstract final class MockData {
     return (hour >= 7 && hour < 9) || (hour >= 17 && hour < 19);
   }
 
-  static List<Map<String, dynamic>> geoAutocomplete(String query) {
+  static List<Map<String, dynamic>> geoAutocomplete(String query, {String? city}) {
     final q = query.toLowerCase().trim();
     if (q.isEmpty) return [];
-    return MarketConfig.kinshasaDistricts
-        .where((c) => c.toLowerCase().contains(q))
-        .take(8)
-        .map((name) => {
-              'label': '$name, Kinshasa',
-              'address': '$name, Kinshasa',
-              'lat': MarketConfig.defaultLat - (name.hashCode % 100) / 10000,
-              'lng': MarketConfig.defaultLng + (name.hashCode % 100) / 10000,
-            })
-        .toList();
+
+    final seen = <String>{};
+    final out = <Map<String, dynamic>>[];
+
+    void push(String label, String address, LatLng coords, String cityName) {
+      if (seen.contains(label)) return;
+      seen.add(label);
+      out.add({
+        'label': label,
+        'address': address,
+        'lat': coords.latitude,
+        'lng': coords.longitude,
+        'city': cityName,
+      });
+    }
+
+    final focus = city != null && city.trim().isNotEmpty ? ServiceAreas.byName(city.trim()) : null;
+    final areasOrdered = [
+      if (focus != null) focus,
+      ...ServiceAreas.all.where((a) => focus == null || a.id != focus.id),
+    ];
+
+    for (final area in areasOrdered) {
+      for (final entry in area.districts.entries) {
+        if (entry.key.toLowerCase().contains(q)) {
+          push(
+            '${entry.key}, ${area.name}',
+            '${entry.key}, ${area.name}, RDC',
+            entry.value,
+            area.name,
+          );
+        }
+      }
+    }
+
+    for (final area in areasOrdered) {
+      if (area.districts.isEmpty &&
+          ('centre-ville'.contains(q) || (q.length >= 3 && 'centre'.contains(q)))) {
+        push(
+          'Centre-ville, ${area.name}',
+          'Centre-ville, ${area.name}, RDC',
+          area.center,
+          area.name,
+        );
+      }
+    }
+
+    if (q.length >= 3) {
+      for (final area in areasOrdered) {
+        if ('marche'.contains(q) || q.contains('marc')) {
+          push(
+            'Marché ${area.name}, ${area.name}',
+            'Marché ${area.name}, ${area.name}, RDC',
+            LatLng(area.center.latitude + 0.004, area.center.longitude + 0.003),
+            area.name,
+          );
+        }
+        if ('pharmacie'.contains(q) || q.contains('pharm')) {
+          push(
+            'Pharmacie Centre ${area.name}, ${area.name}',
+            'Pharmacie Centre ${area.name}, ${area.name}, RDC',
+            area.center,
+            area.name,
+          );
+        }
+        if ('hopital'.contains(q.replaceAll('ô', 'o')) || q.contains('hôp')) {
+          push(
+            'Hôpital Général ${area.name}, ${area.name}',
+            'Hôpital Général ${area.name}, ${area.name}, RDC',
+            LatLng(area.center.latitude - 0.003, area.center.longitude + 0.002),
+            area.name,
+          );
+        }
+        if ('universite'.contains(q.replaceAll('é', 'e')) || q.contains('univ')) {
+          push(
+            'Université de ${area.name}, ${area.name}',
+            'Université de ${area.name}, ${area.name}, RDC',
+            LatLng(area.center.latitude + 0.002, area.center.longitude - 0.004),
+            area.name,
+          );
+        }
+      }
+    }
+
+    if (out.length < 8) {
+      for (final area in ServiceAreas.all) {
+        if (area.name.toLowerCase().contains(q)) {
+          push(
+            '${area.name}, RDC',
+            '${area.name}, ${area.province}, RDC',
+            area.center,
+            area.name,
+          );
+        }
+      }
+    }
+
+    return out.take(12).toList();
   }
 
   static List<Map<String, dynamic>> communes() =>

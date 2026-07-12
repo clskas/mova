@@ -18,7 +18,7 @@ export function GeoAutocompleteInput({
   onSelect,
   placeholder,
   className = "w-full rounded-xl border-0 bg-white p-3 shadow-sm",
-  city = "Kinshasa",
+  city,
 }: Props) {
   const [suggestions, setSuggestions] = useState<GeoSuggestion[]>([]);
   const [open, setOpen] = useState(false);
@@ -60,8 +60,6 @@ export function GeoAutocompleteInput({
         placeholder={placeholder}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        onFocus={() => suggestions.length > 0 && setOpen(true)}
-        onBlur={() => setTimeout(() => setOpen(false), 150)}
         autoComplete="off"
       />
       {loading && (

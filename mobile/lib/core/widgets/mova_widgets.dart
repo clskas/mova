@@ -119,6 +119,24 @@ class MovaErrorBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final friendly = sanitizeUserMessage(message);
+    final narrow = MediaQuery.sizeOf(context).width < 360;
+
+    final messageRow = Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Icon(Icons.info_outline_rounded, color: MovaColors.orange, size: 20),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            friendly,
+            style: const TextStyle(fontSize: 13, height: 1.35),
+            maxLines: 5,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(12),
@@ -127,23 +145,34 @@ class MovaErrorBanner extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: MovaColors.orange.withValues(alpha: 0.4)),
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Icon(Icons.info_outline_rounded, color: MovaColors.orange, size: 20),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              friendly,
-              style: const TextStyle(fontSize: 13, height: 1.35),
-              maxLines: 4,
-              overflow: TextOverflow.ellipsis,
+      child: narrow && onRetry != null
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                messageRow,
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(onPressed: onRetry, child: const Text('Réessayer')),
+                ),
+              ],
+            )
+          : Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.info_outline_rounded, color: MovaColors.orange, size: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    friendly,
+                    style: const TextStyle(fontSize: 13, height: 1.35),
+                    maxLines: 5,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                if (onRetry != null)
+                  TextButton(onPressed: onRetry, child: const Text('Réessayer')),
+              ],
             ),
-          ),
-          if (onRetry != null)
-            TextButton(onPressed: onRetry, child: const Text('Réessayer')),
-        ],
-      ),
     );
   }
 }
@@ -210,6 +239,49 @@ class MovaWelcomeBanner extends StatelessWidget {
           ),
           if (trailing != null) ...[const SizedBox(width: 8), trailing!],
         ],
+      ),
+    );
+  }
+}
+
+/// Étoiles de notation adaptées aux petits écrans (évite l'overflow des IconButton).
+class MovaStarRating extends StatelessWidget {
+  const MovaStarRating({
+    super.key,
+    required this.score,
+    required this.onScoreChanged,
+    this.maxScore = 5,
+    this.starSize = 32,
+    this.enabled = true,
+  });
+
+  final int score;
+  final ValueChanged<int> onScoreChanged;
+  final int maxScore;
+  final double starSize;
+  final bool enabled;
+
+  @override
+  Widget build(BuildContext context) {
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: List.generate(maxScore, (i) {
+          return InkWell(
+            onTap: enabled ? () => onScoreChanged(i + 1) : null,
+            customBorder: const CircleBorder(),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+              child: Icon(
+                i < score ? Icons.star : Icons.star_border,
+                color: Colors.amber,
+                size: starSize,
+              ),
+            ),
+          );
+        }),
       ),
     );
   }

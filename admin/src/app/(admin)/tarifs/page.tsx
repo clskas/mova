@@ -4,10 +4,13 @@ import { useCallback, useEffect, useState } from "react";
 import {
   createPricingRule,
   createPromoCode,
+  createErrandCategoryEstimate,
   deactivatePromoCode,
+  deleteErrandCategoryEstimate,
   deletePricingRule,
   fetchCommissions,
   fetchDeliveryPricingRules,
+  fetchErrandCategoryEstimates,
   fetchPricingRules,
   fetchPromoCodes,
   fetchSurcharges,
@@ -15,10 +18,12 @@ import {
   MOVA_CITIES,
   updateCommission,
   updateDeliveryPricingRule,
+  updateErrandCategoryEstimate,
   updatePricingRule,
   updatePromoCode,
   updateSurcharge,
   type DeliveryPricingRule,
+  type ErrandCategoryEstimate,
   type PlatformCommission,
   type PricingRule,
   type PromoCode,
@@ -63,6 +68,14 @@ const COMMISSION_LABELS: Record<string, string> = {
   CARPOOL: "Covoiturage",
   ERRAND: "Courses & commissions",
 };
+
+const ERRAND_CATEGORY_LABELS: Record<string, string> = {
+  PHARMACY: "Pharmacie",
+  MARKET: "Marché / commerce",
+  OTHER: "Autre",
+};
+
+const ALL_ERRAND_CATEGORIES = ["PHARMACY", "MARKET", "OTHER"] as const;
 
 function VehicleRow({
   label,
@@ -301,6 +314,82 @@ function CommissionRow({
   );
 }
 
+function ErrandCategoryRow({
+  label,
+  rule,
+  onSave,
+  onDeactivate,
+  readOnly,
+}: {
+  label: string;
+  rule: ErrandCategoryEstimate;
+  onSave: (data: Partial<ErrandCategoryEstimate>) => Promise<void>;
+  onDeactivate?: () => void;
+  readOnly?: boolean;
+}) {
+  const [displayLabel, setDisplayLabel] = useState(rule.label);
+  const [perItem, setPerItem] = useState(String(rule.perItemCdf));
+  const [keywords, setKeywords] = useState(rule.keywordPattern ?? "");
+  const [sortOrder, setSortOrder] = useState(String(rule.sortOrder ?? 0));
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setDisplayLabel(rule.label);
+    setPerItem(String(rule.perItemCdf));
+    setKeywords(rule.keywordPattern ?? "");
+    setSortOrder(String(rule.sortOrder ?? 0));
+  }, [rule]);
+
+  async function save() {
+    setSaving(true);
+    try {
+      await onSave({
+        label: displayLabel.trim(),
+        perItemCdf: Number(perItem),
+        keywordPattern: keywords.trim() || null,
+        sortOrder: Number(sortOrder),
+        isActive: true,
+      });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <tr className={`border-b ${rule.isActive === false ? "opacity-50" : ""}`}>
+      <td className="p-3 font-medium">{label}</td>
+      <td className="p-2">
+        <TextInput value={displayLabel} onChange={setDisplayLabel} className="!p-2" disabled={readOnly} />
+      </td>
+      <td className="p-2">
+        <TextInput value={perItem} onChange={setPerItem} type="number" className="!p-2" disabled={readOnly} />
+      </td>
+      <td className="p-2">
+        <TextInput
+          value={keywords}
+          onChange={setKeywords}
+          className="!p-2"
+          disabled={readOnly}
+          placeholder="Regex mots-clés (optionnel)"
+        />
+      </td>
+      <td className="p-2 w-20">
+        <TextInput value={sortOrder} onChange={setSortOrder} type="number" className="!p-2" disabled={readOnly} />
+      </td>
+      <td className="p-3">
+        {!readOnly && (
+          <div className="flex gap-2 flex-wrap">
+            <BtnPrimary onClick={save} disabled={saving}>{saving ? "…" : "Enregistrer"}</BtnPrimary>
+            {onDeactivate && rule.isActive !== false && (
+              <BtnDanger onClick={onDeactivate}>Désactiver</BtnDanger>
+            )}
+          </div>
+        )}
+      </td>
+    </tr>
+  );
+}
+
 export default function TarifsPage() {
   const { canWrite } = useAdmin();
   const readOnly = !canWrite("tarifs");
@@ -309,6 +398,7 @@ export default function TarifsPage() {
   const [deliveryRules, setDeliveryRules] = useState<DeliveryPricingRule[]>([]);
   const [otherSurcharges, setOtherSurcharges] = useState<ServiceSurcharge[]>([]);
   const [commissions, setCommissions] = useState<PlatformCommission[]>([]);
+  const [errandCategories, setErrandCategories] = useState<ErrandCategoryEstimate[]>([]);
   const [promos, setPromos] = useState<PromoCode[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -359,21 +449,60 @@ export default function TarifsPage() {
     }
   }
 
+  const missingErrandCategories = ALL_ERRAND_CATEGORIES.filter(
+    (cat) => !errandCategories.some((r) => r.category === cat),
+  );
+
+  async function handleRestoreErrandCategory(category: (typeof ALL_ERRAND_CATEGORIES)[number]) {
+    setError(null);
+    try {
+      await createErrandCategoryEstimate({
+        category,
+        label: ERRAND_CATEGORY_LABELS[category] ?? category,
+        perItemCdf: category === "PHARMACY" ? 8000 : category === "MARKET" ? 3000 : 5000,
+        keywordPattern:
+          category === "PHARMACY"
+            ? "pharmac|médic|medic|drug|para-?pharm"
+            : category === "MARKET"
+              ? "marché|marche|market|supermarch|commerce|épicer|epicer|boutique"
+              : null,
+        sortOrder: category === "PHARMACY" ? 1 : category === "MARKET" ? 2 : 3,
+        isActive: true,
+      });
+      load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Échec création catégorie");
+    }
+  }
+
+  async function handleDeactivateErrandCategory(category: string) {
+    if (!confirm(`Désactiver la catégorie ${ERRAND_CATEGORY_LABELS[category] ?? category} ?`)) return;
+    setError(null);
+    try {
+      await deleteErrandCategoryEstimate(category);
+      load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Échec désactivation");
+    }
+  }
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [v, d, s, c, p] = await Promise.all([
+      const [v, d, s, c, ec, p] = await Promise.all([
         fetchPricingRules(city),
         fetchDeliveryPricingRules(),
         fetchSurcharges(),
         fetchCommissions(),
+        fetchErrandCategoryEstimates(),
         fetchPromoCodes(),
       ]);
       setVehicleRules(Array.isArray(v) ? v : []);
       setDeliveryRules(Array.isArray(d) ? d : []);
       setOtherSurcharges((Array.isArray(s) ? s : []).filter((x) => x.type === "MOVING"));
       setCommissions(Array.isArray(c) ? c : []);
+      setErrandCategories(Array.isArray(ec) ? ec : []);
       setPromos(Array.isArray(p) ? p : []);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur de chargement");
@@ -543,6 +672,61 @@ export default function TarifsPage() {
                       onSave={(data) => updateDeliveryPricingRule(r.category, data).then(load)}
                     />
                   ))}
+                </tbody>
+              </table>
+            </Card>
+          </section>
+
+          <section>
+            <div className="flex items-start justify-between gap-3 mb-3">
+              <div>
+                <h2 className="font-semibold text-[#1A1A2E] mb-1">Estimation achats — Courses & commissions</h2>
+                <p className="text-sm text-gray-500">
+                  Montant indicatif par article selon le type de commerce détecté (mots-clés dans l&apos;adresse ou la liste).
+                  Formule : achats estimés = montant × nombre d&apos;articles.
+                </p>
+              </div>
+              {!readOnly && missingErrandCategories.length > 0 && (
+                <div className="flex gap-2 flex-wrap">
+                  {missingErrandCategories.map((cat) => (
+                    <BtnPrimary key={cat} onClick={() => handleRestoreErrandCategory(cat)}>
+                      Restaurer {ERRAND_CATEGORY_LABELS[cat]}
+                    </BtnPrimary>
+                  ))}
+                </div>
+              )}
+            </div>
+            <Card className="overflow-x-auto">
+              <table className="w-full text-sm min-w-[760px]">
+                <thead>
+                  <tr className="border-b text-left text-gray-500">
+                    <th className="p-3">Code</th>
+                    <th className="p-3">Libellé</th>
+                    <th className="p-3">Par article (CDF)</th>
+                    <th className="p-3">Mots-clés (regex)</th>
+                    <th className="p-3">Ordre</th>
+                    <th className="p-3"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {errandCategories.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="p-4 text-gray-500">
+                        Aucune catégorie — utilisez « Restaurer » ou redémarrez le service pour le seed.
+                      </td>
+                    </tr>
+                  ) : (
+                    errandCategories.map((r) => (
+                      <ErrandCategoryRow
+                        key={r.category}
+                        label={ERRAND_CATEGORY_LABELS[r.category] ?? r.category}
+                        rule={r}
+                        readOnly={readOnly}
+                        onSave={(data) => updateErrandCategoryEstimate(r.category, data).then(load)}
+                        onDeactivate={() => handleDeactivateErrandCategory(r.category)}
+                      />
+                    ))
+                  )}
                 </tbody>
               </table>
             </Card>

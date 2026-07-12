@@ -10,12 +10,13 @@ import '../../core/billing/service_price_display.dart';
 import '../../core/config/market_config.dart';
 import '../../core/error/result.dart';
 import '../../core/location/destination_coords.dart';
-import '../../core/location/destination_field_sync.dart';
 import '../../core/location/location_service.dart';
 import '../../core/location/service_area_location.dart';
+import '../../core/location/service_area_prefs.dart';
 import '../../core/location/service_areas.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/destination_coord_panel.dart';
+import '../../core/widgets/geo_autocomplete_field.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import '../../widgets/promo_code_field.dart';
@@ -75,10 +76,8 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
   LatLng _pickup = MovaRideMap.mapDefaultCenter();
   LatLng? _dropoff;
   bool _dropoffFromManualCoords = false;
-  List<Map<String, dynamic>> _suggestions = [];
-  Timer? _debounce;
-  bool _loadingSuggestions = false;
-  bool _showSuggestions = false;
+  bool _pickupFromSuggestion = false;
+  bool _pickupFromGps = false;
   bool _loadingGps = false;
 
   bool _uploadingPhoto = false;
@@ -96,28 +95,46 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    _toController.addListener(_onDropoffChanged);
     _loadMyRequests();
     _pollTimer = Timer.periodic(const Duration(seconds: 12), (_) => _loadMyRequests(silent: true));
     WidgetsBinding.instance.addPostFrameCallback((_) => _useMyLocation());
   }
 
-  @override
-  void dispose() {
-    _pollTimer?.cancel();
-    _debounce?.cancel();
-    _tabController.dispose();
-    _toController.removeListener(_onDropoffChanged);
-    _fromController.dispose();
-    _toController.dispose();
-    _itemController.dispose();
-    _promoController.dispose();
-    super.dispose();
+  String get _autocompleteCity => ServiceAreas.autocompleteCity(
+        coords: _pickup,
+        preferredArea: ref.read(selectedServiceAreaProvider),
+      );
+
+  void _onPickupUserInput() {
+    setState(() {
+      _estimatedPrice = null;
+      _estimateBreakdown = null;
+      _distanceKm = null;
+      _pickupFromSuggestion = false;
+      _pickupFromGps = false;
+    });
   }
 
-  void _onDropoffChanged() {
-    _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 350), _fetchSuggestions);
+  void _onPickupSuggestionSelected(Map<String, dynamic> suggestion) {
+    final label = suggestion['label']?.toString() ?? suggestion['address']?.toString() ?? '';
+    _fromController.text = label;
+    _pickup = ServiceAreaLocation.ensureInServiceArea(
+      LatLng(
+        (suggestion['lat'] as num?)?.toDouble() ?? MarketConfig.defaultLat,
+        (suggestion['lng'] as num?)?.toDouble() ?? MarketConfig.defaultLng,
+      ),
+      address: label,
+    );
+    setState(() {
+      _estimatedPrice = null;
+      _estimateBreakdown = null;
+      _distanceKm = null;
+      _pickupFromSuggestion = true;
+      _pickupFromGps = false;
+    });
+  }
+
+  void _onDropoffUserInput() {
     setState(() {
       _estimatedPrice = null;
       _estimateBreakdown = null;
@@ -127,35 +144,9 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
     });
   }
 
-  Future<void> _fetchSuggestions() async {
-    final query = _toController.text.trim();
-    if (query.length < 2) {
-      setState(() {
-        _suggestions = [];
-        _showSuggestions = false;
-      });
-      return;
-    }
-    setState(() => _loadingSuggestions = true);
-    final api = ref.read(apiClientProvider);
-    final result = await api.geoAutocomplete(query, city: ServiceAreas.cityNameForCoords(_pickup));
-    if (!mounted) return;
-    setState(() {
-      _loadingSuggestions = false;
-      switch (result) {
-        case Success(:final data):
-          _suggestions = data;
-          _showSuggestions = data.isNotEmpty;
-        case Failure():
-          _suggestions = [];
-          _showSuggestions = false;
-      }
-    });
-  }
-
-  void _selectSuggestion(Map<String, dynamic> suggestion) {
+  void _onDropoffSuggestionSelected(Map<String, dynamic> suggestion) {
     final label = suggestion['label']?.toString() ?? suggestion['address']?.toString() ?? '';
-    DestinationFieldSync.setText(_toController, _onDropoffChanged, label);
+    _toController.text = label;
     _dropoff = ServiceAreaLocation.ensureInServiceArea(
       LatLng(
         (suggestion['lat'] as num?)?.toDouble() ?? MarketConfig.defaultLat - 0.03,
@@ -164,12 +155,21 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
       address: label,
     );
     setState(() {
-      _showSuggestions = false;
-      _suggestions = [];
       _estimatedPrice = null;
       _estimateBreakdown = null;
       _dropoffFromManualCoords = false;
     });
+  }
+
+  @override
+  void dispose() {
+    _pollTimer?.cancel();
+    _tabController.dispose();
+    _fromController.dispose();
+    _toController.dispose();
+    _itemController.dispose();
+    _promoController.dispose();
+    super.dispose();
   }
 
   Future<void> _useMyLocation() async {
@@ -192,6 +192,8 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
       _pickup = ServiceAreaLocation.ensureInServiceArea(result.position, address: result.label);
       _fromController.text =
           ServiceAreaLocation.isInBounds(result.position) ? result.label : 'Ma position';
+      _pickupFromSuggestion = false;
+      _pickupFromGps = true;
       _estimatedPrice = null;
       _estimateBreakdown = null;
       _distanceKm = null;
@@ -200,10 +202,8 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
 
   void _setDropoffFromCoords(LatLng coords, String label) {
     _dropoff = ServiceAreaLocation.ensureInServiceArea(coords, address: label);
-    DestinationFieldSync.setText(_toController, _onDropoffChanged, label);
+    _toController.text = label;
     setState(() {
-      _showSuggestions = false;
-      _suggestions = [];
       _estimatedPrice = null;
       _estimateBreakdown = null;
       _dropoffFromManualCoords = true;
@@ -218,12 +218,36 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
     _setDropoffFromCoords(raw, LocationService.coordsLabel(raw));
     final label = await ServiceAreaLocation.labelForCoords(raw);
     if (!mounted || !_dropoffFromManualCoords) return;
-    DestinationFieldSync.setText(_toController, _onDropoffChanged, label);
+    _toController.text = label;
     setState(() {});
   }
 
   Future<void> _resolveCoords() async {
-    _pickup = ServiceAreaLocation.ensureInServiceArea(_pickup, address: _fromController.text);
+    final pickupText = _fromController.text.trim();
+    final pickupFromText = DestinationCoords.parseText(pickupText);
+    if (pickupFromText != null && ServiceAreaLocation.isInBounds(pickupFromText)) {
+      _pickup = pickupFromText;
+    } else if ((_pickupFromGps || _pickupFromSuggestion) && ServiceAreaLocation.isInBounds(_pickup)) {
+      // Coordonnées déjà fixées par GPS ou autocomplétion.
+    } else if (pickupText.isNotEmpty && pickupText != 'Ma position') {
+      final api = ref.read(apiClientProvider);
+      final pickupResult = await api.geoAutocomplete(pickupText, city: _autocompleteCity);
+      if (pickupResult case Success(:final data) when data.isNotEmpty) {
+        final s = data.first;
+        _pickup = ServiceAreaLocation.ensureInServiceArea(
+          LatLng(
+            (s['lat'] as num?)?.toDouble() ?? MarketConfig.defaultLat,
+            (s['lng'] as num?)?.toDouble() ?? MarketConfig.defaultLng,
+          ),
+          address: pickupText,
+        );
+        _pickupFromSuggestion = true;
+        _pickupFromGps = false;
+      }
+    } else {
+      _pickup = ServiceAreaLocation.ensureInServiceArea(_pickup, address: pickupText);
+    }
+
     if (_dropoffFromManualCoords && _dropoff != null && ServiceAreaLocation.isInBounds(_dropoff!)) {
       return;
     }
@@ -239,7 +263,7 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
         final api = ref.read(apiClientProvider);
         final result = await api.geoAutocomplete(
           _toController.text.trim(),
-          city: ServiceAreas.cityNameForCoords(_pickup),
+          city: _autocompleteCity,
         );
         if (result case Success(:final data) when data.isNotEmpty) {
           final s = data.first;
@@ -459,6 +483,8 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
   Widget _newRequestTab(ThemeData theme) {
     final recommended = recommendedVehicleForVolume(_volumeM3());
     final dropoff = _dropoff ?? ServiceAreaLocation.defaultDropoffOffset(near: _pickup);
+    final api = ref.read(apiClientProvider);
+    final autocompleteCity = _autocompleteCity;
 
     return SingleChildScrollView(
       physics: kMovaScrollPhysics,
@@ -483,17 +509,15 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
           Row(
             children: [
               Expanded(
-                child: TextField(
+                child: GeoAutocompleteField(
                   controller: _fromController,
-                  decoration: const InputDecoration(
-                    labelText: 'Adresse de départ',
-                    prefixIcon: Icon(Icons.home_outlined),
-                  ),
-                  onChanged: (_) => setState(() {
-                    _estimatedPrice = null;
-                    _estimateBreakdown = null;
-                    _distanceKm = null;
-                  }),
+                  api: api,
+                  city: autocompleteCity,
+                  label: 'Adresse de départ',
+                  hint: 'Ma position ou nom du lieu',
+                  prefixIcon: Icons.home_outlined,
+                  onUserInput: _onPickupUserInput,
+                  onSelected: _onPickupSuggestionSelected,
                 ),
               ),
               IconButton(
@@ -506,35 +530,17 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
             ],
           ),
           const SizedBox(height: 12),
-          TextField(
+          GeoAutocompleteField(
             controller: _toController,
-            decoration: InputDecoration(
-              labelText: 'Adresse d\'arrivée',
-              hintText: 'Rechercher une commune, quartier…',
-              prefixIcon: const Icon(Icons.place_outlined),
-              suffixIcon: _loadingSuggestions
-                  ? const Padding(
-                      padding: EdgeInsets.all(12),
-                      child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
-                    )
-                  : null,
-            ),
+            api: api,
+            city: autocompleteCity,
+            label: 'Adresse d\'arrivée',
+            hint: 'Rechercher une commune, quartier…',
+            prefixIcon: Icons.place_outlined,
+            textInputAction: TextInputAction.done,
+            onUserInput: _onDropoffUserInput,
+            onSelected: _onDropoffSuggestionSelected,
           ),
-          if (_showSuggestions && _suggestions.isNotEmpty)
-            Card(
-              margin: const EdgeInsets.only(top: 4),
-              child: Column(
-                children: _suggestions.take(5).map((s) {
-                  final label = s['label']?.toString() ?? s['address']?.toString() ?? '';
-                  return ListTile(
-                    dense: true,
-                    leading: const Icon(Icons.location_on_outlined, size: 20),
-                    title: Text(label, maxLines: 2, overflow: TextOverflow.ellipsis),
-                    onTap: () => _selectSuggestion(s),
-                  );
-                }).toList(),
-              ),
-            ),
           DestinationCoordPanel(
             onApply: (coords, label) => _setDropoffFromCoords(coords, label),
           ),

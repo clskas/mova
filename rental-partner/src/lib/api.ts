@@ -30,6 +30,9 @@ export type PartnerBooking = {
   endDate?: string;
   rentalPeriod?: string;
   priceCdf?: number | null;
+  subtotalGrossCdf?: number | null;
+  partnerDiscountCdf?: number | null;
+  promoCode?: string | null;
   displayAmountCdf?: number | null;
   displayAmountLabel?: string;
   ownerNetCdf?: number | null;

@@ -416,6 +416,34 @@ export class AdminController {
     return this.adminService.updateDeliveryPricingRule(category, body);
   }
 
+  @Get('errand-category-estimates')
+  @RequirePermissions(AdminPermission.PRICING_READ)
+  @ApiOperation({ summary: 'Estimation achats courses & commissions par catégorie' })
+  errandCategoryEstimates() {
+    return this.adminService.listErrandCategoryEstimates();
+  }
+
+  @Post('errand-category-estimates')
+  @RequirePermissions(AdminPermission.PRICING_WRITE)
+  @ApiOperation({ summary: 'Créer catégorie estimation achats course' })
+  createErrandCategoryEstimate(@Body() body: Record<string, unknown>) {
+    return this.adminService.createErrandCategoryEstimate(body);
+  }
+
+  @Patch('errand-category-estimates/:category')
+  @RequirePermissions(AdminPermission.PRICING_WRITE)
+  @ApiOperation({ summary: 'Modifier catégorie estimation achats course' })
+  updateErrandCategoryEstimate(@Param('category') category: string, @Body() body: Record<string, unknown>) {
+    return this.adminService.updateErrandCategoryEstimate(category, body);
+  }
+
+  @Delete('errand-category-estimates/:category')
+  @RequirePermissions(AdminPermission.PRICING_WRITE)
+  @ApiOperation({ summary: 'Désactiver catégorie estimation achats course' })
+  deleteErrandCategoryEstimate(@Param('category') category: string) {
+    return this.adminService.deleteErrandCategoryEstimate(category);
+  }
+
   @Get('communes')
   @RequirePermissions(AdminPermission.PRICING_READ)
   @ApiOperation({ summary: 'Quartiers/communes par ville' })

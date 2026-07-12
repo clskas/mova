@@ -1,5 +1,5 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { CommissionServiceType, SurchargeType, VehicleType } from '@prisma/client';
+import { CommissionServiceType, ErrandCategory, SurchargeType, VehicleType } from '@prisma/client';
 import { DRC_SERVICE_AREAS, getCommunesForArea, KINSHASA_COMMUNES } from '@mova/shared';
 import { PrismaService } from './prisma.service';
 
@@ -185,6 +185,30 @@ const PLATFORM_COMMISSIONS = [
   },
 ];
 
+const ERRAND_CATEGORY_ESTIMATES = [
+  {
+    category: ErrandCategory.PHARMACY,
+    label: 'Pharmacie',
+    perItemCdf: 8000,
+    keywordPattern: 'pharmac|médic|medic|drug|para-?pharm',
+    sortOrder: 1,
+  },
+  {
+    category: ErrandCategory.MARKET,
+    label: 'Marché',
+    perItemCdf: 3000,
+    keywordPattern: 'marché|marche|market|supermarch|commerce|épicer|epicer|boutique',
+    sortOrder: 2,
+  },
+  {
+    category: ErrandCategory.OTHER,
+    label: 'Autre',
+    perItemCdf: 5000,
+    keywordPattern: null,
+    sortOrder: 3,
+  },
+];
+
 @Injectable()
 export class SeedService implements OnModuleInit {
   private readonly logger = new Logger(SeedService.name);
@@ -301,6 +325,18 @@ export class SeedService implements OnModuleInit {
             description: c.description,
             ...(c.fixedFeeCdf != null ? { fixedFeeCdf: c.fixedFeeCdf } : {}),
             ...(c.perItemFeeCdf != null ? { perItemFeeCdf: c.perItemFeeCdf } : {}),
+          },
+        });
+      }
+      for (const row of ERRAND_CATEGORY_ESTIMATES) {
+        await this.prisma.errandCategoryEstimate.upsert({
+          where: { category: row.category },
+          create: row,
+          update: {
+            label: row.label,
+            perItemCdf: row.perItemCdf,
+            keywordPattern: row.keywordPattern,
+            sortOrder: row.sortOrder,
           },
         });
       }

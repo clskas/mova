@@ -14,20 +14,12 @@ const SCOPE_LABELS: Record<string, string> = {
   FOOD_ORDER: "Commande complète (plats + livraison)",
 };
 
-const ABSORBED_LABELS: Record<string, string> = {
-  PARTNER: "Restaurant (vous)",
-  PLATFORM: "MOVA",
-  SHARED: "Partagé",
-};
-
 const emptyForm = () => ({
   code: "",
   discountPercent: 10,
   maxUses: 100,
   validUntil: "",
   scope: "FOOD_MENU_ONLY" as const,
-  absorbedBy: "PARTNER" as const,
-  partnerAbsorbPercent: 50,
 });
 
 export default function PromosPage() {
@@ -66,8 +58,6 @@ export default function PromosPage() {
         maxUses: form.maxUses,
         validUntil: form.validUntil || undefined,
         scope: form.scope,
-        absorbedBy: form.absorbedBy,
-        partnerAbsorbPercent: form.absorbedBy === "SHARED" ? form.partnerAbsorbPercent : undefined,
       });
       setForm(emptyForm());
       setMessage("Code promo créé.");
@@ -93,7 +83,7 @@ export default function PromosPage() {
         <div>
           <h2 className="text-xl font-semibold text-[#1A1A2E]">Codes promo</h2>
           <p className="text-sm text-gray-600 mt-1">
-            Créez des codes valables uniquement pour votre restaurant. Un code CHEZ-FLORE10 ne s&apos;applique pas au taxi ni chez un autre restaurant.
+            Créez des codes valables uniquement pour votre restaurant. La remise est toujours déduite de votre part — MOVA et le livreur ne la financent pas.
           </p>
         </div>
 
@@ -154,32 +144,10 @@ export default function PromosPage() {
                 <option value="FOOD_ORDER">Commande complète</option>
               </select>
             </label>
-            <label className="block text-sm">
-              Qui absorbe la remise ?
-              <select
-                value={form.absorbedBy}
-                onChange={(e) => setForm((f) => ({ ...f, absorbedBy: e.target.value as typeof f.absorbedBy }))}
-                className="mt-1 w-full border rounded-lg px-3 py-2"
-              >
-                <option value="PARTNER">Restaurant (vous)</option>
-                <option value="PLATFORM">MOVA</option>
-                <option value="SHARED">Partagé</option>
-              </select>
-            </label>
-            {form.absorbedBy === "SHARED" && (
-              <label className="block text-sm md:col-span-2">
-                Part restaurant (%)
-                <input
-                  type="number"
-                  min={0}
-                  max={100}
-                  value={form.partnerAbsorbPercent}
-                  onChange={(e) => setForm((f) => ({ ...f, partnerAbsorbPercent: Number(e.target.value) }))}
-                  className="mt-1 w-full border rounded-lg px-3 py-2"
-                />
-              </label>
-            )}
           </div>
+          <p className="text-xs text-gray-500">
+            La remise sera déduite de votre part nette après commission MOVA.
+          </p>
           <button
             type="submit"
             disabled={saving}
@@ -205,8 +173,7 @@ export default function PromosPage() {
                       {p.discountPercent != null ? `−${p.discountPercent} %` : p.discountCdf != null ? `−${formatCdf(p.discountCdf)}` : "—"}
                       {" · "}
                       {SCOPE_LABELS[p.scope ?? ""] ?? p.scope}
-                      {" · "}
-                      {ABSORBED_LABELS[p.absorbedBy ?? ""] ?? p.absorbedBy}
+                      {" · À votre charge"}
                       {p.maxUses != null && ` · ${p.usedCount ?? 0}/${p.maxUses} utilisations`}
                     </p>
                   </div>

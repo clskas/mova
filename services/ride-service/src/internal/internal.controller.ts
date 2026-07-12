@@ -4,6 +4,7 @@ import {
   CarpoolStatus,
   CommissionServiceType,
   DeliveryStatus,
+  ErrandCategory,
   ErrandOrderStatus,
   MovingRequestStatus,
   RentalInquiryStatus,
@@ -17,6 +18,7 @@ import { InternalApiGuard } from '../common/internal-api.guard';
 import { CarpoolService } from '../carpool/carpool.service';
 import { DeliveriesService } from '../deliveries/deliveries.service';
 import { ErrandsService } from '../errands/errands.service';
+import { ErrandCategoryEstimateService } from '../errands/errand-category-estimate.service';
 import { GeoService } from '../geo/geo.service';
 import { PoiSuggestionsService } from '../geo/poi-suggestions.service';
 import { MovingService } from '../moving/moving.service';
@@ -37,6 +39,7 @@ export class InternalController {
     private rides: RidesService,
     private deliveries: DeliveriesService,
     private errands: ErrandsService,
+    private errandCategoryEstimates: ErrandCategoryEstimateService,
     private scheduledRides: ScheduledRidesService,
     private pricingAdmin: PricingAdminService,
     private paymentInfo: PaymentInfoService,
@@ -331,6 +334,46 @@ export class InternalController {
   @Patch('delivery-pricing-rules/:category')
   updateDeliveryPricing(@Param('category') category: string, @Body() body: Record<string, unknown>) {
     return this.pricingAdmin.updateDeliveryPricingRule(category, body);
+  }
+
+  @Get('errand-category-estimates')
+  listErrandCategoryEstimates() {
+    return this.errandCategoryEstimates.listAll();
+  }
+
+  @Post('errand-category-estimates')
+  createErrandCategoryEstimate(
+    @Body()
+    body: {
+      category: ErrandCategory;
+      label: string;
+      perItemCdf: number;
+      keywordPattern?: string | null;
+      sortOrder?: number;
+      isActive?: boolean;
+    },
+  ) {
+    return this.errandCategoryEstimates.create(body);
+  }
+
+  @Patch('errand-category-estimates/:category')
+  updateErrandCategoryEstimate(
+    @Param('category') category: ErrandCategory,
+    @Body()
+    body: Partial<{
+      label: string;
+      perItemCdf: number;
+      keywordPattern: string | null;
+      sortOrder: number;
+      isActive: boolean;
+    }>,
+  ) {
+    return this.errandCategoryEstimates.update(category, body);
+  }
+
+  @Delete('errand-category-estimates/:category')
+  deleteErrandCategoryEstimate(@Param('category') category: ErrandCategory) {
+    return this.errandCategoryEstimates.deactivate(category);
   }
 
   @Get('commissions')

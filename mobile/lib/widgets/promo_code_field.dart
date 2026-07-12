@@ -7,11 +7,13 @@ class PromoCodeField extends StatelessWidget {
     super.key,
     required this.controller,
     this.onChanged,
+    this.compact = false,
     this.margin = const EdgeInsets.only(bottom: 12),
   });
 
   final TextEditingController controller;
   final VoidCallback? onChanged;
+  final bool compact;
   final EdgeInsets margin;
 
   @override
@@ -21,11 +23,13 @@ class PromoCodeField extends StatelessWidget {
       child: TextField(
         controller: controller,
         textCapitalization: TextCapitalization.characters,
-        decoration: const InputDecoration(
-          labelText: 'Code promo (optionnel)',
+        style: compact ? const TextStyle(fontSize: 14) : null,
+        decoration: InputDecoration(
+          isDense: compact,
+          labelText: compact ? 'Code promo' : 'Code promo (optionnel)',
           hintText: 'Ex. MOVA10',
-          prefixIcon: Icon(Icons.local_offer_outlined),
-          isDense: true,
+          labelStyle: compact ? const TextStyle(fontSize: 13) : null,
+          prefixIcon: Icon(Icons.local_offer_outlined, size: compact ? 20 : 24),
         ),
         onChanged: (_) => onChanged?.call(),
       ),

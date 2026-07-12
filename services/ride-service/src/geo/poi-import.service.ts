@@ -1,7 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PlaceOfInterestCategory } from '@prisma/client';
+import { getActiveServiceAreas, getServiceArea } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
-import { KINSHASA_POI_SEED, OSM_TAG_TO_CATEGORY, PoiSeedRow } from './poi-seed.data';
+import { KINSHASA_POI_SEED, OSM_TAG_TO_CATEGORY, PoiSeedRow, buildRegionalPoiSeed } from './poi-seed.data';
 
 type OverpassElement = {
   id: number;
@@ -19,6 +20,16 @@ export class PoiImportService {
 
   async seedKinshasa(): Promise<{ imported: number; skipped: number }> {
     return this.upsertRows(KINSHASA_POI_SEED);
+  }
+
+  async seedAllServiceAreas(): Promise<{ imported: number; skipped: number }> {
+    return this.upsertRows(buildRegionalPoiSeed());
+  }
+
+  async seedCity(city: string): Promise<{ imported: number; skipped: number }> {
+    const rows = buildRegionalPoiSeed().filter((r) => r.city.toLowerCase() === city.toLowerCase());
+    if (rows.length === 0) return { imported: 0, skipped: 0 };
+    return this.upsertRows(rows);
   }
 
   private async upsertRows(rows: PoiSeedRow[]) {
@@ -49,13 +60,28 @@ export class PoiImportService {
     return { imported, skipped };
   }
 
-  /** Import Overpass API — bbox Kinshasa par défaut. */
-  async importFromOverpass(city = 'Kinshasa', bbox = { south: -4.55, west: 15.12, north: -4.25, east: 15.45 }) {
+  /** Import Overpass API sur la bbox de la ville MOVA demandée (ou Kinshasa par défaut). */
+  async importFromOverpass(
+    city = 'Kinshasa',
+    bbox?: { south: number; west: number; north: number; east: number },
+  ) {
+    const area = getServiceArea(city) ?? getActiveServiceAreas().find((a) => a.name.toLowerCase() === city.toLowerCase());
+    const targetCity = area?.name ?? city;
+    const targetBox = bbox ??
+      (area
+        ? {
+            south: area.bounds.minLat,
+            west: area.bounds.minLng,
+            north: area.bounds.maxLat,
+            east: area.bounds.maxLng,
+          }
+        : { south: -4.55, west: 15.12, north: -4.25, east: 15.45 });
+
     const query = `
       [out:json][timeout:60];
       (
-        node["amenity"~"marketplace|hospital|clinic|university|college|pharmacy|school|bus_station|train_station"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-        way["amenity"~"marketplace|hospital|clinic|university|college|pharmacy|school|bus_station|train_station"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+        node["amenity"~"marketplace|hospital|clinic|university|college|pharmacy|school|bus_station|train_station"](${targetBox.south},${targetBox.west},${targetBox.north},${targetBox.east});
+        way["amenity"~"marketplace|hospital|clinic|university|college|pharmacy|school|bus_station|train_station"](${targetBox.south},${targetBox.west},${targetBox.north},${targetBox.east});
       );
       out center;
     `;
@@ -66,7 +92,7 @@ export class PoiImportService {
     });
     if (!res.ok) {
       this.logger.warn(`Overpass API failed: ${res.status}`);
-      return this.seedKinshasa();
+      return this.seedCity(targetCity);
     }
     const data = (await res.json()) as { elements?: OverpassElement[] };
     const rows: PoiSeedRow[] = [];
@@ -84,21 +110,53 @@ export class PoiImportService {
         category: category as PlaceOfInterestCategory,
         lat,
         lng,
-        city,
-        address: tags['addr:street'] ? `${tags['addr:street']}, ${city}` : undefined,
+        city: targetCity,
+        address: tags['addr:street'] ? `${tags['addr:street']}, ${targetCity}` : undefined,
       });
     }
     if (rows.length === 0) {
-      this.logger.warn('Overpass returned 0 POI — fallback seed Kinshasa');
-      return this.seedKinshasa();
+      this.logger.warn(`Overpass returned 0 POI for ${targetCity} — fallback city seed`);
+      return this.seedCity(targetCity);
     }
     return this.upsertRows(rows);
   }
 
+  async importAllServiceAreasFromOverpass() {
+    let imported = 0;
+    let skipped = 0;
+    const errors: Array<{ city: string; error: string }> = [];
+
+    for (const area of getActiveServiceAreas()) {
+      try {
+        const result = await this.importFromOverpass(area.name);
+        imported += result.imported;
+        skipped += result.skipped;
+      } catch (err) {
+        errors.push({
+          city: area.name,
+          error: err instanceof Error ? err.message : String(err),
+        });
+        const fallback = await this.seedCity(area.name);
+        imported += fallback.imported;
+        skipped += fallback.skipped;
+      }
+    }
+
+    return { imported, skipped, errors };
+  }
+
   async ensureSeeded() {
-    const count = await this.prisma.placeOfInterest.count();
-    if (count > 0) return { alreadySeeded: true, count };
-    const result = await this.seedKinshasa();
-    return { alreadySeeded: false, ...result };
+    const cityNames = [...new Set(buildRegionalPoiSeed().map((r) => r.city))];
+    let imported = 0;
+    let skipped = 0;
+    for (const cityName of cityNames) {
+      const count = await this.prisma.placeOfInterest.count({ where: { city: cityName } });
+      if (count > 0) continue;
+      const result = await this.seedCity(cityName);
+      imported += result.imported;
+      skipped += result.skipped;
+    }
+    const total = await this.prisma.placeOfInterest.count();
+    return { total, imported, skipped, cities: cityNames.length };
   }
 }

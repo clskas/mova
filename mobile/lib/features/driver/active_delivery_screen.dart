@@ -234,28 +234,12 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
       );
       return;
     }
-    final controller = TextEditingController(text: '0');
-    final purchaseStr = await showDialog<String>(
+    FocusManager.instance.primaryFocus?.unfocus();
+    final purchase = await showDialog<int>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Montant des achats'),
-        content: TextField(
-          controller: controller,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(
-            labelText: 'Total achats (CDF)',
-            hintText: '0 si aucun achat',
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Annuler')),
-          TextButton(onPressed: () => Navigator.pop(ctx, controller.text.trim()), child: const Text('Valider')),
-        ],
-      ),
+      builder: (ctx) => const _ErrandPurchaseTotalDialog(),
     );
-    controller.dispose();
-    if (purchaseStr == null || !mounted) return;
-    final purchase = int.tryParse(purchaseStr) ?? 0;
+    if (purchase == null || !mounted) return;
     await _advanceStatus('COMPLETED', 'Courses terminées', purchaseTotalCdf: purchase);
   }
 
@@ -587,6 +571,66 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
         ],
         ),
       ),
+    );
+  }
+}
+
+/// Dialogue montant achats — StatefulWidget pour gérer le cycle de vie du [TextEditingController].
+class _ErrandPurchaseTotalDialog extends StatefulWidget {
+  const _ErrandPurchaseTotalDialog();
+
+  @override
+  State<_ErrandPurchaseTotalDialog> createState() => _ErrandPurchaseTotalDialogState();
+}
+
+class _ErrandPurchaseTotalDialogState extends State<_ErrandPurchaseTotalDialog> {
+  final _controller = TextEditingController(text: '0');
+  String? _error;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final parsed = int.tryParse(_controller.text.trim());
+    if (parsed == null || parsed < 0) {
+      setState(() => _error = 'Saisissez un montant valide (0 ou plus).');
+      return;
+    }
+    FocusScope.of(context).unfocus();
+    Navigator.pop(context, parsed);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Montant des achats'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TextField(
+            controller: _controller,
+            keyboardType: TextInputType.number,
+            autofocus: true,
+            decoration: InputDecoration(
+              labelText: 'Total achats (CDF)',
+              hintText: '0 si aucun achat',
+              errorText: _error,
+            ),
+            onSubmitted: (_) => _submit(),
+            onChanged: (_) {
+              if (_error != null) setState(() => _error = null);
+            },
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler')),
+        TextButton(onPressed: _submit, child: const Text('Valider')),
+      ],
     );
   }
 }

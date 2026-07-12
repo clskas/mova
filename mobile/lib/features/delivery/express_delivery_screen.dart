@@ -10,6 +10,7 @@ import '../../core/error/result.dart';
 import '../../core/location/destination_coords.dart';
 import '../../core/location/destination_field_sync.dart';
 import '../../core/location/service_area_location.dart';
+import '../../core/location/service_area_prefs.dart';
 import '../../core/location/service_areas.dart';
 import '../../core/location/location_service.dart';
 import '../../core/widgets/destination_coord_panel.dart';
@@ -93,7 +94,11 @@ class _ExpressDeliveryScreenState extends ConsumerState<ExpressDeliveryScreen> {
     }
     setState(() => _loadingPickupSuggestions = true);
     final api = ref.read(apiClientProvider);
-    final result = await api.geoAutocomplete(query, city: ServiceAreas.cityNameForCoords(_pickup));
+    final city = ServiceAreas.autocompleteCity(
+      coords: _pickup,
+      preferredArea: ref.read(selectedServiceAreaProvider),
+    );
+    final result = await api.geoAutocomplete(query, city: city);
     if (!mounted) return;
     setState(() {
       _loadingPickupSuggestions = false;
@@ -148,7 +153,11 @@ class _ExpressDeliveryScreenState extends ConsumerState<ExpressDeliveryScreen> {
     }
     setState(() => _loadingSuggestions = true);
     final api = ref.read(apiClientProvider);
-    final result = await api.geoAutocomplete(query, city: ServiceAreas.cityNameForCoords(_pickup));
+    final city = ServiceAreas.autocompleteCity(
+      coords: _pickup,
+      preferredArea: ref.read(selectedServiceAreaProvider),
+    );
+    final result = await api.geoAutocomplete(query, city: city);
     if (!mounted) return;
     setState(() {
       _loadingSuggestions = false;

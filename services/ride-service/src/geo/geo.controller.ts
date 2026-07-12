@@ -55,8 +55,8 @@ export class GeoController {
   }
 
   @Post('places/import')
-  @ApiOperation({ summary: 'Import OSM ciblé (seed Kinshasa ou Overpass)' })
+  @ApiOperation({ summary: 'Import POI RDC (seed national ou Overpass par zone MOVA)' })
   importPlaces(@Query('city') city?: string, @Query('overpass') overpass?: string) {
-    return this.geo.importPois(city ?? 'Kinshasa', overpass === 'true');
+    return this.geo.importPois(city ?? 'RDC', overpass === 'true');
   }
 }

@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:latlong2/latlong.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,9 +6,12 @@ import '../../core/billing/service_price_display.dart';
 import '../../core/location/destination_coords.dart';
 import '../../core/location/location_service.dart';
 import '../../core/location/service_area_location.dart';
+import '../../core/location/service_area_prefs.dart';
 import '../../core/location/service_areas.dart';
 import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
+import '../../core/widgets/geo_autocomplete_field.dart';
+import '../../core/widgets/mova_layout.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import '../../core/config/market_config.dart';
@@ -31,34 +32,45 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
   final _itemController = TextEditingController();
   final List<String> _items = [];
   final _budgetController = TextEditingController();
+  final _budgetFocusNode = FocusNode();
   final _promoController = TextEditingController();
   int? _estimatedPrice;
   int? _estimatedPurchaseCdf;
   bool _loading = false;
   bool _loadingGps = false;
-  bool _loadingPickupSuggestions = false;
-  bool _loadingDropoffSuggestions = false;
-  bool _showPickupSuggestions = false;
-  bool _showDropoffSuggestions = false;
-  List<Map<String, dynamic>> _pickupSuggestions = [];
-  List<Map<String, dynamic>> _dropoffSuggestions = [];
   double? _pickupLat;
   double? _pickupLng;
   double? _deliveryLat;
   double? _deliveryLng;
   String? _error;
   String? _validationError;
-  Timer? _pickupDebounce;
-  Timer? _dropoffDebounce;
+
+  String get _autocompleteCity {
+    if (_pickupLat != null && _pickupLng != null) {
+      return ServiceAreas.autocompleteCity(
+        coords: LatLng(_pickupLat!, _pickupLng!),
+        preferredArea: ref.read(selectedServiceAreaProvider),
+      );
+    }
+    if (_deliveryLat != null && _deliveryLng != null) {
+      return ServiceAreas.autocompleteCity(
+        coords: LatLng(_deliveryLat!, _deliveryLng!),
+        preferredArea: ref.read(selectedServiceAreaProvider),
+      );
+    }
+    return ServiceAreas.autocompleteCity(
+      coords: _pickupPoint,
+      preferredArea: ref.read(selectedServiceAreaProvider),
+    );
+  }
 
   @override
   void dispose() {
-    _pickupDebounce?.cancel();
-    _dropoffDebounce?.cancel();
     _pickupController.dispose();
     _dropoffController.dispose();
     _itemController.dispose();
     _budgetController.dispose();
+    _budgetFocusNode.dispose();
     _promoController.dispose();
     super.dispose();
   }
@@ -186,8 +198,11 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
     }
     final api = ref.read(apiClientProvider);
     final city = nearLat != null && nearLng != null
-        ? ServiceAreas.cityNameForCoords(LatLng(nearLat, nearLng))
-        : ServiceAreas.fallbackArea.name;
+        ? ServiceAreas.autocompleteCity(
+            coords: LatLng(nearLat, nearLng),
+            preferredArea: ref.read(selectedServiceAreaProvider),
+          )
+        : _autocompleteCity;
     final result = await api.geoAutocomplete(text, city: city);
     if (result case Success(:final data) when data.isNotEmpty) {
       final s = data.first;
@@ -227,40 +242,27 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
     );
   }
 
-  void _onPickupChanged(String value) {
-    _pickupDebounce?.cancel();
-    _pickupDebounce = Timer(const Duration(milliseconds: 350), () => _fetchPickupSuggestions(value));
-    setState(() {
-      _estimatedPrice = null;
-      _estimatedPurchaseCdf = null;
-      _pickupLat = null;
-      _pickupLng = null;
+  void _deferResetEstimate({bool clearPickup = false, bool clearDropoff = false}) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      setState(() {
+        _estimatedPrice = null;
+        _estimatedPurchaseCdf = null;
+        if (clearPickup) {
+          _pickupLat = null;
+          _pickupLng = null;
+        }
+        if (clearDropoff) {
+          _deliveryLat = null;
+          _deliveryLng = null;
+        }
+      });
     });
   }
 
-  Future<void> _fetchPickupSuggestions(String query) async {
-    if (query.trim().length < 2) {
-      setState(() {
-        _pickupSuggestions = [];
-        _showPickupSuggestions = false;
-      });
-      return;
-    }
-    setState(() => _loadingPickupSuggestions = true);
-    final result = await ref.read(apiClientProvider).geoAutocomplete(query.trim());
-    if (!mounted) return;
-    setState(() {
-      _loadingPickupSuggestions = false;
-      switch (result) {
-        case Success(:final data):
-          _pickupSuggestions = data;
-          _showPickupSuggestions = data.isNotEmpty;
-        case Failure():
-          _pickupSuggestions = [];
-          _showPickupSuggestions = false;
-      }
-    });
-  }
+  void _onPickupUserInput() => _deferResetEstimate(clearPickup: true);
+
+  void _onDropoffUserInput() => _deferResetEstimate(clearDropoff: true);
 
   void _selectPickupSuggestion(Map<String, dynamic> suggestion) {
     final label = suggestion['label']?.toString() ?? suggestion['address']?.toString() ?? '';
@@ -268,45 +270,8 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
     setState(() {
       _pickupLat = (suggestion['lat'] as num?)?.toDouble();
       _pickupLng = (suggestion['lng'] as num?)?.toDouble();
-      _showPickupSuggestions = false;
-      _pickupSuggestions = [];
       _estimatedPrice = null;
       _estimatedPurchaseCdf = null;
-    });
-  }
-
-  void _onDropoffChanged(String value) {
-    _dropoffDebounce?.cancel();
-    _dropoffDebounce = Timer(const Duration(milliseconds: 350), () => _fetchDropoffSuggestions(value));
-    setState(() {
-      _estimatedPrice = null;
-      _estimatedPurchaseCdf = null;
-      _deliveryLat = null;
-      _deliveryLng = null;
-    });
-  }
-
-  Future<void> _fetchDropoffSuggestions(String query) async {
-    if (query.trim().length < 2) {
-      setState(() {
-        _dropoffSuggestions = [];
-        _showDropoffSuggestions = false;
-      });
-      return;
-    }
-    setState(() => _loadingDropoffSuggestions = true);
-    final result = await ref.read(apiClientProvider).geoAutocomplete(query.trim());
-    if (!mounted) return;
-    setState(() {
-      _loadingDropoffSuggestions = false;
-      switch (result) {
-        case Success(:final data):
-          _dropoffSuggestions = data;
-          _showDropoffSuggestions = data.isNotEmpty;
-        case Failure():
-          _dropoffSuggestions = [];
-          _showDropoffSuggestions = false;
-      }
     });
   }
 
@@ -316,8 +281,6 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
     setState(() {
       _deliveryLat = (suggestion['lat'] as num?)?.toDouble();
       _deliveryLng = (suggestion['lng'] as num?)?.toDouble();
-      _showDropoffSuggestions = false;
-      _dropoffSuggestions = [];
       _estimatedPrice = null;
       _estimatedPurchaseCdf = null;
     });
@@ -345,6 +308,7 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
   }
 
   Future<void> _estimate() async {
+    FocusManager.instance.primaryFocus?.unfocus();
     final validation = _validate();
     if (validation != null) {
       setState(() => _validationError = validation);
@@ -384,6 +348,7 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
   }
 
   Future<void> _confirm() async {
+    FocusManager.instance.primaryFocus?.unfocus();
     final validation = _validate();
     if (validation != null) {
       setState(() => _validationError = validation);
@@ -432,6 +397,11 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final compact = MovaLayout.isCompact(context);
+    final gap = MovaLayout.gap(context);
+    final gapSmall = MovaLayout.gap(context, normal: 12, compact: 8);
+    final api = ref.read(apiClientProvider);
+    final autocompleteCity = _autocompleteCity;
 
     return MovaScreen(
       title: 'Courses & commissions',
@@ -446,122 +416,94 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
           dropoffLabel: _dropoffController.text.trim().isEmpty ? null : _dropoffController.text.trim(),
         ),
         child: Column(
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'Listez vos achats — un livreur s\'en charge pour vous.',
-            style: theme.textTheme.bodyMedium?.copyWith(color: MovaColors.textSecondary),
-            maxLines: 2,
+            compact
+                ? 'Listez vos achats — un livreur s\'en charge.'
+                : 'Listez vos achats — un livreur s\'en charge pour vous.',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: MovaColors.textSecondary,
+              fontSize: compact ? 13 : null,
+            ),
+            maxLines: compact ? 3 : 2,
             overflow: TextOverflow.ellipsis,
           ),
-          const SizedBox(height: 16),
-          TextField(
+          SizedBox(height: gap),
+          GeoAutocompleteField(
             controller: _pickupController,
-            decoration: InputDecoration(
-              labelText: 'Point de retrait (commerce)',
-              hintText: 'Ex: Pharmacie, Marché Central…',
-              prefixIcon: const Icon(Icons.store_outlined),
-              suffixIcon: _loadingPickupSuggestions
-                  ? const Padding(
-                      padding: EdgeInsets.all(12),
-                      child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
-                    )
-                  : null,
-            ),
-            onChanged: _onPickupChanged,
+            api: api,
+            city: autocompleteCity,
+            label: compact ? 'Retrait (commerce)' : 'Point de retrait (commerce)',
+            hint: 'Ex: Pharmacie, Marché…',
+            prefixIcon: Icons.store_outlined,
+            onUserInput: _onPickupUserInput,
+            onSelected: _selectPickupSuggestion,
           ),
-          if (_showPickupSuggestions)
-            Card(
-              margin: const EdgeInsets.only(top: 4),
-              child: Column(
-                children: _pickupSuggestions.take(6).map((s) {
-                  final source = s['source']?.toString();
-                  final icon = source == 'poi' ? Icons.place : Icons.location_on_outlined;
-                  return ListTile(
-                    dense: true,
-                    leading: Icon(icon, color: MovaColors.violet, size: 20),
-                    title: Text(s['label']?.toString() ?? '', maxLines: 2, overflow: TextOverflow.ellipsis),
-                    onTap: () => _selectPickupSuggestion(s),
-                  );
-                }).toList(),
-              ),
-            ),
-          const SizedBox(height: 12),
-          TextField(
+          SizedBox(height: gapSmall),
+          GeoAutocompleteField(
             controller: _dropoffController,
-            textInputAction: TextInputAction.done,
-            decoration: InputDecoration(
-              labelText: 'Lieu de livraison',
-              hintText: 'Ex: Gombe, Bandal, Limete…',
-              helperText: 'Saisissez un nom de lieu ou utilisez Ma position',
-              helperMaxLines: 2,
-              prefixIcon: const Icon(Icons.home_outlined),
-              suffixIcon: _loadingDropoffSuggestions
-                  ? const Padding(
-                      padding: EdgeInsets.all(12),
-                      child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
-                    )
-                  : _loadingGps
-                      ? const Padding(
-                          padding: EdgeInsets.all(12),
-                          child: SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          ),
-                        )
-                      : IconButton(
-                          icon: const Icon(Icons.gps_fixed, color: MovaColors.violet),
-                          tooltip: 'Ma position',
-                          onPressed: _loadingGps ? null : _useMyLocation,
-                        ),
-            ),
-            onChanged: _onDropoffChanged,
+            api: api,
+            city: autocompleteCity,
+            label: compact ? 'Livraison' : 'Lieu de livraison',
+            hint: 'Ex: Gombe, Bandal…',
+            prefixIcon: Icons.home_outlined,
+            textInputAction: TextInputAction.next,
+            blockedQueries: const {},
+            onUserInput: _onDropoffUserInput,
+            onSelected: _selectDropoffSuggestion,
+            suffixIcon: _loadingGps
+                ? Padding(
+                    padding: EdgeInsets.all(compact ? 8 : 12),
+                    child: SizedBox(
+                      width: compact ? 16 : 18,
+                      height: compact ? 16 : 18,
+                      child: const CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  )
+                : IconButton(
+                    icon: Icon(Icons.gps_fixed, color: MovaColors.violet, size: compact ? 20 : 24),
+                    tooltip: 'Ma position',
+                    visualDensity: compact ? VisualDensity.compact : VisualDensity.standard,
+                    onPressed: _loadingGps ? null : _useMyLocation,
+                  ),
           ),
-          if (_showDropoffSuggestions)
-            Card(
-              margin: const EdgeInsets.only(top: 4),
-              child: Column(
-                children: _dropoffSuggestions.take(6).map((s) {
-                  final source = s['source']?.toString();
-                  final icon = source == 'poi' ? Icons.place : Icons.location_on_outlined;
-                  return ListTile(
-                    dense: true,
-                    leading: Icon(icon, color: MovaColors.violet, size: 20),
-                    title: Text(s['label']?.toString() ?? '', maxLines: 2, overflow: TextOverflow.ellipsis),
-                    onTap: () => _selectDropoffSuggestion(s),
-                  );
-                }).toList(),
-              ),
-            ),
-          const SizedBox(height: 16),
+          SizedBox(height: gap),
           TextField(
             controller: _budgetController,
+            focusNode: _budgetFocusNode,
             keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-              labelText: 'Budget achats max (FC, optionnel)',
+            style: compact ? const TextStyle(fontSize: 14) : null,
+            decoration: InputDecoration(
+              isDense: compact,
+              labelText: compact ? 'Budget max (FC)' : 'Budget achats max (FC, optionnel)',
               hintText: 'Ex: 50000',
-              prefixIcon: Icon(Icons.account_balance_wallet_outlined),
+              labelStyle: compact ? const TextStyle(fontSize: 13) : null,
+              prefixIcon: Icon(Icons.account_balance_wallet_outlined, size: compact ? 20 : 24),
             ),
-            onChanged: (_) => setState(() => _estimatedPrice = null),
+            onChanged: (_) => _deferResetEstimate(),
           ),
-          const SizedBox(height: 16),
-          Text('Liste de courses', style: theme.textTheme.titleSmall),
-          const SizedBox(height: 8),
+          SizedBox(height: gap),
+          Text('Liste de courses', style: theme.textTheme.titleSmall?.copyWith(fontSize: compact ? 14 : null)),
+          SizedBox(height: compact ? 6 : 8),
           Row(
             children: [
               Expanded(
                 child: TextField(
                   controller: _itemController,
-                  decoration: const InputDecoration(
-                    hintText: 'Ex: Riz 5 kg, Pain, Savon…',
+                  style: compact ? const TextStyle(fontSize: 14) : null,
+                  decoration: InputDecoration(
+                    hintText: compact ? 'Ex: Riz, Pain…' : 'Ex: Riz 5 kg, Pain, Savon…',
+                    hintStyle: compact ? const TextStyle(fontSize: 13) : null,
                     isDense: true,
                   ),
                   onSubmitted: (_) => _addItem(),
                 ),
               ),
               IconButton(
-                icon: const Icon(Icons.add_circle, color: MovaColors.violet),
+                icon: Icon(Icons.add_circle, color: MovaColors.violet, size: compact ? 22 : 24),
+                visualDensity: compact ? VisualDensity.compact : VisualDensity.standard,
                 onPressed: _addItem,
               ),
             ],
@@ -577,8 +519,9 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
           else
             ...List.generate(_items.length, (i) {
               return Padding(
-                padding: const EdgeInsets.only(bottom: 6),
+                padding: EdgeInsets.only(bottom: compact ? 4 : 6),
                 child: MovaCard(
+                  padding: EdgeInsets.all(compact ? 10 : 16),
                   child: Row(
                     children: [
                       Expanded(
@@ -586,10 +529,12 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
                           _items[i],
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
+                          style: compact ? const TextStyle(fontSize: 13) : null,
                         ),
                       ),
                       IconButton(
-                        icon: const Icon(Icons.close, size: 20),
+                        icon: Icon(Icons.close, size: compact ? 18 : 20),
+                        visualDensity: VisualDensity.compact,
                         onPressed: () => _removeItem(i),
                       ),
                     ],
@@ -598,7 +543,7 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
               );
             }),
           if (_estimatedPrice != null) ...[
-            const SizedBox(height: 16),
+            SizedBox(height: gap),
             ServicePriceDisplay.passengerCard(
               {
                 'type': 'ERRAND',
@@ -610,29 +555,33 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
             ),
           ],
           if (_validationError != null) ...[
-            const SizedBox(height: 16),
+            SizedBox(height: gap),
             MovaErrorBanner(message: _validationError!),
           ],
           PromoCodeField(
             controller: _promoController,
+            compact: compact,
             onChanged: () => setState(() {
               _estimatedPrice = null;
               _estimatedPurchaseCdf = null;
             }),
           ),
           if (_error != null) ...[
-            const SizedBox(height: 16),
+            SizedBox(height: gap),
             MovaErrorBanner(message: _error!, onRetry: _estimate),
           ],
-          const SizedBox(height: 24),
+          SizedBox(height: compact ? 16 : 24),
           MovaButton(
-            label: _estimatedPrice == null ? 'Estimer le prix' : 'Envoyer au livreur',
+            label: _estimatedPrice == null
+                ? 'Estimer le prix'
+                : (compact ? 'Envoyer' : 'Envoyer au livreur'),
             isLoading: _loading,
             icon: _estimatedPrice == null ? Icons.calculate_outlined : Icons.send_outlined,
             onPressed: _loading
                 ? null
                 : (_estimatedPrice == null ? _estimate : _confirm),
           ),
+          SizedBox(height: gap),
         ],
         ),
       ),

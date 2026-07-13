@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { RideStatus } from '@prisma/client';
-import { MARKET_RDC } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
+import { PlatformConfigService } from '../platform/platform-config.service';
 import { RidesService } from './rides.service';
 
 @Injectable()
@@ -12,12 +12,14 @@ export class RideSearchScheduler implements OnModuleInit, OnModuleDestroy {
   constructor(
     private prisma: PrismaService,
     private rides: RidesService,
+    private platformConfig: PlatformConfigService,
   ) {}
 
   onModuleInit() {
-    const intervalMs = MARKET_RDC.matching.radiusIncrementIntervalSec * 1000;
+    const intervalSec = this.platformConfig.get().matching.radiusIncrementIntervalSec;
+    const intervalMs = intervalSec * 1000;
     this.timer = setInterval(() => void this.tick(), intervalMs);
-    this.logger.log(`Auto re-search actif (toutes les ${MARKET_RDC.matching.radiusIncrementIntervalSec}s)`);
+    this.logger.log(`Auto re-search actif (toutes les ${intervalSec}s)`);
   }
 
   onModuleDestroy() {
@@ -38,7 +40,7 @@ export class RideSearchScheduler implements OnModuleInit, OnModuleDestroy {
         });
         if (!lastAttempt) continue;
         const elapsedSec = (Date.now() - lastAttempt.createdAt.getTime()) / 1000;
-        if (elapsedSec < MARKET_RDC.matching.radiusIncrementIntervalSec) continue;
+        if (elapsedSec < this.platformConfig.get().matching.radiusIncrementIntervalSec) continue;
         await this.rides.autoSearchDrivers(ride.id);
       } catch (err) {
         this.logger.warn(`Auto re-search échoué pour ${ride.id}: ${(err as Error).message}`);

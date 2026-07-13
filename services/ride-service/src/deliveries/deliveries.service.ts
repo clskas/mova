@@ -1,6 +1,6 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { DeliveryStatus, DeliveryType, Prisma, SurchargeType, TrackingReferenceType, VehicleType, WeightCategory, CommissionServiceType } from '@prisma/client';
-import { driverEligibleForParcelWeight, INTERNAL_API_KEY, MARKET_RDC, MOVA_EVENTS, MovaErrorCode, MovaHttpException, canCancelDelivery, estimateTripDurationMin, formatCdf, normalizeVehicleType, resolveCityFromCoords, serviceUrl, VehicleTypeValue } from '@mova/shared';
+import { driverEligibleForParcelWeight, INTERNAL_API_KEY, MOVA_EVENTS, MovaErrorCode, MovaHttpException, canCancelDelivery, estimateTripDurationMin, formatCdf, normalizeVehicleType, resolveCityFromCoords, serviceUrl, VehicleTypeValue } from '@mova/shared';
 import { RedisService } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { PricingService } from '../rides/pricing.service';
@@ -26,25 +26,8 @@ import { deliveryDriverGross } from './delivery-driver-gross.util';
 import { parseFoodItemShares, parseOrderPlacedMetadata } from './food-delivery-settlement.util';
 import { applyPromoCode, formatPromoValidation } from '../common/promo-apply.util';
 import { RoutingService } from '../geo/routing.service';
-
-const WEIGHT_MULTIPLIERS: Record<WeightCategory, number> = {
-  [WeightCategory.DOCUMENTS]: 1.0,
-  [WeightCategory.SMALL]: 1.1,
-  [WeightCategory.MEDIUM]: 1.25,
-  [WeightCategory.LARGE]: 1.5,
-};
-
-const WEIGHT_KG_MULTIPLIERS: { maxKg: number; category: WeightCategory; multiplier: number }[] = [
-  { maxKg: 0.5, category: WeightCategory.DOCUMENTS, multiplier: 1.0 },
-  { maxKg: 1, category: WeightCategory.SMALL, multiplier: 1.1 },
-  { maxKg: 5, category: WeightCategory.MEDIUM, multiplier: 1.25 },
-  { maxKg: 50, category: WeightCategory.LARGE, multiplier: 1.5 },
-];
-
-const FOOD_DELIVERY_BASE_CDF = 3000;
-const MAX_FOOD_DELIVERY_DISTANCE_KM = 30;
-const MAX_FOOD_DELIVERY_FEE_CDF = 20_000;
-const RESTAURANT_LIST_RADIUS_KM = 50;
+import { PlatformConfigService } from '../platform/platform-config.service';
+import { ParcelWeightBandService } from '../platform/parcel-weight-band.service';
 
 type MenuSize = { label?: string; name?: string; priceCdf?: number; unitPriceCdf?: number };
 type MenuOption = { label?: string; name?: string; priceCdf?: number; unitPriceCdf?: number };
@@ -68,7 +51,17 @@ export class DeliveriesService {
     private matching: MatchingService,
     private commission: CommissionService,
     private routing: RoutingService,
+    private platformConfig: PlatformConfigService,
+    private parcelWeightBands: ParcelWeightBandService,
   ) {}
+
+  private deliveryCfg() {
+    return this.platformConfig.get().delivery;
+  }
+
+  private tripSpeedDelivery() {
+    return this.platformConfig.get().trip.averageSpeedKmh.delivery;
+  }
 
   private async alertDeliveryOffer(delivery: {
     id: string;
@@ -104,16 +97,16 @@ export class DeliveriesService {
     }
   }
 
-  private resolveWeightCategory(dto: CreateParcelDeliveryDto): WeightCategory {
+  private async resolveWeightCategory(dto: CreateParcelDeliveryDto): Promise<WeightCategory> {
     if (dto.weightKg != null) {
-      const band = WEIGHT_KG_MULTIPLIERS.find((b) => dto.weightKg! <= b.maxKg);
-      return band?.category ?? WeightCategory.LARGE;
+      const resolved = await this.parcelWeightBands.resolve(dto.weightKg);
+      return resolved.category;
     }
     return dto.weightCategory;
   }
 
-  private weightMultiplier(category: WeightCategory, weightKg?: number): number {
-    const base = WEIGHT_MULTIPLIERS[category];
+  private async weightMultiplier(category: WeightCategory, weightKg?: number): Promise<number> {
+    const base = await this.parcelWeightBands.getMultiplier(category);
     if (weightKg != null && weightKg > 5) return base * 1.1;
     return base;
   }
@@ -126,13 +119,13 @@ export class DeliveriesService {
       dto.dropoffLat,
       dto.dropoffLng,
     );
-    const weightCategory = this.resolveWeightCategory(dto);
+    const weightCategory = await this.resolveWeightCategory(dto);
     const route = await this.routing.resolveRoadDistance(dto.pickupLat, dto.pickupLng, dto.dropoffLat, dto.dropoffLng);
     const distanceKm = route.distanceKm;
-    const durationMin = route.durationMin ?? estimateTripDurationMin(distanceKm, MARKET_RDC.trip.averageSpeedKmh.delivery);
+    const durationMin = route.durationMin ?? estimateTripDurationMin(distanceKm, this.tripSpeedDelivery());
     const fare = await this.pricing.estimateFare(VehicleType.STANDARD, distanceKm, durationMin, pickupArea.name);
     const withInterCity = this.pricing.withInterCitySurcharge(fare, isInterCity, distanceKm);
-    const multiplier = this.weightMultiplier(weightCategory, dto.weightKg);
+    const multiplier = await this.weightMultiplier(weightCategory, dto.weightKg);
     const beforePromo = Math.ceil(withInterCity.estimatedFareCdf * multiplier);
     const promoApplied = await applyPromoCode(this.promo, beforePromo, dto.promoCode, redeemPromo, {
       context: { serviceType: 'PARCEL' },
@@ -172,7 +165,7 @@ export class DeliveriesService {
 
   async createParcel(userId: string, dto: CreateParcelDeliveryDto) {
     const estimate = await this.estimateParcel(dto, true);
-    const weightCategory = this.resolveWeightCategory(dto);
+    const weightCategory = await this.resolveWeightCategory(dto);
     const delivery = await this.prisma.delivery.create({
       data: {
         userId,
@@ -266,7 +259,8 @@ export class DeliveriesService {
     const restaurantCity = resolveCityFromCoords(restaurantLat, restaurantLng).toLowerCase();
     const deliveryCity = resolveCityFromCoords(deliveryLat, deliveryLng).toLowerCase();
     const isInterCity = restaurantCity !== deliveryCity;
-    const maxKm = isInterCity ? 200 : MAX_FOOD_DELIVERY_DISTANCE_KM;
+    const deliveryCfg = this.deliveryCfg();
+    const maxKm = isInterCity ? deliveryCfg.maxFoodInterCityDistanceKm : deliveryCfg.maxFoodDeliveryDistanceKm;
     if (distanceKm > maxKm) {
       throw new MovaHttpException(
         MovaErrorCode.VALIDATION_ERROR,
@@ -274,14 +268,14 @@ export class DeliveriesService {
         `Livraison hors zone (${maxKm} km max depuis le restaurant).`,
       );
     }
-    const durationMin = estimateTripDurationMin(distanceKm, MARKET_RDC.trip.averageSpeedKmh.delivery);
+    const durationMin = estimateTripDurationMin(distanceKm, this.tripSpeedDelivery());
     const foodSurcharge = await this.surcharges.get(SurchargeType.DELIVERY_FOOD);
     const fare = await this.pricing.estimateFare(VehicleType.MOTO_TAXI, distanceKm, durationMin);
     const rawFee = Math.max(
-      foodSurcharge.baseFeeCdf || FOOD_DELIVERY_BASE_CDF,
+      foodSurcharge.baseFeeCdf || 3000,
       Math.ceil(fare.estimatedFareCdf * foodSurcharge.multiplier),
     );
-    const cap = MAX_FOOD_DELIVERY_FEE_CDF;
+    const cap = deliveryCfg.maxFoodDeliveryFeeCdf;
     return { distanceKm, durationMin, deliveryFeeCdf: Math.min(rawFee, cap) };
   }
 
@@ -389,7 +383,7 @@ export class DeliveriesService {
     let itemsSubtotalCdf = 0;
     let maxDistanceKm = 0;
     let maxDurationMin = 0;
-    let deliveryFeeCdf = foodSurcharge.baseFeeCdf || FOOD_DELIVERY_BASE_CDF;
+    let deliveryFeeCdf = foodSurcharge.baseFeeCdf || 3000;
 
     for (const order of dto.orders) {
       const r = restaurants.find((x) => x.id === order.restaurantId)!;
@@ -515,7 +509,7 @@ export class DeliveriesService {
 
   async createExpress(userId: string, dto: CreateParcelDeliveryDto) {
     const estimate = await this.estimateExpress(dto, true);
-    const weightCategory = this.resolveWeightCategory(dto);
+    const weightCategory = await this.resolveWeightCategory(dto);
     const delivery = await this.prisma.delivery.create({
       data: {
         userId,
@@ -842,7 +836,7 @@ export class DeliveriesService {
     });
 
     /** Rayon livraison repas autour du point de livraison (km). */
-    const DELIVERY_RADIUS_KM = RESTAURANT_LIST_RADIUS_KM;
+    const DELIVERY_RADIUS_KM = this.deliveryCfg().restaurantListRadiusKm;
 
     const cityKey = deliveryCity?.trim().toLowerCase();
     let scoped = rows;
@@ -871,7 +865,7 @@ export class DeliveriesService {
         }
         if (deliveryLat != null && deliveryLng != null) {
           distanceKm = await this.routing.roadDistanceKm(r.lat, r.lng, deliveryLat, deliveryLng);
-          const travelMin = estimateTripDurationMin(distanceKm, MARKET_RDC.trip.averageSpeedKmh.delivery);
+          const travelMin = estimateTripDurationMin(distanceKm, this.tripSpeedDelivery());
           deliveryEtaMin = Math.max(20, travelMin + 15);
         }
         return { ...r, menuItems: this.publicMenuItems(r.menuItems), deliveryEtaMin, distanceKm, minMenuPriceCdf };
@@ -945,7 +939,7 @@ export class DeliveriesService {
       },
     });
 
-    const radiusKm = MARKET_RDC.matching.maxRadiusKm;
+    const radiusKm = this.platformConfig.get().matching.maxRadiusKm;
     const deliveryRule = await this.commission.get(CommissionServiceType.DELIVERY);
     const driverTypes = (profile.vehicles ?? [])
       .filter((v) => v.isActive !== false)

@@ -17,6 +17,15 @@ describe('service-areas', () => {
     expect(findServiceAreaByCoords(-11.6647, 27.4794)?.name).toBe('Lubumbashi');
   });
 
+  it('assigne le fuseau horaire par ville', async () => {
+    const { resolveCityTimezone, DRC_TIMEZONE_EAST, DRC_TIMEZONE_WEST } = await import('./index');
+    expect(resolveCityTimezone('Kinshasa')).toBe(DRC_TIMEZONE_WEST);
+    expect(resolveCityTimezone('Matadi')).toBe(DRC_TIMEZONE_WEST);
+    expect(resolveCityTimezone('Lubumbashi')).toBe(DRC_TIMEZONE_EAST);
+    expect(resolveCityTimezone('Goma')).toBe(DRC_TIMEZONE_EAST);
+    expect(resolveCityTimezone('Kisangani')).toBe(DRC_TIMEZONE_EAST);
+  });
+
   it('accepts coords anywhere in DRC territory', () => {
     expect(isInServiceArea(0.495, 29.473)).toBe(true);
     expect(isInServiceArea(-3.0, 24.0)).toBe(true);

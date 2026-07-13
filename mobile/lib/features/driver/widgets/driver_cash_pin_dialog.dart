@@ -68,7 +68,7 @@ class _DriverCashPinDialogState extends State<DriverCashPinDialog> {
     if (_submitting || pin.isEmpty) return;
     if (widget.validate == null) {
       if (!mounted) return;
-      Navigator.pop(context, pin);
+      Navigator.of(context, rootNavigator: true).pop(pin);
       return;
     }
     setState(() {
@@ -78,7 +78,8 @@ class _DriverCashPinDialogState extends State<DriverCashPinDialog> {
     final result = await widget.validate!(pin);
     if (!mounted) return;
     if (result.ok) {
-      Navigator.pop(context, pin);
+      if (!mounted) return;
+      Navigator.of(context, rootNavigator: true).pop(pin);
       return;
     }
     setState(() {

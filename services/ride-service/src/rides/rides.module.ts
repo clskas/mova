@@ -5,6 +5,7 @@ import { ScheduledRidesService } from './scheduled-rides.service';
 import { RideSearchScheduler } from './ride-search.scheduler';
 import { ScheduledRidesScheduler } from './scheduled-rides.scheduler';
 import { PricingService } from './pricing.service';
+import { PricingTimeWindowService } from './pricing-time-window.service';
 import { PricingAdminService } from './pricing-admin.service';
 import { CommissionService } from './commission.service';
 import { SurchargeService, PromoService } from './surcharge.service';
@@ -19,7 +20,7 @@ import { GeoModule } from '../geo/geo.module';
 @Module({
   imports: [MatchingModule, WebsocketModule, TrackingModule, ShareModule, GeoModule],
   controllers: [RidesController],
-  providers: [RidesService, ScheduledRidesService, RideSearchScheduler, ScheduledRidesScheduler, PricingService, PricingAdminService, CommissionService, SurchargeService, PromoService, RideChatService, FraudService],
-  exports: [RidesService, ScheduledRidesService, PricingService, PricingAdminService, CommissionService, SurchargeService, PromoService, ShareModule, FraudService, RideChatService, GeoModule],
+  providers: [RidesService, ScheduledRidesService, RideSearchScheduler, ScheduledRidesScheduler, PricingService, PricingTimeWindowService, PricingAdminService, CommissionService, SurchargeService, PromoService, RideChatService, FraudService],
+  exports: [RidesService, ScheduledRidesService, PricingService, PricingTimeWindowService, PricingAdminService, CommissionService, SurchargeService, PromoService, ShareModule, FraudService, RideChatService, GeoModule],
 })
 export class RidesModule {}

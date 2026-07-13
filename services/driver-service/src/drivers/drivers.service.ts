@@ -21,6 +21,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateOnboardingDto } from './drivers.dto';
 import { OcrService } from '../ocr/ocr.service';
+import { MatchingConfigService } from '../common/matching-config.service';
 
 export interface DriverCandidate {
   driverId: string;
@@ -39,6 +40,7 @@ export class DriversService {
   constructor(
     private prisma: PrismaService,
     private ocrService: OcrService,
+    private matchingConfig: MatchingConfigService,
   ) {}
 
   private documentsStatusFor(profile: {
@@ -132,9 +134,10 @@ export class DriversService {
   }
 
   async findNearby(lat: number, lng: number, vehicleType: VehicleType, searchAttempt = 0, city?: string): Promise<DriverCandidate[]> {
+    const matching = this.matchingConfig.get();
     const effectiveRadius = Math.min(
-      MARKET_RDC.matching.initialRadiusKm + searchAttempt * MARKET_RDC.matching.radiusIncrementKm,
-      MARKET_RDC.matching.maxRadiusKm,
+      matching.initialRadiusKm + searchAttempt * matching.radiusIncrementKm,
+      matching.maxRadiusKm,
     );
     const pickupCity = city ?? resolveCityFromCoords(lat, lng);
     const compatibleTypes = driverVehicleTypesForRide(vehicleType) as VehicleType[];
@@ -874,12 +877,17 @@ export class DriversService {
             select: { userId: true, type: true },
           })
         : [];
+    const users = await Promise.all(userIds.map((id) => this.fetchAuthUser(id)));
+    const userById = new Map(users.filter(Boolean).map((u) => [u!.id, u!]));
     const data = rows.map((p) => {
       const kycSummary = this.kycUploadSummary(p.userId, allDocs);
       const documentsStatus = this.documentsStatusFor(p);
+      const user = userById.get(p.userId);
       return {
         ...p,
         publicId: formatMovaPublicId(p.userId, 'DRIVER'),
+        firstName: user?.firstName ?? null,
+        lastName: user?.lastName ?? null,
         activationPinVerified: !!p.activationPinVerifiedAt,
         ...kycSummary,
         readyForReview: p.onboardingCompleted && p.kycStatus === KycStatus.PENDING,
@@ -981,8 +989,9 @@ export class DriversService {
   }
 
   private computeScore(distanceKm: number, rating: number, totalRides: number, acceptanceRate = 0.85): number {
-    const w = MARKET_RDC.matching.scoreWeights;
-    const proximityScore = Math.max(0, 1 - distanceKm / MARKET_RDC.matching.maxRadiusKm);
+    const matching = this.matchingConfig.get();
+    const w = matching.scoreWeights;
+    const proximityScore = Math.max(0, 1 - distanceKm / matching.maxRadiusKm);
     const ratingScore = rating / 5;
     const acceptanceScore = Math.min(1, acceptanceRate);
     const seniorityScore = Math.min(1, totalRides / 500);

@@ -21,7 +21,10 @@ export function filterDriversForMoving(
   return drivers.filter((d) => {
     if (!driverHasCargoVehicle(d)) return false;
     const types = activeVehicleTypes(d);
-    if (vehicleCategory === "CAMION_30M3" || vehicleCategory === "CAMION_50M3") {
+    if (vehicleCategory === "CAMION_50M3") {
+      return types.some((t) => t === "UTILITAIRE" || t === "CAMION");
+    }
+    if (vehicleCategory === "CAMION_30M3") {
       return types.some((t) => t === "UTILITAIRE" || t === "CAMION" || t === "COMFORT" || t === "VIP");
     }
     if (vehicleCategory === "CAMION_15M3" || vehicleCategory === "CAMIONNETTE") {

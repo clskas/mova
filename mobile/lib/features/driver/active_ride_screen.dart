@@ -12,6 +12,7 @@ import '../../core/billing/driver_earnings_display.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
+import '../chat/chat_alert_service.dart';
 import '../chat/ride_chat_screen.dart';
 import 'widgets/driver_cash_pin_dialog.dart';
 
@@ -83,6 +84,18 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
       rideId: _rideId,
       token: token,
     );
+    socket.onChat = (payload) {
+      if (payload['rideId']?.toString() != _rideId) return;
+      final role = payload['senderRole']?.toString() ?? '';
+      if (role == 'driver') return;
+      ChatAlertService.notifyIncoming(
+        kind: 'ride',
+        threadId: _rideId,
+        senderRole: role,
+        text: payload['text']?.toString() ?? '',
+        peerLabel: 'Chauffeur',
+      );
+    };
     // Le passager a réglé en espèces → ouvrir automatiquement la saisie du PIN.
     socket.onCashPending = (payload) {
       final rideId = payload['rideId']?.toString();

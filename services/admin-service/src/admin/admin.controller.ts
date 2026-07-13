@@ -444,6 +444,34 @@ export class AdminController {
     return this.adminService.deleteErrandCategoryEstimate(category);
   }
 
+  @Get('pricing-time-windows')
+  @RequirePermissions(AdminPermission.PRICING_READ)
+  @ApiOperation({ summary: 'Plages horaires pointe / nuit par ville' })
+  pricingTimeWindows(@Query('city') city?: string) {
+    return this.adminService.listPricingTimeWindows(city);
+  }
+
+  @Post('pricing-time-windows')
+  @RequirePermissions(AdminPermission.PRICING_WRITE)
+  @ApiOperation({ summary: 'Créer une plage horaire pointe / nuit' })
+  createPricingTimeWindow(@Body() body: Record<string, unknown>) {
+    return this.adminService.createPricingTimeWindow(body);
+  }
+
+  @Patch('pricing-time-windows/:id')
+  @RequirePermissions(AdminPermission.PRICING_WRITE)
+  @ApiOperation({ summary: 'Modifier une plage horaire pointe / nuit' })
+  updatePricingTimeWindow(@Param('id') id: string, @Body() body: Record<string, unknown>) {
+    return this.adminService.updatePricingTimeWindow(id, body);
+  }
+
+  @Delete('pricing-time-windows/:id')
+  @RequirePermissions(AdminPermission.PRICING_WRITE)
+  @ApiOperation({ summary: 'Supprimer une plage horaire pointe / nuit' })
+  deletePricingTimeWindow(@Param('id') id: string) {
+    return this.adminService.deletePricingTimeWindow(id);
+  }
+
   @Get('communes')
   @RequirePermissions(AdminPermission.PRICING_READ)
   @ApiOperation({ summary: 'Quartiers/communes par ville' })
@@ -489,8 +517,8 @@ export class AdminController {
   @Patch('provinces/:id')
   @RequirePermissions(AdminPermission.PRICING_WRITE)
   @ApiOperation({ summary: 'Modifier une province' })
-  updateProvince(@Param('id') id: string, @Body('name') name: string) {
-    return this.adminService.updateProvince(id, name);
+  updateProvince(@Param('id') id: string, @Body() body: { name?: string; isActive?: boolean }) {
+    return this.adminService.updateProvince(id, body);
   }
 
   @Delete('provinces/:id')
@@ -498,6 +526,20 @@ export class AdminController {
   @ApiOperation({ summary: 'Supprimer une province' })
   deleteProvince(@Param('id') id: string) {
     return this.adminService.deleteProvince(id);
+  }
+
+  @Post('provinces/bulk-active')
+  @RequirePermissions(AdminPermission.PRICING_WRITE)
+  @ApiOperation({ summary: 'Activer ou désactiver toutes les provinces MOVA' })
+  setAllProvincesActive(@Body() body: { isActive: boolean }) {
+    return this.adminService.setAllProvincesActive(body.isActive === true);
+  }
+
+  @Post('poi/seed')
+  @RequirePermissions(AdminPermission.PRICING_WRITE)
+  @ApiOperation({ summary: 'Synchroniser le catalogue POI (toutes les villes MOVA)' })
+  seedPois(@Query('city') city?: string) {
+    return this.adminService.seedPois(city);
   }
 
   @Get('cities')
@@ -533,6 +575,13 @@ export class AdminController {
   @ApiOperation({ summary: 'Supprimer une ville' })
   deleteCity(@Param('id') id: string) {
     return this.adminService.deleteCity(id);
+  }
+
+  @Post('cities/bulk-active')
+  @RequirePermissions(AdminPermission.PRICING_WRITE)
+  @ApiOperation({ summary: 'Activer ou désactiver toutes les villes MOVA' })
+  setAllCitiesActive(@Body() body: { isActive: boolean }) {
+    return this.adminService.setAllCitiesActive(body.isActive === true);
   }
 
   @Get('poi-suggestions')
@@ -757,6 +806,62 @@ export class AdminController {
   @ApiOperation({ summary: 'Modifier majoration service' })
   updateSurcharge(@Param('type') type: string, @Body() body: Record<string, unknown>) {
     return this.adminService.updateSurcharge(type, body);
+  }
+
+  @Get('moving-vehicle-categories')
+  @RequirePermissions(AdminPermission.PRICING_READ)
+  @ApiOperation({ summary: 'Coefficients tarifaires par type d\'engin déménagement' })
+  movingVehicleCategories() {
+    return this.adminService.listMovingVehicleCategories();
+  }
+
+  @Patch('moving-vehicle-categories/:category')
+  @RequirePermissions(AdminPermission.PRICING_WRITE)
+  @ApiOperation({ summary: 'Modifier coefficient engin déménagement' })
+  updateMovingVehicleCategory(@Param('category') category: string, @Body() body: Record<string, unknown>) {
+    return this.adminService.updateMovingVehicleCategory(category, body);
+  }
+
+  @Get('platform-config')
+  @RequirePermissions(AdminPermission.PRICING_READ)
+  @ApiOperation({ summary: 'Configuration plateforme (dispatch, inter-ville, livraison, etc.)' })
+  platformConfig() {
+    return this.adminService.getPlatformConfig();
+  }
+
+  @Patch('platform-config')
+  @RequirePermissions(AdminPermission.PRICING_WRITE)
+  @ApiOperation({ summary: 'Modifier configuration plateforme' })
+  updatePlatformConfig(@Body() body: Record<string, unknown>) {
+    return this.adminService.updatePlatformConfig(body);
+  }
+
+  @Get('cancellation-policies')
+  @RequirePermissions(AdminPermission.PRICING_READ)
+  @ApiOperation({ summary: 'Politiques annulation courses par type véhicule' })
+  cancellationPolicies() {
+    return this.adminService.listCancellationPolicies();
+  }
+
+  @Patch('cancellation-policies/:vehicleType')
+  @RequirePermissions(AdminPermission.PRICING_WRITE)
+  @ApiOperation({ summary: 'Modifier politique annulation' })
+  updateCancellationPolicy(@Param('vehicleType') vehicleType: string, @Body() body: Record<string, unknown>) {
+    return this.adminService.updateCancellationPolicy(vehicleType, body);
+  }
+
+  @Get('parcel-weight-bands')
+  @RequirePermissions(AdminPermission.PRICING_READ)
+  @ApiOperation({ summary: 'Bandes de poids colis et multiplicateurs' })
+  parcelWeightBands() {
+    return this.adminService.listParcelWeightBands();
+  }
+
+  @Patch('parcel-weight-bands/:category')
+  @RequirePermissions(AdminPermission.PRICING_WRITE)
+  @ApiOperation({ summary: 'Modifier bande de poids colis' })
+  updateParcelWeightBand(@Param('category') category: string, @Body() body: Record<string, unknown>) {
+    return this.adminService.updateParcelWeightBand(category, body);
   }
 
   @Get('commissions')

@@ -1,6 +1,6 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { CommissionServiceType, RideStatus, ScheduledRideStatus, VehicleType } from '@prisma/client';
-import { MovaErrorCode, MovaHttpException, MOVA_EVENTS, MARKET_RDC, estimateTripDurationMin, normalizeVehicleType, resolveCityFromCoords, canCancelScheduledRide, formatCdf } from '@mova/shared';
+import { MovaErrorCode, MovaHttpException, MOVA_EVENTS, estimateTripDurationMin, normalizeVehicleType, resolveCityFromCoords, canCancelScheduledRide, formatCdf } from '@mova/shared';
 import { RedisService } from '@mova/shared';
 import { assertServiceAreaCoords, assertServiceAreaDestination, assertServiceAreaPair, DEFAULT_PICKUP } from '../common/address.util';
 import { fetchAuthUserBrief } from '../common/internal-lookup.util';
@@ -18,8 +18,8 @@ import { applyPromoCode } from '../common/promo-apply.util';
 import { PromoService } from './surcharge.service';
 import { GeoService } from '../geo/geo.service';
 import { RoutingService } from '../geo/routing.service';
+import { PlatformConfigService } from '../platform/platform-config.service';
 
-const MAX_SCHEDULE_DAYS = 7;
 const MS_HOUR = 60 * 60 * 1000;
 const MS_DAY = 24 * MS_HOUR;
 
@@ -36,7 +36,12 @@ export class ScheduledRidesService {
     private routing: RoutingService,
     private geo: GeoService,
     private commission: CommissionService,
+    private platformConfig: PlatformConfigService,
   ) {}
+
+  private schedCfg() {
+    return this.platformConfig.get().scheduled;
+  }
 
   private parseVehicleType(value: string): VehicleType {
     try {
@@ -77,7 +82,7 @@ export class ScheduledRidesService {
     const now = new Date();
     if (scheduledAt <= now) throw new MovaHttpException(MovaErrorCode.SCHEDULED_RIDE_PAST);
     const maxDate = new Date(now);
-    maxDate.setDate(maxDate.getDate() + MAX_SCHEDULE_DAYS);
+    maxDate.setDate(maxDate.getDate() + this.schedCfg().maxScheduleDays);
     if (scheduledAt > maxDate) throw new MovaHttpException(MovaErrorCode.SCHEDULED_RIDE_TOO_FAR);
   }
 
@@ -93,7 +98,7 @@ export class ScheduledRidesService {
     });
     const route = await this.routing.resolveRoadDistance(pickup.lat, pickup.lng, dropoff.lat, dropoff.lng);
     const distanceKm = route.distanceKm;
-    const durationMin = route.durationMin ?? estimateTripDurationMin(distanceKm, MARKET_RDC.trip.averageSpeedKmh.ride);
+    const durationMin = route.durationMin ?? estimateTripDurationMin(distanceKm, this.platformConfig.get().trip.averageSpeedKmh.ride);
     const city = resolveCityFromCoords(pickup.lat, pickup.lng);
     const vehicleType = this.parseVehicleType(String(dto.vehicleType));
     const fare = await this.pricing.estimateFare(vehicleType, distanceKm, durationMin, city);
@@ -151,11 +156,11 @@ export class ScheduledRidesService {
     const cancelEligibility = canCancelScheduledRide({ status: ride.status, scheduledAt: ride.scheduledAt });
     const hoursUntil = (ride.scheduledAt.getTime() - Date.now()) / MS_HOUR;
     const lateCancel =
-      hoursUntil < MARKET_RDC.scheduled.lateCancelHoursBefore &&
+      hoursUntil < this.schedCfg().lateCancelHoursBefore &&
       hoursUntil > 0 &&
       ride.status !== ScheduledRideStatus.CANCELLED;
     const potentialFee = lateCancel
-      ? Math.round((ride.estimatedPriceCdf ?? 0) * (MARKET_RDC.scheduled.lateCancelFeePct / 100))
+      ? Math.round((ride.estimatedPriceCdf ?? 0) * (this.schedCfg().lateCancelFeePct / 100))
       : 0;
     return {
       ...ride,
@@ -168,7 +173,7 @@ export class ScheduledRidesService {
       completionPin: ride.completionPin ?? undefined,
       linkedRideId: ride.rideId ?? undefined,
       lateCancelWarning: lateCancel
-        ? `Annulation tardive : frais de ${formatCdf(potentialFee)} (${MARKET_RDC.scheduled.lateCancelFeePct} %).`
+        ? `Annulation tardive : frais de ${formatCdf(potentialFee)} (${this.schedCfg().lateCancelFeePct} %).`
         : undefined,
       potentialCancellationFeeCdf: lateCancel ? potentialFee : 0,
       ...cancelEligibility,
@@ -268,12 +273,12 @@ export class ScheduledRidesService {
     const hoursUntil = (ride.scheduledAt.getTime() - Date.now()) / MS_HOUR;
     let cancellationFeeCdf = 0;
     if (
-      hoursUntil < MARKET_RDC.scheduled.lateCancelHoursBefore &&
+      hoursUntil < this.schedCfg().lateCancelHoursBefore &&
       hoursUntil > 0 &&
       (ride.status === ScheduledRideStatus.CONFIRMED || ride.driverId)
     ) {
       cancellationFeeCdf = Math.round(
-        (ride.estimatedPriceCdf ?? 0) * (MARKET_RDC.scheduled.lateCancelFeePct / 100),
+        (ride.estimatedPriceCdf ?? 0) * (this.schedCfg().lateCancelFeePct / 100),
       );
       if (cancellationFeeCdf > 0) {
         await debitWallet(
@@ -392,7 +397,7 @@ export class ScheduledRidesService {
 
   async processAutoAssignments(): Promise<number> {
     const now = Date.now();
-    const horizonMs = MARKET_RDC.scheduled.autoAssignHoursBefore * MS_HOUR;
+    const horizonMs = this.schedCfg().autoAssignHoursBefore * MS_HOUR;
     const rides = await this.prisma.scheduledRide.findMany({
       where: {
         status: ScheduledRideStatus.SCHEDULED,
@@ -653,7 +658,7 @@ export class ScheduledRidesService {
     const { pickup, dropoff, isInterCity } = await this.resolveScheduledCoords(dto);
     const route = await this.routing.resolveRoadDistance(pickup.lat, pickup.lng, dropoff.lat, dropoff.lng);
     const distanceKm = route.distanceKm;
-    const durationMin = route.durationMin ?? estimateTripDurationMin(distanceKm, MARKET_RDC.trip.averageSpeedKmh.ride);
+    const durationMin = route.durationMin ?? estimateTripDurationMin(distanceKm, this.platformConfig.get().trip.averageSpeedKmh.ride);
     const city = resolveCityFromCoords(pickup.lat, pickup.lng);
     const fare = await this.pricing.estimateFare(vehicleType, distanceKm, durationMin, city);
     const estimate = this.pricing.withInterCitySurcharge(fare, isInterCity, distanceKm);
@@ -678,8 +683,8 @@ export class ScheduledRidesService {
         surchargeCdf: estimate.surchargeCdf,
       },
       lateCancelPolicy:
-        `Annulation gratuite jusqu'à ${MARKET_RDC.scheduled.lateCancelHoursBefore} h avant le départ. ` +
-        `Au-delà : ${MARKET_RDC.scheduled.lateCancelFeePct} % du tarif estimé.`,
+        `Annulation gratuite jusqu'à ${this.schedCfg().lateCancelHoursBefore} h avant le départ. ` +
+        `Au-delà : ${this.schedCfg().lateCancelFeePct} % du tarif estimé.`,
     };
   }
 }

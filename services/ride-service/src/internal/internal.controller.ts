@@ -7,6 +7,8 @@ import {
   ErrandCategory,
   ErrandOrderStatus,
   MovingRequestStatus,
+  MovingVehicleCategory,
+  PricingTimeKind,
   RentalInquiryStatus,
   RideStatus,
   ScheduledRideStatus,
@@ -22,8 +24,12 @@ import { ErrandCategoryEstimateService } from '../errands/errand-category-estima
 import { GeoService } from '../geo/geo.service';
 import { PoiSuggestionsService } from '../geo/poi-suggestions.service';
 import { MovingService } from '../moving/moving.service';
+import { MovingVehiclePricingService } from '../moving/moving-vehicle-pricing.service';
+import { PlatformConfigService } from '../platform/platform-config.service';
+import { ParcelWeightBandService } from '../platform/parcel-weight-band.service';
 import { PaymentInfoService } from './payment-info.service';
 import { PricingAdminService } from '../rides/pricing-admin.service';
+import { PricingTimeWindowService } from '../rides/pricing-time-window.service';
 import { RentalService } from '../rental/rental.service';
 import { ScheduledRidesService } from '../rides/scheduled-rides.service';
 import { RidesService } from '../rides/rides.service';
@@ -42,11 +48,15 @@ export class InternalController {
     private errandCategoryEstimates: ErrandCategoryEstimateService,
     private scheduledRides: ScheduledRidesService,
     private pricingAdmin: PricingAdminService,
+    private pricingTimeWindows: PricingTimeWindowService,
     private paymentInfo: PaymentInfoService,
     private geo: GeoService,
     private poiSuggestions: PoiSuggestionsService,
     private carpool: CarpoolService,
     private moving: MovingService,
+    private movingVehiclePricing: MovingVehiclePricingService,
+    private platformConfig: PlatformConfigService,
+    private parcelWeightBands: ParcelWeightBandService,
     private rental: RentalService,
     private tracking: TrackingService,
     private fraud: FraudService,
@@ -326,6 +336,56 @@ export class InternalController {
     return this.pricingAdmin.updateSurcharge(type, body);
   }
 
+  @Get('moving-vehicle-categories')
+  listMovingVehicleCategories() {
+    return this.movingVehiclePricing.listAll();
+  }
+
+  @Patch('moving-vehicle-categories/:category')
+  updateMovingVehicleCategory(
+    @Param('category') category: string,
+    @Body() body: { label?: string; multiplier?: number; sortOrder?: number; isActive?: boolean },
+  ) {
+    return this.movingVehiclePricing.update(category as MovingVehicleCategory, body);
+  }
+
+  @Get('platform-config')
+  getPlatformConfig() {
+    return {
+      config: this.platformConfig.get(),
+      overrides: this.platformConfig.getOverrides(),
+      defaults: this.platformConfig.getDefaults(),
+    };
+  }
+
+  @Patch('platform-config')
+  updatePlatformConfig(@Body() body: Record<string, unknown>) {
+    return this.platformConfig.update(body as never);
+  }
+
+  @Get('cancellation-policies')
+  listCancellationPolicies() {
+    return this.pricingAdmin.listCancellationPolicies();
+  }
+
+  @Patch('cancellation-policies/:vehicleType')
+  updateCancellationPolicy(@Param('vehicleType') vehicleType: VehicleType, @Body() body: Record<string, unknown>) {
+    return this.pricingAdmin.updateCancellationPolicy(vehicleType, body as never);
+  }
+
+  @Get('parcel-weight-bands')
+  listParcelWeightBands() {
+    return this.parcelWeightBands.listAll();
+  }
+
+  @Patch('parcel-weight-bands/:category')
+  updateParcelWeightBand(
+    @Param('category') category: string,
+    @Body() body: { label?: string; maxKg?: number; multiplier?: number; sortOrder?: number; isActive?: boolean },
+  ) {
+    return this.parcelWeightBands.update(category as never, body);
+  }
+
   @Get('delivery-pricing-rules')
   listDeliveryPricing() {
     return this.pricingAdmin.listDeliveryPricingRules();
@@ -374,6 +434,48 @@ export class InternalController {
   @Delete('errand-category-estimates/:category')
   deleteErrandCategoryEstimate(@Param('category') category: ErrandCategory) {
     return this.errandCategoryEstimates.deactivate(category);
+  }
+
+  @Get('pricing-time-windows')
+  listPricingTimeWindows(@Query('city') city?: string) {
+    return this.pricingTimeWindows.listForCity(city);
+  }
+
+  @Post('pricing-time-windows')
+  createPricingTimeWindow(
+    @Body()
+    body: {
+      city: string;
+      kind: PricingTimeKind;
+      startHour: number;
+      endHour: number;
+      label?: string | null;
+      sortOrder?: number;
+      isActive?: boolean;
+    },
+  ) {
+    return this.pricingTimeWindows.create(body);
+  }
+
+  @Patch('pricing-time-windows/:id')
+  updatePricingTimeWindow(
+    @Param('id') id: string,
+    @Body()
+    body: Partial<{
+      kind: PricingTimeKind;
+      startHour: number;
+      endHour: number;
+      label: string | null;
+      sortOrder: number;
+      isActive: boolean;
+    }>,
+  ) {
+    return this.pricingTimeWindows.update(id, body);
+  }
+
+  @Delete('pricing-time-windows/:id')
+  deletePricingTimeWindow(@Param('id') id: string) {
+    return this.pricingTimeWindows.remove(id);
   }
 
   @Get('commissions')
@@ -432,13 +534,18 @@ export class InternalController {
   }
 
   @Patch('provinces/:id')
-  updateProvince(@Param('id') id: string, @Body('name') name: string) {
-    return this.geo.updateProvince(id, name);
+  updateProvince(@Param('id') id: string, @Body() body: { name?: string; isActive?: boolean }) {
+    return this.geo.updateProvince(id, body);
   }
 
   @Delete('provinces/:id')
   deleteProvince(@Param('id') id: string) {
     return this.geo.deleteProvince(id);
+  }
+
+  @Post('provinces/bulk-active')
+  setAllProvincesActive(@Body() body: { isActive: boolean }) {
+    return this.geo.setAllProvincesActive(body.isActive === true);
   }
 
   @Get('cities')
@@ -447,8 +554,8 @@ export class InternalController {
   }
 
   @Get('cities/catalog')
-  citiesCatalog() {
-    return this.geo.listCitiesCatalog();
+  citiesCatalog(@Query('activeOnly') activeOnly?: string) {
+    return this.geo.listCitiesCatalog({ activeOnly: activeOnly === 'true' });
   }
 
   @Post('cities')
@@ -475,6 +582,16 @@ export class InternalController {
   @Delete('cities/:id')
   deleteCity(@Param('id') id: string) {
     return this.geo.deleteCity(id);
+  }
+
+  @Post('cities/bulk-active')
+  setAllCitiesActive(@Body() body: { isActive: boolean }) {
+    return this.geo.setAllCitiesActive(body.isActive === true);
+  }
+
+  @Post('poi/seed')
+  seedPois(@Query('city') city?: string) {
+    return this.geo.importPois(city ?? 'RDC', false);
   }
 
   @Get('poi-suggestions')

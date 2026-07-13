@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { VehicleType } from '@prisma/client';
-import { INTERNAL_API_KEY, MARKET_RDC, resolveCityFromCoords, serviceUrl } from '@mova/shared';
+import { INTERNAL_API_KEY, resolveCityFromCoords, serviceUrl } from '@mova/shared';
+import { PlatformConfigService } from '../platform/platform-config.service';
 
 export interface DriverCandidate {
   driverId: string;
@@ -15,6 +16,12 @@ export interface DriverCandidate {
 
 @Injectable()
 export class MatchingService {
+  constructor(private platformConfig: PlatformConfigService) {}
+
+  private cfg() {
+    return this.platformConfig.get().matching;
+  }
+
   /**
    * Recherche chauffeurs autour du point de départ.
    * Courses inter-villes : matching initial à la ville de départ ; le trajet longue distance
@@ -32,19 +39,18 @@ export class MatchingService {
   }
 
   computeRadiusKm(searchAttempt = 0): number {
-    return Math.min(
-      MARKET_RDC.matching.initialRadiusKm + searchAttempt * MARKET_RDC.matching.radiusIncrementKm,
-      MARKET_RDC.matching.maxRadiusKm,
-    );
+    const m = this.cfg();
+    return Math.min(m.initialRadiusKm + searchAttempt * m.radiusIncrementKm, m.maxRadiusKm);
   }
 
   getMatchingMeta(searchAttempt = 0) {
+    const m = this.cfg();
     const radiusKm = this.computeRadiusKm(searchAttempt);
     return {
       radiusKm,
-      nextRadiusKm: Math.min(radiusKm + MARKET_RDC.matching.radiusIncrementKm, MARKET_RDC.matching.maxRadiusKm),
-      incrementIntervalSec: MARKET_RDC.matching.radiusIncrementIntervalSec,
-      maxRadiusKm: MARKET_RDC.matching.maxRadiusKm,
+      nextRadiusKm: Math.min(radiusKm + m.radiusIncrementKm, m.maxRadiusKm),
+      incrementIntervalSec: m.radiusIncrementIntervalSec,
+      maxRadiusKm: m.maxRadiusKm,
     };
   }
 }

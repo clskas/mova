@@ -3,7 +3,6 @@ import { CarpoolStatus, CommissionServiceType, VehicleType } from '@prisma/clien
 import {
   canCancelCarpoolTrip,
   INTERNAL_API_KEY,
-  MARKET_RDC,
   MovaErrorCode,
   MovaHttpException,
   UserRole,
@@ -17,9 +16,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { PricingService } from '../rides/pricing.service';
 import { CommissionService } from '../rides/commission.service';
 import { RoutingService } from '../geo/routing.service';
+import { PlatformConfigService } from '../platform/platform-config.service';
 import { CreateCarpoolTripDto } from './carpool.dto';
-
-const MATCH_RADIUS_KM = 5;
 
 type TripRow = {
   id: string;
@@ -54,7 +52,16 @@ export class CarpoolService {
     private pricing: PricingService,
     private routing: RoutingService,
     private commission: CommissionService,
+    private platformConfig: PlatformConfigService,
   ) {}
+
+  private carpoolCfg() {
+    return this.platformConfig.get().carpool;
+  }
+
+  private tripSpeedCarpool() {
+    return this.platformConfig.get().trip.averageSpeedKmh.carpool;
+  }
 
   private maskPhone(phone?: string): string {
     if (!phone || phone.length < 6) return '+243 *** ***';
@@ -213,7 +220,7 @@ export class CarpoolService {
     const distanceKm =
       t.distanceKm ??
       (await this.routing.roadDistanceKm(t.pickupLat, t.pickupLng, t.dropoffLat, t.dropoffLng));
-    const durationMin = t.durationMin ?? estimateTripDurationMin(distanceKm, MARKET_RDC.trip.averageSpeedKmh.carpool);
+    const durationMin = t.durationMin ?? estimateTripDurationMin(distanceKm, this.tripSpeedCarpool());
     const rating = driverMeta?.rating ?? (await this.driverRatingAvg(t.driverId));
     const profile = driverMeta?.kycVerified != null ? null : await this.fetchDriverProfile(t.driverId);
     const kycVerified = driverMeta?.kycVerified ?? profile?.kycStatus === 'APPROVED';
@@ -301,7 +308,7 @@ export class CarpoolService {
     const dropoff = addressToCoords(toAddress);
     const route = await this.routing.resolveRoadDistance(pickup.lat, pickup.lng, dropoff.lat, dropoff.lng);
     const distanceKm = route.distanceKm;
-    const durationMin = route.durationMin ?? estimateTripDurationMin(distanceKm, MARKET_RDC.trip.averageSpeedKmh.carpool);
+    const durationMin = route.durationMin ?? estimateTripDurationMin(distanceKm, this.tripSpeedCarpool());
     const fare = await this.pricing.estimateFare(VehicleType.STANDARD, distanceKm, durationMin);
     const totalPriceCdf = Math.max(fare.estimatedFareCdf, 5000 * seats);
     return {
@@ -471,7 +478,8 @@ export class CarpoolService {
       filtered = filtered.filter((t) => {
         const pickupDist = this.pricing.haversineKm(pickup.lat, pickup.lng, t.pickupLat, t.pickupLng);
         const dropoffDist = this.pricing.haversineKm(dropoff.lat, dropoff.lng, t.dropoffLat, t.dropoffLng);
-        return pickupDist <= MATCH_RADIUS_KM * 3 && dropoffDist <= MATCH_RADIUS_KM * 3;
+        const { matchRadiusKm, relaxedRadiusMultiplier } = this.carpoolCfg();
+        return pickupDist <= matchRadiusKm * relaxedRadiusMultiplier && dropoffDist <= matchRadiusKm * relaxedRadiusMultiplier;
       });
     }
 
@@ -490,7 +498,7 @@ export class CarpoolService {
     if (departureAt <= new Date()) throw new MovaHttpException(MovaErrorCode.SCHEDULED_RIDE_PAST);
     const route = await this.routing.resolveRoadDistance(dto.pickupLat, dto.pickupLng, dto.dropoffLat, dto.dropoffLng);
     const distanceKm = route.distanceKm;
-    const durationMin = route.durationMin ?? estimateTripDurationMin(distanceKm, MARKET_RDC.trip.averageSpeedKmh.carpool);
+    const durationMin = route.durationMin ?? estimateTripDurationMin(distanceKm, this.tripSpeedCarpool());
     let vehicleInfo = dto.vehicleInfo;
     if (!vehicleInfo) {
       const profile = await this.fetchDriverProfile(driverId);
@@ -540,7 +548,8 @@ export class CarpoolService {
       const dropoffDist = query.dropoffLat && query.dropoffLng
         ? this.pricing.haversineKm(query.dropoffLat, query.dropoffLng, t.dropoffLat, t.dropoffLng)
         : 0;
-      return pickupDist <= MATCH_RADIUS_KM && (!query.dropoffLat || dropoffDist <= MATCH_RADIUS_KM);
+      const { matchRadiusKm } = this.carpoolCfg();
+      return pickupDist <= matchRadiusKm && (!query.dropoffLat || dropoffDist <= matchRadiusKm);
     });
     return { trips, matches };
   }

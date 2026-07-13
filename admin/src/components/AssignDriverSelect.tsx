@@ -11,9 +11,17 @@ type AssignDriverSelectProps = {
   disabled?: boolean;
 };
 
+export function driverDisplayName(d: AdminDriver): string | null {
+  const name = [d.firstName, d.lastName].filter(Boolean).join(" ").trim();
+  return name || null;
+}
+
 export function driverOptionLabel(d: AdminDriver) {
+  const name = driverDisplayName(d);
   const plate = d.vehicles?.[0]?.plateNumber;
   const id = d.publicId ?? d.userId.slice(0, 8);
+  if (name && plate) return `${name} · ${plate}`;
+  if (name) return `${name} · ${id}`;
   return plate ? `${id} · ${plate}` : id;
 }
 

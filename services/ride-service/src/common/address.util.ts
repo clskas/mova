@@ -1,11 +1,15 @@
 import {
   DRC_SERVICE_AREAS,
+  findGeographicServiceAreaByCoords,
   findServiceAreaByCoords,
+  findNearestServiceArea,
   findServiceAreaByName,
   fallbackServiceArea,
   getServiceArea,
   isInDrcTerritory,
   isInServiceArea,
+  isCityOperational,
+  cityInactiveMessage,
   MARKET_RDC,
   MovaErrorCode,
   MovaHttpException,
@@ -51,7 +55,23 @@ export function assertServiceAreaCoords(lat: number, lng: number, _areaId?: stri
       rdcTerritoryOutOfBoundsMessage(),
     );
   }
-  return resolveServiceAreaForCoords(lat, lng);
+  const geographic = findGeographicServiceAreaByCoords(lat, lng);
+  if (geographic && !isCityOperational(geographic.id, geographic.name)) {
+    throw new MovaHttpException(
+      MovaErrorCode.CITY_INACTIVE,
+      undefined,
+      cityInactiveMessage(geographic.name),
+    );
+  }
+  const operational = findServiceAreaByCoords(lat, lng) ?? findNearestServiceArea(lat, lng);
+  if (!isCityOperational(operational.id, operational.name)) {
+    throw new MovaHttpException(
+      MovaErrorCode.CITY_INACTIVE,
+      undefined,
+      cityInactiveMessage(operational.name),
+    );
+  }
+  return operational;
 }
 
 /** Destination valide si coords en RDC ou adresse renseignée (couverture nationale). */
@@ -165,7 +185,10 @@ export function assertSameServiceArea(
   return assertServiceAreaPair(pickupLat, pickupLng, dropoffLat, dropoffLng).pickupArea;
 }
 
-export function interCitySurchargeCdf(distanceKm: number): number {
-  const { baseSurchargeCdf, perKmSurchargeCdf } = MARKET_RDC.interCity;
+export function interCitySurchargeCdf(
+  distanceKm: number,
+  interCity: { baseSurchargeCdf: number; perKmSurchargeCdf: number } = MARKET_RDC.interCity,
+): number {
+  const { baseSurchargeCdf, perKmSurchargeCdf } = interCity;
   return Math.ceil(baseSurchargeCdf + distanceKm * perKmSurchargeCdf);
 }

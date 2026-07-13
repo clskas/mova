@@ -82,6 +82,8 @@ export type AdminDriver = {
   id: string;
   userId: string;
   publicId?: string;
+  firstName?: string | null;
+  lastName?: string | null;
   licenseNumber?: string | null;
   isAvailable?: boolean;
   ratingAvg?: number;
@@ -374,6 +376,22 @@ export type ErrandCategoryEstimate = {
   isActive?: boolean;
 };
 
+export type PricingTimeWindow = {
+  id: string;
+  city: string;
+  kind: "PEAK" | "NIGHT";
+  startHour: number;
+  endHour: number;
+  label?: string | null;
+  sortOrder?: number;
+  isActive?: boolean;
+};
+
+export type PricingTimeWindowsList = {
+  timezone: string;
+  windows: PricingTimeWindow[];
+};
+
 export type ServiceSurcharge = {
   id: string;
   type: string;
@@ -382,6 +400,74 @@ export type ServiceSurcharge = {
   perUnitCdf?: number | null;
   description?: string | null;
   isActive?: boolean;
+};
+
+export type MovingVehicleCategoryPricing = {
+  id: string;
+  category: string;
+  label: string;
+  multiplier: number;
+  sortOrder?: number;
+  isActive?: boolean;
+};
+
+export type CancellationPolicy = {
+  id: string;
+  vehicleType: string;
+  freeCancelMinutes: number;
+  passengerFeeCdf: number;
+  driverCompensationCdf: number;
+  noShowFeeCdf: number;
+};
+
+export type ParcelWeightBand = {
+  id: string;
+  category: string;
+  label: string;
+  maxKg: number;
+  multiplier: number;
+  sortOrder?: number;
+  isActive?: boolean;
+};
+
+export type PlatformConfigData = {
+  interCity: { baseSurchargeCdf: number; perKmSurchargeCdf: number };
+  delivery: {
+    maxFoodDeliveryDistanceKm: number;
+    maxFoodDeliveryFeeCdf: number;
+    restaurantListRadiusKm: number;
+    maxFoodInterCityDistanceKm: number;
+  };
+  matching: {
+    initialRadiusKm: number;
+    radiusIncrementKm: number;
+    radiusIncrementIntervalSec: number;
+    maxRadiusKm: number;
+    acceptTimeoutSec: number;
+    scoreWeights: { proximity: number; rating: number; acceptanceRate: number; seniority: number };
+  };
+  scheduled: {
+    autoAssignHoursBefore: number;
+    lateCancelHoursBefore: number;
+    lateCancelFeePct: number;
+    maxScheduleDays: number;
+  };
+  trip: {
+    roadDistanceFactor: number;
+    averageSpeedKmh: { ride: number; delivery: number; moving: number; errand: number; carpool: number };
+  };
+  pricing: {
+    defaultPeakMultiplier: number;
+    defaultNightMultiplier: number;
+    combinedPeakNightMultiplier: number;
+  };
+  carpool: { matchRadiusKm: number; relaxedRadiusMultiplier: number };
+};
+
+export type PlatformConfigResponse = {
+  config: PlatformConfigData;
+  overrides?: Record<string, unknown>;
+  defaults?: PlatformConfigData;
 };
 
 export type PlatformCommission = {
@@ -528,6 +614,7 @@ export type Commune = {
 export type Province = {
   id: string;
   name: string;
+  isActive?: boolean;
   _count?: { cities: number };
 };
 
@@ -1143,12 +1230,26 @@ export async function createProvince(name: string) {
   return apiFetch<Province>("/api/admin/provinces", { method: "POST", body: JSON.stringify({ name }) });
 }
 
-export async function updateProvince(id: string, name: string) {
-  return apiFetch<Province>(`/api/admin/provinces/${id}`, { method: "PATCH", body: JSON.stringify({ name }) });
+export async function updateProvince(id: string, data: { name?: string; isActive?: boolean }) {
+  return apiFetch<Province>(`/api/admin/provinces/${id}`, { method: "PATCH", body: JSON.stringify(data) });
 }
 
 export async function deleteProvince(id: string) {
   return apiFetch(`/api/admin/provinces/${id}`, { method: "DELETE" });
+}
+
+export async function setAllProvincesActive(isActive: boolean) {
+  return apiFetch<{ isActive: boolean; count: number }>("/api/admin/provinces/bulk-active", {
+    method: "POST",
+    body: JSON.stringify({ isActive }),
+  });
+}
+
+export async function seedPoiCatalog(city = "RDC") {
+  return apiFetch<{ imported: number; skipped: number }>(
+    `/api/admin/poi/seed?city=${encodeURIComponent(city)}`,
+    { method: "POST" },
+  );
 }
 
 export async function fetchCities(provinceId?: string): Promise<AdminCity[]> {
@@ -1173,6 +1274,13 @@ export async function updateCity(id: string, data: Partial<AdminCity>) {
 
 export async function deleteCity(id: string) {
   return apiFetch(`/api/admin/cities/${id}`, { method: "DELETE" });
+}
+
+export async function setAllCitiesActive(isActive: boolean) {
+  return apiFetch<{ isActive: boolean; count: number }>("/api/admin/cities/bulk-active", {
+    method: "POST",
+    body: JSON.stringify({ isActive }),
+  });
 }
 
 export async function updateCommune(id: string, data: Partial<Commune>) {
@@ -1737,6 +1845,38 @@ export async function deleteErrandCategoryEstimate(category: string) {
   });
 }
 
+export async function fetchPricingTimeWindows(city?: string): Promise<PricingTimeWindowsList> {
+  const q = city ? `?city=${encodeURIComponent(city)}` : "";
+  const raw = await apiFetch<PricingTimeWindowsList | PricingTimeWindow[]>(`/api/admin/pricing-time-windows${q}`);
+  if (Array.isArray(raw)) {
+    return { timezone: "Africa/Kinshasa", windows: raw };
+  }
+  return {
+    timezone: raw.timezone ?? "Africa/Kinshasa",
+    windows: Array.isArray(raw.windows) ? raw.windows : [],
+  };
+}
+
+export async function createPricingTimeWindow(data: Omit<PricingTimeWindow, "id">) {
+  return apiFetch<PricingTimeWindow>("/api/admin/pricing-time-windows", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updatePricingTimeWindow(id: string, data: Partial<PricingTimeWindow>) {
+  return apiFetch<PricingTimeWindow>(`/api/admin/pricing-time-windows/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deletePricingTimeWindow(id: string) {
+  return apiFetch<PricingTimeWindow>(`/api/admin/pricing-time-windows/${id}`, {
+    method: "DELETE",
+  });
+}
+
 export async function fetchSurcharges(): Promise<ServiceSurcharge[]> {
   const raw = await apiFetch<ServiceSurcharge[]>("/api/admin/surcharges");
   return Array.isArray(raw) ? raw : [];
@@ -1744,6 +1884,62 @@ export async function fetchSurcharges(): Promise<ServiceSurcharge[]> {
 
 export async function updateSurcharge(type: string, data: Partial<ServiceSurcharge>) {
   return apiFetch<ServiceSurcharge>(`/api/admin/surcharges/${type}`, { method: "PATCH", body: JSON.stringify(data) });
+}
+
+export async function fetchMovingVehicleCategories(): Promise<MovingVehicleCategoryPricing[]> {
+  const raw = await apiFetch<MovingVehicleCategoryPricing[] | { data?: MovingVehicleCategoryPricing[] }>(
+    "/api/admin/moving-vehicle-categories",
+  );
+  if (Array.isArray(raw)) return raw;
+  return raw.data ?? [];
+}
+
+export async function updateMovingVehicleCategory(
+  category: string,
+  data: Partial<MovingVehicleCategoryPricing>,
+) {
+  return apiFetch<MovingVehicleCategoryPricing>(`/api/admin/moving-vehicle-categories/${category}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function fetchPlatformConfig(): Promise<PlatformConfigResponse> {
+  return apiFetch<PlatformConfigResponse>("/api/admin/platform-config");
+}
+
+export async function updatePlatformConfig(patch: Record<string, unknown>): Promise<PlatformConfigResponse> {
+  return apiFetch<PlatformConfigResponse>("/api/admin/platform-config", {
+    method: "PATCH",
+    body: JSON.stringify(patch),
+  });
+}
+
+export async function fetchCancellationPolicies(): Promise<CancellationPolicy[]> {
+  const raw = await apiFetch<CancellationPolicy[]>("/api/admin/cancellation-policies");
+  return Array.isArray(raw) ? raw : [];
+}
+
+export async function updateCancellationPolicy(
+  vehicleType: string,
+  data: Partial<CancellationPolicy>,
+) {
+  return apiFetch<CancellationPolicy>(`/api/admin/cancellation-policies/${vehicleType}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function fetchParcelWeightBands(): Promise<ParcelWeightBand[]> {
+  const raw = await apiFetch<ParcelWeightBand[]>("/api/admin/parcel-weight-bands");
+  return Array.isArray(raw) ? raw : [];
+}
+
+export async function updateParcelWeightBand(category: string, data: Partial<ParcelWeightBand>) {
+  return apiFetch<ParcelWeightBand>(`/api/admin/parcel-weight-bands/${category}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
 }
 
 export async function fetchCommissions(): Promise<PlatformCommission[]> {

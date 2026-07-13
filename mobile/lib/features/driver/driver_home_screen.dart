@@ -14,6 +14,7 @@ import '../../core/api/api_client.dart';
 import '../../core/api/ride_socket.dart';
 import '../../core/auth/session.dart';
 import '../../core/offline/connectivity_service.dart';
+import '../../core/location/gps_enable_prompt.dart';
 import '../../core/location/service_area_gps.dart';
 import '../../core/error/result.dart';
 import '../../core/geo/geo_utils.dart';
@@ -87,6 +88,9 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) GpsEnablePrompt.promptIfNeeded(context);
+    });
     _bootstrap();
   }
 
@@ -104,6 +108,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed && mounted) {
+      GpsEnablePrompt.promptIfNeeded(context);
       final connectivity = ref.read(connectivityServiceProvider);
       connectivity.prepareReconnect();
       ref.read(apiClientProvider).checkHealth(resetFailures: true).then((_) {

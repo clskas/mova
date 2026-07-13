@@ -1,6 +1,7 @@
 import { VehicleType } from '@prisma/client';
 import { PricingService } from './pricing.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { PricingTimeWindowService } from './pricing-time-window.service';
 
 describe('PricingService', () => {
   const prisma = {
@@ -9,7 +10,11 @@ describe('PricingService', () => {
     },
   } as unknown as PrismaService;
 
-  const service = new PricingService(prisma);
+  const timeWindows = {
+    evaluate: jest.fn().mockResolvedValue({ isPeak: false, isNight: false }),
+  } as unknown as PricingTimeWindowService;
+
+  const service = new PricingService(prisma, timeWindows);
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -41,8 +46,7 @@ describe('PricingService', () => {
   });
 
   it('applique les multiplicateurs pointe/nuit depuis la règle DB', async () => {
-    jest.useFakeTimers();
-    jest.setSystemTime(new Date('2026-06-15T08:00:00')); // heure de pointe
+    (timeWindows.evaluate as jest.Mock).mockResolvedValue({ isPeak: true, isNight: false });
     (prisma.pricingRule.findUnique as jest.Mock).mockResolvedValue({
       vehicleType: VehicleType.STANDARD,
       baseFareCdf: 3000,
@@ -54,6 +58,5 @@ describe('PricingService', () => {
     });
     const fare = await service.estimateFare(VehicleType.STANDARD, 2, 10);
     expect(fare.surchargeMultiplier).toBe(1.4);
-    jest.useRealTimers();
   });
 });

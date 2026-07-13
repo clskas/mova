@@ -303,6 +303,7 @@ class RideSocket {
     void Function(Map<String, dynamic> payload)? onLocation,
     void Function(Map<String, dynamic> payload)? onPaymentCompleted,
     void Function(Map<String, dynamic> payload)? onCashPending,
+    void Function(Map<String, dynamic> payload)? onChat,
     void Function()? onConnected,
     void Function()? onDisconnected,
   }) {
@@ -313,6 +314,7 @@ class RideSocket {
     if (onLocation != null) _onLocation = onLocation;
     if (onPaymentCompleted != null) _onPaymentCompleted = onPaymentCompleted;
     if (onCashPending != null) _onCashPending = onCashPending;
+    if (onChat != null) _onChat = onChat;
     if (onConnected != null) _onConnected = onConnected;
     if (onDisconnected != null) _onDisconnected = onDisconnected;
 

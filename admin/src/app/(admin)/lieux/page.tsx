@@ -5,6 +5,7 @@ import {
   approvePoiSuggestion,
   fetchPoiSuggestions,
   rejectPoiSuggestion,
+  seedPoiCatalog,
   type PoiSuggestion,
 } from "@/lib/api";
 import { useAdmin } from "@/components/AdminProvider";
@@ -110,6 +111,8 @@ export default function LieuxPage() {
   const [rejectId, setRejectId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [osmModal, setOsmModal] = useState<OsmContribution | null>(null);
+  const [seedingPoi, setSeedingPoi] = useState(false);
+  const [seedResult, setSeedResult] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -167,6 +170,21 @@ export default function LieuxPage() {
     }
   }
 
+  async function handleSeedCatalog() {
+    if (!confirm("Synchroniser tous les POI du catalogue MOVA (32 villes) ?")) return;
+    setSeedingPoi(true);
+    setSeedResult(null);
+    setError(null);
+    try {
+      const result = await seedPoiCatalog("RDC");
+      setSeedResult(`${result.imported} ajouté(s), ${result.skipped} déjà présent(s)`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Échec synchronisation POI");
+    } finally {
+      setSeedingPoi(false);
+    }
+  }
+
   return (
     <div>
       <PageHeader
@@ -185,6 +203,15 @@ export default function LieuxPage() {
       </Card>
 
       {error && <ErrorBanner message={error} onRetry={load} />}
+
+      {!readOnly && (
+        <div className="mb-4 flex flex-wrap items-center gap-3">
+          <BtnPrimary onClick={handleSeedCatalog} disabled={seedingPoi}>
+            {seedingPoi ? "Synchronisation…" : "Synchroniser catalogue POI (toutes villes)"}
+          </BtnPrimary>
+          {seedResult && <span className="text-sm text-green-700">{seedResult}</span>}
+        </div>
+      )}
 
       <div className="flex flex-wrap gap-2 mb-4">
         {(["PENDING", "APPROVED", "REJECTED"] as const).map((s) => (

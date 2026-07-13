@@ -1,6 +1,9 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { CommissionServiceType, ErrandCategory, SurchargeType, VehicleType } from '@prisma/client';
-import { DRC_SERVICE_AREAS, getCommunesForArea, KINSHASA_COMMUNES } from '@mova/shared';
+import { CommissionServiceType, ErrandCategory, MovingVehicleCategory, SurchargeType, VehicleType } from '@prisma/client';
+import { DRC_SERVICE_AREAS, getCommunesForArea, KINSHASA_COMMUNES, setCityActivationOverrides } from '@mova/shared';
+import { MOVING_VEHICLE_CATEGORY_DEFAULTS } from '../moving/moving-vehicle-pricing.service';
+import { PARCEL_WEIGHT_BAND_DEFAULTS } from '../platform/parcel-weight-band.service';
+import { PricingTimeWindowService } from '../rides/pricing-time-window.service';
 import { PrismaService } from './prisma.service';
 
 const PRICING_RULES = [
@@ -239,7 +242,7 @@ export class SeedService implements OnModuleInit {
         if (!provinceId) {
           const p = await this.prisma.province.upsert({
             where: { name: area.province },
-            create: { name: area.province },
+            create: { name: area.province, isActive: true },
             update: {},
           });
           provinceId = p.id;
@@ -269,10 +272,13 @@ export class SeedService implements OnModuleInit {
             maxLat: b.maxLat,
             minLng: b.minLng,
             maxLng: b.maxLng,
-            isActive: area.active,
           },
         });
       }
+      const cities = await this.prisma.city.findMany({
+        select: { slug: true, name: true, isActive: true },
+      });
+      setCityActivationOverrides(cities);
     });
 
     await this.seedSection('communes', async () => {
@@ -337,6 +343,66 @@ export class SeedService implements OnModuleInit {
             perItemCdf: row.perItemCdf,
             keywordPattern: row.keywordPattern,
             sortOrder: row.sortOrder,
+          },
+        });
+      }
+      const { PricingTimeWindowService } = await import('../rides/pricing-time-window.service');
+      for (const city of SEED_CITIES) {
+        for (const w of PricingTimeWindowService.defaultSeedRows()) {
+          const existing = await this.prisma.pricingTimeWindow.findFirst({
+            where: { city, kind: w.kind, startHour: w.startHour, endHour: w.endHour },
+          });
+          if (!existing) {
+            await this.prisma.pricingTimeWindow.create({
+              data: { city, ...w },
+            });
+          }
+        }
+      }
+    });
+
+    await this.seedSection('moving-vehicle-categories', async () => {
+      for (const row of MOVING_VEHICLE_CATEGORY_DEFAULTS) {
+        await this.prisma.movingVehicleCategoryPricing.upsert({
+          where: { category: row.category as MovingVehicleCategory },
+          create: row,
+          update: {},
+        });
+      }
+    });
+
+    await this.seedSection('parcel-weight-bands', async () => {
+      for (const row of PARCEL_WEIGHT_BAND_DEFAULTS) {
+        await this.prisma.parcelWeightBand.upsert({
+          where: { category: row.category },
+          create: row,
+          update: {},
+        });
+      }
+    });
+
+    await this.seedSection('poi', async () => {
+      const { ALL_POI_SEED } = await import('../geo/poi-seed.data');
+      for (const row of ALL_POI_SEED) {
+        const existing = await this.prisma.placeOfInterest.findFirst({
+          where: {
+            OR: [
+              { osmId: row.osmId },
+              { name: row.name, city: row.city, lat: row.lat, lng: row.lng },
+            ],
+          },
+        });
+        if (existing) continue;
+        await this.prisma.placeOfInterest.create({
+          data: {
+            osmId: row.osmId,
+            name: row.name,
+            category: row.category,
+            lat: row.lat,
+            lng: row.lng,
+            city: row.city,
+            address: row.address,
+            source: 'OSM',
           },
         });
       }

@@ -12,6 +12,7 @@ import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
+import '../chat/chat_alert_service.dart';
 import '../chat/delivery_chat_screen.dart';
 import '../chat/errand_chat_screen.dart';
 import '../../core/billing/service_price_display.dart';
@@ -42,6 +43,7 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
   Timer? _paymentPollTimer;
   String? _userId;
   bool _cashDialogOpen = false;
+  bool _skipNextCashAutoOpen = false;
 
   String get _deliveryId => _delivery['id']?.toString() ?? '';
   String get _status => _delivery['status']?.toString() ?? 'PENDING';
@@ -123,11 +125,25 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
         if (!mounted) return;
         WidgetsBinding.instance.addPostFrameCallback((_) => _autoOpenCashConfirm());
       },
+      onChat: (payload) {
+        final id = payload['deliveryId']?.toString() ?? payload['rideId']?.toString();
+        if (id != null && id != _deliveryId) return;
+        final role = payload['senderRole']?.toString() ?? '';
+        if (role == 'driver') return;
+        final text = payload['text']?.toString() ?? '';
+        ChatAlertService.notifyIncoming(
+          kind: _isErrand ? 'errand' : 'delivery',
+          threadId: _deliveryId,
+          senderRole: role,
+          text: text,
+          peerLabel: 'Client',
+        );
+      },
     );
   }
 
   void _autoOpenCashConfirm() {
-    if (!mounted || _cashDialogOpen || _isPaid) return;
+    if (!mounted || _cashDialogOpen || _isPaid || _skipNextCashAutoOpen) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || _cashDialogOpen || _isPaid) return;
       _confirmCash(auto: true);
@@ -193,7 +209,7 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
       final merged = mergeDeliveryApiPayload(Map<String, dynamic>.from(data));
       setState(() => _delivery = merged);
       _syncPaymentPolling();
-      if (_cashPending) _autoOpenCashConfirm();
+      if (_cashPending && !_skipNextCashAutoOpen) _autoOpenCashConfirm();
     }
   }
 
@@ -300,12 +316,12 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
         },
       );
       if (pin == null || pin.isEmpty || !mounted) return;
+      _skipNextCashAutoOpen = true;
       await _refresh();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Livraison terminée')),
       );
-      if (_cashPending) _autoOpenCashConfirm();
       return;
     }
     if (_nextAction != null) {

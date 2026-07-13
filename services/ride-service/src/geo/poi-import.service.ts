@@ -1,8 +1,15 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PlaceOfInterestCategory } from '@prisma/client';
-import { getActiveServiceAreas, getServiceArea } from '@mova/shared';
+import { DRC_SERVICE_AREAS, getServiceArea } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
-import { KINSHASA_POI_SEED, OSM_TAG_TO_CATEGORY, PoiSeedRow, buildRegionalPoiSeed } from './poi-seed.data';
+import {
+  KINSHASA_POI_SEED,
+  MIN_POI_KINSHASA,
+  MIN_POI_PER_CITY,
+  OSM_TAG_TO_CATEGORY,
+  PoiSeedRow,
+  buildRegionalPoiSeed,
+} from './poi-seed.data';
 
 type OverpassElement = {
   id: number;
@@ -65,7 +72,7 @@ export class PoiImportService {
     city = 'Kinshasa',
     bbox?: { south: number; west: number; north: number; east: number },
   ) {
-    const area = getServiceArea(city) ?? getActiveServiceAreas().find((a) => a.name.toLowerCase() === city.toLowerCase());
+    const area = getServiceArea(city) ?? DRC_SERVICE_AREAS.find((a) => a.name.toLowerCase() === city.toLowerCase());
     const targetCity = area?.name ?? city;
     const targetBox = bbox ??
       (area
@@ -126,7 +133,7 @@ export class PoiImportService {
     let skipped = 0;
     const errors: Array<{ city: string; error: string }> = [];
 
-    for (const area of getActiveServiceAreas()) {
+    for (const area of DRC_SERVICE_AREAS) {
       try {
         const result = await this.importFromOverpass(area.name);
         imported += result.imported;
@@ -146,17 +153,51 @@ export class PoiImportService {
   }
 
   async ensureSeeded() {
-    const cityNames = [...new Set(buildRegionalPoiSeed().map((r) => r.city))];
+    const cityNames = DRC_SERVICE_AREAS.map((a) => a.name);
     let imported = 0;
     let skipped = 0;
     for (const cityName of cityNames) {
       const count = await this.prisma.placeOfInterest.count({ where: { city: cityName } });
-      if (count > 0) continue;
+      const min = cityName === 'Kinshasa' ? MIN_POI_KINSHASA : MIN_POI_PER_CITY;
+      if (count >= min) continue;
       const result = await this.seedCity(cityName);
       imported += result.imported;
       skipped += result.skipped;
     }
+
+    const staticNames = new Set(cityNames.map((n) => n.toLowerCase()));
+    const extraCities = await this.prisma.city.findMany({
+      where: { isActive: true },
+      select: { name: true, centerLat: true, centerLng: true, province: { select: { name: true } } },
+    });
+    for (const city of extraCities) {
+      if (staticNames.has(city.name.toLowerCase())) continue;
+      const count = await this.prisma.placeOfInterest.count({ where: { city: city.name } });
+      if (count >= MIN_POI_PER_CITY) continue;
+      const result = await this.seedCityFromCenter(city.name, city.centerLat, city.centerLng, city.province.name);
+      imported += result.imported;
+      skipped += result.skipped;
+    }
+
     const total = await this.prisma.placeOfInterest.count();
     return { total, imported, skipped, cities: cityNames.length };
+  }
+
+  private async seedCityFromCenter(cityName: string, centerLat: number, centerLng: number, province: string) {
+    const slug = cityName.toLowerCase().replace(/[^a-z0-9]+/g, '');
+    const templates: PoiSeedRow[] = [
+      { osmId: `mova-${slug}-market`, name: `Marché ${cityName}`, category: 'MARKET', lat: centerLat + 0.004, lng: centerLng + 0.003, city: cityName, address: `Centre-ville, ${cityName}` },
+      { osmId: `mova-${slug}-hospital`, name: `Hôpital Général ${cityName}`, category: 'HOSPITAL', lat: centerLat - 0.003, lng: centerLng + 0.002, city: cityName, address: `${cityName}, ${province}` },
+      { osmId: `mova-${slug}-university`, name: `Université de ${cityName}`, category: 'UNIVERSITY', lat: centerLat + 0.002, lng: centerLng - 0.004, city: cityName, address: `${cityName}, ${province}` },
+      { osmId: `mova-${slug}-pharmacy`, name: `Pharmacie Centre ${cityName}`, category: 'PHARMACY', lat: centerLat, lng: centerLng, city: cityName, address: `Centre-ville, ${cityName}` },
+      { osmId: `mova-${slug}-school`, name: `Institut ${cityName}`, category: 'SCHOOL', lat: centerLat - 0.002, lng: centerLng - 0.003, city: cityName, address: `${cityName}, ${province}` },
+      { osmId: `mova-${slug}-government`, name: `Gouvernorat ${province}`, category: 'GOVERNMENT', lat: centerLat + 0.003, lng: centerLng - 0.002, city: cityName, address: `${cityName}, ${province}` },
+      { osmId: `mova-${slug}-transport`, name: `Gare routière ${cityName}`, category: 'TRANSPORT', lat: centerLat - 0.004, lng: centerLng - 0.001, city: cityName, address: `${cityName}, ${province}` },
+    ];
+    return this.upsertRows(templates);
+  }
+
+  async seedAllCities() {
+    return this.upsertRows(buildRegionalPoiSeed());
   }
 }

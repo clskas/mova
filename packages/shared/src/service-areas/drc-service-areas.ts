@@ -21,8 +21,34 @@ export interface ServiceArea {
   centerLng: number;
   bounds: ServiceAreaBounds;
   active: boolean;
+  /** Fuseau IANA pour les plages pointe/nuit locales. */
+  timezone: string;
   districts?: ServiceAreaDistrict[];
 }
+
+/** Ouest RDC — UTC+1 (Kinshasa, Kongo Central, Kasaï, Équateur, etc.) */
+export const DRC_TIMEZONE_WEST = 'Africa/Kinshasa';
+
+/** Est RDC — UTC+2 (Katanga, Kivu, Maniema, Ituri, etc.) */
+export const DRC_TIMEZONE_EAST = 'Africa/Lubumbashi';
+
+const EAST_SERVICE_AREA_IDS = new Set([
+  'lubumbashi',
+  'likasi',
+  'kolwezi',
+  'goma',
+  'bukavu',
+  'butembo',
+  'beni',
+  'uvira',
+  'kisangani',
+  'kindu',
+  'bunia',
+  'kalemie',
+  'kamina',
+  'isiro',
+  'buta',
+]);
 
 const PADDING = 0.02;
 
@@ -63,6 +89,7 @@ function area(
     centerLng,
     bounds: id === 'kinshasa' ? kinshasaBounds() : boundsFromCenter(centerLat, centerLng, radiusDeg),
     active: true,
+    timezone: EAST_SERVICE_AREA_IDS.has(id) ? DRC_TIMEZONE_EAST : DRC_TIMEZONE_WEST,
     districts,
   };
 }

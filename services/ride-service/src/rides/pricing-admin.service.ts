@@ -224,4 +224,27 @@ export class PricingAdminService {
       },
     });
   }
+
+  listCancellationPolicies() {
+    return this.prisma.cancellationPolicy.findMany({ orderBy: { vehicleType: 'asc' } });
+  }
+
+  async updateCancellationPolicy(
+    vehicleType: VehicleType,
+    data: Partial<{
+      freeCancelMinutes: number;
+      passengerFeeCdf: number;
+      driverCompensationCdf: number;
+      noShowFeeCdf: number;
+    }>,
+  ) {
+    const existing = await this.prisma.cancellationPolicy.findUnique({ where: { vehicleType } });
+    if (!existing) {
+      throw new MovaHttpException(MovaErrorCode.PRICING_NOT_CONFIGURED, HttpStatus.NOT_FOUND, 'Politique introuvable.');
+    }
+    if (data.freeCancelMinutes != null && data.freeCancelMinutes < 0) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, HttpStatus.BAD_REQUEST, 'Délai annulation invalide.');
+    }
+    return this.prisma.cancellationPolicy.update({ where: { vehicleType }, data });
+  }
 }

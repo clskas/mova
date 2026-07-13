@@ -1,9 +1,13 @@
 import { KINSHASA_COMMUNES } from '../communes-seed';
 import { isInDrcTerritory } from '../territory/rdc-territory';
+import { MARKET_RDC } from '../market-rdc.config';
+import { cityInactiveMessage, clearCityActivationOverrides, isCityOperational, setCityActivationOverrides } from './city-activation.registry';
 import {
   DEFAULT_SERVICE_AREA_ID,
   RDC_MAP_CENTER,
   DRC_SERVICE_AREAS,
+  DRC_TIMEZONE_EAST,
+  DRC_TIMEZONE_WEST,
   KINSHASA_BOUNDS,
   type ServiceArea,
   type ServiceAreaBounds,
@@ -14,6 +18,8 @@ export {
   DEFAULT_SERVICE_AREA_ID,
   RDC_MAP_CENTER,
   DRC_SERVICE_AREAS,
+  DRC_TIMEZONE_EAST,
+  DRC_TIMEZONE_WEST,
   KINSHASA_BOUNDS,
   type ServiceArea,
   type ServiceAreaBounds,
@@ -28,7 +34,22 @@ export function getServiceArea(id: string): ServiceArea | undefined {
 }
 
 export function getActiveServiceAreas(): ServiceArea[] {
-  return DRC_SERVICE_AREAS.filter((a) => a.active);
+  return DRC_SERVICE_AREAS.filter((a) => isCityOperational(a.id, a.name));
+}
+
+function isAreaOperational(area: ServiceArea): boolean {
+  return isCityOperational(area.id, area.name);
+}
+
+/** Zone géographique (ignore l'activation admin). */
+export function findGeographicServiceAreaByCoords(lat: number, lng: number): ServiceArea | null {
+  for (const area of DRC_SERVICE_AREAS) {
+    const b = area.bounds;
+    if (lat >= b.minLat && lat <= b.maxLat && lng >= b.minLng && lng <= b.maxLng) {
+      return area;
+    }
+  }
+  return null;
 }
 
 export function isInServiceArea(
@@ -38,7 +59,7 @@ export function isInServiceArea(
 ): boolean {
   if (areaIdOrArea) {
     const area = typeof areaIdOrArea === 'string' ? getServiceArea(areaIdOrArea) : areaIdOrArea;
-    if (!area || !area.active) return false;
+    if (!area || !isAreaOperational(area)) return false;
     const b = area.bounds;
     return lat >= b.minLat && lat <= b.maxLat && lng >= b.minLng && lng <= b.maxLng;
   }
@@ -52,7 +73,7 @@ export function isKinshasaCoords(lat: number, lng: number): boolean {
 
 export function findServiceAreaByCoords(lat: number, lng: number): ServiceArea | null {
   for (const area of DRC_SERVICE_AREAS) {
-    if (!area.active) continue;
+    if (!isAreaOperational(area)) continue;
     const b = area.bounds;
     if (lat >= b.minLat && lat <= b.maxLat && lng >= b.minLng && lng <= b.maxLng) {
       return area;
@@ -73,10 +94,11 @@ export function findServiceAreaByName(name: string): ServiceArea | null {
 }
 
 export function findNearestServiceArea(lat: number, lng: number): ServiceArea {
-  let best = DRC_SERVICE_AREAS[0];
+  const operational = DRC_SERVICE_AREAS.filter((a) => isAreaOperational(a));
+  const pool = operational.length > 0 ? operational : DRC_SERVICE_AREAS;
+  let best = pool[0];
   let bestDist = Infinity;
-  for (const area of DRC_SERVICE_AREAS) {
-    if (!area.active) continue;
+  for (const area of pool) {
     const d = (area.centerLat - lat) ** 2 + (area.centerLng - lng) ** 2;
     if (d < bestDist) {
       bestDist = d;
@@ -89,6 +111,11 @@ export function findNearestServiceArea(lat: number, lng: number): ServiceArea {
 /** Zone la plus proche du centre carte RDC — fallback quand GPS indisponible. */
 export function fallbackServiceArea(): ServiceArea {
   return findNearestServiceArea(RDC_MAP_CENTER.lat, RDC_MAP_CENTER.lng);
+}
+
+/** Fuseau IANA de la ville MOVA (heure locale pour pointe/nuit). */
+export function resolveCityTimezone(cityName: string): string {
+  return findServiceAreaByName(cityName)?.timezone ?? MARKET_RDC.timezone;
 }
 
 /** Résout le nom de ville à partir des coordonnées GPS. */
@@ -119,3 +146,5 @@ export function formatServiceAreasList(max = 8): string {
 export function serviceAreaOutOfBoundsMessage(): string {
   return 'Indiquez une adresse en République Démocratique du Congo.';
 }
+
+export { cityInactiveMessage, clearCityActivationOverrides, isCityOperational, setCityActivationOverrides };

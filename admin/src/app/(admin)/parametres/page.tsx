@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   fetchCommunes,
   createCommune,
@@ -14,6 +14,8 @@ import {
   createCity,
   updateCity,
   deleteCity,
+  setAllCitiesActive,
+  setAllProvincesActive,
   type Commune,
   type Province,
   type AdminCity,
@@ -44,10 +46,15 @@ export default function ParametresPage() {
 
   const [selectedProvinceId, setSelectedProvinceId] = useState("");
   const [selectedCityName, setSelectedCityName] = useState("Kinshasa");
+  const [citySearch, setCitySearch] = useState("");
+  const [cityProvinceFilter, setCityProvinceFilter] = useState("");
+  const [provinceSearch, setProvinceSearch] = useState("");
+  const [provinceBulkSaving, setProvinceBulkSaving] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [bulkSaving, setBulkSaving] = useState(false);
 
   const [modal, setModal] = useState<"province" | "city" | "commune" | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -76,7 +83,7 @@ export default function ParametresPage() {
       if (tab === "provinces") await loadProvinces();
       if (tab === "cities") {
         await loadProvinces();
-        await loadCities();
+        await loadCities(true);
       }
       if (tab === "communes") {
         const allCities = await loadCities(true);
@@ -113,14 +120,42 @@ export default function ParametresPage() {
   async function saveProvince() {
     setSaving(true);
     try {
-      if (editingId) await updateProvince(editingId, form.name);
-      else await createProvince(form.name);
+      const payload = {
+        name: form.name.trim(),
+        isActive: form.isActive !== "false",
+      };
+      if (editingId) await updateProvince(editingId, payload);
+      else await createProvince(payload.name);
       closeModal();
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Échec enregistrement");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function toggleProvinceActive(province: Province) {
+    setError(null);
+    try {
+      await updateProvince(province.id, { isActive: !(province.isActive ?? true) });
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Échec mise à jour");
+    }
+  }
+
+  async function handleBulkProvinceActive(isActive: boolean) {
+    if (!confirm(`${isActive ? "Activer" : "Désactiver"} toutes les provinces MOVA ?`)) return;
+    setProvinceBulkSaving(true);
+    setError(null);
+    try {
+      await setAllProvincesActive(isActive);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Échec mise à jour des provinces");
+    } finally {
+      setProvinceBulkSaving(false);
     }
   }
 
@@ -146,6 +181,55 @@ export default function ParametresPage() {
     }
   }
 
+  async function toggleCityActive(city: AdminCity) {
+    setError(null);
+    try {
+      await updateCity(city.id, { isActive: !city.isActive });
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Échec mise à jour");
+    }
+  }
+
+  async function handleBulkCityActive(isActive: boolean) {
+    const label = isActive ? "activer" : "désactiver";
+    if (!confirm(`${isActive ? "Activer" : "Désactiver"} toutes les villes MOVA ?`)) return;
+    setBulkSaving(true);
+    setError(null);
+    try {
+      await setAllCitiesActive(isActive);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : `Échec — impossible de ${label} toutes les villes`);
+    } finally {
+      setBulkSaving(false);
+    }
+  }
+
+  const activeCityCount = cities.filter((c) => c.isActive).length;
+  const activeProvinceCount = provinces.filter((p) => p.isActive !== false).length;
+
+  const filteredProvinces = useMemo(() => {
+    const q = provinceSearch.trim().toLowerCase();
+    if (!q) return provinces;
+    return provinces.filter((p) => p.name.toLowerCase().includes(q));
+  }, [provinces, provinceSearch]);
+
+  const filteredCities = useMemo(() => {
+    const q = citySearch.trim().toLowerCase();
+    return cities.filter((c) => {
+      if (cityProvinceFilter && c.provinceId !== cityProvinceFilter) return false;
+      if (!q) return true;
+      const provinceName =
+        c.province?.name ?? provinces.find((p) => p.id === c.provinceId)?.name ?? "";
+      return (
+        c.name.toLowerCase().includes(q) ||
+        c.slug.toLowerCase().includes(q) ||
+        provinceName.toLowerCase().includes(q)
+      );
+    });
+  }, [cities, citySearch, cityProvinceFilter, provinces]);
+
   async function saveCommune() {
     setSaving(true);
     try {
@@ -167,10 +251,10 @@ export default function ParametresPage() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto">
+    <div className={`mx-auto ${tab === "cities" || tab === "provinces" ? "max-w-6xl" : "max-w-5xl"}`}>
       <PageHeader
         title="Zones géographiques"
-        subtitle="Provinces, villes et communes/quartiers MOVA"
+        subtitle="Provinces, villes et communes/quartiers MOVA. Une province ou ville désactivée bloque les commandes dans cette zone."
       />
 
       <div className="flex flex-wrap gap-2 mb-4">
@@ -193,7 +277,7 @@ export default function ParametresPage() {
       {!readOnly && (
         <div className="mb-4">
           {tab === "provinces" && (
-            <BtnPrimary onClick={() => openModal("province", { name: "" })}>+ Province</BtnPrimary>
+            <BtnPrimary onClick={() => openModal("province", { name: "", isActive: "true" })}>+ Province</BtnPrimary>
           )}
           {tab === "cities" && (
             <BtnPrimary
@@ -201,7 +285,7 @@ export default function ParametresPage() {
                 openModal("city", {
                   name: "",
                   slug: "",
-                  provinceId: selectedProvinceId || provinces[0]?.id || "",
+                  provinceId: cityProvinceFilter || provinces[0]?.id || "",
                   centerLat: "-4.32",
                   centerLng: "15.31",
                   isActive: "true",
@@ -223,20 +307,81 @@ export default function ParametresPage() {
         </div>
       )}
 
+      {tab === "provinces" && (
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <div className="flex-1 min-w-[220px]">
+            <TextInput
+              value={provinceSearch}
+              onChange={setProvinceSearch}
+              placeholder="Rechercher une province…"
+            />
+          </div>
+          {!readOnly && (
+            <div className="flex flex-wrap gap-2 ml-auto">
+              <span className="text-sm text-gray-500 self-center">
+                {activeProvinceCount}/{provinces.length} actives
+                {provinceSearch ? ` · ${filteredProvinces.length} affichée${filteredProvinces.length > 1 ? "s" : ""}` : ""}
+              </span>
+              <BtnPrimary onClick={() => handleBulkProvinceActive(true)} disabled={provinceBulkSaving}>
+                {provinceBulkSaving ? "…" : "Activer tout"}
+              </BtnPrimary>
+              <button
+                type="button"
+                onClick={() => handleBulkProvinceActive(false)}
+                disabled={provinceBulkSaving}
+                className="px-3 py-1.5 rounded-lg text-sm border border-red-200 text-red-700 hover:bg-red-50 disabled:opacity-50"
+              >
+                Désactiver tout
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       {tab === "cities" && (
-        <div className="mb-4 flex flex-wrap gap-2">
-          {provinces.map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              onClick={() => setSelectedProvinceId(p.id)}
-              className={`px-3 py-1 rounded-full text-sm border ${
-                selectedProvinceId === p.id ? "bg-violet-100 border-violet-400" : "border-gray-200"
-              }`}
+        <div className="mb-4 space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex-1 min-w-[220px]">
+              <TextInput
+                value={citySearch}
+                onChange={setCitySearch}
+                placeholder="Rechercher ville, slug ou province…"
+              />
+            </div>
+            <select
+              className="border rounded-lg px-3 py-2 text-sm bg-white min-w-[180px]"
+              value={cityProvinceFilter}
+              onChange={(e) => setCityProvinceFilter(e.target.value)}
             >
-              {p.name}
-            </button>
-          ))}
+              <option value="">Toutes les provinces</option>
+              {provinces.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+            {!readOnly && (
+              <div className="flex flex-wrap gap-2 ml-auto">
+                <span className="text-sm text-gray-500 self-center">
+                  {activeCityCount}/{cities.length} actives
+                  {citySearch || cityProvinceFilter
+                    ? ` · ${filteredCities.length} affichée${filteredCities.length > 1 ? "s" : ""}`
+                    : ""}
+                </span>
+                <BtnPrimary onClick={() => handleBulkCityActive(true)} disabled={bulkSaving}>
+                  {bulkSaving ? "…" : "Activer tout"}
+                </BtnPrimary>
+                <button
+                  type="button"
+                  onClick={() => handleBulkCityActive(false)}
+                  disabled={bulkSaving}
+                  className="px-3 py-1.5 rounded-lg text-sm border border-red-200 text-red-700 hover:bg-red-50 disabled:opacity-50"
+                >
+                  Désactiver tout
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -265,6 +410,8 @@ export default function ParametresPage() {
       ) : tab === "provinces" ? (
         provinces.length === 0 ? (
           <EmptyState message="Aucune province" />
+        ) : filteredProvinces.length === 0 ? (
+          <EmptyState message="Aucune province ne correspond à votre recherche" />
         ) : (
           <Card className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -272,19 +419,48 @@ export default function ParametresPage() {
                 <tr className="border-b text-left text-gray-500">
                   <th className="p-3">Province</th>
                   <th className="p-3">Villes</th>
+                  <th className="p-3">Active</th>
                   <th className="p-3"></th>
                 </tr>
               </thead>
               <tbody>
-                {provinces.map((p) => (
+                {filteredProvinces.map((p) => (
                   <tr key={p.id} className="border-b">
                     <td className="p-3 font-medium">{p.name}</td>
                     <td className="p-3">{p._count?.cities ?? 0}</td>
+                    <td className="p-3">
+                      <span
+                        className={
+                          p.isActive !== false ? "text-green-700 font-medium" : "text-red-600 font-medium"
+                        }
+                      >
+                        {p.isActive !== false ? "Active" : "Inactive"}
+                      </span>
+                    </td>
                     <td className="p-3 space-x-2">
+                      {!readOnly && (
+                        <button
+                          type="button"
+                          className={
+                            p.isActive !== false
+                              ? "text-amber-700 hover:underline"
+                              : "text-green-700 hover:underline"
+                          }
+                          onClick={() => toggleProvinceActive(p)}
+                        >
+                          {p.isActive !== false ? "Désactiver" : "Activer"}
+                        </button>
+                      )}
                       <button
                         type="button"
                         className="text-[#6C63FF] hover:underline"
-                        onClick={() => openModal("province", { name: p.name }, p.id)}
+                        onClick={() =>
+                          openModal(
+                            "province",
+                            { name: p.name, isActive: String(p.isActive !== false) },
+                            p.id,
+                          )
+                        }
                       >
                         {readOnly ? "Voir" : "Modifier"}
                       </button>
@@ -310,13 +486,16 @@ export default function ParametresPage() {
         )
       ) : tab === "cities" ? (
         cities.length === 0 ? (
-          <EmptyState message="Aucune ville pour cette province" />
+          <EmptyState message="Aucune ville — redémarrez ride-service pour synchroniser le catalogue MOVA" />
+        ) : filteredCities.length === 0 ? (
+          <EmptyState message="Aucune ville ne correspond à votre recherche" />
         ) : (
           <Card className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b text-left text-gray-500">
                   <th className="p-3">Ville</th>
+                  <th className="p-3">Province</th>
                   <th className="p-3">Slug</th>
                   <th className="p-3">Centre GPS</th>
                   <th className="p-3">Active</th>
@@ -324,15 +503,31 @@ export default function ParametresPage() {
                 </tr>
               </thead>
               <tbody>
-                {cities.map((c) => (
+                {filteredCities.map((c) => (
                   <tr key={c.id} className="border-b">
                     <td className="p-3 font-medium">{c.name}</td>
+                    <td className="p-3 text-gray-600">
+                      {c.province?.name ?? provinces.find((p) => p.id === c.provinceId)?.name ?? "—"}
+                    </td>
                     <td className="p-3 font-mono text-xs">{c.slug}</td>
                     <td className="p-3 text-gray-500 font-mono text-xs">
                       {c.centerLat.toFixed(4)}, {c.centerLng.toFixed(4)}
                     </td>
-                    <td className="p-3">{c.isActive ? "Oui" : "Non"}</td>
+                    <td className="p-3">
+                      <span className={c.isActive ? "text-green-700 font-medium" : "text-red-600 font-medium"}>
+                        {c.isActive ? "Active" : "Inactive"}
+                      </span>
+                    </td>
                     <td className="p-3 space-x-2">
+                      {!readOnly && (
+                        <button
+                          type="button"
+                          className={c.isActive ? "text-amber-700 hover:underline" : "text-green-700 hover:underline"}
+                          onClick={() => toggleCityActive(c)}
+                        >
+                          {c.isActive ? "Désactiver" : "Activer"}
+                        </button>
+                      )}
                       <button
                         type="button"
                         className="text-[#6C63FF] hover:underline"
@@ -452,6 +647,15 @@ export default function ParametresPage() {
               <FieldLabel>Nom</FieldLabel>
               <TextInput value={form.name} onChange={(v) => setForm({ ...form, name: v })} disabled={readOnly} />
             </label>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={form.isActive !== "false"}
+                disabled={readOnly}
+                onChange={(e) => setForm({ ...form, isActive: e.target.checked ? "true" : "false" })}
+              />
+              Province active (MOVA opérationnelle dans cette province)
+            </label>
             {!readOnly && (
               <BtnPrimary onClick={saveProvince} disabled={saving}>
                 {saving ? "Enregistrement…" : "Enregistrer"}
@@ -494,6 +698,15 @@ export default function ParametresPage() {
                 <TextInput value={form.centerLng} onChange={(v) => setForm({ ...form, centerLng: v })} disabled={readOnly} />
               </label>
             </div>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={form.isActive !== "false"}
+                disabled={readOnly}
+                onChange={(e) => setForm({ ...form, isActive: e.target.checked ? "true" : "false" })}
+              />
+              Ville active (MOVA opérationnelle)
+            </label>
             {!readOnly && (
               <BtnPrimary onClick={saveCity} disabled={saving}>
                 {saving ? "Enregistrement…" : "Enregistrer"}

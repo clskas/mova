@@ -6,6 +6,7 @@ import 'core/offline/sync_queue.dart';
 import 'core/theme/mova_theme.dart';
 import 'core/widgets/offline_shell.dart';
 import 'features/auth/auth_session_gate.dart';
+import 'features/chat/chat_alert_service.dart';
 import 'features/driver/driver_job_alert_service.dart';
 import 'features/passenger/passenger_alert_service.dart';
 import 'features/splash/mova_splash_screen.dart';
@@ -15,6 +16,7 @@ Future<void> runMovaPassengerApp() async {
   WidgetsFlutterBinding.ensureInitialized();
   await SyncQueue.init();
   await PassengerAlertService.init();
+  await ChatAlertService.init();
   runApp(
     const ProviderScope(
       child: MovaPassengerApp(),
@@ -26,6 +28,7 @@ Future<void> runMovaDriverApp() async {
   WidgetsFlutterBinding.ensureInitialized();
   await SyncQueue.init();
   await DriverJobAlertService.init();
+  await ChatAlertService.init();
   runApp(
     const ProviderScope(
       child: MovaDriverApp(),

@@ -40,6 +40,7 @@ import { publishDriverJobAlert } from '../common/driver-job-alert.util';
 import { fetchRidePaymentStatus, fetchRidePaymentStatuses } from '../common/payment-status.util';
 import { applyPromoCode } from '../common/promo-apply.util';
 import { PromoService } from './surcharge.service';
+import { PlatformConfigService } from '../platform/platform-config.service';
 
 const ACTIVE_STATUSES: RideStatus[] = [
   RideStatus.REQUESTED,
@@ -72,6 +73,7 @@ export class RidesService {
     private tripShare: TripShareService,
     private promo: PromoService,
     private routing: RoutingService,
+    private platformConfig: PlatformConfigService,
   ) {}
 
   private emitStatusChange(rideId: string, status: RideStatus) {
@@ -91,7 +93,7 @@ export class RidesService {
     const route = await this.routing.resolveRoadDistance(pickupLat, pickupLng, dropoffLat, dropoffLng);
     const distanceKm = route.distanceKm;
     const etaMinutes =
-      route.durationMin ?? estimateTripDurationMin(distanceKm, MARKET_RDC.trip.averageSpeedKmh.ride);
+      route.durationMin ?? estimateTripDurationMin(distanceKm, this.platformConfig.get().trip.averageSpeedKmh.ride);
     const fare = await this.pricing.estimateFare(vehicleType, distanceKm, etaMinutes, pickupArea.name);
     const base = this.pricing.withInterCitySurcharge(fare, isInterCity, distanceKm);
     const promoApplied = await applyPromoCode(this.promo, base.totalCdf, promoCode, redeemPromo, {
@@ -229,7 +231,7 @@ export class RidesService {
     }
 
     const result = await this.runSearchAttempt(ride);
-    if (result.driversFound === 0 && result.radiusKm >= MARKET_RDC.matching.maxRadiusKm) {
+    if (result.driversFound === 0 && result.radiusKm >= this.platformConfig.get().matching.maxRadiusKm) {
       throw new MovaHttpException(MovaErrorCode.RIDE_NO_DRIVERS);
     }
     return result;
@@ -295,7 +297,7 @@ export class RidesService {
         score: Math.round(d.score * 1000) / 1000,
         vehicleId: d.vehicleId,
       })),
-      matchingWeights: MARKET_RDC.matching.scoreWeights,
+      matchingWeights: this.platformConfig.get().matching.scoreWeights,
     };
   }
 
@@ -1056,7 +1058,7 @@ export class RidesService {
           return { referenceType: type, referenceId, driverId: r?.driverId ?? null, driverNetCdf: 0 };
         }
         const rule = await this.commission.get(CommissionServiceType.RENTAL);
-        const gross = MARKET_RDC.interCity.baseSurchargeCdf * 2;
+        const gross = this.platformConfig.get().interCity.baseSurchargeCdf * 2;
         return {
           referenceType: type,
           referenceId,
@@ -1172,7 +1174,7 @@ export class RidesService {
         referenceType: 'RENTAL',
         referenceId: r.id,
         label: `Location · ${r.pickupAddress ?? r.pickupCity ?? ''}`,
-        driverNetCdf: Math.round(rideNet(MARKET_RDC.interCity.baseSurchargeCdf * 2, rentalRule.platformPercent)),
+        driverNetCdf: Math.round(rideNet(this.platformConfig.get().interCity.baseSurchargeCdf * 2, rentalRule.platformPercent)),
         completedAt: r.updatedAt.toISOString(),
       })),
       ...carpools.map((t) => {
@@ -1282,7 +1284,7 @@ export class RidesService {
     const sumRentals = (from: Date) =>
       rentals
         .filter((r) => r.updatedAt >= from)
-        .reduce((a, _r) => a + net(MARKET_RDC.interCity.baseSurchargeCdf * 2, rentalRule.platformPercent), 0);
+        .reduce((a, _r) => a + net(this.platformConfig.get().interCity.baseSurchargeCdf * 2, rentalRule.platformPercent), 0);
     const sumCarpools = (from: Date) =>
       carpools
         .filter((t) => t.updatedAt >= from)

@@ -306,6 +306,20 @@ export class AdminService {
     return this.proxy('ride', `/internal/errand-category-estimates/${category}`, { method: 'DELETE' });
   }
 
+  listPricingTimeWindows(city?: string) {
+    const q = city ? `?city=${encodeURIComponent(city)}` : '';
+    return this.fetchJson('ride', `/internal/pricing-time-windows${q}`);
+  }
+  createPricingTimeWindow(body: Record<string, unknown>) {
+    return this.proxy('ride', '/internal/pricing-time-windows', { method: 'POST', body: JSON.stringify(body) });
+  }
+  updatePricingTimeWindow(id: string, body: Record<string, unknown>) {
+    return this.proxy('ride', `/internal/pricing-time-windows/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
+  }
+  deletePricingTimeWindow(id: string) {
+    return this.proxy('ride', `/internal/pricing-time-windows/${id}`, { method: 'DELETE' });
+  }
+
   listCommunes(city?: string) {
     return this.fetchJson('ride', `/internal/communes${city ? `?city=${city}` : ''}`);
   }
@@ -325,8 +339,8 @@ export class AdminService {
   createProvince(name: string) {
     return this.proxy('ride', '/internal/provinces', { method: 'POST', body: JSON.stringify({ name }) });
   }
-  updateProvince(id: string, name: string) {
-    return this.proxy('ride', `/internal/provinces/${id}`, { method: 'PATCH', body: JSON.stringify({ name }) });
+  updateProvince(id: string, data: { name?: string; isActive?: boolean }) {
+    return this.proxy('ride', `/internal/provinces/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
   }
   deleteProvince(id: string) {
     return this.proxy('ride', `/internal/provinces/${id}`, { method: 'DELETE' });
@@ -347,6 +361,18 @@ export class AdminService {
   }
   deleteCity(id: string) {
     return this.proxy('ride', `/internal/cities/${id}`, { method: 'DELETE' });
+  }
+  setAllCitiesActive(isActive: boolean) {
+    return this.proxy('ride', '/internal/cities/bulk-active', { method: 'POST', body: JSON.stringify({ isActive }) });
+  }
+
+  setAllProvincesActive(isActive: boolean) {
+    return this.proxy('ride', '/internal/provinces/bulk-active', { method: 'POST', body: JSON.stringify({ isActive }) });
+  }
+
+  seedPois(city?: string) {
+    const q = city ? `?city=${encodeURIComponent(city)}` : '?city=RDC';
+    return this.proxy('ride', `/internal/poi/seed${q}`, { method: 'POST' });
   }
 
   listCarpool(take = 50) {
@@ -573,6 +599,47 @@ export class AdminService {
   }
   updateSurcharge(type: string, body: Record<string, unknown>) {
     return this.proxy('ride', `/internal/surcharges/${type}`, { method: 'PATCH', body: JSON.stringify(body) });
+  }
+
+  listMovingVehicleCategories() {
+    return this.fetchJson('ride', '/internal/moving-vehicle-categories');
+  }
+
+  updateMovingVehicleCategory(category: string, body: Record<string, unknown>) {
+    return this.proxy('ride', `/internal/moving-vehicle-categories/${category}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    });
+  }
+
+  getPlatformConfig() {
+    return this.fetchJson('ride', '/internal/platform-config');
+  }
+
+  updatePlatformConfig(body: Record<string, unknown>) {
+    return this.proxy('ride', '/internal/platform-config', { method: 'PATCH', body: JSON.stringify(body) });
+  }
+
+  listCancellationPolicies() {
+    return this.fetchJson('ride', '/internal/cancellation-policies');
+  }
+
+  updateCancellationPolicy(vehicleType: string, body: Record<string, unknown>) {
+    return this.proxy('ride', `/internal/cancellation-policies/${vehicleType}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    });
+  }
+
+  listParcelWeightBands() {
+    return this.fetchJson('ride', '/internal/parcel-weight-bands');
+  }
+
+  updateParcelWeightBand(category: string, body: Record<string, unknown>) {
+    return this.proxy('ride', `/internal/parcel-weight-bands/${category}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    });
   }
 
   listCommissions() {

@@ -17,6 +17,7 @@ import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import '../chat/ride_chat_screen.dart';
+import '../chat/chat_alert_service.dart';
 import '../passenger/passenger_alert_service.dart';
 import 'payment_screen.dart';
 import 'widgets/mova_ride_map.dart';
@@ -395,6 +396,18 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
         });
         if (status == 'COMPLETED') _triggerAutoPayment();
         if (status == 'CANCELLED') Navigator.pop(context);
+      },
+      onChat: (payload) {
+        if (payload['rideId']?.toString() != widget.rideId) return;
+        final role = payload['senderRole']?.toString() ?? '';
+        if (role == 'passenger') return;
+        ChatAlertService.notifyIncoming(
+          kind: 'ride',
+          threadId: widget.rideId,
+          senderRole: role,
+          text: payload['text']?.toString() ?? '',
+          peerLabel: _driver?['name']?.toString() ?? 'Chauffeur',
+        );
       },
       onPaymentCompleted: (payload) {
         if (!mounted) return;

@@ -7,6 +7,7 @@ import '../../core/api/api_client.dart';
 import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
+import 'chat_alert_service.dart';
 import 'chat_receipt.dart';
 import 'ride_chat_screen.dart';
 
@@ -30,6 +31,8 @@ class _DeliveryChatScreenState extends ConsumerState<DeliveryChatScreen> {
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
   final _messages = <RideChatMessage>[];
+  final _knownIds = <String>{};
+  bool _chatHistoryLoaded = false;
   Timer? _pollTimer;
   bool _loading = true;
   bool _sending = false;
@@ -38,12 +41,16 @@ class _DeliveryChatScreenState extends ConsumerState<DeliveryChatScreen> {
   @override
   void initState() {
     super.initState();
+    ChatAlertService.activeThreadKey = ChatAlertService.threadKey('delivery', widget.deliveryId);
     _load();
     _pollTimer = Timer.periodic(const Duration(seconds: 4), (_) => _load());
   }
 
   @override
   void dispose() {
+    if (ChatAlertService.activeThreadKey == ChatAlertService.threadKey('delivery', widget.deliveryId)) {
+      ChatAlertService.activeThreadKey = null;
+    }
     _pollTimer?.cancel();
     _controller.dispose();
     _scrollController.dispose();
@@ -62,23 +69,36 @@ class _DeliveryChatScreenState extends ConsumerState<DeliveryChatScreen> {
       return;
     }
     if (result case Success(:final data)) {
+      final incoming = data.map((m) {
+        final role = m['senderRole']?.toString() ?? '';
+        return RideChatMessage(
+          id: m['id']?.toString() ?? '${m['ts']}',
+          text: m['text']?.toString() ?? '',
+          senderRole: role,
+          ts: DateTime.fromMillisecondsSinceEpoch((m['ts'] as num?)?.toInt() ?? 0),
+          isMine: role == widget.myRole,
+        );
+      }).toList();
+      for (final m in incoming) {
+        if (_knownIds.contains(m.id)) continue;
+        _knownIds.add(m.id);
+        if (_chatHistoryLoaded && !m.isMine) {
+          ChatAlertService.notifyIncoming(
+            kind: 'delivery',
+            threadId: widget.deliveryId,
+            senderRole: m.senderRole,
+            text: m.text,
+            peerLabel: widget.peerLabel,
+          );
+        }
+      }
       setState(() {
         _loading = false;
         _error = null;
+        _chatHistoryLoaded = true;
         _messages
           ..clear()
-          ..addAll(
-            data.map((m) {
-              final role = m['senderRole']?.toString() ?? '';
-              return RideChatMessage(
-                id: m['id']?.toString() ?? '${m['ts']}',
-                text: m['text']?.toString() ?? '',
-                senderRole: role,
-                ts: DateTime.fromMillisecondsSinceEpoch((m['ts'] as num?)?.toInt() ?? 0),
-                isMine: role == widget.myRole,
-              );
-            }),
-          );
+          ..addAll(incoming);
       });
     }
   }

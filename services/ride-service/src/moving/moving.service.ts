@@ -16,6 +16,7 @@ import { CreateMovingDto, EstimateMovingDto } from './moving.dto';
 import { applyPromoCode } from '../common/promo-apply.util';
 import { PromoService } from '../rides/surcharge.service';
 import { RoutingService } from '../geo/routing.service';
+import { MovingVehiclePricingService } from './moving-vehicle-pricing.service';
 
 @Injectable()
 export class MovingService {
@@ -28,32 +29,19 @@ export class MovingService {
     private promo: PromoService,
     private routing: RoutingService,
     private commission: CommissionService,
+    private movingVehiclePricing: MovingVehiclePricingService,
   ) {}
 
   private validateCoords(dto: EstimateMovingDto) {
     assertServiceAreaPair(dto.pickupLat, dto.pickupLng, dto.dropoffLat, dto.dropoffLng);
   }
 
-  private vehicleCategoryMultiplier(category: MovingVehicleCategory): number {
-    return (
-      {
-        [MovingVehicleCategory.CAMIONNETTE]: 0.85,
-        [MovingVehicleCategory.CAMION_15M3]: 1,
-        [MovingVehicleCategory.CAMION_30M3]: 1.45,
-        [MovingVehicleCategory.CAMION_50M3]: 1.9,
-      }[category] ?? 1
-    );
+  private async vehicleCategoryMultiplier(category: MovingVehicleCategory): Promise<number> {
+    return this.movingVehiclePricing.getMultiplier(category);
   }
 
-  private vehicleCategoryLabel(category: MovingVehicleCategory): string {
-    return (
-      {
-        [MovingVehicleCategory.CAMIONNETTE]: 'Camionnette / pick-up',
-        [MovingVehicleCategory.CAMION_15M3]: 'Camion ~15 m³',
-        [MovingVehicleCategory.CAMION_30M3]: 'Camion ~30 m³',
-        [MovingVehicleCategory.CAMION_50M3]: 'Gros camion ~50 m³',
-      }[category] ?? category
-    );
+  private async vehicleCategoryLabel(category: MovingVehicleCategory): Promise<string> {
+    return this.movingVehiclePricing.getLabel(category);
   }
 
   async estimate(dto: EstimateMovingDto, redeemPromo = false) {
@@ -71,7 +59,7 @@ export class MovingService {
     const withInterCity = this.pricing.withInterCitySurcharge(fare, isInterCity, distanceKm);
     const perM3 = moving.perUnitCdf ?? 8000;
     const volumeFee = Math.ceil(dto.volumeM3 * perM3);
-    const vehicleMultiplier = this.vehicleCategoryMultiplier(dto.vehicleCategory);
+    const vehicleMultiplier = await this.vehicleCategoryMultiplier(dto.vehicleCategory);
     const beforePromo = Math.ceil(
       (withInterCity.estimatedFareCdf * moving.multiplier + moving.baseFeeCdf + volumeFee) * vehicleMultiplier,
     );
@@ -95,7 +83,7 @@ export class MovingService {
       isInterCity,
       volumeM3: dto.volumeM3,
       vehicleCategory: dto.vehicleCategory,
-      vehicleCategoryLabel: this.vehicleCategoryLabel(dto.vehicleCategory),
+      vehicleCategoryLabel: await this.vehicleCategoryLabel(dto.vehicleCategory),
       volumeFeeCdf: volumeFee,
       transportFareCdf: transportBeforeVehicle,
       serviceBaseFeeCdf: moving.baseFeeCdf,
@@ -221,7 +209,7 @@ export class MovingService {
       ...request,
       ...pricing,
       photoUrls,
-      vehicleCategoryLabel: vehicleCategory ? this.vehicleCategoryLabel(vehicleCategory) : undefined,
+      vehicleCategoryLabel: vehicleCategory ? await this.vehicleCategoryLabel(vehicleCategory) : undefined,
       timeline,
       tracking: timeline,
       paymentReady: request.status === MovingRequestStatus.COMPLETED && !isPaid,

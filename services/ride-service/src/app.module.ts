@@ -25,9 +25,10 @@ import { TrackingModule } from './tracking/tracking.module';
 import { PublicModule } from './public/public.module';
 import { PromoModule } from './promo/promo.module';
 import { BillingModule } from './billing/billing.module';
+import { PlatformConfigModule } from './platform/platform-config.module';
 import { PublicitesModule } from './publicites/publicites.module';
 
-@Module({ imports: [ConfigModule.forRoot({ isGlobal: true }), RedisModule, PrismaModule, HealthModule, AuthModule, RidesModule, DeliveriesModule, ServicesCatalogModule, CarpoolModule, ErrandsModule, RentalModule, GeoModule, RatingsModule, MatchingModule, WebsocketModule, InternalModule, HistoryModule, MovingModule, ExpressModule, UploadsModule, RestaurantModule, RentalPartnerModule, TrackingModule, PublicModule, PromoModule, BillingModule, PublicitesModule] })
+@Module({ imports: [ConfigModule.forRoot({ isGlobal: true }), RedisModule, PrismaModule, PlatformConfigModule, HealthModule, AuthModule, RidesModule, DeliveriesModule, ServicesCatalogModule, CarpoolModule, ErrandsModule, RentalModule, GeoModule, RatingsModule, MatchingModule, WebsocketModule, InternalModule, HistoryModule, MovingModule, ExpressModule, UploadsModule, RestaurantModule, RentalPartnerModule, TrackingModule, PublicModule, PromoModule, BillingModule, PublicitesModule] })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
     consumer.apply(RequestIdMiddleware).forRoutes({ path: '*', method: RequestMethod.ALL });

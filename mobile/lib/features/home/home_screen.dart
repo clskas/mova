@@ -6,6 +6,7 @@ import '../../core/auth/session.dart';
 import '../../core/config/passenger_copy.dart';
 import '../../core/error/result.dart';
 import '../../core/home/active_shipments_refresh.dart';
+import '../../core/location/gps_enable_prompt.dart';
 import '../../core/location/service_area_gps.dart';
 import '../../core/offline/connectivity_service.dart';
 import '../../core/theme/mova_colors.dart';
@@ -53,6 +54,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) GpsEnablePrompt.promptIfNeeded(context);
+    });
     _loadUser();
     _loadActiveRide();
     _loadActiveDelivery();
@@ -68,6 +72,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      GpsEnablePrompt.promptIfNeeded(context);
       final connectivity = ref.read(connectivityServiceProvider);
       connectivity.prepareReconnect();
       ref.read(apiClientProvider).checkHealth(resetFailures: true);

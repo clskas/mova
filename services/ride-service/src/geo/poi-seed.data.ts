@@ -1,5 +1,5 @@
 import { PlaceOfInterestCategory } from '@prisma/client';
-import { getActiveServiceAreas } from '@mova/shared';
+import { DRC_SERVICE_AREAS } from '@mova/shared';
 
 export type PoiSeedRow = {
   osmId: string;
@@ -47,12 +47,12 @@ export const OSM_TAG_TO_CATEGORY: Record<string, PlaceOfInterestCategory> = {
   train_station: 'TRANSPORT',
 };
 
-/** POI de base pour chaque ville MOVA (31 villes hors Kinshasa détaillée). */
+/** POI de base pour chaque ville MOVA (catalogue national RDC). */
 export function buildRegionalPoiSeed(): PoiSeedRow[] {
   const rows: PoiSeedRow[] = [...KINSHASA_POI_SEED];
   const seenOsm = new Set(rows.map((r) => r.osmId));
 
-  for (const area of getActiveServiceAreas()) {
+  for (const area of DRC_SERVICE_AREAS) {
     if (area.id === 'kinshasa') continue;
     const slug = area.id.replace(/-/g, '');
     const templates: Array<Omit<PoiSeedRow, 'city' | 'osmId'> & { suffix: string }> = [
@@ -88,6 +88,30 @@ export function buildRegionalPoiSeed(): PoiSeedRow[] {
         lng: area.centerLng,
         address: `Centre-ville, ${area.name}`,
       },
+      {
+        suffix: 'school',
+        name: `Institut ${area.name}`,
+        category: 'SCHOOL',
+        lat: area.centerLat - 0.002,
+        lng: area.centerLng - 0.003,
+        address: `${area.name}, ${area.province}`,
+      },
+      {
+        suffix: 'government',
+        name: `Gouvernorat ${area.province}`,
+        category: 'GOVERNMENT',
+        lat: area.centerLat + 0.003,
+        lng: area.centerLng - 0.002,
+        address: `${area.name}, ${area.province}`,
+      },
+      {
+        suffix: 'transport',
+        name: `Gare routière ${area.name}`,
+        category: 'TRANSPORT',
+        lat: area.centerLat - 0.004,
+        lng: area.centerLng - 0.001,
+        address: `${area.name}, ${area.province}`,
+      },
     ];
 
     for (const tpl of templates) {
@@ -108,5 +132,9 @@ export function buildRegionalPoiSeed(): PoiSeedRow[] {
 
   return rows;
 }
+
+/** Nombre minimal de POI attendu par ville après seed. */
+export const MIN_POI_PER_CITY = 7;
+export const MIN_POI_KINSHASA = 15;
 
 export const ALL_POI_SEED = buildRegionalPoiSeed();

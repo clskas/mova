@@ -1,6 +1,7 @@
 "use client";
 
 import type { AdminDriver } from "@/lib/api";
+import { driverDisplayName } from "@/components/AssignDriverSelect";
 import { resolveMediaUrl } from "@/components/VehiclePhotoUpload";
 
 const VEHICLE_TYPE_LABELS: Record<string, string> = {
@@ -8,6 +9,8 @@ const VEHICLE_TYPE_LABELS: Record<string, string> = {
   STANDARD: "Standard",
   COMFORT: "Confort",
   VIP: "VIP",
+  UTILITAIRE: "Utilitaire",
+  CAMION: "Camion",
 };
 
 export function activeDriverVehicle(driver?: AdminDriver | null) {
@@ -33,13 +36,17 @@ export function DriverVehiclePreview({ driver, title = "Véhicule du chauffeur",
 
   const photo = resolveMediaUrl(vehicle.imageUrl);
   const typeLabel = VEHICLE_TYPE_LABELS[vehicle.type] ?? vehicle.type;
+  const driverName = driverDisplayName(driver ?? {});
   const details = [typeLabel, vehicle.plateNumber, vehicle.make, vehicle.model].filter(Boolean).join(" · ");
 
   if (compact) {
     return (
       <div className="flex items-center gap-2 text-xs text-gray-600">
         {photo ? <img src={photo} alt="" className="w-10 h-8 object-cover rounded border shrink-0" /> : null}
-        <span>{details}</span>
+        <span>
+          {driverName ? `${driverName} — ` : ""}
+          {details}
+        </span>
       </div>
     );
   }
@@ -56,8 +63,9 @@ export function DriverVehiclePreview({ driver, title = "Véhicule du chauffeur",
           </div>
         )}
         <div className="text-sm space-y-1">
+          {driverName && <p className="font-semibold text-[#1A1A2E]">{driverName}</p>}
           <p className="font-medium">{details}</p>
-          {driver?.publicId && <p className="text-xs text-gray-500">Chauffeur {driver.publicId}</p>}
+          {driver?.publicId && <p className="text-xs text-gray-500">ID MOVA {driver.publicId}</p>}
         </div>
       </div>
     </div>

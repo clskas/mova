@@ -73,6 +73,7 @@ model Commune {
 model Province {
   id        String   @id @default(uuid())
   name      String   @unique
+  isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   cities    City[]
@@ -116,6 +117,27 @@ model PricingRule {
 
   @@unique([vehicleType, city])
   @@map("pricing_rules")
+}
+
+enum PricingTimeKind {
+  PEAK
+  NIGHT
+}
+
+model PricingTimeWindow {
+  id        String           @id @default(uuid())
+  city      String           @default("Kinshasa")
+  kind      PricingTimeKind
+  startHour Int
+  endHour   Int
+  label     String?
+  sortOrder Int              @default(0)
+  isActive  Boolean          @default(true)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@index([city, isActive])
+  @@map("pricing_time_windows")
 }
 
 model CancellationPolicy {
@@ -742,6 +764,41 @@ model ServiceSurcharge {
   updatedAt   DateTime      @updatedAt
 
   @@map("service_surcharges")
+}
+
+model MovingVehicleCategoryPricing {
+  id         String                @id @default(uuid())
+  category   MovingVehicleCategory @unique
+  label      String
+  multiplier Float                 @default(1.0)
+  sortOrder  Int                   @default(0)
+  isActive   Boolean               @default(true)
+  createdAt  DateTime              @default(now())
+  updatedAt  DateTime              @updatedAt
+
+  @@map("moving_vehicle_category_pricing")
+}
+
+model PlatformConfig {
+  id        String   @id @default("default")
+  config    Json     @default("{}")
+  updatedAt DateTime @updatedAt
+
+  @@map("platform_config")
+}
+
+model ParcelWeightBand {
+  id         String         @id @default(uuid())
+  maxKg      Float
+  category   WeightCategory @unique
+  multiplier Float          @default(1.0)
+  label      String
+  sortOrder  Int            @default(0)
+  isActive   Boolean        @default(true)
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  @@map("parcel_weight_bands")
 }
 
 model PromoCode {

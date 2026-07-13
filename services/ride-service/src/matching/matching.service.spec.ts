@@ -1,9 +1,21 @@
 import { MARKET_RDC } from '@mova/shared';
 import { MatchingService } from './matching.service';
+import { PlatformConfigService } from '../platform/platform-config.service';
 import { computeDriverEta, etaMinutesFromDistanceKm, haversineKm } from './eta.util';
 
 describe('MatchingService', () => {
-  const service = new MatchingService();
+  const platformConfig = {
+    get: () => ({
+      interCity: MARKET_RDC.interCity,
+      delivery: { ...MARKET_RDC.delivery, maxFoodInterCityDistanceKm: 200 },
+      matching: { ...MARKET_RDC.matching, scoreWeights: { ...MARKET_RDC.matching.scoreWeights } },
+      scheduled: { ...MARKET_RDC.scheduled, maxScheduleDays: 7 },
+      trip: { roadDistanceFactor: MARKET_RDC.trip.roadDistanceFactor, averageSpeedKmh: { ...MARKET_RDC.trip.averageSpeedKmh } },
+      pricing: { ...MARKET_RDC.pricing },
+      carpool: { matchRadiusKm: 5, relaxedRadiusMultiplier: 3 },
+    }),
+  } as PlatformConfigService;
+  const service = new MatchingService(platformConfig);
 
   it('increments search radius per attempt up to max', () => {
     expect(service.computeRadiusKm(0)).toBe(MARKET_RDC.matching.initialRadiusKm);

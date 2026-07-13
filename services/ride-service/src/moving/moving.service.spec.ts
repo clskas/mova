@@ -1,5 +1,6 @@
 import { MovingService } from './moving.service';
 import { PricingService } from '../rides/pricing.service';
+import { MOVING_VEHICLE_CATEGORY_DEFAULTS } from './moving-vehicle-pricing.service';
 
 jest.mock('../common/driver-eligibility.util', () => ({
   ...jest.requireActual('../common/driver-eligibility.util'),
@@ -32,7 +33,33 @@ describe('MovingService', () => {
     roadDistanceKm: jest.fn().mockResolvedValue(10),
   };
 
-  const service = new MovingService(prisma as never, pricing, surcharges as never, redis as never, tripShare as never, { peek: jest.fn(), redeem: jest.fn(), applyDiscount: jest.fn((p: number) => p) } as never, routing as never);
+  const movingVehiclePricing = {
+    getMultiplier: jest.fn().mockImplementation(async (category: string) => {
+      const row = MOVING_VEHICLE_CATEGORY_DEFAULTS.find((r) => r.category === category);
+      return row?.multiplier ?? 1;
+    }),
+    getLabel: jest.fn().mockImplementation(async (category: string) => {
+      const row = MOVING_VEHICLE_CATEGORY_DEFAULTS.find((r) => r.category === category);
+      return row?.label ?? category;
+    }),
+  };
+
+  const commission = {
+    get: jest.fn().mockResolvedValue({ platformPercent: 18, driverPercent: 82 }),
+    splitGross: jest.fn().mockImplementation((gross: number) => ({ driverNetCdf: Math.round(gross * 0.82) })),
+  };
+
+  const service = new MovingService(
+    prisma as never,
+    pricing,
+    surcharges as never,
+    redis as never,
+    tripShare as never,
+    { peek: jest.fn(), redeem: jest.fn(), applyDiscount: jest.fn((p: number) => p) } as never,
+    routing as never,
+    commission as never,
+    movingVehiclePricing as never,
+  );
 
   const dto = {
     volumeM3: 5,

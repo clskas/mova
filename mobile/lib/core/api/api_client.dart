@@ -1365,6 +1365,7 @@ class ApiClient {
     double? lat,
     double? lng,
     double radiusKm = 5,
+    bool skipCache = false,
   }) async {
     final params = <String>[
       if (city != null) 'city=$city',
@@ -1373,7 +1374,7 @@ class ApiClient {
       if (lng != null) 'lng=$lng',
       'radiusKm=$radiusKm',
     ].join('&');
-    final result = await get('/geo/places?$params');
+    final result = await get('/geo/places?$params', skipCache: skipCache);
     return switch (result) {
       Success(:final data) => Success(_extractList(data)),
       Failure(:final error) => Failure(error),

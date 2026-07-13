@@ -60,6 +60,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   bool _pickupFromSuggestion = false;
   List<Map<String, dynamic>> _poiPlaces = [];
   String? _poiCategoryFilter;
+  int _poiLoadGeneration = 0;
 
   static const _poiFilters = [
     (null, 'Tous'),
@@ -84,20 +85,23 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
     }
     if (!movaDisableAutoGps && widget.initialPickupAddress == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _useMyLocation());
+    } else {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _loadNearbyPoi());
     }
     WidgetsBinding.instance.addPostFrameCallback((_) => _checkUnpaidRide());
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadNearbyPoi());
   }
 
   Future<void> _loadNearbyPoi() async {
+    final generation = ++_poiLoadGeneration;
     final city = ServiceAreas.cityNameForCoords(_pickup);
     final result = await ref.read(apiClientProvider).geoPlaces(
       city: city,
       lat: _pickup.latitude,
       lng: _pickup.longitude,
       radiusKm: 8,
+      skipCache: true,
     );
-    if (!mounted) return;
+    if (!mounted || generation != _poiLoadGeneration) return;
     if (result case Success(:final data)) {
       setState(() => _poiPlaces = data);
     }
@@ -474,14 +478,11 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
     }
   }
 
-  Future<void> _onVehicleSelected(String type) async {
+  void _onVehicleSelected(String type) {
     setState(() {
       _vehicleType = type;
       _selectedEstimate = _estimateDetails[type];
     });
-    if (_destinationController.text.trim().isNotEmpty) {
-      await _fetchAllEstimates();
-    }
   }
 
   String _selectedVehicleLabel() {
@@ -635,7 +636,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
               padding: const EdgeInsets.only(bottom: 8),
               child: Text(
                 _poiPlaces.isEmpty
-                    ? 'Lieux d\'intérêt : aucun repère à proximité (rayon 8 km). Essayez Kinshasa ou suggérez un lieu.'
+                    ? 'Lieux d\'intérêt : aucun repère à proximité (rayon 8 km). Activez le GPS ou suggérez un lieu.'
                     : 'Lieux sur la carte : $_visiblePoiCount affiché(s) — filtrent les marqueurs orange uniquement.',
                 style: const TextStyle(fontSize: 11, color: MovaColors.textSecondary),
               ),

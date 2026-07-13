@@ -55,6 +55,7 @@ export enum MovaErrorCode {
   PROMO_NOT_FOUND = 'MOVA_VAL_004',
   PROMO_INVALID = 'MOVA_VAL_005',
   SUBSCRIPTION_NOT_FOUND = 'MOVA_VAL_006',
+  CITY_INACTIVE = 'MOVA_VAL_007',
   INTERNAL_ERROR = 'MOVA_INT_001',
 }
 
@@ -120,5 +121,6 @@ export const MOVA_ERROR_MESSAGES: Record<MovaErrorCode, string> = {
   [MovaErrorCode.PROMO_NOT_FOUND]: 'Code promo introuvable.',
   [MovaErrorCode.PROMO_INVALID]: 'Code promo invalide ou expiré.',
   [MovaErrorCode.SUBSCRIPTION_NOT_FOUND]: 'Abonnement introuvable.',
+  [MovaErrorCode.CITY_INACTIVE]: 'MOVA n\'est pas disponible dans cette ville pour le moment.',
   [MovaErrorCode.INTERNAL_ERROR]: 'Une erreur interne est survenue.',
 };

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/config/market_config.dart';
+import 'chat_alert_service.dart';
 import '../../core/api/api_client.dart';
 import '../../core/api/ride_chat_socket.dart';
 import '../../core/error/result.dart';
@@ -60,11 +61,15 @@ class _RideChatScreenState extends ConsumerState<RideChatScreen> {
   @override
   void initState() {
     super.initState();
+    ChatAlertService.activeThreadKey = ChatAlertService.threadKey('ride', widget.rideId);
     _bootstrap();
   }
 
   @override
   void dispose() {
+    if (ChatAlertService.activeThreadKey == ChatAlertService.threadKey('ride', widget.rideId)) {
+      ChatAlertService.activeThreadKey = null;
+    }
     _pollTimer?.cancel();
     _socket?.clearHandlers();
     _controller.dispose();
@@ -123,7 +128,17 @@ class _RideChatScreenState extends ConsumerState<RideChatScreen> {
     final mine = role == widget.myRole;
     if (!fromHistory && mine && _messages.any((m) => m.isMine && m.text == text)) return;
     _knownIds.add(id);
-    _messages.add(RideChatMessage(id: id, text: text, senderRole: role, ts: ts, isMine: mine));
+    final message = RideChatMessage(id: id, text: text, senderRole: role, ts: ts, isMine: mine);
+    _messages.add(message);
+    if (!fromHistory && !mine) {
+      unawaited(ChatAlertService.notifyIncoming(
+        kind: 'ride',
+        threadId: widget.rideId,
+        senderRole: role,
+        text: text,
+        peerLabel: widget.peerLabel,
+      ));
+    }
   }
 
   Future<void> _connectSocket({bool forceReconnect = false}) async {

@@ -5,27 +5,35 @@ import {
   createPricingRule,
   createPromoCode,
   createErrandCategoryEstimate,
+  createPricingTimeWindow,
   deactivatePromoCode,
   deleteErrandCategoryEstimate,
   deletePricingRule,
+  deletePricingTimeWindow,
   fetchCommissions,
   fetchDeliveryPricingRules,
   fetchErrandCategoryEstimates,
   fetchPricingRules,
+  fetchPricingTimeWindows,
   fetchPromoCodes,
   fetchSurcharges,
+  fetchMovingVehicleCategories,
   formatCdf,
   MOVA_CITIES,
   updateCommission,
   updateDeliveryPricingRule,
   updateErrandCategoryEstimate,
+  updateMovingVehicleCategory,
   updatePricingRule,
+  updatePricingTimeWindow,
   updatePromoCode,
   updateSurcharge,
   type DeliveryPricingRule,
   type ErrandCategoryEstimate,
+  type MovingVehicleCategoryPricing,
   type PlatformCommission,
   type PricingRule,
+  type PricingTimeWindow,
   type PromoCode,
   type ServiceSurcharge,
 } from "@/lib/api";
@@ -254,6 +262,49 @@ function SurchargeRow({
   );
 }
 
+function MovingVehicleCategoryRow({
+  rule,
+  onSave,
+  readOnly,
+}: {
+  rule: MovingVehicleCategoryPricing;
+  onSave: (data: Partial<MovingVehicleCategoryPricing>) => Promise<void>;
+  readOnly?: boolean;
+}) {
+  const [label, setLabel] = useState(rule.label);
+  const [multiplier, setMultiplier] = useState(String(rule.multiplier));
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setLabel(rule.label);
+    setMultiplier(String(rule.multiplier));
+  }, [rule]);
+
+  async function save() {
+    setSaving(true);
+    try {
+      await onSave({ label: label.trim(), multiplier: Number(multiplier) });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <tr className="border-b">
+      <td className="p-3 font-medium">{rule.label}</td>
+      <td className="p-3 text-xs text-gray-500 font-mono">{rule.category}</td>
+      <td className="p-2"><TextInput value={label} onChange={setLabel} className="!p-2" disabled={readOnly} /></td>
+      <td className="p-2"><TextInput value={multiplier} onChange={setMultiplier} type="number" step="0.01" min={0.1} max={10} className="!p-2" disabled={readOnly} /></td>
+      <td className="p-3 text-gray-500 text-xs">× sur (transport + base + volume)</td>
+      <td className="p-3">
+        {!readOnly && (
+          <BtnPrimary onClick={save} disabled={saving}>{saving ? "…" : "Enregistrer"}</BtnPrimary>
+        )}
+      </td>
+    </tr>
+  );
+}
+
 function CommissionRow({
   label,
   rule,
@@ -390,6 +441,103 @@ function ErrandCategoryRow({
   );
 }
 
+const TIME_KIND_LABELS: Record<string, string> = {
+  PEAK: "Heure de pointe",
+  NIGHT: "Heure de nuit",
+};
+
+function formatHourRange(startHour: number, endHour: number) {
+  const pad = (h: number) => `${h}`.padStart(2, "0");
+  return `${pad(startHour)}h–${pad(endHour)}h`;
+}
+
+function TimeWindowRow({
+  rule,
+  onSave,
+  onDelete,
+  readOnly,
+}: {
+  rule: PricingTimeWindow;
+  onSave: (data: Partial<PricingTimeWindow>) => Promise<void>;
+  onDelete?: () => void;
+  readOnly?: boolean;
+}) {
+  const [kind, setKind] = useState(rule.kind);
+  const [startHour, setStartHour] = useState(String(rule.startHour));
+  const [endHour, setEndHour] = useState(String(rule.endHour));
+  const [label, setLabel] = useState(rule.label ?? "");
+  const [sortOrder, setSortOrder] = useState(String(rule.sortOrder ?? 0));
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setKind(rule.kind);
+    setStartHour(String(rule.startHour));
+    setEndHour(String(rule.endHour));
+    setLabel(rule.label ?? "");
+    setSortOrder(String(rule.sortOrder ?? 0));
+  }, [rule]);
+
+  async function save() {
+    setSaving(true);
+    try {
+      await onSave({
+        kind,
+        startHour: Number(startHour),
+        endHour: Number(endHour),
+        label: label.trim() || null,
+        sortOrder: Number(sortOrder),
+        isActive: true,
+      });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <tr className={`border-b ${rule.isActive === false ? "opacity-50" : ""}`}>
+      <td className="p-3 font-medium">
+        {readOnly ? (
+          TIME_KIND_LABELS[kind] ?? kind
+        ) : (
+          <select
+            value={kind}
+            onChange={(e) => setKind(e.target.value as PricingTimeWindow["kind"])}
+            className="rounded-lg border border-gray-200 px-2 py-1.5 text-sm bg-white"
+          >
+            <option value="PEAK">Heure de pointe</option>
+            <option value="NIGHT">Heure de nuit</option>
+          </select>
+        )}
+      </td>
+      <td className="p-2 w-24">
+        <TextInput value={startHour} onChange={setStartHour} type="number" min={0} max={23} className="!p-2" disabled={readOnly} />
+      </td>
+      <td className="p-2 w-24">
+        <TextInput value={endHour} onChange={setEndHour} type="number" min={0} max={23} className="!p-2" disabled={readOnly} />
+      </td>
+      <td className="p-3 text-gray-600 hidden sm:table-cell">
+        {formatHourRange(Number(startHour) || 0, Number(endHour) || 0)}
+      </td>
+      <td className="p-2">
+        <TextInput value={label} onChange={setLabel} className="!p-2" disabled={readOnly} placeholder="Libellé" />
+      </td>
+      <td className="p-2 w-20">
+        <TextInput value={sortOrder} onChange={setSortOrder} type="number" className="!p-2" disabled={readOnly} />
+      </td>
+      <td className="p-3">
+        {!readOnly && (
+          <div className="flex gap-2 flex-wrap">
+            <BtnPrimary onClick={save} disabled={saving}>{saving ? "…" : "Enregistrer"}</BtnPrimary>
+            {onDelete && (
+              <BtnDanger onClick={onDelete}>Supprimer</BtnDanger>
+            )}
+          </div>
+        )}
+      </td>
+    </tr>
+  );
+}
+
 export default function TarifsPage() {
   const { canWrite } = useAdmin();
   const readOnly = !canWrite("tarifs");
@@ -397,12 +545,21 @@ export default function TarifsPage() {
   const [vehicleRules, setVehicleRules] = useState<PricingRule[]>([]);
   const [deliveryRules, setDeliveryRules] = useState<DeliveryPricingRule[]>([]);
   const [otherSurcharges, setOtherSurcharges] = useState<ServiceSurcharge[]>([]);
+  const [movingVehicleCategories, setMovingVehicleCategories] = useState<MovingVehicleCategoryPricing[]>([]);
   const [commissions, setCommissions] = useState<PlatformCommission[]>([]);
   const [errandCategories, setErrandCategories] = useState<ErrandCategoryEstimate[]>([]);
+  const [timeWindows, setTimeWindows] = useState<PricingTimeWindow[]>([]);
+  const [cityTimezone, setCityTimezone] = useState("Africa/Kinshasa");
   const [promos, setPromos] = useState<PromoCode[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [createTimeWindowOpen, setCreateTimeWindowOpen] = useState(false);
+  const [newTimeKind, setNewTimeKind] = useState<PricingTimeWindow["kind"]>("PEAK");
+  const [newTimeStart, setNewTimeStart] = useState("7");
+  const [newTimeEnd, setNewTimeEnd] = useState("9");
+  const [newTimeLabel, setNewTimeLabel] = useState("");
+  const [creatingTimeWindow, setCreatingTimeWindow] = useState(false);
   const [newVehicleType, setNewVehicleType] = useState("STANDARD");
   const [creating, setCreating] = useState(false);
   const [promoModal, setPromoModal] = useState<"create" | PromoCode | null>(null);
@@ -486,23 +643,65 @@ export default function TarifsPage() {
     }
   }
 
+  async function handleCreateTimeWindow() {
+    setCreatingTimeWindow(true);
+    setError(null);
+    try {
+      await createPricingTimeWindow({
+        city,
+        kind: newTimeKind,
+        startHour: Number(newTimeStart),
+        endHour: Number(newTimeEnd),
+        label: newTimeLabel.trim() || null,
+        sortOrder: timeWindows.length + 1,
+        isActive: true,
+      });
+      setCreateTimeWindowOpen(false);
+      setNewTimeKind("PEAK");
+      setNewTimeStart("7");
+      setNewTimeEnd("9");
+      setNewTimeLabel("");
+      load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Échec création plage horaire");
+    } finally {
+      setCreatingTimeWindow(false);
+    }
+  }
+
+  async function handleDeleteTimeWindow(id: string) {
+    if (!confirm("Supprimer cette plage horaire ?")) return;
+    setError(null);
+    try {
+      await deletePricingTimeWindow(id);
+      load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Échec suppression");
+    }
+  }
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [v, d, s, c, ec, p] = await Promise.all([
+      const [v, d, s, mvc, c, ec, tw, p] = await Promise.all([
         fetchPricingRules(city),
         fetchDeliveryPricingRules(),
         fetchSurcharges(),
+        fetchMovingVehicleCategories(),
         fetchCommissions(),
         fetchErrandCategoryEstimates(),
+        fetchPricingTimeWindows(city),
         fetchPromoCodes(),
       ]);
       setVehicleRules(Array.isArray(v) ? v : []);
       setDeliveryRules(Array.isArray(d) ? d : []);
       setOtherSurcharges((Array.isArray(s) ? s : []).filter((x) => x.type === "MOVING"));
+      setMovingVehicleCategories(Array.isArray(mvc) ? mvc : []);
       setCommissions(Array.isArray(c) ? c : []);
       setErrandCategories(Array.isArray(ec) ? ec : []);
+      setTimeWindows(Array.isArray(tw.windows) ? tw.windows : []);
+      setCityTimezone(tw.timezone ?? "Africa/Kinshasa");
       setPromos(Array.isArray(p) ? p : []);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur de chargement");
@@ -647,6 +846,92 @@ export default function TarifsPage() {
           </section>
 
           <section>
+            <div className="flex items-start justify-between gap-3 mb-3">
+              <div>
+                <h2 className="font-semibold text-[#1A1A2E] mb-1">Plages horaires — pointe & nuit ({city})</h2>
+                <p className="text-sm text-gray-500">
+                  Créneaux appliqués aux estimations taxi/moto selon l&apos;heure locale de la ville
+                  (<strong>{cityTimezone}</strong>
+                  {cityTimezone === "Africa/Kinshasa" ? ", UTC+1" : cityTimezone === "Africa/Lubumbashi" ? ", UTC+2" : ""}).
+                  Les multiplicateurs (colonnes Pointe × / Nuit ×) restent configurés par type de véhicule ci-dessus.
+                  Heure de fin exclusive (ex. 07h–09h = 7h00 à 8h59). Plage overnight : ex. 22h–05h.
+                </p>
+              </div>
+              {!readOnly && (
+                <BtnPrimary onClick={() => setCreateTimeWindowOpen((v) => !v)}>
+                  {createTimeWindowOpen ? "Annuler" : "Ajouter une plage"}
+                </BtnPrimary>
+              )}
+            </div>
+            {createTimeWindowOpen && !readOnly && (
+              <Card className="p-4 mb-3">
+                <div className="flex flex-wrap gap-3 items-end">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Type</label>
+                    <select
+                      value={newTimeKind}
+                      onChange={(e) => setNewTimeKind(e.target.value as PricingTimeWindow["kind"])}
+                      className="rounded-lg border border-gray-200 px-3 py-2 text-sm bg-white"
+                    >
+                      <option value="PEAK">Heure de pointe</option>
+                      <option value="NIGHT">Heure de nuit</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Début (0–23)</label>
+                    <TextInput value={newTimeStart} onChange={setNewTimeStart} type="number" min={0} max={23} className="!p-2 w-24" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Fin (exclusif)</label>
+                    <TextInput value={newTimeEnd} onChange={setNewTimeEnd} type="number" min={0} max={23} className="!p-2 w-24" />
+                  </div>
+                  <div className="flex-1 min-w-[140px]">
+                    <label className="block text-xs text-gray-500 mb-1">Libellé</label>
+                    <TextInput value={newTimeLabel} onChange={setNewTimeLabel} className="!p-2" placeholder="Matin, Soir, Nuit…" />
+                  </div>
+                  <BtnPrimary onClick={handleCreateTimeWindow} disabled={creatingTimeWindow}>
+                    {creatingTimeWindow ? "…" : "Créer"}
+                  </BtnPrimary>
+                </div>
+              </Card>
+            )}
+            <Card className="overflow-x-auto">
+              <table className="w-full text-sm min-w-[640px]">
+                <thead>
+                  <tr className="border-b text-left text-gray-500">
+                    <th className="p-3">Type</th>
+                    <th className="p-3">Début</th>
+                    <th className="p-3">Fin</th>
+                    <th className="p-3 hidden sm:table-cell">Aperçu</th>
+                    <th className="p-3">Libellé</th>
+                    <th className="p-3">Ordre</th>
+                    <th className="p-3"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {timeWindows.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="p-4 text-gray-500">
+                        Aucune plage pour cette ville — utilisez « Ajouter une plage » ou redémarrez le service pour le seed.
+                      </td>
+                    </tr>
+                  ) : (
+                    timeWindows.map((r) => (
+                      <TimeWindowRow
+                        key={r.id}
+                        rule={r}
+                        readOnly={readOnly}
+                        onSave={(data) => updatePricingTimeWindow(r.id, data).then(load)}
+                        onDelete={() => handleDeleteTimeWindow(r.id)}
+                      />
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </Card>
+          </section>
+
+          <section>
             <h2 className="font-semibold text-[#1A1A2E] mb-1">Majorations livraison</h2>
             <p className="text-sm text-gray-500 mb-3">
               Colis : tarif course Standard + multiplicateur poids. Repas et express : frais de base et multiplicateur sur le tarif course.
@@ -757,6 +1042,40 @@ export default function TarifsPage() {
                         showPerUnit
                         readOnly={readOnly}
                         onSave={(data) => updateSurcharge(r.type, data).then(load)}
+                      />
+                    ))}
+                  </tbody>
+                </table>
+              </Card>
+            </section>
+          )}
+
+          {movingVehicleCategories.length > 0 && (
+            <section>
+              <h2 className="font-semibold text-[#1A1A2E] mb-1">Coefficients par engin déménagement</h2>
+              <p className="text-sm text-gray-500 mb-3">
+                Multiplicateur appliqué selon le type d&apos;engin demandé (camionnette, 15 m³, 30 m³, 50 m³).
+                Le total estimé = (transport STANDARD × coef. MOVING + frais base + volume × CDF/m³) × coefficient engin.
+              </p>
+              <Card className="overflow-x-auto">
+                <table className="w-full text-sm min-w-[640px]">
+                  <thead>
+                    <tr className="border-b text-left text-gray-500">
+                      <th className="p-3">Libellé actuel</th>
+                      <th className="p-3">Code</th>
+                      <th className="p-3">Libellé affiché</th>
+                      <th className="p-3">Coefficient</th>
+                      <th className="p-3">Effet</th>
+                      <th className="p-3"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {movingVehicleCategories.map((r) => (
+                      <MovingVehicleCategoryRow
+                        key={r.category}
+                        rule={r}
+                        readOnly={readOnly}
+                        onSave={(data) => updateMovingVehicleCategory(r.category, data).then(load)}
                       />
                     ))}
                   </tbody>

@@ -6,12 +6,14 @@ import {
   getActiveServiceAreas,
   getCommunesForArea,
   getServiceArea,
+  isCityOperational,
   MovaErrorCode,
   MovaHttpException,
   resolveCityFromCoords,
 } from '@mova/shared';
 import { addressToCoords } from '../common/address.util';
 import { PrismaService } from '../prisma/prisma.service';
+import { CityActivationService } from './city-activation.service';
 import { GeocodeProvider } from './geocode.provider';
 import { PoiImportService } from './poi-import.service';
 
@@ -35,6 +37,7 @@ export class GeoService implements OnModuleInit {
     private prisma: PrismaService,
     private poiImport: PoiImportService,
     private geocode: GeocodeProvider,
+    private cityActivation: CityActivationService,
   ) {}
 
   async onModuleInit() {
@@ -51,6 +54,8 @@ export class GeoService implements OnModuleInit {
       centerLat: a.centerLat,
       centerLng: a.centerLng,
       bounds: a.bounds,
+      timezone: a.timezone,
+      isActive: true,
     }));
   }
 
@@ -64,15 +69,23 @@ export class GeoService implements OnModuleInit {
   async createProvince(name: string) {
     const trimmed = name.trim();
     if (!trimmed) throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Nom de province requis.');
-    return this.prisma.province.create({ data: { name: trimmed } });
+    return this.prisma.province.create({ data: { name: trimmed, isActive: true } });
   }
 
-  async updateProvince(id: string, name: string) {
-    const trimmed = name.trim();
-    if (!trimmed) throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Nom de province requis.');
+  async updateProvince(id: string, data: { name?: string; isActive?: boolean }) {
     const existing = await this.prisma.province.findUnique({ where: { id } });
     if (!existing) throw new MovaHttpException(MovaErrorCode.NOT_FOUND, undefined, 'Province introuvable.');
-    return this.prisma.province.update({ where: { id }, data: { name: trimmed } });
+    const patch: { name?: string; isActive?: boolean } = {};
+    if (typeof data.name === 'string') {
+      const trimmed = data.name.trim();
+      if (!trimmed) throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Nom de province requis.');
+      patch.name = trimmed;
+    }
+    if (typeof data.isActive === 'boolean') patch.isActive = data.isActive;
+    return this.prisma.province.update({ where: { id }, data: patch }).then(async (row) => {
+      await this.cityActivation.refresh();
+      return row;
+    });
   }
 
   async deleteProvince(id: string) {
@@ -123,6 +136,9 @@ export class GeoService implements OnModuleInit {
         isActive: data.isActive ?? true,
       },
       include: { province: { select: { id: true, name: true } } },
+    }).then(async (row) => {
+      await this.cityActivation.refresh();
+      return row;
     });
   }
 
@@ -144,44 +160,66 @@ export class GeoService implements OnModuleInit {
       where: { id },
       data: patch,
       include: { province: { select: { id: true, name: true } } },
+    }).then(async (row) => {
+      await this.cityActivation.refresh();
+      return row;
     });
   }
 
   async deleteCity(id: string) {
     const existing = await this.prisma.city.findUnique({ where: { id } });
     if (!existing) throw new MovaHttpException(MovaErrorCode.NOT_FOUND, undefined, 'Ville introuvable.');
-    return this.prisma.city.delete({ where: { id } });
+    return this.prisma.city.delete({ where: { id } }).then(async (row) => {
+      await this.cityActivation.refresh();
+      return row;
+    });
+  }
+
+  async setAllCitiesActive(isActive: boolean) {
+    const updated = await this.cityActivation.setAllActive(isActive);
+    return { isActive, count: updated.length };
+  }
+
+  async setAllProvincesActive(isActive: boolean) {
+    const count = await this.cityActivation.setAllProvincesActive(isActive);
+    return { isActive, count };
   }
 
   /** Liste villes pour admin / mobile — DB prioritaire, fallback catalogue statique. */
-  async listCitiesCatalog() {
+  async listCitiesCatalog(opts?: { activeOnly?: boolean }) {
+    const activeOnly = opts?.activeOnly ?? false;
     const db = await this.listCities();
     if (db.length > 0) {
-      return db.map((c) => ({
-        id: c.id,
-        slug: c.slug,
-        name: c.name,
-        province: c.province.name,
-        provinceId: c.provinceId,
-        centerLat: c.centerLat,
-        centerLng: c.centerLng,
-        bounds: { minLat: c.minLat, maxLat: c.maxLat, minLng: c.minLng, maxLng: c.maxLng },
-        isActive: c.isActive,
-        source: 'db' as const,
-      }));
+      const rows = db
+        .filter((c) => !activeOnly || c.isActive)
+        .map((c) => ({
+          id: c.id,
+          slug: c.slug,
+          name: c.name,
+          province: c.province.name,
+          provinceId: c.provinceId,
+          centerLat: c.centerLat,
+          centerLng: c.centerLng,
+          bounds: { minLat: c.minLat, maxLat: c.maxLat, minLng: c.minLng, maxLng: c.maxLng },
+          isActive: c.isActive,
+          source: 'db' as const,
+        }));
+      return rows;
     }
-    return getActiveServiceAreas().map((a) => ({
-      id: a.id,
-      slug: a.id,
-      name: a.name,
-      province: a.province,
-      provinceId: null,
-      centerLat: a.centerLat,
-      centerLng: a.centerLng,
-      bounds: a.bounds,
-      isActive: a.active,
-      source: 'static' as const,
-    }));
+    return getActiveServiceAreas()
+      .filter((a) => !activeOnly || isCityOperational(a.id, a.name))
+      .map((a) => ({
+        id: a.id,
+        slug: a.id,
+        name: a.name,
+        province: a.province,
+        provinceId: null,
+        centerLat: a.centerLat,
+        centerLng: a.centerLng,
+        bounds: a.bounds,
+        isActive: isCityOperational(a.id, a.name),
+        source: 'static' as const,
+      }));
   }
 
   async getCommunes(city?: string) {
@@ -288,39 +326,49 @@ export class GeoService implements OnModuleInit {
       }
     };
 
+    const searchDbCity = async (cityName: string, areaId?: string) => {
+      const communeNames = new Set<string>();
+      const communes = await this.prisma.commune.findMany({
+        where: { city: cityName, name: { contains: q, mode: 'insensitive' } },
+        orderBy: { name: 'asc' },
+        take: 10,
+      });
+      for (const c of communes) {
+        communeNames.add(c.name);
+        addCommune(c.name, c.lat, c.lng, cityName);
+      }
+      if (areaId) addSeedMatches(areaId, cityName, communeNames);
+
+      const pois = await this.prisma.placeOfInterest.findMany({
+        where: { city: cityName },
+        orderBy: { name: 'asc' },
+      });
+      for (const p of pois) {
+        if (matchesQuery(p.name) || (p.address != null && matchesQuery(p.address))) addPoi(p);
+      }
+    };
+
     const searchAreas = async (areas: typeof DRC_SERVICE_AREAS) => {
       for (const area of areas) {
-        const cityName = area.name;
-        const communeNames = new Set<string>();
-
-        const communes = await this.prisma.commune.findMany({
-          where: { city: cityName, name: { contains: q, mode: 'insensitive' } },
-          orderBy: { name: 'asc' },
-          take: 10,
-        });
-        for (const c of communes) {
-          communeNames.add(c.name);
-          addCommune(c.name, c.lat, c.lng, cityName);
-        }
-        addSeedMatches(area.id, cityName, communeNames);
-
-        const pois = await this.prisma.placeOfInterest.findMany({
-          where: { city: cityName },
-          orderBy: { name: 'asc' },
-        });
-        for (const p of pois) {
-          if (matchesQuery(p.name) || (p.address != null && matchesQuery(p.address))) addPoi(p);
-        }
+        await searchDbCity(area.name, area.id);
       }
     };
 
     const hasPlaceMatch = () =>
       results.some((r) => r.source === 'commune' || r.source === 'poi');
 
+    const requestedCity = city?.trim() ?? '';
+
     if (primaryArea) {
       await searchAreas([primaryArea]);
       if (!hasPlaceMatch()) {
-        const others = getActiveServiceAreas().filter((a) => a.id !== primaryArea.id);
+        const others = DRC_SERVICE_AREAS.filter((a) => a.id !== primaryArea.id);
+        await searchAreas(others);
+      }
+    } else if (requestedCity !== '') {
+      await searchDbCity(requestedCity);
+      if (!hasPlaceMatch()) {
+        const others = DRC_SERVICE_AREAS.filter((a) => a.name.toLowerCase() !== requestedCity.toLowerCase());
         await searchAreas(others);
       }
     } else {
@@ -332,6 +380,7 @@ export class GeoService implements OnModuleInit {
         }),
         this.prisma.placeOfInterest.findMany({
           orderBy: { name: 'asc' },
+          take: 200,
         }),
       ]);
       const communeNamesByCity = new Map<string, Set<string>>();
@@ -344,18 +393,21 @@ export class GeoService implements OnModuleInit {
       for (const p of pois) {
         if (matchesQuery(p.name) || (p.address != null && matchesQuery(p.address))) addPoi(p);
       }
-      for (const area of getActiveServiceAreas()) {
+      for (const area of DRC_SERVICE_AREAS) {
         addSeedMatches(area.id, area.name, communeNamesByCity.get(area.name) ?? new Set());
       }
     }
 
     if (!hasPlaceMatch()) {
-      const geocodeArea = primaryArea ?? getActiveServiceAreas()[0];
+      const geocodeArea =
+        primaryArea ??
+        DRC_SERVICE_AREAS.find((a) => a.name.toLowerCase() === requestedCity.toLowerCase()) ??
+        DRC_SERVICE_AREAS[0];
       if (geocodeArea) {
         const geocodeHits = await this.geocodeWithTimeout(
           q,
           {
-            city: geocodeArea.name,
+            city: requestedCity !== '' ? requestedCity : geocodeArea.name,
             centerLat: geocodeArea.centerLat,
             centerLng: geocodeArea.centerLng,
             viewbox: geocodeArea.bounds,
@@ -371,7 +423,7 @@ export class GeoService implements OnModuleInit {
             lat: p.lat,
             lng: p.lng,
             commune: p.commune ?? p.city,
-            city: geocodeArea.name,
+            city: requestedCity !== '' ? requestedCity : geocodeArea.name,
           });
         }
       }
@@ -486,18 +538,25 @@ export class GeoService implements OnModuleInit {
     const limit = Math.min(opts.limit ?? 50, 100);
     const where: Record<string, unknown> = {};
     if (opts.category) where.category = opts.category;
-    // Avec GPS : recherche par rayon (pas de filtre ville strict — évite les POI manquants si la commune diffère).
-    if (opts.city && (opts.lat == null || opts.lng == null)) {
+
+    const hasGps = opts.lat != null && opts.lng != null;
+    if (hasGps) {
+      const radiusKm = opts.radiusKm ?? 5;
+      const latDelta = radiusKm / 111;
+      const lngDelta = radiusKm / (111 * Math.cos((opts.lat! * Math.PI) / 180));
+      where.lat = { gte: opts.lat! - latDelta, lte: opts.lat! + latDelta };
+      where.lng = { gte: opts.lng! - lngDelta, lte: opts.lng! + lngDelta };
+    } else if (opts.city) {
       where.city = opts.city;
     }
 
     const rows = await this.prisma.placeOfInterest.findMany({
       where,
       orderBy: { name: 'asc' },
-      take: limit * 3,
+      take: hasGps ? undefined : limit,
     });
 
-    if (opts.lat != null && opts.lng != null) {
+    if (hasGps) {
       const radiusKm = opts.radiusKm ?? 5;
       const filtered = rows
         .map((p) => ({
@@ -510,7 +569,7 @@ export class GeoService implements OnModuleInit {
       return filtered.map(({ distanceKm, ...p }) => ({ ...p, distanceKm: Math.round(distanceKm * 100) / 100 }));
     }
 
-    return rows.slice(0, limit);
+    return rows;
   }
 
   async importPois(city = 'Kinshasa', useOverpass = false) {
@@ -518,9 +577,9 @@ export class GeoService implements OnModuleInit {
     const national = target.toLowerCase() === 'rdc' || target.toLowerCase() === 'all';
     if (useOverpass && national) return this.poiImport.importAllServiceAreasFromOverpass();
     if (useOverpass) return this.poiImport.importFromOverpass(target);
-    if (national) return this.poiImport.seedAllServiceAreas();
+    if (national) return this.poiImport.seedAllCities();
     if (city && city.toLowerCase() !== 'kinshasa') return this.poiImport.seedCity(city);
-    return this.poiImport.seedAllServiceAreas();
+    return this.poiImport.seedAllCities();
   }
 
   private normalizeSearchText(value: string) {

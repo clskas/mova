@@ -40,6 +40,7 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   "/restaurants": RestaurantsIcon,
   "/publicites": PublicitesIcon,
   "/tarifs": PricingIcon,
+  "/regles-plateforme": PricingIcon,
   "/abonnements": SubscriptionIcon,
   "/portefeuille": WalletIcon,
   "/litiges": IncidentsIcon,

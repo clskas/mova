@@ -11,11 +11,17 @@ import {
   resolveCityFromCoords,
 } from '@mova/shared';
 import { interCitySurchargeCdf } from '../common/address.util';
+import { PlatformConfigService } from '../platform/platform-config.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { PricingTimeWindowService } from './pricing-time-window.service';
 
 @Injectable()
 export class PricingService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private timeWindows: PricingTimeWindowService,
+    private platformConfig: PlatformConfigService,
+  ) {}
 
   resolveCity(pickupLat: number, pickupLng: number): string {
     return resolveCityFromCoords(pickupLat, pickupLng);
@@ -38,7 +44,7 @@ export class PricingService {
       });
     }
     if (!rule) throw new MovaHttpException(MovaErrorCode.PRICING_NOT_CONFIGURED, HttpStatus.SERVICE_UNAVAILABLE);
-    const multiplier = this.getSurchargeMultiplier(rule);
+    const multiplier = await this.getSurchargeMultiplier(rule, resolvedCity);
     const baseFareCdf = rule.baseFareCdf;
     const distanceFareCdf = Math.ceil(distanceKm * rule.perKmCdf);
     const durationFareCdf = Math.ceil(durationMin * rule.perMinuteCdf);
@@ -54,11 +60,13 @@ export class PricingService {
     );
   }
 
-  private getSurchargeMultiplier(rule: { peakMultiplier: number; nightMultiplier: number }): number {
-    const hour = new Date().getHours();
-    const isPeak = MARKET_RDC.peakHours.some((p) => hour >= p.start && hour < p.end);
-    const isNight = hour >= MARKET_RDC.nightHours.start || hour < MARKET_RDC.nightHours.end;
-    const { defaultPeakMultiplier, defaultNightMultiplier, combinedPeakNightMultiplier } = MARKET_RDC.pricing;
+  private async getSurchargeMultiplier(
+    rule: { peakMultiplier: number; nightMultiplier: number },
+    city: string,
+  ): Promise<number> {
+    const { isPeak, isNight } = await this.timeWindows.evaluate(city);
+    const { defaultPeakMultiplier, defaultNightMultiplier, combinedPeakNightMultiplier } =
+      this.platformConfig.get().pricing;
     const peakMult = rule.peakMultiplier > 1 ? rule.peakMultiplier : defaultPeakMultiplier;
     const nightMult = rule.nightMultiplier > 1 ? rule.nightMultiplier : defaultNightMultiplier;
     if (isPeak && isNight) {
@@ -81,7 +89,7 @@ export class PricingService {
   /** Majoration inter-villes appliquée sur une estimation existante. */
   withInterCitySurcharge(fare: FareBreakdown, isInterCity: boolean, distanceKm: number): FareBreakdown {
     if (!isInterCity) return fare;
-    const interCityCdf = interCitySurchargeCdf(distanceKm);
+    const interCityCdf = interCitySurchargeCdf(distanceKm, this.platformConfig.get().interCity);
     const totalCdf = fare.totalCdf + interCityCdf;
     const totalFormatted = formatCdf(totalCdf);
     return {

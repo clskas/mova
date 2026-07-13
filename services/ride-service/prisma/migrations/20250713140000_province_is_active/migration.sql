@@ -1,0 +1,1 @@
+ALTER TABLE "provinces" ADD COLUMN "isActive" BOOLEAN NOT NULL DEFAULT true;

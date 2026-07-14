@@ -1,7 +1,10 @@
+import { WeightCategory } from '@prisma/client';
 import { DeliveriesService } from './deliveries.service';
 import { CreateParcelDeliveryDto } from './deliveries.dto';
 import { PricingService } from '../rides/pricing.service';
 import { MovaHttpException } from '@mova/shared';
+import { mockPlatformConfig } from '../platform/platform-config.mock';
+import { PARCEL_WEIGHT_BAND_DEFAULTS } from '../platform/parcel-weight-band.service';
 
 describe('DeliveriesService', () => {
   const pricing = {
@@ -36,6 +39,16 @@ describe('DeliveriesService', () => {
     roadDistanceKm: jest.fn().mockResolvedValue(4.5),
   };
 
+  const parcelWeightBands = {
+    resolve: jest.fn().mockImplementation(async (weightKg?: number) => {
+      const band = PARCEL_WEIGHT_BAND_DEFAULTS.find((b) => (weightKg ?? 0) <= b.maxKg) ?? PARCEL_WEIGHT_BAND_DEFAULTS[3];
+      return { category: band.category, multiplier: band.multiplier };
+    }),
+    getMultiplier: jest.fn().mockImplementation(async (category: WeightCategory) => {
+      return PARCEL_WEIGHT_BAND_DEFAULTS.find((b) => b.category === category)?.multiplier ?? 1;
+    }),
+  };
+
   const service = new DeliveriesService(
     prisma as never,
     pricing,
@@ -46,6 +59,8 @@ describe('DeliveriesService', () => {
     matching as never,
     commission as never,
     routing as never,
+    mockPlatformConfig(),
+    parcelWeightBands as never,
   );
 
   beforeEach(() => jest.clearAllMocks());

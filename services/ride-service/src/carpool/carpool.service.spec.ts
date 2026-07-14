@@ -1,6 +1,7 @@
 import { CarpoolStatus } from '@prisma/client';
 import { CarpoolService } from './carpool.service';
 import { PricingService } from '../rides/pricing.service';
+import { mockPlatformConfig } from '../platform/platform-config.mock';
 
 describe('CarpoolService', () => {
   const haversineKm = jest.fn().mockReturnValue(3);
@@ -20,7 +21,11 @@ describe('CarpoolService', () => {
     roadDistanceKm: jest.fn().mockResolvedValue(3),
   };
 
-  const service = new CarpoolService(prisma as never, pricing, routing as never);
+  const commission = {
+    get: jest.fn().mockResolvedValue({ platformPercent: 10, driverPercent: 90 }),
+    splitGross: jest.fn().mockImplementation((gross: number) => ({ driverNetCdf: Math.round(gross * 0.9) })),
+  };
+  const service = new CarpoolService(prisma as never, pricing, routing as never, commission as never, mockPlatformConfig());
 
   beforeEach(() => {
     jest.clearAllMocks();

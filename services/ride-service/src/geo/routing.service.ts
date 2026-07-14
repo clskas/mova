@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { estimateRoadDistanceKm } from '@mova/shared';
+import { PlatformConfigService } from '../platform/platform-config.service';
 
 export type RoadDistanceSource = 'stored' | 'osrm' | 'estimated';
 
@@ -16,7 +16,7 @@ export class RoutingService {
   private readonly enabled: boolean;
   private readonly timeoutMs: number;
 
-  constructor() {
+  constructor(private platformConfig: PlatformConfigService) {
     this.baseUrl = (process.env.OSRM_BASE_URL ?? 'https://router.project-osrm.org').replace(/\/$/, '');
     this.enabled = process.env.OSRM_ENABLED !== 'false';
     this.timeoutMs = parseInt(process.env.OSRM_TIMEOUT_MS ?? '5000', 10);
@@ -61,8 +61,9 @@ export class RoutingService {
     }
 
     const straight = this.haversineKm(lat1, lng1, lat2, lng2);
+    const factor = this.platformConfig.get().trip.roadDistanceFactor;
     return {
-      distanceKm: estimateRoadDistanceKm(straight),
+      distanceKm: Math.round(straight * factor * 100) / 100,
       source: 'estimated',
     };
   }

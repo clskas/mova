@@ -1,6 +1,7 @@
 import { RideStatus, VehicleType } from '@prisma/client';
 import { MOVA_EVENTS } from '@mova/shared';
 import { RidesService } from './rides.service';
+import { mockPlatformConfig } from '../platform/platform-config.mock';
 
 describe('RidesService', () => {
   const prisma = {
@@ -59,7 +60,19 @@ describe('RidesService', () => {
     resolveRoadDistance: jest.fn().mockResolvedValue({ distanceKm: 4.5, source: 'estimated' }),
     roadDistanceKm: jest.fn().mockResolvedValue(4.5),
   };
-  const service = new RidesService(prisma as never, pricing as never, matching as never, redis as never, trackingGateway as never, trackingService as never, commission as never, tripShare as never, { peek: jest.fn(), redeem: jest.fn(), applyDiscount: jest.fn((p: number) => p) } as never, routing as never);
+  const service = new RidesService(
+    prisma as never,
+    pricing as never,
+    matching as never,
+    redis as never,
+    trackingGateway as never,
+    trackingService as never,
+    commission as never,
+    tripShare as never,
+    { peek: jest.fn(), redeem: jest.fn(), applyDiscount: jest.fn((p: number) => p) } as never,
+    routing as never,
+    mockPlatformConfig(),
+  );
 
   beforeEach(() => jest.clearAllMocks());
 

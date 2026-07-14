@@ -1,4 +1,5 @@
 import { RoutingService } from './routing.service';
+import { mockPlatformConfig } from '../platform/platform-config.mock';
 
 describe('RoutingService', () => {
   const originalFetch = global.fetch;
@@ -10,7 +11,7 @@ describe('RoutingService', () => {
   });
 
   it('returns stored distance when provided', async () => {
-    const service = new RoutingService();
+    const service = new RoutingService(mockPlatformConfig());
     const km = await service.roadDistanceKm(-4.32, 15.31, -4.34, 15.33, 4.12);
     expect(km).toBe(4.12);
   });
@@ -25,7 +26,7 @@ describe('RoutingService', () => {
       }),
     }) as never;
 
-    const service = new RoutingService();
+    const service = new RoutingService(mockPlatformConfig());
     const result = await service.resolveRoadDistance(-4.32, 15.31, -4.34, 15.33);
     expect(result.source).toBe('osrm');
     expect(result.distanceKm).toBe(5.42);
@@ -36,7 +37,7 @@ describe('RoutingService', () => {
     process.env.OSRM_ENABLED = 'true';
     global.fetch = jest.fn().mockRejectedValue(new Error('network')) as never;
 
-    const service = new RoutingService();
+    const service = new RoutingService(mockPlatformConfig());
     const result = await service.resolveRoadDistance(-4.32, 15.31, -4.34, 15.33);
     expect(result.source).toBe('estimated');
     expect(result.distanceKm).toBeGreaterThan(0);

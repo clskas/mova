@@ -2,6 +2,7 @@ import { VehicleType } from '@prisma/client';
 import { MovaErrorCode } from '@mova/shared';
 import { ScheduledRidesService } from './scheduled-rides.service';
 import { PricingService } from './pricing.service';
+import { mockPlatformConfig } from '../platform/platform-config.mock';
 
 describe('ScheduledRidesService', () => {
   const pricing = {
@@ -27,7 +28,24 @@ describe('ScheduledRidesService', () => {
     resolveRoadDistance: jest.fn().mockResolvedValue({ distanceKm: 3, source: 'estimated' }),
     roadDistanceKm: jest.fn().mockResolvedValue(3),
   };
-  const service = new ScheduledRidesService(prisma as never, pricing, redis as never, tripShare as never, matching as never, rides as never, promo as never, routing as never);
+  const geo = { reverseGeocode: jest.fn() };
+  const commission = {
+    get: jest.fn().mockResolvedValue({ platformPercent: 15, driverPercent: 85 }),
+    splitGross: jest.fn().mockImplementation((gross: number) => ({ driverNetCdf: Math.round(gross * 0.85) })),
+  };
+  const service = new ScheduledRidesService(
+    prisma as never,
+    pricing,
+    redis as never,
+    tripShare as never,
+    matching as never,
+    rides as never,
+    promo as never,
+    routing as never,
+    geo as never,
+    commission as never,
+    mockPlatformConfig(),
+  );
 
   beforeEach(() => jest.clearAllMocks());
 

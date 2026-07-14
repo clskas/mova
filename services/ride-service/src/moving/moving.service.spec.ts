@@ -1,6 +1,7 @@
 import { MovingService } from './moving.service';
 import { PricingService } from '../rides/pricing.service';
 import { MOVING_VEHICLE_CATEGORY_DEFAULTS } from './moving-vehicle-pricing.service';
+import { mockPlatformConfig } from '../platform/platform-config.mock';
 
 jest.mock('../common/driver-eligibility.util', () => ({
   ...jest.requireActual('../common/driver-eligibility.util'),
@@ -59,6 +60,7 @@ describe('MovingService', () => {
     routing as never,
     commission as never,
     movingVehiclePricing as never,
+    mockPlatformConfig(),
   );
 
   const dto = {

@@ -158,7 +158,7 @@ export default function ReglesPlateformePage() {
     <div className="space-y-8 pb-12">
       <PageHeader
         title="Règles plateforme"
-        subtitle="Paramètres globaux encore en dur dans le code — dispatch, inter-ville, livraison repas, annulations, colis."
+        subtitle="Paramètres globaux (dispatch, inter-ville, livraison repas, annulations, colis) — modifiables sans redéploiement."
       />
       {error && <ErrorBanner message={error} />}
       {loading || !config ? (

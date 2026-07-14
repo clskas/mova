@@ -2,6 +2,7 @@ import { ErrandsService } from './errands.service';
 import { PricingService } from '../rides/pricing.service';
 import { CommissionService } from '../rides/commission.service';
 import { CommissionServiceType } from '@prisma/client';
+import { mockPlatformConfig } from '../platform/platform-config.mock';
 
 describe('ErrandsService', () => {
   const pricing = {
@@ -46,7 +47,27 @@ describe('ErrandsService', () => {
     resolveRoadDistance: jest.fn().mockResolvedValue({ distanceKm: 4, source: 'estimated' }),
     roadDistanceKm: jest.fn().mockResolvedValue(4),
   };
-  const service = new ErrandsService(prisma as never, pricing, commission, redis as never, trackingService as never, tripShare as never, matching as never, promo as never, routing as never);
+  const geo = { reverseGeocode: jest.fn() };
+  const errandCategories = {
+    listAll: jest.fn().mockResolvedValue([]),
+    inferCategory: jest.fn().mockResolvedValue('OTHER'),
+    estimatePurchase: jest.fn().mockResolvedValue(5000),
+    categoryLabel: jest.fn().mockResolvedValue('Autre'),
+  };
+  const service = new ErrandsService(
+    prisma as never,
+    pricing,
+    commission,
+    redis as never,
+    trackingService as never,
+    tripShare as never,
+    matching as never,
+    promo as never,
+    routing as never,
+    geo as never,
+    errandCategories as never,
+    mockPlatformConfig(),
+  );
 
   const dto = {
     description: 'Acheter pain et lait',

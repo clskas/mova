@@ -105,10 +105,8 @@ export class DeliveriesService {
     return dto.weightCategory;
   }
 
-  private async weightMultiplier(category: WeightCategory, weightKg?: number): Promise<number> {
-    const base = await this.parcelWeightBands.getMultiplier(category);
-    if (weightKg != null && weightKg > 5) return base * 1.1;
-    return base;
+  private async weightMultiplier(category: WeightCategory, _weightKg?: number): Promise<number> {
+    return this.parcelWeightBands.getMultiplier(category);
   }
 
   async estimateParcel(dto: CreateParcelDeliveryDto, redeemPromo = false) {

@@ -1,5 +1,5 @@
 import { HttpStatus, Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { MARKET_RDC, MovaErrorCode, MovaHttpException } from '@mova/shared';
+import { MovaErrorCode, MovaHttpException } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   MergedPlatformConfig,
@@ -135,6 +135,5 @@ export class PlatformConfigService implements OnModuleInit {
     if (m.trip.roadDistanceFactor < 1 || m.trip.roadDistanceFactor > 3) {
       throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, HttpStatus.BAD_REQUEST, 'Facteur de détour entre 1 et 3.');
     }
-    void MARKET_RDC;
   }
 }

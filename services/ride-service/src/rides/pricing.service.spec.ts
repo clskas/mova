@@ -2,6 +2,7 @@ import { VehicleType } from '@prisma/client';
 import { PricingService } from './pricing.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { PricingTimeWindowService } from './pricing-time-window.service';
+import { mockPlatformConfig } from '../platform/platform-config.mock';
 
 describe('PricingService', () => {
   const prisma = {
@@ -14,7 +15,7 @@ describe('PricingService', () => {
     evaluate: jest.fn().mockResolvedValue({ isPeak: false, isNight: false }),
   } as unknown as PricingTimeWindowService;
 
-  const service = new PricingService(prisma, timeWindows);
+  const service = new PricingService(prisma, timeWindows, mockPlatformConfig());
 
   beforeEach(() => {
     jest.clearAllMocks();

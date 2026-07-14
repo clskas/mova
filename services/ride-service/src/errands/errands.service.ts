@@ -1,6 +1,6 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { CommissionServiceType, ErrandCategory, ErrandOrder, ErrandOrderStatus, Prisma, TrackingReferenceType, VehicleType } from '@prisma/client';
-import { INTERNAL_API_KEY, MARKET_RDC, MovaErrorCode, MovaHttpException, MOVA_EVENTS, canCancelErrand, estimateTripDurationMin, serviceUrl } from '@mova/shared';
+import { INTERNAL_API_KEY, MovaErrorCode, MovaHttpException, MOVA_EVENTS, canCancelErrand, estimateTripDurationMin, serviceUrl } from '@mova/shared';
 import { RedisService } from '@mova/shared';
 import { DEFAULT_PICKUP } from '../common/address.util';
 import { fetchServicePaymentStatus } from '../common/payment-status.util';
@@ -27,6 +27,7 @@ import { applyPromoCode } from '../common/promo-apply.util';
 import { PromoService } from '../rides/surcharge.service';
 import { GeoService } from '../geo/geo.service';
 import { RoutingService } from '../geo/routing.service';
+import { PlatformConfigService } from '../platform/platform-config.service';
 
 export type ErrandItemRow = { label: string; qty?: number; estimatedCdf?: number };
 
@@ -44,6 +45,7 @@ export class ErrandsService {
     private routing: RoutingService,
     private geo: GeoService,
     private errandCategories: ErrandCategoryEstimateService,
+    private platformConfig: PlatformConfigService,
   ) {}
 
   private async errandFees() {
@@ -74,7 +76,7 @@ export class ErrandsService {
     const { baseCdf } = await this.errandFees();
     const route = await this.routing.resolveRoadDistance(dto.pickupLat, dto.pickupLng, dto.dropoffLat, dto.dropoffLng);
     const distanceKm = route.distanceKm;
-    const durationMin = route.durationMin ?? estimateTripDurationMin(distanceKm, MARKET_RDC.trip.averageSpeedKmh.errand);
+    const durationMin = route.durationMin ?? estimateTripDurationMin(distanceKm, this.platformConfig.get().trip.averageSpeedKmh.errand);
     const fare = await this.pricing.estimateFare(VehicleType.STANDARD, distanceKm, durationMin);
     const { itemCdf } = await this.errandFees();
     const itemsFee = itemCount * itemCdf;
@@ -524,7 +526,7 @@ export class ErrandsService {
       }),
     ]);
 
-    const radiusKm = MARKET_RDC.matching.maxRadiusKm;
+    const radiusKm = this.platformConfig.get().matching.maxRadiusKm;
     const errandRule = await this.commission.get(CommissionServiceType.ERRAND);
     const assignedOffers = assignedErrands.map((order) => {
       const tripKm = tripDistanceKm(

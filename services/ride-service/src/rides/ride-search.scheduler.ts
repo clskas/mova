@@ -16,10 +16,9 @@ export class RideSearchScheduler implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   onModuleInit() {
-    const intervalSec = this.platformConfig.get().matching.radiusIncrementIntervalSec;
-    const intervalMs = intervalSec * 1000;
-    this.timer = setInterval(() => void this.tick(), intervalMs);
-    this.logger.log(`Auto re-search actif (toutes les ${intervalSec}s)`);
+    // Tick toutes les 5s ; le filtre elapsed utilise la config live (admin peut changer l'intervalle).
+    this.timer = setInterval(() => void this.tick(), 5_000);
+    this.logger.log('Auto re-search actif (tick 5s, intervalle effectif via platform-config)');
   }
 
   onModuleDestroy() {

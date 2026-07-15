@@ -22,7 +22,7 @@ class OtpScreen extends ConsumerWidget {
             child: ClipRRect(
               borderRadius: BorderRadius.circular(16),
               child: Image.asset(
-                'assets/icon/movaicone.png',
+                'assets/icon/movaicone_passenger.png',
                 width: 72,
                 height: 72,
                 fit: BoxFit.cover,

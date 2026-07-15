@@ -407,6 +407,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
           senderRole: role,
           text: payload['text']?.toString() ?? '',
           peerLabel: _driver?['name']?.toString() ?? 'Chauffeur',
+          messageId: payload['id']?.toString(),
         );
       },
       onPaymentCompleted: (payload) {

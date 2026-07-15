@@ -137,6 +137,7 @@ class _RideChatScreenState extends ConsumerState<RideChatScreen> {
         senderRole: role,
         text: text,
         peerLabel: widget.peerLabel,
+        messageId: id,
       ));
     }
   }

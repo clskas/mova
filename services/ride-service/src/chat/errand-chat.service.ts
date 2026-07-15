@@ -1,9 +1,15 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { MovaErrorCode, MovaHttpException } from '@mova/shared';
+import { MOVA_EVENTS, MovaErrorCode, MovaHttpException, RedisService } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { TrackingGateway } from '../websocket/tracking.gateway';
 
 export type ErrandChatSenderRole = 'passenger' | 'driver';
+
+interface ErrandParticipants {
+  role: ErrandChatSenderRole;
+  passengerId: string;
+  driverId: string;
+}
 
 export interface ErrandChatMessage {
   id: string;
@@ -19,9 +25,10 @@ export class ErrandChatService {
   constructor(
     private prisma: PrismaService,
     private trackingGateway: TrackingGateway,
+    private redis: RedisService,
   ) {}
 
-  private async assertParticipant(errandId: string, userId: string): Promise<ErrandChatSenderRole> {
+  private async assertParticipant(errandId: string, userId: string): Promise<ErrandParticipants> {
     const order = await this.prisma.errandOrder.findUnique({
       where: { id: errandId },
       select: { userId: true, driverId: true },
@@ -34,8 +41,9 @@ export class ErrandChatService {
         'Le chat est disponible une fois le livreur assigné.',
       );
     }
-    if (order.userId === userId) return 'passenger';
-    if (order.driverId === userId) return 'driver';
+    const base = { passengerId: order.userId, driverId: order.driverId };
+    if (order.userId === userId) return { role: 'passenger', ...base };
+    if (order.driverId === userId) return { role: 'driver', ...base };
     throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
   }
 
@@ -68,7 +76,8 @@ export class ErrandChatService {
   }
 
   async sendMessage(errandId: string, userId: string, text: string) {
-    const senderRole = await this.assertParticipant(errandId, userId);
+    const participants = await this.assertParticipant(errandId, userId);
+    const senderRole = participants.role;
     const trimmed = text.trim();
     if (!trimmed) throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, HttpStatus.BAD_REQUEST);
 
@@ -78,6 +87,21 @@ export class ErrandChatService {
     });
     const payload = this.toPayload(row);
     this.trackingGateway.broadcastErrandChat(payload);
+
+    const recipientId =
+      senderRole === 'passenger' ? participants.driverId : participants.passengerId;
+    void this.redis
+      .publish(MOVA_EVENTS.CHAT_MESSAGE, {
+        kind: 'errand',
+        threadId: errandId,
+        messageId: row.id,
+        senderId: userId,
+        senderRole,
+        recipientIds: [recipientId],
+        text: trimmed,
+      })
+      .catch(() => undefined);
+
     return payload;
   }
 }

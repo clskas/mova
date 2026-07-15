@@ -17,6 +17,7 @@ export const MOVA_EVENTS = {
   DRIVER_JOB_ALERT: 'driver.job.alert',
   SCHEDULED_REMINDER: 'scheduled.reminder',
   ERRAND_CREATED: 'errand.created',
+  CHAT_MESSAGE: 'chat.message',
 } as const;
 
 export type MovaEventName = (typeof MOVA_EVENTS)[keyof typeof MOVA_EVENTS];
@@ -169,6 +170,18 @@ export interface ErrandCreatedPayload {
   pickupLat: number;
   pickupLng: number;
   estimatedPriceCdf: number;
+}
+
+export type ChatThreadKind = 'ride' | 'delivery' | 'errand' | 'rental';
+
+export interface ChatMessagePayload {
+  kind: ChatThreadKind;
+  threadId: string;
+  messageId: string;
+  senderId: string;
+  senderRole: string;
+  recipientIds: string[];
+  text: string;
 }
 
 export interface RentalPartnerVehiclePayload {

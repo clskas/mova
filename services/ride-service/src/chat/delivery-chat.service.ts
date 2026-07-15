@@ -1,9 +1,16 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { MovaErrorCode, MovaHttpException } from '@mova/shared';
+import { MOVA_EVENTS, MovaErrorCode, MovaHttpException, RedisService } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { TrackingGateway } from '../websocket/tracking.gateway';
 
 export type DeliveryChatSenderRole = 'passenger' | 'driver' | 'partner';
+
+interface DeliveryParticipants {
+  role: DeliveryChatSenderRole;
+  passengerId: string | null;
+  driverId: string | null;
+  partnerId: string | null;
+}
 
 export interface DeliveryChatMessage {
   id: string;
@@ -19,6 +26,7 @@ export class DeliveryChatService {
   constructor(
     private prisma: PrismaService,
     private trackingGateway: TrackingGateway,
+    private redis: RedisService,
   ) {}
 
   private deliveryIncludesRestaurant(items: unknown, restaurantId: string): boolean {
@@ -52,7 +60,7 @@ export class DeliveryChatService {
     return null;
   }
 
-  private async assertParticipant(deliveryId: string, userId: string): Promise<DeliveryChatSenderRole> {
+  private async assertParticipant(deliveryId: string, userId: string): Promise<DeliveryParticipants> {
     const delivery = await this.prisma.delivery.findUnique({
       where: { id: deliveryId },
       select: {
@@ -64,10 +72,15 @@ export class DeliveryChatService {
       },
     });
     if (!delivery) throw new MovaHttpException(MovaErrorCode.DELIVERY_NOT_FOUND, HttpStatus.NOT_FOUND);
-    if (delivery.userId === userId) return 'passenger';
-    if (delivery.driverId === userId) return 'driver';
+    const base = {
+      passengerId: delivery.userId,
+      driverId: delivery.driverId,
+      partnerId: delivery.restaurant?.ownerUserId ?? null,
+    };
+    if (delivery.userId === userId) return { role: 'passenger', ...base };
+    if (delivery.driverId === userId) return { role: 'driver', ...base };
     const partnerRole = await this.resolvePartnerRole(delivery, userId);
-    if (partnerRole) return partnerRole;
+    if (partnerRole) return { role: partnerRole, ...base, partnerId: base.partnerId ?? userId };
     throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
   }
 
@@ -100,7 +113,8 @@ export class DeliveryChatService {
   }
 
   async sendMessage(deliveryId: string, userId: string, text: string) {
-    const senderRole = await this.assertParticipant(deliveryId, userId);
+    const participants = await this.assertParticipant(deliveryId, userId);
+    const senderRole = participants.role;
     const trimmed = text.trim();
     if (!trimmed) throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, HttpStatus.BAD_REQUEST);
 
@@ -110,6 +124,21 @@ export class DeliveryChatService {
     });
     const payload = this.toPayload(row);
     this.trackingGateway.broadcastDeliveryChat(payload);
+
+    const recipientIds = [participants.passengerId, participants.driverId, participants.partnerId]
+      .filter((id): id is string => !!id && id !== userId);
+    void this.redis
+      .publish(MOVA_EVENTS.CHAT_MESSAGE, {
+        kind: 'delivery',
+        threadId: deliveryId,
+        messageId: row.id,
+        senderId: userId,
+        senderRole,
+        recipientIds,
+        text: trimmed,
+      })
+      .catch(() => undefined);
+
     return payload;
   }
 }

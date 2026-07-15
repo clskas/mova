@@ -1,9 +1,16 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { MovaErrorCode, MovaHttpException } from '@mova/shared';
+import { MOVA_EVENTS, MovaErrorCode, MovaHttpException, RedisService } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { TrackingGateway } from '../websocket/tracking.gateway';
 
 export type RentalChatSenderRole = 'passenger' | 'driver' | 'partner';
+
+interface RentalParticipants {
+  role: RentalChatSenderRole;
+  passengerId: string | null;
+  driverId: string | null;
+  partnerId: string | null;
+}
 
 export interface RentalChatMessage {
   id: string;
@@ -19,17 +26,23 @@ export class RentalChatService {
   constructor(
     private prisma: PrismaService,
     private trackingGateway: TrackingGateway,
+    private redis: RedisService,
   ) {}
 
-  private async assertParticipant(inquiryId: string, userId: string): Promise<RentalChatSenderRole> {
+  private async assertParticipant(inquiryId: string, userId: string): Promise<RentalParticipants> {
     const inquiry = await this.prisma.rentalInquiry.findUnique({
       where: { id: inquiryId },
       select: { userId: true, driverId: true, vehicle: { select: { ownerUserId: true } } },
     });
     if (!inquiry) throw new MovaHttpException(MovaErrorCode.RENTAL_INQUIRY_NOT_FOUND, HttpStatus.NOT_FOUND);
-    if (inquiry.userId === userId) return 'passenger';
-    if (inquiry.driverId === userId) return 'driver';
-    if (inquiry.vehicle?.ownerUserId === userId) return 'partner';
+    const base = {
+      passengerId: inquiry.userId,
+      driverId: inquiry.driverId,
+      partnerId: inquiry.vehicle?.ownerUserId ?? null,
+    };
+    if (inquiry.userId === userId) return { role: 'passenger', ...base };
+    if (inquiry.driverId === userId) return { role: 'driver', ...base };
+    if (inquiry.vehicle?.ownerUserId === userId) return { role: 'partner', ...base };
     throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
   }
 
@@ -62,7 +75,8 @@ export class RentalChatService {
   }
 
   async sendMessage(inquiryId: string, userId: string, text: string) {
-    const senderRole = await this.assertParticipant(inquiryId, userId);
+    const participants = await this.assertParticipant(inquiryId, userId);
+    const senderRole = participants.role;
     const trimmed = text.trim();
     if (!trimmed) throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, HttpStatus.BAD_REQUEST);
 
@@ -72,6 +86,21 @@ export class RentalChatService {
     });
     const payload = this.toPayload(row);
     this.trackingGateway.broadcastRentalChat(payload);
+
+    const recipientIds = [participants.passengerId, participants.driverId, participants.partnerId]
+      .filter((id): id is string => !!id && id !== userId);
+    void this.redis
+      .publish(MOVA_EVENTS.CHAT_MESSAGE, {
+        kind: 'rental',
+        threadId: inquiryId,
+        messageId: row.id,
+        senderId: userId,
+        senderRole,
+        recipientIds,
+        text: trimmed,
+      })
+      .catch(() => undefined);
+
     return payload;
   }
 }

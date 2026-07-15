@@ -7,13 +7,38 @@ type BeforeInstallPromptEvent = Event & {
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 };
 
-export function PwaInstallBanner() {
+function isIos(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return /iphone|ipad|ipod/i.test(navigator.userAgent);
+}
+
+function isStandalone(): boolean {
+  if (typeof window === "undefined") return false;
+  return (
+    window.matchMedia("(display-mode: standalone)").matches ||
+    ("standalone" in navigator && Boolean((navigator as Navigator & { standalone?: boolean }).standalone))
+  );
+}
+
+export function PwaInstallBanner({ accentClass = "bg-indigo-600" }: { accentClass?: string }) {
   const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
+  const [showIosHint, setShowIosHint] = useState(false);
   const [hidden, setHidden] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (window.matchMedia("(display-mode: standalone)").matches) return;
+    if (isStandalone()) return;
+
+    const dismissed = sessionStorage.getItem("mova-pwa-install-dismissed");
+    if (dismissed === "1") {
+      setHidden(true);
+      return;
+    }
+
+    if (isIos()) {
+      setShowIosHint(true);
+      return;
+    }
 
     const handler = (e: Event) => {
       e.preventDefault();
@@ -23,29 +48,48 @@ export function PwaInstallBanner() {
     return () => window.removeEventListener("beforeinstallprompt", handler);
   }, []);
 
-  if (!deferred || hidden) return null;
+  function dismiss() {
+    setHidden(true);
+    sessionStorage.setItem("mova-pwa-install-dismissed", "1");
+  }
 
   async function install() {
     if (!deferred) return;
     await deferred.prompt();
     await deferred.userChoice;
     setDeferred(null);
-    setHidden(true);
+    dismiss();
   }
+
+  if (hidden || isStandalone()) return null;
+  if (!deferred && !showIosHint) return null;
 
   return (
     <div className="fixed bottom-4 left-4 right-4 z-50 mx-auto max-w-lg rounded-xl border border-gray-200 bg-white shadow-lg p-4 flex flex-wrap items-center justify-between gap-3">
-      <div className="text-sm">
+      <div className="text-sm pr-2">
         <p className="font-medium text-[#1A1A2E]">Installer l&apos;application</p>
-        <p className="text-gray-500 text-xs mt-0.5">Accès rapide depuis l&apos;écran d&apos;accueil</p>
+        {showIosHint ? (
+          <p className="text-gray-500 text-xs mt-0.5">
+            Sur iPhone : touchez <span className="font-medium">Partager</span> puis{" "}
+            <span className="font-medium">Sur l&apos;écran d&apos;accueil</span>.
+          </p>
+        ) : (
+          <p className="text-gray-500 text-xs mt-0.5">Accès rapide depuis l&apos;écran d&apos;accueil (Android / Chrome).</p>
+        )}
       </div>
       <div className="flex gap-2">
-        <button type="button" onClick={() => setHidden(true)} className="px-3 py-1.5 text-sm text-gray-500">
+        <button type="button" onClick={dismiss} className="px-3 py-1.5 text-sm text-gray-500">
           Plus tard
         </button>
-        <button type="button" onClick={install} className="px-4 py-1.5 rounded-lg bg-indigo-600 text-white text-sm font-medium">
-          Installer
-        </button>
+        {deferred && (
+          <button
+            type="button"
+            onClick={install}
+            className={`px-4 py-1.5 rounded-lg ${accentClass} text-white text-sm font-medium`}
+          >
+            Installer
+          </button>
+        )}
       </div>
     </div>
   );

@@ -196,6 +196,10 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
     setState(() => _loading = false);
     switch (result) {
       case Success(:final data):
+        // Fermer le clavier avant toute navigation pour éviter l'assertion
+        // Flutter `InheritedElement._dependents.isEmpty` (champ focalisé détruit
+        // pendant la transition de route).
+        FocusManager.instance.primaryFocus?.unfocus();
         final token = data['accessToken'] as String?;
         if (token == null) {
           setState(() => _error = 'Réponse serveur invalide (token manquant).');

@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { httpGetJson } from '../common/http-fetch.util';
 
 export type NominatimPlace = {
   label: string;
@@ -124,8 +125,6 @@ export class NominatimService {
 
   private async fetchJson<T>(path: string): Promise<T | null> {
     await this.throttle();
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), this.timeoutMs);
     try {
       const headers: Record<string, string> = {
         Accept: 'application/json',
@@ -133,21 +132,20 @@ export class NominatimService {
       };
       if (this.email) headers['From'] = this.email;
 
-      const res = await fetch(`${this.baseUrl}${path}`, {
-        signal: controller.signal,
+      // Client node:https IPv4 forcé (undici instable dans le réseau Docker).
+      const data = await httpGetJson<T>(`${this.baseUrl}${path}`, {
         headers,
+        timeoutMs: this.timeoutMs,
       });
-      if (!res.ok) {
-        this.logger.warn(`Nominatim HTTP ${res.status} for ${path}`);
+      if (data == null) {
+        this.logger.warn(`Nominatim empty/non-2xx for ${path}`);
         return null;
       }
-      return (await res.json()) as T;
+      return data;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       this.logger.warn(`Nominatim unavailable: ${msg}`);
       return null;
-    } finally {
-      clearTimeout(timer);
     }
   }
 

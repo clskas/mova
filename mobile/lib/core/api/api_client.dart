@@ -1893,6 +1893,15 @@ class ApiClient {
     return post('${_billingPath(referenceType, referenceId)}/share-chat', {});
   }
 
+  /// Mes notifications serveur (chat, reçus, courses…) — utilisé par le poll local.
+  Future<Result<List<Map<String, dynamic>>>> getNotifications() async {
+    final result = await get('/notifications', skipCache: true);
+    return switch (result) {
+      Success(:final data) => Success(_extractList(data)),
+      Failure(:final error) => Failure(error),
+    };
+  }
+
   /// Publicités actives (passager, chauffeur, etc.) — endpoint public.
   Future<Result<List<Map<String, dynamic>>>> getPublicites({String? cible}) async {
     final q = cible != null && cible.isNotEmpty ? '?cible=${Uri.encodeComponent(cible)}' : '';

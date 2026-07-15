@@ -45,21 +45,10 @@ dev_dependencies:
   golden_toolkit: ^0.15.0
   flutter_launcher_icons: ^0.14.3
 
-flutter_launcher_icons:
-  android: true
-  ios: true
-  image_path: assets/icon/movaicone.png
-  adaptive_icon_background: "#1A1A2E"
-  adaptive_icon_foreground: assets/icon/movaicone.png
-  flavors:
-    passenger:
-      image_path: assets/icon/movaicone.png
-      adaptive_icon_background: "#1A1A2E"
-      adaptive_icon_foreground: assets/icon/movaicone.png
-    driver:
-      image_path: assets/icon/movaicone.png
-      adaptive_icon_background: "#1A1A2E"
-      adaptive_icon_foreground: assets/icon/movaicone.png
+# Icônes distinctes par app (modèle Uber) : la config est séparée par flavor dans
+# flutter_launcher_icons-passenger.yaml et flutter_launcher_icons-driver.yaml.
+# `dart run flutter_launcher_icons` détecte ces fichiers et génère les icônes
+# dans android/app/src/<flavor>/res.
 
 flutter:
   uses-material-design: true

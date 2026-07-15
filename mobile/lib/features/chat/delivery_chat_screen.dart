@@ -89,6 +89,7 @@ class _DeliveryChatScreenState extends ConsumerState<DeliveryChatScreen> {
             senderRole: m.senderRole,
             text: m.text,
             peerLabel: widget.peerLabel,
+            messageId: m.id,
           );
         }
       }

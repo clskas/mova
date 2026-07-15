@@ -137,6 +137,7 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
           senderRole: role,
           text: text,
           peerLabel: 'Client',
+          messageId: payload['id']?.toString(),
         );
       },
     );

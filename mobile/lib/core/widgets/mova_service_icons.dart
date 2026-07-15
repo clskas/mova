@@ -245,16 +245,21 @@ class _MovingIconPainter extends _StrokeIconPainter {
   }
 }
 
-/// MOVA brand mark from `assets/icon/movaicone.png`.
+/// MOVA brand mark. Chaque app a son identité (modèle Uber) :
+/// passager = pin violet, chauffeur = volant vert.
 class MovaBrandIcon extends StatelessWidget {
-  const MovaBrandIcon({super.key, this.size = 28});
+  const MovaBrandIcon({super.key, this.size = 28, this.asset = passengerAsset});
+
+  static const String passengerAsset = 'assets/icon/movaicone_passenger.png';
+  static const String driverAsset = 'assets/icon/movaicone_driver.png';
 
   final double size;
+  final String asset;
 
   @override
   Widget build(BuildContext context) {
     return Image.asset(
-      'assets/icon/movaicone.png',
+      asset,
       width: size,
       height: size,
       fit: BoxFit.contain,

@@ -215,7 +215,12 @@ class _MovaSplashScreenState extends ConsumerState<MovaSplashScreen>
                                 ScaleTransition(
                                   scale: Tween<double>(begin: 1, end: 1.06)
                                       .animate(_pulse),
-                                  child: const MovaBrandIcon(size: 52),
+                                  child: MovaBrandIcon(
+                                    size: 52,
+                                    asset: _isPassenger
+                                        ? MovaBrandIcon.passengerAsset
+                                        : MovaBrandIcon.driverAsset,
+                                  ),
                                 ),
                                 const SizedBox(width: 12),
                                 Flexible(

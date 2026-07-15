@@ -1,5 +1,18 @@
-const CACHE = "mova-rental-partner-v2";
-const SHELL = ["/", "/login", "/vehicules", "/vehicules/nouveau", "/reservations", "/revenus", "/promos", "/manifest.webmanifest"];
+const CACHE = "mova-rental-partner-v3";
+const SHELL = [
+  "/",
+  "/login",
+  "/vehicules",
+  "/vehicules/nouveau",
+  "/reservations",
+  "/revenus",
+  "/promos",
+  "/manifest.webmanifest",
+  "/icon-192.png",
+  "/icon-512.png",
+  "/icon-512-maskable.png",
+  "/apple-touch-icon.png",
+];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL).catch(() => undefined)));
@@ -16,15 +29,19 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
   const url = new URL(event.request.url);
-  if (url.pathname.startsWith("/api/")) return;
+  if (url.origin !== self.location.origin) return;
+  if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/_next/")) return;
+
   event.respondWith(
     fetch(event.request)
       .then((res) => {
-        const copy = res.clone();
-        caches.open(CACHE).then((cache) => cache.put(event.request, copy));
+        if (res.ok && (url.pathname.startsWith("/icon") || url.pathname.endsWith(".webmanifest") || SHELL.includes(url.pathname))) {
+          const copy = res.clone();
+          caches.open(CACHE).then((cache) => cache.put(event.request, copy));
+        }
         return res;
       })
-      .catch(() => caches.match(event.request)),
+      .catch(() => caches.match(event.request).then((cached) => cached || caches.match("/login"))),
   );
 });
 
@@ -41,6 +58,7 @@ self.addEventListener("push", (event) => {
       tag: payload.tag,
       data: { url: payload.url },
       icon: "/icon-192.png",
+      badge: "/icon-192.png",
     }),
   );
 });

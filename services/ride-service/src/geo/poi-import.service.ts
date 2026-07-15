@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PlaceOfInterestCategory } from '@prisma/client';
 import { DRC_SERVICE_AREAS, getServiceArea } from '@mova/shared';
+import { httpRequest } from '../common/http-fetch.util';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   KINSHASA_POI_SEED,
@@ -92,16 +93,25 @@ export class PoiImportService {
       );
       out center;
     `;
-    const res = await fetch('https://overpass-api.de/api/interpreter', {
+    // Client node:https IPv4 forcé : le fetch global (undici) échoue par
+    // timeout intermittent dans le réseau Docker (happy-eyeballs IPv6).
+    const res = await httpRequest('https://overpass-api.de/api/interpreter', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: `data=${encodeURIComponent(query)}`,
+      timeoutMs: 90000,
     });
-    if (!res.ok) {
+    if (res.status < 200 || res.status >= 300) {
       this.logger.warn(`Overpass API failed: ${res.status}`);
       return this.seedCity(targetCity);
     }
-    const data = (await res.json()) as { elements?: OverpassElement[] };
+    let data: { elements?: OverpassElement[] };
+    try {
+      data = JSON.parse(res.body) as { elements?: OverpassElement[] };
+    } catch {
+      this.logger.warn(`Overpass returned non-JSON for ${targetCity} — fallback city seed`);
+      return this.seedCity(targetCity);
+    }
     const rows: PoiSeedRow[] = [];
     for (const el of data.elements ?? []) {
       const lat = el.lat ?? el.center?.lat;

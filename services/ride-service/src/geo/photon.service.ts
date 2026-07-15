@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { httpGetJson } from '../common/http-fetch.util';
 
 export type PhotonPlace = {
   label: string;
@@ -127,24 +128,22 @@ export class PhotonService {
   }
 
   private async fetchJson<T>(path: string): Promise<T | null> {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), this.timeoutMs);
     try {
-      const res = await fetch(`${this.baseUrl}${path}`, {
-        signal: controller.signal,
+      // Client node:https IPv4 forcé : le fetch global (undici) est instable
+      // dans le réseau Docker (happy-eyeballs IPv6 → timeouts intermittents).
+      const data = await httpGetJson<T>(`${this.baseUrl}${path}`, {
         headers: { Accept: 'application/json' },
+        timeoutMs: this.timeoutMs,
       });
-      if (!res.ok) {
-        this.logger.warn(`Photon HTTP ${res.status} for ${path}`);
+      if (data == null) {
+        this.logger.warn(`Photon empty/non-2xx for ${path}`);
         return null;
       }
-      return (await res.json()) as T;
+      return data;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       this.logger.warn(`Photon unavailable: ${msg}`);
       return null;
-    } finally {
-      clearTimeout(timer);
     }
   }
 }

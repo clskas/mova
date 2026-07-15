@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import {
   MOVA_EVENTS,
+  ChatMessagePayload,
   DeliveryCreatedPayload,
   DeliveryStatusUpdatedPayload,
   DriverJobAlertPayload,
@@ -48,6 +49,7 @@ export class NotificationsService implements OnModuleInit {
       MOVA_EVENTS.DRIVER_JOB_ALERT,
       MOVA_EVENTS.SCHEDULED_REMINDER,
       MOVA_EVENTS.ERRAND_CREATED,
+      MOVA_EVENTS.CHAT_MESSAGE,
     ];
     this.redis.sub.subscribe(...channels, (err) => {
       if (err) {
@@ -71,6 +73,7 @@ export class NotificationsService implements OnModuleInit {
         if (channel === MOVA_EVENTS.DRIVER_JOB_ALERT) await this.onDriverJobAlert(data as DriverJobAlertPayload);
         if (channel === MOVA_EVENTS.SCHEDULED_REMINDER) await this.onScheduledReminder(data as ScheduledReminderPayload);
         if (channel === MOVA_EVENTS.ERRAND_CREATED) await this.onErrandCreated(data as ErrandCreatedPayload);
+        if (channel === MOVA_EVENTS.CHAT_MESSAGE) await this.onChatMessage(data as ChatMessagePayload);
       } catch (e) {
         this.logger.error('Event handler error', e);
       }
@@ -126,6 +129,58 @@ export class NotificationsService implements OnModuleInit {
     const label = payload.rideId ? `course ${payload.rideId}` : `${payload.referenceType} ${payload.referenceId}`;
     await this.create(payload.userId, 'Paiement confirmé', `Paiement de ${payload.amountCdf} FC effectué (${label})`, 'PAYMENT_COMPLETED', payload);
     this.logger.log(`payment.completed notification for ${payload.rideId ?? payload.referenceId}`);
+  }
+
+  private chatSenderLabel(role: string): string {
+    switch (role) {
+      case 'driver':
+        return 'chauffeur';
+      case 'passenger':
+        return 'passager';
+      case 'partner':
+        return 'restaurant';
+      case 'courier':
+        return 'livreur';
+      default:
+        return 'contact';
+    }
+  }
+
+  async onChatMessage(payload: ChatMessagePayload) {
+    const recipients = (payload.recipientIds ?? []).filter((id) => id && id !== payload.senderId);
+    if (recipients.length === 0) return;
+
+    const raw = (payload.text ?? '').trim();
+    // Un reçu partagé est un message chat avec un marqueur machine `[mova-receipt:…]`.
+    const isReceipt = raw.startsWith('📄') || /\[mova-receipt:/i.test(raw);
+    const title = isReceipt
+      ? 'Reçu de paiement'
+      : `Message du ${this.chatSenderLabel(payload.senderRole)}`;
+    const clean = raw.replace(/\[mova-receipt:[^\]]+\]/gi, '').trim();
+    const preview = isReceipt
+      ? clean.split('\n')[0] || 'Un reçu de paiement a été partagé dans le chat.'
+      : clean.length > 140
+        ? `${clean.slice(0, 137)}…`
+        : clean;
+
+    const data = {
+      kind: payload.kind,
+      threadId: payload.threadId,
+      messageId: payload.messageId,
+      senderRole: payload.senderRole,
+      isReceipt,
+    };
+
+    for (const recipientId of recipients) {
+      await this.create(recipientId, title, preview, 'CHAT_MESSAGE', data);
+    }
+    // Push FCM best-effort (chauffeurs enregistrés) ; sans effet si FCM non configuré.
+    await this.pushToDrivers(recipients, title, preview, {
+      type: 'CHAT_MESSAGE',
+      kind: payload.kind,
+      threadId: payload.threadId,
+    });
+    this.logger.log(`chat.message notification → ${recipients.length} destinataire(s) (${payload.kind}:${payload.threadId})`);
   }
 
   async onIncidentCreated(payload: IncidentCreatedPayload) {

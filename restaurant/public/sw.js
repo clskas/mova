@@ -1,18 +1,27 @@
-const CACHE = "mova-resto-v2";
-const SHELL = ["/", "/login", "/dashboard", "/earnings", "/menu", "/promos", "/settings", "/manifest.webmanifest"];
+const CACHE = "mova-resto-v3";
+const SHELL = [
+  "/",
+  "/login",
+  "/dashboard",
+  "/earnings",
+  "/menu",
+  "/promos",
+  "/settings",
+  "/manifest.webmanifest",
+  "/icon-192.png",
+  "/icon-512.png",
+  "/icon-512-maskable.png",
+  "/apple-touch-icon.png",
+];
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open(CACHE).then((cache) => cache.addAll(SHELL).catch(() => undefined)),
-  );
+  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL).catch(() => undefined)));
   self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))),
-    ),
+    caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))),
   );
   self.clients.claim();
 });
@@ -20,15 +29,19 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
   const url = new URL(event.request.url);
-  if (url.pathname.startsWith("/api/")) return;
+  if (url.origin !== self.location.origin) return;
+  if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/_next/")) return;
+
   event.respondWith(
     fetch(event.request)
       .then((res) => {
-        const copy = res.clone();
-        caches.open(CACHE).then((cache) => cache.put(event.request, copy));
+        if (res.ok && (url.pathname.startsWith("/icon") || url.pathname.endsWith(".webmanifest") || SHELL.includes(url.pathname))) {
+          const copy = res.clone();
+          caches.open(CACHE).then((cache) => cache.put(event.request, copy));
+        }
         return res;
       })
-      .catch(() => caches.match(event.request)),
+      .catch(() => caches.match(event.request).then((cached) => cached || caches.match("/login"))),
   );
 });
 
@@ -45,6 +58,7 @@ self.addEventListener("push", (event) => {
       tag: payload.tag,
       data: { url: payload.url },
       icon: "/icon-192.png",
+      badge: "/icon-192.png",
     }),
   );
 });

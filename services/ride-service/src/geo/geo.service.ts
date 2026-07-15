@@ -354,8 +354,9 @@ export class GeoService implements OnModuleInit {
       }
     };
 
-    const hasPlaceMatch = () =>
-      results.some((r) => r.source === 'commune' || r.source === 'poi');
+    const placeMatchCount = () =>
+      results.filter((r) => r.source === 'commune' || r.source === 'poi').length;
+    const hasPlaceMatch = () => placeMatchCount() > 0;
 
     const requestedCity = city?.trim() ?? '';
 
@@ -398,7 +399,11 @@ export class GeoService implements OnModuleInit {
       }
     }
 
-    if (!hasPlaceMatch()) {
+    // Enrichit via géocodage externe (Photon/Nominatim) tant que le catalogue
+    // local reste pauvre : évite qu'une seule correspondance générique masque
+    // tous les lieux réels d'une ville.
+    const MIN_LOCAL_RESULTS = 5;
+    if (placeMatchCount() < MIN_LOCAL_RESULTS) {
       const geocodeArea =
         primaryArea ??
         DRC_SERVICE_AREAS.find((a) => a.name.toLowerCase() === requestedCity.toLowerCase()) ??

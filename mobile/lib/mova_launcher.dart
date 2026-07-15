@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'core/api/api_client.dart';
 import 'core/offline/mova_app_lifecycle.dart';
 import 'core/offline/sync_queue.dart';
 import 'core/theme/mova_theme.dart';
 import 'core/widgets/offline_shell.dart';
 import 'features/auth/auth_session_gate.dart';
 import 'features/chat/chat_alert_service.dart';
+import 'features/chat/chat_poll_service.dart';
 import 'features/driver/driver_job_alert_service.dart';
 import 'features/passenger/passenger_alert_service.dart';
 import 'features/splash/mova_splash_screen.dart';
@@ -45,6 +47,26 @@ class MovaPassengerApp extends ConsumerStatefulWidget {
 
 class _MovaPassengerAppState extends ConsumerState<MovaPassengerApp>
     with WidgetsBindingObserver, MovaAppLifecycleMixin {
+  ChatPollService? _chatPoll;
+
+  @override
+  void initState() {
+    super.initState();
+    _chatPoll = ChatPollService(ref.read(apiClientProvider))..start();
+  }
+
+  @override
+  void dispose() {
+    _chatPoll?.stop();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed) _chatPoll?.poke();
+  }
+
   @override
   Widget build(BuildContext context) {
     return movaMediaQueryWrapper(
@@ -71,6 +93,26 @@ class MovaDriverApp extends ConsumerStatefulWidget {
 
 class _MovaDriverAppState extends ConsumerState<MovaDriverApp>
     with WidgetsBindingObserver, MovaAppLifecycleMixin {
+  ChatPollService? _chatPoll;
+
+  @override
+  void initState() {
+    super.initState();
+    _chatPoll = ChatPollService(ref.read(apiClientProvider))..start();
+  }
+
+  @override
+  void dispose() {
+    _chatPoll?.stop();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed) _chatPoll?.poke();
+  }
+
   @override
   Widget build(BuildContext context) {
     return movaMediaQueryWrapper(

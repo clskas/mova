@@ -1,7 +1,8 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { mediaUrl, uploadVehiclePhoto } from "@/lib/api";
+import { ImageSourcePicker } from "@/components/ImageSourcePicker";
 
 type Props = {
   value?: string | null;
@@ -10,7 +11,6 @@ type Props = {
 };
 
 export function VehiclePhotoUpload({ value, onChange, onError }: Props) {
-  const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const preview = mediaUrl(value);
 
@@ -24,7 +24,6 @@ export function VehiclePhotoUpload({ value, onChange, onError }: Props) {
       onError?.(e instanceof Error ? e.message : "Échec envoi photo");
     } finally {
       setUploading(false);
-      if (inputRef.current) inputRef.current.value = "";
     }
   }
 
@@ -38,21 +37,10 @@ export function VehiclePhotoUpload({ value, onChange, onError }: Props) {
           Aucune photo
         </div>
       )}
-      <button
-        type="button"
+      <ImageSourcePicker
         disabled={uploading}
-        onClick={() => inputRef.current?.click()}
-        className="px-3 py-2 rounded-lg bg-indigo-600 text-white text-sm disabled:opacity-60"
-      >
-        {uploading ? "Envoi…" : preview ? "Changer la photo" : "Prendre / choisir une photo"}
-      </button>
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        className="hidden"
-        onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
+        onSelect={handleFile}
+        label={uploading ? "Envoi…" : preview ? "Changer la photo" : "Prendre / choisir une photo"}
       />
     </div>
   );

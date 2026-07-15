@@ -55,6 +55,10 @@ class _LocalPinSetupScreenState extends ConsumerState<LocalPinSetupScreen> {
     setState(() => _loading = false);
     switch (result) {
       case Success():
+        // Retirer le focus (fermer le clavier) avant la navigation : sinon le
+        // TextField encore focalisé est détruit pendant pop/pushReplacement et
+        // déclenche l'assertion Flutter `InheritedElement._dependents.isEmpty`.
+        FocusManager.instance.primaryFocus?.unfocus();
         await widget.onCompleted();
       case Failure(:final error):
         setState(() => _error = error.message);

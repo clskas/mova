@@ -94,6 +94,7 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
         senderRole: role,
         text: payload['text']?.toString() ?? '',
         peerLabel: 'Chauffeur',
+        messageId: payload['id']?.toString(),
       );
     };
     // Le passager a réglé en espèces → ouvrir automatiquement la saisie du PIN.

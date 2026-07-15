@@ -24,6 +24,7 @@ class DriverOtpScreen extends ConsumerWidget {
       onboardingDone = data['profile']?['onboardingCompleted'] == true;
     }
     if (!context.mounted) return;
+    FocusManager.instance.primaryFocus?.unfocus();
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
         builder: (_) => onboardingDone
@@ -45,7 +46,7 @@ class DriverOtpScreen extends ConsumerWidget {
             child: ClipRRect(
               borderRadius: BorderRadius.circular(16),
               child: Image.asset(
-                'assets/icon/movaicone.png',
+                'assets/icon/movaicone_driver.png',
                 width: 64,
                 height: 64,
                 fit: BoxFit.cover,

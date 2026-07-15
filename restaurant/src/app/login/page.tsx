@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { decodeJwtPayload, isRestaurantRole, setToken } from "@/lib/auth";
+import { PwaInstallBanner } from "@/components/PwaInstallBanner";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
 const RESTAURANT_PHONE = process.env.NEXT_PUBLIC_RESTAURANT_PHONE ?? "+243900000030";
@@ -47,6 +48,7 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-6 bg-gradient-to-br from-orange-50 to-violet-50">
+      <PwaInstallBanner accentClass="bg-[#FF6B35]" />
       <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-8 space-y-6">
         <div className="text-center">
           <div className="text-3xl mb-2">🍽️</div>

@@ -282,10 +282,12 @@ export class GeoModule {}
 `);
 
   w('services/ride-service/src/ratings/ratings.dto.ts', `import { ApiProperty } from '@nestjs/swagger';
-import { IsInt, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
+import { IsInt, IsNotEmpty, IsOptional, IsString, Max, Min } from 'class-validator';
 export class CreateRatingDto {
-  @ApiProperty() @IsUUID() rideId: string;
-  @ApiProperty() @IsUUID() toUserId: string;
+  // IDs stockés en TEXT ; validés en chaînes non vides (le service vérifie
+  // ensuite l'existence de la course et que toUserId est passager/chauffeur).
+  @ApiProperty() @IsString() @IsNotEmpty() rideId: string;
+  @ApiProperty() @IsString() @IsNotEmpty() toUserId: string;
   @ApiProperty({ minimum: 1, maximum: 5 }) @IsInt() @Min(1) @Max(5) score: number;
   @ApiProperty({ required: false }) @IsOptional() @IsString() comment?: string;
 }

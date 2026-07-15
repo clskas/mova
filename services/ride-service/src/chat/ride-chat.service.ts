@@ -1,9 +1,15 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { MovaErrorCode, MovaHttpException } from '@mova/shared';
+import { MOVA_EVENTS, MovaErrorCode, MovaHttpException, RedisService } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { TrackingGateway } from '../websocket/tracking.gateway';
 
 export type RideChatSenderRole = 'passenger' | 'driver';
+
+interface RideParticipants {
+  role: RideChatSenderRole;
+  passengerId: string;
+  driverId: string;
+}
 
 export interface RideChatMessage {
   id: string;
@@ -19,9 +25,10 @@ export class RideChatService {
   constructor(
     private prisma: PrismaService,
     private trackingGateway: TrackingGateway,
+    private redis: RedisService,
   ) {}
 
-  private async assertParticipant(rideId: string, userId: string): Promise<RideChatSenderRole> {
+  private async assertParticipant(rideId: string, userId: string): Promise<RideParticipants> {
     const ride = await this.prisma.ride.findUnique({
       where: { id: rideId },
       select: { passengerId: true, driverId: true },
@@ -34,8 +41,9 @@ export class RideChatService {
         'Le chat est disponible une fois le chauffeur assigné.',
       );
     }
-    if (ride.passengerId === userId) return 'passenger';
-    if (ride.driverId === userId) return 'driver';
+    const base = { passengerId: ride.passengerId, driverId: ride.driverId };
+    if (ride.passengerId === userId) return { role: 'passenger', ...base };
+    if (ride.driverId === userId) return { role: 'driver', ...base };
     throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
   }
 
@@ -69,7 +77,8 @@ export class RideChatService {
   }
 
   async sendMessage(rideId: string, userId: string, text: string) {
-    const senderRole = await this.assertParticipant(rideId, userId);
+    const participants = await this.assertParticipant(rideId, userId);
+    const senderRole = participants.role;
     const trimmed = text.trim();
     if (!trimmed) throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, HttpStatus.BAD_REQUEST);
 
@@ -85,6 +94,23 @@ export class RideChatService {
     });
     const payload = this.toPayload(row);
     this.trackingGateway.broadcastRideChat(payload);
+
+    // Notifie le destinataire (l'autre participant) même hors écran chat : le
+    // notification-service crée une notification in-app et pousse aux chauffeurs.
+    const recipientId =
+      senderRole === 'passenger' ? participants.driverId : participants.passengerId;
+    void this.redis
+      .publish(MOVA_EVENTS.CHAT_MESSAGE, {
+        kind: 'ride',
+        threadId: rideId,
+        messageId: row.id,
+        senderId: userId,
+        senderRole,
+        recipientIds: [recipientId],
+        text: trimmed,
+      })
+      .catch(() => undefined);
+
     return payload;
   }
 }

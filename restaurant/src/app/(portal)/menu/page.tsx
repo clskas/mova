@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   fetchMenu,
   formatCdf,
@@ -9,6 +9,7 @@ import {
   uploadMenuPhoto,
   type MenuItem,
 } from "@/lib/api";
+import { ImageSourcePicker } from "@/components/ImageSourcePicker";
 
 const emptyDraft = (): MenuItem => ({
   name: "",
@@ -24,11 +25,9 @@ export default function MenuPage() {
   const [editIndex, setEditIndex] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [uploading, setUploading] = useState(false);
+  const [uploadingTarget, setUploadingTarget] = useState<"draft" | number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
-  const [uploadTarget, setUploadTarget] = useState<"draft" | number>("draft");
 
   const load = useCallback(async () => {
     setError(null);
@@ -46,22 +45,22 @@ export default function MenuPage() {
     load();
   }, [load]);
 
-  async function handlePhoto(file: File) {
-    setUploading(true);
+  async function handlePhoto(file: File, target: "draft" | number) {
+    setUploadingTarget(target);
     setError(null);
     try {
       const photoUrl = await uploadMenuPhoto(file);
-      if (uploadTarget === "draft") {
+      if (target === "draft") {
         setDraft((d) => ({ ...d, imageUrl: photoUrl }));
       } else {
         setItems((prev) =>
-          prev.map((item, i) => (i === uploadTarget ? { ...item, imageUrl: photoUrl } : item)),
+          prev.map((item, i) => (i === target ? { ...item, imageUrl: photoUrl } : item)),
         );
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Upload impossible");
     } finally {
-      setUploading(false);
+      setUploadingTarget(null);
     }
   }
 
@@ -121,25 +120,8 @@ export default function MenuPage() {
     }
   }
 
-  function openFilePicker(target: "draft" | number) {
-    setUploadTarget(target);
-    fileRef.current?.click();
-  }
-
   return (
     <>
-      <input
-        ref={fileRef}
-        type="file"
-        accept="image/jpeg,image/png,image/webp"
-        className="hidden"
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          e.target.value = "";
-          if (file) handlePhoto(file);
-        }}
-      />
-
       <div className="space-y-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
@@ -192,14 +174,12 @@ export default function MenuPage() {
             />
           </label>
           <div className="flex flex-wrap items-center gap-4">
-            <button
-              type="button"
-              disabled={uploading}
-              onClick={() => openFilePicker("draft")}
-              className="px-4 py-2 rounded-xl border text-sm hover:bg-gray-50 disabled:opacity-60"
-            >
-              {uploading && uploadTarget === "draft" ? "Upload…" : "Photo du plat"}
-            </button>
+            <ImageSourcePicker
+              disabled={uploadingTarget !== null}
+              onSelect={(file) => handlePhoto(file, "draft")}
+              label={uploadingTarget === "draft" ? "Upload…" : "Photo du plat"}
+              accept="image/jpeg,image/png,image/webp"
+            />
             {draft.imageUrl && (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={mediaUrl(draft.imageUrl) ?? ""} alt="" className="w-16 h-16 rounded-lg object-cover border" />
@@ -254,13 +234,13 @@ export default function MenuPage() {
                     <button type="button" onClick={() => startEdit(index)} className="text-xs text-[#6C63FF] underline">
                       Modifier
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => openFilePicker(index)}
-                      className="text-xs text-gray-600 underline"
-                    >
-                      Photo
-                    </button>
+                    <ImageSourcePicker
+                      disabled={uploadingTarget !== null}
+                      onSelect={(file) => handlePhoto(file, index)}
+                      label={uploadingTarget === index ? "Upload…" : "Photo"}
+                      className="text-xs text-gray-600 underline disabled:opacity-60"
+                      accept="image/jpeg,image/png,image/webp"
+                    />
                     <button type="button" onClick={() => removeItem(index)} className="text-xs text-red-600 underline">
                       Supprimer
                     </button>

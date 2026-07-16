@@ -289,7 +289,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     final suspended = _user?['status']?.toString() == 'SUSPENDED';
 
     return MovaScreen(
-      title: 'MOVA Passager',
+      title: 'Mova',
       actions: [
         IconButton(
           icon: const Icon(Icons.person_outline),

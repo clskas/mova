@@ -37,7 +37,7 @@ class DriverOtpScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return MovaScreen(
-      title: 'MOVA Chauffeur',
+      title: 'MOVA Driver',
       centerContent: true,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,

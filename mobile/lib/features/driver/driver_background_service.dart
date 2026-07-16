@@ -94,7 +94,7 @@ class DriverBackgroundService {
     FlutterForegroundTask.init(
       androidNotificationOptions: AndroidNotificationOptions(
         channelId: 'mova_driver_online',
-        channelName: 'MOVA Chauffeur en ligne',
+        channelName: 'MOVA Driver en ligne',
         channelDescription: 'Recherche de courses et missions en arrière-plan',
         onlyAlertOnce: true,
       ),
@@ -113,7 +113,7 @@ class DriverBackgroundService {
     if (await FlutterForegroundTask.isRunningService) return;
     await FlutterForegroundTask.startService(
       serviceId: 1001,
-      notificationTitle: 'MOVA Chauffeur',
+      notificationTitle: 'MOVA Driver',
       notificationText: 'En ligne — recherche de courses et missions',
       callback: driverBackgroundStartCallback,
     );

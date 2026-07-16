@@ -550,6 +550,7 @@ abstract final class MockData {
           'type': 'PARCEL',
           'pickupAddress': 'Limete',
           'dropoffAddress': 'Masina',
+          'photoUrl': '/api/uploads/parcels/mock-parcel.jpg',
           'estimatedPriceCdf': 8000,
           'distanceKm': 4.5,
           'status': 'PENDING',

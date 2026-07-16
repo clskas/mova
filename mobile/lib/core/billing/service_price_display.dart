@@ -207,14 +207,17 @@ class ServicePriceDisplay {
 
   static Widget _errandPassengerCard(Map<String, dynamic> data, {required String totalLabel}) {
     final serviceFee = data['serviceFeeCdf'] as int? ?? data['estimatedPriceCdf'] as int? ?? 0;
-    final purchase = data['purchaseTotalCdf'] as int? ?? 0;
+    final actualPurchase = data['purchaseTotalCdf'] as int? ?? 0;
+    final estimatedPurchase = data['estimatedPurchaseCdf'] as int? ?? 0;
+    final purchase = actualPurchase > 0 ? actualPurchase : estimatedPurchase;
+    final purchaseLabel = actualPurchase > 0 ? 'Achats réels (remboursement)' : 'Achats estimés';
     final total = data['totalPriceCdf'] as int? ?? (serviceFee + purchase);
     return MovaCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (serviceFee > 0) _row('Frais de course', serviceFee),
-          if (purchase > 0) _row('Achats (remboursement)', purchase),
+          if (purchase > 0) _row(purchaseLabel, purchase),
           if (serviceFee > 0 || purchase > 0) const Divider(height: 16),
           Row(
             children: [

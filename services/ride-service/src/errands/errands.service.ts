@@ -95,8 +95,10 @@ export class ErrandsService {
       errandFeeCdf: baseCdf,
       itemsFeeCdf: itemsFee,
       budgetCdf: dto.budgetCdf,
-      category: resolvedCategory,
       estimatedPurchaseCdf,
+      minimumBudgetCdf: estimatedPurchaseCdf,
+      budgetRequired: true,
+      category: resolvedCategory,
       categoryLabel: await this.errandCategories.categoryLabel(resolvedCategory),
       discountCdf: promoApplied.discountCdf,
       promoCode: promoApplied.promoCode,
@@ -180,16 +182,40 @@ export class ErrandsService {
     }).catch(() => undefined);
   }
 
-  private async maybeHoldBudget(userId: string, orderId: string, budgetCdf?: number | null) {
-    if (!budgetCdf || budgetCdf <= 0) return null;
+  private async maybeHoldBudget(userId: string, orderId: string, budgetCdf: number) {
+    if (budgetCdf <= 0) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        HttpStatus.BAD_REQUEST,
+        'Budget achats max obligatoire pour les courses & commissions.',
+      );
+    }
     await holdWalletFunds(userId, budgetCdf, 'ERRAND', orderId, `Séquestre budget course ${orderId}`);
     return budgetCdf;
+  }
+
+  private assertErrandBudget(budgetCdf: number | undefined | null, estimatedPurchaseCdf: number) {
+    if (budgetCdf == null || budgetCdf <= 0) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        HttpStatus.BAD_REQUEST,
+        'Budget achats max obligatoire. Rechargez votre wallet MOVA pour bloquer ce montant.',
+      );
+    }
+    if (budgetCdf < estimatedPurchaseCdf) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        HttpStatus.BAD_REQUEST,
+        `Budget insuffisant : minimum ${estimatedPurchaseCdf.toLocaleString('fr-CD')} FC (achats estimés).`,
+      );
+    }
   }
 
   async create(userId: string, dto: CreateErrandOrderDto, structuredItems?: ErrandItemRow[]) {
     const itemCount = structuredItems?.length ?? 0;
     const category = await this.errandCategories.inferCategory(dto.pickupAddress, dto.description.split(', '));
     const estimate = await this.estimate(dto, itemCount, category, true);
+    this.assertErrandBudget(dto.budgetCdf, estimate.estimatedPurchaseCdf);
     const order = await this.prisma.errandOrder.create({
       data: {
         userId,
@@ -216,9 +242,7 @@ export class ErrandsService {
       void this.prisma.errandOrder.delete({ where: { id: order.id } }).catch(() => undefined);
       throw err;
     });
-    if (walletHoldCdf) {
-      await this.prisma.errandOrder.update({ where: { id: order.id }, data: { walletHoldCdf } });
-    }
+    await this.prisma.errandOrder.update({ where: { id: order.id }, data: { walletHoldCdf } });
     const finalOrder = await this.prisma.errandOrder.findUniqueOrThrow({ where: { id: order.id } });
     await this.alertErrandOffer(finalOrder);
     await this.redis.publish(MOVA_EVENTS.ERRAND_CREATED, {

@@ -1094,13 +1094,13 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
   Widget build(BuildContext context) {
     if (_bootstrapping) {
       return const MovaScreen(
-        title: 'MOVA Chauffeur',
+        title: 'MOVA Driver',
         child: Center(child: CircularProgressIndicator()),
       );
     }
 
     return MovaScreen(
-      title: 'MOVA Chauffeur',
+      title: 'MOVA Driver',
       scrollable: false,
       actions: [
         IconButton(
@@ -1816,9 +1816,30 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                         if (pickupKm != null) 'Vous → colis ${GeoUtils.formatDistanceKm(pickupKm)}',
                         if (tripKm != null) 'Livraison ${GeoUtils.formatDistanceKm(tripKm)}',
                       ];
+                      final photoUrl = (type == 'PARCEL' || type == 'EXPRESS')
+                          ? offer['photoUrl']?.toString()
+                          : null;
+                      final hasPhoto = photoUrl != null && photoUrl.isNotEmpty;
                       return ListTile(
                         contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 0),
                         minVerticalPadding: 12,
+                        leading: hasPhoto
+                            ? ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Image.network(
+                                  MarketConfig.resolveMediaUrl(photoUrl),
+                                  width: 48,
+                                  height: 48,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => Container(
+                                    width: 48,
+                                    height: 48,
+                                    color: Colors.grey.shade200,
+                                    child: const Icon(Icons.inventory_2_outlined, size: 22),
+                                  ),
+                                ),
+                              )
+                            : null,
                         title: Text(
                           assigned
                               ? 'Mission assignée — ${type == 'ERRAND' ? (offer['description']?.toString() ?? 'Courses & commissions') : (offer['pickupAddress']?.toString() ?? 'Livraison $typeLabel')}'

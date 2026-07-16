@@ -165,6 +165,87 @@ class _ErrandTrackingScreenState extends ConsumerState<ErrandTrackingScreen> {
 
   int get _purchaseCdf => _order?['purchaseTotalCdf'] as int? ?? 0;
 
+  void _showProofFullscreen(String proofUrl) {
+    final resolved = MarketConfig.resolveMediaUrl(proofUrl);
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => Dialog(
+        insetPadding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Align(
+              alignment: Alignment.topRight,
+              child: IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: () => Navigator.pop(ctx),
+              ),
+            ),
+            InteractiveViewer(
+              child: Image.network(
+                resolved,
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => const Padding(
+                  padding: EdgeInsets.all(24),
+                  child: Icon(Icons.broken_image_outlined, size: 48),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _proofPhotoCard(String proofUrl) {
+    final resolved = MarketConfig.resolveMediaUrl(proofUrl);
+    return MovaCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.photo_camera_outlined, color: MovaColors.green, size: 20),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Preuve d\'achat',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: GestureDetector(
+              onTap: () => _showProofFullscreen(proofUrl),
+              child: Image.network(
+                resolved,
+                height: 200,
+                width: double.infinity,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Container(
+                  height: 200,
+                  color: Colors.grey.shade200,
+                  child: const Center(
+                    child: Icon(Icons.broken_image_outlined, color: MovaColors.textSecondary),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Photo prise par le livreur au commerce. Appuyez pour agrandir.',
+            style: TextStyle(color: MovaColors.textSecondary, fontSize: 12),
+          ),
+        ],
+      ),
+    );
+  }
+
   int get _totalPriceCdf =>
       _order?['totalPriceCdf'] as int? ?? (_serviceFeeCdf + _purchaseCdf);
 
@@ -532,24 +613,20 @@ class _ErrandTrackingScreenState extends ConsumerState<ErrandTrackingScreen> {
                                 ),
                               );
                             }),
-                            if (_order?['status']?.toString() == 'COMPLETED') ...[
+                            if (proofUrl != null && proofUrl.isNotEmpty) ...[
+                              const SizedBox(height: 16),
+                              _proofPhotoCard(proofUrl),
+                            ] else if (_order?['status']?.toString() == 'COMPLETED') ...[
                               const SizedBox(height: 16),
                               MovaCard(
                                 child: Row(
                                   children: [
-                                    Icon(
-                                      proofUrl != null
-                                          ? Icons.photo_camera_outlined
-                                          : Icons.verified_outlined,
-                                      color: MovaColors.green,
-                                    ),
+                                    const Icon(Icons.verified_outlined, color: MovaColors.green),
                                     const SizedBox(width: 12),
-                                    Expanded(
+                                    const Expanded(
                                       child: Text(
-                                        proofUrl != null
-                                            ? 'Preuve d\'achat enregistrée'
-                                            : 'Livraison confirmée',
-                                        style: const TextStyle(fontWeight: FontWeight.w600),
+                                        'Livraison confirmée',
+                                        style: TextStyle(fontWeight: FontWeight.w600),
                                       ),
                                     ),
                                   ],

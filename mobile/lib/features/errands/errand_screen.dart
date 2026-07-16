@@ -17,6 +17,7 @@ import '../../core/widgets/mova_widgets.dart';
 import '../../core/config/market_config.dart';
 import '../booking/widgets/mova_ride_map.dart';
 import '../../widgets/promo_code_field.dart';
+import '../wallet/wallet_screen.dart';
 import 'errand_tracking_screen.dart';
 
 class ErrandScreen extends ConsumerStatefulWidget {
@@ -36,6 +37,8 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
   final _promoController = TextEditingController();
   int? _estimatedPrice;
   int? _estimatedPurchaseCdf;
+  int? _minimumBudgetCdf;
+  int? _walletAvailableCdf;
   bool _loading = false;
   bool _loadingGps = false;
   double? _pickupLat;
@@ -126,8 +129,11 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
     });
   }
 
-  Map<String, dynamic> _errandPayload() {
+  Map<String, dynamic> _errandPayload({bool requireBudget = false}) {
     final budget = int.tryParse(_budgetController.text.trim());
+    if (requireBudget && (budget == null || budget <= 0)) {
+      throw StateError('Budget achats max obligatoire.');
+    }
     return {
       'pickupAddress': _pickupController.text.trim(),
       if (_pickupLat != null) 'pickupLat': _pickupLat,
@@ -248,6 +254,7 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
       setState(() {
         _estimatedPrice = null;
         _estimatedPurchaseCdf = null;
+        _minimumBudgetCdf = null;
         if (clearPickup) {
           _pickupLat = null;
           _pickupLng = null;
@@ -304,7 +311,33 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
     if (_dropoffController.text.trim().isEmpty) {
       return 'Indiquez le lieu de livraison (nom du quartier ou adresse).';
     }
+    final budget = int.tryParse(_budgetController.text.trim());
+    if (budget == null || budget <= 0) {
+      return 'Budget achats max obligatoire — rechargez votre wallet MOVA pour bloquer ce montant.';
+    }
+    if (_minimumBudgetCdf != null && budget < _minimumBudgetCdf!) {
+      return 'Budget minimum : ${MarketConfig.formatCdf(_minimumBudgetCdf!)} (achats estimés).';
+    }
     return null;
+  }
+
+  Future<String?> _ensureWalletCoversBudget(int budget) async {
+    final api = ref.read(apiClientProvider);
+    final result = await api.get('/wallet');
+    if (result case Success(:final data)) {
+      final available = data['availableBalanceCdf'] as int? ??
+          ((data['balanceCdf'] as int? ?? 0) - (data['heldBalanceCdf'] as int? ?? 0));
+      _walletAvailableCdf = available;
+      if (available < budget) {
+        return 'Solde wallet insuffisant : ${MarketConfig.formatCdf(available)} disponible, '
+            '${MarketConfig.formatCdf(budget)} requis. Rechargez votre wallet MOVA.';
+      }
+      return null;
+    }
+    if (result case Failure(:final error)) {
+      return error.message;
+    }
+    return 'Impossible de vérifier le wallet.';
   }
 
   Future<void> _estimate() async {
@@ -338,6 +371,7 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
           final estimate = _unwrapEstimate(data);
           _estimatedPrice = _readCdf(estimate['estimatedPriceCdf'] ?? estimate['serviceFeeCdf']);
           _estimatedPurchaseCdf = _readCdf(estimate['estimatedPurchaseCdf']);
+          _minimumBudgetCdf = _readCdf(estimate['minimumBudgetCdf'] ?? estimate['estimatedPurchaseCdf']);
           if (_estimatedPrice == null) {
             _error = 'Estimation indisponible — réessayez dans un instant.';
           }
@@ -368,9 +402,19 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
       });
       return;
     }
+    final budget = int.parse(_budgetController.text.trim());
+    final walletError = await _ensureWalletCoversBudget(budget);
+    if (!mounted) return;
+    if (walletError != null) {
+      setState(() {
+        _loading = false;
+        _validationError = walletError;
+      });
+      return;
+    }
     final api = ref.read(apiClientProvider);
     await api.checkHealth();
-    final result = await api.post('/deliveries/errand', _errandPayload());
+    final result = await api.post('/deliveries/errand', _errandPayload(requireBudget: true));
     setState(() => _loading = false);
     switch (result) {
       case Success(:final data):
@@ -477,13 +521,34 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
             style: compact ? const TextStyle(fontSize: 14) : null,
             decoration: InputDecoration(
               isDense: compact,
-              labelText: compact ? 'Budget max (FC)' : 'Budget achats max (FC, optionnel)',
-              hintText: 'Ex: 50000',
+              labelText: compact ? 'Budget max (FC) *' : 'Budget achats max (FC) *',
+              hintText: _minimumBudgetCdf != null
+                  ? 'Min. ${MarketConfig.formatCdf(_minimumBudgetCdf!)}'
+                  : 'Ex: 50000',
+              helperText: 'Obligatoire — bloqué sur votre wallet MOVA jusqu\'à la fin de la course.',
+              helperMaxLines: 2,
               labelStyle: compact ? const TextStyle(fontSize: 13) : null,
               prefixIcon: Icon(Icons.account_balance_wallet_outlined, size: compact ? 20 : 24),
+              suffixIcon: IconButton(
+                icon: Icon(Icons.add_card_outlined, color: MovaColors.violet, size: compact ? 20 : 24),
+                tooltip: 'Recharger le wallet',
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const WalletScreen()),
+                  );
+                },
+              ),
             ),
             onChanged: (_) => _deferResetEstimate(),
           ),
+          if (_walletAvailableCdf != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              'Solde wallet disponible : ${MarketConfig.formatCdf(_walletAvailableCdf!)}',
+              style: theme.textTheme.bodySmall?.copyWith(color: MovaColors.textSecondary),
+            ),
+          ],
           SizedBox(height: gap),
           Text('Liste de courses', style: theme.textTheme.titleSmall?.copyWith(fontSize: compact ? 14 : null)),
           SizedBox(height: compact ? 6 : 8),

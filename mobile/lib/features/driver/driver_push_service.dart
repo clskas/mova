@@ -10,7 +10,7 @@ import 'driver_job_alert_service.dart';
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
   await DriverJobAlertService.init();
-  final title = message.notification?.title ?? message.data['title']?.toString() ?? 'MOVA Chauffeur';
+  final title = message.notification?.title ?? message.data['title']?.toString() ?? 'MOVA Driver';
   final body = message.notification?.body ?? message.data['body']?.toString() ?? 'Nouvelle alerte';
   await DriverJobAlertService.notify(title: title, body: body, payload: message.data['type']?.toString());
 }
@@ -35,7 +35,7 @@ class DriverPushService {
       await messaging.setForegroundNotificationPresentationOptions(alert: true, badge: true, sound: true);
 
       FirebaseMessaging.onMessage.listen((message) async {
-        final title = message.notification?.title ?? message.data['title']?.toString() ?? 'MOVA Chauffeur';
+        final title = message.notification?.title ?? message.data['title']?.toString() ?? 'MOVA Driver';
         final body = message.notification?.body ?? message.data['body']?.toString() ?? 'Nouvelle alerte';
         await DriverJobAlertService.notify(title: title, body: body, payload: message.data['type']?.toString());
       });

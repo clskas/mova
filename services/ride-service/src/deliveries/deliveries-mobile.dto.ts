@@ -1,7 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { VehicleType } from '@prisma/client';
 import { Transform } from 'class-transformer';
-import { IsArray, IsBoolean, IsDateString, IsEnum, IsNumber, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsArray, IsBoolean, IsDateString, IsEnum, IsInt, IsNumber, IsOptional, IsString, Min, MinLength } from 'class-validator';
 import { normalizeVehicleType } from '@mova/shared';
 
 function toVehicleType(value: unknown): VehicleType {
@@ -18,11 +18,25 @@ export class MobileErrandEstimateDto {
   @ApiPropertyOptional() @IsOptional() @IsNumber() deliveryLng?: number;
   @ApiProperty() @IsString() @MinLength(3) deliveryAddress!: string;
   @ApiProperty({ type: [String] }) @IsArray() @IsString({ each: true }) items!: string[];
-  @ApiPropertyOptional() @IsOptional() @IsNumber() budgetCdf?: number;
+  @ApiPropertyOptional({
+    description: 'Budget achats max (CDF) — obligatoire à la commande',
+    example: 50000,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  budgetCdf?: number;
   @ApiPropertyOptional() @IsOptional() @IsString() promoCode?: string;
 }
 
 export class MobileErrandCreateDto extends MobileErrandEstimateDto {
+  @ApiProperty({
+    description: 'Budget achats max (CDF) — bloqué sur le wallet MOVA à la commande',
+    example: 50000,
+  })
+  @IsInt()
+  @Min(1)
+  declare budgetCdf: number;
   @ApiPropertyOptional() @IsOptional() @IsNumber() deliveryLat?: number;
   @ApiPropertyOptional() @IsOptional() @IsNumber() deliveryLng?: number;
 }

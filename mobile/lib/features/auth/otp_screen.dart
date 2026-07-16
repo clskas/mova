@@ -13,7 +13,7 @@ class OtpScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return MovaScreen(
-      title: 'MOVA Passager',
+      title: 'Mova',
       centerContent: true,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,

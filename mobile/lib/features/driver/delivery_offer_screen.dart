@@ -44,6 +44,14 @@ class _DeliveryOfferScreenState extends ConsumerState<DeliveryOfferScreen> {
     };
   }
 
+  String? get _parcelPhotoUrl {
+    final type = widget.offer['type']?.toString();
+    if (type != 'PARCEL' && type != 'EXPRESS') return null;
+    final url = widget.offer['photoUrl']?.toString();
+    if (url == null || url.isEmpty) return null;
+    return url;
+  }
+
   LatLng? get _pickupPoint {
     final lat = (widget.offer['pickupLat'] as num?)?.toDouble();
     final lng = (widget.offer['pickupLng'] as num?)?.toDouble();
@@ -190,6 +198,34 @@ class _DeliveryOfferScreenState extends ConsumerState<DeliveryOfferScreen> {
                       widget.offer['deliveryAddress']?.toString(),
                   fallback: 'Livraison',
                 ),
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+          if (_parcelPhotoUrl != null) ...[
+            ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Image.network(
+                MarketConfig.resolveMediaUrl(_parcelPhotoUrl!),
+                height: 180,
+                width: double.infinity,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Container(
+                  height: 180,
+                  color: Colors.grey.shade200,
+                  child: const Center(
+                    child: Icon(Icons.broken_image_outlined, color: MovaColors.textSecondary),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Photo du colis',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: MovaColors.textSecondary,
               ),
             ),
             const SizedBox(height: 12),

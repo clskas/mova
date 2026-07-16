@@ -34,12 +34,12 @@ android {
         create("passenger") {
             dimension = "app"
             applicationIdSuffix = ".passenger"
-            resValue("string", "app_name", "MOVA Passager")
+            resValue("string", "app_name", "Mova")
         }
         create("driver") {
             dimension = "app"
             applicationIdSuffix = ".driver"
-            resValue("string", "app_name", "MOVA Chauffeur")
+            resValue("string", "app_name", "MOVA Driver")
         }
     }
 

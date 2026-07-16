@@ -4,6 +4,12 @@ import { CommissionService } from '../rides/commission.service';
 import { CommissionServiceType } from '@prisma/client';
 import { mockPlatformConfig } from '../platform/platform-config.mock';
 
+jest.mock('../common/wallet-hold.util', () => ({
+  holdWalletFunds: jest.fn().mockResolvedValue({ holdId: 'hold-1', amountCdf: 50000, status: 'ACTIVE' }),
+  releaseWalletHold: jest.fn(),
+  captureWalletHold: jest.fn(),
+}));
+
 describe('ErrandsService', () => {
   const pricing = {
     haversineKm: jest.fn().mockReturnValue(4),
@@ -77,6 +83,7 @@ describe('ErrandsService', () => {
     dropoffAddress: 'Gombe',
     dropoffLat: -4.31,
     dropoffLng: 15.3,
+    budgetCdf: 50000,
   };
 
   it('ajoute les frais de commission au tarif course', async () => {
@@ -85,10 +92,15 @@ describe('ErrandsService', () => {
     expect(result.errandFeeCdf).toBe(2500);
   });
 
+  it('rejette une commande sans budget', async () => {
+    await expect(service.create('user-1', { ...dto, budgetCdf: 0 })).rejects.toThrow();
+  });
+
   it('crée une commande courses avec statut PENDING', async () => {
     const order = { id: 'e1', status: 'PENDING', category: 'OTHER', pickupAddress: dto.pickupAddress, pickupLat: dto.pickupLat, pickupLng: dto.pickupLng, estimatedPriceCdf: 10500, ...dto };
     prisma.errandOrder.create.mockResolvedValue(order);
     prisma.errandOrder.findUniqueOrThrow.mockResolvedValue(order);
+    prisma.errandOrder.update.mockResolvedValue({ ...order, walletHoldCdf: 50000 });
     const result = await service.create('user-1', dto);
     expect(result.order.status).toBe('PENDING');
     expect(prisma.errandOrder.create).toHaveBeenCalled();

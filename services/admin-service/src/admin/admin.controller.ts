@@ -64,15 +64,19 @@ export class AdminController {
   @Patch('users/:id')
   @RequirePermissions(AdminPermission.USERS_WRITE)
   @ApiOperation({ summary: 'Modifier utilisateur' })
-  updateUser(@Param('id') id: string, @Body() dto: UpdateUserDto) {
-    return this.adminService.updateUser(id, dto as unknown as Record<string, unknown>);
+  updateUser(
+    @Param('id') id: string,
+    @Body() dto: UpdateUserDto,
+    @Request() req: { user: { role: string } },
+  ) {
+    return this.adminService.updateUser(id, dto as unknown as Record<string, unknown>, req.user.role);
   }
 
   @Delete('users/:id')
   @RequirePermissions(AdminPermission.USERS_WRITE)
   @ApiOperation({ summary: 'Désactiver utilisateur' })
-  deactivateUser(@Param('id') id: string) {
-    return this.adminService.deactivateUser(id);
+  deactivateUser(@Param('id') id: string, @Request() req: { user: { role: string } }) {
+    return this.adminService.deactivateUser(id, req.user.role);
   }
 
   @Get('drivers')

@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/api/api_client.dart';
 import '../../core/config/market_config.dart';
 import '../../core/error/result.dart';
+import '../../core/error/user_friendly_error.dart';
 import '../../core/media/image_pick_util.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
@@ -553,7 +554,9 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
     } catch (e) {
       setState(() {
         _loading = false;
-        _error = e.toString().replaceFirst('Exception: ', '');
+        _error = sanitizeUserMessage(
+          e is Exception ? e.toString().replaceFirst('Exception: ', '') : e.toString(),
+        );
       });
     }
   }

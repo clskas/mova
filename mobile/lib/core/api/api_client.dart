@@ -981,7 +981,10 @@ class ApiClient {
         _markGatewayReachable();
         return Success(response.bodyBytes);
       }
-      return Failure(ServerFailure('Téléchargement impossible (${response.statusCode})'));
+      return Failure(ServerFailure(sanitizeUserMessage(
+        'Téléchargement impossible (${response.statusCode})',
+        fallback: 'Téléchargement impossible. Réessayez.',
+      )));
     } catch (_) {
       return const Failure(NetworkFailure());
     }

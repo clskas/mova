@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { apiFetch, checkGatewayHealth } from "@/lib/api";
 import { clearToken, getToken, setToken } from "@/lib/auth";
+import { toUserErrorMessage } from "@/lib/user-messages";
 
 type Props = { children: React.ReactNode };
 
@@ -34,7 +35,7 @@ export function OtpGate({ children }: Props) {
       }, { useMock: mock });
       setCodeSent(true);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Impossible d'envoyer le code");
+      setError(toUserErrorMessage(e, "Impossible d'envoyer le code"));
     } finally {
       setLoading(false);
     }
@@ -55,7 +56,7 @@ export function OtpGate({ children }: Props) {
         setError("Réponse invalide du serveur");
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Code OTP invalide");
+      setError(toUserErrorMessage(e, "Code OTP invalide"));
     } finally {
       setLoading(false);
     }

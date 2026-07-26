@@ -10,12 +10,21 @@ const PUBLIC_PATHS = [
 ];
 
 function isPublicPath(path: string, method?: string): boolean {
-  if (PUBLIC_PATHS.some((p) => path.startsWith(p))) return true;
-  if (path.startsWith('/api/geo')) return true;
-  if (path.startsWith('/api/rides/estimate')) return true;
-  if (path.startsWith('/api/rental/vehicles')) return true;
-  if (method === 'GET' && path.startsWith('/api/publicites')) return true;
-  if (method === 'GET' && /\/api\/uploads\/(parcels|menu|vehicles)\/[^/]+$/.test(path.split('?')[0] ?? path)) {
+  const m = (method ?? 'GET').toUpperCase();
+  const pathOnly = (path.split('?')[0] ?? path);
+
+  if (PUBLIC_PATHS.some((p) => pathOnly.startsWith(p))) return true;
+
+  // Geo catalog/autocomplete are public reads; mutating geo (e.g. POI import) requires JWT.
+  if (pathOnly.startsWith('/api/geo') && (m === 'GET' || m === 'HEAD' || m === 'OPTIONS')) return true;
+
+  if (pathOnly.startsWith('/api/rides/estimate')) return true;
+  if (pathOnly.startsWith('/api/rental/vehicles') && (m === 'GET' || m === 'HEAD' || m === 'OPTIONS')) return true;
+  if (m === 'GET' && pathOnly.startsWith('/api/publicites')) return true;
+  // Shared trip links (tokenized) — read-only, no auth.
+  if (m === 'GET' && pathOnly.startsWith('/api/public/')) return true;
+  if (m === 'GET' && pathOnly.startsWith('/api/services')) return true;
+  if (m === 'GET' && /\/api\/uploads\/(parcels|menu|vehicles)\/[^/]+$/.test(pathOnly)) {
     return true;
   }
   return false;

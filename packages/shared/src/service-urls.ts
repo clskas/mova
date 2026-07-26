@@ -53,4 +53,8 @@ export function serviceUrl(service: keyof typeof SERVICE_PORTS, path = ''): stri
   return `${base}${path.startsWith('/') ? path : `/${path}`}`;
 }
 
+/**
+ * Inter-service key (dev default). Prefer resolveInternalApiKey() at call sites.
+ * Production bootstrap rejects the weak default via assertProductionSecurity().
+ */
 export const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY ?? 'mova-internal-dev';

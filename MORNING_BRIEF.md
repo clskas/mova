@@ -1,167 +1,131 @@
-# SENGA — Morning Brief (v1.5.0 — finalisé)
+# SENGA — Morning Brief (go-live tests en ligne)
 
-**Date:** 2026-06-15 · **Repo:** [clskas/mova](https://github.com/clskas/mova) · **Branch:** `main`
+**Date:** 2026-07-27 · **Repo:** [afri-soft-com/mova](https://github.com/afri-soft-com/mova) · **Branch:** `main`  
+**Pass overnight:** production-readiness (UI FR, sécurité, CI/CD, backup→migrate, AAB→Play, web deploy)
 
-## Statut finalisé (juin 2026)
+---
 
-| Surface | Note | Statut |
-|---------|------|--------|
-| **Web PWA** | **9/10** | OTP + JWT, 11 services (taxi, colis, express, repas, déménagement, location, commissions, wallet, planifiées, covoiturage, historique), API réelle si gateway OK |
-| **Mobile passager** | **9/10** | Tous modules branchés API, `checkHealth`, pas de mock si gateway up |
-| **Mobile chauffeur** | **9/10** | Accept livraison → pickup → transit → livré, revenus, incidents, KYC |
-| **Admin** | **9/10** | CRUD complet, RBAC 5 rôles staff, communes éditables, locations, abonnements |
-| **Backend OTP** | **Prod-ready*** | Interface Twilio SMS + `MOCK_OTP` dev |
-| **Paiements** | **Prod-ready*** | Wallet persisté, providers OM/M-Pesa/Airtel avec erreurs FR si clés manquantes |
+## Ce qui a été fait cette nuit
 
-\* *Production nationale = clés externes uniquement (Twilio, Orange Money, M-Pesa, Airtel). Voir checklist ci-dessous.*
+### Interfaces (messages utilisateur)
+- Helpers FR `sanitizeUserMessage` / `toUserErrorMessage` / `sanitizeAdminError` sur **mobile**, **web**, **admin**, **restaurant**, **rental-partner**.
+- Filtrage des fuites techniques : codes `MOVA_*` / `SENGA_*`, Prisma, Nest, stack traces, HTTP bruts, Exception…
+- Admin login : OTP non prérempli ; téléphone démo masqué en production ; erreurs sanitizées.
+- Wallet mobile : libellé « MOCK_PAYMENTS » retiré de l’UI (simulation hors prod uniquement si `isMockMode`).
 
-## Quick start
+### Sécurité
+- `packages/shared/src/prod-security.ts` : refus JWT / `INTERNAL_API_KEY` faibles, `MOCK_OTP=true` interdit en prod, CORS via `CORS_ORIGIN`.
+- Tous les services Nest appellent `assertProductionSecurity` + `resolveCorsOrigin` + JWT via `resolveJwtSecret`.
+- `mockCode` OTP **jamais** renvoyé si `NODE_ENV=production`.
+- Helmet sur api-gateway.
+
+### CI/CD (chaîne ordonnée)
+```
+CI → Build and Push (GHCR) → Deploy (backup DB obligatoire → Render) → Smoke prod → Mobile Release (AAB → Play internal)
+```
+- Clients CI : `web`, `admin`, `restaurant`, `rental-partner`.
+- Audit npm : **critical = fail**, high = warning.
+- Deploy : backup `DATABASE_URL_*` **obligatoire** (sinon exit 1 ; override manuel `skip_backup` / urgence seulement).
+- Conteneurs Prisma : `scripts/migrate-with-backup.sh` (backup puis migrate ; échec backup = pas de migrate).
+- Render Blueprint : `mova-web`, `mova-admin-web`, `mova-restaurant`, `mova-rental-partner`.
+- Mobile : upload Play **auto** après build AAB réussi si secret Play présent (env GitHub `production-mobile`).
+
+---
+
+## Secrets / variables GitHub à configurer (bloquants go-live)
+
+### Déploiement & smoke
+| Secret / var | Obligatoire | Usage |
+|--------------|-------------|--------|
+| `RENDER_API_KEY` | Oui | Trigger deploys Render |
+| `RENDER_SERVICE_IDS` | Oui* | IDs services (ou `config/render-services.json`) |
+| `GATEWAY_RENDER_SERVICE_ID` | Oui | Attente live gateway |
+| `DATABASE_URL_AUTH`…`_NOTIFICATIONS` | Oui | Backup pg_dump pré-deploy |
+| `SMOKE_API_URL` ou `vars.GATEWAY_URL` | Oui | Smoke post-deploy |
+| `CORS_ORIGIN` (Render env) | Oui | Origines web/admin/partenaires (sinon CORS navigateur refusé) |
+
+\* Ou fichier `config/render-services.json` commit/à jour avec IDs.
+
+### Mobile / Play Store
+| Secret | Obligatoire pour stores | Usage |
+|--------|-------------------------|--------|
+| `PROD_API_URL` | Oui builds | ex. `https://…/api` |
+| `PROD_WS_URL` | Oui builds | ex. `https://…` |
+| `ANDROID_KEYSTORE_BASE64` | Oui publication | Keystore release |
+| `ANDROID_KEYSTORE_PASSWORD` | Oui | |
+| `ANDROID_KEY_PASSWORD` | Oui | |
+| `ANDROID_KEY_ALIAS` | Oui | |
+| `PLAY_STORE_JSON_KEY` | Oui upload auto | Compte service Play (JSON **base64**) — alias acceptés : `PLAY_STORE_JSON`, `PLAY_SERVICE_ACCOUNT_JSON` |
+
+Environnement GitHub **`production-mobile`** : activer une approbation manuelle recommandée avant publication stores.
+
+### APIs métier (Render / env prod)
+```
+MOCK_OTP=false
+MOCK_PAYMENTS=false
+JWT_SECRET=…          # ≥ 32 caractères
+INTERNAL_API_KEY=…    # ≥ 24 caractères
+TWILIO_* / Verify
+ORANGE_MONEY_* / MPESA_* / AIRTEL_*
+MAPBOX_ACCESS_TOKEN
+FCM_SERVER_KEY
+```
+
+Détail : [docs/PRODUCTION_DEPLOYMENT.md](docs/PRODUCTION_DEPLOYMENT.md) · [docs/cicd.md](docs/cicd.md)
+
+---
+
+## Comment déployer demain matin
+
+1. Vérifier les secrets ci-dessus sur le repo **afri-soft-com/mova**.
+2. Push sur `main` (ou laisser tourner le pipeline du commit overnight).
+3. Suivre Actions : **CI** → **Build and Push** → **Deploy** → **Smoke Tests Production** → **Mobile Release**.
+4. Si Play upload skip : vérifier `PLAY_STORE_JSON_KEY` + approbation env `production-mobile` ; les AAB restent en artefacts Actions.
+5. Smoke manuel optionnel :
+   ```powershell
+   $env:GATEWAY_URL = "https://<gateway>"
+   bash ./scripts/smoke-test.sh
+   ```
+6. Migrations locales / Docker :
+   ```powershell
+   npm run migrate:all          # backup puis prisma deploy (Windows)
+   # Conteneurs : migrate-with-backup.sh déjà dans les Dockerfiles Prisma
+   ```
+
+---
+
+## Blockers résiduels / risques
+
+1. **Secrets Play / keystore** absents → AAB construits mais non publiés (skip gracieux).
+2. **Twilio / mobile money** non configurés → OTP réel et paiements réels indisponibles (MOCK interdit en prod pour OTP).
+3. **`CORS_ORIGIN`** doit lister les URLs finales des frontends sinon navigateurs bloqués.
+4. **Portails restaurant / rental** : images + Blueprint prêts ; IDs Render doivent être dans `RENDER_SERVICE_IDS` / `render-services.json`.
+5. **Appium mobile e2e** : non exécuté en CI (volontaire) — couverture = `flutter test` + smoke API.
+6. **iOS / TestFlight** : hors chemin critique Android ; secrets Apple toujours optionnels.
+7. Images GHCR : Render Blueprint utilise encore build Docker depuis le repo (pas forcément pull GHCR) — cohérent si Render build-from-Dockerfile.
+
+---
+
+## Quick start local (tests)
 
 ```powershell
-cd c:\Users\Administrator\Senga
+cd c:\Users\Administrator\Mova
 docker compose up -d --build
 npm run migrate:all
 npm run seed:admin-demo
 
-# Web PWA (port 3001)
-cd web && npm install && npm run dev
-
-# Admin (port 3002)
-cd admin && npm install && npm run dev
+# Web :3001 · Admin :3002 · Restaurant :3007 · Location :3008
+# OTP démo local uniquement si MOCK_OTP=true → 123456
 ```
 
-| Client | URL | Auth dev |
-|--------|-----|----------|
-| API Gateway | http://localhost:3000 | — |
-| Web PWA | http://localhost:3001 | OTP `123456` (`MOCK_OTP=true`) |
-| Admin | http://localhost:3002/login | Staff `+243900000001`–`005` / OTP `123456` — voir [docs/RBAC_TESTING.md](docs/RBAC_TESTING.md) |
-| Ride service (Docker) | http://localhost:3022 | — |
-
-## Modules Web PWA
-
-| Service | Route API | Flux |
-|---------|-----------|------|
-| Taxi | `/api/rides` | estimate → create |
-| Colis | `/api/deliveries/parcel` | estimate → create |
-| Express | `/api/express` | estimate → create → track |
-| Repas | `/api/deliveries/food` | menu → commande |
-| Déménagement | `/api/moving` | estimate → demande |
-| Location | `/api/rental` | catalogue → estimate → booking |
-| Commissions | `/api/errands` | estimate → create |
-| Portefeuille | `/api/wallet` | solde + top-up persisté |
-| Planifiées | `/api/rides/scheduled` | estimate → book |
-| Covoiturage | `/api/carpool` | search / create / join |
-
-## Admin CRUD
-
-| Page | CRUD |
-|------|------|
-| `/utilisateurs` | Read + edit (tous rôles staff dans dropdown) |
-| `/kyc` | Approve/Reject |
-| `/litiges` | Resolve |
-| `/restaurants` | List + Create + Edit + Delete |
-| `/tarifs` | Edit pricing rules |
-| `/abonnements` | Plans CRUD + abonnés |
-| `/parametres` | Communes multi-ville + edit |
-| `/locations` | Demandes location + statut |
-| `/livraisons`, `/planifiees`, `/courses` | Read + filters + statut |
-
-## Production checklist (clés externes seulement)
-
-```env
-MOCK_OTP=false
-MOCK_PAYMENTS=false
-TWILIO_ACCOUNT_SID=...
-TWILIO_AUTH_TOKEN=...
-TWILIO_PHONE_NUMBER=...   # ou TWILIO_VERIFY_SERVICE_SID
-ORANGE_MONEY_API_KEY=...
-MPESA_CONSUMER_KEY=...
-AIRTEL_MONEY_CLIENT_ID=...
-```
-
-Détail : [docs/PRODUCTION_DEPLOYMENT.md](docs/PRODUCTION_DEPLOYMENT.md)
-
-## CI/CD (automatisé)
-
-Push sur `main` : **CI** → **build images GHCR** → **backup DB + deploy Render** → **smoke production**.
-
-```powershell
-npm run backup:db:win      # sauvegarde locale
-npm run migrate:all:docker # backup + migrations
-npm run smoke:all          # smoke local
-```
-
-Secrets GitHub requis : `RENDER_API_KEY`, `RENDER_SERVICE_IDS`, `DATABASE_URL_*`, `SMOKE_API_URL`. Détail : [docs/cicd.md](docs/cicd.md).
-
-## Tests
-
-```powershell
-.\scripts\verify-all.ps1
-cd e2e && npm run test:e2e:admin
-cd mobile && flutter test
-```
-
-## Mobile — appareil physique (LAN)
-
-Machine dev LAN : **192.168.1.64** · Appareil test : **SM G981V** (`R3CN70C59KF`, `adb devices`).
-
-> **Ne jamais** `flutter run` seul — flavors obligatoires (`passenger` / `driver` + `-t lib/main_*.dart`). Sinon : erreur Gradle *« failed to produce an .apk file »*.
-
-| Variable | Appareil physique | Émulateur Android |
-|----------|-------------------|-------------------|
-| `API_URL` | `http://192.168.1.64:3000/api` | `http://10.0.2.2:3000/api` |
-| `WS_URL` | `http://192.168.1.64:3000` | `http://10.0.2.2:3000` |
-
-```powershell
-# Scripts racine (recommandé)
-.\scripts\run-mobile-passenger.ps1
-.\scripts\run-mobile-driver.ps1
-
-# Ou manuellement
-cd mobile
-flutter run --flavor passenger -t lib/main_passenger.dart `
-  --dart-define=API_URL=http://192.168.1.64:3000/api `
-  --dart-define=WS_URL=http://192.168.1.64:3000
-```
-
-APK debug local : `.\scripts\build-mobile-debug.ps1` (défaut LAN ci-dessus).
-
-## Tester le mode hors ligne
-
-```powershell
-# 1. Lancer l'app passager sur appareil ou émulateur
-cd mobile
-flutter run --flavor passenger -t lib/main_passenger.dart `
-  --dart-define=API_URL=http://192.168.1.64:3000/api `
-  --dart-define=WS_URL=http://192.168.1.64:3000
-
-# 2. Se connecter une fois en ligne pour remplir le cache (historique, wallet)
-
-# 3. Couper le réseau (mode avion) OU arrêter la passerelle :
-docker compose stop gateway
-
-# 4. Vérifier :
-#    - Bannière « Pas de réseau » ou « Serveur indisponible — mode hors ligne »
-#    - Historique affiché avec « Dernière synchro : … »
-#    - Création de course → message « Enregistré hors ligne… » + badge file de sync
-
-# 5. Rétablir réseau + passerelle → la file se vide automatiquement
-docker compose start gateway
-```
-
-## Mobile APK
-
-```powershell
-cd mobile
-# ou : .\scripts\build-mobile-debug.ps1
-flutter build apk --debug --flavor passenger -t lib/main_passenger.dart `
-  --dart-define=API_URL=http://192.168.1.64:3000/api `
-  --dart-define=WS_URL=http://192.168.1.64:3000
-flutter build apk --debug --flavor driver -t lib/main_driver.dart `
-  --dart-define=API_URL=http://192.168.1.64:3000/api `
-  --dart-define=WS_URL=http://192.168.1.64:3000
-```
+| Client | URL | Auth démo |
+|--------|-----|-----------|
+| Gateway | http://localhost:3000 | — |
+| Web PWA | http://localhost:3001 | OTP `123456` si mock |
+| Admin | http://localhost:3002/login | `+243900000001`–`005` / OTP mock |
+| Restaurant | http://localhost:3007 | Compte partenaire seed |
+| Location | http://localhost:3008 | Compte partenaire seed |
 
 ---
 
-*Dernière finalisation : juin 2026 — stack prête pour prod nationale dès configuration des APIs externes.*
+*Brief overnight 2026-07-26/27 — prêt pour tests en ligne dès secrets configurés.*

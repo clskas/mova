@@ -1,5 +1,6 @@
 /** Passerelle API unique (microservices). Toutes les routes passent par `/api/...`. */
 import { authHeaders } from './auth';
+import { sanitizeUserMessage } from './user-messages';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000';
 
@@ -36,12 +37,12 @@ export async function apiFetch<T>(
         /* ignore */
       }
       if (useMock) return mockFor<T>(path, init);
-      throw new ApiError(message, res.status);
+      throw new ApiError(sanitizeUserMessage(message, 'Une erreur est survenue. Veuillez réessayer.'), res.status);
     }
     return (await res.json()) as T;
   } catch (e) {
     if (useMock) return mockFor<T>(path, init);
-    throw e instanceof ApiError ? e : new ApiError('Réseau indisponible', 0);
+    throw e instanceof ApiError ? e : new ApiError('Réseau indisponible. Vérifiez votre connexion.', 0);
   }
 }
 
@@ -470,7 +471,9 @@ export async function fetchReceiptPdfBlob(referenceType: string, referenceId: st
   const res = await fetch(`${API_BASE}${billingPath(referenceType, referenceId)}/pdf`, {
     headers: authHeaders(),
   });
-  if (!res.ok) throw new ApiError(`PDF ${res.status}`, res.status);
+  if (!res.ok) {
+    throw new ApiError(sanitizeUserMessage(`PDF ${res.status}`, 'PDF indisponible pour le moment.'), res.status);
+  }
   return res.blob();
 }
 

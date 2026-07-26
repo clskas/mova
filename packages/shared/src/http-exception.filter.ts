@@ -36,12 +36,50 @@ function isNestHttpException(exception: unknown): exception is HttpException {
   );
 }
 
+const TECHNICAL_OR_NEST_ENGLISH = [
+  /^Forbidden resource$/i,
+  /^Unauthorized$/i,
+  /^Forbidden$/i,
+  /^Bad Request$/i,
+  /^Not Found$/i,
+  /^Internal server error$/i,
+  /PrismaClient/i,
+  /\bPrisma\b/,
+  /NestJS/i,
+  /ECONNREFUSED/i,
+  /Unique constraint/i,
+  /Foreign key constraint/i,
+  /Exception:/i,
+  /^\s*at\s+\S+/m,
+];
+
 function extractHttpMessage(body: string | object): string {
   if (typeof body === 'string') return body;
   const msg = (body as { message?: string | string[] }).message;
   if (Array.isArray(msg)) return msg.join('. ');
   if (typeof msg === 'string') return msg;
   return 'Erreur de validation';
+}
+
+/** Never expose Nest/Prisma/English internals to API clients. */
+function toPublicHttpMessage(raw: string, status: number): string {
+  const msg = (raw ?? '').trim();
+  if (!msg || msg.length > 180 || TECHNICAL_OR_NEST_ENGLISH.some((re) => re.test(msg))) {
+    if (status === HttpStatus.UNAUTHORIZED) {
+      return MOVA_ERROR_MESSAGES[MovaErrorCode.AUTH_UNAUTHORIZED];
+    }
+    if (status === HttpStatus.FORBIDDEN) {
+      return MOVA_ERROR_MESSAGES[MovaErrorCode.AUTH_FORBIDDEN];
+    }
+    if (status === HttpStatus.NOT_FOUND) {
+      return MOVA_ERROR_MESSAGES[MovaErrorCode.NOT_FOUND];
+    }
+    if (status >= 500) {
+      return MOVA_ERROR_MESSAGES[MovaErrorCode.INTERNAL_ERROR];
+    }
+    return MOVA_ERROR_MESSAGES[MovaErrorCode.VALIDATION_ERROR];
+  }
+  return msg;
 }
 
 @Catch()
@@ -74,15 +112,20 @@ export class HttpExceptionFilter implements ExceptionFilter {
     if (isNestHttpException(exception)) {
       const status = exception.getStatus();
       const body = exception.getResponse();
-      const message = extractHttpMessage(body);
+      const rawMessage = extractHttpMessage(body);
+      const message = toPublicHttpMessage(rawMessage, status);
       const code =
         status === HttpStatus.NOT_FOUND
           ? MovaErrorCode.NOT_FOUND
           : status === HttpStatus.UNAUTHORIZED
             ? MovaErrorCode.AUTH_UNAUTHORIZED
-            : MovaErrorCode.VALIDATION_ERROR;
-      if (status >= 500) this.logger.error(`${tag}${code}: ${message}`, exception);
-      else this.logger.warn(`${tag}${code}: ${message}`);
+            : status === HttpStatus.FORBIDDEN
+              ? MovaErrorCode.AUTH_FORBIDDEN
+              : status >= 500
+                ? MovaErrorCode.INTERNAL_ERROR
+                : MovaErrorCode.VALIDATION_ERROR;
+      if (status >= 500) this.logger.error(`${tag}${code}: ${rawMessage}`, exception);
+      else this.logger.warn(`${tag}${code}: ${rawMessage}`);
       return response.status(status).json({
         success: false,
         error: { code, message },

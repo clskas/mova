@@ -1,4 +1,5 @@
 import { authHeaders } from "./auth";
+import { sanitizeUserMessage } from "./user-messages";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
 
@@ -46,18 +47,23 @@ export type RestaurantOrder = {
 };
 
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...authHeaders(),
-      ...(init?.headers ?? {}),
-    },
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+      ...init,
+      headers: {
+        "Content-Type": "application/json",
+        ...authHeaders(),
+        ...(init?.headers ?? {}),
+      },
+    });
+  } catch {
+    throw new Error("Réseau indisponible. Vérifiez votre connexion.");
+  }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const msg = data?.error?.message ?? data?.message ?? `Erreur ${res.status}`;
-    throw new Error(msg);
+    const raw = data?.error?.message ?? data?.message ?? `Erreur ${res.status}`;
+    throw new Error(sanitizeUserMessage(raw));
   }
   return data as T;
 }

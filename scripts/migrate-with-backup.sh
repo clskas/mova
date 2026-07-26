@@ -15,16 +15,24 @@ if [ "${MOVA_SKIP_BACKUP:-}" != "1" ]; then
     export BACKUP_DIR="${BACKUP_DIR:-/tmp/mova-backups}"
     mkdir -p "$BACKUP_DIR"
     echo "=== migrate-with-backup: backup $MOVA_SERVICE ==="
-    "$SCRIPT_DIR/backup-db.sh"
+    "$SCRIPT_DIR/backup-db.sh" || {
+      echo "ERROR: backup failed, aborting migration" >&2
+      exit 1
+    }
   elif [ -n "${DATABASE_URL:-}" ]; then
     echo "=== migrate-with-backup: backup (DATABASE_URL) ==="
     export BACKUP_ONLY="${BACKUP_ONLY:-auth}"
     "$SCRIPT_DIR/backup-db.sh" || {
-      echo "WARN: backup failed, aborting migration" >&2
+      echo "ERROR: backup failed, aborting migration" >&2
       exit 1
     }
   else
-    echo "WARN: MOVA_SERVICE/DATABASE_URL unset — running migrate without backup" >&2
+    if [ "${ALLOW_MIGRATE_WITHOUT_BACKUP:-}" = "1" ]; then
+      echo "WARN: MOVA_SERVICE/DATABASE_URL unset — migrate without backup (ALLOW_MIGRATE_WITHOUT_BACKUP=1)" >&2
+    else
+      echo "ERROR: Cannot migrate without backup — set MOVA_SERVICE or DATABASE_URL, or ALLOW_MIGRATE_WITHOUT_BACKUP=1 for tests" >&2
+      exit 1
+    fi
   fi
 fi
 

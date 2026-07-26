@@ -69,7 +69,7 @@ jobs:
     needs: shared
     strategy:
       matrix:
-        client: [web, admin]
+        client: [web, admin, restaurant, rental-partner]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -85,7 +85,11 @@ jobs:
       - name: Lint ${{ matrix.client }}
         run: |
           cd ${{ matrix.client }}
-          npm run lint
+          if npm run | grep -qE '^  lint'; then
+            npm run lint
+          else
+            echo "No lint script for ${{ matrix.client }} — skip"
+          fi
 
   regression:
     name: Playwright regression
@@ -170,8 +174,22 @@ jobs:
           node-version: '22'
       - name: npm audit (shared + gateway)
         run: |
-          cd packages/shared && npm ci --no-workspaces && npm audit --audit-level=high || true
-          cd ../../services/api-gateway && npm install && npm audit --audit-level=high || true
+          set -e
+          cd packages/shared && npm ci --no-workspaces
+          # Critical = fail; high = report (non-blocking) to avoid advisory noise blocking go-live
+          npm audit --audit-level=critical
+          npm audit --audit-level=high || echo "::warning::npm audit high findings in packages/shared"
+          cd ../../services/api-gateway && npm install
+          npm audit --audit-level=critical
+          npm audit --audit-level=high || echo "::warning::npm audit high findings in api-gateway"
+      - name: Guard against committed secrets
+        run: |
+          set -euo pipefail
+          if git ls-files | grep -E '(^|/)\.env$|(^|/)\.env\.local$|credentials\.json$|upload-keystore\.jks$' ; then
+            echo "::error::Secret-like files are tracked by git"
+            exit 1
+          fi
+          echo "No tracked .env / keystore / credentials.json"
 
   codeql:
     runs-on: ubuntu-latest

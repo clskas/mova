@@ -9,6 +9,7 @@ import {
   uploadMenuPhoto,
   type MenuItem,
 } from "@/lib/api";
+import { sanitizeUserMessage } from "@/lib/user-messages";
 import { ImageSourcePicker } from "@/components/ImageSourcePicker";
 
 const emptyDraft = (): MenuItem => ({
@@ -35,7 +36,7 @@ export default function MenuPage() {
       const menu = await fetchMenu();
       setItems(menu.menuItems ?? []);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Erreur de chargement");
+      setError(sanitizeUserMessage(e instanceof Error ? e.message : e, "Erreur de chargement"));
     } finally {
       setLoading(false);
     }
@@ -58,7 +59,7 @@ export default function MenuPage() {
         );
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Upload impossible");
+      setError(sanitizeUserMessage(e instanceof Error ? e.message : e, "Upload impossible"));
     } finally {
       setUploadingTarget(null);
     }
@@ -114,7 +115,7 @@ export default function MenuPage() {
       setItems(result.menuItems ?? items);
       setMessage("Menu enregistré — visible dans l'app passager");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Échec enregistrement");
+      setError(sanitizeUserMessage(e instanceof Error ? e.message : e, "Échec enregistrement"));
     } finally {
       setSaving(false);
     }

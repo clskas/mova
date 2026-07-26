@@ -3,16 +3,18 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { decodeJwtPayload, setToken } from "@/lib/auth";
+import { sanitizeAdminError } from "@/lib/api";
 import { defaultPathForRole, isAdminRole, normalizeAdminRole } from "@/lib/rbac";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
-const ADMIN_PHONE = process.env.NEXT_PUBLIC_ADMIN_PHONE ?? "+243900000001";
+const isProd = process.env.NODE_ENV === "production";
+const ADMIN_PHONE = process.env.NEXT_PUBLIC_ADMIN_PHONE ?? (isProd ? "" : "+243900000001");
 
 export default function LoginPage() {
   const router = useRouter();
   const [mode, setMode] = useState<"otp" | "token">("otp");
   const [phone, setPhone] = useState(ADMIN_PHONE);
-  const [code, setCode] = useState("123456");
+  const [code, setCode] = useState("");
   const [tokenInput, setTokenInput] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -33,16 +35,18 @@ export default function LoginPage() {
       });
       const data = await verifyRes.json();
       if (!verifyRes.ok || !data.accessToken) {
-        throw new Error(data.error?.message ?? "Connexion refusée");
+        throw new Error(
+          sanitizeAdminError(data.error?.message ?? "Connexion refusée", verifyRes.status),
+        );
       }
       const role = normalizeAdminRole(data.user?.role);
       if (!role) {
-        throw new Error("Ce compte n'a pas un rôle staff autorisé (SUPER_ADMIN, ADMIN, SUPPORT, FINANCE, CONTENT).");
+        throw new Error("Ce compte n'a pas un rôle staff autorisé.");
       }
       setToken(data.accessToken);
       router.replace(defaultPathForRole(role));
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Erreur de connexion");
+      setError(sanitizeAdminError(e instanceof Error ? e.message : "Erreur de connexion"));
     } finally {
       setLoading(false);
     }

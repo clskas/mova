@@ -3,6 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import {
   africasTalkingSendSms,
   isAfricasTalkingConfigured,
+  isMockOtpAllowed,
+  isProductionRuntime,
   isTwilioSmsConfigured,
   resolveSmsBackend,
 } from '@mova/shared';
@@ -28,6 +30,14 @@ export class MockSmsProvider implements SmsProvider {
   }
 
   async sendOtp(phone: string, code: string): Promise<SmsSendResult> {
+    if (isProductionRuntime() || !isMockOtpAllowed()) {
+      this.logger.error('[MOCK SMS] refused outside non-prod MOCK_OTP mode');
+      return {
+        success: false,
+        message: 'Service SMS non configuré. Configurez Africa\'s Talking ou Twilio.',
+      };
+    }
+    // Dev-only: code is intentional for local login; never enabled in production.
     this.logger.log(`[MOCK SMS] OTP ${code} → ${phone}`);
     return { success: true, message: 'Code OTP simulé (mode développement)' };
   }
@@ -137,15 +147,24 @@ export class SmsService {
 
   private get = (key: string) => this.config.get<string>(key);
 
-  private resolveProvider(): SmsProvider {
-    const backend = resolveSmsBackend(this.get, this.config.get('MOCK_OTP') === 'true');
+  private resolveProvider(): SmsProvider | null {
+    const mockMode = isMockOtpAllowed() && this.config.get('MOCK_OTP') === 'true';
+    const backend = resolveSmsBackend(this.get, mockMode);
     if (backend === 'mock') return this.mock;
     if (backend === 'africastalking') return this.africasTalking;
-    return this.twilio;
+    if (backend === 'twilio') return this.twilio;
+    return null;
   }
 
   async sendOtp(phone: string, code: string): Promise<SmsSendResult> {
     const provider = this.resolveProvider();
+    if (!provider) {
+      this.logger.error('SMS OTP failed: no provider configured');
+      return {
+        success: false,
+        message: 'Service SMS non configuré. Définissez Africa\'s Talking ou Twilio.',
+      };
+    }
     const result = await provider.sendOtp(phone, code);
     if (!result.success && this.config.get('MOCK_OTP') !== 'true') {
       this.logger.error(`SMS OTP failed (${provider.name}): ${result.message}`);
@@ -154,7 +173,7 @@ export class SmsService {
   }
 
   isProductionReady(): boolean {
-    if (this.config.get('MOCK_OTP') === 'true') return false;
+    if (isMockOtpAllowed() && this.config.get('MOCK_OTP') === 'true') return false;
     const backend = resolveSmsBackend(this.get, false);
     return backend === 'africastalking' || backend === 'twilio';
   }

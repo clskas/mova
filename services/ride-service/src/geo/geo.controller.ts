@@ -1,6 +1,13 @@
-import { Controller, Get, Post, Query } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Controller, Get, HttpStatus, Post, Query, Request, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { PlaceOfInterestCategory } from '@prisma/client';
+import {
+  AdminPermission,
+  hasAdminPermission,
+  MovaErrorCode,
+  MovaHttpException,
+} from '@mova/shared';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { GeoService } from './geo.service';
 
 @ApiTags('geo')
@@ -55,8 +62,18 @@ export class GeoController {
   }
 
   @Post('places/import')
-  @ApiOperation({ summary: 'Import POI RDC (seed national ou Overpass par zone SENGA)' })
-  importPlaces(@Query('city') city?: string, @Query('overpass') overpass?: string) {
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Import POI RDC (admin) — seed national ou Overpass par zone SENGA' })
+  importPlaces(
+    @Request() req: { user?: { role?: string } },
+    @Query('city') city?: string,
+    @Query('overpass') overpass?: string,
+  ) {
+    const role = req.user?.role ?? '';
+    if (!hasAdminPermission(role, AdminPermission.PRICING_WRITE)) {
+      throw new MovaHttpException(MovaErrorCode.AUTH_FORBIDDEN, HttpStatus.FORBIDDEN);
+    }
     return this.geo.importPois(city ?? 'RDC', overpass === 'true');
   }
 }

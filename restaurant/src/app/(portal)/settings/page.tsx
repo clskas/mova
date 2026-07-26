@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { fetchProfile, updateMenuSettings, updateRestaurantLocation } from "@/lib/api";
+import { sanitizeUserMessage } from "@/lib/user-messages";
 
 export default function SettingsPage() {
   const [accepting, setAccepting] = useState(true);
@@ -26,7 +27,7 @@ export default function SettingsPage() {
       setLat(p.lat != null ? String(p.lat) : "");
       setLng(p.lng != null ? String(p.lng) : "");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Erreur");
+      setError(sanitizeUserMessage(e instanceof Error ? e.message : e, "Erreur"));
     } finally {
       setLoading(false);
     }
@@ -86,7 +87,7 @@ export default function SettingsPage() {
       setMessage("Paramètres enregistrés");
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Échec");
+      setError(sanitizeUserMessage(e instanceof Error ? e.message : e, "Échec"));
     } finally {
       setSaving(false);
     }

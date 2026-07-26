@@ -20,6 +20,7 @@ import {
   updateBookingStatus,
   type PartnerBooking,
 } from "@/lib/api";
+import { sanitizeUserMessage, toUserErrorMessage } from "@/lib/user-messages";
 import { PartnerAmountLine } from "@/components/PartnerAmountLine";
 
 function statusBadge(status?: string, label?: string) {
@@ -57,7 +58,7 @@ function LogisticsEditor({ booking, busy, onSave }: { booking: PartnerBooking; b
       });
       onSave();
     } catch (e) {
-      setLocalError(e instanceof Error ? e.message : "Erreur logistique");
+      setLocalError(sanitizeUserMessage, toUserErrorMessage(e instanceof Error ? e.message : e, "Erreur logistique"));
     } finally {
       setSaving(false);
     }
@@ -139,7 +140,7 @@ function CashPinConfirm({
       setPin("");
       onDone();
     } catch (e) {
-      setLocalError(e instanceof Error ? e.message : "Code PIN incorrect.");
+      setLocalError(sanitizeUserMessage, toUserErrorMessage(e instanceof Error ? e.message : e, "Code PIN incorrect."));
     } finally {
       setSaving(false);
     }
@@ -242,7 +243,7 @@ export default function ReservationsPage() {
         }
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Erreur de chargement");
+      setError(sanitizeUserMessage, toUserErrorMessage(e instanceof Error ? e.message : e, "Erreur de chargement"));
     } finally {
       setLoading(false);
     }
@@ -261,7 +262,7 @@ export default function ReservationsPage() {
       await updateBookingStatus(id, action);
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Action impossible");
+      setError(sanitizeUserMessage, toUserErrorMessage(e instanceof Error ? e.message : e, "Action impossible"));
     } finally {
       setBusyId(null);
     }
@@ -478,7 +479,11 @@ export default function ReservationsPage() {
                   {(paid || b.status === "CLOSED" || b.status === "RETURNED") && (
                     <button
                       type="button"
-                      onClick={() => downloadBookingReceiptPdf(b.id).catch((e) => alert(e.message))}
+                      onClick={() =>
+                        downloadBookingReceiptPdf(b.id).catch((e) =>
+                          alert(sanitizeUserMessage, toUserErrorMessage(e instanceof Error ? e.message : e, "Téléchargement impossible")),
+                        )
+                      }
                       className="text-xs text-[#6C63FF] underline"
                     >
                       Télécharger reçu partenaire

@@ -46,6 +46,18 @@ jobs:
           - service: admin-service
             dockerfile: docker/admin.Dockerfile
             image: admin
+          - service: web
+            dockerfile: docker/web.Dockerfile
+            image: web
+          - service: admin-web
+            dockerfile: docker/admin-web.Dockerfile
+            image: admin-web
+          - service: restaurant
+            dockerfile: docker/restaurant.Dockerfile
+            image: restaurant
+          - service: rental-partner
+            dockerfile: docker/rental-partner.Dockerfile
+            image: rental-partner
     steps:
       - uses: actions/checkout@v4
         with:

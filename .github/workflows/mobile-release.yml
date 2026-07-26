@@ -140,14 +140,16 @@ jobs:
   upload-android:
     name: Upload Play Store (internal)
     needs: build-android
-    if: >
-      startsWith(github.ref, 'refs/tags/v') ||
-      (github.event_name == 'workflow_dispatch' && inputs.upload_to_stores == true)
+    # Auto after every successful AAB build (smoke→mobile on main, tags, manual).
+    # Skips gracefully when PLAY_STORE_JSON_KEY is unset. Gate via environment production-mobile.
+    if: needs.build-android.result == 'success'
     runs-on: ubuntu-latest
     environment: production-mobile
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - uses: ruby/setup-ruby@v1
         with:
@@ -167,18 +169,34 @@ jobs:
           name: mova-driver-aab
           path: mobile/build/app/outputs/bundle/driverRelease/
 
-      - name: Upload to Play Console internal track
+      - name: Upload to Play Console internal track (Fastlane)
         working-directory: mobile/android
         env:
           PLAY_STORE_JSON_KEY: ${{ secrets.PLAY_STORE_JSON_KEY }}
+          PLAY_STORE_JSON: ${{ secrets.PLAY_STORE_JSON }}
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
         run: |
-          if [ -z "$PLAY_STORE_JSON_KEY" ]; then
-            echo "::notice::PLAY_STORE_JSON_KEY non configuré — publication Play Store ignorée. Les artefacts AAB restent disponibles dans l'onglet Actions."
+          # Accepted secrets (first match wins):
+          # - PLAY_STORE_JSON_KEY: service-account JSON encoded base64
+          # - PLAY_SERVICE_ACCOUNT_JSON: raw JSON or base64
+          # - PLAY_STORE_JSON: raw JSON
+          if [ -n "$PLAY_STORE_JSON_KEY" ]; then
+            echo "$PLAY_STORE_JSON_KEY" | base64 -d > /tmp/play-store-key.json
+          elif [ -n "$PLAY_SERVICE_ACCOUNT_JSON" ]; then
+            if printf '%s' "$PLAY_SERVICE_ACCOUNT_JSON" | head -c 1 | grep -q '{'; then
+              printf '%s' "$PLAY_SERVICE_ACCOUNT_JSON" > /tmp/play-store-key.json
+            else
+              echo "$PLAY_SERVICE_ACCOUNT_JSON" | base64 -d > /tmp/play-store-key.json
+            fi
+          elif [ -n "$PLAY_STORE_JSON" ]; then
+            printf '%s' "$PLAY_STORE_JSON" > /tmp/play-store-key.json
+          else
+            echo "::notice::Secrets Play absents (PLAY_STORE_JSON_KEY / PLAY_SERVICE_ACCOUNT_JSON / PLAY_STORE_JSON). AAB en artefacts Actions — upload ignoré."
             exit 0
           fi
-          echo "$PLAY_STORE_JSON_KEY" | base64 -d > /tmp/play-store-key.json
           export PLAY_STORE_JSON_KEY_PATH=/tmp/play-store-key.json
           bundle exec fastlane deploy_internal
+
 
   build-ios:
     name: Build iOS (IPA)

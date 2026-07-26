@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { mediaUrl, uploadVehiclePhoto } from "@/lib/api";
+import { sanitizeUserMessage, toUserErrorMessage } from "@/lib/user-messages";
 import { ImageSourcePicker } from "@/components/ImageSourcePicker";
 
 type Props = {
@@ -21,7 +22,7 @@ export function VehiclePhotoUpload({ value, onChange, onError }: Props) {
       const url = await uploadVehiclePhoto(file);
       onChange(url);
     } catch (e) {
-      onError?.(e instanceof Error ? e.message : "Échec envoi photo");
+      onError?.(sanitizeUserMessage, toUserErrorMessage(e instanceof Error ? e.message : e, "Échec envoi photo"));
     } finally {
       setUploading(false);
     }

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { apiFetch, formatCdf } from "@/lib/api";
+import { toUserErrorMessage } from "@/lib/user-messages";
 import { isWalletRecharge, isWalletWithdraw, walletTxLabel } from "@/lib/wallet-movements";
 import { WalletMovementHistory } from "./WalletMovementHistory";
 
@@ -31,7 +32,7 @@ export function WalletView({ onBack, mock }: Props) {
       const data = await apiFetch<WalletData>("/api/wallet", undefined, { useMock: mock });
       setWallet(data);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Erreur de chargement");
+      setError(toUserErrorMessage(e, "Erreur de chargement"));
     } finally {
       setLoading(false);
     }
@@ -60,7 +61,7 @@ export function WalletView({ onBack, mock }: Props) {
       await load();
       setHistoryRefresh((n) => n + 1);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Échec de la recharge");
+      setError(toUserErrorMessage(e, "Échec de la recharge"));
     } finally {
       setTopUpLoading(false);
     }
@@ -93,7 +94,7 @@ export function WalletView({ onBack, mock }: Props) {
       await load();
       setHistoryRefresh((n) => n + 1);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Échec du retrait");
+      setError(toUserErrorMessage(e, "Échec du retrait"));
     } finally {
       setWithdrawLoading(false);
     }
@@ -120,7 +121,7 @@ export function WalletView({ onBack, mock }: Props) {
       </div>
 
       <div className="bg-white rounded-xl p-4 shadow-sm space-y-3">
-        <p className="font-medium text-sm">Recharger (mock)</p>
+        <p className="font-medium text-sm">Recharger</p>
         <input
           className="w-full rounded-xl border-0 bg-gray-50 p-3"
           type="number"

@@ -11,17 +11,21 @@ COMMIT_SHA="${1:-}"
 IDS="${RENDER_SERVICE_IDS:-}"
 
 if [ -z "$IDS" ] && [ -f config/render-services.json ]; then
+  # Ordered: DBs dependents first, gateway next, then frontends/portals.
   IDS=$(jq -r '
     [
-      .services["mova-auth"].id,
-      .services["mova-ride"].id,
-      .services["mova-payment"].id,
-      .services["mova-driver"].id,
-      .services["mova-notification"].id,
-      .services["mova-admin"].id,
-      .services["mova-gateway"].id,
-      .services["mova-web"].id
-    ] | join(" ")
+      .services["mova-auth"].id // empty,
+      .services["mova-ride"].id // empty,
+      .services["mova-payment"].id // empty,
+      .services["mova-driver"].id // empty,
+      .services["mova-notification"].id // empty,
+      .services["mova-admin"].id // empty,
+      .services["mova-gateway"].id // empty,
+      .services["mova-web"].id // empty,
+      .services["mova-admin-web"].id // empty,
+      .services["mova-restaurant"].id // empty,
+      .services["mova-rental-partner"].id // empty
+    ] | map(select(length > 0)) | join(" ")
   ' config/render-services.json)
 fi
 

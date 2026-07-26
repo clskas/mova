@@ -1,6 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { africasTalkingSendSms, isTwilioSmsConfigured, resolveSmsBackend } from '@mova/shared';
+import {
+  africasTalkingSendSms,
+  isProductionRuntime,
+  isTwilioSmsConfigured,
+  resolveSmsBackend,
+} from '@mova/shared';
 
 export interface SmsSendResult {
   success: boolean;
@@ -21,6 +26,11 @@ export class SmsService {
 
   async sendMessage(phone: string, body: string): Promise<SmsSendResult> {
     if (this.isMock()) {
+      if (isProductionRuntime()) {
+        this.logger.error('[MOCK SMS] refused in production');
+        return { success: false, message: 'SMS mock interdit en production' };
+      }
+      // Dev-only: may contain OTP-like content — never enabled in production.
       this.logger.log(`[MOCK SMS] → ${phone}: ${body}`);
       return { success: true, message: 'SMS simulé (MOCK_SMS)' };
     }

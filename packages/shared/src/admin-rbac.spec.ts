@@ -22,4 +22,15 @@ describe('admin-rbac', () => {
   it('refuse PASSENGER sur le panneau admin', () => {
     expect(hasAdminPermission(UserRole.PASSENGER, AdminPermission.METRICS_READ)).toBe(false);
   });
+
+  it('ADMIN ne peut pas écrire les portefeuilles (FINANCE / SUPER_ADMIN seulement)', () => {
+    expect(hasAdminPermission(UserRole.ADMIN, AdminPermission.WALLETS_READ)).toBe(true);
+    expect(hasAdminPermission(UserRole.ADMIN, AdminPermission.WALLETS_WRITE)).toBe(false);
+    expect(hasAdminPermission(UserRole.FINANCE, AdminPermission.WALLETS_WRITE)).toBe(true);
+  });
+
+  it('SUPPORT ne peut pas suspendre utilisateurs ni écrire pricing', () => {
+    expect(hasAdminPermission(UserRole.SUPPORT, AdminPermission.USERS_WRITE)).toBe(false);
+    expect(hasAdminPermission(UserRole.SUPPORT, AdminPermission.PRICING_WRITE)).toBe(false);
+  });
 });

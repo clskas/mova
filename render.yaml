@@ -152,6 +152,36 @@ services:
       - key: NEXT_PUBLIC_API_URL
         fromService: { name: mova-gateway, type: web, property: hostport }
 
+  - type: web
+    name: mova-admin-web
+    runtime: docker
+    dockerfilePath: ./docker/admin-web.Dockerfile
+    dockerContext: .
+    plan: starter
+    envVars:
+      - key: NEXT_PUBLIC_API_URL
+        fromService: { name: mova-gateway, type: web, property: hostport }
+
+  - type: web
+    name: mova-restaurant
+    runtime: docker
+    dockerfilePath: ./docker/restaurant.Dockerfile
+    dockerContext: .
+    plan: starter
+    envVars:
+      - key: NEXT_PUBLIC_API_URL
+        fromService: { name: mova-gateway, type: web, property: hostport }
+
+  - type: web
+    name: mova-rental-partner
+    runtime: docker
+    dockerfilePath: ./docker/rental-partner.Dockerfile
+    dockerContext: .
+    plan: starter
+    envVars:
+      - key: NEXT_PUBLIC_API_URL
+        fromService: { name: mova-gateway, type: web, property: hostport }
+
 databases:
   # Production Render : 5 Postgres managés (isolation facturation/plan).
   # Alternative documentée : un cluster Neon avec les mêmes databaseName — voir docs/MICROSERVICES_STRATEGY.md

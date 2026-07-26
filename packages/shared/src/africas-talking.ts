@@ -45,21 +45,27 @@ export function isTwilioSmsConfigured(get: EnvGetter): boolean {
 
 export type SmsBackend = 'mock' | 'africastalking' | 'twilio';
 
-/** Résout le canal SMS actif (SENGA RDC : Africa's Talking par défaut). */
-export function resolveSmsBackend(get: EnvGetter, mockMode: boolean): SmsBackend {
+/**
+ * Résout le canal SMS actif (SENGA RDC : Africa's Talking par défaut).
+ * Returns `null` when mockMode is false and no real provider is configured
+ * (never silently falls back to mock — that would log OTP codes).
+ */
+export function resolveSmsBackend(get: EnvGetter, mockMode: boolean): SmsBackend | null {
   if (mockMode) return 'mock';
   const preferred = (get(AFRICAS_TALKING_ENV_KEYS.smsProvider) ?? 'africastalking').trim().toLowerCase();
   if (preferred === 'africastalking') {
     if (isAfricasTalkingConfigured(get)) return 'africastalking';
     if (isTwilioSmsConfigured(get)) return 'twilio';
-    return 'mock';
+    return null;
   }
   if (preferred === 'twilio') {
     if (isTwilioSmsConfigured(get)) return 'twilio';
     if (isAfricasTalkingConfigured(get)) return 'africastalking';
-    return 'mock';
+    return null;
   }
-  return 'mock';
+  if (isAfricasTalkingConfigured(get)) return 'africastalking';
+  if (isTwilioSmsConfigured(get)) return 'twilio';
+  return null;
 }
 
 export function useAfricasTalkingMobileMoney(get: EnvGetter): boolean {

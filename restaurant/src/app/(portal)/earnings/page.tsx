@@ -17,6 +17,7 @@ import {
   printPartnerReport,
   type PartnerEarningsReport,
 } from "@/lib/partner-reports";
+import { sanitizeUserMessage } from "@/lib/user-messages";
 import { PartnerWithdrawPanel } from "@/components/PartnerWithdrawPanel";
 import { WalletMovementHistory } from "@/components/WalletMovementHistory";
 
@@ -54,7 +55,7 @@ export default function EarningsPage() {
       setEarnings(e);
       setReport(r);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Erreur");
+      setError(sanitizeUserMessage(err instanceof Error ? err.message : err, "Erreur"));
     } finally {
       setLoading(false);
     }
@@ -80,7 +81,7 @@ export default function EarningsPage() {
         params,
       );
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Export PDF impossible");
+      alert(sanitizeUserMessage(e instanceof Error ? e.message : e, "Export PDF impossible"));
     } finally {
       setExporting(false);
     }
@@ -192,7 +193,11 @@ export default function EarningsPage() {
                     {sale.reference && (
                       <button
                         type="button"
-                        onClick={() => downloadOrderReceiptPdf(sale.reference!).catch((e) => alert(e.message))}
+                        onClick={() =>
+                          downloadOrderReceiptPdf(sale.reference!).catch((e) =>
+                            alert(sanitizeUserMessage(e instanceof Error ? e.message : e, "Téléchargement impossible")),
+                          )
+                        }
                         className="text-xs text-[#6C63FF] underline mt-1"
                       >
                         Télécharger reçu partenaire

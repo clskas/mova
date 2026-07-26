@@ -5,8 +5,15 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-echo "=== Step 1: backup all databases ==="
-"$ROOT/scripts/backup-db.sh"
+if [ "${MOVA_SKIP_BACKUP:-}" = "1" ]; then
+  echo "WARN: MOVA_SKIP_BACKUP=1 — skipping backup (tests only)"
+else
+  echo "=== Step 1: backup all databases ==="
+  "$ROOT/scripts/backup-db.sh" || {
+    echo "ERROR: backup failed — refusing to migrate" >&2
+    exit 1
+  }
+fi
 
 services=(
   "auth:services/auth-service"

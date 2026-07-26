@@ -368,7 +368,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                       children: [
                         Text('Recharge test (simulation)', style: TextStyle(fontWeight: FontWeight.w600)),
                         Text(
-                          '+50 000 FC instantanés — mode MOCK_PAYMENTS',
+                          '+50 000 FC instantanés (simulation hors production)',
                           style: TextStyle(fontSize: 12, color: MovaColors.textSecondary),
                         ),
                       ],

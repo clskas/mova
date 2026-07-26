@@ -2,7 +2,8 @@ name: Deploy
 
 on:
   workflow_run:
-    workflows: [CI]
+    # Ordered chain: CI → Build and Push → Deploy → Smoke → Mobile Release
+    workflows: ["Build and Push"]
     types: [completed]
     branches: [main]
   workflow_dispatch:
@@ -15,6 +16,11 @@ on:
         options:
           - staging
           - production
+      skip_backup:
+        description: Skip DB backup (tests / emergency only — never for prod migrations)
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   deploy-render:
@@ -32,7 +38,7 @@ jobs:
       - name: Install PostgreSQL client
         run: sudo apt-get update && sudo apt-get install -y postgresql-client jq
 
-      - name: Backup databases before deploy
+      - name: Backup databases before deploy (required before migrations)
         env:
           DATABASE_URL_AUTH: ${{ secrets.DATABASE_URL_AUTH }}
           DATABASE_URL_RIDES: ${{ secrets.DATABASE_URL_RIDES }}
@@ -40,13 +46,20 @@ jobs:
           DATABASE_URL_DRIVERS: ${{ secrets.DATABASE_URL_DRIVERS }}
           DATABASE_URL_NOTIFICATIONS: ${{ secrets.DATABASE_URL_NOTIFICATIONS }}
           BACKUP_RETENTION_DAYS: '14'
+          MOVA_SKIP_BACKUP: ${{ (github.event_name == 'workflow_dispatch' && inputs.skip_backup) && '1' || '' }}
         run: |
+          set -euo pipefail
           chmod +x scripts/backup-db.sh
-          if [ -z "$DATABASE_URL_AUTH" ] && [ -z "$DATABASE_URL_RIDES" ]; then
-            echo "DATABASE_URL_* secrets not set — skip pg_dump (configure secrets for prod backups)"
-          else
-            ./scripts/backup-db.sh
+          if [ "${MOVA_SKIP_BACKUP:-}" = "1" ]; then
+            echo "::warning::MOVA_SKIP_BACKUP=1 — skipping pg_dump (tests/emergency only)"
+            exit 0
           fi
+          if [ -z "${DATABASE_URL_AUTH:-}" ] && [ -z "${DATABASE_URL_RIDES:-}" ]; then
+            echo "::error::DATABASE_URL_AUTH / DATABASE_URL_RIDES secrets required for production deploy backup."
+            echo "Configure DATABASE_URL_* secrets, or use workflow_dispatch with skip_backup=true for non-prod."
+            exit 1
+          fi
+          ./scripts/backup-db.sh
 
       - name: Upload DB backup artifact
         if: success()
@@ -70,13 +83,19 @@ jobs:
             echo "Using service IDs from config/render-services.json (ordered deploy)"
           fi
 
-      - name: Trigger Render deploy
+      - name: Trigger Render deploy (API + web + portals)
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
           RENDER_SERVICE_IDS: ${{ steps.render.outputs.ids }}
         run: |
           chmod +x scripts/render-deploy.sh
           ./scripts/render-deploy.sh "${{ github.event.workflow_run.head_sha || github.sha }}"
+
+      - name: Note — migrations run on container start
+        run: |
+          echo "Prisma migrate deploy runs inside each Prisma service container via"
+          echo "scripts/migrate-with-backup.sh (backup-then-migrate; fails if backup fails)."
+          echo "CI already took a full pg_dump artifact above before deploy trigger."
 
       - name: Wait for Render deploy (gateway)
         env:
@@ -101,3 +120,4 @@ jobs:
             sleep 20
           done
           echo "Timeout waiting for Render deploy"
+          exit 1

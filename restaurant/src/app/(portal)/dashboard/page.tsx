@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRestaurantLiveRegister } from "@/components/RestaurantLiveProvider";
 import { PubliciteCarousel } from "@/components/PubliciteCarousel";
 import { fetchActivePublicites, fetchDashboard, formatCdf, type Publicite, type RestaurantDashboard } from "@/lib/api";
+import { sanitizeUserMessage } from "@/lib/user-messages";
 import { PartnerAmountLine } from "@/components/PartnerAmountLine";
 
 export default function DashboardPage() {
@@ -21,7 +22,7 @@ export default function DashboardPage() {
       setData(d);
       setPublicites(ads);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Erreur de chargement");
+      setError(sanitizeUserMessage(e instanceof Error ? e.message : e, "Erreur de chargement"));
     } finally {
       setLoading(false);
       setRefreshing(false);

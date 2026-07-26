@@ -28,9 +28,9 @@ Architecture détaillée : [architecture.md](./architecture.md).
 Le fichier `render.yaml` à la racine définit :
 
 - **Redis** : `mova-redis`
-- **7 services web Docker** : gateway, auth, ride, payment, driver, notification, admin
+- **7 services API Docker** : gateway, auth, ride, payment, driver, notification, admin-service
 - **5 bases PostgreSQL** : auth, rides, payments, drivers, notifications
-- **Frontend web** : `mova-web` (optionnel)
+- **Frontends Next.js** : `mova-web`, `mova-admin-web`, `mova-restaurant`, `mova-rental-partner`
 
 **Déploiement initial :**
 
@@ -218,7 +218,7 @@ Le workflow `mobile-release.yml` enchaîne après smoke-prod sur `main` :
 |-------|-------------|-----------|
 | Build AAB passager + chauffeur | Oui | Smoke prod vert sur `main` |
 | Artefacts GitHub (AAB) | Oui | Idem |
-| Upload Play Store internal | Sur tag `v*` ou manuel | Secrets `PLAY_STORE_JSON_KEY` + keystore |
+| Upload Play Store internal | Oui après AAB | `PLAY_STORE_JSON_KEY` (base64) ou `PLAY_STORE_JSON` + keystore ; skip gracieux si absent |
 | Build IPA + TestFlight | Sur tag `v*` ou manuel | Runner macOS + certificats Apple |
 
 Configurer les secrets listés dans [cicd.md](./cicd.md#secrets-github) et l'environnement GitHub `production-mobile` (approbation avant upload stores).

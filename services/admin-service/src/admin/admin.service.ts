@@ -1,5 +1,11 @@
-import { Injectable } from '@nestjs/common';
-import { INTERNAL_API_KEY, serviceUrl } from '@mova/shared';
+import { HttpStatus, Injectable } from '@nestjs/common';
+import {
+  INTERNAL_API_KEY,
+  MovaErrorCode,
+  MovaHttpException,
+  UserRole,
+  serviceUrl,
+} from '@mova/shared';
 
 type MovaService = 'auth' | 'ride' | 'driver' | 'payment';
 
@@ -120,10 +126,35 @@ export class AdminService {
   getUser(id: string) {
     return this.fetchJson('auth', `/internal/users/${id}`);
   }
-  updateUser(id: string, body: Record<string, unknown>) {
+  async updateUser(id: string, body: Record<string, unknown>, actorRole: string) {
+    const nextRole = typeof body.role === 'string' ? body.role : undefined;
+    // Only SUPER_ADMIN may grant or alter SUPER_ADMIN accounts (privilege escalation guard).
+    if (nextRole === UserRole.SUPER_ADMIN && actorRole !== UserRole.SUPER_ADMIN) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.FORBIDDEN,
+        'Seul un SUPER_ADMIN peut attribuer le rôle SUPER_ADMIN.',
+      );
+    }
+    const target = await this.getUser(id).catch(() => null) as { role?: string } | null;
+    if (target?.role === UserRole.SUPER_ADMIN && actorRole !== UserRole.SUPER_ADMIN) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.FORBIDDEN,
+        'Seul un SUPER_ADMIN peut modifier un compte SUPER_ADMIN.',
+      );
+    }
     return this.proxy('auth', `/internal/users/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
   }
-  deactivateUser(id: string) {
+  async deactivateUser(id: string, actorRole: string) {
+    const target = await this.getUser(id).catch(() => null) as { role?: string } | null;
+    if (target?.role === UserRole.SUPER_ADMIN && actorRole !== UserRole.SUPER_ADMIN) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.FORBIDDEN,
+        'Seul un SUPER_ADMIN peut désactiver un compte SUPER_ADMIN.',
+      );
+    }
     return this.proxy('auth', `/internal/users/${id}`, { method: 'DELETE' });
   }
 

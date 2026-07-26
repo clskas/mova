@@ -33,6 +33,7 @@ const TECHNICAL_PATTERNS = [
   /SyntaxError:/i,
   /AggregateError/i,
   /^\s*at\s+\S+/m,
+  /\.dart:\d+/i,
   /\.(ts|js|tsx|jsx):\d+/i,
 ];
 

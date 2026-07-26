@@ -639,30 +639,91 @@ export class ApiError extends Error {
   }
 }
 
+const ADMIN_TECHNICAL_PATTERNS = [
+  /^HTTP \d/i,
+  /^Erreur \d{3}$/,
+  /^PDF \d+$/i,
+  /Exception:/i,
+  /SocketException/i,
+  /TimeoutException/i,
+  /FormatException/i,
+  /MOVA_[A-Z]+_\d+/,
+  /SENGA_[A-Z]+_\d+/,
+  /ECONNREFUSED/i,
+  /ECONNRESET/i,
+  /ETIMEDOUT/i,
+  /ENOTFOUND/i,
+  /fetch failed/i,
+  /Failed to fetch/i,
+  /NetworkError/i,
+  /Network request failed/i,
+  /PrismaClient/i,
+  /Prisma|prisma\./i,
+  /NestJS|InternalServerError/i,
+  /Internal server error/i,
+  /Forbidden resource/i,
+  /^Unauthorized$/i,
+  /^Forbidden$/i,
+  /^Bad Request$/i,
+  /^Not Found$/i,
+  /Unexpected token/i,
+  /Cannot (GET|POST|PUT|PATCH|DELETE)\b/i,
+  /Unique constraint/i,
+  /Foreign key constraint/i,
+  /TypeError:/i,
+  /SyntaxError:/i,
+  /AggregateError/i,
+  /EACCES|ENOENT|EPERM/i,
+  /^\s*at\s+\S+/m,
+  /\.(ts|js|tsx|jsx):\d+/i,
+];
+
+function adminErrorFallback(status?: number): string {
+  if (status === 401) return "Session expirée. Reconnectez-vous.";
+  if (status === 403) return "Accès refusé.";
+  if (status === 404) return "Élément introuvable.";
+  if (status === 0) return "Réseau indisponible. Vérifiez votre connexion.";
+  return "Une erreur est survenue. Réessayez.";
+}
+
 export function sanitizeAdminError(message: string, status?: number): string {
-  if (!message || message.startsWith("HTTP ")) {
-    if (status === 401) return "Session expirée. Reconnectez-vous.";
-    if (status === 403) return "Accès refusé.";
-    if (status === 404) return "Élément introuvable.";
-    return "Une erreur est survenue. Réessayez.";
-  }
-  if (message.includes("MOVA_") && message.includes("_")) {
-    return "Une erreur est survenue. Réessayez.";
-  }
-  return message;
+  const fallback = adminErrorFallback(status);
+  const msg = (message ?? "").trim();
+  if (!msg) return fallback;
+  if (msg.length > 180) return fallback;
+  if (ADMIN_TECHNICAL_PATTERNS.some((re) => re.test(msg))) return fallback;
+  if (msg.includes("MOVA_") && msg.includes("_")) return fallback;
+  return msg;
+}
+
+/** Map any thrown value to a safe French UI string. */
+export function toUserErrorMessage(
+  err: unknown,
+  fallback = "Une erreur est survenue. Réessayez.",
+): string {
+  if (err instanceof ApiError) return sanitizeAdminError(err.message, err.status);
+  if (err instanceof Error) return sanitizeAdminError(err.message);
+  const cleaned = sanitizeAdminError(String(err ?? ""));
+  return cleaned || fallback;
 }
 
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const url = `${API_BASE}${path}`;
   const hasToken = Boolean(getToken());
-  const res = await fetch(url, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...authHeaders(),
-      ...init?.headers,
-    },
-  });
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      ...init,
+      headers: {
+        "Content-Type": "application/json",
+        ...authHeaders(),
+        ...init?.headers,
+      },
+    });
+  } catch {
+    if (!hasToken && USE_API_MOCK) return mockFor<T>(path, init);
+    throw new ApiError(adminErrorFallback(0), 0);
+  }
   if (!res.ok) {
     let message = `HTTP ${res.status}`;
     try {

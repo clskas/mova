@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { resolveJwtSecret } from '@mova/shared';
 import { JwtStrategy } from './jwt.strategy';
 import { RolesGuard } from './roles.guard';
 
@@ -10,7 +11,7 @@ import { RolesGuard } from './roles.guard';
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       imports: [ConfigModule],
-      useFactory: (c: ConfigService) => ({ secret: c.get('JWT_SECRET') ?? 'dev_secret' }),
+      useFactory: (c: ConfigService) => ({ secret: resolveJwtSecret(c.get('JWT_SECRET')) }),
       inject: [ConfigService],
     }),
   ],

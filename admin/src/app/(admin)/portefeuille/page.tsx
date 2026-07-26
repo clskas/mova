@@ -15,6 +15,7 @@ import {
   formatDate,
   formatUserName,
   normalizeMetrics,
+  sanitizeAdminError,
   settleCashDebt,
   confirmCashDebtByCode,
   withdrawWallet,
@@ -145,7 +146,7 @@ export default function PortefeuillePage() {
       setPlatformTreasury(treasury);
       setDebtThresholdInput(String(policy.maxOpenDebtCdf ?? 50000));
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Erreur de chargement");
+      setError(sanitizeAdminError(e instanceof Error ? e.message : "Erreur de chargement"));
     } finally {
       setLoading(false);
     }
@@ -161,7 +162,7 @@ export default function PortefeuillePage() {
       setTransactions((prev) => [...prev, ...(tx.data ?? [])]);
       setTxTotal(tx.total ?? transactions.length + (tx.data?.length ?? 0));
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Erreur de chargement");
+      setError(sanitizeAdminError(e instanceof Error ? e.message : "Erreur de chargement"));
     } finally {
       setTxLoadingMore(false);
     }
@@ -205,7 +206,7 @@ export default function PortefeuillePage() {
       if (user?.phone) setWithdrawPhone(user.phone);
     } catch (e) {
       setUserWalletDetail(null);
-      setError(e instanceof Error ? e.message : "Portefeuille introuvable");
+      setError(sanitizeAdminError(e instanceof Error ? e.message : "Portefeuille introuvable"));
     } finally {
       setLookupLoading(false);
     }
@@ -244,7 +245,7 @@ export default function PortefeuillePage() {
       setPlatformRechargeDesc("");
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Échec crédit trésorerie");
+      setError(sanitizeAdminError(e instanceof Error ? e.message : "Échec crédit trésorerie"));
     } finally {
       setPlatformSaving(false);
     }
@@ -265,7 +266,7 @@ export default function PortefeuillePage() {
       setPlatformWithdrawAmount("");
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Échec retrait trésorerie");
+      setError(sanitizeAdminError(e instanceof Error ? e.message : "Échec retrait trésorerie"));
     } finally {
       setPlatformSaving(false);
     }
@@ -286,7 +287,7 @@ export default function PortefeuillePage() {
       await loadUserWalletDetail(activeUserId);
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Échec ajustement");
+      setError(sanitizeAdminError(e instanceof Error ? e.message : "Échec ajustement"));
     } finally {
       setSaving(false);
     }
@@ -313,7 +314,7 @@ export default function PortefeuillePage() {
       await loadUserWalletDetail(activeUserId);
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Échec du retrait");
+      setError(sanitizeAdminError(e instanceof Error ? e.message : "Échec du retrait"));
     } finally {
       setWithdrawing(false);
     }
@@ -327,7 +328,7 @@ export default function PortefeuillePage() {
       await settleCashDebt(debtId);
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Échec du règlement");
+      setError(sanitizeAdminError(e instanceof Error ? e.message : "Échec du règlement"));
     } finally {
       setSettlingDebtId(null);
     }
@@ -355,7 +356,7 @@ export default function PortefeuillePage() {
       setCashConfirmCode("");
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Échec de la confirmation");
+      setError(sanitizeAdminError(e instanceof Error ? e.message : "Échec de la confirmation"));
     } finally {
       setCashConfirmLoading(false);
     }
@@ -437,8 +438,8 @@ export default function PortefeuillePage() {
                 <p className="text-xs text-gray-500 mt-1">Somme des wallets passagers, chauffeurs et partenaires</p>
               </div>
             </div>
-            <p className="text-xs text-gray-500 font-mono">
-              ID compte : {MOVA_PLATFORM_USER_ID}
+            <p className="text-xs text-gray-500">
+              Compte trésorerie interne SENGA (réservé à l&apos;administration)
             </p>
             {!readOnly && (
               <div className="grid lg:grid-cols-2 gap-6 pt-2">
@@ -710,7 +711,7 @@ export default function PortefeuillePage() {
                       setDebtPolicy(updated);
                       setDebtThresholdInput(String(updated.maxOpenDebtCdf));
                     } catch (e) {
-                      setError(e instanceof Error ? e.message : "Erreur enregistrement seuil");
+                      setError(sanitizeAdminError(e instanceof Error ? e.message : "Erreur enregistrement seuil"));
                     } finally {
                       setDebtPolicySaving(false);
                     }

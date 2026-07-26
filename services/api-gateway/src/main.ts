@@ -1,15 +1,27 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { createProxyMiddleware } from 'http-proxy-middleware';
-import { SERVICE_PORTS } from '@mova/shared';
+import helmet from 'helmet';
+import {
+  SERVICE_PORTS,
+  HttpExceptionFilter,
+  assertProductionSecurity,
+  resolveCorsOrigin,
+} from '@mova/shared';
 import { AppModule } from './app.module';
-import { HttpExceptionFilter } from '@mova/shared';
 
 async function bootstrap() {
+  assertProductionSecurity('api-gateway');
   const app = await NestFactory.create(AppModule, { bodyParser: false });
+  app.use(
+    helmet({
+      contentSecurityPolicy: false,
+      crossOriginEmbedderPolicy: false,
+    }),
+  );
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
   app.useGlobalFilters(new HttpExceptionFilter());
-  app.enableCors({ origin: process.env.CORS_ORIGIN?.split(',') ?? '*', credentials: true });
+  app.enableCors({ origin: resolveCorsOrigin(), credentials: true });
 
   const rideTarget = process.env.RIDE_SERVICE_URL ?? `http://localhost:${SERVICE_PORTS.ride}`;
   const socketProxy = createProxyMiddleware({ target: rideTarget, changeOrigin: true, ws: true });

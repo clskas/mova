@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/config/market_config.dart';
@@ -152,7 +153,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
       _step = PhoneLoginStep.otp;
       switch (result) {
         case Success(:final data):
-          _mockHint = data['mockCode'] as String?;
+          _mockHint = kDebugMode ? data['mockCode'] as String? : null;
         case Failure(:final error):
           _error = error.message;
       }
@@ -202,7 +203,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
         FocusManager.instance.primaryFocus?.unfocus();
         final token = data['accessToken'] as String?;
         if (token == null) {
-          setState(() => _error = 'Réponse serveur invalide (token manquant).');
+          setState(() => _error = 'Connexion impossible. Veuillez réessayer.');
           return;
         }
         final api = ref.read(apiClientProvider);
@@ -301,7 +302,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
             autofocus: true,
             enabled: !_loading,
           ),
-          if (_mockHint != null) ...[
+          if (kDebugMode && _mockHint != null) ...[
             const SizedBox(height: 8),
             Text(
               'Code test : $_mockHint',

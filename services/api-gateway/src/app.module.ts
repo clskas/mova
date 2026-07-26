@@ -1,22 +1,23 @@
 import { MiddlewareConsumer, Module, NestModule, RequestMethod } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
-import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { RequestIdMiddleware } from '@mova/shared';
 import { AuthModule } from './auth/auth.module';
 import { HealthModule } from './health/health.module';
 import { ProxyMiddleware } from './proxy/proxy.middleware';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
+import { GatewayThrottlerGuard } from './auth/gateway-throttler.guard';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
-    ThrottlerModule.forRoot([{ ttl: 60000, limit: 120 }]),
+    ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
     AuthModule,
     HealthModule,
   ],
   providers: [
-    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_GUARD, useClass: GatewayThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
   ],
 })

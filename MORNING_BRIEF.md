@@ -18,6 +18,7 @@
 - Tous les services Nest appellent `assertProductionSecurity` + `resolveCorsOrigin` + JWT via `resolveJwtSecret`.
 - `mockCode` OTP **jamais** renvoyé si `NODE_ENV=production`.
 - Helmet sur api-gateway.
+- RBAC admin : seul **SUPER_ADMIN** peut attribuer/modifier les rôles staff (ADMIN, SUPPORT, FINANCE, CONTENT).
 
 ### CI/CD (chaîne ordonnée)
 ```

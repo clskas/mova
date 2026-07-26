@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { apiFetch, formatCdf } from "@/lib/api";
+import { toUserErrorMessage } from "@/lib/user-messages";
 
 type CarpoolTrip = {
   id: string;
@@ -52,7 +53,7 @@ export function CarpoolView({ onBack, mock }: Props) {
       const raw = res.matches ?? res.trips ?? res.data ?? [];
       setTrips(raw.map(normalizeTrip));
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Erreur");
+      setError(toUserErrorMessage(e, "Erreur"));
     } finally {
       setLoading(false);
     }
@@ -72,7 +73,7 @@ export function CarpoolView({ onBack, mock }: Props) {
       }, { useMock: mock });
       await loadTrips();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Impossible de rejoindre");
+      setError(toUserErrorMessage(e, "Impossible de rejoindre"));
     } finally {
       setBusy(false);
     }

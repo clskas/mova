@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { apiFetch, formatCdf } from "@/lib/api";
+import { toUserErrorMessage } from "@/lib/user-messages";
 import { GeoAutocompleteInput } from "./GeoAutocompleteInput";
 import { PromoCodeInput, promoPayload } from "./PromoCodeInput";
 
@@ -55,7 +56,7 @@ export function ErrandsView({ onBack, mock }: Props) {
       );
       setEstimate(data.estimatedPriceCdf ?? 6000);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Erreur d'estimation");
+      setError(toUserErrorMessage(e, "Erreur d'estimation"));
     } finally {
       setLoading(false);
     }
@@ -68,7 +69,7 @@ export function ErrandsView({ onBack, mock }: Props) {
       await apiFetch("/api/errands", { method: "POST", body: JSON.stringify(payload()) }, { useMock: mock });
       setConfirmed(true);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Impossible de créer la commande");
+      setError(toUserErrorMessage(e, "Impossible de créer la commande"));
     } finally {
       setLoading(false);
     }

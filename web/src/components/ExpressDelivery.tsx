@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { apiFetch, formatCdf } from "@/lib/api";
+import { toUserErrorMessage } from "@/lib/user-messages";
 import { GeoAutocompleteInput } from "./GeoAutocompleteInput";
 
 type Props = { onBack: () => void; mock: boolean };
@@ -41,7 +42,7 @@ export function ExpressDelivery({ onBack, mock }: Props) {
       );
       setEstimate(data.estimatedPriceCdf ?? 7500);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Erreur d'estimation");
+      setError(toUserErrorMessage(e, "Erreur d'estimation"));
     } finally {
       setLoading(false);
     }
@@ -59,7 +60,7 @@ export function ExpressDelivery({ onBack, mock }: Props) {
       setTrackingId(data.delivery?.id ?? null);
       setConfirmed(true);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Impossible de créer la livraison");
+      setError(toUserErrorMessage(e, "Impossible de créer la livraison"));
     } finally {
       setLoading(false);
     }

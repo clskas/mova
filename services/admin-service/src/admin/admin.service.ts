@@ -128,20 +128,27 @@ export class AdminService {
   }
   async updateUser(id: string, body: Record<string, unknown>, actorRole: string) {
     const nextRole = typeof body.role === 'string' ? body.role : undefined;
-    // Only SUPER_ADMIN may grant or alter SUPER_ADMIN accounts (privilege escalation guard).
-    if (nextRole === UserRole.SUPER_ADMIN && actorRole !== UserRole.SUPER_ADMIN) {
+    const staffRoles = new Set<string>([
+      UserRole.SUPER_ADMIN,
+      UserRole.ADMIN,
+      UserRole.SUPPORT,
+      UserRole.FINANCE,
+      UserRole.CONTENT,
+    ]);
+    // Only SUPER_ADMIN may grant staff/admin-panel roles (blocks ADMIN→FINANCE escalation).
+    if (nextRole && staffRoles.has(nextRole) && actorRole !== UserRole.SUPER_ADMIN) {
       throw new MovaHttpException(
         MovaErrorCode.AUTH_FORBIDDEN,
         HttpStatus.FORBIDDEN,
-        'Seul un SUPER_ADMIN peut attribuer le rôle SUPER_ADMIN.',
+        'Seul un SUPER_ADMIN peut attribuer un rôle staff (ADMIN, SUPPORT, FINANCE, CONTENT, SUPER_ADMIN).',
       );
     }
     const target = await this.getUser(id).catch(() => null) as { role?: string } | null;
-    if (target?.role === UserRole.SUPER_ADMIN && actorRole !== UserRole.SUPER_ADMIN) {
+    if (target?.role && staffRoles.has(target.role) && actorRole !== UserRole.SUPER_ADMIN) {
       throw new MovaHttpException(
         MovaErrorCode.AUTH_FORBIDDEN,
         HttpStatus.FORBIDDEN,
-        'Seul un SUPER_ADMIN peut modifier un compte SUPER_ADMIN.',
+        'Seul un SUPER_ADMIN peut modifier un compte staff.',
       );
     }
     return this.proxy('auth', `/internal/users/${id}`, { method: 'PATCH', body: JSON.stringify(body) });

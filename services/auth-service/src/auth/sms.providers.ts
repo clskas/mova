@@ -148,8 +148,7 @@ export class SmsService {
   private get = (key: string) => this.config.get<string>(key);
 
   private resolveProvider(): SmsProvider | null {
-    const mockMode = isMockOtpAllowed() && this.config.get('MOCK_OTP') === 'true';
-    const backend = resolveSmsBackend(this.get, mockMode);
+    const backend = resolveSmsBackend(this.get, isMockOtpAllowed());
     if (backend === 'mock') return this.mock;
     if (backend === 'africastalking') return this.africasTalking;
     if (backend === 'twilio') return this.twilio;
@@ -173,7 +172,7 @@ export class SmsService {
   }
 
   isProductionReady(): boolean {
-    if (isMockOtpAllowed() && this.config.get('MOCK_OTP') === 'true') return false;
+    if (isMockOtpAllowed()) return false;
     const backend = resolveSmsBackend(this.get, false);
     return backend === 'africastalking' || backend === 'twilio';
   }

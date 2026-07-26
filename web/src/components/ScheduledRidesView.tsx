@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { apiFetch, formatCdf } from "@/lib/api";
+import { toUserErrorMessage } from "@/lib/user-messages";
 import { GeoAutocompleteInput } from "./GeoAutocompleteInput";
 
 type ScheduledRide = {
@@ -31,7 +32,7 @@ export function ScheduledRidesView({ onBack, mock }: Props) {
       const res = await apiFetch<{ data?: ScheduledRide[] }>("/api/rides/scheduled", undefined, { useMock: mock });
       setRides(res.data ?? []);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Erreur");
+      setError(toUserErrorMessage(e, "Erreur"));
     } finally {
       setLoading(false);
     }
@@ -63,7 +64,7 @@ export function ScheduledRidesView({ onBack, mock }: Props) {
       }, { useMock: mock });
       setEstimate(data.estimatedPriceCdf ?? 9500);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Estimation impossible");
+      setError(toUserErrorMessage(e, "Estimation impossible"));
     } finally {
       setBooking(false);
     }
@@ -90,7 +91,7 @@ export function ScheduledRidesView({ onBack, mock }: Props) {
       setEstimate(null);
       await loadUpcoming();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Réservation impossible");
+      setError(toUserErrorMessage(e, "Réservation impossible"));
     } finally {
       setBooking(false);
     }

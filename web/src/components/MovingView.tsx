@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { apiFetch, formatCdf } from "@/lib/api";
+import { toUserErrorMessage } from "@/lib/user-messages";
 import { GeoAutocompleteInput } from "./GeoAutocompleteInput";
 
 const VOLUMES = [
@@ -46,7 +47,7 @@ export function MovingView({ onBack, mock }: Props) {
       );
       setEstimate(data.estimatedPriceCdf ?? 45000);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Erreur d'estimation");
+      setError(toUserErrorMessage(e, "Erreur d'estimation"));
     } finally {
       setLoading(false);
     }
@@ -59,7 +60,7 @@ export function MovingView({ onBack, mock }: Props) {
       await apiFetch("/api/moving", { method: "POST", body: JSON.stringify(payload()) }, { useMock: mock });
       setConfirmed(true);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Impossible de créer la demande");
+      setError(toUserErrorMessage(e, "Impossible de créer la demande"));
     } finally {
       setLoading(false);
     }

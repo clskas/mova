@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { fetchReceiptHistory, formatCdf, type ReceiptSummary } from "@/lib/api";
+import { toUserErrorMessage } from "@/lib/user-messages";
 
 type Props = {
   onBack: () => void;
@@ -16,7 +17,7 @@ export function ReceiptsListView({ onBack, onOpenReceipt }: Props) {
   useEffect(() => {
     fetchReceiptHistory(50)
       .then((res) => setItems(res.data ?? []))
-      .catch((e) => setError(e instanceof Error ? e.message : "Erreur"))
+      .catch((e) => setError(toUserErrorMessage(e, "Erreur")))
       .finally(() => setLoading(false));
   }, []);
 

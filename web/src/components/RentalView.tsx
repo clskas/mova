@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { apiFetch, formatCdf } from "@/lib/api";
+import { toUserErrorMessage } from "@/lib/user-messages";
 import { GeoAutocompleteInput } from "./GeoAutocompleteInput";
 
 type Vehicle = { id: string; name: string; category?: string; pricePerDayCdf?: number; dailyRateCdf?: number };
@@ -30,7 +31,7 @@ export function RentalView({ onBack, mock }: Props) {
         if (list.length > 0) setSelectedId(list[0].id);
         if (list.length === 0) setLoadError("Aucun véhicule disponible pour le moment.");
       })
-      .catch((e) => setLoadError(e instanceof Error ? e.message : "Erreur catalogue"));
+      .catch((e) => setLoadError(toUserErrorMessage(e, "Erreur catalogue")));
   }, [mock]);
 
   const pricePerDay = (v: Vehicle) => v.dailyRateCdf ?? v.pricePerDayCdf ?? 0;
@@ -60,7 +61,7 @@ export function RentalView({ onBack, mock }: Props) {
       );
       setEstimate(data.totalPriceCdf ?? 170000);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Erreur d'estimation");
+      setError(toUserErrorMessage(e, "Erreur d'estimation"));
     } finally {
       setLoading(false);
     }
@@ -73,7 +74,7 @@ export function RentalView({ onBack, mock }: Props) {
       await apiFetch("/api/rental/bookings", { method: "POST", body: JSON.stringify(payload()) }, { useMock: mock });
       setConfirmed(true);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Impossible de réserver");
+      setError(toUserErrorMessage(e, "Impossible de réserver"));
     } finally {
       setLoading(false);
     }

@@ -9,6 +9,7 @@ import {
   shareReceiptInChat,
   type MovaReceipt,
 } from "@/lib/api";
+import { toUserErrorMessage } from "@/lib/user-messages";
 
 type Props = {
   referenceType: string;
@@ -32,7 +33,7 @@ export function ReceiptView({ referenceType, referenceId, onBack }: Props) {
         setReceipt(data);
         setEmail(data.customer?.email ?? "");
       })
-      .catch((e) => setError(e instanceof Error ? e.message : "Erreur"))
+      .catch((e) => setError(toUserErrorMessage(e, "Erreur")))
       .finally(() => setLoading(false));
   }, [referenceType, referenceId]);
 
@@ -48,7 +49,7 @@ export function ReceiptView({ referenceType, referenceId, onBack }: Props) {
       a.click();
       URL.revokeObjectURL(url);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "PDF indisponible");
+      setError(toUserErrorMessage(e, "PDF indisponible"));
     } finally {
       setBusy(false);
     }
@@ -61,7 +62,7 @@ export function ReceiptView({ referenceType, referenceId, onBack }: Props) {
       const res = await sendReceiptEmail(referenceType, referenceId, email.trim() || undefined);
       setMessage(`Envoyé à ${res.sentTo ?? email}`);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Envoi impossible");
+      setError(toUserErrorMessage(e, "Envoi impossible"));
     } finally {
       setBusy(false);
     }
@@ -74,7 +75,7 @@ export function ReceiptView({ referenceType, referenceId, onBack }: Props) {
       await shareReceiptInChat(referenceType, referenceId);
       setMessage("Reçu partagé dans le chat");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Chat indisponible");
+      setError(toUserErrorMessage(e, "Chat indisponible"));
     } finally {
       setBusy(false);
     }

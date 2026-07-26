@@ -13,7 +13,7 @@ class OtpScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return MovaScreen(
-      title: 'Mova',
+      title: 'Senga',
       centerContent: true,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -31,7 +31,7 @@ class OtpScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 24),
           Text(
-            'Bienvenue sur MOVA',
+            'Bienvenue sur SENGA',
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.bold,

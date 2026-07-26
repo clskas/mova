@@ -41,7 +41,7 @@ const STATUSES = [
 ];
 
 const PARTNER_ADMIN_STATUSES = [
-  { value: "CLOSED", label: "Clôturée (litige / annulation MOVA)" },
+  { value: "CLOSED", label: "Clôturée (litige / annulation SENGA)" },
 ];
 
 function canAssignLogistics(r: RentalInquiry): boolean {
@@ -128,8 +128,8 @@ export default function LocationsPage() {
     if (row && !canAssignLogistics(row)) {
       setError(
         row.needsMovaLogistics || row.logisticsMode === "MOVA_DRIVER"
-          ? "Le propriétaire doit confirmer la disponibilité avant l'assignation logistique MOVA."
-          : "Ce mode logistique ne nécessite pas de chauffeur MOVA.",
+          ? "Le propriétaire doit confirmer la disponibilité avant l'assignation logistique SENGA."
+          : "Ce mode logistique ne nécessite pas de chauffeur SENGA.",
       );
       return;
     }
@@ -238,7 +238,7 @@ export default function LocationsPage() {
                         <span className="text-xs text-gray-500">
                           {r.needsMovaLogistics || r.logisticsMode === "MOVA_DRIVER"
                             ? "Après confirmation propriétaire"
-                            : "Pas de chauffeur MOVA"}
+                            : "Pas de chauffeur SENGA"}
                         </span>
                       )}
                     </td>
@@ -275,7 +275,7 @@ export default function LocationsPage() {
               <span className="text-gray-500">Logistique:</span>{" "}
               {selected.logisticsModeLabel ?? selected.logisticsMode ?? "—"}
               {selected.needsMovaLogistics && (
-                <span className="ml-2 text-xs text-indigo-700">· Chauffeur MOVA requis</span>
+                <span className="ml-2 text-xs text-indigo-700">· Chauffeur SENGA requis</span>
               )}
             </p>
             {selected.passengerDriverPhone && (
@@ -298,7 +298,7 @@ export default function LocationsPage() {
                 qu&apos;en cas de litige, ou forcer un statut (override).
               </p>
             )}
-            <ContactBlock title="Chauffeur logistique MOVA" name={selected.driverName} phone={selected.driverPhone} />
+            <ContactBlock title="Chauffeur logistique SENGA" name={selected.driverName} phone={selected.driverPhone} />
 
             {!readOnly && canAssignLogistics(selected) && (
               <AssignDriverPanel
@@ -309,7 +309,7 @@ export default function LocationsPage() {
                 onAssign={saveAssignment}
                 saving={saving || assigningId === selected.id}
                 title="Chauffeur logistique (optionnel)"
-                fieldLabel="Chauffeur MOVA pour livraison / récupération"
+                fieldLabel="Chauffeur SENGA pour livraison / récupération"
                 assignLabel="Confirmer le chauffeur logistique"
                 hint="Disponible après confirmation du propriétaire. Ce chauffeur intervient uniquement pour la logistique (remise et retour)."
                 emptyLabel="Aucun chauffeur KYC — la logistique peut être gérée directement par le propriétaire."
@@ -319,8 +319,8 @@ export default function LocationsPage() {
             {!readOnly && !canAssignLogistics(selected) && selected.status !== "CLOSED" && (
               <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
                 {selected.needsMovaLogistics || selected.logisticsMode === "MOVA_DRIVER"
-                  ? "Assignation logistique MOVA disponible après confirmation du propriétaire."
-                  : "Ce mode logistique ne nécessite pas de chauffeur MOVA."}
+                  ? "Assignation logistique SENGA disponible après confirmation du propriétaire."
+                  : "Ce mode logistique ne nécessite pas de chauffeur SENGA."}
               </p>
             )}
 
@@ -339,7 +339,7 @@ export default function LocationsPage() {
                       checked={forceOverride}
                       onChange={(e) => setForceOverride(e.target.checked)}
                     />
-                    Forcer le statut (override MOVA — cas exceptionnel)
+                    Forcer le statut (override SENGA — cas exceptionnel)
                   </label>
                 )}
                 <BtnPrimary onClick={saveStatus} disabled={saving || newStatus === selected.status}>

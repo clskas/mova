@@ -49,7 +49,7 @@ export class AfricasTalkingSmsProvider implements SmsProvider {
   async sendOtp(phone: string, code: string): Promise<SmsSendResult> {
     const result = await africasTalkingSendSms(this.get, {
       to: phone,
-      message: `Votre code MOVA : ${code}. Valide 10 minutes.`,
+      message: `Votre code SENGA : ${code}. Valide 10 minutes.`,
     });
     if (!result.success) this.logger.warn(`Africa's Talking SMS: ${result.message}`);
     return result;
@@ -108,7 +108,7 @@ export class TwilioSmsProvider implements SmsProvider {
         body: new URLSearchParams({
           To: phone,
           From: from!,
-          Body: `Votre code MOVA : ${code}. Valide 10 minutes.`,
+          Body: `Votre code SENGA : ${code}. Valide 10 minutes.`,
         }),
       });
       if (!res.ok) {

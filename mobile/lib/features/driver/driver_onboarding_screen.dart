@@ -13,7 +13,7 @@ import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import 'driver_home_screen.dart';
 
-/// Parcours d'enregistrement chauffeur — 6 étapes MOVA.
+/// Parcours d'enregistrement chauffeur — 6 étapes SENGA.
 class DriverOnboardingScreen extends ConsumerStatefulWidget {
   const DriverOnboardingScreen({super.key, this.canSkipToHome = false});
 
@@ -422,7 +422,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Dossier envoyé — validation MOVA sous 24-48 h.'),
+            content: Text('Dossier envoyé — validation SENGA sous 24-48 h.'),
             backgroundColor: MovaColors.green,
           ),
         );
@@ -668,7 +668,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
         const Text('Informations personnelles', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
         const SizedBox(height: 10),
         const Text(
-          'Votre identifiant MOVA (DRV-…) sera visible par le support client.',
+          'Votre identifiant SENGA (DRV-…) sera visible par le support client.',
           style: TextStyle(color: MovaColors.textSecondary, fontSize: 13),
         ),
         const SizedBox(height: 16),
@@ -695,7 +695,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
           const SizedBox(height: 12),
           const MovaCard(
             child: Text(
-              'Renouvellement en attente : après modification des dates, MOVA doit valider vos nouveaux justificatifs avant que vous puissiez repasser en ligne.',
+              'Renouvellement en attente : après modification des dates, SENGA doit valider vos nouveaux justificatifs avant que vous puissiez repasser en ligne.',
               style: TextStyle(color: MovaColors.orange, fontSize: 13),
             ),
           ),
@@ -816,14 +816,14 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
           value: _trainingCompleted,
           onChanged: (v) => setState(() => _trainingCompleted = v ?? false),
           contentPadding: const EdgeInsets.symmetric(vertical: 4),
-          title: const Text('J\'ai suivi la formation sécurité MOVA (utilisation app, règles route)'),
+          title: const Text('J\'ai suivi la formation sécurité SENGA (utilisation app, règles route)'),
           controlAffinity: ListTileControlAffinity.leading,
         ),
         CheckboxListTile(
           value: _charterAccepted,
           onChanged: (v) => setState(() => _charterAccepted = v ?? false),
           contentPadding: const EdgeInsets.symmetric(vertical: 4),
-          title: const Text('J\'accepte la charte de bonne conduite MOVA'),
+          title: const Text('J\'accepte la charte de bonne conduite SENGA'),
           controlAffinity: ListTileControlAffinity.leading,
         ),
       ],
@@ -879,7 +879,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
         ),
         const SizedBox(height: 20),
         const Text(
-          'Après validation par l\'équipe MOVA, vous recevrez un code PIN à 6 chiffres pour activer votre compte et accepter des courses.',
+          'Après validation par l\'équipe SENGA, vous recevrez un code PIN à 6 chiffres pour activer votre compte et accepter des courses.',
           style: TextStyle(color: MovaColors.textSecondary),
         ),
       ],

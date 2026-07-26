@@ -560,7 +560,7 @@ abstract final class MockData {
   static List<Map<String, dynamic>> services() => [
         {'id': 'TAXI', 'name': 'Taxi / Moto-taxi', 'enabled': true},
         {'id': 'PARCEL', 'name': 'Livraison colis', 'enabled': true},
-        {'id': 'WALLET', 'name': 'Wallet MOVA', 'enabled': true},
+        {'id': 'WALLET', 'name': 'Wallet SENGA', 'enabled': true},
         {'id': 'HISTORY', 'name': 'Historique', 'enabled': true},
         {'id': 'SCHEDULED', 'name': 'Réservation planifiée', 'enabled': true},
         {'id': 'FOOD', 'name': 'Livraison repas', 'enabled': true},
@@ -655,7 +655,7 @@ abstract final class MockData {
           'rating': 4.2,
           'deliveryMinCdf': 2500,
           'items': [
-            {'id': 'item-6', 'name': 'Burger MOVA', 'priceCdf': 5500},
+            {'id': 'item-6', 'name': 'Burger SENGA', 'priceCdf': 5500},
             {'id': 'item-7', 'name': 'Frites + soda', 'priceCdf': 4500},
           ],
         },
@@ -798,7 +798,7 @@ abstract final class MockData {
   static Map<String, dynamic> createScheduledInquiry(Map<String, dynamic> body) => {
         'id': 'inq-${DateTime.now().millisecondsSinceEpoch}',
         'status': 'PENDING',
-        'reference': 'MOVA-${DateTime.now().millisecondsSinceEpoch % 1000000}',
+        'reference': 'SENGA-${DateTime.now().millisecondsSinceEpoch % 1000000}',
         ...body,
         'createdAt': DateTime.now().toIso8601String(),
       };
@@ -988,7 +988,7 @@ abstract final class MockData {
           'dailyRateCdf': 120000,
           'depositCdf': 250000,
           'rating': 4.9,
-          'ownerName': 'MOVA Fleet',
+          'ownerName': 'SENGA Fleet',
           'ownerBadge': 'PRO',
           'features': ['Climatisation', 'GPS', 'Cuir'],
           'imageUrl': 'https://placehold.co/600x400/6C63FF/white?text=Mercedes',
@@ -1185,7 +1185,7 @@ abstract final class MockData {
       'vehicleType': vehicle['category'],
       'status': status,
       'logisticsMode': 'MOVA_DRIVER',
-      'logisticsModeLabel': 'Livraison par un chauffeur MOVA',
+      'logisticsModeLabel': 'Livraison par un chauffeur SENGA',
       'startDate': DateTime.now().add(const Duration(days: 1)).toIso8601String(),
       'endDate': DateTime.now().add(const Duration(days: 3)).toIso8601String(),
       'pickupAddress': 'Gombe, Kinshasa',
@@ -1230,7 +1230,7 @@ abstract final class MockData {
         'estimatedTotalCdf': estimate['totalCdf'],
         'totalCdf': estimate['totalCdf'],
       },
-      'message': 'Demande enregistrée. Un conseiller MOVA vous contactera sous 24h.',
+      'message': 'Demande enregistrée. Un conseiller SENGA vous contactera sous 24h.',
     };
   }
 
@@ -1419,13 +1419,13 @@ abstract final class MockData {
           {
             'id': 'plan-basic',
             'code': 'PASSENGER_BASIC',
-            'name': 'MOVA Plus',
+            'name': 'SENGA Plus',
             'monthlyPriceCdf': 15000,
             'feeReductionPercent': 10,
             'priorityMatching': false,
             'description': 'L\'essentiel pour payer moins sur vos trajets du quotidien',
             'benefits': [
-              '−10 % sur les frais de service MOVA',
+              '−10 % sur les frais de service SENGA',
               'Courses, livraisons, déménagement, planifiées',
               'Sans engagement — résiliable à tout moment',
             ],
@@ -1433,14 +1433,14 @@ abstract final class MockData {
           {
             'id': 'plan-premium',
             'code': 'PASSENGER_PREMIUM',
-            'name': 'MOVA Premium',
+            'name': 'SENGA Premium',
             'monthlyPriceCdf': 35000,
             'feeReductionPercent': 20,
             'priorityMatching': true,
             'isPopular': true,
-            'description': 'Priorité chauffeur et réduction maximale sur les frais MOVA',
+            'description': 'Priorité chauffeur et réduction maximale sur les frais SENGA',
             'benefits': [
-              '−20 % sur les frais de service MOVA',
+              '−20 % sur les frais de service SENGA',
               'Priorité de matching chauffeur / livreur',
               'Support prioritaire',
               'Idéal pour 8+ commandes par mois',
@@ -1461,14 +1461,14 @@ abstract final class MockData {
           'plan': planId == 'plan-premium'
               ? {
                   'id': 'plan-premium',
-                  'name': 'MOVA Premium',
+                  'name': 'SENGA Premium',
                   'monthlyPriceCdf': 35000,
                   'feeReductionPercent': 20,
                   'priorityMatching': true,
                 }
               : {
                   'id': 'plan-basic',
-                  'name': 'MOVA Plus',
+                  'name': 'SENGA Plus',
                   'monthlyPriceCdf': 15000,
                   'feeReductionPercent': 10,
                   'priorityMatching': false,
@@ -1477,14 +1477,14 @@ abstract final class MockData {
         'plan': planId == 'plan-premium'
             ? {
                 'id': 'plan-premium',
-                'name': 'MOVA Premium',
+                'name': 'SENGA Premium',
                 'monthlyPriceCdf': 35000,
                 'feeReductionPercent': 20,
                 'priorityMatching': true,
               }
             : {
                 'id': 'plan-basic',
-                'name': 'MOVA Plus',
+                'name': 'SENGA Plus',
                 'monthlyPriceCdf': 15000,
                 'feeReductionPercent': 10,
                 'priorityMatching': false,

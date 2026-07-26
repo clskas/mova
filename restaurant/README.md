@@ -1,12 +1,12 @@
-# MOVA — Portail Restaurant
+# SENGA — Portail Restaurant
 
-Console web pour les **partenaires livraison repas** : recevoir, confirmer et préparer les commandes passées via l'app MOVA.
+Console web pour les **partenaires livraison repas** : recevoir, confirmer et préparer les commandes passées via l'app SENGA.
 
 ## Démarrage (dev)
 
 ```powershell
 # 1. Migrations + compte partenaire
-cd c:\Users\Administrator\Mova
+cd c:\Users\Administrator\Senga
 .\scripts\seed-restaurant.ps1
 
 # 2. Portail (port 3007)
@@ -22,7 +22,7 @@ Ouvrir http://localhost:3007
 
 1. Ouvrir http://localhost:3007 dans **Chrome** (Android) ou **Safari** (iOS)
 2. Menu navigateur → **Ajouter à l'écran d'accueil** / **Installer l'application**
-3. L'app s'ouvre en plein écran (`standalone`) avec icône MOVA Resto
+3. L'app s'ouvre en plein écran (`standalone`) avec icône SENGA Resto
 
 Service worker : cache léger + fonctionnement basique hors ligne sur les pages visitées.
 
@@ -56,7 +56,7 @@ Service worker : cache léger + fonctionnement basique hors ligne sur les pages 
 
 JWT requis, rôle `RESTAURANT`.
 
-## Onboarding partenaire (admin MOVA)
+## Onboarding partenaire (admin SENGA)
 
 1. **Utilisateurs** → créer / modifier un compte avec rôle `RESTAURANT`
 2. **Restaurants** → éditer le partenaire → coller `ownerUserId`

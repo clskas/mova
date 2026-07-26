@@ -33,7 +33,7 @@ export class UpdateOnboardingDto {
 }
 
 export class ActivationPinDto {
-  @ApiProperty({ description: 'Code PIN à 6 chiffres reçu après validation MOVA' })
+  @ApiProperty({ description: 'Code PIN à 6 chiffres reçu après validation SENGA' })
   @IsString()
   @MinLength(6)
   pin: string;

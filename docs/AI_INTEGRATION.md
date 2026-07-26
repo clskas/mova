@@ -1,6 +1,6 @@
-# Intégration IA — MOVA RDC
+# Intégration IA — SENGA RDC
 
-Guide concis des cas d’usage IA compatibles avec l’architecture microservices MOVA (gateway NestJS + 7 services).
+Guide concis des cas d’usage IA compatibles avec l’architecture microservices SENGA (gateway NestJS + 7 services).
 
 ## Configuration des clés API
 
@@ -27,7 +27,7 @@ Après modification : redémarrer les services Docker concernés (`docker compos
 
 ## État actuel
 
-MOVA n’intègre pas encore de modèle IA en production. Les briques existantes facilitent l’ajout :
+SENGA n’intègre pas encore de modèle IA en production. Les briques existantes facilitent l’ajout :
 
 | Domaine | Implémentation actuelle | Piste IA |
 |---------|-------------------------|----------|
@@ -76,10 +76,10 @@ MOVA n’intègre pas encore de modèle IA en production. Les briques existantes
 
 ## Choix technologiques
 
-| Option | Avantages MOVA | Inconvénients |
+| Option | Avantages SENGA | Inconvénients |
 |--------|----------------|---------------|
 | **Azure OpenAI** | Conformité entreprise, région EU possible, bon pour OCR Azure DI | Coût, config Azure |
-| **OpenAI API** | Rapide à prototyper, bon FR | Données hors RDC à cadrer (RGPD / politique MOVA) |
+| **OpenAI API** | Rapide à prototyper, bon FR | Données hors RDC à cadrer (RGPD / politique SENGA) |
 | **Twilio AI** | Déjà Twilio pour OTP ; Verify + ConversationRelay | Moins adapté à matching/ETA |
 | **On-device (Flutter)** | Offline, privacy | Limité (pas de gros LLM) ; utile pour suggestion adresses cache |
 

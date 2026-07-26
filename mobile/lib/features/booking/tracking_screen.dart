@@ -536,7 +536,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
         final url = data['shareUrl']?.toString() ?? 'https://mova.cd/suivi/${widget.rideId}';
         final pickup = _ride?['pickupAddress']?.toString() ?? 'Départ';
         final dropoff = _ride?['dropoffAddress']?.toString() ?? 'Arrivée';
-        final text = 'Je suis en course MOVA ($pickup → $dropoff). Suivi : $url';
+        final text = 'Je suis en course SENGA ($pickup → $dropoff). Suivi : $url';
         await Clipboard.setData(ClipboardData(text: text));
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Lien de suivi copié dans le presse-papiers')),
@@ -544,7 +544,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
       case Failure():
         final pickup = _ride?['pickupAddress']?.toString() ?? 'Départ';
         final dropoff = _ride?['dropoffAddress']?.toString() ?? 'Arrivée';
-        final text = 'Je suis en course MOVA ($pickup → $dropoff). https://mova.cd/suivi/${widget.rideId}';
+        final text = 'Je suis en course SENGA ($pickup → $dropoff). https://mova.cd/suivi/${widget.rideId}';
         await Clipboard.setData(ClipboardData(text: text));
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Lien copié (mode secours)')),
@@ -585,7 +585,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
       builder: (ctx) => AlertDialog(
         title: const Text('Alerte SOS'),
         content: const Text(
-          'MOVA transmettra votre position à l\'équipe support. En cas de danger immédiat, appelez aussi les secours locaux.',
+          'SENGA transmettra votre position à l\'équipe support. En cas de danger immédiat, appelez aussi les secours locaux.',
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
@@ -610,7 +610,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
     switch (result) {
       case Success():
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Alerte SOS envoyée — l\'équipe MOVA a été notifiée')),
+          const SnackBar(content: Text('Alerte SOS envoyée — l\'équipe SENGA a été notifiée')),
         );
       case Failure(:final error):
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));

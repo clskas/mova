@@ -245,7 +245,7 @@ class _MovingIconPainter extends _StrokeIconPainter {
   }
 }
 
-/// MOVA brand mark. Chaque app a son identité (modèle Uber) :
+/// SENGA brand mark. Chaque app a son identité (modèle Uber) :
 /// passager = pin violet, chauffeur = volant vert.
 class MovaBrandIcon extends StatelessWidget {
   const MovaBrandIcon({super.key, this.size = 28, this.asset = passengerAsset});

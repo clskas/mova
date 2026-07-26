@@ -3,9 +3,9 @@ import type { MetadataRoute } from "next";
 export default function manifest(): MetadataRoute.Manifest {
   return {
     id: "/",
-    name: "MOVA Restaurant",
-    short_name: "MOVA Resto",
-    description: "Portail partenaire restaurant — commandes, menu et revenus MOVA RDC",
+    name: "SENGA Restaurant",
+    short_name: "SENGA Resto",
+    description: "Portail partenaire restaurant — commandes, menu et revenus SENGA RDC",
     start_url: "/?source=pwa",
     scope: "/",
     display: "standalone",

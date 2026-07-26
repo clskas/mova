@@ -73,7 +73,7 @@ services:
       NOMINATIM_ENABLED: 'true'
       NOMINATIM_TIMEOUT_MS: '5000'
       NOMINATIM_MIN_INTERVAL_MS: '1000'
-      NOMINATIM_USER_AGENT: MOVA-RDC/1.0 (ride-service; https://mova.cd)
+      NOMINATIM_USER_AGENT: SENGA-RDC/1.0 (ride-service; https://mova.cd)
       PHOTON_BASE_URL: https://photon.komoot.io
       PHOTON_ENABLED: 'true'
       PHOTON_TIMEOUT_MS: '8000'

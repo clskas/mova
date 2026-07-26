@@ -11,6 +11,6 @@ async function bootstrap() {
   app.setGlobalPrefix('api', { exclude: ['health', 'internal/(.*)'] });
   const port = process.env.PORT ?? 3004;
   await app.listen(port);
-  console.log('MOVA driver-service on port ' + port);
+  console.log('SENGA driver-service on port ' + port);
 }
 bootstrap();

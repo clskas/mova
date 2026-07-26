@@ -9,7 +9,7 @@ import {
 } from "./api";
 
 const DEBT_CATEGORY_LABELS: Record<string, string> = {
-  PLATFORM_FEE: "Commission MOVA",
+  PLATFORM_FEE: "Commission SENGA",
   RESTAURANT_SHARE: "Part restaurant",
   PARTNER_SHARE: "Part partenaire",
 };
@@ -22,7 +22,7 @@ export function exportWalletTransactionsCsv(
   cashDebts?: CashDebtsOverview,
 ) {
   const lines = [
-    "MOVA — Rapport portefeuille",
+    "SENGA — Rapport portefeuille",
     `Généré;${new Date().toISOString()}`,
     filterLabel ? `Filtre;${filterLabel}` : "",
     "",
@@ -110,7 +110,7 @@ export function printWalletReport(
 <html lang="fr">
 <head>
   <meta charset="utf-8" />
-  <title>MOVA — Rapport portefeuille</title>
+  <title>SENGA — Rapport portefeuille</title>
   <style>
     body { font-family: system-ui, sans-serif; margin: 24px; color: #1a1a2e; }
     h1 { font-size: 20px; margin: 0 0 4px; color: #6C63FF; }
@@ -127,7 +127,7 @@ export function printWalletReport(
   </style>
 </head>
 <body>
-  <h1>MOVA — Rapport portefeuille</h1>
+  <h1>SENGA — Rapport portefeuille</h1>
   <p class="meta">Généré le ${new Date().toLocaleString("fr-CD")}${filterLabel ? ` · Filtre : ${escapeHtml(filterLabel)}` : ""}</p>
   <div class="kpis">
     <div class="kpi"><label>Revenus du jour</label><strong>${formatCdf(metrics.revenueTodayCdf)}</strong></div>

@@ -492,7 +492,7 @@ export type PromoCode = {
   isActive?: boolean;
 };
 
-/** Villes MOVA couvertes (aligné DRC_SERVICE_AREAS / seed ride-service). */
+/** Villes SENGA couvertes (aligné DRC_SERVICE_AREAS / seed ride-service). */
 export const MOVA_CITIES = [
   "Kinshasa",
   "Lubumbashi",
@@ -560,7 +560,7 @@ export type AdminSessionUser = {
 
 export type WalletOverview = {
   totalBalanceCdf?: number;
-  /** Solde du compte trésorerie MOVA (commissions virtuelles). */
+  /** Solde du compte trésorerie SENGA (commissions virtuelles). */
   platformBalanceCdf?: number;
   /** Somme des soldes utilisateurs (passagers, chauffeurs, partenaires). */
   userLiabilitiesCdf?: number;
@@ -771,7 +771,7 @@ function mockFor<T>(path: string, init?: RequestInit): T {
     return [
       { id: "1", phone: "+243812345678", role: "PASSENGER", status: "ACTIVE", firstName: "Marie", lastName: "K." },
       { id: "2", phone: "+243998765432", role: "DRIVER", status: "ACTIVE", firstName: "Jean", lastName: "M." },
-      { id: "3", phone: "+243900000001", role: "SUPER_ADMIN", status: "ACTIVE", firstName: "Admin", lastName: "MOVA" },
+      { id: "3", phone: "+243900000001", role: "SUPER_ADMIN", status: "ACTIVE", firstName: "Admin", lastName: "SENGA" },
     ] as T;
   }
   if (path.match(/\/drivers\/[^/?]+/) && method === "GET") {
@@ -969,7 +969,7 @@ function mockFor<T>(path: string, init?: RequestInit): T {
     return [
       {
         id: "plan-basic",
-        name: "MOVA Basic",
+        name: "SENGA Basic",
         priceCdfPerMonth: 5000,
         benefits: ["5 % de réduction courses", "Support prioritaire"],
         isActive: true,
@@ -977,7 +977,7 @@ function mockFor<T>(path: string, init?: RequestInit): T {
       },
       {
         id: "plan-plus",
-        name: "MOVA Plus",
+        name: "SENGA Plus",
         priceCdfPerMonth: 12000,
         benefits: ["10 % réduction", "Livraisons offertes (2/mois)", "Annulation gratuite"],
         isActive: true,
@@ -985,7 +985,7 @@ function mockFor<T>(path: string, init?: RequestInit): T {
       },
       {
         id: "plan-pro",
-        name: "MOVA Pro",
+        name: "SENGA Pro",
         priceCdfPerMonth: 25000,
         benefits: ["15 % réduction", "Livraisons illimitées", "Chauffeur VIP"],
         isActive: false,
@@ -995,8 +995,8 @@ function mockFor<T>(path: string, init?: RequestInit): T {
   }
   if (path.includes("/subscriptions")) {
     return [
-      { id: "sub-1", userId: "1", planId: "plan-basic", planName: "MOVA Basic", status: "ACTIVE", startedAt: new Date().toISOString() },
-      { id: "sub-2", userId: "2", planId: "plan-plus", planName: "MOVA Plus", status: "ACTIVE", startedAt: new Date().toISOString() },
+      { id: "sub-1", userId: "1", planId: "plan-basic", planName: "SENGA Basic", status: "ACTIVE", startedAt: new Date().toISOString() },
+      { id: "sub-2", userId: "2", planId: "plan-plus", planName: "SENGA Plus", status: "ACTIVE", startedAt: new Date().toISOString() },
     ] as T;
   }
   if (path.includes("/wallet/overview")) {
@@ -1009,7 +1009,7 @@ function mockFor<T>(path: string, init?: RequestInit): T {
       phone: "+243900000001",
       role,
       firstName: "Admin",
-      lastName: "MOVA",
+      lastName: "SENGA",
     } as T;
   }
   if (path.includes("/pricing-rules") && method !== "GET") {
@@ -1129,7 +1129,7 @@ export async function fetchAdminReports(days = 30): Promise<AdminReports> {
 
 export function exportReportsCsv(reports: AdminReports, metrics: ReturnType<typeof normalizeMetrics>) {
   const lines = [
-    "MOVA — Rapport analytique",
+    "SENGA — Rapport analytique",
     `Généré;${reports.generatedAt}`,
     `Période (jours);${reports.periodDays}`,
     "",

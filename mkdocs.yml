@@ -1,5 +1,5 @@
-site_name: MOVA — Documentation technique
-site_description: Architecture, API et CI/CD de la plateforme MOVA RDC
+site_name: SENGA — Documentation technique
+site_description: Architecture, API et CI/CD de la plateforme SENGA RDC
 repo_url: https://github.com/mova-rdc/mova
 theme:
   name: material

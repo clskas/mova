@@ -4,7 +4,7 @@ import '../../core/config/market_config.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_widgets.dart';
 
-/// Carte plan d'abonnement MOVA Plus.
+/// Carte plan d'abonnement SENGA Plus.
 class SubscriptionPlanCard extends StatelessWidget {
   const SubscriptionPlanCard({
     super.key,
@@ -28,7 +28,7 @@ class SubscriptionPlanCard extends StatelessWidget {
       if (reduction > 0) '−$reduction % sur les frais de service (courses, livraisons, déménagement)',
       if (priority) 'Priorité de matching chauffeur / livreur',
       'Réduction appliquée automatiquement à chaque commande',
-      'Paiement mensuel depuis votre portefeuille MOVA',
+      'Paiement mensuel depuis votre portefeuille SENGA',
       'Annulation à tout moment',
     ];
     final custom = plan['benefits'];

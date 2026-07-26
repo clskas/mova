@@ -109,7 +109,7 @@ describe('ScheduledRidesService', () => {
     expect(result.estimatedPriceCdf).toBe(8000);
   });
 
-  it('refuse des coords pickup hors zones MOVA', async () => {
+  it('refuse des coords pickup hors zones SENGA', async () => {
     const scheduledAt = new Date();
     scheduledAt.setDate(scheduledAt.getDate() + 1);
     await expect(

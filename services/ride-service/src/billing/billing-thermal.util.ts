@@ -16,7 +16,7 @@ export function buildThermalReceiptText(receipt: MovaReceipt, width = 32): strin
   const dash = '-'.repeat(width);
 
   const lines: string[] = [
-    center('MOVA RDC'),
+    center('SENGA RDC'),
     center(receipt.documentType === 'INVOICE' ? 'FACTURE' : 'RECU DE PAIEMENT'),
     divider,
     `N° ${receipt.receiptNumber}`,
@@ -65,5 +65,5 @@ export function buildEscPosBuffer(text: string): Buffer {
   const alignLeft = Buffer.from([ESC, 0x61, 0x00]);
   const cut = Buffer.from([GS, 0x56, 0x00]);
   const body = Buffer.from(text, 'utf8');
-  return Buffer.concat([init, alignCenter, Buffer.from('MOVA RDC\n', 'utf8'), alignLeft, body, cut]);
+  return Buffer.concat([init, alignCenter, Buffer.from('SENGA RDC\n', 'utf8'), alignLeft, body, cut]);
 }

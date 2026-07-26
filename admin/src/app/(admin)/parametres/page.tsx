@@ -146,7 +146,7 @@ export default function ParametresPage() {
   }
 
   async function handleBulkProvinceActive(isActive: boolean) {
-    if (!confirm(`${isActive ? "Activer" : "Désactiver"} toutes les provinces MOVA ?`)) return;
+    if (!confirm(`${isActive ? "Activer" : "Désactiver"} toutes les provinces SENGA ?`)) return;
     setProvinceBulkSaving(true);
     setError(null);
     try {
@@ -193,7 +193,7 @@ export default function ParametresPage() {
 
   async function handleBulkCityActive(isActive: boolean) {
     const label = isActive ? "activer" : "désactiver";
-    if (!confirm(`${isActive ? "Activer" : "Désactiver"} toutes les villes MOVA ?`)) return;
+    if (!confirm(`${isActive ? "Activer" : "Désactiver"} toutes les villes SENGA ?`)) return;
     setBulkSaving(true);
     setError(null);
     try {
@@ -254,7 +254,7 @@ export default function ParametresPage() {
     <div className={`mx-auto ${tab === "cities" || tab === "provinces" ? "max-w-6xl" : "max-w-5xl"}`}>
       <PageHeader
         title="Zones géographiques"
-        subtitle="Provinces, villes et communes/quartiers MOVA. Une province ou ville désactivée bloque les commandes dans cette zone."
+        subtitle="Provinces, villes et communes/quartiers SENGA. Une province ou ville désactivée bloque les commandes dans cette zone."
       />
 
       <div className="flex flex-wrap gap-2 mb-4">
@@ -486,7 +486,7 @@ export default function ParametresPage() {
         )
       ) : tab === "cities" ? (
         cities.length === 0 ? (
-          <EmptyState message="Aucune ville — redémarrez ride-service pour synchroniser le catalogue MOVA" />
+          <EmptyState message="Aucune ville — redémarrez ride-service pour synchroniser le catalogue SENGA" />
         ) : filteredCities.length === 0 ? (
           <EmptyState message="Aucune ville ne correspond à votre recherche" />
         ) : (
@@ -654,7 +654,7 @@ export default function ParametresPage() {
                 disabled={readOnly}
                 onChange={(e) => setForm({ ...form, isActive: e.target.checked ? "true" : "false" })}
               />
-              Province active (MOVA opérationnelle dans cette province)
+              Province active (SENGA opérationnelle dans cette province)
             </label>
             {!readOnly && (
               <BtnPrimary onClick={saveProvince} disabled={saving}>
@@ -705,7 +705,7 @@ export default function ParametresPage() {
                 disabled={readOnly}
                 onChange={(e) => setForm({ ...form, isActive: e.target.checked ? "true" : "false" })}
               />
-              Ville active (MOVA opérationnelle)
+              Ville active (SENGA opérationnelle)
             </label>
             {!readOnly && (
               <BtnPrimary onClick={saveCity} disabled={saving}>

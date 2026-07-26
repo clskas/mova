@@ -27,7 +27,7 @@ export class WalletSeedService implements OnModuleInit {
         await this.wallet.credit(
           demo.userId,
           demo.amountCdf,
-          `Solde test MOVA — ${demo.label}`,
+          `Solde test SENGA — ${demo.label}`,
           `seed_demo_wallet_${demo.userId}`,
         );
         this.logger.log(`Wallet démo crédité : ${demo.label} (+${demo.amountCdf} FC)`);

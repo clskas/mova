@@ -20,7 +20,7 @@ export class ServicesCatalogService {
       { id: 'errand', nameFr: 'Courses & commissions', available: true, category: ServiceCategory.DELIVERY, description: 'Faites vos courses ou déléguez une commission' },
       { id: 'carpool', nameFr: 'Covoiturage', available: true, category: ServiceCategory.TRANSPORT, description: 'Partagez un trajet et économisez' },
       { id: 'rental', nameFr: 'Location véhicule', available: true, category: ServiceCategory.TRANSPORT, description: 'Catalogue véhicules et réservation en ligne' },
-      { id: 'wallet', nameFr: 'Portefeuille MOVA', available: true, category: ServiceCategory.OTHER, description: 'Paiement et retrait mobile money' },
+      { id: 'wallet', nameFr: 'Portefeuille SENGA', available: true, category: ServiceCategory.OTHER, description: 'Paiement et retrait mobile money' },
       { id: 'express', nameFr: 'Livraison express', available: true, category: ServiceCategory.DELIVERY, description: 'Livraison prioritaire en moins de 45 min' },
       { id: 'moving', nameFr: 'Déménagement', available: true, category: ServiceCategory.OTHER, description: 'Transport de meubles et cartons à Kinshasa' },
     ];

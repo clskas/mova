@@ -80,7 +80,7 @@ export function canCancelDelivery(params: { status: string; type?: string }): Ca
   if (params.type === 'FOOD') {
     if (params.status === 'PENDING') return allowed();
     if (params.status === 'RESTAURANT_CONFIRMED') {
-      return blocked('Le restaurant a accepté votre commande — annulation impossible. Contactez le support MOVA.');
+      return blocked('Le restaurant a accepté votre commande — annulation impossible. Contactez le support SENGA.');
     }
     if (params.status === 'READY_FOR_PICKUP') {
       return blocked('Votre commande est en préparation — annulation impossible.');

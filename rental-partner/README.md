@@ -1,17 +1,17 @@
-# MOVA Location — Portail partenaire (PWA)
+# SENGA Location — Portail partenaire (PWA)
 
 Formulaire web pour que les propriétaires de véhicules soumettent leurs annonces.  
-Validation et publication via l'admin MOVA → **Catalogue location** (`/catalogue-location`).
+Validation et publication via l'admin SENGA → **Catalogue location** (`/catalogue-location`).
 
 ## Prérequis
 
-- Backend MOVA (`docker compose up`, port 3000)
+- Backend SENGA (`docker compose up`, port 3000)
 - Compte utilisateur avec rôle `RENTAL_PARTNER` (créé par l'admin dans **Utilisateurs**)
 
 ## Dev local
 
 ```powershell
-cd c:\Users\Administrator\Mova\rental-partner
+cd c:\Users\Administrator\Senga\rental-partner
 copy .env.example .env.local
 npm install
 npm run dev
@@ -43,6 +43,6 @@ Admin → **Utilisateurs** → créer / modifier un utilisateur avec rôle **REN
 Ou seed :
 
 ```powershell
-cd c:\Users\Administrator\Mova\services\auth-service
+cd c:\Users\Administrator\Senga\services\auth-service
 npx prisma db seed
 ```

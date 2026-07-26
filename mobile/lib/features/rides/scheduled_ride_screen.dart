@@ -257,7 +257,7 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
             return null;
           }
         }
-        return 'MOVA couvre toute la République Démocratique du Congo. Indiquez une destination valide.';
+        return 'SENGA couvre toute la République Démocratique du Congo. Indiquez une destination valide.';
       }
       _dropoff = ServiceAreaLocation.ensureInServiceArea(
         resolved,
@@ -357,7 +357,7 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
               ],
               const SizedBox(height: 12),
               const Text(
-                'MOVA confirme la réservation et assigne un chauffeur avant l\'heure prévue. '
+                'SENGA confirme la réservation et assigne un chauffeur avant l\'heure prévue. '
                 'Les mises à jour admin apparaissent ici automatiquement.',
                 style: TextStyle(fontSize: 12, color: MovaColors.textSecondary, height: 1.35),
               ),
@@ -584,7 +584,7 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
             builder: (ctx) => AlertDialog(
               title: const Text('Réservation confirmée'),
               content: Text(
-                'Votre transport MOVA est réservé.\n\n'
+                'Votre transport SENGA est réservé.\n\n'
                 'Référence : ${_shortRef(ride?['id']?.toString())}\n'
                 'Date et heure : $when\n'
                 'Départ : Ma position\n'
@@ -637,7 +637,7 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
           const SizedBox(height: 4),
           const Text(
             'Programmez un trajet jusqu\'à 7 jours à l\'avance. '
-            'MOVA assigne un chauffeur avant l\'heure — rappels J-1 et H-1.',
+            'SENGA assigne un chauffeur avant l\'heure — rappels J-1 et H-1.',
             style: TextStyle(color: MovaColors.textSecondary, height: 1.3),
           ),
           const SizedBox(height: 8),

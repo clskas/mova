@@ -116,7 +116,7 @@ export class FoodDeliveryPayoutService {
     }
     results.restaurants = restaurantResults;
 
-    // Commission plateforme : créditer le compte unique MOVA (idempotent).
+    // Commission plateforme : créditer le compte unique SENGA (idempotent).
     const platformFee = Math.round(settlement.platformFeeCdf ?? 0);
     const platformFeeRef = `PLATFORM_FEE:DELIVERY:${deliveryId}`;
     if (platformFee > 0 && !(await this.alreadyCredited(platformFeeRef))) {
@@ -135,7 +135,7 @@ export class FoodDeliveryPayoutService {
         referenceId: deliveryId,
         category: CashDebtCategory.PLATFORM_FEE,
         amountCdf: platformFee,
-        description: `Commission MOVA à reverser — livraison ${deliveryId.slice(0, 8)}`,
+        description: `Commission SENGA à reverser — livraison ${deliveryId.slice(0, 8)}`,
       });
     }
     results.platformFeeCdf = platformFee;

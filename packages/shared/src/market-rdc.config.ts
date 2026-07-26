@@ -84,7 +84,7 @@ export const MARKET_RDC = {
     combinedPeakNightMultiplier: 1.5,
   },
 
-  /** Majoration livraison / course inter-villes (départ et arrivée dans des zones MOVA différentes). */
+  /** Majoration livraison / course inter-villes (départ et arrivée dans des zones SENGA différentes). */
   interCity: {
     baseSurchargeCdf: 15_000,
     perKmSurchargeCdf: 500,
@@ -138,7 +138,7 @@ export const MARKET_RDC = {
       SELF_PASSENGER: { label: 'Je récupère le véhicule moi-même' },
       PASSENGER_DRIVER: { label: 'Mon chauffeur s\'occupe du transport' },
       OWNER_DRIVER: { label: 'Chauffeur du propriétaire' },
-      MOVA_DRIVER: { label: 'Livraison par un chauffeur MOVA' },
+      MOVA_DRIVER: { label: 'Livraison par un chauffeur SENGA' },
     },
   },
 

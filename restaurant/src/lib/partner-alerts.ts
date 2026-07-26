@@ -108,7 +108,7 @@ export function notifyPartnerAlert(options: {
 export function alertNewRestaurantOrder(deliveryId: string, body?: string) {
   notifyPartnerAlert({
     key: `order:${deliveryId}`,
-    title: "Nouvelle commande MOVA",
+    title: "Nouvelle commande SENGA",
     body: body ?? `Commande #${deliveryId.slice(0, 8)} à confirmer`,
     tag: "mova-new-order",
   });

@@ -1,6 +1,6 @@
-# MOVA Architecture
+# SENGA Architecture
 
-MOVA RDC is a **nationwide** ride-hailing platform for the Democratic Republic of Congo — designed for deployment across all 26 provinces, not only Kinshasa. Kinshasa remains the default launch city (communes, pricing seed, map center), but geo, matching, and communes models support expansion to Lubumbashi, Goma, Bukavu, Kisangani, and other RDC cities.
+SENGA RDC is a **nationwide** ride-hailing platform for the Democratic Republic of Congo — designed for deployment across all 26 provinces, not only Kinshasa. Kinshasa remains the default launch city (communes, pricing seed, map center), but geo, matching, and communes models support expansion to Lubumbashi, Goma, Bukavu, Kisangani, and other RDC cities.
 
 ## Services
 

@@ -145,7 +145,7 @@ export default function RevenusPage() {
           <button
             type="button"
             disabled={!report}
-            onClick={() => report && printPartnerReport(report, "Rapport financier — Location MOVA")}
+            onClick={() => report && printPartnerReport(report, "Rapport financier — Location SENGA")}
             className="px-4 py-2 rounded-xl border text-sm disabled:opacity-50"
           >
             Imprimer

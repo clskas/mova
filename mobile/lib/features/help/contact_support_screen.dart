@@ -36,7 +36,7 @@ class ContactSupportScreen extends StatelessWidget {
                     const Icon(Icons.support_agent, color: MovaColors.violet),
                     const SizedBox(width: 8),
                     Text(
-                      'Assistance MOVA',
+                      'Assistance SENGA',
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
@@ -72,7 +72,7 @@ class ContactSupportScreen extends StatelessWidget {
               Uri(
                 scheme: 'mailto',
                 path: HelpConfig.supportEmail,
-                query: 'subject=Assistance MOVA',
+                query: 'subject=Assistance SENGA',
               ),
             ),
           ),

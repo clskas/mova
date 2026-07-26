@@ -1,6 +1,6 @@
 # Tests E2E — Playwright & Appium
 
-Guide pour exécuter les tests end-to-end web, admin et mobile Android dans le monorepo MOVA.
+Guide pour exécuter les tests end-to-end web, admin et mobile Android dans le monorepo SENGA.
 
 ## Structure
 
@@ -85,7 +85,7 @@ Les tests **ignorent** (`skip`) les specs si l'URL cible ne répond pas — prat
 
 | Fichier | Vérifie |
 |---------|---------|
-| `admin-login.spec.ts` | Page `/login` (MOVA Admin, bouton Se connecter) |
+| `admin-login.spec.ts` | Page `/login` (SENGA Admin, bouton Se connecter) |
 | `admin-users.spec.ts` | Login OTP admin + onglet Utilisateurs |
 | `admin-restaurants.spec.ts` | Page `/restaurants` (formulaire + tableau) |
 

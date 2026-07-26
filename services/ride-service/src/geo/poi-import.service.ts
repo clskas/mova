@@ -68,7 +68,7 @@ export class PoiImportService {
     return { imported, skipped };
   }
 
-  /** Import Overpass API sur la bbox de la ville MOVA demandée (ou Kinshasa par défaut). */
+  /** Import Overpass API sur la bbox de la ville SENGA demandée (ou Kinshasa par défaut). */
   async importFromOverpass(
     city = 'Kinshasa',
     bbox?: { south: number; west: number; north: number; east: number },

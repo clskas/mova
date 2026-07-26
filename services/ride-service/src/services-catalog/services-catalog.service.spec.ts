@@ -4,7 +4,7 @@ import { ServicesCatalogService } from './services-catalog.service';
 describe('ServicesCatalogService', () => {
   const service = new ServicesCatalogService();
 
-  it('liste les services MOVA avec disponibilité', () => {
+  it('liste les services SENGA avec disponibilité', () => {
     const services = service.list();
     expect(services.length).toBeGreaterThanOrEqual(5);
     const parcel = services.find((s) => s.id === 'parcel');

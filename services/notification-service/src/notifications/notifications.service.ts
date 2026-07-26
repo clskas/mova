@@ -56,7 +56,7 @@ export class NotificationsService implements OnModuleInit {
         this.logger.warn(`Redis subscribe unavailable: ${err.message}`);
         return;
       }
-      this.logger.log(`Subscribed to ${channels.length} MOVA event channels`);
+      this.logger.log(`Subscribed to ${channels.length} SENGA event channels`);
     });
     this.redis.sub.on('message', async (channel, message) => {
       try {
@@ -112,7 +112,7 @@ export class NotificationsService implements OnModuleInit {
     if (process.env.PARTNER_SMS_ALERTS !== 'true') return;
     const owner = await fetchAuthUserBrief(options.ownerUserId);
     if (!owner?.phone) return;
-    const smsText = options.smsBody ?? `MOVA — ${options.title}. ${options.body}`;
+    const smsText = options.smsBody ?? `SENGA — ${options.title}. ${options.body}`;
     await this.sms.sendMessage(owner.phone, smsText);
   }
 
@@ -121,7 +121,7 @@ export class NotificationsService implements OnModuleInit {
   }
 
   async onRideCreated(payload: RideCreatedPayload) {
-    await this.create(payload.passengerId, 'Course créée', 'Recherche de chauffeur en cours dans votre zone MOVA', 'RIDE_CREATED', payload);
+    await this.create(payload.passengerId, 'Course créée', 'Recherche de chauffeur en cours dans votre zone SENGA', 'RIDE_CREATED', payload);
     this.logger.log(`ride.created notification for ${payload.rideId}`);
   }
 
@@ -185,7 +185,7 @@ export class NotificationsService implements OnModuleInit {
 
   async onIncidentCreated(payload: IncidentCreatedPayload) {
     const title = payload.isEmergency || payload.type === 'SOS' ? '🚨 Alerte SOS' : 'Nouvel incident';
-    await this.create(payload.userId, title, 'Votre signalement a été transmis à l\'équipe MOVA.', 'INCIDENT_CREATED', payload);
+    await this.create(payload.userId, title, 'Votre signalement a été transmis à l\'équipe SENGA.', 'INCIDENT_CREATED', payload);
     this.logger.warn(`incident.created ${payload.incidentId} type=${payload.type} emergency=${payload.isEmergency}`);
   }
 
@@ -219,7 +219,7 @@ export class NotificationsService implements OnModuleInit {
         body,
         tag: `order-${payload.deliveryId}`,
         portalPath: '/',
-        smsBody: `MOVA Restaurant — Nouvelle commande${label}. Connectez-vous au portail pour confirmer.`,
+        smsBody: `SENGA Restaurant — Nouvelle commande${label}. Connectez-vous au portail pour confirmer.`,
       });
       this.logger.log(`restaurant order notification for ${payload.deliveryId}`);
     }
@@ -258,7 +258,7 @@ export class NotificationsService implements OnModuleInit {
       payload.serviceType === 'RENTAL' ? 'Chauffeur logistique assigné' : 'Livreur assigné';
     const passengerBody =
       payload.serviceType === 'RENTAL'
-        ? `Un chauffeur MOVA a été assigné pour la livraison/récupération : ${payload.summary}`
+        ? `Un chauffeur SENGA a été assigné pour la livraison/récupération : ${payload.summary}`
         : `Un livreur a été assigné : ${payload.summary}`;
     await this.create(payload.passengerId, passengerTitle, passengerBody, 'SERVICE_ASSIGNED_PASSENGER', payload);
     this.logger.log(`service.assigned notification for driver ${payload.driverId} (${payload.serviceType})`);
@@ -302,7 +302,7 @@ export class NotificationsService implements OnModuleInit {
       referenceId: payload.scheduledRideId,
     });
     if (payload.passengerPhone) {
-      await this.sms.sendMessage(payload.passengerPhone, `MOVA — ${body}`);
+      await this.sms.sendMessage(payload.passengerPhone, `SENGA — ${body}`);
     }
     if (payload.driverId) {
       await this.create(payload.driverId, title, body, 'SCHEDULED_REMINDER_DRIVER', payload);
@@ -311,7 +311,7 @@ export class NotificationsService implements OnModuleInit {
         referenceId: payload.scheduledRideId,
       });
       if (payload.driverPhone) {
-        await this.sms.sendMessage(payload.driverPhone, `MOVA chauffeur — ${body}`);
+        await this.sms.sendMessage(payload.driverPhone, `SENGA chauffeur — ${body}`);
       }
     }
     this.logger.log(`scheduled.reminder ${payload.reminderKind} for ${payload.scheduledRideId}`);
@@ -350,10 +350,10 @@ export class NotificationsService implements OnModuleInit {
         body = `La demande pour ${payload.vehicleName} (${period})${route} a été annulée.`;
         break;
       case 'LOGISTICS_ASSIGNED':
-        title = 'Chauffeur logistique MOVA';
+        title = 'Chauffeur logistique SENGA';
         body =
           payload.logisticsSummary ??
-          `Un chauffeur MOVA a été assigné pour la livraison/récupération de ${payload.vehicleName}.`;
+          `Un chauffeur SENGA a été assigné pour la livraison/récupération de ${payload.vehicleName}.`;
         break;
     }
     await this.create(payload.ownerUserId, title, body, 'RENTAL_BOOKING', payload);
@@ -365,7 +365,7 @@ export class NotificationsService implements OnModuleInit {
         body,
         tag: `rental-${payload.inquiryId}`,
         portalPath: '/reservations',
-        smsBody: `MOVA Location — ${passenger} demande ${payload.vehicleName}. Ouvrez le portail partenaire.`,
+        smsBody: `SENGA Location — ${passenger} demande ${payload.vehicleName}. Ouvrez le portail partenaire.`,
       });
     }
     this.logger.log(`rental.booking ${payload.kind} for owner ${payload.ownerUserId}`);
@@ -401,7 +401,7 @@ export class NotificationsService implements OnModuleInit {
       return (
         {
           PENDING: 'Votre demande de location est en attente.',
-          CONTACTED: 'MOVA vous a contacté pour votre location.',
+          CONTACTED: 'SENGA vous a contacté pour votre location.',
           CONFIRMED: 'Votre location est confirmée.',
           IN_PROGRESS: 'Votre location est en cours.',
           RETURNED: 'Le véhicule a été retourné.',

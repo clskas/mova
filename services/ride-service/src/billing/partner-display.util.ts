@@ -3,10 +3,10 @@ import {
   parseOrderPlacedMetadata,
 } from '../deliveries/food-delivery-settlement.util';
 
-/** Commission MOVA sur ventes repas (alignée CommissionServiceType.FOOD). */
+/** Commission SENGA sur ventes repas (alignée CommissionServiceType.FOOD). */
 export const RESTAURANT_PLATFORM_PERCENT = 12;
 
-/** Commission MOVA sur location partenaire. */
+/** Commission SENGA sur location partenaire. */
 export const RENTAL_PLATFORM_PERCENT = 12;
 
 export type RestaurantPartnerDisplay = {
@@ -30,7 +30,7 @@ function platformFeeFromGross(grossCdf: number, platformPercent: number): number
   return Math.ceil(Math.max(0, grossCdf) * (platformPercent / 100));
 }
 
-/** Panier repas + part nette restaurant (commission MOVA déduite, remise partenaire incluse). */
+/** Panier repas + part nette restaurant (commission SENGA déduite, remise partenaire incluse). */
 export function computeRestaurantPartnerDisplay(input: {
   items: unknown;
   restaurantId?: string;

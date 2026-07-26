@@ -94,7 +94,7 @@ function area(
   };
 }
 
-/** Zones de service MOVA — capitales provinciales + grandes villes RDC. */
+/** Zones de service SENGA — capitales provinciales + grandes villes RDC. */
 export const DRC_SERVICE_AREAS: ServiceArea[] = [
   area('kinshasa', 'Kinshasa', 'Kinshasa', -4.3217, 15.3125, 0.35, KINSHASA_COMMUNES),
   area('lubumbashi', 'Lubumbashi', 'Haut-Katanga', -11.6647, 27.4794, 0.15, [

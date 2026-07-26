@@ -35,7 +35,7 @@ export default function LoginPage() {
       }
       const role = data.user?.role ?? decodeJwtPayload(data.accessToken)?.role;
       if (!isRentalPartnerRole(typeof role === "string" ? role : null)) {
-        throw new Error("Ce compte n'est pas un partenaire location. Contactez MOVA.");
+        throw new Error("Ce compte n'est pas un partenaire location. Contactez SENGA.");
       }
       setToken(data.accessToken);
       router.replace("/");
@@ -52,7 +52,7 @@ export default function LoginPage() {
       <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-8 space-y-6">
         <div className="text-center">
           <div className="text-3xl mb-2">🚗</div>
-          <h1 className="text-2xl font-semibold text-[#1A1A2E]">MOVA Location</h1>
+          <h1 className="text-2xl font-semibold text-[#1A1A2E]">SENGA Location</h1>
           <p className="text-sm text-gray-500 mt-1">Portail partenaire — inscription véhicules</p>
         </div>
         <label className="block text-sm">
@@ -81,7 +81,7 @@ export default function LoginPage() {
         </button>
         {error && <p className="text-sm text-red-600 text-center">{error}</p>}
         <p className="text-xs text-gray-400 text-center">
-          Dev : compte <code>{PARTNER_PHONE}</code> — rôle RENTAL_PARTNER créé par l&apos;admin MOVA
+          Dev : compte <code>{PARTNER_PHONE}</code> — rôle RENTAL_PARTNER créé par l&apos;admin SENGA
         </p>
       </div>
     </div>

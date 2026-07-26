@@ -91,7 +91,7 @@ export default function EarningsPage() {
       <div>
         <h2 className="text-xl font-semibold text-[#1A1A2E]">Revenus repas</h2>
         <p className="text-sm text-gray-600 mt-1">
-          Votre part des ventes est créditée après paiement du client (commission MOVA déduite).
+          Votre part des ventes est créditée après paiement du client (commission SENGA déduite).
         </p>
       </div>
 
@@ -104,7 +104,7 @@ export default function EarningsPage() {
             <p className="text-sm opacity-90">Solde disponible</p>
             <p className="text-3xl font-bold mt-1">{earnings.formattedBalance}</p>
             <p className="text-xs opacity-80 mt-2">
-              Les frais de livraison et la commission plateforme sont versés au livreur et à MOVA.
+              Les frais de livraison et la commission plateforme sont versés au livreur et à SENGA.
             </p>
           </div>
           <PartnerWithdrawPanel
@@ -158,7 +158,7 @@ export default function EarningsPage() {
           <button
             type="button"
             disabled={!report}
-            onClick={() => report && printPartnerReport(report, "Rapport financier — Restaurant MOVA")}
+            onClick={() => report && printPartnerReport(report, "Rapport financier — Restaurant SENGA")}
             className="px-4 py-2 rounded-xl border text-sm disabled:opacity-50"
           >
             Imprimer

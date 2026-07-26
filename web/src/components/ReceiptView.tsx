@@ -86,7 +86,7 @@ export function ReceiptView({ referenceType, referenceId, onBack }: Props) {
   return (
     <div className="space-y-4">
       <button onClick={onBack} className="text-sm text-[#6C63FF]">← Retour</button>
-      <h2 className="text-lg font-semibold">{docLabel} MOVA</h2>
+      <h2 className="text-lg font-semibold">{docLabel} SENGA</h2>
 
       {loading && <p className="text-gray-500 py-8 text-center">Chargement…</p>}
       {error && <p className="text-sm text-red-600 bg-red-50 rounded-xl p-3">{error}</p>}
@@ -95,7 +95,7 @@ export function ReceiptView({ referenceType, referenceId, onBack }: Props) {
       {receipt && (
         <>
           <div className="bg-white rounded-xl p-4 shadow-sm space-y-2">
-            <p className="text-xs text-[#6C63FF] font-semibold">MOVA RDC</p>
+            <p className="text-xs text-[#6C63FF] font-semibold">SENGA RDC</p>
             <p className="font-mono text-sm">{receipt.receiptNumber}</p>
             <p className="text-sm text-gray-600">{receipt.serviceTypeLabel}</p>
             <p className="text-sm">{receipt.serviceLabel}</p>

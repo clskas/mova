@@ -108,7 +108,7 @@ export class DriverDebtLedgerService {
     await this.wallet.debit(
       driverUserId,
       summary.totalOpenCdf,
-      'Règlement dettes espèces MOVA',
+      'Règlement dettes espèces SENGA',
       settlementRef,
     );
 

@@ -1,5 +1,5 @@
-site_name: MOVA RDC Documentation
-site_description: Documentation technique MOVA — Plateforme de mobilité RDC
+site_name: SENGA RDC Documentation
+site_description: Documentation technique SENGA — Plateforme de mobilité RDC
 theme:
   name: material
   language: fr

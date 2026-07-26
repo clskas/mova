@@ -13,9 +13,9 @@ test.describe("Admin — page de connexion", () => {
     );
   });
 
-  test("affiche MOVA Admin sur /login", async ({ page }) => {
+  test("affiche SENGA Admin sur /login", async ({ page }) => {
     await page.goto("/login");
-    await expect(page.getByText("MOVA Admin", { exact: true })).toBeVisible();
+    await expect(page.getByText("SENGA Admin", { exact: true })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Connexion" })).toBeVisible();
     await expect(page.getByText("Accès réservé au personnel autorisé")).toBeVisible();
     await expect(page.getByRole("button", { name: "Se connecter" })).toBeVisible();

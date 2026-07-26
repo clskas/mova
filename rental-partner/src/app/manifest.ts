@@ -3,9 +3,9 @@ import type { MetadataRoute } from "next";
 export default function manifest(): MetadataRoute.Manifest {
   return {
     id: "/",
-    name: "MOVA Location Partenaire",
-    short_name: "MOVA Location",
-    description: "Portail partenaire location — véhicules, réservations et revenus MOVA RDC",
+    name: "SENGA Location Partenaire",
+    short_name: "SENGA Location",
+    description: "Portail partenaire location — véhicules, réservations et revenus SENGA RDC",
     start_url: "/?source=pwa",
     scope: "/",
     display: "standalone",

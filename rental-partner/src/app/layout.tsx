@@ -3,14 +3,14 @@ import "./globals.css";
 import { PwaRegister } from "@/components/PwaRegister";
 
 export const metadata: Metadata = {
-  title: "MOVA Location Partenaire",
-  description: "Portail partenaire — inscription véhicules location MOVA RDC",
-  applicationName: "MOVA Location",
+  title: "SENGA Location Partenaire",
+  description: "Portail partenaire — inscription véhicules location SENGA RDC",
+  applicationName: "SENGA Location",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "MOVA Location",
+    title: "SENGA Location",
   },
   formatDetection: { telephone: false },
   icons: {

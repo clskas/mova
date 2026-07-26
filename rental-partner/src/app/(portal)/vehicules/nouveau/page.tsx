@@ -100,8 +100,8 @@ function VehicleFormPageInner() {
           {isEdit && isApproved
             ? "Véhicule publié — vous pouvez ajuster tarifs, photo et équipements sans nouvelle validation."
             : isEdit
-              ? "Après modification, le dossier repasse en validation MOVA."
-              : "Votre annonce sera visible après validation par l'équipe MOVA (catalogue admin)."}
+              ? "Après modification, le dossier repasse en validation SENGA."
+              : "Votre annonce sera visible après validation par l'équipe SENGA (catalogue admin)."}
         </p>
       </div>
 
@@ -121,7 +121,7 @@ function VehicleFormPageInner() {
               ? "Enregistrer les modifications"
               : isEdit
                 ? "Enregistrer et resoumettre"
-                : "Soumettre pour validation MOVA"
+                : "Soumettre pour validation SENGA"
           }
           onPhotoError={setError}
           lockIdentityFields={isApproved}

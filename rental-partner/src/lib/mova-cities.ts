@@ -1,4 +1,4 @@
-/** Villes MOVA — aligné DRC_SERVICE_AREAS / admin MOVA_CITIES. */
+/** Villes SENGA — aligné DRC_SERVICE_AREAS / admin MOVA_CITIES. */
 export const MOVA_CITIES = [
   "Kinshasa",
   "Lubumbashi",

@@ -54,14 +54,14 @@ class _GpsDialog extends StatelessWidget {
 
   String get _message => switch (readiness) {
         GpsReadiness.serviceDisabled =>
-          'MOVA a besoin du GPS pour localiser les courses, les livraisons et votre position sur la carte. '
+          'SENGA a besoin du GPS pour localiser les courses, les livraisons et votre position sur la carte. '
           'Activez la localisation dans les paramètres de votre téléphone.',
         GpsReadiness.permissionDenied =>
-          'Autorisez MOVA à accéder à votre position pour proposer des adresses précises, '
+          'Autorisez SENGA à accéder à votre position pour proposer des adresses précises, '
           'estimer les prix et suivre les courses en temps réel.',
         GpsReadiness.permissionDeniedForever =>
           'L\'accès à la position a été refusé définitivement. '
-          'Ouvrez les paramètres de l\'application et autorisez la localisation pour utiliser MOVA.',
+          'Ouvrez les paramètres de l\'application et autorisez la localisation pour utiliser SENGA.',
         GpsReadiness.ready => '',
       };
 

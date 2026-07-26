@@ -121,13 +121,13 @@ export default function AbonnementsPage() {
     <div className="max-w-6xl mx-auto space-y-8">
       <PageHeader
         title="Abonnements"
-        subtitle={`${totalSubs} abonnés actifs · plans MOVA Plus`}
+        subtitle={`${totalSubs} abonnés actifs · plans SENGA Plus`}
         action={!readOnly ? <BtnPrimary onClick={openCreate}>Nouveau plan</BtnPrimary> : undefined}
       />
       {error && <ErrorBanner message={error} onRetry={load} />}
 
       <Card className="p-4 bg-violet-50 border-violet-100 text-sm text-gray-700 space-y-2">
-        <p className="font-semibold text-[#6C63FF]">Pourquoi les abonnements MOVA Plus ?</p>
+        <p className="font-semibold text-[#6C63FF]">Pourquoi les abonnements SENGA Plus ?</p>
         <p>
           Un abonnement mensuel en CDF fidélise les passagers réguliers (trajets domicile-travail,
           livraisons récurrentes) : réduction sur les frais de service, priorité d&apos;assignation

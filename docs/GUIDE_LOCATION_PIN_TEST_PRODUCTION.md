@@ -1,6 +1,6 @@
 # Location véhicule — PIN espèces, tests réels & production
 
-Guide opérationnel MOVA RDC : confirmation du code PIN par le partenaire loueur, scénarios de test bout-en-bout, et checklist pour un lancement production.
+Guide opérationnel SENGA RDC : confirmation du code PIN par le partenaire loueur, scénarios de test bout-en-bout, et checklist pour un lancement production.
 
 ---
 
@@ -10,7 +10,7 @@ Guide opérationnel MOVA RDC : confirmation du code PIN par le partenaire loueur
 |--------|-------------|------|
 | **Passager** | App mobile Passager | Réserve, reçoit le véhicule, paie (wallet / mobile money / **espèces**) |
 | **Partenaire loueur** | Portail partenaire `http://localhost:3008` | Gère réservations sur **ses** véhicules, remise / retour |
-| **Chauffeur MOVA** (optionnel) | App mobile Chauffeur | Si logistique MOVA : remise / récupération du véhicule |
+| **Chauffeur SENGA** (optionnel) | App mobile Chauffeur | Si logistique SENGA : remise / récupération du véhicule |
 | **Admin** | `http://localhost:3002` | Catalogue, validation véhicules, supervision |
 
 > Le **PIN espèces** sert uniquement au paiement **CASH** après retour du véhicule. Ce n’est **pas** le même bouton que « Confirmer disponibilité » sur le portail partenaire.
@@ -29,8 +29,8 @@ PENDING → CONTACTED → CONFIRMED → IN_PROGRESS → RETURNED → PAID
 | `PENDING` | Demande envoyée | Passager |
 | `CONTACTED` | Partenaire a pris en charge | Partenaire |
 | `CONFIRMED` | Disponibilité confirmée | Partenaire |
-| `IN_PROGRESS` | Véhicule remis au passager | Partenaire (ou chauffeur MOVA) |
-| `RETURNED` | Véhicule rendu — **paiement possible** | Partenaire (ou chauffeur MOVA) |
+| `IN_PROGRESS` | Véhicule remis au passager | Partenaire (ou chauffeur SENGA) |
+| `RETURNED` | Véhicule rendu — **paiement possible** | Partenaire (ou chauffeur SENGA) |
 | `PAID` | Paiement confirmé (espèces, wallet ou mobile money) | Système après paiement |
 | `CLOSED` | Annulée / refusée | Partenaire ou passager |
 
@@ -46,14 +46,14 @@ PENDING → CONTACTED → CONFIRMED → IN_PROGRESS → RETURNED → PAID
 2. Le passager ouvre **Mes locations** → **Payer la location** → choisit **Espèces**.
 3. Le passager voit le **code PIN** et le communique au partenaire (oralement ou par SMS).
 4. Le partenaire **confirme la réception des espèces** en saisissant ce PIN.
-5. Le paiement passe à `COMPLETED`, la location passe à **`PAID`**, le passager peut ouvrir son **reçu MOVA**.
+5. Le paiement passe à `COMPLETED`, la location passe à **`PAID`**, le passager peut ouvrir son **reçu SENGA**.
 
 ### 3.2 Qui peut confirmer le PIN ?
 
 L’API accepte le JWT de l’utilisateur identifié comme « receveur » du paiement espèces :
 
 - le **propriétaire du véhicule** (`ownerUserId` du partenaire), **ou**
-- le **chauffeur MOVA** assigné à la mission (`driverId`), si logistique MOVA.
+- le **chauffeur SENGA** assigné à la mission (`driverId`), si logistique SENGA.
 
 ### 3.3 Portail partenaire (aujourd’hui)
 
@@ -66,7 +66,7 @@ Sur **http://localhost:3008** → **Réservations** :
 | Remise effectuée → En cours | `start` | `IN_PROGRESS` |
 | **Véhicule rendu** | `return` | `RETURNED` (+ génération PIN) |
 
-**Important :** le portail partenaire ne propose pas encore de champ « Saisir le PIN espèces ». La confirmation PIN se fait aujourd’hui via **l’API** (section 3.4) ou, si un chauffeur MOVA est assigné, via l’app Chauffeur (écran mission location — confirmation PIN à venir côté mobile).
+**Important :** le portail partenaire ne propose pas encore de champ « Saisir le PIN espèces ». La confirmation PIN se fait aujourd’hui via **l’API** (section 3.4) ou, si un chauffeur SENGA est assigné, via l’app Chauffeur (écran mission location — confirmation PIN à venir côté mobile).
 
 ### 3.4 Confirmation PIN via API (méthode actuelle pour le partenaire)
 
@@ -134,7 +134,7 @@ Invoke-RestMethod "http://localhost:3000/api/rental/bookings/$bookingId" `
 
 | Mode | Confirmation partenaire |
 |------|-------------------------|
-| **Portefeuille MOVA** | Automatique — pas de PIN |
+| **Portefeuille SENGA** | Automatique — pas de PIN |
 | **Orange Money / M-Pesa / Airtel** | Automatique après callback opérateur |
 | **Espèces** | PIN obligatoire côté partenaire ou chauffeur assigné |
 
@@ -145,7 +145,7 @@ Invoke-RestMethod "http://localhost:3000/api/rental/bookings/$bookingId" `
 ### 4.1 Prérequis infrastructure
 
 ```powershell
-cd c:\Users\Administrator\Mova
+cd c:\Users\Administrator\Senga
 
 # 1. Stack backend
 docker compose up -d --build
@@ -173,7 +173,7 @@ cd admin && npm run dev                   # http://localhost:3002
 
 | Service | Port |
 |---------|------|
-| API Gateway MOVA | **3000** |
+| API Gateway SENGA | **3000** |
 | Web passager | 3001 |
 | Admin | 3002 |
 | Portail partenaire location | **3008** |
@@ -186,7 +186,7 @@ cd admin && npm run dev                   # http://localhost:3002
 |------|-----------|-----------|-----------------|
 | Passager | `+243900000012` (Grace Lumumba) | `123456` | App Passager |
 | Partenaire location | `+243900000031` | `123456` | Portail 3008 |
-| Chauffeur (si logistique MOVA) | `+243900000023` (KYC approuvé) | `123456` | App Chauffeur |
+| Chauffeur (si logistique SENGA) | `+243900000023` (KYC approuvé) | `123456` | App Chauffeur |
 | Admin | `+243900000001` | `123456` | Admin 3002 |
 
 ### 4.3 Étapes du test espèces location
@@ -210,7 +210,7 @@ cd admin && npm run dev                   # http://localhost:3002
 adb -s R3CN70C59KF reverse tcp:3000 tcp:3000
 .\scripts\run-mobile-passenger.ps1 -UsbReverse -Device R3CN70C59KF
 
-# V2 PRO chauffeur (si logistique MOVA)
+# V2 PRO chauffeur (si logistique SENGA)
 adb -s V220206V01014 reverse tcp:3000 tcp:3000
 .\scripts\run-mobile-driver.ps1 -UsbReverse -Device V220206V01014
 ```
@@ -377,11 +377,11 @@ Migration PIN location : `20250705140000_rental_cash_pin_paid` (statut `PAID` + 
 
 ## 7. Documents connexes
 
-- [GUIDE_TEST_APPS.md](./GUIDE_TEST_APPS.md) — tests globaux écosystème MOVA
+- [GUIDE_TEST_APPS.md](./GUIDE_TEST_APPS.md) — tests globaux écosystème SENGA
 - [PRODUCTION_DEPLOYMENT.md](./PRODUCTION_DEPLOYMENT.md) — déploiement national RDC
 - [rental-partner/README.md](../rental-partner/README.md) — portail partenaire
 - [CAHIER_DES_CHARGES_V2.md](./CAHIER_DES_CHARGES_V2.md) — espèces multi-services (CASH-03)
 
 ---
 
-*Dernière mise à jour : juillet 2026 — MOVA RDC v1.4+*
+*Dernière mise à jour : juillet 2026 — SENGA RDC v1.4+*

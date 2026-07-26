@@ -39,7 +39,7 @@ class ComingSoonScreen extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             description ??
-                '$serviceName arrive prochainement sur MOVA, partout en RDC.',
+                '$serviceName arrive prochainement sur SENGA, partout en RDC.',
             textAlign: TextAlign.center,
             style: const TextStyle(
               color: MovaColors.textSecondary,

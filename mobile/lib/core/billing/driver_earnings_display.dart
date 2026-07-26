@@ -1,6 +1,6 @@
 import '../config/market_config.dart';
 
-/// Affichage cohérent des revenus chauffeur (net après commission MOVA).
+/// Affichage cohérent des revenus chauffeur (net après commission SENGA).
 /// Le chauffeur ne voit jamais le montant total payé par le passager.
 class DriverEarningsDisplay {
   DriverEarningsDisplay._();
@@ -29,7 +29,7 @@ class DriverEarningsDisplay {
 
   static String netLabel({int? net}) {
     if (net == null) return 'Revenu net indisponible';
-    return 'Votre revenu net (après commission MOVA)';
+    return 'Votre revenu net (après commission SENGA)';
   }
 
   static String deliveryNetLabel({
@@ -50,7 +50,7 @@ class DriverEarningsDisplay {
       'ERRAND' => 'Revenu net (course + remboursement achats)',
       'MOVING' => 'Revenu net déménagement',
       'CARPOOL' => 'Gain sur les places réservées',
-      'RENTAL' => 'Rémunération logistique MOVA',
+      'RENTAL' => 'Rémunération logistique SENGA',
       'SCHEDULED' => 'Revenu net course planifiée',
       'PARCEL' || 'EXPRESS' || 'DELIVERY' => 'Revenu net livraison',
       _ => netLabel(net: net),

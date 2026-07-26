@@ -33,7 +33,7 @@ void main() {
         home: Scaffold(
           body: MovaCard(
             child: Text(
-              'Paiement en CDF via Orange Money, M-Pesa ou portefeuille MOVA',
+              'Paiement en CDF via Orange Money, M-Pesa ou portefeuille SENGA',
               maxLines: 3,
               overflow: TextOverflow.ellipsis,
             ),

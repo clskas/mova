@@ -29,7 +29,7 @@ class ChatAlertService {
   }
 
   static const _channelId = 'mova_chat';
-  static const _channelName = 'Messages MOVA';
+  static const _channelName = 'Messages SENGA';
 
   static Future<void> init() async {
     if (_initialized) return;
@@ -97,7 +97,7 @@ class ChatAlertService {
           playSound: true,
           enableVibration: true,
           vibrationPattern: Int64List.fromList([0, 250, 100, 250]),
-          ticker: 'Nouveau message MOVA',
+          ticker: 'Nouveau message SENGA',
         ),
         iOS: const DarwinNotificationDetails(
           presentAlert: true,
@@ -130,7 +130,7 @@ class ChatAlertService {
     final id = ++_notificationId;
     await _plugin.show(
       id: id,
-      title: title.isEmpty ? 'Message MOVA' : title,
+      title: title.isEmpty ? 'Message SENGA' : title,
       body: body.length > 120 ? '${body.substring(0, 117)}…' : body,
       notificationDetails: NotificationDetails(
         android: AndroidNotificationDetails(
@@ -141,7 +141,7 @@ class ChatAlertService {
           playSound: true,
           enableVibration: true,
           vibrationPattern: Int64List.fromList([0, 250, 100, 250]),
-          ticker: 'Nouveau message MOVA',
+          ticker: 'Nouveau message SENGA',
         ),
         iOS: const DarwinNotificationDetails(
           presentAlert: true,

@@ -26,7 +26,7 @@ describe('PricingAdminService', () => {
   });
 
   it('rejette un code promo sans réduction', async () => {
-    await expect(service.createPromoCode({ code: 'MOVA' })).rejects.toBeInstanceOf(MovaHttpException);
+    await expect(service.createPromoCode({ code: 'SENGA' })).rejects.toBeInstanceOf(MovaHttpException);
   });
 
   it('crée un code promo valide', async () => {

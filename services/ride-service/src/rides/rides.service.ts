@@ -271,7 +271,7 @@ export class RidesService {
         jobKind: 'RIDE_OFFER',
         referenceId: ride.id,
         driverUserIds: drivers.map((d) => d.userId),
-        title: 'Nouvelle course MOVA',
+        title: 'Nouvelle course SENGA',
         body: `Course disponible · ${pickup}${fare}`,
         pickupAddress: ride.pickupAddress ?? undefined,
         pickupLat: ride.pickupLat,
@@ -305,10 +305,10 @@ export class RidesService {
     const user = await fetchAuthUserBrief(userId);
     if (!user?.phone) return;
     const messages: Partial<Record<RideStatus, string>> = {
-      [RideStatus.ACCEPTED]: 'MOVA : votre chauffeur a accepté la course.',
-      [RideStatus.DRIVER_ARRIVED]: 'MOVA : votre chauffeur est arrivé au point de départ.',
-      [RideStatus.IN_PROGRESS]: 'MOVA : votre course est en cours.',
-      [RideStatus.COMPLETED]: 'MOVA : course terminée. Merci d\'avoir voyagé avec MOVA.',
+      [RideStatus.ACCEPTED]: 'SENGA : votre chauffeur a accepté la course.',
+      [RideStatus.DRIVER_ARRIVED]: 'SENGA : votre chauffeur est arrivé au point de départ.',
+      [RideStatus.IN_PROGRESS]: 'SENGA : votre course est en cours.',
+      [RideStatus.COMPLETED]: 'SENGA : course terminée. Merci d\'avoir voyagé avec SENGA.',
     };
     const message = messages[status];
     if (!message) return;
@@ -920,7 +920,7 @@ export class RidesService {
       platformFeeCdf: number;
     }[] = [];
     // Modèle par absorption : la remise est supportée uniquement par la partie qui la finance
-    // (restaurant si PARTNER, MOVA si PLATFORM, les deux si SHARED). Le livreur n'absorbe jamais
+    // (restaurant si PARTNER, SENGA si PLATFORM, les deux si SHARED). Le livreur n'absorbe jamais
     // la promo. On part des montants bruts (sans mise à l'échelle proportionnelle) et la commission
     // plateforme est le résidu, garantissant : restaurants + livreur + plateforme = montant payé.
     const partnerDiscount = metadata.partnerDiscountCdf ?? 0;

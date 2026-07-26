@@ -34,7 +34,7 @@ export function filterDriversForMoving(
   });
 }
 
-/** Chauffeurs éligibles pour logistique location MOVA (livraison/récupération véhicule). */
+/** Chauffeurs éligibles pour logistique location SENGA (livraison/récupération véhicule). */
 export function filterDriversForRentalLogistics(drivers: AdminDriver[]): AdminDriver[] {
   return drivers.filter((d) => driverHasCargoVehicle(d));
 }

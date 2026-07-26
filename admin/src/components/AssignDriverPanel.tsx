@@ -32,7 +32,7 @@ export function AssignDriverPanel({
   currentDriverId,
   compact,
   title = "Assigner un chauffeur",
-  fieldLabel = "Chauffeur MOVA (KYC approuvé)",
+  fieldLabel = "Chauffeur SENGA (KYC approuvé)",
   assignLabel,
   hint = "L'assignation passe automatiquement le statut à Confirmé (planifiée, location) ou Assigné (déménagement, livraison).",
   emptyLabel,

@@ -72,7 +72,7 @@ export function OtpGate({ children }: Props) {
   if (!authenticated) {
     return (
       <div className="max-w-sm mx-auto min-h-screen flex flex-col justify-center p-6">
-        <h1 className="text-xl font-bold text-center mb-2">MOVA — Connexion</h1>
+        <h1 className="text-xl font-bold text-center mb-2">SENGA — Connexion</h1>
         <p className="text-sm text-gray-500 text-center mb-6">
           Entrez votre numéro +243 pour continuer
         </p>

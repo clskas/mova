@@ -73,7 +73,7 @@ class HelpScreen extends ConsumerWidget {
           _HelpLink(
             icon: Icons.workspace_premium_outlined,
             iconColor: MovaColors.violet,
-            title: 'MOVA Plus',
+            title: 'SENGA Plus',
             subtitle: 'Abonnements passager — réduction de frais',
             onTap: () => _open(context, const SubscriptionsScreen()),
           ),
@@ -81,7 +81,7 @@ class HelpScreen extends ConsumerWidget {
             icon: Icons.place_outlined,
             iconColor: MovaColors.green,
             title: 'Suggérer un lieu',
-            subtitle: 'Marché, pharmacie, arrêt… validation MOVA',
+            subtitle: 'Marché, pharmacie, arrêt… validation SENGA',
             onTap: () => _open(context, const SuggestPlaceScreen()),
           ),
           _HelpLink(
@@ -95,7 +95,7 @@ class HelpScreen extends ConsumerWidget {
             icon: Icons.menu_book_outlined,
             iconColor: MovaColors.violet,
             title: 'Manuel utilisateur',
-            subtitle: 'Tous les modules MOVA, pas à pas',
+            subtitle: 'Tous les modules SENGA, pas à pas',
             onTap: () => _open(context, const ManualScreen()),
           ),
           _HelpLink(
@@ -125,7 +125,7 @@ class HelpScreen extends ConsumerWidget {
             icon: Icons.gavel_outlined,
             iconColor: MovaColors.midnight,
             title: 'Conditions d\'utilisation',
-            subtitle: 'CGU MOVA RDC',
+            subtitle: 'CGU SENGA RDC',
             onTap: () => _open(
               context,
               const LegalScreen(title: 'CGU', asset: 'assets/legal/cgu_fr.md'),
@@ -148,7 +148,7 @@ class HelpScreen extends ConsumerWidget {
                 context: context,
                 builder: (ctx) => AlertDialog(
                   title: const Text('Déconnexion'),
-                  content: const Text('Voulez-vous vous déconnecter de MOVA ?'),
+                  content: const Text('Voulez-vous vous déconnecter de SENGA ?'),
                   actions: [
                     TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
                     TextButton(

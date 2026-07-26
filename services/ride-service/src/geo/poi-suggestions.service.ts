@@ -132,7 +132,7 @@ export class PoiSuggestionsService {
       suggestion: this.formatSuggestion(updated),
       poi,
       osm: this.buildOsmContribution(suggestion),
-      message: 'Lieu publié dans MOVA. Contribuez aussi sur OpenStreetMap via le lien fourni.',
+      message: 'Lieu publié dans SENGA. Contribuez aussi sur OpenStreetMap via le lien fourni.',
     };
   }
 
@@ -147,7 +147,7 @@ export class PoiSuggestionsService {
       where: { id },
       data: {
         status: PoiSuggestionStatus.REJECTED,
-        rejectionReason: dto.reason?.trim() || 'Non conforme aux critères MOVA.',
+        rejectionReason: dto.reason?.trim() || 'Non conforme aux critères SENGA.',
         reviewedBy: dto.reviewedBy?.trim() || 'admin',
         reviewedAt: new Date(),
       },
@@ -170,7 +170,7 @@ export class PoiSuggestionsService {
       throw new MovaHttpException(
         MovaErrorCode.VALIDATION_ERROR,
         HttpStatus.CONFLICT,
-        'Ce lieu existe déjà dans MOVA.',
+        'Ce lieu existe déjà dans SENGA.',
       );
     }
 

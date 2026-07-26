@@ -261,7 +261,7 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
         _pickupFromSuggestion = true;
         _pickupFromGps = false;
       } else {
-        return 'Adresse d\'enlèvement non reconnue — utilisez le GPS, l\'autocomplétion MOVA ou les coordonnées.';
+        return 'Adresse d\'enlèvement non reconnue — utilisez le GPS, l\'autocomplétion SENGA ou les coordonnées.';
       }
     } else if (ServiceAreaLocation.isInBounds(_pickup)) {
       _pickup = ServiceAreaLocation.ensureInServiceArea(
@@ -297,7 +297,7 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
           address: _dropoffController.text,
         );
       } else {
-        return 'Adresse non reconnue — utilisez le GPS, l\'autocomplétion MOVA ou les coordonnées.';
+        return 'Adresse non reconnue — utilisez le GPS, l\'autocomplétion SENGA ou les coordonnées.';
       }
     } else {
       _dropoff = ServiceAreaLocation.ensureInServiceArea(

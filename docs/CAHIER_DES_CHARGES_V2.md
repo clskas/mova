@@ -1,4 +1,4 @@
-# Cahier des charges — MOVA v2 (SOS, ERRAND v2, Cash/SMS)
+# Cahier des charges — SENGA v2 (SOS, ERRAND v2, Cash/SMS)
 
 **Version :** 1.0 — Juin 2026  
 **Statut :** Implémenté (branche `main`)  
@@ -8,15 +8,15 @@
 
 ## Contexte
 
-MOVA dispose déjà d’une super-app mobilité (courses, livraisons, ERRAND, location, covoiturage, wallet, KYC/OCR, traces GPS). Ce cahier définit trois ajouts différenciants pour le marché congolais.
+SENGA dispose déjà d’une super-app mobilité (courses, livraisons, ERRAND, location, covoiturage, wallet, KYC/OCR, traces GPS). Ce cahier définit trois ajouts différenciants pour le marché congolais.
 
 ---
 
-## 1. MOVA Sécurité — SOS + partage de trajet
+## 1. SENGA Sécurité — SOS + partage de trajet
 
 ### Objectif
 
-Renforcer la confiance passager avec une alerte urgence et un lien de suivi partageable sans compte MOVA.
+Renforcer la confiance passager avec une alerte urgence et un lien de suivi partageable sans compte SENGA.
 
 ### Périmètre fonctionnel
 
@@ -51,7 +51,7 @@ TripShareLink { rideId, token, expiresAt, createdBy }
 
 ---
 
-## 2. MOVA Courses — ERRAND v2
+## 2. SENGA Courses — ERRAND v2
 
 ### Objectif
 
@@ -90,7 +90,7 @@ Structurer les « courses & commissions » (achats marché, pharmacie) avec budg
 
 ---
 
-## 3. MOVA Cash + SMS
+## 3. SENGA Cash + SMS
 
 ### Objectif
 

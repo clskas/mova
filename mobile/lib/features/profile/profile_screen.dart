@@ -181,7 +181,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                 ),
                                 const SizedBox(height: 4),
                                 const Text(
-                                  'Vous pouvez utiliser MOVA avec votre numéro seul. '
+                                  'Vous pouvez utiliser SENGA avec votre numéro seul. '
                                   'Ajoutez votre nom pour personnaliser l\'accueil et le chat.',
                                   style: TextStyle(color: MovaColors.textSecondary, fontSize: 12),
                                 ),

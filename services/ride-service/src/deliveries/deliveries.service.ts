@@ -83,7 +83,7 @@ export class DeliveriesService {
       pickupLat,
       pickupLng,
       pickupAddress: pickup,
-      title: 'Nouvelle livraison MOVA',
+      title: 'Nouvelle livraison SENGA',
       body: `${label} · ${pickup}`,
       vehicleTypes: DELIVERY_ALERT_VEHICLE_TYPES,
       data: { deliveryType: delivery.type },

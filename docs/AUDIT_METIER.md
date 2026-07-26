@@ -1,4 +1,4 @@
-# Audit métier MOVA — anomalies & plan de test
+# Audit métier SENGA — anomalies & plan de test
 
 Document de référence pour tester l'ensemble du projet (juin 2026).  
 Inspiré des pratiques Uber/Bolt (courses), Deliveroo (livraisons), AnyVan/Lugg (déménagement).
@@ -17,7 +17,7 @@ Inspiré des pratiques Uber/Bolt (courses), Deliveroo (livraisons), AnyVan/Lugg 
 | Covoiturage | ✅ | ❌ | Après trajet | À faire |
 | Course planifiée | ❌ | ❌ | — | À faire |
 
-**Méthodes :** portefeuille MOVA, Orange/M-Pesa/Airtel, espèces (+ PIN chauffeur pour courses).
+**Méthodes :** portefeuille SENGA, Orange/M-Pesa/Airtel, espèces (+ PIN chauffeur pour courses).
 
 ---
 
@@ -30,7 +30,7 @@ Inspiré des pratiques Uber/Bolt (courses), Deliveroo (livraisons), AnyVan/Lugg 
 | **Planifiée (admin)** | ✅ par `vehicleType` (corrigé) | Corrigé |
 | Colis / food / express (auto) | ❌ moto + voiture sans filtre poids | À faire |
 | Errand (admin + accept) | ❌ prix moto, tout véhicule | À faire |
-| Location MOVA driver | ❌ KYC seulement | À faire |
+| Location SENGA driver | ❌ KYC seulement | À faire |
 
 ---
 
@@ -58,7 +58,7 @@ Inspiré des pratiques Uber/Bolt (courses), Deliveroo (livraisons), AnyVan/Lugg 
 - [x] Admin livraisons : assignation colis/food + filtre poids
 - [x] acceptRide / acceptDelivery : re-validation véhicule API
 - [x] Types **UTILITAIRE / CAMION** (driver + ride DB, onboarding, admin)
-- [x] Location MOVA driver : assign filtre engin cargo
+- [x] Location SENGA driver : assign filtre engin cargo
 
 ### Sécurité / statuts
 - [x] Errand / delivery / moving : passager annulation seule

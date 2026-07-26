@@ -346,7 +346,7 @@ export default function ChauffeursPage() {
       <PageHeader title="Chauffeurs" subtitle={readOnly ? "Consultation profils chauffeurs" : "Profils chauffeurs, KYC et disponibilité"} />
       {error && <div className="mb-4"><ErrorBanner message={error} onRetry={load} /></div>}
       <div className="space-y-4">
-        <SearchInput value={search} onChange={setSearch} placeholder="Rechercher par ID MOVA, plaque ou statut KYC…" />
+        <SearchInput value={search} onChange={setSearch} placeholder="Rechercher par ID SENGA, plaque ou statut KYC…" />
         {loading ? (
           <LoadingState />
         ) : filtered.length === 0 ? (
@@ -394,7 +394,7 @@ export default function ChauffeursPage() {
         ) : selected ? (
           <div className="space-y-4">
             <div className="grid sm:grid-cols-2 gap-3 text-sm">
-              <p><span className="text-gray-500">Identifiant MOVA:</span> <span className="font-mono font-medium">{selected.publicId ?? "—"}</span></p>
+              <p><span className="text-gray-500">Identifiant SENGA:</span> <span className="font-mono font-medium">{selected.publicId ?? "—"}</span></p>
               <p><span className="text-gray-500">Téléphone:</span> {detail?.user?.phone ?? "—"}</p>
               <p><span className="text-gray-500">Nom:</span> {[detail?.user?.firstName, detail?.user?.lastName].filter(Boolean).join(" ") || "—"}</p>
               <p><span className="text-gray-500">KYC:</span> <StatusBadge status={selected.kycStatus} /></p>

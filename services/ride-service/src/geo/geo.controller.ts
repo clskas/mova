@@ -15,7 +15,7 @@ export class GeoController {
   }
 
   @Get('service-areas')
-  @ApiOperation({ summary: 'Zones de service MOVA (villes RDC)' })
+  @ApiOperation({ summary: 'Zones de service SENGA (villes RDC)' })
   serviceAreas() {
     return this.geo.listServiceAreas();
   }
@@ -55,7 +55,7 @@ export class GeoController {
   }
 
   @Post('places/import')
-  @ApiOperation({ summary: 'Import POI RDC (seed national ou Overpass par zone MOVA)' })
+  @ApiOperation({ summary: 'Import POI RDC (seed national ou Overpass par zone SENGA)' })
   importPlaces(@Query('city') city?: string, @Query('overpass') overpass?: string) {
     return this.geo.importPois(city ?? 'RDC', overpass === 'true');
   }

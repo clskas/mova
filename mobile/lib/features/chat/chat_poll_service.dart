@@ -73,7 +73,7 @@ class ChatPollService {
           kind: kind,
           threadId: threadId,
           messageId: messageId,
-          title: n['title']?.toString() ?? 'Message MOVA',
+          title: n['title']?.toString() ?? 'Message SENGA',
           body: n['body']?.toString() ?? '',
         );
       }

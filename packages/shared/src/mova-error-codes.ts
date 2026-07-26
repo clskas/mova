@@ -92,7 +92,7 @@ export const MOVA_ERROR_MESSAGES: Record<MovaErrorCode, string> = {
   [MovaErrorCode.CARPOOL_NO_SEATS]: 'Plus de places disponibles sur ce trajet.',
   [MovaErrorCode.CARPOOL_ALREADY_JOINED]: 'Vous avez déjà rejoint ce trajet.',
   [MovaErrorCode.CARPOOL_PUBLISH_DRIVER_ONLY]:
-    'Seuls les chauffeurs MOVA validés (KYC approuvé) peuvent publier un covoiturage.',
+    'Seuls les chauffeurs SENGA validés (KYC approuvé) peuvent publier un covoiturage.',
 
   [MovaErrorCode.ERRAND_NOT_FOUND]: 'Commande de course introuvable.',
   [MovaErrorCode.ERRAND_INVALID_STATUS]: 'Statut de commande invalide pour cette action.',
@@ -117,10 +117,10 @@ export const MOVA_ERROR_MESSAGES: Record<MovaErrorCode, string> = {
 
   [MovaErrorCode.VALIDATION_ERROR]: 'Données invalides.',
   [MovaErrorCode.NOT_FOUND]: 'Ressource introuvable.',
-  [MovaErrorCode.PRICING_NOT_CONFIGURED]: 'Tarification non configurée. Contactez le support MOVA.',
+  [MovaErrorCode.PRICING_NOT_CONFIGURED]: 'Tarification non configurée. Contactez le support SENGA.',
   [MovaErrorCode.PROMO_NOT_FOUND]: 'Code promo introuvable.',
   [MovaErrorCode.PROMO_INVALID]: 'Code promo invalide ou expiré.',
   [MovaErrorCode.SUBSCRIPTION_NOT_FOUND]: 'Abonnement introuvable.',
-  [MovaErrorCode.CITY_INACTIVE]: 'MOVA n\'est pas disponible dans cette ville pour le moment.',
+  [MovaErrorCode.CITY_INACTIVE]: 'SENGA n\'est pas disponible dans cette ville pour le moment.',
   [MovaErrorCode.INTERNAL_ERROR]: 'Une erreur interne est survenue.',
 };

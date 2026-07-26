@@ -207,7 +207,7 @@ class _MovingTrackingScreenState extends ConsumerState<MovingTrackingScreen> {
                       ],
                       const SizedBox(height: 8),
                       const Text(
-                        'Un administrateur MOVA valide votre demande, assigne une équipe/camion, '
+                        'Un administrateur SENGA valide votre demande, assigne une équipe/camion, '
                         'puis met à jour le statut. Vous voyez ici les changements en temps réel.',
                         style: TextStyle(fontSize: 12, color: MovaColors.textSecondary, height: 1.35),
                       ),

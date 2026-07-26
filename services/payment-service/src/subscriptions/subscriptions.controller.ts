@@ -18,7 +18,7 @@ export class SubscriptionsController {
   constructor(private subscriptions: SubscriptionsService) {}
 
   @Get('plans')
-  @ApiOperation({ summary: 'Plans d\'abonnement MOVA Plus actifs' })
+  @ApiOperation({ summary: 'Plans d\'abonnement SENGA Plus actifs' })
   listPlans() {
     return this.subscriptions.listPlans(true);
   }

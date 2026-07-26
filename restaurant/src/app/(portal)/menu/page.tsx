@@ -126,7 +126,7 @@ export default function MenuPage() {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h2 className="text-xl font-bold">Menu & photos</h2>
-            <p className="text-sm text-gray-500">Plats visibles par les passagers MOVA</p>
+            <p className="text-sm text-gray-500">Plats visibles par les passagers SENGA</p>
           </div>
           <button
             type="button"

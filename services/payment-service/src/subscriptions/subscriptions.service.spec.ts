@@ -21,14 +21,14 @@ describe('SubscriptionsService', () => {
     );
   });
 
-  it('crée un plan MOVA Plus', async () => {
+  it('crée un plan SENGA Plus', async () => {
     prisma.subscriptionPlan.create.mockResolvedValue({
       code: 'MOVA_PLUS_PASSENGER',
       monthlyPriceCdf: 15000,
     });
     const plan = await service.createPlan({
       code: 'mova_plus_passenger',
-      name: 'MOVA Plus',
+      name: 'SENGA Plus',
       target: SubscriptionTarget.PASSENGER,
       monthlyPriceCdf: 15000,
       feeReductionPercent: 10,

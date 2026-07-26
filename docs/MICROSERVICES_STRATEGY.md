@@ -1,4 +1,4 @@
-# Stratégie microservices MOVA
+# Stratégie microservices SENGA
 
 **Décision (2026)** : conserver l’architecture microservices (7 services NestJS + api-gateway) et réduire la charge opérationnelle par consolidation d’infrastructure — sans fusionner le code applicatif.
 

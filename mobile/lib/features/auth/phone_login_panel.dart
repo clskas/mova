@@ -272,7 +272,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
           const SizedBox(height: 16),
           SixDigitPinField(
             controller: _pinController,
-            label: 'Code PIN MOVA',
+            label: 'Code PIN SENGA',
             autofocus: true,
             enabled: !_loading,
           ),

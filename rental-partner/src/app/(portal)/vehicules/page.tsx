@@ -16,7 +16,7 @@ function statusBadge(v: PartnerVehicle) {
     return <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">Retiré</span>;
   }
   if (v.approvalStatus === "PENDING") {
-    return <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">En attente MOVA</span>;
+    return <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">En attente SENGA</span>;
   }
   if (v.approvalStatus === "REJECTED") {
     return <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-800">Refusé</span>;
@@ -77,7 +77,7 @@ export default function VehiclesPage() {
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h2 className="text-xl font-semibold">Mes véhicules</h2>
-          <p className="text-sm text-gray-500">Catalogue partenaire — modifications visibles en temps réel après validation MOVA.</p>
+          <p className="text-sm text-gray-500">Catalogue partenaire — modifications visibles en temps réel après validation SENGA.</p>
         </div>
         <Link
           href="/vehicules/nouveau"
@@ -101,7 +101,7 @@ export default function VehiclesPage() {
             onChange={(e) => setFilterStatus(e.target.value)}
           >
             <option value="">Tous statuts</option>
-            <option value="PENDING">En attente MOVA</option>
+            <option value="PENDING">En attente SENGA</option>
             <option value="APPROVED">Publié</option>
             <option value="REJECTED">Refusé</option>
           </select>

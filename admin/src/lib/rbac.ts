@@ -1,4 +1,4 @@
-/** Rôles staff autorisés sur la console admin MOVA. */
+/** Rôles staff autorisés sur la console admin SENGA. */
 export type AdminRole = "SUPER_ADMIN" | "ADMIN" | "SUPPORT" | "FINANCE" | "CONTENT";
 
 export type AdminSection =

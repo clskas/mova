@@ -2,10 +2,10 @@ import { test, expect, type Page } from "@playwright/test";
 import { requireReachable } from "./helpers";
 
 async function ensureWebHome(page: Page) {
-  const homeHeading = page.getByRole("heading", { name: /MOVA — RDC/i });
+  const homeHeading = page.getByRole("heading", { name: /SENGA — RDC/i });
   if (await homeHeading.isVisible().catch(() => false)) return;
 
-  const loginHeading = page.getByRole("heading", { name: /MOVA — Connexion/i });
+  const loginHeading = page.getByRole("heading", { name: /SENGA — Connexion/i });
   await expect(loginHeading).toBeVisible({ timeout: 15_000 });
 
   await page.getByPlaceholder("+243812345678").fill("+243812345678");
@@ -24,9 +24,9 @@ test.describe("Web passager — accueil", () => {
     );
   });
 
-  test("affiche MOVA — RDC sur la page d'accueil", async ({ page }) => {
+  test("affiche SENGA — RDC sur la page d'accueil", async ({ page }) => {
     await page.goto("/");
     await ensureWebHome(page);
-    await expect(page.getByRole("heading", { name: /MOVA — RDC/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /SENGA — RDC/i })).toBeVisible();
   });
 });

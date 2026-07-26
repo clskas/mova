@@ -1,4 +1,4 @@
-# MOVA RDC — Services externes, coûts et choix stratégiques
+# SENGA RDC — Services externes, coûts et choix stratégiques
 
 **Document à l’attention de la Direction**  
 **Version :** 1.1 — Juillet 2026  
@@ -8,7 +8,7 @@
 
 ## 1. Résumé exécutif
 
-MOVA est une plateforme **techniquement prête** (applications passager, chauffeur, admin, portails partenaire/restaurant, API microservices). En environnement de développement, plusieurs fonctions critiques fonctionnent en **mode simulation** (`MOCK_OTP`, `MOCK_PAYMENTS`, stockage photo local).
+SENGA est une plateforme **techniquement prête** (applications passager, chauffeur, admin, portails partenaire/restaurant, API microservices). En environnement de développement, plusieurs fonctions critiques fonctionnent en **mode simulation** (`MOCK_OTP`, `MOCK_PAYMENTS`, stockage photo local).
 
 Pour être **pleinement opérationnelle en République Démocratique du Congo**, l’entreprise doit contracter des services externes dans **6 familles** :
 
@@ -37,7 +37,7 @@ Pour être **pleinement opérationnelle en République Démocratique du Congo**,
 
 ## 2. Cartographie des besoins par fonction métier
 
-| Fonction MOVA | Service externe | Variable(s) technique | Mode actuel dev |
+| Fonction SENGA | Service externe | Variable(s) technique | Mode actuel dev |
 |---------------|-----------------|----------------------|-----------------|
 | Connexion OTP (+243) | SMS provider | `SMS_PROVIDER`, `AFRICAS_TALKING_*` ou `TWILIO_*` | `MOCK_OTP=true` → code `123456` |
 | Paiement course / wallet | Mobile Money | `MOBILE_MONEY_GATEWAY`, clés AT ou opérateurs | `MOCK_PAYMENTS=true` |
@@ -63,7 +63,7 @@ Référence technique complète : `config/external-apis.env.example`
 
 ### 3.1 Hébergement backend, bases de données et cache
 
-L’architecture MOVA repose sur **7 services web Docker** + **5 bases PostgreSQL** + **Redis** (voir `render.yaml`).
+L’architecture SENGA repose sur **7 services web Docker** + **5 bases PostgreSQL** + **Redis** (voir `render.yaml`).
 
 | Option | Description | Coût mensuel estimé | Avantages | Inconvénients |
 |--------|-------------|---------------------|-----------|---------------|
@@ -90,7 +90,7 @@ L’architecture MOVA repose sur **7 services web Docker** + **5 bases PostgreSQ
 
 Chaque connexion envoie **1 SMS** (code 6 chiffres). Volume pilote : 3 000–10 000 SMS/mois.
 
-| Fournisseur | Coût unitaire indicatif (SMS → RDC) | Contrat | Intégration MOVA |
+| Fournisseur | Coût unitaire indicatif (SMS → RDC) | Contrat | Intégration SENGA |
 |-------------|--------------------------------------|---------|------------------|
 | **Africa’s Talking** ⭐ | **0,02 – 0,05 USD** / SMS (devis volume) | 1 contrat pan-africain | **Native** (`SMS_PROVIDER=africastalking`) |
 | **Twilio** | **0,06 – 0,15+ USD** / SMS | International | Legacy (`SMS_PROVIDER=twilio`) |
@@ -105,13 +105,13 @@ Chaque connexion envoie **1 SMS** (code 6 chiffres). Volume pilote : 3 000–10 
 
 **Choix optimal :** **Africa’s Talking** — coût inférieur, un seul interlocuteur, déjà câblé pour OTP **et** Mobile Money.
 
-**Actions direction :** ouvrir compte sur [account.africastalking.com](https://account.africastalking.com), demander short code ou expéditeur alphanumérique **« MOVA »** (validation ARPTC / opérateurs).
+**Actions direction :** ouvrir compte sur [account.africastalking.com](https://account.africastalking.com), demander short code ou expéditeur alphanumérique **« SENGA »** (validation ARPTC / opérateurs).
 
 ---
 
 ### 3.3 Mobile Money (paiements réels)
 
-MOVA supporte **Orange Money**, **M-Pesa (Vodacom)**, **Airtel Money** via portefeuille intégré.
+SENGA supporte **Orange Money**, **M-Pesa (Vodacom)**, **Airtel Money** via portefeuille intégré.
 
 | Approche | Frais typiques | Contrats | Intégration |
 |----------|----------------|----------|-------------|
@@ -238,7 +238,7 @@ Non bloquants pour le jour J ; recommandés dès **mois 2**.
 
 > **Lecture direction :** tableau de référence pour arbitrer les contrats. Montants en **USD/mois** sauf mention « unique » ou « /an ». Taux indicatif **1 USD ≈ 2 800 CDF** (juillet 2026 — à actualiser en comptabilité).
 
-#### 3.11.1 Hébergement cloud — détail ligne par ligne (Blueprint MOVA)
+#### 3.11.1 Hébergement cloud — détail ligne par ligne (Blueprint SENGA)
 
 Inventaire exact du fichier `render.yaml` :
 
@@ -259,7 +259,7 @@ Montée en charge recommandée (services critiques uniquement) :
 | Redis | Starter (prod) | **10 USD** | 1 | **10 USD** |
 | **Total Render mixte Standard** | | | | **≈ 137 – 202 USD/mois** |
 
-| Plateforme alternative | Entrée de gamme | Milieu de gamme | Enterprise | Intégration MOVA |
+| Plateforme alternative | Entrée de gamme | Milieu de gamme | Enterprise | Intégration SENGA |
 |------------------------|-----------------|-----------------|------------|------------------|
 | **Render** ⭐ | 91 USD (Blueprint) | 200 USD | 500+ USD | **Prête** (`render.yaml`) |
 | **Railway** | 5 USD crédit + usage | 50 – 150 USD | Sur devis | Manuelle (pas de Blueprint) |
@@ -273,7 +273,7 @@ Montée en charge recommandée (services critiques uniquement) :
 
 **Frontends Next.js (admin, web, restaurant, location)** — hors Blueprint Render actuel :
 
-| Plateforme | Plan | Prix/mois | Services MOVA couverts |
+| Plateforme | Plan | Prix/mois | Services SENGA couverts |
 |------------|------|-----------|------------------------|
 | **Render Web** (Starter) | Starter | **7 USD** × N | mova-web inclus ; +7 USD/admin si hébergé |
 | **Vercel** | Hobby / Pro | **0 / 20 USD** | Admin ou web seul |
@@ -347,20 +347,20 @@ Montée en charge recommandée (services critiques uniquement) :
 
 #### 3.11.6 Notifications push & temps réel
 
-| Plateforme | Plan | Prix/mois | Volume | Remarque MOVA |
+| Plateforme | Plan | Prix/mois | Volume | Remarque SENGA |
 |------------|------|-----------|--------|---------------|
 | **Firebase FCM** ⭐ | Spark (gratuit) | **0 USD** | Illimité* | Déjà intégré |
 | **OneSignal** | Free / Growth | **0 / 9 USD** | 10k+ abonnés | Doublon |
 | **Pusher Channels** | Sandbox / Startup | **0 / 49 USD** | Websocket | Redis suffit côté API |
 | **Ably** | Free / Standard | **0 / 29 USD** | Messages | Optionnel |
 
-\* Fair use Google ; largement suffisant pour MOVA pilote.
+\* Fair use Google ; largement suffisant pour SENGA pilote.
 
 ---
 
 #### 3.11.7 Monitoring, CI/CD, email
 
-| Plateforme | Plan | Prix/mois | Usage MOVA |
+| Plateforme | Plan | Prix/mois | Usage SENGA |
 |------------|------|-----------|------------|
 | **GitHub** (dépôt + Actions) | Free / Team | **0 / 4 USD/user** | CI actuelle |
 | **GitHub Actions** (minutes) | Inclus / payant | **0 – 50 USD** | Builds Docker + e2e |
@@ -400,7 +400,7 @@ Montée en charge recommandée (services critiques uniquement) :
 
 | Stack | Infra | SMS (10k) | Carto | Photos | Monitoring | **Total fixe** | MM variable (2 % GMV 50k) | **Total estimé** |
 |-------|-------|-----------|-------|--------|------------|----------------|---------------------------|------------------|
-| **A — MOVA recommandée** ⭐ | Render 91 + VPS carto 15 | 300 | 15 | 0 (Cloudinary free) | 0 | **~421 USD** | 1 000 USD | **~1 421 USD** |
+| **A — SENGA recommandée** ⭐ | Render 91 + VPS carto 15 | 300 | 15 | 0 (Cloudinary free) | 0 | **~421 USD** | 1 000 USD | **~1 421 USD** |
 | **B — Confort** | Render Standard 200 | 300 | 75 | 89 | 30 | **~694 USD** | 1 000 USD | **~1 694 USD** |
 | **C — AWS enterprise** | 450 | 300 | 50 | 30 | 50 | **~880 USD** | 1 000 USD | **~1 880 USD** |
 | **D — Économie VPS** | 60 | 300 | 0 | 0 | 0 | **~360 USD** | 1 000 USD | **~1 360 USD** |
@@ -463,7 +463,7 @@ Conversion direction (stack A, GMV 50k USD) : **~1 421 USD ≈ 3 980 000 CDF/moi
 
 ---
 
-## 5. Recommandation officielle MOVA (solution optimale)
+## 5. Recommandation officielle SENGA (solution optimale)
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -500,7 +500,7 @@ Conversion direction (stack A, GMV 50k USD) : **~1 421 USD ≈ 3 980 000 CDF/moi
 | S2 | Commander domaine `.cd` + DNS | Direction | `api.mova.cd` actif |
 | S2 | Créer projet Firebase + `google-services.json` | Technique | Push Android fonctionnel |
 | S3 | Contrat Mobile Money AT + URL callback HTTPS | Direction / Finance | `MOCK_PAYMENTS=false` |
-| S3 | Valider expéditeur SMS « MOVA » | Direction / Juridique | `MOCK_OTP=false` |
+| S3 | Valider expéditeur SMS « SENGA » | Direction / Juridique | `MOCK_OTP=false` |
 | S4 | Déployer OSRM/Nominatim (VPS ou Render) | Technique | ETA fiables Kinshasa |
 | S4 | Comptes Google Play + Apple Developer | Direction | Soumission apps |
 | S5–6 | Tests bout-en-bout production | QA + Métier | PV de recette |
@@ -566,7 +566,7 @@ Fichier source : `config/external-apis.env.example`
 
 ## 9. Contacts utiles (à compléter par la Direction)
 
-| Fournisseur | URL | Contact interne MOVA |
+| Fournisseur | URL | Contact interne SENGA |
 |-------------|-----|-------------------|
 | Africa’s Talking | https://africastalking.com | _________________ |
 | Render | https://render.com | _________________ |
@@ -579,4 +579,4 @@ Fichier source : `config/external-apis.env.example`
 
 ---
 
-*Document préparé à partir de l’état réel du dépôt MOVA (`config/external-apis.env.example`, `render.yaml`, intégrations payment-service / auth-service / ride-service). Les tarifs externes doivent être confirmés par devis avant engagement contractuel.*
+*Document préparé à partir de l’état réel du dépôt SENGA (`config/external-apis.env.example`, `render.yaml`, intégrations payment-service / auth-service / ride-service). Les tarifs externes doivent être confirmés par devis avant engagement contractuel.*

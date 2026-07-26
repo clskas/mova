@@ -45,7 +45,7 @@ export function isTwilioSmsConfigured(get: EnvGetter): boolean {
 
 export type SmsBackend = 'mock' | 'africastalking' | 'twilio';
 
-/** Résout le canal SMS actif (MOVA RDC : Africa's Talking par défaut). */
+/** Résout le canal SMS actif (SENGA RDC : Africa's Talking par défaut). */
 export function resolveSmsBackend(get: EnvGetter, mockMode: boolean): SmsBackend {
   if (mockMode) return 'mock';
   const preferred = (get(AFRICAS_TALKING_ENV_KEYS.smsProvider) ?? 'africastalking').trim().toLowerCase();
@@ -119,7 +119,7 @@ export async function africasTalkingSendSms(
 
 export type MobileMoneyOperator = 'ORANGE_MONEY' | 'MPESA' | 'AIRTEL_MONEY';
 
-/** Mappe l'opérateur MOVA vers le code produit Africa's Talking (à affiner selon contrat AT RDC). */
+/** Mappe l'opérateur SENGA vers le code produit Africa's Talking (à affiner selon contrat AT RDC). */
 export function africasTalkingMobileMoneyProviderCode(operator: MobileMoneyOperator): string {
   switch (operator) {
     case 'ORANGE_MONEY':

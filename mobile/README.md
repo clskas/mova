@@ -1,4 +1,4 @@
-# MOVA Mobile (Flutter)
+# SENGA Mobile (Flutter)
 
 Apps passager et chauffeur (flavors) pour la mobilité en RDC.
 
@@ -59,7 +59,7 @@ flutter run --flavor passenger -t lib/main_passenger.dart `
   --dart-define=WS_URL=http://192.168.1.64:3000
 ```
 
-VS Code / Cursor : configurations **MOVA Passager/Chauffeur** dans `.vscode/launch.json`.
+VS Code / Cursor : configurations **Senga/Chauffeur** dans `.vscode/launch.json`.
 
 APK debug LAN : `..\scripts\build-mobile-debug.ps1` depuis la racine du repo.
 

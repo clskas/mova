@@ -158,7 +158,7 @@ export class PaymentsService {
         platformFee,
         paymentMethod === PaymentMethod.CASH
           ? `Commission espèces ${referenceType} ${referenceId}`
-          : `Commission MOVA ${referenceType} ${referenceId}`,
+          : `Commission SENGA ${referenceType} ${referenceId}`,
         `PLATFORM_FEE:${referenceType}:${referenceId}`,
       );
     }

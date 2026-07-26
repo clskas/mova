@@ -149,7 +149,7 @@ function CashPinConfirm({
     <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 space-y-2 text-sm">
       <p className="font-medium text-emerald-900">Paiement espèces</p>
       <p className="text-xs text-emerald-800">
-        Après réception des espèces, demandez au passager son code PIN MOVA (écran « Ma location ») et saisissez-le ici.
+        Après réception des espèces, demandez au passager son code PIN SENGA (écran « Ma location ») et saisissez-le ici.
         Le véhicule doit être au statut « Retournée ».
       </p>
       <div className="flex flex-wrap gap-2">
@@ -233,7 +233,7 @@ export default function ReservationsPage() {
           } else if (fresh.length > 1) {
             notifyPartnerAlert({
               key: `rentals-batch:${fresh[0].id}`,
-              title: "Nouvelles réservations MOVA",
+              title: "Nouvelles réservations SENGA",
               body: `${fresh.length} demandes à confirmer`,
               tag: "mova-new-rental",
             });
@@ -272,7 +272,7 @@ export default function ReservationsPage() {
         <div>
           <h2 className="text-xl font-semibold">Réservations</h2>
           <p className="text-sm text-gray-500">
-            Confirmez vos disponibilités et indiquez qui s&apos;occupe de la remise : vous, votre chauffeur, ou MOVA si le
+            Confirmez vos disponibilités et indiquez qui s&apos;occupe de la remise : vous, votre chauffeur, ou SENGA si le
             passager l&apos;a demandé.
           </p>
         </div>
@@ -393,7 +393,7 @@ export default function ReservationsPage() {
                     )}
                     <p className="sm:col-span-2">
                       <span className="text-gray-500">Logistique :</span> {b.logisticsModeLabel ?? b.logisticsMode ?? "—"}
-                      {b.needsMovaLogistics && " · MOVA assignera un chauffeur après votre confirmation"}
+                      {b.needsMovaLogistics && " · SENGA assignera un chauffeur après votre confirmation"}
                     </p>
                     {b.notes && (
                       <p className="sm:col-span-2">

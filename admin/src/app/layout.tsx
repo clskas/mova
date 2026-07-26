@@ -9,13 +9,13 @@ const plusJakarta = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "MOVA Admin",
-  description: "Console d'administration MOVA — couverture nationale RDC",
-  applicationName: "MOVA Admin",
+  title: "SENGA Admin",
+  description: "Console d'administration SENGA — couverture nationale RDC",
+  applicationName: "SENGA Admin",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "MOVA Admin",
+    title: "SENGA Admin",
   },
   icons: {
     icon: [

@@ -1,4 +1,4 @@
-# Manuel utilisateur MOVA
+# Manuel utilisateur SENGA
 
 !!! tip "Documentation vivante"
     Le manuel détaillé est maintenu dans [`docs/user-manual/`](user-manual/index.md) et alimente le contenu in-app mobile (`mobile/assets/legal/manuel_fr.md`).
@@ -44,7 +44,7 @@ Voir [Admin — Niveaux d'accès par rôle](user-manual/admin.md#niveaux-daccès
 ## Nouveautés (juin 2026)
 
 - **Splash animé** : écran d'accueil mobile (**4 s par service**, ~32 s, tap sur l'écran) — contenu **Passager** vs **Chauffeur** distinct.
-- **Ville GPS** : sélection automatique de la ville MOVA à l'ouverture (mobile).
+- **Ville GPS** : sélection automatique de la ville SENGA à l'ouverture (mobile).
 - **Mode hors ligne** : bannière réseau/serveur, secours API LAN, réessai au retour de l'app.
 - **Trace GPS** : trajet parcouru visible passager, chauffeur (mission active) et admin (Courses / Livraisons).
 - **Validation type d'engin** : VIP, Confort, etc. — approbation admin avant mise en ligne.

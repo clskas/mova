@@ -33,7 +33,7 @@ export const KINSHASA_POI_SEED: PoiSeedRow[] = [
   { osmId: 'osm-kin-trans-gare', name: 'Gare Centrale', category: 'TRANSPORT', lat: -4.3189, lng: 15.3156, city: 'Kinshasa' },
 ];
 
-/** Mapping tags Overpass → catégorie MOVA. */
+/** Mapping tags Overpass → catégorie SENGA. */
 export const OSM_TAG_TO_CATEGORY: Record<string, PlaceOfInterestCategory> = {
   marketplace: 'MARKET',
   hospital: 'HOSPITAL',
@@ -47,7 +47,7 @@ export const OSM_TAG_TO_CATEGORY: Record<string, PlaceOfInterestCategory> = {
   train_station: 'TRANSPORT',
 };
 
-/** POI de base pour chaque ville MOVA (catalogue national RDC). */
+/** POI de base pour chaque ville SENGA (catalogue national RDC). */
 export function buildRegionalPoiSeed(): PoiSeedRow[] {
   const rows: PoiSeedRow[] = [...KINSHASA_POI_SEED];
   const seenOsm = new Set(rows.map((r) => r.osmId));

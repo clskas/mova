@@ -9,7 +9,7 @@ import 'express_delivery_screen.dart';
 import 'food_delivery_screen.dart';
 import 'parcel_delivery_screen.dart';
 
-/// Hub regroupant tous les types de livraison MOVA.
+/// Hub regroupant tous les types de livraison SENGA.
 class DeliveryHubScreen extends StatelessWidget {
   const DeliveryHubScreen({super.key});
 

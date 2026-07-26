@@ -437,7 +437,7 @@ export class GeoService implements OnModuleInit {
     return results.slice(0, 12);
   }
 
-  /** Géocodage externe avec timeout — évite de bloquer l'autocomplete MOVA. */
+  /** Géocodage externe avec timeout — évite de bloquer l'autocomplete SENGA. */
   private async geocodeWithTimeout(
     query: string,
     opts: {
@@ -461,7 +461,7 @@ export class GeoService implements OnModuleInit {
     }
   }
 
-  /** Géocodage texte → coordonnées (communes MOVA puis Nominatim / Mapbox). */
+  /** Géocodage texte → coordonnées (communes SENGA puis Nominatim / Mapbox). */
   async forwardGeocode(
     address: string,
     opts?: { city?: string; nearLat?: number; nearLng?: number },
@@ -471,7 +471,7 @@ export class GeoService implements OnModuleInit {
       throw new MovaHttpException(
         MovaErrorCode.VALIDATION_ERROR,
         undefined,
-        'Adresse non reconnue — utilisez le GPS ou l\'autocomplétion MOVA.',
+        'Adresse non reconnue — utilisez le GPS ou l\'autocomplétion SENGA.',
       );
     }
 
@@ -509,7 +509,7 @@ export class GeoService implements OnModuleInit {
     throw new MovaHttpException(
       MovaErrorCode.VALIDATION_ERROR,
       undefined,
-      'Adresse non reconnue — utilisez le GPS ou l\'autocomplétion MOVA.',
+      'Adresse non reconnue — utilisez le GPS ou l\'autocomplétion SENGA.',
     );
   }
 

@@ -38,7 +38,7 @@ const CATEGORY_ALIASES: Record<string, string> = {
 
 const TIMELINE_STEPS = [
   { status: RentalInquiryStatus.PENDING, label: 'Demande' },
-  { status: RentalInquiryStatus.CONTACTED, label: 'Contact MOVA' },
+  { status: RentalInquiryStatus.CONTACTED, label: 'Contact SENGA' },
   { status: RentalInquiryStatus.CONFIRMED, label: 'Confirmée' },
   { status: RentalInquiryStatus.IN_PROGRESS, label: 'En cours' },
   { status: RentalInquiryStatus.RETURNED, label: 'Retournée' },
@@ -47,7 +47,7 @@ const TIMELINE_STEPS = [
 
 const RENTAL_STATUS_LABELS: Record<RentalInquiryStatus, string> = {
   [RentalInquiryStatus.PENDING]: 'En attente',
-  [RentalInquiryStatus.CONTACTED]: 'Contacté par MOVA',
+  [RentalInquiryStatus.CONTACTED]: 'Contacté par SENGA',
   [RentalInquiryStatus.CONFIRMED]: 'Confirmée',
   [RentalInquiryStatus.IN_PROGRESS]: 'En cours',
   [RentalInquiryStatus.RETURNED]: 'Retournée',
@@ -273,7 +273,7 @@ export class RentalService {
       throw new MovaHttpException(
         MovaErrorCode.VALIDATION_ERROR,
         undefined,
-        'Ce statut est géré par le propriétaire (ou le chauffeur logistique). Utilisez forceOverride pour un cas exceptionnel MOVA.',
+        'Ce statut est géré par le propriétaire (ou le chauffeur logistique). Utilisez forceOverride pour un cas exceptionnel SENGA.',
       );
     }
   }
@@ -810,7 +810,7 @@ export class RentalService {
     await this.publishRentalBooking(inquiry, inquiry.vehicle, 'NEW_BOOKING');
     const logisticsHint =
       logistics.logisticsMode === RentalLogisticsMode.MOVA_DRIVER
-        ? ' Un chauffeur MOVA pourra être assigné après confirmation du propriétaire.'
+        ? ' Un chauffeur SENGA pourra être assigné après confirmation du propriétaire.'
         : '';
     return {
       inquiry: this.enrichInquiry(inquiry),
@@ -850,7 +850,7 @@ export class RentalService {
       inquiry: this.enrichInquiry(inquiry),
       message: inquiry.vehicle?.ownerUserId
         ? 'Demande enregistrée. Le propriétaire du véhicule a été notifié.'
-        : 'Demande enregistrée. Un conseiller MOVA vous contactera sous 24h.',
+        : 'Demande enregistrée. Un conseiller SENGA vous contactera sous 24h.',
     };
   }
 
@@ -1047,7 +1047,7 @@ export class RentalService {
         if (audience === 'owner') {
           return 'Prenez en charge la demande, puis confirmez la disponibilité du véhicule.';
         }
-        return 'Le propriétaire ou MOVA examine votre demande.';
+        return 'Le propriétaire ou SENGA examine votre demande.';
       case RentalInquiryStatus.CONTACTED:
         if (audience === 'owner') {
           return 'Confirmez la disponibilité pour valider la réservation.';
@@ -1063,11 +1063,11 @@ export class RentalService {
         if (audience === 'admin') {
           const movaPart =
             mode === RentalLogisticsMode.MOVA_DRIVER
-              ? ' Le chauffeur MOVA assigné peut aussi activer « En cours » à la remise.'
+              ? ' Le chauffeur SENGA assigné peut aussi activer « En cours » à la remise.'
               : '';
-          return `« En cours » : remise par le propriétaire, confirmation passager, chauffeur MOVA, ou automatiquement à la date de début.${movaPart}`;
+          return `« En cours » : remise par le propriétaire, confirmation passager, chauffeur SENGA, ou automatiquement à la date de début.${movaPart}`;
         }
-        return 'Appuyez sur « J\'ai reçu le véhicule » à la remise, ou attendez le propriétaire / chauffeur MOVA. Sinon, passage automatique à En cours à la date de début.';
+        return 'Appuyez sur « J\'ai reçu le véhicule » à la remise, ou attendez le propriétaire / chauffeur SENGA. Sinon, passage automatique à En cours à la date de début.';
       case RentalInquiryStatus.IN_PROGRESS:
         if (audience === 'owner') {
           return 'À la fin de la location, cliquez « Véhicule rendu » pour enregistrer le retour.';
@@ -1083,7 +1083,7 @@ export class RentalService {
             ? 'Demandez le code PIN au passager et saisissez-le pour confirmer le paiement espèces.'
             : 'Location terminée — en attente du paiement passager.';
       case RentalInquiryStatus.PAID:
-        return 'Location payée — reçu disponible dans l\'application MOVA.';
+        return 'Location payée — reçu disponible dans l\'application SENGA.';
       case RentalInquiryStatus.CLOSED:
         return 'Réservation annulée ou refusée.';
       default:
@@ -1581,7 +1581,7 @@ export class RentalService {
       throw new MovaHttpException(
         MovaErrorCode.VALIDATION_ERROR,
         undefined,
-        'Aucun chauffeur MOVA requis pour ce mode logistique.',
+        'Aucun chauffeur SENGA requis pour ce mode logistique.',
       );
     }
     if (

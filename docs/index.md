@@ -1,6 +1,6 @@
-# MOVA RDC — Documentation
+# SENGA RDC — Documentation
 
-Bienvenue dans la documentation technique de MOVA, plateforme de mobilité nationwide pour la RDC (26 provinces, Kinshasa par défaut).
+Bienvenue dans la documentation technique de SENGA, plateforme de mobilité nationwide pour la RDC (26 provinces, Kinshasa par défaut).
 
 ## Quick Start
 

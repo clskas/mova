@@ -64,7 +64,7 @@ class _DriverJobTaskHandler extends TaskHandler {
           discovered.add(key);
           if (!known.contains(key)) {
             await DriverJobAlertService.notify(
-              title: kind == 'offer' ? 'Nouvelle offre MOVA' : 'Nouvelle mission MOVA',
+              title: kind == 'offer' ? 'Nouvelle offre SENGA' : 'Nouvelle mission SENGA',
               body: message(row),
               payload: key,
             );
@@ -94,7 +94,7 @@ class DriverBackgroundService {
     FlutterForegroundTask.init(
       androidNotificationOptions: AndroidNotificationOptions(
         channelId: 'mova_driver_online',
-        channelName: 'MOVA Driver en ligne',
+        channelName: 'SENGA Driver en ligne',
         channelDescription: 'Recherche de courses et missions en arrière-plan',
         onlyAlertOnce: true,
       ),
@@ -113,7 +113,7 @@ class DriverBackgroundService {
     if (await FlutterForegroundTask.isRunningService) return;
     await FlutterForegroundTask.startService(
       serviceId: 1001,
-      notificationTitle: 'MOVA Driver',
+      notificationTitle: 'SENGA Driver',
       notificationText: 'En ligne — recherche de courses et missions',
       callback: driverBackgroundStartCallback,
     );

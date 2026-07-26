@@ -83,7 +83,7 @@ function HomeContent() {
           <div>
             <h1 className="text-xl font-semibold text-center flex items-center justify-center gap-2">
               <img src="/icon-192.png" alt="" width={28} height={28} className="rounded-md" />
-              MOVA — RDC
+              SENGA — RDC
             </h1>
             <p className="text-sm opacity-80 text-center flex items-center justify-center gap-1">
               <LocationIcon color="#6C63FF" size={14} />

@@ -33,7 +33,7 @@ export function httpRequest(url: string, opts: HttpRequestOptions = {}): Promise
         path: `${parsed.pathname}${parsed.search}`,
         family: 4,
         headers: {
-          'User-Agent': 'MOVA-RDC/1.0 (ride-service; https://mova.cd)',
+          'User-Agent': 'SENGA-RDC/1.0 (ride-service; https://mova.cd)',
           ...headers,
         },
         timeout: timeoutMs,

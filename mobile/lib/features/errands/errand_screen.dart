@@ -313,7 +313,7 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
     }
     final budget = int.tryParse(_budgetController.text.trim());
     if (budget == null || budget <= 0) {
-      return 'Budget achats max obligatoire — rechargez votre wallet MOVA pour bloquer ce montant.';
+      return 'Budget achats max obligatoire — rechargez votre wallet SENGA pour bloquer ce montant.';
     }
     if (_minimumBudgetCdf != null && budget < _minimumBudgetCdf!) {
       return 'Budget minimum : ${MarketConfig.formatCdf(_minimumBudgetCdf!)} (achats estimés).';
@@ -330,7 +330,7 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
       _walletAvailableCdf = available;
       if (available < budget) {
         return 'Solde wallet insuffisant : ${MarketConfig.formatCdf(available)} disponible, '
-            '${MarketConfig.formatCdf(budget)} requis. Rechargez votre wallet MOVA.';
+            '${MarketConfig.formatCdf(budget)} requis. Rechargez votre wallet SENGA.';
       }
       return null;
     }
@@ -525,7 +525,7 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
               hintText: _minimumBudgetCdf != null
                   ? 'Min. ${MarketConfig.formatCdf(_minimumBudgetCdf!)}'
                   : 'Ex: 50000',
-              helperText: 'Obligatoire — bloqué sur votre wallet MOVA jusqu\'à la fin de la course.',
+              helperText: 'Obligatoire — bloqué sur votre wallet SENGA jusqu\'à la fin de la course.',
               helperMaxLines: 2,
               labelStyle: compact ? const TextStyle(fontSize: 13) : null,
               prefixIcon: Icon(Icons.account_balance_wallet_outlined, size: compact ? 20 : 24),

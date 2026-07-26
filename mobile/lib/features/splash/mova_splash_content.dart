@@ -20,7 +20,7 @@ class MovaSplashService {
   final bool brandedIcon;
 }
 
-/// Services passager — aligné sur l'écran d'accueil MOVA Passager.
+/// Services passager — aligné sur l'écran d'accueil Senga.
 final passengerSplashServices = <MovaSplashService>[
   MovaSplashService(
     label: 'Taxi / Moto-taxi',
@@ -65,7 +65,7 @@ final passengerSplashServices = <MovaSplashService>[
     brandedIcon: true,
   ),
   MovaSplashService(
-    label: 'Wallet MOVA',
+    label: 'Wallet SENGA',
     description: 'Solde, recharge et paiements',
     icon: MovaServiceIcon.wallet(color: Colors.white, size: 40),
     color: MovaColors.gold,
@@ -78,7 +78,7 @@ final passengerSplashServices = <MovaSplashService>[
   ),
 ];
 
-/// Services chauffeur — aligné sur l'app MOVA Chauffeur.
+/// Services chauffeur — aligné sur l'app SENGA Driver.
 final driverSplashServices = <MovaSplashService>[
   MovaSplashService(
     label: 'Courses',

@@ -6,7 +6,7 @@ export class RentalPartnerRoleGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     const req = context.switchToHttp().getRequest<{ user?: { role?: string } }>();
     if (req.user?.role !== UserRole.RENTAL_PARTNER) {
-      throw new ForbiddenException('Accès réservé aux partenaires location MOVA');
+      throw new ForbiddenException('Accès réservé aux partenaires location SENGA');
     }
     return true;
   }

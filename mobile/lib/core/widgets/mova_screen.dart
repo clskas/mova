@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 
 import 'mova_layout.dart';
 
-/// Scroll fluide utilisé sur tous les écrans MOVA.
+/// Scroll fluide utilisé sur tous les écrans SENGA.
 const ScrollPhysics kMovaScrollPhysics = BouncingScrollPhysics(
   parent: AlwaysScrollableScrollPhysics(),
 );
 
-/// Anti-overflow screen wrapper — mandatory pattern for all MOVA screens
+/// Anti-overflow screen wrapper — mandatory pattern for all SENGA screens
 class MovaScreen extends StatelessWidget {
   const MovaScreen({
     super.key,

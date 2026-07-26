@@ -37,7 +37,7 @@ export class NominatimService {
     this.enabled = process.env.NOMINATIM_ENABLED !== 'false';
     this.timeoutMs = parseInt(process.env.NOMINATIM_TIMEOUT_MS ?? '5000', 10);
     this.userAgent =
-      process.env.NOMINATIM_USER_AGENT ?? 'MOVA-RDC/1.0 (ride-service; https://mova.cd)';
+      process.env.NOMINATIM_USER_AGENT ?? 'SENGA-RDC/1.0 (ride-service; https://mova.cd)';
     this.email = process.env.NOMINATIM_EMAIL?.trim() || undefined;
     this.minIntervalMs = parseInt(process.env.NOMINATIM_MIN_INTERVAL_MS ?? '1000', 10);
   }

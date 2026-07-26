@@ -1,4 +1,4 @@
-# MOVA API Reference
+# SENGA API Reference
 
 Base URL: `http://localhost:3000` (api-gateway)
 
@@ -13,7 +13,7 @@ All routes are prefixed with `/api` except `/health`.
 | GET | `/api/users/me` | JWT | Current user profile |
 | PATCH | `/api/users/me` | JWT | Update profile |
 
-## Services MOVA
+## Services SENGA
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|

@@ -1,6 +1,6 @@
-/// Configuration partagée du centre d'aide MOVA (RDC).
+/// Configuration partagée du centre d'aide SENGA (RDC).
 class HelpConfig {
-  static const hubTitle = "Centre d'aide MOVA";
+  static const hubTitle = "Centre d'aide SENGA";
   static const supportPhone = '+243 900 000 000';
   static const supportPhoneDial = '+243900000000';
   static const supportEmail = 'support@mova.cd';
@@ -19,7 +19,7 @@ class FaqItem {
 
 const kFaqItems = <FaqItem>[
   FaqItem(
-    question: 'Comment créer un compte MOVA ?',
+    question: 'Comment créer un compte SENGA ?',
     answer:
         'Saisissez votre numéro au format +243 suivi de 9 chiffres, puis entrez le code OTP reçu par SMS. Aucun mot de passe n\'est requis.',
   ),
@@ -31,12 +31,12 @@ const kFaqItems = <FaqItem>[
   FaqItem(
     question: 'Quels moyens de paiement sont acceptés ?',
     answer:
-        'Orange Money, M-Pesa (Vodacom), Airtel Money, le portefeuille MOVA et les espèces (selon le service). Tous les montants sont en francs congolais (CDF).',
+        'Orange Money, M-Pesa (Vodacom), Airtel Money, le portefeuille SENGA et les espèces (selon le service). Tous les montants sont en francs congolais (CDF).',
   ),
   FaqItem(
-    question: 'Comment recharger mon portefeuille MOVA ?',
+    question: 'Comment recharger mon portefeuille SENGA ?',
     answer:
-        'Ouvrez Wallet MOVA, appuyez sur Recharger, choisissez votre opérateur mobile money et suivez les instructions USSD ou l\'écran de confirmation.',
+        'Ouvrez Wallet SENGA, appuyez sur Recharger, choisissez votre opérateur mobile money et suivez les instructions USSD ou l\'écran de confirmation.',
   ),
   FaqItem(
     question: 'Le prix affiché est-il définitif ?',
@@ -51,12 +51,12 @@ const kFaqItems = <FaqItem>[
   FaqItem(
     question: 'Pourquoi le GPS ne fonctionne pas ?',
     answer:
-        'Activez la localisation dans les paramètres de votre téléphone et autorisez MOVA. En intérieur ou sous tunnel, la position peut être approximative.',
+        'Activez la localisation dans les paramètres de votre téléphone et autorisez SENGA. En intérieur ou sous tunnel, la position peut être approximative.',
   ),
   FaqItem(
-    question: 'Dans quelles zones MOVA est-il disponible ?',
+    question: 'Dans quelles zones SENGA est-il disponible ?',
     answer:
-        'MOVA est disponible dans 32 zones de service à travers la RDC (capitales provinciales et grandes villes). Choisissez votre ville sur l\'écran d\'accueil ou laissez le GPS détecter la zone la plus proche.',
+        'SENGA est disponible dans 32 zones de service à travers la RDC (capitales provinciales et grandes villes). Choisissez votre ville sur l\'écran d\'accueil ou laissez le GPS détecter la zone la plus proche.',
   ),
   FaqItem(
     question: 'Comment suivre mon chauffeur ou livreur ?',
@@ -81,7 +81,7 @@ const kFaqItems = <FaqItem>[
   FaqItem(
     question: 'La livraison express, c\'est quoi ?',
     answer:
-        'Envoi urgent de petits colis en moins de 45 minutes dans les zones MOVA. Idéal pour documents, clés ou petits objets légers.',
+        'Envoi urgent de petits colis en moins de 45 minutes dans les zones SENGA. Idéal pour documents, clés ou petits objets légers.',
   ),
   FaqItem(
     question: 'Comment fonctionne le covoiturage ?',
@@ -91,7 +91,7 @@ const kFaqItems = <FaqItem>[
   FaqItem(
     question: 'Puis-je louer un véhicule sans chauffeur ?',
     answer:
-        'La location MOVA propose voiture, SUV ou minibus avec ou sans chauffeur selon disponibilité. Une pièce d\'identité peut être demandée.',
+        'La location SENGA propose voiture, SUV ou minibus avec ou sans chauffeur selon disponibilité. Une pièce d\'identité peut être demandée.',
   ),
   FaqItem(
     question: 'Comment demander un déménagement ?',
@@ -101,7 +101,7 @@ const kFaqItems = <FaqItem>[
   FaqItem(
     question: 'Mes données personnelles sont-elles protégées ?',
     answer:
-        'Oui. Consultez la Politique de confidentialité dans Aide. MOVA ne vend pas vos données. Contact DPO : privacy@mova.cd.',
+        'Oui. Consultez la Politique de confidentialité dans Aide. SENGA ne vend pas vos données. Contact DPO : privacy@mova.cd.',
   ),
   FaqItem(
     question: 'Comment supprimer mon compte ?',
@@ -111,7 +111,7 @@ const kFaqItems = <FaqItem>[
   FaqItem(
     question: 'Le paiement mobile money a échoué, que faire ?',
     answer:
-        'Vérifiez votre solde et réessayez. Si le débit a eu lieu sans confirmation MOVA, contactez votre opérateur puis support@mova.cd avec la référence transaction.',
+        'Vérifiez votre solde et réessayez. Si le débit a eu lieu sans confirmation SENGA, contactez votre opérateur puis support@mova.cd avec la référence transaction.',
   ),
   FaqItem(
     question: 'Comment contacter le support ?',
@@ -142,7 +142,7 @@ const kManualChapters = <ManualChapter>[
     title: 'Créer un compte',
     icon: '👤',
     steps: [
-      'Ouvrez MOVA Passager.',
+      'Ouvrez Senga.',
       'Saisissez votre numéro +243 (9 chiffres après l\'indicatif).',
       'Entrez le code OTP reçu par SMS.',
       'Accédez à l\'écran d\'accueil avec tous les services.',
@@ -175,10 +175,10 @@ const kManualChapters = <ManualChapter>[
   ),
   ManualChapter(
     id: 'wallet',
-    title: 'Wallet MOVA',
+    title: 'Wallet SENGA',
     icon: '💳',
     steps: [
-      'Ouvrez Wallet MOVA depuis l\'accueil ou la barre de navigation.',
+      'Ouvrez Wallet SENGA depuis l\'accueil ou la barre de navigation.',
       'Consultez votre solde en CDF.',
       'Rechargez via Orange Money, M-Pesa ou Airtel Money.',
       'Payez vos courses directement depuis le portefeuille.',
@@ -261,7 +261,7 @@ const kManualChapters = <ManualChapter>[
     icon: '⚡',
     steps: [
       'Appuyez sur Livraison express.',
-      'Indiquez enlèvement et livraison dans une zone MOVA.',
+      'Indiquez enlèvement et livraison dans une zone SENGA.',
       'Décrivez le contenu (documents, clés, petit objet).',
       'Confirmez — livraison cible en moins de 45 minutes.',
       'Suivez le coursier en temps réel.',

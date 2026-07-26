@@ -71,7 +71,7 @@ class _MovaPassengerAppState extends ConsumerState<MovaPassengerApp>
   Widget build(BuildContext context) {
     return movaMediaQueryWrapper(
       child: MaterialApp(
-        title: 'Mova',
+        title: 'Senga',
         theme: buildMovaTheme(),
         home: MovaSplashScreen(
           role: MovaSplashRole.passenger,
@@ -117,7 +117,7 @@ class _MovaDriverAppState extends ConsumerState<MovaDriverApp>
   Widget build(BuildContext context) {
     return movaMediaQueryWrapper(
       child: MaterialApp(
-        title: 'MOVA Driver',
+        title: 'SENGA Driver',
         theme: buildMovaTheme(),
         home: MovaSplashScreen(
           role: MovaSplashRole.driver,

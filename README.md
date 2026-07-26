@@ -1,4 +1,4 @@
-# MOVA — Plateforme de mobilité RDC
+# SENGA — Plateforme de mobilité RDC
 
 
 
@@ -319,5 +319,5 @@ npm run test:mobile       # smoke Android (Appium + appareil)
 
 
 
-Propriétaire — MOVA RDC
+Propriétaire — SENGA RDC
 

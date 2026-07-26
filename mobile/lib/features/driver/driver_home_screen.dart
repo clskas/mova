@@ -359,7 +359,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const Text(
-                'Entrez le code à 6 chiffres communiqué par MOVA après validation de votre dossier.',
+                'Entrez le code à 6 chiffres communiqué par SENGA après validation de votre dossier.',
               ),
               const SizedBox(height: 12),
               TextField(
@@ -1094,13 +1094,13 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
   Widget build(BuildContext context) {
     if (_bootstrapping) {
       return const MovaScreen(
-        title: 'MOVA Driver',
+        title: 'SENGA Driver',
         child: Center(child: CircularProgressIndicator()),
       );
     }
 
     return MovaScreen(
-      title: 'MOVA Driver',
+      title: 'SENGA Driver',
       scrollable: false,
       actions: [
         IconButton(
@@ -1281,7 +1281,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                   Expanded(
                     child: Text(
                       _documentsRenewalPending
-                          ? 'Renouvellement de documents en cours de validation MOVA. Mettez à jour vos justificatifs dans Enregistrement si nécessaire.'
+                          ? 'Renouvellement de documents en cours de validation SENGA. Mettez à jour vos justificatifs dans Enregistrement si nécessaire.'
                           : (_documentsBlockReason ??
                               'Permis, assurance ou visite technique expiré(s) ou incomplet(s). '
                                   'Mettez à jour vos dates dans Enregistrement avant de recevoir des missions.'),
@@ -1385,7 +1385,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                   ),
                   const SizedBox(height: 12),
                   const Text(
-                    'Candidature volontaire — MOVA assigne avant le départ.',
+                    'Candidature volontaire — SENGA assigne avant le départ.',
                     style: TextStyle(fontSize: 12, color: MovaColors.textSecondary),
                   ),
                   const SizedBox(height: 12),

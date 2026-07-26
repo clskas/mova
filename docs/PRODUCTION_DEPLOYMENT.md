@@ -1,6 +1,6 @@
-# Déploiement production MOVA — lancement national RDC
+# Déploiement production SENGA — lancement national RDC
 
-Guide opérationnel pour mettre en production MOVA sur **l’ensemble des 32 zones de service** en République Démocratique du Congo, simultanément.
+Guide opérationnel pour mettre en production SENGA sur **l’ensemble des 32 zones de service** en République Démocratique du Congo, simultanément.
 
 > **Prérequis** : accès GitHub, compte [Render](https://render.com), domaine `mova.cd` (ou équivalent), comptes Twilio / mobile money / FCM, stores Apple & Google.
 
@@ -117,7 +117,7 @@ Si Twilio n'est pas configuré avec `MOCK_OTP=false`, l'API renvoie une erreur H
 | `true` (dev) | Mobile money simulé, succès immédiat |
 | `false` (prod) | Providers Orange Money / M-Pesa / Airtel Money |
 
-Le **portefeuille MOVA** (`POST /api/wallet/top-up`, `POST /api/payments/rides/:id`) persiste toujours en PostgreSQL, mock ou réel.
+Le **portefeuille SENGA** (`POST /api/wallet/top-up`, `POST /api/payments/rides/:id`) persiste toujours en PostgreSQL, mock ou réel.
 
 Sans clés provider (`ORANGE_MONEY_*`, `MPESA_*`, `AIRTEL_MONEY_*`), l'API renvoie un message d'erreur explicite listant les variables manquantes (voir `config/external-apis.env.example`).
 
@@ -444,7 +444,7 @@ Les migrations sont **forward-only**. En cas de migration problématique :
 
 ### Communication
 - [ ] Support WhatsApp +243 opérationnel
-- [ ] FAQ / aide mentionnent **zones MOVA RDC** (pas Kinshasa seul)
+- [ ] FAQ / aide mentionnent **zones SENGA RDC** (pas Kinshasa seul)
 - [ ] Équipe ops briefée sur escalation
 
 ---
@@ -464,4 +464,4 @@ Les migrations sont **forward-only**. En cas de migration problématique :
 
 ---
 
-*Dernière mise à jour : juin 2026 — MOVA v1.4+ couverture nationale 32 zones.*
+*Dernière mise à jour : juin 2026 — SENGA v1.4+ couverture nationale 32 zones.*

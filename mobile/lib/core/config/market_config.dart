@@ -1,4 +1,4 @@
-/// Configuration marché RDC — couverture nationale (32 zones MOVA).
+/// Configuration marché RDC — couverture nationale (32 zones SENGA).
 class MarketConfig {
   static const country = 'CD';
   static const currency = 'CDF';

@@ -32,7 +32,7 @@ class ServiceArea {
       coords.longitude <= maxLng;
 }
 
-/// Zones MOVA — capitales provinciales + grandes villes (aligné packages/shared).
+/// Zones SENGA — capitales provinciales + grandes villes (aligné packages/shared).
 class ServiceAreas {
   ServiceAreas._();
 
@@ -176,11 +176,11 @@ class ServiceAreas {
     return null;
   }
 
-  /// Ville MOVA la plus proche des coordonnées (pour libellés et autocomplétion).
+  /// Ville SENGA la plus proche des coordonnées (pour libellés et autocomplétion).
   static String cityNameForCoords(LatLng coords) =>
       (byCoords(coords) ?? nearest(coords)).name;
 
-  /// Ville pour l'autocomplétion adresses — zone GPS, ville choisie, ou ville MOVA la plus proche.
+  /// Ville pour l'autocomplétion adresses — zone GPS, ville choisie, ou ville SENGA la plus proche.
   static String autocompleteCity({
     required LatLng coords,
     ServiceArea? preferredArea,
@@ -214,6 +214,6 @@ class ServiceAreas {
     return '${names.take(max).join(', ')}… (+${names.length - max} villes)';
   }
 
-  /// Noms des villes MOVA (32 zones — aligné admin / packages/shared).
+  /// Noms des villes SENGA (32 zones — aligné admin / packages/shared).
   static List<String> get cityNames => all.map((a) => a.name).toList();
 }

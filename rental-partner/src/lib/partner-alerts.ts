@@ -108,7 +108,7 @@ export function notifyPartnerAlert(options: {
 export function alertNewRentalBooking(inquiryId: string, body?: string) {
   notifyPartnerAlert({
     key: `rental:${inquiryId}`,
-    title: "Nouvelle réservation MOVA",
+    title: "Nouvelle réservation SENGA",
     body: body ?? `Demande #${inquiryId.slice(0, 8)} à confirmer`,
     tag: "mova-new-rental",
   });

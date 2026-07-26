@@ -1085,16 +1085,16 @@ export default function TarifsPage() {
           )}
 
           <section>
-            <h2 className="font-semibold text-[#1A1A2E] mb-1">Commissions plateforme MOVA</h2>
+            <h2 className="font-semibold text-[#1A1A2E] mb-1">Commissions plateforme SENGA</h2>
             <p className="text-sm text-gray-500 mb-3">
-              Part prélevée par MOVA sur chaque service. Le reste revient au chauffeur / partenaire. Les revenus chauffeur affichés dans l&apos;app sont nets de commission.
+              Part prélevée par SENGA sur chaque service. Le reste revient au chauffeur / partenaire. Les revenus chauffeur affichés dans l&apos;app sont nets de commission.
             </p>
             <Card className="overflow-x-auto">
               <table className="w-full text-sm min-w-[720px]">
                 <thead>
                   <tr className="border-b text-left text-gray-500">
                     <th className="p-3">Service</th>
-                    <th className="p-3">MOVA (%)</th>
+                    <th className="p-3">SENGA (%)</th>
                     <th className="p-3">Chauffeur (%)</th>
                     <th className="p-3">Frais fixe (CDF)</th>
                     <th className="p-3">Par article (CDF)</th>

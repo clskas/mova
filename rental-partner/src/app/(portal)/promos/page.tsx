@@ -79,7 +79,7 @@ export default function PromosPage() {
         <div>
           <h2 className="text-xl font-semibold text-[#1A1A2E]">Codes promo location</h2>
           <p className="text-sm text-gray-600 mt-1">
-            Codes valables uniquement sur vos véhicules. La remise est toujours déduite de votre part — MOVA ne la finance pas.
+            Codes valables uniquement sur vos véhicules. La remise est toujours déduite de votre part — SENGA ne la finance pas.
           </p>
         </div>
 
@@ -131,7 +131,7 @@ export default function PromosPage() {
             </label>
           </div>
           <p className="text-xs text-gray-500">
-            La remise sera déduite de votre part nette après commission MOVA.
+            La remise sera déduite de votre part nette après commission SENGA.
           </p>
           <button
             type="submit"

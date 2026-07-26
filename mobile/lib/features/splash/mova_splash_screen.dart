@@ -132,7 +132,7 @@ class _MovaSplashScreenState extends ConsumerState<MovaSplashScreen>
 
   @override
   Widget build(BuildContext context) {
-    final title = _isPassenger ? 'Mova' : 'MOVA Driver';
+    final title = _isPassenger ? 'Senga' : 'SENGA Driver';
     final subtitle = _isPassenger
         ? 'Mobilité · Livraisons · Paiements — 32 villes RDC'
         : 'Courses · Livraisons · Missions — partout en RDC';

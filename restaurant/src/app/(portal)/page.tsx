@@ -88,7 +88,7 @@ export default function OrdersPage() {
     } else {
       notifyPartnerAlert({
         key: `orders-batch:${first.id}`,
-        title: "Nouvelles commandes MOVA",
+        title: "Nouvelles commandes SENGA",
         body,
         tag: "mova-new-order",
       });

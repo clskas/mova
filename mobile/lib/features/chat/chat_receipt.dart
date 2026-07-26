@@ -16,8 +16,8 @@ String deliveryChatRoleLabel(String role) {
 
 bool isReceiptChatMessage(String text) {
   final t = text.trim();
-  return t.startsWith('📄 Reçu MOVA') ||
-      t.startsWith('📄 Facture MOVA') ||
+  return t.startsWith('📄 Reçu SENGA') ||
+      t.startsWith('📄 Facture SENGA') ||
       _receiptMeta.hasMatch(text);
 }
 

@@ -47,7 +47,7 @@ export class EmailService {
 
     const boundary = `mova-${Date.now()}`;
     const lines = [
-      `From: MOVA RDC <${from}>`,
+      `From: SENGA RDC <${from}>`,
       `To: ${input.to}`,
       `Subject: ${input.subject}`,
       'MIME-Version: 1.0',

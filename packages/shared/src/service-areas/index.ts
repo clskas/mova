@@ -113,7 +113,7 @@ export function fallbackServiceArea(): ServiceArea {
   return findNearestServiceArea(RDC_MAP_CENTER.lat, RDC_MAP_CENTER.lng);
 }
 
-/** Fuseau IANA de la ville MOVA (heure locale pour pointe/nuit). */
+/** Fuseau IANA de la ville SENGA (heure locale pour pointe/nuit). */
 export function resolveCityTimezone(cityName: string): string {
   return findServiceAreaByName(cityName)?.timezone ?? MARKET_RDC.timezone;
 }

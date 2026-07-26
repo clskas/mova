@@ -33,7 +33,7 @@ export function PortalShell({
     <div className="min-h-screen flex flex-col">
       <header className="bg-white border-b border-indigo-100 px-4 py-3 flex flex-wrap items-center justify-between gap-4">
         <div>
-          <p className="text-xs text-indigo-600 font-medium uppercase tracking-wide">MOVA Partenaire</p>
+          <p className="text-xs text-indigo-600 font-medium uppercase tracking-wide">SENGA Partenaire</p>
           <div className="flex items-center gap-2 flex-wrap">
             <h1 className="font-semibold text-lg text-[#1A1A2E]">{partnerName ?? "Location véhicules"}</h1>
             {liveConnected && (

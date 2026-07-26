@@ -36,5 +36,5 @@ export function isCityOperational(areaId: string, areaName?: string): boolean {
 }
 
 export function cityInactiveMessage(cityName: string): string {
-  return `MOVA n'est pas disponible à ${cityName} pour le moment.`;
+  return `SENGA n'est pas disponible à ${cityName} pour le moment.`;
 }

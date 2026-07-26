@@ -46,7 +46,7 @@ self.addEventListener("fetch", (event) => {
 });
 
 self.addEventListener("push", (event) => {
-  let payload = { title: "MOVA Restaurant", body: "Nouvelle activité", url: "/", tag: "mova-partner" };
+  let payload = { title: "SENGA Restaurant", body: "Nouvelle activité", url: "/", tag: "mova-partner" };
   try {
     payload = { ...payload, ...(event.data?.json() ?? {}) };
   } catch {

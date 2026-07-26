@@ -147,7 +147,7 @@ export function addressToCoordsForArea(
   throw new MovaHttpException(
     MovaErrorCode.VALIDATION_ERROR,
     undefined,
-    'Adresse non reconnue — utilisez le GPS ou l\'autocomplétion MOVA.',
+    'Adresse non reconnue — utilisez le GPS ou l\'autocomplétion SENGA.',
   );
 }
 
@@ -159,7 +159,7 @@ export type ServiceAreaPair = {
   isInterCity: boolean;
 };
 
-/** Valide départ et destination dans des zones MOVA (même ville ou inter-villes RDC). */
+/** Valide départ et destination dans des zones SENGA (même ville ou inter-villes RDC). */
 export function assertServiceAreaPair(
   pickupLat: number,
   pickupLng: number,

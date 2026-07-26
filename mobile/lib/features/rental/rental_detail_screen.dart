@@ -835,7 +835,7 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
               contentPadding: EdgeInsets.zero,
             ),
             RadioListTile<String>(
-              title: const Text('Livraison par un chauffeur MOVA'),
+              title: const Text('Livraison par un chauffeur SENGA'),
               value: 'MOVA_DRIVER',
               groupValue: _logisticsMode,
               onChanged: (v) => setState(() => _logisticsMode = v!),

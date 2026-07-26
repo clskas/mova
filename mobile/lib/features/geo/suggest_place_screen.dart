@@ -160,7 +160,7 @@ class _SuggestPlaceScreenState extends ConsumerState<SuggestPlaceScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const Text(
-            'Proposez un marché, une pharmacie, un arrêt… Après validation par MOVA, le lieu apparaîtra dans la recherche d\'adresses.',
+            'Proposez un marché, une pharmacie, un arrêt… Après validation par SENGA, le lieu apparaîtra dans la recherche d\'adresses.',
             style: TextStyle(color: MovaColors.textSecondary, fontSize: 14),
           ),
           const SizedBox(height: 16),

@@ -187,7 +187,7 @@ export class DriversService {
       throw new MovaHttpException(
         MovaErrorCode.VALIDATION_ERROR,
         undefined,
-        'Activez votre compte avec le code PIN reçu après validation MOVA.',
+        'Activez votre compte avec le code PIN reçu après validation SENGA.',
       );
     }
     const documentsStatus = this.documentsStatusFor(profile);

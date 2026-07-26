@@ -106,7 +106,7 @@ export function WalletView({ onBack, mock }: Props) {
   return (
     <div className="space-y-4">
       <button type="button" onClick={onBack} className="text-sm text-[#6C63FF]">← Accueil</button>
-      <h2 className="text-lg font-semibold">Portefeuille MOVA</h2>
+      <h2 className="text-lg font-semibold">Portefeuille SENGA</h2>
       {mock && (
         <p className="text-xs text-[#FF6B35] bg-orange-50 rounded-lg py-2 px-3">Mode démo — passerelle indisponible</p>
       )}

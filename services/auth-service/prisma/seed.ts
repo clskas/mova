@@ -9,7 +9,7 @@ async function main() {
   const prisma = new PrismaClient();
   const user = await prisma.user.upsert({
     where: { phone: ADMIN_PHONE },
-    create: { phone: ADMIN_PHONE, role: ADMIN_ROLE, firstName: 'Admin', lastName: 'MOVA' },
+    create: { phone: ADMIN_PHONE, role: ADMIN_ROLE, firstName: 'Admin', lastName: 'SENGA' },
     update: { role: ADMIN_ROLE },
   });
   const restaurantUser = await prisma.user.upsert({

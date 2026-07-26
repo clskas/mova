@@ -108,7 +108,7 @@ export function promoDiscountBaseCdf(
   return parts.orderTotalCdf;
 }
 
-/** Répartition de la remise entre MOVA et le partenaire. */
+/** Répartition de la remise entre SENGA et le partenaire. */
 export function splitPromoDiscount(
   discountCdf: number,
   promo: Pick<PromoCode, 'absorbedBy' | 'partnerAbsorbPercent'>,

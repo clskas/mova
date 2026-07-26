@@ -1,5 +1,5 @@
 /**
- * Génère les icônes MOVA — une identité distincte par application (modèle Uber) :
+ * Génère les icônes SENGA — une identité distincte par application (modèle Uber) :
  *   - Passager   : pin + route, dégradé violet      -> web/ + admin/ + mobile (flavor passenger)
  *   - Chauffeur  : volant, dégradé vert             -> mobile (flavor driver)
  *   - Restaurant : cloche + couverts, dégradé orange-> restaurant/

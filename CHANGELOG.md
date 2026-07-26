@@ -19,7 +19,7 @@
 
 ## [1.3.0] — 2026-06-12
 
-### Added — Services MOVA complets (ride-service)
+### Added — Services SENGA complets (ride-service)
 - **Livraison colis** — estimation CDF, CRUD, suivi statuts (`PENDING` → `PICKED_UP` → `IN_TRANSIT` → `DELIVERED`)
 - **Réservation planifiée** — création jusqu'à J+7, liste, annulation
 - **Livraison repas** — 5 restaurants Kinshasa seed, menu, estimation et commande
@@ -62,7 +62,7 @@
 - Clients branchés exclusivement sur le gateway (`:3000`)
 
 ### Added
-- `packages/shared` — config RDC nationwide, codes erreur MOVA, Redis pub/sub, URLs services
+- `packages/shared` — config RDC nationwide, codes erreur SENGA, Redis pub/sub, URLs services
 - `services/README.md` — ports, env vars, migrations `deploy`, seed ride-service
 - Racine `package.json` — workspaces, `build:all`, `migrate:all`, `seed:rides`, `test:gateway`
 - Health agrégé gateway + smoke tests via gateway
@@ -83,10 +83,10 @@
 
 ### Added
 - Clients MVP : Flutter passager/chauffeur (flavors), PWA web, admin Next.js
-- Design system MOVA (Midnight, Violet, Green, Orange, Cloud) + anti-overflow
+- Design system SENGA (Midnight, Violet, Green, Orange, Cloud) + anti-overflow
 - Mode mock/hors-ligne avec cache historique courses
 - Tests widget overflow 320–428px
-- Monorepo MOVA RDC complet (Flutter, NestJS, Next.js)
+- Monorepo SENGA RDC complet (Flutter, NestJS, Next.js)
 - Auth OTP +243 avec mode mock
 - Module rides + matching + tarification CDF
 - WebSocket GPS tracking

@@ -1205,7 +1205,7 @@ class ApiClient {
     }
   }
 
-  /// Dettes espèces ouvertes (commission MOVA + parts restaurant/partenaire).
+  /// Dettes espèces ouvertes (commission SENGA + parts restaurant/partenaire).
   Future<Result<Map<String, dynamic>>> getCashDebtSummary() async {
     if (isMockMode) {
       return const Success({
@@ -1241,7 +1241,7 @@ class ApiClient {
     };
   }
 
-  /// Génère un code + QR pour payer la dette espèces au guichet MOVA.
+  /// Génère un code + QR pour payer la dette espèces au guichet SENGA.
   Future<Result<Map<String, dynamic>>> createCashDebtCashRequest() async {
     if (isMockMode) {
       return Success({

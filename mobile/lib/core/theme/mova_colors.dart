@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// Palette MOVA — identité premium mobilité RDC.
+/// Palette SENGA — identité premium mobilité RDC.
 class MovaColors {
   MovaColors._();
 

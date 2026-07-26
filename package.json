@@ -2,7 +2,7 @@
   "name": "mova-rdc",
   "version": "1.4.0",
   "private": true,
-  "description": "MOVA RDC — plateforme de mobilité microservices",
+  "description": "SENGA RDC — plateforme de mobilité microservices",
   "workspaces": [
     "packages/shared",
     "services/*"

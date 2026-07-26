@@ -1,4 +1,4 @@
-# Budget production MOVA RDC — présentation Direction
+# Budget production SENGA RDC — présentation Direction
 
 **Document :** demande d'abonnement et validation budgétaire  
 **Version :** 1.0 — Juillet 2026  
@@ -36,7 +36,7 @@
 | Nom de domaine `.cd` (ex. `mova.cd`) | Registrar | **40 – 80** | Annuel | Oui |
 | Configuration DNS + SSL | Render | **0** | — | Inclus |
 | KYC Africa's Talking (Mobile Money) | Africa's Talking | **0 – 500** | Unique | Oui |
-| Expéditeur SMS « MOVA » (validation) | Africa's Talking / ARPTC | **0 – 200** | Unique | Oui |
+| Expéditeur SMS « SENGA » (validation) | Africa's Talking / ARPTC | **0 – 200** | Unique | Oui |
 | Projet Firebase (push notifications) | Google | **0** | — | Oui |
 | Mise en service technique (1ère prod) | Interne / prestataire | **0 – 500** | Unique | Recommandé |
 
@@ -108,7 +108,7 @@ Inventaire `render.yaml` (région Francfort, à valider latence RDC) :
 
 ### 4.1 SMS / OTP (Africa's Talking — recommandé)
 
-**Avec PIN local MOVA** (1 SMS à la 1ère connexion ou nouvel appareil, puis PIN) :
+**Avec PIN local SENGA** (1 SMS à la 1ère connexion ou nouvel appareil, puis PIN) :
 
 | Phase | Utilisateurs actifs/mois | SMS estimés/mois | Coût (0,03 USD/SMS) |
 |-------|--------------------------|------------------|---------------------|
@@ -128,7 +128,7 @@ SMS transactionnels (statut course, optionnel) : **+50 – 200 USD/mois** selon 
 | 100 000 | **2 000 USD** | ~5 600 000 CDF |
 | 300 000 | **6 000 USD** | ~16 800 000 CDF |
 
-Ces frais sont en principe **refacturés** via la commission plateforme MOVA.
+Ces frais sont en principe **refacturés** via la commission plateforme SENGA.
 
 ---
 
@@ -174,7 +174,7 @@ Ces frais sont en principe **refacturés** via la commission plateforme MOVA.
 
 ### Abonnements mensuels à souscrire (validation Direction)
 
-| # | Service | Usage MOVA | Plan | USD/mois | Priorité |
+| # | Service | Usage SENGA | Plan | USD/mois | Priorité |
 |---|---------|------------|------|----------|----------|
 | 1 | **Render** | API + BDD + Redis + web | Starter → Standard | **120 – 180** | P0 |
 | 2 | **Supabase** | Photos KYC, colis, menu, véhicules | Pro | **30** | P0 |
@@ -221,7 +221,7 @@ Ces frais sont en principe **refacturés** via la commission plateforme MOVA.
 | Pic SMS (sans adoption PIN) | +300 – 1 000 USD/mois | PIN local déjà intégré | 15 % budget SMS |
 | Latence Render → RDC | UX dégradée | Standard plan + monitoring | +50 USD/mois |
 | Stockage photos (KYC massif) | +10 – 30 USD/mois | Supabase alertes quota | 10 % budget storage |
-| Rejet expéditeur SMS « MOVA » | Blocage OTP | Démarrer validation ARPTC tôt | — |
+| Rejet expéditeur SMS « SENGA » | Blocage OTP | Démarrer validation ARPTC tôt | — |
 | GMV Mobile Money élevé | Frais % importants | Commission plateforme | Refacturation |
 
 **Réserve opérationnelle recommandée : 15 – 20 % du budget fixe annuel (~1 000 – 2 000 USD).**

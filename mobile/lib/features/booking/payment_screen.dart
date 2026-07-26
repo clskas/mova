@@ -14,7 +14,7 @@ import '../billing/receipt_screen.dart';
 import 'widgets/cash_pin_confirm_dialog.dart';
 
 const _paymentMethods = [
-  ('WALLET', 'Portefeuille MOVA', Icons.account_balance_wallet, MovaColors.violet),
+  ('WALLET', 'Portefeuille SENGA', Icons.account_balance_wallet, MovaColors.violet),
   ('ORANGE_MONEY', 'Orange Money', Icons.phone_android, MovaColors.orange),
   ('MPESA', 'M-Pesa', Icons.phone_android, Color(0xFFE60000)),
   ('AIRTEL_MONEY', 'Airtel Money', Icons.phone_android, Color(0xFFED1C24)),
@@ -177,19 +177,19 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   String get _qrPayload {
     final ref = widget.rideId!.replaceAll('-', '').substring(0, 8).toUpperCase();
     return jsonEncode({
-      'app': 'MOVA',
+      'app': 'SENGA',
       'type': 'RIDE_PAYMENT',
       'rideId': widget.rideId,
       'amountCdf': _amountCdf,
       'method': _method,
-      'ref': 'MOVA-$ref',
+      'ref': 'SENGA-$ref',
     });
   }
 
   String get _paymentRef {
     final id = widget.rideId ?? widget.serviceId ?? '';
-    if (id.isEmpty) return 'MOVA';
-    return 'MOVA-${id.replaceAll('-', '').substring(0, 8).toUpperCase()}';
+    if (id.isEmpty) return 'SENGA';
+    return 'SENGA-${id.replaceAll('-', '').substring(0, 8).toUpperCase()}';
   }
 
   Future<void> _pay({bool skipCashPrompt = false}) async {

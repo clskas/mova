@@ -101,7 +101,7 @@ export function evaluateDriverDocuments(
   if (!canOperate) {
     if (profile.documentsRenewalPending) {
       blockReason =
-        'Renouvellement de documents en attente de validation MOVA. Téléversez les nouveaux justificatifs si ce n\'est pas déjà fait.';
+        'Renouvellement de documents en attente de validation SENGA. Téléversez les nouveaux justificatifs si ce n\'est pas déjà fait.';
     } else if (expired.length > 0) {
       const labels = items.filter((i) => i.status === 'expired').map((i) => i.label);
       blockReason = `Document(s) expiré(s) : ${labels.join(', ')}. Mettez à jour vos dates dans l'enregistrement.`;
@@ -117,10 +117,10 @@ export function evaluateDriverDocuments(
     if (vtStatus === 'REJECTED') {
       blockReason = profile.vehicleTypeApprovalNotes?.trim()
         ? `Type d'engin refusé : ${profile.vehicleTypeApprovalNotes.trim()}`
-        : "Type d'engin refusé par MOVA. Modifiez le type déclaré ou la photo de l'engin dans Enregistrement.";
+        : "Type d'engin refusé par SENGA. Modifiez le type déclaré ou la photo de l'engin dans Enregistrement.";
     } else {
       blockReason =
-        "Type d'engin en attente de validation MOVA (vérifiez la photo et la catégorie déclarée : Moto-taxi, Standard, Confort ou VIP).";
+        "Type d'engin en attente de validation SENGA (vérifiez la photo et la catégorie déclarée : Moto-taxi, Standard, Confort ou VIP).";
     }
   }
 

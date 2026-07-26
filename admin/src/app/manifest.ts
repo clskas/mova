@@ -2,9 +2,9 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "MOVA Admin",
-    short_name: "MOVA Admin",
-    description: "Console d'administration MOVA RDC",
+    name: "SENGA Admin",
+    short_name: "SENGA Admin",
+    description: "Console d'administration SENGA RDC",
     start_url: "/",
     scope: "/",
     display: "standalone",

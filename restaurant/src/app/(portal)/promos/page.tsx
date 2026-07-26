@@ -83,7 +83,7 @@ export default function PromosPage() {
         <div>
           <h2 className="text-xl font-semibold text-[#1A1A2E]">Codes promo</h2>
           <p className="text-sm text-gray-600 mt-1">
-            Créez des codes valables uniquement pour votre restaurant. La remise est toujours déduite de votre part — MOVA et le livreur ne la financent pas.
+            Créez des codes valables uniquement pour votre restaurant. La remise est toujours déduite de votre part — SENGA et le livreur ne la financent pas.
           </p>
         </div>
 
@@ -146,7 +146,7 @@ export default function PromosPage() {
             </label>
           </div>
           <p className="text-xs text-gray-500">
-            La remise sera déduite de votre part nette après commission MOVA.
+            La remise sera déduite de votre part nette après commission SENGA.
           </p>
           <button
             type="submit"

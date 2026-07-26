@@ -51,7 +51,7 @@ const MOBILE_MONEY_PROVIDERS = [
 ];
 
 const DEBT_CATEGORY_LABELS: Record<string, string> = {
-  PLATFORM_FEE: "Commission MOVA",
+  PLATFORM_FEE: "Commission SENGA",
   RESTAURANT_SHARE: "Part restaurant",
   PARTNER_SHARE: "Part partenaire",
 };
@@ -237,7 +237,7 @@ export default function PortefeuillePage() {
       const result = await adjustWallet(MOVA_PLATFORM_USER_ID, {
         amountCdf: Number(platformRechargeAmount),
         type: "CREDIT",
-        description: platformRechargeDesc.trim() || "Apport trésorerie MOVA (admin)",
+        description: platformRechargeDesc.trim() || "Apport trésorerie SENGA (admin)",
       });
       setPlatformSuccess(result.message ?? "Trésorerie créditée.");
       setPlatformRechargeAmount("");
@@ -364,7 +364,7 @@ export default function PortefeuillePage() {
   const m = normalizeMetrics(metrics);
 
   const cards = [
-    { label: "Trésorerie MOVA", value: `${(wallet.platformBalanceCdf ?? platformTreasury?.balanceCdf ?? 0).toLocaleString("fr-CD")} FC` },
+    { label: "Trésorerie SENGA", value: `${(wallet.platformBalanceCdf ?? platformTreasury?.balanceCdf ?? 0).toLocaleString("fr-CD")} FC` },
     { label: "Dettes utilisateurs (wallets)", value: `${(wallet.userLiabilitiesCdf ?? 0).toLocaleString("fr-CD")} FC` },
     { label: "Revenus du jour", value: `${m.revenueTodayCdf.toLocaleString("fr-CD")} FC` },
     { label: "Solde agrégé (tous wallets)", value: `${(wallet.totalBalanceCdf ?? 0).toLocaleString("fr-CD")} FC` },
@@ -418,7 +418,7 @@ export default function PortefeuillePage() {
             <div>
               <h2 className="font-semibold text-lg">{MOVA_PLATFORM_WALLET_LABEL}</h2>
               <p className="text-sm text-gray-600 mt-1">
-                Compte virtuel des commissions MOVA. Il se crédite automatiquement à chaque paiement (wallet ou espèces).
+                Compte virtuel des commissions SENGA. Il se crédite automatiquement à chaque paiement (wallet ou espèces).
                 Les espèces collectées chez les chauffeurs se régularisent au guichet — voir section « Confirmer paiement espèces ».
               </p>
             </div>
@@ -445,7 +445,7 @@ export default function PortefeuillePage() {
                 <div className="space-y-3">
                   <h3 className="font-medium">Recharger la trésorerie (apport virtuel)</h3>
                   <p className="text-xs text-gray-500">
-                    Injecte des fonds virtuels (float initial, correction comptable). En production, cela reflète un dépôt réel sur le compte MOVA.
+                    Injecte des fonds virtuels (float initial, correction comptable). En production, cela reflète un dépôt réel sur le compte SENGA.
                   </p>
                   <label>
                     <FieldLabel>Montant CDF</FieldLabel>
@@ -471,7 +471,7 @@ export default function PortefeuillePage() {
                 <div className="space-y-3">
                   <h3 className="font-medium">Retirer vers Mobile Money (sortie réelle)</h3>
                   <p className="text-xs text-gray-500">
-                    Transfère des fonds du compte trésorerie MOVA vers un numéro Orange / M-Pesa / Airtel (compte société).
+                    Transfère des fonds du compte trésorerie SENGA vers un numéro Orange / M-Pesa / Airtel (compte société).
                   </p>
                   <label>
                     <FieldLabel>Montant CDF</FieldLabel>
@@ -491,7 +491,7 @@ export default function PortefeuillePage() {
                     />
                   </label>
                   <label>
-                    <FieldLabel>Numéro compte MOVA (+243…)</FieldLabel>
+                    <FieldLabel>Numéro compte SENGA (+243…)</FieldLabel>
                     <TextInput
                       value={platformWithdrawPhone}
                       onChange={setPlatformWithdrawPhone}
@@ -726,7 +726,7 @@ export default function PortefeuillePage() {
                 <div>
                   <h2 className="font-semibold">Confirmer paiement espèces chauffeur</h2>
                   <p className="text-xs text-gray-500 mt-0.5">
-                    Le chauffeur paie au guichet MOVA et affiche un code à 6 chiffres (ou QR) dans Revenus → Payer en espèces.
+                    Le chauffeur paie au guichet SENGA et affiche un code à 6 chiffres (ou QR) dans Revenus → Payer en espèces.
                   </p>
                 </div>
                 {cashConfirmSuccess && (
@@ -759,7 +759,7 @@ export default function PortefeuillePage() {
               <div>
                 <h2 className="font-semibold">Dettes espèces à la plateforme</h2>
                 <p className="text-xs text-gray-500 mt-0.5">
-                  Montants dus par chauffeurs/livreurs après paiements cash (commission MOVA, parts restaurant/partenaire).
+                  Montants dus par chauffeurs/livreurs après paiements cash (commission SENGA, parts restaurant/partenaire).
                   {activeUserId && cashDebts ? ` · ${cashDebts.openDebtCount} ligne(s) pour cet utilisateur` : ""}
                 </p>
               </div>
@@ -768,7 +768,7 @@ export default function PortefeuillePage() {
             {cashDebts && cashDebts.totalOpenCdf > 0 && (
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <Card className="p-4">
-                  <p className="text-xs text-gray-500">Commission MOVA</p>
+                  <p className="text-xs text-gray-500">Commission SENGA</p>
                   <p className="text-lg font-bold text-amber-700">{formatCdf(cashDebts.platformFeeCdf)}</p>
                 </Card>
                 <Card className="p-4">

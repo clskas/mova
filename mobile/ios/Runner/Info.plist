@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Mova</string>
+	<string>Senga</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -46,10 +46,10 @@
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>MOVA utilise la caméra pour photographier vos colis lors de l'envoi.</string>
+	<string>SENGA utilise la caméra pour photographier vos colis lors de l'envoi.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>MOVA accède à vos photos pour joindre une image au colis.</string>
+	<string>SENGA accède à vos photos pour joindre une image au colis.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>MOVA utilise votre position pour définir le point de départ ou d'enlèvement.</string>
+	<string>SENGA utilise votre position pour définir le point de départ ou d'enlèvement.</string>
 </dict>
 </plist>

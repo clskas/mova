@@ -169,7 +169,7 @@ async function bootstrap() {
   app.setGlobalPrefix('api', { exclude: ['health', 'internal/(.*)'] });
   const port = process.env.PORT ?? ${port};
   await app.listen(port);
-  console.log('MOVA ${label} on port ' + port);
+  console.log('SENGA ${label} on port ' + port);
 }
 bootstrap();
 `;
@@ -1192,7 +1192,7 @@ async function bootstrap() {
   app.setGlobalPrefix('api', { exclude: ['health', 'internal/(.*)'] });
   const port = process.env.PORT ?? 3002;
   await app.listen(port);
-  console.log('MOVA ride-service on port ' + port);
+  console.log('SENGA ride-service on port ' + port);
 }
 bootstrap();
 `);
@@ -1396,7 +1396,7 @@ async function bootstrap() {
   app.enableCors({ origin: process.env.CORS_ORIGIN?.split(',') ?? '*', credentials: true });
   const port = process.env.PORT ?? 3000;
   await app.listen(port);
-  console.log('MOVA api-gateway on port ' + port);
+  console.log('SENGA api-gateway on port ' + port);
 }
 bootstrap();
 `);

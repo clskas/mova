@@ -19,7 +19,7 @@ void main() {
             title: 'Test',
             child: Column(
               children: [
-                const MovaCard(child: Text('Contenu test MOVA RDC')),
+                const MovaCard(child: Text('Contenu test SENGA RDC')),
                 const SizedBox(height: 16),
                 MovaButton(label: 'Action', onPressed: () {}),
               ],

@@ -27,7 +27,7 @@ void main() {
     SharedPreferences.setMockInitialValues({});
   });
 
-  testWidgets('HomeScreen shows all MOVA services', (tester) async {
+  testWidgets('HomeScreen shows all SENGA services', (tester) async {
     tester.view.physicalSize = const Size(400, 900);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -40,7 +40,7 @@ void main() {
     expect(find.text('Taxi / Moto-taxi'), findsOneWidget);
     expect(find.text('Livraisons'), findsOneWidget);
     expect(find.text('Repas, colis, express et plus'), findsOneWidget);
-    expect(find.text('Wallet MOVA'), findsOneWidget);
+    expect(find.text('Wallet SENGA'), findsOneWidget);
     expect(find.text('Historique'), findsNWidgets(2));
     expect(find.byType(NavigationBar), findsOneWidget);
     expect(find.text('Réservation planifiée'), findsOneWidget);

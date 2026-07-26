@@ -650,7 +650,7 @@ export class ScheduledRidesService {
     return { data };
   }
 
-  /** Compatibilité mobile — coords pickup/dropoff optionnelles (zones MOVA nationales). */
+  /** Compatibilité mobile — coords pickup/dropoff optionnelles (zones SENGA nationales). */
   async estimateMobile(dto: MobileScheduledEstimateDto) {
     const when = new Date(dto.scheduledAt);
     this.validateScheduledAt(when);

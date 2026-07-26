@@ -65,7 +65,7 @@ export function DriverVehiclePreview({ driver, title = "Véhicule du chauffeur",
         <div className="text-sm space-y-1">
           {driverName && <p className="font-semibold text-[#1A1A2E]">{driverName}</p>}
           <p className="font-medium">{details}</p>
-          {driver?.publicId && <p className="text-xs text-gray-500">ID MOVA {driver.publicId}</p>}
+          {driver?.publicId && <p className="text-xs text-gray-500">ID SENGA {driver.publicId}</p>}
         </div>
       </div>
     </div>

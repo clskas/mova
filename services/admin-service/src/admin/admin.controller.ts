@@ -530,21 +530,21 @@ export class AdminController {
 
   @Post('provinces/bulk-active')
   @RequirePermissions(AdminPermission.PRICING_WRITE)
-  @ApiOperation({ summary: 'Activer ou désactiver toutes les provinces MOVA' })
+  @ApiOperation({ summary: 'Activer ou désactiver toutes les provinces SENGA' })
   setAllProvincesActive(@Body() body: { isActive: boolean }) {
     return this.adminService.setAllProvincesActive(body.isActive === true);
   }
 
   @Post('poi/seed')
   @RequirePermissions(AdminPermission.PRICING_WRITE)
-  @ApiOperation({ summary: 'Synchroniser le catalogue POI (toutes les villes MOVA)' })
+  @ApiOperation({ summary: 'Synchroniser le catalogue POI (toutes les villes SENGA)' })
   seedPois(@Query('city') city?: string) {
     return this.adminService.seedPois(city);
   }
 
   @Get('cities')
   @RequirePermissions(AdminPermission.PRICING_READ)
-  @ApiOperation({ summary: 'Villes MOVA' })
+  @ApiOperation({ summary: 'Villes SENGA' })
   cities(@Query('provinceId') provinceId?: string) {
     return this.adminService.listCities(provinceId);
   }
@@ -579,7 +579,7 @@ export class AdminController {
 
   @Post('cities/bulk-active')
   @RequirePermissions(AdminPermission.PRICING_WRITE)
-  @ApiOperation({ summary: 'Activer ou désactiver toutes les villes MOVA' })
+  @ApiOperation({ summary: 'Activer ou désactiver toutes les villes SENGA' })
   setAllCitiesActive(@Body() body: { isActive: boolean }) {
     return this.adminService.setAllCitiesActive(body.isActive === true);
   }
@@ -866,7 +866,7 @@ export class AdminController {
 
   @Get('commissions')
   @RequirePermissions(AdminPermission.PRICING_READ)
-  @ApiOperation({ summary: 'Commissions plateforme MOVA par service' })
+  @ApiOperation({ summary: 'Commissions plateforme SENGA par service' })
   commissions() {
     return this.adminService.listCommissions();
   }
@@ -901,7 +901,7 @@ export class AdminController {
 
   @Get('subscription-plans')
   @RequirePermissions(AdminPermission.SUBSCRIPTIONS_READ)
-  @ApiOperation({ summary: 'Plans abonnement MOVA Plus' })
+  @ApiOperation({ summary: 'Plans abonnement SENGA Plus' })
   subscriptionPlans() {
     return this.adminService.listSubscriptionPlans();
   }

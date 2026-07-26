@@ -15,7 +15,7 @@ class DriverJobAlertService {
   static int _notificationId = 0;
 
   static const _channelId = 'mova_driver_jobs';
-  static const _channelName = 'Missions & courses MOVA';
+  static const _channelName = 'Missions & courses SENGA';
 
   static Future<void> init() async {
     if (_initialized) return;
@@ -64,7 +64,7 @@ class DriverJobAlertService {
         android: AndroidNotificationDetails(
           _channelId,
           _channelName,
-          channelDescription: 'Alertes chauffeur MOVA',
+          channelDescription: 'Alertes chauffeur SENGA',
           importance: Importance.max,
           priority: Priority.max,
           category: AndroidNotificationCategory.call,

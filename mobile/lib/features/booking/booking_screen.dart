@@ -308,7 +308,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
               _pickup = resolved;
               _pickupFromSuggestion = true;
             } else {
-              return 'Point de départ hors zone MOVA.';
+              return 'Point de départ hors zone SENGA.';
             }
           } else {
             return 'Adresse de départ introuvable — choisissez une suggestion ou utilisez le GPS.';

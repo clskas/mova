@@ -9,7 +9,7 @@ import 'help_config.dart';
 import 'legal_screen.dart';
 import '../geo/suggest_place_screen.dart';
 
-/// Centre d'aide minimal pour l'application Chauffeur MOVA.
+/// Centre d'aide minimal pour l'application Chauffeur SENGA.
 class DriverHelpScreen extends ConsumerWidget {
   const DriverHelpScreen({super.key});
 
@@ -25,7 +25,7 @@ class DriverHelpScreen extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const Text(
-            'Ressources pour les chauffeurs et livreurs MOVA en RDC.',
+            'Ressources pour les chauffeurs et livreurs SENGA en RDC.',
             style: TextStyle(color: MovaColors.textSecondary, height: 1.4),
           ),
           const SizedBox(height: 16),
@@ -81,7 +81,7 @@ class DriverHelpScreen extends ConsumerWidget {
                 context: context,
                 builder: (ctx) => AlertDialog(
                   title: const Text('Déconnexion'),
-                  content: const Text('Voulez-vous vous déconnecter de MOVA Chauffeur ?'),
+                  content: const Text('Voulez-vous vous déconnecter de SENGA Driver ?'),
                   actions: [
                     TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
                     TextButton(

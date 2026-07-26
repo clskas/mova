@@ -298,7 +298,7 @@ export class WalletService {
 
     if (providerKey === 'MOCK') {
       this.assertMockAllowed();
-      const wallet = await this.credit(userId, amountCdf, 'Recharge test MOVA (simulation)', ref);
+      const wallet = await this.credit(userId, amountCdf, 'Recharge test SENGA (simulation)', ref);
       return {
         success: true,
         simulated: true,

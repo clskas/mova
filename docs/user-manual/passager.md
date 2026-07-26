@@ -1,15 +1,15 @@
-# MOVA Passager
+# Senga
 
 **Version :** 1.1 — Juillet 2026  
 **Marché :** République Démocratique du Congo (Kinshasa)
 
-## Bienvenue sur MOVA
+## Bienvenue sur SENGA
 
-MOVA est votre application de mobilité urbaine en RDC. Commandez un taxi ou moto-taxi, envoyez un colis, réservez un trajet à l'avance, commandez un repas, faites vos courses ou partagez un covoiturage — le tout en francs congolais (CDF).
+SENGA est votre application de mobilité urbaine en RDC. Commandez un taxi ou moto-taxi, envoyez un colis, réservez un trajet à l'avance, commandez un repas, faites vos courses ou partagez un covoiturage — le tout en francs congolais (CDF).
 
 ## 1. Créer un compte
 
-1. Ouvrez l'application MOVA Passager.
+1. Ouvrez l'application Senga.
 2. **Écran d'accueil animé** (**4 s par service**, ~32 s au total) : présentation des services (taxi, livraisons, wallet, etc.). Touchez l'écran pour aller directement à la connexion.
 3. Saisissez votre numéro de téléphone au format **+243** suivi de 9 chiffres.
 4. Entrez le code OTP reçu par SMS.
@@ -24,9 +24,9 @@ Les services sont présentés en **grille 2×4** (de haut en bas, gauche puis dr
 | 1 | Taxi / Moto-taxi | Livraisons |
 | 2 | Réservation planifiée | Covoiturage |
 | 3 | Location véhicule | Déménagement |
-| 4 | Wallet MOVA | Historique |
+| 4 | Wallet SENGA | Historique |
 
-Les services **Wallet MOVA** et **Historique** sont en bas de la grille. Vous y accédez aussi via la barre de navigation (icônes portefeuille et horloge) et le menu en haut de l'écran.
+Les services **Wallet SENGA** et **Historique** sont en bas de la grille. Vous y accédez aussi via la barre de navigation (icônes portefeuille et horloge) et le menu en haut de l'écran.
 
 ## 2. Taxi / Moto-taxi
 
@@ -37,7 +37,7 @@ Les services **Wallet MOVA** et **Historique** sont en bas de la grille. Vous y 
 5. Suivez votre chauffeur en temps réel sur l'écran de suivi.
 6. Une **ligne bleue** sur la carte représente le trajet déjà parcouru (trace GPS), en plus de la position actuelle du chauffeur.
 7. Sous la carte, utilisez les **filtres POI** (Marchés, Hôpitaux, Universités, Pharmacies) pour afficher les points d'intérêt à proximité.
-8. L'autocomplétion de destination inclut les **lieux MOVA** (marchés, hôpitaux, etc.) en plus des communes.
+8. L'autocomplétion de destination inclut les **lieux SENGA** (marchés, hôpitaux, etc.) en plus des communes.
 
 ## 3. Livraison colis
 
@@ -56,7 +56,7 @@ Les services **Wallet MOVA** et **Historique** sont en bas de la grille. Vous y 
 4. Indiquez la destination et le véhicule souhaité.
 5. Confirmez la réservation.
 6. Vous recevrez des **rappels** la veille et une heure avant le départ (notification et SMS).
-7. Un chauffeur est assigné automatiquement environ **2 heures** avant l'heure prévue (ou manuellement par l'équipe MOVA).
+7. Un chauffeur est assigné automatiquement environ **2 heures** avant l'heure prévue (ou manuellement par l'équipe SENGA).
 8. **Annulation tardive** (moins de 24 h avant le départ, chauffeur déjà confirmé) : des frais de **50 %** du tarif estimé peuvent être retenus sur votre portefeuille.
 
 ## 5. Livraison repas
@@ -73,7 +73,7 @@ Les services **Wallet MOVA** et **Historique** sont en bas de la grille. Vous y 
 2. Indiquez le **point de retrait** (commerce, pharmacie, marché) — utilisez l'autocomplétion pour sélectionner un lieu connu.
 3. Listez vos articles à acheter.
 4. Indiquez l'adresse de livraison (ou **Ma position**).
-5. Optionnel : renseignez un **budget achats max** — le montant est **bloqué** sur votre portefeuille MOVA jusqu'à la fin de la course.
+5. Optionnel : renseignez un **budget achats max** — le montant est **bloqué** sur votre portefeuille SENGA jusqu'à la fin de la course.
 6. Estimez le prix (frais de service + estimation achats selon le type de commerce).
 7. Envoyez la liste : un livreur proche reçoit une **alerte**.
 8. Une fois le livreur assigné, utilisez le **chat** pour préciser un article indisponible.
@@ -87,7 +87,7 @@ Les services **Wallet MOVA** et **Historique** sont en bas de la grille. Vous y 
 4. **Mes réservations** : consultez vos trajets réservés. Annulez avant le départ si besoin.
 5. **Détail trajet** : carte du parcours, timeline (Publié → Places réservées → En route → Terminé).
 
-> La publication de trajets est réservée aux **chauffeurs MOVA** (app Chauffeur, KYC approuvé).
+> La publication de trajets est réservée aux **chauffeurs SENGA** (app Chauffeur, KYC approuvé).
 
 ## 8. Livraison express
 
@@ -109,7 +109,7 @@ Les services **Wallet MOVA** et **Historique** sont en bas de la grille. Vous y 
 3. Sélectionnez camion et options de manutention si besoin.
 4. Estimez, confirmez et suivez l'intervention.
 
-## 11. Wallet MOVA
+## 11. Wallet SENGA
 
 Carte en **dernière ligne** de l'accueil (ou icône portefeuille dans la barre du bas). Consultez votre solde, rechargez via Orange Money, M-Pesa ou Airtel Money, et payez vos courses directement depuis le portefeuille.
 
@@ -142,7 +142,7 @@ La trace se construit au fur et à mesure du déplacement. En cas de faible rés
 | Orange Money | CDF |
 | M-Pesa (Vodacom) | CDF |
 | Airtel Money | CDF |
-| Portefeuille MOVA | CDF |
+| Portefeuille SENGA | CDF |
 
 ## Zone de service
 

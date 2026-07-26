@@ -71,7 +71,7 @@ String historyTypeLabel(String? type) => switch (type) {
 List<Map<String, dynamic>> scheduledTimelineSteps(String? status) {
   const steps = [
     ('SCHEDULED', 'Réservation enregistrée'),
-    ('CONFIRMED', 'Confirmée par MOVA'),
+    ('CONFIRMED', 'Confirmée par SENGA'),
     ('IN_PROGRESS', 'Trajet en cours'),
     ('COMPLETED', 'Terminée'),
   ];

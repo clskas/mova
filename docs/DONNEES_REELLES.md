@@ -1,4 +1,4 @@
-# Passer aux données réelles — MOVA RDC
+# Passer aux données réelles — SENGA RDC
 
 Ce guide explique comment quitter le **mode développement** (OTP mock, paiements simulés, API locale) pour utiliser des **données et services réels** en staging ou production.
 
@@ -60,7 +60,7 @@ NODE_ENV=production
 Puis redémarrer la stack :
 
 ```powershell
-cd c:\Users\Administrator\Mova
+cd c:\Users\Administrator\Senga
 docker compose down
 docker compose up -d --build
 ```
@@ -128,7 +128,7 @@ npx prisma migrate deploy
 Le déménagement **n’est pas** une course taxi automatique. Flux actuel :
 
 ```
-Passager                    Admin MOVA                    Chauffeur / équipe
+Passager                    Admin SENGA                    Chauffeur / équipe
    |                              |                                |
    |-- Demande + photos --------->|                                |
    |   (PENDING)                  |                                |
@@ -150,7 +150,7 @@ Passager                    Admin MOVA                    Chauffeur / équipe
 ## 4. Processus — Réservation planifiée
 
 ```
-Passager                 Admin MOVA              Chauffeur (futur / manuel)
+Passager                 Admin SENGA              Chauffeur (futur / manuel)
    |                         |                         |
    |-- Réserve (SCHEDULED) ->|                         |
    |                         |-- CONFIRMED ----------->|

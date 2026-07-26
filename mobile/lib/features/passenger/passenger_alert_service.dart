@@ -12,7 +12,7 @@ class PassengerAlertService {
   static int _notificationId = 0;
 
   static const _channelId = 'mova_passenger_rides';
-  static const _channelName = 'Courses MOVA';
+  static const _channelName = 'Courses SENGA';
 
   static Future<void> init() async {
     if (_initialized) return;
@@ -71,7 +71,7 @@ class PassengerAlertService {
       case 'DRIVER_ARRIVED':
         await notify(title: 'Chauffeur arrivé', body: 'Votre chauffeur vous attend au point de prise en charge.');
       case 'IN_PROGRESS':
-        await notify(title: 'Course en cours', body: 'Bon voyage avec MOVA !');
+        await notify(title: 'Course en cours', body: 'Bon voyage avec SENGA !');
       case 'COMPLETED':
         await notify(title: 'Course terminée', body: 'Pensez à régler le paiement si nécessaire.');
       default:
@@ -86,7 +86,7 @@ class PassengerAlertService {
       case 'IN_TRANSIT':
         await notify(title: 'Livreur en route', body: 'Votre livraison arrive bientôt.');
       case 'DELIVERED':
-        await notify(title: 'Livraison terminée', body: 'Merci d\'avoir utilisé MOVA !');
+        await notify(title: 'Livraison terminée', body: 'Merci d\'avoir utilisé SENGA !');
       case 'READY_FOR_PICKUP':
         await notify(title: 'Commande prête', body: 'Un livreur va prendre en charge votre commande.');
       default:

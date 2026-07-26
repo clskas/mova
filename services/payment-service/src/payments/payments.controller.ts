@@ -84,7 +84,7 @@ export class PaymentsController {
   }
 
   @Post('cash-debts/cash-request')
-  @ApiOperation({ summary: 'Générer un code/QR pour payer la dette espèces au guichet MOVA' })
+  @ApiOperation({ summary: 'Générer un code/QR pour payer la dette espèces au guichet SENGA' })
   createCashDebtCashRequest(@Request() req: { user: { id: string } }) {
     return this.paymentsService.createCashDebtCashRequest(req.user.id);
   }

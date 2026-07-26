@@ -1,6 +1,6 @@
 name: Render Provision
 
-# One-shot or re-run to sync MOVA services on Render (API, idempotent).
+# One-shot or re-run to sync SENGA services on Render (API, idempotent).
 # Normal deploys go through CI → build-push → deploy.yml (automatic on main).
 
 on:

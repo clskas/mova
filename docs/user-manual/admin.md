@@ -1,4 +1,4 @@
-# MOVA Admin (équipe interne)
+# SENGA Admin (équipe interne)
 
 Console web sur http://localhost:3002 en développement.
 

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_widgets.dart';
 
-/// Tappable service tile for the MOVA home hub.
+/// Tappable service tile for the SENGA home hub.
 class ServiceCard extends StatelessWidget {
   const ServiceCard({
     super.key,

@@ -83,7 +83,7 @@ export function CarpoolView({ onBack, mock }: Props) {
       <button type="button" onClick={onBack} className="text-sm text-[#6C63FF]">← Accueil</button>
       <h2 className="text-lg font-semibold">Covoiturage</h2>
       <p className="text-xs text-gray-500">
-        Recherchez et rejoignez un trajet. La publication est réservée aux chauffeurs MOVA.
+        Recherchez et rejoignez un trajet. La publication est réservée aux chauffeurs SENGA.
       </p>
       {mock && <p className="text-xs text-[#FF6B35] bg-orange-50 rounded-lg py-2 px-3">Mode démo</p>}
       {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg p-3">{error}</p>}

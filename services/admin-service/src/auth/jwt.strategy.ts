@@ -21,7 +21,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('Compte suspendu');
     }
     if (!isAdminPanelRole(payload.role)) {
-      throw new UnauthorizedException('Accès réservé au panneau admin MOVA');
+      throw new UnauthorizedException('Accès réservé au panneau admin SENGA');
     }
     return { id: payload.sub, role: payload.role, status: payload.status };
   }

@@ -13,7 +13,7 @@ import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 
-/// Paiement de la dette espèces au guichet MOVA : code à 6 chiffres + QR pour validation admin.
+/// Paiement de la dette espèces au guichet SENGA : code à 6 chiffres + QR pour validation admin.
 class CashDebtCashPaymentScreen extends ConsumerStatefulWidget {
   const CashDebtCashPaymentScreen({super.key, this.initialRequest});
 
@@ -129,7 +129,7 @@ class _CashDebtCashPaymentScreenState extends ConsumerState<CashDebtCashPaymentS
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     const Text(
-                      'Présentez ce code au guichet MOVA après avoir remis l\'argent en espèces.',
+                      'Présentez ce code au guichet SENGA après avoir remis l\'argent en espèces.',
                       style: TextStyle(color: MovaColors.textSecondary, height: 1.4),
                     ),
                     const SizedBox(height: 16),
@@ -198,7 +198,7 @@ class _CashDebtCashPaymentScreenState extends ConsumerState<CashDebtCashPaymentS
                     ),
                     const SizedBox(height: 16),
                     const Text(
-                      'En attente de validation par l\'équipe MOVA… Vous serez notifié dès que le paiement est confirmé.',
+                      'En attente de validation par l\'équipe SENGA… Vous serez notifié dès que le paiement est confirmé.',
                       textAlign: TextAlign.center,
                       style: TextStyle(fontSize: 13, color: MovaColors.textSecondary, height: 1.4),
                     ),

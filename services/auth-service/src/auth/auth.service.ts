@@ -96,7 +96,7 @@ export class AuthService {
     }
     await this.clearPinFailures(normalized);
     if (user.status === UserStatus.SUSPENDED) {
-      throw new MovaHttpException(MovaErrorCode.AUTH_FORBIDDEN, HttpStatus.FORBIDDEN, 'Compte suspendu. Contactez le support MOVA.');
+      throw new MovaHttpException(MovaErrorCode.AUTH_FORBIDDEN, HttpStatus.FORBIDDEN, 'Compte suspendu. Contactez le support SENGA.');
     }
     return this.buildAuthResponse(user, { isNew: false });
   }
@@ -173,7 +173,7 @@ export class AuthService {
     }
     this.assertRoleAccess(user, role);
     if (user.status === UserStatus.SUSPENDED) {
-      throw new MovaHttpException(MovaErrorCode.AUTH_FORBIDDEN, HttpStatus.FORBIDDEN, 'Compte suspendu. Contactez le support MOVA.');
+      throw new MovaHttpException(MovaErrorCode.AUTH_FORBIDDEN, HttpStatus.FORBIDDEN, 'Compte suspendu. Contactez le support SENGA.');
     }
     await this.clearPinFailures(normalized);
     return this.buildAuthResponse(user, { isNew });
@@ -203,7 +203,7 @@ export class AuthService {
       throw new MovaHttpException(
         MovaErrorCode.AUTH_FORBIDDEN,
         HttpStatus.FORBIDDEN,
-        'Ce numéro est un compte chauffeur. Utilisez l\'application MOVA Chauffeur.',
+        'Ce numéro est un compte chauffeur. Utilisez l\'application SENGA Driver.',
       );
     }
     if (role === UserRole.DRIVER && staffRoles.includes(user.role)) {
@@ -224,14 +224,14 @@ export class AuthService {
       throw new MovaHttpException(
         MovaErrorCode.AUTH_FORBIDDEN,
         HttpStatus.FORBIDDEN,
-        'Compte partenaire location — utilisez le portail MOVA Location.',
+        'Compte partenaire location — utilisez le portail SENGA Location.',
       );
     }
     if ((role === UserRole.PASSENGER || role === UserRole.DRIVER) && user.role === UserRole.RESTAURANT) {
       throw new MovaHttpException(
         MovaErrorCode.AUTH_FORBIDDEN,
         HttpStatus.FORBIDDEN,
-        'Compte restaurant — utilisez le portail MOVA Restaurant.',
+        'Compte restaurant — utilisez le portail SENGA Restaurant.',
       );
     }
   }

@@ -175,7 +175,7 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
     setState(() => _actionLoading = false);
     if (bytes == null) return;
     final name = '${_receipt?['receiptNumber'] ?? 'mova-receipt'}.pdf';
-    await Share.shareXFiles([XFile.fromData(bytes, name: name, mimeType: 'application/pdf')], text: 'Reçu MOVA');
+    await Share.shareXFiles([XFile.fromData(bytes, name: name, mimeType: 'application/pdf')], text: 'Reçu SENGA');
   }
 
   Future<void> _sendEmail() async {
@@ -347,7 +347,7 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('MOVA RDC', style: Theme.of(context).textTheme.titleMedium?.copyWith(color: MovaColors.violet)),
+                          Text('SENGA RDC', style: Theme.of(context).textTheme.titleMedium?.copyWith(color: MovaColors.violet)),
                           const SizedBox(height: 4),
                           Text(docLabel, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
                           const SizedBox(height: 8),

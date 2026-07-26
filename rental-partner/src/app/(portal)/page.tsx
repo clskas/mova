@@ -162,7 +162,7 @@ export default function DashboardPage() {
       <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-5 flex flex-wrap items-center justify-between gap-4">
         <div>
           <p className="font-medium text-indigo-900">Inscrire un nouveau véhicule</p>
-          <p className="text-sm text-indigo-700 mt-1">Soumettez un dossier pour validation MOVA sous 48 h.</p>
+          <p className="text-sm text-indigo-700 mt-1">Soumettez un dossier pour validation SENGA sous 48 h.</p>
         </div>
         <Link
           href="/vehicules/nouveau"

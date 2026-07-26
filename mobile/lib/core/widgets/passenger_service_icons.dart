@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// Icônes PNG brandées pour les services MOVA Passager (écran d'accueil & splash).
+/// Icônes PNG brandées pour les services Senga (écran d'accueil & splash).
 class PassengerServiceIcon extends StatelessWidget {
   const PassengerServiceIcon._(this.asset, {this.size = 48});
 

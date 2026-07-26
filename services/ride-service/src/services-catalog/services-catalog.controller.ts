@@ -8,7 +8,7 @@ export class ServicesCatalogController {
   constructor(private catalog: ServicesCatalogService) {}
 
   @Get()
-  @ApiOperation({ summary: 'Liste des services MOVA' })
+  @ApiOperation({ summary: 'Liste des services SENGA' })
   list() {
     return { data: this.catalog.list() };
   }

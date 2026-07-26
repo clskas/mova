@@ -6,7 +6,7 @@ import 'location_service.dart';
 import 'service_area_prefs.dart';
 import 'service_areas.dart';
 
-/// Détecte la ville MOVA la plus proche du GPS et met à jour la préférence.
+/// Détecte la ville SENGA la plus proche du GPS et met à jour la préférence.
 class ServiceAreaGps {
   static Future<ServiceArea?> sync(WidgetRef ref) async {
     final location = await LocationService.getCurrentLocation();

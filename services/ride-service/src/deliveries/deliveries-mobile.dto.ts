@@ -31,7 +31,7 @@ export class MobileErrandEstimateDto {
 
 export class MobileErrandCreateDto extends MobileErrandEstimateDto {
   @ApiProperty({
-    description: 'Budget achats max (CDF) — bloqué sur le wallet MOVA à la commande',
+    description: 'Budget achats max (CDF) — bloqué sur le wallet SENGA à la commande',
     example: 50000,
   })
   @IsInt()

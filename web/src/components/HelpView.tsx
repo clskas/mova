@@ -4,16 +4,16 @@ import { HelpIcon } from "./ServiceIcons";
 
 const FAQ = [
   {
-    q: "Comment créer un compte MOVA ?",
+    q: "Comment créer un compte SENGA ?",
     a: "Saisissez votre numéro +243 (9 chiffres), puis le code OTP reçu par SMS.",
   },
   {
     q: "Quels moyens de paiement sont acceptés ?",
-    a: "Orange Money, M-Pesa, Airtel Money et portefeuille MOVA — montants en CDF.",
+    a: "Orange Money, M-Pesa, Airtel Money et portefeuille SENGA — montants en CDF.",
   },
   {
-    q: "Dans quelles zones MOVA est-il disponible ?",
-    a: "MOVA couvre 32 zones de service à travers la RDC. Choisissez votre ville ou laissez le GPS détecter la zone la plus proche.",
+    q: "Dans quelles zones SENGA est-il disponible ?",
+    a: "SENGA couvre 32 zones de service à travers la RDC. Choisissez votre ville ou laissez le GPS détecter la zone la plus proche.",
   },
   {
     q: "Comment contacter le support ?",
@@ -40,7 +40,7 @@ export function HelpView({ onBack }: Props) {
 
       <div className="flex items-center gap-2">
         <HelpIcon color="#6C63FF" size={24} />
-        <h2 className="text-lg font-bold">Centre d&apos;aide MOVA</h2>
+        <h2 className="text-lg font-bold">Centre d&apos;aide SENGA</h2>
       </div>
       <p className="text-sm text-gray-500">
         Documentation et support — RDC
@@ -94,7 +94,7 @@ export function HelpView({ onBack }: Props) {
       <section className="text-sm text-gray-500 space-y-1">
         <p>
           <strong className="text-[#1A1A2E]">Manuel complet</strong> — disponible
-          dans l&apos;application mobile MOVA Passager.
+          dans l&apos;application mobile Senga.
         </p>
         <p>CGU et politique de confidentialité : voir l&apos;app mobile.</p>
       </section>

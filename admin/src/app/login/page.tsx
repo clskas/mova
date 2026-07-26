@@ -77,7 +77,7 @@ export default function LoginPage() {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/icon.svg" alt="" width={44} height={44} className="rounded-xl shadow-lg" />
             <div>
-              <p className="text-xl font-semibold tracking-tight">MOVA Admin</p>
+              <p className="text-xl font-semibold tracking-tight">SENGA Admin</p>
               <p className="text-sm text-white/60">Console d&apos;administration</p>
             </div>
           </div>
@@ -109,7 +109,7 @@ export default function LoginPage() {
           </ul>
         </div>
 
-        <p className="relative z-10 text-xs text-white/40 mt-8 lg:mt-0">© MOVA — République Démocratique du Congo</p>
+        <p className="relative z-10 text-xs text-white/40 mt-8 lg:mt-0">© SENGA — République Démocratique du Congo</p>
       </aside>
 
       <main className="flex-1 flex items-center justify-center p-6 sm:p-10 bg-[var(--background)]">

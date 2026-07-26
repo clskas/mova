@@ -3,10 +3,10 @@ import { PrismaClient, UserRole } from '@prisma/client';
 /** Staff demo accounts for local RBAC testing (OTP 123456 with MOCK_OTP=true). */
 export const STAFF_DEMO_ACCOUNTS = [
   { phone: '+243900000001', role: UserRole.SUPER_ADMIN, firstName: 'Super', lastName: 'Admin' },
-  { phone: '+243900000002', role: UserRole.ADMIN, firstName: 'Admin', lastName: 'MOVA' },
-  { phone: '+243900000003', role: UserRole.SUPPORT, firstName: 'Support', lastName: 'MOVA' },
-  { phone: '+243900000004', role: UserRole.FINANCE, firstName: 'Finance', lastName: 'MOVA' },
-  { phone: '+243900000005', role: UserRole.CONTENT, firstName: 'Content', lastName: 'MOVA' },
+  { phone: '+243900000002', role: UserRole.ADMIN, firstName: 'Admin', lastName: 'SENGA' },
+  { phone: '+243900000003', role: UserRole.SUPPORT, firstName: 'Support', lastName: 'SENGA' },
+  { phone: '+243900000004', role: UserRole.FINANCE, firstName: 'Finance', lastName: 'SENGA' },
+  { phone: '+243900000005', role: UserRole.CONTENT, firstName: 'Content', lastName: 'SENGA' },
 ] as const;
 
 async function main() {

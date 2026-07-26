@@ -506,7 +506,7 @@ export class RestaurantPortalService {
           pickupLat,
           pickupLng,
           pickupAddress: pickup,
-          title: 'Nouvelle livraison MOVA',
+          title: 'Nouvelle livraison SENGA',
           body: `Repas · ${pickup}`,
           data: { deliveryType: updated.type },
         }).catch(() => undefined);

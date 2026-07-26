@@ -141,7 +141,7 @@ export class BillingReceiptService {
       footerNote: paid
         ? type === 'RENTAL'
           ? 'Ce document atteste du paiement. La caution indiquée est remboursée après restitution du véhicule.'
-          : 'Ce document atteste du paiement de votre prestation MOVA.'
+          : 'Ce document atteste du paiement de votre prestation SENGA.'
         : 'Facture pro forma — en attente de paiement.',
     };
   }
@@ -220,7 +220,7 @@ export class BillingReceiptService {
         lines.push({ label: `Remise${s.promoCode ? ` (${s.promoCode})` : ''}`, amountCdf: s.discountCdf, kind: 'discount' });
       }
     } else {
-      lines.push({ label: SERVICE_TYPE_LABELS[type] ?? 'Prestation MOVA', amountCdf: totalCdf, kind: 'item' });
+      lines.push({ label: SERVICE_TYPE_LABELS[type] ?? 'Prestation SENGA', amountCdf: totalCdf, kind: 'item' });
     }
 
     lines.push({ label: 'Total à payer', amountCdf: totalCdf, kind: 'total' });
@@ -306,16 +306,16 @@ export class BillingReceiptService {
       throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Aucune adresse e-mail — renseignez votre e-mail dans le profil.');
     }
     const { buffer } = await this.getPdf(userId, referenceType, referenceId);
-    const subject = `${receipt.documentType === 'RECEIPT' ? 'Reçu' : 'Facture'} MOVA ${receipt.receiptNumber}`;
+    const subject = `${receipt.documentType === 'RECEIPT' ? 'Reçu' : 'Facture'} SENGA ${receipt.receiptNumber}`;
     const text = [
       `Bonjour${receipt.customer.name ? ` ${receipt.customer.name}` : ''},`,
       '',
-      `Veuillez trouver ci-joint votre ${receipt.documentType === 'RECEIPT' ? 'reçu' : 'facture'} MOVA.`,
+      `Veuillez trouver ci-joint votre ${receipt.documentType === 'RECEIPT' ? 'reçu' : 'facture'} SENGA.`,
       `Référence : ${receipt.receiptNumber}`,
       `Montant : ${receipt.totalCdf.toLocaleString('fr-CD')} FC`,
       `Service : ${receipt.serviceTypeLabel}`,
       '',
-      'Merci d\'utiliser MOVA RDC.',
+      'Merci d\'utiliser SENGA RDC.',
     ].join('\n');
 
     const res = await fetch(serviceUrl('notification', '/internal/email'), {
@@ -339,7 +339,7 @@ export class BillingReceiptService {
     const receipt = await this.buildReceipt(userId, referenceType, referenceId);
     const type = referenceType.toUpperCase();
     const summary = [
-      `📄 ${receipt.documentType === 'RECEIPT' ? 'Reçu' : 'Facture'} MOVA ${receipt.receiptNumber}`,
+      `📄 ${receipt.documentType === 'RECEIPT' ? 'Reçu' : 'Facture'} SENGA ${receipt.receiptNumber}`,
       `${receipt.serviceTypeLabel} — ${receipt.totalCdf.toLocaleString('fr-CD')} FC`,
       receipt.payment ? `Paiement : ${receipt.payment.methodLabel} (${receipt.payment.status})` : 'En attente de paiement',
       `Réf. ${referenceId.slice(0, 8)}…`,

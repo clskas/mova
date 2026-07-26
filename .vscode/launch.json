@@ -2,7 +2,7 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "MOVA Passager (USB)",
+      "name": "Senga (USB)",
       "request": "launch",
       "type": "dart",
       "cwd": "${workspaceFolder}/mobile",
@@ -16,7 +16,7 @@
       "preLaunchTask": "mova-adb-reverse"
     },
     {
-      "name": "MOVA Passager (LAN)",
+      "name": "Senga (LAN)",
       "request": "launch",
       "type": "dart",
       "cwd": "${workspaceFolder}/mobile",
@@ -29,7 +29,7 @@
       ]
     },
     {
-      "name": "MOVA Chauffeur (USB)",
+      "name": "SENGA Driver (USB)",
       "request": "launch",
       "type": "dart",
       "cwd": "${workspaceFolder}/mobile",
@@ -43,7 +43,7 @@
       "preLaunchTask": "mova-adb-reverse"
     },
     {
-      "name": "MOVA Chauffeur (LAN)",
+      "name": "SENGA Driver (LAN)",
       "request": "launch",
       "type": "dart",
       "cwd": "${workspaceFolder}/mobile",
@@ -56,7 +56,7 @@
       ]
     },
     {
-      "name": "MOVA Passager (émulateur)",
+      "name": "Senga (émulateur)",
       "request": "launch",
       "type": "dart",
       "cwd": "${workspaceFolder}/mobile",
@@ -69,7 +69,7 @@
       ]
     },
     {
-      "name": "MOVA Chauffeur (émulateur)",
+      "name": "SENGA Driver (émulateur)",
       "request": "launch",
       "type": "dart",
       "cwd": "${workspaceFolder}/mobile",

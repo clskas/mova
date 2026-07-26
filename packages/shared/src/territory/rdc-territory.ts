@@ -1,4 +1,4 @@
-/** Emprise approximative du territoire RDC — couverture nationale MOVA (hors boîtes urbaines). */
+/** Emprise approximative du territoire RDC — couverture nationale SENGA (hors boîtes urbaines). */
 export const RDC_TERRITORY_BOUNDS = {
   minLat: -13.6,
   maxLat: 5.6,

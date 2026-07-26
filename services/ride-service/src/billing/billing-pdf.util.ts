@@ -13,7 +13,7 @@ export function buildReceiptPdf(receipt: MovaReceipt): Promise<Buffer> {
 
     const title = receipt.documentType === 'INVOICE' ? 'FACTURE' : 'REÇU DE PAIEMENT';
 
-    doc.fontSize(22).fillColor('#6B21A8').text('MOVA RDC', { align: 'center' });
+    doc.fontSize(22).fillColor('#6B21A8').text('SENGA RDC', { align: 'center' });
     doc.moveDown(0.3);
     doc.fontSize(14).fillColor('#333').text(title, { align: 'center' });
     doc.moveDown(1);
@@ -84,7 +84,7 @@ export function buildThermalPdf(receipt: MovaReceipt): Promise<Buffer> {
     doc.on('end', () => resolve(Buffer.concat(chunks)));
     doc.on('error', reject);
 
-    doc.fontSize(11).text('MOVA RDC', { align: 'center' });
+    doc.fontSize(11).text('SENGA RDC', { align: 'center' });
     doc.fontSize(9).text(receipt.documentType === 'INVOICE' ? 'FACTURE' : 'REÇU', { align: 'center' });
     doc.moveDown(0.3);
     doc.fontSize(8).text(`N° ${receipt.receiptNumber}`, { align: 'center' });

@@ -199,7 +199,7 @@ export class ErrandsService {
       throw new MovaHttpException(
         MovaErrorCode.VALIDATION_ERROR,
         HttpStatus.BAD_REQUEST,
-        'Budget achats max obligatoire. Rechargez votre wallet MOVA pour bloquer ce montant.',
+        'Budget achats max obligatoire. Rechargez votre wallet SENGA pour bloquer ce montant.',
       );
     }
     if (budgetCdf < estimatedPurchaseCdf) {

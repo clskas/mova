@@ -114,7 +114,7 @@ class _SubscriptionsScreenState extends ConsumerState<SubscriptionsScreen> {
     final activeId = activePlan?['id']?.toString();
 
     return MovaScreen(
-      title: 'MOVA Plus',
+      title: 'SENGA Plus',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -148,8 +148,8 @@ class _SubscriptionsScreenState extends ConsumerState<SubscriptionsScreen> {
                 ),
                 SizedBox(height: 8),
                 Text(
-                  'Réductions automatiques sur les frais de service MOVA, '
-                  'sans code promo à saisir. Idéal si vous utilisez MOVA plusieurs fois par semaine.',
+                  'Réductions automatiques sur les frais de service SENGA, '
+                  'sans code promo à saisir. Idéal si vous utilisez SENGA plusieurs fois par semaine.',
                   style: TextStyle(color: MovaColors.textSecondary, height: 1.4, fontSize: 13),
                 ),
               ],
@@ -211,7 +211,7 @@ class _SubscriptionsScreenState extends ConsumerState<SubscriptionsScreen> {
           const Text('Comparer les offres', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
           const SizedBox(height: 4),
           const Text(
-            'Les réductions s\'appliquent sur les frais MOVA (pas sur le panier restaurant ni les achats courses).',
+            'Les réductions s\'appliquent sur les frais SENGA (pas sur le panier restaurant ni les achats courses).',
             style: TextStyle(color: MovaColors.textSecondary, fontSize: 12, height: 1.35),
           ),
           const SizedBox(height: 12),
@@ -237,7 +237,7 @@ class _SubscriptionsScreenState extends ConsumerState<SubscriptionsScreen> {
             }),
           const SizedBox(height: 8),
           const Text(
-            'Le premier mois est débité immédiatement de votre portefeuille MOVA. '
+            'Le premier mois est débité immédiatement de votre portefeuille SENGA. '
             'Rechargez votre solde avant de souscrire si nécessaire.',
             style: TextStyle(color: MovaColors.textSecondary, fontSize: 11, height: 1.35),
             textAlign: TextAlign.center,

@@ -330,7 +330,7 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
       builder: (ctx) => AlertDialog(
         title: const Text('Régler les dettes espèces'),
         content: Text(
-          'MOVA débitera ${MarketConfig.formatCdf(total)} de votre portefeuille pour solder les encaissements cash à reverser.',
+          'SENGA débitera ${MarketConfig.formatCdf(total)} de votre portefeuille pour solder les encaissements cash à reverser.',
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),

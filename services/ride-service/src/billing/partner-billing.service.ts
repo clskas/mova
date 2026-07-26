@@ -93,7 +93,7 @@ export class PartnerBillingService {
     const lines: ReceiptLine[] = [
       { label: `Panier repas #${delivery.id.slice(0, 8)}`, amountCdf: amounts.itemsSubtotalCdf, kind: 'item' },
       {
-        label: `Commission MOVA (${RESTAURANT_PLATFORM_PERCENT} %)`,
+        label: `Commission SENGA (${RESTAURANT_PLATFORM_PERCENT} %)`,
         amountCdf: amounts.platformFeeCdf,
         kind: 'fee',
       },
@@ -122,7 +122,7 @@ export class PartnerBillingService {
       currency: 'CDF',
       promoCode: amounts.promoCode,
       payment: null,
-      footerNote: 'Document partenaire MOVA — montant net crédité sur votre solde.',
+      footerNote: 'Document partenaire SENGA — montant net crédité sur votre solde.',
     };
   }
 
@@ -140,7 +140,7 @@ export class PartnerBillingService {
     const lines: ReceiptLine[] = [
       { label: inquiry.vehicle?.name ?? 'Location véhicule', amountCdf: amounts.subtotalGrossCdf, kind: 'item' },
       {
-        label: `Commission MOVA (${RENTAL_PLATFORM_PERCENT} %)`,
+        label: `Commission SENGA (${RENTAL_PLATFORM_PERCENT} %)`,
         amountCdf: amounts.platformFeeCdf,
         kind: 'fee',
       },
@@ -169,7 +169,7 @@ export class PartnerBillingService {
       currency: 'CDF',
       promoCode: amounts.promoCode,
       payment: null,
-      footerNote: 'Document partenaire MOVA — location véhicule.',
+      footerNote: 'Document partenaire SENGA — location véhicule.',
     };
   }
 
@@ -236,7 +236,7 @@ export class PartnerBillingService {
   ) {
     const label = partnerType === 'restaurant' ? 'Restaurant' : 'Partenaire location';
     const lines = [
-      `MOVA — Rapport financier ${label}`,
+      `SENGA — Rapport financier ${label}`,
       `Partenaire;${partnerName.replace(/;/g, ',')}`,
       `Généré;${new Date().toISOString()}`,
       report.from ? `Du;${report.from}` : '',
@@ -277,7 +277,7 @@ export class PartnerBillingService {
       { label: `Opérations (${report.periodCount})`, amountCdf: report.periodTotalCdf, kind: 'total' },
     ];
     const receipt: MovaReceipt = {
-      receiptNumber: `MOVA-${partnerType.toUpperCase()}-${Date.now()}`,
+      receiptNumber: `SENGA-${partnerType.toUpperCase()}-${Date.now()}`,
       documentType: 'RECEIPT',
       issuedAt: new Date().toISOString(),
       referenceType: partnerType === 'restaurant' ? 'DELIVERY' : 'RENTAL',

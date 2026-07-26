@@ -26,7 +26,7 @@ void main() {
           Column(
             children: [
               const MovaCard(
-                child: Text('MOVA — Mobilité urbaine en RDC'),
+                child: Text('SENGA — Mobilité urbaine en RDC'),
               ),
               const SizedBox(height: 8),
               MovaButton(label: 'Commander un moto-taxi', onPressed: () {}),

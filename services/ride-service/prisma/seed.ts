@@ -155,7 +155,7 @@ const RENTAL_VEHICLES = [
     depositCdf: 250000,
     weeklyDiscountPct: 15,
     rating: 4.9,
-    ownerName: 'MOVA Fleet',
+    ownerName: 'SENGA Fleet',
     ownerBadge: 'PRO',
     ownerContactPhone: '+243900000000',
     features: ['Climatisation', 'GPS', 'Cuir', 'Toit ouvrant'],

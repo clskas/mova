@@ -4,7 +4,7 @@ import '../config/market_config.dart';
 import 'location_service.dart';
 import 'service_areas.dart';
 
-/// Validation GPS et géocodage stub par zone de service MOVA.
+/// Validation GPS et géocodage stub par zone de service SENGA.
 class ServiceAreaLocation {
   ServiceAreaLocation._();
 
@@ -101,7 +101,7 @@ class ServiceAreaLocation {
     return ServiceAreas.nearest(coords).center;
   }
 
-  /// Libellé adresse pour un point carte / GPS (ville MOVA + reverse geocoding si possible).
+  /// Libellé adresse pour un point carte / GPS (ville SENGA + reverse geocoding si possible).
   static Future<String> labelForCoords(LatLng coords) async {
     final city = ServiceAreas.cityNameForCoords(coords);
     final geo = await LocationService.labelForCoords(coords);

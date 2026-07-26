@@ -1,4 +1,4 @@
-# MOVA — Morning Brief (v1.5.0 — finalisé)
+# SENGA — Morning Brief (v1.5.0 — finalisé)
 
 **Date:** 2026-06-15 · **Repo:** [clskas/mova](https://github.com/clskas/mova) · **Branch:** `main`
 
@@ -18,7 +18,7 @@
 ## Quick start
 
 ```powershell
-cd c:\Users\Administrator\Mova
+cd c:\Users\Administrator\Senga
 docker compose up -d --build
 npm run migrate:all
 npm run seed:admin-demo

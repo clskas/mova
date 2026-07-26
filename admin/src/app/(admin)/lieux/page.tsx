@@ -84,7 +84,7 @@ function OsmLinksPanel({ item }: { item: PoiSuggestion }) {
     <div className="mt-3 pt-3 border-t border-gray-100 text-xs space-y-2">
       <p className="text-gray-500">
         {item.status === "APPROVED"
-          ? "Publié dans l'autocomplétion MOVA. OpenStreetMap est une base séparée — le lieu n'y apparaît que si vous le créez manuellement."
+          ? "Publié dans l'autocomplétion SENGA. OpenStreetMap est une base séparée — le lieu n'y apparaît que si vous le créez manuellement."
           : "La carte OSM affiche seulement la position GPS, pas encore le lieu nommé."}
       </p>
       <div className="flex flex-wrap gap-3">
@@ -171,7 +171,7 @@ export default function LieuxPage() {
   }
 
   async function handleSeedCatalog() {
-    if (!confirm("Synchroniser tous les POI du catalogue MOVA (32 villes) ?")) return;
+    if (!confirm("Synchroniser tous les POI du catalogue SENGA (32 villes) ?")) return;
     setSeedingPoi(true);
     setSeedResult(null);
     setError(null);
@@ -189,12 +189,12 @@ export default function LieuxPage() {
     <div>
       <PageHeader
         title="Lieux & POI"
-        subtitle="Validation MOVA — publication dans l'autocomplétion de l'app (distinct d'OpenStreetMap)"
+        subtitle="Validation SENGA — publication dans l'autocomplétion de l'app (distinct d'OpenStreetMap)"
       />
 
       <Card className="mb-4 bg-violet-50 border-violet-100">
         <p className="text-sm text-gray-800 leading-relaxed">
-          <strong>Publier</strong> ajoute le lieu dans la base MOVA (recherche d&apos;adresses, carte Taxi).
+          <strong>Publier</strong> ajoute le lieu dans la base SENGA (recherche d&apos;adresses, carte Taxi).
           <br />
           <strong>OpenStreetMap</strong> n&apos;est pas mis à jour automatiquement : le lien « Éditeur OSM » permet à un
           contributeur de créer le point manuellement. Tant que ce n&apos;est pas fait, « Carte OSM » ne montre que les
@@ -241,7 +241,7 @@ export default function LieuxPage() {
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="font-semibold text-lg">{item.name}</p>
                     {item.status === "APPROVED" && (
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-800">MOVA</span>
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-800">SENGA</span>
                     )}
                   </div>
                   <p className="text-sm text-gray-600">
@@ -266,7 +266,7 @@ export default function LieuxPage() {
                       onClick={() => handleApprove(item.id)}
                       disabled={acting != null}
                     >
-                      {acting === item.id ? "…" : "Publier dans MOVA"}
+                      {acting === item.id ? "…" : "Publier dans SENGA"}
                     </BtnPrimary>
                     <button
                       type="button"
@@ -299,9 +299,9 @@ export default function LieuxPage() {
         </div>
       </Modal>
 
-      <Modal open={osmModal != null} title="Lieu publié dans MOVA" onClose={() => setOsmModal(null)}>
+      <Modal open={osmModal != null} title="Lieu publié dans SENGA" onClose={() => setOsmModal(null)}>
         <p className="text-sm text-gray-700 mb-3">
-          Le lieu est visible dans l&apos;app MOVA (autocomplétion et carte). Pour l&apos;ajouter aussi sur
+          Le lieu est visible dans l&apos;app SENGA (autocomplétion et carte). Pour l&apos;ajouter aussi sur
           OpenStreetMap, ouvrez l&apos;éditeur et créez un point aux coordonnées indiquées :
         </p>
         {osmModal && (

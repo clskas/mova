@@ -31,7 +31,7 @@ describe('address.util', () => {
     } catch (e) {
       expect((e as MovaHttpException).getResponse()).toMatchObject({
         code: MovaErrorCode.VALIDATION_ERROR,
-        message: expect.stringMatching(/RDC|MOVA couvre|République Démocratique/i),
+        message: expect.stringMatching(/RDC|SENGA couvre|République Démocratique/i),
       });
     }
   });

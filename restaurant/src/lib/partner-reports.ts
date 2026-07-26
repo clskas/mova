@@ -26,7 +26,7 @@ function formatDate(iso?: string) {
 
 export function exportPartnerReportCsv(report: PartnerEarningsReport, filenamePrefix: string) {
   const lines = [
-    "MOVA — Rapport financier partenaire",
+    "SENGA — Rapport financier partenaire",
     `Partenaire;${report.partnerName.replace(/;/g, ",")}`,
     `Généré;${new Date().toISOString()}`,
     report.from ? `Du;${report.from}` : "",

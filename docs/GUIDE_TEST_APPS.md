@@ -1,6 +1,6 @@
 # Guide de test manuel — Applications & microservices
 
-Ce document décrit **comment tester MOVA** :
+Ce document décrit **comment tester SENGA** :
 - **par application** (Admin, Passager, Chauffeur) ;
 - **par microservice backend** (API, base de données, endpoints).
 
@@ -27,7 +27,7 @@ Ce document décrit **comment tester MOVA** :
 ### Démarrer le backend
 
 ```powershell
-cd c:\Users\Administrator\Mova
+cd c:\Users\Administrator\Senga
 docker compose up -d --build
 npm run migrate:all
 npm run seed:admin-demo    # comptes staff + données démo
@@ -190,7 +190,7 @@ Testez dans cet ordre pour couvrir les dépendances entre apps :
 ### Lancer l’admin
 
 ```powershell
-cd c:\Users\Administrator\Mova\admin
+cd c:\Users\Administrator\Senga\admin
 Copy-Item .env.example .env.local -ErrorAction SilentlyContinue
 npm install
 npm run dev
@@ -253,7 +253,7 @@ Invoke-RestMethod -Uri "http://localhost:3000/api/admin/drivers/$driverId/kyc" -
 **Script recommandé** (détection auto V2 PRO ou Samsung ; IP LAN ou USB reverse) :
 
 ```powershell
-cd c:\Users\Administrator\Mova
+cd c:\Users\Administrator\Senga
 .\scripts\run-mobile-passenger.ps1 -UsbReverse
 ```
 
@@ -275,10 +275,10 @@ Sans `-UsbReverse` : le PC et le téléphone doivent être sur le **même Wi‑F
 
 ### Écran d’accueil animé (splash)
 
-À l’ouverture, un **splash MOVA Passager** (**4 s par service**, ~32 s au total pour 8 services) présente les **8 services passager** : Taxi/Moto, Livraisons, Réservation, Covoiturage, Location, Déménagement, Wallet, Historique.
+À l’ouverture, un **splash Senga** (**4 s par service**, ~32 s au total pour 8 services) présente les **8 services passager** : Taxi/Moto, Livraisons, Réservation, Covoiturage, Location, Déménagement, Wallet, Historique.
 
 - **Passer** ou **toucher l’écran** : accès direct à l’OTP (dès que le chargement réseau est prêt).
-- La **ville MOVA** est pré-sélectionnée selon votre **position GPS** (modifiable sur l’accueil).
+- La **ville SENGA** est pré-sélectionnée selon votre **position GPS** (modifiable sur l’accueil).
 
 ### Connexion
 
@@ -323,7 +323,7 @@ Vérifier Wi‑Fi, IP dans `--dart-define`, et que Docker tourne.
 ### Lancer l’app
 
 ```powershell
-cd c:\Users\Administrator\Mova
+cd c:\Users\Administrator\Senga
 .\scripts\run-mobile-driver.ps1 -UsbReverse
 ```
 
@@ -339,14 +339,14 @@ cd c:\Users\Administrator\Mova
 .\scripts\run-mobile-driver.ps1 -UsbReverse -Device V220206V01014
 ```
 
-> Si l’installation échoue (`INSTALL_FAILED_INSUFFICIENT_STORAGE`), désinstallez les anciennes APK MOVA sur le téléphone puis relancez.
+> Si l’installation échoue (`INSTALL_FAILED_INSUFFICIENT_STORAGE`), désinstallez les anciennes APK SENGA sur le téléphone puis relancez.
 
 ### Écran d’accueil animé (splash)
 
-À l’ouverture, un **splash MOVA Chauffeur** (**4 s par service**, ~32 s au total pour 8 volets) présente les **8 volets chauffeur** : Courses, Livraisons, Missions assignées, Revenus, Covoiturage, GPS, KYC, Historique.
+À l’ouverture, un **splash SENGA Driver** (**4 s par service**, ~32 s au total pour 8 volets) présente les **8 volets chauffeur** : Courses, Livraisons, Missions assignées, Revenus, Covoiturage, GPS, KYC, Historique.
 
 - **Passer** ou **toucher l’écran** : OTP immédiat (après chargement réseau).
-- Ville MOVA synchronisée au **GPS** (sélecteur sur l’accueil chauffeur).
+- Ville SENGA synchronisée au **GPS** (sélecteur sur l’accueil chauffeur).
 
 ### Connexion
 
@@ -387,7 +387,7 @@ $dt = $d.accessToken
 ## A4. Web PWA passager (optionnel)
 
 ```powershell
-cd c:\Users\Administrator\Mova\web
+cd c:\Users\Administrator\Senga\web
 npm install
 npm run dev
 ```

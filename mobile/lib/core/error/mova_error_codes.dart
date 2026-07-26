@@ -1,7 +1,7 @@
 import 'result.dart';
 import 'user_friendly_error.dart';
 
-/// Messages MOVA alignés sur packages/shared/src/mova-error-codes.ts
+/// Messages SENGA alignés sur packages/shared/src/mova-error-codes.ts
 const movaErrorMessages = <String, String>{
   'MOVA_AUTH_001': 'Code OTP invalide. Veuillez réessayer.',
   'MOVA_AUTH_002': 'Code OTP expiré. Demandez un nouveau code.',
@@ -29,7 +29,7 @@ const movaErrorMessages = <String, String>{
   'MOVA_CAR_001': 'Trajet covoiturage introuvable.',
   'MOVA_CAR_002': 'Plus de places disponibles sur ce trajet.',
   'MOVA_CAR_003': 'Vous avez déjà rejoint ce trajet.',
-  'MOVA_CAR_004': 'Seuls les chauffeurs MOVA validés peuvent publier un covoiturage.',
+  'MOVA_CAR_004': 'Seuls les chauffeurs SENGA validés peuvent publier un covoiturage.',
   'MOVA_ERR_001': 'Commande de course introuvable.',
   'MOVA_REN_001': 'Demande de location introuvable.',
   'MOVA_PAY_001': 'Le paiement a échoué. Vérifiez votre solde.',

@@ -109,7 +109,7 @@ export class CarpoolService {
     }
   }
 
-  /** Publication réservée aux chauffeurs MOVA avec KYC approuvé. */
+  /** Publication réservée aux chauffeurs SENGA avec KYC approuvé. */
   async assertCanPublishCarpool(userId: string, role?: string): Promise<void> {
     if (role !== UserRole.DRIVER) {
       throw new MovaHttpException(MovaErrorCode.CARPOOL_PUBLISH_DRIVER_ONLY);

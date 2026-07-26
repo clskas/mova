@@ -5,7 +5,7 @@ Guide pour vérifier que l’admin, le web PWA et le mobile respectent les nivea
 ## Prérequis
 
 ```powershell
-cd c:\Users\Administrator\Mova
+cd c:\Users\Administrator\Senga
 docker compose up -d --build
 npm run migrate:all
 npm run seed:admin-demo   # crée les 5 comptes staff + données démo

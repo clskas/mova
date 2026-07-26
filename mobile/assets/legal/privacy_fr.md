@@ -1,12 +1,12 @@
-# Politique de Confidentialité — MOVA RDC
+# Politique de Confidentialité — SENGA RDC
 
 **Dernière mise à jour :** 12 juin 2026  
-**Responsable du traitement :** MOVA SARL, Kinshasa, RDC  
+**Responsable du traitement :** SENGA SARL, Kinshasa, RDC  
 **DPO :** privacy@mova.cd
 
 ## 1. Introduction
 
-MOVA s'engage à protéger la vie privée des utilisateurs de son application mobile (Passager et Chauffeur) conformément à la législation congolaise applicable en matière de protection des données personnelles.
+SENGA s'engage à protéger la vie privée des utilisateurs de son application mobile (Passager et Chauffeur) conformément à la législation congolaise applicable en matière de protection des données personnelles.
 
 Cette politique explique quelles données nous collectons, pourquoi, comment longtemps, et quels sont vos droits.
 
@@ -24,7 +24,7 @@ Cette politique explique quelles données nous collectons, pourquoi, comment lon
 ### 2.3 Données transactionnelles
 - Historique des courses, colis, repas, réservations et courses
 - Montants en CDF, moyens de paiement utilisés
-- Solde du portefeuille MOVA
+- Solde du portefeuille SENGA
 
 ### 2.4 Données chauffeur (KYC)
 - Permis de conduire
@@ -50,7 +50,7 @@ Cette politique explique quelles données nous collectons, pourquoi, comment lon
 
 ## 4. Partage des données
 
-MOVA **ne vend pas** vos données. Elles peuvent être partagées avec :
+SENGA **ne vend pas** vos données. Elles peuvent être partagées avec :
 
 - **Prestataires de paiement** : Orange Money, M-Pesa, Airtel Money (traitement des transactions)
 - **Chauffeurs/livreurs** : informations nécessaires à la prestation (nom, téléphone masqué, adresses)
@@ -68,7 +68,7 @@ MOVA **ne vend pas** vos données. Elles peuvent être partagées avec :
 
 ## 6. Sécurité
 
-MOVA met en œuvre des mesures techniques et organisationnelles : chiffrement TLS des communications, authentification JWT, accès restreint aux données, sauvegardes régulières.
+SENGA met en œuvre des mesures techniques et organisationnelles : chiffrement TLS des communications, authentification JWT, accès restreint aux données, sauvegardes régulières.
 
 ## 7. Vos droits
 
@@ -88,7 +88,7 @@ L'application mobile n'utilise pas de cookies web. Des identifiants locaux (toke
 
 ## 9. Mineurs
 
-MOVA n'est pas destiné aux personnes de moins de 18 ans. Nous ne collectons pas sciemment de données de mineurs.
+SENGA n'est pas destiné aux personnes de moins de 18 ans. Nous ne collectons pas sciemment de données de mineurs.
 
 ## 10. Transferts internationaux
 

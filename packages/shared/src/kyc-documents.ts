@@ -1,4 +1,4 @@
-/** Types de documents KYC chauffeur — alignés sur le parcours d'enregistrement MOVA. */
+/** Types de documents KYC chauffeur — alignés sur le parcours d'enregistrement SENGA. */
 export const KYC_DOCUMENT_TYPES = {
   ID_PHOTO: 'ID_PHOTO',
   SELFIE: 'SELFIE',

@@ -260,7 +260,7 @@ class _DriverScheduledMissionScreenState extends ConsumerState<DriverScheduledMi
               const Padding(
                 padding: EdgeInsets.only(bottom: 8),
                 child: Text(
-                  'Candidature enregistrée — MOVA vous notifiera si vous êtes assigné.',
+                  'Candidature enregistrée — SENGA vous notifiera si vous êtes assigné.',
                   style: TextStyle(fontSize: 12, color: MovaColors.green),
                 ),
               ),

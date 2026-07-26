@@ -289,7 +289,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     final suspended = _user?['status']?.toString() == 'SUSPENDED';
 
     return MovaScreen(
-      title: 'Mova',
+      title: 'Senga',
       actions: [
         IconButton(
           icon: const Icon(Icons.person_outline),
@@ -313,7 +313,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                   context: context,
                   builder: (ctx) => AlertDialog(
                     title: const Text('Déconnexion'),
-                    content: const Text('Voulez-vous vous déconnecter de MOVA ?'),
+                    content: const Text('Voulez-vous vous déconnecter de SENGA ?'),
                     actions: [
                       TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
                       TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Déconnexion')),
@@ -339,7 +339,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
               value: _HomeMenuAction.subscriptions,
               child: ListTile(
                 leading: Icon(Icons.card_membership_outlined),
-                title: Text('MOVA Plus'),
+                title: Text('SENGA Plus'),
                 contentPadding: EdgeInsets.zero,
                 visualDensity: VisualDensity.compact,
               ),
@@ -436,7 +436,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                 child: Padding(
                   padding: EdgeInsets.all(12),
                   child: Text(
-                    'Compte suspendu — contactez le support MOVA.',
+                    'Compte suspendu — contactez le support SENGA.',
                     style: TextStyle(color: MovaColors.orange, fontWeight: FontWeight.w600),
                   ),
                 ),
@@ -714,7 +714,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                     ServiceCard(
                       icon: MovaServiceIcon.wallet(color: MovaColors.midnight),
                       iconColor: MovaColors.midnight,
-                      title: 'Wallet MOVA',
+                      title: 'Wallet SENGA',
                       subtitle: 'Solde, recharge et paiements',
                       onTap: () => _open(context, const WalletScreen()),
                       compact: compactCards,

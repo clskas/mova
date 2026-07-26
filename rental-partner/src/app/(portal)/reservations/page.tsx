@@ -20,7 +20,7 @@ import {
   updateBookingStatus,
   type PartnerBooking,
 } from "@/lib/api";
-import { sanitizeUserMessage, toUserErrorMessage } from "@/lib/user-messages";
+import { toUserErrorMessage } from "@/lib/user-messages";
 import { PartnerAmountLine } from "@/components/PartnerAmountLine";
 
 function statusBadge(status?: string, label?: string) {
@@ -58,7 +58,7 @@ function LogisticsEditor({ booking, busy, onSave }: { booking: PartnerBooking; b
       });
       onSave();
     } catch (e) {
-      setLocalError(sanitizeUserMessage, toUserErrorMessage(e instanceof Error ? e.message : e, "Erreur logistique"));
+      setLocalError(toUserErrorMessage(e, "Erreur logistique"));
     } finally {
       setSaving(false);
     }
@@ -140,7 +140,7 @@ function CashPinConfirm({
       setPin("");
       onDone();
     } catch (e) {
-      setLocalError(sanitizeUserMessage, toUserErrorMessage(e instanceof Error ? e.message : e, "Code PIN incorrect."));
+      setLocalError(toUserErrorMessage(e, "Code PIN incorrect."));
     } finally {
       setSaving(false);
     }
@@ -243,7 +243,7 @@ export default function ReservationsPage() {
         }
       }
     } catch (e) {
-      setError(sanitizeUserMessage, toUserErrorMessage(e instanceof Error ? e.message : e, "Erreur de chargement"));
+      setError(toUserErrorMessage(e, "Erreur de chargement"));
     } finally {
       setLoading(false);
     }
@@ -262,7 +262,7 @@ export default function ReservationsPage() {
       await updateBookingStatus(id, action);
       await load();
     } catch (e) {
-      setError(sanitizeUserMessage, toUserErrorMessage(e instanceof Error ? e.message : e, "Action impossible"));
+      setError(toUserErrorMessage(e, "Action impossible"));
     } finally {
       setBusyId(null);
     }
@@ -481,7 +481,7 @@ export default function ReservationsPage() {
                       type="button"
                       onClick={() =>
                         downloadBookingReceiptPdf(b.id).catch((e) =>
-                          alert(sanitizeUserMessage, toUserErrorMessage(e instanceof Error ? e.message : e, "Téléchargement impossible")),
+                          alert(toUserErrorMessage(e, "Téléchargement impossible")),
                         )
                       }
                       className="text-xs text-[#6C63FF] underline"

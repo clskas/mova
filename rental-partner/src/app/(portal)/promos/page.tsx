@@ -9,7 +9,7 @@ import {
   updatePromo,
   type PartnerPromo,
 } from "@/lib/api";
-import { sanitizeUserMessage, toUserErrorMessage } from "@/lib/user-messages";
+import { toUserErrorMessage } from "@/lib/user-messages";
 
 const emptyForm = () => ({
   code: "",
@@ -32,7 +32,7 @@ export default function PromosPage() {
       const data = await fetchPromos();
       setPromos(data.promos ?? []);
     } catch (e) {
-      setError(sanitizeUserMessage, toUserErrorMessage(e instanceof Error ? e.message : e, "Erreur de chargement"));
+      setError(toUserErrorMessage(e, "Erreur de chargement"));
     } finally {
       setLoading(false);
     }
@@ -60,7 +60,7 @@ export default function PromosPage() {
       setMessage("Code promo créé.");
       await load();
     } catch (err) {
-      setError(sanitizeUserMessage, toUserErrorMessage(err instanceof Error ? err.message : err, "Erreur"));
+      setError(toUserErrorMessage(err, "Erreur"));
     } finally {
       setSaving(false);
     }
@@ -71,7 +71,7 @@ export default function PromosPage() {
       await updatePromo(promo.id, { isActive: !promo.isActive });
       await load();
     } catch (err) {
-      setError(sanitizeUserMessage, toUserErrorMessage(err instanceof Error ? err.message : err, "Erreur"));
+      setError(toUserErrorMessage(err, "Erreur"));
     }
   }
 

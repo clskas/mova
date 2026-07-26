@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { decodeJwtPayload, isRestaurantRole, setToken } from "@/lib/auth";
 import { PwaInstallBanner } from "@/components/PwaInstallBanner";
-import { sanitizeUserMessage } from "@/lib/user-messages";
+import { toUserErrorMessage } from "@/lib/user-messages";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
 const RESTAURANT_PHONE = process.env.NEXT_PUBLIC_RESTAURANT_PHONE ?? "+243900000030";
@@ -41,7 +41,7 @@ export default function LoginPage() {
       setToken(data.accessToken);
       router.replace("/");
     } catch (e) {
-      setError(sanitizeUserMessage(e instanceof Error ? e.message : e, "Erreur de connexion"));
+      setError(toUserErrorMessage(e, "Erreur de connexion"));
     } finally {
       setLoading(false);
     }

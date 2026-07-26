@@ -9,6 +9,7 @@ import '../../core/api/api_client.dart';
 import '../../core/api/ride_socket.dart';
 import '../../core/config/market_config.dart';
 import '../../core/error/result.dart';
+import '../../core/error/user_friendly_error.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
@@ -195,7 +196,9 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
           SnackBar(content: Text('Envoyé à ${data['sentTo'] ?? email}')),
         );
       case Failure(:final error):
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(sanitizeUserMessage(error.message))),
+        );
     }
   }
 
@@ -210,7 +213,7 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
         final escPos = data['escPosBase64']?.toString();
         if (escPos == null || escPos.isEmpty) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Données ESC/POS indisponibles.')),
+            const SnackBar(content: Text('Impression thermique indisponible pour le moment.')),
           );
           return;
         }
@@ -222,10 +225,21 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
           );
         } catch (e) {
           if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                sanitizeUserMessage(
+                  e.toString(),
+                  fallback: 'Impression impossible. Vérifiez l\'imprimante Bluetooth.',
+                ),
+              ),
+            ),
+          );
         }
       case Failure(:final error):
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(sanitizeUserMessage(error.message))),
+        );
     }
   }
 
@@ -251,7 +265,9 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
           );
         });
       case Failure(:final error):
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(sanitizeUserMessage(error.message))),
+        );
     }
   }
 

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { phoneFromToken } from "@/lib/auth";
 import { formatCdf, withdrawPartnerWallet } from "@/lib/api";
-import { sanitizeUserMessage } from "@/lib/user-messages";
+import { toUserErrorMessage } from "@/lib/user-messages";
 
 const PAYOUT_PHONE_KEY = "mova_restaurant_payout_phone";
 
@@ -64,7 +64,7 @@ export function PartnerWithdrawPanel({ balanceCdf, onWithdrawn }: Props) {
       setAmount("");
       onWithdrawn?.();
     } catch (e) {
-      setError(sanitizeUserMessage(e instanceof Error ? e.message : e, "Retrait impossible"));
+      setError(toUserErrorMessage(e, "Retrait impossible"));
     } finally {
       setLoading(false);
     }

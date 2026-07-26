@@ -15,7 +15,7 @@ import {
   printPartnerReport,
   type PartnerEarningsReport,
 } from "@/lib/partner-reports";
-import { sanitizeUserMessage, toUserErrorMessage } from "@/lib/user-messages";
+import { toUserErrorMessage } from "@/lib/user-messages";
 import { PartnerWithdrawPanel } from "@/components/PartnerWithdrawPanel";
 import { WalletMovementHistory } from "@/components/WalletMovementHistory";
 
@@ -45,7 +45,7 @@ export default function RevenusPage() {
       setEarnings(e);
       setReport(r);
     } catch (err) {
-      setError(sanitizeUserMessage, toUserErrorMessage(err instanceof Error ? err.message : err, "Erreur"));
+      setError(toUserErrorMessage(err, "Erreur"));
     } finally {
       setLoading(false);
     }
@@ -71,7 +71,7 @@ export default function RevenusPage() {
         params,
       );
     } catch (e) {
-      alert(sanitizeUserMessage, toUserErrorMessage(e instanceof Error ? e.message : e, "Export PDF impossible"));
+      alert(toUserErrorMessage(e, "Export PDF impossible"));
     } finally {
       setExporting(false);
     }

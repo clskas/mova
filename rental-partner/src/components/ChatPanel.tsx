@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchRentalChat, sendRentalChat } from "@/lib/api";
-import { sanitizeUserMessage, toUserErrorMessage } from "@/lib/user-messages";
+import { toUserErrorMessage } from "@/lib/user-messages";
 import { subscribeRentalChat } from "@/lib/partner-chat-socket";
 
 export type ChatMessage = {
@@ -46,7 +46,7 @@ export function ChatPanel({ inquiryId, peerLabel = "Client", onClose }: ChatPane
       const data = await fetchRentalChat(inquiryId);
       setMessages(mapMessages(data.messages ?? []));
     } catch (e) {
-      setError(sanitizeUserMessage, toUserErrorMessage(e instanceof Error ? e.message : e, "Impossible de charger le chat"));
+      setError(toUserErrorMessage(e, "Impossible de charger le chat"));
     } finally {
       setLoading(false);
     }
@@ -100,7 +100,7 @@ export function ChatPanel({ inquiryId, peerLabel = "Client", onClose }: ChatPane
         },
       ]);
     } catch (e) {
-      setError(sanitizeUserMessage, toUserErrorMessage(e instanceof Error ? e.message : e, "Envoi impossible"));
+      setError(toUserErrorMessage(e, "Envoi impossible"));
     } finally {
       setSending(false);
     }

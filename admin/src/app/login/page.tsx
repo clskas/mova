@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { decodeJwtPayload, setToken } from "@/lib/auth";
-import { sanitizeAdminError } from "@/lib/api";
+import { sanitizeAdminError, toUserErrorMessage } from "@/lib/api";
 import { defaultPathForRole, isAdminRole, normalizeAdminRole } from "@/lib/rbac";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
@@ -46,7 +46,7 @@ export default function LoginPage() {
       setToken(data.accessToken);
       router.replace(defaultPathForRole(role));
     } catch (e) {
-      setError(sanitizeAdminError(e instanceof Error ? e.message : "Erreur de connexion"));
+      setError(toUserErrorMessage(e, "Erreur de connexion"));
     } finally {
       setLoading(false);
     }
@@ -55,12 +55,12 @@ export default function LoginPage() {
   function loginWithToken() {
     const trimmed = tokenInput.trim();
     if (!trimmed) {
-      setError("Collez un JWT valide");
+      setError("Collez un jeton d'accès valide");
       return;
     }
     const payload = decodeJwtPayload(trimmed);
     if (!isAdminRole(typeof payload?.role === "string" ? payload.role : null)) {
-      setError("JWT sans rôle staff autorisé");
+      setError("Ce jeton n'a pas un rôle staff autorisé");
       return;
     }
     setToken(trimmed);

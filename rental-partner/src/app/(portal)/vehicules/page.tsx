@@ -10,7 +10,7 @@ import {
   mediaUrl,
   type PartnerVehicle,
 } from "@/lib/api";
-import { sanitizeUserMessage, toUserErrorMessage } from "@/lib/user-messages";
+import { toUserErrorMessage } from "@/lib/user-messages";
 
 function statusBadge(v: PartnerVehicle) {
   if (v.isActive === false) {
@@ -47,7 +47,7 @@ export default function VehiclesPage() {
       });
       setVehicles(Array.isArray(list) ? list : []);
     } catch (e) {
-      setError(sanitizeUserMessage, toUserErrorMessage(e instanceof Error ? e.message : e, "Impossible de charger vos véhicules."));
+      setError(toUserErrorMessage(e, "Impossible de charger vos véhicules."));
     } finally {
       setLoading(false);
     }
@@ -67,7 +67,7 @@ export default function VehiclesPage() {
       await deleteVehicle(id);
       await load();
     } catch (e) {
-      setError(sanitizeUserMessage, toUserErrorMessage(e instanceof Error ? e.message : e, "Suppression impossible."));
+      setError(toUserErrorMessage(e, "Suppression impossible."));
     } finally {
       setBusyId(null);
     }

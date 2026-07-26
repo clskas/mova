@@ -17,7 +17,7 @@ import {
   printPartnerReport,
   type PartnerEarningsReport,
 } from "@/lib/partner-reports";
-import { sanitizeUserMessage } from "@/lib/user-messages";
+import { toUserErrorMessage } from "@/lib/user-messages";
 import { PartnerWithdrawPanel } from "@/components/PartnerWithdrawPanel";
 import { WalletMovementHistory } from "@/components/WalletMovementHistory";
 
@@ -55,7 +55,7 @@ export default function EarningsPage() {
       setEarnings(e);
       setReport(r);
     } catch (err) {
-      setError(sanitizeUserMessage(err instanceof Error ? err.message : err, "Erreur"));
+      setError(toUserErrorMessage(err, "Erreur"));
     } finally {
       setLoading(false);
     }
@@ -81,7 +81,7 @@ export default function EarningsPage() {
         params,
       );
     } catch (e) {
-      alert(sanitizeUserMessage(e instanceof Error ? e.message : e, "Export PDF impossible"));
+      alert(toUserErrorMessage(e, "Export PDF impossible"));
     } finally {
       setExporting(false);
     }
@@ -195,7 +195,7 @@ export default function EarningsPage() {
                         type="button"
                         onClick={() =>
                           downloadOrderReceiptPdf(sale.reference!).catch((e) =>
-                            alert(sanitizeUserMessage(e instanceof Error ? e.message : e, "Téléchargement impossible")),
+                            alert(toUserErrorMessage(e, "Téléchargement impossible")),
                           )
                         }
                         className="text-xs text-[#6C63FF] underline mt-1"

@@ -14,7 +14,7 @@ import {
   type RestaurantOrder,
   type RestaurantProfile,
 } from "@/lib/api";
-import { sanitizeUserMessage } from "@/lib/user-messages";
+import { toUserErrorMessage } from "@/lib/user-messages";
 import { PartnerAmountLine } from "@/components/PartnerAmountLine";
 
 function formatItems(items: unknown): string {
@@ -131,7 +131,7 @@ export default function OrdersPage() {
         }
       }
     } catch (e) {
-      setError(sanitizeUserMessage(e instanceof Error ? e.message : e, "Erreur de chargement"));
+      setError(toUserErrorMessage(e, "Erreur de chargement"));
     } finally {
       setLoading(false);
     }
@@ -158,7 +158,7 @@ export default function OrdersPage() {
       else await rejectOrder(id, "Indisponible");
       await load();
     } catch (e) {
-      setError(sanitizeUserMessage(e instanceof Error ? e.message : e, "Action impossible"));
+      setError(toUserErrorMessage(e, "Action impossible"));
     } finally {
       setBusyId(null);
     }

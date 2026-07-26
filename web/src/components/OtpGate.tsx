@@ -53,7 +53,7 @@ export function OtpGate({ children }: Props) {
         setToken(data.accessToken, phone);
         setAuthenticated(true);
       } else {
-        setError("Réponse invalide du serveur");
+        setError("Connexion impossible. Veuillez réessayer.");
       }
     } catch (e) {
       setError(toUserErrorMessage(e, "Code OTP invalide"));
@@ -79,7 +79,7 @@ export function OtpGate({ children }: Props) {
         </p>
         {mock && (
           <p className="text-sm text-[#FF6B35] bg-orange-50 rounded-lg py-2 px-3 mb-4 text-center">
-            Mode démo — passerelle indisponible (OTP : 123456)
+            Mode démo — passerelle indisponible. Utilisez le code de test fourni.
           </p>
         )}
         {error && (

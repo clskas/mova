@@ -10,7 +10,7 @@ import {
   type VehicleFormState,
 } from "@/components/VehicleForm";
 import { fetchVehicle, submitVehicle, updateVehicle, type PartnerVehicle } from "@/lib/api";
-import { sanitizeUserMessage, toUserErrorMessage } from "@/lib/user-messages";
+import { toUserErrorMessage } from "@/lib/user-messages";
 
 function vehicleToForm(v: PartnerVehicle): VehicleFormState {
   return {
@@ -61,7 +61,7 @@ function VehicleFormPageInner() {
         setIsApproved(vehicle.approvalStatus === "APPROVED");
         setForm(vehicleToForm(vehicle));
       } catch (e) {
-        if (!cancelled) setError(sanitizeUserMessage, toUserErrorMessage(e instanceof Error ? e.message : e, "Erreur chargement"));
+        if (!cancelled) setError(toUserErrorMessage(e, "Erreur chargement"));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -84,7 +84,7 @@ function VehicleFormPageInner() {
       }
       router.replace("/vehicules");
     } catch (err) {
-      setError(sanitizeUserMessage, toUserErrorMessage(err instanceof Error ? err.message : err, "Erreur envoi"));
+      setError(toUserErrorMessage(err, "Erreur envoi"));
     } finally {
       setSaving(false);
     }

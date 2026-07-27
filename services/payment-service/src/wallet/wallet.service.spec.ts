@@ -1,3 +1,4 @@
+import { ConfigService } from '@nestjs/config';
 import { WalletService } from './wallet.service';
 
 describe('WalletService', () => {
@@ -14,7 +15,11 @@ describe('WalletService', () => {
     },
   };
 
-  const service = new WalletService(prisma as never);
+  const config = {
+    get: jest.fn((key: string) => (key === 'MOCK_PAYMENTS' ? 'true' : undefined)),
+  } as unknown as ConfigService;
+
+  const service = new WalletService(prisma as never, config);
 
   beforeEach(() => jest.clearAllMocks());
 

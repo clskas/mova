@@ -25,6 +25,12 @@ describe('PaymentsService', () => {
     fetchRidePayout: jest.fn().mockResolvedValue(null),
     creditRidePayoutFromPayment: jest.fn().mockResolvedValue({ credited: false }),
   };
+  const foodPayouts = {
+    creditFromServicePayment: jest.fn().mockResolvedValue({ credited: false }),
+  };
+  const debtLedger = {
+    recordCashDebt: jest.fn().mockResolvedValue(undefined),
+  };
   const redis = { publish: jest.fn().mockResolvedValue(undefined) };
   const config = { get: jest.fn((key: string) => (key === 'MOCK_PAYMENTS' ? 'true' : undefined)) } as unknown as ConfigService;
 
@@ -33,6 +39,8 @@ describe('PaymentsService', () => {
     config,
     wallet as unknown as WalletService,
     driverPayouts as never,
+    foodPayouts as never,
+    debtLedger as never,
     redis as unknown as RedisService,
     new MockPaymentProvider(config),
     new OrangeMoneyProvider(config),

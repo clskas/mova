@@ -57,14 +57,17 @@ jobs:
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
         run: |
           if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
-            echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > mobile/android/app/upload-keystore.jks
-            cat > mobile/android/key.properties <<EOF
-          storePassword=${ANDROID_KEYSTORE_PASSWORD}
-          keyPassword=${ANDROID_KEY_PASSWORD}
-          keyAlias=${ANDROID_KEY_ALIAS}
-          storeFile=app/upload-keystore.jks
-          EOF
-            echo "Keystore release configuré"
+            # storeFile is resolved relative to mobile/android/app/ (Gradle app module)
+            KEYSTORE_PATH="mobile/android/app/upload-keystore.jks"
+            echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$KEYSTORE_PATH"
+            test -s "$KEYSTORE_PATH"
+            {
+              echo "storePassword=${ANDROID_KEYSTORE_PASSWORD}"
+              echo "keyPassword=${ANDROID_KEY_PASSWORD}"
+              echo "keyAlias=${ANDROID_KEY_ALIAS}"
+              echo "storeFile=upload-keystore.jks"
+            } > mobile/android/key.properties
+            echo "Keystore release configuré ($(wc -c < "$KEYSTORE_PATH") bytes)"
           else
             echo "::notice::ANDROID_KEYSTORE_BASE64 absent — build signé avec clé debug (non publiable sur Play Store)"
           fi

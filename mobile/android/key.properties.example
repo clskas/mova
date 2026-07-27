@@ -7,4 +7,5 @@
 storePassword=CHANGE_ME
 keyPassword=CHANGE_ME
 keyAlias=mova-upload
-storeFile=app/upload-keystore.jks
+# Path relative to mobile/android/app/ (Gradle app module)
+storeFile=upload-keystore.jks

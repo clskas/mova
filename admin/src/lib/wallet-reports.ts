@@ -1,7 +1,6 @@
 import {
   formatCdf,
   formatDate,
-  type AdminMetrics,
   type CashDebtsOverview,
   type WalletOverview,
   type WalletTransaction,

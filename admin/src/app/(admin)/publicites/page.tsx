@@ -12,7 +12,6 @@ import {
 import { resolveMediaUrl } from "@/components/VehiclePhotoUpload";
 import { useAdmin } from "@/components/AdminProvider";
 import {
-  BtnDanger,
   BtnGhost,
   BtnPrimary,
   Card,

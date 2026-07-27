@@ -33,8 +33,10 @@ describe('RolesGuard', () => {
     );
   });
 
-  it('laisse passer sans metadata permissions', () => {
+  it('refuse sans metadata permissions (deny-by-default)', () => {
     (reflector.getAllAndOverride as jest.Mock).mockReturnValue(undefined);
-    expect(guard.canActivate(ctx(UserRole.PASSENGER))).toBe(true);
+    expect(() => guard.canActivate(ctx(UserRole.PASSENGER))).toThrow(
+      expect.objectContaining({ response: expect.objectContaining({ code: MovaErrorCode.AUTH_FORBIDDEN }) }),
+    );
   });
 });

@@ -15,8 +15,18 @@ import {
 
 describe('PaymentsService', () => {
   const prisma = {
-    payment: { upsert: jest.fn().mockResolvedValue({ id: 'pay-1', rideId: 'ride-1' }) },
-    servicePayment: { upsert: jest.fn().mockResolvedValue({ id: 'spay-1', referenceType: 'DELIVERY', referenceId: 'del-1' }) },
+    payment: {
+      upsert: jest.fn().mockResolvedValue({ id: 'pay-1', rideId: 'ride-1', status: 'COMPLETED' }),
+      findUnique: jest.fn().mockResolvedValue(null),
+      update: jest.fn().mockResolvedValue({ id: 'pay-1', rideId: 'ride-1', status: 'COMPLETED' }),
+      findMany: jest.fn().mockResolvedValue([]),
+    },
+    servicePayment: {
+      upsert: jest.fn().mockResolvedValue({ id: 'spay-1', referenceType: 'DELIVERY', referenceId: 'del-1', status: 'COMPLETED' }),
+      findUnique: jest.fn().mockResolvedValue(null),
+      update: jest.fn().mockResolvedValue({ id: 'spay-1', status: 'COMPLETED' }),
+      findMany: jest.fn().mockResolvedValue([]),
+    },
   };
   const wallet = {
     debit: jest.fn().mockResolvedValue({ balanceCdf: 0 }),

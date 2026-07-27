@@ -3,6 +3,13 @@
 **Date:** 2026-07-27 · **Repo:** [afri-soft-com/mova](https://github.com/afri-soft-com/mova) · **Branch:** `main`  
 **Pass overnight:** production-readiness (UI FR, sécurité, CI/CD, backup→migrate, AAB→Play, web deploy)
 
+### Session infrastructure (2026-07-27 matin)
+- Supabase **kongomarket** → **pause** (INACTIVE ; suppression définitive = dashboard, MCP = pause seulement).
+- Supabase **senga** créé : `furttqrltkwirdhiktdl`, région **eu-central-1** (Frankfurt), buckets privés `uploads` + `kyc-docs`.
+- SerdiPay = passerelle **primaire** OTP + Mobile Money (AT/Twilio en secours).
+- Guide Play Store : [docs/PLAY_STORE_GUIDE.md](docs/PLAY_STORE_GUIDE.md).
+- À coller sur Render (auth/ride/payment) : `SUPABASE_SERVICE_ROLE_KEY`, `SERDIPAY_CLIENT_ID`, `SERDIPAY_CLIENT_SECRET` (+ `SERDIPAY_MERCHANT_ID` si fourni).
+
 ---
 
 ## Ce qui a été fait cette nuit

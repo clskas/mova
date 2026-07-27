@@ -40,39 +40,50 @@ Pipeline : workflow GitHub **Mobile Release** (après Deploy + smoke), environne
 3. **Clés** → **Ajouter une clé** → JSON → télécharger le fichier.
 4. Play Console → **Utilisateurs et autorisations** → **Inviter des utilisateurs** → coller l’e-mail du compte de service.
 5. Droits : **Administrateur de versions** (ou au minimum accès aux versions + track Internal) sur **Senga** et **SENGA Driver**.
-6. Encoder le JSON en base64 (PowerShell) :
+6. Placer le JSON en local (gitignored) : `mobile/android/play-service-account.json`.
+7. Encoder + pousser le secret sur le repo CI **afri-soft-com/mova** (PowerShell) :
 
 ```powershell
-[Convert]::ToBase64String([IO.File]::ReadAllBytes("C:\chemin\play-service-account.json"))
+$b64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes("$PWD\mobile\android\play-service-account.json"))
+$b64 | gh secret set PLAY_STORE_JSON_KEY -R afri-soft-com/mova
 ```
 
-7. GitHub repo **afri-soft-com/mova** → **Settings** → **Secrets and variables** → **Actions** (ou env `production-mobile`) :
-   - `PLAY_STORE_JSON_KEY` = la chaîne base64 (aliases acceptés : `PLAY_STORE_JSON`, `PLAY_SERVICE_ACCOUNT_JSON`)
+Aliases acceptés par la CI : `PLAY_STORE_JSON`, `PLAY_SERVICE_ACCOUNT_JSON`.
 
 ---
 
 ## 4. Keystore Android (signature release)
 
-Sur une machine sécurisée (une seule fois) :
+Keystore upload local (ne **jamais** committer) :
+
+- Fichier : `mobile/android/keystore/senga-upload.jks`
+- Alias : `senga`
+- Mots de passe : `mobile/android/key.properties` + backup `mobile/android/.keystore-credentials.local` (tous gitignored)
+
+Si vous devez en générer un nouveau (une seule machine, une seule fois) :
 
 ```powershell
-keytool -genkey -v -keystore senga-release.keystore -alias senga -keyalg RSA -keysize 2048 -validity 10000
+keytool -genkey -v -keystore mobile/android/app/upload-keystore.jks -alias mova-upload -keyalg RSA -keysize 2048 -validity 10000
 ```
 
-Puis secrets GitHub :
+Secrets GitHub (repo **afri-soft-com/mova**, niveau Actions — le job build n’utilise pas l’env) :
 
 | Secret | Contenu |
 |--------|---------|
-| `ANDROID_KEYSTORE_BASE64` | fichier `.keystore` encodé base64 |
+| `ANDROID_KEYSTORE_BASE64` | fichier `.jks` encodé base64 |
 | `ANDROID_KEYSTORE_PASSWORD` | mot de passe keystore |
 | `ANDROID_KEY_PASSWORD` | mot de passe clé |
 | `ANDROID_KEY_ALIAS` | ex. `senga` |
 
 ```powershell
-[Convert]::ToBase64String([IO.File]::ReadAllBytes("C:\chemin\senga-release.keystore"))
+$b64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes("$PWD\mobile\android\keystore\senga-upload.jks"))
+$b64 | gh secret set ANDROID_KEYSTORE_BASE64 -R afri-soft-com/mova
 ```
 
-Autres secrets build prod : `PROD_API_URL`, `PROD_WS_URL` (gateway Render, ex. `https://mova-gateway.onrender.com/api`).
+Autres secrets build prod (déjà attendus par `mobile-release.yml`) :
+
+- `PROD_API_URL` = `https://mova-gateway.onrender.com/api`
+- `PROD_WS_URL` = `https://mova-gateway.onrender.com` (https host ; pas `wss://` — le client Socket.IO gère le schéma)
 
 ---
 

@@ -1,11 +1,14 @@
 # Copier vers key.properties (ne jamais committer).
-# Générer le keystore :
-#   keytool -genkey -v -keystore upload-keystore.jks -keyalg RSA -keysize 2048 -validity 10000 -alias mova-upload
+# Keystore actuel (local) : keystore/senga-upload.jks — alias senga
+# Backup mots de passe (gitignored) : .keystore-credentials.local
+# Générer un nouveau keystore si besoin :
+#   keytool -genkey -v -keystore app/upload-keystore.jks -keyalg RSA -keysize 2048 -validity 10000 -alias mova-upload
 #
-# En CI : secrets ANDROID_KEYSTORE_BASE64 (fichier .jks encodé base64) + mots de passe ci-dessous.
+# En CI : secrets ANDROID_KEYSTORE_BASE64 + ANDROID_KEYSTORE_PASSWORD + ANDROID_KEY_PASSWORD + ANDROID_KEY_ALIAS
+# (repo afri-soft-com/mova). Le workflow écrit app/upload-keystore.jks depuis le secret.
 
 storePassword=CHANGE_ME
 keyPassword=CHANGE_ME
-keyAlias=mova-upload
-# Path relative to mobile/android/app/ (Gradle app module)
-storeFile=upload-keystore.jks
+keyAlias=senga
+# Path relative to mobile/android/ (voir storeFile dans build.gradle)
+storeFile=keystore/senga-upload.jks

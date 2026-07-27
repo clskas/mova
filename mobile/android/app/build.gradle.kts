@@ -56,8 +56,13 @@ android {
             if (keystorePropertiesFile.exists()) {
                 keyAlias = keystoreProperties["keyAlias"] as String
                 keyPassword = keystoreProperties["keyPassword"] as String
+                // Paths in key.properties are relative to this module (mobile/android/app/)
                 storeFile = file(keystoreProperties["storeFile"] as String)
                 storePassword = keystoreProperties["storePassword"] as String
+                require(storeFile!!.exists()) {
+                    "Keystore not found at ${storeFile!!.absolutePath}. " +
+                        "Check storeFile in key.properties (relative to mobile/android/app/)."
+                }
             }
         }
     }

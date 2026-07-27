@@ -69,7 +69,7 @@ flowchart LR
 |-------------|--------------|
 | `workflow_run` smoke-prod OK sur `main` | Build AAB + **upload Play internal** si secret Play configuré (sinon skip gracieux) |
 | Tag `v*` (ex. `v1.2.0`) | Build + upload Play Store internal + TestFlight (si secrets configurés) |
-| `workflow_dispatch` | Build ; upload Play après AAB si secret présent (environnement `production-mobile`) |
+| `workflow_dispatch` | Build AAB + **upload Play internal** si secret (case `upload_ios_testflight` = iOS seulement) |
 
 ### Apps Android (flavors)
 
@@ -78,7 +78,7 @@ flowchart LR
 | passager | `cd.mova.mova.passenger` | `lib/main_passenger.dart` | `internal` (puis promote alpha/prod dans Console) |
 | chauffeur | `cd.mova.mova.driver` | `lib/main_driver.dart` | `internal` |
 
-**Upload automatique :** après smoke prod OK sur `main`, le job `upload-android` (environnement GitHub `production-mobile`) publie les AAB via Fastlane si un secret Play est présent. Sans secret, les AAB restent en artefacts Actions.
+**Upload automatique :** après chaque build AAB réussi (smoke/`main`, tag `v*`, ou manuel), le job `upload-android` (env GitHub `production-mobile`) publie les deux AAB via Fastlane `deploy_internal` si un secret Play est présent. Sans secret → skip gracieux, AAB en artefacts Actions. Avec secret invalide ou erreur API Play → le job **échoue**.
 
 ### Fastlane
 

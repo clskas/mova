@@ -10,8 +10,8 @@ on:
     branches: [main]
   workflow_dispatch:
     inputs:
-      upload_to_stores:
-        description: Publier sur Play Store (internal) / TestFlight
+      upload_ios_testflight:
+        description: "iOS seulement — publier l'IPA sur TestFlight (Play internal est toujours tenté après AAB si secret Play présent)"
         required: false
         type: boolean
         default: false
@@ -140,8 +140,8 @@ jobs:
   upload-android:
     name: Upload Play Store (internal)
     needs: build-android
-    # Auto after every successful AAB build (smoke→mobile on main, tags, manual).
-    # Skips gracefully when PLAY_STORE_JSON_KEY is unset. Gate via environment production-mobile.
+    # Toujours après un build AAB réussi (smoke→main, tag v*, workflow_dispatch).
+    # Skip uniquement si aucun secret Play n'est configuré. Gate env: production-mobile.
     if: needs.build-android.result == 'success'
     runs-on: ubuntu-latest
     environment: production-mobile
@@ -169,6 +169,15 @@ jobs:
           name: mova-driver-aab
           path: mobile/build/app/outputs/bundle/driverRelease/
 
+      - name: Verify AAB artifacts
+        run: |
+          set -e
+          PASSENGER_AAB=mobile/build/app/outputs/bundle/passengerRelease/app-passenger-release.aab
+          DRIVER_AAB=mobile/build/app/outputs/bundle/driverRelease/app-driver-release.aab
+          ls -la "$PASSENGER_AAB" "$DRIVER_AAB"
+          test -s "$PASSENGER_AAB"
+          test -s "$DRIVER_AAB"
+
       - name: Upload to Play Console internal track (Fastlane)
         working-directory: mobile/android
         env:
@@ -176,6 +185,7 @@ jobs:
           PLAY_STORE_JSON: ${{ secrets.PLAY_STORE_JSON }}
           PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
         run: |
+          set -e
           # Accepted secrets (first match wins):
           # - PLAY_STORE_JSON_KEY: service-account JSON encoded base64
           # - PLAY_SERVICE_ACCOUNT_JSON: raw JSON or base64
@@ -194,7 +204,12 @@ jobs:
             echo "::notice::Secrets Play absents (PLAY_STORE_JSON_KEY / PLAY_SERVICE_ACCOUNT_JSON / PLAY_STORE_JSON). AAB en artefacts Actions — upload ignoré."
             exit 0
           fi
+          if ! head -c 1 /tmp/play-store-key.json | grep -q '{'; then
+            echo "::error::Clé Play Store invalide (JSON attendu après décodage)."
+            exit 1
+          fi
           export PLAY_STORE_JSON_KEY_PATH=/tmp/play-store-key.json
+          echo "Upload Play internal: cd.mova.mova.passenger + cd.mova.mova.driver"
           bundle exec fastlane deploy_internal
 
 
@@ -265,7 +280,7 @@ jobs:
     if: >
       needs.build-ios.outputs.ipa_built == 'true' &&
       (startsWith(github.ref, 'refs/tags/v') ||
-       (github.event_name == 'workflow_dispatch' && inputs.upload_to_stores == true))
+       (github.event_name == 'workflow_dispatch' && inputs.upload_ios_testflight == true))
     runs-on: macos-latest
     environment: production-mobile
     timeout-minutes: 30

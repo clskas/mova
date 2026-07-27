@@ -76,14 +76,24 @@ Autres secrets build prod : `PROD_API_URL`, `PROD_WS_URL` (gateway Render, ex. `
 
 ---
 
-## 5. Publier via CI
+## 5. Publier via CI (build AAB → upload Internal automatique)
 
-1. Pousser sur `main` (ou lancer **Mobile Release** en `workflow_dispatch`).
-2. Chaîne : CI → Build and Push → Deploy → Smoke → **Mobile Release**.
-3. Si l’env `production-mobile` a une protection : **Approuver** le run dans Actions.
-4. Vérifier Play Console → **Tests internes** → version **brouillon / en cours d’examen** → promouvoir si besoin.
+Dès qu’un AAB est reconstruit avec succès, le job **Upload Play Store (internal)** tourne automatiquement (passager + chauffeur). Pas de case à cocher pour Play : seul le secret Play (et l’approbation éventuelle de l’env `production-mobile`) conditionnent l’upload.
 
-Si l’upload est **skipped** : secret Play ou keystore manquant — les AAB restent téléchargeables dans les **Artifacts** du run Actions.
+**Déclencheurs :**
+
+| Comment | Effet |
+|---------|--------|
+| Push sur `main` (pipeline complet) | CI → Build/Push → Deploy → Smoke → **Mobile Release** (AAB + upload Internal) |
+| Tag `v*` (ex. `v1.0.0`) | **Mobile Release** direct (AAB + upload) |
+| Actions → **Mobile Release** → Run workflow | Rebuild AAB + upload Internal (case TestFlight = iOS seulement) |
+
+1. Configurer les secrets ci-dessus sur **afri-soft-com/mova**.
+2. Lancer un des déclencheurs.
+3. Si l’env `production-mobile` exige une approbation : **Approuver** le job d’upload dans Actions.
+4. Vérifier Play Console → **Tests internes** → nouvelle version pour `cd.mova.mova.passenger` et `cd.mova.mova.driver`.
+
+Si l’upload est **skipped** : aucun secret Play (`PLAY_STORE_JSON_KEY` / alias) — les AAB restent dans les **Artifacts** du run. Si le secret est présent et l’upload échoue, le job **échoue** (pas de skip silencieux).
 
 ---
 

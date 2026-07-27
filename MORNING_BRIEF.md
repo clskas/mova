@@ -115,7 +115,7 @@ Détail : [docs/PRODUCTION_DEPLOYMENT.md](docs/PRODUCTION_DEPLOYMENT.md) · [doc
 2. **Tests internes** → liste testeurs.  
 3. Compte de service GCP → inviter dans Play → JSON en base64 → secret GitHub `PLAY_STORE_JSON_KEY`.  
 4. Keystore release → secrets `ANDROID_KEYSTORE_*` / `ANDROID_KEY_*`.  
-5. Push `main` ou lancer **Mobile Release** → approuver env `production-mobile` → vérifier AAB sur Internal testing.  
+5. Push `main`, tag `v*`, ou lancer **Mobile Release** (manuel) → approuver env `production-mobile` si demandé → AAB passager + chauffeur sur Internal testing (upload auto si `PLAY_STORE_JSON_KEY` présent).  
 
 Guide pas-à-pas : [docs/PLAY_STORE_GUIDE.md](docs/PLAY_STORE_GUIDE.md).
 

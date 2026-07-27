@@ -90,6 +90,7 @@ services:
         fromService: { name: mova-ride, type: web, property: hostport }
       - key: MOCK_PAYMENTS
         value: "false"
+      - fromGroup: mova-external-apis
 
   - type: web
     name: mova-driver
@@ -213,6 +214,28 @@ envVarGroups:
         sync: false
       - key: MAPBOX_STYLE_URL
         value: mapbox://styles/mova/midnight-violet
+      - key: SMS_PROVIDER
+        value: serdipay
+      - key: MOBILE_MONEY_GATEWAY
+        value: serdipay
+      - key: SERDIPAY_BASE_URL
+        value: https://apis.serdipay.com
+      - key: SERDIPAY_CLIENT_ID
+        sync: false
+      - key: SERDIPAY_CLIENT_SECRET
+        sync: false
+      - key: SERDIPAY_MERCHANT_ID
+        sync: false
+      - key: SERDIPAY_WEBHOOK_SECRET
+        sync: false
+      - key: SUPABASE_URL
+        value: https://furttqrltkwirdhiktdl.supabase.co
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_UPLOADS_BUCKET
+        value: uploads
+      - key: SUPABASE_KYC_BUCKET
+        value: kyc-docs
       - key: TWILIO_ACCOUNT_SID
         sync: false
       - key: TWILIO_AUTH_TOKEN

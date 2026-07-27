@@ -1,0 +1,111 @@
+# One-shot / ops: restore critical Render env vars after accidental wipe.
+# Uses GitHub secrets (never echoed). Safe to re-run.
+name: Restore Render Env
+
+on:
+  workflow_dispatch:
+
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Restore auth / ride / payment env vars
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          DATABASE_URL_AUTH: ${{ secrets.DATABASE_URL_AUTH }}
+          DATABASE_URL_RIDES: ${{ secrets.DATABASE_URL_RIDES }}
+          DATABASE_URL_PAYMENTS: ${{ secrets.DATABASE_URL_PAYMENTS }}
+          REDIS_URL: ${{ secrets.REDIS_URL }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "${RENDER_API_KEY:-}" ]; then echo "::error::RENDER_API_KEY missing"; exit 1; fi
+          if [ -z "${DATABASE_URL_AUTH:-}" ] || [ -z "${DATABASE_URL_RIDES:-}" ] || [ -z "${DATABASE_URL_PAYMENTS:-}" ]; then
+            echo "::error::DATABASE_URL_AUTH/RIDES/PAYMENTS secrets required"; exit 1
+          fi
+          if [ -z "${REDIS_URL:-}" ]; then echo "::error::REDIS_URL secret required"; exit 1; fi
+
+          put_env() {
+            local sid="$1"
+            local payload="$2"
+            echo "Updating service ${sid} (keys only, no values logged)"
+            code=$(curl -sS -o /tmp/render-env-out.json -w "%{http_code}" -X PUT \
+              "https://api.render.com/v1/services/${sid}/env-vars" \
+              -H "Authorization: Bearer ${RENDER_API_KEY}" \
+              -H "Accept: application/json" \
+              -H "Content-Type: application/json" \
+              -d "${payload}")
+            if [ "$code" != "200" ] && [ "$code" != "201" ]; then
+              echo "::error::Render env update failed for ${sid} HTTP ${code}"
+              # never cat body (may contain secrets)
+              exit 1
+            fi
+            echo "OK ${sid} HTTP ${code}"
+          }
+
+          # Optional JWT — omit key if secret unset (some deploys inject elsewhere)
+          jwt_json=""
+          if [ -n "${JWT_SECRET:-}" ]; then
+            jwt_json=$(jq -n --arg v "$JWT_SECRET" '{key:"JWT_SECRET",value:$v}')
+          fi
+
+          auth_payload=$(jq -n \
+            --arg db "$DATABASE_URL_AUTH" \
+            --arg redis "$REDIS_URL" \
+            --argjson jwt "${jwt_json:-null}" \
+            '
+            [
+              {key:"DATABASE_URL", value:$db},
+              {key:"REDIS_URL", value:$redis},
+              {key:"MOCK_OTP", value:"false"},
+              {key:"SMS_PROVIDER", value:"serdipay"},
+              {key:"MOBILE_MONEY_GATEWAY", value:"serdipay"},
+              {key:"SERDIPAY_BASE_URL", value:"https://apis.serdipay.com"},
+              {key:"SUPABASE_URL", value:"https://furttqrltkwirdhiktdl.supabase.co"},
+              {key:"SUPABASE_UPLOADS_BUCKET", value:"uploads"},
+              {key:"SUPABASE_KYC_BUCKET", value:"kyc-docs"}
+            ] + (if $jwt == null then [] else [$jwt] end)
+            ')
+
+          ride_payload=$(jq -n \
+            --arg db "$DATABASE_URL_RIDES" \
+            --arg redis "$REDIS_URL" \
+            --argjson jwt "${jwt_json:-null}" \
+            '
+            [
+              {key:"DATABASE_URL", value:$db},
+              {key:"REDIS_URL", value:$redis},
+              {key:"DRIVER_SERVICE_URL", value:"https://mova-driver.onrender.com"},
+              {key:"SMS_PROVIDER", value:"serdipay"},
+              {key:"MOBILE_MONEY_GATEWAY", value:"serdipay"},
+              {key:"SERDIPAY_BASE_URL", value:"https://apis.serdipay.com"},
+              {key:"SUPABASE_URL", value:"https://furttqrltkwirdhiktdl.supabase.co"},
+              {key:"SUPABASE_UPLOADS_BUCKET", value:"uploads"},
+              {key:"SUPABASE_KYC_BUCKET", value:"kyc-docs"}
+            ] + (if $jwt == null then [] else [$jwt] end)
+            ')
+
+          payment_payload=$(jq -n \
+            --arg db "$DATABASE_URL_PAYMENTS" \
+            --arg redis "$REDIS_URL" \
+            --argjson jwt "${jwt_json:-null}" \
+            '
+            [
+              {key:"DATABASE_URL", value:$db},
+              {key:"REDIS_URL", value:$redis},
+              {key:"RIDE_SERVICE_URL", value:"https://mova-ride.onrender.com"},
+              {key:"MOCK_PAYMENTS", value:"false"},
+              {key:"SMS_PROVIDER", value:"serdipay"},
+              {key:"MOBILE_MONEY_GATEWAY", value:"serdipay"},
+              {key:"SERDIPAY_BASE_URL", value:"https://apis.serdipay.com"},
+              {key:"SUPABASE_URL", value:"https://furttqrltkwirdhiktdl.supabase.co"},
+              {key:"SUPABASE_UPLOADS_BUCKET", value:"uploads"},
+              {key:"SUPABASE_KYC_BUCKET", value:"kyc-docs"}
+            ] + (if $jwt == null then [] else [$jwt] end)
+            ')
+
+          put_env "srv-d8slrk8js32c73dac310" "$auth_payload"
+          put_env "srv-d8slrlernols73b4bcq0" "$ride_payload"
+          put_env "srv-d8slrm8g4nts73bq9pj0" "$payment_payload"
+
+          echo "Restore complete. Verify keys (not values) in Render dashboard."

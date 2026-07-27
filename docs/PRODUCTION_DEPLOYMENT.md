@@ -92,10 +92,13 @@ MOCK_PAYMENTS=false
 
 | Variable | Usage |
 |----------|-------|
-| `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` | OTP SMS (+243) |
-| `ORANGE_MONEY_API_KEY` | Paiements Orange Money |
-| `MPESA_CONSUMER_KEY` | M-Pesa Vodacom |
-| `AIRTEL_MONEY_CLIENT_ID` | Airtel Money |
+| `SERDIPAY_CLIENT_ID` / `SERDIPAY_CLIENT_SECRET` | **Primaire** — OTP SMS + Mobile Money (C2B/B2C) |
+| `SERDIPAY_MERCHANT_ID` | ID marchand SerdiPay (si requis) |
+| `SMS_PROVIDER` | `serdipay` (défaut) \| `africastalking` \| `twilio` |
+| `MOBILE_MONEY_GATEWAY` | `serdipay` (défaut) \| `africastalking` \| `legacy` |
+| `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` | Stockage documents (projet **senga**, buckets `uploads` + `kyc-docs`) |
+| `TWILIO_*` | Secours OTP SMS |
+| `AFRICAS_TALKING_*` | Secours SMS + Mobile Money |
 | `FCM_SERVER_KEY` | Push notifications |
 | `MAPBOX_ACCESS_TOKEN` | Autocomplétion adresses (optionnel, recommandé) |
 
@@ -104,22 +107,29 @@ MOCK_PAYMENTS=false
 | `MOCK_OTP` | Comportement |
 |------------|--------------|
 | `true` (dev/staging) | Code fixe **123456**, pas d'SMS réel |
-| `false` (prod) | Code aléatoire 6 chiffres, envoi via **Twilio** (`auth-service/src/auth/sms.providers.ts`) |
+| `false` (prod) | Code aléatoire 6 chiffres, envoi via **SerdiPay** (défaut) |
 
-Variables Twilio requises en prod : `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, et `TWILIO_PHONE_NUMBER` **ou** `TWILIO_VERIFY_SERVICE_SID`.
+Variables SerdiPay requises en prod : `SERDIPAY_CLIENT_ID`, `SERDIPAY_CLIENT_SECRET` (et chemins optionnels `SERDIPAY_*_PATH` si le portail développeur diffère des défauts).
 
-Si Twilio n'est pas configuré avec `MOCK_OTP=false`, l'API renvoie une erreur HTTP 503 en français (*« Service SMS non configuré »*).
+Sans provider SMS avec `MOCK_OTP=false`, l'API renvoie une erreur HTTP 503 en français (*« Service SMS non configuré »*).
 
 ### 3.3.2 Paiements — comportement production
 
 | `MOCK_PAYMENTS` | Comportement |
 |-----------------|--------------|
 | `true` (dev) | Mobile money simulé, succès immédiat |
-| `false` (prod) | Providers Orange Money / M-Pesa / Airtel Money |
+| `false` (prod) | SerdiPay C2B (Orange / M-Pesa / Airtel) ; B2C pour retraits |
 
 Le **portefeuille SENGA** (`POST /api/wallet/top-up`, `POST /api/payments/rides/:id`) persiste toujours en PostgreSQL, mock ou réel.
 
-Sans clés provider (`ORANGE_MONEY_*`, `MPESA_*`, `AIRTEL_MONEY_*`), l'API renvoie un message d'erreur explicite listant les variables manquantes (voir `config/external-apis.env.example`).
+Sans clés SerdiPay (ou secours AT/legacy), l'API renvoie un message d'erreur explicite listant les variables manquantes (voir `config/external-apis.env.example`).
+
+### 3.3.3 Supabase Storage (documents)
+
+Projet Supabase **senga** (`furttqrltkwirdhiktdl`, région `eu-central-1` Frankfurt) :
+- Buckets privés : `uploads` (photos métier), `kyc-docs` (KYC)
+- Uploads via `SUPABASE_SERVICE_ROLE_KEY` uniquement côté serveurs (`ride-service` UploadsService)
+- Coller la clé **service_role** depuis le dashboard Supabase → Project Settings → API (ne jamais commit)
 
 ### 3.4 URLs inter-services (Render les injecte via `fromService`)
 

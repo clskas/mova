@@ -7,7 +7,10 @@ import {
   africasTalkingDisburseMobileMoney,
   africasTalkingInitiateMobileMoney,
   formatCdf,
+  serdiPayDisburseMobileMoney,
+  serdiPayInitiateMobileMoney,
   useAfricasTalkingMobileMoney,
+  useSerdiPayMobileMoney,
   type MobileMoneyOperator,
 } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
@@ -312,15 +315,24 @@ export class WalletService {
     }
 
     const operator = this.mapProvider(provider);
-    const useAt = useAfricasTalkingMobileMoney(this.envGetter) && phone?.trim();
+    const phoneTrimmed = phone?.trim();
+    const useSerdi = useSerdiPayMobileMoney(this.envGetter) && phoneTrimmed;
+    const useAt = useAfricasTalkingMobileMoney(this.envGetter) && phoneTrimmed;
 
-    if (useAt) {
-      const mm = await africasTalkingInitiateMobileMoney(this.envGetter, {
-        operator,
-        amountCdf,
-        phone: phone!.trim(),
-        reference: ref,
-      });
+    if (useSerdi || useAt) {
+      const mm = useSerdi
+        ? await serdiPayInitiateMobileMoney(this.envGetter, {
+            operator,
+            amountCdf,
+            phone: phoneTrimmed!,
+            reference: ref,
+          })
+        : await africasTalkingInitiateMobileMoney(this.envGetter, {
+            operator,
+            amountCdf,
+            phone: phoneTrimmed!,
+            reference: ref,
+          });
       if (!mm.success) {
         throw new MovaHttpException(MovaErrorCode.PAYMENT_FAILED, undefined, mm.message ?? 'Recharge Mobile Money échouée.');
       }
@@ -342,7 +354,7 @@ export class WalletService {
     return {
       success: true,
       simulated: true,
-      message: `Recharge simulée de ${formatCdf(amountCdf)} — configurez Africa's Talking pour un vrai Mobile Money.`,
+      message: `Recharge simulée de ${formatCdf(amountCdf)} — configurez SerdiPay pour un vrai Mobile Money.`,
       amountCdf,
       provider,
       balanceCdf: wallet.balanceCdf,
@@ -378,21 +390,29 @@ export class WalletService {
 
     const reference = `withdraw_${normalizedProvider}_${Date.now()}`;
     const operator = this.mapProvider(normalizedProvider);
+    const useSerdi = useSerdiPayMobileMoney(this.envGetter);
     const useAt = useAfricasTalkingMobileMoney(this.envGetter);
 
-    if (useAt) {
+    if (useSerdi || useAt) {
       const wallet = await this.debit(
         userId,
         amountCdf,
         `Retrait ${normalizedProvider} vers ${normalizedPhone}`,
         reference,
       );
-      const mm = await africasTalkingDisburseMobileMoney(this.envGetter, {
-        operator,
-        amountCdf,
-        phone: normalizedPhone,
-        reference,
-      });
+      const mm = useSerdi
+        ? await serdiPayDisburseMobileMoney(this.envGetter, {
+            operator,
+            amountCdf,
+            phone: normalizedPhone,
+            reference,
+          })
+        : await africasTalkingDisburseMobileMoney(this.envGetter, {
+            operator,
+            amountCdf,
+            phone: normalizedPhone,
+            reference,
+          });
       if (!mm.success) {
         await this.credit(userId, amountCdf, `Annulation retrait échoué ${reference}`, `rollback_${reference}`);
         throw new MovaHttpException(MovaErrorCode.PAYMENT_FAILED, undefined, mm.message ?? 'Retrait Mobile Money échoué.');

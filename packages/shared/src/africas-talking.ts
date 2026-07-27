@@ -1,4 +1,7 @@
-/** Africa's Talking — URLs et helpers partagés (OTP SMS + Mobile Money RDC). */
+/** Africa's Talking — URLs et helpers partagés (OTP SMS + Mobile Money RDC).
+ * Passerelle primaire SENGA : SerdiPay (`packages/shared/src/serdipay.ts`).
+ * Africa's Talking / Twilio restent en secours.
+ */
 
 export type AfricasTalkingEnv = 'sandbox' | 'production';
 
@@ -43,33 +46,39 @@ export function isTwilioSmsConfigured(get: EnvGetter): boolean {
   );
 }
 
-export type SmsBackend = 'mock' | 'africastalking' | 'twilio';
+export type SmsBackend = 'mock' | 'serdipay' | 'africastalking' | 'twilio';
 
 /**
- * Résout le canal SMS actif (SENGA RDC : Africa's Talking par défaut).
+ * Résout le canal SMS actif (SENGA RDC : SerdiPay par défaut).
  * Returns `null` when mockMode is false and no real provider is configured
  * (never silently falls back to mock — that would log OTP codes).
  */
 export function resolveSmsBackend(get: EnvGetter, mockMode: boolean): SmsBackend | null {
   if (mockMode) return 'mock';
-  const preferred = (get(AFRICAS_TALKING_ENV_KEYS.smsProvider) ?? 'africastalking').trim().toLowerCase();
+  const preferred = (get(AFRICAS_TALKING_ENV_KEYS.smsProvider) ?? 'serdipay').trim().toLowerCase();
+
+  // Inline check to avoid circular import with serdipay.ts
+  const trySerdi = () =>
+    get('SERDIPAY_CLIENT_ID')?.trim() && get('SERDIPAY_CLIENT_SECRET')?.trim()
+      ? ('serdipay' as const)
+      : null;
+  const tryAt = () => (isAfricasTalkingConfigured(get) ? ('africastalking' as const) : null);
+  const tryTwilio = () => (isTwilioSmsConfigured(get) ? ('twilio' as const) : null);
+
+  if (preferred === 'serdipay') {
+    return trySerdi() ?? tryAt() ?? tryTwilio();
+  }
   if (preferred === 'africastalking') {
-    if (isAfricasTalkingConfigured(get)) return 'africastalking';
-    if (isTwilioSmsConfigured(get)) return 'twilio';
-    return null;
+    return tryAt() ?? trySerdi() ?? tryTwilio();
   }
   if (preferred === 'twilio') {
-    if (isTwilioSmsConfigured(get)) return 'twilio';
-    if (isAfricasTalkingConfigured(get)) return 'africastalking';
-    return null;
+    return tryTwilio() ?? trySerdi() ?? tryAt();
   }
-  if (isAfricasTalkingConfigured(get)) return 'africastalking';
-  if (isTwilioSmsConfigured(get)) return 'twilio';
-  return null;
+  return trySerdi() ?? tryAt() ?? tryTwilio();
 }
 
 export function useAfricasTalkingMobileMoney(get: EnvGetter): boolean {
-  const gateway = (get(AFRICAS_TALKING_ENV_KEYS.mobileMoneyGateway) ?? 'africastalking').trim().toLowerCase();
+  const gateway = (get(AFRICAS_TALKING_ENV_KEYS.mobileMoneyGateway) ?? 'serdipay').trim().toLowerCase();
   return gateway === 'africastalking' && isAfricasTalkingConfigured(get);
 }
 

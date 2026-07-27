@@ -4,6 +4,7 @@ import {
   isAfricasTalkingConfigured,
   isTwilioSmsConfigured,
 } from './africas-talking';
+import { isSerdiPayConfigured } from './serdipay';
 
 const DEV_JWT = 'dev_secret';
 const DEV_INTERNAL = 'mova-internal-dev';
@@ -74,9 +75,13 @@ function envGet(key: string): string | undefined {
   return process.env[key];
 }
 
-/** Real SMS provider (Africa's Talking or Twilio) is configured. */
+/** Real SMS provider (SerdiPay, Africa's Talking or Twilio) is configured. */
 export function isProductionSmsConfigured(): boolean {
-  return isAfricasTalkingConfigured(envGet) || isTwilioSmsConfigured(envGet);
+  return (
+    isSerdiPayConfigured(envGet) ||
+    isAfricasTalkingConfigured(envGet) ||
+    isTwilioSmsConfigured(envGet)
+  );
 }
 
 /** Fail fast on weak secrets / mock flags before Nest listens. */
@@ -93,7 +98,7 @@ export function assertProductionSecurity(serviceName = 'service'): void {
   }
   if (process.env.MOCK_SMS === 'true') {
     throw new Error(
-      `[${serviceName}] MOCK_SMS=true is forbidden in production. Configure Africa's Talking or Twilio.`,
+      `[${serviceName}] MOCK_SMS=true is forbidden in production. Configure SerdiPay (ou Africa's Talking / Twilio).`,
     );
   }
   if (process.env.MOCK_PAYMENTS === 'true') {
@@ -105,7 +110,7 @@ export function assertProductionSecurity(serviceName = 'service'): void {
 
   // Only auth-service sends OTP; other services warn if SMS env is missing.
   if (!isProductionSmsConfigured()) {
-    const msg = `[${serviceName}] No SMS provider configured (AFRICAS_TALKING_* or TWILIO_*). OTP delivery will fail.`;
+    const msg = `[${serviceName}] No SMS provider configured (SERDIPAY_* , AFRICAS_TALKING_* or TWILIO_*). OTP delivery will fail.`;
     if (serviceName === 'auth-service') {
       throw new Error(`${msg} Refusing to start.`);
     }

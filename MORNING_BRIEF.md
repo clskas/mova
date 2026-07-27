@@ -66,13 +66,20 @@ MOCK_OTP=false
 MOCK_PAYMENTS=false
 JWT_SECRET=…          # ≥ 32 caractères
 INTERNAL_API_KEY=…    # ≥ 24 caractères
-TWILIO_* / Verify
-ORANGE_MONEY_* / MPESA_* / AIRTEL_*
+# Primaire OTP + Mobile Money
+SERDIPAY_CLIENT_ID / SERDIPAY_CLIENT_SECRET / SERDIPAY_MERCHANT_ID
+SMS_PROVIDER=serdipay
+MOBILE_MONEY_GATEWAY=serdipay
+# Stockage docs (Supabase projet senga)
+SUPABASE_URL=https://furttqrltkwirdhiktdl.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=…   # dashboard → API → service_role
+SUPABASE_UPLOADS_BUCKET=uploads
+SUPABASE_KYC_BUCKET=kyc-docs
 MAPBOX_ACCESS_TOKEN
 FCM_SERVER_KEY
 ```
 
-Détail : [docs/PRODUCTION_DEPLOYMENT.md](docs/PRODUCTION_DEPLOYMENT.md) · [docs/cicd.md](docs/cicd.md)
+Détail : [docs/PRODUCTION_DEPLOYMENT.md](docs/PRODUCTION_DEPLOYMENT.md) · [docs/cicd.md](docs/cicd.md) · **Play Store** : [docs/PLAY_STORE_GUIDE.md](docs/PLAY_STORE_GUIDE.md)
 
 ---
 
@@ -95,15 +102,27 @@ Détail : [docs/PRODUCTION_DEPLOYMENT.md](docs/PRODUCTION_DEPLOYMENT.md) · [doc
 
 ---
 
+## Play Store — prochains clics (compte déjà prêt)
+
+1. Play Console → créer **Senga** (`cd.mova.mova.passenger`) + **SENGA Driver** (`cd.mova.mova.driver`) si besoin.  
+2. **Tests internes** → liste testeurs.  
+3. Compte de service GCP → inviter dans Play → JSON en base64 → secret GitHub `PLAY_STORE_JSON_KEY`.  
+4. Keystore release → secrets `ANDROID_KEYSTORE_*` / `ANDROID_KEY_*`.  
+5. Push `main` ou lancer **Mobile Release** → approuver env `production-mobile` → vérifier AAB sur Internal testing.  
+
+Guide pas-à-pas : [docs/PLAY_STORE_GUIDE.md](docs/PLAY_STORE_GUIDE.md).
+
+---
+
 ## Blockers résiduels / risques
 
 1. **Secrets Play / keystore** absents → AAB construits mais non publiés (skip gracieux).
-2. **Twilio / mobile money** non configurés → OTP réel et paiements réels indisponibles (MOCK interdit en prod pour OTP).
-3. **`CORS_ORIGIN`** doit lister les URLs finales des frontends sinon navigateurs bloqués.
-4. **Portails restaurant / rental** : images + Blueprint prêts ; IDs Render doivent être dans `RENDER_SERVICE_IDS` / `render-services.json`.
-5. **Appium mobile e2e** : non exécuté en CI (volontaire) — couverture = `flutter test` + smoke API.
-6. **iOS / TestFlight** : hors chemin critique Android ; secrets Apple toujours optionnels.
-7. Images GHCR : Render Blueprint utilise encore build Docker depuis le repo (pas forcément pull GHCR) — cohérent si Render build-from-Dockerfile.
+2. **SerdiPay** non configuré (`SERDIPAY_CLIENT_ID` / `SECRET`) → OTP réel et paiements réels indisponibles (MOCK interdit en prod pour OTP).
+3. **`SUPABASE_SERVICE_ROLE_KEY`** à coller sur Render (clé non exposée via MCP — dashboard Supabase projet **senga**).
+4. **`kongomarket` Supabase** : mis en pause (INACTIVE) — suppression définitive manuelle dans le dashboard si souhaitée (MCP = pause seulement).
+5. **`CORS_ORIGIN`** doit lister les URLs finales des frontends sinon navigateurs bloqués.
+6. **Portails restaurant / rental** : IDs Render dans `RENDER_SERVICE_IDS` / `render-services.json`.
+7. **iOS / TestFlight** : hors chemin critique Android.
 
 ---
 

@@ -6,7 +6,13 @@ import { resolveJwtSecret } from '@mova/shared';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtStrategy } from './jwt.strategy';
-import { MockSmsProvider, AfricasTalkingSmsProvider, SmsService, TwilioSmsProvider } from './sms.providers';
+import {
+  MockSmsProvider,
+  SerdiPaySmsProvider,
+  AfricasTalkingSmsProvider,
+  SmsService,
+  TwilioSmsProvider,
+} from './sms.providers';
 
 @Module({
   imports: [
@@ -21,7 +27,15 @@ import { MockSmsProvider, AfricasTalkingSmsProvider, SmsService, TwilioSmsProvid
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, MockSmsProvider, AfricasTalkingSmsProvider, TwilioSmsProvider, SmsService],
+  providers: [
+    AuthService,
+    JwtStrategy,
+    MockSmsProvider,
+    SerdiPaySmsProvider,
+    AfricasTalkingSmsProvider,
+    TwilioSmsProvider,
+    SmsService,
+  ],
   exports: [AuthService, JwtModule],
 })
 export class AuthModule {}

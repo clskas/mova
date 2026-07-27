@@ -5,8 +5,10 @@ import {
   isAfricasTalkingConfigured,
   isMockOtpAllowed,
   isProductionRuntime,
+  isSerdiPayConfigured,
   isTwilioSmsConfigured,
   resolveSmsBackend,
+  serdiPaySendSms,
 } from '@mova/shared';
 
 export interface SmsSendResult {
@@ -34,12 +36,35 @@ export class MockSmsProvider implements SmsProvider {
       this.logger.error('[MOCK SMS] refused outside non-prod MOCK_OTP mode');
       return {
         success: false,
-        message: 'Service SMS non configuré. Configurez Africa\'s Talking ou Twilio.',
+        message: 'Service SMS non configuré. Configurez SerdiPay (ou Africa\'s Talking / Twilio).',
       };
     }
     // Dev-only: code is intentional for local login; never enabled in production.
     this.logger.log(`[MOCK SMS] OTP ${code} → ${phone}`);
     return { success: true, message: 'Code OTP simulé (mode développement)' };
+  }
+}
+
+@Injectable()
+export class SerdiPaySmsProvider implements SmsProvider {
+  readonly name = 'SERDIPAY';
+  private readonly logger = new Logger(SerdiPaySmsProvider.name);
+
+  constructor(private config: ConfigService) {}
+
+  private get = (key: string) => this.config.get<string>(key);
+
+  isConfigured(): boolean {
+    return isSerdiPayConfigured(this.get);
+  }
+
+  async sendOtp(phone: string, code: string): Promise<SmsSendResult> {
+    const result = await serdiPaySendSms(this.get, {
+      to: phone,
+      message: `Votre code SENGA : ${code}. Valide 10 minutes.`,
+    });
+    if (!result.success) this.logger.warn(`SerdiPay SMS: ${result.message}`);
+    return result;
   }
 }
 
@@ -141,6 +166,7 @@ export class SmsService {
   constructor(
     private config: ConfigService,
     private mock: MockSmsProvider,
+    private serdiPay: SerdiPaySmsProvider,
     private africasTalking: AfricasTalkingSmsProvider,
     private twilio: TwilioSmsProvider,
   ) {}
@@ -150,6 +176,7 @@ export class SmsService {
   private resolveProvider(): SmsProvider | null {
     const backend = resolveSmsBackend(this.get, isMockOtpAllowed());
     if (backend === 'mock') return this.mock;
+    if (backend === 'serdipay') return this.serdiPay;
     if (backend === 'africastalking') return this.africasTalking;
     if (backend === 'twilio') return this.twilio;
     return null;
@@ -161,7 +188,7 @@ export class SmsService {
       this.logger.error('SMS OTP failed: no provider configured');
       return {
         success: false,
-        message: 'Service SMS non configuré. Définissez Africa\'s Talking ou Twilio.',
+        message: 'Service SMS non configuré. Définissez SERDIPAY_CLIENT_ID / SERDIPAY_CLIENT_SECRET (ou Africa\'s Talking / Twilio).',
       };
     }
     const result = await provider.sendOtp(phone, code);
@@ -174,6 +201,6 @@ export class SmsService {
   isProductionReady(): boolean {
     if (isMockOtpAllowed()) return false;
     const backend = resolveSmsBackend(this.get, false);
-    return backend === 'africastalking' || backend === 'twilio';
+    return backend === 'serdipay' || backend === 'africastalking' || backend === 'twilio';
   }
 }

@@ -1,6 +1,10 @@
-import 'package:geocoding/geocoding.dart';
+import 'dart:convert';
+
 import 'package:geolocator/geolocator.dart';
+import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
+
+import '../config/market_config.dart';
 
 class LocationResult {
   const LocationResult({required this.position, required this.label});
@@ -9,7 +13,10 @@ class LocationResult {
   final String label;
 }
 
-/// Position GPS actuelle avec libellé d'adresse (reverse geocoding).
+/// Position GPS actuelle avec libellé d'adresse (reverse geocoding via passerelle).
+///
+/// Pas de plugin natif `geocoding` : incompatible Android 7 (GeocodeListener API 33+)
+/// et les anciennes versions ne compilent plus avec Flutter récent (embedding v1).
 class LocationService {
   static Future<LocationResult?> getCurrentLocation() async {
     if (!await Geolocator.isLocationServiceEnabled()) {
@@ -37,18 +44,19 @@ class LocationService {
 
   static Future<String> _reverseGeocode(LatLng pos) async {
     try {
-      final placemarks = await placemarkFromCoordinates(pos.latitude, pos.longitude);
-      if (placemarks.isEmpty) return coordsLabel(pos);
-      final p = placemarks.first;
-      final parts = <String>[
-        if (p.street != null && p.street!.isNotEmpty) p.street!,
-        if (p.subLocality != null && p.subLocality!.isNotEmpty) p.subLocality!,
-        if (p.locality != null && p.locality!.isNotEmpty) p.locality!,
-        if (p.administrativeArea != null && p.administrativeArea!.isNotEmpty)
-          p.administrativeArea!,
-      ];
-      if (parts.isNotEmpty) return parts.join(', ');
-      return coordsLabel(pos);
+      final uri = Uri.parse(
+        '${MarketConfig.effectiveApiBaseUrl}/geo/reverse'
+        '?lat=${pos.latitude}&lng=${pos.longitude}',
+      );
+      final response = await http.get(uri).timeout(const Duration(seconds: 8));
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        return coordsLabel(pos);
+      }
+      final data = jsonDecode(response.body);
+      if (data is! Map) return coordsLabel(pos);
+      final label = data['label']?.toString() ?? data['address']?.toString() ?? '';
+      if (label.trim().isEmpty) return coordsLabel(pos);
+      return label.trim();
     } catch (_) {
       return coordsLabel(pos);
     }

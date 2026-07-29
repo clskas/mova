@@ -15,7 +15,7 @@ export function canCancelRentalBooking(params: {
   status: string;
   startDate: Date | string;
 }): CancelEligibility {
-  const terminal = new Set(['CLOSED', 'RETURNED', 'IN_PROGRESS']);
+  const terminal = new Set(['CLOSED', 'RETURNED', 'IN_PROGRESS', 'PAID']);
   if (terminal.has(params.status)) {
     return blocked('Cette location ne peut plus être annulée à ce stade.');
   }
@@ -24,6 +24,11 @@ export function canCancelRentalBooking(params: {
     return blocked('La date de prise en charge est atteinte — annulation impossible.');
   }
   return allowed();
+}
+
+/** After handover (IN_PROGRESS) or later, cancel/close is forbidden for everyone. */
+export function isRentalCancelBlockedByStatus(status: string): boolean {
+  return new Set(['IN_PROGRESS', 'RETURNED', 'PAID', 'CLOSED']).has(status);
 }
 
 export function canCancelScheduledRide(params: {

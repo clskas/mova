@@ -56,13 +56,22 @@ function canAssignLogistics(r: RentalInquiry): boolean {
   );
 }
 
+function canCancelRental(r: RentalInquiry): boolean {
+  return !["IN_PROGRESS", "RETURNED", "PAID", "CLOSED"].includes(r.status);
+}
+
 function statusOptionsFor(inquiry: RentalInquiry, forceOverride: boolean) {
-  if (!inquiry.ownerUserId || forceOverride) return STATUSES;
-  const current = STATUSES.find((s) => s.value === inquiry.status);
-  return [
-    ...(current ? [current] : []),
-    ...PARTNER_ADMIN_STATUSES.filter((s) => s.value !== inquiry.status),
-  ];
+  const statuses = (!inquiry.ownerUserId || forceOverride
+    ? STATUSES
+    : (() => {
+        const current = STATUSES.find((s) => s.value === inquiry.status);
+        return [
+          ...(current ? [current] : []),
+          ...PARTNER_ADMIN_STATUSES.filter((s) => s.value !== inquiry.status),
+        ];
+      })()
+  ).filter((s) => canCancelRental(inquiry) || s.value !== "CLOSED" || s.value === inquiry.status);
+  return statuses;
 }
 
 export default function LocationsPage() {
@@ -345,10 +354,15 @@ export default function LocationsPage() {
                 <BtnPrimary onClick={saveStatus} disabled={saving || newStatus === selected.status}>
                   {saving ? "Enregistrement…" : "Enregistrer le statut"}
                 </BtnPrimary>
-                {selected.status !== "CLOSED" && (
+                {canCancelRental(selected) && (
                   <BtnDanger onClick={() => cancel(selected.id)} disabled={saving}>
                     Clôturer / annuler
                   </BtnDanger>
+                )}
+                {!canCancelRental(selected) && selected.status !== "CLOSED" && (
+                  <p className="text-xs text-gray-500">
+                    Véhicule déjà remis — annulation impossible.
+                  </p>
                 )}
               </>
             )}

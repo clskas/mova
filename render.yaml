@@ -123,6 +123,7 @@ services:
         fromService: { name: mova-redis, type: keyvalue, property: connectionString }
       - key: JWT_SECRET
         fromService: { name: mova-gateway, type: web, envVarKey: JWT_SECRET }
+      - fromGroup: mova-external-apis
 
   - type: web
     name: mova-admin

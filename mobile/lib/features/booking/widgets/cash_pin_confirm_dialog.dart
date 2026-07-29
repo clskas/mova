@@ -14,6 +14,7 @@ Future<bool> showCashPinConfirmDialog(
     context: context,
     barrierDismissible: false,
     builder: (ctx) => AlertDialog(
+      scrollable: true,
       title: const Text('Paiement espèces'),
       content: Column(
         mainAxisSize: MainAxisSize.min,

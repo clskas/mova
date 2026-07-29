@@ -10,7 +10,8 @@ function isPublicPath(path: string, method?: string): boolean {
     m === 'GET' &&
     (pathOnly.includes('/uploads/parcels/') ||
       pathOnly.includes('/uploads/menu/') ||
-      pathOnly.includes('/uploads/vehicles/'))
+      pathOnly.includes('/uploads/vehicles/') ||
+      pathOnly.includes('/uploads/moving/'))
   ) {
     return true;
   }

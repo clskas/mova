@@ -651,7 +651,6 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
   Widget build(BuildContext context) {
     return MovaScreen(
       title: 'Revenus',
-      scrollable: false,
       actions: [
         IconButton(icon: const Icon(Icons.refresh), onPressed: _loading || _withdrawing ? null : _load),
       ],
@@ -660,85 +659,66 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
           : Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Expanded(
-                  child: MovaFlexScroll(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        if (_error != null) ...[
-                          MovaErrorBanner(message: _error!, onRetry: _load),
-                          const SizedBox(height: 12),
-                        ],
-                        _summaryHero(),
-                        const SizedBox(height: 16),
-                        SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Row(
-                            children: [
-                              _periodChip('Aujourd\'hui', _EarningsPeriod.today),
-                              _periodChip('Semaine', _EarningsPeriod.week),
-                              _periodChip('Mois', _EarningsPeriod.month),
-                              ChoiceChip(
-                                label: const Text('Personnalisé'),
-                                selected: _period == _EarningsPeriod.custom,
-                                onSelected: _loading || _loadingActivity ? null : (_) => _pickCustomRange(),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        TextField(
-                          controller: _searchController,
-                          decoration: InputDecoration(
-                            labelText: 'Rechercher (adresse, référence…)',
-                            prefixIcon: const Icon(Icons.search),
-                            suffixIcon: _searchController.text.isNotEmpty
-                                ? IconButton(
-                                    icon: const Icon(Icons.clear),
-                                    onPressed: () {
-                                      _searchController.clear();
-                                      _loadActivity();
-                                    },
-                                  )
-                                : null,
-                          ),
-                          onSubmitted: (_) => _loadActivity(),
-                        ),
-                        const SizedBox(height: 10),
-                        SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Row(
-                            children: [
-                              _serviceChip('Tout', _ServiceFilter.all),
-                              _serviceChip('Courses', _ServiceFilter.ride),
-                              _serviceChip('Livraisons', _ServiceFilter.delivery),
-                              _serviceChip('Missions', _ServiceFilter.mission),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        TextField(
-                          controller: _searchController,
-                          decoration: InputDecoration(
-                            labelText: 'Rechercher (adresse, référence…)',
-                            prefixIcon: const Icon(Icons.search),
-                            suffixIcon: IconButton(
-                              icon: const Icon(Icons.search),
-                              onPressed: _loadingActivity ? null : _loadActivity,
-                            ),
-                          ),
-                          onSubmitted: (_) => _loadActivity(),
-                        ),
-                        const SizedBox(height: 16),
-                        _cashDebtSection(),
-                        _lifetimeStats(),
-                        const SizedBox(height: 16),
-                        _activityList(),
-                      ],
-                    ),
+                if (_error != null) ...[
+                  MovaErrorBanner(message: _error!, onRetry: _load),
+                  const SizedBox(height: 12),
+                ],
+                _summaryHero(),
+                const SizedBox(height: 16),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      _periodChip('Aujourd\'hui', _EarningsPeriod.today),
+                      _periodChip('Semaine', _EarningsPeriod.week),
+                      _periodChip('Mois', _EarningsPeriod.month),
+                      ChoiceChip(
+                        label: const Text('Personnalisé'),
+                        selected: _period == _EarningsPeriod.custom,
+                        onSelected: _loading || _loadingActivity ? null : (_) => _pickCustomRange(),
+                      ),
+                    ],
                   ),
                 ),
-                const Divider(height: 24),
+                const SizedBox(height: 10),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      _serviceChip('Tout', _ServiceFilter.all),
+                      _serviceChip('Courses', _ServiceFilter.ride),
+                      _serviceChip('Livraisons', _ServiceFilter.delivery),
+                      _serviceChip('Missions', _ServiceFilter.mission),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    labelText: 'Rechercher (adresse, référence…)',
+                    prefixIcon: const Icon(Icons.search),
+                    suffixIcon: _searchController.text.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear),
+                            onPressed: () {
+                              _searchController.clear();
+                              _loadActivity();
+                            },
+                          )
+                        : IconButton(
+                            icon: const Icon(Icons.search),
+                            onPressed: _loadingActivity ? null : _loadActivity,
+                          ),
+                  ),
+                  onSubmitted: (_) => _loadActivity(),
+                ),
+                const SizedBox(height: 16),
+                _cashDebtSection(),
+                _lifetimeStats(),
+                const SizedBox(height: 16),
+                _activityList(),
+                const Divider(height: 32),
                 const Text('Retrait Mobile Money', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                 const SizedBox(height: 8),
                 if (_payoutConfigured)

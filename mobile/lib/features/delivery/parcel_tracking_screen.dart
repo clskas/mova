@@ -435,7 +435,8 @@ class _ParcelTrackingScreenState extends ConsumerState<ParcelTrackingScreen> {
                         ),
                       ),
                     ),
-                    Padding(
+                    MovaStickyActions(
+                      child: Padding(
                       padding: const EdgeInsets.all(16),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -485,6 +486,7 @@ class _ParcelTrackingScreenState extends ConsumerState<ParcelTrackingScreen> {
                           ),
                         ],
                       ),
+                    ),
                     ),
                   ],
                 ),

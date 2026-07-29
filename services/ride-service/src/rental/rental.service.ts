@@ -1,6 +1,6 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { Prisma, RentalInquiryStatus, RentalLogisticsMode, RentalVehicleApprovalStatus } from '@prisma/client';
-import { MARKET_RDC, MOVA_EVENTS, MovaErrorCode, MovaHttpException, canCancelRentalBooking, formatCdf, formatRentalRemaining, shouldChargeGpsAddOn, vehicleHasBuiltInGps, type RentalBookingEventKind } from '@mova/shared';
+import { MARKET_RDC, MOVA_EVENTS, MovaErrorCode, MovaHttpException, canCancelRentalBooking, formatCdf, formatRentalRemaining, isRentalCancelBlockedByStatus, shouldChargeGpsAddOn, vehicleHasBuiltInGps, type RentalBookingEventKind } from '@mova/shared';
 import { RedisService } from '@mova/shared';
 import { fetchAuthUserBrief } from '../common/internal-lookup.util';
 import { fetchServicePaymentStatus } from '../common/payment-status.util';
@@ -1337,8 +1337,14 @@ export class RentalService {
       });
       return this.enrichOwnerBooking(updated);
     } else {
-      if (inquiry.status === RentalInquiryStatus.CLOSED || inquiry.status === RentalInquiryStatus.RETURNED) {
-        throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Cette demande est déjà clôturée.');
+      if (isRentalCancelBlockedByStatus(inquiry.status)) {
+        throw new MovaHttpException(
+          MovaErrorCode.VALIDATION_ERROR,
+          undefined,
+          inquiry.status === RentalInquiryStatus.CLOSED
+            ? 'Cette demande est déjà clôturée.'
+            : 'Le véhicule a déjà été remis — annulation impossible.',
+        );
       }
       newStatus = RentalInquiryStatus.CLOSED;
     }
@@ -1640,6 +1646,15 @@ export class RentalService {
   async adminCancel(id: string) {
     const inquiry = await this.prisma.rentalInquiry.findUnique({ where: { id } });
     if (!inquiry) throw new MovaHttpException(MovaErrorCode.RENTAL_INQUIRY_NOT_FOUND, HttpStatus.NOT_FOUND);
+    if (isRentalCancelBlockedByStatus(inquiry.status)) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        undefined,
+        inquiry.status === RentalInquiryStatus.CLOSED
+          ? 'Cette location est déjà clôturée.'
+          : 'Le véhicule a déjà été remis — annulation impossible.',
+      );
+    }
     const updated = await this.prisma.rentalInquiry.update({
       where: { id },
       data: { status: RentalInquiryStatus.CLOSED },
@@ -1658,6 +1673,15 @@ export class RentalService {
   async adminUpdateStatus(id: string, status: RentalInquiryStatus, forceOverride = false) {
     const inquiry = await this.prisma.rentalInquiry.findUnique({ where: { id }, include: { vehicle: true } });
     if (!inquiry) throw new MovaHttpException(MovaErrorCode.RENTAL_INQUIRY_NOT_FOUND, HttpStatus.NOT_FOUND);
+    if (status === RentalInquiryStatus.CLOSED && isRentalCancelBlockedByStatus(inquiry.status)) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        undefined,
+        inquiry.status === RentalInquiryStatus.CLOSED
+          ? 'Cette location est déjà clôturée.'
+          : 'Le véhicule a déjà été remis — annulation / clôture impossible.',
+      );
+    }
     this.assertAdminRentalStatusChange(inquiry, status, forceOverride);
     const updateData =
       status === RentalInquiryStatus.RETURNED ? this.returnUpdateData(inquiry) : { status };

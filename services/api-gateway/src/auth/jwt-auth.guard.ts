@@ -24,7 +24,7 @@ function isPublicPath(path: string, method?: string): boolean {
   // Shared trip links (tokenized) — read-only, no auth.
   if (m === 'GET' && pathOnly.startsWith('/api/public/')) return true;
   if (m === 'GET' && pathOnly.startsWith('/api/services')) return true;
-  if (m === 'GET' && /\/api\/uploads\/(parcels|menu|vehicles)\/[^/]+$/.test(pathOnly)) {
+  if (m === 'GET' && /\/api\/uploads\/(parcels|menu|vehicles|moving)\/[^/]+$/.test(pathOnly)) {
     return true;
   }
   return false;

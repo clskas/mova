@@ -5,6 +5,7 @@ import {
   isProductionRuntime,
   isTwilioSmsConfigured,
   resolveSmsBackend,
+  serdiPaySendSms,
 } from '@mova/shared';
 
 export interface SmsSendResult {
@@ -36,6 +37,12 @@ export class SmsService {
     }
 
     const backend = resolveSmsBackend(this.get, false);
+    if (backend === 'serdipay') {
+      const result = await serdiPaySendSms(this.get, { to: phone, message: body });
+      if (!result.success) this.logger.warn(`SerdiPay SMS: ${result.message}`);
+      return result;
+    }
+
     if (backend === 'africastalking') {
       const result = await africasTalkingSendSms(this.get, { to: phone, message: body });
       if (!result.success) this.logger.warn(`Africa's Talking SMS: ${result.message}`);
@@ -68,6 +75,6 @@ export class SmsService {
     }
 
     this.logger.warn(`SMS skipped (non configuré): ${phone}`);
-    return { success: false, message: 'SMS non configuré (Africa\'s Talking ou Twilio)' };
+    return { success: false, message: 'SMS non configuré (SerdiPay, Africa\'s Talking ou Twilio)' };
   }
 }

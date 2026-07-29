@@ -17,6 +17,8 @@ async function bootstrap() {
     helmet({
       contentSecurityPolicy: false,
       crossOriginEmbedderPolicy: false,
+      // Allow admin/partner/web (other origins) to display /api/uploads/* in <img>.
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
     }),
   );
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));

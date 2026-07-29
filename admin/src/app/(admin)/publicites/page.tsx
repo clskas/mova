@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   deletePublicite,
   fetchPublicites,
@@ -10,6 +10,7 @@ import {
   type PubliciteCible,
 } from "@/lib/api";
 import { resolveMediaUrl } from "@/components/VehiclePhotoUpload";
+import { ImageSourcePicker } from "@/components/ImageSourcePicker";
 import { useAdmin } from "@/components/AdminProvider";
 import {
   BtnGhost,
@@ -68,7 +69,6 @@ function defaultStartDate() {
 export default function PublicitesPage() {
   const { canWrite } = useAdmin();
   const readOnly = !canWrite("publicites");
-  const fileRef = useRef<HTMLInputElement>(null);
 
   const [items, setItems] = useState<Publicite[]>([]);
   const [loading, setLoading] = useState(true);
@@ -139,7 +139,6 @@ export default function PublicitesPage() {
       setError(e instanceof Error ? e.message : "Échec envoi image");
     } finally {
       setUploading(false);
-      if (fileRef.current) fileRef.current.value = "";
     }
   }
 
@@ -279,32 +278,18 @@ export default function PublicitesPage() {
 
           <label>
             <FieldLabel>Image</FieldLabel>
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-start">
               <TextInput
                 value={imageUrl}
                 onChange={setImageUrl}
                 placeholder="https://exemple.com/image.jpg"
                 disabled={readOnly}
               />
-              <button
-                type="button"
+              <ImageSourcePicker
                 disabled={readOnly || uploading}
-                onClick={() => fileRef.current?.click()}
-                className="shrink-0 h-11 w-11 rounded-xl border-2 border-[#6C63FF] text-[#6C63FF] flex items-center justify-center hover:bg-violet-50 disabled:opacity-50"
-                aria-label="Téléverser une image"
-                title="Téléverser une image"
-              >
-                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
-                  <path d="M4 7h3l2-2h6l2 2h3a2 2 0 012 2v9a2 2 0 01-2 2H4a2 2 0 01-2-2V9a2 2 0 012-2z" />
-                  <circle cx="12" cy="13" r="3.5" />
-                </svg>
-              </button>
-              <input
-                ref={fileRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => handleUpload(e.target.files?.[0] ?? null)}
+                onSelect={handleUpload}
+                label={uploading ? "Envoi…" : "Photo"}
+                className="shrink-0 h-11 px-3 rounded-xl border-2 border-[#6C63FF] text-[#6C63FF] text-sm font-medium hover:bg-violet-50 disabled:opacity-50"
               />
             </div>
             {preview && (

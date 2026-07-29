@@ -45,19 +45,35 @@ export default function SettingsPage() {
       setError("Géolocalisation non disponible sur cet appareil.");
       return;
     }
+    if (typeof window !== "undefined" && !window.isSecureContext) {
+      setError("La géolocalisation nécessite HTTPS ou localhost (pas une IP http://).");
+      return;
+    }
     setLocating(true);
     setError(null);
+    const onSuccess = (pos: GeolocationPosition) => {
+      setLat(pos.coords.latitude.toFixed(6));
+      setLng(pos.coords.longitude.toFixed(6));
+      setLocating(false);
+    };
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setLat(pos.coords.latitude.toFixed(6));
-        setLng(pos.coords.longitude.toFixed(6));
+      onSuccess,
+      (err) => {
+        if (err.code === err.TIMEOUT || err.code === err.POSITION_UNAVAILABLE) {
+          navigator.geolocation.getCurrentPosition(
+            onSuccess,
+            () => {
+              setError("Impossible d'obtenir votre position GPS.");
+              setLocating(false);
+            },
+            { enableHighAccuracy: false, timeout: 20000, maximumAge: 60000 },
+          );
+          return;
+        }
+        setError("Impossible d'obtenir votre position GPS. Autorisez la localisation.");
         setLocating(false);
       },
-      () => {
-        setError("Impossible d'obtenir votre position GPS.");
-        setLocating(false);
-      },
-      { enableHighAccuracy: true, timeout: 15000 },
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 },
     );
   }
 

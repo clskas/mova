@@ -11,7 +11,7 @@ param(
     [string]$WsUrl = "",
     [switch]$UsbReverse,
     [string]$Device = "",
-    [string]$DeviceName = "V2"
+    [string]$DeviceName = "G981"
 )
 
 $ErrorActionPreference = "Stop"

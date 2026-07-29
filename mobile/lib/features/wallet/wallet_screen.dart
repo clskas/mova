@@ -600,58 +600,60 @@ class _WalletWithdrawSheetState extends State<_WalletWithdrawSheet> {
         top: 24,
         bottom: MediaQuery.of(context).viewInsets.bottom + 24,
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            'Retirer vers Mobile Money',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Solde disponible : ${MarketConfig.formatCdf(widget.maxAmount)}',
-            style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
-          ),
-          const SizedBox(height: 16),
-          DropdownButtonFormField<String>(
-            value: _providerId,
-            decoration: const InputDecoration(
-              labelText: 'Opérateur',
-              prefixIcon: Icon(Icons.account_balance_wallet_outlined),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Retirer vers Mobile Money',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
-            items: MarketConfig.mobileMoneyProviders
-                .map((p) => DropdownMenuItem(value: p.id, child: Text(p.name)))
-                .toList(),
-            onChanged: (v) {
-              if (v != null) setState(() => _providerId = v);
-            },
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _amountController,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-              labelText: 'Montant (FC)',
-              prefixIcon: Icon(Icons.payments_outlined),
+            const SizedBox(height: 8),
+            Text(
+              'Solde disponible : ${MarketConfig.formatCdf(widget.maxAmount)}',
+              style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
             ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _phoneController,
-            keyboardType: TextInputType.phone,
-            decoration: const InputDecoration(
-              labelText: 'Numéro Mobile Money',
-              prefixIcon: Icon(Icons.phone_outlined),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              value: _providerId,
+              decoration: const InputDecoration(
+                labelText: 'Opérateur',
+                prefixIcon: Icon(Icons.account_balance_wallet_outlined),
+              ),
+              items: MarketConfig.mobileMoneyProviders
+                  .map((p) => DropdownMenuItem(value: p.id, child: Text(p.name)))
+                  .toList(),
+              onChanged: (v) {
+                if (v != null) setState(() => _providerId = v);
+              },
             ),
-          ),
-          const SizedBox(height: 20),
-          MovaButton(
-            label: 'Confirmer le retrait',
-            icon: Icons.check,
-            onPressed: _confirm,
-          ),
-        ],
+            const SizedBox(height: 12),
+            TextField(
+              controller: _amountController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Montant (FC)',
+                prefixIcon: Icon(Icons.payments_outlined),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _phoneController,
+              keyboardType: TextInputType.phone,
+              decoration: const InputDecoration(
+                labelText: 'Numéro Mobile Money',
+                prefixIcon: Icon(Icons.phone_outlined),
+              ),
+            ),
+            const SizedBox(height: 20),
+            MovaButton(
+              label: 'Confirmer le retrait',
+              icon: Icons.check,
+              onPressed: _confirm,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -711,39 +713,41 @@ class _WalletTopUpSheetState extends State<_WalletTopUpSheet> {
         top: 24,
         bottom: MediaQuery.of(context).viewInsets.bottom + 24,
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            'Recharger via ${widget.provider.name}',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _amountController,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-              labelText: 'Montant (FC)',
-              prefixIcon: Icon(Icons.payments_outlined),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Recharger via ${widget.provider.name}',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _phoneController,
-            keyboardType: TextInputType.phone,
-            decoration: const InputDecoration(
-              labelText: 'Numéro mobile money',
-              prefixIcon: Icon(Icons.phone_outlined),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _amountController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Montant (FC)',
+                prefixIcon: Icon(Icons.payments_outlined),
+              ),
             ),
-          ),
-          const SizedBox(height: 20),
-          MovaButton(
-            label: 'Confirmer la recharge',
-            icon: Icons.check,
-            onPressed: _confirm,
-          ),
-        ],
+            const SizedBox(height: 12),
+            TextField(
+              controller: _phoneController,
+              keyboardType: TextInputType.phone,
+              decoration: const InputDecoration(
+                labelText: 'Numéro mobile money',
+                prefixIcon: Icon(Icons.phone_outlined),
+              ),
+            ),
+            const SizedBox(height: 20),
+            MovaButton(
+              label: 'Confirmer la recharge',
+              icon: Icons.check,
+              onPressed: _confirm,
+            ),
+          ],
+        ),
       ),
     );
   }

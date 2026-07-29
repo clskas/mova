@@ -623,6 +623,7 @@ class _ErrandPurchaseTotalDialogState extends State<_ErrandPurchaseTotalDialog> 
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
+      scrollable: true,
       title: const Text('Montant des achats'),
       content: Column(
         mainAxisSize: MainAxisSize.min,

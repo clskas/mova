@@ -35,11 +35,11 @@ services:
     environment:
       DATABASE_URL: postgresql://mova:mova@postgres:5432/mova_auth
       REDIS_URL: redis://redis:6379
-      JWT_SECRET: dev_secret
+      JWT_SECRET: local_dev_jwt_secret_32chars_min_ok
       # MOCK_OTP + Twilio : config/external-apis.env (gitignored). Sans ce fichier → copier depuis external-apis.env.example
       PAYMENT_SERVICE_URL: http://payment-service:3000
       DRIVER_SERVICE_URL: http://driver-service:3000
-      INTERNAL_API_KEY: mova-internal-dev
+      INTERNAL_API_KEY: mova-internal-dev-key-24
       PORT: 3000
     depends_on:
       postgres:
@@ -62,10 +62,10 @@ services:
     environment:
       DATABASE_URL: postgresql://mova:mova@postgres:5432/mova_rides
       REDIS_URL: redis://redis:6379
-      JWT_SECRET: dev_secret
+      JWT_SECRET: local_dev_jwt_secret_32chars_min_ok
       DRIVER_SERVICE_URL: http://driver-service:3000
       AUTH_SERVICE_URL: http://auth-service:3000
-      INTERNAL_API_KEY: mova-internal-dev
+      INTERNAL_API_KEY: mova-internal-dev-key-24
       OSRM_BASE_URL: https://router.project-osrm.org
       OSRM_ENABLED: 'true'
       OSRM_TIMEOUT_MS: '5000'
@@ -96,13 +96,13 @@ services:
     environment:
       DATABASE_URL: postgresql://mova:mova@postgres:5432/mova_payments
       REDIS_URL: redis://redis:6379
-      JWT_SECRET: dev_secret
+      JWT_SECRET: local_dev_jwt_secret_32chars_min_ok
       # Dev local : paiements simulés. Production : NODE_ENV=production + MOCK_PAYMENTS=false + clés Orange/M-Pesa/Airtel
       # MOCK_PAYMENTS=true n'est autorisé qu'en dehors de NODE_ENV=production (garde anti-mock en prod).
       NODE_ENV: development
       MOCK_PAYMENTS: 'true'
       RIDE_SERVICE_URL: http://ride-service:3000
-      INTERNAL_API_KEY: mova-internal-dev
+      INTERNAL_API_KEY: mova-internal-dev-key-24
       PORT: 3000
     depends_on:
       postgres:
@@ -118,11 +118,11 @@ services:
       - '3004:3000'
     environment:
       DATABASE_URL: postgresql://mova:mova@postgres:5432/mova_drivers
-      JWT_SECRET: dev_secret
+      JWT_SECRET: local_dev_jwt_secret_32chars_min_ok
       AUTH_SERVICE_URL: http://auth-service:3000
       RIDE_SERVICE_URL: http://ride-service:3000
       PAYMENT_SERVICE_URL: http://payment-service:3000
-      INTERNAL_API_KEY: mova-internal-dev
+      INTERNAL_API_KEY: mova-internal-dev-key-24
       PORT: 3000
     depends_on:
       postgres:
@@ -139,9 +139,9 @@ services:
     environment:
       DATABASE_URL: postgresql://mova:mova@postgres:5432/mova_notifications
       REDIS_URL: redis://redis:6379
-      JWT_SECRET: dev_secret
+      JWT_SECRET: local_dev_jwt_secret_32chars_min_ok
       AUTH_SERVICE_URL: http://auth-service:3000
-      INTERNAL_API_KEY: mova-internal-dev
+      INTERNAL_API_KEY: mova-internal-dev-key-24
       DOCKER: 'true'
       PORT: 3000
       FCM_SERVER_KEY: ${FCM_SERVER_KEY:-}
@@ -163,12 +163,12 @@ services:
     ports:
       - '3006:3000'
     environment:
-      JWT_SECRET: dev_secret
+      JWT_SECRET: local_dev_jwt_secret_32chars_min_ok
       AUTH_SERVICE_URL: http://auth-service:3000
       RIDE_SERVICE_URL: http://ride-service:3000
       DRIVER_SERVICE_URL: http://driver-service:3000
       PAYMENT_SERVICE_URL: http://payment-service:3000
-      INTERNAL_API_KEY: mova-internal-dev
+      INTERNAL_API_KEY: mova-internal-dev-key-24
       PORT: 3000
     depends_on:
       - auth-service
@@ -183,7 +183,9 @@ services:
     ports:
       - '3000:3000'
     environment:
-      JWT_SECRET: dev_secret
+      NODE_ENV: development
+      JWT_SECRET: local_dev_jwt_secret_32chars_min_ok
+      INTERNAL_API_KEY: mova-internal-dev-key-24
       AUTH_SERVICE_URL: http://auth-service:3000
       RIDE_SERVICE_URL: http://ride-service:3000
       PAYMENT_SERVICE_URL: http://payment-service:3000
@@ -191,6 +193,7 @@ services:
       NOTIFICATION_SERVICE_URL: http://notification-service:3000
       ADMIN_SERVICE_URL: http://admin-service:3000
       PORT: 3000
+      CORS_ORIGIN: http://localhost:3001,http://localhost:3002,http://localhost:3007,http://localhost:3008
     depends_on:
       - auth-service
       - ride-service

@@ -14,12 +14,6 @@ type Props = {
 const srOnlyFileInput =
   "absolute h-px w-px overflow-hidden whitespace-nowrap border-0 p-0 opacity-0";
 
-/**
- * Bouton de sélection d'image offrant un choix explicite : « Prendre une photo »
- * (appareil photo) ou « Choisir dans la galerie ». Deux <input> distincts
- * garantissent le bon comportement sur tous les navigateurs / PWA installées,
- * où un simple `capture` force la caméra sans laisser le choix de la galerie.
- */
 export function ImageSourcePicker({
   onSelect,
   disabled,
@@ -44,7 +38,6 @@ export function ImageSourcePicker({
   }, [open]);
 
   function pick(ref: RefObject<HTMLInputElement | null>) {
-    // Click while still in the user-gesture stack, then close the menu.
     const input = ref.current;
     if (!input) return;
     input.click();
@@ -65,7 +58,7 @@ export function ImageSourcePicker({
         onClick={() => setOpen((v) => !v)}
         className={
           className ??
-          "px-3 py-2 rounded-lg bg-indigo-600 text-white text-sm disabled:opacity-60"
+          "px-3 py-2 rounded-lg bg-[#6C63FF] text-white text-sm disabled:opacity-60"
         }
       >
         {label}
@@ -77,14 +70,14 @@ export function ImageSourcePicker({
             onClick={() => pick(cameraRef)}
             className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm hover:bg-gray-50"
           >
-            <span className="text-lg">📷</span> Prendre une photo
+            Prendre une photo
           </button>
           <button
             type="button"
             onClick={() => pick(galleryRef)}
             className="flex w-full items-center gap-3 border-t border-gray-100 px-4 py-3 text-left text-sm hover:bg-gray-50"
           >
-            <span className="text-lg">🖼️</span> Choisir dans la galerie
+            Choisir dans la galerie
           </button>
         </div>
       )}

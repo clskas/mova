@@ -383,54 +383,56 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
                   top: 16,
                   bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
                 ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                    const SizedBox(height: 12),
-                    if (sizes != null && sizes.isNotEmpty) ...[
-                      const Text('Taille', style: TextStyle(fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 6),
-                      Wrap(
-                        spacing: 8,
-                        children: sizes.map((s) {
-                          final label = (s['label'] ?? s['name'])?.toString() ?? '';
-                          return ChoiceChip(
-                            label: Text(label),
-                            selected: selectedSize == label,
-                            onSelected: (_) => setStateSheet(() => selectedSize = label),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      const SizedBox(height: 12),
+                      if (sizes != null && sizes.isNotEmpty) ...[
+                        const Text('Taille', style: TextStyle(fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 6),
+                        Wrap(
+                          spacing: 8,
+                          children: sizes.map((s) {
+                            final label = (s['label'] ?? s['name'])?.toString() ?? '';
+                            return ChoiceChip(
+                              label: Text(label),
+                              selected: selectedSize == label,
+                              onSelected: (_) => setStateSheet(() => selectedSize = label),
+                            );
+                          }).toList(),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+                      if (options != null && options.isNotEmpty) ...[
+                        const Text('Options', style: TextStyle(fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 6),
+                        ...options.map((o) {
+                          final label = (o['label'] ?? o['name'])?.toString() ?? '';
+                          return CheckboxListTile(
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                            value: selectedOptions.contains(label),
+                            onChanged: (v) => setStateSheet(() {
+                              if (v == true) {
+                                selectedOptions.add(label);
+                              } else {
+                                selectedOptions.remove(label);
+                              }
+                            }),
+                            title: Text(label),
                           );
-                        }).toList(),
+                        }),
+                        const SizedBox(height: 12),
+                      ],
+                      ElevatedButton(
+                        onPressed: () => Navigator.pop(ctx, true),
+                        child: const Text('Ajouter'),
                       ),
-                      const SizedBox(height: 12),
                     ],
-                    if (options != null && options.isNotEmpty) ...[
-                      const Text('Options', style: TextStyle(fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 6),
-                      ...options.map((o) {
-                        final label = (o['label'] ?? o['name'])?.toString() ?? '';
-                        return CheckboxListTile(
-                          dense: true,
-                          contentPadding: EdgeInsets.zero,
-                          value: selectedOptions.contains(label),
-                          onChanged: (v) => setStateSheet(() {
-                            if (v == true) {
-                              selectedOptions.add(label);
-                            } else {
-                              selectedOptions.remove(label);
-                            }
-                          }),
-                          title: Text(label),
-                        );
-                      }),
-                      const SizedBox(height: 12),
-                    ],
-                    ElevatedButton(
-                      onPressed: () => Navigator.pop(ctx, true),
-                      child: const Text('Ajouter'),
-                    ),
-                  ],
+                  ),
                 ),
               );
             },

@@ -1,7 +1,8 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { uploadVehiclePhoto } from "@/lib/api";
+import { ImageSourcePicker } from "@/components/ImageSourcePicker";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
 
@@ -26,7 +27,6 @@ export function VehiclePhotoUpload({
   label = "Photo du véhicule",
   disabled = false,
 }: Props) {
-  const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const preview = resolveMediaUrl(value);
 
@@ -40,7 +40,6 @@ export function VehiclePhotoUpload({
       onError?.(e instanceof Error ? e.message : "Échec envoi photo");
     } finally {
       setUploading(false);
-      if (inputRef.current) inputRef.current.value = "";
     }
   }
 
@@ -54,15 +53,12 @@ export function VehiclePhotoUpload({
           Aucune photo
         </div>
       )}
-      <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
+      <div className="flex flex-wrap gap-2 items-center">
+        <ImageSourcePicker
           disabled={disabled || uploading}
-          onClick={() => inputRef.current?.click()}
-          className="px-3 py-2 rounded-lg bg-[#6C63FF] text-white text-sm disabled:opacity-60"
-        >
-          {uploading ? "Envoi…" : preview ? "Changer la photo" : "Prendre / choisir une photo"}
-        </button>
+          onSelect={handleFile}
+          label={uploading ? "Envoi…" : preview ? "Changer la photo" : "Prendre / choisir une photo"}
+        />
         {preview && !disabled && (
           <button
             type="button"
@@ -73,15 +69,7 @@ export function VehiclePhotoUpload({
           </button>
         )}
       </div>
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        className="hidden"
-        onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
-      />
-      <p className="text-xs text-gray-500">JPG, PNG ou WebP — max 5 Mo. Utilisez la caméra ou la galerie.</p>
+      <p className="text-xs text-gray-500">JPG, PNG ou WebP — max 5 Mo. Caméra ou galerie.</p>
     </div>
   );
 }

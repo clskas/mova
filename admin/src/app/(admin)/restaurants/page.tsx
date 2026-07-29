@@ -62,6 +62,8 @@ export default function RestaurantsPage() {
     ownerUserId: "",
   });
   const [editTarget, setEditTarget] = useState<Restaurant | null>(null);
+  const [editLat, setEditLat] = useState("");
+  const [editLng, setEditLng] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<Restaurant | null>(null);
   const [saving, setSaving] = useState(false);
   const [partnerUsers, setPartnerUsers] = useState<AdminUser[]>([]);
@@ -143,8 +145,8 @@ export default function RestaurantsPage() {
           name: editTarget.name,
           cuisine: editTarget.cuisine ?? undefined,
           address: editTarget.address ?? undefined,
-          lat: editTarget.lat,
-          lng: editTarget.lng,
+          lat: parseCoord(editLat, editTarget.lat ?? -4.3217),
+          lng: parseCoord(editLng, editTarget.lng ?? 15.3125),
           isActive: editTarget.isActive !== false,
           ownerUserId: editTarget.ownerUserId || null,
         },
@@ -322,7 +324,15 @@ export default function RestaurantsPage() {
                   )}
                   {!readOnly && (
                     <td className="p-3 flex gap-2">
-                      <BtnGhost onClick={() => setEditTarget({ ...r })}>Modifier</BtnGhost>
+                      <BtnGhost
+                        onClick={() => {
+                          setEditTarget({ ...r });
+                          setEditLat(r.lat != null ? String(r.lat) : "");
+                          setEditLng(r.lng != null ? String(r.lng) : "");
+                        }}
+                      >
+                        Modifier
+                      </BtnGhost>
                       <BtnDanger onClick={() => setDeleteTarget(r)}>Supprimer</BtnDanger>
                     </td>
                   )}
@@ -340,18 +350,20 @@ export default function RestaurantsPage() {
             <label><FieldLabel>Cuisine</FieldLabel><TextInput value={editTarget.cuisine ?? ""} onChange={(v) => setEditTarget({ ...editTarget, cuisine: v })} /></label>
             <label><FieldLabel>Adresse</FieldLabel><TextInput value={editTarget.address ?? ""} onChange={(v) => setEditTarget({ ...editTarget, address: v })} /></label>
             <div className="grid gap-3 sm:grid-cols-2">
-              <label><FieldLabel>Latitude</FieldLabel><TextInput value={String(editTarget.lat ?? "")} onChange={(v) => setEditTarget({ ...editTarget, lat: parseCoord(v, editTarget.lat ?? -4.3217) })} /></label>
-              <label><FieldLabel>Longitude</FieldLabel><TextInput value={String(editTarget.lng ?? "")} onChange={(v) => setEditTarget({ ...editTarget, lng: parseCoord(v, editTarget.lng ?? 15.3125) })} /></label>
+              <label>
+                <FieldLabel>Latitude</FieldLabel>
+                <TextInput value={editLat} inputMode="decimal" onChange={setEditLat} placeholder="-4.3217" />
+              </label>
+              <label>
+                <FieldLabel>Longitude</FieldLabel>
+                <TextInput value={editLng} inputMode="decimal" onChange={setEditLng} placeholder="15.3125" />
+              </label>
             </div>
             <GpsCoordButton
-              onCoords={(lat, lng) =>
-                setEditTarget({
-                  ...editTarget,
-                  lat: parseCoord(lat, editTarget.lat ?? -4.3217),
-                  lng: parseCoord(lng, editTarget.lng ?? 15.3125),
-                })
-              }
-              onError={setError}
+              onCoords={(lat, lng) => {
+                setEditLat(lat);
+                setEditLng(lng);
+              }}
             />
             <label className="flex items-center gap-2 text-sm">
               <input

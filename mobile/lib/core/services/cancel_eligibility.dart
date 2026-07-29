@@ -15,7 +15,7 @@ class CancelEligibility {
   static bool _rentalFallback(Map<String, dynamic>? data) {
     if (data == null) return false;
     final status = data['status']?.toString().toUpperCase();
-    if (status == null || {'CLOSED', 'RETURNED', 'IN_PROGRESS'}.contains(status)) return false;
+    if (status == null || {'CLOSED', 'RETURNED', 'IN_PROGRESS', 'PAID'}.contains(status)) return false;
     final startRaw = data['startDate']?.toString();
     if (startRaw == null) return true;
     try {

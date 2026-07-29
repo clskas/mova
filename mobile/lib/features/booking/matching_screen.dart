@@ -334,22 +334,29 @@ class _MatchingScreenState extends ConsumerState<MatchingScreen>
               ),
             ),
           ),
-          MovaButton(
-            label: 'Annuler la recherche',
-            isSecondary: true,
-            isLoading: _cancelling,
-            icon: Icons.close,
-            onPressed: _searching && !_cancelling ? _cancel : null,
+          MovaStickyActions(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                MovaButton(
+                  label: 'Annuler la recherche',
+                  isSecondary: true,
+                  isLoading: _cancelling,
+                  icon: Icons.close,
+                  onPressed: _searching && !_cancelling ? _cancel : null,
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Politique d\'annulation : gratuite avant acceptation du chauffeur.',
+                  textAlign: TextAlign.center,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 12, color: MovaColors.textSecondary),
+                ),
+                SizedBox(height: MediaQuery.paddingOf(context).bottom + 8),
+              ],
+            ),
           ),
-          const SizedBox(height: 8),
-          const Text(
-            'Politique d\'annulation : gratuite avant acceptation du chauffeur.',
-            textAlign: TextAlign.center,
-            maxLines: 3,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(fontSize: 12, color: MovaColors.textSecondary),
-          ),
-          SizedBox(height: MediaQuery.paddingOf(context).bottom + 8),
         ],
       ),
     );

@@ -637,7 +637,8 @@ class _ErrandTrackingScreenState extends ConsumerState<ErrandTrackingScreen> {
                         ),
                       ),
                     ),
-                    Padding(
+                    MovaStickyActions(
+                      child: Padding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -686,6 +687,7 @@ class _ErrandTrackingScreenState extends ConsumerState<ErrandTrackingScreen> {
                           ),
                         ],
                       ),
+                    ),
                     ),
                   ],
                 ),

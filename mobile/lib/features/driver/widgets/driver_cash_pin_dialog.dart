@@ -92,6 +92,7 @@ class _DriverCashPinDialogState extends State<DriverCashPinDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
+      scrollable: true,
       title: Text(widget.title),
       content: Column(
         mainAxisSize: MainAxisSize.min,

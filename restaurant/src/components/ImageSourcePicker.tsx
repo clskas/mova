@@ -10,6 +10,10 @@ type Props = {
   accept?: string;
 };
 
+/** Visually hidden — `display:none` blocks programmatic .click() on some mobile browsers. */
+const srOnlyFileInput =
+  "absolute h-px w-px overflow-hidden whitespace-nowrap border-0 p-0 opacity-0";
+
 /**
  * Bouton de sélection d'image offrant un choix explicite : « Prendre une photo »
  * (appareil photo) ou « Choisir dans la galerie ». Deux <input> distincts
@@ -40,8 +44,11 @@ export function ImageSourcePicker({
   }, [open]);
 
   function pick(ref: RefObject<HTMLInputElement | null>) {
+    // Click while still in the user-gesture stack, then close the menu.
+    const input = ref.current;
+    if (!input) return;
+    input.click();
     setOpen(false);
-    ref.current?.click();
   }
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -86,14 +93,18 @@ export function ImageSourcePicker({
         type="file"
         accept={accept}
         capture="environment"
-        className="hidden"
+        className={srOnlyFileInput}
+        tabIndex={-1}
+        aria-hidden
         onChange={handleChange}
       />
       <input
         ref={galleryRef}
         type="file"
         accept={accept}
-        className="hidden"
+        className={srOnlyFileInput}
+        tabIndex={-1}
+        aria-hidden
         onChange={handleChange}
       />
     </div>

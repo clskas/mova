@@ -177,3 +177,22 @@ class MovaFlexScroll extends StatelessWidget {
     );
   }
 }
+
+/// Pied d'actions sous un [Expanded] : se compacte et défile sur petits écrans
+/// au lieu de provoquer un « BOTTOM OVERFLOWED ».
+class MovaStickyActions extends StatelessWidget {
+  const MovaStickyActions({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Flexible(
+      fit: FlexFit.loose,
+      child: SingleChildScrollView(
+        physics: kMovaScrollPhysics,
+        child: child,
+      ),
+    );
+  }
+}

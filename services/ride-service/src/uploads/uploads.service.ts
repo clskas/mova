@@ -72,16 +72,20 @@ export class UploadsService {
         contentType: mimeType || 'application/octet-stream',
         signedUrlExpiresIn: 7 * 24 * 3600,
       });
-      if (!result.success) {
-        this.logger.error(`Supabase upload failed: ${result.message}`);
+      if (result.success) {
+        const photoUrl = result.signedUrl ?? result.publicUrl ?? `supabase://${bucket}/${objectPath}`;
+        return { photoUrl, cloudinaryMockUrl: photoUrl, storage: 'supabase', bucket, path: objectPath };
+      }
+      if (category === 'kyc') {
+        this.logger.error(`Supabase KYC upload failed: ${result.message}`);
         throw new MovaHttpException(
           MovaErrorCode.INTERNAL_ERROR,
           HttpStatus.BAD_GATEWAY,
           result.message ?? 'Échec stockage document.',
         );
       }
-      const photoUrl = result.signedUrl ?? result.publicUrl ?? `supabase://${bucket}/${objectPath}`;
-      return { photoUrl, cloudinaryMockUrl: photoUrl, storage: 'supabase', bucket, path: objectPath };
+      // Partner/menu photos: keep portals usable if Supabase is misconfigured.
+      this.logger.warn(`Supabase upload failed, falling back to local: ${result.message}`);
     }
 
     const dir = join(process.cwd(), 'uploads', category);

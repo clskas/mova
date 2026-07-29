@@ -353,6 +353,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
       barrierDismissible: !force,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
+          scrollable: true,
           title: const Text('Code PIN d\'activation'),
           content: Column(
             mainAxisSize: MainAxisSize.min,

@@ -299,6 +299,27 @@ class ApiClient {
       final id = path.split('/').last;
       return Success(MockData.payRide(id, body ?? {}));
     }
+    if (RegExp(r'^/payments/rides/[^/]+/status$').hasMatch(path) && method == 'GET') {
+      return const Success({
+        'status': 'COMPLETED',
+        'isPaid': true,
+        'pendingMobileMoney': false,
+      });
+    }
+    if (RegExp(r'^/payments/services/[^/]+/[^/]+/status$').hasMatch(path) && method == 'GET') {
+      return const Success({
+        'status': 'COMPLETED',
+        'isPaid': true,
+        'pendingMobileMoney': false,
+      });
+    }
+    if (path.startsWith('/wallet/top-up/status') && method == 'GET') {
+      return const Success({
+        'status': 'COMPLETED',
+        'isPaid': true,
+        'pendingMobileMoney': false,
+      });
+    }
     if (RegExp(r'^/payments/services/[^/]+/[^/]+/info$').hasMatch(path) && method == 'GET') {
       final parts = path.split('/');
       return Success(MockData.servicePaymentInfo(parts[3], parts[4]));
@@ -1675,6 +1696,37 @@ class ApiClient {
       'amountCdf': amountCdf,
       'phone': MarketConfig.normalizePhone(userPhone),
     });
+  }
+
+  Future<Result<Map<String, dynamic>>> getRidePaymentStatus(String rideId) async {
+    final result = await get('/payments/rides/$rideId/status', skipCache: true);
+    return switch (result) {
+      Success(:final data) => Success(data is Map<String, dynamic> ? data : Map<String, dynamic>.from(data as Map)),
+      Failure(:final error) => Failure(error),
+    };
+  }
+
+  Future<Result<Map<String, dynamic>>> getServicePaymentStatus(
+    String referenceType,
+    String referenceId,
+  ) async {
+    final result = await get(
+      '/payments/services/${referenceType.toUpperCase()}/$referenceId/status',
+      skipCache: true,
+    );
+    return switch (result) {
+      Success(:final data) => Success(data is Map<String, dynamic> ? data : Map<String, dynamic>.from(data as Map)),
+      Failure(:final error) => Failure(error),
+    };
+  }
+
+  Future<Result<Map<String, dynamic>>> getWalletTopUpStatus(String providerRef) async {
+    final encoded = Uri.encodeQueryComponent(providerRef);
+    final result = await get('/wallet/top-up/status?providerRef=$encoded', skipCache: true);
+    return switch (result) {
+      Success(:final data) => Success(data is Map<String, dynamic> ? data : Map<String, dynamic>.from(data as Map)),
+      Failure(:final error) => Failure(error),
+    };
   }
 
   Future<Result<Map<String, dynamic>>> confirmCashRide(String rideId, String pin) async {

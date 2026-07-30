@@ -23,6 +23,12 @@ export class PaymentsController {
     return this.paymentsService.findDriverPendingCashRide(req.user.id);
   }
 
+  @Get('rides/:rideId/status')
+  @ApiOperation({ summary: 'Statut paiement course (passager — polling Mobile Money)' })
+  getRidePaymentStatus(@Request() req: { user: { id: string } }, @Param('rideId') rideId: string) {
+    return this.paymentsService.getPassengerRidePaymentStatus(rideId, req.user.id);
+  }
+
   @Post('rides/:rideId')
   @ApiOperation({ summary: 'Payer une course' })
   payRide(@Request() req: { user: { id: string } }, @Param('rideId') rideId: string, @Body() dto: ProcessPaymentDto) {
@@ -48,6 +54,16 @@ export class PaymentsController {
     @Body('pin') pin: string,
   ) {
     return this.paymentsService.confirmCashService(referenceType, referenceId, req.user.id, pin);
+  }
+
+  @Get('services/:referenceType/:referenceId/status')
+  @ApiOperation({ summary: 'Statut paiement service (passager — polling Mobile Money)' })
+  getServicePaymentStatus(
+    @Request() req: { user: { id: string } },
+    @Param('referenceType') referenceType: string,
+    @Param('referenceId') referenceId: string,
+  ) {
+    return this.paymentsService.getPassengerServicePaymentStatus(referenceType, referenceId, req.user.id);
   }
 
   @Get('services/:referenceType/:referenceId/info')

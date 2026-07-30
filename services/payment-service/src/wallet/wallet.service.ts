@@ -336,7 +336,34 @@ export class WalletService {
       if (!mm.success) {
         throw new MovaHttpException(MovaErrorCode.PAYMENT_FAILED, undefined, mm.message ?? 'Recharge Mobile Money échouée.');
       }
-      const wallet = await this.credit(userId, amountCdf, `Recharge ${provider}`, mm.providerRef ?? ref);
+
+      const providerRef = mm.providerRef ?? ref;
+      const isAsync = providerRef.startsWith('sp_') || providerRef.startsWith('at_');
+      if (isAsync) {
+        const wallet = await this.createWallet(userId);
+        await this.prisma.walletTransaction.create({
+          data: {
+            walletId: wallet.id,
+            amountCdf,
+            type: 'TOPUP_PENDING',
+            description: `Recharge ${provider} en attente`,
+            reference: providerRef,
+          },
+        });
+        return {
+          success: true,
+          simulated: false,
+          pendingMobileMoney: true,
+          message: mm.message ?? `Confirmez la recharge de ${formatCdf(amountCdf)} sur votre téléphone.`,
+          amountCdf,
+          provider,
+          balanceCdf: wallet.balanceCdf,
+          formattedBalance: formatCdf(wallet.balanceCdf),
+          providerRef,
+        };
+      }
+
+      const wallet = await this.credit(userId, amountCdf, `Recharge ${provider}`, providerRef);
       return {
         success: true,
         simulated: false,
@@ -345,7 +372,7 @@ export class WalletService {
         provider,
         balanceCdf: wallet.balanceCdf,
         formattedBalance: formatCdf(wallet.balanceCdf),
-        providerRef: mm.providerRef,
+        providerRef,
       };
     }
 
@@ -502,5 +529,93 @@ export class WalletService {
     }
     const wallet = await this.debit(userId, amountCdf, description, `admin_adjust_${Date.now()}`);
     return { wallet, message: `Débit manuel de ${formatCdf(amountCdf)} appliqué.` };
+  }
+
+  async completePendingTopUp(
+    providerRef: string,
+    outcome: 'COMPLETED' | 'FAILED',
+    message?: string,
+  ): Promise<{ found: boolean; status?: string; balanceCdf?: number; alreadyFinal?: boolean }> {
+    const pending = await this.prisma.walletTransaction.findFirst({
+      where: { reference: providerRef, type: 'TOPUP_PENDING' },
+      orderBy: { createdAt: 'desc' },
+      include: { wallet: true },
+    });
+    if (!pending) {
+      const done = await this.prisma.walletTransaction.findFirst({
+        where: {
+          reference: providerRef,
+          type: { in: ['TOPUP_COMPLETED', 'TOPUP_FAILED', 'CREDIT'] },
+        },
+        orderBy: { createdAt: 'desc' },
+        include: { wallet: true },
+      });
+      if (done) {
+        return {
+          found: true,
+          alreadyFinal: true,
+          status: done.type === 'TOPUP_FAILED' ? 'FAILED' : 'COMPLETED',
+          balanceCdf: done.wallet.balanceCdf,
+        };
+      }
+      return { found: false };
+    }
+
+    if (outcome === 'FAILED') {
+      await this.prisma.walletTransaction.update({
+        where: { id: pending.id },
+        data: {
+          type: 'TOPUP_FAILED',
+          description: message ?? pending.description ?? 'Recharge Mobile Money échouée',
+        },
+      });
+      return { found: true, status: 'FAILED', balanceCdf: pending.wallet.balanceCdf };
+    }
+
+    const description =
+      pending.description?.replace(/\s+en attente$/i, '') ?? 'Recharge Mobile Money';
+    const [, wallet] = await this.prisma.$transaction([
+      this.prisma.walletTransaction.update({
+        where: { id: pending.id },
+        data: { type: 'TOPUP_COMPLETED', description },
+      }),
+      this.prisma.wallet.update({
+        where: { id: pending.walletId },
+        data: { balanceCdf: { increment: pending.amountCdf } },
+      }),
+    ]);
+    return { found: true, status: 'COMPLETED', balanceCdf: wallet.balanceCdf };
+  }
+
+  async getTopUpStatus(userId: string, providerRef: string) {
+    if (!providerRef.trim()) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'providerRef requis');
+    }
+    const wallet = await this.createWallet(userId);
+    const tx = await this.prisma.walletTransaction.findFirst({
+      where: { walletId: wallet.id, reference: providerRef },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (!tx) {
+      return {
+        providerRef,
+        status: null,
+        pendingMobileMoney: false,
+        isPaid: false,
+        balanceCdf: wallet.balanceCdf,
+      };
+    }
+    const pending = tx.type === 'TOPUP_PENDING';
+    const failed = tx.type === 'TOPUP_FAILED';
+    const completed = tx.type === 'TOPUP_COMPLETED' || tx.type === 'CREDIT';
+    return {
+      providerRef,
+      status: pending ? 'PENDING' : failed ? 'FAILED' : completed ? 'COMPLETED' : tx.type,
+      pendingMobileMoney: pending,
+      isPaid: completed,
+      amountCdf: tx.amountCdf,
+      balanceCdf: wallet.balanceCdf,
+      formattedBalance: formatCdf(wallet.balanceCdf),
+    };
   }
 }

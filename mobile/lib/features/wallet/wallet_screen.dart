@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/config/market_config.dart';
@@ -33,11 +35,18 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
   String? _error;
   DateTime? _lastSync;
   bool _fromCache = false;
+  Timer? _topUpPollTimer;
 
   @override
   void initState() {
     super.initState();
     _loadWallet();
+  }
+
+  @override
+  void dispose() {
+    _topUpPollTimer?.cancel();
+    super.dispose();
   }
 
   void _applyWalletData({
@@ -253,10 +262,10 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
       'phone': MarketConfig.normalizePhone(phone),
     });
     if (!mounted) return;
-    setState(() => _topUpLoading = false);
     switch (result) {
       case Success(:final data):
         if (data['offline'] == true) {
+          setState(() => _topUpLoading = false);
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
@@ -269,6 +278,29 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
           }
           return;
         }
+        if (data['pendingMobileMoney'] == true) {
+          final providerRef = data['providerRef']?.toString();
+          if (providerRef == null || providerRef.isEmpty) {
+            setState(() {
+              _topUpLoading = false;
+              _error = 'Recharge initiée mais référence manquante. Réessayez.';
+            });
+            return;
+          }
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  data['message']?.toString() ??
+                      'Confirmez la recharge sur votre téléphone Mobile Money.',
+                ),
+              ),
+            );
+          }
+          await _waitTopUpConfirmation(providerRef, amountCdf);
+          return;
+        }
+        setState(() => _topUpLoading = false);
         final newBalance = data['balanceCdf'] as int?;
         if (newBalance != null) {
           setState(() => _balance = newBalance);
@@ -278,7 +310,8 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                data['message']?.toString() ?? 'Recharge de ${MarketConfig.formatCdf(amountCdf)} en cours',
+                data['message']?.toString() ??
+                    'Recharge de ${MarketConfig.formatCdf(amountCdf)} effectuée',
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -286,8 +319,74 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
           );
         }
       case Failure(:final error):
-        setState(() => _error = error.message);
+        setState(() {
+          _topUpLoading = false;
+          _error = error.message;
+        });
     }
+  }
+
+  Future<void> _waitTopUpConfirmation(String providerRef, int amountCdf) async {
+    _topUpPollTimer?.cancel();
+    var attempts = 0;
+    final api = ref.read(apiClientProvider);
+
+    Future<bool> pollOnce() async {
+      attempts++;
+      if (attempts > 60) {
+        if (mounted) {
+          setState(() {
+            _topUpLoading = false;
+            _error =
+                'Toujours en attente de confirmation Mobile Money. Vérifiez votre téléphone, puis réessayez.';
+          });
+        }
+        return true;
+      }
+      final status = await api.getWalletTopUpStatus(providerRef);
+      if (!mounted) return true;
+      switch (status) {
+        case Success(:final data):
+          if (data['isPaid'] == true || data['status']?.toString() == 'COMPLETED') {
+            final newBalance = data['balanceCdf'] as int?;
+            setState(() {
+              _topUpLoading = false;
+              if (newBalance != null) _balance = newBalance;
+            });
+            await _loadWallet();
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    'Recharge de ${MarketConfig.formatCdf(amountCdf)} confirmée',
+                  ),
+                ),
+              );
+            }
+            return true;
+          }
+          if (data['status']?.toString() == 'FAILED') {
+            setState(() {
+              _topUpLoading = false;
+              _error = 'Recharge Mobile Money refusée ou annulée.';
+            });
+            return true;
+          }
+        case Failure():
+          break;
+      }
+      return false;
+    }
+
+    if (await pollOnce()) return;
+    final completer = Completer<void>();
+    _topUpPollTimer = Timer.periodic(const Duration(seconds: 3), (timer) async {
+      if (await pollOnce()) {
+        timer.cancel();
+        if (!completer.isCompleted) completer.complete();
+      }
+    });
+    await completer.future;
   }
 
   @override

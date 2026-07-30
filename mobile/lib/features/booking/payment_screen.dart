@@ -61,6 +61,9 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   String? _cashPin;
   late int _amountCdf;
   bool _cashPinDialogShown = false;
+  bool _awaitingMobileMoney = false;
+  Timer? _mmPollTimer;
+  int _mmPollAttempts = 0;
 
   bool get _shouldPromptCashPin =>
       widget.promptCashPinOnSelect ?? widget.serviceType != null;
@@ -82,6 +85,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
 
   @override
   void dispose() {
+    _mmPollTimer?.cancel();
     _phoneController.dispose();
     super.dispose();
   }
@@ -192,7 +196,107 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     return 'SENGA-${id.replaceAll('-', '').substring(0, 8).toUpperCase()}';
   }
 
+  Future<void> _goToReceipt({bool pendingCash = false}) async {
+    if (!mounted) return;
+    if (widget.rideId != null) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ReceiptScreen(
+            rideId: widget.rideId,
+            showRatingAfter: true,
+            pendingCash: pendingCash,
+            completionPin: pendingCash ? (_cashPin ?? widget.completionPin) : null,
+            amountCdf: pendingCash ? _amountCdf : null,
+          ),
+        ),
+      );
+      return;
+    }
+    final isErrand = widget.serviceType?.toUpperCase() == 'ERRAND';
+    if (!pendingCash && !isErrand) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Paiement effectué avec succès')),
+      );
+    }
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ReceiptScreen(
+          serviceType: widget.serviceType,
+          serviceId: widget.serviceId,
+          pendingCash: pendingCash,
+          completionPin: pendingCash ? (_cashPin ?? widget.completionPin) : null,
+          amountCdf: pendingCash ? _amountCdf : null,
+          showRatingAfter: isErrand,
+        ),
+      ),
+    );
+  }
+
+  void _stopMmPoll() {
+    _mmPollTimer?.cancel();
+    _mmPollTimer = null;
+  }
+
+  Future<void> _startMobileMoneyWait() async {
+    _stopMmPoll();
+    _mmPollAttempts = 0;
+    setState(() {
+      _awaitingMobileMoney = true;
+      _loading = false;
+      _error = null;
+    });
+    await _pollMobileMoneyOnce();
+    if (!mounted || !_awaitingMobileMoney) return;
+    _mmPollTimer = Timer.periodic(const Duration(seconds: 3), (_) => _pollMobileMoneyOnce());
+  }
+
+  Future<void> _pollMobileMoneyOnce() async {
+    if (!mounted || !_awaitingMobileMoney) return;
+    _mmPollAttempts++;
+    if (_mmPollAttempts > 60) {
+      _stopMmPoll();
+      setState(() {
+        _awaitingMobileMoney = false;
+        _error =
+            'Toujours en attente de confirmation Mobile Money. Vérifiez votre téléphone, puis réessayez.';
+      });
+      return;
+    }
+    final api = ref.read(apiClientProvider);
+    final Result<Map<String, dynamic>> result;
+    if (widget.rideId != null) {
+      result = await api.getRidePaymentStatus(widget.rideId!);
+    } else {
+      result = await api.getServicePaymentStatus(widget.serviceType!, widget.serviceId!);
+    }
+    if (!mounted || !_awaitingMobileMoney) return;
+    switch (result) {
+      case Success(:final data):
+        if (data['isPaid'] == true || data['status']?.toString() == 'COMPLETED') {
+          _stopMmPoll();
+          setState(() => _awaitingMobileMoney = false);
+          await _goToReceipt();
+          return;
+        }
+        final status = data['status']?.toString();
+        if (status == 'FAILED') {
+          _stopMmPoll();
+          setState(() {
+            _awaitingMobileMoney = false;
+            _error = data['failureReason']?.toString() ??
+                'Paiement Mobile Money refusé ou annulé. Réessayez.';
+          });
+        }
+      case Failure():
+        // Keep waiting — transient network errors during USSD.
+        break;
+    }
+  }
+
   Future<void> _pay({bool skipCashPrompt = false}) async {
+    if (_awaitingMobileMoney) return;
     if (!skipCashPrompt && _method == 'CASH' && _shouldPromptCashPin) {
       await _maybePromptCashPin();
       return;
@@ -248,67 +352,22 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
               content: Text('Paiement espèces en attente — communiquez le code PIN au livreur.'),
             ),
           );
-          if (widget.rideId != null) {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (_) => ReceiptScreen(
-                  rideId: widget.rideId,
-                  showRatingAfter: true,
-                  pendingCash: true,
-                  completionPin: _cashPin ?? widget.completionPin,
-                  amountCdf: _amountCdf,
-                ),
-              ),
-            );
-          } else if (widget.serviceType != null && widget.serviceId != null) {
-            final isErrand = widget.serviceType!.toUpperCase() == 'ERRAND';
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (_) => ReceiptScreen(
-                  serviceType: widget.serviceType,
-                  serviceId: widget.serviceId,
-                  pendingCash: true,
-                  completionPin: _cashPin ?? widget.completionPin,
-                  amountCdf: _amountCdf,
-                  showRatingAfter: isErrand,
-                ),
-              ),
-            );
-          } else {
-            Navigator.of(context).popUntil((r) => r.isFirst);
-          }
+          await _goToReceipt(pendingCash: true);
           return;
         }
-        if (widget.rideId != null) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (_) => ReceiptScreen(
-                rideId: widget.rideId,
-                showRatingAfter: true,
+        if (data['pendingMobileMoney'] == true) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                data['message']?.toString() ??
+                    'Confirmez le paiement sur votre téléphone Mobile Money.',
               ),
             ),
           );
-        } else {
-          final isErrand = widget.serviceType?.toUpperCase() == 'ERRAND';
-          if (!isErrand) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Paiement effectué avec succès')),
-            );
-          }
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (_) => ReceiptScreen(
-                serviceType: widget.serviceType,
-                serviceId: widget.serviceId,
-                showRatingAfter: isErrand,
-              ),
-            ),
-          );
+          await _startMobileMoneyWait();
+          return;
         }
+        await _goToReceipt();
       case Failure(:final error):
         setState(() {
           _error = error.message;
@@ -464,16 +523,53 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
               ),
             ],
           ],
+          if (_awaitingMobileMoney) ...[
+            const SizedBox(height: 16),
+            MovaCard(
+              child: Column(
+                children: [
+                  const SizedBox(
+                    width: 28,
+                    height: 28,
+                    child: CircularProgressIndicator(strokeWidth: 2.5),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Confirmez sur votre téléphone',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Une demande Mobile Money a été envoyée. Validez le paiement (USSD / PIN), '
+                    'nous confirmerons automatiquement.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: MovaColors.textSecondary, fontSize: 13),
+                  ),
+                  const SizedBox(height: 12),
+                  TextButton(
+                    onPressed: () {
+                      _stopMmPoll();
+                      setState(() => _awaitingMobileMoney = false);
+                    },
+                    child: const Text('Annuler l\'attente'),
+                  ),
+                ],
+              ),
+            ),
+          ],
           if (_error != null) ...[
             const SizedBox(height: 12),
             MovaErrorBanner(message: _error!, onRetry: _pay),
           ],
           const SizedBox(height: 24),
           MovaButton(
-            label: 'Payer ${MarketConfig.formatCdf(_amountCdf)}',
+            label: _awaitingMobileMoney
+                ? 'En attente de confirmation…'
+                : 'Payer ${MarketConfig.formatCdf(_amountCdf)}',
             isLoading: _loading,
             icon: Icons.lock_outline,
-            onPressed: _loading || !_paymentReady ? null : _pay,
+            onPressed: _loading || !_paymentReady || _awaitingMobileMoney ? null : _pay,
           ),
         ],
       ),

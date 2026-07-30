@@ -50,6 +50,12 @@ export class WalletController {
     return this.walletService.getTransactions(req.user.id, limit ? parseInt(limit, 10) : 20, offset ? parseInt(offset, 10) : 0);
   }
 
+  @Get('top-up/status')
+  @ApiOperation({ summary: 'Statut recharge Mobile Money (polling)' })
+  topUpStatus(@Request() req: { user: { id: string } }, @Query('providerRef') providerRef?: string) {
+    return this.walletService.getTopUpStatus(req.user.id, providerRef?.trim() ?? '');
+  }
+
   @Post('top-up')
   @ApiOperation({ summary: 'Recharger portefeuille (Mobile Money ou simulation dev)' })
   topUp(@Request() req: { user: { id: string } }, @Body() dto: TopUpDto) {

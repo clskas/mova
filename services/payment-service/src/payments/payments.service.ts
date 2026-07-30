@@ -241,15 +241,68 @@ export class PaymentsService {
     }
   }
 
+  private isAsyncMobileMoney(provider: PaymentProvider, result: { providerRef?: string }): boolean {
+    if (provider.name === 'MOCK') return false;
+    const ref = result.providerRef ?? '';
+    return ref.startsWith('sp_') || ref.startsWith('at_');
+  }
+
   async processPayment(rideId: string, userId: string, amountCdf: number, method: PaymentMethod, phone: string) {
     const provider = this.getProvider(method);
     const result = await provider.initiatePayment(amountCdf, phone, rideId);
+    if (!result.success) {
+      const payment = await this.prisma.payment.upsert({
+        where: { rideId },
+        create: {
+          rideId,
+          userId,
+          amountCdf,
+          method,
+          status: PaymentStatus.FAILED,
+          providerRef: result.providerRef,
+          failureReason: result.message,
+        },
+        update: {
+          status: PaymentStatus.FAILED,
+          providerRef: result.providerRef,
+          failureReason: result.message,
+        },
+      });
+      throw new MovaHttpException(MovaErrorCode.PAYMENT_FAILED, undefined, result.message);
+    }
+
+    const asyncMm = this.isAsyncMobileMoney(provider, result);
+    const status = asyncMm ? PaymentStatus.PENDING : PaymentStatus.COMPLETED;
     const payment = await this.prisma.payment.upsert({
       where: { rideId },
-      create: { rideId, userId, amountCdf, method, status: result.success ? PaymentStatus.COMPLETED : PaymentStatus.FAILED, providerRef: result.providerRef, failureReason: result.success ? null : result.message },
-      update: { status: result.success ? PaymentStatus.COMPLETED : PaymentStatus.FAILED, providerRef: result.providerRef, failureReason: result.success ? null : result.message },
+      create: {
+        rideId,
+        userId,
+        amountCdf,
+        method,
+        status,
+        providerRef: result.providerRef,
+        failureReason: null,
+      },
+      update: {
+        status,
+        method,
+        amountCdf,
+        providerRef: result.providerRef,
+        failureReason: null,
+      },
     });
-    if (!result.success) throw new MovaHttpException(MovaErrorCode.PAYMENT_FAILED);
+
+    if (asyncMm) {
+      return {
+        success: true,
+        pendingMobileMoney: true,
+        payment,
+        providerRef: result.providerRef,
+        message: result.message ?? 'Confirmez le paiement sur votre téléphone Mobile Money.',
+      };
+    }
+
     await this.publishPaymentCompleted({ rideId, userId, amountCdf, method } as PaymentCompletedPayload);
     await this.creditDriverAfterRidePayment(rideId);
     return { success: true, payment, message: result.message ?? 'Paiement effectué' };
@@ -266,6 +319,19 @@ export class PaymentsService {
     const existingPayment = await this.prisma.payment.findUnique({ where: { rideId } });
     if (existingPayment?.status === PaymentStatus.COMPLETED) {
       return { success: true, payment: existingPayment, alreadyPaid: true, message: 'Course déjà payée' };
+    }
+    if (
+      existingPayment?.status === PaymentStatus.PENDING &&
+      MOBILE_MONEY_METHODS.has(existingPayment.method) &&
+      MOBILE_MONEY_METHODS.has(method)
+    ) {
+      return {
+        success: true,
+        pendingMobileMoney: true,
+        payment: existingPayment,
+        providerRef: existingPayment.providerRef,
+        message: 'Paiement Mobile Money déjà en cours — confirmez sur votre téléphone.',
+      };
     }
     const amountCdf = amountOverride ?? ride.finalFareCdf ?? ride.estimatedFareCdf ?? ride.priceCdf ?? 0;
     if (amountCdf <= 0) throw new MovaHttpException(MovaErrorCode.PAYMENT_FAILED);
@@ -387,6 +453,35 @@ export class PaymentsService {
     const paymentPhone = this.resolvePaymentPhone(method, phone);
     const refKey = `${type}:${referenceId}`;
 
+    const existingServicePayment = await this.prisma.servicePayment.findUnique({
+      where: { referenceType_referenceId: { referenceType: type, referenceId } },
+    });
+    if (existingServicePayment?.status === PaymentStatus.COMPLETED) {
+      return {
+        success: true,
+        payment: existingServicePayment,
+        alreadyPaid: true,
+        message: 'Service déjà payé',
+        amountCdf,
+        currency: 'CDF',
+      };
+    }
+    if (
+      existingServicePayment?.status === PaymentStatus.PENDING &&
+      MOBILE_MONEY_METHODS.has(existingServicePayment.method) &&
+      MOBILE_MONEY_METHODS.has(method)
+    ) {
+      return {
+        success: true,
+        pendingMobileMoney: true,
+        payment: existingServicePayment,
+        providerRef: existingServicePayment.providerRef,
+        message: 'Paiement Mobile Money déjà en cours — confirmez sur votre téléphone.',
+        amountCdf,
+        currency: 'CDF',
+      };
+    }
+
     if (method === PaymentMethod.WALLET) {
       await this.walletService.debit(userId, amountCdf, `Paiement ${type} ${referenceId}`, refKey);
       const payment = await this.prisma.servicePayment.upsert({
@@ -416,6 +511,30 @@ export class PaymentsService {
 
     const provider = this.getProvider(method);
     const result = await provider.initiatePayment(amountCdf, paymentPhone, refKey);
+    if (!result.success) {
+      await this.prisma.servicePayment.upsert({
+        where: { referenceType_referenceId: { referenceType: type, referenceId } },
+        create: {
+          referenceType: type,
+          referenceId,
+          userId,
+          amountCdf,
+          method,
+          status: PaymentStatus.FAILED,
+          providerRef: result.providerRef,
+          failureReason: result.message,
+        },
+        update: {
+          status: PaymentStatus.FAILED,
+          providerRef: result.providerRef,
+          failureReason: result.message,
+        },
+      });
+      throw new MovaHttpException(MovaErrorCode.PAYMENT_FAILED, undefined, result.message);
+    }
+
+    const asyncMm = this.isAsyncMobileMoney(provider, result);
+    const status = asyncMm ? PaymentStatus.PENDING : PaymentStatus.COMPLETED;
     const payment = await this.prisma.servicePayment.upsert({
       where: { referenceType_referenceId: { referenceType: type, referenceId } },
       create: {
@@ -424,17 +543,31 @@ export class PaymentsService {
         userId,
         amountCdf,
         method,
-        status: result.success ? PaymentStatus.COMPLETED : PaymentStatus.FAILED,
+        status,
         providerRef: result.providerRef,
-        failureReason: result.success ? null : result.message,
+        failureReason: null,
       },
       update: {
-        status: result.success ? PaymentStatus.COMPLETED : PaymentStatus.FAILED,
+        status,
+        method,
+        amountCdf,
         providerRef: result.providerRef,
-        failureReason: result.success ? null : result.message,
+        failureReason: null,
       },
     });
-    if (!result.success) throw new MovaHttpException(MovaErrorCode.PAYMENT_FAILED);
+
+    if (asyncMm) {
+      return {
+        success: true,
+        pendingMobileMoney: true,
+        payment,
+        providerRef: result.providerRef,
+        message: result.message ?? 'Confirmez le paiement sur votre téléphone Mobile Money.',
+        amountCdf,
+        currency: 'CDF',
+      };
+    }
+
     await this.publishPaymentCompleted({
       referenceType: type,
       referenceId,
@@ -780,5 +913,151 @@ export class PaymentsService {
 
   getCashDebtCashRequestStatus(driverUserId: string, requestId: string) {
     return this.debtLedger.getCashPaymentRequestStatus(driverUserId, requestId);
+  }
+
+  /**
+   * Webhook / poll completion for async Mobile Money (SerdiPay / Africa's Talking).
+   * Idempotent: already COMPLETED/FAILED returns without side effects.
+   */
+  async completeMobileMoneyFromWebhook(
+    providerRef: string,
+    outcome: 'COMPLETED' | 'FAILED',
+    message?: string,
+  ) {
+    const ref = providerRef?.trim();
+    if (!ref) {
+      return { success: false, message: 'providerRef manquant' };
+    }
+
+    const ridePayment = await this.prisma.payment.findFirst({
+      where: { providerRef: ref },
+      orderBy: { updatedAt: 'desc' },
+    });
+    if (ridePayment && MOBILE_MONEY_METHODS.has(ridePayment.method)) {
+      if (ridePayment.status === PaymentStatus.COMPLETED || ridePayment.status === PaymentStatus.FAILED) {
+        return {
+          success: true,
+          kind: 'RIDE',
+          alreadyFinal: true,
+          status: ridePayment.status,
+          rideId: ridePayment.rideId,
+        };
+      }
+      if (ridePayment.status !== PaymentStatus.PENDING) {
+        return { success: false, message: `Statut course inattendu: ${ridePayment.status}` };
+      }
+      const payment = await this.prisma.payment.update({
+        where: { id: ridePayment.id },
+        data: {
+          status: outcome === 'COMPLETED' ? PaymentStatus.COMPLETED : PaymentStatus.FAILED,
+          failureReason: outcome === 'FAILED' ? message ?? 'Paiement Mobile Money refusé' : null,
+        },
+      });
+      if (outcome === 'COMPLETED') {
+        await this.publishPaymentCompleted({
+          rideId: payment.rideId,
+          userId: payment.userId,
+          amountCdf: payment.amountCdf,
+          method: payment.method,
+        } as PaymentCompletedPayload);
+        await this.creditDriverAfterRidePayment(payment.rideId);
+      }
+      return { success: true, kind: 'RIDE', status: payment.status, rideId: payment.rideId };
+    }
+
+    const servicePayment = await this.prisma.servicePayment.findFirst({
+      where: { providerRef: ref },
+      orderBy: { updatedAt: 'desc' },
+    });
+    if (servicePayment && MOBILE_MONEY_METHODS.has(servicePayment.method)) {
+      if (servicePayment.status === PaymentStatus.COMPLETED || servicePayment.status === PaymentStatus.FAILED) {
+        return {
+          success: true,
+          kind: 'SERVICE',
+          alreadyFinal: true,
+          status: servicePayment.status,
+          referenceType: servicePayment.referenceType,
+          referenceId: servicePayment.referenceId,
+        };
+      }
+      if (servicePayment.status !== PaymentStatus.PENDING) {
+        return { success: false, message: `Statut service inattendu: ${servicePayment.status}` };
+      }
+      const payment = await this.prisma.servicePayment.update({
+        where: { id: servicePayment.id },
+        data: {
+          status: outcome === 'COMPLETED' ? PaymentStatus.COMPLETED : PaymentStatus.FAILED,
+          failureReason: outcome === 'FAILED' ? message ?? 'Paiement Mobile Money refusé' : null,
+        },
+      });
+      if (outcome === 'COMPLETED') {
+        await this.publishPaymentCompleted({
+          referenceType: payment.referenceType,
+          referenceId: payment.referenceId,
+          userId: payment.userId,
+          amountCdf: payment.amountCdf,
+          method: payment.method.toString(),
+        });
+        await this.creditDriverAfterServicePayment(payment.referenceType, payment.referenceId);
+      }
+      return {
+        success: true,
+        kind: 'SERVICE',
+        status: payment.status,
+        referenceType: payment.referenceType,
+        referenceId: payment.referenceId,
+      };
+    }
+
+    const topUp = await this.walletService.completePendingTopUp(ref, outcome, message);
+    if (topUp.found) {
+      return { success: true, kind: 'TOPUP', ...topUp };
+    }
+
+    this.logger.warn(`Webhook Mobile Money: aucune intention pour providerRef=${ref}`);
+    return { success: false, message: 'Référence Mobile Money inconnue' };
+  }
+
+  async getPassengerRidePaymentStatus(rideId: string, userId: string) {
+    const ride = await this.fetchRide(rideId);
+    if (ride.passengerId !== userId) {
+      throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
+    }
+    const payment = await this.prisma.payment.findUnique({ where: { rideId } });
+    return {
+      rideId,
+      status: payment?.status ?? null,
+      method: payment?.method ?? null,
+      providerRef: payment?.providerRef ?? null,
+      isPaid: payment?.status === PaymentStatus.COMPLETED,
+      pendingMobileMoney:
+        payment?.status === PaymentStatus.PENDING && MOBILE_MONEY_METHODS.has(payment.method),
+      failureReason: payment?.failureReason ?? null,
+      amountCdf: payment?.amountCdf ?? null,
+    };
+  }
+
+  async getPassengerServicePaymentStatus(referenceType: string, referenceId: string, userId: string) {
+    const type = referenceType.toUpperCase();
+    const payment = await this.prisma.servicePayment.findUnique({
+      where: { referenceType_referenceId: { referenceType: type, referenceId } },
+    });
+    if (payment && payment.userId !== userId) {
+      throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
+    }
+    return {
+      referenceType: type,
+      referenceId,
+      status: payment?.status ?? null,
+      method: payment?.method ?? null,
+      providerRef: payment?.providerRef ?? null,
+      isPaid: payment?.status === PaymentStatus.COMPLETED,
+      pendingMobileMoney:
+        !!payment &&
+        payment.status === PaymentStatus.PENDING &&
+        MOBILE_MONEY_METHODS.has(payment.method),
+      failureReason: payment?.failureReason ?? null,
+      amountCdf: payment?.amountCdf ?? null,
+    };
   }
 }

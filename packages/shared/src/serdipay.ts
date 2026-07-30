@@ -218,11 +218,12 @@ export async function serdiPayInitiateMobileMoney(
         message: data.message ?? data.error ?? data.description ?? `Échec paiement SerdiPay (${res.status})`,
       };
     }
-    const txId = data.transactionId ?? data.id ?? `sp_${params.reference}`;
+    const txId = data.transactionId ?? data.id ?? params.reference;
+    const providerRef = txId.startsWith('sp_') ? txId : `sp_${txId}`;
     return {
       success: true,
       transactionId: txId,
-      providerRef: `sp_${txId}`,
+      providerRef,
       message: data.message ?? data.description ?? 'Demande de paiement SerdiPay envoyée',
     };
   } catch {
@@ -286,11 +287,12 @@ export async function serdiPayDisburseMobileMoney(
         message: data.message ?? data.error ?? data.description ?? `Échec retrait SerdiPay (${res.status})`,
       };
     }
-    const txId = data.transactionId ?? data.id ?? `sp_payout_${params.reference}`;
+    const txId = data.transactionId ?? data.id ?? `payout_${params.reference}`;
+    const providerRef = txId.startsWith('sp_') ? txId : `sp_payout_${txId}`;
     return {
       success: true,
       transactionId: txId,
-      providerRef: `sp_payout_${txId}`,
+      providerRef,
       message: data.message ?? data.description ?? 'Retrait SerdiPay initié',
     };
   } catch {

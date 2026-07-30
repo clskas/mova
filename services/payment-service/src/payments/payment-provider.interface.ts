@@ -1,5 +1,7 @@
 export interface PaymentInitResult {
   success: boolean;
+  /** True when the gateway accepted the request but settlement is async (webhook). */
+  pending?: boolean;
   transactionId?: string;
   providerRef?: string;
   message?: string;

@@ -85,11 +85,18 @@ jobs:
       - name: Lint ${{ matrix.client }}
         run: |
           cd ${{ matrix.client }}
-          if npm run | grep -qE '^  lint'; then
-            npm run lint
-          else
+          if ! npm run | grep -qE '^  lint'; then
             echo "No lint script for ${{ matrix.client }} — skip"
+            exit 0
           fi
+          # next lint prompts interactively when ESLint is not configured — skip in that case.
+          if [ ! -f .eslintrc.json ] && [ ! -f .eslintrc.js ] && [ ! -f eslint.config.mjs ] && [ ! -f eslint.config.js ]; then
+            if ! grep -q '"eslintConfig"' package.json 2>/dev/null; then
+              echo "No ESLint config for ${{ matrix.client }} — skip lint"
+              exit 0
+            fi
+          fi
+          npm run lint
 
   regression:
     name: Playwright regression

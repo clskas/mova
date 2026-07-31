@@ -45,10 +45,11 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('BookingScreen estimates fare after destination entered', (tester) async {
-    // Requires geo/estimate mock wiring that currently does not surface "Confirmer la course"
-    // reliably in CI; keep the smoke render test above as the booking gate.
-  }, skip: 'Estimate → confirm flow is flaky without full geo mock in CI');
+  testWidgets(
+    'BookingScreen estimates fare after destination entered',
+    (tester) async {},
+    skip: true, // Estimate → confirm flow needs full geo mock in CI
+  );
 
   testWidgets('HomeScreen navigates to BookingScreen from Taxi card', (tester) async {
     tester.view.physicalSize = const Size(400, 900);
@@ -67,9 +68,11 @@ void main() {
     expect(find.text('Estimer le prix'), findsOneWidget);
   });
 
-  testWidgets('BookingScreen navigates to MatchingScreen after confirm', (tester) async {
-  }, skip: 'Depends on estimate → confirm flow; skipped until geo mock is stabilized');
-  testWidgets('BookingScreen renders without overflow on narrow widths', (tester) async {
+  testWidgets(
+    'BookingScreen navigates to MatchingScreen after confirm',
+    (tester) async {},
+    skip: true, // Depends on estimate → confirm flow
+  );  testWidgets('BookingScreen renders without overflow on narrow widths', (tester) async {
     for (final width in [320.0, 360.0, 390.0]) {
       tester.view.physicalSize = Size(width, 900);
       tester.view.devicePixelRatio = 1.0;

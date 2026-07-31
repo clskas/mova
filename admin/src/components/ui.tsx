@@ -70,8 +70,8 @@ export function EmptyState({ message }: { message: string }) {
   return <p className="text-center text-gray-400 py-12">{message}</p>;
 }
 
-export function LoadingState({ message = "Chargement…" }: { message?: string }) {
-  return <p className="text-center text-gray-400 py-12">{message}</p>;
+export function LoadingState({ message, label }: { message?: string; label?: string }) {
+  return <p className="text-center text-gray-400 py-12">{message ?? label ?? "Chargement…"}</p>;
 }
 
 export function ErrorBanner({ message, onRetry }: { message: string; onRetry?: () => void }) {
@@ -207,6 +207,9 @@ export function TextInput({
   inputMode,
   maxLength,
   autoComplete,
+  step,
+  min,
+  max,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -217,6 +220,9 @@ export function TextInput({
   inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"];
   maxLength?: number;
   autoComplete?: string;
+  step?: string | number;
+  min?: string | number;
+  max?: string | number;
 }) {
   return (
     <input
@@ -229,6 +235,9 @@ export function TextInput({
       inputMode={inputMode}
       maxLength={maxLength}
       autoComplete={autoComplete}
+      step={step}
+      min={min}
+      max={max}
     />
   );
 }

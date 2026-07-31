@@ -11,7 +11,8 @@ type AssignDriverSelectProps = {
   disabled?: boolean;
 };
 
-export function driverDisplayName(d: AdminDriver): string | null {
+export function driverDisplayName(d?: Pick<AdminDriver, "firstName" | "lastName"> | null): string | null {
+  if (!d) return null;
   const name = [d.firstName, d.lastName].filter(Boolean).join(" ").trim();
   return name || null;
 }

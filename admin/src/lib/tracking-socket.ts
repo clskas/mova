@@ -20,12 +20,13 @@ export function createTrackingSocket(): Socket {
 
 export function subscribeMission(
   socket: Socket,
-  type: "ride" | "delivery",
+  type: "ride" | "delivery" | "errand" | "moving",
   id: string,
 ): void {
   if (type === "ride") {
     socket.emit("ride:subscribe", { rideId: id });
-  } else {
-    socket.emit("delivery:subscribe", { deliveryId: id });
+    return;
   }
+  // delivery / errand / moving share the courier tracking channel
+  socket.emit("delivery:subscribe", { deliveryId: id });
 }

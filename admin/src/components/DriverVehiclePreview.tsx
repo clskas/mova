@@ -36,7 +36,7 @@ export function DriverVehiclePreview({ driver, title = "Véhicule du chauffeur",
 
   const photo = resolveMediaUrl(vehicle.imageUrl);
   const typeLabel = VEHICLE_TYPE_LABELS[vehicle.type] ?? vehicle.type;
-  const driverName = driverDisplayName(driver ?? {});
+  const driverName = driverDisplayName(driver);
   const details = [typeLabel, vehicle.plateNumber, vehicle.make, vehicle.model].filter(Boolean).join(" · ");
 
   if (compact) {

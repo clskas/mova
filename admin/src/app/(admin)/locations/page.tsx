@@ -57,7 +57,7 @@ function canAssignLogistics(r: RentalInquiry): boolean {
 }
 
 function canCancelRental(r: RentalInquiry): boolean {
-  return !["IN_PROGRESS", "RETURNED", "PAID", "CLOSED"].includes(r.status);
+  return !["IN_PROGRESS", "RETURNED", "PAID", "CLOSED"].includes(r.status ?? "");
 }
 
 function statusOptionsFor(inquiry: RentalInquiry, forceOverride: boolean) {

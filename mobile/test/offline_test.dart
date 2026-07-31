@@ -44,9 +44,11 @@ void main() {
       expect(data['message'], contains('hors ligne'));
       expect((data['ride'] as Map)['id'], 'offline-pending-1');
     });
-    test('shouldQueue accepts profile PATCH', () {
+    test('shouldQueue accepts profile PATCH and ride/delivery status PATCH', () {
       expect(SyncQueue.shouldQueue('PATCH', '/users/me'), isTrue);
-      expect(SyncQueue.shouldQueue('PATCH', '/rides/abc/status'), isFalse);
+      expect(SyncQueue.shouldQueue('PATCH', '/rides/abc/status'), isTrue);
+      expect(SyncQueue.shouldQueue('PATCH', '/deliveries/xyz/status'), isTrue);
+      expect(SyncQueue.shouldQueue('PATCH', '/rides/abc'), isFalse);
     });
 
     test('optimisticResponse for profile patch', () {

@@ -30,24 +30,29 @@ void main() {
       expect(ServiceAreaLocation.isInBounds(limete), isTrue);
     });
 
-    test('destinationInServiceArea accepts provincial cities', () {
+    test('destinationInServiceArea requires in-bounds coords (text alone is not enough)', () {
       expect(
         ServiceAreaLocation.destinationInServiceArea('Butembo'),
-        isTrue,
+        isFalse,
       );
       expect(
-        ServiceAreaLocation.destinationInServiceArea('Gombe, Kinshasa'),
+        ServiceAreaLocation.destinationInServiceArea(
+          'Gombe, Kinshasa',
+          coords: const LatLng(-4.305, 15.312),
+        ),
         isTrue,
       );
     });
 
-    test('destinationInServiceArea accepts addresses with at least 3 characters', () {
+    test('destinationInServiceArea rejects out-of-bounds coords even with long address', () {
       expect(
-        ServiceAreaLocation.destinationInServiceArea('Paris, France'),
-        isTrue,
+        ServiceAreaLocation.destinationInServiceArea(
+          'Paris, France',
+          coords: const LatLng(48.8566, 2.3522),
+        ),
+        isFalse,
       );
     });
-
     test('destinationInServiceArea rejects very short addresses without coords', () {
       expect(
         ServiceAreaLocation.destinationInServiceArea('AB'),

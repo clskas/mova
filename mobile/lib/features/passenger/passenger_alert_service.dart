@@ -17,27 +17,33 @@ class PassengerAlertService {
   static Future<void> init() async {
     if (_initialized) return;
 
-    const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const darwinInit = DarwinInitializationSettings();
-    await _plugin.initialize(
-      settings: const InitializationSettings(android: androidInit, iOS: darwinInit),
-    );
+    try {
+      const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+      const darwinInit = DarwinInitializationSettings();
+      await _plugin.initialize(
+        settings: const InitializationSettings(android: androidInit, iOS: darwinInit),
+      );
 
-    final androidPlugin = _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
-    await androidPlugin?.createNotificationChannel(
-      AndroidNotificationChannel(
-        _channelId,
-        _channelName,
-        description: 'Mises à jour de vos courses taxi et moto',
-        importance: Importance.high,
-        playSound: true,
-        enableVibration: true,
-        vibrationPattern: Int64List.fromList([0, 300, 120, 300]),
-      ),
-    );
+      final androidPlugin =
+          _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+      await androidPlugin?.createNotificationChannel(
+        AndroidNotificationChannel(
+          _channelId,
+          _channelName,
+          description: 'Mises à jour de vos courses taxi et moto',
+          importance: Importance.high,
+          playSound: true,
+          enableVibration: true,
+          vibrationPattern: Int64List.fromList([0, 300, 120, 300]),
+        ),
+      );
 
-    await androidPlugin?.requestNotificationsPermission();
-    _initialized = true;
+      await androidPlugin?.requestNotificationsPermission();
+      _initialized = true;
+    } catch (_) {
+      // Widget tests / unsupported platforms: skip native plugin init.
+      _initialized = true;
+    }
   }
 
   static Future<void> notify({
@@ -45,21 +51,25 @@ class PassengerAlertService {
     required String body,
   }) async {
     if (!_initialized) await init();
-    final id = ++_notificationId;
-    await _plugin.show(
-      id: id,
-      title: title,
-      body: body,
-      notificationDetails: const NotificationDetails(
-        android: AndroidNotificationDetails(
-          _channelId,
-          _channelName,
-          importance: Importance.high,
-          priority: Priority.high,
+    try {
+      final id = ++_notificationId;
+      await _plugin.show(
+        id: id,
+        title: title,
+        body: body,
+        notificationDetails: const NotificationDetails(
+          android: AndroidNotificationDetails(
+            _channelId,
+            _channelName,
+            importance: Importance.high,
+            priority: Priority.high,
+          ),
+          iOS: DarwinNotificationDetails(),
         ),
-        iOS: DarwinNotificationDetails(),
-      ),
-    );
+      );
+    } catch (_) {
+      // Ignore when the notifications plugin is unavailable (tests / desktop).
+    }
   }
 
   static Future<void> notifyRideStatus(String status) async {

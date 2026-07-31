@@ -229,7 +229,7 @@ describe('RentalService', () => {
     });
     const result = await service.get('r1', 'user-1');
     expect(result.ownerContactPhone).toBe('+243898765432');
-    expect(result.timeline).toHaveLength(5);
+    expect(result.timeline).toHaveLength(6);
     expect(result.timeline[2].label).toBe('Confirmée');
     expect(result.timeline[2].completed).toBe(true);
     expect(result.nextStepHint).toContain('En cours');

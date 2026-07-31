@@ -1,10 +1,9 @@
 import { NominatimService } from './nominatim.service';
+import * as httpFetch from '../common/http-fetch.util';
 
 describe('NominatimService', () => {
-  const originalFetch = global.fetch;
-
   afterEach(() => {
-    global.fetch = originalFetch;
+    jest.restoreAllMocks();
     delete process.env.NOMINATIM_ENABLED;
     delete process.env.NOMINATIM_BASE_URL;
     delete process.env.NOMINATIM_MIN_INTERVAL_MS;
@@ -20,19 +19,16 @@ describe('NominatimService', () => {
   it('maps search hits to places', async () => {
     process.env.NOMINATIM_ENABLED = 'true';
     process.env.NOMINATIM_MIN_INTERVAL_MS = '0';
-    global.fetch = jest.fn().mockResolvedValue({
-      ok: true,
-      json: async () => [
-        {
-          display_name: 'Avenue du Commerce, Gombe, Kinshasa, RDC',
-          lat: '-4.3210',
-          lon: '15.3120',
-          osm_type: 'way',
-          osm_id: 123,
-          address: { road: 'Avenue du Commerce', suburb: 'Gombe', city: 'Kinshasa' },
-        },
-      ],
-    }) as never;
+    jest.spyOn(httpFetch, 'httpGetJson').mockResolvedValue([
+      {
+        display_name: 'Avenue du Commerce, Gombe, Kinshasa, RDC',
+        lat: '-4.3210',
+        lon: '15.3120',
+        osm_type: 'way',
+        osm_id: 123,
+        address: { road: 'Avenue du Commerce', suburb: 'Gombe', city: 'Kinshasa' },
+      },
+    ]);
 
     const service = new NominatimService();
     const results = await service.search('Avenue du Commerce', { city: 'Kinshasa' });
@@ -44,7 +40,7 @@ describe('NominatimService', () => {
       commune: 'Gombe',
       city: 'Kinshasa',
     });
-    expect(global.fetch).toHaveBeenCalledWith(
+    expect(httpFetch.httpGetJson).toHaveBeenCalledWith(
       expect.stringContaining('/search?'),
       expect.objectContaining({
         headers: expect.objectContaining({ 'User-Agent': expect.any(String) }),
@@ -55,15 +51,12 @@ describe('NominatimService', () => {
   it('reverse geocodes coordinates', async () => {
     process.env.NOMINATIM_ENABLED = 'true';
     process.env.NOMINATIM_MIN_INTERVAL_MS = '0';
-    global.fetch = jest.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        display_name: 'Marché Gambela, Lingwala, Kinshasa',
-        lat: '-4.3250',
-        lon: '15.3050',
-        address: { suburb: 'Lingwala', city: 'Kinshasa' },
-      }),
-    }) as never;
+    jest.spyOn(httpFetch, 'httpGetJson').mockResolvedValue({
+      display_name: 'Marché Gambela, Lingwala, Kinshasa',
+      lat: '-4.3250',
+      lon: '15.3050',
+      address: { suburb: 'Lingwala', city: 'Kinshasa' },
+    });
 
     const service = new NominatimService();
     const place = await service.reverse(-4.325, 15.305);

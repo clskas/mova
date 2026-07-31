@@ -168,6 +168,16 @@ async function wireEnvVars(services) {
   if (!gateway?.id) return;
 
   const jwtSecret = await ensureSharedJwtSecret(gateway.id);
+  const { randomBytes } = await import('node:crypto');
+
+  // Keep INTERNAL_API_KEY in sync across services (read gateway or create).
+  const gwEnv = await api('GET', `/services/${gateway.id}/env-vars`);
+  let internalKey =
+    (gwEnv || []).find((e) => (e.envVar?.key || e.key) === 'INTERNAL_API_KEY')?.envVar?.value ||
+    (gwEnv || []).find((e) => (e.envVar?.key || e.key) === 'INTERNAL_API_KEY')?.value;
+  if (!internalKey || String(internalKey).trim().length < 24) {
+    internalKey = randomBytes(32).toString('base64url');
+  }
 
   const updates = {
     'mova-gateway': {
@@ -180,37 +190,44 @@ async function wireEnvVars(services) {
       HEALTH_CHECK_TIMEOUT_MS: '45000',
       HEALTH_CHECK_RETRIES: '2',
       JWT_SECRET: jwtSecret,
+      INTERNAL_API_KEY: internalKey,
     },
     'mova-auth': {
       DATABASE_URL: process.env.DATABASE_URL_AUTH,
       REDIS_URL: process.env.REDIS_URL || REDIS_INTERNAL_URL,
       JWT_SECRET: jwtSecret,
+      INTERNAL_API_KEY: internalKey,
     },
     'mova-ride': {
       DATABASE_URL: process.env.DATABASE_URL_RIDES,
       REDIS_URL: process.env.REDIS_URL || REDIS_INTERNAL_URL,
       JWT_SECRET: jwtSecret,
+      INTERNAL_API_KEY: internalKey,
       DRIVER_SERVICE_URL: `https://${url('mova-driver')}`,
     },
     'mova-payment': {
       DATABASE_URL: process.env.DATABASE_URL_PAYMENTS,
       REDIS_URL: process.env.REDIS_URL || REDIS_INTERNAL_URL,
       JWT_SECRET: jwtSecret,
+      INTERNAL_API_KEY: internalKey,
       RIDE_SERVICE_URL: `https://${url('mova-ride')}`,
     },
     'mova-driver': {
       DATABASE_URL: process.env.DATABASE_URL_DRIVERS,
       REDIS_URL: process.env.REDIS_URL || REDIS_INTERNAL_URL,
       JWT_SECRET: jwtSecret,
+      INTERNAL_API_KEY: internalKey,
       RIDE_SERVICE_URL: `https://${url('mova-ride')}`,
     },
     'mova-notification': {
       DATABASE_URL: process.env.DATABASE_URL_NOTIFICATIONS,
       REDIS_URL: process.env.REDIS_URL || REDIS_INTERNAL_URL,
       JWT_SECRET: jwtSecret,
+      INTERNAL_API_KEY: internalKey,
     },
     'mova-admin': {
       JWT_SECRET: jwtSecret,
+      INTERNAL_API_KEY: internalKey,
       AUTH_SERVICE_URL: `https://${url('mova-auth')}`,
       RIDE_SERVICE_URL: `https://${url('mova-ride')}`,
       DRIVER_SERVICE_URL: `https://${url('mova-driver')}`,

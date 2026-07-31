@@ -34,9 +34,10 @@ if [ -z "$IDS" ]; then
   exit 0
 fi
 
-payload='{"clearCache":"do_not_clear"}'
+payload_latest='{"clearCache":"clear"}'
+payload="$payload_latest"
 if [ -n "$COMMIT_SHA" ]; then
-  payload=$(jq -n --arg sha "$COMMIT_SHA" '{clearCache: "do_not_clear", commitId: $sha}')
+  payload=$(jq -n --arg sha "$COMMIT_SHA" '{clearCache: "clear", commitId: $sha}')
 fi
 
 failed=0
@@ -48,6 +49,17 @@ for id in $IDS; do
     -H "Authorization: Bearer ${RENDER_API_KEY}" \
     -H "Content-Type: application/json" \
     -d "$payload") || true
+
+  # If Render's linked Git repo doesn't contain this SHA (wrong fork/remote),
+  # fall back to deploying the connected branch tip.
+  if [ "$http_code" = "404" ] && [ -n "$COMMIT_SHA" ]; then
+    echo "  Commit not on linked repo — retrying without commitId (branch tip)"
+    http_code=$(curl -sS -w "%{http_code}" -o "$response" -X POST \
+      "https://api.render.com/v1/services/${id}/deploys" \
+      -H "Authorization: Bearer ${RENDER_API_KEY}" \
+      -H "Content-Type: application/json" \
+      -d "$payload_latest") || true
+  fi
 
   if [ "$http_code" = "201" ] || [ "$http_code" = "202" ]; then
     echo "  OK ($http_code)"

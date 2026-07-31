@@ -185,9 +185,9 @@ export function BtnDanger({ children, onClick, disabled }: { children: React.Rea
   );
 }
 
-export function BtnGhost({ children, onClick }: { children: React.ReactNode; onClick?: () => void }) {
+export function BtnGhost({ children, onClick, disabled }: { children: React.ReactNode; onClick?: () => void; disabled?: boolean }) {
   return (
-    <button type="button" onClick={onClick} className="px-3 py-1.5 rounded-lg text-sm text-[#6C63FF] hover:bg-violet-50">
+    <button type="button" onClick={onClick} disabled={disabled} className="px-3 py-1.5 rounded-lg text-sm text-[#6C63FF] hover:bg-violet-50 disabled:opacity-60">
       {children}
     </button>
   );

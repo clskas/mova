@@ -15,4 +15,6 @@ COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
 EXPOSE 3000
 ENV PORT=3000
+# Render / Docker proxy: bind all interfaces (default localhost → HTTP 502).
+ENV HOSTNAME=0.0.0.0
 CMD ["node", "server.js"]

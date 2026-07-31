@@ -1627,7 +1627,10 @@ export async function adjustWallet(
   userId: string,
   data: { amountCdf: number; type: "CREDIT" | "DEBIT"; description: string },
 ) {
-  return apiFetch(`/api/admin/wallet/${userId}/adjust`, { method: "POST", body: JSON.stringify(data) });
+  return apiFetch<{ message?: string; wallet?: { balanceCdf?: number } }>(
+    `/api/admin/wallet/${userId}/adjust`,
+    { method: "POST", body: JSON.stringify(data) },
+  );
 }
 
 export async function withdrawWallet(

@@ -35,8 +35,23 @@ for i in $(seq 1 90); do
   sleep 5
 done
 
+echo "=== Wait for Postgres (host port 48080) ==="
+for i in $(seq 1 30); do
+  if docker compose exec -T postgres pg_isready -U mova -d mova_auth >/dev/null 2>&1; then
+    echo "Postgres ready (attempt $i)"
+    break
+  fi
+  if [ "$i" -eq 30 ]; then
+    echo "Postgres timeout" >&2
+    docker compose logs postgres --tail 40 || true
+    exit 1
+  fi
+  sleep 2
+done
+
 echo "=== Seed staff roles (+243900000001-005) ==="
-export DATABASE_URL="postgresql://mova:mova@localhost:54320/mova_auth"
+# Host publish port must match docker-compose.yml (48080:5432).
+export DATABASE_URL="${DATABASE_URL_AUTH:-postgresql://mova:mova@localhost:48080/mova_auth}"
 cd "$ROOT/services/auth-service"
 npm ci --no-workspaces --silent
 npx ts-node prisma/seed-staff-roles.ts

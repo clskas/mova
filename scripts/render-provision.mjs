@@ -131,6 +131,35 @@ async function ensureService(existing, spec) {
   return svc;
 }
 
+/** Upsert one env var — never replaces the full list (PUT /env-vars wipes omitted keys). */
+async function upsertEnvVar(serviceId, key, value) {
+  if (value === undefined || value === null || value === '') return;
+  await api('PUT', `/services/${serviceId}/env-vars/${encodeURIComponent(key)}`, {
+    value: String(value),
+  });
+}
+
+async function ensureSharedJwtSecret(gatewayId) {
+  const jwt = await api('GET', `/services/${gatewayId}/env-vars`);
+  const rows = jwt || [];
+  const existing = rows.find((e) => (e.envVar?.key || e.key) === 'JWT_SECRET');
+  const value = existing?.envVar?.value ?? existing?.value;
+  if (value && String(value).trim().length >= 32) return String(value).trim();
+
+  // Generate on gateway (Render stores it); re-read if API returns the value.
+  await api('PUT', `/services/${gatewayId}/env-vars/JWT_SECRET`, { generateValue: true });
+  const again = await api('GET', `/services/${gatewayId}/env-vars`);
+  const row = (again || []).find((e) => (e.envVar?.key || e.key) === 'JWT_SECRET');
+  const generated = row?.envVar?.value ?? row?.value;
+  if (generated && String(generated).trim().length >= 32) return String(generated).trim();
+
+  // Fallback if Render redacts generateValue secrets on GET
+  const { randomBytes } = await import('node:crypto');
+  const local = randomBytes(48).toString('base64url');
+  await upsertEnvVar(gatewayId, 'JWT_SECRET', local);
+  return local;
+}
+
 async function wireEnvVars(services) {
   const byName = Object.fromEntries(services.map((s) => [s.name, s]));
   const url = (name) => byName[name]?.serviceDetails?.url?.replace(/^https:\/\//, '') || '';
@@ -138,9 +167,7 @@ async function wireEnvVars(services) {
   const gateway = byName['mova-gateway'];
   if (!gateway?.id) return;
 
-  const jwt = await api('GET', `/services/${gateway.id}/env-vars`);
-  const jwtSecret = (jwt || []).find((e) => e.envVar?.key === 'JWT_SECRET')?.envVar?.value
-    || (jwt || []).find((e) => e.key === 'JWT_SECRET')?.value;
+  const jwtSecret = await ensureSharedJwtSecret(gateway.id);
 
   const updates = {
     'mova-gateway': {
@@ -152,6 +179,7 @@ async function wireEnvVars(services) {
       ADMIN_SERVICE_URL: `https://${url('mova-admin')}`,
       HEALTH_CHECK_TIMEOUT_MS: '45000',
       HEALTH_CHECK_RETRIES: '2',
+      JWT_SECRET: jwtSecret,
     },
     'mova-auth': {
       DATABASE_URL: process.env.DATABASE_URL_AUTH,
@@ -197,9 +225,10 @@ async function wireEnvVars(services) {
     if (!svc?.id) continue;
     const pairs = Object.entries(vars).filter(([, v]) => v);
     if (!pairs.length) continue;
-    const envVars = pairs.map(([k, v]) => ({ key: k, value: String(v) }));
     console.log(`  env ${name}: ${pairs.map(([k]) => k).join(', ')}`);
-    await api('PUT', `/services/${svc.id}/env-vars`, envVars);
+    for (const [k, v] of pairs) {
+      await upsertEnvVar(svc.id, k, v);
+    }
   }
 }
 

@@ -2,6 +2,7 @@ name: Render Provision
 
 # One-shot or re-run to sync SENGA services on Render (API, idempotent).
 # Normal deploys go through CI → build-push → deploy.yml (automatic on main).
+# Manual only: auto push previously wiped secrets via bulk PUT env-vars.
 
 on:
   workflow_dispatch:
@@ -10,18 +11,12 @@ on:
         description: Re-apply env vars (DATABASE_URL_*, REDIS_URL from secrets)
         type: boolean
         default: true
-  push:
-    branches: [main]
-    paths:
-      - scripts/render-provision.mjs
-      - config/render-services.json
 
 permissions:
   contents: read
 
 jobs:
   provision:
-    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: production
     steps:

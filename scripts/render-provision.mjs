@@ -14,7 +14,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
 const API = 'https://api.render.com/v1';
 const OWNER_ID = process.env.RENDER_OWNER_ID || 'tea-d8gnpfm7r5hc73bceacg';
-const REPO = process.env.RENDER_REPO || 'https://github.com/clskas/mova';
+const REPO = process.env.RENDER_REPO || 'https://github.com/afri-soft-com/mova';
 const BRANCH = process.env.RENDER_BRANCH || 'main';
 const REGION = process.env.RENDER_REGION || 'frankfurt';
 /** Internal Render Key Value URL (same region as MOVA services). Prefer over external rediss:// URLs. */

@@ -18,6 +18,7 @@ import {
   sanitizeAdminError,
   settleCashDebt,
   confirmCashDebtByCode,
+  updateDebtPolicy,
   withdrawWallet,
   type AdminMetrics,
   type AdminUser,

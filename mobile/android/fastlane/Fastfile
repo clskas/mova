@@ -46,9 +46,31 @@ platform :android do
     upload_aab_internal(package_name: DRIVER_PACKAGE, aab: aab)
   end
 
-  desc "Publie passager + chauffeur sur internal testing"
+  desc "Publie chauffeur puis passager sur internal testing (échecs isolés)"
   lane :deploy_internal do
-    deploy_internal_passenger
-    deploy_internal_driver
+    # Driver first: priority for Internal testing unblock.
+    # Rescue each app so one Play permission failure does not skip the other.
+    results = {}
+    {
+      driver: -> { deploy_internal_driver },
+      passenger: -> { deploy_internal_passenger }
+    }.each do |app, action|
+      begin
+        action.call
+        results[app] = :ok
+        UI.success("Play upload OK: #{app}")
+      rescue => e
+        results[app] = e.message
+        UI.error("Play upload FAILED: #{app} — #{e.message}")
+      end
+    end
+
+    failed = results.select { |_app, status| status != :ok }
+    if failed.empty?
+      UI.success("Play internal: driver + passenger OK")
+    else
+      summary = results.map { |app, status| "#{app}=#{status == :ok ? 'OK' : 'FAIL'}" }.join(", ")
+      UI.user_error!("Play internal partial/complete failure: #{summary}")
+    end
   end
 end

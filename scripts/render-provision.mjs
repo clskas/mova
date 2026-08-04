@@ -206,6 +206,9 @@ async function wireEnvVars(services) {
       REDIS_URL: process.env.REDIS_URL || REDIS_INTERNAL_URL,
       JWT_SECRET: jwtSecret,
       INTERNAL_API_KEY: internalKey,
+      PAYMENT_SERVICE_URL: `https://${url('mova-payment')}`,
+      DRIVER_SERVICE_URL: `https://${url('mova-driver')}`,
+      NOTIFICATION_SERVICE_URL: `https://${url('mova-notification')}`,
     },
     'mova-ride': {
       DATABASE_URL: process.env.DATABASE_URL_RIDES,

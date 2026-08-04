@@ -135,9 +135,31 @@ export class AuthService {
 
   private async provisionUser(userId: string, role: UserRole) {
     const headers = { 'Content-Type': 'application/json', 'x-internal-api-key': INTERNAL_API_KEY };
-    await fetch(serviceUrl('payment', '/internal/wallets'), { method: 'POST', headers, body: JSON.stringify({ userId }) });
+    try {
+      const walletRes = await fetch(serviceUrl('payment', '/internal/wallets'), {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ userId }),
+      });
+      if (!walletRes.ok) {
+        this.logger.warn(`Wallet provision HTTP ${walletRes.status} for ${userId}`);
+      }
+    } catch (e) {
+      this.logger.warn(`Wallet provision failed for ${userId}: ${(e as Error).message}`);
+    }
     if (role === UserRole.DRIVER) {
-      await fetch(serviceUrl('driver', '/internal/profiles'), { method: 'POST', headers, body: JSON.stringify({ userId }) });
+      try {
+        const driverRes = await fetch(serviceUrl('driver', '/internal/profiles'), {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ userId }),
+        });
+        if (!driverRes.ok) {
+          this.logger.warn(`Driver profile provision HTTP ${driverRes.status} for ${userId}`);
+        }
+      } catch (e) {
+        this.logger.warn(`Driver profile provision failed for ${userId}: ${(e as Error).message}`);
+      }
     }
   }
 
@@ -162,25 +184,29 @@ export class AuthService {
       });
       isNew = true;
       await this.provisionUser(user.id, user.role);
-      const payload: UserCreatedPayload = { userId: user.id, phone: user.phone, role: user.role };
-      await this.redis.publish(MOVA_EVENTS.USER_CREATED, payload);
+      try {
+        const payload: UserCreatedPayload = { userId: user.id, phone: user.phone, role: user.role };
+        await this.redis.publish(MOVA_EVENTS.USER_CREATED, payload);
+      } catch (e) {
+        this.logger.warn(`USER_CREATED publish failed: ${(e as Error).message}`);
+      }
     }
     if (role === UserRole.DRIVER && user.role !== UserRole.DRIVER) {
       user = await this.prisma.user.update({
         where: { id: user.id },
         data: { role: UserRole.DRIVER, status: UserStatus.PENDING_KYC },
       });
-      await fetch(serviceUrl('driver', '/internal/profiles'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-internal-api-key': INTERNAL_API_KEY },
-        body: JSON.stringify({ userId: user.id }),
-      });
+      await this.provisionUser(user.id, UserRole.DRIVER);
     }
     this.assertRoleAccess(user, role);
     if (user.status === UserStatus.SUSPENDED) {
       throw new MovaHttpException(MovaErrorCode.AUTH_FORBIDDEN, HttpStatus.FORBIDDEN, 'Compte suspendu. Contactez le support SENGA.');
     }
-    await this.clearPinFailures(normalized);
+    try {
+      await this.clearPinFailures(normalized);
+    } catch (e) {
+      this.logger.warn(`clearPinFailures failed: ${(e as Error).message}`);
+    }
     return this.buildAuthResponse(user, { isNew });
   }
 

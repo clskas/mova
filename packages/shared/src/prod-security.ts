@@ -66,9 +66,15 @@ export function resolveCorsOrigin(): boolean | string | string[] {
   return true;
 }
 
-/** True only when both NODE_ENV≠production and MOCK_OTP=true (safe for mockCode responses). */
+/**
+ * True when MOCK_OTP=true and either:
+ * - non-production runtime, or
+ * - explicit ALLOW_MOCK_OTP=true (Play Internal / staging only — never leave on for public prod).
+ */
 export function isMockOtpAllowed(): boolean {
-  return !isProductionRuntime() && process.env.MOCK_OTP === 'true';
+  if (process.env.MOCK_OTP !== 'true') return false;
+  if (!isProductionRuntime()) return true;
+  return process.env.ALLOW_MOCK_OTP === 'true';
 }
 
 function envGet(key: string): string | undefined {
@@ -91,12 +97,12 @@ export function assertProductionSecurity(serviceName = 'service'): void {
   resolveJwtSecret();
   resolveInternalApiKey();
 
-  if (process.env.MOCK_OTP === 'true') {
+  if (process.env.MOCK_OTP === 'true' && process.env.ALLOW_MOCK_OTP !== 'true') {
     throw new Error(
-      `[${serviceName}] MOCK_OTP=true is forbidden in production. Set MOCK_OTP=false and configure a real SMS provider.`,
+      `[${serviceName}] MOCK_OTP=true is forbidden in production. Set MOCK_OTP=false and configure a real SMS provider, or set ALLOW_MOCK_OTP=true for staging/Play Internal only.`,
     );
   }
-  if (process.env.MOCK_SMS === 'true') {
+  if (process.env.MOCK_SMS === 'true' && process.env.ALLOW_MOCK_OTP !== 'true') {
     throw new Error(
       `[${serviceName}] MOCK_SMS=true is forbidden in production. Configure SerdiPay (ou Africa's Talking / Twilio).`,
     );
@@ -107,9 +113,15 @@ export function assertProductionSecurity(serviceName = 'service'): void {
       `[${serviceName}] MOCK_PAYMENTS=true in production — mobile-money providers will not charge real users.`,
     );
   }
+  if (isMockOtpAllowed()) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[${serviceName}] ALLOW_MOCK_OTP: OTP mock actif (code fixe 123456). À retirer dès que SerdiPay est configuré.`,
+    );
+  }
 
   // Only auth-service sends OTP; other services warn if SMS env is missing.
-  if (!isProductionSmsConfigured()) {
+  if (!isProductionSmsConfigured() && !isMockOtpAllowed()) {
     const msg = `[${serviceName}] No SMS provider configured (SERDIPAY_* , AFRICAS_TALKING_* or TWILIO_*). OTP delivery will fail.`;
     if (serviceName === 'auth-service') {
       throw new Error(`${msg} Refusing to start.`);

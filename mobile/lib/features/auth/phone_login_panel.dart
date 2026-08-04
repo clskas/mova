@@ -121,11 +121,11 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
           setState(() => _step = PhoneLoginStep.otp);
           await _requestOtp(silent: true);
         }
-      case Failure(:final error):
-        setState(() {
-          _loading = false;
-          _error = error.message;
-        });
+      case Failure():
+        // Backend sans route PIN (déploiement auth en retard) → SMS OTP.
+        _normalizedPhone = phone;
+        setState(() => _step = PhoneLoginStep.otp);
+        await _requestOtp(silent: true);
     }
   }
 

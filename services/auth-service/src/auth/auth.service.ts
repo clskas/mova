@@ -14,7 +14,8 @@ import {
   INTERNAL_API_KEY,
   formatMovaPublicId,
   maskPhoneRdc,
-  isMockOtpAllowed,
+  isTestOtpAllowedForPhone,
+  TEST_OTP_CODE,
 } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '@mova/shared';
@@ -41,11 +42,11 @@ export class AuthService {
     if (!validatePhoneRdc(normalized)) {
       throw new MovaHttpException(MovaErrorCode.AUTH_INVALID_PHONE, HttpStatus.BAD_REQUEST);
     }
-    const isMock = isMockOtpAllowed();
-    const code = isMock ? '123456' : crypto.randomInt(100000, 999999).toString();
+    const useTestOtp = isTestOtpAllowedForPhone(normalized);
+    const code = useTestOtp ? TEST_OTP_CODE : crypto.randomInt(100000, 999999).toString();
     await this.prisma.otpCode.create({ data: { phone: normalized, code, expiresAt: new Date(Date.now() + 10 * 60 * 1000) } });
 
-    if (!isMock) {
+    if (!useTestOtp) {
       const smsResult = await this.sms.sendOtp(normalized, code);
       if (!smsResult.success) {
         throw new MovaHttpException(
@@ -54,15 +55,17 @@ export class AuthService {
           smsResult.message ?? 'Impossible d\'envoyer le code OTP par SMS.',
         );
       }
-      // Never echo OTP codes in API responses outside explicit non-prod mock mode.
+      // Never echo OTP codes in API responses outside explicit test/mock mode.
       return { success: true, message: smsResult.message ?? 'Code OTP envoyé', phone: normalized };
     }
 
+    this.logger.warn(`TEST OTP ${TEST_OTP_CODE} for whitelisted phone ${maskPhoneRdc(normalized)}`);
     return {
       success: true,
-      message: 'Code OTP envoyé',
+      message: 'Code OTP envoyé (mode test)',
       phone: normalized,
-      mockCode: code,
+      // mockCode only in non-production MOCK_OTP — never leak in prod responses.
+      ...(process.env.NODE_ENV !== 'production' ? { mockCode: code } : {}),
     };
   }
 

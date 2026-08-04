@@ -66,15 +66,66 @@ export function resolveCorsOrigin(): boolean | string | string[] {
   return true;
 }
 
+/** Fixed OTP used in local MOCK_OTP and production ALLOW_TEST_OTP (seed phones only). */
+export const TEST_OTP_CODE = '123456';
+
 /**
- * True when MOCK_OTP=true and either:
- * - non-production runtime, or
- * - explicit ALLOW_MOCK_OTP=true (Play Internal / staging only — never leave on for public prod).
+ * Seed / demo phones allowed for ALLOW_TEST_OTP (Play Internal without SerdiPay).
+ * Override with comma-separated TEST_OTP_PHONES if needed.
  */
+export const DEFAULT_TEST_OTP_PHONES: readonly string[] = [
+  '+243900000001',
+  '+243900000002',
+  '+243900000003',
+  '+243900000004',
+  '+243900000005',
+  '+243900000010',
+  '+243900000011',
+  '+243900000012',
+  '+243900000013',
+  '+243900000014',
+  '+243900000015',
+  '+243900000016',
+  '+243900000017',
+  '+243900000018',
+  '+243900000019',
+  '+243900000020',
+  '+243900000021',
+  '+243900000022',
+  '+243900000023',
+  '+243900000024',
+  '+243900000025',
+  '+243900000026',
+  '+243900000027',
+  '+243900000028',
+  '+243900000029',
+  '+243900000030',
+  '+243900000031',
+];
+
+/** True when MOCK_OTP=true outside production (local/dev only). */
 export function isMockOtpAllowed(): boolean {
-  if (process.env.MOCK_OTP !== 'true') return false;
-  if (!isProductionRuntime()) return true;
-  return process.env.ALLOW_MOCK_OTP === 'true';
+  return !isProductionRuntime() && process.env.MOCK_OTP === 'true';
+}
+
+/** Production Play/staging: ALLOW_TEST_OTP=true enables fixed OTP for whitelisted seed phones only. */
+export function isTestOtpModeEnabled(): boolean {
+  return process.env.ALLOW_TEST_OTP === 'true';
+}
+
+export function getTestOtpPhones(): Set<string> {
+  const raw = process.env.TEST_OTP_PHONES?.trim();
+  const list = raw
+    ? raw.split(',').map((s) => s.trim()).filter(Boolean)
+    : [...DEFAULT_TEST_OTP_PHONES];
+  return new Set(list);
+}
+
+/** Fixed OTP 123456 for a phone when mock (dev) or ALLOW_TEST_OTP whitelist (prod Play). */
+export function isTestOtpAllowedForPhone(phone: string): boolean {
+  if (isMockOtpAllowed()) return true;
+  if (!isTestOtpModeEnabled()) return false;
+  return getTestOtpPhones().has(phone);
 }
 
 function envGet(key: string): string | undefined {
@@ -97,12 +148,12 @@ export function assertProductionSecurity(serviceName = 'service'): void {
   resolveJwtSecret();
   resolveInternalApiKey();
 
-  if (process.env.MOCK_OTP === 'true' && process.env.ALLOW_MOCK_OTP !== 'true') {
+  if (process.env.MOCK_OTP === 'true') {
     throw new Error(
-      `[${serviceName}] MOCK_OTP=true is forbidden in production. Set MOCK_OTP=false and configure a real SMS provider, or set ALLOW_MOCK_OTP=true for staging/Play Internal only.`,
+      `[${serviceName}] MOCK_OTP=true is forbidden in production. Use ALLOW_TEST_OTP=true (seed phones + code 123456) for Play testing, or configure SerdiPay.`,
     );
   }
-  if (process.env.MOCK_SMS === 'true' && process.env.ALLOW_MOCK_OTP !== 'true') {
+  if (process.env.MOCK_SMS === 'true') {
     throw new Error(
       `[${serviceName}] MOCK_SMS=true is forbidden in production. Configure SerdiPay (ou Africa's Talking / Twilio).`,
     );
@@ -113,18 +164,18 @@ export function assertProductionSecurity(serviceName = 'service'): void {
       `[${serviceName}] MOCK_PAYMENTS=true in production — mobile-money providers will not charge real users.`,
     );
   }
-  if (isMockOtpAllowed()) {
+  if (isTestOtpModeEnabled()) {
     // eslint-disable-next-line no-console
     console.warn(
-      `[${serviceName}] ALLOW_MOCK_OTP: OTP mock actif (code fixe 123456). À retirer dès que SerdiPay est configuré.`,
+      `[${serviceName}] ALLOW_TEST_OTP=true: OTP de test (123456) limité aux numéros seed. Retirer dès que SerdiPay est disponible.`,
     );
   }
 
   // Only auth-service sends OTP; other services warn if SMS env is missing.
-  if (!isProductionSmsConfigured() && !isMockOtpAllowed()) {
+  if (!isProductionSmsConfigured() && !isTestOtpModeEnabled()) {
     const msg = `[${serviceName}] No SMS provider configured (SERDIPAY_* , AFRICAS_TALKING_* or TWILIO_*). OTP delivery will fail.`;
     if (serviceName === 'auth-service') {
-      throw new Error(`${msg} Refusing to start.`);
+      throw new Error(`${msg} Refusing to start. Set ALLOW_TEST_OTP=true for Play testing without SerdiPay.`);
     }
     // eslint-disable-next-line no-console
     console.warn(msg);

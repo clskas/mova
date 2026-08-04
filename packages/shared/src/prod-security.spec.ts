@@ -49,9 +49,12 @@ describe('prod-security', () => {
     process.env.INTERNAL_API_KEY = 'b'.repeat(24);
     delete process.env.MOCK_OTP;
     delete process.env.MOCK_SMS;
+    delete process.env.ALLOW_TEST_OTP;
     delete process.env.AFRICAS_TALKING_USERNAME;
     delete process.env.AFRICAS_TALKING_API_KEY;
     delete process.env.TWILIO_ACCOUNT_SID;
+    delete process.env.SERDIPAY_CLIENT_ID;
+    delete process.env.SERDIPAY_CLIENT_SECRET;
     const { assertProductionSecurity } = await import('./prod-security');
     expect(() => assertProductionSecurity('auth-service')).toThrow(/SMS provider/);
   });
@@ -66,25 +69,27 @@ describe('prod-security', () => {
   it('isMockOtpAllowed is false in production even if MOCK_OTP=true', async () => {
     process.env.NODE_ENV = 'production';
     process.env.MOCK_OTP = 'true';
-    delete process.env.ALLOW_MOCK_OTP;
     const { isMockOtpAllowed } = await import('./prod-security');
     expect(isMockOtpAllowed()).toBe(false);
   });
 
-  it('allows MOCK_OTP in production only with ALLOW_MOCK_OTP=true', async () => {
+  it('allows auth start with ALLOW_TEST_OTP without SerdiPay', async () => {
     process.env.NODE_ENV = 'production';
     process.env.JWT_SECRET = 'a'.repeat(32);
     process.env.INTERNAL_API_KEY = 'b'.repeat(24);
-    process.env.MOCK_OTP = 'true';
-    process.env.ALLOW_MOCK_OTP = 'true';
+    process.env.ALLOW_TEST_OTP = 'true';
+    delete process.env.MOCK_OTP;
     delete process.env.MOCK_SMS;
-    delete process.env.AFRICAS_TALKING_USERNAME;
-    delete process.env.AFRICAS_TALKING_API_KEY;
     delete process.env.SERDIPAY_CLIENT_ID;
     delete process.env.SERDIPAY_CLIENT_SECRET;
+    delete process.env.AFRICAS_TALKING_USERNAME;
+    delete process.env.AFRICAS_TALKING_API_KEY;
     delete process.env.TWILIO_ACCOUNT_SID;
-    const { assertProductionSecurity, isMockOtpAllowed } = await import('./prod-security');
-    expect(isMockOtpAllowed()).toBe(true);
+    const { assertProductionSecurity, isTestOtpAllowedForPhone, TEST_OTP_CODE } =
+      await import('./prod-security');
     expect(() => assertProductionSecurity('auth-service')).not.toThrow();
+    expect(isTestOtpAllowedForPhone('+243900000010')).toBe(true);
+    expect(isTestOtpAllowedForPhone('+243812345678')).toBe(false);
+    expect(TEST_OTP_CODE).toBe('123456');
   });
 });

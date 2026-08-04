@@ -1,6 +1,8 @@
 import { authHeaders, getToken } from "./auth";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
+import { PUBLIC_API_BASE } from "./public-api-base";
+
+const API_BASE = PUBLIC_API_BASE;
 
 function urlBase64ToUint8Array(base64: string): Uint8Array {
   const padding = "=".repeat((4 - (base64.length % 4)) % 4);

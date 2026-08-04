@@ -3,7 +3,11 @@ import { authHeaders, getToken, roleFromToken } from "./auth";
 import type { AdminRole } from "./rbac";
 import { isAdminRole, normalizeAdminRole } from "./rbac";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
+/** Origin only — strip accidental trailing `/api` (mobile-style PROD_API_URL). */
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000")
+  .trim()
+  .replace(/\/+$/, "")
+  .replace(/\/api$/i, "");
 /** Mock API fallback only when explicitly enabled (dev demos without backend). */
 const USE_API_MOCK = process.env.NEXT_PUBLIC_USE_API_MOCK === "true";
 

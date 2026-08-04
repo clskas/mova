@@ -6,7 +6,10 @@ import { decodeJwtPayload, setToken } from "@/lib/auth";
 import { sanitizeAdminError, toUserErrorMessage } from "@/lib/api";
 import { defaultPathForRole, isAdminRole, normalizeAdminRole } from "@/lib/rbac";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000")
+  .trim()
+  .replace(/\/+$/, "")
+  .replace(/\/api$/i, "");
 const isProd = process.env.NODE_ENV === "production";
 const ADMIN_PHONE = process.env.NEXT_PUBLIC_ADMIN_PHONE ?? (isProd ? "" : "+243900000001");
 

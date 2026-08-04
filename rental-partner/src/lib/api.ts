@@ -1,7 +1,8 @@
 import { authHeaders } from "./auth";
+import { PUBLIC_API_BASE } from "./public-api-base";
 import { sanitizeUserMessage } from "./user-messages";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
+const API_BASE = PUBLIC_API_BASE;
 
 export function getApiBase() {
   return API_BASE;

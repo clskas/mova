@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { PUBLIC_API_BASE } from "@/lib/public-api-base";
 
 export type PubliciteItem = {
   id: string;
@@ -65,7 +66,7 @@ function PubliciteDetailModal({
 
 export function PubliciteCarousel({
   items,
-  apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000",
+  apiBase = PUBLIC_API_BASE,
   intervalMs = 5000,
   className = "",
 }: {

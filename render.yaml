@@ -35,6 +35,9 @@ services:
         value: "45000"
       - key: HEALTH_CHECK_RETRIES
         value: "2"
+      # Browser portals call the public gateway origin; include *.onrender.com for Render previews.
+      - key: CORS_ORIGIN
+        value: "https://mova-web.onrender.com,https://mova-admin-web.onrender.com,https://mova-restaurant.onrender.com,https://mova-rental-partner.onrender.com,https://mova-admin.onrender.com,https://*.onrender.com"
 
   - type: web
     name: mova-auth
@@ -52,6 +55,9 @@ services:
         fromService: { name: mova-gateway, type: web, envVarKey: JWT_SECRET }
       - key: MOCK_OTP
         value: "false"
+      # Play / partner portal demos: fixed OTP 123456 for whitelisted seed phones only.
+      - key: ALLOW_TEST_OTP
+        value: "true"
       - fromGroup: mova-external-apis
 
   - type: web
@@ -151,8 +157,9 @@ services:
     dockerContext: .
     plan: starter
     envVars:
+      # Origin only (no /api) — clients append /api/...
       - key: NEXT_PUBLIC_API_URL
-        fromService: { name: mova-gateway, type: web, property: hostport }
+        value: https://mova-gateway.onrender.com
 
   - type: web
     name: mova-admin-web
@@ -162,7 +169,7 @@ services:
     plan: starter
     envVars:
       - key: NEXT_PUBLIC_API_URL
-        fromService: { name: mova-gateway, type: web, property: hostport }
+        value: https://mova-gateway.onrender.com
 
   - type: web
     name: mova-restaurant
@@ -172,7 +179,7 @@ services:
     plan: starter
     envVars:
       - key: NEXT_PUBLIC_API_URL
-        fromService: { name: mova-gateway, type: web, property: hostport }
+        value: https://mova-gateway.onrender.com
 
   - type: web
     name: mova-rental-partner
@@ -182,7 +189,7 @@ services:
     plan: starter
     envVars:
       - key: NEXT_PUBLIC_API_URL
-        fromService: { name: mova-gateway, type: web, property: hostport }
+        value: https://mova-gateway.onrender.com
 
 databases:
   # Production Render : 5 Postgres managés (isolation facturation/plan).

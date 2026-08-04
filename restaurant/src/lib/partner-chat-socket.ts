@@ -1,8 +1,9 @@
 import { io, type Socket } from "socket.io-client";
 import { getToken } from "./auth";
+import { PUBLIC_API_BASE } from "./public-api-base";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
-const WS_BASE = API_BASE.replace(/\/api\/?$/, "");
+const API_BASE = PUBLIC_API_BASE;
+const WS_BASE = API_BASE;
 
 let sharedSocket: Socket | null = null;
 

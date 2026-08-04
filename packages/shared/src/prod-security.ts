@@ -41,18 +41,32 @@ export function resolveInternalApiKey(explicit?: string | null): string {
   return key || DEV_INTERNAL;
 }
 
+const ONRENDER_ORIGIN_RE = /^https:\/\/[\w-]+\.onrender\.com$/i;
+
 /**
  * CORS origins for Nest `enableCors`.
  * - Dev: reflect request origin (`true`) when unset
  * - Prod: require `CORS_ORIGIN` (comma-separated); otherwise deny browser CORS
+ * - Entries `https://*.onrender.com` / `*.onrender.com` allow any `*.onrender.com` https origin
  */
-export function resolveCorsOrigin(): boolean | string | string[] {
+export function resolveCorsOrigin(): boolean | string | RegExp | Array<string | RegExp> {
   const raw = process.env.CORS_ORIGIN?.trim();
   if (raw) {
-    const origins = raw
+    const tokens = raw
       .split(',')
       .map((s) => s.trim())
       .filter(Boolean);
+    if (tokens.length === 0) return false;
+    const origins: Array<string | RegExp> = [];
+    let allowOnrender = false;
+    for (const token of tokens) {
+      if (token === '*.onrender.com' || token === 'https://*.onrender.com') {
+        allowOnrender = true;
+        continue;
+      }
+      origins.push(token);
+    }
+    if (allowOnrender) origins.push(ONRENDER_ORIGIN_RE);
     if (origins.length === 0) return false;
     return origins.length === 1 ? origins[0] : origins;
   }
@@ -79,6 +93,7 @@ export const DEFAULT_TEST_OTP_PHONES: readonly string[] = [
   '+243900000003',
   '+243900000004',
   '+243900000005',
+  // Passengers (15): 010–019 + 040–044
   '+243900000010',
   '+243900000011',
   '+243900000012',
@@ -89,6 +104,12 @@ export const DEFAULT_TEST_OTP_PHONES: readonly string[] = [
   '+243900000017',
   '+243900000018',
   '+243900000019',
+  '+243900000040',
+  '+243900000041',
+  '+243900000042',
+  '+243900000043',
+  '+243900000044',
+  // Drivers (15): 020–029 + 050–054
   '+243900000020',
   '+243900000021',
   '+243900000022',
@@ -99,6 +120,12 @@ export const DEFAULT_TEST_OTP_PHONES: readonly string[] = [
   '+243900000027',
   '+243900000028',
   '+243900000029',
+  '+243900000050',
+  '+243900000051',
+  '+243900000052',
+  '+243900000053',
+  '+243900000054',
+  // Partners
   '+243900000030',
   '+243900000031',
 ];

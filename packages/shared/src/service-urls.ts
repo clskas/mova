@@ -54,6 +54,15 @@ export function serviceUrl(service: keyof typeof SERVICE_PORTS, path = ''): stri
 }
 
 /**
+ * Browser `NEXT_PUBLIC_API_URL` must be the gateway origin (no `/api` suffix).
+ * Clients append `/api/...` paths; a trailing `/api` caused `/api/api/...` 404s in prod.
+ */
+export function normalizePublicApiBaseUrl(raw?: string | null, fallback = 'http://localhost:3000'): string {
+  const base = (raw ?? fallback).trim().replace(/\/+$/, '');
+  return base.replace(/\/api$/i, '') || fallback;
+}
+
+/**
  * Inter-service key (dev default). Prefer resolveInternalApiKey() at call sites.
  * Production bootstrap rejects the weak default via assertProductionSecurity().
  */

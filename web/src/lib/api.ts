@@ -2,7 +2,11 @@
 import { authHeaders } from './auth';
 import { sanitizeUserMessage } from './user-messages';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000';
+/** Origin only — strip accidental trailing `/api` (mobile-style PROD_API_URL). */
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000')
+  .trim()
+  .replace(/\/+$/, '')
+  .replace(/\/api$/i, '');
 
 export type ApiFetchOptions = {
   /** Utiliser les données mock uniquement si la passerelle est indisponible */

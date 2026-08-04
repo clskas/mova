@@ -66,6 +66,20 @@ describe('prod-security', () => {
     expect(resolveCorsOrigin()).toBe(false);
   });
 
+  it('expands https://*.onrender.com CORS token to a hostname regex', async () => {
+    process.env.NODE_ENV = 'production';
+    process.env.CORS_ORIGIN =
+      'https://mova-web.onrender.com,https://*.onrender.com';
+    const { resolveCorsOrigin } = await import('./prod-security');
+    const origin = resolveCorsOrigin();
+    expect(Array.isArray(origin)).toBe(true);
+    const list = origin as Array<string | RegExp>;
+    expect(list[0]).toBe('https://mova-web.onrender.com');
+    expect(list[1]).toBeInstanceOf(RegExp);
+    expect((list[1] as RegExp).test('https://mova-rental-partner.onrender.com')).toBe(true);
+    expect((list[1] as RegExp).test('https://evil.com')).toBe(false);
+  });
+
   it('isMockOtpAllowed is false in production even if MOCK_OTP=true', async () => {
     process.env.NODE_ENV = 'production';
     process.env.MOCK_OTP = 'true';
@@ -89,6 +103,8 @@ describe('prod-security', () => {
       await import('./prod-security');
     expect(() => assertProductionSecurity('auth-service')).not.toThrow();
     expect(isTestOtpAllowedForPhone('+243900000010')).toBe(true);
+    expect(isTestOtpAllowedForPhone('+243900000040')).toBe(true);
+    expect(isTestOtpAllowedForPhone('+243900000050')).toBe(true);
     expect(isTestOtpAllowedForPhone('+243812345678')).toBe(false);
     expect(TEST_OTP_CODE).toBe('123456');
   });

@@ -4,9 +4,10 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { decodeJwtPayload, isRentalPartnerRole, setToken } from "@/lib/auth";
 import { PwaInstallBanner } from "@/components/PwaInstallBanner";
+import { PUBLIC_API_BASE } from "@/lib/public-api-base";
 import { toUserErrorMessage } from "@/lib/user-messages";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
+const API_BASE = PUBLIC_API_BASE;
 const PARTNER_PHONE = process.env.NEXT_PUBLIC_PARTNER_PHONE ?? "+243900000031";
 
 export default function LoginPage() {
@@ -20,19 +21,52 @@ export default function LoginPage() {
     setLoading(true);
     setError(null);
     try {
-      await fetch(`${API_BASE}/api/auth/otp/request`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone }),
-      });
-      const verifyRes = await fetch(`${API_BASE}/api/auth/otp/verify`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, code }),
-      });
-      const data = await verifyRes.json();
+      let requestRes: Response;
+      try {
+        requestRes = await fetch(`${API_BASE}/api/auth/otp/request`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ phone }),
+        });
+      } catch {
+        throw new Error(
+          "Impossible de joindre l'API SENGA. Vérifiez votre connexion ou attendez le démarrage du serveur.",
+        );
+      }
+      if (!requestRes.ok) {
+        let msg = `Demande OTP refusée (${requestRes.status})`;
+        try {
+          const body = await requestRes.json();
+          msg = body.error?.message ?? body.message ?? msg;
+        } catch {
+          /* ignore */
+        }
+        throw new Error(msg);
+      }
+      let verifyRes: Response;
+      try {
+        verifyRes = await fetch(`${API_BASE}/api/auth/otp/verify`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ phone, code }),
+        });
+      } catch {
+        throw new Error(
+          "Impossible de joindre l'API SENGA lors de la vérification OTP.",
+        );
+      }
+      let data: { accessToken?: string; user?: { role?: string }; error?: { message?: string } } = {};
+      try {
+        data = await verifyRes.json();
+      } catch {
+        throw new Error(
+          verifyRes.status === 404
+            ? "API introuvable (404). NEXT_PUBLIC_API_URL doit être l'origine du gateway sans /api."
+            : `Réponse invalide du serveur (${verifyRes.status}).`,
+        );
+      }
       if (!verifyRes.ok || !data.accessToken) {
-        throw new Error(data.error?.message ?? "Connexion refusée");
+        throw new Error(data.error?.message ?? `Connexion refusée (${verifyRes.status})`);
       }
       const role = data.user?.role ?? decodeJwtPayload(data.accessToken)?.role;
       if (!isRentalPartnerRole(typeof role === "string" ? role : null)) {

@@ -3,7 +3,7 @@ WORKDIR /app
 COPY rental-partner/package*.json ./
 RUN npm ci
 COPY rental-partner/ ./
-ARG NEXT_PUBLIC_API_URL=http://localhost:3000
+ARG NEXT_PUBLIC_API_URL=https://mova-gateway.onrender.com
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 RUN npm run build
 

@@ -20,6 +20,11 @@ on:
         required: false
         type: boolean
         default: false
+      build_apks:
+        description: Aussi construire les APK (install direct) — non requis pour Play
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -40,7 +45,7 @@ jobs:
       (github.event_name == 'workflow_run' &&
        github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
         with:
@@ -120,24 +125,7 @@ jobs:
             --dart-define=API_URL=${{ steps.urls.outputs.api }} \
             --dart-define=WS_URL=${{ steps.urls.outputs.ws }}
 
-      - name: Build passenger APK (install direct)
-        working-directory: mobile
-        run: |
-          flutter build apk --release \
-            --flavor passenger \
-            -t lib/main_passenger.dart \
-            --dart-define=API_URL=${{ steps.urls.outputs.api }} \
-            --dart-define=WS_URL=${{ steps.urls.outputs.ws }}
-
-      - name: Build driver APK (install direct)
-        working-directory: mobile
-        run: |
-          flutter build apk --release \
-            --flavor driver \
-            -t lib/main_driver.dart \
-            --dart-define=API_URL=${{ steps.urls.outputs.api }} \
-            --dart-define=WS_URL=${{ steps.urls.outputs.ws }}
-
+      # Upload AABs before optional APKs so Play upload is not blocked by APK OOM/cancel.
       - name: Upload passenger AAB artifact
         uses: actions/upload-artifact@v4
         with:
@@ -152,7 +140,31 @@ jobs:
           path: mobile/build/app/outputs/bundle/driverRelease/app-driver-release.aab
           retention-days: 30
 
+      - name: Build passenger APK (install direct)
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.build_apks == true }}
+        continue-on-error: true
+        working-directory: mobile
+        run: |
+          flutter build apk --release \
+            --flavor passenger \
+            -t lib/main_passenger.dart \
+            --dart-define=API_URL=${{ steps.urls.outputs.api }} \
+            --dart-define=WS_URL=${{ steps.urls.outputs.ws }}
+
+      - name: Build driver APK (install direct)
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.build_apks == true }}
+        continue-on-error: true
+        working-directory: mobile
+        run: |
+          flutter build apk --release \
+            --flavor driver \
+            -t lib/main_driver.dart \
+            --dart-define=API_URL=${{ steps.urls.outputs.api }} \
+            --dart-define=WS_URL=${{ steps.urls.outputs.ws }}
+
       - name: Upload passenger APK artifact
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.build_apks == true }}
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: mova-passenger-apk
@@ -160,6 +172,8 @@ jobs:
           retention-days: 30
 
       - name: Upload driver APK artifact
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.build_apks == true }}
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: mova-driver-apk

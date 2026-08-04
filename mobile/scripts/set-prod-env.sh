@@ -5,8 +5,8 @@
 
 set -euo pipefail
 
-API_URL="${API_URL:-https://api.mova.cd/api}"
-WS_URL="${WS_URL:-https://api.mova.cd}"
+API_URL="${API_URL:-https://mova-gateway.onrender.com/api}"
+WS_URL="${WS_URL:-https://mova-gateway.onrender.com}"
 
 export MOVA_DART_DEFINES="--dart-define=API_URL=${API_URL} --dart-define=WS_URL=${WS_URL}"
 

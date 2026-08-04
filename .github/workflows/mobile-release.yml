@@ -26,8 +26,10 @@ permissions:
 
 env:
   FLUTTER_VERSION: stable
-  PROD_API_URL: ${{ secrets.PROD_API_URL || 'https://mova-gateway.onrender.com/api' }}
-  PROD_WS_URL: ${{ secrets.PROD_WS_URL || 'https://mova-gateway.onrender.com' }}
+  # Défauts production (Render). Les secrets peuvent surcharger, mais le job
+  # "Resolve production API URLs" rejette les IP LAN / localhost.
+  DEFAULT_PROD_API_URL: https://mova-gateway.onrender.com/api
+  DEFAULT_PROD_WS_URL: https://mova-gateway.onrender.com
 
 jobs:
   build-android:
@@ -43,6 +45,30 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Resolve production API URLs
+        id: urls
+        env:
+          SECRET_API: ${{ secrets.PROD_API_URL }}
+          SECRET_WS: ${{ secrets.PROD_WS_URL }}
+        run: |
+          set -euo pipefail
+          API="${SECRET_API:-$DEFAULT_PROD_API_URL}"
+          WS="${SECRET_WS:-$DEFAULT_PROD_WS_URL}"
+          looks_dev() {
+            local u="$1"
+            echo "$u" | grep -qiE \
+              '(localhost|127\.0\.0\.1|10\.0\.2\.2|:3000|://10\.|://192\.168\.|://172\.(1[6-9]|2[0-9]|3[0-1])\.)'
+          }
+          if looks_dev "$API" || looks_dev "$WS" || [[ "$API" != https://* ]] || [[ "$WS" != https://* ]]; then
+            echo "::warning::PROD_API_URL/PROD_WS_URL invalides ou LAN — forçage Render production"
+            API="$DEFAULT_PROD_API_URL"
+            WS="$DEFAULT_PROD_WS_URL"
+          fi
+          echo "api=$API" >> "$GITHUB_OUTPUT"
+          echo "ws=$WS" >> "$GITHUB_OUTPUT"
+          echo "Using API_URL=$API"
+          echo "Using WS_URL=$WS"
 
       - uses: subosito/flutter-action@v2
         with:
@@ -82,8 +108,8 @@ jobs:
           flutter build appbundle --release \
             --flavor passenger \
             -t lib/main_passenger.dart \
-            --dart-define=API_URL=${{ env.PROD_API_URL }} \
-            --dart-define=WS_URL=${{ env.PROD_WS_URL }}
+            --dart-define=API_URL=${{ steps.urls.outputs.api }} \
+            --dart-define=WS_URL=${{ steps.urls.outputs.ws }}
 
       - name: Build driver AAB
         working-directory: mobile
@@ -91,8 +117,8 @@ jobs:
           flutter build appbundle --release \
             --flavor driver \
             -t lib/main_driver.dart \
-            --dart-define=API_URL=${{ env.PROD_API_URL }} \
-            --dart-define=WS_URL=${{ env.PROD_WS_URL }}
+            --dart-define=API_URL=${{ steps.urls.outputs.api }} \
+            --dart-define=WS_URL=${{ steps.urls.outputs.ws }}
 
       - name: Build passenger APK (install direct)
         working-directory: mobile
@@ -100,8 +126,8 @@ jobs:
           flutter build apk --release \
             --flavor passenger \
             -t lib/main_passenger.dart \
-            --dart-define=API_URL=${{ env.PROD_API_URL }} \
-            --dart-define=WS_URL=${{ env.PROD_WS_URL }}
+            --dart-define=API_URL=${{ steps.urls.outputs.api }} \
+            --dart-define=WS_URL=${{ steps.urls.outputs.ws }}
 
       - name: Build driver APK (install direct)
         working-directory: mobile
@@ -109,8 +135,8 @@ jobs:
           flutter build apk --release \
             --flavor driver \
             -t lib/main_driver.dart \
-            --dart-define=API_URL=${{ env.PROD_API_URL }} \
-            --dart-define=WS_URL=${{ env.PROD_WS_URL }}
+            --dart-define=API_URL=${{ steps.urls.outputs.api }} \
+            --dart-define=WS_URL=${{ steps.urls.outputs.ws }}
 
       - name: Upload passenger AAB artifact
         uses: actions/upload-artifact@v4
@@ -228,6 +254,30 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Resolve production API URLs
+        id: urls
+        env:
+          SECRET_API: ${{ secrets.PROD_API_URL }}
+          SECRET_WS: ${{ secrets.PROD_WS_URL }}
+        run: |
+          set -euo pipefail
+          API="${SECRET_API:-$DEFAULT_PROD_API_URL}"
+          WS="${SECRET_WS:-$DEFAULT_PROD_WS_URL}"
+          looks_dev() {
+            local u="$1"
+            echo "$u" | grep -qiE \
+              '(localhost|127\.0\.0\.1|10\.0\.2\.2|:3000|://10\.|://192\.168\.|://172\.(1[6-9]|2[0-9]|3[0-1])\.)'
+          }
+          if looks_dev "$API" || looks_dev "$WS" || [[ "$API" != https://* ]] || [[ "$WS" != https://* ]]; then
+            echo "::warning::PROD_API_URL/PROD_WS_URL invalides ou LAN — forçage Render production"
+            API="$DEFAULT_PROD_API_URL"
+            WS="$DEFAULT_PROD_WS_URL"
+          fi
+          echo "api=$API" >> "$GITHUB_OUTPUT"
+          echo "ws=$WS" >> "$GITHUB_OUTPUT"
+          echo "Using API_URL=$API"
+          echo "Using WS_URL=$WS"
+
       - name: Check iOS credentials
         id: ios_creds
         run: |
@@ -266,8 +316,8 @@ jobs:
         run: |
           flutter build ipa --release \
             -t lib/main_passenger.dart \
-            --dart-define=API_URL=${{ env.PROD_API_URL }} \
-            --dart-define=WS_URL=${{ env.PROD_WS_URL }}
+            --dart-define=API_URL=${{ steps.urls.outputs.api }} \
+            --dart-define=WS_URL=${{ steps.urls.outputs.ws }}
 
       - name: Upload IPA artifact
         if: steps.ios_creds.outputs.available == 'true'

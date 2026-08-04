@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -34,7 +35,20 @@ class _DriverJobTaskHandler extends TaskHandler {
     final token = prefs.getString('auth_token');
     if (token == null || token.isEmpty) return;
 
-    const apiBase = String.fromEnvironment('API_URL', defaultValue: 'http://10.0.2.2:3000/api');
+    // Aligné sur MarketConfig : en release, jamais d'hôte LAN / émulateur.
+    const apiFromEnv = String.fromEnvironment('API_URL', defaultValue: '');
+    const prodApi = 'https://mova-gateway.onrender.com/api';
+    final raw = apiFromEnv.isNotEmpty
+        ? apiFromEnv
+        : (kReleaseMode ? prodApi : 'http://10.0.2.2:3000/api');
+    final host = Uri.tryParse(raw)?.host ?? '';
+    final isDevHost = host.isEmpty ||
+        host == 'localhost' ||
+        host == '127.0.0.1' ||
+        host == '10.0.2.2' ||
+        host.startsWith('10.') ||
+        host.startsWith('192.168.');
+    final apiBase = (kReleaseMode && isDevHost) ? prodApi : raw;
     final gateway = apiBase.endsWith('/api') ? apiBase.substring(0, apiBase.length - 4) : apiBase;
     final headers = {
       'Authorization': 'Bearer $token',

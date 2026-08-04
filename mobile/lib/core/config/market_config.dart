@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 /// Configuration marché RDC — couverture nationale (32 zones SENGA).
 class MarketConfig {
   static const country = 'CD';
@@ -7,6 +9,10 @@ class MarketConfig {
   static const coverageLabel = 'RDC';
   static const timezone = 'Africa/Kinshasa';
   static const locale = 'fr_CD';
+
+  /// Passerelle production (Render). Les builds release doivent toujours aboutir ici.
+  static const productionApiUrl = 'https://mova-gateway.onrender.com/api';
+  static const productionWsUrl = 'https://mova-gateway.onrender.com';
 
   /// Centre carte RDC — fallback technique uniquement (pas de ville imposée).
   static const mapCenterLat = -2.88;
@@ -25,18 +31,59 @@ class MarketConfig {
   static const defaultLat = mapCenterLat;
   static const defaultLng = mapCenterLng;
 
-  /// Passerelle API unique (microservices). Définir via `--dart-define=API_URL=...`
-  /// Ex. émulateur Android : `http://10.0.2.2:3000/api`, appareil/simulateur iOS : `http://localhost:3000/api`
-  static const apiBaseUrl = String.fromEnvironment(
-    'API_URL',
-    defaultValue: 'http://10.0.2.2:3000/api',
-  );
+  /// `--dart-define=API_URL=...` (vide = défaut selon mode).
+  static const _apiFromEnv = String.fromEnvironment('API_URL', defaultValue: '');
 
-  /// Secours dev (ex. IP LAN si `adb reverse` USB est inactif).
-  static const apiFallbackUrl = String.fromEnvironment(
+  /// `--dart-define=WS_URL=...`
+  static const _wsFromEnv = String.fromEnvironment('WS_URL', defaultValue: '');
+
+  /// Secours dev uniquement (ex. IP LAN si `adb reverse` USB est inactif).
+  static const _fallbackFromEnv = String.fromEnvironment(
     'API_FALLBACK_URL',
     defaultValue: '',
   );
+
+  /// Hôte local / RFC1918 / émulateur — interdit en release.
+  static bool isNonRoutableDevHost(String url) {
+    final uri = Uri.tryParse(url.trim());
+    if (uri == null || uri.host.isEmpty) return true;
+    final host = uri.host.toLowerCase();
+    if (host == 'localhost' ||
+        host == '127.0.0.1' ||
+        host == '10.0.2.2' ||
+        host == '::1' ||
+        host.endsWith('.local')) {
+      return true;
+    }
+    if (host.startsWith('10.') || host.startsWith('192.168.')) return true;
+    final m = RegExp(r'^172\.(\d+)\.').firstMatch(host);
+    if (m != null) {
+      final second = int.tryParse(m.group(1) ?? '') ?? -1;
+      if (second >= 16 && second <= 31) return true;
+    }
+    return false;
+  }
+
+  static String _resolveApiBase(String fromEnv) {
+    final raw = fromEnv.trim().isNotEmpty
+        ? fromEnv.trim()
+        : (kReleaseMode ? productionApiUrl : 'http://10.0.2.2:3000/api');
+    if (kReleaseMode && isNonRoutableDevHost(raw)) {
+      return productionApiUrl;
+    }
+    return raw;
+  }
+
+  /// Passerelle API unique (microservices). Définir via `--dart-define=API_URL=...`
+  /// Debug : émulateur `http://10.0.2.2:3000/api` ou LAN via script.
+  /// Release : force toujours une URL publique (Render) — jamais d'IP LAN.
+  static String get apiBaseUrl => _resolveApiBase(_apiFromEnv);
+
+  /// Secours dev (ignoré en release pour éviter une bascule vers le LAN).
+  static String get apiFallbackUrl {
+    if (kReleaseMode) return '';
+    return _fallbackFromEnv.trim();
+  }
 
   /// URL API active après bascule automatique (health check).
   static String? _runtimeApiBaseUrl;
@@ -44,6 +91,8 @@ class MarketConfig {
   static void applyRuntimeApiBase(String apiBase) {
     final trimmed = apiBase.trim();
     if (trimmed.isEmpty) return;
+    // Jamais basculer vers une IP privée en release (ex. APK debug résiduel / mauvais define).
+    if (kReleaseMode && isNonRoutableDevHost(trimmed)) return;
     _runtimeApiBaseUrl = trimmed;
   }
 
@@ -88,11 +137,16 @@ class MarketConfig {
   }
 
   /// WebSocket (`/tracking` via api-gateway). Définir via `--dart-define=WS_URL=...`
-  /// Par défaut : même hôte que [gatewayBaseUrl] (port 3000, pas ride-service direct).
+  /// Par défaut : même hôte que [gatewayBaseUrl].
   static String get wsUrl {
-    const fromEnv = String.fromEnvironment('WS_URL', defaultValue: '');
     if (_runtimeApiBaseUrl != null) return effectiveGatewayBaseUrl;
-    if (fromEnv.isNotEmpty) return fromEnv;
+    final fromEnv = _wsFromEnv.trim();
+    if (fromEnv.isNotEmpty) {
+      if (kReleaseMode && isNonRoutableDevHost(fromEnv)) {
+        return productionWsUrl;
+      }
+      return fromEnv;
+    }
     return gatewayBaseUrl;
   }
 

@@ -176,8 +176,8 @@ docker compose up -d
 | `GATEWAY_RENDER_SERVICE_ID` | Attente statut deploy gateway |
 | `DATABASE_URL_AUTH` … `DATABASE_URL_NOTIFICATIONS` | **Obligatoires** pour backup pg_dump avant deploy prod |
 | `SMOKE_API_URL` | URL gateway pour smoke prod (fallback) |
-| **`PROD_API_URL`** | `--dart-define=API_URL` builds mobile (ex. `https://api.mova.cd/api`) |
-| **`PROD_WS_URL`** | `--dart-define=WS_URL` builds mobile (ex. `https://api.mova.cd`) |
+| **`PROD_API_URL`** | `--dart-define=API_URL` builds mobile — doit être `https://mova-gateway.onrender.com/api` (LAN/localhost rejetés par CI) |
+| **`PROD_WS_URL`** | `--dart-define=WS_URL` builds mobile — doit être `https://mova-gateway.onrender.com` |
 | **`ANDROID_KEYSTORE_BASE64`** | Keystore release encodé base64 |
 | **`ANDROID_KEYSTORE_PASSWORD`** | Mot de passe keystore |
 | **`ANDROID_KEY_PASSWORD`** | Mot de passe clé |

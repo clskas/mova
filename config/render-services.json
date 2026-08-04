@@ -14,7 +14,10 @@
     "srv-d8slrm8g4nts73bq9pj0",
     "srv-d8slrlernols73b4bcq0",
     "srv-d8slrk8js32c73dac310",
-    "srv-d8slprv7f7vs73d2qn50"
+    "srv-d8slprv7f7vs73d2qn50",
+    "srv-d9oruo4s728c73fpnu5g",
+    "srv-d9oruplbedkc73djqa90",
+    "srv-d9orur4s728c73fpo3sg"
   ],
   "services": {
     "mova-web": {
@@ -48,7 +51,19 @@
     "mova-gateway": {
       "id": "srv-d8slprv7f7vs73d2qn50",
       "url": "https://mova-gateway.onrender.com"
+    },
+    "mova-admin-web": {
+      "id": "srv-d9oruo4s728c73fpnu5g",
+      "url": "https://mova-admin-web.onrender.com"
+    },
+    "mova-restaurant": {
+      "id": "srv-d9oruplbedkc73djqa90",
+      "url": "https://mova-restaurant.onrender.com"
+    },
+    "mova-rental-partner": {
+      "id": "srv-d9orur4s728c73fpo3sg",
+      "url": "https://mova-rental-partner.onrender.com"
     }
   },
-  "updatedAt": "2026-06-22T16:08:57.868Z"
+  "updatedAt": "2026-08-04T10:30:00.000Z"
 }

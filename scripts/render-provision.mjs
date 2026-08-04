@@ -116,6 +116,15 @@ const WEB_SERVICES = [
   dockerService('mova-web', './docker/web.Dockerfile', {
     healthCheckPath: '/',
   }),
+  dockerService('mova-admin-web', './docker/admin-web.Dockerfile', {
+    healthCheckPath: '/',
+  }),
+  dockerService('mova-restaurant', './docker/restaurant.Dockerfile', {
+    healthCheckPath: '/',
+  }),
+  dockerService('mova-rental-partner', './docker/rental-partner.Dockerfile', {
+    healthCheckPath: '/',
+  }),
 ];
 
 async function ensureService(existing, spec) {
@@ -233,6 +242,15 @@ async function wireEnvVars(services) {
       DRIVER_SERVICE_URL: `https://${url('mova-driver')}`,
     },
     'mova-web': {
+      NEXT_PUBLIC_API_URL: `https://${url('mova-gateway')}/api`,
+    },
+    'mova-admin-web': {
+      NEXT_PUBLIC_API_URL: `https://${url('mova-gateway')}/api`,
+    },
+    'mova-restaurant': {
+      NEXT_PUBLIC_API_URL: `https://${url('mova-gateway')}/api`,
+    },
+    'mova-rental-partner': {
       NEXT_PUBLIC_API_URL: `https://${url('mova-gateway')}/api`,
     },
   };

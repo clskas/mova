@@ -1,4 +1,4 @@
-const CACHE = "mova-resto-v3";
+const CACHE = "mova-resto-v4";
 const SHELL = [
   "/",
   "/login",

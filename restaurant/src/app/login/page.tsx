@@ -5,10 +5,40 @@ import { useState } from "react";
 import { decodeJwtPayload, isRestaurantRole, setToken } from "@/lib/auth";
 import { PwaInstallBanner } from "@/components/PwaInstallBanner";
 import { PUBLIC_API_BASE } from "@/lib/public-api-base";
-import { toUserErrorMessage } from "@/lib/user-messages";
 
 const API_BASE = PUBLIC_API_BASE;
 const RESTAURANT_PHONE = process.env.NEXT_PUBLIC_RESTAURANT_PHONE ?? "+243900000030";
+
+function loginErrorMessage(err: unknown, status?: number): string {
+  const raw = err instanceof Error ? err.message : String(err ?? "");
+  const trimmed = raw.trim();
+  const statusPart = status && status > 0 ? ` (HTTP ${status})` : "";
+  const apiHint = ` · API: ${API_BASE}`;
+  if (!trimmed) return `Erreur de connexion${statusPart}${apiHint}`;
+  // Keep status/API visible even when the backend message is technical.
+  if (trimmed.length > 160) {
+    return `Erreur de connexion${statusPart}${apiHint}`;
+  }
+  if (/MOVA_|SENGA_|ECONN|ETIMEDOUT|ENOTFOUND|fetch failed|Failed to fetch|NetworkError|Internal server error|Prisma|NestJS/i.test(trimmed)) {
+    return `Erreur de connexion${statusPart || " (réseau)"}${apiHint}`;
+  }
+  if (status && status > 0 && !trimmed.includes(String(status))) {
+    return `${trimmed}${statusPart}${apiHint}`;
+  }
+  if (!trimmed.includes(API_BASE)) {
+    return `${trimmed}${apiHint}`;
+  }
+  return trimmed;
+}
+
+async function readErrorMessage(res: Response, fallback: string): Promise<string> {
+  try {
+    const body = await res.json();
+    return body.error?.message ?? body.message ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
 
 export default function LoginPage() {
   const router = useRouter();
@@ -20,29 +50,26 @@ export default function LoginPage() {
   async function login() {
     setLoading(true);
     setError(null);
+    let lastStatus = 0;
     try {
       let requestRes: Response;
       try {
         requestRes = await fetch(`${API_BASE}/api/auth/otp/request`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ phone }),
+          body: JSON.stringify({ phone, purpose: "LOGIN" }),
         });
       } catch {
         throw new Error(
-          "Impossible de joindre l'API SENGA. Vérifiez votre connexion ou attendez le démarrage du serveur.",
+          `Impossible de joindre l'API SENGA (${API_BASE}). Vérifiez la connexion ou attendez le démarrage du serveur.`,
         );
       }
+      lastStatus = requestRes.status;
       if (!requestRes.ok) {
-        let msg = `Demande OTP refusée (${requestRes.status})`;
-        try {
-          const body = await requestRes.json();
-          msg = body.error?.message ?? body.message ?? msg;
-        } catch {
-          /* ignore */
-        }
+        const msg = await readErrorMessage(requestRes, `Demande OTP refusée (${requestRes.status})`);
         throw new Error(msg);
       }
+
       let verifyRes: Response;
       try {
         verifyRes = await fetch(`${API_BASE}/api/auth/otp/verify`, {
@@ -52,17 +79,19 @@ export default function LoginPage() {
         });
       } catch {
         throw new Error(
-          "Impossible de joindre l'API SENGA lors de la vérification OTP.",
+          `Impossible de joindre l'API SENGA lors de la vérification OTP (${API_BASE}).`,
         );
       }
+      lastStatus = verifyRes.status;
+
       let data: { accessToken?: string; user?: { role?: string }; error?: { message?: string } } = {};
       try {
         data = await verifyRes.json();
       } catch {
         throw new Error(
           verifyRes.status === 404
-            ? "API introuvable (404). NEXT_PUBLIC_API_URL doit être l'origine du gateway sans /api."
-            : `Réponse invalide du serveur (${verifyRes.status}).`,
+            ? `API introuvable (404). NEXT_PUBLIC_API_URL doit être l'origine du gateway sans /api (${API_BASE}).`
+            : `Réponse invalide du serveur (${verifyRes.status}) · API: ${API_BASE}`,
         );
       }
       if (!verifyRes.ok || !data.accessToken) {
@@ -70,12 +99,12 @@ export default function LoginPage() {
       }
       const role = data.user?.role ?? decodeJwtPayload(data.accessToken)?.role;
       if (!isRestaurantRole(typeof role === "string" ? role : null)) {
-        throw new Error("Ce compte n'est pas un partenaire restaurant. Contactez SENGA.");
+        throw new Error(`Ce compte n'est pas un partenaire restaurant (rôle: ${String(role ?? "?")}).`);
       }
       setToken(data.accessToken);
       router.replace("/");
     } catch (e) {
-      setError(toUserErrorMessage(e, "Erreur de connexion"));
+      setError(loginErrorMessage(e, lastStatus));
     } finally {
       setLoading(false);
     }
@@ -114,10 +143,11 @@ export default function LoginPage() {
         >
           {loading ? "Connexion…" : "Accéder au portail"}
         </button>
-        {error && <p className="text-sm text-red-600 text-center">{error}</p>}
+        {error && <p className="text-sm text-red-600 text-center break-all">{error}</p>}
         <p className="text-xs text-gray-400 text-center">
           Dev : compte <code>{RESTAURANT_PHONE}</code> lié à un restaurant dans l&apos;admin SENGA
         </p>
+        <p className="text-[10px] text-gray-300 text-center break-all">API: {API_BASE}</p>
       </div>
     </div>
   );

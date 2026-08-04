@@ -1,4 +1,4 @@
-const CACHE = "mova-rental-partner-v3";
+const CACHE = "mova-rental-partner-v4";
 const SHELL = [
   "/",
   "/login",

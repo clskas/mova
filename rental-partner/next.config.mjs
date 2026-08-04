@@ -14,6 +14,10 @@ const nextConfig = {
         ],
       },
       {
+        source: "/login",
+        headers: [{ key: "Cache-Control", value: "no-store, must-revalidate" }],
+      },
+      {
         source: "/sw.js",
         headers: [
           { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },

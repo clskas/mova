@@ -5,11 +5,23 @@ function createRedisClient(url: string, label: string): Redis {
   const logger = new Logger(`Redis:${label}`);
   const client = new Redis(url, {
     maxRetriesPerRequest: 3,
+    // Fail fast on commands while disconnected; callers should catch.
     enableOfflineQueue: false,
-    retryStrategy: (times) => (times > 8 ? null : Math.min(times * 200, 2000)),
+    // Never stop reconnecting — free-tier Redis may sleep and come back.
+    retryStrategy: (times) => Math.min(times * 200, 5000),
+    reconnectOnError: (err) => {
+      const msg = err.message || '';
+      return msg.includes('READONLY') || msg.includes('ECONNRESET');
+    },
   });
   client.on('error', (err) => {
     logger.warn(err.message);
+  });
+  client.on('reconnecting', () => {
+    logger.warn('reconnecting…');
+  });
+  client.on('connect', () => {
+    logger.log('connected');
   });
   return client;
 }

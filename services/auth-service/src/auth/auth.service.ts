@@ -293,25 +293,35 @@ export class AuthService {
   }
 
   private async assertPinNotLocked(phone: string) {
-    const key = `${PIN_FAIL_PREFIX}${phone}`;
-    const raw = await this.redis.client.get(key);
-    const fails = raw ? Number.parseInt(raw, 10) : 0;
-    if (fails >= PIN_FAIL_MAX) {
-      throw new MovaHttpException(
-        MovaErrorCode.AUTH_PIN_LOCKED,
-        HttpStatus.TOO_MANY_REQUESTS,
-        'Trop de tentatives PIN. Réessayez dans 15 minutes ou connectez-vous par SMS.',
-      );
+    try {
+      const key = `${PIN_FAIL_PREFIX}${phone}`;
+      const raw = await this.redis.client.get(key);
+      const fails = raw ? Number.parseInt(raw, 10) : 0;
+      if (fails >= PIN_FAIL_MAX) {
+        throw new MovaHttpException(
+          MovaErrorCode.AUTH_PIN_LOCKED,
+          HttpStatus.TOO_MANY_REQUESTS,
+          'Trop de tentatives PIN. Réessayez dans 15 minutes ou connectez-vous par SMS.',
+        );
+      }
+    } catch (e) {
+      if (e instanceof MovaHttpException) throw e;
+      // Redis down (free-tier sleep / closed client): fail-open so PIN login still works.
+      this.logger.warn(`assertPinNotLocked failed: ${(e as Error).message}`);
     }
   }
 
   private async registerPinFailure(phone: string) {
-    const key = `${PIN_FAIL_PREFIX}${phone}`;
-    const raw = await this.redis.client.get(key);
-    const fails = (raw ? Number.parseInt(raw, 10) : 0) + 1;
-    await this.redis.client.set(key, String(fails), 'EX', PIN_FAIL_TTL_SEC);
-    if (fails >= PIN_FAIL_MAX) {
-      this.logger.warn(`PIN locked for ${maskPhoneRdc(phone)} after ${fails} failures`);
+    try {
+      const key = `${PIN_FAIL_PREFIX}${phone}`;
+      const raw = await this.redis.client.get(key);
+      const fails = (raw ? Number.parseInt(raw, 10) : 0) + 1;
+      await this.redis.client.set(key, String(fails), 'EX', PIN_FAIL_TTL_SEC);
+      if (fails >= PIN_FAIL_MAX) {
+        this.logger.warn(`PIN locked for ${maskPhoneRdc(phone)} after ${fails} failures`);
+      }
+    } catch (e) {
+      this.logger.warn(`registerPinFailure failed: ${(e as Error).message}`);
     }
   }
 

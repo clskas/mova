@@ -31,7 +31,11 @@ describe('NominatimService', () => {
     ]);
 
     const service = new NominatimService();
-    const results = await service.search('Avenue du Commerce', { city: 'Kinshasa' });
+    const results = await service.search('Avenue du Commerce', {
+      city: 'Kinshasa',
+      centerLat: -4.32,
+      centerLng: 15.31,
+    });
     expect(results).toHaveLength(1);
     expect(results[0]).toMatchObject({
       label: 'Avenue du Commerce, Gombe, Kinshasa, RDC',
@@ -40,6 +44,15 @@ describe('NominatimService', () => {
       commune: 'Gombe',
       city: 'Kinshasa',
     });
+    const calledUrl = (httpFetch.httpGetJson as jest.Mock).mock.calls[0][0] as string;
+    const decoded = decodeURIComponent(calledUrl.replace(/\+/g, ' '));
+    expect(calledUrl).toContain('countrycodes=cd');
+    expect(calledUrl).toContain('bounded=1');
+    // Viewbox nationale RDC (pas bbox Kinshasa seule)
+    expect(calledUrl).toContain('viewbox=12');
+    expect(decoded).toContain('République Démocratique du Congo');
+    // Ne doit pas forcer « Kinshasa » dans le texte de recherche
+    expect(decoded).not.toMatch(/q=[^&]*Kinshasa/);
     expect(httpFetch.httpGetJson).toHaveBeenCalledWith(
       expect.stringContaining('/search?'),
       expect.objectContaining({

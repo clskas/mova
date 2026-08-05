@@ -100,7 +100,7 @@ MOCK_PAYMENTS=false
 | `TWILIO_*` | Secours OTP SMS |
 | `AFRICAS_TALKING_*` | Secours SMS + Mobile Money |
 | `FCM_SERVER_KEY` | Push notifications |
-| `MAPBOX_ACCESS_TOKEN` | Autocomplétion adresses (optionnel, recommandé) |
+| `MAPBOX_ACCESS_TOKEN` | Autocomplétion adresses nationale RDC (recommandé — sans token, Nominatim/Photon OSM peut omettre des lieux) |
 
 ### 3.3.1 OTP — comportement production
 

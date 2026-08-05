@@ -139,7 +139,7 @@ SENGA supporte **Orange Money**, **M-Pesa (Vodacom)**, **Airtel Money** via port
 | Option | Coût fixe/mois | Coût variable | Fiabilité prod RDC |
 |--------|----------------|---------------|-------------------|
 | **Serveurs publics OSM/Nominatim** | 0 | 0 | **Faible** (limites d’usage, latence) |
-| **Auto-hébergé OSRM + Nominatim** ⭐ | **30 – 80 USD** (petit VPS) | 0 | **Bonne** si données OSM Kinshasa à jour |
+| **Auto-hébergé OSRM + Nominatim** ⭐ | **30 – 80 USD** (petit VPS) | 0 | **Bonne** si données OSM RDC à jour (pas Kinshasa seul) |
 | **Mapbox Geocoding API** | 0 (50 k req/mois gratuites) | ~0,50 USD / 1 000 req au-delà | **Très bonne** |
 | **Google Maps Platform** | Crédit 200 USD/mois | Cher au-delà | Très bonne |
 

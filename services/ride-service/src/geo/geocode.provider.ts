@@ -1,20 +1,25 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { MapboxPlace, MapboxService } from './mapbox.service';
 import { NominatimPlace, NominatimService } from './nominatim.service';
 import { PhotonPlace, PhotonService } from './photon.service';
 
-export type GeocodePlace = (NominatimPlace | PhotonPlace) & { provider: 'nominatim' | 'photon' };
+export type GeocodePlace = (NominatimPlace | PhotonPlace | MapboxPlace) & {
+  provider: 'nominatim' | 'photon' | 'mapbox';
+};
 
 type GeocodeSearchOpts = {
   city?: string;
   centerLat?: number;
   centerLng?: number;
   viewbox?: { minLng: number; minLat: number; maxLng: number; maxLat: number };
+  bounded?: boolean;
   limit?: number;
 };
 
 /**
- * Fournisseur géocodage unifié : Nominatim (OSM officiel) avec repli Photon (Komoot).
- * Photon est utilisé quand Nominatim est indisponible (réseau Docker, timeout, etc.).
+ * Fournisseur géocodage unifié :
+ * 1. Mapbox si MAPBOX_ACCESS_TOKEN (meilleure couverture RDC)
+ * 2. Nominatim (OSM) avec repli Photon
  */
 @Injectable()
 export class GeocodeProvider {
@@ -24,6 +29,7 @@ export class GeocodeProvider {
   private readonly circuitBreakerMs: number;
 
   constructor(
+    private mapbox: MapboxService,
     private nominatim: NominatimService,
     private photon: PhotonService,
   ) {
@@ -32,6 +38,18 @@ export class GeocodeProvider {
   }
 
   async search(query: string, opts?: GeocodeSearchOpts): Promise<GeocodePlace[]> {
+    if (this.mapbox.isConfigured()) {
+      const mapboxHits = await this.mapbox.search(query, {
+        centerLat: opts?.centerLat,
+        centerLng: opts?.centerLng,
+        limit: opts?.limit,
+      });
+      if (mapboxHits.length > 0) {
+        return mapboxHits.map((p) => ({ ...p, provider: 'mapbox' as const }));
+      }
+      this.logger.debug('Mapbox empty — falling back to Nominatim/Photon');
+    }
+
     if (this.preferPhoton) {
       const photonHits = await this.photon.search(query, opts);
       if (photonHits.length > 0) {

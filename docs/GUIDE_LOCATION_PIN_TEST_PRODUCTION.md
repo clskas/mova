@@ -295,8 +295,10 @@ Copier `config/external-apis.env.example` → secrets Render / vault.
 | Variable | Usage |
 |----------|-------|
 | `FCM_SERVER_KEY` | Push notifications passager / chauffeur |
-| `MAPBOX_ACCESS_TOKEN` | Autocomplétion adresses (recommandé) |
-| `OSRM_BASE_URL` / `NOMINATIM_BASE_URL` | Routage / géocodage (instance dédiée RDC recommandée) |
+| `MAPBOX_ACCESS_TOKEN` | Autocomplétion adresses nationale RDC (fortement recommandé en prod) |
+| `OSRM_BASE_URL` / `NOMINATIM_BASE_URL` | Routage / géocodage de secours (OSM public : couverture RDC incomplète hors grandes villes) |
+
+> **Autocomplete RDC :** ride-service utilise Mapbox (si token) puis Nominatim/Photon avec `country=cd` et bbox nationale (−13.6…5.6, 12…31.5). Sans Mapbox, certains territoires / quartiers peuvent manquer dans OSM. OSRM a un repli Haversine si aucune route n’est trouvée.
 | `CLOUDINARY_*` | Photos véhicules partenaires |
 
 ### 5.3 URLs clients production

@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { RDC_TERRITORY_BOUNDS } from '@mova/shared';
 import { httpGetJson } from '../common/http-fetch.util';
 
 export type NominatimPlace = {
@@ -42,7 +43,7 @@ export class NominatimService {
     this.minIntervalMs = parseInt(process.env.NOMINATIM_MIN_INTERVAL_MS ?? '1000', 10);
   }
 
-  /** Géocodage : texte → coordonnées (autocomplétion adresses OSM). */
+  /** Géocodage : texte → coordonnées (autocomplétion adresses OSM, couverture nationale RDC). */
   async search(
     query: string,
     opts?: {
@@ -50,6 +51,8 @@ export class NominatimService {
       centerLat?: number;
       centerLng?: number;
       viewbox?: { minLng: number; minLat: number; maxLng: number; maxLat: number };
+      /** Si true (défaut), restreint aux résultats dans la viewbox (RDC). */
+      bounded?: boolean;
       limit?: number;
     },
   ): Promise<NominatimPlace[]> {
@@ -58,7 +61,9 @@ export class NominatimService {
     if (q.length < 2) return [];
 
     const city = opts?.city?.trim();
-    const searchText = city ? `${q}, ${city}, République Démocratique du Congo` : `${q}, RDC`;
+    // Ne pas coller la ville GPS à la requête : ça masquait les lieux hors zone
+    // (ex. recherche « Goma » avec city=Kinshasa). Bias via lat/lon uniquement.
+    const searchText = `${q}, République Démocratique du Congo`;
     const params = new URLSearchParams({
       q: searchText,
       format: 'json',
@@ -71,9 +76,16 @@ export class NominatimService {
       params.set('lat', String(opts.centerLat));
       params.set('lon', String(opts.centerLng));
     }
-    if (opts?.viewbox) {
-      const { minLng, minLat, maxLng, maxLat } = opts.viewbox;
-      params.set('viewbox', `${minLng},${maxLat},${maxLng},${minLat}`);
+
+    const viewbox = opts?.viewbox ?? {
+      minLng: RDC_TERRITORY_BOUNDS.minLng,
+      minLat: RDC_TERRITORY_BOUNDS.minLat,
+      maxLng: RDC_TERRITORY_BOUNDS.maxLng,
+      maxLat: RDC_TERRITORY_BOUNDS.maxLat,
+    };
+    const { minLng, minLat, maxLng, maxLat } = viewbox;
+    params.set('viewbox', `${minLng},${maxLat},${maxLng},${minLat}`);
+    if (opts?.bounded !== false) {
       params.set('bounded', '1');
     }
 

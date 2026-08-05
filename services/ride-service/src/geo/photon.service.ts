@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { RDC_TERRITORY_BOUNDS } from '@mova/shared';
 import { httpGetJson } from '../common/http-fetch.util';
 
 export type PhotonPlace = {
@@ -62,7 +63,8 @@ export class PhotonService {
     if (q.length < 2) return [];
 
     const city = opts?.city?.trim();
-    const searchText = city ? `${q}, ${city}, RDC` : `${q}, RDC`;
+    // Requête nationale — bias proximité via lat/lon, pas via suffixe ville GPS.
+    const searchText = `${q}, RDC`;
     const params = new URLSearchParams({
       q: searchText,
       limit: String(Math.min(opts?.limit ?? 5, 10)),
@@ -73,10 +75,14 @@ export class PhotonService {
       params.set('lat', String(opts.centerLat));
       params.set('lon', String(opts.centerLng));
     }
-    if (opts?.viewbox) {
-      const { minLng, minLat, maxLng, maxLat } = opts.viewbox;
-      params.set('bbox', `${minLng},${minLat},${maxLng},${maxLat}`);
-    }
+    const viewbox = opts?.viewbox ?? {
+      minLng: RDC_TERRITORY_BOUNDS.minLng,
+      minLat: RDC_TERRITORY_BOUNDS.minLat,
+      maxLng: RDC_TERRITORY_BOUNDS.maxLng,
+      maxLat: RDC_TERRITORY_BOUNDS.maxLat,
+    };
+    const { minLng, minLat, maxLng, maxLat } = viewbox;
+    params.set('bbox', `${minLng},${minLat},${maxLng},${maxLat}`);
 
     const data = await this.fetchJson<PhotonResponse>(`/api/?${params.toString()}`);
     if (!data?.features?.length) return [];

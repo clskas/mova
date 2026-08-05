@@ -34,7 +34,11 @@ describe('PhotonService', () => {
     });
 
     const service = new PhotonService();
-    const results = await service.search('Avenue des Aviateurs', { city: 'Kinshasa' });
+    const results = await service.search('Avenue des Aviateurs', {
+      city: 'Kinshasa',
+      centerLat: -4.3,
+      centerLng: 15.3,
+    });
     expect(results).toHaveLength(1);
     expect(results[0]).toMatchObject({
       lat: -4.3011373,
@@ -42,6 +46,10 @@ describe('PhotonService', () => {
       city: 'Kinshasa',
     });
     expect(results[0].label).toContain('Avenue des Aviateurs');
+    const calledUrl = (httpFetch.httpGetJson as jest.Mock).mock.calls[0][0] as string;
+    // Bbox nationale RDC
+    expect(calledUrl).toContain('bbox=12');
+    expect(decodeURIComponent(calledUrl)).not.toMatch(/q=[^&]*Kinshasa/);
   });
 
   it('filters non-RDC results when countrycode is set', async () => {

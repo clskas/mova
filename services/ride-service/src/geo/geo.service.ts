@@ -9,6 +9,7 @@ import {
   isCityOperational,
   MovaErrorCode,
   MovaHttpException,
+  RDC_TERRITORY_BOUNDS,
   resolveCityFromCoords,
 } from '@mova/shared';
 import { addressToCoords } from '../common/address.util';
@@ -399,39 +400,45 @@ export class GeoService implements OnModuleInit {
       }
     }
 
-    // Enrichit via géocodage externe (Photon/Nominatim) tant que le catalogue
-    // local reste pauvre : évite qu'une seule correspondance générique masque
-    // tous les lieux réels d'une ville.
-    const MIN_LOCAL_RESULTS = 5;
-    if (placeMatchCount() < MIN_LOCAL_RESULTS) {
-      const geocodeArea =
-        primaryArea ??
-        DRC_SERVICE_AREAS.find((a) => a.name.toLowerCase() === requestedCity.toLowerCase()) ??
-        DRC_SERVICE_AREAS[0];
-      if (geocodeArea) {
-        const geocodeHits = await this.geocodeWithTimeout(
-          q,
-          {
-            city: requestedCity !== '' ? requestedCity : geocodeArea.name,
-            centerLat: geocodeArea.centerLat,
-            centerLng: geocodeArea.centerLng,
-            viewbox: geocodeArea.bounds,
-            limit: 5,
-          },
-          6000,
-        );
-        for (const p of geocodeHits) {
-          push({
-            source: p.provider,
-            label: p.label,
-            address: p.address,
-            lat: p.lat,
-            lng: p.lng,
-            commune: p.commune ?? p.city,
-            city: requestedCity !== '' ? requestedCity : geocodeArea.name,
-          });
-        }
-      }
+    // Toujours enrichir via géocodage externe (Mapbox / Nominatim / Photon)
+    // sur le territoire RDC entier — le catalogue local (communes/POI) ne couvre
+    // pas tous les lieux ; l'ancien viewbox ville + bounded=1 masquait le reste du pays.
+    const biasArea =
+      primaryArea ??
+      DRC_SERVICE_AREAS.find((a) => a.name.toLowerCase() === requestedCity.toLowerCase());
+    const geocodeHits = await this.geocodeWithTimeout(
+      q,
+      {
+        centerLat: biasArea?.centerLat,
+        centerLng: biasArea?.centerLng,
+        viewbox: {
+          minLng: RDC_TERRITORY_BOUNDS.minLng,
+          minLat: RDC_TERRITORY_BOUNDS.minLat,
+          maxLng: RDC_TERRITORY_BOUNDS.maxLng,
+          maxLat: RDC_TERRITORY_BOUNDS.maxLat,
+        },
+        bounded: true,
+        limit: 8,
+      },
+      6000,
+    );
+    for (const p of geocodeHits) {
+      const resolvedCity =
+        (p.city && findServiceAreaByName(p.city)?.name) ||
+        resolveCityFromCoords(p.lat, p.lng) ||
+        p.city ||
+        requestedCity ||
+        biasArea?.name ||
+        'RDC';
+      push({
+        source: p.provider,
+        label: p.label,
+        address: p.address,
+        lat: p.lat,
+        lng: p.lng,
+        commune: p.commune ?? p.city,
+        city: resolvedCity,
+      });
     }
 
     return results.slice(0, 12);
@@ -445,6 +452,7 @@ export class GeoService implements OnModuleInit {
       centerLat?: number;
       centerLng?: number;
       viewbox?: { minLng: number; minLat: number; maxLng: number; maxLat: number };
+      bounded?: boolean;
       limit?: number;
     },
     timeoutMs: number,

@@ -326,6 +326,11 @@ export class AuthService {
   }
 
   private async clearPinFailures(phone: string) {
-    await this.redis.client.del(`${PIN_FAIL_PREFIX}${phone}`);
+    try {
+      await this.redis.client.del(`${PIN_FAIL_PREFIX}${phone}`);
+    } catch (e) {
+      // Redis down / IP allowlist / free-tier sleep: do not block successful login.
+      this.logger.warn(`clearPinFailures failed: ${(e as Error).message}`);
+    }
   }
 }

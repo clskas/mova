@@ -64,11 +64,14 @@ export class PaymentsWebhookController {
   }
 
   private extractProviderRef(payload: Record<string, unknown>, fallbackPrefix: 'sp' | 'at'): string | undefined {
-    const nested = asRecord(payload.data ?? payload.payload ?? payload.result ?? {});
+    // SerdiPay Public API callback: { message, payment: { status, sessionId, transactionId } }
+    const nested = asRecord(
+      payload.data ?? payload.payload ?? payload.result ?? payload.payment ?? {},
+    );
     const candidates = [
       pickString(payload, ['providerRef', 'provider_ref', 'externalId', 'external_id', 'transactionId', 'transaction_id', 'txnId', 'id']),
-      pickString(nested, ['providerRef', 'provider_ref', 'externalId', 'external_id', 'transactionId', 'transaction_id', 'txnId', 'id']),
-      pickString(payload, ['reference', 'merchantReference', 'clientReference', 'metadata']),
+      pickString(nested, ['providerRef', 'provider_ref', 'externalId', 'external_id', 'transactionId', 'transaction_id', 'txnId', 'sessionId', 'id']),
+      pickString(payload, ['reference', 'merchantReference', 'clientReference', 'metadata', 'message']),
       pickString(nested, ['reference', 'merchantReference', 'clientReference']),
     ].filter(Boolean) as string[];
 
@@ -89,7 +92,16 @@ export class PaymentsWebhookController {
   }
 
   private extractOutcome(payload: Record<string, unknown>): 'COMPLETED' | 'FAILED' | null {
-    const nested = asRecord(payload.data ?? payload.payload ?? payload.result ?? {});
+    const nested = asRecord(
+      payload.data ?? payload.payload ?? payload.result ?? payload.payment ?? {},
+    );
+    // SerdiPay may send top-level status as HTTP-like number (200 / 402)
+    const topStatus = payload.status;
+    if (typeof topStatus === 'number') {
+      if (topStatus === 200) return 'COMPLETED';
+      if (topStatus === 102) return null; // still processing — ignore until final callback
+      if ([400, 401, 402, 403, 409, 429].includes(topStatus)) return 'FAILED';
+    }
     return (
       normalizeOutcome(pickString(payload, ['status', 'transactionStatus', 'paymentStatus', 'state', 'resultCode'])) ??
       normalizeOutcome(pickString(nested, ['status', 'transactionStatus', 'paymentStatus', 'state', 'resultCode']))
@@ -110,7 +122,11 @@ export class PaymentsWebhookController {
     }
     const payload = asRecord(body);
     const providerRef = this.extractProviderRef(payload, 'sp');
-    const outcome = this.extractOutcome(payload) ?? 'COMPLETED';
+    const outcome = this.extractOutcome(payload);
+    if (!outcome) {
+      this.logger.log(`SerdiPay webhook pending (102/unknown) ref=${providerRef ?? '?'}`);
+      return { success: true, message: 'Transaction en cours' };
+    }
     if (!providerRef) {
       this.logger.warn(`SerdiPay webhook sans référence: ${raw.slice(0, 300)}`);
       return { success: false, message: 'Référence manquante' };

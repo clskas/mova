@@ -4,7 +4,7 @@ import {
   isAfricasTalkingConfigured,
   isTwilioSmsConfigured,
 } from './africas-talking';
-import { isSerdiPayConfigured } from './serdipay';
+import { isSerdiPaySmsConfigured } from './serdipay';
 
 const DEV_JWT = 'dev_secret';
 const DEV_INTERNAL = 'mova-internal-dev';
@@ -159,10 +159,10 @@ function envGet(key: string): string | undefined {
   return process.env[key];
 }
 
-/** Real SMS provider (SerdiPay, Africa's Talking or Twilio) is configured. */
+/** Real SMS provider (SerdiPay SMS path, Africa's Talking or Twilio) is configured. */
 export function isProductionSmsConfigured(): boolean {
   return (
-    isSerdiPayConfigured(envGet) ||
+    isSerdiPaySmsConfigured(envGet) ||
     isAfricasTalkingConfigured(envGet) ||
     isTwilioSmsConfigured(envGet)
   );
@@ -194,15 +194,18 @@ export function assertProductionSecurity(serviceName = 'service'): void {
   if (isTestOtpModeEnabled()) {
     // eslint-disable-next-line no-console
     console.warn(
-      `[${serviceName}] ALLOW_TEST_OTP=true: OTP de test (123456) limité aux numéros seed. Retirer dès que SerdiPay est disponible.`,
+      `[${serviceName}] ALLOW_TEST_OTP=true: OTP de test (123456) limité aux numéros seed. Retirer dès que SERDIPAY_SMS_PATH (ou AT/Twilio) fonctionne.`,
     );
   }
 
   // Only auth-service sends OTP; other services warn if SMS env is missing.
   if (!isProductionSmsConfigured() && !isTestOtpModeEnabled()) {
-    const msg = `[${serviceName}] No SMS provider configured (SERDIPAY_* , AFRICAS_TALKING_* or TWILIO_*). OTP delivery will fail.`;
+    const msg =
+      `[${serviceName}] No SMS provider configured (SERDIPAY_SMS_PATH + auth, AFRICAS_TALKING_* or TWILIO_*). OTP delivery will fail.`;
     if (serviceName === 'auth-service') {
-      throw new Error(`${msg} Refusing to start. Set ALLOW_TEST_OTP=true for Play testing without SerdiPay.`);
+      throw new Error(
+        `${msg} Refusing to start. Keep ALLOW_TEST_OTP=true until SerdiPay SMS (or AT/Twilio) is live.`,
+      );
     }
     // eslint-disable-next-line no-console
     console.warn(msg);

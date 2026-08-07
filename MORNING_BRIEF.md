@@ -6,9 +6,9 @@
 ### Session infrastructure (2026-07-27 matin)
 - Supabase **kongomarket** → **pause** (INACTIVE ; suppression définitive = dashboard, MCP = pause seulement).
 - Supabase **senga** créé : `furttqrltkwirdhiktdl`, région **eu-central-1** (Frankfurt), buckets privés `uploads` + `kyc-docs`.
-- SerdiPay = passerelle **primaire** OTP + Mobile Money (AT/Twilio en secours).
+- SerdiPay = passerelle **primaire** Mobile Money (Public API) ; SMS OTP seulement si `SERDIPAY_SMS_PATH` (sinon AT/Twilio / `ALLOW_TEST_OTP`).
 - Guide Play Store : [docs/PLAY_STORE_GUIDE.md](docs/PLAY_STORE_GUIDE.md).
-- À coller sur Render (auth/ride/payment) : `SUPABASE_SERVICE_ROLE_KEY`, `SERDIPAY_CLIENT_ID`, `SERDIPAY_CLIENT_SECRET` (+ `SERDIPAY_MERCHANT_ID` si fourni).
+- À coller sur Render (payment) quand SerdiPay envoie le compte marchand : `SERDIPAY_EMAIL`, `SERDIPAY_PASSWORD`, `SERDIPAY_API_ID`, `SERDIPAY_API_PASSWORD`, `SERDIPAY_MERCHANT_CODE`, `SERDIPAY_MERCHANT_PIN` (+ `SUPABASE_SERVICE_ROLE_KEY`).
 
 ---
 
@@ -73,10 +73,14 @@ MOCK_OTP=false
 MOCK_PAYMENTS=false
 JWT_SECRET=…          # ≥ 32 caractères
 INTERNAL_API_KEY=…    # ≥ 24 caractères
-# Primaire OTP + Mobile Money
-SERDIPAY_CLIENT_ID / SERDIPAY_CLIENT_SECRET / SERDIPAY_MERCHANT_ID
+# Primaire Mobile Money (Public API) — credentials réels après compte marchand SerdiPay
+SERDIPAY_EMAIL / SERDIPAY_PASSWORD
+SERDIPAY_API_ID / SERDIPAY_API_PASSWORD / SERDIPAY_MERCHANT_CODE / SERDIPAY_MERCHANT_PIN
+# SMS SerdiPay : seulement si chemin fourni ; sinon ALLOW_TEST_OTP=true ou AT/Twilio
+# SERDIPAY_SMS_PATH=
 SMS_PROVIDER=serdipay
 MOBILE_MONEY_GATEWAY=serdipay
+ALLOW_TEST_OTP=true   # retirer seulement après SMS réel OK
 # Stockage docs (Supabase projet senga)
 SUPABASE_URL=https://furttqrltkwirdhiktdl.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=…   # dashboard → API → service_role
@@ -124,7 +128,7 @@ Guide pas-à-pas : [docs/PLAY_STORE_GUIDE.md](docs/PLAY_STORE_GUIDE.md).
 ## Blockers résiduels / risques
 
 1. **Secrets Play / keystore** absents → AAB construits mais non publiés (skip gracieux).
-2. **SerdiPay** non configuré (`SERDIPAY_CLIENT_ID` / `SECRET`) → OTP réel et paiements réels indisponibles (MOCK interdit en prod pour OTP).
+2. **SerdiPay** : attendre email d’activation marchand (credentials réels). Doc PDF = placeholders. SMS OTP non dans la doc paiement → garder `ALLOW_TEST_OTP` jusqu’à `SERDIPAY_SMS_PATH` ou AT/Twilio.
 3. **`SUPABASE_SERVICE_ROLE_KEY`** à coller sur Render (clé non exposée via MCP — dashboard Supabase projet **senga**).
 4. **`kongomarket` Supabase** : mis en pause (INACTIVE) — suppression définitive manuelle dans le dashboard si souhaitée (MCP = pause seulement).
 5. **`CORS_ORIGIN`** doit lister les URLs finales des frontends sinon navigateurs bloqués.

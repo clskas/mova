@@ -66,8 +66,12 @@ export class OrangeMoneyProvider implements PaymentProvider {
         success: false,
         transactionId: '',
         message: missingConfigMessage('Orange Money / SerdiPay', [
-          'SERDIPAY_CLIENT_ID',
-          'SERDIPAY_CLIENT_SECRET',
+          'SERDIPAY_EMAIL',
+          'SERDIPAY_PASSWORD',
+          'SERDIPAY_API_ID',
+          'SERDIPAY_API_PASSWORD',
+          'SERDIPAY_MERCHANT_CODE',
+          'SERDIPAY_MERCHANT_PIN',
           'MOBILE_MONEY_GATEWAY=serdipay',
         ]),
       };
@@ -102,8 +106,12 @@ export class MpesaProvider implements PaymentProvider {
         success: false,
         transactionId: '',
         message: missingConfigMessage('M-Pesa / SerdiPay', [
-          'SERDIPAY_CLIENT_ID',
-          'SERDIPAY_CLIENT_SECRET',
+          'SERDIPAY_EMAIL',
+          'SERDIPAY_PASSWORD',
+          'SERDIPAY_API_ID',
+          'SERDIPAY_API_PASSWORD',
+          'SERDIPAY_MERCHANT_CODE',
+          'SERDIPAY_MERCHANT_PIN',
           'MOBILE_MONEY_GATEWAY=serdipay',
         ]),
       };
@@ -134,8 +142,12 @@ export class AirtelMoneyProvider implements PaymentProvider {
         success: false,
         transactionId: '',
         message: missingConfigMessage('Airtel Money / SerdiPay', [
-          'SERDIPAY_CLIENT_ID',
-          'SERDIPAY_CLIENT_SECRET',
+          'SERDIPAY_EMAIL',
+          'SERDIPAY_PASSWORD',
+          'SERDIPAY_API_ID',
+          'SERDIPAY_API_PASSWORD',
+          'SERDIPAY_MERCHANT_CODE',
+          'SERDIPAY_MERCHANT_PIN',
           'MOBILE_MONEY_GATEWAY=serdipay',
         ]),
       };

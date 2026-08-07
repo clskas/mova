@@ -92,10 +92,13 @@ MOCK_PAYMENTS=false
 
 | Variable | Usage |
 |----------|-------|
-| `SERDIPAY_CLIENT_ID` / `SERDIPAY_CLIENT_SECRET` | **Primaire** — OTP SMS + Mobile Money (C2B/B2C) |
-| `SERDIPAY_MERCHANT_ID` | ID marchand SerdiPay (si requis) |
-| `SMS_PROVIDER` | `serdipay` (défaut) \| `africastalking` \| `twilio` |
+| `SERDIPAY_EMAIL` / `SERDIPAY_PASSWORD` | Auth Public API `get-token` (alias : `SERDIPAY_CLIENT_ID` / `SERDIPAY_CLIENT_SECRET`) |
+| `SERDIPAY_API_ID` / `SERDIPAY_API_PASSWORD` | Clés API dans le corps paiement |
+| `SERDIPAY_MERCHANT_CODE` / `SERDIPAY_MERCHANT_PIN` | Code marchand + PIN |
+| `SERDIPAY_SMS_PATH` | **Optionnel** — chemin SMS OTP (absent de la doc paiement ; laisser vide jusqu'à instruction SerdiPay) |
+| `SMS_PROVIDER` | `serdipay` (si SMS path) \| `africastalking` \| `twilio` |
 | `MOBILE_MONEY_GATEWAY` | `serdipay` (défaut) \| `africastalking` \| `legacy` |
+| `ALLOW_TEST_OTP` | `true` tant que SMS réel indisponible (OTP `123456` sur numéros seed uniquement) |
 | `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` | Stockage documents (projet **senga**, buckets `uploads` + `kyc-docs`) |
 | `TWILIO_*` | Secours OTP SMS |
 | `AFRICAS_TALKING_*` | Secours SMS + Mobile Money |
@@ -107,22 +110,22 @@ MOCK_PAYMENTS=false
 | `MOCK_OTP` | Comportement |
 |------------|--------------|
 | `true` (dev/staging) | Code fixe **123456**, pas d'SMS réel |
-| `false` (prod) | Code aléatoire 6 chiffres, envoi via **SerdiPay** (défaut) |
+| `false` (prod) | Code aléatoire 6 chiffres, envoi via provider SMS réel |
 
-Variables SerdiPay requises en prod : `SERDIPAY_CLIENT_ID`, `SERDIPAY_CLIENT_SECRET` (et chemins optionnels `SERDIPAY_*_PATH` si le portail développeur diffère des défauts).
+La doc SerdiPay Public API reçue couvre les **paiements**, pas l'SMS OTP. Tant que `SERDIPAY_SMS_PATH` (ou AT/Twilio) n'est pas fourni : **garder `ALLOW_TEST_OTP=true`** sur `mova-auth`. Ne pas le désactiver avant un test SMS réussi.
 
-Sans provider SMS avec `MOCK_OTP=false`, l'API renvoie une erreur HTTP 503 en français (*« Service SMS non configuré »*).
+Sans provider SMS avec `MOCK_OTP=false` et sans `ALLOW_TEST_OTP`, l'API renvoie une erreur HTTP 503 en français (*« Service SMS non configuré »*).
 
 ### 3.3.2 Paiements — comportement production
 
 | `MOCK_PAYMENTS` | Comportement |
 |-----------------|--------------|
 | `true` (dev) | Mobile money simulé, succès immédiat |
-| `false` (prod) | SerdiPay C2B (Orange / M-Pesa / Airtel) ; B2C pour retraits |
+| `false` (prod) | SerdiPay C2B (`payment-client`) / B2C (`payment-merchant`) ; telecom `OM` / `MP` / `AM` / `AF` |
 
 Le **portefeuille SENGA** (`POST /api/wallet/top-up`, `POST /api/payments/rides/:id`) persiste toujours en PostgreSQL, mock ou réel.
 
-Sans clés SerdiPay (ou secours AT/legacy), l'API renvoie un message d'erreur explicite listant les variables manquantes (voir `config/external-apis.env.example`).
+Sans credentials marchand SerdiPay (ou secours AT/legacy), l'API renvoie un message d'erreur explicite listant les variables manquantes (voir `config/external-apis.env.example`). Callback : `POST /api/payments/webhooks/serdipay`.
 
 ### 3.3.3 Supabase Storage (documents)
 

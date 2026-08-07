@@ -55,6 +55,9 @@ describe('prod-security', () => {
     delete process.env.TWILIO_ACCOUNT_SID;
     delete process.env.SERDIPAY_CLIENT_ID;
     delete process.env.SERDIPAY_CLIENT_SECRET;
+    delete process.env.SERDIPAY_EMAIL;
+    delete process.env.SERDIPAY_PASSWORD;
+    delete process.env.SERDIPAY_SMS_PATH;
     const { assertProductionSecurity } = await import('./prod-security');
     expect(() => assertProductionSecurity('auth-service')).toThrow(/SMS provider/);
   });
@@ -96,6 +99,9 @@ describe('prod-security', () => {
     delete process.env.MOCK_SMS;
     delete process.env.SERDIPAY_CLIENT_ID;
     delete process.env.SERDIPAY_CLIENT_SECRET;
+    delete process.env.SERDIPAY_EMAIL;
+    delete process.env.SERDIPAY_PASSWORD;
+    delete process.env.SERDIPAY_SMS_PATH;
     delete process.env.AFRICAS_TALKING_USERNAME;
     delete process.env.AFRICAS_TALKING_API_KEY;
     delete process.env.TWILIO_ACCOUNT_SID;
@@ -107,5 +113,27 @@ describe('prod-security', () => {
     expect(isTestOtpAllowedForPhone('+243900000050')).toBe(true);
     expect(isTestOtpAllowedForPhone('+243812345678')).toBe(false);
     expect(TEST_OTP_CODE).toBe('123456');
+  });
+
+  it('does not treat SerdiPay payment-only credentials as SMS ready', async () => {
+    process.env.NODE_ENV = 'production';
+    process.env.JWT_SECRET = 'a'.repeat(32);
+    process.env.INTERNAL_API_KEY = 'b'.repeat(24);
+    delete process.env.ALLOW_TEST_OTP;
+    delete process.env.MOCK_OTP;
+    delete process.env.MOCK_SMS;
+    process.env.SERDIPAY_EMAIL = 'merchant@example.com';
+    process.env.SERDIPAY_PASSWORD = 'secret';
+    process.env.SERDIPAY_API_ID = 'APIXXX';
+    process.env.SERDIPAY_API_PASSWORD = 'pw';
+    process.env.SERDIPAY_MERCHANT_CODE = '123';
+    process.env.SERDIPAY_MERCHANT_PIN = '1234';
+    delete process.env.SERDIPAY_SMS_PATH;
+    delete process.env.AFRICAS_TALKING_USERNAME;
+    delete process.env.AFRICAS_TALKING_API_KEY;
+    delete process.env.TWILIO_ACCOUNT_SID;
+    const { assertProductionSecurity, isProductionSmsConfigured } = await import('./prod-security');
+    expect(isProductionSmsConfigured()).toBe(false);
+    expect(() => assertProductionSecurity('auth-service')).toThrow(/SMS provider/);
   });
 });

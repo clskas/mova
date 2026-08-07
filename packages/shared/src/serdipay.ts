@@ -1,15 +1,31 @@
-/** SerdiPay — OTP SMS + Mobile Money RDC (passerelle primaire SENGA).
+/** SerdiPay Public API — Mobile Money RDC (passerelle primaire SENGA).
  *
- * Docs marchand : https://apis.serdipay.com/ (OAuth 2.0 / JWT).
- * Les chemins REST exacts sont configurables : confirmez-les dans le portail
- * développeur SerdiPay ou avec info@serdipay.com avant la prod.
+ * Doc marchand « API USSD - documentation » (Public API) :
+ * - Auth : POST /api/public-api/v1/merchant/get-token  { email, password }
+ * - Paiement : POST …/payment-client | …/payment-merchant
+ *   body : api_id, api_password, merchantCode, merchant_pin, clientPhone,
+ *          amount, currency, telecom (AM|OM|MP|AF)
+ * - Callback : { status, message, payment: { status, sessionId, transactionId } }
+ *
+ * SMS OTP : non documenté dans ce PDF — activer seulement si SERDIPAY_SMS_PATH
+ * est fourni par SerdiPay (sinon Africa's Talking / Twilio / ALLOW_TEST_OTP).
  */
 
 export const SERDIPAY_ENV_KEYS = {
   baseUrl: 'SERDIPAY_BASE_URL',
+  /** Merchant portal login email (get-token). Alias: SERDIPAY_CLIENT_ID */
+  email: 'SERDIPAY_EMAIL',
+  /** Merchant portal password (get-token). Alias: SERDIPAY_CLIENT_SECRET */
+  password: 'SERDIPAY_PASSWORD',
+  /** Legacy aliases kept for existing Render env / docs */
   clientId: 'SERDIPAY_CLIENT_ID',
   clientSecret: 'SERDIPAY_CLIENT_SECRET',
+  apiId: 'SERDIPAY_API_ID',
+  apiPassword: 'SERDIPAY_API_PASSWORD',
+  merchantCode: 'SERDIPAY_MERCHANT_CODE',
+  /** Alias for merchantCode */
   merchantId: 'SERDIPAY_MERCHANT_ID',
+  merchantPin: 'SERDIPAY_MERCHANT_PIN',
   webhookSecret: 'SERDIPAY_WEBHOOK_SECRET',
   tokenPath: 'SERDIPAY_TOKEN_PATH',
   smsPath: 'SERDIPAY_SMS_PATH',
@@ -21,19 +37,63 @@ export const SERDIPAY_ENV_KEYS = {
 
 import type { EnvGetter, MobileMoneyOperator } from './africas-talking';
 
-export function isSerdiPayConfigured(get: EnvGetter): boolean {
+function firstEnv(get: EnvGetter, ...keys: string[]): string | undefined {
+  for (const key of keys) {
+    const v = get(key)?.trim();
+    if (v) return v;
+  }
+  return undefined;
+}
+
+/** Auth credentials for get-token (email + password). */
+export function isSerdiPayAuthConfigured(get: EnvGetter): boolean {
+  return Boolean(serdiPayEmail(get) && serdiPayPassword(get));
+}
+
+/** Full merchant payment credentials (Public API payment body). */
+export function isSerdiPayPaymentConfigured(get: EnvGetter): boolean {
   return Boolean(
-    get(SERDIPAY_ENV_KEYS.clientId)?.trim() && get(SERDIPAY_ENV_KEYS.clientSecret)?.trim(),
+    isSerdiPayAuthConfigured(get) &&
+      firstEnv(get, SERDIPAY_ENV_KEYS.apiId) &&
+      firstEnv(get, SERDIPAY_ENV_KEYS.apiPassword) &&
+      serdiPayMerchantCode(get) &&
+      firstEnv(get, SERDIPAY_ENV_KEYS.merchantPin),
   );
+}
+
+/**
+ * True when SerdiPay can be used at all (auth present).
+ * Prefer {@link isSerdiPayPaymentConfigured} / {@link isSerdiPaySmsConfigured}
+ * for specific channels.
+ */
+export function isSerdiPayConfigured(get: EnvGetter): boolean {
+  return isSerdiPayAuthConfigured(get);
+}
+
+/** SMS only if SerdiPay shared an SMS path (not in Public API payment PDF). */
+export function isSerdiPaySmsConfigured(get: EnvGetter): boolean {
+  return Boolean(isSerdiPayAuthConfigured(get) && get(SERDIPAY_ENV_KEYS.smsPath)?.trim());
 }
 
 export function useSerdiPayMobileMoney(get: EnvGetter): boolean {
   const gateway = (get(SERDIPAY_ENV_KEYS.mobileMoneyGateway) ?? 'serdipay').trim().toLowerCase();
-  return gateway === 'serdipay' && isSerdiPayConfigured(get);
+  return gateway === 'serdipay' && isSerdiPayPaymentConfigured(get);
+}
+
+function serdiPayEmail(get: EnvGetter): string | undefined {
+  return firstEnv(get, SERDIPAY_ENV_KEYS.email, SERDIPAY_ENV_KEYS.clientId);
+}
+
+function serdiPayPassword(get: EnvGetter): string | undefined {
+  return firstEnv(get, SERDIPAY_ENV_KEYS.password, SERDIPAY_ENV_KEYS.clientSecret);
+}
+
+function serdiPayMerchantCode(get: EnvGetter): string | undefined {
+  return firstEnv(get, SERDIPAY_ENV_KEYS.merchantCode, SERDIPAY_ENV_KEYS.merchantId);
 }
 
 function baseUrl(get: EnvGetter): string {
-  return (get(SERDIPAY_ENV_KEYS.baseUrl)?.trim() || 'https://apis.serdipay.com').replace(/\/$/, '');
+  return (get(SERDIPAY_ENV_KEYS.baseUrl)?.trim() || 'https://serdipay.com').replace(/\/$/, '');
 }
 
 function pathOr(get: EnvGetter, key: keyof typeof SERDIPAY_ENV_KEYS, fallback: string): string {
@@ -42,14 +102,46 @@ function pathOr(get: EnvGetter, key: keyof typeof SERDIPAY_ENV_KEYS, fallback: s
   return raw.startsWith('/') ? raw : `/${raw}`;
 }
 
+/** Doc uses 243… without leading +. */
+export function serdiPayNormalizePhone(phone: string): string {
+  const digits = phone.replace(/\D/g, '');
+  if (digits.startsWith('243')) return digits;
+  if (digits.startsWith('0') && digits.length >= 9) return `243${digits.slice(1)}`;
+  return digits;
+}
+
+/** Telecom codes from SerdiPay Public API doc. */
+export function serdiPayTelecomCode(operator: MobileMoneyOperator | string): string {
+  switch (operator) {
+    case 'ORANGE_MONEY':
+    case 'OM':
+      return 'OM';
+    case 'MPESA':
+    case 'MP':
+      return 'MP';
+    case 'AIRTEL_MONEY':
+    case 'AM':
+      return 'AM';
+    case 'AFRIMONEY':
+    case 'AF':
+      return 'AF';
+    default:
+      return String(operator);
+  }
+}
+
 let cachedToken: { accessToken: string; expiresAtMs: number } | null = null;
 
-/** OAuth 2.0 client_credentials → Bearer JWT. */
-export async function serdiPayGetAccessToken(get: EnvGetter): Promise<{ ok: true; token: string } | { ok: false; message: string }> {
-  if (!isSerdiPayConfigured(get)) {
+/** Merchant get-token → Bearer access_token. */
+export async function serdiPayGetAccessToken(
+  get: EnvGetter,
+): Promise<{ ok: true; token: string } | { ok: false; message: string }> {
+  if (!isSerdiPayAuthConfigured(get)) {
     return {
       ok: false,
-      message: `SerdiPay non configuré. Définissez ${SERDIPAY_ENV_KEYS.clientId} et ${SERDIPAY_ENV_KEYS.clientSecret}.`,
+      message:
+        `SerdiPay non configuré. Définissez ${SERDIPAY_ENV_KEYS.email} / ${SERDIPAY_ENV_KEYS.password} ` +
+        `(ou alias ${SERDIPAY_ENV_KEYS.clientId} / ${SERDIPAY_ENV_KEYS.clientSecret}).`,
     };
   }
 
@@ -58,22 +150,18 @@ export async function serdiPayGetAccessToken(get: EnvGetter): Promise<{ ok: true
     return { ok: true, token: cachedToken.accessToken };
   }
 
-  const clientId = get(SERDIPAY_ENV_KEYS.clientId)!.trim();
-  const clientSecret = get(SERDIPAY_ENV_KEYS.clientSecret)!.trim();
-  const tokenUrl = `${baseUrl(get)}${pathOr(get, 'tokenPath', '/oauth/token')}`;
+  const email = serdiPayEmail(get)!;
+  const password = serdiPayPassword(get)!;
+  const tokenUrl = `${baseUrl(get)}${pathOr(get, 'tokenPath', '/api/public-api/v1/merchant/get-token')}`;
 
   try {
     const res = await fetch(tokenUrl, {
       method: 'POST',
       headers: {
         Accept: 'application/json',
-        'Content-Type': 'application/x-www-form-urlencoded',
+        'Content-Type': 'application/json',
       },
-      body: new URLSearchParams({
-        grant_type: 'client_credentials',
-        client_id: clientId,
-        client_secret: clientSecret,
-      }),
+      body: JSON.stringify({ email, password }),
     });
     const data = (await res.json().catch(() => ({}))) as {
       access_token?: string;
@@ -89,9 +177,10 @@ export async function serdiPayGetAccessToken(get: EnvGetter): Promise<{ ok: true
         message: data.message ?? data.error ?? `Échec auth SerdiPay (${res.status})`,
       };
     }
-    const ttlSec = typeof data.expires_in === 'number' ? data.expires_in : 3600;
-    cachedToken = { accessToken: token, expiresAtMs: now + ttlSec * 1000 };
-    return { ok: true, token };
+    // Doc does not specify TTL; refresh proactively after 50 minutes.
+    const ttlSec = typeof data.expires_in === 'number' ? data.expires_in : 3000;
+    cachedToken = { accessToken: String(token), expiresAtMs: now + ttlSec * 1000 };
+    return { ok: true, token: String(token) };
   } catch {
     return { ok: false, message: 'Service SerdiPay temporairement indisponible (auth).' };
   }
@@ -104,16 +193,29 @@ export function __resetSerdiPayTokenCache(): void {
 
 export type SerdiPaySmsResult = { success: boolean; message?: string };
 
-/** Envoi SMS OTP via API SerdiPay (chemin configurable SERDIPAY_SMS_PATH). */
+/**
+ * Envoi SMS OTP — uniquement si SERDIPAY_SMS_PATH est défini
+ * (chemin non présent dans la doc Public API paiement reçue).
+ */
 export async function serdiPaySendSms(
   get: EnvGetter,
   params: { to: string; message: string },
 ): Promise<SerdiPaySmsResult> {
+  const smsPath = get(SERDIPAY_ENV_KEYS.smsPath)?.trim();
+  if (!smsPath) {
+    return {
+      success: false,
+      message:
+        'SMS SerdiPay non activé : la doc Public API reçue ne couvre que les paiements. ' +
+        'Attendez le chemin SMS de SerdiPay (SERDIPAY_SMS_PATH) ou configurez Africa\'s Talking / Twilio.',
+    };
+  }
+
   const auth = await serdiPayGetAccessToken(get);
   if (auth.ok === false) return { success: false, message: auth.message };
 
-  const url = `${baseUrl(get)}${pathOr(get, 'smsPath', '/api/v1/sms/send')}`;
-  const merchantId = get(SERDIPAY_ENV_KEYS.merchantId)?.trim();
+  const url = `${baseUrl(get)}${smsPath.startsWith('/') ? smsPath : `/${smsPath}`}`;
+  const merchantCode = serdiPayMerchantCode(get);
 
   try {
     const res = await fetch(url, {
@@ -124,15 +226,16 @@ export async function serdiPaySendSms(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        to: params.to,
-        phone: params.to,
+        to: serdiPayNormalizePhone(params.to),
+        phone: serdiPayNormalizePhone(params.to),
+        clientPhone: serdiPayNormalizePhone(params.to),
         message: params.message,
-        ...(merchantId ? { merchantId } : {}),
+        ...(merchantCode ? { merchantCode } : {}),
       }),
     });
     const data = (await res.json().catch(() => ({}))) as {
       success?: boolean;
-      status?: string;
+      status?: string | number;
       message?: string;
       error?: string;
     };
@@ -148,19 +251,6 @@ export async function serdiPaySendSms(
   }
 }
 
-function operatorCode(operator: MobileMoneyOperator): string {
-  switch (operator) {
-    case 'ORANGE_MONEY':
-      return 'ORANGE';
-    case 'MPESA':
-      return 'MPESA';
-    case 'AIRTEL_MONEY':
-      return 'AIRTEL';
-    default:
-      return operator;
-  }
-}
-
 export type SerdiPayMmResult = {
   success: boolean;
   transactionId: string;
@@ -168,18 +258,47 @@ export type SerdiPayMmResult = {
   message?: string;
 };
 
-/** C2B — encaissement Mobile Money (checkout / push USSD). */
-export async function serdiPayInitiateMobileMoney(
+function paymentCredentials(get: EnvGetter):
+  | { ok: true; apiId: string; apiPassword: string; merchantCode: string; merchantPin: string }
+  | { ok: false; message: string } {
+  if (!isSerdiPayPaymentConfigured(get)) {
+    return {
+      ok: false,
+      message:
+        'SerdiPay paiement non configuré. Définissez SERDIPAY_EMAIL, SERDIPAY_PASSWORD, ' +
+        'SERDIPAY_API_ID, SERDIPAY_API_PASSWORD, SERDIPAY_MERCHANT_CODE, SERDIPAY_MERCHANT_PIN.',
+    };
+  }
+  return {
+    ok: true,
+    apiId: firstEnv(get, SERDIPAY_ENV_KEYS.apiId)!,
+    apiPassword: firstEnv(get, SERDIPAY_ENV_KEYS.apiPassword)!,
+    merchantCode: serdiPayMerchantCode(get)!,
+    merchantPin: firstEnv(get, SERDIPAY_ENV_KEYS.merchantPin)!,
+  };
+}
+
+async function postMerchantPayment(
   get: EnvGetter,
+  pathKey: 'c2bPath' | 'b2cPath',
+  defaultPath: string,
   params: { operator: MobileMoneyOperator; amountCdf: number; phone: string; reference: string },
+  kind: 'c2b' | 'b2c',
 ): Promise<SerdiPayMmResult> {
+  const creds = paymentCredentials(get);
+  if (creds.ok === false) {
+    return { success: false, transactionId: '', providerRef: '', message: creds.message };
+  }
+
   const auth = await serdiPayGetAccessToken(get);
   if (auth.ok === false) {
     return { success: false, transactionId: '', providerRef: '', message: auth.message };
   }
 
-  const url = `${baseUrl(get)}${pathOr(get, 'c2bPath', '/api/v1/payments/c2b')}`;
-  const merchantId = get(SERDIPAY_ENV_KEYS.merchantId)?.trim();
+  const url = `${baseUrl(get)}${pathOr(get, pathKey, defaultPath)}`;
+  const amount = Math.round(params.amountCdf);
+  const clientPhone = serdiPayNormalizePhone(params.phone);
+  const telecom = serdiPayTelecomCode(params.operator);
 
   try {
     const res = await fetch(url, {
@@ -190,117 +309,121 @@ export async function serdiPayInitiateMobileMoney(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        amount: params.amountCdf,
+        api_id: creds.apiId,
+        api_password: creds.apiPassword,
+        merchantCode: creds.merchantCode,
+        merchant_pin: creds.merchantPin,
+        clientPhone,
+        amount,
         currency: 'CDF',
-        phone: params.phone,
-        phoneNumber: params.phone,
-        provider: operatorCode(params.operator),
-        operator: operatorCode(params.operator),
+        telecom,
+        // Extra correlation fields (confirm with SerdiPay if accepted)
         reference: params.reference,
         externalId: params.reference,
-        ...(merchantId ? { merchantId } : {}),
+        merchantReference: params.reference,
       }),
     });
+
     const data = (await res.json().catch(() => ({}))) as {
       success?: boolean;
-      status?: string;
-      transactionId?: string;
-      id?: string;
+      status?: string | number;
       message?: string;
       error?: string;
       description?: string;
+      transactionId?: string;
+      id?: string;
+      payment?: {
+        status?: string;
+        sessionId?: string | number;
+        transactionId?: string;
+      };
     };
-    if (!res.ok || data.success === false || data.status === 'Failed') {
+
+    // 102 = in process (callback later); 200 = completed
+    const accepted = res.status === 102 || res.status === 200 || (res.ok && data.success !== false);
+    const failedStatus =
+      res.status === 400 ||
+      res.status === 401 ||
+      res.status === 402 ||
+      res.status === 403 ||
+      res.status === 409 ||
+      res.status === 429 ||
+      data.success === false ||
+      data.status === 'Failed' ||
+      data.payment?.status === 'failed';
+
+    if (!accepted || failedStatus) {
       return {
         success: false,
         transactionId: '',
         providerRef: '',
-        message: data.message ?? data.error ?? data.description ?? `Échec paiement SerdiPay (${res.status})`,
+        message:
+          data.message ??
+          data.error ??
+          data.description ??
+          `Échec paiement SerdiPay (${res.status})`,
       };
     }
-    const txId = data.transactionId ?? data.id ?? params.reference;
-    const providerRef = txId.startsWith('sp_') ? txId : `sp_${txId}`;
+
+    const txId =
+      data.payment?.transactionId ??
+      data.transactionId ??
+      data.id ??
+      (typeof data.payment?.sessionId !== 'undefined' ? String(data.payment.sessionId) : undefined) ??
+      params.reference;
+    const prefix = kind === 'b2c' ? 'sp_payout_' : 'sp_';
+    const providerRef = String(txId).startsWith('sp_') ? String(txId) : `${prefix}${txId}`;
+
     return {
       success: true,
-      transactionId: txId,
+      transactionId: String(txId),
       providerRef,
-      message: data.message ?? data.description ?? 'Demande de paiement SerdiPay envoyée',
+      message:
+        data.message ??
+        data.description ??
+        (res.status === 102
+          ? 'Transaction SerdiPay en cours (callback)'
+          : kind === 'b2c'
+            ? 'Retrait SerdiPay initié'
+            : 'Demande de paiement SerdiPay envoyée'),
     };
   } catch {
     return {
       success: false,
       transactionId: '',
       providerRef: '',
-      message: 'Service Mobile Money SerdiPay temporairement indisponible.',
+      message:
+        kind === 'b2c'
+          ? 'Service retrait SerdiPay temporairement indisponible.'
+          : 'Service Mobile Money SerdiPay temporairement indisponible.',
     };
   }
 }
 
-/** B2C — décaissement / retrait vers Mobile Money. */
+/** C2B — encaissement (payment-client) : push USSD vers le téléphone client. */
+export async function serdiPayInitiateMobileMoney(
+  get: EnvGetter,
+  params: { operator: MobileMoneyOperator; amountCdf: number; phone: string; reference: string },
+): Promise<SerdiPayMmResult> {
+  return postMerchantPayment(
+    get,
+    'c2bPath',
+    '/api/public-api/v1/merchant/payment-client',
+    params,
+    'c2b',
+  );
+}
+
+/** B2C — décaissement (payment-merchant) — confirmer le sens avec SerdiPay si besoin. */
 export async function serdiPayDisburseMobileMoney(
   get: EnvGetter,
   params: { operator: MobileMoneyOperator; amountCdf: number; phone: string; reference: string },
 ): Promise<SerdiPayMmResult> {
-  const auth = await serdiPayGetAccessToken(get);
-  if (auth.ok === false) {
-    return { success: false, transactionId: '', providerRef: '', message: auth.message };
-  }
-
-  const url = `${baseUrl(get)}${pathOr(get, 'b2cPath', '/api/v1/payments/b2c')}`;
-  const merchantId = get(SERDIPAY_ENV_KEYS.merchantId)?.trim();
-
-  try {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${auth.token}`,
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        amount: params.amountCdf,
-        currency: 'CDF',
-        phone: params.phone,
-        phoneNumber: params.phone,
-        provider: operatorCode(params.operator),
-        operator: operatorCode(params.operator),
-        reference: params.reference,
-        externalId: params.reference,
-        type: 'payout',
-        ...(merchantId ? { merchantId } : {}),
-      }),
-    });
-    const data = (await res.json().catch(() => ({}))) as {
-      success?: boolean;
-      status?: string;
-      transactionId?: string;
-      id?: string;
-      message?: string;
-      error?: string;
-      description?: string;
-    };
-    if (!res.ok || data.success === false || data.status === 'Failed') {
-      return {
-        success: false,
-        transactionId: '',
-        providerRef: '',
-        message: data.message ?? data.error ?? data.description ?? `Échec retrait SerdiPay (${res.status})`,
-      };
-    }
-    const txId = data.transactionId ?? data.id ?? `payout_${params.reference}`;
-    const providerRef = txId.startsWith('sp_') ? txId : `sp_payout_${txId}`;
-    return {
-      success: true,
-      transactionId: txId,
-      providerRef,
-      message: data.message ?? data.description ?? 'Retrait SerdiPay initié',
-    };
-  } catch {
-    return {
-      success: false,
-      transactionId: '',
-      providerRef: '',
-      message: 'Service retrait SerdiPay temporairement indisponible.',
-    };
-  }
+  return postMerchantPayment(
+    get,
+    'b2cPath',
+    '/api/public-api/v1/merchant/payment-merchant',
+    params,
+    'b2c',
+  );
 }

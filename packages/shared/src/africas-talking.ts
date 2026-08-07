@@ -57,11 +57,14 @@ export function resolveSmsBackend(get: EnvGetter, mockMode: boolean): SmsBackend
   if (mockMode) return 'mock';
   const preferred = (get(AFRICAS_TALKING_ENV_KEYS.smsProvider) ?? 'serdipay').trim().toLowerCase();
 
+  // SMS SerdiPay only when auth + SERDIPAY_SMS_PATH (payment PDF has no SMS API).
   // Inline check to avoid circular import with serdipay.ts
-  const trySerdi = () =>
-    get('SERDIPAY_CLIENT_ID')?.trim() && get('SERDIPAY_CLIENT_SECRET')?.trim()
-      ? ('serdipay' as const)
-      : null;
+  const trySerdi = () => {
+    const email = get('SERDIPAY_EMAIL')?.trim() || get('SERDIPAY_CLIENT_ID')?.trim();
+    const password = get('SERDIPAY_PASSWORD')?.trim() || get('SERDIPAY_CLIENT_SECRET')?.trim();
+    const smsPath = get('SERDIPAY_SMS_PATH')?.trim();
+    return email && password && smsPath ? ('serdipay' as const) : null;
+  };
   const tryAt = () => (isAfricasTalkingConfigured(get) ? ('africastalking' as const) : null);
   const tryTwilio = () => (isTwilioSmsConfigured(get) ? ('twilio' as const) : null);
 

@@ -5,7 +5,7 @@ import {
   isAfricasTalkingConfigured,
   isMockOtpAllowed,
   isProductionRuntime,
-  isSerdiPayConfigured,
+  isSerdiPaySmsConfigured,
   isTwilioSmsConfigured,
   resolveSmsBackend,
   serdiPaySendSms,
@@ -55,7 +55,7 @@ export class SerdiPaySmsProvider implements SmsProvider {
   private get = (key: string) => this.config.get<string>(key);
 
   isConfigured(): boolean {
-    return isSerdiPayConfigured(this.get);
+    return isSerdiPaySmsConfigured(this.get);
   }
 
   async sendOtp(phone: string, code: string): Promise<SmsSendResult> {
@@ -188,7 +188,8 @@ export class SmsService {
       this.logger.error('SMS OTP failed: no provider configured');
       return {
         success: false,
-        message: 'Service SMS non configuré. Définissez SERDIPAY_CLIENT_ID / SERDIPAY_CLIENT_SECRET (ou Africa\'s Talking / Twilio).',
+        message:
+          'Service SMS non configuré. Définissez SERDIPAY_SMS_PATH + SERDIPAY_EMAIL / SERDIPAY_PASSWORD (ou Africa\'s Talking / Twilio).',
       };
     }
     const result = await provider.sendOtp(phone, code);

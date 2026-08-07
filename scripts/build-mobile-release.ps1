@@ -1,11 +1,11 @@
 # Build local des AAB passager + chauffeur (parité CI mobile-release).
 # Usage : .\scripts\build-mobile-release.ps1
-#         .\scripts\build-mobile-release.ps1 -ApiUrl "https://mova-gateway.onrender.com/api" -WsUrl "https://mova-gateway.onrender.com"
+#         .\scripts\build-mobile-release.ps1 -ApiUrl "https://api.afri-soft.com/api" -WsUrl "https://api.afri-soft.com"
 # Dev LAN (appareil physique) : .\scripts\build-mobile-debug.ps1
 
 param(
-    [string]$ApiUrl = "https://mova-gateway.onrender.com/api",
-    [string]$WsUrl = "https://mova-gateway.onrender.com"
+    [string]$ApiUrl = "https://api.afri-soft.com/api",
+    [string]$WsUrl = "https://api.afri-soft.com"
 )
 
 $ErrorActionPreference = "Stop"

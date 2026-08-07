@@ -31,10 +31,10 @@ permissions:
 
 env:
   FLUTTER_VERSION: stable
-  # Défauts production (Render). Les secrets peuvent surcharger, mais le job
+  # Défauts production (domaine custom). Les secrets peuvent surcharger, mais le job
   # "Resolve production API URLs" rejette les IP LAN / localhost.
-  DEFAULT_PROD_API_URL: https://mova-gateway.onrender.com/api
-  DEFAULT_PROD_WS_URL: https://mova-gateway.onrender.com
+  DEFAULT_PROD_API_URL: https://api.afri-soft.com/api
+  DEFAULT_PROD_WS_URL: https://api.afri-soft.com
 
 jobs:
   build-android:
@@ -66,7 +66,7 @@ jobs:
               '(localhost|127\.0\.0\.1|10\.0\.2\.2|:3000|://10\.|://192\.168\.|://172\.(1[6-9]|2[0-9]|3[0-1])\.)'
           }
           if looks_dev "$API" || looks_dev "$WS" || [[ "$API" != https://* ]] || [[ "$WS" != https://* ]]; then
-            echo "::warning::PROD_API_URL/PROD_WS_URL invalides ou LAN — forçage Render production"
+            echo "::warning::PROD_API_URL/PROD_WS_URL invalides ou LAN — forçage API production"
             API="$DEFAULT_PROD_API_URL"
             WS="$DEFAULT_PROD_WS_URL"
           fi
@@ -283,7 +283,7 @@ jobs:
               '(localhost|127\.0\.0\.1|10\.0\.2\.2|:3000|://10\.|://192\.168\.|://172\.(1[6-9]|2[0-9]|3[0-1])\.)'
           }
           if looks_dev "$API" || looks_dev "$WS" || [[ "$API" != https://* ]] || [[ "$WS" != https://* ]]; then
-            echo "::warning::PROD_API_URL/PROD_WS_URL invalides ou LAN — forçage Render production"
+            echo "::warning::PROD_API_URL/PROD_WS_URL invalides ou LAN — forçage API production"
             API="$DEFAULT_PROD_API_URL"
             WS="$DEFAULT_PROD_WS_URL"
           fi

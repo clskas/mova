@@ -10,9 +10,9 @@ class MarketConfig {
   static const timezone = 'Africa/Kinshasa';
   static const locale = 'fr_CD';
 
-  /// Passerelle production (Render). Les builds release doivent toujours aboutir ici.
-  static const productionApiUrl = 'https://mova-gateway.onrender.com/api';
-  static const productionWsUrl = 'https://mova-gateway.onrender.com';
+  /// Passerelle production (domaine custom). Les builds release doivent toujours aboutir ici.
+  static const productionApiUrl = 'https://api.afri-soft.com/api';
+  static const productionWsUrl = 'https://api.afri-soft.com';
 
   /// Centre carte RDC — fallback technique uniquement (pas de ville imposée).
   static const mapCenterLat = -2.88;

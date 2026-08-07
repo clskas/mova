@@ -37,7 +37,7 @@ class _DriverJobTaskHandler extends TaskHandler {
 
     // Aligné sur MarketConfig : en release, jamais d'hôte LAN / émulateur.
     const apiFromEnv = String.fromEnvironment('API_URL', defaultValue: '');
-    const prodApi = 'https://mova-gateway.onrender.com/api';
+    const prodApi = 'https://api.afri-soft.com/api';
     final raw = apiFromEnv.isNotEmpty
         ? apiFromEnv
         : (kReleaseMode ? prodApi : 'http://10.0.2.2:3000/api');

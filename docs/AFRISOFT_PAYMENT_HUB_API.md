@@ -9,20 +9,20 @@
 
 ## 1. Réponses clés / Key answers
 
-### Les autres apps doivent-elles être hébergées sur Render ?
+### Les autres apps doivent-elles être hébergées sur le VPS paiements ?
 
-**Non.** Seul le **module paiements** qui dialogue avec SerdiPay a besoin des **IP fixes Render** (whitelist SerdiPay) et du **callback unique** enregistré chez SerdiPay.
+**Non.** Seul le **module paiements** qui dialogue avec SerdiPay a besoin de l’**IP fixe du VPS** (whitelist SerdiPay) et du **callback unique** enregistré chez SerdiPay.
 
-Les applications clientes (Educongo, futures apps…) peuvent tourner **n’importe où** (Vercel, AWS, VPS, on-prem, autre cloud), à condition de :
+Les applications clientes (Educongo, futures apps…) peuvent tourner **n’importe où** (Vercel, AWS, VPS, on-prem, autre cloud — y compris Render pour le reste de SENGA), à condition de :
 
 1. Appeler l’API HTTPS du hub ;
 2. Exposer une **URL de webhook sortant** joignable par le hub (HTTPS public).
 
-| Composant | Hébergement | IP fixe Render requise ? |
+| Composant | Hébergement | IP fixe whitelist SerdiPay |
 |-----------|-------------|---------------------------|
-| Module paiements AfriSoft (`mova-payment` / gateway) | Render (aujourd’hui) | **Oui** — seuls sortants vers SerdiPay |
-| Callback SerdiPay → hub | Même domaine (`api.afri-soft.com`) | N/A (entrant) |
-| SENGA, Educongo, apps futures | Libre | **Non** |
+| Module paiements AfriSoft (`afrisoft-pay` / hub) | **VPS Hetzner** (`pay.afri-soft.com`, IP `178.104.82.66`) | **Oui** — seuls sortants vers SerdiPay |
+| Callback SerdiPay → hub | Même domaine (`https://pay.afri-soft.com/webhooks/serdipay`) | N/A (entrant) |
+| SENGA, Educongo, apps futures | Libre (ex. Render pour SENGA API) | **Non** |
 | Webhook app ← hub | URL HTTPS publique de l’app | **Non** (doit être joignable depuis le hub) |
 
 ### La recharge wallet fonctionnera-t-elle dès que SerdiPay / Mobile Money marche ?
@@ -38,11 +38,12 @@ Pour **les autres apps AfriSoft** : elles n’utilisent pas le wallet SENGA ; el
 ```
 SENGA ──┐
 Educongo┼── HTTPS (app_id + API key / HMAC) ──►  Module paiements AfriSoft
-Future ─┘                                         (mova-payment derrière api.afri-soft.com)
+Future ─┘                                         (afrisoft-pay sur VPS Hetzner
+                                                   derrière pay.afri-soft.com)
                                                     • auth app
                                                     • crée / suit les paiements
                                                     • 1 seul dialogue SerdiPay
-                                                    • 1 domaine + 1 callback + IP Render
+                                                    • 1 domaine + 1 callback + IP fixe VPS
                                                               │
                                                               ▼
                                                           SerdiPay
@@ -64,7 +65,7 @@ Future ─┘                                         (mova-payment derrière ap
 4. SerdiPay envoie **un** webhook au hub ; le hub notifie l’app concernée.
 5. Les apps **ne stockent jamais** `SERDIPAY_*`.
 
-**État code actuel (août 2026) :** SENGA consomme déjà SerdiPay en interne (`packages/shared/src/serdipay.ts`, `POST /api/payments/webhooks/serdipay`). Les endpoints **`/v1/*` multi-apps** ci-dessous sont le **contrat d’intégration** à exposer / stabiliser pour Educongo et les suivantes (SENGA peut rester le premier client, éventuellement via adapters internes).
+**État code actuel (août 2026) :** SENGA consomme déjà SerdiPay en interne (`packages/shared/src/serdipay.ts`). Le callback public enregistré chez SerdiPay est `POST https://pay.afri-soft.com/webhooks/serdipay` (hub VPS). Les endpoints **`/v1/*` multi-apps** ci-dessous sont le **contrat d’intégration** à exposer / stabiliser pour Educongo et les suivantes (SENGA peut rester le premier client, éventuellement via adapters internes).
 
 ---
 
@@ -120,7 +121,7 @@ const sig = crypto
 
 ## 4. Endpoints / Endpoints
 
-Base URL cible : `https://api.afri-soft.com` (gateway).  
+Base URL cible : `https://pay.afri-soft.com` (hub paiements VPS).  
 Préfixe contrat multi-apps : `/v1`.
 
 ### 4.1 Créer un paiement Mobile Money — `POST /v1/payments`
@@ -190,12 +191,12 @@ Ou : `GET /v1/payments/by-reference/{reference}`
 ### 4.3 Webhook entrant SerdiPay (interne hub) — ne pas appeler depuis les apps
 
 ```http
-POST /api/payments/webhooks/serdipay
+POST https://pay.afri-soft.com/webhooks/serdipay
 ```
 
-- Enregistré **une fois** chez SerdiPay (domaine AfriSoft).
+- Enregistré **une fois** chez SerdiPay (domaine hub AfriSoft).
 - Vérifié avec `SERDIPAY_WEBHOOK_SECRET` (`X-SerdiPay-Signature` / HMAC SHA-256).
-- Implémenté aujourd’hui dans `services/payment-service/src/payments/payments-webhook.controller.ts`.
+- Déployé sur le VPS (`/opt/afrisoft-pay`) ; côté monorepo SENGA, le handler historique est `services/payment-service/src/payments/payments-webhook.controller.ts` (`POST /api/payments/webhooks/serdipay` — le reverse proxy du hub expose le chemin public `/webhooks/serdipay`).
 - Les apps clientes **n’utilisent pas** cet endpoint.
 
 ### 4.4 Webhook sortant hub → app
@@ -286,7 +287,7 @@ BODY='{"app_id":"educongo","amount_cdf":15000,"currency":"CDF","phone":"24397000
 PATH_ONLY=/v1/payments
 SIG=$(node -e "const c=require('crypto');const b=process.argv[1],ts=process.argv[2],k=process.argv[3];process.stdout.write(c.createHmac('sha256',k).update(ts+'.POST./v1/payments.'+b).digest('hex'))" "$BODY" "$TS" "$API_KEY")
 
-curl -sS -X POST "https://api.afri-soft.com/v1/payments" \
+curl -sS -X POST "https://pay.afri-soft.com/v1/payments" \
   -H "Content-Type: application/json" \
   -H "X-AfriSoft-App-Id: $APP_ID" \
   -H "X-AfriSoft-Api-Key: $API_KEY" \
@@ -298,7 +299,7 @@ curl -sS -X POST "https://api.afri-soft.com/v1/payments" \
 ### Polling statut
 
 ```bash
-curl -sS "https://api.afri-soft.com/v1/payments/by-reference/educongo_tuition_550e8400-e29b-41d4-a716-446655440000" \
+curl -sS "https://pay.afri-soft.com/v1/payments/by-reference/educongo_tuition_550e8400-e29b-41d4-a716-446655440000" \
   -H "X-AfriSoft-App-Id: educongo" \
   -H "X-AfriSoft-Api-Key: $API_KEY" \
   -H "X-AfriSoft-Timestamp: $TS" \
@@ -317,7 +318,7 @@ Flux réel dans le dépôt :
 2. **API** : `WalletController` → `WalletService.topUp` (`services/payment-service/src/wallet/wallet.service.ts`).
 3. Si `useSerdiPayMobileMoney` + téléphone : appel `serdiPayInitiateMobileMoney` (C2B `payment-client`).
 4. Transaction `TOPUP_PENDING` + `providerRef` (`sp_…`) ; l’app poll `GET /wallet/top-up/status?providerRef=`.
-5. Callback SerdiPay → `POST /api/payments/webhooks/serdipay` → `completeMobileMoneyFromWebhook` → `completePendingTopUp` → crédit solde (`TOPUP_COMPLETED`).
+5. Callback SerdiPay → `POST https://pay.afri-soft.com/webhooks/serdipay` → `completeMobileMoneyFromWebhook` → `completePendingTopUp` → crédit solde (`TOPUP_COMPLETED`).
 
 Fichiers clés :
 
@@ -326,13 +327,13 @@ Fichiers clés :
 - `services/payment-service/src/payments/payments-webhook.controller.ts`
 - `mobile/lib/features/wallet/wallet_screen.dart`
 
-**Implication :** dès que SerdiPay est opérationnel (env Render + callback), **la recharge wallet SENGA fonctionne sans développement supplémentaire** sur ce flux (hors tuning / tests terrain). Mode mock (`MOCK` / `MOCK_PAYMENTS`) reste pour le dev.
+**Implication :** dès que SerdiPay est opérationnel (env VPS hub + callback), **la recharge wallet SENGA fonctionne sans développement supplémentaire** sur ce flux (hors tuning / tests terrain). Mode mock (`MOCK` / `MOCK_PAYMENTS`) reste pour le dev.
 
 ### 7.2 Autres apps (Educongo, etc.)
 
 - Elles **ne partagent pas** le ledger wallet SENGA.
 - Pattern recommandé : `POST /v1/payments` avec `purpose=topup` (ou métier), puis à `payment.completed` créditer **leur** portefeuille interne.
-- Pas besoin d’héberger sur Render ; besoin uniquement d’appeler le hub + recevoir le webhook.
+- Pas besoin d’héberger sur le VPS paiements ni d’IP fixe ; besoin uniquement d’appeler le hub + recevoir le webhook.
 
 ### 7.3 Travail restant (hub multi-apps)
 
@@ -348,23 +349,36 @@ Fichiers clés :
 
 ## 8. Hébergement / Hosting requirements
 
+### 8.1 Hub paiements (prod actuelle)
+
+| Élément | Valeur |
+|---------|--------|
+| Hébergeur | **VPS Hetzner** (dédié SerdiPay / hub) |
+| Domaine public | `https://pay.afri-soft.com` |
+| IP fixe (whitelist SerdiPay) | `178.104.82.66` |
+| Chemin déploiement | `/opt/afrisoft-pay` |
+| Callback SerdiPay | `https://pay.afri-soft.com/webhooks/serdipay` |
+| DNS | **Cloudflare uniquement** (pas d’autre registrar DNS pour ce hostname) |
+
+> **Render vs VPS :** le reste de SENGA (API métier, apps) peut rester sur Render ou ailleurs. **Seul** le hub qui parle à SerdiPay doit sortir depuis l’IP VPS ci-dessus. Ne pas replacer le callback SerdiPay sur un service Render à IP dynamique.
+
 | Exigence SerdiPay | Qui doit la satisfaire |
 |-------------------|------------------------|
-| IP sortantes whitelistées (Render dedicated) | **Module paiements uniquement** |
-| 1 domaine / 1 URL de callback | **Module paiements uniquement** |
-| Credentials marchand | **Module paiements uniquement** (env Render) |
+| IP sortantes whitelistées (`178.104.82.66`) | **Module paiements uniquement** (VPS) |
+| 1 domaine / 1 URL de callback | **Module paiements uniquement** (`pay.afri-soft.com`) |
+| Credentials marchand | **Module paiements uniquement** (env sur le VPS) |
 
-**Les apps clientes n’ont pas besoin d’IP fixe Render.**  
+**Les apps clientes n’ont pas besoin d’IP fixe ni d’hébergement sur ce VPS.**  
 Elles doivent seulement :
 
-- Pouvoir joindre `https://api.afri-soft.com` (HTTPS sortant) ;
+- Pouvoir joindre `https://pay.afri-soft.com` (HTTPS sortant) ;
 - Exposer un webhook HTTPS que le hub peut joindre (firewall / auth HMAC).
 
 ---
 
 ## 9. Variables d’environnement & checklist onboarding
 
-### 9.1 Côté hub (Render — secrets, ne pas committer)
+### 9.1 Côté hub (VPS `/opt/afrisoft-pay` — secrets, ne pas committer)
 
 | Variable | Rôle |
 |----------|------|
@@ -384,17 +398,17 @@ Voir aussi `config/external-apis.env.example` et `docs/PRODUCTION_DEPLOYMENT.md`
 2. Fournir **`webhook_url`** HTTPS (staging puis prod).
 3. Implémenter vérification HMAC des webhooks entrants.
 4. Générer des `reference` au format `{app_id}_{purpose}_{uuid}`.
-5. Appeler `POST /v1/payments` puis gérer `PENDING` (UI + poll optionnel).
+5. Appeler `POST /v1/payments` sur `https://pay.afri-soft.com` puis gérer `PENDING` (UI + poll optionnel).
 6. Sur `payment.completed` : idempotence + crédit métier.
 7. Tester en staging avec petits montants CDF (OM / MP / AM).
-8. **Ne pas** demander de nouveau compte SerdiPay ni d’IP Render pour l’app (sauf volume / KYC commercial).
+8. **Ne pas** demander de nouveau compte SerdiPay ni d’IP whitelist pour l’app (sauf volume / KYC commercial).
 
 ### 9.3 Côté SENGA (déjà en place pour MM)
 
 - [x] Client SerdiPay Public API  
-- [x] Webhook `/api/payments/webhooks/serdipay`  
+- [x] Webhook public hub `https://pay.afri-soft.com/webhooks/serdipay`  
 - [x] Wallet top-up async + poll Flutter  
-- [ ] Credentials marchand réels sur Render  
+- [ ] Credentials marchand réels sur le VPS hub  
 - [ ] Endpoints `/v1/*` + registre multi-apps + webhooks sortants  
 
 ---

@@ -95,13 +95,19 @@ MOCK_PAYMENTS=false
 | `SERDIPAY_EMAIL` / `SERDIPAY_PASSWORD` | Auth Public API `get-token` (alias : `SERDIPAY_CLIENT_ID` / `SERDIPAY_CLIENT_SECRET`) |
 | `SERDIPAY_API_ID` / `SERDIPAY_API_PASSWORD` | Clés API dans le corps paiement |
 | `SERDIPAY_MERCHANT_CODE` / `SERDIPAY_MERCHANT_PIN` | Code marchand + PIN |
-| `SERDIPAY_SMS_PATH` | **Optionnel** — chemin SMS OTP (absent de la doc paiement ; laisser vide jusqu'à instruction SerdiPay) |
-| `SMS_PROVIDER` | `serdipay` (si SMS path) \| `africastalking` \| `twilio` |
-| `MOBILE_MONEY_GATEWAY` | `serdipay` (défaut) \| `africastalking` \| `legacy` |
+| `SERDIPAY_SMS_API_ID` / `SERDIPAY_SMS_API_KEY` | Credentials SMS API (doc `sms-api.pdf`) — distincts du paiement |
+| `SERDIPAY_SMS_BASE_URL` / `SERDIPAY_SMS_PATH` | Défauts `https://serdipay.com` + `/api/sms-api/v1/send` |
+| `SERDIPAY_SMS_SENDER_ID` | Sender alphanumérique SerdiPay (ex. `SerdiPay`) |
+| `SMS_PROVIDER` | `africastalking` \| `serdipay` \| `twilio` — switch **explicite**, sans fallback (voir [SMS_OTP_PROVIDERS.md](./SMS_OTP_PROVIDERS.md)) |
+| `AFRICAS_TALKING_USERNAME` / `AFRICAS_TALKING_API_KEY` | App AT (ex. `mova`) + API key — voir [AFRICAS_TALKING_SMS.md](./AFRICAS_TALKING_SMS.md) |
+| `AFRICAS_TALKING_ENV` | `production` pour vrais `+243` (`sandbox` = tests AT seulement) |
+| `AFRICAS_TALKING_SMS_SENDER` | Alphanumeric / shortcode approuvé (ex. `MOVA`) |
+| `MOBILE_MONEY_GATEWAY` | `serdipay` (défaut) \| `cinetpay` \| `africastalking` \| `legacy` \| `mock` — switch sticky (voir [MOBILE_MONEY_PROVIDER_ALTERNATIVES.md](./MOBILE_MONEY_PROVIDER_ALTERNATIVES.md)) |
+| `CINETPAY_API_KEY` / `CINETPAY_SITE_ID` / `CINETPAY_SECRET_KEY` | Failover CinetPay (hub) |
+| `CINETPAY_NOTIFY_URL` | `https://pay.afri-soft.com/webhooks/cinetpay` |
 | `ALLOW_TEST_OTP` | `true` tant que SMS réel indisponible (OTP `123456` sur numéros seed uniquement) |
 | `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` | Stockage documents (projet **senga**, buckets `uploads` + `kyc-docs`) |
 | `TWILIO_*` | Secours OTP SMS |
-| `AFRICAS_TALKING_*` | Secours SMS + Mobile Money |
 | `FCM_SERVER_KEY` | Push notifications |
 | `MAPBOX_ACCESS_TOKEN` | Autocomplétion adresses nationale RDC (recommandé — sans token, Nominatim/Photon OSM peut omettre des lieux) |
 
@@ -112,7 +118,7 @@ MOCK_PAYMENTS=false
 | `true` (dev/staging) | Code fixe **123456**, pas d'SMS réel |
 | `false` (prod) | Code aléatoire 6 chiffres, envoi via provider SMS réel |
 
-La doc SerdiPay Public API reçue couvre les **paiements**, pas l'SMS OTP. Tant que `SERDIPAY_SMS_PATH` (ou AT/Twilio) n'est pas fourni : **garder `ALLOW_TEST_OTP=true`** sur `mova-auth`. Ne pas le désactiver avant un test SMS réussi.
+OTP SMS : bascule **AT ↔ SerdiPay** via `SMS_PROVIDER` — guide [SMS_OTP_PROVIDERS.md](./SMS_OTP_PROVIDERS.md). AT détail : [AFRICAS_TALKING_SMS.md](./AFRICAS_TALKING_SMS.md). Tant que le SMS réel n’est pas validé : **garder `ALLOW_TEST_OTP=true`** sur `mova-auth`.
 
 Sans provider SMS avec `MOCK_OTP=false` et sans `ALLOW_TEST_OTP`, l'API renvoie une erreur HTTP 503 en français (*« Service SMS non configuré »*).
 

@@ -10,6 +10,9 @@ const APPROVED_DRIVER_PHONES = new Set([
   '+243900000025',
   '+243900000027',
   '+243900000029',
+  '+243900000050',
+  '+243900000052',
+  '+243900000054',
 ]);
 
 const DRIVER_SEEDS = [
@@ -23,6 +26,11 @@ const DRIVER_SEEDS = [
   { phone: '+243900000027', license: 'KIN-DRV-008', plate: 'CD-COMF-027', make: 'BMW', model: 'Serie 3', type: VehicleType.COMFORT },
   { phone: '+243900000028', license: 'KIN-DRV-009', plate: 'CD-MOTO-028', make: 'Honda', model: 'Wave', type: VehicleType.MOTO_TAXI },
   { phone: '+243900000029', license: 'KIN-DRV-010', plate: 'CD-7890-KIN', make: 'Nissan', model: 'Sentra', type: VehicleType.STANDARD },
+  { phone: '+243900000050', license: 'KIN-DRV-011', plate: 'CD-5050-KIN', make: 'Toyota', model: 'Corolla', type: VehicleType.STANDARD },
+  { phone: '+243900000051', license: 'KIN-DRV-012', plate: 'CD-MOTO-051', make: 'Suzuki', model: 'Address', type: VehicleType.MOTO_TAXI },
+  { phone: '+243900000052', license: 'KIN-DRV-013', plate: 'CD-5252-KIN', make: 'Hyundai', model: 'i10', type: VehicleType.STANDARD },
+  { phone: '+243900000053', license: 'KIN-DRV-014', plate: 'CD-COMF-053', make: 'Mercedes', model: 'C-Class', type: VehicleType.COMFORT },
+  { phone: '+243900000054', license: 'KIN-DRV-015', plate: 'CD-5454-KIN', make: 'Nissan', model: 'Almera', type: VehicleType.STANDARD },
 ];
 
 const DEMO_PASSENGERS = [

@@ -1,0 +1,58 @@
+# AfriSoft SMS / OTP Hub — VPS scaffold (parallel to /opt/afrisoft-pay)
+# Do NOT put live AT / SerdiPay SMS secrets in git. Fill /opt/afrisoft-sms/.env on the server only.
+#
+# Build from Mova monorepo root:
+#   docker build -f docker/sms.Dockerfile -t afrisoft-sms/hub:local .
+#
+# Start:
+#   docker compose --profile hub up -d
+
+services:
+  redis:
+    profiles: ["infra", "hub"]
+    image: redis:7-alpine
+    container_name: afrisoft-sms-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "64mb", "--maxmemory-policy", "allkeys-lru"]
+    volumes:
+      - ./data/redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - smsnet
+
+  sms:
+    profiles: ["hub"]
+    image: ${SMS_IMAGE:-afrisoft-sms/hub:local}
+    container_name: afrisoft-sms-hub
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: "3001"
+      REDIS_URL: redis://redis:6379
+      SMS_PROVIDER: ${SMS_PROVIDER:-mock}
+      MOCK_OTP: ${MOCK_OTP:-true}
+      MOCK_RETURN_CODE: ${MOCK_RETURN_CODE:-true}
+      MOCK_FIXED_OTP: ${MOCK_FIXED_OTP:-true}
+    ports:
+      - "127.0.0.1:3001:3001"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3001/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 25s
+    networks:
+      - smsnet
+
+networks:
+  smsnet:
+    name: afrisoft-sms-net

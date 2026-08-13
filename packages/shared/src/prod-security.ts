@@ -159,8 +159,12 @@ function envGet(key: string): string | undefined {
   return process.env[key];
 }
 
-/** Real SMS provider (SerdiPay SMS path, Africa's Talking or Twilio) is configured. */
+/** Real SMS provider matching SMS_PROVIDER (or any if unset) is configured. */
 export function isProductionSmsConfigured(): boolean {
+  const preferred = (process.env.SMS_PROVIDER ?? '').trim().toLowerCase();
+  if (preferred === 'serdipay') return isSerdiPaySmsConfigured(envGet);
+  if (preferred === 'africastalking') return isAfricasTalkingConfigured(envGet);
+  if (preferred === 'twilio') return isTwilioSmsConfigured(envGet);
   return (
     isSerdiPaySmsConfigured(envGet) ||
     isAfricasTalkingConfigured(envGet) ||
@@ -194,14 +198,14 @@ export function assertProductionSecurity(serviceName = 'service'): void {
   if (isTestOtpModeEnabled()) {
     // eslint-disable-next-line no-console
     console.warn(
-      `[${serviceName}] ALLOW_TEST_OTP=true: OTP de test (123456) limité aux numéros seed. Retirer dès que SERDIPAY_SMS_PATH (ou AT/Twilio) fonctionne.`,
+      `[${serviceName}] ALLOW_TEST_OTP=true: OTP de test (123456) limité aux numéros seed. Retirer dès que SerdiPay SMS (SERDIPAY_SMS_API_ID/KEY) ou AT/Twilio fonctionne.`,
     );
   }
 
   // Only auth-service sends OTP; other services warn if SMS env is missing.
   if (!isProductionSmsConfigured() && !isTestOtpModeEnabled()) {
     const msg =
-      `[${serviceName}] No SMS provider configured (SERDIPAY_SMS_PATH + auth, AFRICAS_TALKING_* or TWILIO_*). OTP delivery will fail.`;
+      `[${serviceName}] No SMS provider configured (SERDIPAY_SMS_API_ID/KEY, AFRICAS_TALKING_* or TWILIO_* for SMS_PROVIDER). OTP delivery will fail.`;
     if (serviceName === 'auth-service') {
       throw new Error(
         `${msg} Refusing to start. Keep ALLOW_TEST_OTP=true until SerdiPay SMS (or AT/Twilio) is live.`,

@@ -22,6 +22,11 @@ const DEMO_PASSENGERS = [
   { suffix: 17, firstName: 'Fabrice', lastName: 'Ilunga' },
   { suffix: 18, firstName: 'Hortense', lastName: 'Tshilombo' },
   { suffix: 19, firstName: 'Innocent', lastName: 'Bemba' },
+  { suffix: 40, firstName: 'Clarisse', lastName: 'Mputu' },
+  { suffix: 41, firstName: 'Dieudonné', lastName: 'Kabongo' },
+  { suffix: 42, firstName: 'Sandrine', lastName: 'Lumbala' },
+  { suffix: 43, firstName: 'Théo', lastName: 'Ngalula' },
+  { suffix: 44, firstName: 'Véronique', lastName: 'Katanga' },
 ] as const;
 
 const DEMO_DRIVERS = [
@@ -35,6 +40,11 @@ const DEMO_DRIVERS = [
   { suffix: 27, firstName: 'Michel', lastName: 'Banza' },
   { suffix: 28, firstName: 'Nadège', lastName: 'Mwadi' },
   { suffix: 29, firstName: 'Christian', lastName: 'Odia' },
+  { suffix: 50, firstName: 'Blaise', lastName: 'Mbuyamba' },
+  { suffix: 51, firstName: 'Carine', lastName: 'Tshimanga' },
+  { suffix: 52, firstName: 'Dieudonné', lastName: 'Kalonji' },
+  { suffix: 53, firstName: 'Francine', lastName: 'Lukusa' },
+  { suffix: 54, firstName: 'Gaston', lastName: 'Mwakasu' },
 ] as const;
 
 function demoUserId(role: 'passenger' | 'driver', suffix: number): string {

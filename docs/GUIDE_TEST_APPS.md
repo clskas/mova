@@ -113,9 +113,11 @@ Le PC et le téléphone doivent être sur le **même Wi‑Fi**.
 adb devices    # USB debugging activé
 ```
 
-### Comptes de test — passagers et chauffeurs (10 + 10)
+### Comptes de test — passagers et chauffeurs (15 + 15)
 
-> **OTP local :** toujours **`123456`** (`MOCK_OTP=true` dans `config/external-apis.env`).
+> **OTP :** **`123456`** en local (`MOCK_OTP=true`) et en prod Play (`ALLOW_TEST_OTP=true`, numéros whitelistés ci-dessous uniquement).
+
+> **PIN local vs OTP (app mobile prod) :** si l’écran demande un **Code PIN SENGA** (et non un OTP SMS), `123456` ne fonctionne **pas** comme PIN. Appuyer sur **« Code PIN oublié ? »** pour recevoir / saisir l’OTP `123456`. Format téléphone : **`+2439…`** (indicatif inclus). API prod : `https://mova-gateway.onrender.com/api`.
 
 **Prérequis chauffeur :** KYC **APPROVED** pour accepter des courses. Après `npm run seed:admin-demo`, les numéros marqués ✅ sont prêts ; les autres sont en **KYC en attente** (à approuver dans l’admin).
 
@@ -133,6 +135,11 @@ adb devices    # USB debugging activé
 | 8 | `+243900000017` | Fabrice Ilunga | Testeur 8 |
 | 9 | `+243900000018` | Hortense Tshilombo | Testeur 9 |
 | 10 | `+243900000019` | Innocent Bemba | Testeur 10 |
+| 11 | `+243900000040` | Clarisse Mputu | Testeur 11 |
+| 12 | `+243900000041` | Dieudonné Kabongo | Testeur 12 |
+| 13 | `+243900000042` | Sandrine Lumbala | Testeur 13 |
+| 14 | `+243900000043` | Théo Ngalula | Testeur 14 |
+| 15 | `+243900000044` | Véronique Katanga | Testeur 15 |
 
 #### Chauffeurs (app **Chauffeur**)
 
@@ -148,6 +155,11 @@ adb devices    # USB debugging activé
 | 8 | `+243900000027` | Michel Banza | ✅ Approuvé | Confort |
 | 9 | `+243900000028` | Nadège Mwadi | En attente | Workflow KYC admin |
 | 10 | `+243900000029` | Christian Odia | ✅ Approuvé | Courses immédiates |
+| 11 | `+243900000050` | Blaise Mbuyamba | ✅ Approuvé | Courses immédiates |
+| 12 | `+243900000051` | Carine Tshimanga | En attente | Workflow KYC admin |
+| 13 | `+243900000052` | Dieudonné Kalonji | ✅ Approuvé | Courses immédiates |
+| 14 | `+243900000053` | Francine Lukusa | En attente | Workflow KYC admin |
+| 15 | `+243900000054` | Gaston Mwakasu | ✅ Approuvé | Courses immédiates |
 
 #### Staff admin (back-office `localhost:3002`)
 
@@ -169,7 +181,7 @@ Détail RBAC : [RBAC_TESTING.md](./RBAC_TESTING.md).
 | **Passager** | `+243900000010` | PASSENGER (Marie Kabila) |
 | **Chauffeur** | `+243900000023` | DRIVER (Alain Kabeya, KYC ✅) |
 
-Voir les tableaux ci-dessus pour les **10 passagers** et **10 chauffeurs**.
+Voir les tableaux ci-dessus pour les **15 passagers** et **15 chauffeurs**.
 
 ---
 
@@ -282,8 +294,9 @@ Sans `-UsbReverse` : le PC et le téléphone doivent être sur le **même Wi‑F
 
 ### Connexion
 
-1. Téléphone : `+243900000010`
-2. OTP : **`123456`**
+1. Téléphone : `+243900000010` (format `+243…`)
+2. Continuer → si écran **PIN** : **« Code PIN oublié ? »**
+3. OTP : **`123456`** → **Vérifier le code**
 
 ### Checklist Passager
 
@@ -350,8 +363,9 @@ cd c:\Users\Administrator\Senga
 
 ### Connexion
 
-1. Téléphone : `+243900000020`
-2. OTP : **`123456`**
+1. Téléphone : `+243900000020` ou `+243900000023` (KYC ✅)
+2. Continuer → si écran **PIN** : **« Code PIN oublié ? »**
+3. OTP : **`123456`** → **Vérifier le code**
 
 ### Checklist Chauffeur
 

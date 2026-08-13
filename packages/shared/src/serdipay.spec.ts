@@ -6,6 +6,7 @@ import {
   serdiPayGetAccessToken,
   serdiPayInitiateMobileMoney,
   serdiPayNormalizePhone,
+  serdiPayNormalizeSmsPhone,
   serdiPaySendSms,
   serdiPayTelecomCode,
   useSerdiPayMobileMoney,
@@ -24,6 +25,8 @@ describe('serdipay Public API', () => {
   it('normalizes phones and telecom codes per doc', () => {
     expect(serdiPayNormalizePhone('+243994972450')).toBe('243994972450');
     expect(serdiPayNormalizePhone('0994972450')).toBe('243994972450');
+    expect(serdiPayNormalizeSmsPhone('+243994972450')).toBe('+243994972450');
+    expect(serdiPayNormalizeSmsPhone('0994972450')).toBe('+243994972450');
     expect(serdiPayTelecomCode('AIRTEL_MONEY')).toBe('AM');
     expect(serdiPayTelecomCode('ORANGE_MONEY')).toBe('OM');
     expect(serdiPayTelecomCode('MPESA')).toBe('MP');
@@ -116,11 +119,63 @@ describe('serdipay Public API', () => {
     });
   });
 
-  it('refuses SMS when SERDIPAY_SMS_PATH unset', async () => {
+  it('refuses SMS when SERDIPAY_SMS_API_ID/KEY unset', async () => {
     env.SERDIPAY_EMAIL = 'm@example.com';
     env.SERDIPAY_PASSWORD = 'secret';
     const result = await serdiPaySendSms(get, { to: '+243900000010', message: 'OTP 123456' });
     expect(result.success).toBe(false);
-    expect(result.message).toMatch(/SMS SerdiPay non activé/);
+    expect(result.message).toMatch(/SERDIPAY_SMS_API_ID/);
+    expect(isSerdiPaySmsConfigured(get)).toBe(false);
+  });
+
+  it('posts SMS body per sms-api.pdf (apiId, apiKey, phone, senderId, text)', async () => {
+    env.SERDIPAY_SMS_API_ID = 'APISMSDEMO';
+    env.SERDIPAY_SMS_API_KEY = 'test-sms-key';
+    env.SERDIPAY_SMS_SENDER_ID = 'SerdiPay';
+    env.SERDIPAY_SMS_BASE_URL = 'https://serdipay.com';
+    expect(isSerdiPaySmsConfigured(get)).toBe(true);
+
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ message: 'SMS sent successfully.', data: { sms_api_id: 2 } }),
+    });
+    (global as unknown as { fetch: typeof fetch }).fetch = fetchMock as unknown as typeof fetch;
+
+    const result = await serdiPaySendSms(get, {
+      to: '0994972450',
+      message: 'Votre code MOVA : 123456. Valide 10 minutes.',
+    });
+    expect(result.success).toBe(true);
+    expect(result.message).toMatch(/SMS sent successfully/);
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://serdipay.com/api/sms-api/v1/send',
+      expect.objectContaining({ method: 'POST' }),
+    );
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body as string);
+    expect(body).toEqual({
+      apiId: 'APISMSDEMO',
+      apiKey: 'test-sms-key',
+      phone: '+243994972450',
+      senderId: 'SerdiPay',
+      text: 'Votre code MOVA : 123456. Valide 10 minutes.',
+    });
+    // No Bearer / get-token for SMS API
+    expect(fetchMock.mock.calls[0][1].headers.Authorization).toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('surfaces 403 credit errors from SMS API', async () => {
+    env.SERDIPAY_SMS_API_ID = 'APISMSDEMO';
+    env.SERDIPAY_SMS_API_KEY = 'test-sms-key';
+    (global as unknown as { fetch: typeof fetch }).fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 403,
+      json: async () => ({ message: 'not enough sms' }),
+    }) as unknown as typeof fetch;
+
+    const result = await serdiPaySendSms(get, { to: '+243812345678', message: 'hi' });
+    expect(result.success).toBe(false);
+    expect(result.message).toMatch(/Crédit SMS|not enough sms/i);
   });
 });

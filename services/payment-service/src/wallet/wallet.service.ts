@@ -6,7 +6,10 @@ import {
   MovaHttpException,
   africasTalkingDisburseMobileMoney,
   africasTalkingInitiateMobileMoney,
+  cinetPayInitiateMobileMoney,
   formatCdf,
+  isCinetPayConfigured,
+  isSerdiPayPaymentConfigured,
   serdiPayDisburseMobileMoney,
   serdiPayInitiateMobileMoney,
   useAfricasTalkingMobileMoney,
@@ -316,29 +319,55 @@ export class WalletService {
 
     const operator = this.mapProvider(provider);
     const phoneTrimmed = phone?.trim();
-    const useSerdi = useSerdiPayMobileMoney(this.envGetter) && phoneTrimmed;
-    const useAt = useAfricasTalkingMobileMoney(this.envGetter) && phoneTrimmed;
+    const gateway = (this.config.get<string>('MOBILE_MONEY_GATEWAY') ?? 'serdipay').trim().toLowerCase();
+    const useSerdi = gateway === 'serdipay' && isSerdiPayPaymentConfigured(this.envGetter) && Boolean(phoneTrimmed);
+    const useCinet = gateway === 'cinetpay' && isCinetPayConfigured(this.envGetter) && Boolean(phoneTrimmed);
+    const useAt = gateway === 'africastalking' && useAfricasTalkingMobileMoney(this.envGetter) && Boolean(phoneTrimmed);
 
-    if (useSerdi || useAt) {
-      const mm = useSerdi
-        ? await serdiPayInitiateMobileMoney(this.envGetter, {
+    if ((gateway === 'serdipay' || gateway === 'cinetpay' || gateway === 'africastalking') && phoneTrimmed) {
+      if (!useSerdi && !useCinet && !useAt) {
+        throw new MovaHttpException(
+          MovaErrorCode.PAYMENT_FAILED,
+          undefined,
+          gateway === 'cinetpay'
+            ? 'CinetPay non configuré. Définissez CINETPAY_API_KEY, CINETPAY_SITE_ID, CINETPAY_NOTIFY_URL.'
+            : gateway === 'serdipay'
+              ? 'SerdiPay non configuré. Définissez SERDIPAY_EMAIL/PASSWORD/API_ID/API_PASSWORD/MERCHANT_CODE/MERCHANT_PIN.'
+              : "Africa's Talking MM non configuré.",
+        );
+      }
+
+      const mm = useCinet
+        ? await cinetPayInitiateMobileMoney(this.envGetter, {
             operator,
             amountCdf,
-            phone: phoneTrimmed!,
+            phone: phoneTrimmed,
             reference: ref,
           })
-        : await africasTalkingInitiateMobileMoney(this.envGetter, {
-            operator,
-            amountCdf,
-            phone: phoneTrimmed!,
-            reference: ref,
-          });
+        : useSerdi
+          ? await serdiPayInitiateMobileMoney(this.envGetter, {
+              operator,
+              amountCdf,
+              phone: phoneTrimmed,
+              reference: ref,
+            })
+          : await africasTalkingInitiateMobileMoney(this.envGetter, {
+              operator,
+              amountCdf,
+              phone: phoneTrimmed,
+              reference: ref,
+            });
       if (!mm.success) {
         throw new MovaHttpException(MovaErrorCode.PAYMENT_FAILED, undefined, mm.message ?? 'Recharge Mobile Money échouée.');
       }
 
       const providerRef = mm.providerRef ?? ref;
-      const isAsync = providerRef.startsWith('sp_') || providerRef.startsWith('at_');
+      const paymentUrl = 'paymentUrl' in mm ? mm.paymentUrl : undefined;
+      const isAsync =
+        providerRef.startsWith('sp_') ||
+        providerRef.startsWith('cp_') ||
+        providerRef.startsWith('at_') ||
+        Boolean(mm.pending);
       if (isAsync) {
         const wallet = await this.createWallet(userId);
         await this.prisma.walletTransaction.create({
@@ -360,6 +389,7 @@ export class WalletService {
           balanceCdf: wallet.balanceCdf,
           formattedBalance: formatCdf(wallet.balanceCdf),
           providerRef,
+          ...(paymentUrl ? { paymentUrl } : {}),
         };
       }
 
@@ -381,7 +411,7 @@ export class WalletService {
     return {
       success: true,
       simulated: true,
-      message: `Recharge simulée de ${formatCdf(amountCdf)} — configurez SerdiPay pour un vrai Mobile Money.`,
+      message: `Recharge simulée de ${formatCdf(amountCdf)} — configurez SerdiPay ou CinetPay (MOBILE_MONEY_GATEWAY).`,
       amountCdf,
       provider,
       balanceCdf: wallet.balanceCdf,

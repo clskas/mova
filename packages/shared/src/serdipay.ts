@@ -7,8 +7,11 @@
  *          amount, currency, telecom (AM|OM|MP|AF)
  * - Callback : { status, message, payment: { status, sessionId, transactionId } }
  *
- * SMS OTP : non documenté dans ce PDF — activer seulement si SERDIPAY_SMS_PATH
- * est fourni par SerdiPay (sinon Africa's Talking / Twilio / ALLOW_TEST_OTP).
+ * SMS OTP — doc séparée « SerdiPay SMS API » (sms-api.pdf) :
+ * - Auth dans le corps JSON : apiId + apiKey (pas de Bearer / get-token)
+ * - POST /api/sms-api/v1/send  { apiId, apiKey, phone, senderId, text }
+ * - Prod : https://serdipay.com  | Staging : https://api.serdipay.cloud
+ * - Credentials SMS distincts des credentials paiement (email/password).
  */
 
 export const SERDIPAY_ENV_KEYS = {
@@ -28,6 +31,14 @@ export const SERDIPAY_ENV_KEYS = {
   merchantPin: 'SERDIPAY_MERCHANT_PIN',
   webhookSecret: 'SERDIPAY_WEBHOOK_SECRET',
   tokenPath: 'SERDIPAY_TOKEN_PATH',
+  /** SMS API (doc sms-api.pdf) — distinct from payment SERDIPAY_API_ID */
+  smsApiId: 'SERDIPAY_SMS_API_ID',
+  smsApiKey: 'SERDIPAY_SMS_API_KEY',
+  smsUsername: 'SERDIPAY_SMS_USERNAME',
+  smsSenderId: 'SERDIPAY_SMS_SENDER_ID',
+  /** Default prod https://serdipay.com ; staging https://api.serdipay.cloud */
+  smsBaseUrl: 'SERDIPAY_SMS_BASE_URL',
+  /** Default /api/sms-api/v1/send */
   smsPath: 'SERDIPAY_SMS_PATH',
   c2bPath: 'SERDIPAY_C2B_PATH',
   b2cPath: 'SERDIPAY_B2C_PATH',
@@ -70,9 +81,11 @@ export function isSerdiPayConfigured(get: EnvGetter): boolean {
   return isSerdiPayAuthConfigured(get);
 }
 
-/** SMS only if SerdiPay shared an SMS path (not in Public API payment PDF). */
+/** SMS API credentials (sms-api.pdf: apiId + apiKey). Independent of payment auth. */
 export function isSerdiPaySmsConfigured(get: EnvGetter): boolean {
-  return Boolean(isSerdiPayAuthConfigured(get) && get(SERDIPAY_ENV_KEYS.smsPath)?.trim());
+  return Boolean(
+    firstEnv(get, SERDIPAY_ENV_KEYS.smsApiId) && firstEnv(get, SERDIPAY_ENV_KEYS.smsApiKey),
+  );
 }
 
 export function useSerdiPayMobileMoney(get: EnvGetter): boolean {
@@ -102,12 +115,22 @@ function pathOr(get: EnvGetter, key: keyof typeof SERDIPAY_ENV_KEYS, fallback: s
   return raw.startsWith('/') ? raw : `/${raw}`;
 }
 
-/** Doc uses 243… without leading +. */
+/** Doc payment uses 243… without leading +. */
 export function serdiPayNormalizePhone(phone: string): string {
   const digits = phone.replace(/\D/g, '');
   if (digits.startsWith('243')) return digits;
   if (digits.startsWith('0') && digits.length >= 9) return `243${digits.slice(1)}`;
   return digits;
+}
+
+/** SMS API examples use E.164 with leading + (e.g. +243…). */
+export function serdiPayNormalizeSmsPhone(phone: string): string {
+  const digits = serdiPayNormalizePhone(phone);
+  return digits.startsWith('+') ? digits : `+${digits}`;
+}
+
+function smsBaseUrl(get: EnvGetter): string {
+  return (get(SERDIPAY_ENV_KEYS.smsBaseUrl)?.trim() || 'https://serdipay.com').replace(/\/$/, '');
 }
 
 /** Telecom codes from SerdiPay Public API doc. */
@@ -194,43 +217,43 @@ export function __resetSerdiPayTokenCache(): void {
 export type SerdiPaySmsResult = { success: boolean; message?: string };
 
 /**
- * Envoi SMS OTP — uniquement si SERDIPAY_SMS_PATH est défini
- * (chemin non présent dans la doc Public API paiement reçue).
+ * Envoi SMS — SerdiPay SMS API (sms-api.pdf).
+ * POST {base}/api/sms-api/v1/send with { apiId, apiKey, phone, senderId?, text }.
+ * Does not use payment get-token / Bearer auth.
  */
 export async function serdiPaySendSms(
   get: EnvGetter,
   params: { to: string; message: string },
 ): Promise<SerdiPaySmsResult> {
-  const smsPath = get(SERDIPAY_ENV_KEYS.smsPath)?.trim();
-  if (!smsPath) {
+  if (!isSerdiPaySmsConfigured(get)) {
     return {
       success: false,
       message:
-        'SMS SerdiPay non activé : la doc Public API reçue ne couvre que les paiements. ' +
-        'Attendez le chemin SMS de SerdiPay (SERDIPAY_SMS_PATH) ou configurez Africa\'s Talking / Twilio.',
+        'SMS SerdiPay non configuré. Définissez SERDIPAY_SMS_API_ID et SERDIPAY_SMS_API_KEY ' +
+        '(credentials SMS API fournis par SerdiPay — distincts de SERDIPAY_EMAIL / SERDIPAY_PASSWORD). ' +
+        'Ou basculez SMS_PROVIDER=africastalking.',
     };
   }
 
-  const auth = await serdiPayGetAccessToken(get);
-  if (auth.ok === false) return { success: false, message: auth.message };
-
-  const url = `${baseUrl(get)}${smsPath.startsWith('/') ? smsPath : `/${smsPath}`}`;
-  const merchantCode = serdiPayMerchantCode(get);
+  const apiId = firstEnv(get, SERDIPAY_ENV_KEYS.smsApiId)!;
+  const apiKey = firstEnv(get, SERDIPAY_ENV_KEYS.smsApiKey)!;
+  const senderId = get(SERDIPAY_ENV_KEYS.smsSenderId)?.trim();
+  const url = `${smsBaseUrl(get)}${pathOr(get, 'smsPath', '/api/sms-api/v1/send')}`;
+  const phone = serdiPayNormalizeSmsPhone(params.to);
 
   try {
     const res = await fetch(url, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${auth.token}`,
         Accept: 'application/json',
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        to: serdiPayNormalizePhone(params.to),
-        phone: serdiPayNormalizePhone(params.to),
-        clientPhone: serdiPayNormalizePhone(params.to),
-        message: params.message,
-        ...(merchantCode ? { merchantCode } : {}),
+        apiId,
+        apiKey,
+        phone,
+        text: params.message,
+        ...(senderId ? { senderId } : {}),
       }),
     });
     const data = (await res.json().catch(() => ({}))) as {
@@ -238,8 +261,17 @@ export async function serdiPaySendSms(
       status?: string | number;
       message?: string;
       error?: string;
+      data?: unknown;
     };
-    if (!res.ok || data.success === false || data.status === 'Failed') {
+
+    // Doc HTTP: 200 sent; 400 API ID; 403 not enough SMS; 404 bad request; 406 Not Acceptable
+    if (res.status === 403) {
+      return {
+        success: false,
+        message: data.message ?? data.error ?? 'Crédit SMS SerdiPay insuffisant (403).',
+      };
+    }
+    if (!res.ok || data.success === false) {
       return {
         success: false,
         message: data.message ?? data.error ?? `Échec SMS SerdiPay (${res.status})`,

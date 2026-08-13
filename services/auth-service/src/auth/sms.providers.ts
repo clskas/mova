@@ -61,7 +61,7 @@ export class SerdiPaySmsProvider implements SmsProvider {
   async sendOtp(phone: string, code: string): Promise<SmsSendResult> {
     const result = await serdiPaySendSms(this.get, {
       to: phone,
-      message: `Votre code SENGA : ${code}. Valide 10 minutes.`,
+      message: `Votre code MOVA : ${code}. Valide 10 minutes.`,
     });
     if (!result.success) this.logger.warn(`SerdiPay SMS: ${result.message}`);
     return result;
@@ -84,7 +84,7 @@ export class AfricasTalkingSmsProvider implements SmsProvider {
   async sendOtp(phone: string, code: string): Promise<SmsSendResult> {
     const result = await africasTalkingSendSms(this.get, {
       to: phone,
-      message: `Votre code SENGA : ${code}. Valide 10 minutes.`,
+      message: `Votre code MOVA : ${code}. Valide 10 minutes.`,
     });
     if (!result.success) this.logger.warn(`Africa's Talking SMS: ${result.message}`);
     return result;
@@ -143,7 +143,7 @@ export class TwilioSmsProvider implements SmsProvider {
         body: new URLSearchParams({
           To: phone,
           From: from!,
-          Body: `Votre code SENGA : ${code}. Valide 10 minutes.`,
+          Body: `Votre code MOVA : ${code}. Valide 10 minutes.`,
         }),
       });
       if (!res.ok) {
@@ -189,7 +189,7 @@ export class SmsService {
       return {
         success: false,
         message:
-          'Service SMS non configuré. Définissez SERDIPAY_SMS_PATH + SERDIPAY_EMAIL / SERDIPAY_PASSWORD (ou Africa\'s Talking / Twilio).',
+          'Service SMS non configuré. Définissez SMS_PROVIDER=serdipay + SERDIPAY_SMS_API_ID / SERDIPAY_SMS_API_KEY, ou SMS_PROVIDER=africastalking + AFRICAS_TALKING_*.',
       };
     }
     const result = await provider.sendOtp(phone, code);
@@ -201,7 +201,8 @@ export class SmsService {
 
   isProductionReady(): boolean {
     if (isMockOtpAllowed()) return false;
-    const backend = resolveSmsBackend(this.get, false);
-    return backend === 'serdipay' || backend === 'africastalking' || backend === 'twilio';
+    const provider = this.resolveProvider();
+    if (!provider || provider.name === 'MOCK') return false;
+    return provider.isConfigured();
   }
 }

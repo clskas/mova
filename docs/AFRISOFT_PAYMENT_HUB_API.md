@@ -3,7 +3,8 @@
 **Version :** 1.0 — Août 2026  
 **Public :** équipes AfriSoft (SENGA, Educongo, applications futures)  
 **Statut :** contrat cible multi-apps + état réel SENGA documenté  
-**Langue :** français (en-têtes bilingues FR / EN)
+**Langue :** français (en-têtes bilingues FR / EN)  
+**Companion SMS/OTP :** même pattern multi-apps (`app_id` + HMAC) — [AFRISOFT_SMS_OTP_HUB_API.md](./AFRISOFT_SMS_OTP_HUB_API.md).
 
 ---
 
@@ -20,8 +21,9 @@ Les applications clientes (Educongo, futures apps…) peuvent tourner **n’impo
 
 | Composant | Hébergement | IP fixe whitelist SerdiPay |
 |-----------|-------------|---------------------------|
-| Module paiements AfriSoft (`afrisoft-pay` / hub) | **VPS Hetzner** (`pay.afri-soft.com`, IP `178.104.82.66`) | **Oui** — seuls sortants vers SerdiPay |
-| Callback SerdiPay → hub | Même domaine (`https://pay.afri-soft.com/webhooks/serdipay`) | N/A (entrant) |
+| Module paiements AfriSoft (`afrisoft-pay` / hub) | **VPS Hetzner** (`pay.afri-soft.com`, IP `178.104.82.66`) | **Oui** pour SerdiPay — CinetPay collect **n’exige pas** d’IP fixe |
+| Callback SerdiPay → hub | `https://pay.afri-soft.com/webhooks/serdipay` | N/A (entrant) |
+| Callback CinetPay → hub | `https://pay.afri-soft.com/webhooks/cinetpay` | N/A (entrant) |
 | SENGA, Educongo, apps futures | Libre (ex. Render pour SENGA API) | **Non** |
 | Webhook app ← hub | URL HTTPS publique de l’app | **Non** (doit être joignable depuis le hub) |
 
@@ -59,13 +61,14 @@ Future ─┘                                         (afrisoft-pay sur VPS Hetz
 
 ### Règles d’or
 
-1. **Seul le hub** détient les secrets SerdiPay et appelle SerdiPay.
+1. **Seul le hub** détient les secrets agrégateurs (`SERDIPAY_*`, `CINETPAY_*`) et les appelle.
 2. Chaque app a un **`app_id`** stable (`senga`, `educongo`, …).
 3. Chaque opération a une **référence unique** : `{app_id}_{purpose}_{uuid}` (voir §5).
-4. SerdiPay envoie **un** webhook au hub ; le hub notifie l’app concernée.
-5. Les apps **ne stockent jamais** `SERDIPAY_*`.
+4. L’agrégateur envoie **un** webhook au hub ; le hub notifie l’app concernée.
+5. Les apps **ne stockent jamais** `SERDIPAY_*` / `CINETPAY_*`.
+6. Switch sticky : `MOBILE_MONEY_GATEWAY=serdipay|cinetpay` (comme `SMS_PROVIDER`) — **pas** de failover silencieux.
 
-**État code actuel (août 2026) :** SENGA consomme déjà SerdiPay en interne (`packages/shared/src/serdipay.ts`). Le callback public enregistré chez SerdiPay est `POST https://pay.afri-soft.com/webhooks/serdipay` (hub VPS). Les endpoints **`/v1/*` multi-apps** ci-dessous sont le **contrat d’intégration** à exposer / stabiliser pour Educongo et les suivantes (SENGA peut rester le premier client, éventuellement via adapters internes).
+**État code actuel (août 2026) :** SENGA consomme SerdiPay (`packages/shared/src/serdipay.ts`) et le client **CinetPay** est scaffoldé (`packages/shared/src/cinetpay.ts`). Callbacks publics hub : `POST https://pay.afri-soft.com/webhooks/serdipay` et `…/webhooks/cinetpay`. Les endpoints **`/v1/*` multi-apps** ci-dessous restent le **contrat** pour Educongo et suivantes.
 
 ---
 
@@ -199,6 +202,19 @@ POST https://pay.afri-soft.com/webhooks/serdipay
 - Déployé sur le VPS (`/opt/afrisoft-pay`) ; côté monorepo SENGA, le handler historique est `services/payment-service/src/payments/payments-webhook.controller.ts` (`POST /api/payments/webhooks/serdipay` — le reverse proxy du hub expose le chemin public `/webhooks/serdipay`).
 - Les apps clientes **n’utilisent pas** cet endpoint.
 
+### 4.3bis Webhook entrant CinetPay (interne hub)
+
+```http
+GET  https://pay.afri-soft.com/webhooks/cinetpay   # ping disponibilité
+POST https://pay.afri-soft.com/webhooks/cinetpay   # notify (form-urlencoded)
+```
+
+- `notify_url` posé à l’init (`CINETPAY_NOTIFY_URL`) et/ou dans le dashboard CinetPay.
+- Header optionnel `x-token` (HMAC-SHA256 avec `CINETPAY_SECRET_KEY`) — voir [docs CinetPay HMAC](https://docs.cinetpay.com/api/1.0-en/checkout/hmac).
+- Le hub **rappelle toujours** `POST /v2/payment/check` avant de finaliser (ACCEPTED → COMPLETED, REFUSED → FAILED).
+- Handler Nest : `POST /api/payments/webhooks/cinetpay` ; Caddy rewrite public `/webhooks/cinetpay` (snippet `deploy/afrisoft-pay/caddy/Caddyfile.snippet`).
+- `providerRef` stocké : `cp_{transaction_id}`.
+
 ### 4.4 Webhook sortant hub → app
 
 Quand le statut devient final, le hub POST vers `webhook_url` de l’app :
@@ -310,24 +326,27 @@ curl -sS "https://pay.afri-soft.com/v1/payments/by-reference/educongo_tuition_55
 
 ## 7. Recharge portefeuille / Wallet top-up
 
-### 7.1 SENGA aujourd’hui (déjà câblé SerdiPay)
+### 7.1 SENGA aujourd’hui (SerdiPay + CinetPay scaffold)
 
 Flux réel dans le dépôt :
 
 1. **App Flutter** : `mobile/lib/features/wallet/wallet_screen.dart` → `POST /wallet/top-up` `{ provider, amountCdf, phone }`.
 2. **API** : `WalletController` → `WalletService.topUp` (`services/payment-service/src/wallet/wallet.service.ts`).
-3. Si `useSerdiPayMobileMoney` + téléphone : appel `serdiPayInitiateMobileMoney` (C2B `payment-client`).
-4. Transaction `TOPUP_PENDING` + `providerRef` (`sp_…`) ; l’app poll `GET /wallet/top-up/status?providerRef=`.
-5. Callback SerdiPay → `POST https://pay.afri-soft.com/webhooks/serdipay` → `completeMobileMoneyFromWebhook` → `completePendingTopUp` → crédit solde (`TOPUP_COMPLETED`).
+3. Selon `MOBILE_MONEY_GATEWAY` + téléphone :
+   - `serdipay` → `serdiPayInitiateMobileMoney` (C2B push USSD) → `providerRef` `sp_…`
+   - `cinetpay` → `cinetPayInitiateMobileMoney` (checkout + `paymentUrl`) → `providerRef` `cp_…`
+4. Transaction `TOPUP_PENDING` ; l’app poll `GET /wallet/top-up/status?providerRef=`.
+5. Callback agrégateur → hub webhook → `completeMobileMoneyFromWebhook` → `completePendingTopUp` → crédit (`TOPUP_COMPLETED`).
 
 Fichiers clés :
 
-- `packages/shared/src/serdipay.ts`
+- `packages/shared/src/serdipay.ts` · `packages/shared/src/cinetpay.ts`
 - `services/payment-service/src/wallet/wallet.service.ts` (`topUp`, `completePendingTopUp`)
+- `services/payment-service/src/payments/payment-providers.ts`
 - `services/payment-service/src/payments/payments-webhook.controller.ts`
-- `mobile/lib/features/wallet/wallet_screen.dart`
+- `mobile/lib/features/wallet/wallet_screen.dart` — **à prévoir** : ouvrir `paymentUrl` si renvoyé (CinetPay)
 
-**Implication :** dès que SerdiPay est opérationnel (env VPS hub + callback), **la recharge wallet SENGA fonctionne sans développement supplémentaire** sur ce flux (hors tuning / tests terrain). Mode mock (`MOCK` / `MOCK_PAYMENTS`) reste pour le dev.
+**Implication :** SerdiPay live dès credentials + `MOCK_PAYMENTS=false`. CinetPay : code prêt ; ouvrir compte + env + bascule `MOBILE_MONEY_GATEWAY=cinetpay`. Mode mock reste pour le dev.
 
 ### 7.2 Autres apps (Educongo, etc.)
 
@@ -340,7 +359,8 @@ Fichiers clés :
 | Élément | SENGA wallet | Hub `/v1` multi-apps |
 |---------|--------------|----------------------|
 | Init MM SerdiPay | ✅ fait | À exposer comme API app-to-hub |
-| Webhook SerdiPay | ✅ fait | ✅ (interne) |
+| Init MM CinetPay | ✅ scaffold (switch sticky) | Même gateway côté hub |
+| Webhook SerdiPay / CinetPay | ✅ handlers | ✅ (interne hub) |
 | Crédit wallet | ✅ SENGA DB | ❌ chaque app gère son ledger |
 | Auth `app_id` + HMAC | ❌ (JWT user) | À implémenter |
 | Webhooks sortants vers apps | ❌ | À implémenter |
@@ -358,6 +378,7 @@ Fichiers clés :
 | IP fixe (whitelist SerdiPay) | `178.104.82.66` |
 | Chemin déploiement | `/opt/afrisoft-pay` |
 | Callback SerdiPay | `https://pay.afri-soft.com/webhooks/serdipay` |
+| Callback CinetPay | `https://pay.afri-soft.com/webhooks/cinetpay` |
 | DNS | **Cloudflare uniquement** (pas d’autre registrar DNS pour ce hostname) |
 
 > **Render vs VPS :** le reste de SENGA (API métier, apps) peut rester sur Render ou ailleurs. **Seul** le hub qui parle à SerdiPay doit sortir depuis l’IP VPS ci-dessus. Ne pas replacer le callback SerdiPay sur un service Render à IP dynamique.
@@ -386,11 +407,18 @@ Elles doivent seulement :
 | `SERDIPAY_API_ID` / `SERDIPAY_API_PASSWORD` | Corps paiement |
 | `SERDIPAY_MERCHANT_CODE` / `SERDIPAY_MERCHANT_PIN` | Marchand |
 | `SERDIPAY_WEBHOOK_SECRET` | Vérif callback SerdiPay |
-| `MOBILE_MONEY_GATEWAY=serdipay` | Activer la passerelle |
-| `MOCK_PAYMENTS=false` | Prod réelle |
+| `CINETPAY_API_KEY` / `CINETPAY_SITE_ID` | Auth Checkout CinetPay |
+| `CINETPAY_SECRET_KEY` | HMAC `x-token` notify |
+| `CINETPAY_NOTIFY_URL` | `https://pay.afri-soft.com/webhooks/cinetpay` |
+| `CINETPAY_RETURN_URL` | Redirect après guichet |
+| `CINETPAY_ENV` / `CINETPAY_CURRENCY` | `PROD`\|`TEST` · `CDF`\|`USD` |
+| `MOBILE_MONEY_GATEWAY` | `serdipay` \| `cinetpay` (sticky) |
+| `MOCK_PAYMENTS=false` | Prod réelle — **ne pas** activer sans credentials validés |
 | Table / config apps | `app_id`, `api_key_hash`, `webhook_url`, `webhook_secret` |
 
-Voir aussi `config/external-apis.env.example` et `docs/PRODUCTION_DEPLOYMENT.md` §3.3.
+Voir aussi `config/external-apis.env.example`, [MOBILE_MONEY_PROVIDER_ALTERNATIVES.md](./MOBILE_MONEY_PROVIDER_ALTERNATIVES.md) et `docs/PRODUCTION_DEPLOYMENT.md` §3.3.
+
+**Bascule ops :** une seule variable `MOBILE_MONEY_GATEWAY=serdipay|cinetpay` + recreate conteneur. Les deux jeux de secrets peuvent coexister sur le VPS.
 
 ### 9.2 Côté nouvelle app (checklist)
 
@@ -406,20 +434,23 @@ Voir aussi `config/external-apis.env.example` et `docs/PRODUCTION_DEPLOYMENT.md`
 ### 9.3 Côté SENGA (déjà en place pour MM)
 
 - [x] Client SerdiPay Public API  
-- [x] Webhook public hub `https://pay.afri-soft.com/webhooks/serdipay`  
+- [x] Client CinetPay Checkout (scaffold + tests)  
+- [x] Webhook public hub SerdiPay `https://pay.afri-soft.com/webhooks/serdipay`  
+- [x] Webhook public hub CinetPay `https://pay.afri-soft.com/webhooks/cinetpay`  
 - [x] Wallet top-up async + poll Flutter  
-- [ ] Credentials marchand réels sur le VPS hub  
+- [ ] Credentials marchand SerdiPay / CinetPay réels sur le VPS hub  
+- [ ] Flutter : ouvrir `paymentUrl` CinetPay  
 - [ ] Endpoints `/v1/*` + registre multi-apps + webhooks sortants  
 
 ---
 
 ## 10. Sécurité
 
-- Jamais de secrets SerdiPay dans Educongo / apps clientes.
-- Rotation des `api_key` / `webhook_secret` sans redeploy SerdiPay.
+- Jamais de secrets SerdiPay / CinetPay dans Educongo / apps clientes.
+- Rotation des `api_key` / `webhook_secret` sans redeploy agrégateur.
 - TLS obligatoire ; pas de webhook HTTP clair.
 - Idempotence obligatoire côté app.
-- Logs : masquer `phone` partiel, ne jamais logger `api_key` / PIN marchand.
+- Logs : masquer `phone` partiel, ne jamais logger `api_key` / PIN / `CINETPAY_SECRET_KEY`.
 
 ---
 
@@ -428,12 +459,14 @@ Voir aussi `config/external-apis.env.example` et `docs/PRODUCTION_DEPLOYMENT.md`
 | Sujet | Emplacement |
 |-------|-------------|
 | Client SerdiPay | `packages/shared/src/serdipay.ts` |
+| Client CinetPay | `packages/shared/src/cinetpay.ts` |
 | Providers MM | `services/payment-service/src/payments/payment-providers.ts` |
-| Webhook SerdiPay | `services/payment-service/src/payments/payments-webhook.controller.ts` |
+| Webhooks MM | `services/payment-service/src/payments/payments-webhook.controller.ts` |
 | Complétion MM | `PaymentsService.completeMobileMoneyFromWebhook` |
 | Top-up wallet | `services/payment-service/src/wallet/wallet.service.ts` |
 | UI recharge | `mobile/lib/features/wallet/wallet_screen.dart` |
 | Env exemple | `config/external-apis.env.example` |
+| Caddy rewrite | `deploy/afrisoft-pay/caddy/Caddyfile.snippet` |
 
 ---
 

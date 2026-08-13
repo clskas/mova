@@ -222,10 +222,19 @@ envVarGroups:
         sync: false
       - key: MAPBOX_STYLE_URL
         value: mapbox://styles/mova/midnight-violet
+      # OTP SMS switch : africastalking | serdipay (docs/SMS_OTP_PROVIDERS.md). Sticky — no silent fallback.
       - key: SMS_PROVIDER
-        value: serdipay
+        value: africastalking
       - key: MOBILE_MONEY_GATEWAY
         value: serdipay
+      - key: AFRICAS_TALKING_USERNAME
+        sync: false
+      - key: AFRICAS_TALKING_API_KEY
+        sync: false
+      - key: AFRICAS_TALKING_ENV
+        value: production
+      - key: AFRICAS_TALKING_SMS_SENDER
+        value: MOVA
       - key: SERDIPAY_BASE_URL
         value: https://apis.serdipay.com
       - key: SERDIPAY_CLIENT_ID
@@ -235,6 +244,17 @@ envVarGroups:
       - key: SERDIPAY_MERCHANT_ID
         sync: false
       - key: SERDIPAY_WEBHOOK_SECRET
+        sync: false
+      # SerdiPay SMS API (otp) — distinct from payment email/password
+      - key: SERDIPAY_SMS_BASE_URL
+        value: https://serdipay.com
+      - key: SERDIPAY_SMS_PATH
+        value: /api/sms-api/v1/send
+      - key: SERDIPAY_SMS_API_ID
+        sync: false
+      - key: SERDIPAY_SMS_API_KEY
+        sync: false
+      - key: SERDIPAY_SMS_SENDER_ID
         sync: false
       - key: SUPABASE_URL
         value: https://furttqrltkwirdhiktdl.supabase.co

@@ -49,34 +49,39 @@ export function isTwilioSmsConfigured(get: EnvGetter): boolean {
 export type SmsBackend = 'mock' | 'serdipay' | 'africastalking' | 'twilio';
 
 /**
- * Résout le canal SMS actif (SENGA RDC : SerdiPay par défaut).
- * Returns `null` when mockMode is false and no real provider is configured
+ * Résout le canal SMS actif.
+ *
+ * Explicit `SMS_PROVIDER` is sticky (no silent fallback):
+ * - `serdipay` → SerdiPay SMS only (errors if SERDIPAY_SMS_API_ID/KEY missing)
+ * - `africastalking` → Africa's Talking only
+ * - `twilio` → Twilio only
+ *
+ * When unset / unknown: auto-detect SerdiPay → AT → Twilio.
+ * Returns `null` when mockMode is false and nothing is usable
  * (never silently falls back to mock — that would log OTP codes).
  */
 export function resolveSmsBackend(get: EnvGetter, mockMode: boolean): SmsBackend | null {
   if (mockMode) return 'mock';
-  const preferred = (get(AFRICAS_TALKING_ENV_KEYS.smsProvider) ?? 'serdipay').trim().toLowerCase();
+  const raw = get(AFRICAS_TALKING_ENV_KEYS.smsProvider)?.trim().toLowerCase();
+  const preferred = raw || '';
 
-  // SMS SerdiPay only when auth + SERDIPAY_SMS_PATH (payment PDF has no SMS API).
-  // Inline check to avoid circular import with serdipay.ts
+  // Inline check to avoid circular import with serdipay.ts (sms-api.pdf: apiId + apiKey).
   const trySerdi = () => {
-    const email = get('SERDIPAY_EMAIL')?.trim() || get('SERDIPAY_CLIENT_ID')?.trim();
-    const password = get('SERDIPAY_PASSWORD')?.trim() || get('SERDIPAY_CLIENT_SECRET')?.trim();
-    const smsPath = get('SERDIPAY_SMS_PATH')?.trim();
-    return email && password && smsPath ? ('serdipay' as const) : null;
+    const apiId = get('SERDIPAY_SMS_API_ID')?.trim();
+    const apiKey = get('SERDIPAY_SMS_API_KEY')?.trim();
+    return apiId && apiKey ? ('serdipay' as const) : null;
   };
   const tryAt = () => (isAfricasTalkingConfigured(get) ? ('africastalking' as const) : null);
   const tryTwilio = () => (isTwilioSmsConfigured(get) ? ('twilio' as const) : null);
 
-  if (preferred === 'serdipay') {
-    return trySerdi() ?? tryAt() ?? tryTwilio();
-  }
-  if (preferred === 'africastalking') {
-    return tryAt() ?? trySerdi() ?? tryTwilio();
-  }
-  if (preferred === 'twilio') {
-    return tryTwilio() ?? trySerdi() ?? tryAt();
-  }
+  // Explicit switch: route to the named provider even if misconfigured so callers
+  // surface a clear credentials error instead of silently using another backend.
+  // `mock` is first-class for AfriSoft SMS hub bootstrap (sms.afri-soft.com) before AT/SerdiPay keys.
+  if (preferred === 'mock') return 'mock';
+  if (preferred === 'serdipay') return 'serdipay';
+  if (preferred === 'africastalking') return 'africastalking';
+  if (preferred === 'twilio') return 'twilio';
+
   return trySerdi() ?? tryAt() ?? tryTwilio();
 }
 
@@ -127,9 +132,20 @@ export async function africasTalkingSendSms(
     }
     const recipients = raw.SMSMessageData?.Recipients ?? [];
     const ok = recipients.length === 0 || recipients.every((r) => r.statusCode === 101 || r.status === 'Success');
-    return ok
-      ? { success: true, message: raw.SMSMessageData?.Message ?? 'SMS envoyé' }
-      : { success: false, message: raw.SMSMessageData?.Message ?? 'Échec envoi SMS Africa\'s Talking' };
+    if (ok) {
+      return { success: true, message: raw.SMSMessageData?.Message ?? 'SMS envoyé' };
+    }
+    const detail = recipients
+      .map((r) => r.status ?? (r.statusCode != null ? `code ${r.statusCode}` : undefined))
+      .filter(Boolean)
+      .join('; ');
+    return {
+      success: false,
+      message:
+        detail ||
+        raw.SMSMessageData?.Message ||
+        "Échec envoi SMS Africa's Talking",
+    };
   } catch {
     return { success: false, message: 'Service SMS Africa\'s Talking temporairement indisponible.' };
   }

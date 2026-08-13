@@ -244,7 +244,7 @@ export class PaymentsService {
   private isAsyncMobileMoney(provider: PaymentProvider, result: { providerRef?: string }): boolean {
     if (provider.name === 'MOCK') return false;
     const ref = result.providerRef ?? '';
-    return ref.startsWith('sp_') || ref.startsWith('at_');
+    return ref.startsWith('sp_') || ref.startsWith('cp_') || ref.startsWith('at_');
   }
 
   async processPayment(rideId: string, userId: string, amountCdf: number, method: PaymentMethod, phone: string) {

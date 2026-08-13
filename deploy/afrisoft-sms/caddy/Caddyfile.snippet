@@ -1,0 +1,9 @@
+# Append to /etc/caddy/Caddyfile (keep pay.afri-soft.com block intact)
+
+sms.afri-soft.com {
+	encode gzip
+	reverse_proxy 127.0.0.1:3001
+	log {
+		output file /var/log/caddy/afrisoft-sms-access.log
+	}
+}

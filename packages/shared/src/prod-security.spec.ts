@@ -58,6 +58,9 @@ describe('prod-security', () => {
     delete process.env.SERDIPAY_EMAIL;
     delete process.env.SERDIPAY_PASSWORD;
     delete process.env.SERDIPAY_SMS_PATH;
+    delete process.env.SERDIPAY_SMS_API_ID;
+    delete process.env.SERDIPAY_SMS_API_KEY;
+    delete process.env.SMS_PROVIDER;
     const { assertProductionSecurity } = await import('./prod-security');
     expect(() => assertProductionSecurity('auth-service')).toThrow(/SMS provider/);
   });
@@ -102,6 +105,9 @@ describe('prod-security', () => {
     delete process.env.SERDIPAY_EMAIL;
     delete process.env.SERDIPAY_PASSWORD;
     delete process.env.SERDIPAY_SMS_PATH;
+    delete process.env.SERDIPAY_SMS_API_ID;
+    delete process.env.SERDIPAY_SMS_API_KEY;
+    delete process.env.SMS_PROVIDER;
     delete process.env.AFRICAS_TALKING_USERNAME;
     delete process.env.AFRICAS_TALKING_API_KEY;
     delete process.env.TWILIO_ACCOUNT_SID;
@@ -129,11 +135,29 @@ describe('prod-security', () => {
     process.env.SERDIPAY_MERCHANT_CODE = '123';
     process.env.SERDIPAY_MERCHANT_PIN = '1234';
     delete process.env.SERDIPAY_SMS_PATH;
+    delete process.env.SERDIPAY_SMS_API_ID;
+    delete process.env.SERDIPAY_SMS_API_KEY;
+    delete process.env.SMS_PROVIDER;
     delete process.env.AFRICAS_TALKING_USERNAME;
     delete process.env.AFRICAS_TALKING_API_KEY;
     delete process.env.TWILIO_ACCOUNT_SID;
     const { assertProductionSecurity, isProductionSmsConfigured } = await import('./prod-security');
     expect(isProductionSmsConfigured()).toBe(false);
     expect(() => assertProductionSecurity('auth-service')).toThrow(/SMS provider/);
+  });
+
+  it('SMS_PROVIDER=serdipay ignores AT credentials for production readiness', async () => {
+    process.env.NODE_ENV = 'production';
+    process.env.SMS_PROVIDER = 'serdipay';
+    process.env.AFRICAS_TALKING_USERNAME = 'mova';
+    process.env.AFRICAS_TALKING_API_KEY = 'k'.repeat(24);
+    delete process.env.SERDIPAY_SMS_API_ID;
+    delete process.env.SERDIPAY_SMS_API_KEY;
+    const { isProductionSmsConfigured } = await import('./prod-security');
+    expect(isProductionSmsConfigured()).toBe(false);
+
+    process.env.SERDIPAY_SMS_API_ID = 'APISMSDEMO';
+    process.env.SERDIPAY_SMS_API_KEY = 'sms-key';
+    expect(isProductionSmsConfigured()).toBe(true);
   });
 });

@@ -1,0 +1,27 @@
+# Snippet for pay.afri-soft.com (VPS /opt/afrisoft-pay)
+# Append / merge into the existing Caddy site block — keep SerdiPay rewrite intact.
+#
+# Public paths registered at aggregators:
+#   https://pay.afri-soft.com/webhooks/serdipay
+#   https://pay.afri-soft.com/webhooks/cinetpay
+# Nest payment-service global prefix is /api → rewrite to /api/payments/webhooks/*
+
+# pay.afri-soft.com {
+# 	encode gzip
+#
+# 	# SerdiPay notify
+# 	handle /webhooks/serdipay* {
+# 		rewrite * /api/payments{uri}
+# 		reverse_proxy 127.0.0.1:3003
+# 	}
+#
+# 	# CinetPay notify (GET ping + POST form-urlencoded)
+# 	handle /webhooks/cinetpay* {
+# 		rewrite * /api/payments{uri}
+# 		reverse_proxy 127.0.0.1:3003
+# 	}
+#
+# 	handle {
+# 		reverse_proxy 127.0.0.1:3003
+# 	}
+# }

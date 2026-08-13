@@ -4,6 +4,8 @@ export interface PaymentInitResult {
   pending?: boolean;
   transactionId?: string;
   providerRef?: string;
+  /** CinetPay hosted checkout URL (open in WebView / browser). */
+  paymentUrl?: string;
   message?: string;
 }
 export interface PaymentProvider {

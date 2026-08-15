@@ -1,4 +1,4 @@
-const CACHE = "mova-rental-partner-v4";
+const CACHE = "mova-rental-partner-v5";
 const SHELL = [
   "/",
   "/login",
@@ -14,9 +14,18 @@ const SHELL = [
   "/apple-touch-icon.png",
 ];
 
+function isVersionRequest(url) {
+  return url.pathname === "/version.json" || url.pathname === "/api/version";
+}
+
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL).catch(() => undefined)));
-  self.skipWaiting();
+  event.waitUntil(
+    (async () => {
+      const cache = await caches.open(CACHE);
+      await cache.addAll(SHELL).catch(() => undefined);
+      if (!self.registration.active) await self.skipWaiting();
+    })(),
+  );
 });
 
 self.addEventListener("activate", (event) => {
@@ -26,11 +35,17 @@ self.addEventListener("activate", (event) => {
   self.clients.claim();
 });
 
+self.addEventListener("message", (event) => {
+  if (event.data === "SKIP_WAITING" || event.data?.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
+});
+
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
   const url = new URL(event.request.url);
   if (url.origin !== self.location.origin) return;
-  if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/_next/")) return;
+  if (isVersionRequest(url) || url.pathname.startsWith("/api/") || url.pathname.startsWith("/_next/")) return;
 
   event.respondWith(
     fetch(event.request)

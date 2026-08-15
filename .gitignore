@@ -73,3 +73,9 @@ config/external-apis.env
 _temp_*
 tmp-*
 *.zip
+
+# Generated at Next.js build (in-app update probe)
+web/public/version.json
+admin/public/version.json
+restaurant/public/version.json
+rental-partner/public/version.json

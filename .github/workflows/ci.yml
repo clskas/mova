@@ -78,6 +78,9 @@ jobs:
           cache: npm
           cache-dependency-path: ${{ matrix.client }}/package-lock.json
       - name: Install and build ${{ matrix.client }}
+        env:
+          NEXT_PUBLIC_BUILD_ID: ${{ github.sha }}
+          GITHUB_SHA: ${{ github.sha }}
         run: |
           cd ${{ matrix.client }}
           npm ci

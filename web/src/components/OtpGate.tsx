@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { apiFetch, checkGatewayHealth } from "@/lib/api";
+import { ApiError, apiFetch, checkGatewayHealth } from "@/lib/api";
 import { clearToken, getToken, setToken } from "@/lib/auth";
 import { toUserErrorMessage } from "@/lib/user-messages";
 
@@ -11,7 +11,7 @@ export function OtpGate({ children }: Props) {
   const [ready, setReady] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
   const [mock, setMock] = useState(false);
-  const [phone, setPhone] = useState("+243812345678");
+  const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
   const [codeSent, setCodeSent] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -35,7 +35,13 @@ export function OtpGate({ children }: Props) {
       }, { useMock: mock });
       setCodeSent(true);
     } catch (e) {
-      setError(toUserErrorMessage(e, "Impossible d'envoyer le code"));
+      const status = e instanceof ApiError ? e.status : 0;
+      setError(toUserErrorMessage(
+        e,
+        status === 503
+          ? "Impossible d'envoyer le code par SMS. Réessayez dans quelques minutes."
+          : "Impossible d'envoyer le code",
+      ));
     } finally {
       setLoading(false);
     }
@@ -64,7 +70,7 @@ export function OtpGate({ children }: Props) {
 
   if (!ready) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-gray-500">
+      <div className="min-h-[100dvh] flex items-center justify-center text-gray-500">
         Chargement…
       </div>
     );
@@ -72,7 +78,7 @@ export function OtpGate({ children }: Props) {
 
   if (!authenticated) {
     return (
-      <div className="max-w-sm mx-auto min-h-screen flex flex-col justify-center p-6">
+      <div className="max-w-sm mx-auto min-h-[100dvh] flex flex-col justify-center p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
         <h1 className="text-xl font-bold text-center mb-2">SENGA — Connexion</h1>
         <p className="text-sm text-gray-500 text-center mb-6">
           Entrez votre numéro +243 pour continuer
@@ -87,7 +93,10 @@ export function OtpGate({ children }: Props) {
         )}
         <input
           className="w-full rounded-xl border-0 bg-white p-3 shadow-sm mb-3"
-          placeholder="+243812345678"
+          type="tel"
+          inputMode="tel"
+          autoComplete="tel"
+          placeholder="+243 8XX XXX XXX"
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
           disabled={codeSent}
@@ -95,6 +104,10 @@ export function OtpGate({ children }: Props) {
         {codeSent && (
           <input
             className="w-full rounded-xl border-0 bg-white p-3 shadow-sm mb-3"
+            type="text"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            pattern="[0-9]*"
             placeholder="Code à 6 chiffres"
             value={code}
             onChange={(e) => setCode(e.target.value)}
@@ -104,7 +117,7 @@ export function OtpGate({ children }: Props) {
         <button
           type="button"
           onClick={codeSent ? verifyOtp : requestOtp}
-          disabled={loading}
+          disabled={loading || !phone.trim()}
           className="w-full bg-[#6C63FF] text-white rounded-xl py-3 font-semibold disabled:opacity-50"
         >
           {loading ? "Chargement…" : codeSent ? "Se connecter" : "Recevoir le code"}

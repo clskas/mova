@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { apiFetch, formatCdf } from "@/lib/api";
+import { toUserErrorMessage } from "@/lib/user-messages";
 import { GeoAutocompleteInput } from "./GeoAutocompleteInput";
 import { PromoCodeInput, promoPayload } from "./PromoCodeInput";
 
@@ -21,36 +22,49 @@ export function ParcelDelivery({ onBack, mock }: Props) {
   const [estimate, setEstimate] = useState<number | null>(null);
   const [promoCode, setPromoCode] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState(false);
 
   async function handleEstimate() {
     if (!dropoff) return;
     setLoading(true);
-    const data = await apiFetch<{ estimatedPriceCdf?: number }>("/api/deliveries/parcel/estimate", {
-      method: "POST",
-      body: JSON.stringify({ pickupAddress: pickup, dropoffAddress: dropoff, weightCategory, ...promoPayload(promoCode) }),
-    }, { useMock: mock });
-    setEstimate(data.estimatedPriceCdf ?? 5000);
-    setLoading(false);
+    setError(null);
+    try {
+      const data = await apiFetch<{ estimatedPriceCdf?: number }>("/api/deliveries/parcel/estimate", {
+        method: "POST",
+        body: JSON.stringify({ pickupAddress: pickup, dropoffAddress: dropoff, weightCategory, ...promoPayload(promoCode) }),
+      }, { useMock: mock });
+      setEstimate(data.estimatedPriceCdf ?? 5000);
+    } catch (e) {
+      setError(toUserErrorMessage(e, "Erreur d'estimation"));
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function handleConfirm() {
     setLoading(true);
-    await apiFetch("/api/deliveries/parcel", {
-      method: "POST",
-      body: JSON.stringify({
-        pickupAddress: pickup,
-        dropoffAddress: dropoff,
-        weightCategory,
-        pickupLat: -4.3217,
-        pickupLng: 15.3125,
-        dropoffLat: -4.35,
-        dropoffLng: 15.35,
-        ...promoPayload(promoCode),
-      }),
-    }, { useMock: mock });
-    setConfirmed(true);
-    setLoading(false);
+    setError(null);
+    try {
+      await apiFetch("/api/deliveries/parcel", {
+        method: "POST",
+        body: JSON.stringify({
+          pickupAddress: pickup,
+          dropoffAddress: dropoff,
+          weightCategory,
+          pickupLat: -4.3217,
+          pickupLng: 15.3125,
+          dropoffLat: -4.35,
+          dropoffLng: 15.35,
+          ...promoPayload(promoCode),
+        }),
+      }, { useMock: mock });
+      setConfirmed(true);
+    } catch (e) {
+      setError(toUserErrorMessage(e, "Impossible de créer la livraison"));
+    } finally {
+      setLoading(false);
+    }
   }
 
   if (confirmed) {
@@ -71,6 +85,7 @@ export function ParcelDelivery({ onBack, mock }: Props) {
     <div className="space-y-4">
       <button onClick={onBack} className="text-sm text-[#6C63FF]">← Accueil</button>
       <h2 className="text-lg font-semibold">Livraison colis</h2>
+      {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg p-3">{error}</p>}
 
       <GeoAutocompleteInput placeholder="Adresse d'enlèvement" value={pickup} onChange={setPickup} />
       <GeoAutocompleteInput

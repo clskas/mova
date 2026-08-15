@@ -1,24 +1,47 @@
 const TOKEN_KEY = 'mova_web_token';
 const PHONE_KEY = 'mova_web_phone';
 
-export function getToken(): string | null {
+function storageGet(key: string): string | null {
   if (typeof window === 'undefined') return null;
-  return localStorage.getItem(TOKEN_KEY);
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function storageSet(key: string, value: string): void {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    /* Safari private mode / blocked storage */
+  }
+}
+
+function storageRemove(key: string): void {
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    /* ignore */
+  }
+}
+
+export function getToken(): string | null {
+  return storageGet(TOKEN_KEY);
 }
 
 export function setToken(token: string, phone?: string): void {
-  localStorage.setItem(TOKEN_KEY, token);
-  if (phone) localStorage.setItem(PHONE_KEY, phone);
+  storageSet(TOKEN_KEY, token);
+  if (phone) storageSet(PHONE_KEY, phone);
 }
 
 export function clearToken(): void {
-  localStorage.removeItem(TOKEN_KEY);
-  localStorage.removeItem(PHONE_KEY);
+  storageRemove(TOKEN_KEY);
+  storageRemove(PHONE_KEY);
 }
 
 export function getStoredPhone(): string | null {
-  if (typeof window === 'undefined') return null;
-  return localStorage.getItem(PHONE_KEY);
+  return storageGet(PHONE_KEY);
 }
 
 export function authHeaders(): Record<string, string> {

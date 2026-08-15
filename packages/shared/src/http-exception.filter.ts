@@ -51,6 +51,11 @@ const TECHNICAL_OR_NEST_ENGLISH = [
   /Foreign key constraint/i,
   /Exception:/i,
   /^\s*at\s+\S+/m,
+  /SERDIPAY_/i,
+  /SMS_PROVIDER/i,
+  /AFRICAS_TALKING/i,
+  /TWILIO_(ACCOUNT_SID|AUTH_TOKEN|PHONE_NUMBER|VERIFY)/i,
+  /Définissez [A-Z0-9_]+/,
 ];
 
 function extractHttpMessage(body: string | object): string {
@@ -73,6 +78,9 @@ function toPublicHttpMessage(raw: string, status: number): string {
     }
     if (status === HttpStatus.NOT_FOUND) {
       return MOVA_ERROR_MESSAGES[MovaErrorCode.NOT_FOUND];
+    }
+    if (status === HttpStatus.SERVICE_UNAVAILABLE) {
+      return 'Service temporairement indisponible. Réessayez dans quelques minutes.';
     }
     if (status >= 500) {
       return MOVA_ERROR_MESSAGES[MovaErrorCode.INTERNAL_ERROR];
@@ -101,10 +109,11 @@ export class HttpExceptionFilter implements ExceptionFilter {
     if (exception instanceof MovaHttpException) {
       const status = exception.getStatus();
       const body = exception.getResponse() as { code: string; message: string };
+      const message = toPublicHttpMessage(body.message, status);
       this.logger.warn(`${tag}${body.code}: ${body.message}`);
       return response.status(status).json({
         success: false,
-        error: body,
+        error: { code: body.code, message },
         timestamp: new Date().toISOString(),
       });
     }

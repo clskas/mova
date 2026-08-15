@@ -9,6 +9,7 @@ import {
   isTwilioSmsConfigured,
   resolveSmsBackend,
   serdiPaySendSms,
+  SMS_UNAVAILABLE_USER_MESSAGE,
 } from '@mova/shared';
 
 export interface SmsSendResult {
@@ -36,7 +37,7 @@ export class MockSmsProvider implements SmsProvider {
       this.logger.error('[MOCK SMS] refused outside non-prod MOCK_OTP mode');
       return {
         success: false,
-        message: 'Service SMS non configuré. Configurez SerdiPay (ou Africa\'s Talking / Twilio).',
+        message: SMS_UNAVAILABLE_USER_MESSAGE,
       };
     }
     // Dev-only: code is intentional for local login; never enabled in production.
@@ -106,8 +107,7 @@ export class TwilioSmsProvider implements SmsProvider {
     if (!this.isConfigured()) {
       return {
         success: false,
-        message:
-          'Service SMS Twilio non configuré. Définissez TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN et TWILIO_PHONE_NUMBER.',
+        message: SMS_UNAVAILABLE_USER_MESSAGE,
       };
     }
 
@@ -188,8 +188,7 @@ export class SmsService {
       this.logger.error('SMS OTP failed: no provider configured');
       return {
         success: false,
-        message:
-          'Service SMS non configuré. Définissez SMS_PROVIDER=serdipay + SERDIPAY_SMS_API_ID / SERDIPAY_SMS_API_KEY, ou SMS_PROVIDER=africastalking + AFRICAS_TALKING_*.',
+        message: SMS_UNAVAILABLE_USER_MESSAGE,
       };
     }
     const result = await provider.sendOtp(phone, code);

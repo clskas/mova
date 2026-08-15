@@ -16,6 +16,10 @@ const FAQ = [
     a: "SENGA couvre 32 zones de service à travers la RDC. Choisissez votre ville ou laissez le GPS détecter la zone la plus proche.",
   },
   {
+    q: "Puis-je utiliser SENGA sur iPhone ?",
+    a: "Oui, dans Safari (senga.afri-soft.com). Pour l'installer : Partager → Sur l'écran d'accueil. Les notifications push et le GPS en arrière-plan restent réservés à l'app mobile.",
+  },
+  {
     q: "Comment contacter le support ?",
     a: "WhatsApp +243 900 000 000, support@mova.cd, Lun–Sam 8h–20h (Africa/Kinshasa).",
   },

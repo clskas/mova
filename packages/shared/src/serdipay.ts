@@ -14,6 +14,10 @@
  * - Credentials SMS distincts des credentials paiement (email/password).
  */
 
+/** Client-safe OTP SMS copy. Keep under 180 chars — never leak env var names. */
+export const SMS_UNAVAILABLE_USER_MESSAGE =
+  "Impossible d'envoyer le code par SMS. Réessayez dans quelques minutes.";
+
 export const SERDIPAY_ENV_KEYS = {
   baseUrl: 'SERDIPAY_BASE_URL',
   /** Merchant portal login email (get-token). Alias: SERDIPAY_CLIENT_ID */
@@ -228,10 +232,7 @@ export async function serdiPaySendSms(
   if (!isSerdiPaySmsConfigured(get)) {
     return {
       success: false,
-      message:
-        'SMS SerdiPay non configuré. Définissez SERDIPAY_SMS_API_ID et SERDIPAY_SMS_API_KEY ' +
-        '(credentials SMS API fournis par SerdiPay — distincts de SERDIPAY_EMAIL / SERDIPAY_PASSWORD). ' +
-        'Ou basculez SMS_PROVIDER=africastalking.',
+      message: SMS_UNAVAILABLE_USER_MESSAGE,
     };
   }
 

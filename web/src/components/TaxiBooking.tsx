@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { apiFetch, formatCdf } from "@/lib/api";
+import { toUserErrorMessage } from "@/lib/user-messages";
 import { GeoAutocompleteInput } from "./GeoAutocompleteInput";
 import { PromoCodeInput, promoPayload } from "./PromoCodeInput";
 
@@ -19,43 +20,56 @@ export function TaxiBooking({ onBack, mock }: Props) {
   const [estimate, setEstimate] = useState<number | null>(null);
   const [promoCode, setPromoCode] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState(false);
 
   async function handleEstimate() {
     if (!destination) return;
     setLoading(true);
-    const data = await apiFetch<{ priceCdf?: number; estimatedFareCdf?: number }>("/api/rides/estimate", {
-      method: "POST",
-      body: JSON.stringify({
-        pickupLat: -4.3217,
-        pickupLng: 15.3125,
-        dropoffLat: -4.35,
-        dropoffLng: 15.35,
-        vehicleType,
-        ...promoPayload(promoCode),
-      }),
-    }, { useMock: mock });
-    setEstimate(data.priceCdf ?? data.estimatedFareCdf ?? 8500);
-    setLoading(false);
+    setError(null);
+    try {
+      const data = await apiFetch<{ priceCdf?: number; estimatedFareCdf?: number }>("/api/rides/estimate", {
+        method: "POST",
+        body: JSON.stringify({
+          pickupLat: -4.3217,
+          pickupLng: 15.3125,
+          dropoffLat: -4.35,
+          dropoffLng: 15.35,
+          vehicleType,
+          ...promoPayload(promoCode),
+        }),
+      }, { useMock: mock });
+      setEstimate(data.priceCdf ?? data.estimatedFareCdf ?? 8500);
+    } catch (e) {
+      setError(toUserErrorMessage(e, "Estimation impossible"));
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function handleConfirm() {
     setLoading(true);
-    await apiFetch("/api/rides", {
-      method: "POST",
-      body: JSON.stringify({
-        pickupAddress: "Ma position",
-        dropoffAddress: destination,
-        pickupLat: -4.3217,
-        pickupLng: 15.3125,
-        dropoffLat: -4.35,
-        dropoffLng: 15.35,
-        vehicleType,
-        ...promoPayload(promoCode),
-      }),
-    }, { useMock: mock });
-    setConfirmed(true);
-    setLoading(false);
+    setError(null);
+    try {
+      await apiFetch("/api/rides", {
+        method: "POST",
+        body: JSON.stringify({
+          pickupAddress: "Ma position",
+          dropoffAddress: destination,
+          pickupLat: -4.3217,
+          pickupLng: 15.3125,
+          dropoffLat: -4.35,
+          dropoffLng: 15.35,
+          vehicleType,
+          ...promoPayload(promoCode),
+        }),
+      }, { useMock: mock });
+      setConfirmed(true);
+    } catch (e) {
+      setError(toUserErrorMessage(e, "Impossible de confirmer la course"));
+    } finally {
+      setLoading(false);
+    }
   }
 
   if (confirmed) {
@@ -76,6 +90,7 @@ export function TaxiBooking({ onBack, mock }: Props) {
     <div className="space-y-4">
       <button onClick={onBack} className="text-sm text-[#6C63FF]">← Accueil</button>
       <h2 className="text-lg font-semibold">Taxi / Moto-taxi</h2>
+      {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg p-3">{error}</p>}
 
       <label className="block text-sm font-medium">Destination</label>
       <GeoAutocompleteInput

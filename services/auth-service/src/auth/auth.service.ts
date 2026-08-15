@@ -16,6 +16,7 @@ import {
   maskPhoneRdc,
   isTestOtpAllowedForPhone,
   TEST_OTP_CODE,
+  SMS_UNAVAILABLE_USER_MESSAGE,
 } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '@mova/shared';
@@ -49,10 +50,11 @@ export class AuthService {
     if (!useTestOtp) {
       const smsResult = await this.sms.sendOtp(normalized, code);
       if (!smsResult.success) {
+        this.logger.error(`OTP SMS failed for ${maskPhoneRdc(normalized)}: ${smsResult.message}`);
         throw new MovaHttpException(
           MovaErrorCode.VALIDATION_ERROR,
           HttpStatus.SERVICE_UNAVAILABLE,
-          smsResult.message ?? 'Impossible d\'envoyer le code OTP par SMS.',
+          SMS_UNAVAILABLE_USER_MESSAGE,
         );
       }
       // Never echo OTP codes in API responses outside explicit test/mock mode.

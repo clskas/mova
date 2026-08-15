@@ -1,6 +1,6 @@
 /** Passerelle API unique (microservices). Toutes les routes passent par `/api/...`. */
 import { authHeaders } from './auth';
-import { sanitizeUserMessage } from './user-messages';
+import { httpStatusUserMessage, sanitizeUserMessage } from './user-messages';
 
 /** Origin only — strip accidental trailing `/api` (mobile-style PROD_API_URL). */
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000')
@@ -41,7 +41,7 @@ export async function apiFetch<T>(
         /* ignore */
       }
       if (useMock) return mockFor<T>(path, init);
-      throw new ApiError(sanitizeUserMessage(message, 'Une erreur est survenue. Veuillez réessayer.'), res.status);
+      throw new ApiError(sanitizeUserMessage(message, httpStatusUserMessage(res.status)), res.status);
     }
     return (await res.json()) as T;
   } catch (e) {
@@ -51,11 +51,15 @@ export async function apiFetch<T>(
 }
 
 export async function checkGatewayHealth(): Promise<boolean> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8000);
   try {
-    const res = await fetch(`${API_BASE}/health`);
+    const res = await fetch(`${API_BASE}/health`, { signal: controller.signal });
     return res.ok;
   } catch {
     return false;
+  } finally {
+    clearTimeout(timer);
   }
 }
 

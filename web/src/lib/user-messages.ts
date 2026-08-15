@@ -35,7 +35,22 @@ const TECHNICAL_PATTERNS = [
   /^\s*at\s+\S+/m,
   /\.dart:\d+/i,
   /\.(ts|js|tsx|jsx):\d+/i,
+  /SERDIPAY_/i,
+  /SMS_PROVIDER/i,
+  /AFRICAS_TALKING/i,
+  /TWILIO_(ACCOUNT_SID|AUTH_TOKEN|PHONE_NUMBER|VERIFY)/i,
+  /Définissez [A-Z0-9_]+/,
 ];
+
+export function httpStatusUserMessage(status: number): string {
+  if (status === 401) return "Non autorisé. Veuillez vous connecter.";
+  if (status === 403) return "Accès refusé.";
+  if (status === 404) return "Ressource introuvable.";
+  if (status === 429) return "Trop de tentatives. Réessayez dans un instant.";
+  if (status === 503) return "Service temporairement indisponible. Réessayez dans quelques minutes.";
+  if (status >= 500) return "Une erreur interne est survenue.";
+  return "Une erreur est survenue. Veuillez réessayer.";
+}
 
 export function sanitizeUserMessage(
   raw: unknown,
@@ -54,6 +69,11 @@ export function toUserErrorMessage(
   err: unknown,
   fallback = "Une erreur est survenue. Veuillez réessayer.",
 ): string {
-  if (err instanceof Error) return sanitizeUserMessage(err.message, fallback);
-  return sanitizeUserMessage(err, fallback);
+  const status =
+    err && typeof err === "object" && "status" in err ? Number((err as { status: unknown }).status) : 0;
+  const generic = "Une erreur est survenue. Veuillez réessayer.";
+  const resolvedFallback =
+    fallback !== generic ? fallback : status ? httpStatusUserMessage(status) : generic;
+  const raw = err instanceof Error ? err.message : err;
+  return sanitizeUserMessage(raw, resolvedFallback);
 }

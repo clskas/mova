@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { apiFetch, formatCdf } from "@/lib/api";
+import { toUserErrorMessage } from "@/lib/user-messages";
 import { GeoAutocompleteInput } from "./GeoAutocompleteInput";
 
 type MenuItem = { id: string; name: string; priceCdf: number };
@@ -46,6 +47,7 @@ export function FoodOrder({ onBack, mock }: Props) {
   const [address, setAddress] = useState("Ma position");
   const [loading, setLoading] = useState(true);
   const [ordering, setOrdering] = useState(false);
+  const [orderError, setOrderError] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState(false);
   const [total, setTotal] = useState(0);
 
@@ -78,23 +80,29 @@ export function FoodOrder({ onBack, mock }: Props) {
   async function handleOrder() {
     if (!selected || cartTotal === 0) return;
     setOrdering(true);
-    const items = Object.entries(cart).map(([id, quantity]) => {
-      const item = selected.items.find((i) => i.id === id)!;
-      return { name: item.name, unitPriceCdf: item.priceCdf, quantity };
-    });
-    const res = await apiFetch<{ delivery?: { estimatedPriceCdf?: number }; order?: { priceCdf?: number } }>("/api/deliveries/food", {
-      method: "POST",
-      body: JSON.stringify({
-        restaurantId: selected.id,
-        deliveryAddress: address,
-        deliveryLat: -4.3217,
-        deliveryLng: 15.3125,
-        items,
-      }),
-    }, { useMock: mock });
-    setTotal(res.delivery?.estimatedPriceCdf ?? res.order?.priceCdf ?? cartTotal + deliveryFee);
-    setConfirmed(true);
-    setOrdering(false);
+    setOrderError(null);
+    try {
+      const items = Object.entries(cart).map(([id, quantity]) => {
+        const item = selected.items.find((i) => i.id === id)!;
+        return { name: item.name, unitPriceCdf: item.priceCdf, quantity };
+      });
+      const res = await apiFetch<{ delivery?: { estimatedPriceCdf?: number }; order?: { priceCdf?: number } }>("/api/deliveries/food", {
+        method: "POST",
+        body: JSON.stringify({
+          restaurantId: selected.id,
+          deliveryAddress: address,
+          deliveryLat: -4.3217,
+          deliveryLng: 15.3125,
+          items,
+        }),
+      }, { useMock: mock });
+      setTotal(res.delivery?.estimatedPriceCdf ?? res.order?.priceCdf ?? cartTotal + deliveryFee);
+      setConfirmed(true);
+    } catch (e) {
+      setOrderError(toUserErrorMessage(e, "Impossible de passer la commande"));
+    } finally {
+      setOrdering(false);
+    }
   }
 
   if (confirmed) {
@@ -161,6 +169,7 @@ export function FoodOrder({ onBack, mock }: Props) {
         );
       })}
 
+      {orderError && <p className="text-sm text-red-600 bg-red-50 rounded-lg p-3">{orderError}</p>}
       {cartTotal > 0 && (
         <>
           <GeoAutocompleteInput placeholder="Adresse de livraison" value={address} onChange={setAddress} />

@@ -124,7 +124,8 @@ describe('serdipay Public API', () => {
     env.SERDIPAY_PASSWORD = 'secret';
     const result = await serdiPaySendSms(get, { to: '+243900000010', message: 'OTP 123456' });
     expect(result.success).toBe(false);
-    expect(result.message).toMatch(/SERDIPAY_SMS_API_ID/);
+    expect(result.message).toMatch(/Impossible d'envoyer le code par SMS/);
+    expect(result.message).not.toMatch(/SERDIPAY_/);
     expect(isSerdiPaySmsConfigured(get)).toBe(false);
   });
 

@@ -23,13 +23,14 @@ docker compose up -d --build
 
 echo "=== Wait for API gateway /health ==="
 for i in $(seq 1 90); do
-  if curl -sf http://localhost:3000/health >/dev/null 2>&1; then
+  if curl -sf --max-time 8 http://127.0.0.1:3000/health >/dev/null 2>&1; then
     echo "Gateway ready (attempt $i)"
     break
   fi
   if [ "$i" -eq 90 ]; then
     echo "Gateway timeout after 90 attempts" >&2
-    docker compose logs api-gateway --tail 80 || true
+    docker compose ps -a || true
+    docker compose logs api-gateway auth-service payment-service --tail 80 || true
     exit 1
   fi
   sleep 5

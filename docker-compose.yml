@@ -182,6 +182,7 @@ services:
       dockerfile: docker/gateway.Dockerfile
     ports:
       - '3000:3000'
+    restart: unless-stopped
     environment:
       NODE_ENV: development
       JWT_SECRET: local_dev_jwt_secret_32chars_min_ok
@@ -193,6 +194,9 @@ services:
       NOTIFICATION_SERVICE_URL: http://notification-service:3000
       ADMIN_SERVICE_URL: http://admin-service:3000
       PORT: 3000
+      # Fast probes in CI/local — Render overrides these for cold starts.
+      HEALTH_CHECK_TIMEOUT_MS: '3000'
+      HEALTH_CHECK_RETRIES: '0'
       CORS_ORIGIN: http://localhost:3001,http://localhost:3002,http://localhost:3007,http://localhost:3008
     depends_on:
       - auth-service

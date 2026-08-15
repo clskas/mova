@@ -15,7 +15,7 @@ services:
     dockerfilePath: ./docker/gateway.Dockerfile
     dockerContext: .
     plan: starter
-    healthCheckPath: /health
+    healthCheckPath: /health/live
     envVars:
       - key: JWT_SECRET
         generateValue: true

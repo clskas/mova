@@ -18,16 +18,16 @@ jobs:
         with:
           node-version: "22"
 
-      - name: Start regression stack
-        run: |
-          chmod +x scripts/regression-ci.sh scripts/regression-ci-teardown.sh
-          ./scripts/regression-ci.sh
-
       - name: Install Playwright
         working-directory: e2e
         run: |
           npm ci
           npx playwright install --with-deps chromium
+
+      - name: Start regression stack
+        run: |
+          chmod +x scripts/regression-ci.sh scripts/regression-ci-teardown.sh
+          ./scripts/regression-ci.sh
 
       - name: Run Playwright tests
         working-directory: e2e
@@ -36,7 +36,7 @@ jobs:
           E2E_REQUIRE_STACK: true
           ADMIN_BASE_URL: http://localhost:3002
           WEB_BASE_URL: http://localhost:3001
-          GATEWAY_URL: http://localhost:3000
+          GATEWAY_URL: http://127.0.0.1:3000
         run: npm run test:e2e
 
       - name: Teardown regression stack

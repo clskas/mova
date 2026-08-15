@@ -113,16 +113,18 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Start regression stack (Docker + admin/web)
-        run: |
-          chmod +x scripts/regression-ci.sh scripts/regression-ci-teardown.sh
-          ./scripts/regression-ci.sh
-
+      # Install browsers before the stack so Docker services are not idle
+      # (and memory-pressured) during Playwright setup.
       - name: Install Playwright
         working-directory: e2e
         run: |
           npm ci
           npx playwright install --with-deps chromium
+
+      - name: Start regression stack (Docker + admin/web)
+        run: |
+          chmod +x scripts/regression-ci.sh scripts/regression-ci-teardown.sh
+          ./scripts/regression-ci.sh
 
       - name: Run Playwright regression (admin + web + health)
         working-directory: e2e
@@ -131,11 +133,17 @@ jobs:
           E2E_REQUIRE_STACK: true
           ADMIN_BASE_URL: http://localhost:3002
           WEB_BASE_URL: http://localhost:3001
-          GATEWAY_URL: http://localhost:3000
+          GATEWAY_URL: http://127.0.0.1:3000
           ADMIN_PHONE: "+243900000001"
         run: |
           npm run test:e2e:admin
           npm run test:e2e:web
+
+      - name: Dump stack logs on failure
+        if: failure()
+        run: |
+          docker compose ps -a || true
+          docker compose logs --tail 80 api-gateway auth-service payment-service ride-service || true
 
       - name: Upload Playwright report on failure
         if: failure()

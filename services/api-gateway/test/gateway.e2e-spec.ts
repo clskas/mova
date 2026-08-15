@@ -32,6 +32,14 @@ describe('ApiGateway (e2e)', () => {
     });
   });
 
+  it('/health/live (GET) returns process liveness', () => {
+    return request(app.getHttpServer()).get('/health/live').expect(200).expect((res) => {
+      expect(res.body.status).toBe('ok');
+      expect(res.body.service).toBe('api-gateway');
+      expect(res.body.services).toBeUndefined();
+    });
+  });
+
   it('/health (GET) sets X-Request-Id', () => {
     return request(app.getHttpServer())
       .get('/health')

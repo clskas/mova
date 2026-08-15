@@ -35,4 +35,14 @@ describe('HealthController', () => {
     expect(result).toHaveProperty('services');
     expect(Array.isArray(result.services)).toBe(true);
   });
+
+  it('live does not probe backends', () => {
+    const controller = new HealthController();
+    expect(controller.live()).toEqual({
+      status: 'ok',
+      service: 'api-gateway',
+      version: '1.0.0',
+    });
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
 });

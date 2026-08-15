@@ -1,9 +1,14 @@
 import { Controller, Get } from '@nestjs/common';
 import { MARKET_RDC, SERVICE_PORTS, serviceUrl } from '@mova/shared';
 
-/** Per-attempt fetch timeout (ms). Render free-tier cold starts can exceed 30s. */
-const HEALTH_CHECK_TIMEOUT_MS = Number(process.env.HEALTH_CHECK_TIMEOUT_MS ?? 45_000);
-const HEALTH_CHECK_RETRIES = Math.max(0, Number(process.env.HEALTH_CHECK_RETRIES ?? 2));
+/**
+ * Per-attempt backend probe timeout (ms).
+ * Keep the default short so GET /health stays a liveness-friendly probe
+ * (Playwright, load balancers, CI). Render cold starts set
+ * HEALTH_CHECK_TIMEOUT_MS=45000 via render.yaml.
+ */
+const HEALTH_CHECK_TIMEOUT_MS = Number(process.env.HEALTH_CHECK_TIMEOUT_MS ?? 3_000);
+const HEALTH_CHECK_RETRIES = Math.max(0, Number(process.env.HEALTH_CHECK_RETRIES ?? 0));
 
 async function fetchServiceHealth(name: keyof typeof SERVICE_PORTS) {
   let lastError: unknown;
@@ -31,6 +36,12 @@ async function fetchServiceHealth(name: keyof typeof SERVICE_PORTS) {
 
 @Controller()
 export class HealthController {
+  /** Process liveness — does not wait on downstream services. */
+  @Get('health/live')
+  live() {
+    return { status: 'ok', service: 'api-gateway', version: '1.0.0' };
+  }
+
   @Get('health')
   async health() {
     const services = ['auth', 'ride', 'payment', 'driver', 'notification', 'admin'] as const;

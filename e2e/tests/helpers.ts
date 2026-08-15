@@ -37,10 +37,19 @@ export async function requireGateway(
   request: APIRequestContext,
   gatewayUrl: string,
 ): Promise<void> {
-  try {
-    const health = await request.get(`${gatewayUrl}/health`, { timeout: 5_000 });
-    if (!health.ok()) skipOrFail(`Gateway indisponible sur ${gatewayUrl}`);
-  } catch {
-    skipOrFail(`Gateway indisponible sur ${gatewayUrl}`);
+  const attempts = e2eStrict ? 8 : 1;
+  let lastError = "injoignable";
+  for (let i = 0; i < attempts; i++) {
+    try {
+      const health = await request.get(`${gatewayUrl}/health`, { timeout: 15_000 });
+      if (health.ok()) return;
+      lastError = `HTTP ${health.status()}`;
+    } catch (err) {
+      lastError = err instanceof Error ? err.message : String(err);
+    }
+    if (i < attempts - 1) {
+      await new Promise((r) => setTimeout(r, 2_000));
+    }
   }
+  skipOrFail(`Gateway indisponible sur ${gatewayUrl} (${lastError})`);
 }

@@ -367,7 +367,7 @@ export class WalletService {
         providerRef.startsWith('sp_') ||
         providerRef.startsWith('cp_') ||
         providerRef.startsWith('at_') ||
-        Boolean(mm.pending);
+        Boolean('pending' in mm && mm.pending);
       if (isAsync) {
         const wallet = await this.createWallet(userId);
         await this.prisma.walletTransaction.create({

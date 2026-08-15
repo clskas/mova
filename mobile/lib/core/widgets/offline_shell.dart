@@ -9,22 +9,33 @@ import '../theme/mova_colors.dart';
 import '../update/app_update_service.dart';
 
 /// Bannière globale hors ligne + indicateur de file de synchronisation.
-class MovaOfflineShell extends ConsumerWidget {
+class MovaOfflineShell extends ConsumerStatefulWidget {
   const MovaOfflineShell({super.key, required this.child});
 
   final Widget? child;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MovaOfflineShell> createState() => _MovaOfflineShellState();
+}
+
+class _MovaOfflineShellState extends ConsumerState<MovaOfflineShell> {
+  @override
+  void initState() {
+    super.initState();
+    ref.read(appUpdateServiceProvider.notifier).start();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final offlineAsync = ref.watch(offlineStateProvider);
     final state = offlineAsync.valueOrNull;
-    final update = ref.watch(appUpdateStateProvider).valueOrNull;
+    final update = ref.watch(appUpdateServiceProvider);
 
     return Stack(
       children: [
-        child ?? const SizedBox.shrink(),
+        widget.child ?? const SizedBox.shrink(),
         if ((state != null && (state.isOffline || state.pendingSyncCount > 0)) ||
-            (update?.updateAvailable ?? false))
+            update.showBanner)
           Positioned(
             top: 0,
             left: 0,
@@ -32,35 +43,55 @@ class MovaOfflineShell extends ConsumerWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (update?.updateAvailable == true)
+                if (update.showBanner)
                   Material(
                     color: MovaColors.violet,
                     child: SafeArea(
                       bottom: false,
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        child: Row(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 8, 4),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            const Icon(Icons.system_update, color: Colors.white, size: 18),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                update!.forceUpdate
-                                    ? 'Une nouvelle version est requise pour continuer.'
-                                    : 'Une nouvelle version est disponible.',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
+                            Row(
+                              children: [
+                                const Icon(Icons.system_update, color: Colors.white, size: 18),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    update.forceUpdate
+                                        ? 'Une nouvelle version est requise pour continuer.'
+                                        : 'Une nouvelle version est disponible.',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
                                 ),
-                              ),
+                              ],
                             ),
-                            TextButton(
-                              onPressed: () => ref.read(appUpdateServiceProvider).openStore(),
-                              child: const Text(
-                                'Mettre à jour',
-                                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
-                              ),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                if (!update.forceUpdate)
+                                  TextButton(
+                                    onPressed: () =>
+                                        ref.read(appUpdateServiceProvider.notifier).dismiss(),
+                                    child: const Text(
+                                      'Plus tard',
+                                      style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600),
+                                    ),
+                                  ),
+                                TextButton(
+                                  onPressed: () =>
+                                      ref.read(appUpdateServiceProvider.notifier).openStore(),
+                                  child: const Text(
+                                    'Mettre à jour',
+                                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),

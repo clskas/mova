@@ -4,6 +4,13 @@ Base URL: `http://localhost:3000` (api-gateway)
 
 All routes are prefixed with `/api` except `/health`.
 
+## Public
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/api/public/app-version` | Public | Versions store passager / chauffeur (bannière in-app). Contrôlé par `MOBILE_PASSENGER_VERSION`, `MOBILE_DRIVER_VERSION`, `MOBILE_MIN_VERSION` |
+| GET | `/api/public/trips/:token` | Public | Suivi trajet partagé (lien tokenisé) |
+
 ## Authentication
 
 | Method | Path | Auth | Description |

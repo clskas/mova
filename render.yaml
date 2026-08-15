@@ -278,3 +278,14 @@ envVarGroups:
         sync: false
       - key: FCM_SERVER_KEY
         sync: false
+      # In-app update banner (ride-service GET /api/public/app-version). Raise after Play upload.
+      - key: MOBILE_PASSENGER_VERSION
+        value: "1.0.2"
+      - key: MOBILE_DRIVER_VERSION
+        value: "1.0.2"
+      - key: MOBILE_MIN_VERSION
+        value: "1.0.0"
+      - key: PLAY_STORE_PASSENGER_URL
+        value: "https://play.google.com/store/apps/details?id=cd.mova.mova.passenger"
+      - key: PLAY_STORE_DRIVER_URL
+        value: "https://play.google.com/store/apps/details?id=cd.mova.mova.driver"

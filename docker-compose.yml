@@ -83,6 +83,9 @@ services:
       PHOTON_TIMEOUT_MS: '8000'
       # Docker Windows : Nominatim/OSRM publics souvent injoignables — Photon en priorité.
       GEOCODE_PREFER_PHOTON: 'true'
+      MOBILE_PASSENGER_VERSION: '1.0.2'
+      MOBILE_DRIVER_VERSION: '1.0.2'
+      MOBILE_MIN_VERSION: '1.0.0'
       DOCKER: 'true'
       PORT: 3000
     depends_on:

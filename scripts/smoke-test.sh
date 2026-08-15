@@ -37,6 +37,16 @@ if [ "${SMOKE_DIRECT_SERVICES:-}" = "true" ]; then
   done
 fi
 
+echo "=== Public app-version (no auth) ==="
+if appver=$(curl -sf "${HEADERS[@]}" "${GATEWAY_URL}/api/public/app-version"); then
+  echo "$appver" | head -c 300
+  echo ""
+  echo "$appver" | grep -q '"passenger"' && echo "$appver" | grep -q '"driver"' \
+    || fail "GET /api/public/app-version missing passenger/driver blocks"
+else
+  fail "GET /api/public/app-version failed (must stay public)"
+fi
+
 echo "=== Geo communes (via gateway) ==="
 if curl -sf "${HEADERS[@]}" "${GATEWAY_URL}/api/geo/communes?city=Kinshasa" | head -c 200; then
   echo ""

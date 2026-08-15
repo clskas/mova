@@ -1,7 +1,7 @@
-/// Version client — alignée sur `mobile/pubspec.yaml` (`version: 1.0.2+6`).
+/// Version client — alignée sur `mobile/pubspec.yaml` (`version: 1.0.2+7`).
 class AppVersion {
   static const name = '1.0.2';
-  static const build = 6;
+  static const build = 7;
 
   static int compare(String a, String b) {
     List<int> parts(String raw) => raw

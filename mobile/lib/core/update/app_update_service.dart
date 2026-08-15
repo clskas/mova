@@ -13,86 +13,152 @@ class AppUpdateState {
     this.forceUpdate = false,
     this.storeUrl,
     this.remoteVersion,
+    this.dismissedVersion,
   });
 
   final bool updateAvailable;
   final bool forceUpdate;
   final String? storeUrl;
   final String? remoteVersion;
-}
+  final String? dismissedVersion;
 
-final appUpdateServiceProvider = Provider<AppUpdateService>((ref) {
-  final service = AppUpdateService(ref.read(apiClientProvider));
-  ref.onDispose(service.dispose);
-  return service;
-});
+  bool get showBanner =>
+      updateAvailable && (forceUpdate || dismissedVersion != remoteVersion);
 
-final appUpdateStateProvider = StreamProvider<AppUpdateState>((ref) {
-  return ref.watch(appUpdateServiceProvider).stream;
-});
-
-class AppUpdateService {
-  AppUpdateService(this._api);
-
-  final ApiClient _api;
-  final _controller = StreamController<AppUpdateState>.broadcast();
-  AppUpdateState _state = const AppUpdateState();
-  Timer? _timer;
-  bool _started = false;
-
-  Stream<AppUpdateState> get stream async* {
-    yield _state;
-    yield* _controller.stream;
+  AppUpdateState copyWith({
+    bool? updateAvailable,
+    bool? forceUpdate,
+    String? storeUrl,
+    String? remoteVersion,
+    String? dismissedVersion,
+  }) {
+    return AppUpdateState(
+      updateAvailable: updateAvailable ?? this.updateAvailable,
+      forceUpdate: forceUpdate ?? this.forceUpdate,
+      storeUrl: storeUrl ?? this.storeUrl,
+      remoteVersion: remoteVersion ?? this.remoteVersion,
+      dismissedVersion: dismissedVersion ?? this.dismissedVersion,
+    );
   }
 
-  AppUpdateState get state => _state;
+  @override
+  bool operator ==(Object other) {
+    return other is AppUpdateState &&
+        other.updateAvailable == updateAvailable &&
+        other.forceUpdate == forceUpdate &&
+        other.storeUrl == storeUrl &&
+        other.remoteVersion == remoteVersion &&
+        other.dismissedVersion == dismissedVersion;
+  }
+
+  @override
+  int get hashCode => Object.hash(
+        updateAvailable,
+        forceUpdate,
+        storeUrl,
+        remoteVersion,
+        dismissedVersion,
+      );
+}
+
+final appUpdateServiceProvider =
+    NotifierProvider<AppUpdateService, AppUpdateState>(AppUpdateService.new);
+
+class AppUpdateService extends Notifier<AppUpdateState> {
+  Timer? _timer;
+  Timer? _retryTimer;
+  bool _started = false;
+  bool _checking = false;
+
+  @override
+  AppUpdateState build() {
+    ref.onDispose(() {
+      _timer?.cancel();
+      _retryTimer?.cancel();
+    });
+    return const AppUpdateState();
+  }
 
   void start() {
     if (_started) return;
     _started = true;
     unawaited(check());
-    _timer = Timer.periodic(const Duration(minutes: 15), (_) => check());
+    _retryTimer = Timer(const Duration(seconds: 8), () => unawaited(check()));
+    _timer = Timer.periodic(const Duration(minutes: 5), (_) => unawaited(check()));
   }
 
   Future<void> check() async {
-    final result = await _api.get('/public/app-version', retries: 1, skipCache: true);
-    if (result is! Success) return;
-    final data = result.data;
-    if (data is! Map) return;
-    final flavor = AppFlavor.isDriver ? 'driver' : 'passenger';
-    final block = data[flavor];
-    if (block is! Map) return;
-    final current = block['currentVersion']?.toString() ?? '';
-    final min = block['minVersion']?.toString() ?? '1.0.0';
-    final storeUrl = block['storeUrl']?.toString();
-    if (current.isEmpty) return;
-    final behindCurrent = AppVersion.compare(AppVersion.name, current) < 0;
-    final belowMin = AppVersion.compare(AppVersion.name, min) < 0;
-    final next = AppUpdateState(
-      updateAvailable: behindCurrent || belowMin,
-      forceUpdate: belowMin,
-      storeUrl: storeUrl,
-      remoteVersion: current,
-    );
-    if (next.updateAvailable == _state.updateAvailable &&
-        next.forceUpdate == _state.forceUpdate &&
-        next.remoteVersion == _state.remoteVersion) {
-      return;
+    if (_checking) return;
+    _checking = true;
+    try {
+      final result = await ref.read(apiClientProvider).get(
+            '/public/app-version',
+            retries: 1,
+            skipCache: true,
+          );
+      if (result is! Success) return;
+      final parsed = parseRemote(
+        result.data,
+        isDriver: AppFlavor.isDriver,
+        localVersion: AppVersion.name,
+      );
+      if (parsed == null) return;
+      final next = parsed.copyWith(dismissedVersion: state.dismissedVersion);
+      if (next == state) return;
+      state = next;
+    } finally {
+      _checking = false;
     }
-    _state = next;
-    if (!_controller.isClosed) _controller.add(_state);
+  }
+
+  void dismiss() {
+    if (!state.updateAvailable || state.forceUpdate) return;
+    final next = state.copyWith(dismissedVersion: state.remoteVersion);
+    if (next == state) return;
+    state = next;
   }
 
   Future<void> openStore() async {
-    final raw = _state.storeUrl;
+    final raw = state.storeUrl;
     if (raw == null || raw.isEmpty) return;
     final uri = Uri.tryParse(raw);
     if (uri == null) return;
     await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
-  void dispose() {
-    _timer?.cancel();
-    _controller.close();
+  /// Accepte le JSON brut ou un enveloppe `{ data: { passenger, driver } }`.
+  static AppUpdateState? parseRemote(
+    Object? raw, {
+    required bool isDriver,
+    required String localVersion,
+  }) {
+    final root = _asMap(raw);
+    if (root == null) return null;
+    final flavor = isDriver ? 'driver' : 'passenger';
+    var block = _asMap(root[flavor]);
+    if (block == null) {
+      block = _asMap(_asMap(root['data'])?[flavor]);
+    }
+    if (block == null) return null;
+    final current = block['currentVersion']?.toString().trim() ?? '';
+    final min = block['minVersion']?.toString().trim() ?? '1.0.0';
+    final storeUrl = block['storeUrl']?.toString();
+    if (current.isEmpty) return null;
+    final behindCurrent = AppVersion.compare(localVersion, current) < 0;
+    final belowMin = AppVersion.compare(localVersion, min) < 0;
+    return AppUpdateState(
+      updateAvailable: behindCurrent || belowMin,
+      forceUpdate: belowMin,
+      storeUrl: storeUrl,
+      remoteVersion: current,
+    );
+  }
+
+  static Map<String, dynamic>? _asMap(Object? value) {
+    if (value is Map<String, dynamic>) return value;
+    if (value is Map) {
+      return value.map((key, val) => MapEntry(key.toString(), val));
+    }
+    return null;
   }
 }

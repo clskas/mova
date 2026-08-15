@@ -57,7 +57,7 @@ class _MovaPassengerAppState extends ConsumerState<MovaPassengerApp>
   void initState() {
     super.initState();
     _chatPoll = ChatPollService(ref.read(apiClientProvider))..start();
-    ref.read(appUpdateServiceProvider).start();
+    ref.read(appUpdateServiceProvider.notifier).start();
   }
 
   @override
@@ -71,7 +71,7 @@ class _MovaPassengerAppState extends ConsumerState<MovaPassengerApp>
     super.didChangeAppLifecycleState(state);
     if (state == AppLifecycleState.resumed) {
       _chatPoll?.poke();
-      ref.read(appUpdateServiceProvider).check();
+      ref.read(appUpdateServiceProvider.notifier).check();
     }
   }
 
@@ -107,7 +107,7 @@ class _MovaDriverAppState extends ConsumerState<MovaDriverApp>
   void initState() {
     super.initState();
     _chatPoll = ChatPollService(ref.read(apiClientProvider))..start();
-    ref.read(appUpdateServiceProvider).start();
+    ref.read(appUpdateServiceProvider.notifier).start();
   }
 
   @override
@@ -121,7 +121,7 @@ class _MovaDriverAppState extends ConsumerState<MovaDriverApp>
     super.didChangeAppLifecycleState(state);
     if (state == AppLifecycleState.resumed) {
       _chatPoll?.poke();
-      ref.read(appUpdateServiceProvider).check();
+      ref.read(appUpdateServiceProvider.notifier).check();
     }
   }
 

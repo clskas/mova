@@ -110,6 +110,9 @@ MOCK_PAYMENTS=false
 | `TWILIO_*` | Secours OTP SMS |
 | `FCM_SERVER_KEY` | Push notifications |
 | `MAPBOX_ACCESS_TOKEN` | Autocomplétion adresses nationale RDC (recommandé — sans token, Nominatim/Photon OSM peut omettre des lieux) |
+| `MOBILE_PASSENGER_VERSION` / `MOBILE_DRIVER_VERSION` | Version store courante (bannière in-app). Défaut `1.0.2`. **Lever après upload Play** (ex. `1.0.3`) — `GET /api/public/app-version` (sans auth, ride-service) |
+| `MOBILE_MIN_VERSION` | Version minimale (force-update). Défaut `1.0.0` |
+| `PLAY_STORE_PASSENGER_URL` / `PLAY_STORE_DRIVER_URL` | Liens Play ouverts par « Mettre à jour » |
 
 ### 3.3.1 OTP — comportement production
 

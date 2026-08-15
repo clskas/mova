@@ -6,6 +6,7 @@ import { MovaErrorCode, MovaHttpException } from '@mova/shared';
 import { HttpStatus } from '@nestjs/common';
 import { toMobileRideStatus } from '@mova/shared';
 import { TrackingService } from '../tracking/tracking.service';
+import { buildMobileAppVersionResponse } from './app-version';
 
 @ApiTags('public')
 @Controller('public')
@@ -15,28 +16,7 @@ export class PublicController {
   @Get('app-version')
   @ApiOperation({ summary: 'Versions courantes / minimales (apps mobiles + web)' })
   getAppVersion() {
-    const passengerCurrent = process.env.MOBILE_PASSENGER_VERSION?.trim() || '1.0.2';
-    const driverCurrent = process.env.MOBILE_DRIVER_VERSION?.trim() || '1.0.2';
-    const minVersion = process.env.MOBILE_MIN_VERSION?.trim() || '1.0.0';
-    const passengerStore =
-      process.env.PLAY_STORE_PASSENGER_URL?.trim() ||
-      'https://play.google.com/store/apps/details?id=cd.mova.mova.passenger';
-    const driverStore =
-      process.env.PLAY_STORE_DRIVER_URL?.trim() ||
-      'https://play.google.com/store/apps/details?id=cd.mova.mova.driver';
-    return {
-      generatedAt: new Date().toISOString(),
-      passenger: {
-        currentVersion: passengerCurrent,
-        minVersion,
-        storeUrl: passengerStore,
-      },
-      driver: {
-        currentVersion: driverCurrent,
-        minVersion,
-        storeUrl: driverStore,
-      },
-    };
+    return buildMobileAppVersionResponse();
   }
 
   @Get('trips/:token')

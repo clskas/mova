@@ -15,6 +15,14 @@ nav:
     - Passager: user-manual/passager.md
     - Chauffeur: user-manual/chauffeur.md
     - Admin: user-manual/admin.md
+  - Scripts vidéo:
+    - Vue d'ensemble: video-scripts/index.md
+    - Passager mobile: video-scripts/passager-mobile.md
+    - Chauffeur mobile: video-scripts/chauffeur-mobile.md
+    - Passager web: video-scripts/passager-web.md
+    - Restaurant: video-scripts/restaurant.md
+    - Location: video-scripts/location.md
+    - Admin: video-scripts/admin.md
   - Architecture: architecture.md
   - API: api.md
   - CI/CD: cicd.md

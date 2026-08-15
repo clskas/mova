@@ -61,4 +61,13 @@ Manuel vivant (source de vérité pour l'aide in-app mobile) :
 - [Chauffeur](user-manual/chauffeur.md)
 - [Admin](user-manual/admin.md)
 
+## Vidéos explicatives (tournage)
+
+Storyboards 30–60 s pour montrer comment utiliser chaque app :
+
+- [Index des scripts](video-scripts/index.md)
+- Mobile passager, chauffeur, web PWA, restaurant, location, admin
+
+Les démos Play Console FGS (`mobile/store-listing/senga/fgs-*-demo-README.md`) sont un autre usage : ne pas les confondre.
+
 Lancer la doc : `mkdocs serve` (après `pip install mkdocs-material`).

@@ -70,3 +70,4 @@ Lancement à **Kinshasa**. Extension progressive vers Lubumbashi, Goma, Bukavu e
 
 - [Guide de test applications](../GUIDE_TEST_APPS.md) — scénarios manuels complets
 - [RBAC — tests par rôle](../RBAC_TESTING.md) — vérification des accès admin
+- [Scripts vidéo explicatives](../video-scripts/index.md) — storyboards 30–60 s (toutes les apps)

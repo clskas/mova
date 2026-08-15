@@ -367,7 +367,7 @@ function OrderCard({
             type="button"
             disabled={busy}
             onClick={onConfirm}
-            className="px-4 py-2 rounded-xl bg-green-600 text-white text-sm font-medium disabled:opacity-60"
+            className="px-4 py-2.5 min-h-11 rounded-xl bg-green-600 text-white text-sm font-medium disabled:opacity-60"
           >
             Accepter
           </button>
@@ -377,7 +377,7 @@ function OrderCard({
             type="button"
             disabled={busy}
             onClick={onReady}
-            className="px-4 py-2 rounded-xl bg-[#6C63FF] text-white text-sm font-medium disabled:opacity-60"
+            className="px-4 py-2.5 min-h-11 rounded-xl bg-[#6C63FF] text-white text-sm font-medium disabled:opacity-60"
           >
             Prête pour livreur
           </button>

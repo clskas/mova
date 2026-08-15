@@ -122,6 +122,8 @@ export type RestaurantDashboard = {
     deliveredTodayGrossCdf: number;
     balanceCdf: number;
     formattedBalance: string;
+    walletAvailable?: boolean;
+    walletMessage?: string;
     revenueTodayCdf: number;
     revenueMonthCdf: number;
     totalSalesCount: number;
@@ -137,6 +139,8 @@ export type RestaurantEarnings = {
   restaurant: { id: string; name: string };
   balanceCdf: number;
   formattedBalance: string;
+  walletAvailable?: boolean;
+  walletMessage?: string;
   recentFoodSales: {
     id: string;
     amountCdf: number;

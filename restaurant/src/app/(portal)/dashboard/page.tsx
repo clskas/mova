@@ -67,6 +67,12 @@ export default function DashboardPage() {
 
       {kpis && (
         <>
+          {kpis.walletAvailable === false && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+              {kpis.walletMessage ??
+                "Portefeuille temporairement indisponible. En attente de configuration du hub de paiement."}
+            </div>
+          )}
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <KpiCard label="Solde disponible" value={kpis.formattedBalance} href="/earnings" accent="from-orange-500 to-orange-600" />
             <KpiCard label="Revenus aujourd'hui" value={formatCdf(kpis.revenueTodayCdf)} href={`/earnings?from=${today}&to=${today}`} />

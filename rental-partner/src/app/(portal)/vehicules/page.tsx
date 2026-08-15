@@ -133,7 +133,55 @@ export default function VehiclesPage() {
           </Link>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <>
+        <div className="space-y-3 md:hidden">
+          {vehicles.map((v) => {
+            const thumb = mediaUrl(v.imageUrl);
+            const canDelete = v.isActive !== false;
+            const rateLabel =
+              v.hourlyRateCdf != null && v.hourlyRateCdf > 0
+                ? `${formatCdf(v.dailyRateCdf)}/j · ${formatCdf(v.hourlyRateCdf)}/h`
+                : `${formatCdf(v.dailyRateCdf)}/j`;
+            return (
+              <article key={v.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-3">
+                <div className="flex gap-3 min-w-0">
+                  {thumb ? (
+                    <img src={thumb} alt="" className="w-16 h-14 object-cover rounded-lg shrink-0" />
+                  ) : (
+                    <div className="w-16 h-14 rounded-lg bg-gray-100 shrink-0 flex items-center justify-center text-lg">🚗</div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold text-[#1A1A2E] truncate">{v.name}</p>
+                    <p className="text-xs text-gray-500">
+                      {v.categoryLabel ?? v.category} · {v.city ?? "Kinshasa"}
+                    </p>
+                    <p className="text-sm text-gray-700 mt-1">{rateLabel}</p>
+                    <div className="mt-2">{statusBadge(v)}</div>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Link
+                    href={`/vehicules/nouveau?id=${v.id}`}
+                    className="flex-1 text-center px-3 py-2.5 min-h-11 rounded-lg bg-indigo-50 text-indigo-700 font-medium"
+                  >
+                    Modifier
+                  </Link>
+                  {canDelete && (
+                    <button
+                      type="button"
+                      disabled={busyId === v.id}
+                      onClick={() => handleDelete(v.id, v.name)}
+                      className="flex-1 px-3 py-2.5 min-h-11 rounded-lg bg-red-50 text-red-700 font-medium disabled:opacity-50"
+                    >
+                      {busyId === v.id ? "…" : "Retirer"}
+                    </button>
+                  )}
+                </div>
+              </article>
+            );
+          })}
+        </div>
+        <div className="hidden md:block bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -200,6 +248,7 @@ export default function VehiclesPage() {
             </table>
           </div>
         </div>
+        </>
       )}
     </div>
   );

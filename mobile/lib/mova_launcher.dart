@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/api/api_client.dart';
+import 'core/config/app_version.dart';
 import 'core/offline/mova_app_lifecycle.dart';
 import 'core/offline/sync_queue.dart';
 import 'core/theme/mova_theme.dart';
+import 'core/update/app_update_service.dart';
 import 'core/widgets/offline_shell.dart';
 import 'features/auth/auth_session_gate.dart';
 import 'features/chat/chat_alert_service.dart';
@@ -16,6 +18,7 @@ import 'features/splash/mova_splash_screen.dart';
 /// Point d'entrée partagé — évite SyncQueue non initialisé si le mauvais main.dart est ciblé.
 Future<void> runMovaPassengerApp() async {
   WidgetsFlutterBinding.ensureInitialized();
+  AppFlavor.current = MovaAppFlavor.passenger;
   await SyncQueue.init();
   await PassengerAlertService.init();
   await ChatAlertService.init();
@@ -28,6 +31,7 @@ Future<void> runMovaPassengerApp() async {
 
 Future<void> runMovaDriverApp() async {
   WidgetsFlutterBinding.ensureInitialized();
+  AppFlavor.current = MovaAppFlavor.driver;
   await SyncQueue.init();
   await DriverJobAlertService.init();
   await ChatAlertService.init();
@@ -53,6 +57,7 @@ class _MovaPassengerAppState extends ConsumerState<MovaPassengerApp>
   void initState() {
     super.initState();
     _chatPoll = ChatPollService(ref.read(apiClientProvider))..start();
+    ref.read(appUpdateServiceProvider).start();
   }
 
   @override
@@ -64,7 +69,10 @@ class _MovaPassengerAppState extends ConsumerState<MovaPassengerApp>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
-    if (state == AppLifecycleState.resumed) _chatPoll?.poke();
+    if (state == AppLifecycleState.resumed) {
+      _chatPoll?.poke();
+      ref.read(appUpdateServiceProvider).check();
+    }
   }
 
   @override
@@ -99,6 +107,7 @@ class _MovaDriverAppState extends ConsumerState<MovaDriverApp>
   void initState() {
     super.initState();
     _chatPoll = ChatPollService(ref.read(apiClientProvider))..start();
+    ref.read(appUpdateServiceProvider).start();
   }
 
   @override
@@ -110,7 +119,10 @@ class _MovaDriverAppState extends ConsumerState<MovaDriverApp>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
-    if (state == AppLifecycleState.resumed) _chatPoll?.poke();
+    if (state == AppLifecycleState.resumed) {
+      _chatPoll?.poke();
+      ref.read(appUpdateServiceProvider).check();
+    }
   }
 
   @override

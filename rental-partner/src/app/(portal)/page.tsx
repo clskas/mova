@@ -101,6 +101,13 @@ export default function DashboardPage() {
         <>
           <PubliciteCarousel items={publicites} />
 
+          {kpis && kpis.walletAvailable === false && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+              {kpis.walletMessage ??
+                "Portefeuille temporairement indisponible. En attente de configuration du hub de paiement."}
+            </div>
+          )}
+
           {kpis && (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <Link href="/revenus" className="block hover:scale-[1.02] transition-transform">

@@ -214,6 +214,8 @@ export class PartnerBillingService {
       partnerName,
       balanceCdf: wallet.balanceCdf,
       formattedBalance: wallet.formattedBalance,
+      walletAvailable: wallet.available,
+      walletMessage: wallet.unavailableReason,
       periodTotalCdf: wallet.periodTotalCdf ?? filtered.reduce((sum, tx) => sum + (tx.amountCdf ?? 0), 0),
       periodCount: wallet.pagination.total,
       from: from?.toISOString() ?? null,

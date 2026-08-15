@@ -12,6 +12,14 @@ export function PwaRegister() {
       .then((reg) => {
         void reg.update();
         if (getToken()) void registerPartnerWebPush("restaurant");
+        reg.addEventListener("updatefound", () => {
+          const incoming = reg.installing;
+          incoming?.addEventListener("statechange", () => {
+            if (incoming.state === "installed" && navigator.serviceWorker.controller) {
+              window.dispatchEvent(new Event("mova:update-available"));
+            }
+          });
+        });
       })
       .catch(() => undefined);
   }, []);

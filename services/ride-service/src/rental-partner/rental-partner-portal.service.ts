@@ -55,10 +55,13 @@ export class RentalPartnerPortalService {
       kpis: {
         balanceCdf: wallet.balanceCdf,
         formattedBalance: wallet.formattedBalance,
+        walletAvailable: wallet.available,
+        walletMessage: wallet.unavailableReason,
         revenueTodayCdf,
         revenueMonthCdf,
         activeBookings,
         completedMonth,
+        completedMonthCount: completedMonth,
         totalRentalSales: rentalCredits.length,
       },
       recentBookings: recentBookings.data,
@@ -73,6 +76,8 @@ export class RentalPartnerPortalService {
       partnerName: user?.name ?? 'Partenaire',
       balanceCdf: wallet.balanceCdf,
       formattedBalance: wallet.formattedBalance,
+      walletAvailable: wallet.available,
+      walletMessage: wallet.unavailableReason,
       recentRentalSales: rentalCredits.slice(0, 20).map((tx) => ({
         id: tx.id,
         amountCdf: tx.amountCdf,

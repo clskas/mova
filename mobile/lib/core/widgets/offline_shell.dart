@@ -6,6 +6,7 @@ import '../api/api_client.dart';
 import '../config/market_config.dart';
 import '../offline/connectivity_service.dart';
 import '../theme/mova_colors.dart';
+import '../update/app_update_service.dart';
 
 /// Bannière globale hors ligne + indicateur de file de synchronisation.
 class MovaOfflineShell extends ConsumerWidget {
@@ -17,11 +18,13 @@ class MovaOfflineShell extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final offlineAsync = ref.watch(offlineStateProvider);
     final state = offlineAsync.valueOrNull;
+    final update = ref.watch(appUpdateStateProvider).valueOrNull;
 
     return Stack(
       children: [
         child ?? const SizedBox.shrink(),
-        if (state != null && (state.isOffline || state.pendingSyncCount > 0))
+        if ((state != null && (state.isOffline || state.pendingSyncCount > 0)) ||
+            (update?.updateAvailable ?? false))
           Positioned(
             top: 0,
             left: 0,
@@ -29,7 +32,42 @@ class MovaOfflineShell extends ConsumerWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (state.isOffline)
+                if (update?.updateAvailable == true)
+                  Material(
+                    color: MovaColors.violet,
+                    child: SafeArea(
+                      bottom: false,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.system_update, color: Colors.white, size: 18),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                update!.forceUpdate
+                                    ? 'Une nouvelle version est requise pour continuer.'
+                                    : 'Une nouvelle version est disponible.',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: () => ref.read(appUpdateServiceProvider).openStore(),
+                              child: const Text(
+                                'Mettre à jour',
+                                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                if (state != null && state.isOffline)
                   Material(
                     color: state.reason == OfflineReason.noNetwork
                         ? MovaColors.orange
@@ -77,7 +115,7 @@ class MovaOfflineShell extends ConsumerWidget {
                       ),
                     ),
                   ),
-                if (state.pendingSyncCount > 0)
+                if (state != null && state.pendingSyncCount > 0)
                   Material(
                     color: MovaColors.violet.withValues(alpha: 0.95),
                     child: Padding(

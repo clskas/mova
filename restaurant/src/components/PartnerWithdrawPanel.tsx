@@ -15,10 +15,11 @@ const PROVIDERS = [
 
 type Props = {
   balanceCdf: number;
+  walletAvailable?: boolean;
   onWithdrawn?: () => void;
 };
 
-export function PartnerWithdrawPanel({ balanceCdf, onWithdrawn }: Props) {
+export function PartnerWithdrawPanel({ balanceCdf, walletAvailable = true, onWithdrawn }: Props) {
   const [amount, setAmount] = useState("");
   const [provider, setProvider] = useState("ORANGE_MONEY");
   const [phone, setPhone] = useState("");
@@ -70,6 +71,17 @@ export function PartnerWithdrawPanel({ balanceCdf, onWithdrawn }: Props) {
     }
   }
 
+  if (!walletAvailable) {
+    return (
+      <section className="rounded-xl border border-gray-100 bg-white p-4">
+        <h3 className="font-medium text-[#1A1A2E]">Retirer vers Mobile Money</h3>
+        <p className="text-sm text-gray-500 mt-2">
+          Les retraits seront disponibles dès que le portefeuille partenaire sera connecté.
+        </p>
+      </section>
+    );
+  }
+
   return (
     <section className="rounded-xl border border-gray-100 bg-white p-4 space-y-4">
       <div>
@@ -119,7 +131,7 @@ export function PartnerWithdrawPanel({ balanceCdf, onWithdrawn }: Props) {
         type="button"
         disabled={loading || balanceCdf < 500}
         onClick={submit}
-        className="px-4 py-2 rounded-xl bg-orange-600 text-white text-sm font-medium disabled:opacity-50"
+        className="px-4 py-2.5 min-h-11 rounded-xl bg-orange-600 text-white text-sm font-medium disabled:opacity-50 w-full sm:w-auto"
       >
         {loading ? "Retrait en cours…" : "Retirer mes revenus"}
       </button>

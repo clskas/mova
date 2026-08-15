@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { PwaRegister } from "@/components/PwaRegister";
+import { UpdateBanner } from "@/components/UpdateBanner";
 
 export const metadata: Metadata = {
   title: "SENGA Restaurant",
@@ -38,6 +39,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="fr">
       <body className="min-h-screen antialiased">
         <PwaRegister />
+        <UpdateBanner />
         {children}
       </body>
     </html>

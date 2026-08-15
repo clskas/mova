@@ -12,6 +12,33 @@ import { TrackingService } from '../tracking/tracking.service';
 export class PublicController {
   constructor(private prisma: PrismaService, private tracking: TrackingService) {}
 
+  @Get('app-version')
+  @ApiOperation({ summary: 'Versions courantes / minimales (apps mobiles + web)' })
+  getAppVersion() {
+    const passengerCurrent = process.env.MOBILE_PASSENGER_VERSION?.trim() || '1.0.2';
+    const driverCurrent = process.env.MOBILE_DRIVER_VERSION?.trim() || '1.0.2';
+    const minVersion = process.env.MOBILE_MIN_VERSION?.trim() || '1.0.0';
+    const passengerStore =
+      process.env.PLAY_STORE_PASSENGER_URL?.trim() ||
+      'https://play.google.com/store/apps/details?id=cd.mova.mova.passenger';
+    const driverStore =
+      process.env.PLAY_STORE_DRIVER_URL?.trim() ||
+      'https://play.google.com/store/apps/details?id=cd.mova.mova.driver';
+    return {
+      generatedAt: new Date().toISOString(),
+      passenger: {
+        currentVersion: passengerCurrent,
+        minVersion,
+        storeUrl: passengerStore,
+      },
+      driver: {
+        currentVersion: driverCurrent,
+        minVersion,
+        storeUrl: driverStore,
+      },
+    };
+  }
+
   @Get('trips/:token')
   @ApiOperation({ summary: 'Suivi trajet public (lien partagé, sans auth)' })
   async getSharedTrip(@Param('token') token: string) {

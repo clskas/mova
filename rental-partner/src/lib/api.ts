@@ -203,6 +203,8 @@ export function fetchBookings(params?: {
 export type PartnerEarnings = {
   balanceCdf: number;
   formattedBalance: string;
+  walletAvailable?: boolean;
+  walletMessage?: string;
   recentCredits: { id: string; amountCdf: number; description?: string; reference?: string; createdAt: string }[];
 };
 
@@ -240,6 +242,8 @@ export type RentalDashboard = {
   kpis: {
     balanceCdf: number;
     formattedBalance: string;
+    walletAvailable?: boolean;
+    walletMessage?: string;
     revenueTodayCdf: number;
     revenueMonthCdf: number;
     pendingBookings: number;

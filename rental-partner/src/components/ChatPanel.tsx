@@ -107,14 +107,14 @@ export function ChatPanel({ inquiryId, peerLabel = "Client", onClose }: ChatPane
   }
 
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white shadow-lg flex flex-col max-h-[70vh]">
+    <div className="fixed inset-x-2 top-16 bottom-20 z-40 rounded-2xl border border-gray-200 bg-white shadow-lg flex flex-col md:static md:inset-auto md:z-auto md:max-h-[70vh]">
       <div className="flex items-center justify-between px-4 py-3 border-b">
         <div>
           <p className="font-semibold text-sm text-gray-900">Chat · {peerLabel}</p>
           <p className="text-xs text-gray-400">#{inquiryId.slice(0, 8)}</p>
         </div>
         {onClose && (
-          <button type="button" onClick={onClose} className="text-sm text-gray-500 hover:text-gray-800">
+          <button type="button" onClick={onClose} className="text-sm text-gray-500 hover:text-gray-800 min-h-11 min-w-11">
             Fermer
           </button>
         )}
@@ -154,7 +154,7 @@ export function ChatPanel({ inquiryId, peerLabel = "Client", onClose }: ChatPane
           type="button"
           disabled={sending}
           onClick={() => void send()}
-          className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-sm font-medium disabled:opacity-60"
+          className="px-4 py-2.5 min-h-11 rounded-xl bg-indigo-600 text-white text-sm font-medium disabled:opacity-60"
         >
           {sending ? "…" : "Envoyer"}
         </button>

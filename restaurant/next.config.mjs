@@ -1,5 +1,12 @@
+const buildId =
+  process.env.RENDER_GIT_COMMIT ||
+  process.env.SOURCE_VERSION ||
+  process.env.NEXT_PUBLIC_BUILD_ID ||
+  `dev-${Date.now()}`;
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  env: { NEXT_PUBLIC_BUILD_ID: buildId },
   output: "standalone",
   poweredByHeader: false,
   async headers() {
@@ -27,6 +34,10 @@ const nextConfig = {
       {
         source: "/manifest.webmanifest",
         headers: [{ key: "Content-Type", value: "application/manifest+json" }],
+      },
+      {
+        source: "/version.json",
+        headers: [{ key: "Cache-Control", value: "no-store, must-revalidate" }],
       },
     ];
   },

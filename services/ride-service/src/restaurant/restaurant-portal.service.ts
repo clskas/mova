@@ -358,6 +358,8 @@ export class RestaurantPortalService {
         ),
         balanceCdf: wallet.balanceCdf,
         formattedBalance: wallet.formattedBalance,
+        walletAvailable: wallet.available,
+        walletMessage: wallet.unavailableReason,
         revenueTodayCdf,
         revenueMonthCdf,
         totalSalesCount: foodCredits.length,
@@ -374,6 +376,8 @@ export class RestaurantPortalService {
       restaurant: { id: restaurant.id, name: restaurant.name },
       balanceCdf: wallet.balanceCdf,
       formattedBalance: wallet.formattedBalance,
+      walletAvailable: wallet.available,
+      walletMessage: wallet.unavailableReason,
       recentFoodSales: foodCredits.slice(0, 20).map((tx) => ({
         id: tx.id,
         amountCdf: tx.amountCdf,

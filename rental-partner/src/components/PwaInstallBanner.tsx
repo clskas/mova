@@ -65,7 +65,7 @@ export function PwaInstallBanner({ accentClass = "bg-indigo-600" }: { accentClas
   if (!deferred && !showIosHint) return null;
 
   return (
-    <div className="fixed bottom-4 left-4 right-4 z-50 mx-auto max-w-lg rounded-xl border border-gray-200 bg-white shadow-lg p-4 flex flex-wrap items-center justify-between gap-3">
+    <div className="fixed bottom-20 md:bottom-4 left-4 right-4 z-50 mx-auto max-w-lg rounded-xl border border-gray-200 bg-white shadow-lg p-4 flex flex-wrap items-center justify-between gap-3">
       <div className="text-sm pr-2">
         <p className="font-medium text-[#1A1A2E]">Installer l&apos;application</p>
         {showIosHint ? (

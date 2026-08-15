@@ -5,6 +5,8 @@ export type PartnerEarningsReport = {
   partnerName: string;
   balanceCdf: number;
   formattedBalance: string;
+  walletAvailable?: boolean;
+  walletMessage?: string;
   periodTotalCdf: number;
   periodCount: number;
   from: string | null;

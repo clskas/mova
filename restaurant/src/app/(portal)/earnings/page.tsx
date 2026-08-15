@@ -42,23 +42,33 @@ export default function EarningsPage() {
 
   const load = useCallback(async () => {
     setError(null);
-    try {
-      const [e, r] = await Promise.all([
-        fetchEarnings(),
-        fetchEarningsReport({
-          from: from || undefined,
-          to: to || undefined,
-          q: q.trim() || undefined,
-          take: 200,
-        }),
-      ]);
-      setEarnings(e);
-      setReport(r);
-    } catch (err) {
-      setError(toUserErrorMessage(err, "Erreur"));
-    } finally {
-      setLoading(false);
+    const [earningsResult, reportResult] = await Promise.allSettled([
+      fetchEarnings(),
+      fetchEarningsReport({
+        from: from || undefined,
+        to: to || undefined,
+        q: q.trim() || undefined,
+        take: 200,
+      }),
+    ]);
+    if (earningsResult.status === "fulfilled") {
+      setEarnings(earningsResult.value);
+    } else {
+      setEarnings({
+        restaurant: { id: "", name: "" },
+        balanceCdf: 0,
+        formattedBalance: formatCdf(0),
+        walletAvailable: false,
+        walletMessage:
+          "Portefeuille temporairement indisponible. Le solde s'affichera dès que le service de paiement sera prêt.",
+        recentFoodSales: [],
+      });
+      setError(toUserErrorMessage(earningsResult.reason, "Portefeuille temporairement indisponible."));
     }
+    if (reportResult.status === "fulfilled") {
+      setReport(reportResult.value);
+    }
+    setLoading(false);
   }, [from, to, q]);
 
   useEffect(() => {
@@ -97,19 +107,26 @@ export default function EarningsPage() {
       </div>
 
       {loading && <p className="text-gray-500">Chargement…</p>}
-      {error && <p className="text-red-600 text-sm">{error}</p>}
+      {error && earnings?.walletAvailable !== false && <p className="text-red-600 text-sm">{error}</p>}
 
       {earnings && (
         <>
-          <div className="rounded-2xl bg-gradient-to-br from-orange-500 to-orange-600 text-white p-6 shadow-md">
+          {earnings.walletAvailable === false && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+              {earnings.walletMessage ??
+                "Portefeuille temporairement indisponible. En attente de configuration du hub de paiement — votre solde s'affichera ici dès que le service sera prêt."}
+            </div>
+          )}
+          <div className="rounded-2xl bg-gradient-to-br from-orange-500 to-orange-600 text-white p-5 sm:p-6 shadow-md">
             <p className="text-sm opacity-90">Solde disponible</p>
-            <p className="text-3xl font-bold mt-1">{earnings.formattedBalance}</p>
+            <p className="text-2xl sm:text-3xl font-bold mt-1 break-words">{earnings.formattedBalance}</p>
             <p className="text-xs opacity-80 mt-2">
               Les frais de livraison et la commission plateforme sont versés au livreur et à SENGA.
             </p>
           </div>
           <PartnerWithdrawPanel
             balanceCdf={earnings.balanceCdf}
+            walletAvailable={earnings.walletAvailable !== false}
             onWithdrawn={() => {
               setLoading(true);
               setWalletHistoryRefresh((n) => n + 1);
@@ -142,7 +159,7 @@ export default function EarningsPage() {
           </label>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={() => { setLoading(true); load(); }} className="px-4 py-2 rounded-xl bg-orange-600 text-white text-sm">
+          <button type="button" onClick={() => { setLoading(true); load(); }} className="px-4 py-2.5 min-h-11 rounded-xl bg-orange-600 text-white text-sm">
             Appliquer
           </button>
           <button

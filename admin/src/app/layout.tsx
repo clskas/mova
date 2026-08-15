@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { PwaRegister } from "@/components/PwaRegister";
+import { UpdateBanner } from "@/components/UpdateBanner";
 
 const plusJakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],
@@ -38,6 +39,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="fr" className={plusJakarta.variable}>
       <body className={`${plusJakarta.className} min-h-screen antialiased font-sans bg-[var(--background)] text-[var(--foreground)]`}>
         <PwaRegister />
+        <UpdateBanner />
         {children}
       </body>
     </html>

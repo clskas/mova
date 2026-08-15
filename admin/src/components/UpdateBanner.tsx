@@ -48,14 +48,15 @@ export function UpdateBanner({ accentClass = "bg-[#6C63FF]" }: { accentClass?: s
   if (!available) return null;
 
   return (
-    <div className="sticky top-0 z-50 border-b border-amber-200 bg-amber-50 px-3 py-2.5 flex flex-wrap items-center justify-between gap-2">
-      <p className="text-sm text-amber-950">
-        Une nouvelle version est disponible. Rechargez pour bénéficier des dernières améliorations.
+    <div className="sticky top-0 z-50 border-b border-amber-200 bg-amber-50 px-3 py-1.5 sm:py-2.5 flex items-center justify-between gap-2">
+      <p className="text-xs sm:text-sm text-amber-950 min-w-0 truncate sm:whitespace-normal sm:overflow-visible">
+        <span className="sm:hidden">Nouvelle version disponible.</span>
+        <span className="hidden sm:inline">Une nouvelle version est disponible. Rechargez pour bénéficier des dernières améliorations.</span>
       </p>
-      <div className="flex gap-2">
+      <div className="flex gap-1.5 shrink-0">
         <button
           type="button"
-          className="px-3 py-2 min-h-11 text-sm text-amber-800"
+          className="px-2.5 py-1.5 min-h-9 sm:min-h-11 text-xs sm:text-sm text-amber-800"
           onClick={() => {
             sessionStorage.setItem(DISMISS_KEY, "1");
             setAvailable(false);
@@ -65,7 +66,7 @@ export function UpdateBanner({ accentClass = "bg-[#6C63FF]" }: { accentClass?: s
         </button>
         <button
           type="button"
-          className={`px-4 py-2 min-h-11 rounded-lg ${accentClass} text-white text-sm font-medium`}
+          className={`px-3 py-1.5 sm:px-4 sm:py-2 min-h-9 sm:min-h-11 rounded-lg ${accentClass} text-white text-xs sm:text-sm font-medium`}
           onClick={() => window.location.reload()}
         >
           Actualiser

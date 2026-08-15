@@ -152,9 +152,9 @@ export function PubliciteCarousel({
           <button
             type="button"
             onClick={() => setDetail(current)}
-            className="flex w-full items-center gap-3 p-4 pr-12 min-h-[6.5rem] text-left hover:brightness-105 transition"
+            className="flex w-full items-center gap-2 sm:gap-3 p-3 sm:p-4 pr-11 min-h-[4.75rem] sm:min-h-[6.5rem] text-left hover:brightness-105 transition"
           >
-            <div className="shrink-0 w-[4.5rem] h-[4.5rem] rounded-2xl overflow-hidden bg-white/15 ring-1 ring-white/20">
+            <div className="shrink-0 w-14 h-14 sm:w-[4.5rem] sm:h-[4.5rem] rounded-2xl overflow-hidden bg-white/15 ring-1 ring-white/20">
               <img
                 src={resolveImage(current.imageUrl, apiBase)}
                 alt=""
@@ -171,7 +171,7 @@ export function PubliciteCarousel({
         </div>
 
         {visible.length > 1 && (
-          <div className="flex justify-center items-center gap-2 mt-3">
+          <div className="flex justify-center items-center gap-2 mt-1.5 sm:mt-3">
             {visible.map((item, i) => (
               <button
                 key={item.id}

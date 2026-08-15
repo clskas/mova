@@ -77,7 +77,7 @@ function HomeContent() {
 
   return (
     <div className="max-w-lg mx-auto min-h-screen flex flex-col">
-      <header className="bg-[#1A1A2E] text-white p-4">
+      <header className="bg-[#1A1A2E] text-white p-3 sm:p-4">
         <div className="flex items-center justify-between max-w-lg mx-auto">
           <div className="w-10" />
           <div>
@@ -101,24 +101,24 @@ function HomeContent() {
         </div>
       </header>
 
-      <main className="flex-1 p-4">
+      <main className="flex-1 p-3 sm:p-4">
         {mock && (
-          <p className="text-center text-sm text-[#FF6B35] bg-orange-50 rounded-lg py-2 mb-4">
+          <p className="text-center text-sm text-[#FF6B35] bg-orange-50 rounded-lg py-2 mb-3 sm:mb-4">
             Serveur indisponible — mode hors ligne
           </p>
         )}
 
         {view === "home" && (
-          <div className="space-y-4">
+          <div className="space-y-3 sm:space-y-4">
             <div>
-              <p className="text-lg font-bold">{greeting()} 👋</p>
-              <p className="text-[#6C63FF] font-medium">La mobilité, simplement.</p>
-              <p className="text-sm text-gray-500">Choisissez un service pour continuer</p>
+              <p className="text-base sm:text-lg font-bold">{greeting()} 👋</p>
+              <p className="text-[#6C63FF] font-medium text-sm sm:text-base">La mobilité, simplement.</p>
+              <p className="text-xs sm:text-sm text-gray-500">Choisissez un service pour continuer</p>
             </div>
 
             <PubliciteCarousel items={publicites} />
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 sm:grid-cols-2 gap-2 sm:gap-3">
               <ServiceCard icon={<TaxiIcon color="#6C63FF" />} title="Taxi / Moto-taxi" subtitle="Course immédiate" color="#6C63FF" onClick={() => setView("taxi")} />
               <ServiceCard icon={<ParcelIcon color="#00D4A1" />} title="Livraison colis" subtitle="Envoi sécurisé" color="#00D4A1" onClick={() => setView("parcel")} />
               <ServiceCard icon={<ExpressIcon color="#FF6B35" />} title="Express" subtitle="Livraison prioritaire" color="#FF6B35" onClick={() => setView("express")} />

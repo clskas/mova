@@ -54,23 +54,10 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   "/covoiturage": CarpoolIcon,
 };
 
-function useWideChrome() {
-  const [wide, setWide] = useState(false);
-  useEffect(() => {
-    const mq = window.matchMedia("(min-width: 1024px)");
-    const apply = () => setWide(mq.matches);
-    apply();
-    mq.addEventListener("change", apply);
-    return () => mq.removeEventListener("change", apply);
-  }, []);
-  return wide;
-}
-
 function ShellInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [demo, setDemo] = useState(false);
   const { role, loading, user } = useAdmin();
-  const wide = useWideChrome();
 
   useEffect(() => {
     checkGatewayHealth().then((ok) => setDemo(!ok && !getToken()));
@@ -82,7 +69,8 @@ function ShellInner({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen flex overflow-x-hidden">
       <aside
-        className={`${wide ? "flex" : "hidden"} w-64 text-white flex-col overflow-hidden`}
+        data-desktop-nav
+        className="senga-nav-desktop w-64 text-white flex-col overflow-hidden"
         style={{ background: "var(--sidebar-gradient)" }}
       >
         <div className="p-5 border-b border-white/10 shrink-0">
@@ -122,9 +110,9 @@ function ShellInner({ children }: { children: React.ReactNode }) {
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="bg-white border-b pt-[env(safe-area-inset-top)]">
+        <header className="bg-white border-b overflow-x-hidden pt-[env(safe-area-inset-top)]">
           <div className="px-3 lg:px-6 py-2 lg:py-3 flex items-center justify-between gap-3">
-            <div className={`flex items-center gap-2 min-w-0 ${wide ? "hidden" : ""}`}>
+            <div className="flex items-center gap-2 min-w-0 lg:hidden">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/icon.svg" alt="" width={28} height={28} className="rounded-md shrink-0" />
               <p className="font-semibold text-sm text-[#1A1A2E] truncate">SENGA Admin</p>
@@ -155,8 +143,7 @@ function ShellInner({ children }: { children: React.ReactNode }) {
               </button>
             </div>
           </div>
-          {!wide && (
-          <nav className="senga-nav-phone senga-nav-phone-admin" aria-label="Navigation">
+          <nav data-mobile-nav className="senga-nav-phone senga-nav-phone-admin" aria-label="Navigation">
             {loading ? (
               <p className="col-span-3 text-xs text-gray-400 px-2 py-2">Chargement menu…</p>
             ) : (
@@ -180,7 +167,6 @@ function ShellInner({ children }: { children: React.ReactNode }) {
               })
             )}
           </nav>
-          )}
         </header>
         <main className="flex-1 p-3 lg:p-6 overflow-x-auto pb-[max(1rem,env(safe-area-inset-bottom))]">{children}</main>
       </div>

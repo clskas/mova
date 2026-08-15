@@ -1,12 +1,5 @@
-const CACHE = "mova-rental-partner-v6";
+const CACHE = "mova-rental-partner-v7";
 const SHELL = [
-  "/",
-  "/login",
-  "/vehicules",
-  "/vehicules/nouveau",
-  "/reservations",
-  "/revenus",
-  "/promos",
   "/manifest.webmanifest",
   "/icon-192.png",
   "/icon-512.png",
@@ -52,7 +45,9 @@ self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
   const url = new URL(event.request.url);
   if (url.origin !== self.location.origin) return;
-  if (isVersionRequest(url) || url.pathname.startsWith("/api/") || url.pathname.startsWith("/_next/")) return;
+  if (event.request.mode === "navigate" || isVersionRequest(url) || url.pathname.startsWith("/api/") || url.pathname.startsWith("/_next/")) {
+    return;
+  }
 
   event.respondWith(
     fetch(event.request)
@@ -63,7 +58,7 @@ self.addEventListener("fetch", (event) => {
         }
         return res;
       })
-      .catch(() => caches.match(event.request).then((cached) => cached || caches.match("/login"))),
+      .catch(() => caches.match(event.request)),
   );
 });
 

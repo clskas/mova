@@ -78,7 +78,7 @@ export function UpdateBanner({ accentClass = "bg-[#6C63FF]" }: { accentClass?: s
   return (
     <div
       role="status"
-      className="fixed top-0 inset-x-0 z-[400] border-b-2 border-amber-400 bg-amber-400 px-3 py-2.5 flex items-center justify-between gap-2 pt-[max(0.6rem,env(safe-area-inset-top))] shadow-lg"
+      className="fixed top-0 inset-x-0 z-[9999] border-b-2 border-amber-400 bg-amber-400 px-3 py-2.5 flex items-center justify-between gap-2 pt-[max(0.6rem,env(safe-area-inset-top))] shadow-lg"
     >
       <p className="text-sm font-semibold text-amber-950 min-w-0">
         Nouvelle version disponible

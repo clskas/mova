@@ -180,6 +180,7 @@ services:
     envVars:
       - key: NEXT_PUBLIC_API_URL
         value: https://mova-gateway.onrender.com
+      # next.config.mjs also reads RENDER_GIT_COMMIT (injected by Render) as NEXT_PUBLIC_BUILD_ID.
 
   - type: web
     name: mova-rental-partner

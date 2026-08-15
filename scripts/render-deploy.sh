@@ -10,9 +10,10 @@ fi
 COMMIT_SHA="${1:-}"
 IDS="${RENDER_SERVICE_IDS:-}"
 
-if [ -z "$IDS" ] && [ -f config/render-services.json ]; then
-  # Ordered: DBs dependents first, gateway next, then frontends/portals.
-  IDS=$(jq -r '
+if [ -f config/render-services.json ]; then
+  # Always prefer the in-repo map so restaurant / rental / admin-web cannot be dropped
+  # when the GitHub secret still lists only the original 8 services.
+  JSON_IDS=$(jq -r '
     [
       .services["mova-auth"].id // empty,
       .services["mova-ride"].id // empty,
@@ -27,11 +28,32 @@ if [ -z "$IDS" ] && [ -f config/render-services.json ]; then
       .services["mova-rental-partner"].id // empty
     ] | map(select(length > 0)) | join(" ")
   ' config/render-services.json)
+  if [ -n "$JSON_IDS" ]; then
+    IDS="$JSON_IDS"
+  fi
 fi
 
 if [ -z "$IDS" ]; then
   echo "::warning::RENDER_SERVICE_IDS not set — skip remote deploy"
   exit 0
+fi
+
+if [ -f config/render-services.json ]; then
+  restaurant_id=$(jq -r '.services["mova-restaurant"].id // empty' config/render-services.json)
+  rental_id=$(jq -r '.services["mova-rental-partner"].id // empty' config/render-services.json)
+  admin_web_id=$(jq -r '.services["mova-admin-web"].id // empty' config/render-services.json)
+  missing=""
+  for required in "$restaurant_id" "$rental_id" "$admin_web_id"; do
+    if [ -n "$required" ] && ! printf ' %s ' "$IDS" | grep -q " $required "; then
+      missing="$missing $required"
+    fi
+  done
+  if [ -n "$missing" ]; then
+    echo "::error::Portal service IDs missing from deploy list:$missing"
+    echo "Restaurant/rental/admin-web would stay on stale images."
+    exit 1
+  fi
+  echo "Deploy list includes restaurant=$restaurant_id rental=$rental_id admin-web=$admin_web_id"
 fi
 
 payload_latest='{"clearCache":"clear"}'

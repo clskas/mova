@@ -29,12 +29,14 @@ button {
   }
 }
 
-/* Phone/tablet: icon grid. Never a single overflowing horizontal row. */
-.senga-nav-desktop {
-  display: none;
+/* Phone/tablet: both navs stay in the DOM. CSS — not Tailwind md: or JS — picks which one shows.
+   A missing viewport meta makes layout ~980px, which activates Tailwind md (768px) and clips
+   "Tableau de bord | Commandes | Men…". max-width: 1023px still treats that as a phone. */
+[data-desktop-nav] {
+  display: none !important;
 }
-.senga-nav-phone {
-  display: grid;
+[data-mobile-nav] {
+  display: grid !important;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.25rem;
   padding: 0 0.5rem 0.5rem;
@@ -43,10 +45,10 @@ button {
   overflow: hidden;
 }
 @media (min-width: 1024px) {
-  .senga-nav-desktop {
-    display: flex;
+  [data-desktop-nav] {
+    display: flex !important;
   }
-  .senga-nav-phone {
-    display: none;
+  [data-mobile-nav] {
+    display: none !important;
   }
 }

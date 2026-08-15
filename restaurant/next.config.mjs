@@ -43,7 +43,31 @@ const nextConfig = {
         ],
       },
       {
+        source: "/",
+        headers: [{ key: "Cache-Control", value: noStore }],
+      },
+      {
         source: "/login",
+        headers: [{ key: "Cache-Control", value: noStore }],
+      },
+      {
+        source: "/dashboard",
+        headers: [{ key: "Cache-Control", value: noStore }],
+      },
+      {
+        source: "/menu",
+        headers: [{ key: "Cache-Control", value: noStore }],
+      },
+      {
+        source: "/promos",
+        headers: [{ key: "Cache-Control", value: noStore }],
+      },
+      {
+        source: "/earnings",
+        headers: [{ key: "Cache-Control", value: noStore }],
+      },
+      {
+        source: "/settings",
         headers: [{ key: "Cache-Control", value: noStore }],
       },
       {

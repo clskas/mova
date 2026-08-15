@@ -43,6 +43,14 @@ const nextConfig = {
         ],
       },
       {
+        source: "/",
+        headers: [{ key: "Cache-Control", value: noStore }],
+      },
+      {
+        source: "/login",
+        headers: [{ key: "Cache-Control", value: noStore }],
+      },
+      {
         source: "/version.json",
         headers: [
           { key: "Cache-Control", value: noStore },

@@ -74,13 +74,32 @@ jobs:
       - name: Resolve Render service IDs
         id: render
         run: |
-          if [ -n "${{ secrets.RENDER_SERVICE_IDS }}" ]; then
+          # config/render-services.json is the source of truth (includes restaurant,
+          # rental-partner, admin-web). A stale RENDER_SERVICE_IDS secret previously
+          # deployed only the original 8 API/web services and left portals on old images.
+          if [ -f config/render-services.json ]; then
+            ids=$(jq -r '
+              [
+                .services["mova-auth"].id // empty,
+                .services["mova-ride"].id // empty,
+                .services["mova-payment"].id // empty,
+                .services["mova-driver"].id // empty,
+                .services["mova-notification"].id // empty,
+                .services["mova-admin"].id // empty,
+                .services["mova-gateway"].id // empty,
+                .services["mova-web"].id // empty,
+                .services["mova-admin-web"].id // empty,
+                .services["mova-restaurant"].id // empty,
+                .services["mova-rental-partner"].id // empty
+              ] | map(select(length > 0)) | join(" ")
+            ' config/render-services.json)
+            echo "ids=$ids" >> "$GITHUB_OUTPUT"
+            echo "gateway=$(jq -r '.gatewayServiceId // empty' config/render-services.json)" >> "$GITHUB_OUTPUT"
+            echo "Using service IDs from config/render-services.json"
+            echo "services=$ids"
+          elif [ -n "${{ secrets.RENDER_SERVICE_IDS }}" ]; then
             echo "ids=${{ secrets.RENDER_SERVICE_IDS }}" >> "$GITHUB_OUTPUT"
             echo "gateway=${{ secrets.GATEWAY_RENDER_SERVICE_ID }}" >> "$GITHUB_OUTPUT"
-          elif [ -f config/render-services.json ]; then
-            gateway=$(jq -r '.gatewayServiceId // empty' config/render-services.json)
-            echo "gateway=$gateway" >> "$GITHUB_OUTPUT"
-            echo "Using service IDs from config/render-services.json (ordered deploy)"
           fi
 
       - name: Trigger Render deploy (API + web + portals)

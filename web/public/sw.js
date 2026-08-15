@@ -1,5 +1,5 @@
-const CACHE = "mova-web-v2";
-const SHELL = ["/", "/manifest.json", "/favicon.png", "/icon-192.png", "/icon-512.png"];
+const CACHE = "mova-web-v3";
+const SHELL = ["/manifest.json", "/favicon.png", "/icon-192.png", "/icon-512.png"];
 
 function isVersionRequest(url) {
   return url.pathname === "/version.json" || url.pathname === "/api/version";
@@ -39,12 +39,14 @@ self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
   const url = new URL(event.request.url);
   if (url.origin !== self.location.origin) return;
-  if (isVersionRequest(url) || url.pathname.startsWith("/api/") || url.pathname.startsWith("/_next/")) return;
+  if (event.request.mode === "navigate" || isVersionRequest(url) || url.pathname.startsWith("/api/") || url.pathname.startsWith("/_next/")) {
+    return;
+  }
 
   event.respondWith(
     fetch(event.request)
       .then((res) => {
-        if (res.ok && (url.pathname.startsWith("/icon") || url.pathname.endsWith(".webmanifest") || url.pathname.endsWith("manifest.json") || SHELL.includes(url.pathname))) {
+        if (res.ok && (url.pathname.startsWith("/icon") || url.pathname.endsWith("manifest.json") || SHELL.includes(url.pathname))) {
           const copy = res.clone();
           caches.open(CACHE).then((cache) => cache.put(event.request, copy));
         }

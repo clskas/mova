@@ -4,6 +4,9 @@ import "./globals.css";
 import { PwaRegister } from "@/components/PwaRegister";
 import { UpdateBanner } from "@/components/UpdateBanner";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 const plusJakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],
   variable: "--font-plus-jakarta",

@@ -1,5 +1,5 @@
-const CACHE = "mova-admin-v3";
-const SHELL = ["/", "/login", "/manifest.webmanifest", "/icon-192.png", "/icon-512.png", "/apple-touch-icon.png"];
+const CACHE = "mova-admin-v4";
+const SHELL = ["/manifest.webmanifest", "/icon-192.png", "/icon-512.png", "/apple-touch-icon.png"];
 
 function isVersionRequest(url) {
   return url.pathname === "/version.json" || url.pathname === "/api/version";
@@ -39,7 +39,9 @@ self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
   const url = new URL(event.request.url);
   if (url.origin !== self.location.origin) return;
-  if (isVersionRequest(url) || url.pathname.startsWith("/api/") || url.pathname.startsWith("/_next/")) return;
+  if (event.request.mode === "navigate" || isVersionRequest(url) || url.pathname.startsWith("/api/") || url.pathname.startsWith("/_next/")) {
+    return;
+  }
 
   event.respondWith(
     fetch(event.request)

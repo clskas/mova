@@ -3,6 +3,9 @@ import "./globals.css";
 import { PwaRegister } from "@/components/PwaRegister";
 import { UpdateBanner } from "@/components/UpdateBanner";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export const metadata: Metadata = {
   title: "SENGA Restaurant",
   description: "Portail partenaire — commandes repas SENGA RDC",

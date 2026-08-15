@@ -8,7 +8,7 @@ async function ensureWebHome(page: Page) {
   const loginHeading = page.getByRole("heading", { name: /SENGA — Connexion/i });
   await expect(loginHeading).toBeVisible({ timeout: 15_000 });
 
-  await page.getByPlaceholder("+243812345678").fill("+243812345678");
+  await page.getByPlaceholder("+243812345678").fill("+243900000010");
   await page.getByRole("button", { name: "Recevoir le code" }).click();
   await page.getByPlaceholder("Code à 6 chiffres").fill("123456");
   await page.getByRole("button", { name: "Se connecter" }).click();

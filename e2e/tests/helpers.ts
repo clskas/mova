@@ -42,15 +42,21 @@ export async function requireGateway(
   for (let i = 0; i < attempts; i++) {
     try {
       const live = await request.get(`${gatewayUrl}/health/live`, { timeout: 5_000 });
-      if (live.ok()) return;
-      lastError = `/health/live HTTP ${live.status()}`;
-    } catch (err) {
-      lastError = err instanceof Error ? err.message : String(err);
-    }
-    try {
-      const health = await request.get(`${gatewayUrl}/health`, { timeout: 8_000 });
-      if (health.ok()) return;
-      lastError = `/health HTTP ${health.status()}`;
+      if (!live.ok()) {
+        lastError = `/health/live HTTP ${live.status()}`;
+      } else {
+        const health = await request.get(`${gatewayUrl}/health`, { timeout: 8_000 });
+        if (health.ok()) {
+          const body = (await health.json().catch(() => null)) as
+            | { status?: string; services?: { name?: string; status?: string }[] }
+            | null;
+          const auth = body?.services?.find((s) => s.name === "auth");
+          if (auth?.status === "ok") return;
+          lastError = `gateway ${body?.status ?? "unknown"}, auth ${auth?.status ?? "absent"}`;
+        } else {
+          lastError = `/health HTTP ${health.status()}`;
+        }
+      }
     } catch (err) {
       lastError = err instanceof Error ? err.message : String(err);
     }

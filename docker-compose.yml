@@ -33,6 +33,10 @@ services:
     env_file:
       - config/external-apis.env
     environment:
+      # Dockerfile defaults to NODE_ENV=production, which forbids MOCK_OTP and breaks Playwright.
+      NODE_ENV: development
+      MOCK_OTP: "true"
+      ALLOW_TEST_OTP: "true"
       DATABASE_URL: postgresql://mova:mova@postgres:5432/mova_auth
       REDIS_URL: redis://redis:6379
       JWT_SECRET: local_dev_jwt_secret_32chars_min_ok

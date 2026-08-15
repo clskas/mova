@@ -14,19 +14,23 @@ echo "=== MOVA regression stack ==="
 
 mkdir -p config
 cat > config/external-apis.env <<'EOF'
+NODE_ENV=development
 MOCK_OTP=true
+ALLOW_TEST_OTP=true
 MOCK_PAYMENTS=true
 EOF
 
 echo "=== Docker compose (microservices) ==="
 docker compose up -d --build
 
-echo "=== Wait for API gateway /health/live then /health ==="
+echo "=== Wait for API gateway /health/live then auth-ready /health ==="
 for i in $(seq 1 90); do
-  if curl -sf --max-time 3 http://127.0.0.1:3000/health/live >/dev/null 2>&1 \
-    && curl -sf --max-time 8 http://127.0.0.1:3000/health >/dev/null 2>&1; then
-    echo "Gateway ready (attempt $i)"
-    break
+  if curl -sf --max-time 3 http://127.0.0.1:3000/health/live >/dev/null 2>&1; then
+    health_json="$(curl -sf --max-time 8 http://127.0.0.1:3000/health 2>/dev/null || true)"
+    if echo "$health_json" | grep -qE '"name":"auth"[^}]*"status":"ok"'; then
+      echo "Gateway + auth ready (attempt $i)"
+      break
+    fi
   fi
   if [ "$i" -eq 90 ]; then
     echo "Gateway timeout after 90 attempts" >&2

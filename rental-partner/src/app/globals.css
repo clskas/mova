@@ -29,6 +29,28 @@ button {
   }
 }
 
+/* Phone: brand titles must stay centered even if Tailwind utilities are ignored
+   (PWA / missing viewport previously left them stuck to the left of the header card). */
+[data-brand] {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+[data-brand] p,
+[data-brand] h1 {
+  text-align: center !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+
 [data-desktop-nav] {
   display: none !important;
 }

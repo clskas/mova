@@ -32,6 +32,28 @@ button {
 /* Phone/tablet: both navs stay in the DOM. CSS — not Tailwind md: or JS — picks which one shows.
    A missing viewport meta makes layout ~980px, which activates Tailwind md (768px) and clips
    "Tableau de bord | Commandes | Men…". max-width: 1023px still treats that as a phone. */
+/* Phone: brand titles must stay centered even if Tailwind utilities are ignored
+   (PWA / missing viewport previously left them stuck to the left of the header card). */
+[data-brand] {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+[data-brand] p,
+[data-brand] h1 {
+  text-align: center !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+
 [data-desktop-nav] {
   display: none !important;
 }

@@ -16,7 +16,7 @@ export default function manifest(): MetadataRoute.Manifest {
     dir: "ltr",
     categories: ["business", "travel"],
     shortcuts: [
-      { name: "Réservations", short_name: "Résas", url: "/reservations", icons: [{ src: "/icon-192.png", sizes: "192x192" }] },
+      { name: "Réservations", short_name: "Reservation", url: "/reservations", icons: [{ src: "/icon-192.png", sizes: "192x192" }] },
       { name: "Revenus", short_name: "Revenus", url: "/revenus", icons: [{ src: "/icon-192.png", sizes: "192x192" }] },
       { name: "Véhicules", short_name: "Flotte", url: "/vehicules", icons: [{ src: "/icon-192.png", sizes: "192x192" }] },
     ],

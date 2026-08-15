@@ -74,10 +74,10 @@ function ShellInner({ children }: { children: React.ReactNode }) {
         style={{ background: "var(--sidebar-gradient)" }}
       >
         <div className="p-5 border-b border-white/10 shrink-0">
-          <div className="flex items-center gap-2.5">
+          <div className="flex flex-col items-center text-center gap-2">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/icon.svg" alt="" width={36} height={36} className="rounded-lg" />
-            <div className="min-w-0 flex-1">
+            <div className="min-w-0 w-full">
               <p className="font-semibold">SENGA Admin</p>
               <p className="text-xs opacity-60">Couverture nationale RDC</p>
             </div>
@@ -111,13 +111,18 @@ function ShellInner({ children }: { children: React.ReactNode }) {
 
       <div className="flex-1 flex flex-col min-w-0">
         <header className="bg-white border-b overflow-x-hidden pt-[env(safe-area-inset-top)]">
-          <div className="px-3 lg:px-6 py-2 lg:py-3 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2 min-w-0 lg:hidden">
+          <div className="px-3 lg:px-6 py-2 lg:py-3 flex flex-col items-center lg:items-stretch gap-2">
+            <div className="flex flex-col items-center text-center mx-auto min-w-0 w-full lg:hidden">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/icon.svg" alt="" width={28} height={28} className="rounded-md shrink-0" />
-              <p className="font-semibold text-sm text-[#1A1A2E] truncate">SENGA Admin</p>
+              <img src="/icon.svg" alt="" width={28} height={28} className="rounded-md" />
+              <p className="font-semibold text-sm text-[#1A1A2E] truncate max-w-full">SENGA Admin</p>
+              {user?.firstName && (
+                <p className="text-xs text-gray-600 truncate max-w-full">
+                  {user.firstName} {user.lastName ?? ""}
+                </p>
+              )}
             </div>
-            <div className="flex items-center gap-2 sm:gap-3 ml-auto">
+            <div className="flex items-center justify-center lg:justify-end gap-2 sm:gap-3 w-full">
               {role && (
                 <span className={`text-[10px] sm:text-xs px-2 py-1 rounded-full font-medium ${roleBadgeClass(role)}`}>
                   {ROLE_LABELS[role]}
@@ -129,7 +134,7 @@ function ShellInner({ children }: { children: React.ReactNode }) {
                 </span>
               )}
               {user?.firstName && (
-                <span className="text-sm text-gray-600 hidden sm:inline">
+                <span className="text-sm text-gray-600 hidden lg:inline">
                   {user.firstName} {user.lastName ?? ""}
                 </span>
               )}

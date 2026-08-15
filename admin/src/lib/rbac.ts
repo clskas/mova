@@ -73,31 +73,32 @@ const ROLE_WRITE: Record<AdminRole, AdminSection[]> = {
 export type NavItem = {
   href: string;
   label: string;
+  short: string;
   section: AdminSection;
 };
 
 export const NAV_ITEMS: NavItem[] = [
-  { href: "/", label: "Tableau de bord", section: "dashboard" },
-  { href: "/utilisateurs", label: "Utilisateurs", section: "utilisateurs" },
-  { href: "/chauffeurs", label: "Chauffeurs", section: "chauffeurs" },
-  { href: "/kyc", label: "KYC", section: "kyc" },
-  { href: "/courses", label: "Courses", section: "courses" },
-  { href: "/livraisons", label: "Livraisons", section: "livraisons" },
-  { href: "/restaurants", label: "Restaurants", section: "restaurants" },
-  { href: "/publicites", label: "Publicités", section: "publicites" },
-  { href: "/tarifs", label: "Tarifs", section: "tarifs" },
-  { href: "/regles-plateforme", label: "Règles plateforme", section: "tarifs" },
-  { href: "/abonnements", label: "Abonnements", section: "abonnements" },
-  { href: "/portefeuille", label: "Portefeuille", section: "portefeuille" },
-  { href: "/litiges", label: "Litiges", section: "litiges" },
-  { href: "/fraude", label: "Fraude", section: "fraude" },
-  { href: "/planifiees", label: "Planifiées", section: "planifiees" },
-  { href: "/parametres", label: "Zones géographiques", section: "parametres" },
-  { href: "/lieux", label: "Lieux & POI", section: "parametres" },
-  { href: "/locations", label: "Locations", section: "locations" },
-  { href: "/catalogue-location", label: "Catalogue location", section: "locations" },
-  { href: "/demenagements", label: "Déménagements", section: "demenagements" },
-  { href: "/covoiturage", label: "Covoiturage", section: "covoiturage" },
+  { href: "/", label: "Tableau de bord", short: "Accueil", section: "dashboard" },
+  { href: "/utilisateurs", label: "Utilisateurs", short: "Utilis.", section: "utilisateurs" },
+  { href: "/chauffeurs", label: "Chauffeurs", short: "Chauff.", section: "chauffeurs" },
+  { href: "/kyc", label: "KYC", short: "KYC", section: "kyc" },
+  { href: "/courses", label: "Courses", short: "Courses", section: "courses" },
+  { href: "/livraisons", label: "Livraisons", short: "Livr.", section: "livraisons" },
+  { href: "/restaurants", label: "Restaurants", short: "Restos", section: "restaurants" },
+  { href: "/publicites", label: "Publicités", short: "Pubs", section: "publicites" },
+  { href: "/tarifs", label: "Tarifs", short: "Tarifs", section: "tarifs" },
+  { href: "/regles-plateforme", label: "Règles plateforme", short: "Règles", section: "tarifs" },
+  { href: "/abonnements", label: "Abonnements", short: "Abos", section: "abonnements" },
+  { href: "/portefeuille", label: "Portefeuille", short: "Portef.", section: "portefeuille" },
+  { href: "/litiges", label: "Litiges", short: "Litiges", section: "litiges" },
+  { href: "/fraude", label: "Fraude", short: "Fraude", section: "fraude" },
+  { href: "/planifiees", label: "Planifiées", short: "Planif.", section: "planifiees" },
+  { href: "/parametres", label: "Zones géographiques", short: "Zones", section: "parametres" },
+  { href: "/lieux", label: "Lieux & POI", short: "Lieux", section: "parametres" },
+  { href: "/locations", label: "Locations", short: "Loc.", section: "locations" },
+  { href: "/catalogue-location", label: "Catalogue location", short: "Catal.", section: "locations" },
+  { href: "/demenagements", label: "Déménagements", short: "Démén.", section: "demenagements" },
+  { href: "/covoiturage", label: "Covoiturage", short: "Covoit.", section: "covoiturage" },
 ];
 
 export function normalizeAdminRole(role?: string | null): AdminRole | null {

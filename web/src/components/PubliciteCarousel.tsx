@@ -152,7 +152,7 @@ export function PubliciteCarousel({
           <button
             type="button"
             onClick={() => setDetail(current)}
-            className="flex w-full items-center gap-2 sm:gap-3 p-3 sm:p-4 pr-11 min-h-[4.75rem] sm:min-h-[6.5rem] text-left hover:brightness-105 transition"
+            className="flex w-full items-center gap-2 sm:gap-3 p-2 sm:p-4 pr-11 min-h-14 sm:min-h-[6.5rem] text-left hover:brightness-105 transition"
           >
             <div className="shrink-0 w-14 h-14 sm:w-[4.5rem] sm:h-[4.5rem] rounded-2xl overflow-hidden bg-white/15 ring-1 ring-white/20">
               <img
@@ -164,7 +164,7 @@ export function PubliciteCarousel({
             <div className="flex-1 min-w-0 text-center px-1">
               <p className="font-bold text-[15px] leading-snug text-white line-clamp-2">{current.titre}</p>
               {current.description && (
-                <p className="text-xs text-white/90 mt-1.5 leading-relaxed line-clamp-2">{current.description}</p>
+                <p className="hidden sm:block text-xs text-white/90 mt-1.5 leading-relaxed line-clamp-2">{current.description}</p>
               )}
             </div>
           </button>

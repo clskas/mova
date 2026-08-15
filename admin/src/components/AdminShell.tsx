@@ -56,7 +56,6 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
 
 function ShellInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [demo, setDemo] = useState(false);
   const { role, loading, user } = useAdmin();
 
@@ -68,35 +67,26 @@ function ShellInner({ children }: { children: React.ReactNode }) {
   const hasWriteAccess = role ? nav.some((item) => canWriteSection(role, item.section)) : false;
 
   return (
-    <div className="min-h-screen flex">
-      {sidebarOpen && (
-        <button type="button" className="fixed inset-0 bg-black/30 z-40 lg:hidden" onClick={() => setSidebarOpen(false)} aria-label="Fermer menu" />
-      )}
-
-      <aside className={`fixed lg:static inset-y-0 left-0 z-50 w-full max-w-none lg:w-64 lg:max-w-none text-white flex flex-col transform transition-transform lg:translate-x-0 overflow-hidden ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`} style={{ background: "var(--sidebar-gradient)" }}>
-        <div className="px-3 py-2.5 lg:p-5 border-b border-white/10 shrink-0">
+    <div className="min-h-screen flex overflow-x-hidden">
+      <aside
+        className="hidden lg:flex w-64 text-white flex-col overflow-hidden"
+        style={{ background: "var(--sidebar-gradient)" }}
+      >
+        <div className="p-5 border-b border-white/10 shrink-0">
           <div className="flex items-center gap-2.5">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/icon.svg" alt="" width={32} height={32} className="rounded-lg lg:w-9 lg:h-9" />
+            <img src="/icon.svg" alt="" width={36} height={36} className="rounded-lg" />
             <div className="min-w-0 flex-1">
-              <p className="font-semibold text-sm lg:text-base">SENGA Admin</p>
-              <p className="text-[10px] lg:text-xs opacity-60">Couverture nationale RDC</p>
+              <p className="font-semibold">SENGA Admin</p>
+              <p className="text-xs opacity-60">Couverture nationale RDC</p>
             </div>
-            <button
-              type="button"
-              className="lg:hidden min-h-10 min-w-10 rounded-lg text-white/80"
-              onClick={() => setSidebarOpen(false)}
-              aria-label="Fermer le menu"
-            >
-              ✕
-            </button>
           </div>
         </div>
-        <nav className="flex-1 p-1.5 lg:p-3 overflow-hidden lg:overflow-y-auto">
+        <nav className="flex-1 p-3 overflow-y-auto">
           {loading ? (
             <p className="text-xs text-white/50 px-3 py-2">Chargement menu…</p>
           ) : (
-            <div className="grid grid-cols-3 gap-1 lg:grid-cols-1 lg:gap-0 lg:space-y-0.5 content-start">
+            <div className="space-y-0.5">
               {nav.map(({ href, label }) => {
                 const Icon = ICONS[href] ?? MetricsIcon;
                 const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
@@ -104,13 +94,12 @@ function ShellInner({ children }: { children: React.ReactNode }) {
                   <Link
                     key={href}
                     href={href}
-                    onClick={() => setSidebarOpen(false)}
-                    className={`flex flex-col lg:flex-row items-center lg:items-center justify-center lg:justify-start gap-0.5 lg:gap-3 px-1 py-1.5 lg:px-3 lg:py-2.5 rounded-xl text-[10px] lg:text-sm leading-tight text-center lg:text-left min-h-10 transition-colors ${
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm min-h-11 transition-colors ${
                       active ? "bg-[#6C63FF] text-white font-medium" : "text-white/70 hover:bg-white/10 hover:text-white"
                     }`}
                   >
                     <Icon className="w-4 h-4 shrink-0" />
-                    <span className="line-clamp-2">{label}</span>
+                    <span>{label}</span>
                   </Link>
                 );
               })}
@@ -120,37 +109,65 @@ function ShellInner({ children }: { children: React.ReactNode }) {
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="bg-white border-b px-4 lg:px-6 py-3 flex items-center justify-between gap-3">
-          <button type="button" className="lg:hidden min-h-10 min-w-10 p-2 rounded-lg hover:bg-gray-100" onClick={() => setSidebarOpen(true)} aria-label="Menu">
-            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
-          </button>
-          <div className="flex items-center gap-3 ml-auto">
-            {role && (
-              <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${roleBadgeClass(role)}`}>
-                {ROLE_LABELS[role]}
-              </span>
-            )}
-            {role && !loading && (
-              <span className={`text-xs px-2.5 py-1 rounded-full hidden sm:inline ${hasWriteAccess ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-600"}`}>
-                {hasWriteAccess ? "Édition" : "Consultation"}
-              </span>
-            )}
-            {user?.firstName && (
-              <span className="text-sm text-gray-600 hidden sm:inline">
-                {user.firstName} {user.lastName ?? ""}
-              </span>
-            )}
-            <DemoBadge show={demo} />
-            <button
-              type="button"
-              onClick={() => { clearToken(); window.location.href = "/login"; }}
-              className="text-sm text-gray-500 hover:text-[#6C63FF] underline"
-            >
-              Déconnexion
-            </button>
+        <header className="bg-white border-b pt-[env(safe-area-inset-top)]">
+          <div className="px-3 lg:px-6 py-2 lg:py-3 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 min-w-0 lg:hidden">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/icon.svg" alt="" width={28} height={28} className="rounded-md shrink-0" />
+              <p className="font-semibold text-sm text-[#1A1A2E] truncate">SENGA Admin</p>
+            </div>
+            <div className="flex items-center gap-2 sm:gap-3 ml-auto">
+              {role && (
+                <span className={`text-[10px] sm:text-xs px-2 py-1 rounded-full font-medium ${roleBadgeClass(role)}`}>
+                  {ROLE_LABELS[role]}
+                </span>
+              )}
+              {role && !loading && (
+                <span className={`text-xs px-2.5 py-1 rounded-full hidden sm:inline ${hasWriteAccess ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-600"}`}>
+                  {hasWriteAccess ? "Édition" : "Consultation"}
+                </span>
+              )}
+              {user?.firstName && (
+                <span className="text-sm text-gray-600 hidden sm:inline">
+                  {user.firstName} {user.lastName ?? ""}
+                </span>
+              )}
+              <DemoBadge show={demo} />
+              <button
+                type="button"
+                onClick={() => { clearToken(); window.location.href = "/login"; }}
+                className="text-xs sm:text-sm text-gray-500 hover:text-[#6C63FF] underline min-h-10 px-1"
+              >
+                Déconnexion
+              </button>
+            </div>
           </div>
+          <nav className="lg:hidden grid grid-cols-5 gap-0.5 px-1.5 pb-1.5">
+            {loading ? (
+              <p className="col-span-5 text-xs text-gray-400 px-2 py-2">Chargement menu…</p>
+            ) : (
+              nav.map(({ href, label, short }) => {
+                const Icon = ICONS[href] ?? MetricsIcon;
+                const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
+                return (
+                  <Link
+                    key={href}
+                    href={href}
+                    aria-label={label}
+                    title={label}
+                    className={`flex flex-col items-center justify-center gap-0.5 min-h-10 rounded-lg text-[9px] leading-tight text-center px-0.5 ${
+                      active ? "bg-[#6C63FF] text-white font-semibold" : "text-gray-600"
+                    }`}
+                  >
+                    <Icon className="w-3.5 h-3.5 shrink-0" />
+                    <span className="line-clamp-1">{short}</span>
+                  </Link>
+                );
+              })
+            )}
+          </nav>
         </header>
-        <main className="flex-1 p-4 lg:p-6 overflow-x-auto">{children}</main>
+        <main className="flex-1 p-3 lg:p-6 overflow-x-auto pb-[max(1rem,env(safe-area-inset-bottom))]">{children}</main>
       </div>
     </div>
   );

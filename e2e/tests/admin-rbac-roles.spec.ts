@@ -1,8 +1,7 @@
-import { test, expect, type Page } from "@playwright/test";
-import { requireGateway, requireReachable } from "./helpers";
+import { test, expect } from "@playwright/test";
+import { loginAsStaff, requireGateway, requireReachable } from "./helpers";
 
 const GATEWAY_URL = process.env.GATEWAY_URL ?? "http://localhost:3000";
-const OTP = "123456";
 
 type StaffRole = "SUPER_ADMIN" | "ADMIN" | "SUPPORT" | "FINANCE" | "CONTENT";
 
@@ -18,27 +17,20 @@ const STAFF_ACCOUNTS: { phone: string; role: StaffRole; label: string }[] = [
 const MENU_BY_ROLE: Record<StaffRole, string[]> = {
   SUPER_ADMIN: [
     "Tableau de bord", "Utilisateurs", "Chauffeurs", "KYC", "Courses", "Livraisons",
-    "Restaurants", "Tarifs", "Abonnements", "Portefeuille", "Litiges", "Planifiées", "Communes", "Locations",
+    "Restaurants", "Tarifs", "Abonnements", "Portefeuille", "Litiges", "Planifiées", "Zones géographiques", "Locations",
   ],
   ADMIN: [
     "Tableau de bord", "Utilisateurs", "Chauffeurs", "KYC", "Courses", "Livraisons",
-    "Restaurants", "Tarifs", "Abonnements", "Portefeuille", "Litiges", "Planifiées", "Communes", "Locations",
+    "Restaurants", "Tarifs", "Abonnements", "Portefeuille", "Litiges", "Planifiées", "Zones géographiques", "Locations",
   ],
   SUPPORT: [
     "Utilisateurs", "Chauffeurs", "KYC", "Litiges", "Courses", "Livraisons", "Planifiées", "Locations",
   ],
   FINANCE: ["Tableau de bord", "Portefeuille", "Tarifs", "Abonnements"],
-  CONTENT: ["Restaurants", "Tarifs", "Communes", "Locations"],
+  CONTENT: ["Restaurants", "Tarifs", "Zones géographiques", "Locations"],
 };
 
 const HIDDEN_FOR_SUPPORT = ["Restaurants", "Abonnements", "Portefeuille", "Tableau de bord"];
-
-async function loginAs(page: Page, phone: string): Promise<void> {
-  await page.goto("/login");
-  await page.getByPlaceholder("+243900000001").fill(phone);
-  await page.getByRole("button", { name: "Se connecter" }).click();
-  await expect(page.getByRole("button", { name: "Déconnexion" })).toBeVisible({ timeout: 15_000 });
-}
 
 test.describe("Admin — RBAC par rôle staff", () => {
   test.beforeEach(async ({ request, baseURL }) => {
@@ -52,11 +44,13 @@ test.describe("Admin — RBAC par rôle staff", () => {
 
   for (const { phone, role, label } of STAFF_ACCOUNTS) {
     test(`${role} (${phone}) — menu et badge`, async ({ page }) => {
-      await loginAs(page, phone);
+      await loginAsStaff(page, phone);
       await expect(page.getByText(label, { exact: true })).toBeVisible();
 
       for (const item of MENU_BY_ROLE[role]) {
-        await expect(page.getByRole("link", { name: item, exact: true })).toBeVisible();
+        const link = page.getByRole("link", { name: item, exact: true });
+        await link.scrollIntoViewIfNeeded();
+        await expect(link).toBeVisible();
       }
 
       if (role === "SUPPORT") {
@@ -68,14 +62,14 @@ test.describe("Admin — RBAC par rôle staff", () => {
   }
 
   test("SUPER_ADMIN — écriture tarifs", async ({ page }) => {
-    await loginAs(page, "+243900000001");
+    await loginAsStaff(page, "+243900000001");
     await page.goto("/tarifs");
     await expect(page.getByText("Accès lecture seule pour votre rôle.")).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Enregistrer" }).first()).toBeVisible({ timeout: 10_000 });
   });
 
   test("SUPPORT — utilisateurs lecture seule, pas de menu Tarifs", async ({ page }) => {
-    await loginAs(page, "+243900000003");
+    await loginAsStaff(page, "+243900000003");
     await expect(page.getByRole("link", { name: "Tarifs", exact: true })).toHaveCount(0);
     await page.goto("/utilisateurs");
     await expect(page.getByText(/Consultation des comptes \(\d+ au total\)/)).toBeVisible();

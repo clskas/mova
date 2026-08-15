@@ -1,15 +1,8 @@
 import { test, expect } from "@playwright/test";
-import { requireGateway, requireReachable } from "./helpers";
+import { loginAsStaff, requireGateway, requireReachable } from "./helpers";
 
 const ADMIN_PHONE = process.env.ADMIN_PHONE ?? "+243900000001";
 const GATEWAY_URL = process.env.GATEWAY_URL ?? "http://localhost:3000";
-
-async function loginAsAdmin(page: import("@playwright/test").Page) {
-  await page.goto("/login");
-  await page.getByPlaceholder("+243900000001").fill(ADMIN_PHONE);
-  await page.getByRole("button", { name: "Se connecter" }).click();
-  await expect(page.getByRole("heading", { name: "Tableau de bord" })).toBeVisible({ timeout: 15_000 });
-}
 
 test.describe("Admin — liste utilisateurs", () => {
   test.beforeEach(async ({ request, baseURL }) => {
@@ -22,7 +15,7 @@ test.describe("Admin — liste utilisateurs", () => {
   });
 
   test("page Utilisateurs affiche le tableau", async ({ page }) => {
-    await loginAsAdmin(page);
+    await loginAsStaff(page, ADMIN_PHONE);
     await page.getByRole("link", { name: "Utilisateurs", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Utilisateurs" })).toBeVisible({ timeout: 15_000 });
     await expect(page.getByPlaceholder(/Rechercher/)).toBeVisible();

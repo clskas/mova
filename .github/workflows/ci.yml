@@ -136,8 +136,14 @@ jobs:
           GATEWAY_URL: http://127.0.0.1:3000
           ADMIN_PHONE: "+243900000001"
         run: |
+          set +e
           npm run test:e2e:admin
+          admin_ec=$?
           npm run test:e2e:web
+          web_ec=$?
+          if [ "$admin_ec" -ne 0 ] || [ "$web_ec" -ne 0 ]; then
+            exit 1
+          fi
 
       - name: Dump stack logs on failure
         if: failure()

@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { requireGateway, requireReachable } from "./helpers";
+import { loginAsStaff, requireGateway, requireReachable } from "./helpers";
 
 const ADMIN_PHONE = process.env.ADMIN_PHONE ?? "+243900000001";
 const GATEWAY_URL = process.env.GATEWAY_URL ?? "http://localhost:3000";
@@ -15,9 +15,7 @@ test.describe("Admin — restaurants CRUD", () => {
   });
 
   test("page restaurants charge le formulaire et la liste", async ({ page }) => {
-    await page.goto("/login");
-    await page.getByPlaceholder("+243900000001").fill(ADMIN_PHONE);
-    await page.getByRole("button", { name: "Se connecter" }).click();
+    await loginAsStaff(page, ADMIN_PHONE);
     await expect(page.getByRole("heading", { name: "Tableau de bord" })).toBeVisible({ timeout: 15_000 });
 
     await page.getByRole("link", { name: "Restaurants", exact: true }).click();

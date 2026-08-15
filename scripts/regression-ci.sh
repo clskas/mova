@@ -21,9 +21,10 @@ EOF
 echo "=== Docker compose (microservices) ==="
 docker compose up -d --build
 
-echo "=== Wait for API gateway /health ==="
+echo "=== Wait for API gateway /health/live then /health ==="
 for i in $(seq 1 90); do
-  if curl -sf --max-time 8 http://127.0.0.1:3000/health >/dev/null 2>&1; then
+  if curl -sf --max-time 3 http://127.0.0.1:3000/health/live >/dev/null 2>&1 \
+    && curl -sf --max-time 8 http://127.0.0.1:3000/health >/dev/null 2>&1; then
     echo "Gateway ready (attempt $i)"
     break
   fi

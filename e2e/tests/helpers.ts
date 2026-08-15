@@ -1,4 +1,4 @@
-import { test, type APIRequestContext } from "@playwright/test";
+import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 
 /** En CI, les tests doivent échouer si la stack n'est pas prête (pas de skip silencieux). */
 export const e2eStrict =
@@ -41,9 +41,16 @@ export async function requireGateway(
   let lastError = "injoignable";
   for (let i = 0; i < attempts; i++) {
     try {
-      const health = await request.get(`${gatewayUrl}/health`, { timeout: 15_000 });
+      const live = await request.get(`${gatewayUrl}/health/live`, { timeout: 5_000 });
+      if (live.ok()) return;
+      lastError = `/health/live HTTP ${live.status()}`;
+    } catch (err) {
+      lastError = err instanceof Error ? err.message : String(err);
+    }
+    try {
+      const health = await request.get(`${gatewayUrl}/health`, { timeout: 8_000 });
       if (health.ok()) return;
-      lastError = `HTTP ${health.status()}`;
+      lastError = `/health HTTP ${health.status()}`;
     } catch (err) {
       lastError = err instanceof Error ? err.message : String(err);
     }
@@ -52,4 +59,24 @@ export async function requireGateway(
     }
   }
   skipOrFail(`Gateway indisponible sur ${gatewayUrl} (${lastError})`);
+}
+
+const DEV_OTP = process.env.E2E_OTP ?? "123456";
+
+/** Ferme la bannière de mise à jour si elle recouvre le formulaire. */
+export async function dismissUpdateBanner(page: Page): Promise<void> {
+  const later = page.getByRole("button", { name: "Plus tard" });
+  if (await later.isVisible().catch(() => false)) {
+    await later.click();
+  }
+}
+
+/** Connexion staff admin (OTP mock 123456). */
+export async function loginAsStaff(page: Page, phone: string): Promise<void> {
+  await page.goto("/login");
+  await dismissUpdateBanner(page);
+  await page.getByPlaceholder("+243900000001").fill(phone);
+  await page.getByRole("textbox", { name: /Code OTP/i }).fill(DEV_OTP);
+  await page.getByRole("button", { name: "Se connecter" }).click();
+  await expect(page.getByRole("button", { name: "Déconnexion" })).toBeVisible({ timeout: 15_000 });
 }

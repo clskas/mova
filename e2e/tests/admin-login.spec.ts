@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { requireGateway, requireReachable } from "./helpers";
+import { loginAsStaff, requireGateway, requireReachable } from "./helpers";
 
 const ADMIN_PHONE = process.env.ADMIN_PHONE ?? "+243900000001";
 const GATEWAY_URL = process.env.GATEWAY_URL ?? "http://localhost:3000";
@@ -23,9 +23,7 @@ test.describe("Admin — page de connexion", () => {
 
   test("connexion OTP redirige vers le tableau de bord", async ({ page, request }) => {
     await requireGateway(request, GATEWAY_URL);
-    await page.goto("/login");
-    await page.getByPlaceholder("+243900000001").fill(ADMIN_PHONE);
-    await page.getByRole("button", { name: "Se connecter" }).click();
+    await loginAsStaff(page, ADMIN_PHONE);
     await expect(page.getByRole("heading", { name: "Tableau de bord" })).toBeVisible({ timeout: 15_000 });
   });
 });

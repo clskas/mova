@@ -1,4 +1,4 @@
-const CACHE = "mova-admin-v2";
+const CACHE = "mova-admin-v3";
 const SHELL = ["/", "/login", "/manifest.webmanifest", "/icon-192.png", "/icon-512.png", "/apple-touch-icon.png"];
 
 function isVersionRequest(url) {
@@ -10,14 +10,21 @@ self.addEventListener("install", (event) => {
     (async () => {
       const cache = await caches.open(CACHE);
       await cache.addAll(SHELL).catch(() => undefined);
-      if (!self.registration.active) await self.skipWaiting();
+      await self.skipWaiting();
     })(),
   );
 });
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))),
+    (async () => {
+      const keys = await caches.keys();
+      await Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)));
+      const clients = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+      for (const client of clients) {
+        client.postMessage({ type: "MOVA_UPDATE_AVAILABLE" });
+      }
+    })(),
   );
   self.clients.claim();
 });

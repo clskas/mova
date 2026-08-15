@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { clearToken } from "@/lib/auth";
 import { usePartnerLiveConnected } from "@/components/PartnerLiveProvider";
@@ -17,6 +18,18 @@ function navActive(pathname: string, href: string) {
   return pathname === href || (href !== "/" && pathname.startsWith(href));
 }
 
+function useWideChrome() {
+  const [wide, setWide] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const apply = () => setWide(mq.matches);
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, []);
+  return wide;
+}
+
 export function PortalShell({
   children,
   partnerName,
@@ -27,6 +40,7 @@ export function PortalShell({
   const pathname = usePathname();
   const router = useRouter();
   const liveConnected = usePartnerLiveConnected();
+  const wide = useWideChrome();
 
   function logout() {
     clearToken();
@@ -48,54 +62,59 @@ export function PortalShell({
               )}
             </div>
           </div>
-          <nav className="hidden md:flex items-center gap-1 flex-wrap justify-end">
+          {wide ? (
+            <nav className="senga-nav-desktop items-center gap-1 flex-wrap justify-end min-w-0">
+              {NAV.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`px-3 py-2 rounded-lg text-sm min-h-11 inline-flex items-center ${
+                    navActive(pathname, item.href)
+                      ? "bg-indigo-100 text-indigo-800 font-medium"
+                      : "text-gray-600 hover:bg-gray-100"
+                  }`}
+                >
+                  {item.label}
+                </Link>
+              ))}
+              <button type="button" onClick={logout} className="px-3 py-2 rounded-lg text-sm text-gray-500 hover:bg-gray-100 min-h-11">
+                Déconnexion
+              </button>
+            </nav>
+          ) : (
+            <button
+              type="button"
+              onClick={logout}
+              className="shrink-0 px-2.5 min-h-10 rounded-lg text-xs text-gray-600 border border-indigo-100"
+            >
+              Déconnexion
+            </button>
+          )}
+        </div>
+        {!wide && (
+          <nav className="senga-nav-phone" aria-label="Navigation">
             {NAV.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`px-3 py-2 rounded-lg text-sm min-h-11 inline-flex items-center ${
+                aria-label={item.label}
+                className={`flex flex-col items-center justify-center gap-0.5 min-h-10 rounded-xl text-[11px] leading-tight text-center px-1 ${
                   navActive(pathname, item.href)
-                    ? "bg-indigo-100 text-indigo-800 font-medium"
-                    : "text-gray-600 hover:bg-gray-100"
+                    ? "bg-indigo-100 text-indigo-800 font-semibold"
+                    : "text-gray-600"
                 }`}
               >
-                {item.label}
+                <span className="text-base leading-none" aria-hidden>
+                  {item.icon}
+                </span>
+                {item.short}
               </Link>
             ))}
-            <button type="button" onClick={logout} className="px-3 py-2 rounded-lg text-sm text-gray-500 hover:bg-gray-100 min-h-11">
-              Déconnexion
-            </button>
           </nav>
-          <button
-            type="button"
-            onClick={logout}
-            className="md:hidden shrink-0 px-2.5 min-h-10 rounded-lg text-xs text-gray-600 border border-indigo-100"
-          >
-            Déconnexion
-          </button>
-        </div>
-        <nav className="md:hidden grid grid-cols-3 gap-1 px-2 pb-2">
-          {NAV.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              aria-label={item.label}
-              className={`flex flex-col items-center justify-center gap-0.5 min-h-11 rounded-xl text-[11px] leading-tight text-center px-1 ${
-                navActive(pathname, item.href)
-                  ? "bg-indigo-100 text-indigo-800 font-semibold"
-                  : "text-gray-600"
-              }`}
-            >
-              <span className="text-base leading-none" aria-hidden>
-                {item.icon}
-              </span>
-              {item.short}
-            </Link>
-          ))}
-        </nav>
+        )}
       </header>
 
-      <main className="flex-1 p-3 sm:p-4 md:p-6 max-w-5xl mx-auto w-full min-w-0 pb-[max(1rem,env(safe-area-inset-bottom))]">
+      <main className="flex-1 p-3 sm:p-4 lg:p-6 max-w-5xl mx-auto w-full min-w-0 pb-[max(1rem,env(safe-area-inset-bottom))]">
         {children}
       </main>
     </div>

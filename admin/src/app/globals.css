@@ -39,6 +39,27 @@ body {
   }
 }
 
+.senga-nav-desktop {
+  display: none;
+}
+.senga-nav-phone {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.25rem;
+  padding: 0 0.375rem 0.375rem;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+}
+@media (min-width: 1024px) {
+  .senga-nav-desktop {
+    display: flex;
+  }
+  .senga-nav-phone {
+    display: none;
+  }
+}
+
 @layer components {
   .mova-card {
     @apply bg-white rounded-2xl border border-[var(--mova-border)] shadow-sm;

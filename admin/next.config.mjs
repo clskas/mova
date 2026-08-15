@@ -31,9 +31,6 @@ const nextConfig = {
   env: { NEXT_PUBLIC_BUILD_ID: buildId },
   output: "standalone",
   poweredByHeader: false,
-  async rewrites() {
-    return [{ source: "/version.json", destination: "/api/version" }];
-  },
   async headers() {
     return [
       {

@@ -1,22 +1,21 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { randomUUID } from 'crypto';
 import {
   MOVA_PLATFORM_USER_ID,
   MovaErrorCode,
   MovaHttpException,
-  africasTalkingDisburseMobileMoney,
-  africasTalkingInitiateMobileMoney,
-  cinetPayInitiateMobileMoney,
+  afrisoftHubReference,
+  afrisoftPayHubGetPayment,
+  afrisoftPayHubInitiatePayout,
   formatCdf,
-  isCinetPayConfigured,
-  isSerdiPayPaymentConfigured,
-  serdiPayDisburseMobileMoney,
-  serdiPayInitiateMobileMoney,
-  useAfricasTalkingMobileMoney,
-  useSerdiPayMobileMoney,
+  isAfrisoftHubAsyncRef,
+  isAfrisoftPayHubClientConfigured,
+  isAfrisoftPayHubMode,
   type MobileMoneyOperator,
 } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
+import { initiateViaGateway } from '../payments/payment-providers';
 
 @Injectable()
 export class WalletService {
@@ -299,8 +298,8 @@ export class WalletService {
     if (amountCdf < 500) {
       throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Montant minimum : 500 FC.');
     }
-    const ref = `topup_${provider}_${Date.now()}`;
     const providerKey = provider.trim().toUpperCase();
+    const ref = afrisoftHubReference('senga', 'topup', randomUUID());
 
     if (providerKey === 'MOCK') {
       this.assertMockAllowed();
@@ -319,104 +318,67 @@ export class WalletService {
 
     const operator = this.mapProvider(provider);
     const phoneTrimmed = phone?.trim();
-    const gateway = (this.config.get<string>('MOBILE_MONEY_GATEWAY') ?? 'serdipay').trim().toLowerCase();
-    const useSerdi = gateway === 'serdipay' && isSerdiPayPaymentConfigured(this.envGetter) && Boolean(phoneTrimmed);
-    const useCinet = gateway === 'cinetpay' && isCinetPayConfigured(this.envGetter) && Boolean(phoneTrimmed);
-    const useAt = gateway === 'africastalking' && useAfricasTalkingMobileMoney(this.envGetter) && Boolean(phoneTrimmed);
+    if (!phoneTrimmed) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Numéro Mobile Money requis.');
+    }
 
-    if ((gateway === 'serdipay' || gateway === 'cinetpay' || gateway === 'africastalking') && phoneTrimmed) {
-      if (!useSerdi && !useCinet && !useAt) {
-        throw new MovaHttpException(
-          MovaErrorCode.PAYMENT_FAILED,
-          undefined,
-          gateway === 'cinetpay'
-            ? 'CinetPay non configuré. Définissez CINETPAY_API_KEY, CINETPAY_SITE_ID, CINETPAY_NOTIFY_URL.'
-            : gateway === 'serdipay'
-              ? 'SerdiPay non configuré. Définissez SERDIPAY_EMAIL/PASSWORD/API_ID/API_PASSWORD/MERCHANT_CODE/MERCHANT_PIN.'
-              : "Africa's Talking MM non configuré.",
-        );
-      }
+    const mm = await initiateViaGateway(this.config, operator, amountCdf, phoneTrimmed, ref, 'topup');
+    if (!mm) {
+      this.assertMockAllowed();
+      const wallet = await this.credit(userId, amountCdf, `Recharge ${provider} (simulation)`, ref);
+      return {
+        success: true,
+        simulated: true,
+        message: `Recharge simulée de ${formatCdf(amountCdf)} — configurez le hub AfriSoft (AFRISOFT_PAY_HUB_URL).`,
+        amountCdf,
+        provider,
+        balanceCdf: wallet.balanceCdf,
+        formattedBalance: formatCdf(wallet.balanceCdf),
+        providerRef: ref,
+      };
+    }
+    if (!mm.success) {
+      throw new MovaHttpException(MovaErrorCode.PAYMENT_FAILED, undefined, mm.message ?? 'Recharge Mobile Money échouée.');
+    }
 
-      const mm = useCinet
-        ? await cinetPayInitiateMobileMoney(this.envGetter, {
-            operator,
-            amountCdf,
-            phone: phoneTrimmed,
-            reference: ref,
-          })
-        : useSerdi
-          ? await serdiPayInitiateMobileMoney(this.envGetter, {
-              operator,
-              amountCdf,
-              phone: phoneTrimmed,
-              reference: ref,
-            })
-          : await africasTalkingInitiateMobileMoney(this.envGetter, {
-              operator,
-              amountCdf,
-              phone: phoneTrimmed,
-              reference: ref,
-            });
-      if (!mm.success) {
-        throw new MovaHttpException(MovaErrorCode.PAYMENT_FAILED, undefined, mm.message ?? 'Recharge Mobile Money échouée.');
-      }
-
-      const providerRef = mm.providerRef ?? ref;
-      const paymentUrl = 'paymentUrl' in mm ? mm.paymentUrl : undefined;
-      const isAsync =
-        providerRef.startsWith('sp_') ||
-        providerRef.startsWith('cp_') ||
-        providerRef.startsWith('at_') ||
-        Boolean('pending' in mm && mm.pending);
-      if (isAsync) {
-        const wallet = await this.createWallet(userId);
-        await this.prisma.walletTransaction.create({
-          data: {
-            walletId: wallet.id,
-            amountCdf,
-            type: 'TOPUP_PENDING',
-            description: `Recharge ${provider} en attente`,
-            reference: providerRef,
-          },
-        });
-        return {
-          success: true,
-          simulated: false,
-          pendingMobileMoney: true,
-          message: mm.message ?? `Confirmez la recharge de ${formatCdf(amountCdf)} sur votre téléphone.`,
+    const providerRef = mm.providerRef ?? ref;
+    const paymentUrl = mm.paymentUrl;
+    const isAsync = isAfrisoftHubAsyncRef(providerRef) || Boolean(mm.pending);
+    if (isAsync) {
+      const wallet = await this.createWallet(userId);
+      await this.prisma.walletTransaction.create({
+        data: {
+          walletId: wallet.id,
           amountCdf,
-          provider,
-          balanceCdf: wallet.balanceCdf,
-          formattedBalance: formatCdf(wallet.balanceCdf),
-          providerRef,
-          ...(paymentUrl ? { paymentUrl } : {}),
-        };
-      }
-
-      const wallet = await this.credit(userId, amountCdf, `Recharge ${provider}`, providerRef);
+          type: 'TOPUP_PENDING',
+          description: `Recharge ${provider} en attente`,
+          reference: providerRef,
+        },
+      });
       return {
         success: true,
         simulated: false,
-        message: mm.message ?? `Recharge de ${formatCdf(amountCdf)} effectuée`,
+        pendingMobileMoney: true,
+        message: mm.message ?? `Confirmez la recharge de ${formatCdf(amountCdf)} sur votre téléphone.`,
         amountCdf,
         provider,
         balanceCdf: wallet.balanceCdf,
         formattedBalance: formatCdf(wallet.balanceCdf),
         providerRef,
+        ...(paymentUrl ? { paymentUrl } : {}),
       };
     }
 
-    this.assertMockAllowed();
-    const wallet = await this.credit(userId, amountCdf, `Recharge ${provider} (simulation)`, ref);
+    const wallet = await this.credit(userId, amountCdf, `Recharge ${provider}`, providerRef);
     return {
       success: true,
-      simulated: true,
-      message: `Recharge simulée de ${formatCdf(amountCdf)} — configurez SerdiPay ou CinetPay (MOBILE_MONEY_GATEWAY).`,
+      simulated: false,
+      message: mm.message ?? `Recharge de ${formatCdf(amountCdf)} effectuée`,
       amountCdf,
       provider,
       balanceCdf: wallet.balanceCdf,
       formattedBalance: formatCdf(wallet.balanceCdf),
-      providerRef: ref,
+      providerRef,
     };
   }
 
@@ -445,38 +407,40 @@ export class WalletService {
       throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Montant minimum : 500 FC.');
     }
 
-    const reference = `withdraw_${normalizedProvider}_${Date.now()}`;
+    const reference = afrisoftHubReference('senga', 'withdraw', randomUUID());
     const operator = this.mapProvider(normalizedProvider);
-    const useSerdi = useSerdiPayMobileMoney(this.envGetter);
-    const useAt = useAfricasTalkingMobileMoney(this.envGetter);
+    const hubClient = isAfrisoftPayHubClientConfigured(this.envGetter) && !isAfrisoftPayHubMode(this.envGetter);
 
-    if (useSerdi || useAt) {
+    if (hubClient) {
       const wallet = await this.debit(
         userId,
         amountCdf,
         `Retrait ${normalizedProvider} vers ${normalizedPhone}`,
         reference,
       );
-      const mm = useSerdi
-        ? await serdiPayDisburseMobileMoney(this.envGetter, {
-            operator,
-            amountCdf,
-            phone: normalizedPhone,
-            reference,
-          })
-        : await africasTalkingDisburseMobileMoney(this.envGetter, {
-            operator,
-            amountCdf,
-            phone: normalizedPhone,
-            reference,
-          });
+      const mm = await afrisoftPayHubInitiatePayout(this.envGetter, {
+        operator,
+        amountCdf,
+        phone: normalizedPhone,
+        reference,
+        purpose: 'withdraw',
+        idempotencyKey: `senga:withdraw:${reference}`,
+      });
       if (!mm.success) {
         await this.credit(userId, amountCdf, `Annulation retrait échoué ${reference}`, `rollback_${reference}`);
         throw new MovaHttpException(MovaErrorCode.PAYMENT_FAILED, undefined, mm.message ?? 'Retrait Mobile Money échoué.');
       }
+      const providerRef = mm.providerRef ?? reference;
+      if (providerRef !== reference) {
+        await this.prisma.walletTransaction.updateMany({
+          where: { reference, type: 'DEBIT' },
+          data: { reference: providerRef },
+        });
+      }
       return {
         success: true,
         simulated: false,
+        pendingMobileMoney: Boolean(mm.pending),
         message: mm.message ?? `Retrait de ${formatCdf(amountCdf)} vers ${normalizedPhone} initié`,
         amountCdf,
         provider: normalizedProvider,
@@ -484,6 +448,7 @@ export class WalletService {
         balanceCdf: wallet.balanceCdf,
         formattedBalance: formatCdf(wallet.balanceCdf),
         reference: mm.providerRef ?? reference,
+        providerRef: mm.providerRef ?? reference,
       };
     }
 
@@ -497,7 +462,7 @@ export class WalletService {
     return {
       success: true,
       simulated: true,
-      message: `Retrait simulé de ${formatCdf(amountCdf)} — configurez Africa's Talking pour un vrai virement.`,
+      message: `Retrait simulé de ${formatCdf(amountCdf)} — configurez AFRISOFT_PAY_HUB_URL pour un vrai virement.`,
       amountCdf,
       provider: normalizedProvider,
       phone: normalizedPhone,
@@ -565,16 +530,18 @@ export class WalletService {
     providerRef: string,
     outcome: 'COMPLETED' | 'FAILED',
     message?: string,
+    altRefs: string[] = [],
   ): Promise<{ found: boolean; status?: string; balanceCdf?: number; alreadyFinal?: boolean }> {
+    const refs = [...new Set([providerRef, ...altRefs].map((r) => r?.trim()).filter(Boolean) as string[])];
     const pending = await this.prisma.walletTransaction.findFirst({
-      where: { reference: providerRef, type: 'TOPUP_PENDING' },
+      where: { reference: { in: refs }, type: 'TOPUP_PENDING' },
       orderBy: { createdAt: 'desc' },
       include: { wallet: true },
     });
     if (!pending) {
       const done = await this.prisma.walletTransaction.findFirst({
         where: {
-          reference: providerRef,
+          reference: { in: refs },
           type: { in: ['TOPUP_COMPLETED', 'TOPUP_FAILED', 'CREDIT'] },
         },
         orderBy: { createdAt: 'desc' },
@@ -617,9 +584,51 @@ export class WalletService {
     return { found: true, status: 'COMPLETED', balanceCdf: wallet.balanceCdf };
   }
 
+  async refundFailedPayout(
+    refs: string[],
+    message?: string,
+  ): Promise<{ found: boolean; refunded?: boolean }> {
+    const debit = await this.prisma.walletTransaction.findFirst({
+      where: {
+        reference: { in: refs },
+        type: 'DEBIT',
+        description: { contains: 'Retrait' },
+      },
+      orderBy: { createdAt: 'desc' },
+      include: { wallet: true },
+    });
+    if (!debit) return { found: false };
+    const rollbackRef = `rollback_${debit.reference}`;
+    const already = await this.prisma.walletTransaction.findFirst({
+      where: {
+        walletId: debit.walletId,
+        OR: [{ reference: rollbackRef }, { reference: { in: refs.map((r) => `rollback_${r}`) } }],
+        type: 'CREDIT',
+      },
+    });
+    if (already) return { found: true, refunded: false };
+    await this.credit(
+      debit.wallet.userId,
+      Math.abs(debit.amountCdf),
+      message ?? `Annulation retrait échoué ${debit.reference}`,
+      rollbackRef,
+    );
+    return { found: true, refunded: true };
+  }
+
   async getTopUpStatus(userId: string, providerRef: string) {
     if (!providerRef.trim()) {
       throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'providerRef requis');
+    }
+    if (isAfrisoftPayHubClientConfigured(this.envGetter) && !isAfrisoftPayHubMode(this.envGetter)) {
+      const remote = await afrisoftPayHubGetPayment(this.envGetter, providerRef);
+      if (remote.status === 'COMPLETED' || remote.status === 'FAILED') {
+        await this.completePendingTopUp(providerRef, remote.status, remote.message, [
+          remote.paymentId ?? '',
+          remote.providerRef ?? '',
+          remote.reference ?? '',
+        ]);
+      }
     }
     const wallet = await this.createWallet(userId);
     const tx = await this.prisma.walletTransaction.findFirst({

@@ -68,7 +68,7 @@ Future ─┘                                         (afrisoft-pay sur VPS Hetz
 5. Les apps **ne stockent jamais** `SERDIPAY_*` / `CINETPAY_*`.
 6. Switch sticky : `MOBILE_MONEY_GATEWAY=serdipay|cinetpay` (comme `SMS_PROVIDER`) — **pas** de failover silencieux.
 
-**État code actuel (août 2026) :** SENGA consomme SerdiPay (`packages/shared/src/serdipay.ts`) et le client **CinetPay** est scaffoldé (`packages/shared/src/cinetpay.ts`). Callbacks publics hub : `POST https://pay.afri-soft.com/webhooks/serdipay` et `…/webhooks/cinetpay`. Les endpoints **`/v1/*` multi-apps** ci-dessous restent le **contrat** pour Educongo et suivantes.
+**État code actuel (août 2026) :** SENGA (Render `mova-payment`) appelle le hub `https://pay.afri-soft.com` (`POST /v1/payments`, HMAC `app_id=senga`). Seul le VPS (`AFRISOFT_PAY_HUB_MODE=true`) détient `SERDIPAY_*` et appelle `apis.serdipay.com`. Callbacks publics hub : `POST https://pay.afri-soft.com/webhooks/serdipay` et `…/webhooks/cinetpay`. Le hub notifie SENGA sur `POST /api/payments/webhooks/afrisoft-hub`.
 
 ---
 
@@ -358,12 +358,12 @@ Fichiers clés :
 
 | Élément | SENGA wallet | Hub `/v1` multi-apps |
 |---------|--------------|----------------------|
-| Init MM SerdiPay | ✅ fait | À exposer comme API app-to-hub |
-| Init MM CinetPay | ✅ scaffold (switch sticky) | Même gateway côté hub |
-| Webhook SerdiPay / CinetPay | ✅ handlers | ✅ (interne hub) |
-| Crédit wallet | ✅ SENGA DB | ❌ chaque app gère son ledger |
-| Auth `app_id` + HMAC | ❌ (JWT user) | À implémenter |
-| Webhooks sortants vers apps | ❌ | À implémenter |
+| Init MM SerdiPay | via hub `/v1` | ✅ `POST /v1/payments` |
+| Init MM CinetPay | switch sticky hub | Même gateway côté hub |
+| Webhook SerdiPay / CinetPay | handlers VPS | ✅ interne hub |
+| Crédit wallet | ✅ SENGA DB (Render) | ❌ chaque app gère son ledger |
+| Auth `app_id` + HMAC | client SENGA → hub | ✅ |
+| Webhooks sortants vers apps | ✅ `afrisoft-hub` | ✅ |
 
 ---
 
@@ -475,14 +475,14 @@ curl -sS https://pay.afri-soft.com/health
 
 ### 9.3 Côté SENGA (déjà en place pour MM)
 
-- [x] Client SerdiPay Public API  
+- [x] Client SerdiPay Public API (VPS hub uniquement)  
 - [x] Client CinetPay Checkout (scaffold + tests)  
 - [x] Webhook public hub SerdiPay `https://pay.afri-soft.com/webhooks/serdipay`  
 - [x] Webhook public hub CinetPay `https://pay.afri-soft.com/webhooks/cinetpay`  
 - [x] Wallet top-up async + poll Flutter  
+- [x] Endpoints `/v1/*` + HMAC `app_id` + webhook sortant vers SENGA  
 - [ ] Credentials marchand SerdiPay / CinetPay réels sur le VPS hub  
 - [ ] Flutter : ouvrir `paymentUrl` CinetPay  
-- [ ] Endpoints `/v1/*` + registre multi-apps + webhooks sortants  
 
 ---
 

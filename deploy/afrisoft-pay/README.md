@@ -15,6 +15,7 @@ Public:
 
 - Domain: `https://pay.afri-soft.com`
 - Health: `GET /health` (200)
+- Multi-app API: `POST /v1/payments` (HMAC `app_id` + `X-AfriSoft-*`)
 - SerdiPay callback: `POST /webhooks/serdipay` → Nest `/api/payments/webhooks/serdipay`
 
 ## Align with repo / API contract

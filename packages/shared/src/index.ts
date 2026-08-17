@@ -20,6 +20,7 @@ export * from './driver-documents';
 export * from './public-id';
 export * from './africas-talking';
 export * from './serdipay';
+export * from './afrisoft-pay-hub';
 export * from './cinetpay';
 export * from './supabase-storage';
 export * from './platform-wallet';

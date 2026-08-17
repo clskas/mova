@@ -56,8 +56,22 @@ env.MOBILE_MONEY_GATEWAY ||= 'serdipay';
 env.SERDIPAY_BASE_URL ||= 'https://apis.serdipay.com';
 env.AFRICAS_TALKING_ENV ||= 'production';
 env.AFRICAS_TALKING_SMS_SENDER ||= 'MOVA';
+env.AFRISOFT_PAY_HUB_URL ||= 'https://pay.afri-soft.com';
+env.PAY_HUB_URL ||= env.AFRISOFT_PAY_HUB_URL;
+env.AFRISOFT_PAY_HUB_APP_ID ||= 'senga';
+env.AFRISOFT_HUB_APP_ID ||= env.AFRISOFT_PAY_HUB_APP_ID;
+env.AFRISOFT_HUB_API_KEY ||= env.AFRISOFT_PAY_HUB_API_KEY;
+env.AFRISOFT_PAY_HUB_API_KEY ||= env.AFRISOFT_HUB_API_KEY;
+env.AFRISOFT_PAY_HUB_WEBHOOK_SECRET ||= env.AFRISOFT_HUB_WEBHOOK_SECRET;
+env.AFRISOFT_HUB_WEBHOOK_SECRET ||= env.AFRISOFT_PAY_HUB_WEBHOOK_SECRET;
 
 const needed = [
+  'SERDIPAY_EMAIL',
+  'SERDIPAY_PASSWORD',
+  'SERDIPAY_API_ID',
+  'SERDIPAY_API_PASSWORD',
+  'SERDIPAY_MERCHANT_CODE',
+  'SERDIPAY_MERCHANT_PIN',
   'SERDIPAY_CLIENT_ID',
   'SERDIPAY_CLIENT_SECRET',
   'SERDIPAY_MERCHANT_ID',
@@ -83,6 +97,14 @@ const needed = [
   'SUPABASE_KYC_BUCKET',
   'CORS_ORIGIN',
   'MOCK_PAYMENTS',
+  'AFRISOFT_PAY_HUB_URL',
+  'AFRISOFT_PAY_HUB_APP_ID',
+  'AFRISOFT_PAY_HUB_API_KEY',
+  'AFRISOFT_PAY_HUB_WEBHOOK_SECRET',
+  'AFRISOFT_HUB_APP_ID',
+  'AFRISOFT_HUB_API_KEY',
+  'AFRISOFT_HUB_WEBHOOK_SECRET',
+  'PAY_HUB_URL',
 ];
 
 console.log(
@@ -94,9 +116,13 @@ console.log(
   needed.filter((k) => !env[k]).join(', ') || '(none)',
 );
 
-if (!env.SERDIPAY_CLIENT_ID || !env.SERDIPAY_CLIENT_SECRET) {
-  console.error('SERDIPAY_CLIENT_ID/SECRET missing in external-apis.env — abort');
-  process.exit(1);
+const hasAuth =
+  (env.SERDIPAY_EMAIL && env.SERDIPAY_PASSWORD) ||
+  (env.SERDIPAY_CLIENT_ID && env.SERDIPAY_CLIENT_SECRET);
+if (!hasAuth) {
+  console.warn(
+    'SerdiPay merchant auth missing in external-apis.env — OK for Render payment (hub client). SMS/auth may still need other keys.',
+  );
 }
 
 const targets = {
@@ -146,13 +172,14 @@ const targets = {
     'SUPABASE_KYC_BUCKET',
   ],
   'srv-d8slrm8g4nts73bq9pj0': [
-    'SERDIPAY_CLIENT_ID',
-    'SERDIPAY_CLIENT_SECRET',
-    'SERDIPAY_MERCHANT_ID',
-    'SERDIPAY_WEBHOOK_SECRET',
-    'SERDIPAY_BASE_URL',
-    'SERDIPAY_C2B_PATH',
-    'SERDIPAY_B2C_PATH',
+    'PAY_HUB_URL',
+    'AFRISOFT_PAY_HUB_URL',
+    'AFRISOFT_PAY_HUB_APP_ID',
+    'AFRISOFT_PAY_HUB_API_KEY',
+    'AFRISOFT_PAY_HUB_WEBHOOK_SECRET',
+    'AFRISOFT_HUB_APP_ID',
+    'AFRISOFT_HUB_API_KEY',
+    'AFRISOFT_HUB_WEBHOOK_SECRET',
     'MOBILE_MONEY_GATEWAY',
     'MOCK_PAYMENTS',
   ],

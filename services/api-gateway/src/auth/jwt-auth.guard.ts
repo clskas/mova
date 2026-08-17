@@ -27,13 +27,10 @@ function isPublicPath(path: string, method?: string): boolean {
   if (m === 'GET' && /\/api\/uploads\/(parcels|menu|vehicles|moving)\/[^/]+$/.test(pathOnly)) {
     return true;
   }
-  // Mobile Money provider callbacks (no JWT — verified by webhook secret / provider trust).
+  // Mobile Money callbacks (no JWT — verified by HMAC / provider secret).
   if (
-    m === 'POST' &&
-    (pathOnly === '/api/payments/webhooks/serdipay' ||
-      pathOnly === '/api/payments/africastalking/callback' ||
-      pathOnly.startsWith('/api/payments/webhooks/serdipay') ||
-      pathOnly.startsWith('/api/payments/africastalking/callback'))
+    pathOnly.startsWith('/api/payments/webhooks/') ||
+    pathOnly.startsWith('/api/payments/africastalking/callback')
   ) {
     return true;
   }

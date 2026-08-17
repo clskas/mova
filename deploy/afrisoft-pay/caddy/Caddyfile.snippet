@@ -2,10 +2,11 @@
 # Live Caddy on the VPS listens on 127.0.0.1:3000 (compose publishes payment there).
 # Merge CinetPay rewrite into /etc/caddy/Caddyfile if missing, then: systemctl reload caddy
 #
-# Public paths registered at aggregators:
+# Public paths:
+#   https://pay.afri-soft.com/v1/payments          (HMAC app_id)
 #   https://pay.afri-soft.com/webhooks/serdipay
 #   https://pay.afri-soft.com/webhooks/cinetpay
-# Nest payment-service global prefix is /api
+# Nest payment-service global prefix is /api ; /health, /internal, /v1 are excluded.
 
 # pay.afri-soft.com {
 # 	encode gzip

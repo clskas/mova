@@ -96,6 +96,10 @@ services:
         fromService: { name: mova-ride, type: web, property: hostport }
       - key: MOCK_PAYMENTS
         value: "false"
+      - key: AFRISOFT_PAY_HUB_URL
+        value: "https://pay.afri-soft.com"
+      - key: AFRISOFT_PAY_HUB_APP_ID
+        value: "senga"
       - fromGroup: mova-external-apis
 
   - type: web

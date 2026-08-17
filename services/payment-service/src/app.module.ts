@@ -5,6 +5,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { HealthModule } from './health/health.module';
 import { WalletModule } from './wallet/wallet.module';
 import { PaymentsModule } from './payments/payments.module';
+import { HubModule } from './hub/hub.module';
 import { InternalModule } from './internal/internal.module';
 import { AuthModule } from './auth/auth.module';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
@@ -18,6 +19,7 @@ import { SubscriptionsModule } from './subscriptions/subscriptions.module';
     AuthModule,
     WalletModule,
     PaymentsModule,
+    HubModule,
     SubscriptionsModule,
     InternalModule,
   ],

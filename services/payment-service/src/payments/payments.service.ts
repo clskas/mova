@@ -1,4 +1,4 @@
-import { HttpStatus, Injectable, Logger } from '@nestjs/common';
+import { HttpStatus, Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { CashDebtCategory, PaymentMethod, PaymentStatus } from '@prisma/client';
 import {
@@ -19,7 +19,8 @@ import { WalletService } from '../wallet/wallet.service';
 import { DriverPayoutService } from '../payouts/driver-payout.service';
 import { FoodDeliveryPayoutService } from '../payouts/food-delivery-payout.service';
 import { DriverDebtLedgerService } from '../ledger/driver-debt-ledger.service';
-import { AirtelMoneyProvider, MockPaymentProvider, MpesaProvider, OrangeMoneyProvider } from './payment-providers';
+import { HubPaymentsService } from '../hub/hub-payments.service';
+import { AirtelMoneyProvider, MockPaymentProvider, MpesaProvider, OrangeMoneyProvider, isAsyncMobileMoneyRef } from './payment-providers';
 import { PaymentProvider } from './payment-provider.interface';
 
 const MOBILE_MONEY_METHODS = new Set<PaymentMethod>([
@@ -45,6 +46,7 @@ export class PaymentsService {
     orange: OrangeMoneyProvider,
     mpesa: MpesaProvider,
     airtel: AirtelMoneyProvider,
+    @Optional() private readonly hubPayments?: HubPaymentsService,
   ) {
     this.providers = new Map<PaymentMethod, PaymentProvider>([
       [PaymentMethod.ORANGE_MONEY, orange],
@@ -241,10 +243,9 @@ export class PaymentsService {
     }
   }
 
-  private isAsyncMobileMoney(provider: PaymentProvider, result: { providerRef?: string }): boolean {
+  private isAsyncMobileMoney(provider: PaymentProvider, result: { providerRef?: string; pending?: boolean }): boolean {
     if (provider.name === 'MOCK') return false;
-    const ref = result.providerRef ?? '';
-    return ref.startsWith('sp_') || ref.startsWith('cp_') || ref.startsWith('at_');
+    return Boolean(result.pending) || isAsyncMobileMoneyRef(result.providerRef);
   }
 
   async processPayment(rideId: string, userId: string, amountCdf: number, method: PaymentMethod, phone: string) {
@@ -923,14 +924,24 @@ export class PaymentsService {
     providerRef: string,
     outcome: 'COMPLETED' | 'FAILED',
     message?: string,
+    altRefs: string[] = [],
   ) {
-    const ref = providerRef?.trim();
-    if (!ref) {
+    const refs = [...new Set([providerRef, ...altRefs].map((r) => r?.trim()).filter(Boolean) as string[])];
+    if (refs.length === 0) {
       return { success: false, message: 'providerRef manquant' };
     }
 
+    if (this.hubPayments?.isEnabled()) {
+      for (const ref of refs) {
+        const hub = await this.hubPayments.finalizeFromAggregator(ref, outcome, message);
+        if (hub.found) {
+          return { success: true, kind: 'HUB', ...hub };
+        }
+      }
+    }
+
     const ridePayment = await this.prisma.payment.findFirst({
-      where: { providerRef: ref },
+      where: { providerRef: { in: refs } },
       orderBy: { updatedAt: 'desc' },
     });
     if (ridePayment && MOBILE_MONEY_METHODS.has(ridePayment.method)) {
@@ -966,7 +977,7 @@ export class PaymentsService {
     }
 
     const servicePayment = await this.prisma.servicePayment.findFirst({
-      where: { providerRef: ref },
+      where: { providerRef: { in: refs } },
       orderBy: { updatedAt: 'desc' },
     });
     if (servicePayment && MOBILE_MONEY_METHODS.has(servicePayment.method)) {
@@ -1009,12 +1020,19 @@ export class PaymentsService {
       };
     }
 
-    const topUp = await this.walletService.completePendingTopUp(ref, outcome, message);
+    const topUp = await this.walletService.completePendingTopUp(refs[0], outcome, message, refs.slice(1));
     if (topUp.found) {
       return { success: true, kind: 'TOPUP', ...topUp };
     }
 
-    this.logger.warn(`Webhook Mobile Money: aucune intention pour providerRef=${ref}`);
+    if (outcome === 'FAILED') {
+      const payout = await this.walletService.refundFailedPayout(refs, message);
+      if (payout.found) {
+        return { success: true, kind: 'PAYOUT', ...payout };
+      }
+    }
+
+    this.logger.warn(`Webhook Mobile Money: aucune intention pour providerRef=${refs.join(',')}`);
     return { success: false, message: 'Référence Mobile Money inconnue' };
   }
 

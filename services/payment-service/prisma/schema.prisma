@@ -38,6 +38,34 @@ model Payment {
   @@map("payments")
 }
 
+/// Intentions multi-apps du hub VPS (COLLECT/PAYOUT). Ledger wallet SENGA reste sur Render.
+model HubPayment {
+  id             String    @id
+  appId          String
+  reference      String
+  idempotencyKey String?
+  amountCdf      Int
+  currency       String    @default("CDF")
+  phone          String
+  telecom        String
+  purpose        String?
+  metadata       Json?
+  status         String    @default("PENDING")
+  providerRef    String?
+  failureReason  String?
+  kind           String    @default("COLLECT")
+  notifiedAt     DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@unique([appId, reference])
+  @@unique([appId, idempotencyKey])
+  @@index([providerRef])
+  @@index([appId, status])
+  @@map("hub_payments")
+}
+
 model ServicePayment {
   id            String        @id @default(uuid())
   referenceType String

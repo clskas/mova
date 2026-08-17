@@ -3,11 +3,14 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import { createHmac, timingSafeEqual } from 'crypto';
 import {
+  afrisoftHubWebhookSecret,
+  afrisoftPayHubVerifySignature,
   cinetPayCheckTransaction,
   cinetPayVerifyXToken,
   isCinetPayConfigured,
 } from '@mova/shared';
 import { PaymentsService } from './payments.service';
+import { HubPaymentsService } from '../hub/hub-payments.service';
 
 function asRecord(body: unknown): Record<string, unknown> {
   return body && typeof body === 'object' && !Array.isArray(body) ? (body as Record<string, unknown>) : {};
@@ -42,6 +45,7 @@ export class PaymentsWebhookController {
   constructor(
     private payments: PaymentsService,
     private config: ConfigService,
+    private hub: HubPaymentsService,
   ) {}
 
   private verifySerdiPaySignature(rawBody: string, headers: Record<string, string | string[] | undefined>): boolean {
@@ -137,6 +141,14 @@ export class PaymentsWebhookController {
       return { success: false, message: 'Référence manquante' };
     }
     this.logger.log(`SerdiPay webhook ${outcome} ref=${providerRef}`);
+    if (this.hub.isEnabled()) {
+      const hubResult = await this.hub.finalizeFromAggregator(
+        providerRef,
+        outcome,
+        pickString(payload, ['message', 'description', 'failureReason']),
+      );
+      if (hubResult.found) return { success: true, ...hubResult };
+    }
     return this.payments.completeMobileMoneyFromWebhook(
       providerRef,
       outcome,
@@ -215,10 +227,80 @@ export class PaymentsWebhookController {
     const outcome = checked.status === 'ACCEPTED' ? 'COMPLETED' : 'FAILED';
     const providerRef = transId.startsWith('cp_') ? transId : `cp_${transId}`;
     this.logger.log(`CinetPay webhook ${outcome} ref=${providerRef}`);
+    if (this.hub.isEnabled()) {
+      const hubResult = await this.hub.finalizeFromAggregator(
+        providerRef,
+        outcome,
+        checked.message ?? pickString(payload, ['cpm_error_message', 'message']),
+      );
+      if (hubResult.found) return { success: true, ...hubResult };
+    }
     return this.payments.completeMobileMoneyFromWebhook(
       providerRef,
       outcome,
       checked.message ?? pickString(payload, ['cpm_error_message', 'message']),
+    );
+  }
+
+  /**
+   * Hub AfriSoft → SENGA (Render). SerdiPay never POSTs here.
+   * Public: POST /api/payments/webhooks/afrisoft-hub
+   */
+  @Post('webhooks/afrisoft-hub')
+  @ApiOperation({ summary: 'Webhook sortant hub AfriSoft (crédit wallet SENGA)' })
+  async afrisoftHub(
+    @Body() body: unknown,
+    @Headers() headers: Record<string, string | string[] | undefined>,
+    @Req() req: { rawBody?: string; originalUrl?: string; url?: string },
+  ) {
+    return this.handleAfriSoftHubWebhook(body, headers, req);
+  }
+
+  @Post('webhooks/afrisoft-pay')
+  @ApiOperation({ summary: 'Alias webhook hub AfriSoft' })
+  async afrisoftPayAlias(
+    @Body() body: unknown,
+    @Headers() headers: Record<string, string | string[] | undefined>,
+    @Req() req: { rawBody?: string; originalUrl?: string; url?: string },
+  ) {
+    return this.handleAfriSoftHubWebhook(body, headers, req);
+  }
+
+  private handleAfriSoftHubWebhook(
+    body: unknown,
+    headers: Record<string, string | string[] | undefined>,
+    req: { rawBody?: string; originalUrl?: string; url?: string },
+  ) {
+    const get = (key: string) => this.config.get<string>(key);
+    const secret = afrisoftHubWebhookSecret(get);
+    const timestamp = typeof headers['x-afrisoft-timestamp'] === 'string' ? headers['x-afrisoft-timestamp'] : '';
+    const signature = typeof headers['x-afrisoft-signature'] === 'string' ? headers['x-afrisoft-signature'] : '';
+    const raw = req.rawBody ?? JSON.stringify(body ?? {});
+    const path = (req.originalUrl ?? req.url ?? '/api/payments/webhooks/afrisoft-hub').split('?')[0];
+    if (!secret || !afrisoftPayHubVerifySignature({ secret, timestamp, method: 'POST', path, rawBody: raw, signature })) {
+      this.logger.warn('AfriSoft hub webhook: signature invalide');
+      return { success: false, message: 'Signature invalide' };
+    }
+    const payload = asRecord(body);
+    const statusRaw = pickString(payload, ['status'])?.toUpperCase();
+    const outcome =
+      statusRaw === 'COMPLETED' || statusRaw === 'FAILED'
+        ? statusRaw
+        : payload.event === 'payment.failed'
+          ? 'FAILED'
+          : 'COMPLETED';
+    const paymentId = pickString(payload, ['payment_id', 'paymentId']);
+    const providerRef = pickString(payload, ['provider_ref', 'providerRef']) ?? paymentId;
+    const reference = pickString(payload, ['reference']);
+    if (!providerRef && !paymentId && !reference) {
+      return { success: false, message: 'Référence manquante' };
+    }
+    this.logger.log(`AfriSoft hub webhook ${outcome} payment=${paymentId ?? '?'} provider=${providerRef ?? '?'}`);
+    return this.payments.completeMobileMoneyFromWebhook(
+      providerRef ?? paymentId ?? reference ?? '',
+      outcome,
+      pickString(payload, ['failure_reason', 'message']),
+      [paymentId ?? '', reference ?? ''],
     );
   }
 }

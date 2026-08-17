@@ -79,7 +79,6 @@ async function initiateViaGateway(
           'SERDIPAY_EMAIL',
           'SERDIPAY_PASSWORD',
           'SERDIPAY_API_ID',
-          'SERDIPAY_API_PASSWORD',
           'SERDIPAY_MERCHANT_CODE',
           'SERDIPAY_MERCHANT_PIN',
           'MOBILE_MONEY_GATEWAY=serdipay',

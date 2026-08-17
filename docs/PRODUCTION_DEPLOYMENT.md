@@ -95,7 +95,8 @@ MOCK_PAYMENTS=false
 | Variable | Usage |
 |----------|-------|
 | `SERDIPAY_EMAIL` / `SERDIPAY_PASSWORD` | **VPS hub** — auth Public API `get-token` (alias : `SERDIPAY_CLIENT_ID` / `SERDIPAY_CLIENT_SECRET`) |
-| `SERDIPAY_API_ID` / `SERDIPAY_API_PASSWORD` | **VPS hub** — clés API dans le corps paiement |
+| `SERDIPAY_API_ID` | **VPS hub** — `api_id` du corps paiement |
+| `SERDIPAY_API_PASSWORD` | **VPS hub** — `api_password` du corps ; **optionnel**, défaut = `SERDIPAY_PASSWORD` |
 | `SERDIPAY_MERCHANT_CODE` / `SERDIPAY_MERCHANT_PIN` | **VPS hub** — code marchand + PIN |
 | `SERDIPAY_SMS_API_ID` / `SERDIPAY_SMS_API_KEY` | Credentials SMS API (doc `sms-api.pdf`) — distincts du paiement |
 | `SERDIPAY_SMS_BASE_URL` / `SERDIPAY_SMS_PATH` | Défauts `https://serdipay.com` + `/api/sms-api/v1/send` |

@@ -426,8 +426,9 @@ Elles doivent seulement :
 
 | Variable | Rôle |
 |----------|------|
-| `SERDIPAY_EMAIL` / `SERDIPAY_PASSWORD` | Auth `get-token` |
-| `SERDIPAY_API_ID` / `SERDIPAY_API_PASSWORD` | Corps paiement |
+| `SERDIPAY_EMAIL` / `SERDIPAY_PASSWORD` | Auth `get-token` (Username + Password de la fiche marchand) |
+| `SERDIPAY_API_ID` | Corps paiement (`api_id`) |
+| `SERDIPAY_API_PASSWORD` | Corps (`api_password`) — **optionnel** ; défaut = `SERDIPAY_PASSWORD` (pas de champ « API Password » chez SerdiPay) |
 | `SERDIPAY_MERCHANT_CODE` / `SERDIPAY_MERCHANT_PIN` | Marchand |
 | `SERDIPAY_WEBHOOK_SECRET` | Vérif callback SerdiPay |
 | `CINETPAY_API_KEY` / `CINETPAY_SITE_ID` | Auth Checkout CinetPay |
@@ -452,7 +453,8 @@ chmod 600 .env
 nano .env
 # MOCK_PAYMENTS=false
 # SERDIPAY_EMAIL=…          SERDIPAY_PASSWORD=…
-# SERDIPAY_API_ID=…         SERDIPAY_API_PASSWORD=…
+# SERDIPAY_API_ID=…
+# SERDIPAY_API_PASSWORD=…   # optionnel : défaut = SERDIPAY_PASSWORD
 # SERDIPAY_MERCHANT_CODE=…  SERDIPAY_MERCHANT_PIN=…
 # SERDIPAY_WEBHOOK_SECRET=… (si fourni)
 docker compose --profile hub up -d --force-recreate payment

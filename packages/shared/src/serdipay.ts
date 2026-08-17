@@ -5,6 +5,8 @@
  * - Paiement : POST …/payment-client | …/payment-merchant
  *   body : api_id, api_password, merchantCode, merchant_pin, clientPhone,
  *          amount, currency, telecom (AM|OM|MP|AF)
+ *   api_password : same as portal Password in the merchant credential sheet
+ *   (no separate "API Password" field). SERDIPAY_API_PASSWORD overrides if set.
  * - Callback : { status, message, payment: { status, sessionId, transactionId } }
  *
  * SMS OTP — doc séparée « SerdiPay SMS API » (sms-api.pdf) :
@@ -28,6 +30,7 @@ export const SERDIPAY_ENV_KEYS = {
   clientId: 'SERDIPAY_CLIENT_ID',
   clientSecret: 'SERDIPAY_CLIENT_SECRET',
   apiId: 'SERDIPAY_API_ID',
+  /** Payment body api_password. Optional: falls back to SERDIPAY_PASSWORD. */
   apiPassword: 'SERDIPAY_API_PASSWORD',
   merchantCode: 'SERDIPAY_MERCHANT_CODE',
   /** Alias for merchantCode */
@@ -70,7 +73,7 @@ export function isSerdiPayPaymentConfigured(get: EnvGetter): boolean {
   return Boolean(
     isSerdiPayAuthConfigured(get) &&
       firstEnv(get, SERDIPAY_ENV_KEYS.apiId) &&
-      firstEnv(get, SERDIPAY_ENV_KEYS.apiPassword) &&
+      serdiPayApiPassword(get) &&
       serdiPayMerchantCode(get) &&
       firstEnv(get, SERDIPAY_ENV_KEYS.merchantPin),
   );
@@ -107,6 +110,20 @@ function serdiPayPassword(get: EnvGetter): string | undefined {
 
 function serdiPayMerchantCode(get: EnvGetter): string | undefined {
   return firstEnv(get, SERDIPAY_ENV_KEYS.merchantCode, SERDIPAY_ENV_KEYS.merchantId);
+}
+
+/**
+ * Public API payment body `api_password`.
+ * Merchant sheets (SerdipayAPIKey) list Password, not a separate API password —
+ * default to the portal password used by get-token.
+ */
+function serdiPayApiPassword(get: EnvGetter): string | undefined {
+  return firstEnv(
+    get,
+    SERDIPAY_ENV_KEYS.apiPassword,
+    SERDIPAY_ENV_KEYS.password,
+    SERDIPAY_ENV_KEYS.clientSecret,
+  );
 }
 
 function baseUrl(get: EnvGetter): string {
@@ -299,13 +316,14 @@ function paymentCredentials(get: EnvGetter):
       ok: false,
       message:
         'SerdiPay paiement non configuré. Définissez SERDIPAY_EMAIL, SERDIPAY_PASSWORD, ' +
-        'SERDIPAY_API_ID, SERDIPAY_API_PASSWORD, SERDIPAY_MERCHANT_CODE, SERDIPAY_MERCHANT_PIN.',
+        'SERDIPAY_API_ID, SERDIPAY_MERCHANT_CODE, SERDIPAY_MERCHANT_PIN ' +
+        '(SERDIPAY_API_PASSWORD optionnel : défaut = SERDIPAY_PASSWORD).',
     };
   }
   return {
     ok: true,
     apiId: firstEnv(get, SERDIPAY_ENV_KEYS.apiId)!,
-    apiPassword: firstEnv(get, SERDIPAY_ENV_KEYS.apiPassword)!,
+    apiPassword: serdiPayApiPassword(get)!,
     merchantCode: serdiPayMerchantCode(get)!,
     merchantPin: firstEnv(get, SERDIPAY_ENV_KEYS.merchantPin)!,
   };

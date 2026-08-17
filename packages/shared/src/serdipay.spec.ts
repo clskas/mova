@@ -41,11 +41,42 @@ describe('serdipay Public API', () => {
     expect(isSerdiPaySmsConfigured(get)).toBe(false);
 
     env.SERDIPAY_API_ID = 'APIX';
-    env.SERDIPAY_API_PASSWORD = 'apipw';
     env.SERDIPAY_MERCHANT_CODE = '466551';
     env.SERDIPAY_MERCHANT_PIN = '1234';
+    // No SERDIPAY_API_PASSWORD: merchant sheet uses portal Password as api_password
     expect(isSerdiPayPaymentConfigured(get)).toBe(true);
     expect(useSerdiPayMobileMoney(get)).toBe(true);
+  });
+
+  it('uses portal Password as api_password when SERDIPAY_API_PASSWORD is unset', async () => {
+    env.SERDIPAY_EMAIL = 'm@example.com';
+    env.SERDIPAY_PASSWORD = 'portal-pw';
+    env.SERDIPAY_API_ID = 'APIX';
+    env.SERDIPAY_MERCHANT_CODE = '466551';
+    env.SERDIPAY_MERCHANT_PIN = '1234';
+
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ access_token: 'tok-abc' }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 102,
+        json: async () => ({ message: 'ok', payment: { status: 'pending', transactionId: 'TX1' } }),
+      });
+    (global as unknown as { fetch: typeof fetch }).fetch = fetchMock as unknown as typeof fetch;
+
+    await serdiPayInitiateMobileMoney(get, {
+      operator: 'AIRTEL_MONEY',
+      amountCdf: 400,
+      phone: '+243994972450',
+      reference: 'topup_ref_fallback',
+    });
+    const payBody = JSON.parse(fetchMock.mock.calls[1][1].body as string);
+    expect(payBody.api_password).toBe('portal-pw');
   });
 
   it('accepts legacy CLIENT_ID / CLIENT_SECRET aliases for auth', () => {

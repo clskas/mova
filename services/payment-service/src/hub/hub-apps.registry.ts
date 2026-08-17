@@ -62,7 +62,7 @@ export class HubAppsRegistry implements OnModuleInit {
     const explicit = this.config.get<string>(key)?.trim();
     if (explicit) return explicit;
     if (appId === 'senga') {
-      return 'https://mova-payment.onrender.com/api/payments/webhooks/afrisoft-hub';
+      return 'https://api.afri-soft.com/api/payments/webhooks/afrisoft-hub';
     }
     return undefined;
   }

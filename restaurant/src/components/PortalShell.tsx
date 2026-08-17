@@ -87,7 +87,7 @@ export function PortalShell({ children, restaurantName }: { children: React.Reac
             <span className="text-base leading-none" aria-hidden>
               🚪
             </span>
-            Deconnection
+            Déconnexion
           </button>
         </nav>
       </header>

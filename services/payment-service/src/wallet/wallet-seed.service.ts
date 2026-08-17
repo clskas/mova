@@ -19,6 +19,8 @@ export class WalletSeedService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
+    const hubMode = (this.config.get('AFRISOFT_PAY_HUB_MODE') ?? '').trim().toLowerCase();
+    if (hubMode === 'true' || hubMode === '1' || hubMode === 'yes') return;
     if (this.config.get('MOCK_PAYMENTS') !== 'true') return;
     for (const demo of DEMO_WALLET_CREDITS) {
       try {

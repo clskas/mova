@@ -64,7 +64,7 @@ services:
       PORT: "3000"
       DATABASE_URL: postgresql://${POSTGRES_USER:-afrisoft}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-afrisoft_payments}
       REDIS_URL: redis://redis:6379
-      MOCK_PAYMENTS: ${MOCK_PAYMENTS:-true}
+      MOCK_PAYMENTS: ${MOCK_PAYMENTS:-false}
       MOBILE_MONEY_GATEWAY: ${MOBILE_MONEY_GATEWAY:-serdipay}
       AFRISOFT_PAY_HUB_MODE: ${AFRISOFT_PAY_HUB_MODE:-true}
       SERDIPAY_BASE_URL: ${SERDIPAY_BASE_URL:-https://apis.serdipay.com}

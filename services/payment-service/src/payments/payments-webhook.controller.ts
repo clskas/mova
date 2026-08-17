@@ -7,6 +7,7 @@ import {
   afrisoftPayHubVerifySignature,
   cinetPayCheckTransaction,
   cinetPayVerifyXToken,
+  isAfrisoftPayHubMode,
   isCinetPayConfigured,
 } from '@mova/shared';
 import { PaymentsService } from './payments.service';
@@ -47,6 +48,16 @@ export class PaymentsWebhookController {
     private config: ConfigService,
     private hub: HubPaymentsService,
   ) {}
+
+  /** Aggregator callbacks (SerdiPay / CinetPay / AT) belong on the VPS hub only. */
+  private isHubProcess(): boolean {
+    return isAfrisoftPayHubMode((key) => this.config.get<string>(key));
+  }
+
+  private rejectAggregatorOnSenga(name: string) {
+    this.logger.warn(`${name} webhook rejected on SENGA — use POST /api/payments/webhooks/afrisoft-hub`);
+    return { success: false, message: 'Webhook agrégateur non accepté ici' };
+  }
 
   private verifySerdiPaySignature(rawBody: string, headers: Record<string, string | string[] | undefined>): boolean {
     const secret = this.config.get<string>('SERDIPAY_WEBHOOK_SECRET')?.trim();
@@ -124,6 +135,7 @@ export class PaymentsWebhookController {
     @Headers() headers: Record<string, string | string[] | undefined>,
     @Req() req: { rawBody?: Buffer },
   ) {
+    if (!this.isHubProcess()) return this.rejectAggregatorOnSenga('SerdiPay');
     const raw = req.rawBody?.toString('utf8') ?? JSON.stringify(body ?? {});
     if (!this.verifySerdiPaySignature(raw, headers)) {
       this.logger.warn('SerdiPay webhook: signature invalide');
@@ -159,6 +171,7 @@ export class PaymentsWebhookController {
   @Post('africastalking/callback')
   @ApiOperation({ summary: 'Callback Africa\'s Talking Mobile Money (public)' })
   async africasTalking(@Body() body: unknown) {
+    if (!this.isHubProcess()) return this.rejectAggregatorOnSenga("Africa's Talking");
     const payload = asRecord(body);
     const providerRef = this.extractProviderRef(payload, 'at');
     const outcome = this.extractOutcome(payload) ?? 'COMPLETED';
@@ -182,6 +195,7 @@ export class PaymentsWebhookController {
   @Get('webhooks/cinetpay')
   @ApiOperation({ summary: 'Ping CinetPay notify_url (GET)' })
   cinetPayPing() {
+    if (!this.isHubProcess()) return this.rejectAggregatorOnSenga('CinetPay');
     return { success: true, message: 'ok' };
   }
 
@@ -191,6 +205,7 @@ export class PaymentsWebhookController {
     @Body() body: unknown,
     @Headers() headers: Record<string, string | string[] | undefined>,
   ) {
+    if (!this.isHubProcess()) return this.rejectAggregatorOnSenga('CinetPay');
     const payload = asRecord(body);
     const transId =
       pickString(payload, ['cpm_trans_id', 'transaction_id', 'transactionId']) ?? '';

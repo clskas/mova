@@ -31,6 +31,17 @@ describe('prod-security', () => {
     expect(() => assertProductionSecurity('test')).toThrow(/MOCK_OTP/);
   });
 
+  it('rejects MOCK_PAYMENTS in production', async () => {
+    process.env.NODE_ENV = 'production';
+    process.env.JWT_SECRET = 'a'.repeat(32);
+    process.env.INTERNAL_API_KEY = 'b'.repeat(24);
+    process.env.MOCK_PAYMENTS = 'true';
+    process.env.AFRICAS_TALKING_USERNAME = 'senga';
+    process.env.AFRICAS_TALKING_API_KEY = 'c'.repeat(24);
+    const { assertProductionSecurity } = await import('./prod-security');
+    expect(() => assertProductionSecurity('payment-service')).toThrow(/MOCK_PAYMENTS/);
+  });
+
   it('rejects MOCK_SMS in production', async () => {
     process.env.NODE_ENV = 'production';
     process.env.JWT_SECRET = 'a'.repeat(32);

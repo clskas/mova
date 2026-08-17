@@ -41,7 +41,7 @@ export class ProviderService {
 
     if (provider === 'mock') {
       // Intentional in MOCK hub bootstrap — codes appear only in server logs, not in API (unless MOCK_RETURN_CODE).
-      this.logger.log(`[MOCK SMS] OTP → ${this.maskPhone(phone)} code=${code} app=${appId}`);
+      this.logger.log(`[MOCK SMS] OTP sent (code omitted) → ${this.maskPhone(phone)} app=${appId}`);
       return { success: true, message: 'OTP mocked (SMS_PROVIDER=mock)', provider: 'mock' };
     }
 

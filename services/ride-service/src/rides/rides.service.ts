@@ -571,12 +571,19 @@ export class RidesService {
     return { ride: await this.getRide(ride.id) };
   }
 
-  async getRide(rideId: string) {
+  async getRide(rideId: string, participantUserId?: string) {
     const ride = await this.prisma.ride.findUnique({
       where: { id: rideId },
       include: { events: { orderBy: { createdAt: 'asc' } }, ratings: true },
     });
     if (!ride) throw new MovaHttpException(MovaErrorCode.RIDE_NOT_FOUND, HttpStatus.NOT_FOUND);
+    if (
+      participantUserId &&
+      ride.passengerId !== participantUserId &&
+      ride.driverId !== participantUserId
+    ) {
+      throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
+    }
     const driver = ride.driverId ? await this.fetchDriverInfo(ride.driverId) : null;
     const detail = this.formatRideDetail(ride);
     const rideRule = await this.commission.get(CommissionServiceType.RIDE);

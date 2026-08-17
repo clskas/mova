@@ -142,8 +142,8 @@ export class RidesController {
 
   @Get(':id')
   @ApiOperation({ summary: 'Détail course avec chauffeur si assigné' })
-  get(@Param('id') id: string) {
-    return this.ridesService.getRide(id);
+  get(@Request() req: { user: { id: string } }, @Param('id') id: string) {
+    return this.ridesService.getRide(id, req.user.id);
   }
 
   @Post(':id/search')

@@ -559,28 +559,41 @@ export class WalletService {
     }
 
     if (outcome === 'FAILED') {
-      await this.prisma.walletTransaction.update({
-        where: { id: pending.id },
+      const failed = await this.prisma.walletTransaction.updateMany({
+        where: { id: pending.id, type: 'TOPUP_PENDING' },
         data: {
           type: 'TOPUP_FAILED',
           description: message ?? pending.description ?? 'Recharge Mobile Money échouée',
         },
       });
+      if (failed.count !== 1) {
+        return { found: true, alreadyFinal: true, status: 'COMPLETED', balanceCdf: pending.wallet.balanceCdf };
+      }
       return { found: true, status: 'FAILED', balanceCdf: pending.wallet.balanceCdf };
     }
 
     const description =
       pending.description?.replace(/\s+en attente$/i, '') ?? 'Recharge Mobile Money';
-    const [, wallet] = await this.prisma.$transaction([
-      this.prisma.walletTransaction.update({
-        where: { id: pending.id },
+    const wallet = await this.prisma.$transaction(async (tx) => {
+      const claimed = await tx.walletTransaction.updateMany({
+        where: { id: pending.id, type: 'TOPUP_PENDING' },
         data: { type: 'TOPUP_COMPLETED', description },
-      }),
-      this.prisma.wallet.update({
+      });
+      if (claimed.count !== 1) return null;
+      return tx.wallet.update({
         where: { id: pending.walletId },
         data: { balanceCdf: { increment: pending.amountCdf } },
-      }),
-    ]);
+      });
+    });
+    if (!wallet) {
+      const current = await this.prisma.wallet.findUnique({ where: { id: pending.walletId } });
+      return {
+        found: true,
+        alreadyFinal: true,
+        status: 'COMPLETED',
+        balanceCdf: current?.balanceCdf ?? pending.wallet.balanceCdf,
+      };
+    }
     return { found: true, status: 'COMPLETED', balanceCdf: wallet.balanceCdf };
   }
 

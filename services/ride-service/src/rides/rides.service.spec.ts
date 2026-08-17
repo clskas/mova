@@ -213,6 +213,39 @@ describe('RidesService', () => {
     expect(result.driver?.plateNumber).toBe('KIN-1');
   });
 
+  it('refuses ride detail to a user who is not passenger or driver', async () => {
+    prisma.ride.findUnique.mockResolvedValue({
+      id: 'ride-1',
+      passengerId: 'p1',
+      driverId: 'driver-1',
+      vehicleId: 'v1',
+      status: RideStatus.ACCEPTED,
+      vehicleType: VehicleType.MOTO_TAXI,
+      pickupLat: -4.32,
+      pickupLng: 15.31,
+      dropoffLat: -4.34,
+      dropoffLng: 15.33,
+      pickupAddress: 'Gombe',
+      dropoffAddress: 'Limete',
+      estimatedFareCdf: 6200,
+      finalFareCdf: null,
+      distanceKm: 4.5,
+      durationMin: 11,
+      acceptedAt: new Date(),
+      startedAt: null,
+      completedAt: null,
+      cancelledAt: null,
+      cancelReason: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      events: [],
+      ratings: [],
+    });
+    await expect(service.getRide('ride-1', 'stranger')).rejects.toMatchObject({
+      response: { code: 'MOVA_AUTH_003' },
+    });
+  });
+
   it('cancels ride for passenger with reason', async () => {
     prisma.ride.findUnique.mockResolvedValue({
       id: 'ride-1',

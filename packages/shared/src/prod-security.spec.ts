@@ -40,6 +40,7 @@ describe('prod-security', () => {
     process.env.AFRICAS_TALKING_API_KEY = 'c'.repeat(24);
     const { assertProductionSecurity } = await import('./prod-security');
     expect(() => assertProductionSecurity('payment-service')).toThrow(/MOCK_PAYMENTS/);
+    expect(() => assertProductionSecurity('auth-service')).not.toThrow();
   });
 
   it('rejects MOCK_SMS in production', async () => {

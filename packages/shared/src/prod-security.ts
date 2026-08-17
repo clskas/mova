@@ -190,8 +190,14 @@ export function assertProductionSecurity(serviceName = 'service'): void {
     );
   }
   if (process.env.MOCK_PAYMENTS === 'true') {
-    throw new Error(
-      `[${serviceName}] MOCK_PAYMENTS=true is forbidden in production. Real Mobile Money must go through the AfriSoft hub.`,
+    if (serviceName === 'payment-service') {
+      throw new Error(
+        `[${serviceName}] MOCK_PAYMENTS=true is forbidden in production. Real Mobile Money must go through the AfriSoft hub.`,
+      );
+    }
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[${serviceName}] MOCK_PAYMENTS=true in production — ignored here; payment-service refuses to start with this flag.`,
     );
   }
   if (isTestOtpModeEnabled()) {

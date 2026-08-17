@@ -238,6 +238,20 @@ envVarGroups:
         value: MOVA
       - key: SERDIPAY_BASE_URL
         value: https://apis.serdipay.com
+      # Public API MM — live keys belong on VPS /opt/afrisoft-pay/.env (pay.afri-soft.com), not git.
+      - key: SERDIPAY_EMAIL
+        sync: false
+      - key: SERDIPAY_PASSWORD
+        sync: false
+      - key: SERDIPAY_API_ID
+        sync: false
+      - key: SERDIPAY_API_PASSWORD
+        sync: false
+      - key: SERDIPAY_MERCHANT_CODE
+        sync: false
+      - key: SERDIPAY_MERCHANT_PIN
+        sync: false
+      # Legacy aliases: EMAIL/PASSWORD and MERCHANT_CODE
       - key: SERDIPAY_CLIENT_ID
         sync: false
       - key: SERDIPAY_CLIENT_SECRET
@@ -246,7 +260,7 @@ envVarGroups:
         sync: false
       - key: SERDIPAY_WEBHOOK_SECRET
         sync: false
-      # SerdiPay SMS API (otp) — distinct from payment email/password
+      # SerdiPay SMS API (otp) — distinct from payment email/password / API_ID
       - key: SERDIPAY_SMS_BASE_URL
         value: https://serdipay.com
       - key: SERDIPAY_SMS_PATH

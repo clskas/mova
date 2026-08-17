@@ -1,0 +1,83 @@
+# AfriSoft Payment Hub — scaffold for Hetzner VPS (SerdiPay static IP gateway)
+# Do NOT put live SerdiPay secrets in git. Fill /opt/afrisoft-pay/.env on the server only.
+#
+# Build payment image from Mova monorepo root:
+#   docker build -f docker/payment.Dockerfile -t afrisoft-pay/payment:local .
+#
+# Start infra only (safe before secrets/image ready):
+#   docker compose --profile infra up -d
+# Start full hub (after image + .env):
+#   docker compose --profile hub up -d
+
+services:
+  postgres:
+    profiles: ["infra", "hub"]
+    image: postgres:16-alpine
+    container_name: afrisoft-pay-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-afrisoft}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-afrisoft_payments}
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - paynet
+
+  redis:
+    profiles: ["infra", "hub"]
+    image: redis:7-alpine
+    container_name: afrisoft-pay-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - ./data/redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - paynet
+
+  # SENGA payment-service Nest image — SerdiPay gateway (IP 178.104.82.66).
+  # Multi-app /v1/* hub contract may still need adapters; this process talks to SerdiPay.
+  payment:
+    profiles: ["hub"]
+    image: ${PAYMENT_IMAGE:-afrisoft-pay/payment:local}
+    container_name: afrisoft-pay-payment
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      DATABASE_URL: postgresql://${POSTGRES_USER:-afrisoft}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-afrisoft_payments}
+      REDIS_URL: redis://redis:6379
+      MOCK_PAYMENTS: ${MOCK_PAYMENTS:-true}
+      MOBILE_MONEY_GATEWAY: ${MOBILE_MONEY_GATEWAY:-serdipay}
+      SERDIPAY_BASE_URL: ${SERDIPAY_BASE_URL:-https://apis.serdipay.com}
+    ports:
+      - "127.0.0.1:3000:3000"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    networks:
+      - paynet
+
+networks:
+  paynet:
+    name: afrisoft-pay-net

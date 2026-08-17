@@ -49,7 +49,7 @@ MOBILE_MONEY_GATEWAY=serdipay|cinetpay
 
 - Webhooks hub : `/webhooks/serdipay`, `/webhooks/cinetpay`.
 - Les apps sœurs ne voient **jamais** le fournisseur sous-jacent.
-- Credentials uniquement sur le VPS hub / secrets Render.
+- Credentials uniquement sur le VPS hub (`/opt/afrisoft-pay/.env`), pas GitHub/Render.
 
 ---
 
@@ -155,7 +155,7 @@ Webhook sortant unifié vers l’app (inchangé)
 **Bascule manuelle (sticky) :**
 
 1. Garder **les deux** jeux de secrets sur le VPS (`SERDIPAY_*` + `CINETPAY_*`).
-2. Sur `/opt/afrisoft-pay` (et Render si applicable) :
+2. Sur `/opt/afrisoft-pay` uniquement :
    - Primaire : `MOBILE_MONEY_GATEWAY=serdipay`
    - Failover : `MOBILE_MONEY_GATEWAY=cinetpay`
 3. Recreate / redeploy le conteneur hub **seulement** après smoke test avec `MOCK_PAYMENTS` encore cohérent (ne pas passer `MOCK_PAYMENTS=false` sans credentials live validés).

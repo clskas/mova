@@ -90,11 +90,13 @@ MOCK_PAYMENTS=false
 
 ### 3.3 APIs externes (groupe `mova-external-apis` sur Render)
 
+> **Mobile Money SerdiPay n’est pas un secret Render.** Les credentials marchand (`SERDIPAY_EMAIL` / `PASSWORD` / `API_ID` / `API_PASSWORD` / `MERCHANT_CODE` / `MERCHANT_PIN` / `WEBHOOK_SECRET`) vont sur le **VPS hub** : `/opt/afrisoft-pay/.env` (`pay.afri-soft.com`, IP `178.104.82.66`). GitHub Actions ou `mova-payment` **ne remplacent pas** ce fichier — SerdiPay n’accepte que cette IP. Voir [AFRISOFT_PAYMENT_HUB_API.md](./AFRISOFT_PAYMENT_HUB_API.md) §8–9 et `deploy/afrisoft-pay/README.md`.
+
 | Variable | Usage |
 |----------|-------|
-| `SERDIPAY_EMAIL` / `SERDIPAY_PASSWORD` | Auth Public API `get-token` (alias : `SERDIPAY_CLIENT_ID` / `SERDIPAY_CLIENT_SECRET`) |
-| `SERDIPAY_API_ID` / `SERDIPAY_API_PASSWORD` | Clés API dans le corps paiement |
-| `SERDIPAY_MERCHANT_CODE` / `SERDIPAY_MERCHANT_PIN` | Code marchand + PIN |
+| `SERDIPAY_EMAIL` / `SERDIPAY_PASSWORD` | **VPS hub** — auth Public API `get-token` (alias : `SERDIPAY_CLIENT_ID` / `SERDIPAY_CLIENT_SECRET`) |
+| `SERDIPAY_API_ID` / `SERDIPAY_API_PASSWORD` | **VPS hub** — clés API dans le corps paiement |
+| `SERDIPAY_MERCHANT_CODE` / `SERDIPAY_MERCHANT_PIN` | **VPS hub** — code marchand + PIN |
 | `SERDIPAY_SMS_API_ID` / `SERDIPAY_SMS_API_KEY` | Credentials SMS API (doc `sms-api.pdf`) — distincts du paiement |
 | `SERDIPAY_SMS_BASE_URL` / `SERDIPAY_SMS_PATH` | Défauts `https://serdipay.com` + `/api/sms-api/v1/send` |
 | `SERDIPAY_SMS_SENDER_ID` | Sender alphanumérique SerdiPay (ex. `SerdiPay`) |
@@ -134,7 +136,7 @@ Sans provider SMS avec `MOCK_OTP=false` et sans `ALLOW_TEST_OTP`, l'API renvoie 
 
 Le **portefeuille SENGA** (`POST /api/wallet/top-up`, `POST /api/payments/rides/:id`) persiste toujours en PostgreSQL, mock ou réel.
 
-Sans credentials marchand SerdiPay (ou secours AT/legacy), l'API renvoie un message d'erreur explicite listant les variables manquantes (voir `config/external-apis.env.example`). Callback : `POST /api/payments/webhooks/serdipay`.
+Sans credentials marchand SerdiPay **sur le VPS hub** (ou secours AT/legacy), l'API renvoie un message d'erreur explicite listant les variables manquantes (voir `config/external-apis.env.example`). Callback public : `POST https://pay.afri-soft.com/webhooks/serdipay` (Nest : `POST /api/payments/webhooks/serdipay`).
 
 ### 3.3.3 Supabase Storage (documents)
 

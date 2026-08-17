@@ -212,7 +212,7 @@ POST https://pay.afri-soft.com/webhooks/cinetpay   # notify (form-urlencoded)
 - `notify_url` posé à l’init (`CINETPAY_NOTIFY_URL`) et/ou dans le dashboard CinetPay.
 - Header optionnel `x-token` (HMAC-SHA256 avec `CINETPAY_SECRET_KEY`) — voir [docs CinetPay HMAC](https://docs.cinetpay.com/api/1.0-en/checkout/hmac).
 - Le hub **rappelle toujours** `POST /v2/payment/check` avant de finaliser (ACCEPTED → COMPLETED, REFUSED → FAILED).
-- Handler Nest : `POST /api/payments/webhooks/cinetpay` ; Caddy rewrite public `/webhooks/cinetpay` (snippet `deploy/afrisoft-pay/caddy/Caddyfile.snippet`).
+- Handler Nest : `POST /api/payments/webhooks/cinetpay` ; Caddy rewrite public `/webhooks/cinetpay` (snippet `deploy/afrisoft-pay/caddy/Caddyfile.snippet` → `127.0.0.1:3000`).
 - `providerRef` stocké : `cp_{transaction_id}`.
 
 ### 4.4 Webhook sortant hub → app
@@ -382,12 +382,35 @@ Fichiers clés :
 | DNS | **Cloudflare uniquement** (pas d’autre registrar DNS pour ce hostname) |
 
 > **Render vs VPS :** le reste de SENGA (API métier, apps) peut rester sur Render ou ailleurs. **Seul** le hub qui parle à SerdiPay doit sortir depuis l’IP VPS ci-dessus. Ne pas replacer le callback SerdiPay sur un service Render à IP dynamique.
+>
+> Poser `SERDIPAY_*` dans GitHub Actions ou Render (`mova-payment` / groupe `mova-external-apis`) **ne suffit pas**. SerdiPay n’accepte que l’IP `178.104.82.66`. Les clés marchand vont dans `/opt/afrisoft-pay/.env` (voir `deploy/afrisoft-pay/README.md`).
 
 | Exigence SerdiPay | Qui doit la satisfaire |
 |-------------------|------------------------|
 | IP sortantes whitelistées (`178.104.82.66`) | **Module paiements uniquement** (VPS) |
 | 1 domaine / 1 URL de callback | **Module paiements uniquement** (`pay.afri-soft.com`) |
 | Credentials marchand | **Module paiements uniquement** (env sur le VPS) |
+
+### 8.2 Split SENGA aujourd’hui (Render ≠ hub)
+
+```
+App Flutter / web
+        │  JWT  POST /api/wallet/top-up  (via gateway)
+        ▼
+mova-payment  (Render)     — ledger wallet SENGA, Postgres Render
+        │  cible : appeler le hub  (contrat /v1 encore à câbler)
+        ▼
+Hub afrisoft-pay           — VPS /opt/afrisoft-pay · pay.afri-soft.com
+        │  SERDIPAY_* ici, sortie IP 178.104.82.66
+        ▼
+SerdiPay  ──webhook──►  https://pay.afri-soft.com/webhooks/serdipay
+```
+
+| Process | Où | Rôle |
+|---------|----|------|
+| Hub `afrisoft-pay-payment` | **VPS** `pay.afri-soft.com` · `/opt/afrisoft-pay` · conteneur port `127.0.0.1:3000` | **Seul** processus autorisé à appeler SerdiPay (IP whitelist) + recevoir `/webhooks/serdipay` |
+| `mova-payment` | **Render** (`render.yaml`) | Wallet / courses SENGA. **Ne doit pas** détenir les secrets agrégateurs. |
+| Apps sœurs (Educongo…) | n’importe où | `POST https://pay.afri-soft.com/v1/payments` (contrat §4 ; `/v1` encore à implémenter) |
 
 **Les apps clientes n’ont pas besoin d’IP fixe ni d’hébergement sur ce VPS.**  
 Elles doivent seulement :
@@ -416,9 +439,26 @@ Elles doivent seulement :
 | `MOCK_PAYMENTS=false` | Prod réelle — **ne pas** activer sans credentials validés |
 | Table / config apps | `app_id`, `api_key_hash`, `webhook_url`, `webhook_secret` |
 
-Voir aussi `config/external-apis.env.example`, [MOBILE_MONEY_PROVIDER_ALTERNATIVES.md](./MOBILE_MONEY_PROVIDER_ALTERNATIVES.md) et `docs/PRODUCTION_DEPLOYMENT.md` §3.3.
+Voir aussi `deploy/afrisoft-pay/.env.example`, `config/external-apis.env.example`, [MOBILE_MONEY_PROVIDER_ALTERNATIVES.md](./MOBILE_MONEY_PROVIDER_ALTERNATIVES.md) et `docs/PRODUCTION_DEPLOYMENT.md` §3.3.
 
 **Bascule ops :** une seule variable `MOBILE_MONEY_GATEWAY=serdipay|cinetpay` + recreate conteneur. Les deux jeux de secrets peuvent coexister sur le VPS.
+
+**Checklist VPS (copier-coller) — ne pas committer les valeurs :**
+
+```bash
+ssh -i ~/.ssh/afrisoft_pay root@178.104.82.66
+cd /opt/afrisoft-pay
+chmod 600 .env
+nano .env
+# MOCK_PAYMENTS=false
+# SERDIPAY_EMAIL=…          SERDIPAY_PASSWORD=…
+# SERDIPAY_API_ID=…         SERDIPAY_API_PASSWORD=…
+# SERDIPAY_MERCHANT_CODE=…  SERDIPAY_MERCHANT_PIN=…
+# SERDIPAY_WEBHOOK_SECRET=… (si fourni)
+docker compose --profile hub up -d --force-recreate payment
+docker exec afrisoft-pay-payment printenv MOCK_PAYMENTS
+curl -sS https://pay.afri-soft.com/health
+```
 
 ### 9.2 Côté nouvelle app (checklist)
 
@@ -466,7 +506,8 @@ Voir aussi `config/external-apis.env.example`, [MOBILE_MONEY_PROVIDER_ALTERNATIV
 | Top-up wallet | `services/payment-service/src/wallet/wallet.service.ts` |
 | UI recharge | `mobile/lib/features/wallet/wallet_screen.dart` |
 | Env exemple | `config/external-apis.env.example` |
-| Caddy rewrite | `deploy/afrisoft-pay/caddy/Caddyfile.snippet` |
+| Scaffold VPS | `deploy/afrisoft-pay/` (README, compose, `.env.example`) |
+| Caddy rewrite | `deploy/afrisoft-pay/caddy/Caddyfile.snippet` (live : `127.0.0.1:3000`) |
 
 ---
 

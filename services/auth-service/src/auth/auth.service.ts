@@ -22,6 +22,12 @@ import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '@mova/shared';
 import { SmsService } from './sms.providers';
 import { hashLocalPin, isValidLocalPin, verifyLocalPin } from './local-pin.util';
+import {
+  isInviteOnlyAuthRole,
+  missingInviteOnlyAccountMessage,
+  mismatchedPartnerRoleMessage,
+  shouldRefusePassengerAutoRegister,
+} from './partner-auth.util';
 
 const PIN_FAIL_PREFIX = 'auth:pin:fail:';
 const PIN_FAIL_MAX = 5;
@@ -177,6 +183,13 @@ export class AuthService {
     let user = await this.prisma.user.findUnique({ where: { phone: normalized } });
     let isNew = false;
     if (!user) {
+      if (shouldRefusePassengerAutoRegister(normalized, role)) {
+        throw new MovaHttpException(
+          MovaErrorCode.AUTH_FORBIDDEN,
+          HttpStatus.FORBIDDEN,
+          missingInviteOnlyAccountMessage(normalized, role),
+        );
+      }
       user = await this.prisma.user.create({
         data: {
           phone: normalized,
@@ -194,6 +207,9 @@ export class AuthService {
       }
     }
     if (role === UserRole.DRIVER && user.role !== UserRole.DRIVER) {
+      if (isInviteOnlyAuthRole(user.role)) {
+        this.assertRoleAccess(user, role);
+      }
       user = await this.prisma.user.update({
         where: { id: user.id },
         data: { role: UserRole.DRIVER, status: UserStatus.PENDING_KYC },
@@ -265,6 +281,27 @@ export class AuthService {
         MovaErrorCode.AUTH_FORBIDDEN,
         HttpStatus.FORBIDDEN,
         'Compte restaurant — utilisez le portail SENGA Restaurant.',
+      );
+    }
+    if (role === UserRole.RESTAURANT && user.role !== UserRole.RESTAURANT) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.FORBIDDEN,
+        mismatchedPartnerRoleMessage(role, user.role),
+      );
+    }
+    if (role === UserRole.RENTAL_PARTNER && user.role !== UserRole.RENTAL_PARTNER) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.FORBIDDEN,
+        mismatchedPartnerRoleMessage(role, user.role),
+      );
+    }
+    if (isInviteOnlyAuthRole(role) && role !== user.role && role !== UserRole.RESTAURANT && role !== UserRole.RENTAL_PARTNER) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.FORBIDDEN,
+        mismatchedPartnerRoleMessage(role, user.role),
       );
     }
   }

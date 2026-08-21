@@ -1,9 +1,17 @@
-import { Body, Controller, Delete, Get, Param, Patch, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { UserRole, UserStatus } from '@prisma/client';
 import { IsEnum, IsOptional, IsString } from 'class-validator';
 import { UsersService } from '../users/users.service';
 import { InternalApiGuard } from '../common/internal-api.guard';
+
+class CreateUserAdminDto {
+  @IsString() phone: string;
+  @IsEnum(UserRole) role: UserRole;
+  @IsOptional() @IsEnum(UserStatus) status?: UserStatus;
+  @IsOptional() @IsString() firstName?: string;
+  @IsOptional() @IsString() lastName?: string;
+}
 
 class UpdateUserAdminDto {
   @IsOptional() @IsEnum(UserRole) role?: UserRole;
@@ -29,6 +37,8 @@ export class InternalController {
   }
   @Get('users/:id')
   get(@Param('id') id: string) { return this.users.findById(id); }
+  @Post('users')
+  create(@Body() dto: CreateUserAdminDto) { return this.users.createAdmin(dto); }
   @Patch('users/:id')
   update(@Param('id') id: string, @Body() dto: UpdateUserAdminDto) { return this.users.updateAdmin(id, dto); }
   @Delete('users/:id')

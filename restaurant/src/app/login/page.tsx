@@ -57,7 +57,7 @@ export default function LoginPage() {
         requestRes = await fetch(`${API_BASE}/api/auth/otp/request`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ phone, purpose: "LOGIN" }),
+          body: JSON.stringify({ phone, purpose: "LOGIN", role: "RESTAURANT" }),
         });
       } catch {
         throw new Error(
@@ -75,7 +75,7 @@ export default function LoginPage() {
         verifyRes = await fetch(`${API_BASE}/api/auth/otp/verify`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ phone, code }),
+          body: JSON.stringify({ phone, code, role: "RESTAURANT" }),
         });
       } catch {
         throw new Error(
@@ -98,7 +98,13 @@ export default function LoginPage() {
         throw new Error(data.error?.message ?? `Connexion refusée (${verifyRes.status})`);
       }
       const role = data.user?.role ?? decodeJwtPayload(data.accessToken)?.role;
+      const createdNow = verifyRes.status === 201 || (data as { isNew?: boolean }).isNew === true;
       if (!isRestaurantRole(typeof role === "string" ? role : null)) {
+        if (createdNow || role === "PASSENGER") {
+          throw new Error(
+            "Aucun compte partenaire restaurant pour ce numéro. Créez-le d'abord dans l'admin SENGA (rôle Restaurant), puis liez le restaurant — pas d'inscription automatique.",
+          );
+        }
         throw new Error(`Ce compte n'est pas un partenaire restaurant (rôle: ${String(role ?? "?")}).`);
       }
       setToken(data.accessToken);
@@ -145,7 +151,7 @@ export default function LoginPage() {
         </button>
         {error && <p className="text-sm text-red-600 text-center break-all">{error}</p>}
         <p className="text-xs text-gray-400 text-center">
-          Dev : compte <code>{RESTAURANT_PHONE}</code> lié à un restaurant dans l&apos;admin SENGA
+          Dev : compte <code>{RESTAURANT_PHONE}</code> — rôle RESTAURANT créé dans l&apos;admin SENGA, puis lié au restaurant
         </p>
         <p className="text-[10px] text-gray-300 text-center break-all">API: {API_BASE}</p>
       </div>

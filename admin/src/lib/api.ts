@@ -1694,6 +1694,16 @@ export async function updateDebtPolicy(data: {
   });
 }
 
+export async function createUser(data: {
+  phone: string;
+  role: string;
+  firstName?: string;
+  lastName?: string;
+  status?: string;
+}) {
+  return apiFetch<AdminUser>("/api/admin/users", { method: "POST", body: JSON.stringify(data) });
+}
+
 export async function updateUser(id: string, data: Partial<AdminUser>) {
   return apiFetch<AdminUser>(`/api/admin/users/${id}`, { method: "PATCH", body: JSON.stringify(data) });
 }

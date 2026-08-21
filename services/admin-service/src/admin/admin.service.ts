@@ -126,6 +126,31 @@ export class AdminService {
   getUser(id: string) {
     return this.fetchJson('auth', `/internal/users/${id}`);
   }
+  async createUser(body: Record<string, unknown>, actorRole: string) {
+    const nextRole = typeof body.role === 'string' ? body.role : undefined;
+    const staffRoles = new Set<string>([
+      UserRole.SUPER_ADMIN,
+      UserRole.ADMIN,
+      UserRole.SUPPORT,
+      UserRole.FINANCE,
+      UserRole.CONTENT,
+    ]);
+    if (nextRole && staffRoles.has(nextRole) && actorRole !== UserRole.SUPER_ADMIN) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.FORBIDDEN,
+        'Seul un SUPER_ADMIN peut attribuer un rôle staff (ADMIN, SUPPORT, FINANCE, CONTENT, SUPER_ADMIN).',
+      );
+    }
+    if (!nextRole) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        HttpStatus.BAD_REQUEST,
+        'Le rôle est obligatoire (ex. RESTAURANT, RENTAL_PARTNER). Ne pas laisser PASSENGER par défaut pour un partenaire.',
+      );
+    }
+    return this.proxy('auth', '/internal/users', { method: 'POST', body: JSON.stringify(body) });
+  }
   async updateUser(id: string, body: Record<string, unknown>, actorRole: string) {
     const nextRole = typeof body.role === 'string' ? body.role : undefined;
     const staffRoles = new Set<string>([

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import {
+  createUser,
   deactivateUser as deactivateUserApi,
   fetchUsers,
   formatUserName,
@@ -42,6 +43,11 @@ export default function UtilisateursPage() {
   const [editLast, setEditLast] = useState("");
   const [saving, setSaving] = useState(false);
   const [deactivateTarget, setDeactivateTarget] = useState<AdminUser | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createPhone, setCreatePhone] = useState("");
+  const [createRole, setCreateRole] = useState("RESTAURANT");
+  const [createFirst, setCreateFirst] = useState("");
+  const [createLast, setCreateLast] = useState("");
 
   const [page, setPage] = useState(0);
   const pageSize = 50;
@@ -77,6 +83,33 @@ export default function UtilisateursPage() {
     setEditStatus(u.status ?? "ACTIVE");
     setEditFirst(u.firstName ?? "");
     setEditLast(u.lastName ?? "");
+  }
+
+  async function saveNewUser() {
+    if (!createPhone.trim()) {
+      setError("Le téléphone est obligatoire.");
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      await createUser({
+        phone: createPhone.trim(),
+        role: createRole,
+        firstName: createFirst.trim() || undefined,
+        lastName: createLast.trim() || undefined,
+      });
+      setCreateOpen(false);
+      setCreatePhone("");
+      setCreateFirst("");
+      setCreateLast("");
+      setCreateRole("RESTAURANT");
+      load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Échec de la création");
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function saveUser() {
@@ -121,7 +154,12 @@ export default function UtilisateursPage() {
         subtitle={
           readOnly
             ? `Consultation des comptes (${total} au total)`
-            : `Gestion des comptes passagers, chauffeurs et admins — ${total} au total`
+            : `Gestion des comptes passagers, chauffeurs, partenaires et admins — ${total} au total`
+        }
+        action={
+          !readOnly ? (
+            <BtnPrimary onClick={() => setCreateOpen(true)}>Créer un partenaire</BtnPrimary>
+          ) : undefined
         }
       />
       {error && <div className="mb-4"><ErrorBanner message={error} onRetry={load} /></div>}
@@ -178,6 +216,45 @@ export default function UtilisateursPage() {
           </>
         )}
       </div>
+
+      <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Créer un partenaire">
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">
+            Le portail restaurant / location refuse l&apos;inscription automatique. Créez le compte ici avec le
+            bon rôle, puis liez le restaurant (menu Restaurants) ou le véhicule (Catalogue location).
+          </p>
+          <label>
+            <FieldLabel>Téléphone *</FieldLabel>
+            <TextInput value={createPhone} onChange={setCreatePhone} placeholder="+243900000030" />
+          </label>
+          <label>
+            <FieldLabel>Rôle *</FieldLabel>
+            <SelectInput
+              value={createRole}
+              onChange={setCreateRole}
+              options={[
+                { value: "RESTAURANT", label: "Restaurant partenaire" },
+                { value: "RENTAL_PARTNER", label: "Partenaire location" },
+                { value: "PASSENGER", label: "Passager" },
+                { value: "DRIVER", label: "Chauffeur" },
+              ]}
+            />
+          </label>
+          <div className="grid sm:grid-cols-2 gap-4">
+            <label>
+              <FieldLabel>Prénom</FieldLabel>
+              <TextInput value={createFirst} onChange={setCreateFirst} />
+            </label>
+            <label>
+              <FieldLabel>Nom</FieldLabel>
+              <TextInput value={createLast} onChange={setCreateLast} />
+            </label>
+          </div>
+          <BtnPrimary onClick={saveNewUser} disabled={saving}>
+            {saving ? "Création…" : "Créer le compte"}
+          </BtnPrimary>
+        </div>
+      </Modal>
 
       <Modal open={!!selected} onClose={() => setSelected(null)} title={readOnly ? "Détail utilisateur" : "Modifier utilisateur"} wide>
         {selected && (

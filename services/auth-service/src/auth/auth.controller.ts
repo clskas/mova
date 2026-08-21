@@ -1,5 +1,6 @@
-import { Body, Controller, Post, Request, UseGuards } from '@nestjs/common';
+import { Body, Controller, HttpStatus, Post, Request, Res, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Response } from 'express';
 import { AuthService } from './auth.service';
 import {
   LoginOptionsDto,
@@ -23,8 +24,10 @@ export class AuthController {
 
   @Post('otp/verify')
   @ApiOperation({ summary: 'Vérifier OTP et obtenir JWT' })
-  verifyOtp(@Body() dto: VerifyOtpDto) {
-    return this.authService.verifyOtp(dto.phone, dto.code, dto.role);
+  async verifyOtp(@Body() dto: VerifyOtpDto, @Res({ passthrough: true }) res: Response) {
+    const result = await this.authService.verifyOtp(dto.phone, dto.code, dto.role);
+    res.status(result.isNew ? HttpStatus.CREATED : HttpStatus.OK);
+    return result;
   }
 
   @Post('login/options')

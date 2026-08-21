@@ -261,6 +261,26 @@ async function main() {
     });
   }
 
+  const restaurantOwnerId = process.env.RESTAURANT_OWNER_USER_ID?.trim();
+  const rentalOwnerId = process.env.RENTAL_PARTNER_OWNER_USER_ID?.trim();
+  if (restaurantOwnerId && chezFlore) {
+    await prisma.restaurant.update({
+      where: { id: chezFlore.id },
+      data: { ownerUserId: restaurantOwnerId, isActive: true },
+    });
+    console.log(`Chez Flore linked to owner ${restaurantOwnerId}`);
+  }
+  if (rentalOwnerId) {
+    const corolla = await prisma.rentalVehicle.findFirst({ where: { name: 'Toyota Corolla' } });
+    if (corolla) {
+      await prisma.rentalVehicle.update({
+        where: { id: corolla.id },
+        data: { ownerUserId: rentalOwnerId, isActive: true, approvalStatus: 'APPROVED' },
+      });
+      console.log(`Toyota Corolla linked to owner ${rentalOwnerId}`);
+    }
+  }
+
   console.log('Ride service seed complete');
 }
 main().finally(() => prisma.$disconnect());

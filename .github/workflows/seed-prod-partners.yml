@@ -1,0 +1,23 @@
+name: Seed production partners
+
+on:
+  workflow_dispatch:
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Seed partner accounts
+        env:
+          DATABASE_URL_AUTH: ${{ secrets.DATABASE_URL_AUTH }}
+          DATABASE_URL_RIDES: ${{ secrets.DATABASE_URL_RIDES }}
+        run: |
+          set -euo pipefail
+          chmod +x scripts/seed-prod-partners.sh
+          ./scripts/seed-prod-partners.sh

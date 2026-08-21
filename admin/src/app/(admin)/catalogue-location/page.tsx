@@ -1,13 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   deleteRentalVehicle,
   fetchRentalVehicles,
+  fetchUsers,
+  formatUserName,
   MOVA_CITIES,
   reviewRentalVehicle,
   saveRentalVehicle,
+  type AdminUser,
   type RentalCatalogVehicle,
 } from "@/lib/api";
 import { useAdmin } from "@/components/AdminProvider";
@@ -53,6 +56,7 @@ const EMPTY_FORM = {
   depositCdf: "100000",
   ownerName: "",
   ownerContactPhone: "",
+  ownerUserId: "",
   ownerBadge: "PRO",
   features: "",
   imageUrl: null as string | null,
@@ -75,6 +79,18 @@ export default function CatalogueLocationPage() {
   const [saving, setSaving] = useState(false);
   const [reviewingId, setReviewingId] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "pending" | "approved" | "rejected" | "inactive">("all");
+  const [partnerUsers, setPartnerUsers] = useState<AdminUser[]>([]);
+
+  const partnerOptions = useMemo(
+    () => [
+      { value: "", label: "— Aucun compte partenaire lié —" },
+      ...partnerUsers.map((u) => ({
+        value: u.id,
+        label: `${formatUserName(u)}${u.phone ? ` · ${u.phone}` : ""}`,
+      })),
+    ],
+    [partnerUsers],
+  );
 
   const filteredVehicles = vehicles.filter((v) => {
     switch (filter) {
@@ -109,7 +125,9 @@ export default function CatalogueLocationPage() {
     setLoading(true);
     setError(null);
     try {
-      setVehicles(await fetchRentalVehicles());
+      const [data, usersRes] = await Promise.all([fetchRentalVehicles(), fetchUsers(0, 200)]);
+      setVehicles(data);
+      setPartnerUsers((usersRes.data ?? []).filter((u) => u.role === "RENTAL_PARTNER" && u.status !== "INACTIVE"));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur de chargement");
     } finally {
@@ -153,6 +171,12 @@ export default function CatalogueLocationPage() {
         ((source as typeof form).ownerContactPhone?.trim() || undefined),
       ownerBadge:
         (source as RentalCatalogVehicle).ownerBadge ?? ((source as typeof form).ownerBadge?.trim() || undefined),
+      ownerUserId: (() => {
+        const raw =
+          "ownerUserId" in source ? (source as { ownerUserId?: string | null }).ownerUserId : undefined;
+        if (raw == null || String(raw).trim() === "") return null;
+        return String(raw);
+      })(),
       features,
       imageUrl: (source as RentalCatalogVehicle).imageUrl ?? (source as typeof form).imageUrl ?? undefined,
       isActive: (source as RentalCatalogVehicle).isActive !== false,
@@ -292,6 +316,18 @@ export default function CatalogueLocationPage() {
             <label>
               <FieldLabel>Tél. propriétaire</FieldLabel>
               <TextInput value={form.ownerContactPhone} onChange={(v) => setForm({ ...form, ownerContactPhone: v })} />
+            </label>
+            <label className="sm:col-span-2">
+              <FieldLabel>Compte partenaire (portail location)</FieldLabel>
+              <SelectInput
+                value={form.ownerUserId}
+                onChange={(v) => setForm({ ...form, ownerUserId: v })}
+                options={partnerOptions}
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Liez un utilisateur rôle <strong>RENTAL_PARTNER</strong>.{" "}
+                <Link href="/utilisateurs" className="text-[#6C63FF] underline">Créer un compte →</Link>
+              </p>
             </label>
             <label className="sm:col-span-2">
               <FieldLabel>Équipements (séparés par des virgules)</FieldLabel>
@@ -539,6 +575,19 @@ export default function CatalogueLocationPage() {
                   onChange={(v) => setEditTarget({ ...editTarget, ownerContactPhone: v })}
                 />
               </label>
+            </div>
+            <div className="rounded-xl border border-violet-100 bg-violet-50/50 p-3 space-y-2">
+              <FieldLabel>Lier au compte partenaire</FieldLabel>
+              <SelectInput
+                value={editTarget.ownerUserId ?? ""}
+                onChange={(v) => setEditTarget({ ...editTarget, ownerUserId: v || null })}
+                options={partnerOptions}
+              />
+              <p className="text-xs text-gray-500">
+                Le compte choisi pourra gérer ce véhicule sur le portail SENGA Location. Créez d&apos;abord un
+                utilisateur rôle RENTAL_PARTNER dans{" "}
+                <Link href="/utilisateurs" className="text-[#6C63FF] underline">Utilisateurs</Link>.
+              </p>
             </div>
             <label>
               <FieldLabel>Équipements (virgules)</FieldLabel>

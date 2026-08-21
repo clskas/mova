@@ -1,6 +1,13 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { UserRole, UserStatus } from '@prisma/client';
-import { MovaErrorCode, MovaHttpException, formatMovaPublicId, maskPhoneRdc } from '@mova/shared';
+import {
+  MovaErrorCode,
+  MovaHttpException,
+  formatMovaPublicId,
+  maskPhoneRdc,
+  normalizePhoneRdc,
+  validatePhoneRdc,
+} from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -78,6 +85,66 @@ export class UsersService {
     if (role && !allowed.includes(role)) {
       throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, HttpStatus.BAD_REQUEST, 'Rôle utilisateur invalide.');
     }
+  }
+
+  async createAdmin(data: {
+    phone: string;
+    role: UserRole;
+    firstName?: string;
+    lastName?: string;
+    status?: UserStatus;
+  }) {
+    const phone = normalizePhoneRdc(data.phone);
+    if (!validatePhoneRdc(phone)) {
+      throw new MovaHttpException(MovaErrorCode.AUTH_INVALID_PHONE, HttpStatus.BAD_REQUEST);
+    }
+    this.assertAssignableRole(data.role);
+    const existing = await this.prisma.user.findUnique({ where: { phone } });
+    if (existing) {
+      const promotePassengerToPartner =
+        existing.role === UserRole.PASSENGER &&
+        (data.role === UserRole.RESTAURANT || data.role === UserRole.RENTAL_PARTNER);
+      if (existing.role === data.role) {
+        return this.enrichUser(
+          await this.prisma.user.update({
+            where: { id: existing.id },
+            data: {
+              status: data.status ?? existing.status,
+              ...(data.firstName !== undefined ? { firstName: data.firstName } : {}),
+              ...(data.lastName !== undefined ? { lastName: data.lastName } : {}),
+            },
+          }),
+        );
+      }
+      if (promotePassengerToPartner) {
+        return this.enrichUser(
+          await this.prisma.user.update({
+            where: { id: existing.id },
+            data: {
+              role: data.role,
+              status: data.status ?? UserStatus.ACTIVE,
+              ...(data.firstName !== undefined ? { firstName: data.firstName } : {}),
+              ...(data.lastName !== undefined ? { lastName: data.lastName } : {}),
+            },
+          }),
+        );
+      }
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        HttpStatus.CONFLICT,
+        `Ce numéro existe déjà (rôle: ${existing.role}). Modifiez le rôle depuis la fiche utilisateur.`,
+      );
+    }
+    const user = await this.prisma.user.create({
+      data: {
+        phone,
+        role: data.role,
+        status: data.status ?? (data.role === UserRole.DRIVER ? UserStatus.PENDING_KYC : UserStatus.ACTIVE),
+        firstName: data.firstName,
+        lastName: data.lastName,
+      },
+    });
+    return this.enrichUser(user);
   }
 
   async updateAdmin(

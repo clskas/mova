@@ -1997,7 +1997,9 @@ export class RentalService {
         data.limitedMileageFeeCdf != null ? Math.round(Number(data.limitedMileageFeeCdf)) : 15000,
       imageUrl: data.imageUrl != null ? String(data.imageUrl) : undefined,
       isActive: data.isActive !== false,
-      ...(data.ownerUserId != null ? { ownerUserId: String(data.ownerUserId) } : {}),
+      ...(data.ownerUserId !== undefined
+        ? { ownerUserId: data.ownerUserId ? String(data.ownerUserId) : null }
+        : {}),
       ...(data.approvalStatus != null
         ? { approvalStatus: data.approvalStatus as RentalVehicleApprovalStatus }
         : {}),

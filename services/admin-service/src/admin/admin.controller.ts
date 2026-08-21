@@ -21,6 +21,14 @@ class UpdateUserDto {
   @ApiProperty({ required: false }) @IsOptional() @IsString() lastName?: string;
 }
 
+class CreateUserDto {
+  @ApiProperty({ example: '+243900000030' }) @IsString() phone: string;
+  @ApiProperty({ example: 'RESTAURANT' }) @IsString() role: string;
+  @ApiProperty({ required: false }) @IsOptional() @IsString() firstName?: string;
+  @ApiProperty({ required: false }) @IsOptional() @IsString() lastName?: string;
+  @ApiProperty({ required: false }) @IsOptional() @IsString() status?: string;
+}
+
 class DriverStatusDto {
   @ApiProperty() @IsBoolean() active: boolean;
   @ApiProperty({ required: false }) @IsOptional() @IsBoolean() suspendUser?: boolean;
@@ -59,6 +67,13 @@ export class AdminController {
   @ApiOperation({ summary: 'Détail utilisateur' })
   user(@Param('id') id: string) {
     return this.adminService.getUser(id);
+  }
+
+  @Post('users')
+  @RequirePermissions(AdminPermission.USERS_WRITE)
+  @ApiOperation({ summary: 'Créer un utilisateur (partenaire restaurant / location, etc.)' })
+  createUser(@Body() dto: CreateUserDto, @Request() req: { user: { role: string } }) {
+    return this.adminService.createUser(dto as unknown as Record<string, unknown>, req.user.role);
   }
 
   @Patch('users/:id')

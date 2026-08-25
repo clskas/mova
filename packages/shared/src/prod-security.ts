@@ -4,6 +4,7 @@ import {
   isAfricasTalkingConfigured,
   isTwilioSmsConfigured,
 } from './africas-talking';
+import { isAfrisoftSmsHubClientConfigured } from './afrisoft-sms-hub';
 import { isSerdiPaySmsConfigured } from './serdipay';
 
 const DEV_JWT = 'dev_secret';
@@ -161,6 +162,7 @@ function envGet(key: string): string | undefined {
 
 /** Real SMS provider matching SMS_PROVIDER (or any if unset) is configured. */
 export function isProductionSmsConfigured(): boolean {
+  if (isAfrisoftSmsHubClientConfigured(envGet)) return true;
   const preferred = (process.env.SMS_PROVIDER ?? '').trim().toLowerCase();
   if (preferred === 'serdipay') return isSerdiPaySmsConfigured(envGet);
   if (preferred === 'africastalking') return isAfricasTalkingConfigured(envGet);
@@ -210,10 +212,10 @@ export function assertProductionSecurity(serviceName = 'service'): void {
   // Only auth-service sends OTP; other services warn if SMS env is missing.
   if (!isProductionSmsConfigured() && !isTestOtpModeEnabled()) {
     const msg =
-      `[${serviceName}] No SMS provider configured (SERDIPAY_SMS_API_ID/KEY, AFRICAS_TALKING_* or TWILIO_* for SMS_PROVIDER). OTP delivery will fail.`;
+      `[${serviceName}] No SMS provider configured (AFRISOFT_SMS_HUB_URL + AFRISOFT_HUB_API_KEY, or SERDIPAY_SMS_API_ID/KEY, AFRICAS_TALKING_* / TWILIO_*). OTP delivery will fail.`;
     if (serviceName === 'auth-service') {
       throw new Error(
-        `${msg} Refusing to start. Keep ALLOW_TEST_OTP=true until SerdiPay SMS (or AT/Twilio) is live.`,
+        `${msg} Refusing to start. Keep ALLOW_TEST_OTP=true until the SMS hub (or SerdiPay/AT) is live.`,
       );
     }
     // eslint-disable-next-line no-console

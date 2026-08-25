@@ -25,6 +25,17 @@ MOCK_FIXED_OTP=true
 MOCK_OTP_CODE=123456
 ```
 
+When SerdiPay SMS keys are in `/opt/afrisoft-sms/.env`:
+
+```env
+SMS_PROVIDER=serdipay
+MOCK_OTP=false
+MOCK_RETURN_CODE=false
+MOCK_FIXED_OTP=false
+SERDIPAY_SMS_BASE_URL=https://serdipay.com
+SERDIPAY_SMS_SENDER_ID=SerdiPay
+```
+
 OTP codes are logged in the container; with `MOCK_RETURN_CODE=true` the API also returns `debug_code` (disable when going live).
 
 ## DNS (Cloudflare)

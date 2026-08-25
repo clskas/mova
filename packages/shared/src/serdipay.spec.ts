@@ -210,4 +210,19 @@ describe('serdipay Public API', () => {
     expect(result.success).toBe(false);
     expect(result.message).toMatch(/Crédit SMS|not enough sms/i);
   });
+
+  it('accepts SERDIPAY_SMS_SENDER alias for senderId', async () => {
+    env.SERDIPAY_SMS_API_ID = 'APISMSDEMO';
+    env.SERDIPAY_SMS_API_KEY = 'test-sms-key';
+    env.SERDIPAY_SMS_SENDER = 'SerdiPay';
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ message: 'SMS sent successfully.' }),
+    });
+    (global as unknown as { fetch: typeof fetch }).fetch = fetchMock as unknown as typeof fetch;
+    await serdiPaySendSms(get, { to: '+243812345678', message: 'hi' });
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body as string);
+    expect(body.senderId).toBe('SerdiPay');
+  });
 });

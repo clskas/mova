@@ -255,7 +255,7 @@ export async function serdiPaySendSms(
 
   const apiId = firstEnv(get, SERDIPAY_ENV_KEYS.smsApiId)!;
   const apiKey = firstEnv(get, SERDIPAY_ENV_KEYS.smsApiKey)!;
-  const senderId = get(SERDIPAY_ENV_KEYS.smsSenderId)?.trim();
+  const senderId = firstEnv(get, SERDIPAY_ENV_KEYS.smsSenderId, 'SERDIPAY_SMS_SENDER');
   const url = `${smsBaseUrl(get)}${pathOr(get, 'smsPath', '/api/sms-api/v1/send')}`;
   const phone = serdiPayNormalizeSmsPhone(params.to);
 

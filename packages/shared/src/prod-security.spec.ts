@@ -172,4 +172,18 @@ describe('prod-security', () => {
     process.env.SERDIPAY_SMS_API_KEY = 'sms-key';
     expect(isProductionSmsConfigured()).toBe(true);
   });
+
+  it('treats AfriSoft SMS hub client as production SMS', async () => {
+    process.env.NODE_ENV = 'production';
+    process.env.SMS_PROVIDER = 'africastalking';
+    delete process.env.SERDIPAY_SMS_API_ID;
+    delete process.env.SERDIPAY_SMS_API_KEY;
+    delete process.env.AFRICAS_TALKING_USERNAME;
+    delete process.env.AFRICAS_TALKING_API_KEY;
+    process.env.AFRISOFT_SMS_HUB_URL = 'https://sms.afri-soft.com';
+    process.env.AFRISOFT_HUB_APP_ID = 'senga';
+    process.env.AFRISOFT_HUB_API_KEY = 'hub-key';
+    const { isProductionSmsConfigured } = await import('./prod-security');
+    expect(isProductionSmsConfigured()).toBe(true);
+  });
 });

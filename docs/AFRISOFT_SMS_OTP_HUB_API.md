@@ -349,7 +349,7 @@ DNS : Cloudflare (même pratique que le hub paiements) — **A** `sms` → `178.
 | Code | `services/sms-hub-service` |
 | Scaffold repo | `deploy/afrisoft-sms/` |
 
-**Mode actuel :** `SMS_PROVIDER=mock` (Sender ID AT / clés SerdiPay SMS pas encore prêts). Health : `GET /health` → `provider: "mock"`. Quand les clés arrivent : remplir `.env`, `SMS_PROVIDER=africastalking|serdipay`, `MOCK_RETURN_CODE=false`, recreate du conteneur.
+**Mode actuel :** `SMS_PROVIDER=serdipay` une fois les clés SMS posées dans `/opt/afrisoft-sms/.env`. Health : `GET /health` → `provider` doit être `serdipay` (plus `mock`). Si les clés du PDF `sms-api.pdf` sont des exemples, le provider reste collé sur `serdipay` mais l’envoi réel échoue (400/403) — remplacer par les credentials WhatsApp/mail SerdiPay.
 
 Pas d’obligation d’IP fixe pour AT (contrairement à SerdiPay MM). SerdiPay SMS — confirmer whitelist au moment de l’activation.
 
@@ -367,15 +367,14 @@ Pas d’obligation d’IP fixe pour AT (contrairement à SerdiPay MM). SerdiPay 
 | Action | Détail |
 |--------|--------|
 | Activer AT ou SerdiPay SMS | Credentials uniquement dans `/opt/afrisoft-sms/.env` |
-| Migrer `mova-auth` | OTP SENGA → client HTTP du hub (optionnel) |
-| Migrer `mova-notification` | SMS métier → `POST /v1/sms/send` |
+| Migrer `mova-auth` | OTP SENGA : envoi SMS via `POST /v1/sms/send` (HMAC `app_id=senga`) ; verify JWT reste dans `mova-auth`. Seed `123456` inchangé. `/v1/otp/send` reste le contrat multi-apps (Educongo). |
+| Migrer `mova-notification` | SMS métier → `POST /v1/sms/send` (même client HMAC) |
 
 ```
-Maintenant                              Plus tard
-────────                                ────────
-Apps sœurs ──► sms.afri-soft.com        SMS_PROVIDER=africastalking|serdipay
-               (MOCK → vrai SMS)                   │
-SENGA mobile ──► /api/auth/otp/*                   └── mova-auth (client hub, optionnel)
+Maintenant
+────────
+Apps sœurs ──► sms.afri-soft.com  (SMS_PROVIDER=serdipay)
+SENGA mobile ──► /api/auth/otp/* ──► mova-auth ──► POST /v1/sms/send (HMAC senga)
 ```
 
 ---
@@ -417,9 +416,10 @@ Mode test : `ALLOW_TEST_OTP=true` → code fixe sur numéros seed (voir [AFRICAS
 - [x] Endpoints `/v1/otp/*` + `/health` exposés (`SMS_PROVIDER=mock`)  
 - [x] Registre `app_id` + `api_key` (env VPS `AFRISOFT_HUB_APPS`, chmod 600)  
 - [ ] Sender ID approuvé (AT et/ou SerdiPay) pour la RDC  
-- [ ] Credentials fournisseur dans `/opt/afrisoft-sms/.env`  
-- [ ] `SMS_PROVIDER=africastalking|serdipay` + SMS réel reçu ; `MOCK_RETURN_CODE=false`  
+- [x] Credentials fournisseur dans `/opt/afrisoft-sms/.env` (clés du PDF `sms-api.pdf` posées ; SerdiPay répond 400 « SMS API configuration not found for this merchant » — activer l’API SMS côté admin / demander les clés réelles)  
+- [ ] `SMS_PROVIDER=serdipay` + SMS réel reçu ; `MOCK_RETURN_CODE=false`  
 - [ ] Quotas / monitoring crédit SMS  
+- [x] Client SENGA `mova-auth` → hub (`AFRISOFT_SMS_HUB_URL` + HMAC) — déployer Render + `AFRISOFT_HUB_API_KEY`  
 
 ---
 
@@ -440,6 +440,7 @@ Mode test : `ALLOW_TEST_OTP=true` → code fixe sur numéros seed (voir [AFRICAS
 |-------|-------------|
 | Client Africa’s Talking | `packages/shared/src/africas-talking.ts` |
 | Client SerdiPay SMS | `packages/shared/src/serdipay.ts` (`serdiPaySendSms`) |
+| Client hub SMS (SENGA → VPS) | `packages/shared/src/afrisoft-sms-hub.ts` |
 | Switch `SMS_PROVIDER` | `resolveSmsBackend` (shared) + `services/auth-service/src/auth/sms.providers.ts` |
 | OTP request / verify | `services/auth-service/src/auth/auth.service.ts` / `auth.controller.ts` |
 | SMS métier | `services/notification-service/src/sms/sms.service.ts` |
@@ -453,12 +454,12 @@ Mode test : `ALLOW_TEST_OTP=true` → code fixe sur numéros seed (voir [AFRICAS
 
 | Élément | SENGA `mova-auth` OTP | Hub `/v1` multi-apps |
 |---------|----------------------|----------------------|
-| Envoi SMS AT / SerdiPay | ✅ fait | Clients shared prêts ; hub en **MOCK** jusqu’aux clés |
+| Envoi SMS AT / SerdiPay | ✅ via hub (`/v1/sms/send`) une fois Render env posé | Clients shared prêts ; hub `SMS_PROVIDER=serdipay` |
 | Verify OTP + sessions JWT | ✅ SENGA | ✅ Verify OTP générique (hub) ; JWT reste par app |
-| Auth `app_id` + HMAC | ❌ | ✅ hub `sms.afri-soft.com` |
+| Auth `app_id` + HMAC | ✅ client `afrisoft-sms-hub.ts` | ✅ hub `sms.afri-soft.com` |
 | Endpoints `/v1/otp/*` | ❌ (chemins `/api/auth/otp/*`) | ✅ déployés |
-| Service dédié `sms.afri-soft.com` | — | ✅ `/opt/afrisoft-sms` (MOCK) |
-| Educongo onboardé | — | HMAC prêt ; SMS réel après Sender ID / clés |
+| Service dédié `sms.afri-soft.com` | — | ✅ `/opt/afrisoft-sms` |
+| Educongo onboardé | — | HMAC prêt ; SMS réel après Sender ID / clés validées |
 
 ---
 

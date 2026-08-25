@@ -2,7 +2,9 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   africasTalkingSendSms,
+  afrisoftSmsHubSendSms,
   isAfricasTalkingConfigured,
+  isAfrisoftSmsHubClientConfigured,
   isMockOtpAllowed,
   isProductionRuntime,
   isSerdiPaySmsConfigured,
@@ -43,6 +45,31 @@ export class MockSmsProvider implements SmsProvider {
     // Dev-only: code is intentional for local login; never enabled in production.
     this.logger.log(`[MOCK SMS] OTP ${code} → ${phone}`);
     return { success: true, message: 'Code OTP simulé (mode développement)' };
+  }
+}
+
+@Injectable()
+export class AfriSoftSmsHubProvider implements SmsProvider {
+  readonly name = 'AFRISOFT_SMS_HUB';
+  private readonly logger = new Logger(AfriSoftSmsHubProvider.name);
+
+  constructor(private config: ConfigService) {}
+
+  private get = (key: string) => this.config.get<string>(key);
+
+  isConfigured(): boolean {
+    return isAfrisoftSmsHubClientConfigured(this.get);
+  }
+
+  async sendOtp(phone: string, code: string): Promise<SmsSendResult> {
+    const brand = this.config.get<string>('APP_BRAND_NAME')?.trim() || 'SENGA';
+    const result = await afrisoftSmsHubSendSms(this.get, {
+      phone,
+      text: `Votre code ${brand} : ${code}. Valide 10 minutes.`,
+      purpose: 'login',
+    });
+    if (!result.success) this.logger.warn(`SMS hub: ${result.message}`);
+    return { success: result.success, message: result.message };
   }
 }
 
@@ -166,6 +193,7 @@ export class SmsService {
   constructor(
     private config: ConfigService,
     private mock: MockSmsProvider,
+    private hub: AfriSoftSmsHubProvider,
     private serdiPay: SerdiPaySmsProvider,
     private africasTalking: AfricasTalkingSmsProvider,
     private twilio: TwilioSmsProvider,
@@ -174,6 +202,7 @@ export class SmsService {
   private get = (key: string) => this.config.get<string>(key);
 
   private resolveProvider(): SmsProvider | null {
+    if (isAfrisoftSmsHubClientConfigured(this.get)) return this.hub;
     const backend = resolveSmsBackend(this.get, isMockOtpAllowed());
     if (backend === 'mock') return this.mock;
     if (backend === 'serdipay') return this.serdiPay;

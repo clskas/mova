@@ -8,6 +8,7 @@ import { AuthController } from './auth.controller';
 import { JwtStrategy } from './jwt.strategy';
 import {
   MockSmsProvider,
+  AfriSoftSmsHubProvider,
   SerdiPaySmsProvider,
   AfricasTalkingSmsProvider,
   SmsService,
@@ -31,6 +32,7 @@ import {
     AuthService,
     JwtStrategy,
     MockSmsProvider,
+    AfriSoftSmsHubProvider,
     SerdiPaySmsProvider,
     AfricasTalkingSmsProvider,
     TwilioSmsProvider,

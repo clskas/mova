@@ -58,6 +58,10 @@ services:
       # Play / partner portal demos: fixed OTP 123456 for whitelisted seed phones only.
       - key: ALLOW_TEST_OTP
         value: "true"
+      - key: AFRISOFT_SMS_HUB_URL
+        value: "https://sms.afri-soft.com"
+      - key: AFRISOFT_HUB_APP_ID
+        value: "senga"
       - fromGroup: mova-external-apis
 
   - type: web
@@ -133,6 +137,10 @@ services:
         fromService: { name: mova-redis, type: keyvalue, property: connectionString }
       - key: JWT_SECRET
         fromService: { name: mova-gateway, type: web, envVarKey: JWT_SECRET }
+      - key: AFRISOFT_SMS_HUB_URL
+        value: "https://sms.afri-soft.com"
+      - key: AFRISOFT_HUB_APP_ID
+        value: "senga"
       - fromGroup: mova-external-apis
 
   - type: web
@@ -232,6 +240,11 @@ envVarGroups:
         value: africastalking
       - key: MOBILE_MONEY_GATEWAY
         value: serdipay
+      # HMAC for pay.afri-soft.com + sms.afri-soft.com (same app_id:api_key as VPS AFRISOFT_HUB_APPS).
+      - key: AFRISOFT_HUB_API_KEY
+        sync: false
+      - key: AFRISOFT_PAY_HUB_API_KEY
+        sync: false
       - key: AFRICAS_TALKING_USERNAME
         sync: false
       - key: AFRICAS_TALKING_API_KEY

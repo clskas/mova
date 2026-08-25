@@ -2,6 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   africasTalkingSendSms,
+  afrisoftSmsHubSendSms,
+  isAfrisoftSmsHubClientConfigured,
   isProductionRuntime,
   isTwilioSmsConfigured,
   resolveSmsBackend,
@@ -37,6 +39,16 @@ export class SmsService {
     }
 
     const backend = resolveSmsBackend(this.get, false);
+    if (isAfrisoftSmsHubClientConfigured(this.get)) {
+      const result = await afrisoftSmsHubSendSms(this.get, {
+        phone,
+        text: body,
+        purpose: 'notify',
+      });
+      if (!result.success) this.logger.warn(`SMS hub: ${result.message}`);
+      return result;
+    }
+
     if (backend === 'serdipay') {
       const result = await serdiPaySendSms(this.get, { to: phone, message: body });
       if (!result.success) this.logger.warn(`SerdiPay SMS: ${result.message}`);

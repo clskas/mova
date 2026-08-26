@@ -37,7 +37,7 @@ describe('afrisoft-sms-hub', () => {
 
     const result = await afrisoftSmsHubSendSms((k) => env[k], {
       phone: '+243970000001',
-      text: 'Votre code SENGA : 482913. Valide 10 minutes.',
+      text: 'Votre code SENGA : 482913 Valide 10 minutes',
       purpose: 'login',
       reference: 'senga_login_ref',
     });
@@ -59,6 +59,30 @@ describe('afrisoft-sms-hub', () => {
     expect(headers['X-AfriSoft-Signature']).toBe(expected);
     expect(JSON.parse(body).phone).toBe('243970000001');
     expect(JSON.parse(body).text).toMatch(/482913/);
+  });
+
+  it('surfaces nested hub error.message when SMS send fails', async () => {
+    const env: Record<string, string> = {
+      AFRISOFT_SMS_HUB_URL: 'https://sms.afri-soft.com',
+      AFRISOFT_HUB_APP_ID: 'senga',
+      AFRISOFT_HUB_API_KEY: 'test-key',
+    };
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 503,
+      json: async () => ({
+        success: false,
+        error: { code: 'MOVA_INT_001', message: 'An error occor while processing the sms' },
+      }),
+    }) as unknown as typeof fetch;
+
+    const result = await afrisoftSmsHubSendSms((k) => env[k], {
+      phone: '+243971163574',
+      text: 'x',
+      purpose: 'login',
+    });
+    expect(result.success).toBe(false);
+    expect(result.message).toMatch(/error occor/i);
   });
 
   it('POSTs /v1/otp/send for multi-app OTP', async () => {

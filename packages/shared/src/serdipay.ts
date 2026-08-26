@@ -150,6 +150,15 @@ export function serdiPayNormalizeSmsPhone(phone: string): string {
   return digits.startsWith('+') ? digits : `+${digits}`;
 }
 
+/**
+ * SerdiPay/Dream Digital returns HTTP 400 "An error occor while processing the sms"
+ * when `text` contains a sentence-ending period (`.` followed by space or end).
+ * Keep decimals (`50.00`) and abbreviations (`No.Jeton`).
+ */
+export function serdiPaySanitizeSmsText(text: string): string {
+  return text.replace(/\.(\s|$)/g, ' $1').replace(/\s+/g, ' ').trim();
+}
+
 function smsBaseUrl(get: EnvGetter): string {
   return (get(SERDIPAY_ENV_KEYS.smsBaseUrl)?.trim() || 'https://serdipay.com').replace(/\/$/, '');
 }
@@ -258,6 +267,7 @@ export async function serdiPaySendSms(
   const senderId = firstEnv(get, SERDIPAY_ENV_KEYS.smsSenderId, 'SERDIPAY_SMS_SENDER');
   const url = `${smsBaseUrl(get)}${pathOr(get, 'smsPath', '/api/sms-api/v1/send')}`;
   const phone = serdiPayNormalizeSmsPhone(params.to);
+  const text = serdiPaySanitizeSmsText(params.message);
 
   try {
     const res = await fetch(url, {
@@ -270,7 +280,7 @@ export async function serdiPaySendSms(
         apiId,
         apiKey,
         phone,
-        text: params.message,
+        text,
         ...(senderId ? { senderId } : {}),
       }),
     });
@@ -290,9 +300,10 @@ export async function serdiPaySendSms(
       };
     }
     if (!res.ok || data.success === false) {
+      const detail = data.message ?? data.error ?? 'échec fournisseur';
       return {
         success: false,
-        message: data.message ?? data.error ?? `Échec SMS SerdiPay (${res.status})`,
+        message: `Échec SMS SerdiPay (${res.status}): ${detail}`.slice(0, 180),
       };
     }
     return { success: true, message: data.message ?? 'SMS envoyé via SerdiPay' };

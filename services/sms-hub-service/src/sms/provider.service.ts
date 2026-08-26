@@ -36,8 +36,8 @@ export class ProviderService {
     const brand = this.brandName(appId);
     const message =
       locale === 'en'
-        ? `Your ${brand} code: ${code}. Valid 5 minutes.`
-        : `Votre code ${brand} : ${code}. Valide 5 minutes.`;
+        ? `Your ${brand} code: ${code} Valid 5 minutes`
+        : `Votre code ${brand} : ${code} Valide 5 minutes`;
 
     if (provider === 'mock') {
       // Intentional in MOCK hub bootstrap — codes appear only in server logs, not in API (unless MOCK_RETURN_CODE).

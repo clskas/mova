@@ -7,6 +7,7 @@ import {
   serdiPayInitiateMobileMoney,
   serdiPayNormalizePhone,
   serdiPayNormalizeSmsPhone,
+  serdiPaySanitizeSmsText,
   serdiPaySendSms,
   serdiPayTelecomCode,
   useSerdiPayMobileMoney,
@@ -27,6 +28,12 @@ describe('serdipay Public API', () => {
     expect(serdiPayNormalizePhone('0994972450')).toBe('243994972450');
     expect(serdiPayNormalizeSmsPhone('+243994972450')).toBe('+243994972450');
     expect(serdiPayNormalizeSmsPhone('0994972450')).toBe('+243994972450');
+    expect(serdiPaySanitizeSmsText('Votre code SENGA : 111111. Valide 10 minutes.')).toBe(
+      'Votre code SENGA : 111111 Valide 10 minutes',
+    );
+    expect(serdiPaySanitizeSmsText('RECU Token Montant 50.00 USD No.Jeton 12')).toBe(
+      'RECU Token Montant 50.00 USD No.Jeton 12',
+    );
     expect(serdiPayTelecomCode('AIRTEL_MONEY')).toBe('AM');
     expect(serdiPayTelecomCode('ORANGE_MONEY')).toBe('OM');
     expect(serdiPayTelecomCode('MPESA')).toBe('MP');
@@ -190,7 +197,7 @@ describe('serdipay Public API', () => {
       apiKey: 'test-sms-key',
       phone: '+243994972450',
       senderId: 'SerdiPay',
-      text: 'Votre code MOVA : 123456. Valide 10 minutes.',
+      text: 'Votre code MOVA : 123456 Valide 10 minutes',
     });
     // No Bearer / get-token for SMS API
     expect(fetchMock.mock.calls[0][1].headers.Authorization).toBeUndefined();

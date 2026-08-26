@@ -108,6 +108,10 @@ function pickStr(obj: Record<string, unknown>, keys: string[]): string | undefin
   for (const k of keys) {
     const v = obj[k];
     if (typeof v === 'string' && v.trim()) return v.trim();
+    if (v && typeof v === 'object' && !Array.isArray(v)) {
+      const nested = (v as Record<string, unknown>).message;
+      if (typeof nested === 'string' && nested.trim()) return nested.trim();
+    }
   }
   return undefined;
 }

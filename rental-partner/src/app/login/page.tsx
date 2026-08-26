@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { decodeJwtPayload, isRentalPartnerRole, isSeedDemoPhone, setToken } from "@/lib/auth";
+import { decodeJwtPayload, isRentalPartnerRole, isSeedDemoPhone, normalizeLoginPhone, setToken } from "@/lib/auth";
 import { PwaInstallBanner } from "@/components/PwaInstallBanner";
 import { PUBLIC_API_BASE } from "@/lib/public-api-base";
 
@@ -54,10 +54,11 @@ export default function LoginPage() {
     try {
       let requestRes: Response;
       try {
+        const msisdn = normalizeLoginPhone(phone);
         requestRes = await fetch(`${API_BASE}/api/auth/otp/request`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ phone, purpose: "LOGIN", role: "RENTAL_PARTNER" }),
+          body: JSON.stringify({ phone: msisdn, purpose: "LOGIN", role: "RENTAL_PARTNER" }),
         });
       } catch {
         throw new Error(
@@ -91,7 +92,7 @@ export default function LoginPage() {
         verifyRes = await fetch(`${API_BASE}/api/auth/otp/verify`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ phone, code, role: "RENTAL_PARTNER" }),
+          body: JSON.stringify({ phone: normalizeLoginPhone(phone), code: code.trim(), role: "RENTAL_PARTNER" }),
         });
       } catch {
         throw new Error(
@@ -195,8 +196,10 @@ export default function LoginPage() {
         )}
         {error && <p className="text-sm text-red-600 text-center break-all">{error}</p>}
         <p className="text-xs text-gray-400 text-center">
-          Saisissez le code SMS. Compte location créé dans l&apos;admin SENGA.
-          Les numéros de démo <code>+2439000000xx</code> acceptent aussi <code>123456</code>.
+          {isSeedDemoPhone(phone)
+            ? <>Numéro de démo : code <code>123456</code>, pas de SMS.</>
+            : "Numéro réel +243 : le code arrive par SMS."}{" "}
+          Le compte location doit exister dans l&apos;admin SENGA.
         </p>
         <p className="text-[10px] text-gray-300 text-center break-all">API: {API_BASE}</p>
       </div>

@@ -167,6 +167,17 @@ describe('prod-security', () => {
     expect(otpCodesToIssue('+243812345678', '847291')).toEqual(['847291']);
   });
 
+  it('keeps seed phones when TEST_OTP_PHONES adds extras', async () => {
+    process.env.NODE_ENV = 'production';
+    process.env.ALLOW_TEST_OTP = 'true';
+    process.env.TEST_OTP_PHONES = '+243811111111';
+    delete process.env.MOCK_OTP;
+    const { isTestOtpAllowedForPhone } = await import('./prod-security');
+    expect(isTestOtpAllowedForPhone('+243900000031')).toBe(true);
+    expect(isTestOtpAllowedForPhone('+243811111111')).toBe(true);
+    expect(isTestOtpAllowedForPhone('+243822222222')).toBe(false);
+  });
+
   it('does not treat SerdiPay payment-only credentials as SMS ready', async () => {
     process.env.NODE_ENV = 'production';
     process.env.JWT_SECRET = 'a'.repeat(32);

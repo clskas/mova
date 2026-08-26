@@ -4,15 +4,19 @@ export const PARTNER_SEED_PHONES = {
   rental: '+243900000031',
 } as const;
 
-const INVITE_ONLY_ROLES: ReadonlySet<string> = new Set([
-  'RESTAURANT',
-  'RENTAL_PARTNER',
+const STAFF_ROLES: ReadonlySet<string> = new Set([
   'SUPER_ADMIN',
   'ADMIN',
   'SUPPORT',
   'FINANCE',
   'CONTENT',
 ]);
+
+const INVITE_ONLY_ROLES: ReadonlySet<string> = new Set(['RESTAURANT', 'RENTAL_PARTNER', ...STAFF_ROLES]);
+
+export function isStaffAuthRole(role?: string | null): boolean {
+  return !!role && STAFF_ROLES.has(role);
+}
 
 export function isInviteOnlyAuthRole(role?: string | null): boolean {
   return !!role && INVITE_ONLY_ROLES.has(role);
@@ -30,6 +34,9 @@ export function missingInviteOnlyAccountMessage(phone: string, role?: string | n
   }
   if (role === 'RESTAURANT' || phone === PARTNER_SEED_PHONES.restaurant) {
     return "Aucun compte partenaire restaurant pour ce numéro. Créez le partenaire dans l'admin SENGA (rôle Restaurant) avant la première connexion.";
+  }
+  if (isStaffAuthRole(role)) {
+    return "Aucun compte staff pour ce numéro. Créez-le d'abord dans l'admin SENGA.";
   }
   return "Ce numéro n'a pas de compte. Créez-le d'abord dans l'admin SENGA.";
 }

@@ -6,6 +6,10 @@ export class RequestOtpDto {
   @ApiProperty({ example: '+243812345678' })
   @IsString()
   phone: string;
+  @ApiProperty({ required: false, enum: UserRole })
+  @IsOptional()
+  @IsEnum(UserRole)
+  role?: UserRole;
 }
 
 export class VerifyOtpDto {

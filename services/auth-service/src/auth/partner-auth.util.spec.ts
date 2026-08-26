@@ -1,4 +1,5 @@
 import {
+  isStaffAuthRole,
   missingInviteOnlyAccountMessage,
   PARTNER_SEED_PHONES,
   shouldRefusePassengerAutoRegister,
@@ -25,5 +26,12 @@ describe('partner-auth.util', () => {
   it('explains that Admin must create the partner first', () => {
     expect(missingInviteOnlyAccountMessage(PARTNER_SEED_PHONES.restaurant, 'RESTAURANT')).toMatch(/admin SENGA/);
     expect(missingInviteOnlyAccountMessage(PARTNER_SEED_PHONES.rental, 'RENTAL_PARTNER')).toMatch(/Partenaire location/);
+    expect(missingInviteOnlyAccountMessage('+243811111111', 'ADMIN')).toMatch(/compte staff/);
+  });
+
+  it('treats all admin console roles as staff', () => {
+    expect(isStaffAuthRole('ADMIN')).toBe(true);
+    expect(isStaffAuthRole('SUPER_ADMIN')).toBe(true);
+    expect(isStaffAuthRole('RENTAL_PARTNER')).toBe(false);
   });
 });

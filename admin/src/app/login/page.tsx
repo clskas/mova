@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { decodeJwtPayload, setToken } from "@/lib/auth";
+import { decodeJwtPayload, isSeedDemoPhone, normalizeLoginPhone, setToken } from "@/lib/auth";
 import { sanitizeAdminError, toUserErrorMessage } from "@/lib/api";
 import { defaultPathForRole, isAdminRole, normalizeAdminRole } from "@/lib/rbac";
 
@@ -27,18 +27,22 @@ export default function LoginPage() {
     setLoading(true);
     setError(null);
     try {
+      const msisdn = normalizeLoginPhone(phone);
       const requestRes = await fetch(`${API_BASE}/api/auth/otp/request`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone }),
+        body: JSON.stringify({ phone: msisdn, role: "ADMIN" }),
       });
       if (!requestRes.ok) {
         const body = await requestRes.json().catch(() => ({}));
-        throw new Error(
-          sanitizeAdminError(body.error?.message ?? "Impossible d'envoyer le code", requestRes.status),
-        );
+        const seed = isSeedDemoPhone(phone);
+        if (!(seed && (requestRes.status === 429 || requestRes.status >= 500))) {
+          throw new Error(
+            sanitizeAdminError(body.error?.message ?? "Impossible d'envoyer le code", requestRes.status),
+          );
+        }
       }
-      setCode("");
+      setCode(isSeedDemoPhone(phone) ? "123456" : "");
       setCodeSent(true);
     } catch (e) {
       setError(toUserErrorMessage(e, "Impossible d'envoyer le code"));
@@ -54,7 +58,7 @@ export default function LoginPage() {
       const verifyRes = await fetch(`${API_BASE}/api/auth/otp/verify`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, code }),
+        body: JSON.stringify({ phone: normalizeLoginPhone(phone), code: code.trim(), role: "ADMIN" }),
       });
       const data = await verifyRes.json();
       if (!verifyRes.ok || !data.accessToken) {
@@ -146,6 +150,7 @@ export default function LoginPage() {
             <p className="text-sm text-gray-500 mt-1">Accès réservé au personnel autorisé</p>
           </div>
 
+          {!isProd && (
           <div className="flex gap-1.5 rounded-xl bg-gray-100 p-1">
             <button
               type="button"
@@ -166,6 +171,7 @@ export default function LoginPage() {
               JWT dev
             </button>
           </div>
+          )}
 
           {mode === "otp" ? (
             <div className="space-y-4">
@@ -183,7 +189,9 @@ export default function LoginPage() {
               {codeSent && (
                 <label className="block text-sm">
                   <span className="font-medium text-gray-700">Code OTP</span>
-                  <span className="ml-2 text-xs text-gray-400">SMS, ou 123456 pour un numéro de démo</span>
+                  <span className="ml-2 text-xs text-gray-400">
+                    {isSeedDemoPhone(phone) ? "démo : 123456 (aucun SMS)" : "code reçu par SMS"}
+                  </span>
                   <input
                     className="mt-2 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-mova-midnight outline-none transition focus:border-mova-violet focus:ring-2 focus:ring-mova-violet/20"
                     value={code}
@@ -238,8 +246,14 @@ export default function LoginPage() {
           )}
 
           <p className="text-xs text-gray-400 text-center leading-relaxed">
-            Code envoyé par SMS. Les numéros de démo <code className="rounded bg-gray-100 px-1.5 py-0.5 text-gray-600">+2439000000xx</code>{" "}
-            acceptent aussi <code className="rounded bg-gray-100 px-1.5 py-0.5 text-gray-600">123456</code>.
+            {isSeedDemoPhone(phone) ? (
+              <>
+                Numéro de démo : code{" "}
+                <code className="rounded bg-gray-100 px-1.5 py-0.5 text-gray-600">123456</code>, pas de SMS.
+              </>
+            ) : (
+              "Un SMS avec le code vous sera envoyé. Le compte staff doit déjà exister."
+            )}
           </p>
         </div>
       </main>

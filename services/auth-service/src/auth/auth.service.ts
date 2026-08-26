@@ -26,6 +26,7 @@ import { SmsService } from './sms.providers';
 import { hashLocalPin, isValidLocalPin, verifyLocalPin } from './local-pin.util';
 import {
   isInviteOnlyAuthRole,
+  isStaffAuthRole,
   missingInviteOnlyAccountMessage,
   mismatchedPartnerRoleMessage,
   shouldRefusePassengerAutoRegister,
@@ -46,11 +47,12 @@ export class AuthService {
     private sms: SmsService,
   ) {}
 
-  async requestOtp(phone: string) {
+  async requestOtp(phone: string, role?: UserRole) {
     const normalized = normalizePhoneRdc(phone);
     if (!validatePhoneRdc(normalized)) {
       throw new MovaHttpException(MovaErrorCode.AUTH_INVALID_PHONE, HttpStatus.BAD_REQUEST);
     }
+    await this.assertInviteOnlyAccountExists(normalized, role);
     const useTestOtp = isTestOtpAllowedForPhone(normalized);
     const liveCode = useTestOtp ? TEST_OTP_CODE : crypto.randomInt(100000, 999999).toString();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
@@ -249,6 +251,19 @@ export class AuthService {
     return normalized;
   }
 
+  private async assertInviteOnlyAccountExists(phone: string, role?: UserRole) {
+    if (!isInviteOnlyAuthRole(role)) return;
+    const user = await this.prisma.user.findUnique({ where: { phone } });
+    if (!user) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.FORBIDDEN,
+        missingInviteOnlyAccountMessage(phone, role),
+      );
+    }
+    this.assertRoleAccess(user, role);
+  }
+
   private assertRoleAccess(user: User, role?: UserRole) {
     const staffRoles: UserRole[] = [
       UserRole.SUPER_ADMIN,
@@ -257,6 +272,16 @@ export class AuthService {
       UserRole.FINANCE,
       UserRole.CONTENT,
     ];
+    if (role && isStaffAuthRole(role)) {
+      if (!staffRoles.includes(user.role)) {
+        throw new MovaHttpException(
+          MovaErrorCode.AUTH_FORBIDDEN,
+          HttpStatus.FORBIDDEN,
+          'Ce compte n\'a pas un rôle staff autorisé. Connexion réservée à la console admin.',
+        );
+      }
+      return;
+    }
     if (role === UserRole.PASSENGER && user.role === UserRole.DRIVER) {
       throw new MovaHttpException(
         MovaErrorCode.AUTH_FORBIDDEN,
@@ -300,13 +325,6 @@ export class AuthService {
       );
     }
     if (role === UserRole.RENTAL_PARTNER && user.role !== UserRole.RENTAL_PARTNER) {
-      throw new MovaHttpException(
-        MovaErrorCode.AUTH_FORBIDDEN,
-        HttpStatus.FORBIDDEN,
-        mismatchedPartnerRoleMessage(role, user.role),
-      );
-    }
-    if (isInviteOnlyAuthRole(role) && role !== user.role && role !== UserRole.RESTAURANT && role !== UserRole.RENTAL_PARTNER) {
       throw new MovaHttpException(
         MovaErrorCode.AUTH_FORBIDDEN,
         HttpStatus.FORBIDDEN,

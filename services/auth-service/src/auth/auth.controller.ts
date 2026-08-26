@@ -19,7 +19,7 @@ export class AuthController {
   @Post('otp/request')
   @ApiOperation({ summary: 'Demander un code OTP' })
   requestOtp(@Body() dto: RequestOtpDto) {
-    return this.authService.requestOtp(dto.phone);
+    return this.authService.requestOtp(dto.phone, dto.role);
   }
 
   @Post('otp/verify')

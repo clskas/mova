@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { apiFetch, formatCdf } from "@/lib/api";
+import { getStoredPhone } from "@/lib/auth";
 import { toUserErrorMessage } from "@/lib/user-messages";
 import { isWalletRecharge, isWalletWithdraw, walletTxLabel } from "@/lib/wallet-movements";
 import { WalletMovementHistory } from "./WalletMovementHistory";
@@ -19,8 +20,10 @@ export function WalletView({ onBack, mock }: Props) {
   const [topUpLoading, setTopUpLoading] = useState(false);
   const [withdrawLoading, setWithdrawLoading] = useState(false);
   const [amount, setAmount] = useState("10000");
+  const [topUpPhone, setTopUpPhone] = useState("");
+  const [topUpProvider, setTopUpProvider] = useState("ORANGE_MONEY");
   const [withdrawAmount, setWithdrawAmount] = useState("5000");
-  const [withdrawPhone, setWithdrawPhone] = useState("+243812345678");
+  const [withdrawPhone, setWithdrawPhone] = useState("");
   const [withdrawProvider, setWithdrawProvider] = useState("ORANGE_MONEY");
   const [error, setError] = useState<string | null>(null);
   const [historyRefresh, setHistoryRefresh] = useState(0);
@@ -39,6 +42,14 @@ export function WalletView({ onBack, mock }: Props) {
   }
 
   useEffect(() => {
+    const stored = getStoredPhone()?.trim();
+    if (stored) {
+      setTopUpPhone((p) => p || stored);
+      setWithdrawPhone((p) => p || stored);
+    }
+  }, []);
+
+  useEffect(() => {
     load();
   }, [mock]);
 
@@ -48,12 +59,20 @@ export function WalletView({ onBack, mock }: Props) {
       setError("Montant minimum : 500 FC");
       return;
     }
+    if (!mock && !topUpPhone.trim()) {
+      setError("Indiquez le numéro Mobile Money à débiter.");
+      return;
+    }
     setTopUpLoading(true);
     setError(null);
     try {
       const res = await apiFetch<{ balanceCdf?: number; message?: string }>("/api/wallet/top-up", {
         method: "POST",
-        body: JSON.stringify({ provider: mock ? "MOCK" : "ORANGE_MONEY", amountCdf: value, phone: "+243812345678" }),
+        body: JSON.stringify({
+          provider: mock ? "MOCK" : topUpProvider,
+          amountCdf: value,
+          phone: topUpPhone.trim() || undefined,
+        }),
       }, { useMock: mock });
       if (res.balanceCdf != null) {
         setWallet((w) => ({ ...w, balanceCdf: res.balanceCdf }));
@@ -127,7 +146,22 @@ export function WalletView({ onBack, mock }: Props) {
           type="number"
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
-          placeholder="Montant FC"
+          placeholder="Montant FC (min. 500)"
+        />
+        <select
+          className="w-full rounded-xl border-0 bg-gray-50 p-3"
+          value={topUpProvider}
+          onChange={(e) => setTopUpProvider(e.target.value)}
+        >
+          <option value="ORANGE_MONEY">Orange Money</option>
+          <option value="MPESA">M-Pesa</option>
+          <option value="AIRTEL_MONEY">Airtel Money</option>
+        </select>
+        <input
+          className="w-full rounded-xl border-0 bg-gray-50 p-3"
+          value={topUpPhone}
+          onChange={(e) => setTopUpPhone(e.target.value)}
+          placeholder="+243… (numéro Mobile Money)"
         />
         <button
           type="button"

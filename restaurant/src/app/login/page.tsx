@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { decodeJwtPayload, isRestaurantRole, isSeedDemoPhone, setToken } from "@/lib/auth";
+import { decodeJwtPayload, isRestaurantRole, isSeedDemoPhone, normalizeLoginPhone, setToken } from "@/lib/auth";
 import { PwaInstallBanner } from "@/components/PwaInstallBanner";
 import { PUBLIC_API_BASE } from "@/lib/public-api-base";
 
@@ -54,10 +54,11 @@ export default function LoginPage() {
     try {
       let requestRes: Response;
       try {
+        const msisdn = normalizeLoginPhone(phone);
         requestRes = await fetch(`${API_BASE}/api/auth/otp/request`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ phone, purpose: "LOGIN", role: "RESTAURANT" }),
+          body: JSON.stringify({ phone: msisdn, purpose: "LOGIN", role: "RESTAURANT" }),
         });
       } catch {
         throw new Error(
@@ -65,11 +66,14 @@ export default function LoginPage() {
         );
       }
       lastStatus = requestRes.status;
+      const seed = isSeedDemoPhone(phone);
       if (!requestRes.ok) {
         const msg = await readErrorMessage(requestRes, `Demande OTP refusée (${requestRes.status})`);
-        throw new Error(msg);
+        if (!(seed && (requestRes.status === 429 || requestRes.status >= 500))) {
+          throw new Error(msg);
+        }
       }
-      setCode("");
+      setCode(seed ? "123456" : "");
       setCodeSent(true);
     } catch (e) {
       setError(loginErrorMessage(e, lastStatus));
@@ -88,7 +92,7 @@ export default function LoginPage() {
         verifyRes = await fetch(`${API_BASE}/api/auth/otp/verify`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ phone, code, role: "RESTAURANT" }),
+          body: JSON.stringify({ phone: normalizeLoginPhone(phone), code: code.trim(), role: "RESTAURANT" }),
         });
       } catch {
         throw new Error(
@@ -153,7 +157,11 @@ export default function LoginPage() {
         </label>
         {codeSent && (
           <label className="block text-sm">
-            <span className="text-gray-600">Code reçu par SMS</span>
+            <span className="text-gray-600">
+              {isSeedDemoPhone(phone)
+                ? "Code de démo (aucun SMS) : 123456"
+                : "Code reçu par SMS"}
+            </span>
             <input
               className="mt-1 w-full rounded-xl border border-gray-200 p-3"
               value={code}
@@ -188,8 +196,10 @@ export default function LoginPage() {
         )}
         {error && <p className="text-sm text-red-600 text-center break-all">{error}</p>}
         <p className="text-xs text-gray-400 text-center">
-          Saisissez le code SMS. Compte restaurant créé dans l&apos;admin SENGA, puis lié au restaurant.
-          Les numéros de démo <code>+2439000000xx</code> acceptent aussi <code>123456</code>.
+          {isSeedDemoPhone(phone)
+            ? <>Numéro de démo : code <code>123456</code>, pas de SMS.</>
+            : "Numéro réel +243 : le code arrive par SMS."}{" "}
+          Le compte restaurant doit exister dans l&apos;admin SENGA.
         </p>
         <p className="text-[10px] text-gray-300 text-center break-all">API: {API_BASE}</p>
       </div>

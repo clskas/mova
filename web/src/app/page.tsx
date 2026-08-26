@@ -71,7 +71,7 @@ function HomeContent() {
   };
 
   useEffect(() => {
-    checkGatewayHealth().then((ok) => setMock(!ok));
+    checkGatewayHealth().then((ok) => setMock(!ok && process.env.NODE_ENV !== "production"));
     fetchActivePublicites("PASSENGER").then(setPublicites);
   }, []);
 

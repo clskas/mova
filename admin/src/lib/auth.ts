@@ -5,6 +5,24 @@ export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);
 }
 
+/** Seed demo range +2439000000xx — OTP 123456, no SMS. */
+const SEED_DEMO_PHONE_RE = /^\+2439000000\d{2}$/;
+
+export function normalizeLoginPhone(phone: string): string {
+  let n = (phone ?? "").replace(/[\s\-.\(\)\u00a0]/g, "");
+  if (n.startsWith("00")) n = `+${n.slice(2)}`;
+  if (n.startsWith("+2430") && n.length === 14) n = `+243${n.slice(5)}`;
+  if (n.startsWith("2430") && n.length === 13) n = `243${n.slice(4)}`;
+  if (n.startsWith("0") && n.length === 10) return `+243${n.slice(1)}`;
+  if (n.startsWith("243") && n.length === 12) return `+${n}`;
+  if (/^[89]\d{8}$/.test(n)) return `+243${n}`;
+  return n;
+}
+
+export function isSeedDemoPhone(phone: string): boolean {
+  return SEED_DEMO_PHONE_RE.test(normalizeLoginPhone(phone));
+}
+
 export function setToken(token: string) {
   localStorage.setItem(TOKEN_KEY, token);
 }

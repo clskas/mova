@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { decodeJwtPayload, isRentalPartnerRole, setToken } from "@/lib/auth";
+import { decodeJwtPayload, isRentalPartnerRole, isSeedDemoPhone, setToken } from "@/lib/auth";
 import { PwaInstallBanner } from "@/components/PwaInstallBanner";
 import { PUBLIC_API_BASE } from "@/lib/public-api-base";
 
@@ -42,11 +42,12 @@ async function readErrorMessage(res: Response, fallback: string): Promise<string
 export default function LoginPage() {
   const router = useRouter();
   const [phone, setPhone] = useState(PARTNER_PHONE);
-  const [code, setCode] = useState("123456");
+  const [code, setCode] = useState("");
+  const [codeSent, setCodeSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  async function login() {
+  async function requestOtp() {
     setLoading(true);
     setError(null);
     let lastStatus = 0;
@@ -64,11 +65,27 @@ export default function LoginPage() {
         );
       }
       lastStatus = requestRes.status;
+      const seed = isSeedDemoPhone(phone);
       if (!requestRes.ok) {
         const msg = await readErrorMessage(requestRes, `Demande OTP refusée (${requestRes.status})`);
-        throw new Error(msg);
+        if (!(seed && (requestRes.status === 429 || requestRes.status >= 500))) {
+          throw new Error(msg);
+        }
       }
+      setCode(seed ? "123456" : "");
+      setCodeSent(true);
+    } catch (e) {
+      setError(loginErrorMessage(e, lastStatus));
+    } finally {
+      setLoading(false);
+    }
+  }
 
+  async function verifyOtp() {
+    setLoading(true);
+    setError(null);
+    let lastStatus = 0;
+    try {
       let verifyRes: Response;
       try {
         verifyRes = await fetch(`${API_BASE}/api/auth/otp/verify`, {
@@ -130,27 +147,56 @@ export default function LoginPage() {
             className="mt-1 w-full rounded-xl border border-gray-200 p-3"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
+            placeholder="+243 8XX XXX XXX"
+            type="tel"
+            inputMode="tel"
+            autoComplete="tel"
+            disabled={codeSent}
           />
         </label>
-        <label className="block text-sm">
-          <span className="text-gray-600">Code OTP (dev: 123456)</span>
-          <input
-            className="mt-1 w-full rounded-xl border border-gray-200 p-3"
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-          />
-        </label>
+        {codeSent && (
+          <label className="block text-sm">
+            <span className="text-gray-600">
+              {isSeedDemoPhone(phone)
+                ? "Code de démo (aucun SMS) : 123456"
+                : "Code reçu par SMS"}
+            </span>
+            <input
+              className="mt-1 w-full rounded-xl border border-gray-200 p-3"
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              placeholder="Code à 6 chiffres"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              maxLength={6}
+            />
+          </label>
+        )}
         <button
           type="button"
-          disabled={loading}
-          onClick={login}
+          disabled={loading || !phone.trim() || (codeSent && !code.trim())}
+          onClick={codeSent ? verifyOtp : requestOtp}
           className="w-full py-3 rounded-xl bg-indigo-600 text-white font-medium disabled:opacity-60"
         >
-          {loading ? "Connexion…" : "Accéder au portail"}
+          {loading ? (codeSent ? "Connexion…" : "Envoi…") : codeSent ? "Se connecter" : "Recevoir le code"}
         </button>
+        {codeSent && (
+          <button
+            type="button"
+            className="w-full text-sm text-gray-500 underline"
+            onClick={() => {
+              setCodeSent(false);
+              setCode("");
+              setError(null);
+            }}
+          >
+            Changer de numéro
+          </button>
+        )}
         {error && <p className="text-sm text-red-600 text-center break-all">{error}</p>}
         <p className="text-xs text-gray-400 text-center">
-          Dev : compte <code>{PARTNER_PHONE}</code> — rôle RENTAL_PARTNER créé dans l&apos;admin SENGA
+          Saisissez le code SMS. Compte location créé dans l&apos;admin SENGA.
+          Les numéros de démo <code>+2439000000xx</code> acceptent aussi <code>123456</code>.
         </p>
         <p className="text-[10px] text-gray-300 text-center break-all">API: {API_BASE}</p>
       </div>

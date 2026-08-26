@@ -5,6 +5,7 @@ import {
   isTwilioSmsConfigured,
 } from './africas-talking';
 import { isAfrisoftSmsHubClientConfigured } from './afrisoft-sms-hub';
+import { normalizePhoneRdc } from './market-rdc.config';
 import { isSerdiPaySmsConfigured } from './serdipay';
 
 const DEV_JWT = 'dev_secret';
@@ -81,12 +82,18 @@ export function resolveCorsOrigin(): boolean | string | RegExp | Array<string | 
   return true;
 }
 
-/** Fixed OTP used in local MOCK_OTP and production ALLOW_TEST_OTP (seed phones only). */
+/** Fixed OTP used in local MOCK_OTP and for seed/demo phones (even when the SMS hub is live). */
 export const TEST_OTP_CODE = '123456';
 
 /**
- * Seed / demo phones allowed for ALLOW_TEST_OTP (Play Internal without SerdiPay).
- * Override with comma-separated TEST_OTP_PHONES if needed.
+ * Reserved demo range `+2439000000xx` (admin 001, passenger 010, restaurant 030, rental 031, …).
+ * These numbers are not real MSISDNs — they always use 123456 and never receive SMS.
+ */
+export const SEED_DEMO_PHONE_RE = /^\+2439000000\d{2}$/;
+
+/**
+ * Seed / demo phones (Play Internal, partner portals). Always treated as test OTP.
+ * `TEST_OTP_PHONES` adds extras when `ALLOW_TEST_OTP=true` (does not remove this list).
  */
 export const DEFAULT_TEST_OTP_PHONES: readonly string[] = [
   '+243900000001',
@@ -131,29 +138,60 @@ export const DEFAULT_TEST_OTP_PHONES: readonly string[] = [
   '+243900000031',
 ];
 
+const DEFAULT_TEST_OTP_PHONE_SET = new Set(DEFAULT_TEST_OTP_PHONES);
+
+function normalizeTestOtpPhone(phone: string): string {
+  return normalizePhoneRdc((phone ?? '').trim());
+}
+
 /** True when MOCK_OTP=true outside production (local/dev only). */
 export function isMockOtpAllowed(): boolean {
   return !isProductionRuntime() && process.env.MOCK_OTP === 'true';
 }
 
-/** Production Play/staging: ALLOW_TEST_OTP=true enables fixed OTP for whitelisted seed phones only. */
+/** Production Play/staging: ALLOW_TEST_OTP=true enables fixed OTP for extra TEST_OTP_PHONES. */
 export function isTestOtpModeEnabled(): boolean {
   return process.env.ALLOW_TEST_OTP === 'true';
 }
 
-export function getTestOtpPhones(): Set<string> {
-  const raw = process.env.TEST_OTP_PHONES?.trim();
-  const list = raw
-    ? raw.split(',').map((s) => s.trim()).filter(Boolean)
-    : [...DEFAULT_TEST_OTP_PHONES];
-  return new Set(list);
+export function isSeedDemoPhone(phone: string): boolean {
+  const normalized = normalizeTestOtpPhone(phone);
+  return SEED_DEMO_PHONE_RE.test(normalized) || DEFAULT_TEST_OTP_PHONE_SET.has(normalized);
 }
 
-/** Fixed OTP 123456 for a phone when mock (dev) or ALLOW_TEST_OTP whitelist (prod Play). */
+export function getTestOtpPhones(): Set<string> {
+  const raw = process.env.TEST_OTP_PHONES?.trim();
+  const extras = raw
+    ? raw.split(',').map((s) => normalizeTestOtpPhone(s)).filter(Boolean)
+    : [];
+  return new Set([...DEFAULT_TEST_OTP_PHONES, ...extras]);
+}
+
+/**
+ * Fixed OTP 123456: all phones in local MOCK_OTP; seed `+2439000000xx` always
+ * as a fallback (SMS hub live or not); extra numbers only when ALLOW_TEST_OTP=true.
+ */
 export function isTestOtpAllowedForPhone(phone: string): boolean {
   if (isMockOtpAllowed()) return true;
+  const normalized = normalizeTestOtpPhone(phone);
+  if (isSeedDemoPhone(normalized)) return true;
   if (!isTestOtpModeEnabled()) return false;
-  return getTestOtpPhones().has(phone);
+  return getTestOtpPhones().has(normalized);
+}
+
+/** Standing demo OTP — valid without a prior `/otp/request` for seed/test phones. */
+export function matchesSeedTestOtp(phone: string, code: string): boolean {
+  const digits = String(code ?? '').replace(/\s/g, '');
+  return isTestOtpAllowedForPhone(phone) && digits === TEST_OTP_CODE;
+}
+
+/**
+ * OTP rows to persist. Seed/mock phones store only 123456 (no live SMS).
+ * Real numbers store the SMS code only.
+ */
+export function otpCodesToIssue(phone: string, liveCode: string): string[] {
+  if (isMockOtpAllowed() || isTestOtpAllowedForPhone(phone)) return [TEST_OTP_CODE];
+  return [liveCode];
 }
 
 function envGet(key: string): string | undefined {
@@ -205,7 +243,7 @@ export function assertProductionSecurity(serviceName = 'service'): void {
   if (isTestOtpModeEnabled()) {
     // eslint-disable-next-line no-console
     console.warn(
-      `[${serviceName}] ALLOW_TEST_OTP=true: OTP de test (123456) limité aux numéros seed. Retirer dès que SerdiPay SMS (SERDIPAY_SMS_API_ID/KEY) ou AT/Twilio fonctionne.`,
+      `[${serviceName}] ALLOW_TEST_OTP=true: extra TEST_OTP_PHONES accept 123456. Seed +2439000000xx keep 123456 as fallback; real +243 numbers use the SMS code.`,
     );
   }
 

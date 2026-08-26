@@ -20,7 +20,7 @@ export function OtpGate({ children }: Props) {
   useEffect(() => {
     checkGatewayHealth().then((ok) => {
       setMock(!ok);
-      setAuthenticated(Boolean(getToken()) || !ok);
+      setAuthenticated(Boolean(getToken()));
       setReady(true);
     });
   }, []);
@@ -81,7 +81,7 @@ export function OtpGate({ children }: Props) {
       <div className="max-w-sm mx-auto min-h-[100dvh] flex flex-col justify-center p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
         <h1 className="text-xl font-bold text-center mb-2">SENGA — Connexion</h1>
         <p className="text-sm text-gray-500 text-center mb-6">
-          Entrez votre numéro +243 pour continuer
+          Entrez votre numéro +243. Un SMS avec le code vous sera envoyé.
         </p>
         {mock && (
           <p className="text-sm text-[#FF6B35] bg-orange-50 rounded-lg py-2 px-3 mb-4 text-center">
@@ -117,11 +117,24 @@ export function OtpGate({ children }: Props) {
         <button
           type="button"
           onClick={codeSent ? verifyOtp : requestOtp}
-          disabled={loading || !phone.trim()}
+          disabled={loading || !phone.trim() || (codeSent && !code.trim())}
           className="w-full bg-[#6C63FF] text-white rounded-xl py-3 font-semibold disabled:opacity-50"
         >
           {loading ? "Chargement…" : codeSent ? "Se connecter" : "Recevoir le code"}
         </button>
+        {codeSent && (
+          <button
+            type="button"
+            className="w-full mt-3 text-sm text-gray-500 underline"
+            onClick={() => {
+              setCodeSent(false);
+              setCode("");
+              setError(null);
+            }}
+          >
+            Changer de numéro
+          </button>
+        )}
       </div>
     );
   }

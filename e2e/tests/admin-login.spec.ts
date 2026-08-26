@@ -18,7 +18,7 @@ test.describe("Admin — page de connexion", () => {
     await expect(page.getByText("SENGA Admin", { exact: true })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Connexion" })).toBeVisible();
     await expect(page.getByText("Accès réservé au personnel autorisé")).toBeVisible();
-    await expect(page.getByRole("button", { name: "Se connecter" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Recevoir le code" })).toBeVisible();
   });
 
   test("connexion OTP redirige vers le tableau de bord", async ({ page, request }) => {

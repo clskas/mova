@@ -177,12 +177,25 @@ export function validatePhoneRdc(phone: string): boolean {
 }
 
 export function normalizePhoneRdc(phone: string): string {
-  const cleaned = phone.replace(/\s/g, '');
-  if (cleaned.startsWith('0')) {
+  let cleaned = phone.replace(/[\s\-\.\(\)\u00a0]/g, '');
+  if (cleaned.startsWith('00')) {
+    cleaned = `+${cleaned.slice(2)}`;
+  }
+  // Common RDC typing: +243 0 8XX… (trunk 0 kept after country code).
+  if (cleaned.startsWith('+2430') && cleaned.length === 14) {
+    cleaned = `+243${cleaned.slice(5)}`;
+  }
+  if (cleaned.startsWith('2430') && cleaned.length === 13) {
+    cleaned = `243${cleaned.slice(4)}`;
+  }
+  if (cleaned.startsWith('0') && cleaned.length === 10) {
     return `+243${cleaned.slice(1)}`;
   }
-  if (cleaned.startsWith('243')) {
+  if (cleaned.startsWith('243') && cleaned.length === 12) {
     return `+${cleaned}`;
+  }
+  if (/^[89]\d{8}$/.test(cleaned)) {
+    return `+243${cleaned}`;
   }
   return cleaned;
 }

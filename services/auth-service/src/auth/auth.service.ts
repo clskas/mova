@@ -15,6 +15,8 @@ import {
   formatMovaPublicId,
   maskPhoneRdc,
   isTestOtpAllowedForPhone,
+  matchesSeedTestOtp,
+  otpCodesToIssue,
   TEST_OTP_CODE,
   SMS_UNAVAILABLE_USER_MESSAGE,
 } from '@mova/shared';
@@ -50,31 +52,32 @@ export class AuthService {
       throw new MovaHttpException(MovaErrorCode.AUTH_INVALID_PHONE, HttpStatus.BAD_REQUEST);
     }
     const useTestOtp = isTestOtpAllowedForPhone(normalized);
-    const code = useTestOtp ? TEST_OTP_CODE : crypto.randomInt(100000, 999999).toString();
-    await this.prisma.otpCode.create({ data: { phone: normalized, code, expiresAt: new Date(Date.now() + 10 * 60 * 1000) } });
-
-    if (!useTestOtp) {
-      const smsResult = await this.sms.sendOtp(normalized, code);
-      if (!smsResult.success) {
-        this.logger.error(`OTP SMS failed for ${maskPhoneRdc(normalized)}: ${smsResult.message}`);
-        throw new MovaHttpException(
-          MovaErrorCode.VALIDATION_ERROR,
-          HttpStatus.SERVICE_UNAVAILABLE,
-          SMS_UNAVAILABLE_USER_MESSAGE,
-        );
-      }
-      // Never echo OTP codes in API responses outside explicit test/mock mode.
-      return { success: true, message: smsResult.message ?? 'Code OTP envoyé', phone: normalized };
+    const liveCode = useTestOtp ? TEST_OTP_CODE : crypto.randomInt(100000, 999999).toString();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+    for (const code of otpCodesToIssue(normalized, liveCode)) {
+      await this.prisma.otpCode.create({ data: { phone: normalized, code, expiresAt } });
     }
 
-    this.logger.warn(`TEST OTP ${TEST_OTP_CODE} for whitelisted phone ${maskPhoneRdc(normalized)}`);
-    return {
-      success: true,
-      message: 'Code OTP envoyé (mode test)',
-      phone: normalized,
-      // mockCode only in non-production MOCK_OTP — never leak in prod responses.
-      ...(process.env.NODE_ENV !== 'production' ? { mockCode: code } : {}),
-    };
+    if (useTestOtp) {
+      this.logger.warn(`TEST OTP ${TEST_OTP_CODE} for whitelisted phone ${maskPhoneRdc(normalized)}`);
+      return {
+        success: true,
+        message: 'Code OTP envoyé (mode test)',
+        phone: normalized,
+        ...(process.env.NODE_ENV !== 'production' ? { mockCode: TEST_OTP_CODE } : {}),
+      };
+    }
+
+    const smsResult = await this.sms.sendOtp(normalized, liveCode);
+    if (!smsResult.success) {
+      this.logger.error(`OTP SMS failed for ${maskPhoneRdc(normalized)}: ${smsResult.message}`);
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        HttpStatus.SERVICE_UNAVAILABLE,
+        SMS_UNAVAILABLE_USER_MESSAGE,
+      );
+    }
+    return { success: true, message: smsResult.message ?? 'Code OTP envoyé', phone: normalized };
   }
 
   async getLoginOptions(phone: string, role?: UserRole) {
@@ -173,12 +176,18 @@ export class AuthService {
 
   async verifyOtp(phone: string, code: string, role?: UserRole) {
     const normalized = normalizePhoneRdc(phone);
+    const trimmedCode = String(code ?? '').replace(/\s/g, '');
     const otp = await this.prisma.otpCode.findFirst({
-      where: { phone: normalized, code, used: false, expiresAt: { gt: new Date() } },
+      where: { phone: normalized, code: trimmedCode, used: false, expiresAt: { gt: new Date() } },
       orderBy: { createdAt: 'desc' },
     });
-    if (!otp) throw new MovaHttpException(MovaErrorCode.AUTH_INVALID_OTP);
-    await this.prisma.otpCode.update({ where: { id: otp.id }, data: { used: true } });
+    // Seed/demo phones keep 123456 even with no prior send (hub live, OTP already used, or portal skipped request).
+    if (!otp && !matchesSeedTestOtp(normalized, trimmedCode)) {
+      throw new MovaHttpException(MovaErrorCode.AUTH_INVALID_OTP);
+    }
+    if (otp) {
+      await this.prisma.otpCode.update({ where: { id: otp.id }, data: { used: true } });
+    }
 
     let user = await this.prisma.user.findUnique({ where: { phone: normalized } });
     let isNew = false;

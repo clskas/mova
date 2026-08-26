@@ -18,19 +18,39 @@ export default function LoginPage() {
   const [mode, setMode] = useState<"otp" | "token">("otp");
   const [phone, setPhone] = useState(ADMIN_PHONE);
   const [code, setCode] = useState("");
+  const [codeSent, setCodeSent] = useState(false);
   const [tokenInput, setTokenInput] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  async function requestOtp() {
+    setLoading(true);
+    setError(null);
+    try {
+      const requestRes = await fetch(`${API_BASE}/api/auth/otp/request`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone }),
+      });
+      if (!requestRes.ok) {
+        const body = await requestRes.json().catch(() => ({}));
+        throw new Error(
+          sanitizeAdminError(body.error?.message ?? "Impossible d'envoyer le code", requestRes.status),
+        );
+      }
+      setCode("");
+      setCodeSent(true);
+    } catch (e) {
+      setError(toUserErrorMessage(e, "Impossible d'envoyer le code"));
+    } finally {
+      setLoading(false);
+    }
+  }
 
   async function loginWithOtp() {
     setLoading(true);
     setError(null);
     try {
-      await fetch(`${API_BASE}/api/auth/otp/request`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone }),
-      });
       const verifyRes = await fetch(`${API_BASE}/api/auth/otp/verify`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -157,22 +177,44 @@ export default function LoginPage() {
                   onChange={(e) => setPhone(e.target.value)}
                   placeholder="+243900000001"
                   autoComplete="tel"
+                  disabled={codeSent}
                 />
               </label>
-              <label className="block text-sm">
-                <span className="font-medium text-gray-700">Code OTP</span>
-                <span className="ml-2 text-xs text-gray-400">dev : 123456</span>
-                <input
-                  className="mt-2 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-mova-midnight outline-none transition focus:border-mova-violet focus:ring-2 focus:ring-mova-violet/20"
-                  value={code}
-                  onChange={(e) => setCode(e.target.value)}
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                />
-              </label>
-              <button type="button" disabled={loading} onClick={loginWithOtp} className="mova-btn-primary w-full">
-                {loading ? "Connexion…" : "Se connecter"}
+              {codeSent && (
+                <label className="block text-sm">
+                  <span className="font-medium text-gray-700">Code OTP</span>
+                  <span className="ml-2 text-xs text-gray-400">SMS, ou 123456 pour un numéro de démo</span>
+                  <input
+                    className="mt-2 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-mova-midnight outline-none transition focus:border-mova-violet focus:ring-2 focus:ring-mova-violet/20"
+                    value={code}
+                    onChange={(e) => setCode(e.target.value)}
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    maxLength={6}
+                  />
+                </label>
+              )}
+              <button
+                type="button"
+                disabled={loading || !phone.trim() || (codeSent && !code.trim())}
+                onClick={codeSent ? loginWithOtp : requestOtp}
+                className="mova-btn-primary w-full"
+              >
+                {loading ? (codeSent ? "Connexion…" : "Envoi…") : codeSent ? "Se connecter" : "Recevoir le code"}
               </button>
+              {codeSent && (
+                <button
+                  type="button"
+                  className="w-full text-sm text-gray-500 underline"
+                  onClick={() => {
+                    setCodeSent(false);
+                    setCode("");
+                    setError(null);
+                  }}
+                >
+                  Changer de numéro
+                </button>
+              )}
             </div>
           ) : (
             <div className="space-y-4">
@@ -196,10 +238,8 @@ export default function LoginPage() {
           )}
 
           <p className="text-xs text-gray-400 text-center leading-relaxed">
-            Environnement dev : exécutez <code className="rounded bg-gray-100 px-1.5 py-0.5 text-gray-600">npm run seed:admin-demo</code>
-            <br />
-            puis OTP <code className="rounded bg-gray-100 px-1.5 py-0.5 text-gray-600">{ADMIN_PHONE}</code> /{" "}
-            <code className="rounded bg-gray-100 px-1.5 py-0.5 text-gray-600">123456</code>
+            Code envoyé par SMS. Les numéros de démo <code className="rounded bg-gray-100 px-1.5 py-0.5 text-gray-600">+2439000000xx</code>{" "}
+            acceptent aussi <code className="rounded bg-gray-100 px-1.5 py-0.5 text-gray-600">123456</code>.
           </p>
         </div>
       </main>

@@ -37,7 +37,7 @@ services:
         value: "2"
       # Browser portals call the public gateway origin; include *.onrender.com for Render previews.
       - key: CORS_ORIGIN
-        value: "https://mova-web.onrender.com,https://mova-admin-web.onrender.com,https://mova-restaurant.onrender.com,https://mova-rental-partner.onrender.com,https://mova-admin.onrender.com,https://*.onrender.com"
+        value: "https://senga.afri-soft.com,https://admin.afri-soft.com,https://restaurant.afri-soft.com,https://rental.afri-soft.com,https://mova-web.onrender.com,https://mova-admin-web.onrender.com,https://mova-restaurant.onrender.com,https://mova-rental-partner.onrender.com,https://mova-admin.onrender.com,https://*.onrender.com"
 
   - type: web
     name: mova-auth
@@ -55,7 +55,7 @@ services:
         fromService: { name: mova-gateway, type: web, envVarKey: JWT_SECRET }
       - key: MOCK_OTP
         value: "false"
-      # Play / partner portal demos: fixed OTP 123456 for whitelisted seed phones only.
+      # Seed phones (+2439000000xx): 123456, no SMS. Real +243 receive SMS. ALLOW_TEST_OTP only adds extra TEST_OTP_PHONES.
       - key: ALLOW_TEST_OTP
         value: "true"
       - key: AFRISOFT_SMS_HUB_URL

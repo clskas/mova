@@ -82,6 +82,7 @@ export async function loginAsStaff(page: Page, phone: string): Promise<void> {
   await page.goto("/login");
   await dismissUpdateBanner(page);
   await page.getByPlaceholder("+243900000001").fill(phone);
+  await page.getByRole("button", { name: "Recevoir le code" }).click();
   await page.getByRole("textbox", { name: /Code OTP/i }).fill(DEV_OTP);
   await page.getByRole("button", { name: "Se connecter" }).click();
   await expect(page.getByRole("button", { name: "Déconnexion" })).toBeVisible({ timeout: 15_000 });

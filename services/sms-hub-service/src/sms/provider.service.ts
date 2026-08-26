@@ -2,6 +2,7 @@ import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config';
 import {
   africasTalkingSendSms,
+  isSeedDemoPhone,
   resolveSmsBackend,
   serdiPaySendSms,
   type SmsBackend,
@@ -32,6 +33,10 @@ export class ProviderService {
   }
 
   async sendOtpSms(appId: string, phone: string, code: string, locale = 'fr'): Promise<HubSmsResult> {
+    if (isSeedDemoPhone(phone)) {
+      this.logger.warn(`Skip OTP SMS for seed phone ${this.maskPhone(phone)} app=${appId}`);
+      return { success: true, message: 'OTP skipped (seed phone)', provider: 'mock' };
+    }
     const provider = this.activeProvider();
     const brand = this.brandName(appId);
     const message =
@@ -64,6 +69,10 @@ export class ProviderService {
   }
 
   async sendTransactional(appId: string, phone: string, text: string): Promise<HubSmsResult> {
+    if (isSeedDemoPhone(phone)) {
+      this.logger.warn(`Skip SMS for seed phone ${this.maskPhone(phone)} app=${appId}`);
+      return { success: true, message: 'SMS skipped (seed phone)', provider: 'mock' };
+    }
     const provider = this.activeProvider();
     if (provider === 'mock') {
       this.logger.log(`[MOCK SMS] text → ${this.maskPhone(phone)} app=${appId} len=${text.length}`);

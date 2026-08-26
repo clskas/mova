@@ -9,6 +9,11 @@ describe('Market RDC Config', () => {
   it('should normalize local phone to +243', () => {
     expect(normalizePhoneRdc('0812345678')).toBe('+243812345678');
     expect(normalizePhoneRdc('243812345678')).toBe('+243812345678');
+    expect(normalizePhoneRdc('+243 81 234 5678')).toBe('+243812345678');
+    expect(normalizePhoneRdc('+2430812345678')).toBe('+243812345678');
+    expect(normalizePhoneRdc('00243812345678')).toBe('+243812345678');
+    expect(normalizePhoneRdc('812345678')).toBe('+243812345678');
+    expect(normalizePhoneRdc('+243-900-000-031')).toBe('+243900000031');
   });
 
   it('should format CDF amounts', () => {

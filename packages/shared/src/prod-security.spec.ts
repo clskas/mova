@@ -133,6 +133,40 @@ describe('prod-security', () => {
     expect(TEST_OTP_CODE).toBe('123456');
   });
 
+  it('seed demo phones always allow 123456 even when SMS hub is live and ALLOW_TEST_OTP is off', async () => {
+    process.env.NODE_ENV = 'production';
+    delete process.env.ALLOW_TEST_OTP;
+    delete process.env.MOCK_OTP;
+    delete process.env.TEST_OTP_PHONES;
+    process.env.AFRISOFT_SMS_HUB_URL = 'https://sms.afri-soft.com';
+    process.env.AFRISOFT_HUB_API_KEY = 'hub-key';
+    const { isTestOtpAllowedForPhone, isSeedDemoPhone, matchesSeedTestOtp } =
+      await import('./prod-security');
+    expect(isSeedDemoPhone('+243900000001')).toBe(true);
+    expect(isSeedDemoPhone('243900000010')).toBe(true);
+    expect(isSeedDemoPhone('+243900000030')).toBe(true);
+    expect(isSeedDemoPhone('+243900000031')).toBe(true);
+    expect(isSeedDemoPhone('+243812345678')).toBe(false);
+    expect(isTestOtpAllowedForPhone('+243900000001')).toBe(true);
+    expect(isTestOtpAllowedForPhone('+243900000010')).toBe(true);
+    expect(isTestOtpAllowedForPhone('+243900000030')).toBe(true);
+    expect(isTestOtpAllowedForPhone('+243900000031')).toBe(true);
+    expect(isTestOtpAllowedForPhone('+243812345678')).toBe(false);
+    expect(matchesSeedTestOtp('+243900000031', '123456')).toBe(true);
+    expect(matchesSeedTestOtp('+243900000031', ' 123456 ')).toBe(true);
+    expect(matchesSeedTestOtp('+243900000031', '000000')).toBe(false);
+    expect(matchesSeedTestOtp('+243812345678', '123456')).toBe(false);
+  });
+
+  it('otpCodesToIssue stores only 123456 for seed phones (no live SMS code)', async () => {
+    process.env.NODE_ENV = 'production';
+    delete process.env.ALLOW_TEST_OTP;
+    delete process.env.MOCK_OTP;
+    const { otpCodesToIssue, TEST_OTP_CODE } = await import('./prod-security');
+    expect(otpCodesToIssue('+243900000031', '847291')).toEqual([TEST_OTP_CODE]);
+    expect(otpCodesToIssue('+243812345678', '847291')).toEqual(['847291']);
+  });
+
   it('does not treat SerdiPay payment-only credentials as SMS ready', async () => {
     process.env.NODE_ENV = 'production';
     process.env.JWT_SECRET = 'a'.repeat(32);

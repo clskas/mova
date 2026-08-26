@@ -8,7 +8,9 @@ import {
   isMockOtpAllowed,
   isProductionRuntime,
   isSerdiPaySmsConfigured,
+  isTestOtpAllowedForPhone,
   isTwilioSmsConfigured,
+  maskPhoneRdc,
   resolveSmsBackend,
   serdiPaySendSms,
   SMS_UNAVAILABLE_USER_MESSAGE,
@@ -212,6 +214,10 @@ export class SmsService {
   }
 
   async sendOtp(phone: string, code: string): Promise<SmsSendResult> {
+    if (isTestOtpAllowedForPhone(phone)) {
+      this.logger.warn(`Skip live SMS for seed/test phone ${maskPhoneRdc(phone)}`);
+      return { success: true, message: 'Code OTP envoyé (mode test)' };
+    }
     const provider = this.resolveProvider();
     if (!provider) {
       this.logger.error('SMS OTP failed: no provider configured');

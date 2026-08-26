@@ -12,20 +12,39 @@ const STAFF_ROLES: ReadonlySet<string> = new Set([
   'CONTENT',
 ]);
 
-const INVITE_ONLY_ROLES: ReadonlySet<string> = new Set(['RESTAURANT', 'RENTAL_PARTNER', ...STAFF_ROLES]);
+const PARTNER_PORTAL_ROLES: ReadonlySet<string> = new Set(['RESTAURANT', 'RENTAL_PARTNER']);
 
 export function isStaffAuthRole(role?: string | null): boolean {
   return !!role && STAFF_ROLES.has(role);
 }
 
-export function isInviteOnlyAuthRole(role?: string | null): boolean {
-  return !!role && INVITE_ONLY_ROLES.has(role);
+export function isPartnerPortalRole(role?: string | null): boolean {
+  return !!role && PARTNER_PORTAL_ROLES.has(role);
 }
 
-/** Partner / staff accounts must exist in Admin before OTP login. */
+/** Staff (admin console) accounts must exist in Admin before OTP login. */
+export function isInviteOnlyAuthRole(role?: string | null): boolean {
+  return isStaffAuthRole(role);
+}
+
+/**
+ * Refuse creating a PASSENGER (or unspecified-role) account.
+ * Partner portals self-register; staff stays invite-only.
+ */
 export function shouldRefusePassengerAutoRegister(phone: string, role?: string | null): boolean {
-  if (isInviteOnlyAuthRole(role)) return true;
+  if (isStaffAuthRole(role)) return true;
+  if (isPartnerPortalRole(role)) return false;
   return phone === PARTNER_SEED_PHONES.restaurant || phone === PARTNER_SEED_PHONES.rental;
+}
+
+export function canPromoteToPartnerRole(currentRole: string, requested?: string | null): boolean {
+  return isPartnerPortalRole(requested) && currentRole === 'PASSENGER';
+}
+
+export function defaultPartnerDisplayName(role?: string | null): string {
+  if (role === 'RESTAURANT') return 'Mon restaurant';
+  if (role === 'RENTAL_PARTNER') return 'Ma flotte';
+  return '';
 }
 
 export function missingInviteOnlyAccountMessage(phone: string, role?: string | null): string {

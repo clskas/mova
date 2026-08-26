@@ -11,6 +11,7 @@ import {
 } from '../common/partner-wallet.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { formatParcelDelivery } from '../deliveries/parcel.util';
+import { DeliveriesService } from '../deliveries/deliveries.service';
 import { UploadsService } from '../uploads/uploads.service';
 import { MenuItemDto, UpdateRestaurantLocationDto, UpdateRestaurantMenuDto } from './restaurant-portal.dto';
 import { MatchingService } from '../matching/matching.service';
@@ -35,6 +36,7 @@ export class RestaurantPortalService {
     private uploads: UploadsService,
     private matching: MatchingService,
     private partnerBilling: PartnerBillingService,
+    private deliveries: DeliveriesService,
   ) {}
 
   async getEarningsReport(
@@ -66,13 +68,11 @@ export class RestaurantPortalService {
   }
 
   async getRestaurantForOwner(ownerUserId: string) {
-    const restaurant = await this.prisma.restaurant.findFirst({
-      where: { ownerUserId, isActive: true },
-    });
-    if (!restaurant) {
-      throw new MovaHttpException(MovaErrorCode.RESTAURANT_NOT_FOUND, HttpStatus.NOT_FOUND, 'Aucun restaurant lié à ce compte.');
-    }
-    return restaurant;
+    return this.ensureRestaurantForOwner(ownerUserId);
+  }
+
+  async ensureRestaurantForOwner(ownerUserId: string, name?: string) {
+    return this.deliveries.ensureRestaurantForOwner(ownerUserId, name);
   }
 
   async getProfile(ownerUserId: string) {
@@ -454,6 +454,8 @@ export class RestaurantPortalService {
     const updated = await this.prisma.restaurant.update({
       where: { id: restaurant.id },
       data: {
+        ...(dto.name !== undefined ? { name: dto.name.trim() || restaurant.name } : {}),
+        ...(dto.cuisine !== undefined ? { cuisine: dto.cuisine.trim() || restaurant.cuisine } : {}),
         ...(dto.address !== undefined ? { address: dto.address.trim() || restaurant.address } : {}),
         ...(dto.lat != null ? { lat: dto.lat } : {}),
         ...(dto.lng != null ? { lng: dto.lng } : {}),
@@ -461,6 +463,8 @@ export class RestaurantPortalService {
     });
     return {
       id: updated.id,
+      name: updated.name,
+      cuisine: updated.cuisine,
       address: updated.address,
       lat: updated.lat,
       lng: updated.lng,

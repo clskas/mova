@@ -824,6 +824,7 @@ export class DeliveriesService {
     const rows = await this.prisma.restaurant.findMany({
       where: {
         isActive: true,
+        isAcceptingOrders: true,
         ...(cuisine?.trim() ? { cuisine: { contains: cuisine.trim(), mode: 'insensitive' } } : {}),
       },
       orderBy: { rating: 'desc' },
@@ -1206,6 +1207,42 @@ export class DeliveriesService {
 
   async listRestaurantsAdmin() {
     return this.prisma.restaurant.findMany({ orderBy: { name: 'asc' } });
+  }
+
+  /** First restaurant-portal login creates a stub profile the partner can edit. */
+  async ensureRestaurantForOwner(ownerUserId: string, name?: string) {
+    const existing = await this.prisma.restaurant.findFirst({
+      where: { ownerUserId },
+      orderBy: { createdAt: 'asc' },
+    });
+    if (existing) return existing;
+    const displayName = name?.trim() || 'Mon restaurant';
+    try {
+      return await this.prisma.restaurant.create({
+        data: {
+          name: displayName,
+          cuisine: 'À préciser',
+          address: 'Kinshasa — à compléter',
+          lat: -4.3105,
+          lng: 15.3032,
+          ownerUserId,
+          isActive: true,
+          isAcceptingOrders: false,
+          menuItems: [],
+        },
+      });
+    } catch {
+      const raced = await this.prisma.restaurant.findFirst({
+        where: { ownerUserId },
+        orderBy: { createdAt: 'asc' },
+      });
+      if (raced) return raced;
+      throw new MovaHttpException(
+        MovaErrorCode.RESTAURANT_NOT_FOUND,
+        HttpStatus.NOT_FOUND,
+        'Impossible de créer le restaurant pour ce compte.',
+      );
+    }
   }
 
   async upsertRestaurant(id: string | null, data: Record<string, unknown>) {

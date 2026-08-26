@@ -220,8 +220,9 @@ export default function UtilisateursPage() {
       <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Créer un partenaire">
         <div className="space-y-4">
           <p className="text-sm text-gray-600">
-            Le portail restaurant / location refuse l&apos;inscription automatique. Créez le compte ici avec le
-            bon rôle, puis liez le restaurant (menu Restaurants) ou le véhicule (Catalogue location).
+            Le portail restaurant / location crée le compte à la première connexion OTP. Vous pouvez aussi
+            créer ou lier un partenaire ici (rôle Restaurant ou Partenaire location), puis relier le
+            restaurant (menu Restaurants) ou les véhicules (Catalogue location).
           </p>
           <label>
             <FieldLabel>Téléphone *</FieldLabel>

@@ -115,13 +115,7 @@ export default function LoginPage() {
         throw new Error(data.error?.message ?? `Connexion refusée (${verifyRes.status})`);
       }
       const role = data.user?.role ?? decodeJwtPayload(data.accessToken)?.role;
-      const createdNow = verifyRes.status === 201 || (data as { isNew?: boolean }).isNew === true;
       if (!isRestaurantRole(typeof role === "string" ? role : null)) {
-        if (createdNow || role === "PASSENGER") {
-          throw new Error(
-            "Aucun compte partenaire restaurant pour ce numéro. Créez-le d'abord dans l'admin SENGA (rôle Restaurant), puis liez le restaurant — pas d'inscription automatique.",
-          );
-        }
         throw new Error(`Ce compte n'est pas un partenaire restaurant (rôle: ${String(role ?? "?")}).`);
       }
       setToken(data.accessToken);
@@ -199,7 +193,7 @@ export default function LoginPage() {
           {isSeedDemoPhone(phone)
             ? <>Numéro de démo : code <code>123456</code>, pas de SMS.</>
             : "Numéro réel +243 : le code arrive par SMS."}{" "}
-          Le compte restaurant doit exister dans l&apos;admin SENGA.
+          Première connexion : un compte restaurant est créé automatiquement.
         </p>
         <p className="text-[10px] text-gray-300 text-center break-all">API: {API_BASE}</p>
       </div>

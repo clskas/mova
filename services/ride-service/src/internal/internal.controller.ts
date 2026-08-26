@@ -271,6 +271,15 @@ export class InternalController {
     return this.deliveries.listRestaurantsAdmin();
   }
 
+  @Post('restaurants/ensure')
+  ensureRestaurant(@Body() body: { ownerUserId?: string; name?: string }) {
+    const ownerUserId = body.ownerUserId?.trim();
+    if (!ownerUserId) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'ownerUserId requis.');
+    }
+    return this.deliveries.ensureRestaurantForOwner(ownerUserId, body.name);
+  }
+
   @Post('restaurants')
   createRestaurant(@Body() body: Record<string, unknown>) {
     return this.deliveries.upsertRestaurant(null, body);

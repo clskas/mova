@@ -210,6 +210,8 @@ export function updateMenuSettings(data: {
 }
 
 export function updateRestaurantLocation(data: {
+  name?: string;
+  cuisine?: string;
   address?: string;
   lat?: number;
   lng?: number;

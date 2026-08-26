@@ -25,7 +25,9 @@ import { RedisService } from '@mova/shared';
 import { SmsService } from './sms.providers';
 import { hashLocalPin, isValidLocalPin, verifyLocalPin } from './local-pin.util';
 import {
-  isInviteOnlyAuthRole,
+  canPromoteToPartnerRole,
+  defaultPartnerDisplayName,
+  isPartnerPortalRole,
   isStaffAuthRole,
   missingInviteOnlyAccountMessage,
   mismatchedPartnerRoleMessage,
@@ -174,6 +176,23 @@ export class AuthService {
         this.logger.warn(`Driver profile provision failed for ${userId}: ${(e as Error).message}`);
       }
     }
+    if (role === UserRole.RESTAURANT) {
+      try {
+        const restoRes = await fetch(serviceUrl('ride', '/internal/restaurants/ensure'), {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            ownerUserId: userId,
+            name: defaultPartnerDisplayName(UserRole.RESTAURANT),
+          }),
+        });
+        if (!restoRes.ok) {
+          this.logger.warn(`Restaurant profile provision HTTP ${restoRes.status} for ${userId}`);
+        }
+      } catch (e) {
+        this.logger.warn(`Restaurant profile provision failed for ${userId}: ${(e as Error).message}`);
+      }
+    }
   }
 
   async verifyOtp(phone: string, code: string, role?: UserRole) {
@@ -201,11 +220,13 @@ export class AuthService {
           missingInviteOnlyAccountMessage(normalized, role),
         );
       }
+      const partnerName = defaultPartnerDisplayName(role);
       user = await this.prisma.user.create({
         data: {
           phone: normalized,
           role: role ?? UserRole.PASSENGER,
           status: role === UserRole.DRIVER ? UserStatus.PENDING_KYC : UserStatus.ACTIVE,
+          ...(partnerName ? { firstName: partnerName } : {}),
         },
       });
       isNew = true;
@@ -216,9 +237,20 @@ export class AuthService {
       } catch (e) {
         this.logger.warn(`USER_CREATED publish failed: ${(e as Error).message}`);
       }
+    } else if (canPromoteToPartnerRole(user.role, role) && role) {
+      const partnerName = defaultPartnerDisplayName(role);
+      user = await this.prisma.user.update({
+        where: { id: user.id },
+        data: {
+          role,
+          status: UserStatus.ACTIVE,
+          ...(user.firstName?.trim() ? {} : partnerName ? { firstName: partnerName } : {}),
+        },
+      });
+      await this.provisionUser(user.id, role);
     }
     if (role === UserRole.DRIVER && user.role !== UserRole.DRIVER) {
-      if (isInviteOnlyAuthRole(user.role)) {
+      if (isStaffAuthRole(user.role) || isPartnerPortalRole(user.role)) {
         this.assertRoleAccess(user, role);
       }
       user = await this.prisma.user.update({
@@ -252,7 +284,7 @@ export class AuthService {
   }
 
   private async assertInviteOnlyAccountExists(phone: string, role?: UserRole) {
-    if (!isInviteOnlyAuthRole(role)) return;
+    if (!isStaffAuthRole(role)) return;
     const user = await this.prisma.user.findUnique({ where: { phone } });
     if (!user) {
       throw new MovaHttpException(

@@ -8,6 +8,8 @@ export default function SettingsPage() {
   const [accepting, setAccepting] = useState(true);
   const [prepTime, setPrepTime] = useState(25);
   const [promo, setPromo] = useState("");
+  const [name, setName] = useState("");
+  const [cuisine, setCuisine] = useState("");
   const [address, setAddress] = useState("");
   const [lat, setLat] = useState("");
   const [lng, setLng] = useState("");
@@ -23,6 +25,8 @@ export default function SettingsPage() {
       setAccepting(p.isAcceptingOrders ?? true);
       setPrepTime(p.prepTimeMin ?? 25);
       setPromo("");
+      setName(p.name ?? "");
+      setCuisine(p.cuisine ?? "");
       setAddress(p.address ?? "");
       setLat(p.lat != null ? String(p.lat) : "");
       setLng(p.lng != null ? String(p.lng) : "");
@@ -94,8 +98,10 @@ export default function SettingsPage() {
         prepTimeMin: prepTime,
         promotionLabel: promo.trim() || undefined,
       });
-      if (address.trim() || latNum != null) {
+      if (address.trim() || name.trim() || cuisine.trim() || latNum != null) {
         await updateRestaurantLocation({
+          ...(name.trim() ? { name: name.trim() } : {}),
+          ...(cuisine.trim() ? { cuisine: cuisine.trim() } : {}),
           ...(address.trim() ? { address: address.trim() } : {}),
           ...(latNum != null && lngNum != null ? { lat: latNum, lng: lngNum } : {}),
         });
@@ -118,6 +124,24 @@ export default function SettingsPage() {
           <div className="bg-white rounded-2xl border p-6 space-y-5">
             <div className="space-y-3 pb-4 border-b">
               <h3 className="font-semibold text-sm text-gray-700">Localisation du restaurant</h3>
+              <label className="block text-sm">
+                <span className="text-gray-600">Nom du restaurant</span>
+                <input
+                  className="mt-1 w-full rounded-xl border p-3"
+                  placeholder="Ex. Chez Flore"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                />
+              </label>
+              <label className="block text-sm">
+                <span className="text-gray-600">Cuisine</span>
+                <input
+                  className="mt-1 w-full rounded-xl border p-3"
+                  placeholder="Ex. Congolais"
+                  value={cuisine}
+                  onChange={(e) => setCuisine(e.target.value)}
+                />
+              </label>
               <label className="block text-sm">
                 <span className="text-gray-600">Adresse</span>
                 <input

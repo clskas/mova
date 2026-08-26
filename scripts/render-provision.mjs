@@ -216,6 +216,9 @@ async function wireEnvVars(services) {
       JWT_SECRET: jwtSecret,
       INTERNAL_API_KEY: internalKey,
       DRIVER_SERVICE_URL: `https://${url('mova-driver')}`,
+      PAYMENT_SERVICE_URL: `https://${url('mova-payment')}`,
+      AUTH_SERVICE_URL: `https://${url('mova-auth')}`,
+      PAY_HUB_URL: 'https://pay.afri-soft.com',
     },
     'mova-payment': {
       DATABASE_URL: process.env.DATABASE_URL_PAYMENTS,

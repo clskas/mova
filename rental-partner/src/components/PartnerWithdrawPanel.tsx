@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { phoneFromToken } from "@/lib/auth";
-import { formatCdf, withdrawPartnerWallet } from "@/lib/api";
+import { formatCdf, topUpPartnerWallet, withdrawPartnerWallet } from "@/lib/api";
 import { toUserErrorMessage } from "@/lib/user-messages";
 
 const PAYOUT_PHONE_KEY = "mova_rental_partner_payout_phone";
@@ -21,9 +21,10 @@ type Props = {
 
 export function PartnerWithdrawPanel({ balanceCdf, walletAvailable = true, onWithdrawn }: Props) {
   const [amount, setAmount] = useState("");
+  const [topUpAmount, setTopUpAmount] = useState("");
   const [provider, setProvider] = useState("ORANGE_MONEY");
   const [phone, setPhone] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState<"withdraw" | "topup" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -37,7 +38,11 @@ export function PartnerWithdrawPanel({ balanceCdf, walletAvailable = true, onWit
     if (fromToken) setPhone(fromToken);
   }, []);
 
-  async function submit() {
+  function rememberPhone() {
+    if (phone.trim()) localStorage.setItem(PAYOUT_PHONE_KEY, phone.trim());
+  }
+
+  async function submitWithdraw() {
     const amountCdf = Number(amount);
     if (!Number.isFinite(amountCdf) || amountCdf < 500) {
       setError("Montant minimum : 500 FC.");
@@ -51,7 +56,7 @@ export function PartnerWithdrawPanel({ balanceCdf, walletAvailable = true, onWit
       setError("Numéro Mobile Money requis.");
       return;
     }
-    setLoading(true);
+    setLoading("withdraw");
     setError(null);
     setSuccess(null);
     try {
@@ -60,49 +65,68 @@ export function PartnerWithdrawPanel({ balanceCdf, walletAvailable = true, onWit
         provider,
         phone: phone.trim(),
       });
-      localStorage.setItem(PAYOUT_PHONE_KEY, phone.trim());
+      rememberPhone();
       setSuccess(result.message ?? "Retrait initié avec succès.");
       setAmount("");
       onWithdrawn?.();
     } catch (e) {
       setError(toUserErrorMessage(e, "Retrait impossible"));
     } finally {
-      setLoading(false);
+      setLoading(null);
+    }
+  }
+
+  async function submitTopUp() {
+    const amountCdf = Number(topUpAmount);
+    if (!Number.isFinite(amountCdf) || amountCdf < 500) {
+      setError("Montant minimum : 500 FC.");
+      return;
+    }
+    if (!phone.trim()) {
+      setError("Numéro Mobile Money requis.");
+      return;
+    }
+    setLoading("topup");
+    setError(null);
+    setSuccess(null);
+    try {
+      const result = await topUpPartnerWallet({
+        amountCdf,
+        provider,
+        phone: phone.trim(),
+      });
+      rememberPhone();
+      setSuccess(result.message ?? "Recharge initiée. Confirmez sur votre téléphone.");
+      setTopUpAmount("");
+      onWithdrawn?.();
+    } catch (e) {
+      setError(toUserErrorMessage(e, "Recharge impossible"));
+    } finally {
+      setLoading(null);
     }
   }
 
   if (!walletAvailable) {
     return (
       <section className="rounded-xl border border-gray-100 bg-white p-4">
-        <h3 className="font-medium text-[#1A1A2E]">Retirer vers Mobile Money</h3>
+        <h3 className="font-medium text-[#1A1A2E]">Portefeuille Mobile Money</h3>
         <p className="text-sm text-gray-500 mt-2">
-          Les retraits seront disponibles dès que le portefeuille partenaire sera connecté.
+          Recharge et retraits seront disponibles dès que le hub de paiement sera joignable.
         </p>
       </section>
     );
   }
 
   return (
-    <section className="rounded-xl border border-gray-100 bg-white p-4 space-y-4">
+    <section className="rounded-xl border border-gray-100 bg-white p-4 space-y-5">
       <div>
-        <h3 className="font-medium text-[#1A1A2E]">Retirer vers Mobile Money</h3>
+        <h3 className="font-medium text-[#1A1A2E]">Portefeuille Mobile Money</h3>
         <p className="text-xs text-gray-500 mt-1">
-          Transférez votre solde vers Orange Money, M-Pesa ou Airtel Money. Minimum 500 FC.
-          Solde disponible : <strong>{formatCdf(balanceCdf)}</strong>
+          Orange Money, M-Pesa ou Airtel Money. Minimum 500 FC. Solde :{" "}
+          <strong>{formatCdf(balanceCdf)}</strong>
         </p>
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
-        <label className="text-xs text-gray-500">
-          Montant (FC)
-          <input
-            type="number"
-            min={500}
-            className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-            placeholder="5000"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-          />
-        </label>
         <label className="text-xs text-gray-500">
           Opérateur
           <select
@@ -117,7 +141,7 @@ export function PartnerWithdrawPanel({ balanceCdf, walletAvailable = true, onWit
             ))}
           </select>
         </label>
-        <label className="text-xs text-gray-500 sm:col-span-2">
+        <label className="text-xs text-gray-500">
           Numéro Mobile Money (+243…)
           <input
             className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
@@ -127,14 +151,46 @@ export function PartnerWithdrawPanel({ balanceCdf, walletAvailable = true, onWit
           />
         </label>
       </div>
-      <button
-        type="button"
-        disabled={loading || balanceCdf < 500}
-        onClick={submit}
-        className="px-4 py-2.5 min-h-11 rounded-xl bg-indigo-600 text-white text-sm font-medium disabled:opacity-50 w-full sm:w-auto"
-      >
-        {loading ? "Retrait en cours…" : "Retirer mes revenus"}
-      </button>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-2">
+          <p className="text-sm font-medium text-[#1A1A2E]">Recharger</p>
+          <input
+            type="number"
+            min={500}
+            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+            placeholder="500"
+            value={topUpAmount}
+            onChange={(e) => setTopUpAmount(e.target.value)}
+          />
+          <button
+            type="button"
+            disabled={loading !== null}
+            onClick={submitTopUp}
+            className="px-4 py-2.5 min-h-11 rounded-xl bg-emerald-600 text-white text-sm font-medium disabled:opacity-50 w-full"
+          >
+            {loading === "topup" ? "Recharge…" : "Recharger (min. 500 FC)"}
+          </button>
+        </div>
+        <div className="space-y-2">
+          <p className="text-sm font-medium text-[#1A1A2E]">Retirer</p>
+          <input
+            type="number"
+            min={500}
+            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+            placeholder="5000"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+          />
+          <button
+            type="button"
+            disabled={loading !== null || balanceCdf < 500}
+            onClick={submitWithdraw}
+            className="px-4 py-2.5 min-h-11 rounded-xl bg-indigo-600 text-white text-sm font-medium disabled:opacity-50 w-full"
+          >
+            {loading === "withdraw" ? "Retrait en cours…" : "Retirer mes revenus"}
+          </button>
+        </div>
+      </div>
       {success && <p className="text-sm text-green-700">{success}</p>}
       {error && <p className="text-sm text-red-600">{error}</p>}
     </section>

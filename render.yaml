@@ -80,6 +80,12 @@ services:
         fromService: { name: mova-gateway, type: web, envVarKey: JWT_SECRET }
       - key: DRIVER_SERVICE_URL
         fromService: { name: mova-driver, type: web, property: hostport }
+      - key: PAYMENT_SERVICE_URL
+        fromService: { name: mova-payment, type: web, property: hostport }
+      - key: AUTH_SERVICE_URL
+        fromService: { name: mova-auth, type: web, property: hostport }
+      - key: PAY_HUB_URL
+        value: "https://pay.afri-soft.com"
       - fromGroup: mova-external-apis
 
   - type: web

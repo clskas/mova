@@ -36,6 +36,21 @@ describe('WalletService', () => {
     });
   });
 
+  it('crée le portefeuille au premier getWallet', async () => {
+    prisma.wallet.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ id: 'w-new', userId: 'u-new', balanceCdf: 0, heldBalanceCdf: 0, transactions: [] });
+    prisma.wallet.upsert.mockResolvedValue({ id: 'w-new', userId: 'u-new', balanceCdf: 0 });
+    const result = await service.getWallet('u-new');
+    expect(prisma.wallet.upsert).toHaveBeenCalledWith({
+      where: { userId: 'u-new' },
+      create: { userId: 'u-new', balanceCdf: 0 },
+      update: {},
+    });
+    expect(result.balanceCdf).toBe(0);
+    expect(result.formattedBalance).toContain('FC');
+  });
+
   it('refuse un débit si solde insuffisant', async () => {
     prisma.wallet.findUnique.mockResolvedValue({ id: 'w1', userId: 'u1', balanceCdf: 100, transactions: [] });
     await expect(service.debit('u1', 500, 'test')).rejects.toMatchObject({

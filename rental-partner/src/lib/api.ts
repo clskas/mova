@@ -226,6 +226,13 @@ export function withdrawPartnerWallet(data: { amountCdf: number; provider: strin
   });
 }
 
+export function topUpPartnerWallet(data: { amountCdf: number; provider: string; phone: string }) {
+  return apiFetch<WalletWithdrawResult>("/api/wallet/top-up", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
 export function fetchEarningsReport(params?: { from?: string; to?: string; q?: string; skip?: number; take?: number }) {
   const sp = new URLSearchParams();
   if (params?.from) sp.set("from", params.from);

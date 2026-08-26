@@ -44,15 +44,7 @@ export default function RevenusPage() {
     if (earningsResult.status === "fulfilled") {
       setEarnings(earningsResult.value);
     } else {
-      setEarnings({
-        balanceCdf: 0,
-        formattedBalance: formatCdf(0),
-        walletAvailable: false,
-        walletMessage:
-          "Portefeuille temporairement indisponible. Le solde s'affichera dès que le service de paiement sera prêt.",
-        recentCredits: [],
-      });
-      setError(toUserErrorMessage(earningsResult.reason, "Portefeuille temporairement indisponible."));
+      setError(toUserErrorMessage(earningsResult.reason, "Impossible de charger les revenus."));
     }
     if (reportResult.status === "fulfilled") {
       setReport(reportResult.value);

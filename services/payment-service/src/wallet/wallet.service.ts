@@ -51,22 +51,33 @@ export class WalletService {
   }
 
   async getWallet(userId: string) {
+    const id = userId?.trim();
+    if (!id) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'userId requis');
+    }
     let wallet = await this.prisma.wallet.findUnique({
-      where: { userId },
+      where: { userId: id },
       include: { transactions: { orderBy: { createdAt: 'desc' }, take: 20 } },
     });
     if (!wallet) {
-      await this.createWallet(userId);
+      await this.createWallet(id);
       wallet = await this.prisma.wallet.findUnique({
-        where: { userId },
+        where: { userId: id },
         include: { transactions: { orderBy: { createdAt: 'desc' }, take: 20 } },
       });
     }
+    if (!wallet) {
+      throw new MovaHttpException(
+        MovaErrorCode.INTERNAL_ERROR,
+        undefined,
+        'Impossible de créer le portefeuille.',
+      );
+    }
     return {
       ...wallet,
-      formattedBalance: formatCdf(wallet!.balanceCdf),
-      availableBalanceCdf: wallet!.balanceCdf - (wallet!.heldBalanceCdf ?? 0),
-      heldBalanceCdf: wallet!.heldBalanceCdf ?? 0,
+      formattedBalance: formatCdf(wallet.balanceCdf),
+      availableBalanceCdf: wallet.balanceCdf - (wallet.heldBalanceCdf ?? 0),
+      heldBalanceCdf: wallet.heldBalanceCdf ?? 0,
       currency: 'CDF',
     };
   }

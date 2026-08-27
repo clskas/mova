@@ -39,6 +39,7 @@ Fill (no placeholders from the SerdiPay PDF):
 ```env
 MOCK_PAYMENTS=false
 MOBILE_MONEY_GATEWAY=serdipay
+# UAT TEST (SerdiPay). After they activate production: https://serdipay.com
 SERDIPAY_BASE_URL=https://apis.serdipay.com
 SERDIPAY_EMAIL=
 SERDIPAY_PASSWORD=

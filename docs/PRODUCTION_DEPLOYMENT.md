@@ -135,6 +135,8 @@ Sans provider SMS avec `MOCK_OTP=false` et sans `ALLOW_TEST_OTP`, l'API renvoie 
 | `true` (dev) | Mobile money simulé, succès immédiat |
 | `false` (prod) | SerdiPay C2B (`payment-client`) / B2C (`payment-merchant`) ; telecom `OM` / `MP` / `AM` / `AF` |
 
+`SERDIPAY_BASE_URL` : **UAT** `https://apis.serdipay.com` (TEST, demandé par SerdiPay) jusqu’à activation du marchand ; **prod** `https://serdipay.com` ensuite (fiche Word). Recreate du conteneur `payment` après changement. Auth : `POST …/merchant/get-token` `{ email, password }`.
+
 Le **portefeuille SENGA** (`POST /api/wallet/top-up`, `POST /api/payments/rides/:id`) persiste toujours en PostgreSQL, mock ou réel.
 
 Sans credentials marchand SerdiPay **sur le VPS hub** (ou secours AT/legacy), l'API renvoie un message d'erreur explicite listant les variables manquantes (voir `config/external-apis.env.example`). Callback public : `POST https://pay.afri-soft.com/webhooks/serdipay` (Nest : `POST /api/payments/webhooks/serdipay`).

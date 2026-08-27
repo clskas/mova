@@ -1,6 +1,9 @@
 /** SerdiPay Public API — Mobile Money RDC (passerelle primaire SENGA).
  *
  * Doc marchand « API USSD - documentation » (Public API) :
+ * - Hosts : UAT/TEST https://apis.serdipay.com (until SerdiPay activates prod) ;
+ *   prod https://serdipay.com (Word « API Routes PRODUCTION »).
+ *   Word also lists staging https://api.serdipay.cloud (separate host).
  * - Auth : POST /api/public-api/v1/merchant/get-token  { email, password }
  * - Paiement : POST …/payment-client | …/payment-merchant
  *   body : api_id, api_password, merchantCode, merchant_pin, clientPhone,

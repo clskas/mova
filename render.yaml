@@ -260,7 +260,7 @@ envVarGroups:
       - key: AFRICAS_TALKING_SMS_SENDER
         value: MOVA
       - key: SERDIPAY_BASE_URL
-        value: https://apis.serdipay.com
+        value: https://serdipay.com
       # Public API MM — live keys belong on VPS /opt/afrisoft-pay/.env (pay.afri-soft.com), not git.
       - key: SERDIPAY_EMAIL
         sync: false

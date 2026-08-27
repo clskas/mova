@@ -62,7 +62,7 @@ jobs:
               {key:"AFRICAS_TALKING_ENV", value:"production"},
               {key:"AFRICAS_TALKING_SMS_SENDER", value:"MOVA"},
               {key:"MOBILE_MONEY_GATEWAY", value:"serdipay"},
-              {key:"SERDIPAY_BASE_URL", value:"https://apis.serdipay.com"},
+              {key:"SERDIPAY_BASE_URL", value:"https://serdipay.com"},
               {key:"SUPABASE_URL", value:"https://furttqrltkwirdhiktdl.supabase.co"},
               {key:"SUPABASE_UPLOADS_BUCKET", value:"uploads"},
               {key:"SUPABASE_KYC_BUCKET", value:"kyc-docs"}
@@ -80,7 +80,7 @@ jobs:
               {key:"DRIVER_SERVICE_URL", value:"https://mova-driver.onrender.com"},
               {key:"SMS_PROVIDER", value:"africastalking"},
               {key:"MOBILE_MONEY_GATEWAY", value:"serdipay"},
-              {key:"SERDIPAY_BASE_URL", value:"https://apis.serdipay.com"},
+              {key:"SERDIPAY_BASE_URL", value:"https://serdipay.com"},
               {key:"SUPABASE_URL", value:"https://furttqrltkwirdhiktdl.supabase.co"},
               {key:"SUPABASE_UPLOADS_BUCKET", value:"uploads"},
               {key:"SUPABASE_KYC_BUCKET", value:"kyc-docs"},
@@ -104,7 +104,7 @@ jobs:
               {key:"MOCK_PAYMENTS", value:"false"},
               {key:"SMS_PROVIDER", value:"africastalking"},
               {key:"MOBILE_MONEY_GATEWAY", value:"serdipay"},
-              {key:"SERDIPAY_BASE_URL", value:"https://apis.serdipay.com"},
+              {key:"SERDIPAY_BASE_URL", value:"https://serdipay.com"},
               {key:"SUPABASE_URL", value:"https://furttqrltkwirdhiktdl.supabase.co"},
               {key:"SUPABASE_UPLOADS_BUCKET", value:"uploads"},
               {key:"SUPABASE_KYC_BUCKET", value:"kyc-docs"}

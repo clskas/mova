@@ -135,7 +135,7 @@ Sans provider SMS avec `MOCK_OTP=false` et sans `ALLOW_TEST_OTP`, l'API renvoie 
 | `true` (dev) | Mobile money simulé, succès immédiat |
 | `false` (prod) | SerdiPay C2B (`payment-merchant`) / B2C (`payment-client`) ; telecom `OM` / `MP` / `AM` / `AF` |
 
-`SERDIPAY_BASE_URL` : **UAT** `https://apis.serdipay.com` (TEST, demandé par SerdiPay) jusqu’à activation du marchand ; **prod** `https://serdipay.com` ensuite (fiche Word). Recreate du conteneur `payment` après changement. Auth : `POST …/merchant/get-token` `{ email, password }`.
+`SERDIPAY_BASE_URL` : **prod** `https://serdipay.com` (PDF Public API + fiche Word « API Routes PRODUCTION »). Staging Word : `https://api.serdipay.cloud`. Recreate du conteneur `payment` après changement. Auth : `POST …/merchant/get-token` `{ email, password }`.
 
 Le **portefeuille SENGA** (`POST /api/wallet/top-up`, `POST /api/payments/rides/:id`) persiste toujours en PostgreSQL, mock ou réel.
 

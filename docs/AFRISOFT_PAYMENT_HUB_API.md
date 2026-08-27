@@ -68,7 +68,7 @@ Future ─┘                                         (afrisoft-pay sur VPS Hetz
 5. Les apps **ne stockent jamais** `SERDIPAY_*` / `CINETPAY_*`.
 6. Switch sticky : `MOBILE_MONEY_GATEWAY=serdipay|cinetpay` (comme `SMS_PROVIDER`) — **pas** de failover silencieux.
 
-**État code actuel (août 2026) :** SENGA (Render `mova-payment`) appelle le hub `https://pay.afri-soft.com` (`POST /v1/payments`, HMAC `app_id=senga`). Seul le VPS (`AFRISOFT_PAY_HUB_MODE=true`) détient `SERDIPAY_*` et appelle `apis.serdipay.com`. Callbacks publics hub : `POST https://pay.afri-soft.com/webhooks/serdipay` et `…/webhooks/cinetpay`. Le hub notifie SENGA sur `POST /api/payments/webhooks/afrisoft-hub`.
+**État code actuel (août 2026) :** SENGA (Render `mova-payment`) appelle le hub `https://pay.afri-soft.com` (`POST /v1/payments`, HMAC `app_id=senga`). Seul le VPS (`AFRISOFT_PAY_HUB_MODE=true`) détient `SERDIPAY_*` et appelle `https://serdipay.com` (PDF Public API + fiche Word PRODUCTION). Callbacks publics hub : `POST https://pay.afri-soft.com/webhooks/serdipay` et `…/webhooks/cinetpay`. Le hub notifie SENGA sur `POST /api/payments/webhooks/afrisoft-hub`.
 
 ---
 
@@ -426,7 +426,7 @@ Elles doivent seulement :
 
 | Variable | Rôle |
 |----------|------|
-| `SERDIPAY_BASE_URL` | Hôte Public API — **UAT actuel** `https://apis.serdipay.com` jusqu’à activation prod ; ensuite `https://serdipay.com` (fiche Word « API Routes PRODUCTION ») |
+| `SERDIPAY_BASE_URL` | Hôte Public API — **prod** `https://serdipay.com` (PDF + fiche Word « API Routes PRODUCTION ») ; staging Word `https://api.serdipay.cloud` |
 | `SERDIPAY_EMAIL` / `SERDIPAY_PASSWORD` | Auth `get-token` (Username + Password de la fiche marchand) — JSON `{ email, password }` |
 | `SERDIPAY_API_ID` | Corps paiement (`api_id`) |
 | `SERDIPAY_API_PASSWORD` | Corps (`api_password`) — **optionnel** ; défaut = `SERDIPAY_PASSWORD` (pas de champ « API Password » chez SerdiPay) |
@@ -445,9 +445,9 @@ Voir aussi `deploy/afrisoft-pay/.env.example`, `config/external-apis.env.example
 
 **Bascule ops :** une seule variable `MOBILE_MONEY_GATEWAY=serdipay|cinetpay` + recreate conteneur. Les deux jeux de secrets peuvent coexister sur le VPS.
 
-**UAT vs production SerdiPay (août 2026) :** SerdiPay a indiqué que `apis.serdipay.com` est le **TEST**. Le hub VPS y pointe (`SERDIPAY_BASE_URL`) avec `MOCK_PAYMENTS=false` et les clés de la fiche *SerdipayAPIKey*. La prod (fiche Word) est `https://serdipay.com` — **ne pas y basculer** tant que SerdiPay n’a pas activé le marchand après un test UAT réussi. La fiche liste aussi un staging `https://api.serdipay.cloud` (hôte distinct ; actuellement 500).
+**Production SerdiPay (août 2026) :** le hub VPS pointe vers `https://serdipay.com` (`SERDIPAY_BASE_URL`) avec `MOCK_PAYMENTS=false` et les clés de la fiche *SerdipayAPIKey*. `https://apis.serdipay.com` n’est **pas** dans le PDF ni le Word — ne plus l’utiliser. Staging Word : `https://api.serdipay.cloud` (hôte distinct ; actuellement 500).
 
-Le PDF « API USSD - documentation » contient **deux** produits : (1) **Public API** (pp. 1–15) — Mobile Money marchand, ce que le Word documente et ce que le hub appelle ; (2) **SERDIPAY USSD** (pp. 16–25) — dépôt/retrait wallet `{ username, account }`, endpoints non fournis (« Share the Endpoint ») — 404 sur l’UAT. `get-token` Public API : `POST {BASE}/api/public-api/v1/merchant/get-token` avec `{ email, password }` (un champ `username` seul → 400). Fiche Word : C2B = `payment-merchant`, B2C = `payment-client`.
+Le PDF « API USSD - documentation » contient **deux** produits : (1) **Public API** (pp. 1–15) — Mobile Money marchand, ce que le Word documente et ce que le hub appelle ; (2) **SERDIPAY USSD** (pp. 16–25) — dépôt/retrait wallet `{ username, account }`, endpoints non fournis (« Share the Endpoint »). `get-token` Public API : `POST {BASE}/api/public-api/v1/merchant/get-token` avec `{ email, password }` (un champ `username` seul → 400 `email required`). Fiche Word : C2B = `payment-merchant`, B2C = `payment-client`. Pas de sandbox dans ces deux fichiers : un C2B réel (≥ 500 FC SENGA) est le test suivant une fois `get-token` en 200.
 
 **Checklist VPS (copier-coller) — ne pas committer les valeurs :**
 
@@ -457,7 +457,7 @@ cd /opt/afrisoft-pay
 chmod 600 .env
 nano .env
 # MOCK_PAYMENTS=false
-# SERDIPAY_BASE_URL=https://apis.serdipay.com   # UAT ; prod = https://serdipay.com après activation
+# SERDIPAY_BASE_URL=https://serdipay.com   # prod PDF/Word ; staging = https://api.serdipay.cloud
 # SERDIPAY_EMAIL=…          SERDIPAY_PASSWORD=…
 # SERDIPAY_API_ID=…
 # SERDIPAY_API_PASSWORD=…   # optionnel : défaut = SERDIPAY_PASSWORD
@@ -487,9 +487,9 @@ curl -sS https://pay.afri-soft.com/health
 - [x] Webhook public hub CinetPay `https://pay.afri-soft.com/webhooks/cinetpay`  
 - [x] Wallet top-up async + poll Flutter  
 - [x] Endpoints `/v1/*` + HMAC `app_id` + webhook sortant vers SENGA  
-- [x] Credentials marchand SerdiPay posés sur le VPS hub (UAT `apis.serdipay.com`)  
-- [ ] `get-token` UAT accepté par SerdiPay (encore 401 Invalid Credentials avec les clés Word)  
-- [ ] Après test UAT validé par SerdiPay : `SERDIPAY_BASE_URL=https://serdipay.com` + recreate
+- [x] Credentials marchand SerdiPay posés sur le VPS hub (prod `https://serdipay.com`)  
+- [ ] `get-token` prod accepté par SerdiPay (encore 400 « Failed to get the token »)  
+- [ ] Test C2B réel ≥ 500 FC (OM / MP / AM) une fois le token 200
 - [ ] Flutter : ouvrir `paymentUrl` CinetPay  
 
 ---

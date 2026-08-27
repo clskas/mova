@@ -3,7 +3,7 @@
  * Contract: docs/AFRISOFT_PAYMENT_HUB_API.md
  *
  * Render mova-payment MUST call this client (pay.afri-soft.com).
- * Never call apis.serdipay.com from Render (IP not whitelisted).
+ * Never call serdipay.com from Render (IP not whitelisted — VPS hub only).
  *
  * Env (client / SENGA Render) — any alias works:
  *   PAY_HUB_URL | AFRISOFT_PAY_BASE_URL | AFRISOFT_PAY_HUB_URL = https://pay.afri-soft.com

@@ -67,7 +67,7 @@ services:
       MOCK_PAYMENTS: ${MOCK_PAYMENTS:-false}
       MOBILE_MONEY_GATEWAY: ${MOBILE_MONEY_GATEWAY:-serdipay}
       AFRISOFT_PAY_HUB_MODE: ${AFRISOFT_PAY_HUB_MODE:-true}
-      SERDIPAY_BASE_URL: ${SERDIPAY_BASE_URL:-https://apis.serdipay.com}
+      SERDIPAY_BASE_URL: ${SERDIPAY_BASE_URL:-https://serdipay.com}
     ports:
       - "127.0.0.1:3000:3000"
     healthcheck:

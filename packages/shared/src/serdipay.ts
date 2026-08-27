@@ -6,9 +6,9 @@
  *    Endpoints are placeholders (“Share the Endpoint”); not used for SENGA MM.
  *
  * Public API (this client) :
- * - Hosts : UAT/TEST https://apis.serdipay.com (until SerdiPay activates prod) ;
- *   prod https://serdipay.com (Word « API Routes PRODUCTION »).
- *   Word also lists staging https://api.serdipay.cloud (separate host).
+ * - Hosts from *SerdipayAPIKey* + PDF « API USSD » :
+ *   prod https://serdipay.com ; staging https://api.serdipay.cloud.
+ *   Do not use https://apis.serdipay.com (not in those files).
  * - Auth : POST /api/public-api/v1/merchant/get-token  { email, password }
  *   Word field is Username (email). A `username`-only body is rejected (400).
  * - Word routes : C2B → …/payment-merchant ; B2C → …/payment-client

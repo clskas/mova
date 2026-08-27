@@ -3,6 +3,7 @@ import {
   isSerdiPayAuthConfigured,
   isSerdiPayPaymentConfigured,
   isSerdiPaySmsConfigured,
+  serdiPayDisburseMobileMoney,
   serdiPayGetAccessToken,
   serdiPayInitiateMobileMoney,
   serdiPayNormalizePhone,
@@ -113,7 +114,7 @@ describe('serdipay Public API', () => {
     );
   });
 
-  it('C2B posts payment-client body with telecom codes', async () => {
+  it('C2B posts payment-merchant body with telecom codes (Word C2B route)', async () => {
     env.SERDIPAY_EMAIL = 'm@example.com';
     env.SERDIPAY_PASSWORD = 'secret';
     env.SERDIPAY_API_ID = 'APIX';
@@ -144,8 +145,8 @@ describe('serdipay Public API', () => {
     expect(result.success).toBe(true);
     expect(result.providerRef).toBe('sp_SERDXYZ');
     const payCall = fetchMock.mock.calls[1];
-    expect(payCall[0]).toBe('https://serdipay.com/api/public-api/v1/merchant/payment-client');
-    expect(JSON.parse(payCall[1].body)).toMatchObject({
+    expect(payCall[0]).toBe('https://serdipay.com/api/public-api/v1/merchant/payment-merchant');
+    expect(JSON.parse(payCall[1].body)).toEqual({
       api_id: 'APIX',
       api_password: 'apipw',
       merchantCode: '466551',
@@ -155,6 +156,40 @@ describe('serdipay Public API', () => {
       currency: 'CDF',
       telecom: 'AM',
     });
+  });
+
+  it('B2C posts payment-client (Word B2C route)', async () => {
+    env.SERDIPAY_EMAIL = 'm@example.com';
+    env.SERDIPAY_PASSWORD = 'secret';
+    env.SERDIPAY_API_ID = 'APIX';
+    env.SERDIPAY_API_PASSWORD = 'apipw';
+    env.SERDIPAY_MERCHANT_CODE = '466551';
+    env.SERDIPAY_MERCHANT_PIN = '1234';
+
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ access_token: 'tok-abc' }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 102,
+        json: async () => ({ message: 'ok', payment: { transactionId: 'SERDPAY' } }),
+      });
+    (global as unknown as { fetch: typeof fetch }).fetch = fetchMock as unknown as typeof fetch;
+
+    await serdiPayDisburseMobileMoney(get, {
+      operator: 'MPESA',
+      amountCdf: 500,
+      phone: '0994972450',
+      reference: 'payout_ref_1',
+    });
+    expect(fetchMock.mock.calls[1][0]).toBe(
+      'https://serdipay.com/api/public-api/v1/merchant/payment-client',
+    );
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body as string).telecom).toBe('MP');
   });
 
   it('refuses SMS when SERDIPAY_SMS_API_ID/KEY unset', async () => {

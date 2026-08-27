@@ -1,11 +1,17 @@
 /** SerdiPay Public API — Mobile Money RDC (passerelle primaire SENGA).
  *
- * Doc marchand « API USSD - documentation » (Public API) :
+ * The PDF « API USSD - documentation » contains two products:
+ * 1) Public API (pp. 1–15) — merchant Mobile Money. Word *SerdipayAPIKey* routes.
+ * 2) SERDIPAY USSD (pp. 16–25) — wallet deposit/withdraw `{ username, password, account }`.
+ *    Endpoints are placeholders (“Share the Endpoint”); not used for SENGA MM.
+ *
+ * Public API (this client) :
  * - Hosts : UAT/TEST https://apis.serdipay.com (until SerdiPay activates prod) ;
  *   prod https://serdipay.com (Word « API Routes PRODUCTION »).
  *   Word also lists staging https://api.serdipay.cloud (separate host).
  * - Auth : POST /api/public-api/v1/merchant/get-token  { email, password }
- * - Paiement : POST …/payment-client | …/payment-merchant
+ *   Word field is Username (email). A `username`-only body is rejected (400).
+ * - Word routes : C2B → …/payment-merchant ; B2C → …/payment-client
  *   body : api_id, api_password, merchantCode, merchant_pin, clientPhone,
  *          amount, currency, telecom (AM|OM|MP|AF)
  *   api_password : same as portal Password in the merchant credential sheet
@@ -382,10 +388,6 @@ async function postMerchantPayment(
         amount,
         currency: 'CDF',
         telecom,
-        // Extra correlation fields (confirm with SerdiPay if accepted)
-        reference: params.reference,
-        externalId: params.reference,
-        merchantReference: params.reference,
       }),
     });
 
@@ -465,7 +467,7 @@ async function postMerchantPayment(
   }
 }
 
-/** C2B — encaissement (payment-client) : push USSD vers le téléphone client. */
+/** C2B — encaissement (Word: payment-merchant) : push USSD vers le téléphone client. */
 export async function serdiPayInitiateMobileMoney(
   get: EnvGetter,
   params: { operator: MobileMoneyOperator; amountCdf: number; phone: string; reference: string },
@@ -473,13 +475,13 @@ export async function serdiPayInitiateMobileMoney(
   return postMerchantPayment(
     get,
     'c2bPath',
-    '/api/public-api/v1/merchant/payment-client',
+    '/api/public-api/v1/merchant/payment-merchant',
     params,
     'c2b',
   );
 }
 
-/** B2C — décaissement (payment-merchant) — confirmer le sens avec SerdiPay si besoin. */
+/** B2C — décaissement (Word: payment-client). */
 export async function serdiPayDisburseMobileMoney(
   get: EnvGetter,
   params: { operator: MobileMoneyOperator; amountCdf: number; phone: string; reference: string },
@@ -487,7 +489,7 @@ export async function serdiPayDisburseMobileMoney(
   return postMerchantPayment(
     get,
     'b2cPath',
-    '/api/public-api/v1/merchant/payment-merchant',
+    '/api/public-api/v1/merchant/payment-client',
     params,
     'b2c',
   );

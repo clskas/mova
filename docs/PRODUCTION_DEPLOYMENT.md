@@ -133,7 +133,7 @@ Sans provider SMS avec `MOCK_OTP=false` et sans `ALLOW_TEST_OTP`, l'API renvoie 
 | `MOCK_PAYMENTS` | Comportement |
 |-----------------|--------------|
 | `true` (dev) | Mobile money simulé, succès immédiat |
-| `false` (prod) | SerdiPay C2B (`payment-client`) / B2C (`payment-merchant`) ; telecom `OM` / `MP` / `AM` / `AF` |
+| `false` (prod) | SerdiPay C2B (`payment-merchant`) / B2C (`payment-client`) ; telecom `OM` / `MP` / `AM` / `AF` |
 
 `SERDIPAY_BASE_URL` : **UAT** `https://apis.serdipay.com` (TEST, demandé par SerdiPay) jusqu’à activation du marchand ; **prod** `https://serdipay.com` ensuite (fiche Word). Recreate du conteneur `payment` après changement. Auth : `POST …/merchant/get-token` `{ email, password }`.
 

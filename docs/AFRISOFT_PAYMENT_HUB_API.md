@@ -333,7 +333,7 @@ Flux réel dans le dépôt :
 1. **App Flutter** : `mobile/lib/features/wallet/wallet_screen.dart` → `POST /wallet/top-up` `{ provider, amountCdf, phone }`.
 2. **API** : `WalletController` → `WalletService.topUp` (`services/payment-service/src/wallet/wallet.service.ts`).
 3. Selon `MOBILE_MONEY_GATEWAY` + téléphone :
-   - `serdipay` → `serdiPayInitiateMobileMoney` (C2B push USSD) → `providerRef` `sp_…`
+   - `serdipay` → `serdiPayInitiateMobileMoney` (C2B Word : `payment-merchant`) → `providerRef` `sp_…`
    - `cinetpay` → `cinetPayInitiateMobileMoney` (checkout + `paymentUrl`) → `providerRef` `cp_…`
 4. Transaction `TOPUP_PENDING` ; l’app poll `GET /wallet/top-up/status?providerRef=`.
 5. Callback agrégateur → hub webhook → `completeMobileMoneyFromWebhook` → `completePendingTopUp` → crédit (`TOPUP_COMPLETED`).
@@ -445,7 +445,9 @@ Voir aussi `deploy/afrisoft-pay/.env.example`, `config/external-apis.env.example
 
 **Bascule ops :** une seule variable `MOBILE_MONEY_GATEWAY=serdipay|cinetpay` + recreate conteneur. Les deux jeux de secrets peuvent coexister sur le VPS.
 
-**UAT vs production SerdiPay (août 2026) :** SerdiPay a indiqué que `apis.serdipay.com` est le **TEST**. Le hub VPS y pointe (`SERDIPAY_BASE_URL`) avec `MOCK_PAYMENTS=false` et les clés de la fiche *SerdipayAPIKey*. La prod (fiche Word) est `https://serdipay.com` — **ne pas y basculer** tant que SerdiPay n’a pas activé le marchand après un test UAT réussi. La fiche liste aussi un staging `https://api.serdipay.cloud` (hôte distinct ; actuellement 500). `get-token` : `POST {BASE}/api/public-api/v1/merchant/get-token` avec `{ email, password }` (un champ `username` seul est rejeté).
+**UAT vs production SerdiPay (août 2026) :** SerdiPay a indiqué que `apis.serdipay.com` est le **TEST**. Le hub VPS y pointe (`SERDIPAY_BASE_URL`) avec `MOCK_PAYMENTS=false` et les clés de la fiche *SerdipayAPIKey*. La prod (fiche Word) est `https://serdipay.com` — **ne pas y basculer** tant que SerdiPay n’a pas activé le marchand après un test UAT réussi. La fiche liste aussi un staging `https://api.serdipay.cloud` (hôte distinct ; actuellement 500).
+
+Le PDF « API USSD - documentation » contient **deux** produits : (1) **Public API** (pp. 1–15) — Mobile Money marchand, ce que le Word documente et ce que le hub appelle ; (2) **SERDIPAY USSD** (pp. 16–25) — dépôt/retrait wallet `{ username, account }`, endpoints non fournis (« Share the Endpoint ») — 404 sur l’UAT. `get-token` Public API : `POST {BASE}/api/public-api/v1/merchant/get-token` avec `{ email, password }` (un champ `username` seul → 400). Fiche Word : C2B = `payment-merchant`, B2C = `payment-client`.
 
 **Checklist VPS (copier-coller) — ne pas committer les valeurs :**
 

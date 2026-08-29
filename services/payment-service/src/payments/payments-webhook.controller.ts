@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Headers, Logger, Post, Req } from '@nestjs/common';
+import { Body, Controller, Get, Headers, HttpCode, HttpStatus, Logger, Post, Req } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import { createHmac, timingSafeEqual } from 'crypto';
@@ -12,31 +12,12 @@ import {
 } from '@mova/shared';
 import { PaymentsService } from './payments.service';
 import { HubPaymentsService } from '../hub/hub-payments.service';
-
-function asRecord(body: unknown): Record<string, unknown> {
-  return body && typeof body === 'object' && !Array.isArray(body) ? (body as Record<string, unknown>) : {};
-}
-
-function pickString(obj: Record<string, unknown>, keys: string[]): string | undefined {
-  for (const key of keys) {
-    const value = obj[key];
-    if (typeof value === 'string' && value.trim()) return value.trim();
-    if (typeof value === 'number' && Number.isFinite(value)) return String(value);
-  }
-  return undefined;
-}
-
-function normalizeOutcome(raw?: string): 'COMPLETED' | 'FAILED' | null {
-  if (!raw) return null;
-  const s = raw.trim().toUpperCase();
-  if (['SUCCESS', 'SUCCESSFUL', 'COMPLETED', 'COMPLETE', 'PAID', 'OK', 'TS-SUCCESS'].includes(s)) {
-    return 'COMPLETED';
-  }
-  if (['FAILED', 'FAIL', 'ERROR', 'CANCELLED', 'CANCELED', 'REJECTED', 'TIMEOUT', 'TS-FAILED'].includes(s)) {
-    return 'FAILED';
-  }
-  return null;
-}
+import {
+  asRecord,
+  extractAggregatorOutcome,
+  extractAggregatorProviderRef,
+  pickString,
+} from './provider-ref.util';
 
 @ApiTags('payments-webhooks')
 @Controller('payments')
@@ -83,52 +64,8 @@ export class PaymentsWebhookController {
     }
   }
 
-  private extractProviderRef(payload: Record<string, unknown>, fallbackPrefix: 'sp' | 'at'): string | undefined {
-    // SerdiPay Public API callback: { message, payment: { status, sessionId, transactionId } }
-    const nested = asRecord(
-      payload.data ?? payload.payload ?? payload.result ?? payload.payment ?? {},
-    );
-    const candidates = [
-      pickString(payload, ['providerRef', 'provider_ref', 'externalId', 'external_id', 'transactionId', 'transaction_id', 'txnId', 'id']),
-      pickString(nested, ['providerRef', 'provider_ref', 'externalId', 'external_id', 'transactionId', 'transaction_id', 'txnId', 'sessionId', 'id']),
-      pickString(payload, ['reference', 'merchantReference', 'clientReference', 'metadata', 'message']),
-      pickString(nested, ['reference', 'merchantReference', 'clientReference']),
-    ].filter(Boolean) as string[];
-
-    for (const c of candidates) {
-      if (c.startsWith('sp_') || c.startsWith('at_')) return c;
-      if (c.startsWith('topup_') || c.includes(':') || c.length >= 8) {
-        // May be our merchant reference — try with prefix variants
-        if (fallbackPrefix === 'sp' && !c.startsWith('sp_')) {
-          // Prefer exact match first; PaymentsService looks up by providerRef stored at initiate time
-        }
-        return c.startsWith('sp_') || c.startsWith('at_') ? c : c;
-      }
-    }
-    const raw = candidates[0];
-    if (!raw) return undefined;
-    if (raw.startsWith('sp_') || raw.startsWith('at_')) return raw;
-    return `${fallbackPrefix}_${raw}`;
-  }
-
-  private extractOutcome(payload: Record<string, unknown>): 'COMPLETED' | 'FAILED' | null {
-    const nested = asRecord(
-      payload.data ?? payload.payload ?? payload.result ?? payload.payment ?? {},
-    );
-    // SerdiPay may send top-level status as HTTP-like number (200 / 402)
-    const topStatus = payload.status;
-    if (typeof topStatus === 'number') {
-      if (topStatus === 200) return 'COMPLETED';
-      if (topStatus === 102) return null; // still processing — ignore until final callback
-      if ([400, 401, 402, 403, 409, 429].includes(topStatus)) return 'FAILED';
-    }
-    return (
-      normalizeOutcome(pickString(payload, ['status', 'transactionStatus', 'paymentStatus', 'state', 'resultCode'])) ??
-      normalizeOutcome(pickString(nested, ['status', 'transactionStatus', 'paymentStatus', 'state', 'resultCode']))
-    );
-  }
-
   @Post('webhooks/serdipay')
+  @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Webhook SerdiPay Mobile Money (public)' })
   async serdiPay(
     @Body() body: unknown,
@@ -142,39 +79,38 @@ export class PaymentsWebhookController {
       return { success: false, message: 'Signature invalide' };
     }
     const payload = asRecord(body);
-    const providerRef = this.extractProviderRef(payload, 'sp');
-    const outcome = this.extractOutcome(payload);
+    const providerRef = extractAggregatorProviderRef(payload);
+    const outcome = extractAggregatorOutcome(payload);
     if (!outcome) {
       this.logger.log(`SerdiPay webhook pending (102/unknown) ref=${providerRef ?? '?'}`);
       return { success: true, message: 'Transaction en cours' };
     }
     if (!providerRef) {
       this.logger.warn(`SerdiPay webhook sans référence: ${raw.slice(0, 300)}`);
-      return { success: false, message: 'Référence manquante' };
+      return { success: true, message: 'Référence manquante' };
     }
     this.logger.log(`SerdiPay webhook ${outcome} ref=${providerRef}`);
+    const failure = pickString(payload, ['message', 'description', 'failureReason']);
     if (this.hub.isEnabled()) {
-      const hubResult = await this.hub.finalizeFromAggregator(
-        providerRef,
-        outcome,
-        pickString(payload, ['message', 'description', 'failureReason']),
-      );
+      const hubResult = await this.hub.finalizeFromAggregator(providerRef, outcome, failure);
       if (hubResult.found) return { success: true, ...hubResult };
     }
-    return this.payments.completeMobileMoneyFromWebhook(
-      providerRef,
-      outcome,
-      pickString(payload, ['message', 'description', 'failureReason']),
-    );
+    const result = await this.payments.completeMobileMoneyFromWebhook(providerRef, outcome, failure);
+    if (!result.success) {
+      this.logger.warn(`SerdiPay webhook unknown ref=${providerRef} — ACK 200 (no retry storm)`);
+      return { success: true, message: result.message ?? 'Référence inconnue (ack)' };
+    }
+    return result;
   }
 
   @Post('africastalking/callback')
+  @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Callback Africa\'s Talking Mobile Money (public)' })
   async africasTalking(@Body() body: unknown) {
     if (!this.isHubProcess()) return this.rejectAggregatorOnSenga("Africa's Talking");
     const payload = asRecord(body);
-    const providerRef = this.extractProviderRef(payload, 'at');
-    const outcome = this.extractOutcome(payload) ?? 'COMPLETED';
+    const providerRef = extractAggregatorProviderRef(payload);
+    const outcome = extractAggregatorOutcome(payload) ?? 'COMPLETED';
     if (!providerRef) {
       this.logger.warn(`AT callback sans référence: ${JSON.stringify(body).slice(0, 300)}`);
       return { success: false, message: 'Référence manquante' };
@@ -200,6 +136,7 @@ export class PaymentsWebhookController {
   }
 
   @Post('webhooks/cinetpay')
+  @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Webhook CinetPay Mobile Money (public)' })
   async cinetPay(
     @Body() body: unknown,

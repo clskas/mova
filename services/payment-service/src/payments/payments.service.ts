@@ -22,6 +22,7 @@ import { DriverDebtLedgerService } from '../ledger/driver-debt-ledger.service';
 import { HubPaymentsService } from '../hub/hub-payments.service';
 import { AirtelMoneyProvider, MockPaymentProvider, MpesaProvider, OrangeMoneyProvider, isAsyncMobileMoneyRef } from './payment-providers';
 import { PaymentProvider } from './payment-provider.interface';
+import { expandProviderRefKeys } from './provider-ref.util';
 
 const MOBILE_MONEY_METHODS = new Set<PaymentMethod>([
   PaymentMethod.ORANGE_MONEY,
@@ -926,7 +927,13 @@ export class PaymentsService {
     message?: string,
     altRefs: string[] = [],
   ) {
-    const refs = [...new Set([providerRef, ...altRefs].map((r) => r?.trim()).filter(Boolean) as string[])];
+    const refs = [
+      ...new Set(
+        [providerRef, ...altRefs]
+          .flatMap((r) => expandProviderRefKeys(r ?? ''))
+          .filter(Boolean),
+      ),
+    ];
     if (refs.length === 0) {
       return { success: false, message: 'providerRef manquant' };
     }

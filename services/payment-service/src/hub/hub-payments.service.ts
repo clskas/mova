@@ -15,6 +15,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { HubAppsRegistry } from './hub-apps.registry';
 import { CreateHubPaymentDto } from './hub-payments.dto';
+import { expandProviderRefKeys } from '../payments/provider-ref.util';
 
 type HubKind = 'COLLECT' | 'PAYOUT';
 
@@ -213,9 +214,10 @@ export class HubPaymentsService {
     const ref = providerRef.trim();
     if (!ref) return { found: false };
 
+    const keys = expandProviderRefKeys(ref);
     const row =
       (await this.prisma.hubPayment.findFirst({
-        where: { OR: [{ providerRef: ref }, { id: ref }, { reference: ref }] },
+        where: { OR: [{ providerRef: { in: keys } }, { id: { in: keys } }, { reference: { in: keys } }] },
         orderBy: { updatedAt: 'desc' },
       })) ?? null;
     if (!row) return { found: false };

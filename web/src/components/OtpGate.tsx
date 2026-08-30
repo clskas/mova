@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { GoogleContinueButton, googleClientId } from "@/components/GoogleContinueButton";
 import { ApiError, apiFetch, checkGatewayHealth } from "@/lib/api";
 import { clearToken, getToken, isSeedDemoPhone, normalizeLoginPhone, setToken } from "@/lib/auth";
-import { toUserErrorMessage } from "@/lib/user-messages";
+import { LOGIN_GOOGLE_UNAVAILABLE, LOGIN_OTP_UNAVAILABLE, toUserErrorMessage } from "@/lib/user-messages";
 
 type Props = { children: React.ReactNode };
 
@@ -52,8 +52,8 @@ export function OtpGate({ children }: Props) {
       setError(toUserErrorMessage(
         e,
         status === 503 || status >= 500
-          ? "Impossible d'envoyer le code par SMS. Réessayez dans quelques minutes."
-          : "Impossible d'envoyer le code",
+          ? LOGIN_OTP_UNAVAILABLE
+          : "Impossible d'envoyer le code. Réessayez.",
       ));
     } finally {
       setLoading(false);
@@ -90,10 +90,10 @@ export function OtpGate({ children }: Props) {
         setToken(data.accessToken, data.user?.phone);
         setAuthenticated(true);
       } else {
-        setError("Connexion Google impossible. Veuillez réessayer.");
+        setError(LOGIN_GOOGLE_UNAVAILABLE);
       }
     } catch (e) {
-      setError(toUserErrorMessage(e, "Connexion Google refusée"));
+      setError(toUserErrorMessage(e, LOGIN_GOOGLE_UNAVAILABLE));
     } finally {
       setLoading(false);
     }

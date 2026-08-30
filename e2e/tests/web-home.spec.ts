@@ -10,7 +10,9 @@ async function ensureWebHome(page: Page) {
 
   await page.getByPlaceholder("+243 8XX XXX XXX").fill("+243900000010");
   await page.getByRole("button", { name: "Recevoir le code" }).click();
-  await page.getByPlaceholder("Code à 6 chiffres").fill("123456");
+  const otp = page.getByPlaceholder(/123456 \(démo\)|Code à 6 chiffres|Code reçu par e-mail/);
+  await expect(otp).toBeVisible({ timeout: 15_000 });
+  await otp.fill("123456");
   await page.getByRole("button", { name: "Se connecter" }).click();
   await expect(homeHeading).toBeVisible({ timeout: 15_000 });
 }

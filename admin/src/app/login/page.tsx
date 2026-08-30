@@ -44,14 +44,14 @@ export default function LoginPage() {
         const seed = isSeedDemoPhone(phone);
         if (!(seed && (requestRes.status === 429 || requestRes.status >= 500))) {
           throw new Error(
-            sanitizeAdminError(body.error?.message ?? "Impossible d'envoyer le code", requestRes.status),
+            sanitizeAdminError(body.error?.message ?? "Impossible d'envoyer le code. Réessayez.", requestRes.status),
           );
         }
       }
       setCode(isSeedDemoPhone(phone) ? "123456" : "");
       setCodeSent(true);
     } catch (e) {
-      setError(toUserErrorMessage(e, "Impossible d'envoyer le code"));
+      setError(toUserErrorMessage(e, "Impossible d'envoyer le code. Réessayez."));
     } finally {
       setLoading(false);
     }
@@ -63,7 +63,7 @@ export default function LoginPage() {
       throw new Error("Ce compte n'a pas un rôle staff autorisé.");
     }
     if (!data.accessToken) {
-      throw new Error("Connexion Google refusée");
+      throw new Error("Connexion Google impossible pour le moment. Réessayez.");
     }
     setToken(data.accessToken);
     router.replace(defaultPathForRole(role));
@@ -81,7 +81,7 @@ export default function LoginPage() {
       const data = await verifyRes.json();
       if (!verifyRes.ok) {
         throw new Error(
-          sanitizeAdminError(data.error?.message ?? "Connexion Google refusée", verifyRes.status),
+          sanitizeAdminError(data.error?.message ?? "Connexion Google impossible pour le moment. Réessayez.", verifyRes.status),
         );
       }
       if (data.otpRequired && data.challengeId) {
@@ -96,7 +96,7 @@ export default function LoginPage() {
       }
       finishAdminSession(data);
     } catch (e) {
-      setError(toUserErrorMessage(e, "Erreur de connexion"));
+      setError(toUserErrorMessage(e, "Connexion Google impossible pour le moment. Réessayez."));
     } finally {
       setLoading(false);
     }
@@ -121,12 +121,12 @@ export default function LoginPage() {
       const data = await verifyRes.json();
       if (!verifyRes.ok || !data.accessToken) {
         throw new Error(
-          sanitizeAdminError(data.error?.message ?? "Connexion refusée", verifyRes.status),
+          sanitizeAdminError(data.error?.message ?? "Connexion impossible. Réessayez.", verifyRes.status),
         );
       }
       finishAdminSession(data);
     } catch (e) {
-      setError(toUserErrorMessage(e, "Erreur de connexion"));
+      setError(toUserErrorMessage(e, "Connexion impossible. Réessayez."));
     } finally {
       setLoading(false);
     }

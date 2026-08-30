@@ -1,7 +1,15 @@
 const TECHNICAL_PATTERNS = [
   /^HTTP \d/i,
+  /\bHTTP\s*\d{3}\b/i,
+  /\(\s*\d{3}\s*\)/,
   /^Erreur \d{3}$/,
   /^PDF \d+$/i,
+  /API\s*:/i,
+  /https?:\/\//i,
+  /afri-soft\.com/i,
+  /onrender\.com/i,
+  /localhost:\d+/i,
+  /NEXT_PUBLIC_[A-Z0-9_]+/,
   /Exception:/i,
   /SocketException/i,
   /TimeoutException/i,
@@ -41,6 +49,10 @@ const TECHNICAL_PATTERNS = [
   /TWILIO_(ACCOUNT_SID|AUTH_TOKEN|PHONE_NUMBER|VERIFY)/i,
   /Définissez [A-Z0-9_]+/,
 ];
+
+export const LOGIN_GOOGLE_UNAVAILABLE = "Connexion Google impossible pour le moment. Réessayez.";
+export const LOGIN_OTP_UNAVAILABLE = "Impossible d'envoyer le code. Réessayez.";
+export const LOGIN_GENERIC = "Connexion impossible. Réessayez.";
 
 export function httpStatusUserMessage(status: number): string {
   if (status === 401) return "Non autorisé. Veuillez vous connecter.";

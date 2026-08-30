@@ -651,8 +651,16 @@ export class ApiError extends Error {
 
 const ADMIN_TECHNICAL_PATTERNS = [
   /^HTTP \d/i,
+  /\bHTTP\s*\d{3}\b/i,
+  /\(\s*\d{3}\s*\)/,
   /^Erreur \d{3}$/,
   /^PDF \d+$/i,
+  /API\s*:/i,
+  /https?:\/\//i,
+  /afri-soft\.com/i,
+  /onrender\.com/i,
+  /localhost:\d+/i,
+  /NEXT_PUBLIC_[A-Z0-9_]+/,
   /Exception:/i,
   /SocketException/i,
   /TimeoutException/i,
@@ -692,7 +700,9 @@ function adminErrorFallback(status?: number): string {
   if (status === 401) return "Session expirée. Reconnectez-vous.";
   if (status === 403) return "Accès refusé.";
   if (status === 404) return "Élément introuvable.";
+  if (status === 429) return "Trop de tentatives. Réessayez dans un instant.";
   if (status === 0) return "Réseau indisponible. Vérifiez votre connexion.";
+  if (status === 502 || status === 503) return "Service temporairement indisponible. Réessayez dans quelques minutes.";
   return "Une erreur est survenue. Réessayez.";
 }
 

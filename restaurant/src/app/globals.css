@@ -74,3 +74,31 @@ button {
     display: none !important;
   }
 }
+
+.google-gis-wrap {
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.google-gis-host {
+  width: 100%;
+  max-width: 100%;
+  min-height: 40px;
+  overflow: hidden;
+  display: flex;
+  justify-content: center;
+}
+
+.google-gis-host iframe,
+.google-gis-host > div,
+.google-gis-host > div > div {
+  max-width: 100% !important;
+}
+
+@media (max-width: 399px) {
+  .google-gis-host {
+    transform: scale(0.88);
+    transform-origin: top center;
+  }
+}

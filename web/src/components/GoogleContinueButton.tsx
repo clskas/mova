@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 
 const GIS_SRC = "https://accounts.google.com/gsi/client";
+const MAX_BTN_WIDTH = 320;
+const MIN_BTN_WIDTH = 200;
 
 declare global {
   interface Window {
@@ -33,6 +35,11 @@ type Props = {
   disabled?: boolean;
 };
 
+function buttonWidth(host: HTMLElement | null): number {
+  const raw = host?.clientWidth ?? MAX_BTN_WIDTH;
+  return Math.max(MIN_BTN_WIDTH, Math.min(MAX_BTN_WIDTH, Math.floor(raw)));
+}
+
 export function GoogleContinueButton({ onCredential, disabled }: Props) {
   const hostRef = useRef<HTMLDivElement>(null);
   const onCredentialRef = useRef(onCredential);
@@ -58,7 +65,7 @@ export function GoogleContinueButton({ onCredential, disabled }: Props) {
         size: "large",
         text: "continue_with",
         locale: "fr",
-        width: 320,
+        width: buttonWidth(hostRef.current),
       });
       setReady(true);
     }
@@ -67,15 +74,13 @@ export function GoogleContinueButton({ onCredential, disabled }: Props) {
     if (existing) {
       if (window.google?.accounts?.id) init();
       else existing.addEventListener("load", init, { once: true });
-      return () => {
-        cancelled = true;
-      };
+    } else {
+      const script = document.createElement("script");
+      script.src = GIS_SRC;
+      script.async = true;
+      script.onload = init;
+      document.head.appendChild(script);
     }
-    const script = document.createElement("script");
-    script.src = GIS_SRC;
-    script.async = true;
-    script.onload = init;
-    document.head.appendChild(script);
     return () => {
       cancelled = true;
     };
@@ -84,8 +89,8 @@ export function GoogleContinueButton({ onCredential, disabled }: Props) {
   if (!clientId) return null;
 
   return (
-    <div className={disabled ? "pointer-events-none opacity-50" : undefined}>
-      <div ref={hostRef} className="flex justify-center min-h-[40px]" />
+    <div className={`google-gis-wrap${disabled ? " pointer-events-none opacity-50" : ""}`}>
+      <div ref={hostRef} className="google-gis-host" />
       {!ready && <p className="text-xs text-gray-400 text-center mt-1">Chargement Google…</p>}
     </div>
   );

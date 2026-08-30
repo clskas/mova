@@ -6,30 +6,15 @@ import { decodeJwtPayload, isRentalPartnerRole, isSeedDemoPhone, normalizeLoginP
 import { GoogleContinueButton, googleClientId } from "@/components/GoogleContinueButton";
 import { PwaInstallBanner } from "@/components/PwaInstallBanner";
 import { PUBLIC_API_BASE } from "@/lib/public-api-base";
+import {
+  LOGIN_GENERIC,
+  LOGIN_GOOGLE_UNAVAILABLE,
+  LOGIN_OTP_UNAVAILABLE,
+  toUserErrorMessage,
+} from "@/lib/user-messages";
 
 const API_BASE = PUBLIC_API_BASE;
 const PARTNER_PHONE = process.env.NEXT_PUBLIC_PARTNER_PHONE ?? "+243900000031";
-
-function loginErrorMessage(err: unknown, status?: number): string {
-  const raw = err instanceof Error ? err.message : String(err ?? "");
-  const trimmed = raw.trim();
-  const statusPart = status && status > 0 ? ` (HTTP ${status})` : "";
-  const apiHint = ` · API: ${API_BASE}`;
-  if (!trimmed) return `Erreur de connexion${statusPart}${apiHint}`;
-  if (trimmed.length > 160) {
-    return `Erreur de connexion${statusPart}${apiHint}`;
-  }
-  if (/MOVA_|SENGA_|ECONN|ETIMEDOUT|ENOTFOUND|fetch failed|Failed to fetch|NetworkError|Internal server error|Prisma|NestJS/i.test(trimmed)) {
-    return `Erreur de connexion${statusPart || " (réseau)"}${apiHint}`;
-  }
-  if (status && status > 0 && !trimmed.includes(String(status))) {
-    return `${trimmed}${statusPart}${apiHint}`;
-  }
-  if (!trimmed.includes(API_BASE)) {
-    return `${trimmed}${apiHint}`;
-  }
-  return trimmed;
-}
 
 async function readErrorMessage(res: Response, fallback: string): Promise<string> {
   try {
@@ -73,14 +58,12 @@ export default function LoginPage() {
           }),
         });
       } catch {
-        throw new Error(
-          `Impossible de joindre l'API SENGA (${API_BASE}). Vérifiez la connexion ou attendez le démarrage du serveur.`,
-        );
+        throw new Error(LOGIN_OTP_UNAVAILABLE);
       }
       lastStatus = requestRes.status;
       const seed = isSeedDemoPhone(phone);
       if (!requestRes.ok) {
-        const msg = await readErrorMessage(requestRes, `Demande OTP refusée (${requestRes.status})`);
+        const msg = await readErrorMessage(requestRes, LOGIN_OTP_UNAVAILABLE);
         if (!(seed && (requestRes.status === 429 || requestRes.status >= 500))) {
           throw new Error(msg);
         }
@@ -88,7 +71,7 @@ export default function LoginPage() {
       setCode(seed ? "123456" : "");
       setCodeSent(true);
     } catch (e) {
-      setError(loginErrorMessage(e, lastStatus));
+      setError(toUserErrorMessage(e, lastStatus >= 500 ? LOGIN_OTP_UNAVAILABLE : "Impossible d'envoyer le code. Réessayez."));
     } finally {
       setLoading(false);
     }
@@ -96,11 +79,11 @@ export default function LoginPage() {
 
   function finishRentalSession(data: { accessToken?: string; user?: { role?: string } }) {
     if (!data.accessToken) {
-      throw new Error("Connexion Google refusée");
+      throw new Error(LOGIN_GOOGLE_UNAVAILABLE);
     }
     const role = data.user?.role ?? decodeJwtPayload(data.accessToken)?.role;
     if (!isRentalPartnerRole(typeof role === "string" ? role : null)) {
-      throw new Error(`Ce compte n'est pas un partenaire location (rôle: ${String(role ?? "?")}).`);
+      throw new Error("Ce compte n'est pas un partenaire location.");
     }
     setToken(data.accessToken);
     router.replace("/");
@@ -122,7 +105,7 @@ export default function LoginPage() {
       });
       const data = await verifyRes.json().catch(() => ({}));
       if (!verifyRes.ok) {
-        throw new Error(data.error?.message ?? `Connexion Google refusée (${verifyRes.status})`);
+        throw new Error(data.error?.message ?? LOGIN_GOOGLE_UNAVAILABLE);
       }
       if (data.otpRequired && data.challengeId) {
         setGoogleChallenge({
@@ -136,7 +119,7 @@ export default function LoginPage() {
       }
       finishRentalSession(data);
     } catch (e) {
-      setError(loginErrorMessage(e));
+      setError(toUserErrorMessage(e, LOGIN_GOOGLE_UNAVAILABLE));
     } finally {
       setLoading(false);
     }
@@ -174,9 +157,7 @@ export default function LoginPage() {
           },
         );
       } catch {
-        throw new Error(
-          `Impossible de joindre l'API SENGA lors de la vérification OTP (${API_BASE}).`,
-        );
+        throw new Error(LOGIN_GENERIC);
       }
       lastStatus = verifyRes.status;
 
@@ -184,23 +165,19 @@ export default function LoginPage() {
       try {
         data = await verifyRes.json();
       } catch {
-        throw new Error(
-          verifyRes.status === 404
-            ? `API introuvable (404). NEXT_PUBLIC_API_URL doit être l'origine du gateway sans /api (${API_BASE}).`
-            : `Réponse invalide du serveur (${verifyRes.status}) · API: ${API_BASE}`,
-        );
+        throw new Error(LOGIN_GENERIC);
       }
       if (!verifyRes.ok || !data.accessToken) {
-        throw new Error(data.error?.message ?? `Connexion refusée (${verifyRes.status})`);
+        throw new Error(data.error?.message ?? LOGIN_GENERIC);
       }
       const role = data.user?.role ?? decodeJwtPayload(data.accessToken)?.role;
       if (!isRentalPartnerRole(typeof role === "string" ? role : null)) {
-        throw new Error(`Ce compte n'est pas un partenaire location (rôle: ${String(role ?? "?")}).`);
+        throw new Error("Ce compte n'est pas un partenaire location.");
       }
       setToken(data.accessToken);
       router.replace("/");
     } catch (e) {
-      setError(loginErrorMessage(e, lastStatus));
+      setError(toUserErrorMessage(e, lastStatus >= 500 ? LOGIN_GENERIC : "Connexion impossible. Réessayez."));
     } finally {
       setLoading(false);
     }
@@ -276,14 +253,13 @@ export default function LoginPage() {
             {googleChallenge ? "Retour" : "Changer de numéro"}
           </button>
         )}
-        {error && <p className="text-sm text-red-600 text-center break-all">{error}</p>}
+        {error && <p className="text-sm text-red-600 text-center">{error}</p>}
         <p className="text-xs text-gray-400 text-center">
           {isSeedDemoPhone(phone)
             ? <>Numéro de démo : code <code>123456</code>, pas de SMS.</>
             : "Numéro réel +243 : le code arrive par SMS."}{" "}
           Première connexion (téléphone ou Google) : un compte partenaire location est créé automatiquement. Un seul portefeuille.
         </p>
-        <p className="text-[10px] text-gray-300 text-center break-all">API: {API_BASE}</p>
       </div>
     </div>
   );

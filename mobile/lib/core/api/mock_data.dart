@@ -55,12 +55,49 @@ abstract final class MockData {
   static Map<String, dynamic> _mockPassengerProfile = {
     'id': 'passenger-mock-1',
     'phone': '+243900000010',
+    'phoneMasked': '+243 *** 0010',
     'role': 'PASSENGER',
     'status': 'ACTIVE',
     'firstName': 'Marie',
     'lastName': 'Passagère',
     'email': '',
+    'emailMasked': '',
+    'googleLinked': false,
+    'hasPhone': true,
+    'canUnlinkGoogle': false,
+    'canUnlinkPhone': false,
+    'pinConfigured': false,
   };
+
+  static Map<String, dynamic> linkAccount({bool google = false, bool phone = false}) {
+    if (google) {
+      _mockPassengerProfile = {
+        ..._mockPassengerProfile,
+        'googleLinked': true,
+        'email': 'marie@gmail.com',
+        'emailMasked': 'ma***@gmail.com',
+        'canUnlinkGoogle': _mockPassengerProfile['hasPhone'] == true,
+        'canUnlinkPhone': _mockPassengerProfile['hasPhone'] == true,
+      };
+    }
+    if (phone) {
+      _mockPassengerProfile = {
+        ..._mockPassengerProfile,
+        'hasPhone': true,
+        'phone': '+243900000010',
+        'phoneMasked': '+243 *** 0010',
+        'canUnlinkGoogle': _mockPassengerProfile['googleLinked'] == true,
+        'canUnlinkPhone': _mockPassengerProfile['googleLinked'] == true,
+      };
+    }
+    return {
+      'success': true,
+      'accessToken': 'mock-jwt-token',
+      'message': 'Compte lié. Vous pouvez vous connecter avec le téléphone ou Google.',
+      ...currentUser(),
+      'user': currentUser(),
+    };
+  }
 
   static Map<String, dynamic> currentUser() => Map<String, dynamic>.from(_mockPassengerProfile);
 

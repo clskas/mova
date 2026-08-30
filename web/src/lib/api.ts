@@ -223,11 +223,26 @@ function mockFor<T>(path: string, init?: RequestInit): T {
   if (path.includes('/auth/otp/request')) {
     return { success: true, message: 'Code OTP envoyé', mockCode: '123456' } as T;
   }
-  if (path.includes('/auth/otp/verify') || path.includes('/auth/google')) {
+  if (path.includes('/auth/otp/verify') || path.includes('/auth/google') || path.includes('/auth/link-')) {
     return {
       success: true,
       accessToken: 'mock-web-token',
+      message: 'Compte lié. Vous pouvez vous connecter avec le téléphone ou Google.',
       user: { id: 'mock-user', phone: '+243812345678', role: 'PASSENGER' },
+    } as T;
+  }
+  if (path.includes('/users/me')) {
+    return {
+      id: 'mock-user',
+      phone: '+243812345678',
+      phoneMasked: '+243 *** 5678',
+      email: '',
+      emailMasked: '',
+      googleLinked: false,
+      hasPhone: true,
+      canUnlinkGoogle: false,
+      canUnlinkPhone: false,
+      role: 'PASSENGER',
     } as T;
   }
   if (path.includes('/rides/history')) {

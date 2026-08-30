@@ -13,3 +13,15 @@ export function maskPhoneRdc(phone?: string | null): string {
   const last4 = digits.slice(-4);
   return `+243 *** ${last4}`;
 }
+
+/** Masque l'e-mail pour affichage (ex. ma***@gmail.com). */
+export function maskEmail(email?: string | null): string {
+  if (!email) return '';
+  const trimmed = email.trim();
+  const at = trimmed.indexOf('@');
+  if (at < 1) return trimmed;
+  const local = trimmed.slice(0, at);
+  const domain = trimmed.slice(at + 1);
+  const keep = local.length <= 2 ? 1 : 2;
+  return `${local.slice(0, keep)}***@${domain}`;
+}

@@ -4,6 +4,8 @@ import { Response } from 'express';
 import { AuthService } from './auth.service';
 import {
   GoogleLoginDto,
+  LinkGoogleDto,
+  LinkPhoneDto,
   LoginOptionsDto,
   PinLoginDto,
   RequestOtpDto,
@@ -49,6 +51,38 @@ export class AuthController {
     const result = await this.authService.loginWithGoogle(dto.idToken, dto.role, dto.phone, dto.otpCode);
     res.status(result.isNew ? HttpStatus.CREATED : HttpStatus.OK);
     return result;
+  }
+
+  @Post('link-google')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Lier Google au compte courant (JWT + ID token)' })
+  linkGoogle(@Request() req: { user: { id: string } }, @Body() dto: LinkGoogleDto) {
+    return this.authService.linkGoogle(req.user.id, dto.idToken);
+  }
+
+  @Post('link-phone')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Lier un numéro +243 au compte courant (JWT + OTP)' })
+  linkPhone(@Request() req: { user: { id: string } }, @Body() dto: LinkPhoneDto) {
+    return this.authService.linkPhone(req.user.id, dto.phone, dto.otpCode);
+  }
+
+  @Post('unlink-google')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Délier Google (uniquement si un numéro reste)' })
+  unlinkGoogle(@Request() req: { user: { id: string } }) {
+    return this.authService.unlinkGoogle(req.user.id);
+  }
+
+  @Post('unlink-phone')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Délier le numéro (uniquement si Google reste)' })
+  unlinkPhone(@Request() req: { user: { id: string } }) {
+    return this.authService.unlinkPhone(req.user.id);
   }
 
   @Post('pin/setup')

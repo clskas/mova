@@ -8,6 +8,7 @@ import '../../core/offline/connectivity_service.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
+import 'account_link_card.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -24,6 +25,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   bool _saving = false;
   String? _error;
   String? _phone;
+  Map<String, dynamic> _profile = {};
   DateTime? _lastSync;
   bool _offlinePending = false;
 
@@ -43,6 +45,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   void _applyProfile(Map<String, dynamic> data, {DateTime? syncedAt, bool offline = false}) {
     _phone = data['phone']?.toString();
+    _profile = Map<String, dynamic>.from(data);
     _firstName.text = data['firstName']?.toString() ?? '';
     _lastName.text = data['lastName']?.toString() ?? '';
     _email.text = data['email']?.toString() ?? '';
@@ -157,6 +160,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           : Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                if (_profile.isNotEmpty) ...[
+                  AccountLinkCard(profile: _profile, onChanged: _load),
+                  const SizedBox(height: 12),
+                ],
                 MovaCard(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,

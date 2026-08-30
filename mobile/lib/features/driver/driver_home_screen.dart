@@ -19,6 +19,7 @@ import '../../core/location/service_area_gps.dart';
 import '../../core/error/result.dart';
 import '../../core/geo/geo_utils.dart';
 import '../help/driver_help_screen.dart';
+import '../profile/profile_screen.dart';
 import '../carpool/carpool_screen.dart';
 import 'active_delivery_screen.dart';
 import 'active_ride_screen.dart';
@@ -36,7 +37,7 @@ import 'driver_rental_mission_screen.dart';
 import 'driver_scheduled_mission_screen.dart';
 import '../delivery/delivery_payment_state.dart';
 
-enum _DriverMenuAction { earnings, history, carpool, dossier, help, incident, logout }
+enum _DriverMenuAction { earnings, history, carpool, dossier, profile, help, incident, logout }
 
 class DriverHomeScreen extends ConsumerStatefulWidget {
   const DriverHomeScreen({super.key});
@@ -1137,6 +1138,11 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                   MaterialPageRoute(builder: (_) => const DriverOnboardingScreen(canSkipToHome: true)),
                 );
                 if (mounted) await _loadProfile(clearCache: true);
+              case _DriverMenuAction.profile:
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ProfileScreen()),
+                );
               case _DriverMenuAction.help:
                 await Navigator.push(
                   context,
@@ -1197,6 +1203,15 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
               child: ListTile(
                 leading: Icon(Icons.badge_outlined),
                 title: Text('Mon dossier'),
+                contentPadding: EdgeInsets.zero,
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+            PopupMenuItem(
+              value: _DriverMenuAction.profile,
+              child: ListTile(
+                leading: Icon(Icons.person_outline),
+                title: Text('Compte et connexion'),
                 contentPadding: EdgeInsets.zero,
                 visualDensity: VisualDensity.compact,
               ),

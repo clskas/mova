@@ -87,8 +87,8 @@ class HelpScreen extends ConsumerWidget {
           _HelpLink(
             icon: Icons.person_outline,
             iconColor: MovaColors.violet,
-            title: 'Mon profil',
-            subtitle: 'Prénom, nom et e-mail (optionnels)',
+            title: 'Compte et connexion',
+            subtitle: 'Lier Google ou votre numéro +243, prénom et e-mail',
             onTap: () => _open(context, const ProfileScreen()),
           ),
           _HelpLink(

@@ -7,6 +7,7 @@ import {
   RedisService,
   denyJwtUser,
   formatMovaPublicId,
+  maskEmail,
   maskPhoneRdc,
   normalizePhoneRdc,
   validatePhoneRdc,
@@ -23,6 +24,8 @@ export class UsersService {
   private enrichUser(user: {
     id: string;
     phone: string | null;
+    googleId?: string | null;
+    localPinHash?: string | null;
     role: UserRole;
     firstName?: string | null;
     lastName?: string | null;
@@ -32,10 +35,17 @@ export class UsersService {
     createdAt: Date;
     updatedAt: Date;
   }) {
+    const { googleId, localPinHash: _pin, ...safe } = user;
     return {
-      ...user,
+      ...safe,
       publicId: formatMovaPublicId(user.id, user.role),
       phoneMasked: maskPhoneRdc(user.phone),
+      emailMasked: maskEmail(user.email),
+      googleLinked: Boolean(googleId),
+      hasPhone: Boolean(user.phone),
+      canUnlinkGoogle: Boolean(googleId && user.phone),
+      canUnlinkPhone: Boolean(user.phone && googleId),
+      pinConfigured: Boolean(_pin),
     };
   }
 

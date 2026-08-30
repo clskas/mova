@@ -315,4 +315,93 @@ describe('AuthService', () => {
       response: { code: MovaErrorCode.AUTH_FORBIDDEN },
     });
   });
+
+  it('linkGoogle attaches to the current phone user without changing role', async () => {
+    const passenger = makeUser({ role: UserRole.PASSENGER });
+    prisma.user.findUnique.mockResolvedValue(passenger);
+    prisma.user.update.mockResolvedValue({ ...passenger, googleId: 'gid-new', email: 'new.user@gmail.com' });
+    const result = await service.linkGoogle(passenger.id, 'id-token');
+    expect(result.user.role).toBe(UserRole.PASSENGER);
+    expect(result.user.googleLinked).toBe(true);
+    expect(result.message).toContain('Compte lié');
+    expect(prisma.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: passenger.id },
+        data: expect.objectContaining({ googleId: 'gid-new' }),
+      }),
+    );
+  });
+
+  it('linkGoogle on SUPER_ADMIN keeps SUPER_ADMIN (no second admin)', async () => {
+    const admin = makeUser({
+      id: 'owner-1',
+      phone: OWNER_SUPER_ADMIN_PHONE,
+      role: UserRole.SUPER_ADMIN,
+    });
+    prisma.user.findUnique.mockResolvedValue(admin);
+    prisma.user.update.mockResolvedValue({ ...admin, googleId: 'gid-new' });
+    const result = await service.linkGoogle(admin.id, 'id-token');
+    expect(result.user.role).toBe(UserRole.SUPER_ADMIN);
+    expect(prisma.user.create).not.toHaveBeenCalled();
+  });
+
+  it('linkGoogle rejects a googleId already used by another user', async () => {
+    const current = makeUser({ id: 'me' });
+    const other = makeUser({ id: 'other', googleId: 'gid-new', phone: '+243822222222' });
+    prisma.user.findUnique
+      .mockResolvedValueOnce(current)
+      .mockResolvedValueOnce(other);
+    await expect(service.linkGoogle(current.id, 'id-token')).rejects.toMatchObject({
+      response: { code: MovaErrorCode.AUTH_IDENTITY_TAKEN },
+    });
+    expect(prisma.user.update).not.toHaveBeenCalled();
+  });
+
+  it('linkPhone attaches +243 to a Google-only user', async () => {
+    const googleOnly = makeUser({ id: 'g-user', phone: null, googleId: 'gid-new' });
+    await seedHashedOtp('+243812345678', '847291');
+    prisma.user.findUnique.mockImplementation(({ where }: { where: { id?: string; phone?: string } }) => {
+      if (where.id === 'g-user') return Promise.resolve(googleOnly);
+      if (where.phone === '+243812345678') return Promise.resolve(null);
+      return Promise.resolve(null);
+    });
+    prisma.user.update.mockResolvedValue({ ...googleOnly, phone: '+243812345678' });
+    const result = await service.linkPhone(googleOnly.id, '+243812345678', '847291');
+    expect(result.user.hasPhone).toBe(true);
+    expect(result.user.role).toBe(UserRole.PASSENGER);
+    expect(prisma.user.create).not.toHaveBeenCalled();
+  });
+
+  it('linkPhone rejects a phone already used by another user', async () => {
+    const googleOnly = makeUser({ id: 'g-user', phone: null, googleId: 'gid-new' });
+    const other = makeUser({ id: 'other', phone: '+243812345678' });
+    await seedHashedOtp('+243812345678', '847291');
+    prisma.user.findUnique.mockImplementation(({ where }: { where: { id?: string; phone?: string } }) => {
+      if (where.id === 'g-user') return Promise.resolve(googleOnly);
+      if (where.phone === '+243812345678') return Promise.resolve(other);
+      return Promise.resolve(null);
+    });
+    await expect(service.linkPhone(googleOnly.id, '+243812345678', '847291')).rejects.toMatchObject({
+      response: { code: MovaErrorCode.AUTH_IDENTITY_TAKEN },
+    });
+    expect(prisma.user.update).not.toHaveBeenCalled();
+  });
+
+  it('unlinkGoogle refuses to leave a user with neither phone nor Google', async () => {
+    const googleOnly = makeUser({ id: 'g-user', phone: null, googleId: 'gid-new' });
+    prisma.user.findUnique.mockResolvedValue(googleOnly);
+    await expect(service.unlinkGoogle(googleOnly.id)).rejects.toMatchObject({
+      response: { code: MovaErrorCode.AUTH_FORBIDDEN },
+    });
+    expect(prisma.user.update).not.toHaveBeenCalled();
+  });
+
+  it('unlinkPhone refuses to leave a user with neither phone nor Google', async () => {
+    const phoneOnly = makeUser();
+    prisma.user.findUnique.mockResolvedValue(phoneOnly);
+    await expect(service.unlinkPhone(phoneOnly.id)).rejects.toMatchObject({
+      response: { code: MovaErrorCode.AUTH_FORBIDDEN },
+    });
+    expect(prisma.user.update).not.toHaveBeenCalled();
+  });
 });

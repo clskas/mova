@@ -33,7 +33,8 @@ import { HelpView } from "@/components/HelpView";
 import { WalletView } from "@/components/WalletView";
 import { ScheduledRidesView } from "@/components/ScheduledRidesView";
 import { CarpoolView } from "@/components/CarpoolView";
-import { HelpIcon } from "@/components/ServiceIcons";
+import { AccountView } from "@/components/AccountView";
+import { HelpIcon, ProfileIcon } from "@/components/ServiceIcons";
 
 type View =
   | "home"
@@ -48,6 +49,7 @@ type View =
   | "receipts"
   | "receipt"
   | "help"
+  | "account"
   | "wallet"
   | "scheduled"
   | "carpool";
@@ -90,14 +92,24 @@ function HomeContent() {
               Kinshasa · Mobilité nationwide
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => setView("help")}
-            className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/10"
-            aria-label="Aide"
-          >
-            <HelpIcon color="#FFFFFF" size={22} />
-          </button>
+          <div className="flex items-center">
+            <button
+              type="button"
+              onClick={() => setView("account")}
+              className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/10"
+              aria-label="Connexion"
+            >
+              <ProfileIcon color="#FFFFFF" size={22} />
+            </button>
+            <button
+              type="button"
+              onClick={() => setView("help")}
+              className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/10"
+              aria-label="Aide"
+            >
+              <HelpIcon color="#FFFFFF" size={22} />
+            </button>
+          </div>
         </div>
       </header>
 
@@ -162,6 +174,7 @@ function HomeContent() {
           />
         )}
         {view === "help" && <HelpView onBack={() => setView("home")} />}
+        {view === "account" && <AccountView onBack={() => setView("home")} mock={mock} />}
       </main>
     </div>
   );

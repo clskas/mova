@@ -5,7 +5,11 @@ import { HelpIcon } from "./ServiceIcons";
 const FAQ = [
   {
     q: "Comment créer un compte SENGA ?",
-    a: "Saisissez votre numéro +243 (9 chiffres), puis le code OTP reçu par SMS.",
+    a: "Saisissez votre numéro +243 (9 chiffres), puis le code OTP reçu par SMS — ou continuez avec Google.",
+  },
+  {
+    q: "Puis-je lier mon numéro et Google ?",
+    a: "Oui, c’est optionnel. Dans Connexion (profil), liez Google ou votre +243. Vous pouvez aussi rester téléphone seul ou Google seul — un seul portefeuille si les deux sont liés.",
   },
   {
     q: "Quels moyens de paiement sont acceptés ?",

@@ -102,6 +102,15 @@ export function LocationIcon(props: IconProps) {
   );
 }
 
+export function ProfileIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <circle cx="12" cy="8" r="3.5" />
+      <path d="M5 19v-1a5 5 0 015-5h4a5 5 0 015 5v1" />
+    </Svg>
+  );
+}
+
 export function HelpIcon(props: IconProps) {
   return (
     <Svg {...props}>

@@ -68,6 +68,21 @@ export class GoogleLoginDto {
   otpCode?: string;
 }
 
+export class LinkGoogleDto {
+  @ApiProperty({ description: 'Google ID token (GIS / google_sign_in)' })
+  @IsString()
+  idToken: string;
+}
+
+export class LinkPhoneDto {
+  @ApiProperty({ example: '+243812345678' })
+  @IsString()
+  phone: string;
+  @ApiProperty({ example: '123456' })
+  @IsString()
+  otpCode: string;
+}
+
 export class SetupLocalPinDto {
   @ApiProperty({ example: '847291' })
   @IsString()

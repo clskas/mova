@@ -14,6 +14,7 @@ import {
   INTERNAL_API_KEY,
   formatMovaPublicId,
   maskPhoneRdc,
+  maskEmail,
   isTestOtpAllowedForPhone,
   matchesSeedTestOtp,
   otpCodesToIssue,
@@ -337,6 +338,87 @@ export class AuthService {
     return this.buildAuthResponse(user, { isNew });
   }
 
+  /**
+   * Attach Google to the JWT user. Does not change role (no self-promote).
+   * Rejects if this googleId already belongs to someone else.
+   */
+  async linkGoogle(userId: string, idToken: string) {
+    const identity = await this.googleTokens.verify(idToken);
+    const user = await this.requireActiveUser(userId);
+    const linked = await this.attachGoogleIdentity(user, identity);
+    return this.buildLinkResponse(linked);
+  }
+
+  /**
+   * Attach a verified +243 to the JWT user (OTP already requested via /auth/otp/request).
+   * Rejects if the phone belongs to another account. Does not change role.
+   */
+  async linkPhone(userId: string, phone: string, otpCode: string) {
+    const normalized = await this.consumeValidOtp(phone, otpCode);
+    const user = await this.requireActiveUser(userId);
+    if (user.phone && user.phone !== normalized) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.CONFLICT,
+        'Ce compte a déjà un numéro. Déliez-le d\'abord pour en changer.',
+      );
+    }
+    const taken = await this.prisma.user.findUnique({ where: { phone: normalized } });
+    if (taken && taken.id !== user.id) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_IDENTITY_TAKEN,
+        HttpStatus.CONFLICT,
+        'Ce numéro est déjà utilisé par un autre compte SENGA.',
+      );
+    }
+    const updated =
+      user.phone === normalized
+        ? user
+        : await this.prisma.user.update({
+            where: { id: user.id },
+            data: { phone: normalized },
+          });
+    return this.buildLinkResponse(updated);
+  }
+
+  async unlinkGoogle(userId: string) {
+    const user = await this.requireActiveUser(userId);
+    if (!user.googleId) {
+      return this.buildLinkResponse(user, 'Google n\'est pas lié à ce compte.');
+    }
+    if (!user.phone) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.CONFLICT,
+        'Impossible de délier Google : ajoutez d\'abord un numéro +243.',
+      );
+    }
+    const updated = await this.prisma.user.update({
+      where: { id: user.id },
+      data: { googleId: null },
+    });
+    return this.buildLinkResponse(updated, 'Compte Google délié.');
+  }
+
+  async unlinkPhone(userId: string) {
+    const user = await this.requireActiveUser(userId);
+    if (!user.phone) {
+      return this.buildLinkResponse(user, 'Aucun numéro lié à ce compte.');
+    }
+    if (!user.googleId) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.CONFLICT,
+        'Impossible de délier le numéro : liez d\'abord Google.',
+      );
+    }
+    const updated = await this.prisma.user.update({
+      where: { id: user.id },
+      data: { phone: null, localPinHash: null, localPinSetAt: null },
+    });
+    return this.buildLinkResponse(updated, 'Numéro délié. Connectez-vous avec Google.');
+  }
+
   async validateUser(userId: string) {
     return this.prisma.user.findUnique({ where: { id: userId } });
   }
@@ -369,6 +451,14 @@ export class AuthService {
         'Ce compte est déjà lié à un autre compte Google.',
       );
     }
+    const taken = await this.prisma.user.findUnique({ where: { googleId: identity.googleId } });
+    if (taken && taken.id !== user.id) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_IDENTITY_TAKEN,
+        HttpStatus.CONFLICT,
+        'Cet e-mail Google est déjà lié à un autre compte SENGA.',
+      );
+    }
     return this.prisma.user.update({
       where: { id: user.id },
       data: {
@@ -379,6 +469,19 @@ export class AuthService {
         avatarUrl: user.avatarUrl ?? identity.picture,
       },
     });
+  }
+
+  private async requireActiveUser(userId: string): Promise<User> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new MovaHttpException(MovaErrorCode.USER_NOT_FOUND, HttpStatus.NOT_FOUND);
+    if (user.status === UserStatus.SUSPENDED) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.FORBIDDEN,
+        'Compte suspendu. Contactez le support SENGA.',
+      );
+    }
+    return user;
   }
 
   private normalizePhoneOrThrow(phone: string) {
@@ -531,12 +634,27 @@ export class AuthService {
         id: user.id,
         phone: user.phone ?? '',
         phoneMasked: maskPhoneRdc(user.phone),
+        email: user.email ?? '',
+        emailMasked: maskEmail(user.email),
+        googleLinked: Boolean(user.googleId),
+        hasPhone: Boolean(user.phone),
+        canUnlinkGoogle: Boolean(user.googleId && user.phone),
+        canUnlinkPhone: Boolean(user.phone && user.googleId),
         publicId: formatMovaPublicId(user.id, user.role),
         role: user.role,
         status: user.status,
         firstName: user.firstName,
         lastName: user.lastName,
       },
+    };
+  }
+
+  private buildLinkResponse(user: User, message?: string) {
+    return {
+      ...this.buildAuthResponse(user, { isNew: false }),
+      message:
+        message ??
+        'Compte lié. Vous pouvez vous connecter avec le téléphone ou Google.',
     };
   }
 

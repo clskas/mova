@@ -275,6 +275,19 @@ class ApiClient {
         role: body?['role']?.toString(),
       ));
     }
+    if (path.contains('/auth/link-google')) {
+      return Success(MockData.linkAccount(google: true));
+    }
+    if (path.contains('/auth/link-phone')) {
+      return Success(MockData.linkAccount(phone: true));
+    }
+    if (path.contains('/auth/unlink-google') || path.contains('/auth/unlink-phone')) {
+      return Success({
+        'success': true,
+        'message': 'Compte mis à jour.',
+        ...MockData.currentUser(),
+      });
+    }
     if (path == '/users/me' && method == 'GET') {
       return Success(MockData.currentUser());
     }

@@ -1,8 +1,8 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, Optional, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
-import { assertActiveUserStatus, MovaJwtPayload, resolveJwtSecret, UserStatus } from '@mova/shared';
+import { assertActiveUserStatus, isJwtDenied, MovaJwtPayload, RedisService, resolveJwtSecret, UserStatus } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -10,6 +10,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
     config: ConfigService,
     private prisma: PrismaService,
+    @Optional() private readonly redis?: RedisService,
   ) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
@@ -19,6 +20,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: MovaJwtPayload) {
+    if (await isJwtDenied(this.redis, payload)) {
+      throw new UnauthorizedException('Session révoquée');
+    }
     const user = await this.prisma.user.findUnique({ where: { id: payload.sub } });
     if (!user) {
       throw new UnauthorizedException('Compte introuvable');
@@ -31,6 +35,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     } catch {
       throw new UnauthorizedException('Compte suspendu');
     }
-    return { id: user.id, phone: user.phone, role: user.role, status: user.status };
+    return { id: user.id, phone: user.phone, role: user.role, status: user.status, jti: payload.jti };
   }
 }

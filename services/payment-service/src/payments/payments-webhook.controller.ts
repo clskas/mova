@@ -129,8 +129,27 @@ export class PaymentsWebhookController {
   @Post('africastalking/callback')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Callback Africa\'s Talking Mobile Money (public)' })
-  async africasTalking(@Body() body: unknown) {
+  async africasTalking(
+    @Body() body: unknown,
+    @Headers() headers: Record<string, string | string[] | undefined> = {},
+  ) {
     if (!this.isHubProcess()) return this.rejectAggregatorOnSenga("Africa's Talking");
+    const secret = this.config.get<string>('AFRICAS_TALKING_WEBHOOK_SECRET')?.trim();
+    if (!secret) {
+      this.logger.error('AFRICAS_TALKING_WEBHOOK_SECRET unset — callback rejected (fail-closed)');
+      throw new UnauthorizedException({ success: false, message: 'AFRICAS_TALKING_WEBHOOK_SECRET requis' });
+    }
+    const provided =
+      (typeof headers['x-at-signature'] === 'string' && headers['x-at-signature']) ||
+      (typeof headers['x-api-key'] === 'string' && headers['x-api-key']) ||
+      (typeof headers['authorization'] === 'string' && headers['authorization'].replace(/^Bearer\s+/i, '')) ||
+      '';
+    const a = Buffer.from(provided);
+    const b = Buffer.from(secret);
+    if (a.length !== b.length || !timingSafeEqual(a, b)) {
+      this.logger.warn("Africa's Talking callback: secret invalide");
+      throw new UnauthorizedException({ success: false, message: 'Signature invalide' });
+    }
     const payload = asRecord(body);
     const providerRef = extractAggregatorProviderRef(payload);
     const outcome = extractAggregatorOutcome(payload) ?? 'COMPLETED';

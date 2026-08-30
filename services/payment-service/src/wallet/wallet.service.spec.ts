@@ -120,6 +120,31 @@ describe('WalletService', () => {
     expect(result.formattedBalance).toContain('FC');
   });
 
+  it('refuse une 2e recharge identique pendant le verrou Redis 60s', async () => {
+    const redis = {
+      client: {
+        set: jest.fn().mockResolvedValue(null),
+      },
+    };
+    const locked = new WalletService(prisma as never, config, redis as never);
+    prisma.wallet.upsert.mockResolvedValue({ id: 'w1', userId: 'u1', balanceCdf: 0 });
+    await expect(locked.topUp('u1', 5000, 'ORANGE_MONEY', '+243970000001')).rejects.toMatchObject({
+      response: { message: expect.stringMatching(/déjà en cours/i) },
+    });
+  });
+
+  it('refuse la recharge si Redis est down (fail-closed)', async () => {
+    const redis = {
+      client: {
+        set: jest.fn().mockRejectedValue(new Error('redis down')),
+      },
+    };
+    const locked = new WalletService(prisma as never, config, redis as never);
+    await expect(locked.topUp('u1', 5000, 'ORANGE_MONEY', '+243970000001')).rejects.toMatchObject({
+      response: { code: 'MOVA_INT_001' },
+    });
+  });
+
   it('refuse un débit si solde insuffisant (verrou FOR UPDATE)', async () => {
     tx.$queryRaw.mockResolvedValue([{ id: 'w1', balanceCdf: 100, heldBalanceCdf: 0 }]);
     await expect(service.debit('u1', 500, 'test')).rejects.toMatchObject({

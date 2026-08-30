@@ -45,7 +45,14 @@ describe('PaymentsService', () => {
   const debtLedger = {
     recordCashDebt: jest.fn().mockResolvedValue(undefined),
   };
-  const redis = { publish: jest.fn().mockResolvedValue(undefined) };
+  const redis = {
+    publish: jest.fn().mockResolvedValue(undefined),
+    client: {
+      get: jest.fn().mockResolvedValue(null),
+      set: jest.fn().mockResolvedValue('OK'),
+      del: jest.fn().mockResolvedValue(1),
+    },
+  };
   const config = { get: jest.fn((key: string) => (key === 'MOCK_PAYMENTS' ? 'true' : undefined)) } as unknown as ConfigService;
 
   const service = new PaymentsService(
@@ -64,6 +71,9 @@ describe('PaymentsService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    redis.client.get.mockResolvedValue(null);
+    redis.client.set.mockResolvedValue('OK');
+    redis.client.del.mockResolvedValue(1);
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
       status: 200,
@@ -152,6 +162,21 @@ describe('PaymentsService', () => {
       expect.any(String),
     );
     expect(prisma.servicePayment.upsert).toHaveBeenCalled();
+  });
+
+  it('verrouille le PIN espèces après 5 échecs', async () => {
+    redis.client.get.mockResolvedValue('5');
+    await expect(service.confirmCashRide('ride-1', 'driver-1', '0000')).rejects.toMatchObject({
+      response: { code: MovaErrorCode.AUTH_PIN_LOCKED },
+    });
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('refuse le PIN espèces si Redis est down (fail-closed)', async () => {
+    redis.client.get.mockRejectedValue(new Error('redis down'));
+    await expect(service.confirmCashRide('ride-1', 'driver-1', '1234')).rejects.toMatchObject({
+      response: { code: MovaErrorCode.INTERNAL_ERROR },
+    });
   });
 
   it('rejette le paiement service si non terminé', async () => {

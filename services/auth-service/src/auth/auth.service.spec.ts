@@ -176,6 +176,30 @@ describe('AuthService', () => {
     expect(prisma.otpCode.findFirst).not.toHaveBeenCalled();
   });
 
+  it('issues JWT with a jti (jwtid) for denylist logout', async () => {
+    const passenger = makeUser();
+    prisma.user.findUnique.mockResolvedValue(passenger);
+    await seedHashedOtp(passenger.phone);
+    await service.verifyOtp(passenger.phone, '847291', UserRole.PASSENGER);
+    expect(jwt.sign).toHaveBeenCalledWith(
+      expect.objectContaining({ sub: passenger.id, role: UserRole.PASSENGER }),
+      expect.objectContaining({ jwtid: expect.any(String) }),
+    );
+  });
+
+  it('denylists jti on logout', async () => {
+    const result = await service.logout('jti-logout-1');
+    expect(result).toEqual({ success: true, revoked: true });
+    expect(redis.client.set).toHaveBeenCalled();
+  });
+
+  it('fail-closes logout when Redis is down', async () => {
+    redis.client.set.mockRejectedValue(new Error('redis down'));
+    await expect(service.logout('jti-logout-1')).rejects.toMatchObject({
+      response: { code: MovaErrorCode.INTERNAL_ERROR },
+    });
+  });
+
   it('fail-opens OTP lock when Redis is down', async () => {
     redis.client.get.mockRejectedValue(new Error('redis asleep'));
     const passenger = makeUser({ phone: '+243812345678' });

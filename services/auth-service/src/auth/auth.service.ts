@@ -19,6 +19,7 @@ import {
   otpCodesToIssue,
   TEST_OTP_CODE,
   SMS_UNAVAILABLE_USER_MESSAGE,
+  denyJwtJti,
 } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '@mova/shared';
@@ -391,13 +392,33 @@ export class AuthService {
     }
   }
 
+  async logout(jti?: string) {
+    if (!jti?.trim()) {
+      return { success: true, revoked: false };
+    }
+    try {
+      await denyJwtJti(this.redis, jti);
+    } catch (e) {
+      this.logger.warn(`logout denylist failed: ${(e as Error).message}`);
+      throw new MovaHttpException(
+        MovaErrorCode.INTERNAL_ERROR,
+        HttpStatus.SERVICE_UNAVAILABLE,
+        'Déconnexion temporairement indisponible. Réessayez.',
+      );
+    }
+    return { success: true, revoked: true };
+  }
+
   private buildAuthResponse(user: User, options: { isNew: boolean }) {
-    const token = this.jwt.sign({
-      sub: user.id,
-      phone: user.phone,
-      role: user.role,
-      status: user.status,
-    });
+    const token = this.jwt.sign(
+      {
+        sub: user.id,
+        phone: user.phone,
+        role: user.role,
+        status: user.status,
+      },
+      { jwtid: crypto.randomUUID() },
+    );
     return {
       success: true,
       accessToken: token,

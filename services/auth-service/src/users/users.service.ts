@@ -1,8 +1,11 @@
-import { HttpStatus, Injectable } from '@nestjs/common';
+import { HttpStatus, Injectable, Optional } from '@nestjs/common';
 import { UserRole, UserStatus } from '@prisma/client';
 import {
   MovaErrorCode,
   MovaHttpException,
+  OWNER_SUPER_ADMIN_PHONE,
+  RedisService,
+  denyJwtUser,
   formatMovaPublicId,
   maskPhoneRdc,
   normalizePhoneRdc,
@@ -12,7 +15,10 @@ import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class UsersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    @Optional() private readonly redis?: RedisService,
+  ) {}
 
   private enrichUser(user: {
     id: string;
@@ -151,13 +157,42 @@ export class UsersService {
     id: string,
     data: { role?: UserRole; phone?: string; status?: UserStatus; firstName?: string; lastName?: string },
   ) {
-    await this.findById(id);
+    const existing = await this.findById(id);
     this.assertAssignableRole(data.role);
-    return this.prisma.user.update({ where: { id }, data });
+    if (data.status === UserStatus.SUSPENDED) {
+      this.assertNotOwnerSuspend(existing.phone);
+    }
+    const updated = await this.prisma.user.update({ where: { id }, data });
+    if (data.status === UserStatus.SUSPENDED) {
+      await this.denySuspendedUser(updated.id);
+    }
+    return updated;
   }
 
   async deactivateUser(id: string) {
-    await this.findById(id);
-    return this.prisma.user.update({ where: { id }, data: { status: UserStatus.SUSPENDED } });
+    const existing = await this.findById(id);
+    this.assertNotOwnerSuspend(existing.phone);
+    const updated = await this.prisma.user.update({ where: { id }, data: { status: UserStatus.SUSPENDED } });
+    await this.denySuspendedUser(updated.id);
+    return updated;
+  }
+
+  private assertNotOwnerSuspend(phone: string) {
+    if (normalizePhoneRdc(phone) === OWNER_SUPER_ADMIN_PHONE) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.FORBIDDEN,
+        'Impossible de suspendre le compte propriétaire SUPER_ADMIN.',
+      );
+    }
+  }
+
+  private async denySuspendedUser(userId: string) {
+    if (!this.redis) return;
+    try {
+      await denyJwtUser(this.redis, userId);
+    } catch {
+      /* DB status already SUSPENDED; denylist is extra */
+    }
   }
 }

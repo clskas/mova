@@ -5,6 +5,8 @@ export type MovaJwtPayload = {
   phone?: string;
   role: string;
   status?: UserStatus | string;
+  /** Present on tokens issued after logout/denylist support. Old 7d tokens omit it. */
+  jti?: string;
 };
 
 /** Refuse l'accès aux comptes suspendus (JWT ou login). */

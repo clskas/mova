@@ -2,7 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { json, Request, Response, NextFunction } from 'express';
 import { AppModule } from './app.module';
-import { HttpExceptionFilter } from '@mova/shared';
+import { HttpExceptionFilter, resolveCorsOrigin } from '@mova/shared';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bodyParser: false });
@@ -28,7 +28,7 @@ async function bootstrap() {
     }),
   );
   app.useGlobalFilters(new HttpExceptionFilter());
-  app.enableCors({ origin: true, credentials: true });
+  app.enableCors({ origin: resolveCorsOrigin(), credentials: true });
 
   const port = Number(process.env.PORT ?? 3001);
   await app.listen(port, '0.0.0.0');

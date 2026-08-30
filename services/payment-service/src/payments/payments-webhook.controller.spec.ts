@@ -22,6 +22,28 @@ describe('PaymentsWebhookController aggregator gate', () => {
     await expect(ctl.cinetPay({}, {})).resolves.toMatchObject({ success: false });
   });
 
+  it("rejects Africa's Talking callback when secret is empty (401 fail-closed)", async () => {
+    const config = {
+      get: (key: string) => (key === 'AFRISOFT_PAY_HUB_MODE' ? 'true' : undefined),
+    } as never;
+    const ctl = new PaymentsWebhookController({} as never, config, hub);
+    await expect(ctl.africasTalking({}, {})).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it("rejects Africa's Talking callback when secret is wrong (401)", async () => {
+    const config = {
+      get: (key: string) => {
+        if (key === 'AFRISOFT_PAY_HUB_MODE') return 'true';
+        if (key === 'AFRICAS_TALKING_WEBHOOK_SECRET') return 'at_whsec';
+        return undefined;
+      },
+    } as never;
+    const ctl = new PaymentsWebhookController({} as never, config, hub);
+    await expect(
+      ctl.africasTalking({ transactionId: 'at_1' }, { 'x-api-key': 'wrong' }),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
   it('rejects SerdiPay webhook when secret is empty (401 fail-closed)', async () => {
     const config = {
       get: (key: string) => (key === 'AFRISOFT_PAY_HUB_MODE' ? 'true' : undefined),

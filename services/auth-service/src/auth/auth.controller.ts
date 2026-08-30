@@ -49,4 +49,12 @@ export class AuthController {
   setupPin(@Request() req: { user: { id: string } }, @Body() dto: SetupLocalPinDto) {
     return this.authService.setupLocalPin(req.user.id, dto.pin, dto.confirmPin);
   }
+
+  @Post('logout')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Révoquer le JWT courant (denylist jti)' })
+  logout(@Request() req: { user: { jti?: string } }) {
+    return this.authService.logout(req.user.jti);
+  }
 }

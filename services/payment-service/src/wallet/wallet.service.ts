@@ -1,10 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { HttpStatus, Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'crypto';
 import {
   MOVA_PLATFORM_USER_ID,
   MovaErrorCode,
   MovaHttpException,
+  RedisService,
   afrisoftHubReference,
   afrisoftPayHubGetPayment,
   afrisoftPayHubInitiatePayout,
@@ -17,6 +18,10 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { initiateViaGateway } from '../payments/payment-providers';
 
+const TOPUP_LOCK_PREFIX = 'wallet:topup:';
+const TOPUP_LOCK_TTL_SEC = 60;
+const STALE_PAYOUT_MIN_AGE_MS = 15 * 60 * 1000;
+
 @Injectable()
 export class WalletService {
   private readonly logger = new Logger(WalletService.name);
@@ -24,6 +29,7 @@ export class WalletService {
   constructor(
     private prisma: PrismaService,
     private config: ConfigService,
+    @Optional() private readonly redis?: RedisService,
   ) {}
 
   private envGetter = (key: string) => this.config.get<string>(key);
@@ -93,6 +99,11 @@ export class WalletService {
     const id = userId?.trim();
     if (!id) {
       throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'userId requis');
+    }
+    try {
+      await this.reconcileStalePayouts(id);
+    } catch (e) {
+      this.logger.warn(`reconcileStalePayouts failed: ${(e as Error).message}`);
     }
     let wallet = await this.prisma.wallet.findUnique({
       where: { userId: id },
@@ -435,6 +446,7 @@ export class WalletService {
     if (amountCdf < 500) {
       throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Montant minimum : 500 FC.');
     }
+    await this.acquireTopUpLock(userId, amountCdf);
     const providerKey = provider.trim().toUpperCase();
     const ref = afrisoftHubReference('senga', 'topup', randomUUID());
 
@@ -809,6 +821,71 @@ export class WalletService {
       };
     }
     return { found: true, status: 'COMPLETED', balanceCdf: wallet.balanceCdf };
+  }
+
+  private topUpLockKey(userId: string, amountCdf: number) {
+    return `${TOPUP_LOCK_PREFIX}${userId}:${amountCdf}`;
+  }
+
+  /** Short Redis lock (60s) so a double-tap cannot open two C2B. Fail-closed if Redis is down. */
+  private async acquireTopUpLock(userId: string, amountCdf: number) {
+    const client = this.redis?.client;
+    if (!client) return;
+    try {
+      const ok = await client.set(this.topUpLockKey(userId, amountCdf), '1', 'EX', TOPUP_LOCK_TTL_SEC, 'NX');
+      if (!ok) {
+        throw new MovaHttpException(
+          MovaErrorCode.VALIDATION_ERROR,
+          HttpStatus.TOO_MANY_REQUESTS,
+          'Recharge déjà en cours — patientez une minute.',
+        );
+      }
+    } catch (e) {
+      if (e instanceof MovaHttpException) throw e;
+      throw new MovaHttpException(
+        MovaErrorCode.INTERNAL_ERROR,
+        HttpStatus.SERVICE_UNAVAILABLE,
+        'Recharge temporairement indisponible. Réessayez.',
+      );
+    }
+  }
+
+  /**
+   * User-triggered reconcile: refund a debit-then-B2C withdraw only when the hub says FAILED.
+   * PENDING-stuck is not auto-refunded (would race a late B2C success).
+   */
+  private async reconcileStalePayouts(userId: string) {
+    if (!isAfrisoftPayHubClientConfigured(this.envGetter) || isAfrisoftPayHubMode(this.envGetter)) {
+      return;
+    }
+    const wallet = await this.prisma.wallet.findUnique({ where: { userId } });
+    if (!wallet) return;
+    const cutoff = new Date(Date.now() - STALE_PAYOUT_MIN_AGE_MS);
+    const debits = await this.prisma.walletTransaction.findMany({
+      where: {
+        walletId: wallet.id,
+        type: 'DEBIT',
+        description: { contains: 'Retrait' },
+        createdAt: { lte: cutoff },
+      },
+      take: 8,
+      orderBy: { createdAt: 'desc' },
+    });
+    for (const debit of debits) {
+      if (!debit.reference) continue;
+      const already = await this.prisma.walletTransaction.findFirst({
+        where: {
+          walletId: wallet.id,
+          type: 'CREDIT',
+          OR: [{ reference: `rollback_${debit.reference}` }, { reference: debit.reference }],
+        },
+      });
+      if (already) continue;
+      const remote = await afrisoftPayHubGetPayment(this.envGetter, debit.reference);
+      if (remote.status === 'FAILED') {
+        await this.refundFailedPayout([debit.reference], remote.message);
+      }
+    }
   }
 
   async refundFailedPayout(

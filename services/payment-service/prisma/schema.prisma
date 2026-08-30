@@ -61,7 +61,7 @@ model HubPayment {
 
   @@unique([appId, reference])
   @@unique([appId, idempotencyKey])
-  @@index([providerRef])
+  @@unique([providerRef])
   @@index([appId, status])
   @@map("hub_payments")
 }
@@ -124,7 +124,7 @@ model WalletTransaction {
   createdAt   DateTime @default(now())
 
   @@index([walletId])
-  @@index([reference, type])
+  @@unique([reference, type])
   @@map("wallet_transactions")
 }
 

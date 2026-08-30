@@ -139,6 +139,12 @@ function ShellInner({ children }: { children: React.ReactNode }) {
                 </span>
               )}
               <DemoBadge show={demo} />
+              <Link
+                href="/compte"
+                className="text-xs sm:text-sm text-gray-500 hover:text-[#6C63FF] underline min-h-10 px-1 inline-flex items-center"
+              >
+                Connexion
+              </Link>
               <button
                 type="button"
                 onClick={() => { clearToken(); window.location.href = "/login"; }}

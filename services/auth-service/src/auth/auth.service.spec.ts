@@ -404,4 +404,34 @@ describe('AuthService', () => {
     });
     expect(prisma.user.update).not.toHaveBeenCalled();
   });
+
+  it('unlinkPhone refuses to detach the owner SUPER_ADMIN number', async () => {
+    const owner = makeUser({
+      id: 'owner-1',
+      phone: OWNER_SUPER_ADMIN_PHONE,
+      googleId: 'gid-owner',
+      role: UserRole.SUPER_ADMIN,
+    });
+    prisma.user.findUnique.mockResolvedValue(owner);
+    await expect(service.unlinkPhone(owner.id)).rejects.toMatchObject({
+      response: { code: MovaErrorCode.AUTH_FORBIDDEN },
+    });
+    expect(prisma.user.update).not.toHaveBeenCalled();
+  });
+
+  it('unlinkGoogle succeeds when a phone remains (no role change)', async () => {
+    const both = makeUser({ googleId: 'gid-new', phone: '+243811111111', role: UserRole.PASSENGER });
+    prisma.user.findUnique.mockResolvedValue(both);
+    prisma.user.update.mockResolvedValue({ ...both, googleId: null });
+    const result = await service.unlinkGoogle(both.id);
+    expect(result.user.googleLinked).toBe(false);
+    expect(result.user.hasPhone).toBe(true);
+    expect(result.user.role).toBe(UserRole.PASSENGER);
+    expect(prisma.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: both.id },
+        data: { googleId: null },
+      }),
+    );
+  });
 });

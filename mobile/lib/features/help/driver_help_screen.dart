@@ -48,8 +48,8 @@ class DriverHelpScreen extends ConsumerWidget {
           const Divider(height: 24),
           ListTile(
             leading: const Icon(Icons.person_outline, color: MovaColors.violet),
-            title: const Text('Compte et connexion', style: TextStyle(fontWeight: FontWeight.w600)),
-            subtitle: const Text('Lier Google ou votre numéro +243'),
+            title: const Text('Connexion', style: TextStyle(fontWeight: FontWeight.w600)),
+            subtitle: const Text('Optionnel : lier Google ou votre numéro +243'),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => _open(context, const ProfileScreen()),
           ),

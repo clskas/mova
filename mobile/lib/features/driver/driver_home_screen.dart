@@ -1211,7 +1211,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
               value: _DriverMenuAction.profile,
               child: ListTile(
                 leading: Icon(Icons.person_outline),
-                title: Text('Compte et connexion'),
+                title: Text('Connexion'),
                 contentPadding: EdgeInsets.zero,
                 visualDensity: VisualDensity.compact,
               ),

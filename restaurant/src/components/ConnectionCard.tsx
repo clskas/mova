@@ -20,14 +20,12 @@ type Me = {
 type LinkRes = {
   accessToken?: string;
   message?: string;
-  user?: { phone?: string };
 };
 
-const LINKED_SNACK = "Compte lié. Vous pouvez vous connecter avec le téléphone ou Google.";
+const OPTIONAL_COPY =
+  "Optionnel. Vous pouvez utiliser seulement le téléphone, seulement Google, ou les deux pour le même compte.";
 
-type Props = { onBack: () => void; mock?: boolean };
-
-export function AccountView({ onBack, mock }: Props) {
+export function ConnectionCard() {
   const [me, setMe] = useState<Me | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -39,21 +37,20 @@ export function AccountView({ onBack, mock }: Props) {
 
   const load = useCallback(async () => {
     try {
-      const data = await apiFetch<Me>("/api/users/me", undefined, { useMock: mock });
-      setMe(data);
+      setMe(await apiFetch<Me>("/api/users/me"));
     } catch (e) {
       setError(toUserErrorMessage(e, "Impossible de charger le compte"));
     } finally {
       setLoading(false);
     }
-  }, [mock]);
+  }, []);
 
   useEffect(() => {
     void load();
   }, [load]);
 
   function applyLink(data: LinkRes, fallback: string) {
-    if (data.accessToken) setToken(data.accessToken, data.user?.phone);
+    if (data.accessToken) setToken(data.accessToken);
     setSnack(data.message ?? fallback);
     setError(null);
     setOtpSent(false);
@@ -68,8 +65,8 @@ export function AccountView({ onBack, mock }: Props) {
       const data = await apiFetch<LinkRes>("/api/auth/link-google", {
         method: "POST",
         body: JSON.stringify({ idToken }),
-      }, { useMock: mock });
-      applyLink(data, LINKED_SNACK);
+      });
+      applyLink(data, "Compte lié. Vous pouvez vous connecter avec le téléphone ou Google.");
     } catch (e) {
       setError(toUserErrorMessage(e, "Impossible de lier Google"));
     } finally {
@@ -81,11 +78,10 @@ export function AccountView({ onBack, mock }: Props) {
     setBusy(true);
     setError(null);
     try {
-      const msisdn = normalizeLoginPhone(phone);
       await apiFetch("/api/auth/otp/request", {
         method: "POST",
-        body: JSON.stringify({ phone: msisdn }),
-      }, { useMock: mock });
+        body: JSON.stringify({ phone: normalizeLoginPhone(phone) }),
+      });
       setOtpSent(true);
     } catch (e) {
       setError(toUserErrorMessage(e, "Impossible d'envoyer le code"));
@@ -101,8 +97,8 @@ export function AccountView({ onBack, mock }: Props) {
       const data = await apiFetch<LinkRes>("/api/auth/link-phone", {
         method: "POST",
         body: JSON.stringify({ phone: normalizeLoginPhone(phone), otpCode: otp.trim() }),
-      }, { useMock: mock });
-      applyLink(data, LINKED_SNACK);
+      });
+      applyLink(data, "Compte lié. Vous pouvez vous connecter avec le téléphone ou Google.");
     } catch (e) {
       setError(toUserErrorMessage(e, "Impossible de lier le numéro"));
     } finally {
@@ -123,10 +119,10 @@ export function AccountView({ onBack, mock }: Props) {
       const data = await apiFetch<LinkRes>(`/api/auth/unlink-${kind}`, {
         method: "POST",
         body: JSON.stringify({}),
-      }, { useMock: mock });
+      });
       applyLink(data, "Compte mis à jour.");
     } catch (e) {
-      setError(toUserErrorMessage(e, "Impossible de délier"));
+      setError(toUserErrorMessage(e, "Impossible de détacher"));
     } finally {
       setBusy(false);
     }
@@ -134,34 +130,21 @@ export function AccountView({ onBack, mock }: Props) {
 
   const googleLinked = me?.googleLinked === true;
   const hasPhone = me?.hasPhone === true || Boolean(me?.phone);
-  const phoneLabel = me?.phoneMasked || me?.phone || "Non lié";
-  const emailLabel = me?.emailMasked || me?.email || "Non lié";
-  const linkedBoth = googleLinked && hasPhone;
+  const phoneLabel = me?.phoneMasked || me?.phone || "non lié";
+  const emailLabel = me?.emailMasked || me?.email || "non lié";
 
   return (
-    <div className="space-y-4">
-      <button type="button" onClick={onBack} className="text-[#6C63FF] text-sm font-medium">
-        ← Retour
-      </button>
-
+    <section className="bg-white rounded-2xl border p-6 space-y-3">
       <div>
-        <h2 className="text-lg font-bold">Connexion</h2>
-        <p className="text-sm text-gray-500">
-          Optionnel. Vous pouvez utiliser seulement le téléphone, seulement Google, ou les deux pour le même compte.
-        </p>
+        <h3 className="font-semibold text-sm text-gray-700">Connexion</h3>
+        <p className="text-xs text-gray-500 mt-1">{OPTIONAL_COPY}</p>
       </div>
-
-      {snack && (
-        <p className="text-sm text-[#00A37A] bg-emerald-50 rounded-lg py-2 px-3">{snack}</p>
-      )}
-      {error && (
-        <p className="text-sm text-red-600 bg-red-50 rounded-lg py-2 px-3">{error}</p>
-      )}
-
+      {snack && <p className="text-sm text-emerald-700 bg-emerald-50 rounded-lg py-2 px-3">{snack}</p>}
+      {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg py-2 px-3">{error}</p>}
       {loading ? (
-        <p className="text-sm text-gray-500">Chargement…</p>
+        <p className="text-sm text-gray-400">Chargement…</p>
       ) : (
-        <section className="bg-white rounded-xl p-4 shadow-sm space-y-3">
+        <>
           <p className="text-sm">
             <span className="text-gray-500">Téléphone :</span>{" "}
             <strong>{hasPhone ? `lié · ${phoneLabel}` : "non lié"}</strong>
@@ -170,22 +153,17 @@ export function AccountView({ onBack, mock }: Props) {
             <span className="text-gray-500">Google :</span>{" "}
             <strong>{googleLinked ? `lié · ${emailLabel}` : "non lié"}</strong>
           </p>
-          {linkedBoth && (
-            <p className="text-xs text-gray-500">Les deux méthodes sont liées. Un seul portefeuille.</p>
-          )}
-
           {!googleLinked && googleClientId() && (
-            <div className="pt-2">
+            <div className="pt-1">
               <p className="text-sm font-medium mb-2">Lier Google</p>
               <GoogleContinueButton onCredential={linkGoogle} disabled={busy} />
             </div>
           )}
-
           {!hasPhone && (
-            <div className="pt-2 space-y-2">
+            <div className="pt-1 space-y-2">
               <p className="text-sm font-medium">Lier un numéro</p>
               <input
-                className="w-full rounded-xl border border-gray-200 bg-white p-3"
+                className="w-full rounded-xl border p-3"
                 type="tel"
                 inputMode="tel"
                 autoComplete="tel"
@@ -196,7 +174,7 @@ export function AccountView({ onBack, mock }: Props) {
               />
               {otpSent && (
                 <input
-                  className="w-full rounded-xl border border-gray-200 bg-white p-3"
+                  className="w-full rounded-xl border p-3"
                   type="text"
                   inputMode="numeric"
                   autoComplete="one-time-code"
@@ -210,47 +188,24 @@ export function AccountView({ onBack, mock }: Props) {
                 type="button"
                 onClick={otpSent ? linkPhone : requestOtp}
                 disabled={busy || !phone.trim() || (otpSent && !otp.trim())}
-                className="w-full bg-[#6C63FF] text-white rounded-xl py-3 font-semibold disabled:opacity-50"
+                className="w-full py-3 rounded-xl bg-[#FF6B35] text-white font-medium disabled:opacity-60"
               >
                 {busy ? "Chargement…" : otpSent ? "Confirmer le numéro" : "Lier un numéro"}
               </button>
-              {otpSent && (
-                <button
-                  type="button"
-                  className="w-full text-sm text-gray-500 underline"
-                  onClick={() => {
-                    setOtpSent(false);
-                    setOtp("");
-                  }}
-                >
-                  Changer de numéro
-                </button>
-              )}
             </div>
           )}
-
           {me?.canUnlinkGoogle && (
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => unlink("google")}
-              className="text-sm text-gray-500 underline"
-            >
+            <button type="button" disabled={busy} onClick={() => unlink("google")} className="text-sm text-gray-500 underline">
               Détacher Google
             </button>
           )}
           {me?.canUnlinkPhone && (
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => unlink("phone")}
-              className="text-sm text-gray-500 underline block"
-            >
+            <button type="button" disabled={busy} onClick={() => unlink("phone")} className="text-sm text-gray-500 underline block">
               Détacher le numéro
             </button>
           )}
-        </section>
+        </>
       )}
-    </div>
+    </section>
   );
 }

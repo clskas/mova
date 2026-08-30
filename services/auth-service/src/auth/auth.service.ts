@@ -32,6 +32,7 @@ import {
   isStaffAuthRole,
   missingInviteOnlyAccountMessage,
   mismatchedPartnerRoleMessage,
+  OWNER_SUPER_ADMIN_PHONE,
   shouldRefusePassengerAutoRegister,
 } from './partner-auth.util';
 import { hashOtpCode } from './otp-code.util';
@@ -405,6 +406,13 @@ export class AuthService {
     if (!user.phone) {
       return this.buildLinkResponse(user, 'Aucun numéro lié à ce compte.');
     }
+    if (user.phone === OWNER_SUPER_ADMIN_PHONE) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.FORBIDDEN,
+        'Le numéro du compte propriétaire SENGA ne peut pas être détaché.',
+      );
+    }
     if (!user.googleId) {
       throw new MovaHttpException(
         MovaErrorCode.AUTH_FORBIDDEN,
@@ -639,7 +647,7 @@ export class AuthService {
         googleLinked: Boolean(user.googleId),
         hasPhone: Boolean(user.phone),
         canUnlinkGoogle: Boolean(user.googleId && user.phone),
-        canUnlinkPhone: Boolean(user.phone && user.googleId),
+        canUnlinkPhone: Boolean(user.phone && user.googleId && user.phone !== OWNER_SUPER_ADMIN_PHONE),
         publicId: formatMovaPublicId(user.id, user.role),
         role: user.role,
         status: user.status,

@@ -556,10 +556,16 @@ export type SubscriptionRecord = {
 export type AdminSessionUser = {
   id: string;
   phone?: string;
+  phoneMasked?: string;
   role: AdminRole | string;
   firstName?: string;
   lastName?: string;
   email?: string;
+  emailMasked?: string;
+  googleLinked?: boolean;
+  hasPhone?: boolean;
+  canUnlinkGoogle?: boolean;
+  canUnlinkPhone?: boolean;
 };
 
 export type WalletOverview = {
@@ -1072,9 +1078,14 @@ function mockFor<T>(path: string, init?: RequestInit): T {
     return {
       id: "1",
       phone: "+243900000001",
+      phoneMasked: "+243 *** 0001",
       role,
       firstName: "Admin",
       lastName: "SENGA",
+      googleLinked: false,
+      hasPhone: true,
+      canUnlinkGoogle: false,
+      canUnlinkPhone: false,
     } as T;
   }
   if (path.includes("/pricing-rules") && method !== "GET") {

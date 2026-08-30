@@ -44,7 +44,7 @@ export class UsersService {
       googleLinked: Boolean(googleId),
       hasPhone: Boolean(user.phone),
       canUnlinkGoogle: Boolean(googleId && user.phone),
-      canUnlinkPhone: Boolean(user.phone && googleId),
+      canUnlinkPhone: Boolean(user.phone && googleId && user.phone !== OWNER_SUPER_ADMIN_PHONE),
       pinConfigured: Boolean(_pin),
     };
   }

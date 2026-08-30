@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { ConnectionCard } from "@/components/ConnectionCard";
 import { fetchProfile, updateMenuSettings, updateRestaurantLocation } from "@/lib/api";
 import { toUserErrorMessage } from "@/lib/user-messages";
 
@@ -118,6 +119,7 @@ export default function SettingsPage() {
   return (
     <div className="max-w-lg space-y-6">
         <h2 className="text-xl font-bold">Paramètres</h2>
+        <ConnectionCard />
         {loading ? (
           <p className="text-gray-400">Chargement…</p>
         ) : (

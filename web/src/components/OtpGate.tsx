@@ -104,12 +104,12 @@ export function OtpGate({ children }: Props) {
             method: "POST",
             body: JSON.stringify({ challengeId: googleChallenge.id, code: code.trim() }),
           }, { useMock: mock })
-        : await apiFetch<{ accessToken?: string }>("/api/auth/otp/verify", {
+        : await apiFetch<{ accessToken?: string; user?: { phone?: string } }>("/api/auth/otp/verify", {
             method: "POST",
             body: JSON.stringify({ phone: normalizeLoginPhone(phone), code: code.trim() }),
           }, { useMock: mock });
       if (data.accessToken) {
-        setToken(data.accessToken, "user" in data ? data.user?.phone ?? phone : phone);
+        setToken(data.accessToken, data.user?.phone ?? phone);
         setAuthenticated(true);
       } else {
         setError("Connexion impossible. Veuillez réessayer.");

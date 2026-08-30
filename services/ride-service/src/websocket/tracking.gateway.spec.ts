@@ -110,6 +110,40 @@ describe('TrackingGateway', () => {
     expect(result).toEqual({ subscribed: 'ride-1' });
   });
 
+  it('lets staff with rides:read observe a ride they are not on', async () => {
+    tracking.isRideParticipant.mockResolvedValue(false);
+    const client = mockSocket({ data: { user: { id: 'admin-1', role: 'SUPER_ADMIN' } } });
+    const result = await gateway.handleRideSubscribe(client as never, { rideId: 'ride-ops' });
+    expect(client.join).toHaveBeenCalledWith('ride:ride-ops');
+    expect(result).toEqual({ subscribed: 'ride-ops' });
+  });
+
+  it('lets support observe courier rooms used by the admin live map', async () => {
+    tracking.canJoinCourierRoom.mockResolvedValue(false);
+    const client = mockSocket({ data: { user: { id: 'support-1', role: 'SUPPORT' } } });
+    const result = await gateway.handleDeliverySubscribe(client as never, { deliveryId: 'del-ops' });
+    expect(client.join).toHaveBeenCalledWith('delivery:del-ops');
+    expect(result).toEqual({ subscribed: 'del-ops' });
+  });
+
+  it('does not let content staff observe rides', async () => {
+    tracking.isRideParticipant.mockResolvedValue(false);
+    const result = await gateway.handleRideSubscribe(
+      mockSocket({ data: { user: { id: 'content-1', role: 'CONTENT' } } }) as never,
+      { rideId: 'ride-9' },
+    );
+    expect(result).toEqual({ subscribed: false });
+  });
+
+  it('does not let staff emit ride chat', async () => {
+    tracking.isRideParticipant.mockResolvedValue(false);
+    const result = await gateway.handleRideChat(
+      mockSocket({ data: { user: { id: 'admin-1', role: 'SUPER_ADMIN' } } }) as never,
+      { rideId: 'ride-9', text: 'hello' },
+    );
+    expect(result).toEqual({ ok: false });
+  });
+
   it('updates driver coords with JWT Bearer only (no internal key fallback)', async () => {
     tracking.isRideParticipant.mockResolvedValue(true);
     (global.fetch as jest.Mock).mockResolvedValueOnce({ ok: false, status: 401 });

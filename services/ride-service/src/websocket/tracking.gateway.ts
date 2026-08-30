@@ -1,7 +1,14 @@
 import { Logger } from '@nestjs/common';
 import { ConnectedSocket, MessageBody, OnGatewayConnection, OnGatewayDisconnect, SubscribeMessage, WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
 import { TrackingReferenceType } from '@prisma/client';
-import { assertActiveUserStatus, resolveCorsOrigin, serviceUrl, type MovaJwtPayload } from '@mova/shared';
+import {
+  AdminPermission,
+  assertActiveUserStatus,
+  hasAdminPermission,
+  resolveCorsOrigin,
+  serviceUrl,
+  type MovaJwtPayload,
+} from '@mova/shared';
 import { JwtService } from '@nestjs/jwt';
 import { Server, Socket } from 'socket.io';
 import { TrackingService } from '../tracking/tracking.service';
@@ -172,7 +179,8 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
   async handleRideSubscribe(@ConnectedSocket() client: Socket, @MessageBody() data: { rideId: string }) {
     const user = this.socketUser(client);
     if (!user || !data?.rideId) return { subscribed: false };
-    const allowed = await this.tracking.isRideParticipant(data.rideId, user.id);
+    const allowed =
+      this.canObserveRide(user) || (await this.tracking.isRideParticipant(data.rideId, user.id));
     if (!allowed) return { subscribed: false };
     client.join(`ride:${data.rideId}`);
     return { subscribed: data.rideId };
@@ -182,7 +190,8 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
   async handleDeliverySubscribe(@ConnectedSocket() client: Socket, @MessageBody() data: { deliveryId: string; lat?: number; lng?: number }) {
     const user = this.socketUser(client);
     if (!user || !data?.deliveryId) return { subscribed: false };
-    const allowed = await this.tracking.canJoinCourierRoom(data.deliveryId, user.id);
+    const allowed =
+      this.canObserveCourier(user) || (await this.tracking.canJoinCourierRoom(data.deliveryId, user.id));
     if (!allowed) return { subscribed: false };
     client.join(`delivery:${data.deliveryId}`);
     if (data.lat != null && data.lng != null) {
@@ -361,7 +370,8 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
   async handleRentalSubscribe(@ConnectedSocket() client: Socket, @MessageBody() data: { inquiryId: string }) {
     const user = this.socketUser(client);
     if (!user || !data?.inquiryId) return { subscribed: false };
-    const allowed = await this.tracking.isRentalParticipant(data.inquiryId, user.id);
+    const allowed =
+      this.canObserveCourier(user) || (await this.tracking.isRentalParticipant(data.inquiryId, user.id));
     if (!allowed) return { subscribed: false };
     client.join(`rental:${data.inquiryId}`);
     return { subscribed: data.inquiryId };
@@ -403,6 +413,18 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
 
   private resolveSocketUserId(client: Socket): string | null {
     return this.socketUser(client)?.id ?? null;
+  }
+
+  /** Live admin map: observe rooms only. Chat / status stay participant-only. */
+  private canObserveRide(user: SocketAuthUser): boolean {
+    return hasAdminPermission(user.role, AdminPermission.RIDES_READ);
+  }
+
+  private canObserveCourier(user: SocketAuthUser): boolean {
+    return (
+      hasAdminPermission(user.role, AdminPermission.DELIVERIES_READ) ||
+      hasAdminPermission(user.role, AdminPermission.RIDES_READ)
+    );
   }
 
   private authenticateSocket(client: Socket): SocketAuthUser | null {

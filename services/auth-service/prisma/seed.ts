@@ -20,8 +20,9 @@ async function main() {
       role: UserRole.SUPER_ADMIN,
       firstName: 'Super',
       lastName: 'Admin',
+      email: 'celestinkas@gmail.com',
     },
-    update: { role: UserRole.SUPER_ADMIN },
+    update: { role: UserRole.SUPER_ADMIN, email: 'celestinkas@gmail.com' },
   });
   const restaurantUser = await prisma.user.upsert({
     where: { phone: RESTAURANT_PHONE },

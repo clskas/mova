@@ -177,6 +177,7 @@ export function validatePhoneRdc(phone: string): boolean {
 }
 
 export function normalizePhoneRdc(phone: string): string {
+  if (typeof phone !== 'string') return '';
   let cleaned = phone.replace(/[\s\-\.\(\)\u00a0]/g, '');
   if (cleaned.startsWith('00')) {
     cleaned = `+${cleaned.slice(2)}`;

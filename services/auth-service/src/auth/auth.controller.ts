@@ -23,13 +23,19 @@ export class AuthController {
   @Post('otp/request')
   @ApiOperation({ summary: 'Demander un code OTP' })
   requestOtp(@Body() dto: RequestOtpDto) {
-    return this.authService.requestOtp(dto.phone, dto.role);
+    return this.authService.requestOtp(dto.phone, dto.role, dto.portal, dto.intendedRole);
   }
 
   @Post('otp/verify')
   @ApiOperation({ summary: 'Vérifier OTP et obtenir JWT' })
   async verifyOtp(@Body() dto: VerifyOtpDto, @Res({ passthrough: true }) res: Response) {
-    const result = await this.authService.verifyOtp(dto.phone, dto.code, dto.role);
+    const result = await this.authService.verifyOtp(
+      dto.phone,
+      dto.code,
+      dto.role,
+      dto.portal,
+      dto.intendedRole,
+    );
     res.status(result.isNew ? HttpStatus.CREATED : HttpStatus.OK);
     return result;
   }
@@ -37,25 +43,31 @@ export class AuthController {
   @Post('login/options')
   @ApiOperation({ summary: 'Options de connexion (PIN local ou SMS)' })
   loginOptions(@Body() dto: LoginOptionsDto) {
-    return this.authService.getLoginOptions(dto.phone, dto.role);
+    return this.authService.getLoginOptions(dto.phone, dto.role, dto.portal, dto.intendedRole);
   }
 
   @Post('pin/login')
   @ApiOperation({ summary: 'Connexion par code PIN local (sans SMS)' })
   pinLogin(@Body() dto: PinLoginDto) {
-    return this.authService.loginWithPin(dto.phone, dto.pin, dto.role);
+    return this.authService.loginWithPin(dto.phone, dto.pin, dto.role, dto.portal, dto.intendedRole);
   }
 
   @Post('google')
   @ApiOperation({ summary: 'Connexion Google — étape 1 : ID token, puis OTP (SMS ou e-mail)' })
   loginGoogle(@Body() dto: GoogleLoginDto) {
-    return this.authService.loginWithGoogle(dto.idToken, dto.role);
+    return this.authService.loginWithGoogle(dto.idToken, dto.role, dto.portal);
   }
 
   @Post('google/verify')
   @ApiOperation({ summary: 'Connexion Google — étape 2 : vérifier l\'OTP et obtenir le JWT' })
   async verifyGoogle(@Body() dto: GoogleVerifyDto, @Res({ passthrough: true }) res: Response) {
-    const result = await this.authService.verifyGoogleOtp(dto.challengeId, dto.code, dto.role);
+    const result = await this.authService.verifyGoogleOtp(
+      dto.challengeId,
+      dto.code,
+      dto.role,
+      dto.portal,
+      dto.intendedRole,
+    );
     res.status(result.isNew ? HttpStatus.CREATED : HttpStatus.OK);
     return result;
   }

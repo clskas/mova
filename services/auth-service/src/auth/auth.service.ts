@@ -31,11 +31,15 @@ import { EMAIL_UNAVAILABLE_USER_MESSAGE, EmailOtpMailer } from './email-otp.mail
 import { hashLocalPin, isValidLocalPin, verifyLocalPin } from './local-pin.util';
 import {
   defaultPartnerDisplayName,
+  isAllowedPartnerSelfRegisterRole,
   isPartnerPortalRole,
   isStaffAuthRole,
   missingInviteOnlyAccountMessage,
   mismatchedPartnerRoleMessage,
   OWNER_SUPER_ADMIN_PHONE,
+  isOwnerSuperAdminEmail,
+  roleFromPartnerPortal,
+  sanitizeIntendedAuthRole,
   shouldRefusePassengerAutoRegister,
 } from './partner-auth.util';
 import { hashOtpCode } from './otp-code.util';
@@ -53,6 +57,16 @@ const GOOGLE_CHALLENGE_PREFIX = 'auth:google:ch:';
 const GOOGLE_CHALLENGE_TTL_SEC = 10 * 60;
 
 type GoogleOtpChannel = 'sms' | 'email';
+
+type GoogleOtpChallengeResult = {
+  success: true;
+  otpRequired: true;
+  challengeId: string;
+  otpChannel: GoogleOtpChannel;
+  destinationMasked: string;
+  message: string;
+  mockCode?: string;
+};
 
 type GoogleChallenge = {
   googleId: string;
@@ -85,23 +99,41 @@ export class AuthService {
     private emailOtp: EmailOtpMailer,
   ) {}
 
-  async requestOtp(phone: string, role?: UserRole) {
+  async requestOtp(phone: string, role?: UserRole, portal?: string, intendedRole?: string) {
+    const requestedRole = this.resolveRequestedAuthRole(role, portal, intendedRole);
+    if (phone == null || typeof phone !== 'string' || !phone.trim()) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_INVALID_PHONE,
+        HttpStatus.BAD_REQUEST,
+        'Numéro de téléphone requis.',
+      );
+    }
     const normalized = normalizePhoneRdc(phone);
     if (!validatePhoneRdc(normalized)) {
       throw new MovaHttpException(MovaErrorCode.AUTH_INVALID_PHONE, HttpStatus.BAD_REQUEST);
     }
-    await this.assertInviteOnlyAccountExists(normalized, role);
+    await this.assertInviteOnlyAccountExists(normalized, requestedRole);
     const useTestOtp = isTestOtpAllowedForPhone(normalized);
     const liveCode = useTestOtp ? TEST_OTP_CODE : crypto.randomInt(100000, 999999).toString();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
-    await this.prisma.otpCode.updateMany({
-      where: { phone: normalized, used: false },
-      data: { used: true },
-    });
-    for (const code of otpCodesToIssue(normalized, liveCode)) {
-      await this.prisma.otpCode.create({
-        data: { phone: normalized, code: hashOtpCode(code), expiresAt },
+    try {
+      await this.prisma.otpCode.updateMany({
+        where: { phone: normalized, used: false },
+        data: { used: true },
       });
+      for (const code of otpCodesToIssue(normalized, liveCode)) {
+        await this.prisma.otpCode.create({
+          data: { phone: normalized, code: hashOtpCode(code), expiresAt },
+        });
+      }
+    } catch (e) {
+      if (e instanceof MovaHttpException) throw e;
+      this.logger.error(`OTP persist failed for ${maskPhoneRdc(normalized)}: ${(e as Error).message}`);
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        HttpStatus.SERVICE_UNAVAILABLE,
+        SMS_UNAVAILABLE_USER_MESSAGE,
+      );
     }
 
     if (useTestOtp) {
@@ -114,7 +146,17 @@ export class AuthService {
       };
     }
 
-    const smsResult = await this.sms.sendOtp(normalized, liveCode);
+    let smsResult: { success: boolean; message?: string };
+    try {
+      smsResult = await this.sms.sendOtp(normalized, liveCode);
+    } catch (e) {
+      this.logger.error(`OTP SMS threw for ${maskPhoneRdc(normalized)}: ${(e as Error).message}`);
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        HttpStatus.SERVICE_UNAVAILABLE,
+        SMS_UNAVAILABLE_USER_MESSAGE,
+      );
+    }
     if (!smsResult.success) {
       this.logger.error(`OTP SMS failed for ${maskPhoneRdc(normalized)}: ${smsResult.message}`);
       throw new MovaHttpException(
@@ -126,21 +168,23 @@ export class AuthService {
     return { success: true, message: smsResult.message ?? 'Code OTP envoyé', phone: normalized };
   }
 
-  async getLoginOptions(phone: string, role?: UserRole) {
+  async getLoginOptions(phone: string, role?: UserRole, portal?: string, intendedRole?: string) {
+    const requestedRole = this.resolveRequestedAuthRole(role, portal, intendedRole);
     const normalized = this.normalizePhoneOrThrow(phone);
     const user = await this.prisma.user.findUnique({ where: { phone: normalized } });
     if (!user || !user.localPinHash) {
       return { success: true, phone: normalized, pinEnabled: false };
     }
     try {
-      this.assertRoleAccess(user, role);
+      this.assertRoleAccess(user, requestedRole);
     } catch {
       return { success: true, phone: normalized, pinEnabled: false };
     }
     return { success: true, phone: normalized, pinEnabled: true };
   }
 
-  async loginWithPin(phone: string, pin: string, role?: UserRole) {
+  async loginWithPin(phone: string, pin: string, role?: UserRole, portal?: string, intendedRole?: string) {
+    const requestedRole = this.resolveRequestedAuthRole(role, portal, intendedRole);
     const normalized = this.normalizePhoneOrThrow(phone);
     await this.assertPinNotLocked(normalized);
     const user = await this.prisma.user.findUnique({ where: { phone: normalized } });
@@ -151,7 +195,7 @@ export class AuthService {
         'Aucun code PIN configuré. Connectez-vous par SMS.',
       );
     }
-    this.assertRoleAccess(user, role);
+    this.assertRoleAccess(user, requestedRole);
     if (!verifyLocalPin(pin, user.localPinHash)) {
       await this.registerPinFailure(normalized);
       throw new MovaHttpException(MovaErrorCode.AUTH_INVALID_PIN, HttpStatus.UNAUTHORIZED);
@@ -237,30 +281,41 @@ export class AuthService {
     }
   }
 
-  async verifyOtp(phone: string, code: string, role?: UserRole) {
+  async verifyOtp(phone: string, code: string, role?: UserRole, portal?: string, intendedRole?: string) {
+    const requestedRole = this.resolveRequestedAuthRole(role, portal, intendedRole);
     const normalized = await this.consumeValidOtp(phone, code);
 
     let user = await this.prisma.user.findUnique({ where: { phone: normalized } });
     let isNew = false;
     if (!user) {
-      if (role === UserRole.DRIVER) {
+      if (requestedRole === UserRole.DRIVER) {
         throw new MovaHttpException(
           MovaErrorCode.AUTH_FORBIDDEN,
           HttpStatus.FORBIDDEN,
           NO_DRIVER_ACCOUNT_MESSAGE,
         );
       }
-      if (shouldRefusePassengerAutoRegister(normalized, role)) {
+      if (isStaffAuthRole(requestedRole) || normalized === OWNER_SUPER_ADMIN_PHONE) {
         throw new MovaHttpException(
           MovaErrorCode.AUTH_FORBIDDEN,
           HttpStatus.FORBIDDEN,
-          missingInviteOnlyAccountMessage(normalized, role),
+          missingInviteOnlyAccountMessage(normalized, requestedRole),
         );
       }
+      if (shouldRefusePassengerAutoRegister(normalized, requestedRole)) {
+        throw new MovaHttpException(
+          MovaErrorCode.AUTH_FORBIDDEN,
+          HttpStatus.FORBIDDEN,
+          missingInviteOnlyAccountMessage(normalized, requestedRole),
+        );
+      }
+      const createdRole = isAllowedPartnerSelfRegisterRole(requestedRole)
+        ? requestedRole!
+        : UserRole.PASSENGER;
       user = await this.prisma.user.create({
         data: {
           phone: normalized,
-          role: UserRole.PASSENGER,
+          role: createdRole,
           status: UserStatus.ACTIVE,
         },
       });
@@ -273,7 +328,7 @@ export class AuthService {
         this.logger.warn(`USER_CREATED publish failed: ${(e as Error).message}`);
       }
     }
-    this.assertRoleAccess(user, role);
+    this.assertRoleAccess(user, requestedRole);
     if (user.status === UserStatus.SUSPENDED) {
       throw new MovaHttpException(MovaErrorCode.AUTH_FORBIDDEN, HttpStatus.FORBIDDEN, 'Compte suspendu. Contactez le support SENGA.');
     }
@@ -287,22 +342,23 @@ export class AuthService {
 
   /**
    * Step 1: verify Google ID token, issue OTP (SMS if the account has a phone, else email).
-   * Does not return a session JWT. Never creates DRIVER, staff, or partner accounts.
+   * Does not return a session JWT. Never creates DRIVER or staff. Partner roles only
+   * from restaurant / rental portals (explicit role or portal).
    */
-  async loginWithGoogle(idToken: string, role?: UserRole) {
+  async loginWithGoogle(
+    idToken: string,
+    role?: UserRole,
+    portal?: string,
+    intendedRole?: string,
+  ): Promise<GoogleOtpChallengeResult | ReturnType<AuthService['buildAuthResponse']>> {
+    const requestedRole = this.resolveRequestedAuthRole(role, portal, intendedRole);
     const identity = await this.googleTokens.verify(idToken);
-    let user = await this.prisma.user.findUnique({ where: { googleId: identity.googleId } });
-
-    if (!user && identity.email) {
-      user = await this.prisma.user.findFirst({
-        where: { email: { equals: identity.email, mode: 'insensitive' } },
-      });
-    }
+    let user = await this.resolveGoogleLoginUser(identity, requestedRole);
 
     if (!user) {
-      this.assertGoogleCanAutoRegister(role);
+      this.assertGoogleCanAutoRegister(requestedRole);
     } else {
-      this.assertRoleAccess(user, role);
+      this.assertRoleAccess(user, requestedRole);
       if (user.status === UserStatus.SUSPENDED) {
         throw new MovaHttpException(
           MovaErrorCode.AUTH_FORBIDDEN,
@@ -329,7 +385,23 @@ export class AuthService {
       );
     }
 
-    const issued = await this.issueOtpToDestination(destination, channel);
+    let issued: { mock: boolean };
+    try {
+      issued = await this.issueOtpToDestination(destination, channel);
+    } catch (e) {
+      if (
+        channel === 'email' &&
+        identity.emailVerified !== false &&
+        e instanceof MovaHttpException &&
+        e.getStatus() === HttpStatus.SERVICE_UNAVAILABLE
+      ) {
+        this.logger.warn(
+          `Email OTP unavailable for ${maskEmail(destination)} — completing Google login after verified ID token`,
+        );
+        return this.finalizeGoogleSession(identity, user, requestedRole);
+      }
+      throw e;
+    }
     const challengeId = await this.storeGoogleChallenge({
       googleId: identity.googleId,
       email: identity.email,
@@ -338,7 +410,7 @@ export class AuthService {
       picture: identity.picture,
       userId: user?.id ?? null,
       isNew: !user,
-      role,
+      role: requestedRole,
       destination,
       channel,
     });
@@ -362,9 +434,15 @@ export class AuthService {
    * Step 2: consume the Google OTP challenge and issue the session JWT.
    * New Google-only passengers are created here (one wallet). Existing users keep the same id.
    */
-  async verifyGoogleOtp(challengeId: string, code: string, role?: UserRole) {
+  async verifyGoogleOtp(
+    challengeId: string,
+    code: string,
+    role?: UserRole,
+    portal?: string,
+    intendedRole?: string,
+  ) {
     const challenge = await this.loadGoogleChallenge(challengeId);
-    const requestedRole = role ?? challenge.role;
+    const requestedRole = this.resolveRequestedAuthRole(role ?? challenge.role, portal, intendedRole);
     await this.consumeValidOtp(challenge.destination, code, { email: challenge.channel === 'email' });
 
     let user: User | null = challenge.userId
@@ -384,6 +462,9 @@ export class AuthService {
 
     if (!user) {
       this.assertGoogleCanAutoRegister(requestedRole);
+      const createdRole = isAllowedPartnerSelfRegisterRole(requestedRole)
+        ? requestedRole!
+        : UserRole.PASSENGER;
       user = await this.prisma.user.create({
         data: {
           googleId: identity.googleId,
@@ -391,7 +472,7 @@ export class AuthService {
           firstName: identity.givenName,
           lastName: identity.familyName,
           avatarUrl: identity.picture,
-          role: UserRole.PASSENGER,
+          role: createdRole,
           status: UserStatus.ACTIVE,
         },
       });
@@ -521,6 +602,126 @@ export class AuthService {
     return this.prisma.user.findUnique({ where: { id: userId } });
   }
 
+  private resolveRequestedAuthRole(
+    role?: UserRole,
+    portal?: string,
+    intendedRole?: string,
+  ): UserRole | undefined {
+    if (isStaffAuthRole(role)) return role;
+    const fromIntended = sanitizeIntendedAuthRole(intendedRole);
+    const fromPortal = roleFromPartnerPortal(portal);
+    if (portal && !fromPortal) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        HttpStatus.BAD_REQUEST,
+        'Portail inconnu. Utilisez restaurant ou rental.',
+      );
+    }
+    if (fromPortal && role && role !== fromPortal) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        HttpStatus.BAD_REQUEST,
+        'Le rôle ne correspond pas à ce portail partenaire.',
+      );
+    }
+    if (fromIntended && fromPortal && fromIntended !== fromPortal) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        HttpStatus.BAD_REQUEST,
+        'Le rôle demandé ne correspond pas à ce portail partenaire.',
+      );
+    }
+    return (fromIntended as UserRole | undefined) ?? role ?? (fromPortal as UserRole | undefined);
+  }
+
+  private async resolveGoogleLoginUser(
+    identity: GoogleIdentity,
+    requestedRole?: UserRole,
+  ): Promise<User | null> {
+    let user = await this.prisma.user.findUnique({ where: { googleId: identity.googleId } });
+    if (isStaffAuthRole(requestedRole)) {
+      const owner = await this.resolveAllowlistedSuperAdmin(identity);
+      if (owner) return owner;
+      if (user && isStaffAuthRole(user.role)) return user;
+      if (!user && identity.email) {
+        user = await this.prisma.user.findFirst({
+          where: { email: { equals: identity.email, mode: 'insensitive' } },
+        });
+        if (user && isStaffAuthRole(user.role)) return user;
+      }
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.FORBIDDEN,
+        'Aucun compte autorisé pour cet e-mail Google. Le compte staff doit déjà exister.',
+      );
+    }
+    if (!user && identity.email) {
+      user = await this.prisma.user.findFirst({
+        where: { email: { equals: identity.email, mode: 'insensitive' } },
+      });
+    }
+    return user;
+  }
+
+  private async resolveAllowlistedSuperAdmin(identity: GoogleIdentity): Promise<User | null> {
+    if (!isOwnerSuperAdminEmail(identity.email)) return null;
+    const owner = await this.prisma.user.findUnique({ where: { phone: OWNER_SUPER_ADMIN_PHONE } });
+    if (owner && owner.role === UserRole.SUPER_ADMIN) return owner;
+    return null;
+  }
+
+  private async finalizeGoogleSession(
+    identity: GoogleIdentity,
+    existing: User | null,
+    requestedRole?: UserRole,
+  ) {
+    let user = existing;
+    let isNew = false;
+    if (!user) {
+      this.assertGoogleCanAutoRegister(requestedRole);
+      const createdRole = isAllowedPartnerSelfRegisterRole(requestedRole)
+        ? requestedRole!
+        : UserRole.PASSENGER;
+      user = await this.prisma.user.create({
+        data: {
+          googleId: identity.googleId,
+          email: identity.email,
+          firstName: identity.givenName,
+          lastName: identity.familyName,
+          avatarUrl: identity.picture,
+          role: createdRole,
+          status: UserStatus.ACTIVE,
+        },
+      });
+      isNew = true;
+      await this.provisionUser(user.id, user.role);
+      try {
+        const payload: UserCreatedPayload = { userId: user.id, phone: user.phone ?? undefined, role: user.role };
+        await this.redis.publish(MOVA_EVENTS.USER_CREATED, payload);
+      } catch (e) {
+        this.logger.warn(`USER_CREATED publish failed: ${(e as Error).message}`);
+      }
+    } else {
+      user = await this.attachGoogleIdentity(user, identity);
+    }
+    this.assertRoleAccess(user, requestedRole);
+    if (user.status === UserStatus.SUSPENDED) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.FORBIDDEN,
+        'Compte suspendu. Contactez le support SENGA.',
+      );
+    }
+    if (user.phone) {
+      try {
+        await this.clearPinFailures(user.phone);
+      } catch (e) {
+        this.logger.warn(`clearPinFailures failed: ${(e as Error).message}`);
+      }
+    }
+    return this.buildAuthResponse(user, { isNew });
+  }
+
   private assertGoogleCanAutoRegister(role?: UserRole) {
     if (role === UserRole.DRIVER) {
       throw new MovaHttpException(
@@ -529,14 +730,17 @@ export class AuthService {
         'Aucun compte chauffeur lié à Google. Connectez-vous avec votre numéro +243, ou terminez le KYC chauffeur.',
       );
     }
-    if (isStaffAuthRole(role) || isPartnerPortalRole(role)) {
+    if (isStaffAuthRole(role)) {
       throw new MovaHttpException(
         MovaErrorCode.AUTH_FORBIDDEN,
         HttpStatus.FORBIDDEN,
-        'Aucun compte autorisé pour cet e-mail Google. Le compte staff / partenaire doit déjà exister.',
+        'Aucun compte autorisé pour cet e-mail Google. Le compte staff doit déjà exister.',
       );
     }
-    if (shouldRefusePassengerAutoRegister('', role)) {
+    if (isAllowedPartnerSelfRegisterRole(role)) {
+      return;
+    }
+    if (isPartnerPortalRole(role) || shouldRefusePassengerAutoRegister('', role)) {
       throw new MovaHttpException(
         MovaErrorCode.AUTH_FORBIDDEN,
         HttpStatus.FORBIDDEN,
@@ -549,14 +753,23 @@ export class AuthService {
     const useTestOtp = channel === 'sms' ? isTestOtpAllowedForPhone(destination) : isMockOtpAllowed();
     const liveCode = useTestOtp ? TEST_OTP_CODE : crypto.randomInt(100000, 999999).toString();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
-    await this.prisma.otpCode.updateMany({
-      where: { phone: destination, used: false },
-      data: { used: true },
-    });
-    for (const code of otpCodesToIssue(destination, liveCode)) {
-      await this.prisma.otpCode.create({
-        data: { phone: destination, code: hashOtpCode(code), expiresAt },
+    try {
+      await this.prisma.otpCode.updateMany({
+        where: { phone: destination, used: false },
+        data: { used: true },
       });
+      for (const code of otpCodesToIssue(destination, liveCode)) {
+        await this.prisma.otpCode.create({
+          data: { phone: destination, code: hashOtpCode(code), expiresAt },
+        });
+      }
+    } catch (e) {
+      this.logger.error(`Google OTP persist failed: ${(e as Error).message}`);
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        HttpStatus.SERVICE_UNAVAILABLE,
+        channel === 'sms' ? SMS_UNAVAILABLE_USER_MESSAGE : EMAIL_UNAVAILABLE_USER_MESSAGE,
+      );
     }
 
     if (useTestOtp) {
@@ -566,7 +779,17 @@ export class AuthService {
     }
 
     if (channel === 'sms') {
-      const smsResult = await this.sms.sendOtp(destination, liveCode);
+      let smsResult: { success: boolean; message?: string };
+      try {
+        smsResult = await this.sms.sendOtp(destination, liveCode);
+      } catch (e) {
+        this.logger.error(`OTP SMS threw for ${maskPhoneRdc(destination)}: ${(e as Error).message}`);
+        throw new MovaHttpException(
+          MovaErrorCode.VALIDATION_ERROR,
+          HttpStatus.SERVICE_UNAVAILABLE,
+          SMS_UNAVAILABLE_USER_MESSAGE,
+        );
+      }
       if (!smsResult.success) {
         this.logger.error(`OTP SMS failed for ${maskPhoneRdc(destination)}: ${smsResult.message}`);
         throw new MovaHttpException(
@@ -578,7 +801,17 @@ export class AuthService {
       return { mock: false as const };
     }
 
-    const emailResult = await this.emailOtp.sendOtp(destination, liveCode);
+    let emailResult: { success: boolean; message: string };
+    try {
+      emailResult = await this.emailOtp.sendOtp(destination, liveCode);
+    } catch (e) {
+      this.logger.error(`OTP email threw for ${maskEmail(destination)}: ${(e as Error).message}`);
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        HttpStatus.SERVICE_UNAVAILABLE,
+        EMAIL_UNAVAILABLE_USER_MESSAGE,
+      );
+    }
     if (!emailResult.success) {
       this.logger.error(`OTP email failed for ${maskEmail(destination)}: ${emailResult.message}`);
       throw new MovaHttpException(
@@ -742,7 +975,7 @@ export class AuthService {
       this.assertRoleAccess(user, role);
       return;
     }
-    if (!isStaffAuthRole(role) && !isPartnerPortalRole(role)) return;
+    if (!isStaffAuthRole(role)) return;
     const user = await this.prisma.user.findUnique({ where: { phone } });
     if (!user) {
       throw new MovaHttpException(

@@ -14,6 +14,8 @@ describe('Market RDC Config', () => {
     expect(normalizePhoneRdc('00243812345678')).toBe('+243812345678');
     expect(normalizePhoneRdc('812345678')).toBe('+243812345678');
     expect(normalizePhoneRdc('+243-900-000-031')).toBe('+243900000031');
+    expect(normalizePhoneRdc(undefined as unknown as string)).toBe('');
+    expect(normalizePhoneRdc(null as unknown as string)).toBe('');
   });
 
   it('should format CDF amounts', () => {

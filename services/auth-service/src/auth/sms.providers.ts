@@ -226,11 +226,16 @@ export class SmsService {
         message: SMS_UNAVAILABLE_USER_MESSAGE,
       };
     }
-    const result = await provider.sendOtp(phone, code);
-    if (!result.success && this.config.get('MOCK_OTP') !== 'true') {
-      this.logger.error(`SMS OTP failed (${provider.name}): ${result.message}`);
+    try {
+      const result = await provider.sendOtp(phone, code);
+      if (!result.success && this.config.get('MOCK_OTP') !== 'true') {
+        this.logger.error(`SMS OTP failed (${provider.name}): ${result.message}`);
+      }
+      return result;
+    } catch (e) {
+      this.logger.error(`SMS OTP threw (${provider.name}): ${(e as Error).message}`);
+      return { success: false, message: SMS_UNAVAILABLE_USER_MESSAGE };
     }
-    return result;
   }
 
   isProductionReady(): boolean {

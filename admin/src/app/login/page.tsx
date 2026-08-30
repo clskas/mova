@@ -316,7 +316,7 @@ export default function LoginPage() {
                 <code className="rounded bg-gray-100 px-1.5 py-0.5 text-gray-600">123456</code>, pas de SMS.
               </>
             ) : (
-              "Un SMS avec le code vous sera envoyé. Le compte staff doit déjà exister."
+              "Un SMS avec le code vous sera envoyé. Google : seul l'e-mail du personnel autorisé est accepté."
             )}
           </p>
         </div>

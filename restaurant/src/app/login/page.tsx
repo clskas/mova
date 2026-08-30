@@ -64,7 +64,13 @@ export default function LoginPage() {
         requestRes = await fetch(`${API_BASE}/api/auth/otp/request`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ phone: msisdn, purpose: "LOGIN", role: "RESTAURANT" }),
+          body: JSON.stringify({
+            phone: msisdn,
+            purpose: "LOGIN",
+            role: "RESTAURANT",
+            intendedRole: "RESTAURANT",
+            portal: "restaurant",
+          }),
         });
       } catch {
         throw new Error(
@@ -107,7 +113,12 @@ export default function LoginPage() {
       const verifyRes = await fetch(`${API_BASE}/api/auth/google`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ idToken, role: "RESTAURANT" }),
+        body: JSON.stringify({
+          idToken,
+          role: "RESTAURANT",
+          intendedRole: "RESTAURANT",
+          portal: "restaurant",
+        }),
       });
       const data = await verifyRes.json().catch(() => ({}));
       if (!verifyRes.ok) {
@@ -145,8 +156,20 @@ export default function LoginPage() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(
               googleChallenge
-                ? { challengeId: googleChallenge.id, code: code.trim(), role: "RESTAURANT" }
-                : { phone: normalizeLoginPhone(phone), code: code.trim(), role: "RESTAURANT" },
+                ? {
+                    challengeId: googleChallenge.id,
+                    code: code.trim(),
+                    role: "RESTAURANT",
+                    intendedRole: "RESTAURANT",
+                    portal: "restaurant",
+                  }
+                : {
+                    phone: normalizeLoginPhone(phone),
+                    code: code.trim(),
+                    role: "RESTAURANT",
+                    intendedRole: "RESTAURANT",
+                    portal: "restaurant",
+                  },
             ),
           },
         );
@@ -258,7 +281,7 @@ export default function LoginPage() {
           {isSeedDemoPhone(phone)
             ? <>Numéro de démo : code <code>123456</code>, pas de SMS.</>
             : "Numéro réel +243 : le code arrive par SMS."}{" "}
-          Première connexion : un compte restaurant est créé automatiquement.
+          Première connexion (téléphone ou Google) : un compte restaurant est créé automatiquement. Un seul portefeuille.
         </p>
         <p className="text-[10px] text-gray-300 text-center break-all">API: {API_BASE}</p>
       </div>

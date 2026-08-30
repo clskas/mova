@@ -20,8 +20,14 @@ async function main() {
   }
   const owner = await prisma.user.upsert({
     where: { phone: '+243971163574' },
-    create: { phone: '+243971163574', role: UserRole.SUPER_ADMIN, firstName: 'Super', lastName: 'Admin' },
-    update: { role: UserRole.SUPER_ADMIN },
+    create: {
+      phone: '+243971163574',
+      role: UserRole.SUPER_ADMIN,
+      firstName: 'Super',
+      lastName: 'Admin',
+      email: 'celestinkas@gmail.com',
+    },
+    update: { role: UserRole.SUPER_ADMIN, email: 'celestinkas@gmail.com' },
   });
   console.log(`Staff roles seeded: ${STAFF_DEMO_ACCOUNTS.length} demo accounts + owner ${owner.phone} (${owner.role})`);
   console.log('Login: POST /api/auth/otp/request then verify with code 123456 (MOCK_OTP=true)');

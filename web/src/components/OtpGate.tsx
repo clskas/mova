@@ -37,9 +37,13 @@ export function OtpGate({ children }: Props) {
     setError(null);
     try {
       const msisdn = normalizeLoginPhone(phone);
+      if (!/^\+243\d{9}$/.test(msisdn)) {
+        setError("Numéro invalide. Format : +243XXXXXXXXX");
+        return;
+      }
       await apiFetch("/api/auth/otp/request", {
         method: "POST",
-        body: JSON.stringify({ phone: msisdn }),
+        body: JSON.stringify({ phone: msisdn, intendedRole: "PASSENGER" }),
       }, { useMock: mock });
       setCode(isSeedDemoPhone(msisdn) ? "123456" : "");
       setCodeSent(true);
@@ -47,7 +51,7 @@ export function OtpGate({ children }: Props) {
       const status = e instanceof ApiError ? e.status : 0;
       setError(toUserErrorMessage(
         e,
-        status === 503
+        status === 503 || status >= 500
           ? "Impossible d'envoyer le code par SMS. Réessayez dans quelques minutes."
           : "Impossible d'envoyer le code",
       ));
@@ -70,7 +74,7 @@ export function OtpGate({ children }: Props) {
         user?: { phone?: string };
       }>("/api/auth/google", {
         method: "POST",
-        body: JSON.stringify({ idToken }),
+        body: JSON.stringify({ idToken, intendedRole: "PASSENGER" }),
       }, { useMock: mock });
       if (data.otpRequired && data.challengeId) {
         setGoogleChallenge({
@@ -102,11 +106,19 @@ export function OtpGate({ children }: Props) {
       const data = googleChallenge
         ? await apiFetch<{ accessToken?: string; user?: { phone?: string } }>("/api/auth/google/verify", {
             method: "POST",
-            body: JSON.stringify({ challengeId: googleChallenge.id, code: code.trim() }),
+            body: JSON.stringify({
+              challengeId: googleChallenge.id,
+              code: code.trim(),
+              intendedRole: "PASSENGER",
+            }),
           }, { useMock: mock })
         : await apiFetch<{ accessToken?: string; user?: { phone?: string } }>("/api/auth/otp/verify", {
             method: "POST",
-            body: JSON.stringify({ phone: normalizeLoginPhone(phone), code: code.trim() }),
+            body: JSON.stringify({
+              phone: normalizeLoginPhone(phone),
+              code: code.trim(),
+              intendedRole: "PASSENGER",
+            }),
           }, { useMock: mock });
       if (data.accessToken) {
         setToken(data.accessToken, data.user?.phone ?? phone);

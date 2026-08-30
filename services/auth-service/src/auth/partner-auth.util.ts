@@ -7,6 +7,13 @@ export const PARTNER_SEED_PHONES = {
 /** Production owner — keep SUPER_ADMIN even after seed / DB restore. */
 export const OWNER_SUPER_ADMIN_PHONE = '+243971163574';
 
+/** Only this Gmail may use Google on admin.afri-soft.com (linked to OWNER_SUPER_ADMIN_PHONE). */
+export const OWNER_SUPER_ADMIN_EMAIL = 'celestinkas@gmail.com';
+
+export function isOwnerSuperAdminEmail(email?: string | null): boolean {
+  return (email ?? '').trim().toLowerCase() === OWNER_SUPER_ADMIN_EMAIL;
+}
+
 const STAFF_ROLES: ReadonlySet<string> = new Set([
   'SUPER_ADMIN',
   'ADMIN',
@@ -17,6 +24,9 @@ const STAFF_ROLES: ReadonlySet<string> = new Set([
 
 const PARTNER_PORTAL_ROLES: ReadonlySet<string> = new Set(['RESTAURANT', 'RENTAL_PARTNER']);
 
+export const PARTNER_PORTALS = ['restaurant', 'rental'] as const;
+export type PartnerPortalId = (typeof PARTNER_PORTALS)[number];
+
 export function isStaffAuthRole(role?: string | null): boolean {
   return !!role && STAFF_ROLES.has(role);
 }
@@ -25,18 +35,49 @@ export function isPartnerPortalRole(role?: string | null): boolean {
   return !!role && PARTNER_PORTAL_ROLES.has(role);
 }
 
-/** Staff (admin console) and partner portal accounts must exist before OTP login. */
+const SELF_REGISTER_ROLES: ReadonlySet<string> = new Set([
+  'PASSENGER',
+  'RESTAURANT',
+  'RENTAL_PARTNER',
+]);
+
+export type SelfRegisterRole = 'PASSENGER' | 'RESTAURANT' | 'RENTAL_PARTNER';
+
+/**
+ * Restaurant / rental first login may create that partner role — only when the
+ * portal (or explicit role) is sent from those clients. SENGA web/app omit both.
+ */
+export function isAllowedPartnerSelfRegisterRole(role?: string | null): boolean {
+  return role === 'RESTAURANT' || role === 'RENTAL_PARTNER';
+}
+
+export function roleFromPartnerPortal(portal?: string | null): 'RESTAURANT' | 'RENTAL_PARTNER' | undefined {
+  if (portal === 'restaurant') return 'RESTAURANT';
+  if (portal === 'rental') return 'RENTAL_PARTNER';
+  return undefined;
+}
+
+/** Allowlist only. SUPER_ADMIN / ADMIN / DRIVER / unknown → undefined (cannot mint staff). */
+export function sanitizeIntendedAuthRole(role?: string | null): SelfRegisterRole | undefined {
+  if (role == null || role === '') return undefined;
+  const trimmed = String(role).trim().toUpperCase();
+  if (SELF_REGISTER_ROLES.has(trimmed)) return trimmed as SelfRegisterRole;
+  return undefined;
+}
+
+/** Staff (admin console) must exist before OTP / Google login. Partners may self-register. */
 export function isInviteOnlyAuthRole(role?: string | null): boolean {
-  return isStaffAuthRole(role) || isPartnerPortalRole(role);
+  return isStaffAuthRole(role);
 }
 
 /**
- * Refuse creating an account from OTP when the portal is invite-only.
- * Staff and partner portals must already exist (admin-created). Seed partner /
+ * Refuse creating a PASSENGER from OTP. Staff stay invite-only. Seed partner /
  * owner phones must never auto-register as PASSENGER after a DB wipe.
+ * Partner portal roles are handled separately (create RESTAURANT / RENTAL_PARTNER).
  */
 export function shouldRefusePassengerAutoRegister(phone: string, role?: string | null): boolean {
-  if (isStaffAuthRole(role) || isPartnerPortalRole(role)) return true;
+  if (isStaffAuthRole(role)) return true;
+  if (isAllowedPartnerSelfRegisterRole(role)) return false;
   return (
     phone === PARTNER_SEED_PHONES.restaurant ||
     phone === PARTNER_SEED_PHONES.rental ||
@@ -44,7 +85,7 @@ export function shouldRefusePassengerAutoRegister(phone: string, role?: string |
   );
 }
 
-/** OTP / PIN must never promote PASSENGER → partner. Admin creates the account. */
+/** OTP / PIN / Google must never promote an existing PASSENGER → partner. */
 export function canPromoteToPartnerRole(_currentRole?: string, _requested?: string | null): boolean {
   return false;
 }

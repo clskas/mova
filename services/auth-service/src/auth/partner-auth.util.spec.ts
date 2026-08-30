@@ -1,23 +1,46 @@
 import {
   canPromoteToPartnerRole,
   defaultPartnerDisplayName,
+  isAllowedPartnerSelfRegisterRole,
   isInviteOnlyAuthRole,
   isPartnerPortalRole,
   isStaffAuthRole,
   missingInviteOnlyAccountMessage,
+  isOwnerSuperAdminEmail,
+  OWNER_SUPER_ADMIN_EMAIL,
   OWNER_SUPER_ADMIN_PHONE,
   PARTNER_SEED_PHONES,
+  roleFromPartnerPortal,
+  sanitizeIntendedAuthRole,
   shouldRefusePassengerAutoRegister,
 } from './partner-auth.util';
 
 describe('partner-auth.util', () => {
-  it('refuses restaurant and rental portal self-register', () => {
-    expect(shouldRefusePassengerAutoRegister('+243811111111', 'RESTAURANT')).toBe(true);
-    expect(shouldRefusePassengerAutoRegister('+243811111111', 'RENTAL_PARTNER')).toBe(true);
-    expect(shouldRefusePassengerAutoRegister(PARTNER_SEED_PHONES.restaurant, 'RESTAURANT')).toBe(true);
-    expect(shouldRefusePassengerAutoRegister(PARTNER_SEED_PHONES.rental, 'RENTAL_PARTNER')).toBe(true);
-    expect(isInviteOnlyAuthRole('RESTAURANT')).toBe(true);
-    expect(isInviteOnlyAuthRole('RENTAL_PARTNER')).toBe(true);
+  it('allows restaurant and rental portal self-register (not as PASSENGER)', () => {
+    expect(shouldRefusePassengerAutoRegister('+243811111111', 'RESTAURANT')).toBe(false);
+    expect(shouldRefusePassengerAutoRegister('+243811111111', 'RENTAL_PARTNER')).toBe(false);
+    expect(isAllowedPartnerSelfRegisterRole('RESTAURANT')).toBe(true);
+    expect(isAllowedPartnerSelfRegisterRole('RENTAL_PARTNER')).toBe(true);
+    expect(isAllowedPartnerSelfRegisterRole('PASSENGER')).toBe(false);
+    expect(isAllowedPartnerSelfRegisterRole('ADMIN')).toBe(false);
+    expect(isInviteOnlyAuthRole('RESTAURANT')).toBe(false);
+    expect(isInviteOnlyAuthRole('RENTAL_PARTNER')).toBe(false);
+    expect(roleFromPartnerPortal('restaurant')).toBe('RESTAURANT');
+    expect(roleFromPartnerPortal('rental')).toBe('RENTAL_PARTNER');
+    expect(roleFromPartnerPortal(undefined)).toBeUndefined();
+    expect(sanitizeIntendedAuthRole('PASSENGER')).toBe('PASSENGER');
+    expect(sanitizeIntendedAuthRole('RESTAURANT')).toBe('RESTAURANT');
+    expect(sanitizeIntendedAuthRole('RENTAL_PARTNER')).toBe('RENTAL_PARTNER');
+    expect(sanitizeIntendedAuthRole('SUPER_ADMIN')).toBeUndefined();
+    expect(sanitizeIntendedAuthRole('ADMIN')).toBeUndefined();
+    expect(sanitizeIntendedAuthRole('DRIVER')).toBeUndefined();
+  });
+
+  it('allowlists only celestinkas@gmail.com as owner Google email', () => {
+    expect(OWNER_SUPER_ADMIN_EMAIL).toBe('celestinkas@gmail.com');
+    expect(isOwnerSuperAdminEmail('celestinkas@gmail.com')).toBe(true);
+    expect(isOwnerSuperAdminEmail('CELESTINKAS@gmail.com')).toBe(true);
+    expect(isOwnerSuperAdminEmail('afriri75@gmail.com')).toBe(false);
   });
 
   it('still refuses staff auto-register', () => {
@@ -44,7 +67,7 @@ describe('partner-auth.util', () => {
     expect(shouldRefusePassengerAutoRegister('+243811111111', 'DRIVER')).toBe(false);
   });
 
-  it('never promotes a role via OTP (admin-created partners only)', () => {
+  it('never promotes an existing role via OTP', () => {
     expect(canPromoteToPartnerRole('PASSENGER', 'RESTAURANT')).toBe(false);
     expect(canPromoteToPartnerRole('PASSENGER', 'RENTAL_PARTNER')).toBe(false);
     expect(canPromoteToPartnerRole('DRIVER', 'RESTAURANT')).toBe(false);

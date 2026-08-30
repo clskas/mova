@@ -124,6 +124,7 @@ model WalletTransaction {
   createdAt   DateTime @default(now())
 
   @@index([walletId])
+  @@index([reference, type])
   @@map("wallet_transactions")
 }
 

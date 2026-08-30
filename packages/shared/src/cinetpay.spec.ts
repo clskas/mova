@@ -32,6 +32,7 @@ describe('cinetpay Checkout API', () => {
     expect(cinetPayPaymentMethod('MPESA', 'CDF')).toBe('MPESACD');
     expect(cinetPayPaymentMethod('AIRTEL_MONEY', 'CDF')).toBe('AIRTELCD');
     expect(cinetPayPaymentMethod('OM', 'USD')).toBe('OMCDUSD');
+    expect(() => cinetPayPaymentMethod('AFRIMONEY', 'CDF')).toThrow(/AfriMoney/);
     expect(cinetPaySanitizeDescription('Pay #topup_ref/$1&x')).toBe('Pay topup ref 1 x');
     expect(cinetPayTransactionIdFromProviderRef('cp_topup_1')).toBe('topup_1');
   });

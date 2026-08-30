@@ -87,25 +87,30 @@ export class SubscriptionsService {
     if (!plan.isActive) {
       throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, HttpStatus.BAD_REQUEST, 'Ce plan n\'est plus disponible.');
     }
-    const existing = await this.getActiveSubscription(userId, plan.target);
-    if (existing) {
-      throw new MovaHttpException(
-        MovaErrorCode.VALIDATION_ERROR,
-        HttpStatus.CONFLICT,
-        'Vous avez déjà un abonnement actif pour ce profil.',
-      );
-    }
-    await this.wallet.debit(userId, plan.monthlyPriceCdf, `Abonnement ${plan.name}`, `SUBSCRIBE:${plan.id}`);
     const endsAt = new Date();
     endsAt.setMonth(endsAt.getMonth() + 1);
-    const sub = await this.prisma.userSubscription.create({
-      data: {
-        userId,
-        planId: plan.id,
-        status: SubscriptionStatus.ACTIVE,
-        endsAt,
-      },
-      include: { plan: true },
+    const subscribeRef = `SUBSCRIBE:${userId}:${plan.target}`;
+    const sub = await this.prisma.$transaction(async (tx) => {
+      const existing = await tx.userSubscription.findFirst({
+        where: { userId, status: SubscriptionStatus.ACTIVE, plan: { target: plan.target } },
+      });
+      if (existing) {
+        throw new MovaHttpException(
+          MovaErrorCode.VALIDATION_ERROR,
+          HttpStatus.CONFLICT,
+          'Vous avez déjà un abonnement actif pour ce profil.',
+        );
+      }
+      await this.wallet.debit(userId, plan.monthlyPriceCdf, `Abonnement ${plan.name}`, subscribeRef, tx);
+      return tx.userSubscription.create({
+        data: {
+          userId,
+          planId: plan.id,
+          status: SubscriptionStatus.ACTIVE,
+          endsAt,
+        },
+        include: { plan: true },
+      });
     });
     return {
       subscription: sub,

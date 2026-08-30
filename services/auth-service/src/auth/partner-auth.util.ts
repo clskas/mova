@@ -25,18 +25,18 @@ export function isPartnerPortalRole(role?: string | null): boolean {
   return !!role && PARTNER_PORTAL_ROLES.has(role);
 }
 
-/** Staff (admin console) accounts must exist in Admin before OTP login. */
+/** Staff (admin console) and partner portal accounts must exist before OTP login. */
 export function isInviteOnlyAuthRole(role?: string | null): boolean {
-  return isStaffAuthRole(role);
+  return isStaffAuthRole(role) || isPartnerPortalRole(role);
 }
 
 /**
- * Refuse creating a PASSENGER (or unspecified-role) account.
- * Partner portals self-register; staff stays invite-only.
+ * Refuse creating an account from OTP when the portal is invite-only.
+ * Staff and partner portals must already exist (admin-created). Seed partner /
+ * owner phones must never auto-register as PASSENGER after a DB wipe.
  */
 export function shouldRefusePassengerAutoRegister(phone: string, role?: string | null): boolean {
-  if (isStaffAuthRole(role)) return true;
-  if (isPartnerPortalRole(role)) return false;
+  if (isStaffAuthRole(role) || isPartnerPortalRole(role)) return true;
   return (
     phone === PARTNER_SEED_PHONES.restaurant ||
     phone === PARTNER_SEED_PHONES.rental ||
@@ -44,8 +44,9 @@ export function shouldRefusePassengerAutoRegister(phone: string, role?: string |
   );
 }
 
-export function canPromoteToPartnerRole(currentRole: string, requested?: string | null): boolean {
-  return isPartnerPortalRole(requested) && currentRole === 'PASSENGER';
+/** OTP / PIN must never promote PASSENGER → partner. Admin creates the account. */
+export function canPromoteToPartnerRole(_currentRole?: string, _requested?: string | null): boolean {
+  return false;
 }
 
 export function defaultPartnerDisplayName(role?: string | null): string {

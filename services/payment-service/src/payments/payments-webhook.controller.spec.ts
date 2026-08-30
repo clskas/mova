@@ -1,4 +1,10 @@
+import { createHmac } from 'crypto';
+import { UnauthorizedException } from '@nestjs/common';
 import { PaymentsWebhookController } from './payments-webhook.controller';
+
+function signSerdiPay(secret: string, raw: string) {
+  return createHmac('sha256', secret).update(raw).digest('hex');
+}
 
 describe('PaymentsWebhookController aggregator gate', () => {
   const payments = {} as never;
@@ -16,7 +22,30 @@ describe('PaymentsWebhookController aggregator gate', () => {
     await expect(ctl.cinetPay({}, {})).resolves.toMatchObject({ success: false });
   });
 
+  it('rejects SerdiPay webhook when secret is empty (401 fail-closed)', async () => {
+    const config = {
+      get: (key: string) => (key === 'AFRISOFT_PAY_HUB_MODE' ? 'true' : undefined),
+    } as never;
+    const ctl = new PaymentsWebhookController({} as never, config, hub);
+    await expect(ctl.serdiPay({}, {}, {})).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it('rejects SerdiPay webhook when signature is invalid (401 not 200)', async () => {
+    const config = {
+      get: (key: string) => {
+        if (key === 'AFRISOFT_PAY_HUB_MODE') return 'true';
+        if (key === 'SERDIPAY_WEBHOOK_SECRET') return 'whsec_test';
+        return undefined;
+      },
+    } as never;
+    const ctl = new PaymentsWebhookController({} as never, config, hub);
+    await expect(
+      ctl.serdiPay({ status: 'success' }, { 'x-serdipay-signature': 'deadbeef' }, {}),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
   it('finalizes hub payment from nested SerdiPay callback (raw transactionId)', async () => {
+    const secret = 'whsec_test';
     const finalizeFromAggregator = jest.fn().mockResolvedValue({
       found: true,
       notified: true,
@@ -25,7 +54,11 @@ describe('PaymentsWebhookController aggregator gate', () => {
     });
     const hubOn = { isEnabled: () => true, finalizeFromAggregator } as never;
     const config = {
-      get: (key: string) => (key === 'AFRISOFT_PAY_HUB_MODE' ? 'true' : undefined),
+      get: (key: string) => {
+        if (key === 'AFRISOFT_PAY_HUB_MODE') return 'true';
+        if (key === 'SERDIPAY_WEBHOOK_SECRET') return secret;
+        return undefined;
+      },
     } as never;
     const ctl = new PaymentsWebhookController({} as never, config, hubOn);
     const body = {
@@ -37,7 +70,9 @@ describe('PaymentsWebhookController aggregator gate', () => {
         transactionId: 'SD260829CPHOG',
       },
     };
-    await expect(ctl.serdiPay(body, {}, {})).resolves.toMatchObject({
+    const raw = JSON.stringify(body);
+    const headers = { 'x-serdipay-signature': signSerdiPay(secret, raw) };
+    await expect(ctl.serdiPay(body, headers, { rawBody: Buffer.from(raw) })).resolves.toMatchObject({
       success: true,
       found: true,
       status: 'COMPLETED',

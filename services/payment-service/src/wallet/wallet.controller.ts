@@ -13,9 +13,9 @@ class WithdrawDto {
 
 class TopUpDto {
   @ApiProperty() @IsInt() @Min(500) amountCdf: number;
-  @ApiPropertyOptional({ enum: ['ORANGE_MONEY', 'MPESA', 'AIRTEL_MONEY', 'MOCK'] })
+  @ApiPropertyOptional({ enum: ['ORANGE_MONEY', 'MPESA', 'AIRTEL_MONEY', 'AFRIMONEY', 'MOCK'] })
   @IsOptional()
-  @IsEnum(['ORANGE_MONEY', 'MPESA', 'AIRTEL_MONEY', 'MOCK'])
+  @IsEnum(['ORANGE_MONEY', 'MPESA', 'AIRTEL_MONEY', 'AFRIMONEY', 'MOCK'])
   provider?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() phone?: string;
 }

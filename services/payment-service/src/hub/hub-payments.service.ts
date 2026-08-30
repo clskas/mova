@@ -96,7 +96,15 @@ export class HubPaymentsService {
     if (dup) return { statusCode: HttpStatus.OK, body: this.toView(dup) };
 
     const gateway = (this.config.get<string>('MOBILE_MONEY_GATEWAY') ?? 'serdipay').trim().toLowerCase();
-    const operator = afrisoftPayHubOperator(dto.telecom);
+    let operator: ReturnType<typeof afrisoftPayHubOperator>;
+    try {
+      operator = afrisoftPayHubOperator(dto.telecom);
+    } catch {
+      throw new HttpException(
+        { message: `Opérateur inconnu: ${dto.telecom}. Utilisez OM, MP, AM ou AF (AfriMoney).`, code: 'HUB_TELECOM' },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
     const phone = serdiPayNormalizePhone(dto.phone);
     const purpose = dto.purpose?.trim() || (kind === 'PAYOUT' ? 'withdraw' : 'pay');
 
@@ -230,16 +238,20 @@ export class HubPaymentsService {
       return { found: true, notified: true, payment_id: row.id, status: row.status };
     }
 
-    const updated = await this.prisma.hubPayment.update({
-      where: { id: row.id },
+    const claimed = await this.prisma.hubPayment.updateMany({
+      where: { id: row.id, status: 'PENDING' },
       data: {
         status: outcome,
         failureReason: outcome === 'FAILED' ? message ?? 'Paiement Mobile Money refusé' : null,
         completedAt: outcome === 'COMPLETED' ? new Date() : row.completedAt,
       },
     });
-    const notified = await this.notifyApp(updated.id);
-    return { found: true, notified, payment_id: updated.id, status: updated.status };
+    if (claimed.count !== 1) {
+      const current = await this.prisma.hubPayment.findUnique({ where: { id: row.id } });
+      return { found: true, notified: Boolean(current?.notifiedAt), payment_id: row.id, status: current?.status };
+    }
+    const notified = await this.notifyApp(row.id);
+    return { found: true, notified, payment_id: row.id, status: outcome };
   }
 
   async notifyApp(paymentId: string): Promise<boolean> {

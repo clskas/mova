@@ -92,8 +92,14 @@ export const TEST_OTP_CODE = '123456';
 export const SEED_DEMO_PHONE_RE = /^\+2439000000\d{2}$/;
 
 /**
+ * Production owner — never accept fixed OTP 123456, even if listed in TEST_OTP_PHONES.
+ * Must stay in sync with auth-service `OWNER_SUPER_ADMIN_PHONE`.
+ */
+export const OWNER_SUPER_ADMIN_PHONE = '+243971163574';
+
+/**
  * Seed / demo phones (Play Internal, partner portals). Always treated as test OTP.
- * `TEST_OTP_PHONES` adds extras when `ALLOW_TEST_OTP=true` (does not remove this list).
+ * `TEST_OTP_PHONES` extras apply only outside production when `ALLOW_TEST_OTP=true`.
  */
 export const DEFAULT_TEST_OTP_PHONES: readonly string[] = [
   '+243900000001',
@@ -149,7 +155,7 @@ export function isMockOtpAllowed(): boolean {
   return !isProductionRuntime() && process.env.MOCK_OTP === 'true';
 }
 
-/** Production Play/staging: ALLOW_TEST_OTP=true enables fixed OTP for extra TEST_OTP_PHONES. */
+/** ALLOW_TEST_OTP=true: extras via TEST_OTP_PHONES only outside production. */
 export function isTestOtpModeEnabled(): boolean {
   return process.env.ALLOW_TEST_OTP === 'true';
 }
@@ -162,19 +168,25 @@ export function isSeedDemoPhone(phone: string): boolean {
 export function getTestOtpPhones(): Set<string> {
   const raw = process.env.TEST_OTP_PHONES?.trim();
   const extras = raw
-    ? raw.split(',').map((s) => normalizeTestOtpPhone(s)).filter(Boolean)
+    ? raw
+        .split(',')
+        .map((s) => normalizeTestOtpPhone(s))
+        .filter((p) => p && p !== OWNER_SUPER_ADMIN_PHONE)
     : [];
   return new Set([...DEFAULT_TEST_OTP_PHONES, ...extras]);
 }
 
 /**
- * Fixed OTP 123456: all phones in local MOCK_OTP; seed `+2439000000xx` always
- * as a fallback (SMS hub live or not); extra numbers only when ALLOW_TEST_OTP=true.
+ * Fixed OTP 123456: seed `+2439000000xx` always (SMS hub live or not).
+ * Extra TEST_OTP_PHONES: only outside production when ALLOW_TEST_OTP=true.
+ * Owner phone is never eligible. Production never honors extras.
  */
 export function isTestOtpAllowedForPhone(phone: string): boolean {
-  if (isMockOtpAllowed()) return true;
   const normalized = normalizeTestOtpPhone(phone);
+  if (normalized === OWNER_SUPER_ADMIN_PHONE) return false;
+  if (isMockOtpAllowed()) return true;
   if (isSeedDemoPhone(normalized)) return true;
+  if (isProductionRuntime()) return false;
   if (!isTestOtpModeEnabled()) return false;
   return getTestOtpPhones().has(normalized);
 }
@@ -243,7 +255,7 @@ export function assertProductionSecurity(serviceName = 'service'): void {
   if (isTestOtpModeEnabled()) {
     // eslint-disable-next-line no-console
     console.warn(
-      `[${serviceName}] ALLOW_TEST_OTP=true: extra TEST_OTP_PHONES accept 123456. Seed +2439000000xx keep 123456 as fallback; real +243 numbers use the SMS code.`,
+      `[${serviceName}] ALLOW_TEST_OTP=true: seed +2439000000xx keep 123456. Extra TEST_OTP_PHONES are ignored in production; real +243 numbers use the SMS code.`,
     );
   }
 

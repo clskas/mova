@@ -67,6 +67,9 @@
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"
     },
+    "moduleNameMapper": {
+      "^@mova/shared$": "<rootDir>/../../../packages/shared/src"
+    },
     "testEnvironment": "node"
   }
 }

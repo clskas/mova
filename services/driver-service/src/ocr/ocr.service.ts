@@ -9,6 +9,7 @@ import {
   type KycOcrStatus as SharedKycOcrStatus,
 } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
+import { hostnameFromUrl, parseAllowedOcrMediaUrl } from './ocr-media-url';
 
 const OCR_VISION_PROMPT = `Tu analyses une photo de document officiel (permis de conduire, assurance véhicule ou visite technique) en République Démocratique du Congo.
 
@@ -97,20 +98,37 @@ export class OcrService {
     return KycOcrStatus.UNREADABLE;
   }
 
-  private resolveMediaUrl(url: string): string {
-    if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  private gatewayHosts(): string[] {
+    const hosts = [
+      hostnameFromUrl(process.env.GATEWAY_SERVICE_URL),
+      hostnameFromUrl(process.env.GATEWAY_URL),
+      hostnameFromUrl(serviceUrl('gateway')),
+    ].filter((host): host is string => Boolean(host));
+    return [...new Set(hosts)];
+  }
+
+  private resolveMediaUrl(url: string): string | null {
+    const trimmed = url.trim();
+    if (!trimmed) return null;
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      return parseAllowedOcrMediaUrl(trimmed, this.gatewayHosts()) ? trimmed : null;
+    }
     const gatewayBase =
       process.env.GATEWAY_SERVICE_URL?.replace(/\/$/, '') ??
       process.env.GATEWAY_URL?.replace(/\/$/, '') ??
       serviceUrl('gateway');
-    const path = url.startsWith('/api/') ? url : `/api${url.startsWith('/') ? url : `/${url}`}`;
+    const path = trimmed.startsWith('/api/') ? trimmed : `/api${trimmed.startsWith('/') ? trimmed : `/${trimmed}`}`;
     return `${gatewayBase}${path}`;
   }
 
   private async fetchImageAsDataUrl(url: string): Promise<string | null> {
     try {
       const absolute = this.resolveMediaUrl(url);
-      const res = await fetch(absolute);
+      if (!absolute) {
+        this.logger.warn('OCR image URL rejected (host not allowlisted)');
+        return null;
+      }
+      const res = await fetch(absolute, { redirect: 'error' });
       if (!res.ok) {
         this.logger.warn(`Image fetch ${res.status} for ${absolute}`);
         return null;

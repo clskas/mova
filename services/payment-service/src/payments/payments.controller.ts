@@ -32,7 +32,7 @@ export class PaymentsController {
   @Post('rides/:rideId')
   @ApiOperation({ summary: 'Payer une course' })
   payRide(@Request() req: { user: { id: string } }, @Param('rideId') rideId: string, @Body() dto: ProcessPaymentDto) {
-    return this.paymentsService.payRide(rideId, req.user.id, dto.method, dto.phone, dto.amountCdf);
+    return this.paymentsService.payRide(rideId, req.user.id, dto.method, dto.phone);
   }
 
   @Post('rides/:rideId/cash/confirm')
@@ -84,7 +84,7 @@ export class PaymentsController {
     @Param('referenceId') referenceId: string,
     @Body() dto: ProcessPaymentDto,
   ) {
-    return this.paymentsService.payService(referenceType, referenceId, req.user.id, dto.method, dto.phone, dto.amountCdf);
+    return this.paymentsService.payService(referenceType, referenceId, req.user.id, dto.method, dto.phone);
   }
 
   @Get('cash-debts/summary')

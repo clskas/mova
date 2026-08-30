@@ -107,6 +107,9 @@ export function cinetPayPaymentMethod(
     case 'AIRTEL_MONEY':
     case 'AM':
       return usd ? 'AIRTELCD' : 'AIRTELCD';
+    case 'AFRIMONEY':
+    case 'AF':
+      throw new Error('AfriMoney n\'est pas supporté par CinetPay — utilisez SerdiPay.');
     default:
       return String(operator);
   }

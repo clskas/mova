@@ -71,9 +71,11 @@ export function isAfrisoftHubAsyncRef(providerRef?: string | null): boolean {
 
 export function afrisoftPayHubOperator(telecom: string): MobileMoneyOperator {
   const t = telecom.trim().toUpperCase();
-  if (t === 'MP' || t === 'MPESA') return 'MPESA';
-  if (t === 'AM' || t === 'AF' || t === 'AIRTEL_MONEY' || t === 'AIRTEL') return 'AIRTEL_MONEY';
-  return 'ORANGE_MONEY';
+  if (t === 'MP' || t === 'MPESA' || t === 'M-PESA') return 'MPESA';
+  if (t === 'AM' || t === 'AIRTEL_MONEY' || t === 'AIRTEL') return 'AIRTEL_MONEY';
+  if (t === 'AF' || t === 'AFRIMONEY') return 'AFRIMONEY';
+  if (t === 'OM' || t === 'ORANGE_MONEY' || t === 'ORANGE') return 'ORANGE_MONEY';
+  throw new Error(`Opérateur Mobile Money inconnu: ${telecom}`);
 }
 
 export function afrisoftHubReference(appId: string, purpose: string, uuid = randomUUID()): string {

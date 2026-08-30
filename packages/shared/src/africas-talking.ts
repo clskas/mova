@@ -151,7 +151,7 @@ export async function africasTalkingSendSms(
   }
 }
 
-export type MobileMoneyOperator = 'ORANGE_MONEY' | 'MPESA' | 'AIRTEL_MONEY';
+export type MobileMoneyOperator = 'ORANGE_MONEY' | 'MPESA' | 'AIRTEL_MONEY' | 'AFRIMONEY';
 
 /** Mappe l'opérateur SENGA vers le code produit Africa's Talking (à affiner selon contrat AT RDC). */
 export function africasTalkingMobileMoneyProviderCode(operator: MobileMoneyOperator): string {
@@ -162,6 +162,8 @@ export function africasTalkingMobileMoneyProviderCode(operator: MobileMoneyOpera
       return 'MPESA';
     case 'AIRTEL_MONEY':
       return 'AIRTEL';
+    case 'AFRIMONEY':
+      return 'AFRIMONEY';
     default:
       return operator;
   }

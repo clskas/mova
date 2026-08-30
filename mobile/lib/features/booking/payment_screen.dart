@@ -329,7 +329,6 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       result = await api.payRide(
         widget.rideId!,
         method: _method,
-        amountCdf: _amountCdf,
         phone: _needsPhone ? MarketConfig.normalizePhone(_phoneController.text) : null,
       );
     } else {
@@ -337,7 +336,6 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
         widget.serviceType!,
         widget.serviceId!,
         method: _method,
-        amountCdf: _amountCdf,
         phone: _needsPhone ? MarketConfig.normalizePhone(_phoneController.text) : null,
       );
     }

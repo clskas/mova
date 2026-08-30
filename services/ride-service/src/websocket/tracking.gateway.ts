@@ -1,7 +1,7 @@
 import { Logger } from '@nestjs/common';
 import { ConnectedSocket, MessageBody, OnGatewayConnection, OnGatewayDisconnect, SubscribeMessage, WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
 import { TrackingReferenceType } from '@prisma/client';
-import { INTERNAL_API_KEY, serviceUrl } from '@mova/shared';
+import { assertActiveUserStatus, resolveCorsOrigin, serviceUrl, type MovaJwtPayload } from '@mova/shared';
 import { JwtService } from '@nestjs/jwt';
 import { Server, Socket } from 'socket.io';
 import { TrackingService } from '../tracking/tracking.service';
@@ -28,7 +28,28 @@ export type RestaurantLivePayload = {
   paymentStatus?: string | null;
 };
 
-@WebSocketGateway({ cors: { origin: '*' }, namespace: '/tracking' })
+export type SocketAuthUser = { id: string; role: string };
+
+export function trackingGatewayCorsOptions(): { origin: boolean | string | RegExp | Array<string | RegExp>; credentials?: boolean } {
+  const origin = resolveCorsOrigin();
+  if (origin === false) return { origin: false };
+  return { origin, credentials: true };
+}
+
+export function extractHandshakeToken(client: Socket): string | null {
+  const authToken = client.handshake.auth?.token;
+  if (typeof authToken === 'string' && authToken.trim()) {
+    return authToken.replace(/^Bearer\s+/i, '').trim();
+  }
+  const header = client.handshake.headers?.authorization;
+  const raw = Array.isArray(header) ? header[0] : header;
+  if (typeof raw === 'string' && raw.trim()) {
+    return raw.replace(/^Bearer\s+/i, '').trim();
+  }
+  return null;
+}
+
+@WebSocketGateway({ cors: trackingGatewayCorsOptions(), namespace: '/tracking' })
 export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer() server: Server;
   private readonly logger = new Logger(TrackingGateway.name);
@@ -39,6 +60,13 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
   ) {}
 
   handleConnection(client: Socket) {
+    const user = this.authenticateSocket(client);
+    if (!user) {
+      this.logger.warn(`WS rejected (invalid JWT): ${client.id}`);
+      client.disconnect(true);
+      return;
+    }
+    client.data.user = user;
     this.logger.log(`Client connected: ${client.id}`);
     client.emit('ping', { ts: Date.now() });
   }
@@ -48,13 +76,13 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
   }
 
   @SubscribeMessage('driver:location')
-  async handleDriverLocation(@ConnectedSocket() client: Socket, @MessageBody() data: { userId: string; lat: number; lng: number; rideId?: string }) {
+  async handleDriverLocation(@ConnectedSocket() client: Socket, @MessageBody() data: { userId?: string; lat: number; lng: number; rideId?: string }) {
     return this.broadcastDriverLocation(client, data);
   }
 
   /** Alias mobile — même comportement que driver:location */
   @SubscribeMessage('ride:location')
-  async handleRideLocation(@ConnectedSocket() client: Socket, @MessageBody() data: { userId: string; lat: number; lng: number; rideId?: string }) {
+  async handleRideLocation(@ConnectedSocket() client: Socket, @MessageBody() data: { userId?: string; lat: number; lng: number; rideId?: string }) {
     return this.broadcastDriverLocation(client, data);
   }
 
@@ -63,7 +91,7 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
     @ConnectedSocket() client: Socket,
     @MessageBody()
     data: {
-      userId: string;
+      userId?: string;
       lat: number;
       lng: number;
       deliveryId?: string;
@@ -71,10 +99,14 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
       referenceId?: string;
     },
   ) {
-    await this.updateDriverCoords(client, data.userId, data.lat, data.lng);
+    const user = this.socketUser(client);
+    if (!user) return { success: false };
+    await this.updateDriverCoords(client, user.id, data.lat, data.lng);
     const refType = (data.referenceType ?? (data.deliveryId ? 'DELIVERY' : undefined))?.toUpperCase();
     const refId = data.referenceId ?? data.deliveryId;
     if (refType && refId) {
+      const allowed = await this.canAccessLocationReference(refType, refId, user.id);
+      if (!allowed) return { success: false };
       try {
         await this.tracking.recordPoint(this.tracking.normalizeType(refType), refId, data.lat, data.lng);
       } catch {
@@ -88,8 +120,14 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
     return { success: true };
   }
 
-  private async broadcastDriverLocation(client: Socket, data: { userId: string; lat: number; lng: number; rideId?: string }) {
-    await this.updateDriverCoords(client, data.userId, data.lat, data.lng);
+  private async broadcastDriverLocation(client: Socket, data: { userId?: string; lat: number; lng: number; rideId?: string }) {
+    const user = this.socketUser(client);
+    if (!user) return { success: false };
+    if (data.rideId) {
+      const allowed = await this.tracking.isRideParticipant(data.rideId, user.id);
+      if (!allowed) return { success: false };
+    }
+    await this.updateDriverCoords(client, user.id, data.lat, data.lng);
     if (data.rideId) {
       await this.tracking.recordPoint(TrackingReferenceType.RIDE, data.rideId, data.lat, data.lng);
     }
@@ -103,46 +141,63 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
 
   private async updateDriverCoords(client: Socket, userId: string, lat: number, lng: number) {
     if (!userId) return;
-    await fetch(serviceUrl('driver', '/drivers/location'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${client.handshake.auth?.token ?? ''}` },
-      body: JSON.stringify({ lat, lng }),
-    }).catch(() =>
-      fetch(serviceUrl('driver', `/internal/drivers/${userId}/location`), {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', 'x-internal-api-key': INTERNAL_API_KEY },
+    const token = extractHandshakeToken(client);
+    if (!token) {
+      this.logger.warn('driver location skipped: missing JWT');
+      return;
+    }
+    try {
+      const res = await fetch(serviceUrl('driver', '/drivers/location'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ lat, lng }),
-      }),
-    );
+      });
+      if (!res.ok) {
+        this.logger.warn(`driver location update failed: ${res.status}`);
+      }
+    } catch (err) {
+      this.logger.warn(`driver location update error: ${err instanceof Error ? err.message : err}`);
+    }
   }
 
   @SubscribeMessage('driver:subscribe')
-  handleDriverSubscribe(@ConnectedSocket() client: Socket, @MessageBody() data: { userId: string }) {
-    if (data.userId) {
-      client.join(`driver:${data.userId}`);
-    }
-    return { subscribed: data.userId };
+  handleDriverSubscribe(@ConnectedSocket() client: Socket) {
+    const userId = this.resolveSocketUserId(client);
+    if (!userId) return { subscribed: false };
+    client.join(`driver:${userId}`);
+    return { subscribed: userId };
   }
 
   @SubscribeMessage('ride:subscribe')
-  handleRideSubscribe(@ConnectedSocket() client: Socket, @MessageBody() data: { rideId: string }) {
+  async handleRideSubscribe(@ConnectedSocket() client: Socket, @MessageBody() data: { rideId: string }) {
+    const user = this.socketUser(client);
+    if (!user || !data?.rideId) return { subscribed: false };
+    const allowed = await this.tracking.isRideParticipant(data.rideId, user.id);
+    if (!allowed) return { subscribed: false };
     client.join(`ride:${data.rideId}`);
     return { subscribed: data.rideId };
   }
 
   @SubscribeMessage('delivery:subscribe')
-  handleDeliverySubscribe(@ConnectedSocket() client: Socket, @MessageBody() data: { deliveryId: string; lat?: number; lng?: number }) {
+  async handleDeliverySubscribe(@ConnectedSocket() client: Socket, @MessageBody() data: { deliveryId: string; lat?: number; lng?: number }) {
+    const user = this.socketUser(client);
+    if (!user || !data?.deliveryId) return { subscribed: false };
+    const allowed = await this.tracking.canJoinCourierRoom(data.deliveryId, user.id);
+    if (!allowed) return { subscribed: false };
     client.join(`delivery:${data.deliveryId}`);
     if (data.lat != null && data.lng != null) {
       const payload = { lat: data.lat, lng: data.lng, ts: Date.now() };
       client.emit('courier:location', payload);
-      this.server.to(`delivery:${data.deliveryId}`).emit('courier:location', payload);
     }
     return { subscribed: data.deliveryId };
   }
 
   @SubscribeMessage('ride:status')
-  handleRideStatus(@MessageBody() data: { rideId: string; status: string }) {
+  async handleRideStatus(@ConnectedSocket() client: Socket, @MessageBody() data: { rideId: string; status: string }) {
+    const user = this.socketUser(client);
+    if (!user || !data?.rideId) return { broadcast: false };
+    const allowed = await this.tracking.isRideParticipant(data.rideId, user.id);
+    if (!allowed) return { broadcast: false };
     this.broadcastRideStatus(data.rideId, data.status);
     return { broadcast: true };
   }
@@ -213,15 +268,18 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
   }
 
   @SubscribeMessage('ride:chat')
-  handleRideChat(@ConnectedSocket() client: Socket, @MessageBody() data: { rideId: string; senderId?: string; senderRole?: string; text: string; ts?: number }) {
-    if (!data?.rideId || !data.text?.trim()) {
+  async handleRideChat(@ConnectedSocket() client: Socket, @MessageBody() data: { rideId: string; senderId?: string; senderRole?: string; text: string; ts?: number }) {
+    const user = this.socketUser(client);
+    if (!user || !data?.rideId || !data.text?.trim()) {
       return { ok: false };
     }
+    const allowed = await this.tracking.isRideParticipant(data.rideId, user.id);
+    if (!allowed) return { ok: false };
     client.join(`ride:${data.rideId}`);
     const payload = {
       rideId: data.rideId,
-      senderId: data.senderId ?? 'unknown',
-      senderRole: data.senderRole ?? 'unknown',
+      senderId: user.id,
+      senderRole: data.senderRole ?? user.role,
       text: data.text.trim(),
       ts: data.ts ?? Date.now(),
     };
@@ -234,13 +292,16 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
   }
 
   @SubscribeMessage('errand:chat')
-  handleErrandChat(@ConnectedSocket() client: Socket, @MessageBody() data: { errandId: string; senderId?: string; senderRole?: string; text: string; ts?: number }) {
-    if (!data?.errandId || !data.text?.trim()) return { ok: false };
+  async handleErrandChat(@ConnectedSocket() client: Socket, @MessageBody() data: { errandId: string; senderId?: string; senderRole?: string; text: string; ts?: number }) {
+    const user = this.socketUser(client);
+    if (!user || !data?.errandId || !data.text?.trim()) return { ok: false };
+    const allowed = await this.tracking.isErrandParticipant(data.errandId, user.id);
+    if (!allowed) return { ok: false };
     client.join(`errand:${data.errandId}`);
     const payload = {
       errandId: data.errandId,
-      senderId: data.senderId ?? 'unknown',
-      senderRole: data.senderRole ?? 'unknown',
+      senderId: user.id,
+      senderRole: data.senderRole ?? user.role,
       text: data.text.trim(),
       ts: data.ts ?? Date.now(),
     };
@@ -253,13 +314,16 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
   }
 
   @SubscribeMessage('delivery:chat')
-  handleDeliveryChat(@ConnectedSocket() client: Socket, @MessageBody() data: { deliveryId: string; senderId?: string; senderRole?: string; text: string; ts?: number }) {
-    if (!data?.deliveryId || !data.text?.trim()) return { ok: false };
+  async handleDeliveryChat(@ConnectedSocket() client: Socket, @MessageBody() data: { deliveryId: string; senderId?: string; senderRole?: string; text: string; ts?: number }) {
+    const user = this.socketUser(client);
+    if (!user || !data?.deliveryId || !data.text?.trim()) return { ok: false };
+    const allowed = await this.tracking.isDeliveryParticipant(data.deliveryId, user.id);
+    if (!allowed) return { ok: false };
     client.join(`delivery:${data.deliveryId}`);
     const payload = {
       deliveryId: data.deliveryId,
-      senderId: data.senderId ?? 'unknown',
-      senderRole: data.senderRole ?? 'unknown',
+      senderId: user.id,
+      senderRole: data.senderRole ?? user.role,
       text: data.text.trim(),
       ts: data.ts ?? Date.now(),
     };
@@ -272,13 +336,16 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
   }
 
   @SubscribeMessage('rental:chat')
-  handleRentalChat(@ConnectedSocket() client: Socket, @MessageBody() data: { inquiryId: string; senderId?: string; senderRole?: string; text: string; ts?: number }) {
-    if (!data?.inquiryId || !data.text?.trim()) return { ok: false };
+  async handleRentalChat(@ConnectedSocket() client: Socket, @MessageBody() data: { inquiryId: string; senderId?: string; senderRole?: string; text: string; ts?: number }) {
+    const user = this.socketUser(client);
+    if (!user || !data?.inquiryId || !data.text?.trim()) return { ok: false };
+    const allowed = await this.tracking.isRentalParticipant(data.inquiryId, user.id);
+    if (!allowed) return { ok: false };
     client.join(`rental:${data.inquiryId}`);
     const payload = {
       inquiryId: data.inquiryId,
-      senderId: data.senderId ?? 'unknown',
-      senderRole: data.senderRole ?? 'unknown',
+      senderId: user.id,
+      senderRole: data.senderRole ?? user.role,
       text: data.text.trim(),
       ts: data.ts ?? Date.now(),
     };
@@ -291,8 +358,11 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
   }
 
   @SubscribeMessage('rental:subscribe')
-  handleRentalSubscribe(@ConnectedSocket() client: Socket, @MessageBody() data: { inquiryId: string }) {
-    if (!data?.inquiryId) return { subscribed: false };
+  async handleRentalSubscribe(@ConnectedSocket() client: Socket, @MessageBody() data: { inquiryId: string }) {
+    const user = this.socketUser(client);
+    if (!user || !data?.inquiryId) return { subscribed: false };
+    const allowed = await this.tracking.isRentalParticipant(data.inquiryId, user.id);
+    if (!allowed) return { subscribed: false };
     client.join(`rental:${data.inquiryId}`);
     return { subscribed: data.inquiryId };
   }
@@ -325,14 +395,35 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
     this.server.to(`restaurant:${ownerUserId}`).emit('restaurant:order', payload);
   }
 
+  private socketUser(client: Socket): SocketAuthUser | null {
+    const user = client.data?.user as SocketAuthUser | undefined;
+    if (user && typeof user.id === 'string' && user.id) return user;
+    return null;
+  }
+
   private resolveSocketUserId(client: Socket): string | null {
-    const token = client.handshake.auth?.token;
-    if (typeof token !== 'string' || !token.trim()) return null;
+    return this.socketUser(client)?.id ?? null;
+  }
+
+  private authenticateSocket(client: Socket): SocketAuthUser | null {
+    const token = extractHandshakeToken(client);
+    if (!token) return null;
     try {
-      const decoded = this.jwt.verify<{ sub?: string }>(token);
-      return decoded.sub ?? null;
+      const decoded = this.jwt.verify<MovaJwtPayload>(token);
+      if (!decoded.sub) return null;
+      assertActiveUserStatus(decoded.status);
+      return { id: decoded.sub, role: decoded.role ?? '' };
     } catch {
       return null;
+    }
+  }
+
+  private async canAccessLocationReference(refType: string, refId: string, userId: string): Promise<boolean> {
+    try {
+      const type = this.tracking.normalizeType(refType);
+      return this.tracking.userCanAccessReference(type, refId, userId);
+    } catch {
+      return this.tracking.canJoinCourierRoom(refId, userId);
     }
   }
 }

@@ -2,7 +2,13 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
-import { assertActiveUserStatus, MovaJwtPayload, resolveJwtSecret } from '@mova/shared';
+import {
+  assertActiveUserStatus,
+  INTERNAL_API_KEY,
+  MovaJwtPayload,
+  resolveJwtSecret,
+  serviceUrl,
+} from '@mova/shared';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
@@ -13,7 +19,25 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       secretOrKey: resolveJwtSecret(config.get('JWT_SECRET')),
     });
   }
-  validate(payload: MovaJwtPayload) {
+
+  async validate(payload: MovaJwtPayload) {
+    try {
+      const res = await fetch(serviceUrl('auth', `/internal/users/${payload.sub}`), {
+        headers: { 'x-internal-api-key': INTERNAL_API_KEY },
+      });
+      if (res.ok) {
+        const user = (await res.json()) as {
+          id: string;
+          phone?: string;
+          role: string;
+          status?: string;
+        };
+        assertActiveUserStatus(user.status);
+        return { id: user.id, phone: user.phone ?? payload.phone, role: user.role, status: user.status };
+      }
+    } catch {
+      /* auth unreachable — fall back to JWT claims */
+    }
     try {
       assertActiveUserStatus(payload.status);
     } catch {

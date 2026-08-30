@@ -6,6 +6,7 @@ import {
   afrisoftHubTimestampFresh,
   afrisoftHubVerifySignature,
   afrisoftPayHubInitiate,
+  afrisoftPayHubOperator,
   isAfriSoftPayHubConfigured,
 } from './afrisoft-pay-hub';
 
@@ -35,6 +36,13 @@ describe('afrisoft-pay-hub', () => {
   it('builds {app_id}_{purpose}_{uuid} references', () => {
     const ref = afrisoftHubPaymentReference('senga', 'topup', '550e8400-e29b-41d4-a716-446655440000');
     expect(ref).toBe('senga_topup_550e8400-e29b-41d4-a716-446655440000');
+  });
+
+  it('maps AF to AfriMoney, never Airtel', () => {
+    expect(afrisoftPayHubOperator('AF')).toBe('AFRIMONEY');
+    expect(afrisoftPayHubOperator('AFRIMONEY')).toBe('AFRIMONEY');
+    expect(afrisoftPayHubOperator('AM')).toBe('AIRTEL_MONEY');
+    expect(() => afrisoftPayHubOperator('UNKNOWN')).toThrow(/inconnu/i);
   });
 
   it('is configured only when URL + app_id + api_key are set', () => {

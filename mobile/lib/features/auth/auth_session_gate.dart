@@ -13,6 +13,20 @@ import 'otp_screen.dart';
 
 enum AuthSessionRole { passenger, driver }
 
+/// JWT `role` vs compiled app flavor. Wrong flavor is treated as logged out.
+bool jwtRoleMatchesAppFlavor(AuthSessionRole appRole, String? jwtRole) {
+  final role = (jwtRole ?? '').trim().toUpperCase();
+  if (role.isEmpty) return false;
+  switch (appRole) {
+    case AuthSessionRole.passenger:
+      // SUPER_ADMIN may use the passenger app; staff / partners / drivers may not.
+      return role == 'PASSENGER' || role == 'SUPER_ADMIN';
+    case AuthSessionRole.driver:
+      // DRIVER (incl. PENDING_KYC status) only. PENDING_KYC accepted if sent as role.
+      return role == 'DRIVER' || role == 'PENDING_KYC';
+  }
+}
+
 /// Restaure la session JWT au démarrage ou affiche l'écran de connexion.
 class AuthSessionGate extends ConsumerStatefulWidget {
   const AuthSessionGate({super.key, required this.role});
@@ -43,18 +57,27 @@ class _AuthSessionGateState extends ConsumerState<AuthSessionGate> {
     final result = await api.get('/users/me');
     if (!mounted) return;
     switch (result) {
-      case Success():
+      case Success(:final data):
+        final role = data['role']?.toString();
+        if (!jwtRoleMatchesAppFlavor(widget.role, role)) {
+          await _clearRejectedSession(api);
+          return;
+        }
         setState(() {
           _checking = false;
           _authenticated = true;
         });
       case Failure():
-        await api.clearToken(keepPhone: true);
-        if (widget.role == AuthSessionRole.driver) {
-          await ProfileCache.clear();
-        }
-        if (mounted) setState(() => _checking = false);
+        await _clearRejectedSession(api);
     }
+  }
+
+  Future<void> _clearRejectedSession(ApiClient api) async {
+    await api.clearToken(keepPhone: true);
+    if (widget.role == AuthSessionRole.driver) {
+      await ProfileCache.clear();
+    }
+    if (mounted) setState(() => _checking = false);
   }
 
   @override

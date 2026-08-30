@@ -35,9 +35,9 @@ services:
         value: "45000"
       - key: HEALTH_CHECK_RETRIES
         value: "2"
-      # Browser portals call the public gateway origin; include *.onrender.com for Render previews.
+      # Browser portals call the public gateway origin. Explicit hosts only (no *.onrender.com wildcard).
       - key: CORS_ORIGIN
-        value: "https://senga.afri-soft.com,https://admin.afri-soft.com,https://restaurant.afri-soft.com,https://rental.afri-soft.com,https://mova-web.onrender.com,https://mova-admin-web.onrender.com,https://mova-restaurant.onrender.com,https://mova-rental-partner.onrender.com,https://mova-admin.onrender.com,https://*.onrender.com"
+        value: "https://senga.afri-soft.com,https://admin.afri-soft.com,https://restaurant.afri-soft.com,https://rental.afri-soft.com,https://mova-web.onrender.com,https://mova-admin-web.onrender.com,https://mova-restaurant.onrender.com,https://mova-rental-partner.onrender.com,https://mova-admin.onrender.com"
 
   - type: web
     name: mova-auth

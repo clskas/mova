@@ -1687,13 +1687,11 @@ class ApiClient {
   Future<Result<Map<String, dynamic>>> payRide(
     String rideId, {
     required String method,
-    required int amountCdf,
     String? phone,
   }) async {
     final userPhone = phone ?? await loadUserPhone() ?? '+243812345678';
     return post('/payments/rides/$rideId', {
       'method': method,
-      'amountCdf': amountCdf,
       'phone': MarketConfig.normalizePhone(userPhone),
     });
   }
@@ -1777,13 +1775,11 @@ class ApiClient {
     String referenceType,
     String referenceId, {
     required String method,
-    required int amountCdf,
     String? phone,
   }) async {
     final userPhone = phone ?? await loadUserPhone() ?? '+243812345678';
     return post('/payments/services/$referenceType/$referenceId', {
       'method': method,
-      'amountCdf': amountCdf,
       'phone': MarketConfig.normalizePhone(userPhone),
     });
   }

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Request, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { IsNumber } from 'class-validator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -18,8 +18,13 @@ export class TrackingController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Trace GPS d\'une course, livraison ou commission' })
-  getTrace(@Param('type') type: string, @Param('id') id: string) {
+  async getTrace(
+    @Request() req: { user: { id: string } },
+    @Param('type') type: string,
+    @Param('id') id: string,
+  ) {
     const referenceType = this.tracking.normalizeType(type);
+    await this.tracking.assertUserCanAccess(referenceType, id, req.user.id);
     return this.tracking.getTraceSummary(referenceType, id);
   }
 
@@ -27,8 +32,14 @@ export class TrackingController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Enregistrer un point GPS (chauffeur / coursier)' })
-  recordPoint(@Param('type') type: string, @Param('id') id: string, @Body() dto: RecordPointDto) {
+  async recordPoint(
+    @Request() req: { user: { id: string } },
+    @Param('type') type: string,
+    @Param('id') id: string,
+    @Body() dto: RecordPointDto,
+  ) {
     const referenceType = this.tracking.normalizeType(type);
+    await this.tracking.assertUserCanAccess(referenceType, id, req.user.id);
     return this.tracking.recordPoint(referenceType, id, dto.lat, dto.lng);
   }
 }

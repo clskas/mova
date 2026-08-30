@@ -19,17 +19,21 @@ describe('PaymentsService', () => {
       upsert: jest.fn().mockResolvedValue({ id: 'pay-1', rideId: 'ride-1', status: 'COMPLETED' }),
       findUnique: jest.fn().mockResolvedValue(null),
       update: jest.fn().mockResolvedValue({ id: 'pay-1', rideId: 'ride-1', status: 'COMPLETED' }),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       findMany: jest.fn().mockResolvedValue([]),
     },
     servicePayment: {
       upsert: jest.fn().mockResolvedValue({ id: 'spay-1', referenceType: 'DELIVERY', referenceId: 'del-1', status: 'COMPLETED' }),
       findUnique: jest.fn().mockResolvedValue(null),
       update: jest.fn().mockResolvedValue({ id: 'spay-1', status: 'COMPLETED' }),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       findMany: jest.fn().mockResolvedValue([]),
     },
   };
   const wallet = {
     debit: jest.fn().mockResolvedValue({ balanceCdf: 0 }),
+    consumeHoldOrDebit: jest.fn().mockResolvedValue({ consumed: true, via: 'DEBIT' }),
+    creditPlatformFee: jest.fn().mockResolvedValue(null),
   };
   const driverPayouts = {
     fetchRidePayout: jest.fn().mockResolvedValue(null),
@@ -73,9 +77,16 @@ describe('PaymentsService', () => {
   });
 
   it('accepte WALLET sans numéro de téléphone (contrat mobile)', async () => {
-    const result = await service.payRide('ride-1', 'user-1', PaymentMethod.WALLET, undefined, 8500);
+    const result = await service.payRide('ride-1', 'user-1', PaymentMethod.WALLET, undefined, 1);
     expect(result.success).toBe(true);
     expect(wallet.debit).toHaveBeenCalledWith('user-1', 8500, expect.any(String), 'RIDE:ride-1');
+  });
+
+  it('ignore le amountCdf client et utilise finalFareCdf de la course', async () => {
+    const result = await service.payRide('ride-1', 'user-1', PaymentMethod.WALLET, undefined, 100);
+    expect(result.success).toBe(true);
+    expect(wallet.debit).toHaveBeenCalledWith('user-1', 8500, expect.any(String), 'RIDE:ride-1');
+    expect(wallet.debit).not.toHaveBeenCalledWith('user-1', 100, expect.any(String), expect.any(String));
   });
 
   it('accepte CASH sans numéro de téléphone', async () => {
@@ -131,9 +142,15 @@ describe('PaymentsService', () => {
         referenceId: 'del-1',
       }),
     });
-    const result = await service.payService('DELIVERY', 'del-1', 'user-1', PaymentMethod.WALLET, undefined, 12000);
+    const result = await service.payService('DELIVERY', 'del-1', 'user-1', PaymentMethod.WALLET, undefined, 1);
     expect(result.success).toBe(true);
-    expect(wallet.debit).toHaveBeenCalledWith('user-1', 12000, expect.any(String), 'DELIVERY:del-1');
+    expect(wallet.consumeHoldOrDebit).toHaveBeenCalledWith(
+      'user-1',
+      12000,
+      'DELIVERY',
+      'del-1',
+      expect.any(String),
+    );
     expect(prisma.servicePayment.upsert).toHaveBeenCalled();
   });
 

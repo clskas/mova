@@ -174,8 +174,31 @@ describe('prod-security', () => {
     delete process.env.MOCK_OTP;
     const { isTestOtpAllowedForPhone } = await import('./prod-security');
     expect(isTestOtpAllowedForPhone('+243900000031')).toBe(true);
-    expect(isTestOtpAllowedForPhone('+243811111111')).toBe(true);
+    expect(isTestOtpAllowedForPhone('+243811111111')).toBe(false);
     expect(isTestOtpAllowedForPhone('+243822222222')).toBe(false);
+
+    process.env.NODE_ENV = 'development';
+    jest.resetModules();
+    const { isTestOtpAllowedForPhone: isTestOtpDev } = await import('./prod-security');
+    expect(isTestOtpDev('+243900000031')).toBe(true);
+    expect(isTestOtpDev('+243811111111')).toBe(true);
+    expect(isTestOtpDev('+243822222222')).toBe(false);
+  });
+
+  it('never allows the owner phone as test OTP, even if listed in TEST_OTP_PHONES', async () => {
+    process.env.NODE_ENV = 'development';
+    process.env.ALLOW_TEST_OTP = 'true';
+    process.env.TEST_OTP_PHONES = '+243971163574,+243811111111';
+    delete process.env.MOCK_OTP;
+    const { isTestOtpAllowedForPhone, OWNER_SUPER_ADMIN_PHONE } = await import('./prod-security');
+    expect(isTestOtpAllowedForPhone(OWNER_SUPER_ADMIN_PHONE)).toBe(false);
+    expect(isTestOtpAllowedForPhone('+243811111111')).toBe(true);
+
+    process.env.NODE_ENV = 'production';
+    jest.resetModules();
+    const { isTestOtpAllowedForPhone: isTestOtpProd } = await import('./prod-security');
+    expect(isTestOtpProd('+243971163574')).toBe(false);
+    expect(isTestOtpProd('+243811111111')).toBe(false);
   });
 
   it('does not treat SerdiPay payment-only credentials as SMS ready', async () => {

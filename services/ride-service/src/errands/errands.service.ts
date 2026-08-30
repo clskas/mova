@@ -13,7 +13,7 @@ import { fetchDriverDebtStatus } from '../common/driver-debt.util';
 import { tripDistanceKm } from '../common/geo.util';
 import { fetchAuthUserBrief } from '../common/internal-lookup.util';
 import { notifyNearbyDrivers, DELIVERY_ALERT_VEHICLE_TYPES } from '../common/driver-job-alert.util';
-import { captureWalletHold, holdWalletFunds, releaseWalletHold } from '../common/wallet-hold.util';
+import { holdWalletFunds, releaseWalletHold } from '../common/wallet-hold.util';
 import { buildErrandTimeline, enrichErrandTrackingFields } from '../deliveries/parcel.util';
 import { MatchingService } from '../matching/matching.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -714,10 +714,7 @@ export class ErrandsService {
       if (proofPhotoUrl?.trim()) updates.proofPhotoUrl = proofPhotoUrl.trim();
     }
     const updated = await this.prisma.errandOrder.update({ where: { id }, data: updates });
-    if (status === ErrandOrderStatus.COMPLETED && updated.walletHoldCdf) {
-      const captureAmount = (updated.purchaseTotalCdf ?? 0) + (updated.finalPriceCdf ?? updated.estimatedPriceCdf);
-      await captureWalletHold('ERRAND', updated.id, Math.min(captureAmount, updated.walletHoldCdf)).catch(() => undefined);
-    }
+    // Keep the hold until payService — never capture here (would debit twice).
     const formatted = this.formatErrand(updated);
     await this.redis.publish(MOVA_EVENTS.SERVICE_STATUS_UPDATED, {
       serviceType: 'ERRAND',

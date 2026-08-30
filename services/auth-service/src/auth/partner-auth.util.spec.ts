@@ -11,19 +11,19 @@ import {
 } from './partner-auth.util';
 
 describe('partner-auth.util', () => {
-  it('allows restaurant and rental portals to self-register', () => {
-    expect(shouldRefusePassengerAutoRegister('+243811111111', 'RESTAURANT')).toBe(false);
-    expect(shouldRefusePassengerAutoRegister('+243811111111', 'RENTAL_PARTNER')).toBe(false);
-    expect(shouldRefusePassengerAutoRegister(PARTNER_SEED_PHONES.restaurant, 'RESTAURANT')).toBe(false);
-    expect(shouldRefusePassengerAutoRegister(PARTNER_SEED_PHONES.rental, 'RENTAL_PARTNER')).toBe(false);
+  it('refuses restaurant and rental portal self-register', () => {
+    expect(shouldRefusePassengerAutoRegister('+243811111111', 'RESTAURANT')).toBe(true);
+    expect(shouldRefusePassengerAutoRegister('+243811111111', 'RENTAL_PARTNER')).toBe(true);
+    expect(shouldRefusePassengerAutoRegister(PARTNER_SEED_PHONES.restaurant, 'RESTAURANT')).toBe(true);
+    expect(shouldRefusePassengerAutoRegister(PARTNER_SEED_PHONES.rental, 'RENTAL_PARTNER')).toBe(true);
+    expect(isInviteOnlyAuthRole('RESTAURANT')).toBe(true);
+    expect(isInviteOnlyAuthRole('RENTAL_PARTNER')).toBe(true);
   });
 
   it('still refuses staff auto-register', () => {
     expect(shouldRefusePassengerAutoRegister('+243811111111', 'ADMIN')).toBe(true);
     expect(shouldRefusePassengerAutoRegister('+243811111111', 'SUPER_ADMIN')).toBe(true);
     expect(isInviteOnlyAuthRole('ADMIN')).toBe(true);
-    expect(isInviteOnlyAuthRole('RESTAURANT')).toBe(false);
-    expect(isInviteOnlyAuthRole('RENTAL_PARTNER')).toBe(false);
   });
 
   it('refuses auto-register for seed partner phones without a portal role', () => {
@@ -38,15 +38,15 @@ describe('partner-auth.util', () => {
     expect(missingInviteOnlyAccountMessage(OWNER_SUPER_ADMIN_PHONE)).toMatch(/compte staff/);
   });
 
-  it('allows passenger/driver auto-register on unknown phones', () => {
+  it('allows passenger auto-register on unknown phones (not driver/partner)', () => {
     expect(shouldRefusePassengerAutoRegister('+243811111111')).toBe(false);
     expect(shouldRefusePassengerAutoRegister('+243811111111', 'PASSENGER')).toBe(false);
     expect(shouldRefusePassengerAutoRegister('+243811111111', 'DRIVER')).toBe(false);
   });
 
-  it('promotes only PASSENGER into a portal role', () => {
-    expect(canPromoteToPartnerRole('PASSENGER', 'RESTAURANT')).toBe(true);
-    expect(canPromoteToPartnerRole('PASSENGER', 'RENTAL_PARTNER')).toBe(true);
+  it('never promotes a role via OTP (admin-created partners only)', () => {
+    expect(canPromoteToPartnerRole('PASSENGER', 'RESTAURANT')).toBe(false);
+    expect(canPromoteToPartnerRole('PASSENGER', 'RENTAL_PARTNER')).toBe(false);
     expect(canPromoteToPartnerRole('DRIVER', 'RESTAURANT')).toBe(false);
     expect(canPromoteToPartnerRole('ADMIN', 'RENTAL_PARTNER')).toBe(false);
     expect(canPromoteToPartnerRole('RESTAURANT', 'RENTAL_PARTNER')).toBe(false);

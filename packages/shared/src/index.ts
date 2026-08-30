@@ -11,6 +11,7 @@ export * from './territory/rdc-territory';
 export * from './kinshasa-bounds';
 export * from './service-urls';
 export * from './prod-security';
+export * from './timing-safe';
 export * from './jwt-user';
 export * from './redis.module';
 export * from './request-id.middleware';

@@ -212,6 +212,11 @@ const ERRAND_CATEGORY_ESTIMATES = [
   },
 ];
 
+/** Demo restaurants / rental vehicles / phantom inquiries. Off unless explicitly enabled. */
+export function isDemoCatalogSeedEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env.SEED_DEMO_CATALOG === 'true';
+}
+
 @Injectable()
 export class SeedService implements OnModuleInit {
   private readonly logger = new Logger(SeedService.name);
@@ -408,41 +413,45 @@ export class SeedService implements OnModuleInit {
       }
     });
 
-    await this.seedSection('catalog', async () => {
-      for (const r of RESTAURANTS) {
-        const existing = await this.prisma.restaurant.findFirst({ where: { name: r.name } });
-        if (existing) await this.prisma.restaurant.update({ where: { id: existing.id }, data: r });
-        else await this.prisma.restaurant.create({ data: r });
-      }
-      for (const v of RENTAL_VEHICLES) {
-        const existing = await this.prisma.rentalVehicle.findFirst({ where: { name: v.name } });
-        if (existing) await this.prisma.rentalVehicle.update({ where: { id: existing.id }, data: v });
-        else await this.prisma.rentalVehicle.create({ data: v });
-      }
-      const demoVehicle = await this.prisma.rentalVehicle.findFirst({ where: { isActive: true } });
-      const inquiryCount = await this.prisma.rentalInquiry.count();
-      if (demoVehicle && inquiryCount === 0) {
-        const start = new Date();
-        start.setDate(start.getDate() + 1);
-        const end = new Date(start);
-        end.setDate(end.getDate() + 2);
-        await this.prisma.rentalInquiry.create({
-          data: {
-            userId: 'demo-passenger-rental',
-            vehicleId: demoVehicle.id,
-            vehicleType: demoVehicle.category,
-            startDate: start,
-            endDate: end,
-            pickupAddress: 'Gombe, Kinshasa',
-            pickupCity: 'Kinshasa',
-            contactPhone: '+243900000010',
-            estimatedPriceCdf: demoVehicle.dailyRateCdf * 2,
-            totalCdf: demoVehicle.dailyRateCdf * 2,
-            status: 'PENDING',
-          },
-        });
-      }
-    });
+    if (isDemoCatalogSeedEnabled()) {
+      await this.seedSection('catalog', async () => {
+        for (const r of RESTAURANTS) {
+          const existing = await this.prisma.restaurant.findFirst({ where: { name: r.name } });
+          if (existing) await this.prisma.restaurant.update({ where: { id: existing.id }, data: r });
+          else await this.prisma.restaurant.create({ data: r });
+        }
+        for (const v of RENTAL_VEHICLES) {
+          const existing = await this.prisma.rentalVehicle.findFirst({ where: { name: v.name } });
+          if (existing) await this.prisma.rentalVehicle.update({ where: { id: existing.id }, data: v });
+          else await this.prisma.rentalVehicle.create({ data: v });
+        }
+        const demoVehicle = await this.prisma.rentalVehicle.findFirst({ where: { isActive: true } });
+        const inquiryCount = await this.prisma.rentalInquiry.count();
+        if (demoVehicle && inquiryCount === 0) {
+          const start = new Date();
+          start.setDate(start.getDate() + 1);
+          const end = new Date(start);
+          end.setDate(end.getDate() + 2);
+          await this.prisma.rentalInquiry.create({
+            data: {
+              userId: 'demo-passenger-rental',
+              vehicleId: demoVehicle.id,
+              vehicleType: demoVehicle.category,
+              startDate: start,
+              endDate: end,
+              pickupAddress: 'Gombe, Kinshasa',
+              pickupCity: 'Kinshasa',
+              contactPhone: '+243900000010',
+              estimatedPriceCdf: demoVehicle.dailyRateCdf * 2,
+              totalCdf: demoVehicle.dailyRateCdf * 2,
+              status: 'PENDING',
+            },
+          });
+        }
+      });
+    } else {
+      this.logger.log('Demo catalog seed skipped (SEED_DEMO_CATALOG is not true)');
+    }
 
     this.logger.log('Ride service seed data ensured');
   }

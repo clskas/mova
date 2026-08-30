@@ -25,7 +25,6 @@ import { RedisService } from '@mova/shared';
 import { SmsService } from './sms.providers';
 import { hashLocalPin, isValidLocalPin, verifyLocalPin } from './local-pin.util';
 import {
-  canPromoteToPartnerRole,
   defaultPartnerDisplayName,
   isPartnerPortalRole,
   isStaffAuthRole,
@@ -33,10 +32,20 @@ import {
   mismatchedPartnerRoleMessage,
   shouldRefusePassengerAutoRegister,
 } from './partner-auth.util';
+import { hashOtpCode } from './otp-code.util';
 
 const PIN_FAIL_PREFIX = 'auth:pin:fail:';
 const PIN_FAIL_MAX = 5;
 const PIN_FAIL_TTL_SEC = 15 * 60;
+
+const OTP_FAIL_PREFIX = 'auth:otp:fail:';
+const OTP_FAIL_MAX = 5;
+const OTP_FAIL_TTL_SEC = 15 * 60;
+
+const PASSENGER_ON_DRIVER_APP_MESSAGE =
+  'Ce numéro est un compte passager. Utilisez l\'application SENGA passager, ou attendez qu\'un administrateur vous promeuve chauffeur (après KYC).';
+const NO_DRIVER_ACCOUNT_MESSAGE =
+  'Aucun compte chauffeur pour ce numéro. Utilisez l\'application SENGA passager, ou attendez une promotion chauffeur après validation KYC.';
 
 @Injectable()
 export class AuthService {
@@ -58,8 +67,14 @@ export class AuthService {
     const useTestOtp = isTestOtpAllowedForPhone(normalized);
     const liveCode = useTestOtp ? TEST_OTP_CODE : crypto.randomInt(100000, 999999).toString();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+    await this.prisma.otpCode.updateMany({
+      where: { phone: normalized, used: false },
+      data: { used: true },
+    });
     for (const code of otpCodesToIssue(normalized, liveCode)) {
-      await this.prisma.otpCode.create({ data: { phone: normalized, code, expiresAt } });
+      await this.prisma.otpCode.create({
+        data: { phone: normalized, code: hashOtpCode(code), expiresAt },
+      });
     }
 
     if (useTestOtp) {
@@ -198,21 +213,32 @@ export class AuthService {
   async verifyOtp(phone: string, code: string, role?: UserRole) {
     const normalized = normalizePhoneRdc(phone);
     const trimmedCode = String(code ?? '').replace(/\s/g, '');
+    await this.assertOtpNotLocked(normalized);
+    const hashedCode = hashOtpCode(trimmedCode);
     const otp = await this.prisma.otpCode.findFirst({
-      where: { phone: normalized, code: trimmedCode, used: false, expiresAt: { gt: new Date() } },
+      where: { phone: normalized, code: hashedCode, used: false, expiresAt: { gt: new Date() } },
       orderBy: { createdAt: 'desc' },
     });
     // Seed/demo phones keep 123456 even with no prior send (hub live, OTP already used, or portal skipped request).
     if (!otp && !matchesSeedTestOtp(normalized, trimmedCode)) {
+      await this.registerOtpFailure(normalized);
       throw new MovaHttpException(MovaErrorCode.AUTH_INVALID_OTP);
     }
     if (otp) {
       await this.prisma.otpCode.update({ where: { id: otp.id }, data: { used: true } });
     }
+    await this.clearOtpFailures(normalized);
 
     let user = await this.prisma.user.findUnique({ where: { phone: normalized } });
     let isNew = false;
     if (!user) {
+      if (role === UserRole.DRIVER) {
+        throw new MovaHttpException(
+          MovaErrorCode.AUTH_FORBIDDEN,
+          HttpStatus.FORBIDDEN,
+          NO_DRIVER_ACCOUNT_MESSAGE,
+        );
+      }
       if (shouldRefusePassengerAutoRegister(normalized, role)) {
         throw new MovaHttpException(
           MovaErrorCode.AUTH_FORBIDDEN,
@@ -220,13 +246,11 @@ export class AuthService {
           missingInviteOnlyAccountMessage(normalized, role),
         );
       }
-      const partnerName = defaultPartnerDisplayName(role);
       user = await this.prisma.user.create({
         data: {
           phone: normalized,
-          role: role ?? UserRole.PASSENGER,
-          status: role === UserRole.DRIVER ? UserStatus.PENDING_KYC : UserStatus.ACTIVE,
-          ...(partnerName ? { firstName: partnerName } : {}),
+          role: UserRole.PASSENGER,
+          status: UserStatus.ACTIVE,
         },
       });
       isNew = true;
@@ -237,27 +261,6 @@ export class AuthService {
       } catch (e) {
         this.logger.warn(`USER_CREATED publish failed: ${(e as Error).message}`);
       }
-    } else if (canPromoteToPartnerRole(user.role, role) && role) {
-      const partnerName = defaultPartnerDisplayName(role);
-      user = await this.prisma.user.update({
-        where: { id: user.id },
-        data: {
-          role,
-          status: UserStatus.ACTIVE,
-          ...(user.firstName?.trim() ? {} : partnerName ? { firstName: partnerName } : {}),
-        },
-      });
-      await this.provisionUser(user.id, role);
-    }
-    if (role === UserRole.DRIVER && user.role !== UserRole.DRIVER) {
-      if (isStaffAuthRole(user.role) || isPartnerPortalRole(user.role)) {
-        this.assertRoleAccess(user, role);
-      }
-      user = await this.prisma.user.update({
-        where: { id: user.id },
-        data: { role: UserRole.DRIVER, status: UserStatus.PENDING_KYC },
-      });
-      await this.provisionUser(user.id, UserRole.DRIVER);
     }
     this.assertRoleAccess(user, role);
     if (user.status === UserStatus.SUSPENDED) {
@@ -284,7 +287,19 @@ export class AuthService {
   }
 
   private async assertInviteOnlyAccountExists(phone: string, role?: UserRole) {
-    if (!isStaffAuthRole(role)) return;
+    if (role === UserRole.DRIVER) {
+      const user = await this.prisma.user.findUnique({ where: { phone } });
+      if (!user) {
+        throw new MovaHttpException(
+          MovaErrorCode.AUTH_FORBIDDEN,
+          HttpStatus.FORBIDDEN,
+          NO_DRIVER_ACCOUNT_MESSAGE,
+        );
+      }
+      this.assertRoleAccess(user, role);
+      return;
+    }
+    if (!isStaffAuthRole(role) && !isPartnerPortalRole(role)) return;
     const user = await this.prisma.user.findUnique({ where: { phone } });
     if (!user) {
       throw new MovaHttpException(
@@ -319,6 +334,13 @@ export class AuthService {
         MovaErrorCode.AUTH_FORBIDDEN,
         HttpStatus.FORBIDDEN,
         'Ce numéro est un compte chauffeur. Utilisez l\'application SENGA Driver.',
+      );
+    }
+    if (role === UserRole.DRIVER && user.role === UserRole.PASSENGER) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.FORBIDDEN,
+        PASSENGER_ON_DRIVER_APP_MESSAGE,
       );
     }
     if (role === UserRole.DRIVER && staffRoles.includes(user.role)) {
@@ -433,6 +455,47 @@ export class AuthService {
     } catch (e) {
       // Redis down / IP allowlist / free-tier sleep: do not block successful login.
       this.logger.warn(`clearPinFailures failed: ${(e as Error).message}`);
+    }
+  }
+
+  private async assertOtpNotLocked(phone: string) {
+    try {
+      const key = `${OTP_FAIL_PREFIX}${phone}`;
+      const raw = await this.redis.client.get(key);
+      const fails = raw ? Number.parseInt(raw, 10) : 0;
+      if (fails >= OTP_FAIL_MAX) {
+        throw new MovaHttpException(
+          MovaErrorCode.AUTH_FORBIDDEN,
+          HttpStatus.TOO_MANY_REQUESTS,
+          'Trop de tentatives OTP. Réessayez dans 15 minutes.',
+        );
+      }
+    } catch (e) {
+      if (e instanceof MovaHttpException) throw e;
+      // Redis down (free-tier sleep / closed client): fail-open so SMS login still works.
+      this.logger.warn(`assertOtpNotLocked failed: ${(e as Error).message}`);
+    }
+  }
+
+  private async registerOtpFailure(phone: string) {
+    try {
+      const key = `${OTP_FAIL_PREFIX}${phone}`;
+      const raw = await this.redis.client.get(key);
+      const fails = (raw ? Number.parseInt(raw, 10) : 0) + 1;
+      await this.redis.client.set(key, String(fails), 'EX', OTP_FAIL_TTL_SEC);
+      if (fails >= OTP_FAIL_MAX) {
+        this.logger.warn(`OTP locked for ${maskPhoneRdc(phone)} after ${fails} failures`);
+      }
+    } catch (e) {
+      this.logger.warn(`registerOtpFailure failed: ${(e as Error).message}`);
+    }
+  }
+
+  private async clearOtpFailures(phone: string) {
+    try {
+      await this.redis.client.del(`${OTP_FAIL_PREFIX}${phone}`);
+    } catch (e) {
+      this.logger.warn(`clearOtpFailures failed: ${(e as Error).message}`);
     }
   }
 }

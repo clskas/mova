@@ -9,7 +9,8 @@ export class ProcessPaymentDto {
   @IsOptional()
   @IsString()
   phone?: string;
-  @ApiProperty({ required: false })
+  /** Ignored — fare always comes from the ride/service record. Kept so old apps do not 400. */
+  @ApiProperty({ required: false, deprecated: true })
   @IsOptional()
   @IsInt()
   amountCdf?: number;

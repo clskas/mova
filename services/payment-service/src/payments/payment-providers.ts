@@ -50,7 +50,7 @@ export function isAsyncMobileMoneyRef(providerRef?: string | null): boolean {
  */
 export async function initiateViaGateway(
   config: ConfigService,
-  operator: 'ORANGE_MONEY' | 'MPESA' | 'AIRTEL_MONEY',
+  operator: 'ORANGE_MONEY' | 'MPESA' | 'AIRTEL_MONEY' | 'AFRIMONEY',
   amountCdf: number,
   phone: string,
   reference: string,

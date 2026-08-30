@@ -32,14 +32,53 @@ export class WalletService {
     return this.config.get('MOCK_PAYMENTS') === 'true';
   }
 
+  /** NODE_ENV=production or a real AfriSoft / Render host — never simulate money. */
+  private isProductionLike(): boolean {
+    if (this.config.get('NODE_ENV') === 'production') return true;
+    const hosts = [
+      this.config.get<string>('RENDER_EXTERNAL_URL'),
+      this.config.get<string>('RENDER_EXTERNAL_HOSTNAME'),
+      this.config.get<string>('AFRISOFT_PAY_HUB_URL'),
+      this.config.get<string>('PAY_HUB_URL'),
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase();
+    return /afri-soft\.com|onrender\.com|serdipay\.com/.test(hosts);
+  }
+
   private assertMockAllowed() {
-    if (this.config.get('NODE_ENV') === 'production' && this.isMockPayments()) {
+    if (this.isProductionLike() || this.config.get('NODE_ENV') === 'production') {
       throw new MovaHttpException(
         MovaErrorCode.INTERNAL_ERROR,
         undefined,
-        'MOCK_PAYMENTS interdit en production.',
+        'Crédit simulé / MOCK interdit en production. Le portefeuille n’est crédité qu’après confirmation hub/webhook.',
       );
     }
+    if (this.isMockPayments()) return;
+    throw new MovaHttpException(
+      MovaErrorCode.INTERNAL_ERROR,
+      undefined,
+      'MOCK_PAYMENTS n’est pas activé — recharge simulée refusée.',
+    );
+  }
+
+  private assertPositiveIntAmount(amountCdf: number, label = 'Montant') {
+    if (!Number.isInteger(amountCdf) || amountCdf < 1) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        undefined,
+        `${label} invalide : entier ≥ 1 requis.`,
+      );
+    }
+  }
+
+  private async findExistingLedger(reference: string, type: string) {
+    if (!reference.trim()) return null;
+    return this.prisma.walletTransaction.findFirst({
+      where: { reference, type },
+      orderBy: { createdAt: 'desc' },
+    });
   }
 
   async ensurePlatformWallet() {
@@ -162,27 +201,107 @@ export class WalletService {
   }
 
   async credit(userId: string, amountCdf: number, description: string, reference?: string) {
-    const wallet = await this.getWallet(userId);
-    const updated = await this.prisma.wallet.update({ where: { id: wallet.id }, data: { balanceCdf: { increment: amountCdf } } });
-    await this.prisma.walletTransaction.create({
-      data: { walletId: wallet.id, amountCdf, type: 'CREDIT', description, reference },
+    this.assertPositiveIntAmount(amountCdf, 'Crédit');
+    if (reference) {
+      const existing = await this.findExistingLedger(reference, 'CREDIT');
+      if (existing) {
+        return this.prisma.wallet.findUnique({ where: { userId } });
+      }
+    }
+    return this.prisma.$transaction(async (tx) => {
+      const locked = await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT id FROM wallets WHERE "userId" = ${userId} FOR UPDATE
+      `;
+      let walletId = locked[0]?.id;
+      if (!walletId) {
+        const created = await tx.wallet.upsert({
+          where: { userId },
+          create: { userId, balanceCdf: 0 },
+          update: {},
+        });
+        walletId = created.id;
+      }
+      if (reference) {
+        const dup = await tx.walletTransaction.findFirst({
+          where: { reference, type: 'CREDIT' },
+        });
+        if (dup) {
+          return tx.wallet.findUnique({ where: { id: walletId } });
+        }
+      }
+      const updated = await tx.wallet.update({
+        where: { id: walletId },
+        data: { balanceCdf: { increment: amountCdf } },
+      });
+      await tx.walletTransaction.create({
+        data: { walletId, amountCdf, type: 'CREDIT', description, reference },
+      });
+      return updated;
     });
-    return updated;
   }
 
-  async debit(userId: string, amountCdf: number, description: string, reference?: string) {
-    const wallet = await this.getWallet(userId);
-    const available = wallet.balanceCdf - (wallet.heldBalanceCdf ?? 0);
-    if (available < amountCdf) throw new MovaHttpException(MovaErrorCode.PAYMENT_INSUFFICIENT_BALANCE);
-    const updated = await this.prisma.wallet.update({ where: { id: wallet.id }, data: { balanceCdf: { decrement: amountCdf } } });
-    await this.prisma.walletTransaction.create({
-      data: { walletId: wallet.id, amountCdf: -amountCdf, type: 'DEBIT', description, reference },
-    });
-    return updated;
+  async debit(
+    userId: string,
+    amountCdf: number,
+    description: string,
+    reference?: string,
+    db?: { $queryRaw: PrismaService['$queryRaw']; wallet: PrismaService['wallet']; walletTransaction: PrismaService['walletTransaction'] },
+  ) {
+    this.assertPositiveIntAmount(amountCdf, 'Débit');
+    const run = async (
+      tx: { $queryRaw: PrismaService['$queryRaw']; wallet: PrismaService['wallet']; walletTransaction: PrismaService['walletTransaction'] },
+    ) => {
+      const rows = await tx.$queryRaw<
+        Array<{ id: string; balanceCdf: number; heldBalanceCdf: number }>
+      >`
+        SELECT id, "balanceCdf", "heldBalanceCdf" FROM wallets WHERE "userId" = ${userId} FOR UPDATE
+      `;
+      let wallet = rows[0];
+      if (!wallet) {
+        const created = await tx.wallet.upsert({
+          where: { userId },
+          create: { userId, balanceCdf: 0 },
+          update: {},
+        });
+        wallet = { id: created.id, balanceCdf: created.balanceCdf, heldBalanceCdf: created.heldBalanceCdf ?? 0 };
+      }
+      if (reference) {
+        const dup = await tx.walletTransaction.findFirst({
+          where: { reference, type: 'DEBIT' },
+        });
+        if (dup) {
+          return tx.wallet.findUnique({ where: { id: wallet.id } });
+        }
+      }
+      const available = wallet.balanceCdf - (wallet.heldBalanceCdf ?? 0);
+      if (available < amountCdf) {
+        throw new MovaHttpException(MovaErrorCode.PAYMENT_INSUFFICIENT_BALANCE);
+      }
+      const updated = await tx.wallet.update({
+        where: { id: wallet.id },
+        data: { balanceCdf: { decrement: amountCdf } },
+      });
+      await tx.walletTransaction.create({
+        data: { walletId: wallet.id, amountCdf: -amountCdf, type: 'DEBIT', description, reference },
+      });
+      return updated;
+    };
+    if (db) return run(db);
+    if (reference) {
+      const existing = await this.findExistingLedger(reference, 'DEBIT');
+      if (existing) {
+        return this.prisma.wallet.findUnique({ where: { userId } });
+      }
+    }
+    return this.prisma.$transaction(async (tx) => run(tx));
   }
 
   async creditPlatformFee(amountCdf: number, description: string, reference: string) {
     if (amountCdf <= 0) return null;
+    if (reference) {
+      const already = await this.findExistingLedger(reference, 'CREDIT');
+      if (already) return null;
+    }
     await this.ensurePlatformWallet();
     return this.credit(MOVA_PLATFORM_USER_ID, amountCdf, description, reference);
   }
@@ -300,17 +419,48 @@ export class WalletService {
 
   private mapProvider(provider: string): MobileMoneyOperator {
     const p = provider.trim().toUpperCase();
-    if (p === 'MPESA' || p === 'M-PESA') return 'MPESA';
-    if (p === 'AIRTEL_MONEY' || p === 'AIRTEL') return 'AIRTEL_MONEY';
-    return 'ORANGE_MONEY';
+    if (p === 'MPESA' || p === 'M-PESA' || p === 'MP') return 'MPESA';
+    if (p === 'AIRTEL_MONEY' || p === 'AIRTEL' || p === 'AM') return 'AIRTEL_MONEY';
+    if (p === 'AFRIMONEY' || p === 'AF') return 'AFRIMONEY';
+    if (p === 'ORANGE_MONEY' || p === 'ORANGE' || p === 'OM') return 'ORANGE_MONEY';
+    throw new MovaHttpException(
+      MovaErrorCode.PAYMENT_INVALID_METHOD,
+      undefined,
+      `Opérateur inconnu: ${provider}. Utilisez ORANGE_MONEY, MPESA, AIRTEL_MONEY ou AFRIMONEY.`,
+    );
   }
 
   async topUp(userId: string, amountCdf: number, provider: string, phone?: string) {
+    this.assertPositiveIntAmount(amountCdf, 'Montant de recharge');
     if (amountCdf < 500) {
       throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Montant minimum : 500 FC.');
     }
     const providerKey = provider.trim().toUpperCase();
     const ref = afrisoftHubReference('senga', 'topup', randomUUID());
+
+    const walletForLock = await this.createWallet(userId);
+    const recentPending = await this.prisma.walletTransaction.findFirst({
+      where: {
+        walletId: walletForLock.id,
+        type: 'TOPUP_PENDING',
+        amountCdf,
+        createdAt: { gte: new Date(Date.now() - 2 * 60 * 1000) },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (recentPending) {
+      return {
+        success: true,
+        simulated: false,
+        pendingMobileMoney: true,
+        message: 'Recharge déjà en cours — confirmez sur votre téléphone ou patientez 2 minutes.',
+        amountCdf,
+        provider: providerKey,
+        balanceCdf: walletForLock.balanceCdf,
+        formattedBalance: formatCdf(walletForLock.balanceCdf),
+        providerRef: recentPending.reference ?? ref,
+      };
+    }
 
     if (providerKey === 'MOCK') {
       this.assertMockAllowed();
@@ -393,22 +543,51 @@ export class WalletService {
     };
   }
 
-  async payFromWallet(userId: string, amountCdf: number, referenceType: string, referenceId: string, description?: string) {
-    const ref = `${referenceType}:${referenceId}`;
-    const desc = description ?? `Paiement ${referenceType} ${referenceId}`;
-    const wallet = await this.debit(userId, amountCdf, desc, ref);
+  async payFromWallet(_userId: string, _amountCdf: number, _referenceType: string, _referenceId: string, _description?: string) {
+    throw new MovaHttpException(
+      MovaErrorCode.AUTH_UNAUTHORIZED,
+      undefined,
+      'POST /wallet/pay est fermé. Utilisez POST /payments/rides/:id ou /payments/services/:type/:id (montant serveur).',
+    );
+  }
+
+  /**
+   * Wallet payment for a service: consume an ACTIVE hold if present (one debit),
+   * otherwise debit. Never capture then debit again.
+   */
+  async consumeHoldOrDebit(
+    userId: string,
+    amountCdf: number,
+    referenceType: string,
+    referenceId: string,
+    description: string,
+  ) {
+    this.assertPositiveIntAmount(amountCdf, 'Montant');
+    const type = referenceType.toUpperCase();
+    const hold = await this.prisma.walletHold.findUnique({
+      where: { referenceType_referenceId: { referenceType: type, referenceId } },
+    });
+    if (hold?.status === 'CAPTURED') {
+      return { consumed: true, via: 'HOLD' as const, already: true, amountCdf: hold.amountCdf };
+    }
+    if (hold?.status === 'ACTIVE') {
+      const captured = await this.captureHold(type, referenceId, amountCdf);
+      if (captured.captured) {
+        return { consumed: true, via: 'HOLD' as const, already: false, amountCdf: captured.amountCdf };
+      }
+    }
+    const wallet = await this.debit(userId, amountCdf, description, `${type}:${referenceId}`);
     return {
-      success: true,
-      message: 'Paiement portefeuille effectué',
+      consumed: true,
+      via: 'DEBIT' as const,
+      already: false,
       amountCdf,
-      referenceType,
-      referenceId,
       balanceCdf: wallet.balanceCdf,
-      formattedBalance: formatCdf(wallet.balanceCdf),
     };
   }
 
   async withdrawToMobileMoney(userId: string, amountCdf: number, provider: string, phone: string) {
+    this.assertPositiveIntAmount(amountCdf, 'Montant de retrait');
     const normalizedProvider = provider?.trim().toUpperCase() || 'ORANGE_MONEY';
     const normalizedPhone = phone?.trim();
     if (!normalizedPhone) {
@@ -529,11 +708,13 @@ export class WalletService {
   }
 
   async adminAdjust(userId: string, amountCdf: number, type: 'CREDIT' | 'DEBIT', description: string) {
+    this.assertPositiveIntAmount(amountCdf, 'Ajustement');
+    const auditRef = `admin_adjust_${type}_${Date.now()}`;
     if (type === 'CREDIT') {
-      const wallet = await this.credit(userId, amountCdf, description, `admin_adjust_${Date.now()}`);
+      const wallet = await this.credit(userId, amountCdf, description, auditRef);
       return { wallet, message: `Crédit manuel de ${formatCdf(amountCdf)} appliqué.` };
     }
-    const wallet = await this.debit(userId, amountCdf, description, `admin_adjust_${Date.now()}`);
+    const wallet = await this.debit(userId, amountCdf, description, auditRef);
     return { wallet, message: `Débit manuel de ${formatCdf(amountCdf)} appliqué.` };
   }
 
@@ -542,6 +723,7 @@ export class WalletService {
     outcome: 'COMPLETED' | 'FAILED',
     message?: string,
     altRefs: string[] = [],
+    confirmedAmountCdf?: number,
   ): Promise<{ found: boolean; status?: string; balanceCdf?: number; alreadyFinal?: boolean }> {
     const refs = [...new Set([providerRef, ...altRefs].map((r) => r?.trim()).filter(Boolean) as string[])];
     const pending = await this.prisma.walletTransaction.findFirst({
@@ -575,6 +757,27 @@ export class WalletService {
         data: {
           type: 'TOPUP_FAILED',
           description: message ?? pending.description ?? 'Recharge Mobile Money échouée',
+        },
+      });
+      if (failed.count !== 1) {
+        return { found: true, alreadyFinal: true, status: 'COMPLETED', balanceCdf: pending.wallet.balanceCdf };
+      }
+      return { found: true, status: 'FAILED', balanceCdf: pending.wallet.balanceCdf };
+    }
+
+    if (
+      confirmedAmountCdf != null &&
+      Number.isFinite(confirmedAmountCdf) &&
+      Math.round(confirmedAmountCdf) !== pending.amountCdf
+    ) {
+      this.logger.error(
+        `Top-up amount mismatch ref=${pending.reference} pending=${pending.amountCdf} hub=${confirmedAmountCdf}`,
+      );
+      const failed = await this.prisma.walletTransaction.updateMany({
+        where: { id: pending.id, type: 'TOPUP_PENDING' },
+        data: {
+          type: 'TOPUP_FAILED',
+          description: `Montant hub (${confirmedAmountCdf}) ≠ montant en attente (${pending.amountCdf})`,
         },
       });
       if (failed.count !== 1) {
@@ -647,11 +850,13 @@ export class WalletService {
     if (isAfrisoftPayHubClientConfigured(this.envGetter) && !isAfrisoftPayHubMode(this.envGetter)) {
       const remote = await afrisoftPayHubGetPayment(this.envGetter, providerRef);
       if (remote.status === 'COMPLETED' || remote.status === 'FAILED') {
-        await this.completePendingTopUp(providerRef, remote.status, remote.message, [
-          remote.paymentId ?? '',
-          remote.providerRef ?? '',
-          remote.reference ?? '',
-        ]);
+        await this.completePendingTopUp(
+          providerRef,
+          remote.status,
+          remote.message,
+          [remote.paymentId ?? '', remote.providerRef ?? '', remote.reference ?? ''],
+          remote.amountCdf,
+        );
       }
     }
     const wallet = await this.createWallet(userId);

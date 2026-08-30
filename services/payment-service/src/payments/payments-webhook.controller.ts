@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Headers, HttpCode, HttpStatus, Logger, Post, Req } from '@nestjs/common';
+import { Body, Controller, Get, Headers, HttpCode, HttpStatus, Logger, Post, Req, UnauthorizedException } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import { createHmac, timingSafeEqual } from 'crypto';
@@ -43,9 +43,8 @@ export class PaymentsWebhookController {
   private verifySerdiPaySignature(rawBody: string, headers: Record<string, string | string[] | undefined>): boolean {
     const secret = this.config.get<string>('SERDIPAY_WEBHOOK_SECRET')?.trim();
     if (!secret) {
-      // Dev / misconfigured: accept but log. Production should set the secret.
-      this.logger.warn('SERDIPAY_WEBHOOK_SECRET unset — webhook accepted without signature check');
-      return true;
+      this.logger.error('SERDIPAY_WEBHOOK_SECRET unset — webhook rejected (fail-closed)');
+      return false;
     }
     const header =
       (typeof headers['x-serdipay-signature'] === 'string' && headers['x-serdipay-signature']) ||
@@ -60,8 +59,21 @@ export class PaymentsWebhookController {
       const b = Buffer.from(expected, 'hex');
       return a.length === b.length && timingSafeEqual(a, b);
     } catch {
-      return provided === expected;
+      return false;
     }
+  }
+
+  private extractConfirmedAmountCdf(payload: Record<string, unknown>): number | undefined {
+    const raw =
+      payload.amount_cdf ??
+      payload.amountCdf ??
+      payload.amount ??
+      (payload.payment && typeof payload.payment === 'object'
+        ? (payload.payment as Record<string, unknown>).amount_cdf ??
+          (payload.payment as Record<string, unknown>).amountCdf
+        : undefined);
+    const n = typeof raw === 'number' ? raw : typeof raw === 'string' ? Number(raw) : NaN;
+    return Number.isFinite(n) && n > 0 ? Math.round(n) : undefined;
   }
 
   @Post('webhooks/serdipay')
@@ -73,10 +85,14 @@ export class PaymentsWebhookController {
     @Req() req: { rawBody?: Buffer },
   ) {
     if (!this.isHubProcess()) return this.rejectAggregatorOnSenga('SerdiPay');
+    const secret = this.config.get<string>('SERDIPAY_WEBHOOK_SECRET')?.trim();
+    if (!secret) {
+      throw new UnauthorizedException({ success: false, message: 'SERDIPAY_WEBHOOK_SECRET requis' });
+    }
     const raw = req.rawBody?.toString('utf8') ?? JSON.stringify(body ?? {});
     if (!this.verifySerdiPaySignature(raw, headers)) {
       this.logger.warn('SerdiPay webhook: signature invalide');
-      return { success: false, message: 'Signature invalide' };
+      throw new UnauthorizedException({ success: false, message: 'Signature invalide' });
     }
     const payload = asRecord(body);
     const providerRef = extractAggregatorProviderRef(payload);
@@ -91,11 +107,18 @@ export class PaymentsWebhookController {
     }
     this.logger.log(`SerdiPay webhook ${outcome} ref=${providerRef}`);
     const failure = pickString(payload, ['message', 'description', 'failureReason']);
+    const confirmedAmountCdf = this.extractConfirmedAmountCdf(payload);
     if (this.hub.isEnabled()) {
       const hubResult = await this.hub.finalizeFromAggregator(providerRef, outcome, failure);
       if (hubResult.found) return { success: true, ...hubResult };
     }
-    const result = await this.payments.completeMobileMoneyFromWebhook(providerRef, outcome, failure);
+    const result = await this.payments.completeMobileMoneyFromWebhook(
+      providerRef,
+      outcome,
+      failure,
+      [],
+      confirmedAmountCdf,
+    );
     if (!result.success) {
       this.logger.warn(`SerdiPay webhook unknown ref=${providerRef} — ACK 200 (no retry storm)`);
       return { success: true, message: result.message ?? 'Référence inconnue (ack)' };
@@ -248,11 +271,13 @@ export class PaymentsWebhookController {
       return { success: false, message: 'Référence manquante' };
     }
     this.logger.log(`AfriSoft hub webhook ${outcome} payment=${paymentId ?? '?'} provider=${providerRef ?? '?'}`);
+    const confirmedAmountCdf = this.extractConfirmedAmountCdf(payload);
     return this.payments.completeMobileMoneyFromWebhook(
       providerRef ?? paymentId ?? reference ?? '',
       outcome,
       pickString(payload, ['failure_reason', 'message']),
       [paymentId ?? '', reference ?? ''],
+      confirmedAmountCdf,
     );
   }
 }

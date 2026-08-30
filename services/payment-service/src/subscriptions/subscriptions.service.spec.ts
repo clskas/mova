@@ -5,7 +5,8 @@ import { MovaHttpException } from '@mova/shared';
 describe('SubscriptionsService', () => {
   const prisma = {
     subscriptionPlan: { findMany: jest.fn(), findUnique: jest.fn(), create: jest.fn(), update: jest.fn() },
-    userSubscription: { findMany: jest.fn() },
+    userSubscription: { findMany: jest.fn(), findFirst: jest.fn(), create: jest.fn() },
+    $transaction: jest.fn(),
   };
 
   const wallet = { debit: jest.fn().mockResolvedValue({ balanceCdf: 0 }) };

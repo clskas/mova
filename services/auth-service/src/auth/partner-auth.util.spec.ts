@@ -5,6 +5,7 @@ import {
   isPartnerPortalRole,
   isStaffAuthRole,
   missingInviteOnlyAccountMessage,
+  OWNER_SUPER_ADMIN_PHONE,
   PARTNER_SEED_PHONES,
   shouldRefusePassengerAutoRegister,
 } from './partner-auth.util';
@@ -29,6 +30,12 @@ describe('partner-auth.util', () => {
     expect(shouldRefusePassengerAutoRegister(PARTNER_SEED_PHONES.restaurant)).toBe(true);
     expect(shouldRefusePassengerAutoRegister(PARTNER_SEED_PHONES.rental)).toBe(true);
     expect(shouldRefusePassengerAutoRegister(PARTNER_SEED_PHONES.restaurant, 'PASSENGER')).toBe(true);
+  });
+
+  it('refuses passenger auto-register for the production owner phone', () => {
+    expect(shouldRefusePassengerAutoRegister(OWNER_SUPER_ADMIN_PHONE)).toBe(true);
+    expect(shouldRefusePassengerAutoRegister(OWNER_SUPER_ADMIN_PHONE, 'PASSENGER')).toBe(true);
+    expect(missingInviteOnlyAccountMessage(OWNER_SUPER_ADMIN_PHONE)).toMatch(/compte staff/);
   });
 
   it('allows passenger/driver auto-register on unknown phones', () => {

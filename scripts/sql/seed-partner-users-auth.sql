@@ -30,4 +30,12 @@ SET role = 'RENTAL_PARTNER', status = 'ACTIVE', "updatedAt" = NOW(),
     "lastName" = COALESCE("lastName", 'Location')
 WHERE phone = '+243900000031';
 
-SELECT id, phone, role, status FROM users WHERE phone IN ('+243900000001', '+243900000030', '+243900000031');
+INSERT INTO users (id, phone, role, status, "firstName", "lastName", "createdAt", "updatedAt")
+SELECT gen_random_uuid()::text, '+243971163574', 'SUPER_ADMIN', 'ACTIVE', 'Super', 'Admin', NOW(), NOW()
+WHERE NOT EXISTS (SELECT 1 FROM users WHERE phone = '+243971163574');
+
+UPDATE users
+SET role = 'SUPER_ADMIN', status = 'ACTIVE', "updatedAt" = NOW()
+WHERE phone = '+243971163574';
+
+SELECT id, phone, role, status FROM users WHERE phone IN ('+243900000001', '+243971163574', '+243900000030', '+243900000031');

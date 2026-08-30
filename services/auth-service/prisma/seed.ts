@@ -2,6 +2,7 @@ import { PrismaClient, UserRole } from '@prisma/client';
 
 const ADMIN_PHONE = process.env.ADMIN_PHONE ?? '+243900000001';
 const ADMIN_ROLE = (process.env.ADMIN_ROLE as UserRole) ?? UserRole.SUPER_ADMIN;
+const OWNER_SUPER_ADMIN_PHONE = process.env.OWNER_SUPER_ADMIN_PHONE ?? '+243971163574';
 const RESTAURANT_PHONE = process.env.RESTAURANT_PHONE ?? '+243900000030';
 const RENTAL_PARTNER_PHONE = process.env.RENTAL_PARTNER_PHONE ?? '+243900000031';
 
@@ -11,6 +12,16 @@ async function main() {
     where: { phone: ADMIN_PHONE },
     create: { phone: ADMIN_PHONE, role: ADMIN_ROLE, firstName: 'Admin', lastName: 'SENGA' },
     update: { role: ADMIN_ROLE },
+  });
+  const owner = await prisma.user.upsert({
+    where: { phone: OWNER_SUPER_ADMIN_PHONE },
+    create: {
+      phone: OWNER_SUPER_ADMIN_PHONE,
+      role: UserRole.SUPER_ADMIN,
+      firstName: 'Super',
+      lastName: 'Admin',
+    },
+    update: { role: UserRole.SUPER_ADMIN },
   });
   const restaurantUser = await prisma.user.upsert({
     where: { phone: RESTAURANT_PHONE },
@@ -33,6 +44,7 @@ async function main() {
     update: { role: UserRole.RENTAL_PARTNER },
   });
   console.log(`Admin user ready: ${user.phone} (${user.role})`);
+  console.log(`Owner superadmin ready: ${owner.phone} (${owner.role})`);
   console.log(`Restaurant user ready: ${restaurantUser.phone} (${restaurantUser.id})`);
   console.log(`Rental partner ready: ${rentalPartner.phone} (${rentalPartner.id})`);
   console.log('Link restaurant ownerUserId in admin or ride DB to this user id.');

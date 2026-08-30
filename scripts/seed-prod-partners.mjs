@@ -59,6 +59,21 @@ async function connectionStringForPostgres(id) {
   return url;
 }
 
+async function neonConnectionUri(databaseName) {
+  const neonKey = process.env.NEON_API_KEY;
+  if (!neonKey) return null;
+  const projectId = 'flat-sunset-51785163';
+  const branchId = 'br-crimson-thunder-as8yzt2b';
+  const res = await fetch(
+    `https://console.neon.tech/api/v2/projects/${projectId}/connection_uri?database_name=${databaseName}&role_name=neondb_owner&branch_id=${branchId}&pooled=true`,
+    { headers: { Accept: 'application/json', Authorization: `Bearer ${neonKey}` } },
+  );
+  const text = await res.text();
+  if (!res.ok) throw new Error(`Neon connection_uri ${databaseName} HTTP ${res.status}: ${text.slice(0, 200)}`);
+  const uri = text ? JSON.parse(text).uri : null;
+  return uri || null;
+}
+
 async function resolveDatabaseUrls() {
   if (process.env.AUTH_DATABASE_URL && process.env.RIDE_DATABASE_URL) {
     return {
@@ -66,18 +81,21 @@ async function resolveDatabaseUrls() {
       rides: process.env.RIDE_DATABASE_URL,
     };
   }
-  const list = unwrapPostgresList(await renderJson('/postgres?limit=50'));
+  const list = unwrapPostgresList(await renderJson('/postgres?limit=50').catch(() => []));
   const authDb = list.find((db) => db.name === 'mova-db-auth' || db.databaseName === 'mova_auth');
   const ridesDb = list.find((db) => db.name === 'mova-db-rides' || db.databaseName === 'mova_rides');
-  if (!authDb?.id || !ridesDb?.id) {
-    throw new Error(
-      `Could not find mova-db-auth / mova-db-rides in Render postgres list (${list.map((d) => d.name).join(', ') || 'empty'})`,
-    );
+  if (authDb?.id && ridesDb?.id) {
+    return {
+      auth: await connectionStringForPostgres(authDb.id),
+      rides: await connectionStringForPostgres(ridesDb.id),
+    };
   }
-  return {
-    auth: await connectionStringForPostgres(authDb.id),
-    rides: await connectionStringForPostgres(ridesDb.id),
-  };
+  const auth = await neonConnectionUri('mova_auth');
+  const rides = await neonConnectionUri('mova_rides');
+  if (auth && rides) return { auth, rides };
+  throw new Error(
+    `Could not find mova-db-auth / mova-db-rides (Render: ${list.map((d) => d.name).join(', ') || 'empty'}; Neon fallback ${auth ? 'auth-ok' : 'auth-missing'}/${rides ? 'rides-ok' : 'rides-missing'})`,
+  );
 }
 
 async function main() {
@@ -95,6 +113,11 @@ async function main() {
           create: { phone: '+243900000001', role: 'SUPER_ADMIN', status: 'ACTIVE', firstName: 'Admin', lastName: 'SENGA' },
           update: { role: 'SUPER_ADMIN', status: 'ACTIVE' },
         });
+        const owner = await prisma.user.upsert({
+          where: { phone: '+243971163574' },
+          create: { phone: '+243971163574', role: 'SUPER_ADMIN', status: 'ACTIVE', firstName: 'Super', lastName: 'Admin' },
+          update: { role: 'SUPER_ADMIN', status: 'ACTIVE' },
+        });
         const restaurant = await prisma.user.upsert({
           where: { phone: '${RESTAURANT_PHONE}' },
           create: { phone: '${RESTAURANT_PHONE}', role: 'RESTAURANT', status: 'ACTIVE', firstName: 'Chez', lastName: 'Flore' },
@@ -105,7 +128,7 @@ async function main() {
           create: { phone: '${RENTAL_PHONE}', role: 'RENTAL_PARTNER', status: 'ACTIVE', firstName: 'Partenaire', lastName: 'Location' },
           update: { role: 'RENTAL_PARTNER', status: 'ACTIVE' },
         });
-        console.log(JSON.stringify({ adminId: admin.id, adminRole: admin.role, restaurantId: restaurant.id, rentalId: rental.id, restaurantRole: restaurant.role, rentalRole: rental.role }));
+        console.log(JSON.stringify({ adminId: admin.id, adminRole: admin.role, ownerId: owner.id, ownerRole: owner.role, restaurantId: restaurant.id, rentalId: rental.id, restaurantRole: restaurant.role, rentalRole: rental.role }));
         await prisma.$disconnect();
       })().catch((e) => { console.error(e); process.exit(1); });
     `,

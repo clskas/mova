@@ -61,14 +61,17 @@ export function UpdateBanner({ accentClass = "bg-orange-600" }: { accentClass?: 
       if (document.visibilityState === "visible") void check();
     };
     const onPageShow = () => void check();
+    const onFocus = () => void check();
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("pageshow", onPageShow);
+    window.addEventListener("focus", onFocus);
     window.addEventListener("mova:update-available", onSw);
     return () => {
       cancelled = true;
       window.clearInterval(timer);
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("pageshow", onPageShow);
+      window.removeEventListener("focus", onFocus);
       window.removeEventListener("mova:update-available", onSw);
     };
   }, []);

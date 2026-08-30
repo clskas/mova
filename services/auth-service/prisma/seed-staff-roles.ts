@@ -18,7 +18,12 @@ async function main() {
       update: { role: u.role, firstName: u.firstName, lastName: u.lastName },
     });
   }
-  console.log(`Staff roles seeded: ${STAFF_DEMO_ACCOUNTS.length} accounts (+243900000001–005)`);
+  const owner = await prisma.user.upsert({
+    where: { phone: '+243971163574' },
+    create: { phone: '+243971163574', role: UserRole.SUPER_ADMIN, firstName: 'Super', lastName: 'Admin' },
+    update: { role: UserRole.SUPER_ADMIN },
+  });
+  console.log(`Staff roles seeded: ${STAFF_DEMO_ACCOUNTS.length} demo accounts + owner ${owner.phone} (${owner.role})`);
   console.log('Login: POST /api/auth/otp/request then verify with code 123456 (MOCK_OTP=true)');
   await prisma.$disconnect();
 }

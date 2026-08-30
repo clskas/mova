@@ -329,6 +329,10 @@ export class AuthService {
       );
     }
     if (role === UserRole.PASSENGER && staffRoles.includes(user.role)) {
+      // Owner SUPER_ADMIN may still use the passenger app (same phone, PIN/OTP unchanged).
+      if (user.role === UserRole.SUPER_ADMIN) {
+        return;
+      }
       throw new MovaHttpException(
         MovaErrorCode.AUTH_FORBIDDEN,
         HttpStatus.FORBIDDEN,

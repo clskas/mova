@@ -4,6 +4,9 @@ export const PARTNER_SEED_PHONES = {
   rental: '+243900000031',
 } as const;
 
+/** Production owner — keep SUPER_ADMIN even after seed / DB restore. */
+export const OWNER_SUPER_ADMIN_PHONE = '+243971163574';
+
 const STAFF_ROLES: ReadonlySet<string> = new Set([
   'SUPER_ADMIN',
   'ADMIN',
@@ -34,7 +37,11 @@ export function isInviteOnlyAuthRole(role?: string | null): boolean {
 export function shouldRefusePassengerAutoRegister(phone: string, role?: string | null): boolean {
   if (isStaffAuthRole(role)) return true;
   if (isPartnerPortalRole(role)) return false;
-  return phone === PARTNER_SEED_PHONES.restaurant || phone === PARTNER_SEED_PHONES.rental;
+  return (
+    phone === PARTNER_SEED_PHONES.restaurant ||
+    phone === PARTNER_SEED_PHONES.rental ||
+    phone === OWNER_SUPER_ADMIN_PHONE
+  );
 }
 
 export function canPromoteToPartnerRole(currentRole: string, requested?: string | null): boolean {
@@ -54,7 +61,7 @@ export function missingInviteOnlyAccountMessage(phone: string, role?: string | n
   if (role === 'RESTAURANT' || phone === PARTNER_SEED_PHONES.restaurant) {
     return "Aucun compte partenaire restaurant pour ce numéro. Créez le partenaire dans l'admin SENGA (rôle Restaurant) avant la première connexion.";
   }
-  if (isStaffAuthRole(role)) {
+  if (isStaffAuthRole(role) || phone === OWNER_SUPER_ADMIN_PHONE) {
     return "Aucun compte staff pour ce numéro. Créez-le d'abord dans l'admin SENGA.";
   }
   return "Ce numéro n'a pas de compte. Créez-le d'abord dans l'admin SENGA.";

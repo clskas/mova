@@ -223,7 +223,18 @@ function mockFor<T>(path: string, init?: RequestInit): T {
   if (path.includes('/auth/otp/request')) {
     return { success: true, message: 'Code OTP envoyé', mockCode: '123456' } as T;
   }
-  if (path.includes('/auth/otp/verify') || path.includes('/auth/google') || path.includes('/auth/link-')) {
+  if (path.includes('/auth/google') && !path.includes('/auth/google/verify') && !path.includes('/auth/link-')) {
+    return {
+      success: true,
+      otpRequired: true,
+      challengeId: 'mock-google-challenge',
+      otpChannel: 'email',
+      destinationMasked: 'ma***@gmail.com',
+      message: 'Code envoyé par e-mail. Vérifiez votre boîte de réception.',
+      mockCode: '123456',
+    } as T;
+  }
+  if (path.includes('/auth/otp/verify') || path.includes('/auth/google/verify') || path.includes('/auth/link-')) {
     return {
       success: true,
       accessToken: 'mock-web-token',

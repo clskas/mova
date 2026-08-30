@@ -302,7 +302,7 @@ class _AccountLinkCardState extends ConsumerState<AccountLinkCard> {
             ],
             const SizedBox(height: 12),
             MovaButton(
-              label: _otpSent ? 'Confirmer le numéro' : 'Lier un numéro',
+              label: _otpSent ? 'Confirmer le numéro' : 'Lier mon numéro',
               icon: _otpSent ? Icons.check : Icons.sms_outlined,
               isLoading: _busy,
               onPressed: _busy ? null : (_otpSent ? _linkPhone : _requestOtp),

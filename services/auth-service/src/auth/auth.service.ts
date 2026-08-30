@@ -21,10 +21,13 @@ import {
   TEST_OTP_CODE,
   SMS_UNAVAILABLE_USER_MESSAGE,
   denyJwtJti,
+  isMockOtpAllowed,
+  isProductionRuntime,
 } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '@mova/shared';
 import { SmsService } from './sms.providers';
+import { EMAIL_UNAVAILABLE_USER_MESSAGE, EmailOtpMailer } from './email-otp.mailer';
 import { hashLocalPin, isValidLocalPin, verifyLocalPin } from './local-pin.util';
 import {
   defaultPartnerDisplayName,
@@ -46,6 +49,24 @@ const OTP_FAIL_PREFIX = 'auth:otp:fail:';
 const OTP_FAIL_MAX = 5;
 const OTP_FAIL_TTL_SEC = 15 * 60;
 
+const GOOGLE_CHALLENGE_PREFIX = 'auth:google:ch:';
+const GOOGLE_CHALLENGE_TTL_SEC = 10 * 60;
+
+type GoogleOtpChannel = 'sms' | 'email';
+
+type GoogleChallenge = {
+  googleId: string;
+  email: string | null;
+  givenName: string | null;
+  familyName: string | null;
+  picture: string | null;
+  userId: string | null;
+  isNew: boolean;
+  role?: UserRole;
+  destination: string;
+  channel: GoogleOtpChannel;
+};
+
 const PASSENGER_ON_DRIVER_APP_MESSAGE =
   'Ce numéro est un compte passager. Utilisez l\'application SENGA passager, ou attendez qu\'un administrateur vous promeuve chauffeur (après KYC).';
 const NO_DRIVER_ACCOUNT_MESSAGE =
@@ -61,6 +82,7 @@ export class AuthService {
     private redis: RedisService,
     private sms: SmsService,
     private googleTokens: GoogleTokenVerifier,
+    private emailOtp: EmailOtpMailer,
   ) {}
 
   async requestOtp(phone: string, role?: UserRole) {
@@ -264,53 +286,104 @@ export class AuthService {
   }
 
   /**
-   * Google ID token → existing user (googleId / email / OTP-proved phone) or new PASSENGER.
-   * Never creates DRIVER, staff, or partner accounts.
+   * Step 1: verify Google ID token, issue OTP (SMS if the account has a phone, else email).
+   * Does not return a session JWT. Never creates DRIVER, staff, or partner accounts.
    */
-  async loginWithGoogle(idToken: string, role?: UserRole, phone?: string, otpCode?: string) {
+  async loginWithGoogle(idToken: string, role?: UserRole) {
     const identity = await this.googleTokens.verify(idToken);
     let user = await this.prisma.user.findUnique({ where: { googleId: identity.googleId } });
-    let isNew = false;
 
     if (!user && identity.email) {
-      const byEmail = await this.prisma.user.findFirst({
+      user = await this.prisma.user.findFirst({
         where: { email: { equals: identity.email, mode: 'insensitive' } },
       });
-      if (byEmail) {
-        user = await this.attachGoogleIdentity(byEmail, identity);
-      }
-    }
-
-    if (!user && phone && otpCode) {
-      const normalized = await this.consumeValidOtp(phone, otpCode);
-      const byPhone = await this.prisma.user.findUnique({ where: { phone: normalized } });
-      if (byPhone) {
-        user = await this.attachGoogleIdentity(byPhone, identity);
-      }
     }
 
     if (!user) {
-      if (role === UserRole.DRIVER) {
+      this.assertGoogleCanAutoRegister(role);
+    } else {
+      this.assertRoleAccess(user, role);
+      if (user.status === UserStatus.SUSPENDED) {
         throw new MovaHttpException(
           MovaErrorCode.AUTH_FORBIDDEN,
           HttpStatus.FORBIDDEN,
-          'Aucun compte chauffeur lié à Google. Connectez-vous avec votre numéro +243, ou terminez le KYC chauffeur.',
+          'Compte suspendu. Contactez le support SENGA.',
         );
       }
-      if (isStaffAuthRole(role) || isPartnerPortalRole(role)) {
-        throw new MovaHttpException(
-          MovaErrorCode.AUTH_FORBIDDEN,
-          HttpStatus.FORBIDDEN,
-          'Aucun compte autorisé pour cet e-mail Google. Le compte staff / partenaire doit déjà exister.',
-        );
-      }
-      if (shouldRefusePassengerAutoRegister('', role)) {
-        throw new MovaHttpException(
-          MovaErrorCode.AUTH_FORBIDDEN,
-          HttpStatus.FORBIDDEN,
-          missingInviteOnlyAccountMessage('', role),
-        );
-      }
+    }
+
+    const channel: GoogleOtpChannel = user?.phone ? 'sms' : 'email';
+    const destination = channel === 'sms' ? user!.phone! : (identity.email ?? user?.email ?? null);
+    if (!destination) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_INVALID_GOOGLE,
+        HttpStatus.BAD_REQUEST,
+        'Votre compte Google n\'a pas d\'e-mail. Liez un numéro +243 ou utilisez un autre compte Google.',
+      );
+    }
+    if (channel === 'email' && identity.email && identity.emailVerified === false) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_INVALID_GOOGLE,
+        HttpStatus.BAD_REQUEST,
+        'E-mail Google non vérifié. Vérifiez-le chez Google, ou liez un numéro +243.',
+      );
+    }
+
+    const issued = await this.issueOtpToDestination(destination, channel);
+    const challengeId = await this.storeGoogleChallenge({
+      googleId: identity.googleId,
+      email: identity.email,
+      givenName: identity.givenName,
+      familyName: identity.familyName,
+      picture: identity.picture,
+      userId: user?.id ?? null,
+      isNew: !user,
+      role,
+      destination,
+      channel,
+    });
+    const destinationMasked = channel === 'sms' ? maskPhoneRdc(destination) : maskEmail(destination);
+    const message =
+      channel === 'sms'
+        ? 'Code envoyé par SMS. Entrez-le pour terminer la connexion.'
+        : 'Code envoyé par e-mail. Vérifiez votre boîte de réception.';
+    return {
+      success: true,
+      otpRequired: true,
+      challengeId,
+      otpChannel: channel,
+      destinationMasked,
+      message,
+      ...(issued.mock && !isProductionRuntime() ? { mockCode: TEST_OTP_CODE } : {}),
+    };
+  }
+
+  /**
+   * Step 2: consume the Google OTP challenge and issue the session JWT.
+   * New Google-only passengers are created here (one wallet). Existing users keep the same id.
+   */
+  async verifyGoogleOtp(challengeId: string, code: string, role?: UserRole) {
+    const challenge = await this.loadGoogleChallenge(challengeId);
+    const requestedRole = role ?? challenge.role;
+    await this.consumeValidOtp(challenge.destination, code, { email: challenge.channel === 'email' });
+
+    let user: User | null = challenge.userId
+      ? await this.prisma.user.findUnique({ where: { id: challenge.userId } })
+      : null;
+    let isNew = false;
+
+    const identity: GoogleIdentity = {
+      googleId: challenge.googleId,
+      email: challenge.email,
+      emailVerified: true,
+      givenName: challenge.givenName,
+      familyName: challenge.familyName,
+      picture: challenge.picture,
+      audience: '',
+    };
+
+    if (!user) {
+      this.assertGoogleCanAutoRegister(requestedRole);
       user = await this.prisma.user.create({
         data: {
           googleId: identity.googleId,
@@ -330,11 +403,25 @@ export class AuthService {
       } catch (e) {
         this.logger.warn(`USER_CREATED publish failed: ${(e as Error).message}`);
       }
+    } else {
+      user = await this.attachGoogleIdentity(user, identity);
     }
 
-    this.assertRoleAccess(user, role);
+    this.assertRoleAccess(user, requestedRole);
     if (user.status === UserStatus.SUSPENDED) {
-      throw new MovaHttpException(MovaErrorCode.AUTH_FORBIDDEN, HttpStatus.FORBIDDEN, 'Compte suspendu. Contactez le support SENGA.');
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.FORBIDDEN,
+        'Compte suspendu. Contactez le support SENGA.',
+      );
+    }
+    await this.clearGoogleChallenge(challengeId);
+    if (user.phone) {
+      try {
+        await this.clearPinFailures(user.phone);
+      } catch (e) {
+        this.logger.warn(`clearPinFailures failed: ${(e as Error).message}`);
+      }
     }
     return this.buildAuthResponse(user, { isNew });
   }
@@ -343,9 +430,12 @@ export class AuthService {
    * Attach Google to the JWT user. Does not change role (no self-promote).
    * Rejects if this googleId already belongs to someone else.
    */
-  async linkGoogle(userId: string, idToken: string) {
+  async linkGoogle(userId: string, idToken: string, otpCode?: string) {
     const identity = await this.googleTokens.verify(idToken);
     const user = await this.requireActiveUser(userId);
+    if (user.phone && otpCode) {
+      await this.consumeValidOtp(user.phone, otpCode);
+    }
     const linked = await this.attachGoogleIdentity(user, identity);
     return this.buildLinkResponse(linked);
   }
@@ -431,8 +521,147 @@ export class AuthService {
     return this.prisma.user.findUnique({ where: { id: userId } });
   }
 
-  private async consumeValidOtp(phone: string, code: string): Promise<string> {
-    const normalized = normalizePhoneRdc(phone);
+  private assertGoogleCanAutoRegister(role?: UserRole) {
+    if (role === UserRole.DRIVER) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.FORBIDDEN,
+        'Aucun compte chauffeur lié à Google. Connectez-vous avec votre numéro +243, ou terminez le KYC chauffeur.',
+      );
+    }
+    if (isStaffAuthRole(role) || isPartnerPortalRole(role)) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.FORBIDDEN,
+        'Aucun compte autorisé pour cet e-mail Google. Le compte staff / partenaire doit déjà exister.',
+      );
+    }
+    if (shouldRefusePassengerAutoRegister('', role)) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.FORBIDDEN,
+        missingInviteOnlyAccountMessage('', role),
+      );
+    }
+  }
+
+  private async issueOtpToDestination(destination: string, channel: GoogleOtpChannel) {
+    const useTestOtp = channel === 'sms' ? isTestOtpAllowedForPhone(destination) : isMockOtpAllowed();
+    const liveCode = useTestOtp ? TEST_OTP_CODE : crypto.randomInt(100000, 999999).toString();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+    await this.prisma.otpCode.updateMany({
+      where: { phone: destination, used: false },
+      data: { used: true },
+    });
+    for (const code of otpCodesToIssue(destination, liveCode)) {
+      await this.prisma.otpCode.create({
+        data: { phone: destination, code: hashOtpCode(code), expiresAt },
+      });
+    }
+
+    if (useTestOtp) {
+      const label = channel === 'sms' ? maskPhoneRdc(destination) : maskEmail(destination);
+      this.logger.warn(`TEST OTP ${TEST_OTP_CODE} for Google ${channel} ${label}`);
+      return { mock: true as const };
+    }
+
+    if (channel === 'sms') {
+      const smsResult = await this.sms.sendOtp(destination, liveCode);
+      if (!smsResult.success) {
+        this.logger.error(`OTP SMS failed for ${maskPhoneRdc(destination)}: ${smsResult.message}`);
+        throw new MovaHttpException(
+          MovaErrorCode.VALIDATION_ERROR,
+          HttpStatus.SERVICE_UNAVAILABLE,
+          SMS_UNAVAILABLE_USER_MESSAGE,
+        );
+      }
+      return { mock: false as const };
+    }
+
+    const emailResult = await this.emailOtp.sendOtp(destination, liveCode);
+    if (!emailResult.success) {
+      this.logger.error(`OTP email failed for ${maskEmail(destination)}: ${emailResult.message}`);
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        HttpStatus.SERVICE_UNAVAILABLE,
+        EMAIL_UNAVAILABLE_USER_MESSAGE,
+      );
+    }
+    return { mock: false as const };
+  }
+
+  private async storeGoogleChallenge(challenge: GoogleChallenge): Promise<string> {
+    const challengeId = crypto.randomUUID();
+    try {
+      await this.redis.client.set(
+        `${GOOGLE_CHALLENGE_PREFIX}${challengeId}`,
+        JSON.stringify(challenge),
+        'EX',
+        GOOGLE_CHALLENGE_TTL_SEC,
+      );
+    } catch (e) {
+      this.logger.error(`Google challenge store failed: ${(e as Error).message}`);
+      throw new MovaHttpException(
+        MovaErrorCode.INTERNAL_ERROR,
+        HttpStatus.SERVICE_UNAVAILABLE,
+        'Connexion Google temporairement indisponible. Réessayez.',
+      );
+    }
+    return challengeId;
+  }
+
+  private async loadGoogleChallenge(challengeId: string): Promise<GoogleChallenge> {
+    const trimmed = String(challengeId ?? '').trim();
+    if (!trimmed) {
+      throw new MovaHttpException(MovaErrorCode.AUTH_EXPIRED_OTP, HttpStatus.BAD_REQUEST, 'Session Google expirée. Recommencez.');
+    }
+    let raw: string | null = null;
+    try {
+      raw = await this.redis.client.get(`${GOOGLE_CHALLENGE_PREFIX}${trimmed}`);
+    } catch (e) {
+      this.logger.error(`Google challenge load failed: ${(e as Error).message}`);
+      throw new MovaHttpException(
+        MovaErrorCode.INTERNAL_ERROR,
+        HttpStatus.SERVICE_UNAVAILABLE,
+        'Connexion Google temporairement indisponible. Réessayez.',
+      );
+    }
+    if (!raw) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_EXPIRED_OTP,
+        HttpStatus.BAD_REQUEST,
+        'Session Google expirée. Recommencez avec Google.',
+      );
+    }
+    try {
+      return JSON.parse(raw) as GoogleChallenge;
+    } catch {
+      throw new MovaHttpException(MovaErrorCode.AUTH_EXPIRED_OTP, HttpStatus.BAD_REQUEST, 'Session Google invalide. Recommencez.');
+    }
+  }
+
+  private async clearGoogleChallenge(challengeId: string) {
+    try {
+      await this.redis.client.del(`${GOOGLE_CHALLENGE_PREFIX}${challengeId}`);
+    } catch (e) {
+      this.logger.warn(`Google challenge clear failed: ${(e as Error).message}`);
+    }
+  }
+
+  private async consumeValidOtp(
+    destination: string,
+    code: string,
+    options?: { email?: boolean },
+  ): Promise<string> {
+    const normalized = options?.email
+      ? String(destination ?? '').trim().toLowerCase()
+      : normalizePhoneRdc(destination);
+    if (!options?.email && !validatePhoneRdc(normalized)) {
+      throw new MovaHttpException(MovaErrorCode.AUTH_INVALID_PHONE, HttpStatus.BAD_REQUEST);
+    }
+    if (options?.email && !normalized.includes('@')) {
+      throw new MovaHttpException(MovaErrorCode.AUTH_INVALID_OTP);
+    }
     const trimmedCode = String(code ?? '').replace(/\s/g, '');
     await this.assertOtpNotLocked(normalized);
     const hashedCode = hashOtpCode(trimmedCode);

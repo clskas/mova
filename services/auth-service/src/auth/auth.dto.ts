@@ -58,20 +58,29 @@ export class GoogleLoginDto {
   @IsOptional()
   @IsEnum(UserRole)
   role?: UserRole;
-  @ApiProperty({ required: false, example: '+243812345678' })
-  @IsOptional()
+}
+
+export class GoogleVerifyDto {
+  @ApiProperty({ description: 'challengeId renvoyé par POST /auth/google' })
   @IsString()
-  phone?: string;
-  @ApiProperty({ required: false, example: '123456' })
-  @IsOptional()
+  challengeId: string;
+  @ApiProperty({ example: '123456' })
   @IsString()
-  otpCode?: string;
+  code: string;
+  @ApiProperty({ required: false, enum: UserRole })
+  @IsOptional()
+  @IsEnum(UserRole)
+  role?: UserRole;
 }
 
 export class LinkGoogleDto {
   @ApiProperty({ description: 'Google ID token (GIS / google_sign_in)' })
   @IsString()
   idToken: string;
+  @ApiProperty({ required: false, example: '123456', description: 'OTP SMS du numéro déjà lié, si demandé' })
+  @IsOptional()
+  @IsString()
+  otpCode?: string;
 }
 
 export class LinkPhoneDto {

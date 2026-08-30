@@ -10,7 +10,7 @@ import '../../core/widgets/mova_widgets.dart';
 import 'local_pin_setup_screen.dart';
 import 'widgets/six_digit_pin_field.dart';
 
-enum PhoneLoginStep { phone, pin, otp }
+enum PhoneLoginStep { phone, pin, otp, googleOtp }
 
 /// Écran de connexion téléphone : PIN local ou SMS OTP.
 class PhoneLoginPanel extends ConsumerStatefulWidget {
@@ -42,6 +42,9 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
   String? _error;
   String? _mockHint;
   String? _normalizedPhone;
+  String? _googleChallengeId;
+  String? _googleOtpChannel;
+  String? _googleDestinationMasked;
 
   @override
   void initState() {
@@ -210,18 +213,34 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
       }
       final api = ref.read(apiClientProvider);
       await api.checkHealth();
-      final body = <String, dynamic>{
+      final result = await api.post('/auth/google', {
         'idToken': idToken,
         'role': widget.appRole,
-      };
-      final phone = _normalizedPhone ?? MarketConfig.normalizePhone(_phoneController.text);
-      final otp = _codeController.text.trim();
-      if (MarketConfig.validatePhone(phone) && otp.length == 6) {
-        body['phone'] = phone;
-        body['otpCode'] = otp;
+      });
+      if (!mounted) return;
+      switch (result) {
+        case Success(:final data):
+          if (data['otpRequired'] == true) {
+            setState(() {
+              _loading = false;
+              _googleChallengeId = data['challengeId']?.toString();
+              _googleOtpChannel = data['otpChannel']?.toString();
+              _googleDestinationMasked = data['destinationMasked']?.toString();
+              _step = PhoneLoginStep.googleOtp;
+              _codeController.clear();
+              _mockHint = kDebugMode ? data['mockCode'] as String? : null;
+              _error = null;
+            });
+            return;
+          }
+          final phone = _normalizedPhone ?? MarketConfig.normalizePhone(_phoneController.text);
+          await _handleAuthResult(result, phone);
+        case Failure(:final error):
+          setState(() {
+            _loading = false;
+            _error = error.message;
+          });
       }
-      final result = await api.post('/auth/google', body);
-      await _handleAuthResult(result, phone);
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -229,6 +248,26 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
         _error = 'Impossible de se connecter avec Google. Réessayez ou utilisez le SMS.';
       });
     }
+  }
+
+  Future<void> _verifyGoogleOtp() async {
+    final challengeId = _googleChallengeId;
+    if (challengeId == null || challengeId.isEmpty) {
+      setState(() => _error = 'Session Google expirée. Recommencez.');
+      return;
+    }
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    final api = ref.read(apiClientProvider);
+    final result = await api.post('/auth/google/verify', {
+      'challengeId': challengeId,
+      'code': _codeController.text.trim(),
+      'role': widget.appRole,
+    });
+    final phone = _normalizedPhone ?? MarketConfig.normalizePhone(_phoneController.text);
+    await _handleAuthResult(result, phone);
   }
 
   Future<void> _handleAuthResult(Result<Map<String, dynamic>> result, String phone) async {
@@ -285,6 +324,9 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
       _forgotPinRecovery = false;
       _error = null;
       _mockHint = null;
+      _googleChallengeId = null;
+      _googleOtpChannel = null;
+      _googleDestinationMasked = null;
       _codeController.clear();
       _pinController.clear();
     });
@@ -327,9 +369,9 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
             ),
           ),
         ],
-        if (_step == PhoneLoginStep.otp) ...[
+        if (_step == PhoneLoginStep.otp || _step == PhoneLoginStep.googleOtp) ...[
           const SizedBox(height: 16),
-          if (_forgotPinRecovery) ...[
+          if (_step == PhoneLoginStep.otp && _forgotPinRecovery) ...[
             Text(
               'Un code SMS vous permet de vous reconnecter et de définir un nouveau PIN.',
               textAlign: TextAlign.center,
@@ -337,9 +379,21 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
             ),
             const SizedBox(height: 12),
           ],
+          if (_step == PhoneLoginStep.googleOtp) ...[
+            Text(
+              _googleOtpChannel == 'email'
+                  ? 'Un code a été envoyé par e-mail${_googleDestinationMasked != null && _googleDestinationMasked!.isNotEmpty ? ' ($_googleDestinationMasked)' : ''}. Vérifiez votre boîte de réception.'
+                  : 'Un code SMS a été envoyé${_googleDestinationMasked != null && _googleDestinationMasked!.isNotEmpty ? ' ($_googleDestinationMasked)' : ''}.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: MovaColors.textSecondary.withValues(alpha: 0.9), fontSize: 13),
+            ),
+            const SizedBox(height: 12),
+          ],
           SixDigitPinField(
             controller: _codeController,
-            label: 'Code OTP reçu par SMS',
+            label: _step == PhoneLoginStep.googleOtp && _googleOtpChannel == 'email'
+                ? 'Code OTP reçu par e-mail'
+                : 'Code OTP reçu par SMS',
             autofocus: true,
             enabled: !_loading,
           ),
@@ -360,25 +414,26 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
           label: switch (_step) {
             PhoneLoginStep.phone => 'Continuer',
             PhoneLoginStep.pin => 'Se connecter',
-            PhoneLoginStep.otp => 'Vérifier le code',
+            PhoneLoginStep.otp || PhoneLoginStep.googleOtp => 'Vérifier le code',
           },
           isLoading: _loading,
           onPressed: switch (_step) {
             PhoneLoginStep.phone => _continueFromPhone,
             PhoneLoginStep.pin => _loginWithPin,
             PhoneLoginStep.otp => _verifyOtp,
+            PhoneLoginStep.googleOtp => _verifyGoogleOtp,
           },
           icon: switch (_step) {
             PhoneLoginStep.phone => Icons.arrow_forward,
             PhoneLoginStep.pin => Icons.login,
-            PhoneLoginStep.otp => Icons.check,
+            PhoneLoginStep.otp || PhoneLoginStep.googleOtp => Icons.check,
           },
         ),
         if (_step != PhoneLoginStep.phone) ...[
           const SizedBox(height: 8),
           TextButton(
             onPressed: _loading ? null : _backToPhone,
-            child: const Text('Changer de numéro'),
+            child: Text(_step == PhoneLoginStep.googleOtp ? 'Retour' : 'Changer de numéro'),
           ),
         ],
         if (_step == PhoneLoginStep.phone) ...[

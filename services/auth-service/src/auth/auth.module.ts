@@ -8,6 +8,7 @@ import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtStrategy } from './jwt.strategy';
 import { GoogleTokenVerifier } from './google-id-token';
+import { EmailOtpMailer } from './email-otp.mailer';
 import {
   MockSmsProvider,
   AfriSoftSmsHubProvider,
@@ -34,6 +35,7 @@ import {
   providers: [
     AuthService,
     GoogleTokenVerifier,
+    EmailOtpMailer,
     JwtStrategy,
     MockSmsProvider,
     AfriSoftSmsHubProvider,

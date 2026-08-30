@@ -15,6 +15,11 @@ export function OtpGate({ children }: Props) {
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
   const [codeSent, setCodeSent] = useState(false);
+  const [googleChallenge, setGoogleChallenge] = useState<{
+    id: string;
+    channel: string;
+    masked: string;
+  } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -55,10 +60,28 @@ export function OtpGate({ children }: Props) {
     setLoading(true);
     setError(null);
     try {
-      const data = await apiFetch<{ accessToken?: string; user?: { phone?: string } }>("/api/auth/google", {
+      const data = await apiFetch<{
+        accessToken?: string;
+        otpRequired?: boolean;
+        challengeId?: string;
+        otpChannel?: string;
+        destinationMasked?: string;
+        mockCode?: string;
+        user?: { phone?: string };
+      }>("/api/auth/google", {
         method: "POST",
         body: JSON.stringify({ idToken }),
       }, { useMock: mock });
+      if (data.otpRequired && data.challengeId) {
+        setGoogleChallenge({
+          id: data.challengeId,
+          channel: data.otpChannel ?? "email",
+          masked: data.destinationMasked ?? "",
+        });
+        setCode(data.mockCode ?? "");
+        setCodeSent(true);
+        return;
+      }
       if (data.accessToken) {
         setToken(data.accessToken, data.user?.phone);
         setAuthenticated(true);
@@ -76,12 +99,17 @@ export function OtpGate({ children }: Props) {
     setLoading(true);
     setError(null);
     try {
-      const data = await apiFetch<{ accessToken?: string }>("/api/auth/otp/verify", {
-        method: "POST",
-        body: JSON.stringify({ phone: normalizeLoginPhone(phone), code: code.trim() }),
-      }, { useMock: mock });
+      const data = googleChallenge
+        ? await apiFetch<{ accessToken?: string; user?: { phone?: string } }>("/api/auth/google/verify", {
+            method: "POST",
+            body: JSON.stringify({ challengeId: googleChallenge.id, code: code.trim() }),
+          }, { useMock: mock })
+        : await apiFetch<{ accessToken?: string }>("/api/auth/otp/verify", {
+            method: "POST",
+            body: JSON.stringify({ phone: normalizeLoginPhone(phone), code: code.trim() }),
+          }, { useMock: mock });
       if (data.accessToken) {
-        setToken(data.accessToken, phone);
+        setToken(data.accessToken, "user" in data ? data.user?.phone ?? phone : phone);
         setAuthenticated(true);
       } else {
         setError("Connexion impossible. Veuillez réessayer.");
@@ -106,9 +134,13 @@ export function OtpGate({ children }: Props) {
       <div className="max-w-sm mx-auto min-h-[100dvh] flex flex-col justify-center p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
         <h1 className="text-xl font-bold text-center mb-2">SENGA — Connexion</h1>
         <p className="text-sm text-gray-500 text-center mb-6">
-          {isSeedDemoPhone(phone)
-            ? "Numéro de démo : code 123456, pas de SMS."
-            : "Entrez votre numéro +243. Un SMS avec le code vous sera envoyé."}
+          {googleChallenge
+            ? googleChallenge.channel === "email"
+              ? `Un code a été envoyé par e-mail${googleChallenge.masked ? ` (${googleChallenge.masked})` : ""}. Vérifiez votre boîte de réception.`
+              : `Un code SMS a été envoyé${googleChallenge.masked ? ` (${googleChallenge.masked})` : ""}.`
+            : isSeedDemoPhone(phone)
+              ? "Numéro de démo : code 123456, pas de SMS."
+              : "Entrez votre numéro +243. Un SMS avec le code vous sera envoyé."}
         </p>
         {mock && (
           <p className="text-sm text-[#FF6B35] bg-orange-50 rounded-lg py-2 px-3 mb-4 text-center">
@@ -126,7 +158,7 @@ export function OtpGate({ children }: Props) {
           placeholder="+243 8XX XXX XXX"
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
-          disabled={codeSent}
+          disabled={codeSent || Boolean(googleChallenge)}
         />
         {codeSent && (
           <input
@@ -135,7 +167,13 @@ export function OtpGate({ children }: Props) {
             inputMode="numeric"
             autoComplete="one-time-code"
             pattern="[0-9]*"
-            placeholder={isSeedDemoPhone(phone) ? "123456 (démo)" : "Code à 6 chiffres"}
+            placeholder={
+              googleChallenge?.channel === "email"
+                ? "Code reçu par e-mail"
+                : isSeedDemoPhone(phone)
+                  ? "123456 (démo)"
+                  : "Code à 6 chiffres"
+            }
             value={code}
             onChange={(e) => setCode(e.target.value)}
             maxLength={6}
@@ -144,12 +182,12 @@ export function OtpGate({ children }: Props) {
         <button
           type="button"
           onClick={codeSent ? verifyOtp : requestOtp}
-          disabled={loading || !phone.trim() || (codeSent && !code.trim())}
+          disabled={loading || (!googleChallenge && !phone.trim()) || (codeSent && !code.trim())}
           className="w-full bg-[#6C63FF] text-white rounded-xl py-3 font-semibold disabled:opacity-50"
         >
           {loading ? "Chargement…" : codeSent ? "Se connecter" : "Recevoir le code"}
         </button>
-        {googleClientId() && !codeSent && (
+        {googleClientId() && !codeSent && !googleChallenge && (
           <>
             <p className="text-center text-xs text-gray-400 my-4">ou</p>
             <GoogleContinueButton onCredential={loginWithGoogle} disabled={loading} />
@@ -162,10 +200,11 @@ export function OtpGate({ children }: Props) {
             onClick={() => {
               setCodeSent(false);
               setCode("");
+              setGoogleChallenge(null);
               setError(null);
             }}
           >
-            Changer de numéro
+            {googleChallenge ? "Retour" : "Changer de numéro"}
           </button>
         )}
       </div>

@@ -45,6 +45,11 @@ export default function LoginPage() {
   const [phone, setPhone] = useState(RESTAURANT_PHONE);
   const [code, setCode] = useState("");
   const [codeSent, setCodeSent] = useState(false);
+  const [googleChallenge, setGoogleChallenge] = useState<{
+    id: string;
+    channel: string;
+    masked: string;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -83,6 +88,18 @@ export default function LoginPage() {
     }
   }
 
+  function finishRestaurantSession(data: { accessToken?: string; user?: { role?: string } }) {
+    if (!data.accessToken) {
+      throw new Error("Connexion Google refusée");
+    }
+    const role = data.user?.role ?? decodeJwtPayload(data.accessToken)?.role;
+    if (!isRestaurantRole(typeof role === "string" ? role : null)) {
+      throw new Error(`Ce compte n'est pas un partenaire restaurant (rôle: ${String(role ?? "?")}).`);
+    }
+    setToken(data.accessToken);
+    router.replace("/");
+  }
+
   async function loginWithGoogle(idToken: string) {
     setLoading(true);
     setError(null);
@@ -93,15 +110,20 @@ export default function LoginPage() {
         body: JSON.stringify({ idToken, role: "RESTAURANT" }),
       });
       const data = await verifyRes.json().catch(() => ({}));
-      if (!verifyRes.ok || !data.accessToken) {
+      if (!verifyRes.ok) {
         throw new Error(data.error?.message ?? `Connexion Google refusée (${verifyRes.status})`);
       }
-      const role = data.user?.role ?? decodeJwtPayload(data.accessToken)?.role;
-      if (!isRestaurantRole(typeof role === "string" ? role : null)) {
-        throw new Error(`Ce compte n'est pas un partenaire restaurant (rôle: ${String(role ?? "?")}).`);
+      if (data.otpRequired && data.challengeId) {
+        setGoogleChallenge({
+          id: data.challengeId,
+          channel: data.otpChannel ?? "email",
+          masked: data.destinationMasked ?? "",
+        });
+        setCode(data.mockCode ?? "");
+        setCodeSent(true);
+        return;
       }
-      setToken(data.accessToken);
-      router.replace("/");
+      finishRestaurantSession(data);
     } catch (e) {
       setError(loginErrorMessage(e));
     } finally {
@@ -116,11 +138,18 @@ export default function LoginPage() {
     try {
       let verifyRes: Response;
       try {
-        verifyRes = await fetch(`${API_BASE}/api/auth/otp/verify`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ phone: normalizeLoginPhone(phone), code: code.trim(), role: "RESTAURANT" }),
-        });
+        verifyRes = await fetch(
+          googleChallenge ? `${API_BASE}/api/auth/google/verify` : `${API_BASE}/api/auth/otp/verify`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(
+              googleChallenge
+                ? { challengeId: googleChallenge.id, code: code.trim(), role: "RESTAURANT" }
+                : { phone: normalizeLoginPhone(phone), code: code.trim(), role: "RESTAURANT" },
+            ),
+          },
+        );
       } catch {
         throw new Error(
           `Impossible de joindre l'API SENGA lors de la vérification OTP (${API_BASE}).`,
@@ -173,15 +202,17 @@ export default function LoginPage() {
             type="tel"
             inputMode="tel"
             autoComplete="tel"
-            disabled={codeSent}
+            disabled={codeSent || Boolean(googleChallenge)}
           />
         </label>
         {codeSent && (
           <label className="block text-sm">
             <span className="text-gray-600">
-              {isSeedDemoPhone(phone)
-                ? "Code de démo (aucun SMS) : 123456"
-                : "Code reçu par SMS"}
+              {googleChallenge?.channel === "email"
+                ? `Code reçu par e-mail${googleChallenge.masked ? ` (${googleChallenge.masked})` : ""}`
+                : isSeedDemoPhone(phone)
+                  ? "Code de démo (aucun SMS) : 123456"
+                  : "Code reçu par SMS"}
             </span>
             <input
               className="mt-1 w-full rounded-xl border border-gray-200 p-3"
@@ -196,13 +227,13 @@ export default function LoginPage() {
         )}
         <button
           type="button"
-          disabled={loading || !phone.trim() || (codeSent && !code.trim())}
+          disabled={loading || (!googleChallenge && !phone.trim()) || (codeSent && !code.trim())}
           onClick={codeSent ? verifyOtp : requestOtp}
           className="w-full py-3 rounded-xl bg-[#FF6B35] text-white font-medium disabled:opacity-60"
         >
           {loading ? (codeSent ? "Connexion…" : "Envoi…") : codeSent ? "Se connecter" : "Recevoir le code"}
         </button>
-        {googleClientId() && !codeSent && (
+        {googleClientId() && !codeSent && !googleChallenge && (
           <>
             <p className="text-center text-xs text-gray-400">ou</p>
             <GoogleContinueButton onCredential={loginWithGoogle} disabled={loading} />
@@ -215,10 +246,11 @@ export default function LoginPage() {
             onClick={() => {
               setCodeSent(false);
               setCode("");
+              setGoogleChallenge(null);
               setError(null);
             }}
           >
-            Changer de numéro
+            {googleChallenge ? "Retour" : "Changer de numéro"}
           </button>
         )}
         {error && <p className="text-sm text-red-600 text-center break-all">{error}</p>}

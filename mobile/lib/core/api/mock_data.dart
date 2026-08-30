@@ -4,6 +4,16 @@ import '../config/market_config.dart';
 import '../location/service_areas.dart';
 
 abstract final class MockData {
+  static Map<String, dynamic> googleOtpChallenge() => {
+        'success': true,
+        'otpRequired': true,
+        'challengeId': 'mock-google-challenge',
+        'otpChannel': 'email',
+        'destinationMasked': 'ma***@gmail.com',
+        'message': 'Code envoyé par e-mail. Vérifiez votre boîte de réception.',
+        'mockCode': '123456',
+      };
+
   static Map<String, dynamic> otpRequest(String phone) => {
         'success': true,
         'message': 'Code OTP envoyé (mode démo)',

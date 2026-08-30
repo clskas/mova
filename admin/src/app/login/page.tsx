@@ -20,6 +20,11 @@ export default function LoginPage() {
   const [phone, setPhone] = useState(ADMIN_PHONE);
   const [code, setCode] = useState("");
   const [codeSent, setCodeSent] = useState(false);
+  const [googleChallenge, setGoogleChallenge] = useState<{
+    id: string;
+    channel: string;
+    masked: string;
+  } | null>(null);
   const [tokenInput, setTokenInput] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -52,6 +57,18 @@ export default function LoginPage() {
     }
   }
 
+  function finishAdminSession(data: { accessToken?: string; user?: { role?: string } }) {
+    const role = normalizeAdminRole(data.user?.role);
+    if (!role) {
+      throw new Error("Ce compte n'a pas un rôle staff autorisé.");
+    }
+    if (!data.accessToken) {
+      throw new Error("Connexion Google refusée");
+    }
+    setToken(data.accessToken);
+    router.replace(defaultPathForRole(role));
+  }
+
   async function loginWithGoogle(idToken: string) {
     setLoading(true);
     setError(null);
@@ -62,17 +79,22 @@ export default function LoginPage() {
         body: JSON.stringify({ idToken, role: "ADMIN" }),
       });
       const data = await verifyRes.json();
-      if (!verifyRes.ok || !data.accessToken) {
+      if (!verifyRes.ok) {
         throw new Error(
           sanitizeAdminError(data.error?.message ?? "Connexion Google refusée", verifyRes.status),
         );
       }
-      const role = normalizeAdminRole(data.user?.role);
-      if (!role) {
-        throw new Error("Ce compte n'a pas un rôle staff autorisé.");
+      if (data.otpRequired && data.challengeId) {
+        setGoogleChallenge({
+          id: data.challengeId,
+          channel: data.otpChannel ?? "email",
+          masked: data.destinationMasked ?? "",
+        });
+        setCode(data.mockCode ?? "");
+        setCodeSent(true);
+        return;
       }
-      setToken(data.accessToken);
-      router.replace(defaultPathForRole(role));
+      finishAdminSession(data);
     } catch (e) {
       setError(toUserErrorMessage(e, "Erreur de connexion"));
     } finally {
@@ -84,23 +106,25 @@ export default function LoginPage() {
     setLoading(true);
     setError(null);
     try {
-      const verifyRes = await fetch(`${API_BASE}/api/auth/otp/verify`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: normalizeLoginPhone(phone), code: code.trim(), role: "ADMIN" }),
-      });
+      const verifyRes = await fetch(
+        googleChallenge ? `${API_BASE}/api/auth/google/verify` : `${API_BASE}/api/auth/otp/verify`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(
+            googleChallenge
+              ? { challengeId: googleChallenge.id, code: code.trim(), role: "ADMIN" }
+              : { phone: normalizeLoginPhone(phone), code: code.trim(), role: "ADMIN" },
+          ),
+        },
+      );
       const data = await verifyRes.json();
       if (!verifyRes.ok || !data.accessToken) {
         throw new Error(
           sanitizeAdminError(data.error?.message ?? "Connexion refusée", verifyRes.status),
         );
       }
-      const role = normalizeAdminRole(data.user?.role);
-      if (!role) {
-        throw new Error("Ce compte n'a pas un rôle staff autorisé.");
-      }
-      setToken(data.accessToken);
-      router.replace(defaultPathForRole(role));
+      finishAdminSession(data);
     } catch (e) {
       setError(toUserErrorMessage(e, "Erreur de connexion"));
     } finally {
@@ -212,14 +236,18 @@ export default function LoginPage() {
                   onChange={(e) => setPhone(e.target.value)}
                   placeholder="+243900000001"
                   autoComplete="tel"
-                  disabled={codeSent}
+                  disabled={codeSent || Boolean(googleChallenge)}
                 />
               </label>
               {codeSent && (
                 <label className="block text-sm">
                   <span className="font-medium text-gray-700">Code OTP</span>
                   <span className="ml-2 text-xs text-gray-400">
-                    {isSeedDemoPhone(phone) ? "démo : 123456 (aucun SMS)" : "code reçu par SMS"}
+                    {googleChallenge?.channel === "email"
+                      ? `e-mail${googleChallenge.masked ? ` (${googleChallenge.masked})` : ""}`
+                      : isSeedDemoPhone(phone)
+                        ? "démo : 123456 (aucun SMS)"
+                        : "code reçu par SMS"}
                   </span>
                   <input
                     className="mt-2 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-mova-midnight outline-none transition focus:border-mova-violet focus:ring-2 focus:ring-mova-violet/20"
@@ -233,13 +261,13 @@ export default function LoginPage() {
               )}
               <button
                 type="button"
-                disabled={loading || !phone.trim() || (codeSent && !code.trim())}
+                disabled={loading || (!googleChallenge && !phone.trim()) || (codeSent && !code.trim())}
                 onClick={codeSent ? loginWithOtp : requestOtp}
                 className="mova-btn-primary w-full"
               >
                 {loading ? (codeSent ? "Connexion…" : "Envoi…") : codeSent ? "Se connecter" : "Recevoir le code"}
               </button>
-              {googleClientId() && !codeSent && (
+              {googleClientId() && !codeSent && !googleChallenge && (
                 <>
                   <p className="text-center text-xs text-gray-400">ou</p>
                   <GoogleContinueButton onCredential={loginWithGoogle} disabled={loading} />
@@ -252,10 +280,11 @@ export default function LoginPage() {
                   onClick={() => {
                     setCodeSent(false);
                     setCode("");
+                    setGoogleChallenge(null);
                     setError(null);
                   }}
                 >
-                  Changer de numéro
+                  {googleChallenge ? "Retour" : "Changer de numéro"}
                 </button>
               )}
             </div>

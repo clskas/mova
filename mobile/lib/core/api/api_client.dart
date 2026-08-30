@@ -268,12 +268,15 @@ class ApiClient {
         role: body?['role']?.toString(),
       ));
     }
-    if (path.contains('/auth/google')) {
+    if (path.contains('/auth/google/verify')) {
       return Success(MockData.verifyOtp(
         body?['phone']?.toString() ?? '+243812345678',
-        '123456',
+        body?['code']?.toString() ?? '',
         role: body?['role']?.toString(),
       ));
+    }
+    if (path.contains('/auth/google')) {
+      return Success(MockData.googleOtpChallenge());
     }
     if (path.contains('/auth/link-google')) {
       return Success(MockData.linkAccount(google: true));

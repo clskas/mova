@@ -4,6 +4,7 @@ import { Response } from 'express';
 import { AuthService } from './auth.service';
 import {
   GoogleLoginDto,
+  GoogleVerifyDto,
   LinkGoogleDto,
   LinkPhoneDto,
   LoginOptionsDto,
@@ -46,9 +47,15 @@ export class AuthController {
   }
 
   @Post('google')
-  @ApiOperation({ summary: 'Connexion Google (ID token) — JWT identique à OTP/PIN' })
-  async loginGoogle(@Body() dto: GoogleLoginDto, @Res({ passthrough: true }) res: Response) {
-    const result = await this.authService.loginWithGoogle(dto.idToken, dto.role, dto.phone, dto.otpCode);
+  @ApiOperation({ summary: 'Connexion Google — étape 1 : ID token, puis OTP (SMS ou e-mail)' })
+  loginGoogle(@Body() dto: GoogleLoginDto) {
+    return this.authService.loginWithGoogle(dto.idToken, dto.role);
+  }
+
+  @Post('google/verify')
+  @ApiOperation({ summary: 'Connexion Google — étape 2 : vérifier l\'OTP et obtenir le JWT' })
+  async verifyGoogle(@Body() dto: GoogleVerifyDto, @Res({ passthrough: true }) res: Response) {
+    const result = await this.authService.verifyGoogleOtp(dto.challengeId, dto.code, dto.role);
     res.status(result.isNew ? HttpStatus.CREATED : HttpStatus.OK);
     return result;
   }
@@ -58,7 +65,7 @@ export class AuthController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Lier Google au compte courant (JWT + ID token)' })
   linkGoogle(@Request() req: { user: { id: string } }, @Body() dto: LinkGoogleDto) {
-    return this.authService.linkGoogle(req.user.id, dto.idToken);
+    return this.authService.linkGoogle(req.user.id, dto.idToken, dto.otpCode);
   }
 
   @Post('link-phone')

@@ -234,7 +234,7 @@ export default function LoginPage() {
                   className="mt-2 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-mova-midnight outline-none transition focus:border-mova-violet focus:ring-2 focus:ring-mova-violet/20"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  placeholder="+243900000001"
+                  placeholder="+243 …"
                   autoComplete="tel"
                   disabled={codeSent || Boolean(googleChallenge)}
                 />

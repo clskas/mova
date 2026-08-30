@@ -268,6 +268,13 @@ class ApiClient {
         role: body?['role']?.toString(),
       ));
     }
+    if (path.contains('/auth/google')) {
+      return Success(MockData.verifyOtp(
+        body?['phone']?.toString() ?? '+243812345678',
+        '123456',
+        role: body?['role']?.toString(),
+      ));
+    }
     if (path == '/users/me' && method == 'GET') {
       return Success(MockData.currentUser());
     }

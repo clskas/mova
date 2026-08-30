@@ -7,6 +7,7 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtStrategy } from './jwt.strategy';
+import { GoogleTokenVerifier } from './google-id-token';
 import {
   MockSmsProvider,
   AfriSoftSmsHubProvider,
@@ -32,6 +33,7 @@ import {
   controllers: [AuthController],
   providers: [
     AuthService,
+    GoogleTokenVerifier,
     JwtStrategy,
     MockSmsProvider,
     AfriSoftSmsHubProvider,

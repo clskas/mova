@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { decodeJwtPayload, isSeedDemoPhone, normalizeLoginPhone, setToken } from "@/lib/auth";
 import { sanitizeAdminError, toUserErrorMessage } from "@/lib/api";
 import { defaultPathForRole, isAdminRole, normalizeAdminRole } from "@/lib/rbac";
+import { GoogleContinueButton, googleClientId } from "@/components/GoogleContinueButton";
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000")
   .trim()
@@ -46,6 +47,34 @@ export default function LoginPage() {
       setCodeSent(true);
     } catch (e) {
       setError(toUserErrorMessage(e, "Impossible d'envoyer le code"));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function loginWithGoogle(idToken: string) {
+    setLoading(true);
+    setError(null);
+    try {
+      const verifyRes = await fetch(`${API_BASE}/api/auth/google`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idToken, role: "ADMIN" }),
+      });
+      const data = await verifyRes.json();
+      if (!verifyRes.ok || !data.accessToken) {
+        throw new Error(
+          sanitizeAdminError(data.error?.message ?? "Connexion Google refusée", verifyRes.status),
+        );
+      }
+      const role = normalizeAdminRole(data.user?.role);
+      if (!role) {
+        throw new Error("Ce compte n'a pas un rôle staff autorisé.");
+      }
+      setToken(data.accessToken);
+      router.replace(defaultPathForRole(role));
+    } catch (e) {
+      setError(toUserErrorMessage(e, "Erreur de connexion"));
     } finally {
       setLoading(false);
     }
@@ -210,6 +239,12 @@ export default function LoginPage() {
               >
                 {loading ? (codeSent ? "Connexion…" : "Envoi…") : codeSent ? "Se connecter" : "Recevoir le code"}
               </button>
+              {googleClientId() && !codeSent && (
+                <>
+                  <p className="text-center text-xs text-gray-400">ou</p>
+                  <GoogleContinueButton onCredential={loginWithGoogle} disabled={loading} />
+                </>
+              )}
               {codeSent && (
                 <button
                   type="button"

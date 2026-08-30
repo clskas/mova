@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { GoogleContinueButton, googleClientId } from "@/components/GoogleContinueButton";
 import { ApiError, apiFetch, checkGatewayHealth } from "@/lib/api";
 import { clearToken, getToken, isSeedDemoPhone, normalizeLoginPhone, setToken } from "@/lib/auth";
 import { toUserErrorMessage } from "@/lib/user-messages";
@@ -45,6 +46,27 @@ export function OtpGate({ children }: Props) {
           ? "Impossible d'envoyer le code par SMS. Réessayez dans quelques minutes."
           : "Impossible d'envoyer le code",
       ));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function loginWithGoogle(idToken: string) {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await apiFetch<{ accessToken?: string; user?: { phone?: string } }>("/api/auth/google", {
+        method: "POST",
+        body: JSON.stringify({ idToken }),
+      }, { useMock: mock });
+      if (data.accessToken) {
+        setToken(data.accessToken, data.user?.phone);
+        setAuthenticated(true);
+      } else {
+        setError("Connexion Google impossible. Veuillez réessayer.");
+      }
+    } catch (e) {
+      setError(toUserErrorMessage(e, "Connexion Google refusée"));
     } finally {
       setLoading(false);
     }
@@ -127,6 +149,12 @@ export function OtpGate({ children }: Props) {
         >
           {loading ? "Chargement…" : codeSent ? "Se connecter" : "Recevoir le code"}
         </button>
+        {googleClientId() && !codeSent && (
+          <>
+            <p className="text-center text-xs text-gray-400 my-4">ou</p>
+            <GoogleContinueButton onCredential={loginWithGoogle} disabled={loading} />
+          </>
+        )}
         {codeSent && (
           <button
             type="button"

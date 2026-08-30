@@ -12,6 +12,8 @@ function makeUser(overrides: Record<string, unknown> = {}) {
     status: UserStatus.ACTIVE,
     firstName: null,
     lastName: null,
+    email: null,
+    googleId: null,
     localPinHash: null,
     localPinSetAt: null,
     ...overrides,
@@ -28,11 +30,13 @@ describe('AuthService', () => {
     };
     user: {
       findUnique: jest.Mock;
+      findFirst: jest.Mock;
       create: jest.Mock;
       update: jest.Mock;
     };
   };
   let jwt: { sign: jest.Mock };
+  let googleTokens: { verify: jest.Mock };
   let redis: {
     publish: jest.Mock;
     client: { get: jest.Mock; set: jest.Mock; del: jest.Mock };
@@ -50,11 +54,23 @@ describe('AuthService', () => {
       },
       user: {
         findUnique: jest.fn(),
+        findFirst: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
       },
     };
     jwt = { sign: jest.fn().mockReturnValue('jwt-token') };
+    googleTokens = {
+      verify: jest.fn().mockResolvedValue({
+        googleId: 'gid-new',
+        email: 'new.user@gmail.com',
+        emailVerified: true,
+        givenName: 'Marie',
+        familyName: 'Kabila',
+        picture: null,
+        audience: 'web-client.apps.googleusercontent.com',
+      }),
+    };
     redis = {
       publish: jest.fn().mockResolvedValue(undefined),
       client: {
@@ -70,6 +86,7 @@ describe('AuthService', () => {
       { get: jest.fn() } as never,
       redis as never,
       sms as never,
+      googleTokens as never,
     );
     global.fetch = jest.fn().mockResolvedValue({ ok: true, status: 200 }) as jest.Mock;
   });
@@ -207,6 +224,87 @@ describe('AuthService', () => {
     await seedHashedOtp(passenger.phone);
     const result = await service.verifyOtp(passenger.phone, '847291', UserRole.PASSENGER);
     expect(result.success).toBe(true);
+  });
+
+  it('does not create an admin from a random Google account', async () => {
+    prisma.user.findUnique.mockResolvedValue(null);
+    prisma.user.findFirst.mockResolvedValue(null);
+    await expect(service.loginWithGoogle('id-token', UserRole.ADMIN)).rejects.toMatchObject({
+      response: { code: MovaErrorCode.AUTH_FORBIDDEN },
+    });
+    expect(prisma.user.create).not.toHaveBeenCalled();
+  });
+
+  it('does not create a DRIVER from Google', async () => {
+    prisma.user.findUnique.mockResolvedValue(null);
+    prisma.user.findFirst.mockResolvedValue(null);
+    await expect(service.loginWithGoogle('id-token', UserRole.DRIVER)).rejects.toMatchObject({
+      response: { code: MovaErrorCode.AUTH_FORBIDDEN },
+    });
+    expect(prisma.user.create).not.toHaveBeenCalled();
+  });
+
+  it('creates a PASSENGER on first Google login when email is new', async () => {
+    prisma.user.findUnique.mockResolvedValue(null);
+    prisma.user.findFirst.mockResolvedValue(null);
+    const created = makeUser({
+      id: 'g-user',
+      phone: null,
+      googleId: 'gid-new',
+      email: 'new.user@gmail.com',
+      firstName: 'Marie',
+    });
+    prisma.user.create.mockResolvedValue(created);
+    const result = await service.loginWithGoogle('id-token', UserRole.PASSENGER);
+    expect(result.isNew).toBe(true);
+    expect(result.user.role).toBe(UserRole.PASSENGER);
+    expect(prisma.user.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          googleId: 'gid-new',
+          role: UserRole.PASSENGER,
+        }),
+      }),
+    );
+    expect(jwt.sign).toHaveBeenCalledWith(
+      expect.objectContaining({ sub: 'g-user', role: UserRole.PASSENGER }),
+      expect.objectContaining({ jwtid: expect.any(String) }),
+    );
+  });
+
+  it('attaches Google to an existing phone user when emails match', async () => {
+    const existing = makeUser({ email: 'marie@gmail.com' });
+    prisma.user.findUnique.mockResolvedValue(null);
+    prisma.user.findFirst.mockResolvedValue(existing);
+    prisma.user.update.mockResolvedValue({ ...existing, googleId: 'gid-new' });
+    googleTokens.verify.mockResolvedValue({
+      googleId: 'gid-new',
+      email: 'marie@gmail.com',
+      emailVerified: true,
+      givenName: 'Marie',
+      familyName: null,
+      picture: null,
+      audience: 'web',
+    });
+    const result = await service.loginWithGoogle('id-token', UserRole.PASSENGER);
+    expect(result.isNew).toBe(false);
+    expect(prisma.user.create).not.toHaveBeenCalled();
+    expect(prisma.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: existing.id },
+        data: expect.objectContaining({ googleId: 'gid-new' }),
+      }),
+    );
+  });
+
+  it('rejects a Google token the verifier refuses (bad audience)', async () => {
+    googleTokens.verify.mockRejectedValue({
+      response: { code: MovaErrorCode.AUTH_INVALID_GOOGLE },
+    });
+    await expect(service.loginWithGoogle('bad-token', UserRole.PASSENGER)).rejects.toMatchObject({
+      response: { code: MovaErrorCode.AUTH_INVALID_GOOGLE },
+    });
+    expect(prisma.user.create).not.toHaveBeenCalled();
   });
 
   it('refuses PIN login of a PASSENGER on the driver app', async () => {

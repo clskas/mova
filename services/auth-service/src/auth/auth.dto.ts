@@ -50,6 +50,24 @@ export class PinLoginDto {
   role?: UserRole;
 }
 
+export class GoogleLoginDto {
+  @ApiProperty({ description: 'Google ID token (GIS / google_sign_in)' })
+  @IsString()
+  idToken: string;
+  @ApiProperty({ required: false, enum: UserRole })
+  @IsOptional()
+  @IsEnum(UserRole)
+  role?: UserRole;
+  @ApiProperty({ required: false, example: '+243812345678' })
+  @IsOptional()
+  @IsString()
+  phone?: string;
+  @ApiProperty({ required: false, example: '123456' })
+  @IsOptional()
+  @IsString()
+  otpCode?: string;
+}
+
 export class SetupLocalPinDto {
   @ApiProperty({ example: '847291' })
   @IsString()

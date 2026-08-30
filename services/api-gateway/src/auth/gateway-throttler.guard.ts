@@ -6,6 +6,7 @@ const AUTH_SENSITIVE_PREFIXES = [
   '/api/auth/otp/request',
   '/api/auth/otp/verify',
   '/api/auth/pin/login',
+  '/api/auth/google',
 ];
 
 const AUTH_LIMIT = 8;

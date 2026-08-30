@@ -3,6 +3,7 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import { AuthService } from './auth.service';
 import {
+  GoogleLoginDto,
   LoginOptionsDto,
   PinLoginDto,
   RequestOtpDto,
@@ -40,6 +41,14 @@ export class AuthController {
   @ApiOperation({ summary: 'Connexion par code PIN local (sans SMS)' })
   pinLogin(@Body() dto: PinLoginDto) {
     return this.authService.loginWithPin(dto.phone, dto.pin, dto.role);
+  }
+
+  @Post('google')
+  @ApiOperation({ summary: 'Connexion Google (ID token) — JWT identique à OTP/PIN' })
+  async loginGoogle(@Body() dto: GoogleLoginDto, @Res({ passthrough: true }) res: Response) {
+    const result = await this.authService.loginWithGoogle(dto.idToken, dto.role, dto.phone, dto.otpCode);
+    res.status(result.isNew ? HttpStatus.CREATED : HttpStatus.OK);
+    return result;
   }
 
   @Post('pin/setup')

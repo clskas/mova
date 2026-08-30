@@ -6,6 +6,7 @@ const PUBLIC_PATHS = [
   '/api/auth/otp/verify',
   '/api/auth/login/options',
   '/api/auth/pin/login',
+  '/api/auth/google',
   '/health',
 ];
 

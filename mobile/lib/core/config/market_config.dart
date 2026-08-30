@@ -31,6 +31,18 @@ class MarketConfig {
   static const defaultLat = mapCenterLat;
   static const defaultLng = mapCenterLng;
 
+  /// Web OAuth client ID (Google Cloud). Required as `serverClientId` so Android
+  /// returns an ID token the backend can verify. Same value as `GOOGLE_CLIENT_ID`.
+  ///
+  /// Android OAuth clients (Play / Cloud Console) — SHA-1 of the upload keystore:
+  /// `keytool -list -v -keystore <upload.jks> -alias <alias>`
+  /// Packages: `cd.mova.mova.passenger`, `cd.mova.mova.driver`.
+  /// `--dart-define=GOOGLE_SERVER_CLIENT_ID=....apps.googleusercontent.com`
+  static const googleServerClientId = String.fromEnvironment(
+    'GOOGLE_SERVER_CLIENT_ID',
+    defaultValue: '',
+  );
+
   /// `--dart-define=API_URL=...` (vide = défaut selon mode).
   static const _apiFromEnv = String.fromEnvironment('API_URL', defaultValue: '');
 

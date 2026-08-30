@@ -223,7 +223,7 @@ function mockFor<T>(path: string, init?: RequestInit): T {
   if (path.includes('/auth/otp/request')) {
     return { success: true, message: 'Code OTP envoyé', mockCode: '123456' } as T;
   }
-  if (path.includes('/auth/otp/verify')) {
+  if (path.includes('/auth/otp/verify') || path.includes('/auth/google')) {
     return {
       success: true,
       accessToken: 'mock-web-token',

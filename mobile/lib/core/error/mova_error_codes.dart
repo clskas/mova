@@ -11,6 +11,7 @@ const movaErrorMessages = <String, String>{
   'MOVA_AUTH_006': 'Code PIN incorrect. Réessayez ou connectez-vous par SMS.',
   'MOVA_AUTH_007': 'Trop de tentatives PIN. Réessayez dans 15 minutes ou connectez-vous par SMS.',
   'MOVA_AUTH_008': 'Aucun code PIN configuré. Connectez-vous par SMS.',
+  'MOVA_AUTH_009': 'Connexion Google refusée. Réessayez ou utilisez le numéro de téléphone.',
   'MOVA_RIDE_001': 'Course introuvable.',
   'MOVA_RIDE_002': 'Statut de course invalide pour cette action.',
   'MOVA_RIDE_003':

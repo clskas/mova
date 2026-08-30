@@ -43,6 +43,10 @@ android {
         }
     }
 
+    // Google Sign-In: register SHA-1 (upload + debug) in Google Cloud OAuth
+    // Android clients for cd.mova.mova.passenger and cd.mova.mova.driver.
+    // Web client ID → GOOGLE_CLIENT_ID (auth-service) and
+    // --dart-define=GOOGLE_SERVER_CLIENT_ID (this app). Do not commit secrets.
     defaultConfig {
         applicationId = "cd.mova.mova"
         minSdk = maxOf(23, flutter.minSdkVersion)

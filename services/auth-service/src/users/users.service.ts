@@ -22,7 +22,7 @@ export class UsersService {
 
   private enrichUser(user: {
     id: string;
-    phone: string;
+    phone: string | null;
     role: UserRole;
     firstName?: string | null;
     lastName?: string | null;
@@ -177,8 +177,8 @@ export class UsersService {
     return updated;
   }
 
-  private assertNotOwnerSuspend(phone: string) {
-    if (normalizePhoneRdc(phone) === OWNER_SUPER_ADMIN_PHONE) {
+  private assertNotOwnerSuspend(phone?: string | null) {
+    if (phone && normalizePhoneRdc(phone) === OWNER_SUPER_ADMIN_PHONE) {
       throw new MovaHttpException(
         MovaErrorCode.AUTH_FORBIDDEN,
         HttpStatus.FORBIDDEN,

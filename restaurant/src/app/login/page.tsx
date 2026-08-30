@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { decodeJwtPayload, isRestaurantRole, isSeedDemoPhone, normalizeLoginPhone, setToken } from "@/lib/auth";
+import { GoogleContinueButton, googleClientId } from "@/components/GoogleContinueButton";
 import { PwaInstallBanner } from "@/components/PwaInstallBanner";
 import { PUBLIC_API_BASE } from "@/lib/public-api-base";
 
@@ -77,6 +78,32 @@ export default function LoginPage() {
       setCodeSent(true);
     } catch (e) {
       setError(loginErrorMessage(e, lastStatus));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function loginWithGoogle(idToken: string) {
+    setLoading(true);
+    setError(null);
+    try {
+      const verifyRes = await fetch(`${API_BASE}/api/auth/google`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idToken, role: "RESTAURANT" }),
+      });
+      const data = await verifyRes.json().catch(() => ({}));
+      if (!verifyRes.ok || !data.accessToken) {
+        throw new Error(data.error?.message ?? `Connexion Google refusée (${verifyRes.status})`);
+      }
+      const role = data.user?.role ?? decodeJwtPayload(data.accessToken)?.role;
+      if (!isRestaurantRole(typeof role === "string" ? role : null)) {
+        throw new Error(`Ce compte n'est pas un partenaire restaurant (rôle: ${String(role ?? "?")}).`);
+      }
+      setToken(data.accessToken);
+      router.replace("/");
+    } catch (e) {
+      setError(loginErrorMessage(e));
     } finally {
       setLoading(false);
     }
@@ -175,6 +202,12 @@ export default function LoginPage() {
         >
           {loading ? (codeSent ? "Connexion…" : "Envoi…") : codeSent ? "Se connecter" : "Recevoir le code"}
         </button>
+        {googleClientId() && !codeSent && (
+          <>
+            <p className="text-center text-xs text-gray-400">ou</p>
+            <GoogleContinueButton onCredential={loginWithGoogle} disabled={loading} />
+          </>
+        )}
         {codeSent && (
           <button
             type="button"

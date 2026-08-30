@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/auth/google_sign_in.dart';
 import '../../core/config/market_config.dart';
 import '../../core/api/api_client.dart';
 import '../../core/error/result.dart';
@@ -192,6 +193,44 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
     await _handleAuthResult(result, phone);
   }
 
+  Future<void> _loginWithGoogle() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final idToken = await signInWithGoogleIdToken();
+      if (!mounted) return;
+      if (idToken == null || idToken.isEmpty) {
+        setState(() {
+          _loading = false;
+          _error = 'Connexion Google annulée.';
+        });
+        return;
+      }
+      final api = ref.read(apiClientProvider);
+      await api.checkHealth();
+      final body = <String, dynamic>{
+        'idToken': idToken,
+        'role': widget.appRole,
+      };
+      final phone = _normalizedPhone ?? MarketConfig.normalizePhone(_phoneController.text);
+      final otp = _codeController.text.trim();
+      if (MarketConfig.validatePhone(phone) && otp.length == 6) {
+        body['phone'] = phone;
+        body['otpCode'] = otp;
+      }
+      final result = await api.post('/auth/google', body);
+      await _handleAuthResult(result, phone);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = 'Impossible de se connecter avec Google. Réessayez ou utilisez le SMS.';
+      });
+    }
+  }
+
   Future<void> _handleAuthResult(Result<Map<String, dynamic>> result, String phone) async {
     if (!mounted) return;
     setState(() => _loading = false);
@@ -208,8 +247,10 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
         }
         final api = ref.read(apiClientProvider);
         await api.saveToken(token);
-        await api.saveUserPhone(phone);
-        if (data['pinConfigured'] != true && mounted) {
+        if (MarketConfig.validatePhone(phone)) {
+          await api.saveUserPhone(phone);
+        }
+        if (data['pinConfigured'] != true && MarketConfig.validatePhone(phone) && mounted) {
           await Navigator.of(context).push(
             MaterialPageRoute(
               builder: (_) => LocalPinSetupScreen(
@@ -338,6 +379,30 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
           TextButton(
             onPressed: _loading ? null : _backToPhone,
             child: const Text('Changer de numéro'),
+          ),
+        ],
+        if (_step == PhoneLoginStep.phone) ...[
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              const Expanded(child: Divider()),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Text(
+                  'ou',
+                  style: TextStyle(color: MovaColors.textSecondary.withValues(alpha: 0.9), fontSize: 13),
+                ),
+              ),
+              const Expanded(child: Divider()),
+            ],
+          ),
+          const SizedBox(height: 16),
+          MovaButton(
+            label: 'Continuer avec Google',
+            isSecondary: true,
+            isLoading: _loading,
+            onPressed: _loginWithGoogle,
+            icon: Icons.g_mobiledata,
           ),
         ],
       ],

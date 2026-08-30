@@ -7,6 +7,7 @@ export enum MovaErrorCode {
   AUTH_INVALID_PIN = 'MOVA_AUTH_006',
   AUTH_PIN_LOCKED = 'MOVA_AUTH_007',
   AUTH_PIN_NOT_SET = 'MOVA_AUTH_008',
+  AUTH_INVALID_GOOGLE = 'MOVA_AUTH_009',
 
   RIDE_NOT_FOUND = 'MOVA_RIDE_001',
   RIDE_INVALID_STATUS = 'MOVA_RIDE_002',
@@ -68,6 +69,7 @@ export const MOVA_ERROR_MESSAGES: Record<MovaErrorCode, string> = {
   [MovaErrorCode.AUTH_INVALID_PIN]: 'Code PIN incorrect. Réessayez ou connectez-vous par SMS.',
   [MovaErrorCode.AUTH_PIN_LOCKED]: 'Trop de tentatives PIN. Réessayez dans 15 minutes ou connectez-vous par SMS.',
   [MovaErrorCode.AUTH_PIN_NOT_SET]: 'Aucun code PIN configuré. Connectez-vous par SMS.',
+  [MovaErrorCode.AUTH_INVALID_GOOGLE]: 'Connexion Google refusée. Réessayez ou utilisez le numéro de téléphone.',
 
   [MovaErrorCode.RIDE_NOT_FOUND]: 'Course introuvable.',
   [MovaErrorCode.RIDE_INVALID_STATUS]: 'Statut de course invalide pour cette action.',

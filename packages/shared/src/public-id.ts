@@ -6,7 +6,8 @@ export function formatMovaPublicId(userId: string, role: string): string {
 }
 
 /** Masque le téléphone pour affichage (ex. +243 *** 9010). */
-export function maskPhoneRdc(phone: string): string {
+export function maskPhoneRdc(phone?: string | null): string {
+  if (!phone) return '';
   const digits = phone.replace(/\D/g, '');
   if (digits.length < 4) return phone;
   const last4 = digits.slice(-4);

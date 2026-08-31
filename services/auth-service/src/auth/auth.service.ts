@@ -1084,7 +1084,6 @@ export class AuthService {
       );
     }
     if (role === UserRole.RESTAURANT && user.role !== UserRole.RESTAURANT) {
-      if (user.role === UserRole.SUPER_ADMIN) return;
       throw new MovaHttpException(
         MovaErrorCode.AUTH_FORBIDDEN,
         HttpStatus.FORBIDDEN,
@@ -1092,7 +1091,6 @@ export class AuthService {
       );
     }
     if (role === UserRole.RENTAL_PARTNER && user.role !== UserRole.RENTAL_PARTNER) {
-      if (user.role === UserRole.SUPER_ADMIN) return;
       throw new MovaHttpException(
         MovaErrorCode.AUTH_FORBIDDEN,
         HttpStatus.FORBIDDEN,

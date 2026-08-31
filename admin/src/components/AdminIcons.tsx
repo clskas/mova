@@ -189,3 +189,12 @@ export function PublicitesIcon({ className }: IconProps) {
     </Svg>
   );
 }
+
+export function AccountIcon({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <circle cx="12" cy="8" r="3.5" />
+      <path d="M5 20v-1a5 5 0 015-5h4a5 5 0 015 5v1" />
+    </Svg>
+  );
+}

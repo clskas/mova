@@ -1,8 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { decodeJwtPayload, normalizeLoginPhone, setToken } from "@/lib/auth";
+import {
+  decodeJwtPayload,
+  getLastPhone,
+  getToken,
+  isPinPending,
+  normalizeLoginPhone,
+  roleFromToken,
+  setLastPhone,
+  setPinPending,
+  setToken,
+} from "@/lib/auth";
 import { sanitizeAdminError, toUserErrorMessage } from "@/lib/api";
 import { defaultPathForRole, isAdminRole, normalizeAdminRole } from "@/lib/rbac";
 import { GoogleContinueButton, googleClientId } from "@/components/GoogleContinueButton";
@@ -29,7 +39,9 @@ export default function LoginPage() {
   const [pin, setPin] = useState("");
   const [codeSent, setCodeSent] = useState(false);
   const [pinMode, setPinMode] = useState(false);
-  const [setupToken, setSetupToken] = useState<string | null>(null);
+  const [setupToken, setSetupToken] = useState<string | null>(() =>
+    typeof window !== "undefined" && isPinPending() ? getToken() : null,
+  );
   const [setupRolePath, setSetupRolePath] = useState("/");
   const [googleChallenge, setGoogleChallenge] = useState<{
     id: string;
@@ -39,6 +51,40 @@ export default function LoginPage() {
   const [tokenInput, setTokenInput] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const token = getToken();
+    if (token && (isPinPending() || setupToken)) {
+      const role = normalizeAdminRole(roleFromToken(token));
+      if (role) setSetupRolePath(defaultPathForRole(role));
+      if (!setupToken) setSetupToken(token);
+      return;
+    }
+    if (token) {
+      void fetch(`${API_BASE}/api/users/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((me) => {
+          if (!me) return;
+          if (shouldRequirePinSetup({ pinConfigured: me.pinConfigured, user: me })) {
+            setPinPending(true);
+            setSetupToken(token);
+            const role = normalizeAdminRole(me.role ?? roleFromToken(token));
+            if (role) setSetupRolePath(defaultPathForRole(role));
+          }
+        })
+        .catch(() => undefined);
+      return;
+    }
+    const last = getLastPhone();
+    if (last) {
+      setPhone(last);
+      void fetchPinEnabled(API_BASE, last, { role: "ADMIN" }).then((enabled) => {
+        if (enabled) setPinMode(true);
+      });
+    }
+  }, [setupToken]);
 
   async function requestOtp() {
     setLoading(true);
@@ -80,12 +126,16 @@ export default function LoginPage() {
     if (!data.accessToken) {
       throw new Error("Connexion Google impossible pour le moment. Réessayez.");
     }
-    setToken(data.accessToken);
+    const phoneOnAccount = (data.user?.phone ?? "").trim();
+    setToken(data.accessToken, phoneOnAccount || undefined);
+    if (phoneOnAccount) setLastPhone(phoneOnAccount);
     if (shouldRequirePinSetup(data)) {
+      setPinPending(true);
       setSetupRolePath(defaultPathForRole(role));
       setSetupToken(data.accessToken);
       return;
     }
+    setPinPending(false);
     router.replace(defaultPathForRole(role));
   }
 
@@ -263,7 +313,14 @@ export default function LoginPage() {
           )}
 
           {setupToken ? (
-            <PinSetupForm apiBase={API_BASE} token={setupToken} onDone={() => router.replace(setupRolePath)} />
+            <PinSetupForm
+              apiBase={API_BASE}
+              token={setupToken}
+              onDone={() => {
+                setPinPending(false);
+                router.replace(setupRolePath);
+              }}
+            />
           ) : mode === "otp" ? (
             <div className="space-y-4">
               <label className="block text-sm">
@@ -283,7 +340,7 @@ export default function LoginPage() {
               </label>
               {pinMode && !codeSent && (
                 <label className="block text-sm">
-                  <span className="font-medium text-gray-700">Code PIN</span>
+                  <span className="font-medium text-gray-700">Entrez votre code PIN</span>
                   <input
                     className="mt-2 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 tracking-widest outline-none transition focus:border-mova-violet focus:ring-2 focus:ring-mova-violet/20"
                     value={pin}
@@ -296,10 +353,9 @@ export default function LoginPage() {
               )}
               {codeSent && (
                 <label className="block text-sm">
-                  <span className="font-medium text-gray-700">Code OTP</span>
-                  <span className="ml-2 text-xs text-gray-400">
+                  <span className="font-medium text-gray-700">
                     {googleChallenge?.channel === "email"
-                      ? `e-mail${googleChallenge.masked ? ` (${googleChallenge.masked})` : ""}`
+                      ? `code reçu par e-mail${googleChallenge.masked ? ` (${googleChallenge.masked})` : ""}`
                       : "code reçu par SMS"}
                   </span>
                   <input
@@ -318,7 +374,7 @@ export default function LoginPage() {
                   loading ||
                   (!googleChallenge && !phone.trim()) ||
                   (codeSent && !code.trim()) ||
-                  (pinMode && !codeSent && pin.length > 0 && pin.length !== 6)
+                  (pinMode && !codeSent && pin.length !== 6)
                 }
                 onClick={codeSent ? loginWithOtp : pinMode && pin.length === 6 ? loginWithPin : requestOtp}
                 className="mova-btn-primary w-full"
@@ -389,7 +445,8 @@ export default function LoginPage() {
           )}
 
           <p className="text-xs text-gray-400 text-center leading-relaxed">
-            Un SMS avec le code vous sera envoyé. Google : seul l&apos;e-mail du personnel autorisé est accepté.
+            Téléphone : code par SMS. Google : code par e-mail (boîte Google), même si un numéro est lié.
+            Après la première connexion avec un téléphone, le PIN à 6 chiffres s&apos;affiche à la suivante.
           </p>
         </div>
       </main>

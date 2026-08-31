@@ -24,6 +24,7 @@ import {
   PublicitesIcon,
   UsersIcon,
   WalletIcon,
+  AccountIcon,
 } from "@/components/AdminIcons";
 import { DemoBadge } from "@/components/ui";
 import { checkGatewayHealth } from "@/lib/api";
@@ -52,6 +53,7 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   "/catalogue-location": LocationsIcon,
   "/demenagements": MovingIcon,
   "/covoiturage": CarpoolIcon,
+  "/compte": AccountIcon,
 };
 
 function ShellInner({ children }: { children: React.ReactNode }) {
@@ -104,6 +106,17 @@ function ShellInner({ children }: { children: React.ReactNode }) {
                   </Link>
                 );
               })}
+              <Link
+                href="/compte"
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm min-h-11 transition-colors ${
+                  pathname.startsWith("/compte")
+                    ? "bg-[#6C63FF] text-white font-medium"
+                    : "text-white/70 hover:bg-white/10 hover:text-white"
+                }`}
+              >
+                <AccountIcon className="w-4 h-4 shrink-0" />
+                <span>Compte et connexion</span>
+              </Link>
             </div>
           )}
         </nav>
@@ -141,7 +154,7 @@ function ShellInner({ children }: { children: React.ReactNode }) {
               <DemoBadge show={demo} />
               <Link
                 href="/compte"
-                className="text-xs sm:text-sm text-gray-500 hover:text-[#6C63FF] underline min-h-10 px-1 inline-flex items-center"
+                className="inline-flex items-center min-h-10 px-3 rounded-xl bg-[#6C63FF] text-white text-xs sm:text-sm font-medium hover:bg-[#5b54e6]"
               >
                 Compte et connexion
               </Link>
@@ -177,6 +190,17 @@ function ShellInner({ children }: { children: React.ReactNode }) {
                 );
               })
             )}
+            <Link
+              href="/compte"
+              aria-label="Compte et connexion"
+              title="Compte et connexion"
+              className={`flex flex-col items-center justify-center gap-0.5 min-h-10 rounded-lg text-[10px] leading-tight text-center px-0.5 ${
+                pathname.startsWith("/compte") ? "bg-[#6C63FF] text-white font-semibold" : "text-gray-600"
+              }`}
+            >
+              <AccountIcon className="w-3.5 h-3.5 shrink-0" />
+              <span className="line-clamp-2 break-words">Compte</span>
+            </Link>
           </nav>
         </header>
         <main className="flex-1 p-3 lg:p-6 overflow-x-auto pb-[max(1rem,env(safe-area-inset-bottom))]">{children}</main>

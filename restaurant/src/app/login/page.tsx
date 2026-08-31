@@ -1,8 +1,17 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { decodeJwtPayload, isRestaurantRole, normalizeLoginPhone, setToken } from "@/lib/auth";
+import {
+  decodeJwtPayload,
+  getLastPhone,
+  getToken,
+  isPinPending,
+  isRestaurantRole,
+  normalizeLoginPhone,
+  setPinPending,
+  setToken,
+} from "@/lib/auth";
 import { GoogleContinueButton, googleClientId } from "@/components/GoogleContinueButton";
 import { PwaInstallBanner } from "@/components/PwaInstallBanner";
 import { PUBLIC_API_BASE } from "@/lib/public-api-base";
@@ -39,7 +48,9 @@ export default function LoginPage() {
   const [pin, setPin] = useState("");
   const [codeSent, setCodeSent] = useState(false);
   const [pinMode, setPinMode] = useState(false);
-  const [setupToken, setSetupToken] = useState<string | null>(null);
+  const [setupToken, setSetupToken] = useState<string | null>(() =>
+    typeof window !== "undefined" && isPinPending() ? getToken() : null,
+  );
   const [googleChallenge, setGoogleChallenge] = useState<{
     id: string;
     channel: string;
@@ -47,6 +58,35 @@ export default function LoginPage() {
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const token = getToken();
+    if (token && (isPinPending() || setupToken)) {
+      if (!setupToken) setSetupToken(token);
+      return;
+    }
+    if (token) {
+      void fetch(`${API_BASE}/api/users/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((me) => {
+          if (me && shouldRequirePinSetup({ pinConfigured: me.pinConfigured, user: me })) {
+            setPinPending(true);
+            setSetupToken(token);
+          }
+        })
+        .catch(() => undefined);
+      return;
+    }
+    const last = getLastPhone();
+    if (last) {
+      setPhone(last);
+      void fetchPinEnabled(API_BASE, last, INTENT).then((enabled) => {
+        if (enabled) setPinMode(true);
+      });
+    }
+  }, [setupToken]);
 
   function finishRestaurantSession(data: AuthPayload) {
     if (!data.accessToken) {
@@ -56,11 +96,13 @@ export default function LoginPage() {
     if (!isRestaurantRole(typeof role === "string" ? role : null)) {
       throw new Error("Ce compte n'est pas un partenaire restaurant.");
     }
-    setToken(data.accessToken);
+    setToken(data.accessToken, (data.user?.phone ?? "").trim() || undefined);
     if (shouldRequirePinSetup(data)) {
+      setPinPending(true);
       setSetupToken(data.accessToken);
       return;
     }
+    setPinPending(false);
     router.replace("/");
   }
 
@@ -216,7 +258,10 @@ export default function LoginPage() {
             apiBase={API_BASE}
             token={setupToken}
             accentClass="bg-[#FF6B35]"
-            onDone={() => router.replace("/")}
+            onDone={() => {
+              setPinPending(false);
+              router.replace("/");
+            }}
           />
         ) : (
           <>
@@ -275,7 +320,7 @@ export default function LoginPage() {
                 loading ||
                 (!googleChallenge && !phone.trim()) ||
                 (codeSent && !code.trim()) ||
-                (pinMode && !codeSent && pin.length > 0 && pin.length !== 6)
+                (pinMode && !codeSent && pin.length !== 6)
               }
               onClick={primaryAction}
               className="w-full py-3 rounded-xl bg-[#FF6B35] text-white font-medium disabled:opacity-60"

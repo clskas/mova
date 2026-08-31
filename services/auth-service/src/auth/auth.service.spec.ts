@@ -504,7 +504,7 @@ describe('AuthService', () => {
     );
   });
 
-  it('Google login of a phone user sends SMS OTP and keeps the same userId after verify', async () => {
+  it('Google login of a phone user sends email OTP (not SMS) and keeps the same userId after verify', async () => {
     const existing = makeUser({
       id: 'phone-user',
       phone: '+243811111111',
@@ -514,20 +514,22 @@ describe('AuthService', () => {
     prisma.user.findUnique.mockResolvedValue(existing);
     const start = googleOtpChallenge(await service.loginWithGoogle('id-token', UserRole.PASSENGER));
     expect(start.otpRequired).toBe(true);
-    expect(start.otpChannel).toBe('sms');
+    expect(start.otpChannel).toBe('email');
     expect(start).not.toHaveProperty('accessToken');
-    expect(sms.sendOtp).toHaveBeenCalledWith('+243811111111', expect.any(String));
-    expect(mailer.sendOtp).not.toHaveBeenCalled();
+    expect(sms.sendOtp).not.toHaveBeenCalled();
     expect(prisma.user.create).not.toHaveBeenCalled();
+    if (!isMockOtpAllowed()) {
+      expect(mailer.sendOtp).toHaveBeenCalledWith('new.user@gmail.com', expect.any(String));
+    }
 
     seedGoogleChallenge({
       userId: existing.id,
       isNew: false,
-      destination: existing.phone,
-      channel: 'sms',
-      email: 'marie@gmail.com',
+      destination: 'new.user@gmail.com',
+      channel: 'email',
+      email: 'new.user@gmail.com',
     });
-    await seedHashedOtp(existing.phone, '847291');
+    await seedHashedOtp('new.user@gmail.com', '847291');
     prisma.user.findUnique.mockResolvedValue(existing);
     prisma.user.update.mockResolvedValue(existing);
     const done = await service.verifyGoogleOtp('challenge-1', '847291', UserRole.PASSENGER);
@@ -550,18 +552,19 @@ describe('AuthService', () => {
       audience: 'web',
     });
     const start = googleOtpChallenge(await service.loginWithGoogle('id-token', UserRole.PASSENGER));
-    expect(start.otpChannel).toBe('sms');
+    expect(start.otpChannel).toBe('email');
+    expect(sms.sendOtp).not.toHaveBeenCalled();
     expect(prisma.user.create).not.toHaveBeenCalled();
     expect(prisma.user.update).not.toHaveBeenCalled();
 
     seedGoogleChallenge({
       userId: existing.id,
       isNew: false,
-      destination: existing.phone,
-      channel: 'sms',
+      destination: 'marie@gmail.com',
+      channel: 'email',
       email: 'marie@gmail.com',
     });
-    await seedHashedOtp(existing.phone, '847291');
+    await seedHashedOtp('marie@gmail.com', '847291');
     prisma.user.findUnique.mockResolvedValue(existing);
     prisma.user.update.mockResolvedValue({ ...existing, googleId: 'gid-new' });
     const done = await service.verifyGoogleOtp('challenge-1', '847291', UserRole.PASSENGER);
@@ -625,12 +628,15 @@ describe('AuthService', () => {
     });
     const start = googleOtpChallenge(await service.loginWithGoogle('id-token', UserRole.ADMIN));
     expect(start.otpRequired).toBe(true);
-    expect(start.otpChannel).toBe('sms');
-    expect(sms.sendOtp).toHaveBeenCalledWith(OWNER_SUPER_ADMIN_PHONE, expect.any(String));
+    expect(start.otpChannel).toBe('email');
+    expect(sms.sendOtp).not.toHaveBeenCalled();
+    if (!isMockOtpAllowed()) {
+      expect(mailer.sendOtp).toHaveBeenCalledWith('celestinkas@gmail.com', expect.any(String));
+    }
     expect(prisma.user.create).not.toHaveBeenCalled();
   });
 
-  it('issues SUPER_ADMIN JWT when owner Google SMS OTP cannot be sent', async () => {
+  it('issues SUPER_ADMIN JWT when owner Google email OTP cannot be sent', async () => {
     const owner = makeUser({
       id: 'owner-1',
       phone: OWNER_SUPER_ADMIN_PHONE,
@@ -653,14 +659,21 @@ describe('AuthService', () => {
       return Promise.resolve(null);
     });
     prisma.user.update.mockResolvedValue({ ...owner, googleId: 'gid-owner', email: 'celestinkas@gmail.com' });
-    sms.sendOtp.mockResolvedValue({ success: false, message: 'hub down' });
+    mailer.sendOtp.mockResolvedValue({ success: false, message: 'SMTP missing' });
+    if (isMockOtpAllowed()) {
+      const result = googleOtpChallenge(await service.loginWithGoogle('id-token', UserRole.ADMIN));
+      expect(result.otpRequired).toBe(true);
+      expect(result.otpChannel).toBe('email');
+      expect(prisma.user.create).not.toHaveBeenCalled();
+      return;
+    }
     const result = googleSession(await service.loginWithGoogle('id-token', UserRole.ADMIN));
     expect(result.accessToken).toBe('jwt-token');
     expect(result.user.role).toBe(UserRole.SUPER_ADMIN);
     expect(prisma.user.create).not.toHaveBeenCalled();
   });
 
-  it('allows owner SUPER_ADMIN Google on the restaurant portal (SMS OTP, same account)', async () => {
+  it('allows owner SUPER_ADMIN Google on the restaurant portal (email OTP, same account)', async () => {
     const owner = makeUser({
       id: 'owner-1',
       phone: OWNER_SUPER_ADMIN_PHONE,
@@ -684,8 +697,11 @@ describe('AuthService', () => {
     prisma.user.findFirst.mockResolvedValue(owner);
     const start = googleOtpChallenge(await service.loginWithGoogle('id-token', UserRole.RESTAURANT, 'restaurant'));
     expect(start.otpRequired).toBe(true);
-    expect(start.otpChannel).toBe('sms');
-    expect(sms.sendOtp).toHaveBeenCalledWith(OWNER_SUPER_ADMIN_PHONE, expect.any(String));
+    expect(start.otpChannel).toBe('email');
+    expect(sms.sendOtp).not.toHaveBeenCalled();
+    if (!isMockOtpAllowed()) {
+      expect(mailer.sendOtp).toHaveBeenCalledWith('celestinkas@gmail.com', expect.any(String));
+    }
     expect(prisma.user.create).not.toHaveBeenCalled();
   });
 

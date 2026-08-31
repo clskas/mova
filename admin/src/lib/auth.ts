@@ -1,8 +1,34 @@
 const TOKEN_KEY = "mova_admin_token";
+const PIN_PENDING_KEY = "mova_admin_pin_pending";
+const LAST_PHONE_KEY = "mova_admin_last_phone";
+
+function storageGet(key: string): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function storageSet(key: string, value: string): void {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    /* Safari private mode / blocked storage */
+  }
+}
+
+function storageRemove(key: string): void {
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    /* ignore */
+  }
+}
 
 export function getToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem(TOKEN_KEY);
+  return storageGet(TOKEN_KEY);
 }
 
 /** Seed demo range +2439000000xx — OTP 123456, no SMS. */
@@ -23,12 +49,32 @@ export function isSeedDemoPhone(phone: string): boolean {
   return SEED_DEMO_PHONE_RE.test(normalizeLoginPhone(phone));
 }
 
-export function setToken(token: string) {
-  localStorage.setItem(TOKEN_KEY, token);
+export function setToken(token: string, phone?: string) {
+  storageSet(TOKEN_KEY, token);
+  if (phone) storageSet(LAST_PHONE_KEY, phone);
 }
 
 export function clearToken() {
-  localStorage.removeItem(TOKEN_KEY);
+  storageRemove(TOKEN_KEY);
+  storageRemove(PIN_PENDING_KEY);
+}
+
+export function setPinPending(pending: boolean): void {
+  if (pending) storageSet(PIN_PENDING_KEY, "1");
+  else storageRemove(PIN_PENDING_KEY);
+}
+
+export function isPinPending(): boolean {
+  return storageGet(PIN_PENDING_KEY) === "1";
+}
+
+export function getLastPhone(): string | null {
+  return storageGet(LAST_PHONE_KEY);
+}
+
+export function setLastPhone(phone: string): void {
+  const trimmed = phone.trim();
+  if (trimmed) storageSet(LAST_PHONE_KEY, trimmed);
 }
 
 export function authHeaders(): Record<string, string> {

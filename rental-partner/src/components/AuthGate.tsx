@@ -2,7 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { getToken, isRentalPartnerRole, roleFromToken } from "@/lib/auth";
+import { shouldRequirePinSetup } from "@/components/PinAuth";
+import { apiFetch } from "@/lib/api";
+import { getToken, isPinPending, isRentalPartnerRole, roleFromToken, setPinPending } from "@/lib/auth";
 
 export function AuthGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -10,11 +12,30 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const token = getToken();
-    if (!token || !isRentalPartnerRole(roleFromToken())) {
+    if (!token || !isRentalPartnerRole(roleFromToken()) || isPinPending()) {
       router.replace("/login");
       return;
     }
-    setReady(true);
+    let cancelled = false;
+    void (async () => {
+      try {
+        const me = await apiFetch<{ pinConfigured?: boolean; phone?: string; hasPhone?: boolean }>(
+          "/api/users/me",
+        );
+        if (cancelled) return;
+        if (shouldRequirePinSetup({ pinConfigured: me.pinConfigured, user: me })) {
+          setPinPending(true);
+          router.replace("/login");
+          return;
+        }
+      } catch {
+        /* keep going if /me is unreachable — token is still present */
+      }
+      if (!cancelled) setReady(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [router]);
 
   if (!ready) {

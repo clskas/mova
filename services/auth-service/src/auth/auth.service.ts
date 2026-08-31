@@ -342,7 +342,8 @@ export class AuthService {
   }
 
   /**
-   * Step 1: verify Google ID token, issue OTP (SMS if the account has a phone, else email).
+   * Step 1: verify Google ID token, issue email OTP to the Google mailbox.
+   * A linked phone does not change the channel — SMS OTP is only for POST /auth/otp/request.
    * Does not return a session JWT. Never creates DRIVER or staff. Partner roles only
    * from restaurant / rental portals (explicit role or portal).
    */
@@ -369,16 +370,16 @@ export class AuthService {
       }
     }
 
-    const channel: GoogleOtpChannel = user?.phone ? 'sms' : 'email';
-    const destination = channel === 'sms' ? user!.phone! : (identity.email ?? user?.email ?? null);
-    if (!destination) {
+    const channel: GoogleOtpChannel = 'email';
+    const destination = (identity.email ?? user?.email ?? '').trim().toLowerCase();
+    if (!destination.includes('@')) {
       throw new MovaHttpException(
         MovaErrorCode.AUTH_INVALID_GOOGLE,
         HttpStatus.BAD_REQUEST,
         'Votre compte Google n\'a pas d\'e-mail. Liez un numéro +243 ou utilisez un autre compte Google.',
       );
     }
-    if (channel === 'email' && identity.email && identity.emailVerified === false) {
+    if (identity.email && identity.emailVerified === false) {
       throw new MovaHttpException(
         MovaErrorCode.AUTH_INVALID_GOOGLE,
         HttpStatus.BAD_REQUEST,
@@ -392,9 +393,7 @@ export class AuthService {
     } catch (e) {
       if (this.canCompleteVerifiedGoogleWithoutOtp(identity, user, requestedRole, channel, e)) {
         this.logger.warn(
-          `${channel} OTP unavailable — completing verified Google login for ${
-            channel === 'sms' ? maskPhoneRdc(destination) : maskEmail(destination)
-          }`,
+          `email OTP unavailable — completing verified Google login for ${maskEmail(destination)}`,
         );
         return this.finalizeGoogleSession(identity, user, requestedRole);
       }
@@ -421,11 +420,8 @@ export class AuthService {
       }
       throw e;
     }
-    const destinationMasked = channel === 'sms' ? maskPhoneRdc(destination) : maskEmail(destination);
-    const message =
-      channel === 'sms'
-        ? 'Code envoyé par SMS. Entrez-le pour terminer la connexion.'
-        : 'Code envoyé par e-mail. Vérifiez votre boîte de réception.';
+    const destinationMasked = maskEmail(destination);
+    const message = 'Code envoyé par e-mail. Vérifiez votre boîte de réception.';
     return {
       success: true,
       otpRequired: true,

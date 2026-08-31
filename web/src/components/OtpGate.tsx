@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { GoogleContinueButton, googleClientId } from "@/components/GoogleContinueButton";
 import { ApiError, apiFetch, checkGatewayHealth } from "@/lib/api";
-import { clearToken, getToken, isPinPending, normalizeLoginPhone, setPinPending, setToken } from "@/lib/auth";
+import { clearToken, getStoredPhone, getToken, isPinPending, normalizeLoginPhone, setPinPending, setToken } from "@/lib/auth";
 import { LOGIN_GOOGLE_UNAVAILABLE, LOGIN_OTP_UNAVAILABLE, toUserErrorMessage } from "@/lib/user-messages";
 import { AuthPayload, PinSetupForm, fetchPinEnabled, shouldRequirePinSetup } from "@/components/PinAuth";
 
@@ -37,6 +37,13 @@ export function OtpGate({ children }: Props) {
       setMock(useMock);
       const token = getToken();
       if (!token) {
+        const stored = getStoredPhone();
+        if (stored) {
+          setPhone(stored);
+          const enabled = await fetchPinEnabled(apiFetch, stored);
+          if (cancelled) return;
+          if (enabled) setPinMode(true);
+        }
         setReady(true);
         return;
       }
@@ -293,7 +300,7 @@ export function OtpGate({ children }: Props) {
             loading ||
             (!googleChallenge && !phone.trim()) ||
             (codeSent && !code.trim()) ||
-            (pinMode && !codeSent && pin.length > 0 && pin.length !== 6)
+            (pinMode && !codeSent && pin.length !== 6)
           }
           className="w-full bg-[#6C63FF] text-white rounded-xl py-3 font-semibold disabled:opacity-50"
         >

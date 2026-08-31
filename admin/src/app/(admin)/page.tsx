@@ -16,6 +16,7 @@ import { BarChart } from "@/components/dashboard/BarChart";
 import { DonutChart } from "@/components/dashboard/DonutChart";
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { ReportsPanel } from "@/components/dashboard/ReportsPanel";
+import { ConnectionCard } from "@/components/ConnectionCard";
 import { Card, ErrorBanner, LoadingState, PageHeader, StatusBadge } from "@/components/ui";
 
 type Period = 7 | 30 | 90;
@@ -141,6 +142,8 @@ export default function DashboardPage() {
           </div>
         }
       />
+
+      <ConnectionCard />
 
       {error && (
         <div className="mb-2">

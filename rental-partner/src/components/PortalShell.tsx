@@ -11,7 +11,7 @@ const NAV = [
   { href: "/reservations", label: "Réservations", short: "Reservation", icon: "📅" },
   { href: "/revenus", label: "Revenus", short: "Revenus", icon: "💰" },
   { href: "/promos", label: "Codes promo", short: "Promos", icon: "🏷️" },
-  { href: "/compte", label: "Compte", short: "Compte", icon: "👤" },
+  { href: "/compte", label: "Compte et connexion", short: "Compte", icon: "👤" },
 ];
 
 function navActive(pathname: string, href: string) {

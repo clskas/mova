@@ -94,8 +94,9 @@ export function PinSetupForm({ apiBase, token, onDone, accentClass }: PinSetupPr
 
   return (
     <div className="space-y-4">
+      <h2 className="text-lg font-semibold text-center text-[#1A1A2E]">Créer votre code PIN</h2>
       <p className="text-sm text-gray-600 text-center">
-        Choisissez un code PIN à 6 chiffres pour vos prochaines connexions. Évitez 123456 ou des chiffres identiques.
+        Obligatoire pour les prochaines connexions. 6 chiffres — évitez 123456 ou des chiffres identiques. Pas d&apos;étape suivante sans enregistrement.
       </p>
       <label className="block text-sm">
         <span className="text-gray-600">Nouveau PIN</span>

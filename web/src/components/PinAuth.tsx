@@ -64,7 +64,7 @@ export function PinSetupForm({ apiFetchFn, onDone }: PinSetupProps) {
     <div className="max-w-sm mx-auto min-h-[100dvh] flex flex-col justify-center p-6">
       <h1 className="text-xl font-bold text-center mb-2">Créer votre code PIN</h1>
       <p className="text-sm text-gray-500 text-center mb-6">
-        6 chiffres pour vos prochaines connexions. Évitez 123456 ou des chiffres identiques. OTP et Google restent disponibles.
+        6 chiffres — obligatoire pour les prochaines connexions. Évitez 123456 ou des chiffres identiques. OTP et Google restent disponibles.
       </p>
       {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg py-2 px-3 mb-4">{error}</p>}
       <input

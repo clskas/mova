@@ -11,6 +11,7 @@ const NAV = [
   { href: "/menu", label: "Menu", short: "Menu", icon: "🍽️" },
   { href: "/promos", label: "Codes promo", short: "Promos", icon: "🏷️" },
   { href: "/earnings", label: "Revenus", short: "Revenus", icon: "💰" },
+  { href: "/compte", label: "Compte et connexion", short: "Compte", icon: "👤" },
   { href: "/settings", label: "Paramètres", short: "Réglages", icon: "⚙️" },
 ];
 

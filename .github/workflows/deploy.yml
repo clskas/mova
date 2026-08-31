@@ -38,6 +38,17 @@ jobs:
       - name: Install PostgreSQL client
         run: sudo apt-get update && sudo apt-get install -y postgresql-client jq
 
+      # Pre-deploy pg_dump. Production is Render Postgres mova-db-auth
+      # (dpg-daa5u3on74is739uken0-a): mova_auth, mova_rides, mova_payments,
+      # mova_drivers, mova_notifications.
+      # Required GitHub secrets (Render External URLs, host *.render.com — not Neon):
+      #   DATABASE_URL_AUTH          → …/mova_auth
+      #   DATABASE_URL_RIDES         → …/mova_rides
+      #   DATABASE_URL_PAYMENTS      → …/mova_payments
+      #   DATABASE_URL_DRIVERS       → …/mova_drivers
+      #   DATABASE_URL_NOTIFICATIONS → …/mova_notifications
+      # Internal hostnames (dpg-…-a, no domain) are unreachable from GitHub.
+      # Neon (*.neon.tech) is skipped with a warning so deploy still proceeds.
       - name: Backup databases before deploy (required before migrations)
         env:
           DATABASE_URL_AUTH: ${{ secrets.DATABASE_URL_AUTH }}
@@ -56,9 +67,11 @@ jobs:
           fi
           if [ -z "${DATABASE_URL_AUTH:-}" ] && [ -z "${DATABASE_URL_RIDES:-}" ]; then
             echo "::error::DATABASE_URL_AUTH / DATABASE_URL_RIDES secrets required for production deploy backup."
-            echo "Configure DATABASE_URL_* secrets, or use workflow_dispatch with skip_backup=true for non-prod."
+            echo "Configure DATABASE_URL_* secrets (Render External URLs), or use workflow_dispatch with skip_backup=true for non-prod."
             exit 1
           fi
+          # Host policy in scripts/backup-db.sh:
+          #   *.render.com → pg_dump; *.neon.tech → skip with warning (do not fail deploy).
           ./scripts/backup-db.sh
 
       - name: Upload DB backup artifact

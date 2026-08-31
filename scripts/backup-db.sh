@@ -5,6 +5,12 @@
 #   DATABASE_URL_AUTH=... ./scripts/backup-db.sh   # CI / Render via secrets
 #   POSTGRES_CONTAINER=mova-postgres-1 ./scripts/backup-db.sh
 #   BACKUP_ONLY=auth ./scripts/backup-db.sh   # single DB (Docker entrypoint)
+#
+# Host policy (CI / production):
+#   *.render.com / dpg-*.render.com  → pg_dump (production Render Postgres)
+#   *.neon.tech                      → skip with a warning (legacy, not prod; do not fail)
+# GitHub Actions cannot reach Render Internal hostnames (dpg-…-a with no domain);
+# those are skipped with a warning so deploy still proceeds. Use External URLs in secrets.
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -12,6 +18,45 @@ BACKUP_DIR="${BACKUP_DIR:-$ROOT_DIR/backups}"
 RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-14}"
 TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
 mkdir -p "$BACKUP_DIR"
+
+# Hostname only — never echo the URL (passwords).
+pg_url_host() {
+  local url="$1"
+  local rest="${url#*://}"
+  if [[ "$rest" == *"@"* ]]; then
+    rest="${rest##*@}"
+  fi
+  printf '%s' "${rest%%[:/?]*}"
+}
+
+backup_warn() {
+  if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+    echo "::warning::$1"
+  else
+    echo "WARN: $1" >&2
+  fi
+}
+
+# Return 0 to skip this URL (do not fail the job); 1 to dump it.
+should_skip_backup_url() {
+  local url="$1"
+  local label="$2"
+  local host
+  host="$(pg_url_host "$url")"
+
+  if [[ "${host,,}" == *neon.tech ]]; then
+    backup_warn "Skipping $label backup: host is Neon ($host), no longer production. Set GitHub secret DATABASE_URL_* to the Render External URL (*.render.com). Deploy continues without this dump."
+    return 0
+  fi
+
+  # Render Internal hostname is only reachable on Render's network.
+  if [ "${GITHUB_ACTIONS:-}" = "true" ] && [[ "$host" == dpg-* ]] && [[ "$host" != *.* ]]; then
+    backup_warn "Skipping $label backup: host $host looks like a Render Internal URL (unreachable from GitHub). Use the External URL (dpg-….*.render.com). Deploy continues without this dump."
+    return 0
+  fi
+
+  return 1
+}
 
 POSTGRES_HOST="${POSTGRES_HOST:-localhost}"
 POSTGRES_PORT="${POSTGRES_PORT:-54320}"
@@ -76,6 +121,10 @@ if [ -n "${BACKUP_ONLY:-}" ] && [ -n "${DATABASE_URL:-}" ]; then
   db_name="${DB_NAMES[$BACKUP_ONLY]}"
   out="${BACKUP_DIR}/mova_${BACKUP_ONLY}_${TIMESTAMP}.sql"
   echo "=== MOVA DB backup ($TIMESTAMP) -> $BACKUP_DIR ==="
+  if should_skip_backup_url "$DATABASE_URL" "$BACKUP_ONLY"; then
+    echo "=== Backups skipped (legacy/unreachable host) ==="
+    exit 0
+  fi
   echo "Backing up $BACKUP_ONLY ($db_name) via DATABASE_URL -> $out"
   backup_via_pg_dump "$DATABASE_URL" "$out"
   gzip -f "$out"
@@ -86,10 +135,16 @@ fi
 
 echo "=== MOVA DB backup ($TIMESTAMP) -> $BACKUP_DIR ==="
 
+dumped=0
+skipped=0
 for key in "${keys[@]}"; do
   db_name="${DB_NAMES[$key]}"
   url="${DB_URLS[$key]}"
   out="${BACKUP_DIR}/mova_${key}_${TIMESTAMP}.sql"
+  if [ -z "${POSTGRES_CONTAINER:-}" ] && should_skip_backup_url "$url" "$key"; then
+    skipped=$((skipped + 1))
+    continue
+  fi
   echo "Backing up $key ($db_name) -> $out"
   if [ -n "${POSTGRES_CONTAINER:-}" ]; then
     backup_via_docker "$db_name" "$out"
@@ -98,6 +153,7 @@ for key in "${keys[@]}"; do
   fi
   gzip -f "$out"
   echo "  -> ${out}.gz"
+  dumped=$((dumped + 1))
 done
 
 # Retention: delete backups older than RETENTION_DAYS
@@ -106,4 +162,10 @@ if [ "$RETENTION_DAYS" -gt 0 ] 2>/dev/null; then
   echo "Retention: fichiers > ${RETENTION_DAYS} jours supprimés dans $BACKUP_DIR"
 fi
 
-echo "=== Backups complete ==="
+if [ "$dumped" -eq 0 ] && [ "$skipped" -gt 0 ]; then
+  backup_warn "No databases dumped ($skipped skipped). Deploy continues. Point DATABASE_URL_* GitHub secrets at Render External URLs to restore pre-deploy backups."
+  echo "=== Backups skipped ==="
+  exit 0
+fi
+
+echo "=== Backups complete (dumped=$dumped skipped=$skipped) ==="

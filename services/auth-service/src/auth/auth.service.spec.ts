@@ -630,6 +630,58 @@ describe('AuthService', () => {
     expect(prisma.user.create).not.toHaveBeenCalled();
   });
 
+  it('issues SUPER_ADMIN JWT when owner Google SMS OTP cannot be sent', async () => {
+    const owner = makeUser({
+      id: 'owner-1',
+      phone: OWNER_SUPER_ADMIN_PHONE,
+      role: UserRole.SUPER_ADMIN,
+      email: null,
+      googleId: null,
+    });
+    googleTokens.verify.mockResolvedValue({
+      googleId: 'gid-owner',
+      email: 'celestinkas@gmail.com',
+      emailVerified: true,
+      givenName: 'Celestin',
+      familyName: 'Kas',
+      picture: null,
+      audience: 'web',
+    });
+    prisma.user.findUnique.mockImplementation(({ where }: { where: { googleId?: string; phone?: string; id?: string } }) => {
+      if (where.phone === OWNER_SUPER_ADMIN_PHONE) return Promise.resolve(owner);
+      if (where.id === owner.id) return Promise.resolve(owner);
+      return Promise.resolve(null);
+    });
+    prisma.user.update.mockResolvedValue({ ...owner, googleId: 'gid-owner', email: 'celestinkas@gmail.com' });
+    sms.sendOtp.mockResolvedValue({ success: false, message: 'hub down' });
+    const result = googleSession(await service.loginWithGoogle('id-token', UserRole.ADMIN));
+    expect(result.accessToken).toBe('jwt-token');
+    expect(result.user.role).toBe(UserRole.SUPER_ADMIN);
+    expect(prisma.user.create).not.toHaveBeenCalled();
+  });
+
+  it('refuses owner Google on the restaurant portal with a 403, not 5xx', async () => {
+    googleTokens.verify.mockResolvedValue({
+      googleId: 'gid-owner',
+      email: 'celestinkas@gmail.com',
+      emailVerified: true,
+      givenName: 'Celestin',
+      familyName: 'Kas',
+      picture: null,
+      audience: 'web',
+    });
+    await expect(
+      service.loginWithGoogle('id-token', UserRole.RESTAURANT, 'restaurant'),
+    ).rejects.toMatchObject({
+      response: {
+        code: MovaErrorCode.AUTH_FORBIDDEN,
+        message: 'Ce compte est déjà administrateur. Utilisez un autre e-mail pour le resto.',
+      },
+    });
+    expect(sms.sendOtp).not.toHaveBeenCalled();
+    expect(prisma.user.create).not.toHaveBeenCalled();
+  });
+
   it('rejects a Google token the verifier refuses (bad audience)', async () => {
     googleTokens.verify.mockRejectedValue({
       response: { code: MovaErrorCode.AUTH_INVALID_GOOGLE },

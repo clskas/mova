@@ -41,6 +41,7 @@ import {
   roleFromPartnerPortal,
   sanitizeIntendedAuthRole,
   shouldRefusePassengerAutoRegister,
+  STAFF_ON_PARTNER_PORTAL_MESSAGE,
 } from './partner-auth.util';
 import { hashOtpCode } from './otp-code.util';
 import { GoogleIdentity, GoogleTokenVerifier } from './google-id-token';
@@ -389,31 +390,37 @@ export class AuthService {
     try {
       issued = await this.issueOtpToDestination(destination, channel);
     } catch (e) {
-      if (
-        channel === 'email' &&
-        identity.emailVerified !== false &&
-        e instanceof MovaHttpException &&
-        e.getStatus() === HttpStatus.SERVICE_UNAVAILABLE
-      ) {
+      if (this.canCompleteVerifiedGoogleWithoutOtp(identity, user, requestedRole, channel, e)) {
         this.logger.warn(
-          `Email OTP unavailable for ${maskEmail(destination)} — completing Google login after verified ID token`,
+          `${channel} OTP unavailable — completing verified Google login for ${
+            channel === 'sms' ? maskPhoneRdc(destination) : maskEmail(destination)
+          }`,
         );
         return this.finalizeGoogleSession(identity, user, requestedRole);
       }
       throw e;
     }
-    const challengeId = await this.storeGoogleChallenge({
-      googleId: identity.googleId,
-      email: identity.email,
-      givenName: identity.givenName,
-      familyName: identity.familyName,
-      picture: identity.picture,
-      userId: user?.id ?? null,
-      isNew: !user,
-      role: requestedRole,
-      destination,
-      channel,
-    });
+    let challengeId: string;
+    try {
+      challengeId = await this.storeGoogleChallenge({
+        googleId: identity.googleId,
+        email: identity.email,
+        givenName: identity.givenName,
+        familyName: identity.familyName,
+        picture: identity.picture,
+        userId: user?.id ?? null,
+        isNew: !user,
+        role: requestedRole,
+        destination,
+        channel,
+      });
+    } catch (e) {
+      if (this.canCompleteVerifiedGoogleWithoutOtp(identity, user, requestedRole, channel, e)) {
+        this.logger.warn('Google challenge store failed — completing verified Google login');
+        return this.finalizeGoogleSession(identity, user, requestedRole);
+      }
+      throw e;
+    }
     const destinationMasked = channel === 'sms' ? maskPhoneRdc(destination) : maskEmail(destination);
     const message =
       channel === 'sms'
@@ -668,6 +675,24 @@ export class AuthService {
     const owner = await this.prisma.user.findUnique({ where: { phone: OWNER_SUPER_ADMIN_PHONE } });
     if (owner && owner.role === UserRole.SUPER_ADMIN) return owner;
     return null;
+  }
+
+  private canCompleteVerifiedGoogleWithoutOtp(
+    identity: GoogleIdentity,
+    user: User | null,
+    requestedRole: UserRole | undefined,
+    channel: GoogleOtpChannel,
+    error: unknown,
+  ): boolean {
+    if (!(error instanceof MovaHttpException) || error.getStatus() !== HttpStatus.SERVICE_UNAVAILABLE) {
+      return false;
+    }
+    if (identity.emailVerified === false) return false;
+    if (channel === 'email') return true;
+    return (
+      isOwnerSuperAdminEmail(identity.email) ||
+      Boolean(user && isStaffAuthRole(user.role) && isStaffAuthRole(requestedRole))
+    );
   }
 
   private async finalizeGoogleSession(

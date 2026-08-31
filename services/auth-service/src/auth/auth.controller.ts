@@ -55,7 +55,7 @@ export class AuthController {
   @Post('google')
   @ApiOperation({ summary: 'Connexion Google — étape 1 : ID token, puis OTP (SMS ou e-mail)' })
   loginGoogle(@Body() dto: GoogleLoginDto) {
-    return this.authService.loginWithGoogle(dto.idToken, dto.role, dto.portal);
+    return this.authService.loginWithGoogle(dto.idToken, dto.role, dto.portal, dto.intendedRole);
   }
 
   @Post('google/verify')

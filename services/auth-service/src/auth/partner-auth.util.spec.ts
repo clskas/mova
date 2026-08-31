@@ -84,6 +84,12 @@ describe('partner-auth.util', () => {
     expect(missingInviteOnlyAccountMessage('+243811111111', 'ADMIN')).toMatch(/compte staff/);
   });
 
+  it('tells staff to use the admin portal instead of restaurant', async () => {
+    const { mismatchedPartnerRoleMessage, STAFF_ON_PARTNER_PORTAL_MESSAGE } = await import('./partner-auth.util');
+    expect(mismatchedPartnerRoleMessage('RESTAURANT', 'SUPER_ADMIN')).toBe(STAFF_ON_PARTNER_PORTAL_MESSAGE);
+    expect(STAFF_ON_PARTNER_PORTAL_MESSAGE).toMatch(/déjà administrateur/);
+  });
+
   it('treats all admin console roles as staff', () => {
     expect(isStaffAuthRole('ADMIN')).toBe(true);
     expect(isStaffAuthRole('SUPER_ADMIN')).toBe(true);

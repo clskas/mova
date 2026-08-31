@@ -109,7 +109,14 @@ export function missingInviteOnlyAccountMessage(phone: string, role?: string | n
   return "Ce numéro n'a pas de compte. Créez-le d'abord dans l'admin SENGA.";
 }
 
+/** Staff (non-owner) Google on a partner portal — never a 5xx. No URL (UI sanitizers strip hosts). */
+export const STAFF_ON_PARTNER_PORTAL_MESSAGE =
+  'Ce compte est administrateur. Utilisez un autre e-mail Google pour ce portail.';
+
 export function mismatchedPartnerRoleMessage(requested: string, actual: string): string {
+  if (isStaffAuthRole(actual)) {
+    return STAFF_ON_PARTNER_PORTAL_MESSAGE;
+  }
   if (requested === 'RESTAURANT') {
     return `Ce compte n'est pas un partenaire restaurant (rôle: ${actual}). Corrigez le rôle dans l'admin SENGA.`;
   }

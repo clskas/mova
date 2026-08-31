@@ -657,7 +657,6 @@ const ADMIN_TECHNICAL_PATTERNS = [
   /^PDF \d+$/i,
   /API\s*:/i,
   /https?:\/\//i,
-  /afri-soft\.com/i,
   /onrender\.com/i,
   /localhost:\d+/i,
   /NEXT_PUBLIC_[A-Z0-9_]+/,
@@ -721,9 +720,11 @@ export function toUserErrorMessage(
   err: unknown,
   fallback = "Une erreur est survenue. Réessayez.",
 ): string {
-  if (err instanceof ApiError) return sanitizeAdminError(err.message, err.status);
-  if (err instanceof Error) return sanitizeAdminError(err.message);
-  const cleaned = sanitizeAdminError(String(err ?? ""));
+  const status = err instanceof ApiError ? err.status : undefined;
+  const raw = err instanceof Error ? err.message : String(err ?? "");
+  const cleaned = sanitizeAdminError(raw, status);
+  const generic = adminErrorFallback(status);
+  if (cleaned === generic && fallback && fallback !== generic) return fallback;
   return cleaned || fallback;
 }
 

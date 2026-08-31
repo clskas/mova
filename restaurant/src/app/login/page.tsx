@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { decodeJwtPayload, isRestaurantRole, isSeedDemoPhone, normalizeLoginPhone, setToken } from "@/lib/auth";
+import { decodeJwtPayload, isRestaurantRole, normalizeLoginPhone, setToken } from "@/lib/auth";
 import { GoogleContinueButton, googleClientId } from "@/components/GoogleContinueButton";
 import { PwaInstallBanner } from "@/components/PwaInstallBanner";
 import { PUBLIC_API_BASE } from "@/lib/public-api-base";
@@ -14,7 +14,6 @@ import {
 } from "@/lib/user-messages";
 
 const API_BASE = PUBLIC_API_BASE;
-const RESTAURANT_PHONE = process.env.NEXT_PUBLIC_RESTAURANT_PHONE ?? "+243900000030";
 
 async function readErrorMessage(res: Response, fallback: string): Promise<string> {
   try {
@@ -27,7 +26,7 @@ async function readErrorMessage(res: Response, fallback: string): Promise<string
 
 export default function LoginPage() {
   const router = useRouter();
-  const [phone, setPhone] = useState(RESTAURANT_PHONE);
+  const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
   const [codeSent, setCodeSent] = useState(false);
   const [googleChallenge, setGoogleChallenge] = useState<{
@@ -61,14 +60,10 @@ export default function LoginPage() {
         throw new Error(LOGIN_OTP_UNAVAILABLE);
       }
       lastStatus = requestRes.status;
-      const seed = isSeedDemoPhone(phone);
       if (!requestRes.ok) {
-        const msg = await readErrorMessage(requestRes, LOGIN_OTP_UNAVAILABLE);
-        if (!(seed && (requestRes.status === 429 || requestRes.status >= 500))) {
-          throw new Error(msg);
-        }
+        throw new Error(await readErrorMessage(requestRes, LOGIN_OTP_UNAVAILABLE));
       }
-      setCode(seed ? "123456" : "");
+      setCode("");
       setCodeSent(true);
     } catch (e) {
       setError(toUserErrorMessage(e, lastStatus >= 500 ? LOGIN_OTP_UNAVAILABLE : "Impossible d'envoyer le code. Réessayez."));
@@ -210,9 +205,7 @@ export default function LoginPage() {
             <span className="text-gray-600">
               {googleChallenge?.channel === "email"
                 ? `Code reçu par e-mail${googleChallenge.masked ? ` (${googleChallenge.masked})` : ""}`
-                : isSeedDemoPhone(phone)
-                  ? "Code de démo (aucun SMS) : 123456"
-                  : "Code reçu par SMS"}
+                : "Code reçu par SMS"}
             </span>
             <input
               className="mt-1 w-full rounded-xl border border-gray-200 p-3"
@@ -255,10 +248,8 @@ export default function LoginPage() {
         )}
         {error && <p className="text-sm text-red-600 text-center">{error}</p>}
         <p className="text-xs text-gray-400 text-center">
-          {isSeedDemoPhone(phone)
-            ? <>Numéro de démo : code <code>123456</code>, pas de SMS.</>
-            : "Numéro réel +243 : le code arrive par SMS."}{" "}
-          Première connexion (téléphone ou Google) : un compte restaurant est créé automatiquement. Un seul portefeuille.
+          Numéro partenaire +243 : le code arrive par SMS. Première connexion (téléphone ou Google) :
+          un compte restaurant est créé automatiquement. Un seul portefeuille.
         </p>
       </div>
     </div>

@@ -6,7 +6,6 @@ const TECHNICAL_PATTERNS = [
   /^PDF \d+$/i,
   /API\s*:/i,
   /https?:\/\//i,
-  /afri-soft\.com/i,
   /onrender\.com/i,
   /localhost:\d+/i,
   /NEXT_PUBLIC_[A-Z0-9_]+/,

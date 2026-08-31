@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { decodeJwtPayload, isSeedDemoPhone, normalizeLoginPhone, setToken } from "@/lib/auth";
+import { decodeJwtPayload, normalizeLoginPhone, setToken } from "@/lib/auth";
 import { sanitizeAdminError, toUserErrorMessage } from "@/lib/api";
 import { defaultPathForRole, isAdminRole, normalizeAdminRole } from "@/lib/rbac";
 import { GoogleContinueButton, googleClientId } from "@/components/GoogleContinueButton";
@@ -41,14 +41,11 @@ export default function LoginPage() {
       });
       if (!requestRes.ok) {
         const body = await requestRes.json().catch(() => ({}));
-        const seed = isSeedDemoPhone(phone);
-        if (!(seed && (requestRes.status === 429 || requestRes.status >= 500))) {
-          throw new Error(
-            sanitizeAdminError(body.error?.message ?? "Impossible d'envoyer le code. Réessayez.", requestRes.status),
-          );
-        }
+        throw new Error(
+          sanitizeAdminError(body.error?.message ?? "Impossible d'envoyer le code. Réessayez.", requestRes.status),
+        );
       }
-      setCode(isSeedDemoPhone(phone) ? "123456" : "");
+      setCode("");
       setCodeSent(true);
     } catch (e) {
       setError(toUserErrorMessage(e, "Impossible d'envoyer le code. Réessayez."));
@@ -78,7 +75,7 @@ export default function LoginPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ idToken, role: "ADMIN" }),
       });
-      const data = await verifyRes.json();
+      const data = await verifyRes.json().catch(() => ({}));
       if (!verifyRes.ok) {
         throw new Error(
           sanitizeAdminError(data.error?.message ?? "Connexion Google impossible pour le moment. Réessayez.", verifyRes.status),
@@ -245,9 +242,7 @@ export default function LoginPage() {
                   <span className="ml-2 text-xs text-gray-400">
                     {googleChallenge?.channel === "email"
                       ? `e-mail${googleChallenge.masked ? ` (${googleChallenge.masked})` : ""}`
-                      : isSeedDemoPhone(phone)
-                        ? "démo : 123456 (aucun SMS)"
-                        : "code reçu par SMS"}
+                      : "code reçu par SMS"}
                   </span>
                   <input
                     className="mt-2 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-mova-midnight outline-none transition focus:border-mova-violet focus:ring-2 focus:ring-mova-violet/20"
@@ -310,14 +305,7 @@ export default function LoginPage() {
           )}
 
           <p className="text-xs text-gray-400 text-center leading-relaxed">
-            {isSeedDemoPhone(phone) ? (
-              <>
-                Numéro de démo : code{" "}
-                <code className="rounded bg-gray-100 px-1.5 py-0.5 text-gray-600">123456</code>, pas de SMS.
-              </>
-            ) : (
-              "Un SMS avec le code vous sera envoyé. Google : seul l'e-mail du personnel autorisé est accepté."
-            )}
+            Un SMS avec le code vous sera envoyé. Google : seul l&apos;e-mail du personnel autorisé est accepté.
           </p>
         </div>
       </main>

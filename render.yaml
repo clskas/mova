@@ -351,16 +351,16 @@ envVarGroups:
         sync: false
       # In-app update banner (ride-service GET /api/public/app-version). Raise after Play upload.
       - key: MOBILE_PASSENGER_VERSION
-        value: "1.0.2"
+        value: "1.0.3"
       - key: MOBILE_DRIVER_VERSION
-        value: "1.0.2"
+        value: "1.0.3"
       - key: MOBILE_MIN_VERSION
         value: "1.0.0"
       # Raise after Play accepts a new AAB (must be ≥ 8). 0 = ignore versionCode.
       - key: MOBILE_PASSENGER_VERSION_CODE
-        value: "0"
+        value: "28"
       - key: MOBILE_DRIVER_VERSION_CODE
-        value: "0"
+        value: "28"
       - key: MOBILE_MIN_VERSION_CODE
         value: "0"
       - key: PLAY_STORE_PASSENGER_URL

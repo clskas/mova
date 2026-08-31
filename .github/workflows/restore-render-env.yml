@@ -84,8 +84,8 @@ jobs:
               {key:"SUPABASE_URL", value:"https://furttqrltkwirdhiktdl.supabase.co"},
               {key:"SUPABASE_UPLOADS_BUCKET", value:"uploads"},
               {key:"SUPABASE_KYC_BUCKET", value:"kyc-docs"},
-              {key:"MOBILE_PASSENGER_VERSION", value:"1.0.2"},
-              {key:"MOBILE_DRIVER_VERSION", value:"1.0.2"},
+              {key:"MOBILE_PASSENGER_VERSION", value:"1.0.3"},
+              {key:"MOBILE_DRIVER_VERSION", value:"1.0.3"},
               {key:"MOBILE_MIN_VERSION", value:"1.0.0"},
               {key:"PLAY_STORE_PASSENGER_URL", value:"https://play.google.com/store/apps/details?id=cd.mova.mova.passenger"},
               {key:"PLAY_STORE_DRIVER_URL", value:"https://play.google.com/store/apps/details?id=cd.mova.mova.driver"}

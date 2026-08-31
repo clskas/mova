@@ -143,7 +143,7 @@ function ShellInner({ children }: { children: React.ReactNode }) {
                 href="/compte"
                 className="text-xs sm:text-sm text-gray-500 hover:text-[#6C63FF] underline min-h-10 px-1 inline-flex items-center"
               >
-                Connexion
+                Compte et connexion
               </Link>
               <button
                 type="button"

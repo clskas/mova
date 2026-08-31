@@ -138,7 +138,7 @@ export function ConnectionCard() {
   return (
     <section className="bg-white rounded-xl border p-5 space-y-3 max-w-lg">
       <div>
-        <h3 className="font-semibold text-sm text-gray-700">Connexion</h3>
+        <h3 className="font-semibold text-sm text-gray-700">Compte et connexion</h3>
         <p className="text-xs text-gray-500 mt-1">{OPTIONAL_COPY}</p>
       </div>
       {snack && <p className="text-sm text-emerald-700 bg-emerald-50 rounded-lg py-2 px-3">{snack}</p>}

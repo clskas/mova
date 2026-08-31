@@ -9,7 +9,11 @@ async function ensureWebHome(page: Page) {
   await expect(loginHeading).toBeVisible({ timeout: 15_000 });
 
   await page.getByPlaceholder("+243 8XX XXX XXX").fill("+243900000010");
-  await page.getByRole("button", { name: "Recevoir le code" }).click();
+  await page.getByRole("button", { name: "Continuer", exact: true }).click();
+  const smsFallback = page.getByRole("button", { name: "Recevoir un code SMS" });
+  if (await smsFallback.isVisible().catch(() => false)) {
+    await smsFallback.click();
+  }
   const otp = page.getByPlaceholder(/123456 \(démo\)|Code à 6 chiffres|Code reçu par e-mail/);
   await expect(otp).toBeVisible({ timeout: 15_000 });
   await otp.fill("123456");

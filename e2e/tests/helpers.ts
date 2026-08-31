@@ -77,13 +77,43 @@ export async function dismissUpdateBanner(page: Page): Promise<void> {
   }
 }
 
+async function fillLoginPhone(page: Page, phone: string): Promise<void> {
+  const tel = page.locator('input[autocomplete="tel"], input[type="tel"]').first();
+  await tel.fill(phone);
+}
+
+/** Bouton principal : « Continuer » (PIN/OTP) — ne pas matcher « Continuer avec Google ». */
+async function clickLoginContinue(page: Page): Promise<void> {
+  const continueBtn = page.getByRole("button", { name: "Continuer", exact: true });
+  const legacyOtpBtn = page.getByRole("button", { name: "Recevoir le code", exact: true });
+  if (await continueBtn.isVisible().catch(() => false)) {
+    await continueBtn.click();
+  } else {
+    await legacyOtpBtn.click();
+  }
+  const smsFallback = page.getByRole("button", { name: "Recevoir un code SMS" });
+  if (await smsFallback.isVisible().catch(() => false)) {
+    await smsFallback.click();
+  }
+}
+
+async function skipPinSetupIfPresent(page: Page): Promise<void> {
+  const setup = page.getByRole("heading", { name: /Créer votre code PIN|Nouveau PIN/i });
+  if (await setup.isVisible().catch(() => false)) {
+    throw new Error("PIN setup shown for a seed/demo account — shouldRequirePinSetup should skip +2439000000xx");
+  }
+}
+
 /** Connexion staff admin (OTP mock 123456). */
 export async function loginAsStaff(page: Page, phone: string): Promise<void> {
   await page.goto("/login");
   await dismissUpdateBanner(page);
-  await page.getByPlaceholder("+243900000001").fill(phone);
-  await page.getByRole("button", { name: "Recevoir le code" }).click();
-  await page.getByRole("textbox", { name: /Code OTP/i }).fill(DEV_OTP);
+  await fillLoginPhone(page, phone);
+  await clickLoginContinue(page);
+  const otp = page.getByRole("textbox", { name: /Code OTP/i });
+  await expect(otp).toBeVisible({ timeout: 15_000 });
+  await otp.fill(DEV_OTP);
   await page.getByRole("button", { name: "Se connecter" }).click();
+  await skipPinSetupIfPresent(page);
   await expect(page.getByRole("button", { name: "Déconnexion" })).toBeVisible({ timeout: 15_000 });
 }

@@ -1,5 +1,6 @@
 const TOKEN_KEY = 'mova_web_token';
 const PHONE_KEY = 'mova_web_phone';
+const PIN_PENDING_KEY = 'mova_web_pin_pending';
 
 function storageGet(key: string): string | null {
   if (typeof window === 'undefined') return null;
@@ -38,6 +39,16 @@ export function setToken(token: string, phone?: string): void {
 export function clearToken(): void {
   storageRemove(TOKEN_KEY);
   storageRemove(PHONE_KEY);
+  storageRemove(PIN_PENDING_KEY);
+}
+
+export function setPinPending(pending: boolean): void {
+  if (pending) storageSet(PIN_PENDING_KEY, '1');
+  else storageRemove(PIN_PENDING_KEY);
+}
+
+export function isPinPending(): boolean {
+  return storageGet(PIN_PENDING_KEY) === '1';
 }
 
 export function getStoredPhone(): string | null {

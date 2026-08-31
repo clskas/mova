@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { GoogleContinueButton, googleClientId } from "@/components/GoogleContinueButton";
 import { ApiError, apiFetch, checkGatewayHealth } from "@/lib/api";
-import { clearToken, getToken, normalizeLoginPhone, setToken } from "@/lib/auth";
+import { clearToken, getToken, isPinPending, normalizeLoginPhone, setPinPending, setToken } from "@/lib/auth";
 import { LOGIN_GOOGLE_UNAVAILABLE, LOGIN_OTP_UNAVAILABLE, toUserErrorMessage } from "@/lib/user-messages";
 import { AuthPayload, PinSetupForm, fetchPinEnabled, shouldRequirePinSetup } from "@/components/PinAuth";
 
@@ -29,11 +29,49 @@ export function OtpGate({ children }: Props) {
 
   useEffect(() => {
     const allowMock = process.env.NODE_ENV !== "production";
-    checkGatewayHealth().then((ok) => {
-      setMock(allowMock && !ok);
-      setAuthenticated(Boolean(getToken()));
+    let cancelled = false;
+    void (async () => {
+      const ok = await checkGatewayHealth();
+      if (cancelled) return;
+      const useMock = allowMock && !ok;
+      setMock(useMock);
+      const token = getToken();
+      if (!token) {
+        setReady(true);
+        return;
+      }
+      if (isPinPending()) {
+        setSetupPin(true);
+        setReady(true);
+        return;
+      }
+      try {
+        const me = await apiFetch<{ pinConfigured?: boolean; phone?: string; hasPhone?: boolean }>(
+          "/api/users/me",
+          undefined,
+          { useMock },
+        );
+        if (cancelled) return;
+        if (shouldRequirePinSetup({ pinConfigured: me.pinConfigured, user: me })) {
+          setPinPending(true);
+          setSetupPin(true);
+          setReady(true);
+          return;
+        }
+        setAuthenticated(true);
+      } catch (e) {
+        if (cancelled) return;
+        if (e instanceof ApiError && (e.status === 401 || e.status === 403)) {
+          clearToken();
+        } else {
+          setAuthenticated(true);
+        }
+      }
       setReady(true);
-    });
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   function completeSession(data: AuthPayload & { user?: { phone?: string } }) {
@@ -43,9 +81,11 @@ export function OtpGate({ children }: Props) {
     }
     setToken(data.accessToken, data.user?.phone ?? phone);
     if (shouldRequirePinSetup(data)) {
+      setPinPending(true);
       setSetupPin(true);
       return;
     }
+    setPinPending(false);
     setAuthenticated(true);
   }
 
@@ -178,6 +218,7 @@ export function OtpGate({ children }: Props) {
       <PinSetupForm
         apiFetchFn={apiFetch}
         onDone={() => {
+          setPinPending(false);
           setSetupPin(false);
           setAuthenticated(true);
         }}

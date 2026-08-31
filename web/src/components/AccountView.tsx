@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { GoogleContinueButton, googleClientId } from "@/components/GoogleContinueButton";
 import { apiFetch } from "@/lib/api";
-import { normalizeLoginPhone, setToken } from "@/lib/auth";
+import { clearToken, normalizeLoginPhone, setToken } from "@/lib/auth";
 import { toUserErrorMessage } from "@/lib/user-messages";
 
 type Me = {
@@ -145,9 +145,9 @@ export function AccountView({ onBack, mock }: Props) {
       </button>
 
       <div>
-        <h2 className="text-lg font-bold">Connexion</h2>
+        <h2 className="text-lg font-bold">Compte et connexion</h2>
         <p className="text-sm text-gray-500">
-          Optionnel. Vous pouvez utiliser seulement le téléphone, seulement Google, ou les deux pour le même compte.
+          Optionnel. Vous pouvez lier le téléphone et Google (les deux directions) — un seul portefeuille.
         </p>
       </div>
 
@@ -249,6 +249,18 @@ export function AccountView({ onBack, mock }: Props) {
               Détacher le numéro
             </button>
           )}
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => {
+              void apiFetch("/api/auth/logout", { method: "POST" }, { useMock: mock }).catch(() => undefined);
+              clearToken();
+              window.location.reload();
+            }}
+            className="w-full mt-4 text-sm text-gray-600 underline"
+          >
+            Se déconnecter
+          </button>
         </section>
       )}
     </div>

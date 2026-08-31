@@ -1,4 +1,4 @@
-const CACHE = "mova-web-v3";
+const CACHE = "mova-web-v4";
 const SHELL = ["/manifest.json", "/favicon.png", "/icon-192.png", "/icon-512.png"];
 
 function isVersionRequest(url) {

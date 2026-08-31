@@ -97,7 +97,7 @@ function HomeContent() {
               type="button"
               onClick={() => setView("account")}
               className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/10"
-              aria-label="Connexion"
+              aria-label="Compte et connexion"
             >
               <ProfileIcon color="#FFFFFF" size={22} />
             </button>
@@ -125,6 +125,13 @@ function HomeContent() {
             <div>
               <p className="text-sm sm:text-lg font-bold">{greeting()} 👋 <span className="text-[#6C63FF] font-medium">La mobilité, simplement.</span></p>
               <p className="hidden sm:block text-sm text-gray-500">Choisissez un service pour continuer</p>
+              <button
+                type="button"
+                onClick={() => setView("account")}
+                className="mt-1 text-sm text-[#6C63FF] font-medium underline"
+              >
+                Compte et connexion
+              </button>
             </div>
 
             <PubliciteCarousel items={publicites} />

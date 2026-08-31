@@ -9,7 +9,7 @@ const FAQ = [
   },
   {
     q: "Puis-je lier mon numéro et Google ?",
-    a: "Oui, c’est optionnel. Dans Connexion (profil), liez Google ou votre +243. Vous pouvez aussi rester téléphone seul ou Google seul — un seul portefeuille si les deux sont liés.",
+    a: "Oui, c’est optionnel. Dans Compte et connexion (icône profil), liez Google ou votre +243. Vous pouvez aussi rester téléphone seul ou Google seul — un seul portefeuille si les deux sont liés.",
   },
   {
     q: "Quels moyens de paiement sont acceptés ?",

@@ -8,9 +8,13 @@ export type AuthPayload = {
   user?: { phone?: string; hasPhone?: boolean; role?: string };
 };
 
+const SEED_DEMO_PHONE_RE = /^\+2439000000\d{2}$/;
+
 export function shouldRequirePinSetup(data: AuthPayload): boolean {
   if (data.pinConfigured) return false;
-  return Boolean(data.user?.hasPhone || data.user?.phone);
+  const phone = (data.user?.phone ?? "").trim();
+  if (SEED_DEMO_PHONE_RE.test(phone)) return false;
+  return Boolean(data.user?.hasPhone || phone);
 }
 
 export async function fetchPinEnabled(

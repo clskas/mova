@@ -135,55 +135,110 @@ function b64(value: string) {
   return Buffer.from(value, 'utf8').toString('base64');
 }
 
+/** True when the buffer holds a complete SMTP reply (last line is `NNN ` not `NNN-`). */
+export function smtpReplyComplete(buffer: string): boolean {
+  const normalized = buffer.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const lines = normalized.split('\n').filter((line) => line.length > 0);
+  if (!lines.length) return false;
+  return /^\d{3} /.test(lines[lines.length - 1]);
+}
+
+const SMTP_TIMEOUT_MS = 20_000;
+
 async function smtpSend(opts: SmtpOpts): Promise<void> {
   const implicitTls = opts.port === 465;
-  const socket: net.Socket = implicitTls
-    ? tls.connect({ host: opts.host, port: opts.port, servername: opts.host })
-    : net.connect(opts.port, opts.host);
+  const state: { socket: net.Socket } = {
+    socket: implicitTls
+      ? tls.connect({ host: opts.host, port: opts.port, servername: opts.host })
+      : net.connect(opts.port, opts.host),
+  };
 
-  const lines: string[] = [];
-  const read = () =>
-    new Promise<string>((resolve, reject) => {
-      const onData = (chunk: Buffer) => {
-        lines.push(chunk.toString('utf8'));
-        const joined = lines.join('');
-        if (/\r?\n$/.test(joined) || joined.includes('\n')) {
-          socket.off('data', onData);
-          socket.off('error', reject);
-          const out = joined;
-          lines.length = 0;
-          resolve(out);
-        }
-      };
-      socket.on('data', onData);
-      socket.on('error', reject);
+  const timed = <T>(p: Promise<T>, label: string): Promise<T> =>
+    new Promise<T>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error(`SMTP timeout (${label})`)), SMTP_TIMEOUT_MS);
+      p.then(
+        (v) => {
+          clearTimeout(timer);
+          resolve(v);
+        },
+        (e) => {
+          clearTimeout(timer);
+          reject(e);
+        },
+      );
     });
+
+  let buf = '';
+  const onData = (chunk: Buffer) => {
+    buf += chunk.toString('utf8');
+  };
+  const attach = (sock: net.Socket) => {
+    sock.on('data', onData);
+  };
+  attach(state.socket);
+
+  const read = () =>
+    timed(
+      new Promise<string>((resolve, reject) => {
+        const tryResolve = () => {
+          if (smtpReplyComplete(buf)) {
+            const out = buf;
+            buf = '';
+            resolve(out);
+            return true;
+          }
+          return false;
+        };
+        if (tryResolve()) return;
+        const onChunk = () => {
+          if (tryResolve()) {
+            state.socket.off('error', onErr);
+            state.socket.off('data', onChunk);
+          }
+        };
+        const onErr = (e: Error) => {
+          state.socket.off('data', onChunk);
+          reject(e);
+        };
+        state.socket.on('data', onChunk);
+        state.socket.once('error', onErr);
+      }),
+      'read',
+    );
 
   const expect = async (ok: string[]) => {
     const reply = await read();
-    if (!ok.some((code) => reply.startsWith(code))) {
+    const code = reply.trimStart().slice(0, 3);
+    if (!ok.includes(code)) {
       throw new Error(`SMTP unexpected: ${reply.trim().slice(0, 120)}`);
     }
     return reply;
   };
 
   const write = (cmd: string) => {
-    socket.write(`${cmd}\r\n`);
+    state.socket.write(`${cmd}\r\n`);
   };
 
   try {
     await expect(['220']);
-    write(`EHLO senga`);
+    write('EHLO senga');
     await expect(['250']);
-    if (!implicitTls && opts.port === 587) {
+    if (!implicitTls && (opts.port === 587 || opts.port === 25)) {
       write('STARTTLS');
       await expect(['220']);
-      await new Promise<void>((resolve, reject) => {
-        const upgraded = tls.connect({ socket, servername: opts.host }, () => resolve());
-        upgraded.on('error', reject);
-        Object.assign(socket, upgraded);
-      });
-      write(`EHLO senga`);
+      const upgraded = await timed(
+        new Promise<tls.TLSSocket>((resolve, reject) => {
+          let next: tls.TLSSocket;
+          next = tls.connect({ socket: state.socket, servername: opts.host }, () => resolve(next));
+          next.once('error', reject);
+        }),
+        'starttls',
+      );
+      state.socket.removeListener('data', onData);
+      state.socket = upgraded;
+      buf = '';
+      attach(state.socket);
+      write('EHLO senga');
       await expect(['250']);
     }
     write('AUTH LOGIN');
@@ -198,11 +253,15 @@ async function smtpSend(opts: SmtpOpts): Promise<void> {
     await expect(['250']);
     write('DATA');
     await expect(['354']);
-    socket.write(`${opts.message}\r\n.\r\n`);
+    state.socket.write(`${opts.message}\r\n.\r\n`);
     await expect(['250']);
     write('QUIT');
   } finally {
-    socket.end();
-    socket.destroy();
+    try {
+      state.socket.end();
+    } catch {
+      /* ignore */
+    }
+    state.socket.destroy();
   }
 }

@@ -107,12 +107,25 @@ jobs:
         working-directory: mobile
         run: flutter pub get
 
+      - name: Resolve Play version code
+        id: playver
+        run: |
+          set -euo pipefail
+          # Play rejected Mobile Release #26: "Version code 7 has already been used".
+          # github.run_number is unique per Mobile Release workflow (currently 26+).
+          CODE="${{ github.run_number }}"
+          if [ "$CODE" -lt 8 ]; then CODE=8; fi
+          echo "code=$CODE" >> "$GITHUB_OUTPUT"
+          echo "Play versionCode=$CODE (pubspec 1.0.2+8; run_number=${{ github.run_number }})"
+
       - name: Build passenger AAB
         working-directory: mobile
         run: |
           flutter build appbundle --release \
             --flavor passenger \
             -t lib/main_passenger.dart \
+            --build-name=1.0.2 \
+            --build-number=${{ steps.playver.outputs.code }} \
             --dart-define=API_URL=${{ steps.urls.outputs.api }} \
             --dart-define=WS_URL=${{ steps.urls.outputs.ws }}
 
@@ -122,6 +135,8 @@ jobs:
           flutter build appbundle --release \
             --flavor driver \
             -t lib/main_driver.dart \
+            --build-name=1.0.2 \
+            --build-number=${{ steps.playver.outputs.code }} \
             --dart-define=API_URL=${{ steps.urls.outputs.api }} \
             --dart-define=WS_URL=${{ steps.urls.outputs.ws }}
 

@@ -19,14 +19,24 @@ export type GoogleTicketClient = {
   }>;
 };
 
+function splitClientIds(value?: string): string[] {
+  if (!value) return [];
+  return value
+    .split(/[,\s]+/)
+    .map((id) => id.trim())
+    .filter(Boolean);
+}
+
 export function collectGoogleAudiences(env: NodeJS.ProcessEnv = process.env): string[] {
   const ids = [
-    env.GOOGLE_CLIENT_ID,
-    env.GOOGLE_ANDROID_CLIENT_ID,
-    env.GOOGLE_IOS_CLIENT_ID,
-    env.GOOGLE_OAUTH_CLIENT_ID,
+    ...splitClientIds(env.GOOGLE_CLIENT_ID),
+    ...splitClientIds(env.GOOGLE_ANDROID_CLIENT_ID),
+    ...splitClientIds(env.GOOGLE_ANDROID_CLIENT_ID_PASSENGER),
+    ...splitClientIds(env.GOOGLE_ANDROID_CLIENT_ID_DRIVER),
+    ...splitClientIds(env.GOOGLE_IOS_CLIENT_ID),
+    ...splitClientIds(env.GOOGLE_OAUTH_CLIENT_ID),
   ];
-  return [...new Set(ids.map((id) => id?.trim()).filter((id): id is string => Boolean(id)))];
+  return [...new Set(ids)];
 }
 
 export function audienceAllowed(aud: string | string[] | undefined, allowed: string[]): boolean {
@@ -78,6 +88,8 @@ export class GoogleTokenVerifier {
     return collectGoogleAudiences({
       GOOGLE_CLIENT_ID: this.config.get<string>('GOOGLE_CLIENT_ID'),
       GOOGLE_ANDROID_CLIENT_ID: this.config.get<string>('GOOGLE_ANDROID_CLIENT_ID'),
+      GOOGLE_ANDROID_CLIENT_ID_PASSENGER: this.config.get<string>('GOOGLE_ANDROID_CLIENT_ID_PASSENGER'),
+      GOOGLE_ANDROID_CLIENT_ID_DRIVER: this.config.get<string>('GOOGLE_ANDROID_CLIENT_ID_DRIVER'),
       GOOGLE_IOS_CLIENT_ID: this.config.get<string>('GOOGLE_IOS_CLIENT_ID'),
       GOOGLE_OAUTH_CLIENT_ID: this.config.get<string>('GOOGLE_OAUTH_CLIENT_ID'),
     });

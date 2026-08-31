@@ -24,6 +24,24 @@ describe('google-id-token', () => {
     ).toEqual([WEB_AUD, ANDROID_AUD]);
   });
 
+  it('accepts comma-separated Android client ids and a dedicated driver var', () => {
+    const passenger = 'passenger-android.apps.googleusercontent.com';
+    const driver = 'driver-android.apps.googleusercontent.com';
+    expect(
+      collectGoogleAudiences({
+        GOOGLE_CLIENT_ID: WEB_AUD,
+        GOOGLE_ANDROID_CLIENT_ID: `${passenger},${driver}`,
+      }),
+    ).toEqual([WEB_AUD, passenger, driver]);
+    expect(
+      collectGoogleAudiences({
+        GOOGLE_CLIENT_ID: WEB_AUD,
+        GOOGLE_ANDROID_CLIENT_ID: passenger,
+        GOOGLE_ANDROID_CLIENT_ID_DRIVER: driver,
+      }),
+    ).toEqual([WEB_AUD, passenger, driver]);
+  });
+
   it('rejects a token whose audience is not allow-listed', async () => {
     const client = mockClient({ sub: 'gid-1', email: 'a@b.com', aud: BAD_AUD });
     await expect(verifyGoogleIdToken('token', [WEB_AUD], client)).rejects.toThrow('GOOGLE_AUDIENCE_MISMATCH');

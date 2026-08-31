@@ -67,7 +67,9 @@ class _LocalPinSetupScreenState extends ConsumerState<LocalPinSetupScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return MovaScreen(
+    return PopScope(
+      canPop: false,
+      child: MovaScreen(
       title: widget.title,
       centerContent: true,
       child: Column(
@@ -76,7 +78,7 @@ class _LocalPinSetupScreenState extends ConsumerState<LocalPinSetupScreen> {
           const Icon(Icons.lock_outline, size: 56, color: MovaColors.violet),
           const SizedBox(height: 16),
           Text(
-            'Choisissez un code PIN à 6 chiffres',
+            widget.title,
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
                   fontWeight: FontWeight.bold,
@@ -85,7 +87,7 @@ class _LocalPinSetupScreenState extends ConsumerState<LocalPinSetupScreen> {
           ),
           const SizedBox(height: 8),
           const Text(
-            'Vous l\'utiliserez pour vous reconnecter sans SMS.',
+            '6 chiffres — obligatoire. Évitez 123456 ou des chiffres identiques. Pas d\'étape suivante sans enregistrement.',
             textAlign: TextAlign.center,
             style: TextStyle(color: MovaColors.textSecondary),
           ),
@@ -113,6 +115,7 @@ class _LocalPinSetupScreenState extends ConsumerState<LocalPinSetupScreen> {
           ),
         ],
       ),
+    ),
     );
   }
 }

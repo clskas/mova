@@ -9,6 +9,8 @@ import '../driver/driver_home_screen.dart';
 import '../driver/driver_onboarding_screen.dart';
 import '../driver/driver_otp_screen.dart';
 import '../home/home_screen.dart';
+import '../../core/config/market_config.dart';
+import 'local_pin_setup_screen.dart';
 import 'otp_screen.dart';
 
 enum AuthSessionRole { passenger, driver }
@@ -40,6 +42,7 @@ class AuthSessionGate extends ConsumerStatefulWidget {
 class _AuthSessionGateState extends ConsumerState<AuthSessionGate> {
   bool _checking = true;
   bool _authenticated = false;
+  bool _needsPinSetup = false;
 
   @override
   void initState() {
@@ -61,6 +64,17 @@ class _AuthSessionGateState extends ConsumerState<AuthSessionGate> {
         final role = data['role']?.toString();
         if (!jwtRoleMatchesAppFlavor(widget.role, role)) {
           await _clearRejectedSession(api);
+          return;
+        }
+        final phone = (data['phone']?.toString() ?? '').trim();
+        final seedDemo = RegExp(r'^\+2439000000\d{2}$').hasMatch(phone);
+        final hasPhone = data['hasPhone'] == true || MarketConfig.validatePhone(phone);
+        final pinConfigured = data['pinConfigured'] == true;
+        if (!pinConfigured && hasPhone && !seedDemo) {
+          setState(() {
+            _checking = false;
+            _needsPinSetup = true;
+          });
           return;
         }
         setState(() {
@@ -87,6 +101,17 @@ class _AuthSessionGateState extends ConsumerState<AuthSessionGate> {
         body: Center(
           child: CircularProgressIndicator(color: MovaColors.violet),
         ),
+      );
+    }
+    if (_needsPinSetup) {
+      return LocalPinSetupScreen(
+        onCompleted: () async {
+          if (!mounted) return;
+          setState(() {
+            _needsPinSetup = false;
+            _authenticated = true;
+          });
+        },
       );
     }
     if (_authenticated) {

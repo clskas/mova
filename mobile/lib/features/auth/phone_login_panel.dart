@@ -289,10 +289,17 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
         if (MarketConfig.validatePhone(phone)) {
           await api.saveUserPhone(phone);
         }
-        if (data['pinConfigured'] != true && MarketConfig.validatePhone(phone) && mounted) {
+        final seedDemo = RegExp(r'^\+2439000000\d{2}$').hasMatch(phone);
+        final mustSetupPin = !seedDemo &&
+            MarketConfig.validatePhone(phone) &&
+            (_forgotPinRecovery || data['pinConfigured'] != true);
+        if (mustSetupPin && mounted) {
           await Navigator.of(context).push(
             MaterialPageRoute(
               builder: (_) => LocalPinSetupScreen(
+                title: _forgotPinRecovery
+                    ? 'Définir un nouveau code PIN'
+                    : 'Créer votre code PIN',
                 onCompleted: () async {
                   Navigator.of(context).pop();
                   await widget.onAuthenticated(data);

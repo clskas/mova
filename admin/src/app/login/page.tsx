@@ -18,6 +18,7 @@ import { defaultPathForRole, isAdminRole, normalizeAdminRole } from "@/lib/rbac"
 import { GoogleContinueButton, googleClientId } from "@/components/GoogleContinueButton";
 import {
   AuthPayload,
+  PinForgotLink,
   PinSetupForm,
   fetchPinEnabled,
   loginWithPinRequest,
@@ -39,6 +40,7 @@ export default function LoginPage() {
   const [pin, setPin] = useState("");
   const [codeSent, setCodeSent] = useState(false);
   const [pinMode, setPinMode] = useState(false);
+  const [forgotPin, setForgotPin] = useState(false);
   const [setupToken, setSetupToken] = useState<string | null>(() =>
     typeof window !== "undefined" && isPinPending() ? getToken() : null,
   );
@@ -67,7 +69,7 @@ export default function LoginPage() {
         .then((r) => (r.ok ? r.json() : null))
         .then((me) => {
           if (!me) return;
-          if (shouldRequirePinSetup({ pinConfigured: me.pinConfigured, user: me })) {
+          if (shouldRequirePinSetup({ pinConfigured: me.pinConfigured, user: me }, me.phone)) {
             setPinPending(true);
             setSetupToken(token);
             const role = normalizeAdminRole(me.role ?? roleFromToken(token));
@@ -86,12 +88,12 @@ export default function LoginPage() {
     }
   }, [setupToken]);
 
-  async function requestOtp() {
+  async function requestOtp(opts?: { forceSms?: boolean }) {
     setLoading(true);
     setError(null);
     try {
       const msisdn = normalizeLoginPhone(phone);
-      if (!pinMode) {
+      if (!opts?.forceSms && !pinMode) {
         const enabled = await fetchPinEnabled(API_BASE, msisdn, { role: "ADMIN" });
         if (enabled) {
           setPinMode(true);
@@ -126,10 +128,11 @@ export default function LoginPage() {
     if (!data.accessToken) {
       throw new Error("Connexion Google impossible pour le moment. Réessayez.");
     }
-    const phoneOnAccount = (data.user?.phone ?? "").trim();
+    const typedPhone = googleChallenge ? "" : normalizeLoginPhone(phone);
+    const phoneOnAccount = (data.user?.phone ?? typedPhone).trim();
     setToken(data.accessToken, phoneOnAccount || undefined);
     if (phoneOnAccount) setLastPhone(phoneOnAccount);
-    if (shouldRequirePinSetup(data)) {
+    if (forgotPin || shouldRequirePinSetup(data, phoneOnAccount)) {
       setPinPending(true);
       setSetupRolePath(defaultPathForRole(role));
       setSetupToken(data.accessToken);
@@ -316,8 +319,10 @@ export default function LoginPage() {
             <PinSetupForm
               apiBase={API_BASE}
               token={setupToken}
+              reset={forgotPin}
               onDone={() => {
                 setPinPending(false);
+                setForgotPin(false);
                 router.replace(setupRolePath);
               }}
             />
@@ -396,11 +401,22 @@ export default function LoginPage() {
                   onClick={() => {
                     setPinMode(false);
                     setPin("");
-                    void requestOtp();
+                    void requestOtp({ forceSms: true });
                   }}
                 >
                   Recevoir un code SMS
                 </button>
+              )}
+              {pinMode && !codeSent && (
+                <PinForgotLink
+                  disabled={loading}
+                  onClick={() => {
+                    setForgotPin(true);
+                    setPinMode(false);
+                    setPin("");
+                    void requestOtp({ forceSms: true });
+                  }}
+                />
               )}
               {googleClientId() && !codeSent && !googleChallenge && (
                 <>
@@ -446,7 +462,8 @@ export default function LoginPage() {
 
           <p className="text-xs text-gray-400 text-center leading-relaxed">
             Téléphone : code par SMS. Google : code par e-mail (boîte Google), même si un numéro est lié.
-            Après la première connexion avec un téléphone, le PIN à 6 chiffres s&apos;affiche à la suivante.
+            Après la première connexion avec un téléphone, le PIN à 6 chiffres est obligatoire. PIN oublié : un SMS
+            permet de définir un nouveau code.
           </p>
         </div>
       </main>

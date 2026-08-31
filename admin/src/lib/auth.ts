@@ -72,6 +72,13 @@ export function getLastPhone(): string | null {
   return storageGet(LAST_PHONE_KEY);
 }
 
+export function phoneFromToken(token?: string | null): string | null {
+  const t = token ?? getToken();
+  if (!t) return null;
+  const payload = decodeJwtPayload(t);
+  return typeof payload?.phone === "string" ? payload.phone : null;
+}
+
 export function setLastPhone(phone: string): void {
   const trimmed = phone.trim();
   if (trimmed) storageSet(LAST_PHONE_KEY, trimmed);

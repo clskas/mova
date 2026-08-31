@@ -55,6 +55,21 @@ export function getStoredPhone(): string | null {
   return storageGet(PHONE_KEY);
 }
 
+export function phoneFromToken(): string | null {
+  const token = getToken();
+  if (!token) return null;
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) return null;
+    const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const json = typeof atob !== "undefined" ? atob(base64) : Buffer.from(base64, "base64").toString("utf8");
+    const payload = JSON.parse(json) as { phone?: unknown };
+    return typeof payload.phone === "string" ? payload.phone : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Seed demo range +2439000000xx — OTP 123456, no SMS. */
 const SEED_DEMO_PHONE_RE = /^\+2439000000\d{2}$/;
 

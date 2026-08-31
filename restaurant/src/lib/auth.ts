@@ -54,6 +54,11 @@ export function getLastPhone(): string | null {
   return storageGet(LAST_PHONE_KEY);
 }
 
+export function setLastPhone(phone: string): void {
+  const trimmed = phone.trim();
+  if (trimmed) storageSet(LAST_PHONE_KEY, trimmed);
+}
+
 export function authHeaders(): Record<string, string> {
   const token = getToken();
   return token ? { Authorization: `Bearer ${token}` } : {};

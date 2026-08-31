@@ -3,9 +3,9 @@
 import { useEffect, useState } from "react";
 import { GoogleContinueButton, googleClientId } from "@/components/GoogleContinueButton";
 import { ApiError, apiFetch, checkGatewayHealth } from "@/lib/api";
-import { clearToken, getStoredPhone, getToken, isPinPending, normalizeLoginPhone, setPinPending, setToken } from "@/lib/auth";
+import { clearToken, getStoredPhone, getToken, isPinPending, normalizeLoginPhone, phoneFromToken, setPinPending, setToken } from "@/lib/auth";
 import { LOGIN_GOOGLE_UNAVAILABLE, LOGIN_OTP_UNAVAILABLE, toUserErrorMessage } from "@/lib/user-messages";
-import { AuthPayload, PinSetupForm, fetchPinEnabled, shouldRequirePinSetup } from "@/components/PinAuth";
+import { AuthPayload, PinForgotLink, PinSetupForm, fetchPinEnabled, shouldRequirePinSetup } from "@/components/PinAuth";
 
 type Props = { children: React.ReactNode };
 
@@ -19,6 +19,7 @@ export function OtpGate({ children }: Props) {
   const [pin, setPin] = useState("");
   const [codeSent, setCodeSent] = useState(false);
   const [pinMode, setPinMode] = useState(false);
+  const [forgotPin, setForgotPin] = useState(false);
   const [googleChallenge, setGoogleChallenge] = useState<{
     id: string;
     channel: string;
@@ -59,7 +60,8 @@ export function OtpGate({ children }: Props) {
           { useMock },
         );
         if (cancelled) return;
-        if (shouldRequirePinSetup({ pinConfigured: me.pinConfigured, user: me })) {
+        const fallback = (me.phone ?? getStoredPhone() ?? phoneFromToken() ?? "").trim();
+        if (shouldRequirePinSetup({ pinConfigured: me.pinConfigured, user: me }, fallback)) {
           setPinPending(true);
           setSetupPin(true);
           setReady(true);
@@ -86,8 +88,10 @@ export function OtpGate({ children }: Props) {
       setError(LOGIN_GOOGLE_UNAVAILABLE);
       return;
     }
-    setToken(data.accessToken, data.user?.phone ?? phone);
-    if (shouldRequirePinSetup(data)) {
+    const typedPhone = googleChallenge ? "" : normalizeLoginPhone(phone);
+    const phoneOnAccount = (data.user?.phone ?? typedPhone).trim();
+    setToken(data.accessToken, phoneOnAccount || undefined);
+    if (forgotPin || shouldRequirePinSetup(data, phoneOnAccount)) {
       setPinPending(true);
       setSetupPin(true);
       return;
@@ -96,7 +100,7 @@ export function OtpGate({ children }: Props) {
     setAuthenticated(true);
   }
 
-  async function requestOtp() {
+  async function requestOtp(opts?: { forceSms?: boolean }) {
     setLoading(true);
     setError(null);
     try {
@@ -105,7 +109,7 @@ export function OtpGate({ children }: Props) {
         setError("Numéro invalide. Format : +243XXXXXXXXX");
         return;
       }
-      if (!pinMode) {
+      if (!opts?.forceSms && !pinMode) {
         const enabled = await fetchPinEnabled(apiFetch, msisdn);
         if (enabled) {
           setPinMode(true);
@@ -224,8 +228,10 @@ export function OtpGate({ children }: Props) {
     return (
       <PinSetupForm
         apiFetchFn={apiFetch}
+        reset={forgotPin}
         onDone={() => {
           setPinPending(false);
+          setForgotPin(false);
           setSetupPin(false);
           setAuthenticated(true);
         }}
@@ -319,11 +325,22 @@ export function OtpGate({ children }: Props) {
             onClick={() => {
               setPinMode(false);
               setPin("");
-              void requestOtp();
+              void requestOtp({ forceSms: true });
             }}
           >
             Recevoir un code SMS
           </button>
+        )}
+        {pinMode && !codeSent && (
+          <PinForgotLink
+            disabled={loading}
+            onClick={() => {
+              setForgotPin(true);
+              setPinMode(false);
+              setPin("");
+              void requestOtp({ forceSms: true });
+            }}
+          />
         )}
         {googleClientId() && !codeSent && !googleChallenge && (
           <>

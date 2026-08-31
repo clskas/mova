@@ -67,6 +67,9 @@ services:
         sync: false
       - key: GOOGLE_ANDROID_CLIENT_ID
         sync: false
+      # Optional second Android OAuth client (SENGA Driver). Alternatively comma-separate both IDs in GOOGLE_ANDROID_CLIENT_ID.
+      - key: GOOGLE_ANDROID_CLIENT_ID_DRIVER
+        sync: false
       - key: GOOGLE_IOS_CLIENT_ID
         sync: false
       # Email OTP for Google-only accounts (no +243). Resend or SMTP — do not skip OTP if unset.

@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { shouldRequirePinSetup } from "@/components/PinAuth";
 import { fetchCurrentUser } from "@/lib/api";
-import { getToken, isPinPending, setPinPending } from "@/lib/auth";
+import { getLastPhone, getToken, isPinPending, phoneFromToken, setPinPending } from "@/lib/auth";
 
 export function AuthGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -21,7 +21,8 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
       try {
         const me = await fetchCurrentUser();
         if (cancelled) return;
-        if (shouldRequirePinSetup({ pinConfigured: me.pinConfigured, user: me })) {
+        const fallback = (me.phone ?? phoneFromToken() ?? getLastPhone() ?? "").trim();
+        if (shouldRequirePinSetup({ pinConfigured: me.pinConfigured, user: me }, fallback)) {
           setPinPending(true);
           router.replace("/login");
           return;

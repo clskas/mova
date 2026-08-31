@@ -10,6 +10,7 @@ import {
   isRestaurantRole,
   normalizeLoginPhone,
   setPinPending,
+  setLastPhone,
   setToken,
 } from "@/lib/auth";
 import { GoogleContinueButton, googleClientId } from "@/components/GoogleContinueButton";
@@ -23,6 +24,7 @@ import {
 } from "@/lib/user-messages";
 import {
   AuthPayload,
+  PinForgotLink,
   PinSetupForm,
   fetchPinEnabled,
   loginWithPinRequest,
@@ -48,6 +50,7 @@ export default function LoginPage() {
   const [pin, setPin] = useState("");
   const [codeSent, setCodeSent] = useState(false);
   const [pinMode, setPinMode] = useState(false);
+  const [forgotPin, setForgotPin] = useState(false);
   const [setupToken, setSetupToken] = useState<string | null>(() =>
     typeof window !== "undefined" && isPinPending() ? getToken() : null,
   );
@@ -71,7 +74,7 @@ export default function LoginPage() {
       })
         .then((r) => (r.ok ? r.json() : null))
         .then((me) => {
-          if (me && shouldRequirePinSetup({ pinConfigured: me.pinConfigured, user: me })) {
+          if (me && shouldRequirePinSetup({ pinConfigured: me.pinConfigured, user: me }, me.phone)) {
             setPinPending(true);
             setSetupToken(token);
           }
@@ -96,8 +99,11 @@ export default function LoginPage() {
     if (!isRestaurantRole(typeof role === "string" ? role : null)) {
       throw new Error("Ce compte n'est pas un partenaire restaurant.");
     }
-    setToken(data.accessToken, (data.user?.phone ?? "").trim() || undefined);
-    if (shouldRequirePinSetup(data)) {
+    const typedPhone = googleChallenge ? "" : normalizeLoginPhone(phone);
+    const phoneOnAccount = (data.user?.phone ?? typedPhone).trim();
+    setToken(data.accessToken, phoneOnAccount || undefined);
+    if (phoneOnAccount) setLastPhone(phoneOnAccount);
+    if (forgotPin || shouldRequirePinSetup(data, phoneOnAccount)) {
       setPinPending(true);
       setSetupToken(data.accessToken);
       return;
@@ -106,13 +112,13 @@ export default function LoginPage() {
     router.replace("/");
   }
 
-  async function requestOtp() {
+  async function requestOtp(opts?: { forceSms?: boolean }) {
     setLoading(true);
     setError(null);
     let lastStatus = 0;
     try {
       const msisdn = normalizeLoginPhone(phone);
-      if (!pinMode) {
+      if (!opts?.forceSms && !pinMode) {
         const enabled = await fetchPinEnabled(API_BASE, msisdn, INTENT);
         if (enabled) {
           setPinMode(true);
@@ -258,8 +264,10 @@ export default function LoginPage() {
             apiBase={API_BASE}
             token={setupToken}
             accentClass="bg-[#FF6B35]"
+            reset={forgotPin}
             onDone={() => {
               setPinPending(false);
+              setForgotPin(false);
               router.replace("/");
             }}
           />
@@ -342,11 +350,22 @@ export default function LoginPage() {
                 onClick={() => {
                   setPinMode(false);
                   setPin("");
-                  void requestOtp();
+                  void requestOtp({ forceSms: true });
                 }}
               >
                 Recevoir un code SMS
               </button>
+            )}
+            {pinMode && !codeSent && (
+              <PinForgotLink
+                disabled={loading}
+                onClick={() => {
+                  setForgotPin(true);
+                  setPinMode(false);
+                  setPin("");
+                  void requestOtp({ forceSms: true });
+                }}
+              />
             )}
             {googleClientId() && !codeSent && !googleChallenge && (
               <>
@@ -374,7 +393,7 @@ export default function LoginPage() {
         {!setupToken && (
           <p className="text-xs text-gray-400 text-center">
             Numéro +243 : le code arrive par SMS. Après la première connexion, un PIN à 6 chiffres
-            sert de connexion rapide (OTP et Google restent disponibles).
+            est obligatoire. PIN oublié : un SMS permet de définir un nouveau code.
           </p>
         )}
       </div>

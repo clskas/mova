@@ -10,11 +10,31 @@ export type AuthPayload = {
 
 const SEED_DEMO_PHONE_RE = /^\+2439000000\d{2}$/;
 
-export function shouldRequirePinSetup(data: AuthPayload): boolean {
+/** PIN obligatoire dès qu'un téléphone est connu (OTP saisi, JWT, /me). Google seul : pas de PIN. */
+export function shouldRequirePinSetup(data: AuthPayload, fallbackPhone?: string): boolean {
   if (data.pinConfigured) return false;
-  const phone = (data.user?.phone ?? "").trim();
+  const phone = (data.user?.phone ?? fallbackPhone ?? "").trim();
   if (SEED_DEMO_PHONE_RE.test(phone)) return false;
   return Boolean(data.user?.hasPhone || phone);
+}
+
+export function PinForgotLink({
+  onClick,
+  disabled,
+}: {
+  onClick: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      className="w-full mt-3 text-sm text-gray-500 underline disabled:opacity-50"
+      disabled={disabled}
+      onClick={onClick}
+    >
+      PIN oublié
+    </button>
+  );
 }
 
 export async function fetchPinEnabled(apiFetchFn: typeof import("@/lib/api").apiFetch, phone: string): Promise<boolean> {
@@ -32,9 +52,10 @@ export async function fetchPinEnabled(apiFetchFn: typeof import("@/lib/api").api
 type PinSetupProps = {
   apiFetchFn: (path: string, init?: RequestInit, opts?: { useMock?: boolean }) => Promise<{ pinConfigured?: boolean }>;
   onDone: () => void;
+  reset?: boolean;
 };
 
-export function PinSetupForm({ apiFetchFn, onDone }: PinSetupProps) {
+export function PinSetupForm({ apiFetchFn, onDone, reset }: PinSetupProps) {
   const [pin, setPin] = useState("");
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
@@ -62,9 +83,11 @@ export function PinSetupForm({ apiFetchFn, onDone }: PinSetupProps) {
 
   return (
     <div className="max-w-sm mx-auto min-h-[100dvh] flex flex-col justify-center p-6">
-      <h1 className="text-xl font-bold text-center mb-2">Créer votre code PIN</h1>
+      <h1 className="text-xl font-bold text-center mb-2">
+        {reset ? "Définir un nouveau code PIN" : "Créer votre code PIN"}
+      </h1>
       <p className="text-sm text-gray-500 text-center mb-6">
-        6 chiffres — obligatoire pour les prochaines connexions. Évitez 123456 ou des chiffres identiques. OTP et Google restent disponibles.
+        6 chiffres — obligatoire pour les prochaines connexions. Évitez 123456 ou des chiffres identiques. Pas d&apos;étape suivante sans enregistrement.
       </p>
       {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg py-2 px-3 mb-4">{error}</p>}
       <input

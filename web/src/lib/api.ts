@@ -239,7 +239,8 @@ function mockFor<T>(path: string, init?: RequestInit): T {
       success: true,
       accessToken: 'mock-web-token',
       message: 'Compte lié. Vous pouvez vous connecter avec le téléphone ou Google.',
-      user: { id: 'mock-user', phone: '+243812345678', role: 'PASSENGER' },
+      pinConfigured: false,
+      user: { id: 'mock-user', phone: '+243812345678', hasPhone: true, role: 'PASSENGER' },
     } as T;
   }
   if (path.includes('/users/me')) {
@@ -253,6 +254,7 @@ function mockFor<T>(path: string, init?: RequestInit): T {
       hasPhone: true,
       canUnlinkGoogle: false,
       canUnlinkPhone: false,
+      pinConfigured: false,
       role: 'PASSENGER',
     } as T;
   }

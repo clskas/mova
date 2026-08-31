@@ -10,11 +10,26 @@ export type AuthPayload = {
 
 const SEED_DEMO_PHONE_RE = /^\+2439000000\d{2}$/;
 
-export function shouldRequirePinSetup(data: AuthPayload): boolean {
+/** PIN obligatoire dès qu'un téléphone est connu (OTP saisi, JWT, /me). Google seul : pas de PIN. */
+export function shouldRequirePinSetup(data: AuthPayload, fallbackPhone?: string): boolean {
   if (data.pinConfigured) return false;
-  const phone = (data.user?.phone ?? "").trim();
+  const phone = (data.user?.phone ?? fallbackPhone ?? "").trim();
   if (SEED_DEMO_PHONE_RE.test(phone)) return false;
   return Boolean(data.user?.hasPhone || phone);
+}
+
+export function PinForgotLink({
+  onClick,
+  disabled,
+}: {
+  onClick: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <button type="button" className="w-full text-sm text-gray-500 underline" disabled={disabled} onClick={onClick}>
+      PIN oublié
+    </button>
+  );
 }
 
 export async function fetchPinEnabled(
@@ -56,9 +71,10 @@ type PinSetupProps = {
   token: string;
   onDone: () => void;
   accentClass: string;
+  reset?: boolean;
 };
 
-export function PinSetupForm({ apiBase, token, onDone, accentClass }: PinSetupProps) {
+export function PinSetupForm({ apiBase, token, onDone, accentClass, reset }: PinSetupProps) {
   const [pin, setPin] = useState("");
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
@@ -94,7 +110,9 @@ export function PinSetupForm({ apiBase, token, onDone, accentClass }: PinSetupPr
 
   return (
     <div className="space-y-4">
-      <h2 className="text-lg font-semibold text-center text-[#1A1A2E]">Créer votre code PIN</h2>
+      <h2 className="text-lg font-semibold text-center text-[#1A1A2E]">
+        {reset ? "Définir un nouveau code PIN" : "Créer votre code PIN"}
+      </h2>
       <p className="text-sm text-gray-600 text-center">
         Obligatoire pour les prochaines connexions. 6 chiffres — évitez 123456 ou des chiffres identiques. Pas d&apos;étape suivante sans enregistrement.
       </p>

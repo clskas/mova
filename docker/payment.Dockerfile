@@ -1,7 +1,7 @@
 FROM node:22-alpine AS shared-builder
 WORKDIR /app/packages/shared
 COPY packages/shared/package*.json ./
-RUN npm config set fetch-retries 5 && npm config set fetch-retry-mintimeout 20000 && npm config set fetch-retry-maxtimeout 180000 && npm ci
+RUN npm config set fetch-retries 5 && npm config set fetch-retry-mintimeout 20000 && npm config set fetch-retry-maxtimeout 180000 && (npm ci || npm ci || npm ci)
 COPY packages/shared/ ./
 RUN npm run build
 
@@ -11,7 +11,7 @@ RUN apk add --no-cache openssl
 COPY --from=shared-builder /app/packages/shared ./packages/shared
 COPY services/payment-service/package*.json ./services/payment-service/
 WORKDIR /app/services/payment-service
-RUN npm config set fetch-retries 5 && npm config set fetch-retry-mintimeout 20000 && npm config set fetch-retry-maxtimeout 180000 && npm ci
+RUN npm config set fetch-retries 5 && npm config set fetch-retry-mintimeout 20000 && npm config set fetch-retry-maxtimeout 180000 && (npm ci || npm ci || npm ci)
 COPY services/payment-service/ ./
 RUN npx prisma generate
 RUN npm run build
@@ -21,7 +21,7 @@ WORKDIR /app/services/payment-service
 RUN apk add --no-cache openssl postgresql-client bash
 COPY --from=shared-builder /app/packages/shared /app/packages/shared
 COPY services/payment-service/package*.json ./
-RUN npm config set fetch-retries 5 && npm config set fetch-retry-mintimeout 20000 && npm config set fetch-retry-maxtimeout 180000 && npm ci --omit=dev
+RUN npm config set fetch-retries 5 && npm config set fetch-retry-mintimeout 20000 && npm config set fetch-retry-maxtimeout 180000 && (npm ci --omit=dev || npm ci --omit=dev || npm ci --omit=dev)
 RUN npm config set fetch-retries 5 && npm install prisma@5.22.0 --no-save
 COPY --from=builder /app/services/payment-service/dist ./dist
 COPY --from=builder /app/services/payment-service/node_modules/.prisma ./node_modules/.prisma

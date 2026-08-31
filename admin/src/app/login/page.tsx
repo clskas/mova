@@ -381,7 +381,11 @@ export default function LoginPage() {
                   (codeSent && !code.trim()) ||
                   (pinMode && !codeSent && pin.length !== 6)
                 }
-                onClick={codeSent ? loginWithOtp : pinMode && pin.length === 6 ? loginWithPin : requestOtp}
+                onClick={() => {
+                  if (codeSent) void loginWithOtp();
+                  else if (pinMode && pin.length === 6) void loginWithPin();
+                  else void requestOtp();
+                }}
                 className="mova-btn-primary w-full"
               >
                 {loading

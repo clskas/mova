@@ -301,7 +301,11 @@ export function OtpGate({ children }: Props) {
         )}
         <button
           type="button"
-          onClick={codeSent ? verifyOtp : pinMode && pin.length === 6 ? loginWithPin : requestOtp}
+          onClick={() => {
+            if (codeSent) void verifyOtp();
+            else if (pinMode && pin.length === 6) void loginWithPin();
+            else void requestOtp();
+          }}
           disabled={
             loading ||
             (!googleChallenge && !phone.trim()) ||

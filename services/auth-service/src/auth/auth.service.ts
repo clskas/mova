@@ -667,6 +667,10 @@ export class AuthService {
         where: { email: { equals: identity.email, mode: 'insensitive' } },
       });
     }
+    if (!user && isPartnerPortalRole(requestedRole)) {
+      const owner = await this.resolveAllowlistedSuperAdmin(identity);
+      if (owner) return owner;
+    }
     return user;
   }
 
@@ -1082,6 +1086,13 @@ export class AuthService {
         HttpStatus.FORBIDDEN,
         'Compte restaurant — utilisez le portail SENGA Restaurant.',
       );
+    }
+    if (
+      user.role === UserRole.SUPER_ADMIN &&
+      (role === UserRole.RESTAURANT || role === UserRole.RENTAL_PARTNER)
+    ) {
+      // Same Gmail / phone as the owner console — do not mint a second partner user.
+      return;
     }
     if (role === UserRole.RESTAURANT && user.role !== UserRole.RESTAURANT) {
       throw new MovaHttpException(

@@ -645,6 +645,13 @@ export class AuthService {
     identity: GoogleIdentity,
     requestedRole?: UserRole,
   ): Promise<User | null> {
+    if (isPartnerPortalRole(requestedRole) && isOwnerSuperAdminEmail(identity.email)) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.FORBIDDEN,
+        STAFF_ON_PARTNER_PORTAL_MESSAGE,
+      );
+    }
     let user = await this.prisma.user.findUnique({ where: { googleId: identity.googleId } });
     if (isStaffAuthRole(requestedRole)) {
       const owner = await this.resolveAllowlistedSuperAdmin(identity);
@@ -1077,6 +1084,7 @@ export class AuthService {
       );
     }
     if (role === UserRole.RESTAURANT && user.role !== UserRole.RESTAURANT) {
+      if (user.role === UserRole.SUPER_ADMIN) return;
       throw new MovaHttpException(
         MovaErrorCode.AUTH_FORBIDDEN,
         HttpStatus.FORBIDDEN,
@@ -1084,6 +1092,7 @@ export class AuthService {
       );
     }
     if (role === UserRole.RENTAL_PARTNER && user.role !== UserRole.RENTAL_PARTNER) {
+      if (user.role === UserRole.SUPER_ADMIN) return;
       throw new MovaHttpException(
         MovaErrorCode.AUTH_FORBIDDEN,
         HttpStatus.FORBIDDEN,

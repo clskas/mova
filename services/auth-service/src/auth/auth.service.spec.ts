@@ -660,7 +660,14 @@ describe('AuthService', () => {
     expect(prisma.user.create).not.toHaveBeenCalled();
   });
 
-  it('refuses owner Google on the restaurant portal with a 403, not 5xx', async () => {
+  it('allows owner SUPER_ADMIN Google on the restaurant portal (SMS OTP, same account)', async () => {
+    const owner = makeUser({
+      id: 'owner-1',
+      phone: OWNER_SUPER_ADMIN_PHONE,
+      role: UserRole.SUPER_ADMIN,
+      email: 'celestinkas@gmail.com',
+      googleId: 'gid-owner',
+    });
     googleTokens.verify.mockResolvedValue({
       googleId: 'gid-owner',
       email: 'celestinkas@gmail.com',
@@ -670,15 +677,12 @@ describe('AuthService', () => {
       picture: null,
       audience: 'web',
     });
-    await expect(
-      service.loginWithGoogle('id-token', UserRole.RESTAURANT, 'restaurant'),
-    ).rejects.toMatchObject({
-      response: {
-        code: MovaErrorCode.AUTH_FORBIDDEN,
-        message: 'Ce compte est déjà administrateur. Utilisez un autre e-mail pour le resto.',
-      },
-    });
-    expect(sms.sendOtp).not.toHaveBeenCalled();
+    prisma.user.findUnique.mockResolvedValue(owner);
+    prisma.user.findFirst.mockResolvedValue(owner);
+    const start = googleOtpChallenge(await service.loginWithGoogle('id-token', UserRole.RESTAURANT, 'restaurant'));
+    expect(start.otpRequired).toBe(true);
+    expect(start.otpChannel).toBe('sms');
+    expect(sms.sendOtp).toHaveBeenCalledWith(OWNER_SUPER_ADMIN_PHONE, expect.any(String));
     expect(prisma.user.create).not.toHaveBeenCalled();
   });
 

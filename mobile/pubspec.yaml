@@ -1,7 +1,7 @@
 name: mova
 description: SENGA — Plateforme de mobilité RDC
 publish_to: 'none'
-version: 1.0.2+8
+version: 1.0.3+8
 
 environment:
   sdk: ^3.8.1
@@ -37,6 +37,7 @@ dependencies:
   firebase_core: ^4.11.0
   firebase_messaging: ^16.4.1
   google_sign_in: ^6.2.2
+  in_app_update: ^4.2.3
 
 dev_dependencies:
   flutter_test:

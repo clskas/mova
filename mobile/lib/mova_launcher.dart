@@ -71,7 +71,7 @@ class _MovaPassengerAppState extends ConsumerState<MovaPassengerApp>
     super.didChangeAppLifecycleState(state);
     if (state == AppLifecycleState.resumed) {
       _chatPoll?.poke();
-      ref.read(appUpdateServiceProvider.notifier).check();
+      ref.read(appUpdateServiceProvider.notifier).onAppResumed();
     }
   }
 
@@ -121,7 +121,7 @@ class _MovaDriverAppState extends ConsumerState<MovaDriverApp>
     super.didChangeAppLifecycleState(state);
     if (state == AppLifecycleState.resumed) {
       _chatPoll?.poke();
-      ref.read(appUpdateServiceProvider.notifier).check();
+      ref.read(appUpdateServiceProvider.notifier).onAppResumed();
     }
   }
 

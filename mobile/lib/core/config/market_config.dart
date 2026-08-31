@@ -38,9 +38,13 @@ class MarketConfig {
   /// `keytool -list -v -keystore <upload.jks> -alias <alias>`
   /// Packages: `cd.mova.mova.passenger`, `cd.mova.mova.driver`.
   /// `--dart-define=GOOGLE_SERVER_CLIENT_ID=....apps.googleusercontent.com`
+  ///
+  /// Must be the **Web** OAuth client (same as Render `GOOGLE_CLIENT_ID`).
+  /// Android OAuth clients stay in Google Cloud (package + SHA-1) and on
+  /// Render (`GOOGLE_ANDROID_CLIENT_ID` / `_DRIVER`) — not in this binary.
   static const googleServerClientId = String.fromEnvironment(
     'GOOGLE_SERVER_CLIENT_ID',
-    defaultValue: '',
+    defaultValue: '58917716638-rbgibno8pdvlud8dd00pdfjdv3q1dh4k.apps.googleusercontent.com',
   );
 
   /// `--dart-define=API_URL=...` (vide = défaut selon mode).

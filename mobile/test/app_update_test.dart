@@ -61,7 +61,12 @@ void main() {
       );
       expect(state!.forceUpdate, isTrue);
       expect(state.showBanner, isTrue);
-      expect(state.copyWith(dismissedVersion: '1.0.4').showBanner, isTrue);
+      expect(
+        state
+            .copyWith(dismissedUntil: DateTime.now().add(const Duration(days: 1)))
+            .showBanner,
+        isTrue,
+      );
     });
 
     test('unwraps a data envelope', () {
@@ -74,13 +79,42 @@ void main() {
       expect(state.remoteVersion, '1.0.3');
     });
 
-    test('Plus tard hides a soft update for that remote version', () {
+    test('Plus tard hides a soft update until snooze expires', () {
       final state = AppUpdateService.parseRemote(
         payload,
         isDriver: false,
         localVersion: '1.0.2',
-      )!.copyWith(dismissedVersion: '1.0.3');
+      )!.copyWith(dismissedUntil: DateTime.now().add(const Duration(minutes: 15)));
       expect(state.showBanner, isFalse);
+    });
+
+    test('soft banner returns after snooze expires', () {
+      final state = AppUpdateService.parseRemote(
+        payload,
+        isDriver: false,
+        localVersion: '1.0.2',
+      )!.copyWith(
+        dismissedUntil: DateTime.now().subtract(const Duration(minutes: 1)),
+      );
+      expect(state.showBanner, isTrue);
+    });
+
+    test('versionCode behind current triggers an optional update', () {
+      final state = AppUpdateService.parseRemote(
+        {
+          'passenger': {
+            'currentVersion': '1.0.2',
+            'minVersion': '1.0.0',
+            'currentVersionCode': 12,
+            'storeUrl': 'https://play.google.com/store/apps/details?id=cd.mova.mova.passenger',
+          },
+        },
+        isDriver: false,
+        localVersion: '1.0.2',
+        localBuild: 8,
+      );
+      expect(state!.updateAvailable, isTrue);
+      expect(state.forceUpdate, isFalse);
     });
   });
 }

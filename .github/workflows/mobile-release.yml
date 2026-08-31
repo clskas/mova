@@ -116,29 +116,43 @@ jobs:
           CODE="${{ github.run_number }}"
           if [ "$CODE" -lt 8 ]; then CODE=8; fi
           echo "code=$CODE" >> "$GITHUB_OUTPUT"
-          echo "Play versionCode=$CODE (pubspec 1.0.2+8; run_number=${{ github.run_number }})"
+          echo "Play versionCode=$CODE (pubspec 1.0.3; run_number=${{ github.run_number }})"
 
       - name: Build passenger AAB
         working-directory: mobile
+        env:
+          GOOGLE_SERVER_CLIENT_ID: ${{ secrets.GOOGLE_SERVER_CLIENT_ID }}
         run: |
+          EXTRA=""
+          if [ -n "$GOOGLE_SERVER_CLIENT_ID" ]; then
+            EXTRA="--dart-define=GOOGLE_SERVER_CLIENT_ID=$GOOGLE_SERVER_CLIENT_ID"
+          fi
           flutter build appbundle --release \
             --flavor passenger \
             -t lib/main_passenger.dart \
-            --build-name=1.0.2 \
+            --build-name=1.0.3 \
             --build-number=${{ steps.playver.outputs.code }} \
             --dart-define=API_URL=${{ steps.urls.outputs.api }} \
-            --dart-define=WS_URL=${{ steps.urls.outputs.ws }}
+            --dart-define=WS_URL=${{ steps.urls.outputs.ws }} \
+            $EXTRA
 
       - name: Build driver AAB
         working-directory: mobile
+        env:
+          GOOGLE_SERVER_CLIENT_ID: ${{ secrets.GOOGLE_SERVER_CLIENT_ID }}
         run: |
+          EXTRA=""
+          if [ -n "$GOOGLE_SERVER_CLIENT_ID" ]; then
+            EXTRA="--dart-define=GOOGLE_SERVER_CLIENT_ID=$GOOGLE_SERVER_CLIENT_ID"
+          fi
           flutter build appbundle --release \
             --flavor driver \
             -t lib/main_driver.dart \
-            --build-name=1.0.2 \
+            --build-name=1.0.3 \
             --build-number=${{ steps.playver.outputs.code }} \
             --dart-define=API_URL=${{ steps.urls.outputs.api }} \
-            --dart-define=WS_URL=${{ steps.urls.outputs.ws }}
+            --dart-define=WS_URL=${{ steps.urls.outputs.ws }} \
+            $EXTRA
 
       # Upload AABs before optional APKs so Play upload is not blocked by APK OOM/cancel.
       - name: Upload passenger AAB artifact
@@ -159,23 +173,37 @@ jobs:
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.build_apks == true }}
         continue-on-error: true
         working-directory: mobile
+        env:
+          GOOGLE_SERVER_CLIENT_ID: ${{ secrets.GOOGLE_SERVER_CLIENT_ID }}
         run: |
+          EXTRA=""
+          if [ -n "$GOOGLE_SERVER_CLIENT_ID" ]; then
+            EXTRA="--dart-define=GOOGLE_SERVER_CLIENT_ID=$GOOGLE_SERVER_CLIENT_ID"
+          fi
           flutter build apk --release \
             --flavor passenger \
             -t lib/main_passenger.dart \
             --dart-define=API_URL=${{ steps.urls.outputs.api }} \
-            --dart-define=WS_URL=${{ steps.urls.outputs.ws }}
+            --dart-define=WS_URL=${{ steps.urls.outputs.ws }} \
+            $EXTRA
 
       - name: Build driver APK (install direct)
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.build_apks == true }}
         continue-on-error: true
         working-directory: mobile
+        env:
+          GOOGLE_SERVER_CLIENT_ID: ${{ secrets.GOOGLE_SERVER_CLIENT_ID }}
         run: |
+          EXTRA=""
+          if [ -n "$GOOGLE_SERVER_CLIENT_ID" ]; then
+            EXTRA="--dart-define=GOOGLE_SERVER_CLIENT_ID=$GOOGLE_SERVER_CLIENT_ID"
+          fi
           flutter build apk --release \
             --flavor driver \
             -t lib/main_driver.dart \
             --dart-define=API_URL=${{ steps.urls.outputs.api }} \
-            --dart-define=WS_URL=${{ steps.urls.outputs.ws }}
+            --dart-define=WS_URL=${{ steps.urls.outputs.ws }} \
+            $EXTRA
 
       - name: Upload passenger APK artifact
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.build_apks == true }}
@@ -342,11 +370,18 @@ jobs:
         id: build_ipa
         if: steps.ios_creds.outputs.available == 'true'
         working-directory: mobile
+        env:
+          GOOGLE_SERVER_CLIENT_ID: ${{ secrets.GOOGLE_SERVER_CLIENT_ID }}
         run: |
+          EXTRA=""
+          if [ -n "$GOOGLE_SERVER_CLIENT_ID" ]; then
+            EXTRA="--dart-define=GOOGLE_SERVER_CLIENT_ID=$GOOGLE_SERVER_CLIENT_ID"
+          fi
           flutter build ipa --release \
             -t lib/main_passenger.dart \
             --dart-define=API_URL=${{ steps.urls.outputs.api }} \
-            --dart-define=WS_URL=${{ steps.urls.outputs.ws }}
+            --dart-define=WS_URL=${{ steps.urls.outputs.ws }} \
+            $EXTRA
 
       - name: Upload IPA artifact
         if: steps.ios_creds.outputs.available == 'true'

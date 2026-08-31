@@ -1,7 +1,8 @@
-/// Version client — alignée sur `mobile/pubspec.yaml` (`version: 1.0.2+7`).
+/// Version client — alignée sur `mobile/pubspec.yaml` (`version: 1.0.3+8`).
+/// Play versionCode is overridden in CI (`github.run_number`, floor 8).
 class AppVersion {
-  static const name = '1.0.2';
-  static const build = 7;
+  static const name = '1.0.3';
+  static const build = 8;
 
   static int compare(String a, String b) {
     List<int> parts(String raw) => raw

@@ -356,6 +356,13 @@ envVarGroups:
         value: "1.0.2"
       - key: MOBILE_MIN_VERSION
         value: "1.0.0"
+      # Raise after Play accepts a new AAB (must be ≥ 8). 0 = ignore versionCode.
+      - key: MOBILE_PASSENGER_VERSION_CODE
+        value: "0"
+      - key: MOBILE_DRIVER_VERSION_CODE
+        value: "0"
+      - key: MOBILE_MIN_VERSION_CODE
+        value: "0"
       - key: PLAY_STORE_PASSENGER_URL
         value: "https://play.google.com/store/apps/details?id=cd.mova.mova.passenger"
       - key: PLAY_STORE_DRIVER_URL

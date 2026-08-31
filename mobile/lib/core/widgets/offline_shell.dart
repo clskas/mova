@@ -18,11 +18,26 @@ class MovaOfflineShell extends ConsumerStatefulWidget {
   ConsumerState<MovaOfflineShell> createState() => _MovaOfflineShellState();
 }
 
-class _MovaOfflineShellState extends ConsumerState<MovaOfflineShell> {
+class _MovaOfflineShellState extends ConsumerState<MovaOfflineShell>
+    with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     ref.read(appUpdateServiceProvider.notifier).start();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      ref.read(appUpdateServiceProvider.notifier).onAppResumed();
+    }
   }
 
   @override
@@ -30,12 +45,14 @@ class _MovaOfflineShellState extends ConsumerState<MovaOfflineShell> {
     final offlineAsync = ref.watch(offlineStateProvider);
     final state = offlineAsync.valueOrNull;
     final update = ref.watch(appUpdateServiceProvider);
+    final showSoftBanner = update.showBanner && !update.forceUpdate;
 
     return Stack(
+      fit: StackFit.expand,
       children: [
         widget.child ?? const SizedBox.shrink(),
         if ((state != null && (state.isOffline || state.pendingSyncCount > 0)) ||
-            update.showBanner)
+            showSoftBanner)
           Positioned(
             top: 0,
             left: 0,
@@ -43,7 +60,7 @@ class _MovaOfflineShellState extends ConsumerState<MovaOfflineShell> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (update.showBanner)
+                if (showSoftBanner)
                   Material(
                     color: MovaColors.violet,
                     child: SafeArea(
@@ -59,9 +76,9 @@ class _MovaOfflineShellState extends ConsumerState<MovaOfflineShell> {
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
-                                    update.forceUpdate
-                                        ? 'Une nouvelle version est requise pour continuer.'
-                                        : 'Une nouvelle version est disponible.',
+                                    update.flexibleDownloaded
+                                        ? 'La mise à jour de SENGA est prête. Redémarrez pour l\'installer.'
+                                        : 'Une nouvelle version de SENGA est disponible.',
                                     style: const TextStyle(
                                       color: Colors.white,
                                       fontSize: 13,
@@ -86,9 +103,9 @@ class _MovaOfflineShellState extends ConsumerState<MovaOfflineShell> {
                                 TextButton(
                                   onPressed: () =>
                                       ref.read(appUpdateServiceProvider.notifier).openStore(),
-                                  child: const Text(
-                                    'Mettre à jour',
-                                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+                                  child: Text(
+                                    update.flexibleDownloaded ? 'Redémarrer' : 'Mettre à jour',
+                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
                                   ),
                                 ),
                               ],
@@ -175,7 +192,78 @@ class _MovaOfflineShellState extends ConsumerState<MovaOfflineShell> {
               ],
             ),
           ),
+        if (update.forceUpdate)
+          const Positioned.fill(child: _ForceUpdateBarrier()),
       ],
+    );
+  }
+}
+
+class _ForceUpdateBarrier extends ConsumerWidget {
+  const _ForceUpdateBarrier();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Material(
+      color: MovaColors.midnight.withValues(alpha: 0.72),
+      child: SafeArea(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 400),
+              child: Card(
+                color: Colors.white,
+                elevation: 8,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.system_update, color: MovaColors.violet, size: 40),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Mise à jour obligatoire',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: MovaColors.midnight,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Cette version de SENGA n\'est plus prise en charge. '
+                        'Installez la dernière version pour continuer.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 14, color: MovaColors.textSecondary, height: 1.4),
+                      ),
+                      const SizedBox(height: 20),
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton(
+                          style: FilledButton.styleFrom(
+                            backgroundColor: MovaColors.violet,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                          ),
+                          onPressed: () =>
+                              ref.read(appUpdateServiceProvider.notifier).openStore(),
+                          child: const Text(
+                            'Mettre à jour',
+                            style: TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

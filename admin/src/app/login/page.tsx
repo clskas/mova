@@ -6,6 +6,13 @@ import { decodeJwtPayload, normalizeLoginPhone, setToken } from "@/lib/auth";
 import { sanitizeAdminError, toUserErrorMessage } from "@/lib/api";
 import { defaultPathForRole, isAdminRole, normalizeAdminRole } from "@/lib/rbac";
 import { GoogleContinueButton, googleClientId } from "@/components/GoogleContinueButton";
+import {
+  AuthPayload,
+  PinSetupForm,
+  fetchPinEnabled,
+  loginWithPinRequest,
+  shouldRequirePinSetup,
+} from "@/components/PinAuth";
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000")
   .trim()
@@ -19,7 +26,11 @@ export default function LoginPage() {
   const [mode, setMode] = useState<"otp" | "token">("otp");
   const [phone, setPhone] = useState(ADMIN_PHONE);
   const [code, setCode] = useState("");
+  const [pin, setPin] = useState("");
   const [codeSent, setCodeSent] = useState(false);
+  const [pinMode, setPinMode] = useState(false);
+  const [setupToken, setSetupToken] = useState<string | null>(null);
+  const [setupRolePath, setSetupRolePath] = useState("/");
   const [googleChallenge, setGoogleChallenge] = useState<{
     id: string;
     channel: string;
@@ -34,6 +45,13 @@ export default function LoginPage() {
     setError(null);
     try {
       const msisdn = normalizeLoginPhone(phone);
+      if (!pinMode) {
+        const enabled = await fetchPinEnabled(API_BASE, msisdn, { role: "ADMIN" });
+        if (enabled) {
+          setPinMode(true);
+          return;
+        }
+      }
       const requestRes = await fetch(`${API_BASE}/api/auth/otp/request`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -54,7 +72,7 @@ export default function LoginPage() {
     }
   }
 
-  function finishAdminSession(data: { accessToken?: string; user?: { role?: string } }) {
+  function finishAdminSession(data: AuthPayload) {
     const role = normalizeAdminRole(data.user?.role);
     if (!role) {
       throw new Error("Ce compte n'a pas un rôle staff autorisé.");
@@ -63,6 +81,11 @@ export default function LoginPage() {
       throw new Error("Connexion Google impossible pour le moment. Réessayez.");
     }
     setToken(data.accessToken);
+    if (shouldRequirePinSetup(data)) {
+      setSetupRolePath(defaultPathForRole(role));
+      setSetupToken(data.accessToken);
+      return;
+    }
     router.replace(defaultPathForRole(role));
   }
 
@@ -124,6 +147,22 @@ export default function LoginPage() {
       finishAdminSession(data);
     } catch (e) {
       setError(toUserErrorMessage(e, "Connexion impossible. Réessayez."));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function loginWithPin() {
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await loginWithPinRequest(API_BASE, normalizeLoginPhone(phone), pin, { role: "ADMIN" });
+      if (!result.ok) {
+        throw new Error(result.data.error?.message ?? "PIN incorrect. Réessayez ou utilisez le code SMS.");
+      }
+      finishAdminSession(result.data);
+    } catch (e) {
+      setError(toUserErrorMessage(e, "PIN incorrect. Réessayez."));
     } finally {
       setLoading(false);
     }
@@ -223,19 +262,38 @@ export default function LoginPage() {
           </div>
           )}
 
-          {mode === "otp" ? (
+          {setupToken ? (
+            <PinSetupForm apiBase={API_BASE} token={setupToken} onDone={() => router.replace(setupRolePath)} />
+          ) : mode === "otp" ? (
             <div className="space-y-4">
               <label className="block text-sm">
                 <span className="font-medium text-gray-700">Téléphone admin</span>
                 <input
                   className="mt-2 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-mova-midnight outline-none transition focus:border-mova-violet focus:ring-2 focus:ring-mova-violet/20"
                   value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
+                  onChange={(e) => {
+                    setPhone(e.target.value);
+                    setPinMode(false);
+                    setPin("");
+                  }}
                   placeholder="+243 …"
                   autoComplete="tel"
                   disabled={codeSent || Boolean(googleChallenge)}
                 />
               </label>
+              {pinMode && !codeSent && (
+                <label className="block text-sm">
+                  <span className="font-medium text-gray-700">Code PIN</span>
+                  <input
+                    className="mt-2 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 tracking-widest outline-none transition focus:border-mova-violet focus:ring-2 focus:ring-mova-violet/20"
+                    value={pin}
+                    onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                    inputMode="numeric"
+                    autoComplete="current-password"
+                    maxLength={6}
+                  />
+                </label>
+              )}
               {codeSent && (
                 <label className="block text-sm">
                   <span className="font-medium text-gray-700">Code OTP</span>
@@ -256,12 +314,38 @@ export default function LoginPage() {
               )}
               <button
                 type="button"
-                disabled={loading || (!googleChallenge && !phone.trim()) || (codeSent && !code.trim())}
-                onClick={codeSent ? loginWithOtp : requestOtp}
+                disabled={
+                  loading ||
+                  (!googleChallenge && !phone.trim()) ||
+                  (codeSent && !code.trim()) ||
+                  (pinMode && !codeSent && pin.length > 0 && pin.length !== 6)
+                }
+                onClick={codeSent ? loginWithOtp : pinMode && pin.length === 6 ? loginWithPin : requestOtp}
                 className="mova-btn-primary w-full"
               >
-                {loading ? (codeSent ? "Connexion…" : "Envoi…") : codeSent ? "Se connecter" : "Recevoir le code"}
+                {loading
+                  ? codeSent || pinMode
+                    ? "Connexion…"
+                    : "Envoi…"
+                  : codeSent
+                    ? "Se connecter"
+                    : pinMode
+                      ? "Se connecter avec le PIN"
+                      : "Continuer"}
               </button>
+              {pinMode && !codeSent && (
+                <button
+                  type="button"
+                  className="w-full text-sm text-gray-500 underline"
+                  onClick={() => {
+                    setPinMode(false);
+                    setPin("");
+                    void requestOtp();
+                  }}
+                >
+                  Recevoir un code SMS
+                </button>
+              )}
               {googleClientId() && !codeSent && !googleChallenge && (
                 <>
                   <p className="text-center text-xs text-gray-400">ou</p>

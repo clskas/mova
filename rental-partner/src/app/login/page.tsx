@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { decodeJwtPayload, isRentalPartnerRole, isSeedDemoPhone, normalizeLoginPhone, setToken } from "@/lib/auth";
+import { decodeJwtPayload, isRentalPartnerRole, normalizeLoginPhone, setToken } from "@/lib/auth";
 import { GoogleContinueButton, googleClientId } from "@/components/GoogleContinueButton";
 import { PwaInstallBanner } from "@/components/PwaInstallBanner";
 import { PUBLIC_API_BASE } from "@/lib/public-api-base";
@@ -12,9 +12,16 @@ import {
   LOGIN_OTP_UNAVAILABLE,
   toUserErrorMessage,
 } from "@/lib/user-messages";
+import {
+  AuthPayload,
+  PinSetupForm,
+  fetchPinEnabled,
+  loginWithPinRequest,
+  shouldRequirePinSetup,
+} from "@/components/PinAuth";
 
 const API_BASE = PUBLIC_API_BASE;
-const PARTNER_PHONE = process.env.NEXT_PUBLIC_PARTNER_PHONE ?? "+243900000031";
+const INTENT = { role: "RENTAL_PARTNER", intendedRole: "RENTAL_PARTNER", portal: "rental" };
 
 async function readErrorMessage(res: Response, fallback: string): Promise<string> {
   try {
@@ -27,9 +34,12 @@ async function readErrorMessage(res: Response, fallback: string): Promise<string
 
 export default function LoginPage() {
   const router = useRouter();
-  const [phone, setPhone] = useState(PARTNER_PHONE);
+  const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
+  const [pin, setPin] = useState("");
   const [codeSent, setCodeSent] = useState(false);
+  const [pinMode, setPinMode] = useState(false);
+  const [setupToken, setSetupToken] = useState<string | null>(null);
   const [googleChallenge, setGoogleChallenge] = useState<{
     id: string;
     channel: string;
@@ -38,46 +48,7 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  async function requestOtp() {
-    setLoading(true);
-    setError(null);
-    let lastStatus = 0;
-    try {
-      let requestRes: Response;
-      try {
-        const msisdn = normalizeLoginPhone(phone);
-        requestRes = await fetch(`${API_BASE}/api/auth/otp/request`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            phone: msisdn,
-            purpose: "LOGIN",
-            role: "RENTAL_PARTNER",
-            intendedRole: "RENTAL_PARTNER",
-            portal: "rental",
-          }),
-        });
-      } catch {
-        throw new Error(LOGIN_OTP_UNAVAILABLE);
-      }
-      lastStatus = requestRes.status;
-      const seed = isSeedDemoPhone(phone);
-      if (!requestRes.ok) {
-        const msg = await readErrorMessage(requestRes, LOGIN_OTP_UNAVAILABLE);
-        if (!(seed && (requestRes.status === 429 || requestRes.status >= 500))) {
-          throw new Error(msg);
-        }
-      }
-      setCode(seed ? "123456" : "");
-      setCodeSent(true);
-    } catch (e) {
-      setError(toUserErrorMessage(e, lastStatus >= 500 ? LOGIN_OTP_UNAVAILABLE : "Impossible d'envoyer le code. Réessayez."));
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  function finishRentalSession(data: { accessToken?: string; user?: { role?: string } }) {
+  function finishRentalSession(data: AuthPayload) {
     if (!data.accessToken) {
       throw new Error(LOGIN_GOOGLE_UNAVAILABLE);
     }
@@ -86,7 +57,47 @@ export default function LoginPage() {
       throw new Error("Ce compte n'est pas un partenaire location.");
     }
     setToken(data.accessToken);
+    if (shouldRequirePinSetup(data)) {
+      setSetupToken(data.accessToken);
+      return;
+    }
     router.replace("/");
+  }
+
+  async function requestOtp() {
+    setLoading(true);
+    setError(null);
+    let lastStatus = 0;
+    try {
+      const msisdn = normalizeLoginPhone(phone);
+      if (!pinMode) {
+        const enabled = await fetchPinEnabled(API_BASE, msisdn, INTENT);
+        if (enabled) {
+          setPinMode(true);
+          return;
+        }
+      }
+      let requestRes: Response;
+      try {
+        requestRes = await fetch(`${API_BASE}/api/auth/otp/request`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ phone: msisdn, purpose: "LOGIN", ...INTENT }),
+        });
+      } catch {
+        throw new Error(LOGIN_OTP_UNAVAILABLE);
+      }
+      lastStatus = requestRes.status;
+      if (!requestRes.ok) {
+        throw new Error(await readErrorMessage(requestRes, LOGIN_OTP_UNAVAILABLE));
+      }
+      setCode("");
+      setCodeSent(true);
+    } catch (e) {
+      setError(toUserErrorMessage(e, lastStatus >= 500 ? LOGIN_OTP_UNAVAILABLE : "Impossible d'envoyer le code. Réessayez."));
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function loginWithGoogle(idToken: string) {
@@ -96,14 +107,16 @@ export default function LoginPage() {
       const verifyRes = await fetch(`${API_BASE}/api/auth/google`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          idToken,
-          role: "RENTAL_PARTNER",
-          intendedRole: "RENTAL_PARTNER",
-          portal: "rental",
-        }),
+        body: JSON.stringify({ idToken, ...INTENT }),
       });
-      const data = await verifyRes.json().catch(() => ({}));
+      const data = (await verifyRes.json().catch(() => ({}))) as AuthPayload & {
+        otpRequired?: boolean;
+        challengeId?: string;
+        otpChannel?: string;
+        destinationMasked?: string;
+        mockCode?: string;
+        error?: { message?: string };
+      };
       if (!verifyRes.ok) {
         throw new Error(data.error?.message ?? LOGIN_GOOGLE_UNAVAILABLE);
       }
@@ -125,6 +138,22 @@ export default function LoginPage() {
     }
   }
 
+  async function loginWithPin() {
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await loginWithPinRequest(API_BASE, normalizeLoginPhone(phone), pin, INTENT);
+      if (!result.ok) {
+        throw new Error(result.data.error?.message ?? "PIN incorrect. Réessayez ou utilisez le code SMS.");
+      }
+      finishRentalSession(result.data);
+    } catch (e) {
+      setError(toUserErrorMessage(e, "PIN incorrect. Réessayez."));
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function verifyOtp() {
     setLoading(true);
     setError(null);
@@ -139,20 +168,8 @@ export default function LoginPage() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(
               googleChallenge
-                ? {
-                    challengeId: googleChallenge.id,
-                    code: code.trim(),
-                    role: "RENTAL_PARTNER",
-                    intendedRole: "RENTAL_PARTNER",
-                    portal: "rental",
-                  }
-                : {
-                    phone: normalizeLoginPhone(phone),
-                    code: code.trim(),
-                    role: "RENTAL_PARTNER",
-                    intendedRole: "RENTAL_PARTNER",
-                    portal: "rental",
-                  },
+                ? { challengeId: googleChallenge.id, code: code.trim(), ...INTENT }
+                : { phone: normalizeLoginPhone(phone), code: code.trim(), ...INTENT },
             ),
           },
         );
@@ -160,27 +177,25 @@ export default function LoginPage() {
         throw new Error(LOGIN_GENERIC);
       }
       lastStatus = verifyRes.status;
-
-      let data: { accessToken?: string; user?: { role?: string }; error?: { message?: string } } = {};
-      try {
-        data = await verifyRes.json();
-      } catch {
+      const data = (await verifyRes.json().catch(() => {
         throw new Error(LOGIN_GENERIC);
-      }
+      })) as AuthPayload & { error?: { message?: string } };
       if (!verifyRes.ok || !data.accessToken) {
         throw new Error(data.error?.message ?? LOGIN_GENERIC);
       }
-      const role = data.user?.role ?? decodeJwtPayload(data.accessToken)?.role;
-      if (!isRentalPartnerRole(typeof role === "string" ? role : null)) {
-        throw new Error("Ce compte n'est pas un partenaire location.");
-      }
-      setToken(data.accessToken);
-      router.replace("/");
+      finishRentalSession(data);
     } catch (e) {
       setError(toUserErrorMessage(e, lastStatus >= 500 ? LOGIN_GENERIC : "Connexion impossible. Réessayez."));
     } finally {
       setLoading(false);
     }
+  }
+
+  function primaryAction() {
+    if (setupToken) return;
+    if (codeSent) return void verifyOtp();
+    if (pinMode && pin.length === 6) return void loginWithPin();
+    return void requestOtp();
   }
 
   return (
@@ -190,76 +205,131 @@ export default function LoginPage() {
         <div className="text-center">
           <div className="text-3xl mb-2">🚗</div>
           <h1 className="text-2xl font-semibold text-[#1A1A2E]">SENGA Location</h1>
-          <p className="text-sm text-gray-500 mt-1">Portail partenaire — inscription véhicules</p>
+          <p className="text-sm text-gray-500 mt-1">
+            {setupToken ? "Créez votre code PIN" : "Portail partenaire — inscription véhicules"}
+          </p>
         </div>
-        <label className="block text-sm">
-          <span className="text-gray-600">Téléphone partenaire</span>
-          <input
-            className="mt-1 w-full rounded-xl border border-gray-200 p-3"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            placeholder="+243 8XX XXX XXX"
-            type="tel"
-            inputMode="tel"
-            autoComplete="tel"
-            disabled={codeSent || Boolean(googleChallenge)}
+        {setupToken ? (
+          <PinSetupForm
+            apiBase={API_BASE}
+            token={setupToken}
+            accentClass="bg-indigo-600"
+            onDone={() => router.replace("/")}
           />
-        </label>
-        {codeSent && (
-          <label className="block text-sm">
-            <span className="text-gray-600">
-              {googleChallenge?.channel === "email"
-                ? `Code reçu par e-mail${googleChallenge.masked ? ` (${googleChallenge.masked})` : ""}`
-                : isSeedDemoPhone(phone)
-                  ? "Code de démo (aucun SMS) : 123456"
-                  : "Code reçu par SMS"}
-            </span>
-            <input
-              className="mt-1 w-full rounded-xl border border-gray-200 p-3"
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              placeholder="Code à 6 chiffres"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              maxLength={6}
-            />
-          </label>
-        )}
-        <button
-          type="button"
-          disabled={loading || (!googleChallenge && !phone.trim()) || (codeSent && !code.trim())}
-          onClick={codeSent ? verifyOtp : requestOtp}
-          className="w-full py-3 rounded-xl bg-indigo-600 text-white font-medium disabled:opacity-60"
-        >
-          {loading ? (codeSent ? "Connexion…" : "Envoi…") : codeSent ? "Se connecter" : "Recevoir le code"}
-        </button>
-        {googleClientId() && !codeSent && !googleChallenge && (
+        ) : (
           <>
-            <p className="text-center text-xs text-gray-400">ou</p>
-            <GoogleContinueButton onCredential={loginWithGoogle} disabled={loading} />
+            <label className="block text-sm">
+              <span className="text-gray-600">Téléphone partenaire</span>
+              <input
+                className="mt-1 w-full rounded-xl border border-gray-200 p-3"
+                value={phone}
+                onChange={(e) => {
+                  setPhone(e.target.value);
+                  setPinMode(false);
+                  setPin("");
+                }}
+                placeholder="+243 8XX XXX XXX"
+                type="tel"
+                inputMode="tel"
+                autoComplete="tel"
+                disabled={codeSent || Boolean(googleChallenge)}
+              />
+            </label>
+            {pinMode && !codeSent && (
+              <label className="block text-sm">
+                <span className="text-gray-600">Code PIN</span>
+                <input
+                  className="mt-1 w-full rounded-xl border border-gray-200 p-3 tracking-widest"
+                  value={pin}
+                  onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                  placeholder="6 chiffres"
+                  inputMode="numeric"
+                  autoComplete="current-password"
+                  maxLength={6}
+                />
+              </label>
+            )}
+            {codeSent && (
+              <label className="block text-sm">
+                <span className="text-gray-600">
+                  {googleChallenge?.channel === "email"
+                    ? `Code reçu par e-mail${googleChallenge.masked ? ` (${googleChallenge.masked})` : ""}`
+                    : "Code reçu par SMS"}
+                </span>
+                <input
+                  className="mt-1 w-full rounded-xl border border-gray-200 p-3"
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  placeholder="Code à 6 chiffres"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={6}
+                />
+              </label>
+            )}
+            <button
+              type="button"
+              disabled={
+                loading ||
+                (!googleChallenge && !phone.trim()) ||
+                (codeSent && !code.trim()) ||
+                (pinMode && !codeSent && pin.length > 0 && pin.length !== 6)
+              }
+              onClick={primaryAction}
+              className="w-full py-3 rounded-xl bg-indigo-600 text-white font-medium disabled:opacity-60"
+            >
+              {loading
+                ? codeSent || pinMode
+                  ? "Connexion…"
+                  : "Envoi…"
+                : codeSent
+                  ? "Se connecter"
+                  : pinMode
+                    ? "Se connecter avec le PIN"
+                    : "Continuer"}
+            </button>
+            {pinMode && !codeSent && (
+              <button
+                type="button"
+                className="w-full text-sm text-gray-500 underline"
+                onClick={() => {
+                  setPinMode(false);
+                  setPin("");
+                  void requestOtp();
+                }}
+              >
+                Recevoir un code SMS
+              </button>
+            )}
+            {googleClientId() && !codeSent && !googleChallenge && (
+              <>
+                <p className="text-center text-xs text-gray-400">ou</p>
+                <GoogleContinueButton onCredential={loginWithGoogle} disabled={loading} />
+              </>
+            )}
+            {codeSent && (
+              <button
+                type="button"
+                className="w-full text-sm text-gray-500 underline"
+                onClick={() => {
+                  setCodeSent(false);
+                  setCode("");
+                  setGoogleChallenge(null);
+                  setError(null);
+                }}
+              >
+                {googleChallenge ? "Retour" : "Changer de numéro"}
+              </button>
+            )}
           </>
         )}
-        {codeSent && (
-          <button
-            type="button"
-            className="w-full text-sm text-gray-500 underline"
-            onClick={() => {
-              setCodeSent(false);
-              setCode("");
-              setGoogleChallenge(null);
-              setError(null);
-            }}
-          >
-            {googleChallenge ? "Retour" : "Changer de numéro"}
-          </button>
-        )}
         {error && <p className="text-sm text-red-600 text-center">{error}</p>}
-        <p className="text-xs text-gray-400 text-center">
-          {isSeedDemoPhone(phone)
-            ? <>Numéro de démo : code <code>123456</code>, pas de SMS.</>
-            : "Numéro réel +243 : le code arrive par SMS."}{" "}
-          Première connexion (téléphone ou Google) : un compte partenaire location est créé automatiquement. Un seul portefeuille.
-        </p>
+        {!setupToken && (
+          <p className="text-xs text-gray-400 text-center">
+            Numéro +243 : le code arrive par SMS. Après la première connexion, un PIN à 6 chiffres
+            sert de connexion rapide (OTP et Google restent disponibles).
+          </p>
+        )}
       </div>
     </div>
   );

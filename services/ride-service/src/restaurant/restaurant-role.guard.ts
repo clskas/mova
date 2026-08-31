@@ -5,7 +5,8 @@ import { UserRole } from '@mova/shared';
 export class RestaurantRoleGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     const req = context.switchToHttp().getRequest<{ user?: { role?: string } }>();
-    if (req.user?.role !== UserRole.RESTAURANT) {
+    const role = req.user?.role;
+    if (role !== UserRole.RESTAURANT && role !== UserRole.SUPER_ADMIN) {
       throw new ForbiddenException('Accès réservé aux comptes restaurant');
     }
     return true;

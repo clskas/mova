@@ -39,7 +39,7 @@ export function roleFromToken(): string | null {
 }
 
 export function isRestaurantRole(role: string | null): boolean {
-  return role === "RESTAURANT";
+  return role === "RESTAURANT" || role === "SUPER_ADMIN";
 }
 
 /** Seed demo range +2439000000xx — OTP 123456, no SMS. */

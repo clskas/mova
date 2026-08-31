@@ -39,7 +39,7 @@ export function roleFromToken(): string | null {
 }
 
 export function isRentalPartnerRole(role: string | null): boolean {
-  return role === "RENTAL_PARTNER";
+  return role === "RENTAL_PARTNER" || role === "SUPER_ADMIN";
 }
 
 /** Seed demo range +2439000000xx — OTP 123456, no SMS. */

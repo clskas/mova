@@ -3,18 +3,22 @@
 import { useEffect, useState } from "react";
 import { GoogleContinueButton, googleClientId } from "@/components/GoogleContinueButton";
 import { ApiError, apiFetch, checkGatewayHealth } from "@/lib/api";
-import { clearToken, getToken, isSeedDemoPhone, normalizeLoginPhone, setToken } from "@/lib/auth";
+import { clearToken, getToken, normalizeLoginPhone, setToken } from "@/lib/auth";
 import { LOGIN_GOOGLE_UNAVAILABLE, LOGIN_OTP_UNAVAILABLE, toUserErrorMessage } from "@/lib/user-messages";
+import { AuthPayload, PinSetupForm, fetchPinEnabled, shouldRequirePinSetup } from "@/components/PinAuth";
 
 type Props = { children: React.ReactNode };
 
 export function OtpGate({ children }: Props) {
   const [ready, setReady] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
+  const [setupPin, setSetupPin] = useState(false);
   const [mock, setMock] = useState(false);
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
+  const [pin, setPin] = useState("");
   const [codeSent, setCodeSent] = useState(false);
+  const [pinMode, setPinMode] = useState(false);
   const [googleChallenge, setGoogleChallenge] = useState<{
     id: string;
     channel: string;
@@ -32,6 +36,19 @@ export function OtpGate({ children }: Props) {
     });
   }, []);
 
+  function completeSession(data: AuthPayload & { user?: { phone?: string } }) {
+    if (!data.accessToken) {
+      setError(LOGIN_GOOGLE_UNAVAILABLE);
+      return;
+    }
+    setToken(data.accessToken, data.user?.phone ?? phone);
+    if (shouldRequirePinSetup(data)) {
+      setSetupPin(true);
+      return;
+    }
+    setAuthenticated(true);
+  }
+
   async function requestOtp() {
     setLoading(true);
     setError(null);
@@ -41,11 +58,18 @@ export function OtpGate({ children }: Props) {
         setError("Numéro invalide. Format : +243XXXXXXXXX");
         return;
       }
+      if (!pinMode) {
+        const enabled = await fetchPinEnabled(apiFetch, msisdn);
+        if (enabled) {
+          setPinMode(true);
+          return;
+        }
+      }
       await apiFetch("/api/auth/otp/request", {
         method: "POST",
         body: JSON.stringify({ phone: msisdn, intendedRole: "PASSENGER" }),
       }, { useMock: mock });
-      setCode(isSeedDemoPhone(msisdn) ? "123456" : "");
+      setCode("");
       setCodeSent(true);
     } catch (e) {
       const status = e instanceof ApiError ? e.status : 0;
@@ -64,14 +88,12 @@ export function OtpGate({ children }: Props) {
     setLoading(true);
     setError(null);
     try {
-      const data = await apiFetch<{
-        accessToken?: string;
+      const data = await apiFetch<AuthPayload & {
         otpRequired?: boolean;
         challengeId?: string;
         otpChannel?: string;
         destinationMasked?: string;
         mockCode?: string;
-        user?: { phone?: string };
       }>("/api/auth/google", {
         method: "POST",
         body: JSON.stringify({ idToken, intendedRole: "PASSENGER" }),
@@ -86,14 +108,29 @@ export function OtpGate({ children }: Props) {
         setCodeSent(true);
         return;
       }
-      if (data.accessToken) {
-        setToken(data.accessToken, data.user?.phone);
-        setAuthenticated(true);
-      } else {
-        setError(LOGIN_GOOGLE_UNAVAILABLE);
-      }
+      completeSession(data);
     } catch (e) {
       setError(toUserErrorMessage(e, LOGIN_GOOGLE_UNAVAILABLE));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function loginWithPin() {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await apiFetch<AuthPayload>("/api/auth/pin/login", {
+        method: "POST",
+        body: JSON.stringify({
+          phone: normalizeLoginPhone(phone),
+          pin,
+          intendedRole: "PASSENGER",
+        }),
+      }, { useMock: mock });
+      completeSession(data);
+    } catch (e) {
+      setError(toUserErrorMessage(e, "PIN incorrect. Réessayez ou utilisez le code SMS."));
     } finally {
       setLoading(false);
     }
@@ -104,7 +141,7 @@ export function OtpGate({ children }: Props) {
     setError(null);
     try {
       const data = googleChallenge
-        ? await apiFetch<{ accessToken?: string; user?: { phone?: string } }>("/api/auth/google/verify", {
+        ? await apiFetch<AuthPayload>("/api/auth/google/verify", {
             method: "POST",
             body: JSON.stringify({
               challengeId: googleChallenge.id,
@@ -112,7 +149,7 @@ export function OtpGate({ children }: Props) {
               intendedRole: "PASSENGER",
             }),
           }, { useMock: mock })
-        : await apiFetch<{ accessToken?: string; user?: { phone?: string } }>("/api/auth/otp/verify", {
+        : await apiFetch<AuthPayload>("/api/auth/otp/verify", {
             method: "POST",
             body: JSON.stringify({
               phone: normalizeLoginPhone(phone),
@@ -120,12 +157,7 @@ export function OtpGate({ children }: Props) {
               intendedRole: "PASSENGER",
             }),
           }, { useMock: mock });
-      if (data.accessToken) {
-        setToken(data.accessToken, data.user?.phone ?? phone);
-        setAuthenticated(true);
-      } else {
-        setError("Connexion impossible. Veuillez réessayer.");
-      }
+      completeSession(data);
     } catch (e) {
       setError(toUserErrorMessage(e, "Code OTP invalide"));
     } finally {
@@ -141,6 +173,18 @@ export function OtpGate({ children }: Props) {
     );
   }
 
+  if (setupPin && !authenticated) {
+    return (
+      <PinSetupForm
+        apiFetchFn={apiFetch}
+        onDone={() => {
+          setSetupPin(false);
+          setAuthenticated(true);
+        }}
+      />
+    );
+  }
+
   if (!authenticated) {
     return (
       <div className="max-w-sm mx-auto min-h-[100dvh] flex flex-col justify-center p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
@@ -150,8 +194,8 @@ export function OtpGate({ children }: Props) {
             ? googleChallenge.channel === "email"
               ? `Un code a été envoyé par e-mail${googleChallenge.masked ? ` (${googleChallenge.masked})` : ""}. Vérifiez votre boîte de réception.`
               : `Un code SMS a été envoyé${googleChallenge.masked ? ` (${googleChallenge.masked})` : ""}.`
-            : isSeedDemoPhone(phone)
-              ? "Numéro de démo : code 123456, pas de SMS."
+            : pinMode
+              ? "Entrez votre code PIN à 6 chiffres, ou demandez un SMS."
               : "Entrez votre numéro +243. Un SMS avec le code vous sera envoyé."}
         </p>
         {mock && (
@@ -169,9 +213,25 @@ export function OtpGate({ children }: Props) {
           autoComplete="tel"
           placeholder="+243 8XX XXX XXX"
           value={phone}
-          onChange={(e) => setPhone(e.target.value)}
+          onChange={(e) => {
+            setPhone(e.target.value);
+            setPinMode(false);
+            setPin("");
+          }}
           disabled={codeSent || Boolean(googleChallenge)}
         />
+        {pinMode && !codeSent && (
+          <input
+            className="w-full rounded-xl border-0 bg-white p-3 shadow-sm mb-3 tracking-widest"
+            type="password"
+            inputMode="numeric"
+            autoComplete="current-password"
+            placeholder="PIN à 6 chiffres"
+            value={pin}
+            onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
+            maxLength={6}
+          />
+        )}
         {codeSent && (
           <input
             className="w-full rounded-xl border-0 bg-white p-3 shadow-sm mb-3"
@@ -179,13 +239,7 @@ export function OtpGate({ children }: Props) {
             inputMode="numeric"
             autoComplete="one-time-code"
             pattern="[0-9]*"
-            placeholder={
-              googleChallenge?.channel === "email"
-                ? "Code reçu par e-mail"
-                : isSeedDemoPhone(phone)
-                  ? "123456 (démo)"
-                  : "Code à 6 chiffres"
-            }
+            placeholder={googleChallenge?.channel === "email" ? "Code reçu par e-mail" : "Code à 6 chiffres"}
             value={code}
             onChange={(e) => setCode(e.target.value)}
             maxLength={6}
@@ -193,12 +247,36 @@ export function OtpGate({ children }: Props) {
         )}
         <button
           type="button"
-          onClick={codeSent ? verifyOtp : requestOtp}
-          disabled={loading || (!googleChallenge && !phone.trim()) || (codeSent && !code.trim())}
+          onClick={codeSent ? verifyOtp : pinMode && pin.length === 6 ? loginWithPin : requestOtp}
+          disabled={
+            loading ||
+            (!googleChallenge && !phone.trim()) ||
+            (codeSent && !code.trim()) ||
+            (pinMode && !codeSent && pin.length > 0 && pin.length !== 6)
+          }
           className="w-full bg-[#6C63FF] text-white rounded-xl py-3 font-semibold disabled:opacity-50"
         >
-          {loading ? "Chargement…" : codeSent ? "Se connecter" : "Recevoir le code"}
+          {loading
+            ? "Chargement…"
+            : codeSent
+              ? "Se connecter"
+              : pinMode
+                ? "Se connecter avec le PIN"
+                : "Continuer"}
         </button>
+        {pinMode && !codeSent && (
+          <button
+            type="button"
+            className="w-full mt-3 text-sm text-gray-500 underline"
+            onClick={() => {
+              setPinMode(false);
+              setPin("");
+              void requestOtp();
+            }}
+          >
+            Recevoir un code SMS
+          </button>
+        )}
         {googleClientId() && !codeSent && !googleChallenge && (
           <>
             <p className="text-center text-xs text-gray-400 my-4">ou</p>

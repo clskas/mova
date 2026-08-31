@@ -44,6 +44,13 @@ export function clearToken(): void {
   clearPinSessionUnlocked();
 }
 
+export function dropTokenKeepPhone(phone?: string): void {
+  storageRemove(TOKEN_KEY);
+  storageRemove(PIN_PENDING_KEY);
+  const keep = (phone || getStoredPhone() || "").trim();
+  if (keep) storageSet(PHONE_KEY, keep);
+}
+
 export function markPinSessionUnlocked(): void {
   if (typeof window === "undefined") return;
   try {

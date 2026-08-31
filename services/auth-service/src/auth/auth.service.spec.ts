@@ -156,12 +156,31 @@ describe('AuthService', () => {
     expect(jwt.sign).toHaveBeenCalled();
   });
 
+  it('flags needsPinSetup after phone OTP when no PIN is set', async () => {
+    const passenger = makeUser({ phone: '+243812345678', localPinHash: null });
+    prisma.user.findUnique.mockResolvedValue(passenger);
+    await seedHashedOtp(passenger.phone);
+    const result = await service.verifyOtp(passenger.phone, '847291', UserRole.PASSENGER);
+    expect(result.needsPinSetup).toBe(true);
+    expect(result.pinConfigured).toBe(false);
+  });
+
+  it('does not flag needsPinSetup for seed demo phones', async () => {
+    const seed = makeUser({ phone: '+243900000010', localPinHash: null });
+    prisma.user.findUnique.mockResolvedValue(seed);
+    await seedHashedOtp(seed.phone);
+    const result = await service.verifyOtp(seed.phone, '847291', UserRole.PASSENGER);
+    expect(result.needsPinSetup).toBe(false);
+  });
+
   it('allows an existing DRIVER on the driver app', async () => {
     const driver = makeUser({ role: UserRole.DRIVER, status: UserStatus.PENDING_KYC });
     prisma.user.findUnique.mockResolvedValue(driver);
     await seedHashedOtp(driver.phone);
     const result = await service.verifyOtp(driver.phone, '847291', UserRole.DRIVER);
     expect(result.user.role).toBe(UserRole.DRIVER);
+    expect(result.pinConfigured).toBe(false);
+    expect(result.needsPinSetup).toBe(true);
     expect(prisma.user.update).not.toHaveBeenCalled();
   });
 

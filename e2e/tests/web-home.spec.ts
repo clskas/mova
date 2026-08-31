@@ -32,9 +32,9 @@ test.describe("Web passager — accueil", () => {
   });
 
   test("affiche SENGA — RDC sur la page d'accueil", async ({ page }) => {
-  await page.goto("/");
-  await dismissUpdateBanner(page);
-  await ensureWebHome(page);
+    await page.goto("/");
+    await dismissUpdateBanner(page);
+    await ensureWebHome(page);
     await expect(page.getByRole("heading", { name: /SENGA — RDC/i })).toBeVisible();
   });
 });

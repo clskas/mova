@@ -240,6 +240,7 @@ function mockFor<T>(path: string, init?: RequestInit): T {
       accessToken: 'mock-web-token',
       message: 'Compte lié. Vous pouvez vous connecter avec le téléphone ou Google.',
       pinConfigured: false,
+      needsPinSetup: true,
       user: { id: 'mock-user', phone: '+243812345678', hasPhone: true, role: 'PASSENGER' },
     } as T;
   }
@@ -255,6 +256,7 @@ function mockFor<T>(path: string, init?: RequestInit): T {
       canUnlinkGoogle: false,
       canUnlinkPhone: false,
       pinConfigured: false,
+      needsPinSetup: true,
       role: 'PASSENGER',
     } as T;
   }

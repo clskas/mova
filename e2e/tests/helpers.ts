@@ -72,8 +72,11 @@ const DEV_OTP = process.env.E2E_OTP ?? "123456";
 /** Ferme la bannière de mise à jour si elle recouvre le formulaire. */
 export async function dismissUpdateBanner(page: Page): Promise<void> {
   const later = page.getByRole("button", { name: "Plus tard" });
-  if (await later.isVisible().catch(() => false)) {
+  try {
+    await later.waitFor({ state: "visible", timeout: 1_500 });
     await later.click();
+  } catch {
+    /* banner absent */
   }
 }
 

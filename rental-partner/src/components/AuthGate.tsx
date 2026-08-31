@@ -2,10 +2,22 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { PinSetupForm, shouldRequirePinSetup } from "@/components/PinAuth";
+import { PinSetupForm, accountPhone, shouldRequirePinSetup } from "@/components/PinAuth";
 import { apiFetch } from "@/lib/api";
 import { PUBLIC_API_BASE } from "@/lib/public-api-base";
-import { getLastPhone, getToken, isPinPending, isRentalPartnerRole, phoneFromToken, roleFromToken, setPinPending } from "@/lib/auth";
+import {
+  dropTokenKeepPhone,
+  getLastPhone,
+  getToken,
+  isPinPending,
+  isPinSessionUnlocked,
+  isRentalPartnerRole,
+  isSeedDemoPhone,
+  markPinSessionUnlocked,
+  phoneFromToken,
+  roleFromToken,
+  setPinPending,
+} from "@/lib/auth";
 
 export function AuthGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -25,14 +37,17 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     let cancelled = false;
     void (async () => {
       try {
-        const me = await apiFetch<{ pinConfigured?: boolean; phone?: string; hasPhone?: boolean }>(
+        const me = await apiFetch<{ pinConfigured?: boolean; needsPinSetup?: boolean; phone?: string; hasPhone?: boolean }>(
           "/api/users/me",
         );
         if (cancelled) return;
-        const fallback = (me.phone ?? phoneFromToken() ?? getLastPhone() ?? "").trim();
+        const fallback = accountPhone(
+          { pinConfigured: me.pinConfigured, phone: me.phone, hasPhone: me.hasPhone, user: me },
+          phoneFromToken() || getLastPhone() || "",
+        );
         if (
           shouldRequirePinSetup(
-            { pinConfigured: me.pinConfigured, phone: me.phone, hasPhone: me.hasPhone, user: me },
+            { pinConfigured: me.pinConfigured, needsPinSetup: me.needsPinSetup, phone: me.phone, hasPhone: me.hasPhone, user: me },
             fallback,
           )
         ) {
@@ -40,10 +55,20 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
           setSetupToken(token);
           return;
         }
+        if (me.pinConfigured && fallback && !isSeedDemoPhone(fallback) && !isPinSessionUnlocked()) {
+          dropTokenKeepPhone(fallback);
+          router.replace("/login");
+          return;
+        }
       } catch {
-        /* keep going if /me is unreachable — token is still present */
+        dropTokenKeepPhone(phoneFromToken() || getLastPhone() || "");
+        router.replace("/login");
+        return;
       }
-      if (!cancelled) setReady(true);
+      if (!cancelled) {
+        markPinSessionUnlocked();
+        setReady(true);
+      }
     })();
     return () => {
       cancelled = true;
@@ -52,7 +77,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
 
   if (setupToken) {
     return (
-      <div className="fixed inset-0 z-[80] bg-gradient-to-br from-indigo-50 to-violet-50 overflow-y-auto">
+      <div className="fixed inset-0 z-[10050] bg-gradient-to-br from-indigo-50 to-violet-50 overflow-y-auto">
         <div className="min-h-[100dvh] flex items-center justify-center p-6">
           <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-8">
             <PinSetupForm
@@ -61,6 +86,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
               accentClass="bg-indigo-600"
               onDone={() => {
                 setPinPending(false);
+                markPinSessionUnlocked();
                 setSetupToken(null);
                 setReady(true);
               }}

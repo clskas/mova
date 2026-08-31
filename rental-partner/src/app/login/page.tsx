@@ -9,6 +9,7 @@ import {
   isPinPending,
   isRentalPartnerRole,
   normalizeLoginPhone,
+  markPinSessionUnlocked,
   setPinPending,
   setLastPhone,
   setToken,
@@ -26,8 +27,10 @@ import {
   AuthPayload,
   PinForgotLink,
   PinSetupForm,
+  accountPhone,
   fetchPinEnabled,
   loginWithPinRequest,
+  mustSetupPinAfterPhoneLogin,
   shouldRequirePinSetup,
 } from "@/components/PinAuth";
 
@@ -106,15 +109,16 @@ export default function LoginPage() {
       throw new Error("Ce compte n'est pas un partenaire location.");
     }
     const typedPhone = googleChallenge ? "" : normalizeLoginPhone(phone);
-    const phoneOnAccount = (data.user?.phone ?? data.phone ?? typedPhone).trim();
+    const phoneOnAccount = accountPhone(data, typedPhone);
     setToken(data.accessToken, phoneOnAccount || undefined);
     if (phoneOnAccount) setLastPhone(phoneOnAccount);
-    if (forgotPin || shouldRequirePinSetup(data, phoneOnAccount)) {
+    if (forgotPin || mustSetupPinAfterPhoneLogin(data, typedPhone) || shouldRequirePinSetup(data, phoneOnAccount)) {
       setPinPending(true);
       setSetupToken(data.accessToken);
       return;
     }
     setPinPending(false);
+    markPinSessionUnlocked();
     router.replace("/");
   }
 
@@ -264,7 +268,7 @@ export default function LoginPage() {
           </p>
         </div>
         {setupToken ? (
-          <div className="fixed inset-0 z-[80] bg-gradient-to-br from-indigo-50 to-violet-50 overflow-y-auto">
+          <div className="fixed inset-0 z-[10050] bg-gradient-to-br from-indigo-50 to-violet-50 overflow-y-auto">
             <div className="min-h-[100dvh] flex items-center justify-center p-6">
               <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-8">
                 <PinSetupForm
@@ -275,6 +279,7 @@ export default function LoginPage() {
                   onDone={() => {
                     setPinPending(false);
                     setForgotPin(false);
+                    markPinSessionUnlocked();
                     router.replace("/");
                   }}
                 />

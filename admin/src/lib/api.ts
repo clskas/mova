@@ -567,6 +567,7 @@ export type AdminSessionUser = {
   canUnlinkGoogle?: boolean;
   canUnlinkPhone?: boolean;
   pinConfigured?: boolean;
+  needsPinSetup?: boolean;
 };
 
 export type WalletOverview = {

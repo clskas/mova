@@ -1,4 +1,4 @@
-const CACHE = "mova-admin-v4";
+const CACHE = "mova-admin-v6";
 const SHELL = ["/manifest.webmanifest", "/icon-192.png", "/icon-512.png", "/apple-touch-icon.png"];
 
 function isVersionRequest(url) {

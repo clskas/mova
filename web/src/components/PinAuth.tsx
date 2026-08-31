@@ -21,10 +21,18 @@ export function accountPhone(data: AuthPayload, fallbackPhone?: string): string 
 /** PIN obligatoire dès qu'un téléphone est connu (OTP saisi, JWT, /me). Google seul : pas de PIN. */
 export function shouldRequirePinSetup(data: AuthPayload, fallbackPhone?: string): boolean {
   if (data.pinConfigured === true) return false;
-  if (data.needsPinSetup === true) return true;
   const phone = accountPhone(data, fallbackPhone);
   if (SEED_DEMO_PHONE_RE.test(phone)) return false;
+  if (data.needsPinSetup === true) return true;
   return Boolean(data.user?.hasPhone || data.hasPhone || phone);
+}
+
+/** Phone OTP: always create PIN. Do not depend on API user.phone / hasPhone (those were empty in prod). */
+export function mustSetupPinAfterPhoneLogin(data: AuthPayload, typedPhone: string): boolean {
+  if (data.pinConfigured === true) return false;
+  const phone = accountPhone(data, typedPhone);
+  if (SEED_DEMO_PHONE_RE.test(phone) || (typedPhone && SEED_DEMO_PHONE_RE.test(typedPhone))) return false;
+  return Boolean(typedPhone);
 }
 
 export function PinForgotLink({

@@ -4,10 +4,15 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   decodeJwtPayload,
+  dropTokenKeepPhone,
   getLastPhone,
   getToken,
   isPinPending,
+  isPinSessionUnlocked,
+  isSeedDemoPhone,
+  markPinSessionUnlocked,
   normalizeLoginPhone,
+  phoneFromToken,
   roleFromToken,
   setLastPhone,
   setPinPending,
@@ -20,8 +25,10 @@ import {
   AuthPayload,
   PinForgotLink,
   PinSetupForm,
+  accountPhone,
   fetchPinEnabled,
   loginWithPinRequest,
+  mustSetupPinAfterPhoneLogin,
   shouldRequirePinSetup,
 } from "@/components/PinAuth";
 
@@ -72,13 +79,20 @@ export default function LoginPage() {
           if (
             shouldRequirePinSetup(
               { pinConfigured: me.pinConfigured, phone: me.phone, hasPhone: me.hasPhone, user: me },
-              me.phone,
+              me.phone || phoneFromToken(token) || getLastPhone() || "",
             )
           ) {
             setPinPending(true);
             setSetupToken(token);
             const role = normalizeAdminRole(me.role ?? roleFromToken(token));
             if (role) setSetupRolePath(defaultPathForRole(role));
+            return;
+          }
+          const remembered = (me.phone || phoneFromToken(token) || getLastPhone() || "").trim();
+          if (me.pinConfigured && remembered && !isSeedDemoPhone(remembered) && !isPinSessionUnlocked()) {
+            dropTokenKeepPhone(remembered);
+            setPhone(remembered);
+            setPinMode(true);
           }
         })
         .catch(() => undefined);
@@ -134,16 +148,17 @@ export default function LoginPage() {
       throw new Error("Connexion Google impossible pour le moment. Réessayez.");
     }
     const typedPhone = googleChallenge ? "" : normalizeLoginPhone(phone);
-    const phoneOnAccount = (data.user?.phone ?? data.phone ?? typedPhone).trim();
+    const phoneOnAccount = accountPhone(data, typedPhone);
     setToken(data.accessToken, phoneOnAccount || undefined);
     if (phoneOnAccount) setLastPhone(phoneOnAccount);
-    if (forgotPin || shouldRequirePinSetup(data, phoneOnAccount)) {
+    if (forgotPin || mustSetupPinAfterPhoneLogin(data, typedPhone) || shouldRequirePinSetup(data, phoneOnAccount)) {
       setPinPending(true);
       setSetupRolePath(defaultPathForRole(role));
       setSetupToken(data.accessToken);
       return;
     }
     setPinPending(false);
+    markPinSessionUnlocked();
     router.replace(defaultPathForRole(role));
   }
 
@@ -321,7 +336,7 @@ export default function LoginPage() {
           )}
 
           {setupToken ? (
-            <div className="fixed inset-0 z-[80] bg-[var(--background)] overflow-y-auto">
+            <div className="fixed inset-0 z-[10050] bg-[var(--background)] overflow-y-auto">
               <div className="min-h-[100dvh] flex items-center justify-center p-6">
                 <div className="w-full max-w-md mova-card p-8 shadow-mova">
                   <PinSetupForm
@@ -331,6 +346,7 @@ export default function LoginPage() {
                     onDone={() => {
                       setPinPending(false);
                       setForgotPin(false);
+                      markPinSessionUnlocked();
                       router.replace(setupRolePath);
                     }}
                   />

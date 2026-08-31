@@ -3,9 +3,9 @@
 import { useEffect, useState } from "react";
 import { GoogleContinueButton, googleClientId } from "@/components/GoogleContinueButton";
 import { ApiError, apiFetch, checkGatewayHealth } from "@/lib/api";
-import { clearToken, getStoredPhone, getToken, isPinPending, isPinSessionUnlocked, isSeedDemoPhone, markPinSessionUnlocked, normalizeLoginPhone, phoneFromToken, setPinPending, setToken } from "@/lib/auth";
+import { clearToken, dropTokenKeepPhone, getStoredPhone, getToken, isPinPending, isPinSessionUnlocked, isSeedDemoPhone, markPinSessionUnlocked, normalizeLoginPhone, phoneFromToken, setPinPending, setToken } from "@/lib/auth";
 import { LOGIN_GOOGLE_UNAVAILABLE, LOGIN_OTP_UNAVAILABLE, toUserErrorMessage } from "@/lib/user-messages";
-import { AuthPayload, PinForgotLink, PinSetupForm, accountPhone, fetchPinEnabled, shouldRequirePinSetup } from "@/components/PinAuth";
+import { AuthPayload, PinForgotLink, PinSetupForm, accountPhone, fetchPinEnabled, mustSetupPinAfterPhoneLogin, shouldRequirePinSetup } from "@/components/PinAuth";
 
 type Props = { children: React.ReactNode };
 
@@ -71,6 +71,7 @@ export function OtpGate({ children }: Props) {
           return;
         }
         if (me.pinConfigured && fallback && !isSeedDemoPhone(fallback) && !isPinSessionUnlocked()) {
+          dropTokenKeepPhone(fallback);
           setPhone(fallback);
           setPinMode(true);
           setReady(true);
@@ -100,7 +101,7 @@ export function OtpGate({ children }: Props) {
     const typedPhone = googleChallenge ? "" : normalizeLoginPhone(phone);
     const phoneOnAccount = accountPhone(data, typedPhone);
     setToken(data.accessToken, phoneOnAccount || undefined);
-    if (forgotPin || shouldRequirePinSetup(data, phoneOnAccount)) {
+    if (forgotPin || mustSetupPinAfterPhoneLogin(data, typedPhone) || shouldRequirePinSetup(data, phoneOnAccount)) {
       setPinPending(true);
       setSetupPin(true);
       return;

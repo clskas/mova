@@ -4,6 +4,7 @@ import {
   MovaErrorCode,
   MovaHttpException,
   OWNER_SUPER_ADMIN_PHONE,
+  isSeedDemoPhone,
   RedisService,
   denyJwtUser,
   formatMovaPublicId,
@@ -46,6 +47,7 @@ export class UsersService {
       canUnlinkGoogle: Boolean(googleId && user.phone),
       canUnlinkPhone: Boolean(user.phone && googleId && user.phone !== OWNER_SUPER_ADMIN_PHONE),
       pinConfigured: Boolean(_pin),
+      needsPinSetup: Boolean(user.phone && !_pin && !isSeedDemoPhone(user.phone ?? '')),
     };
   }
 

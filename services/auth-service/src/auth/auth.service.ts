@@ -15,6 +15,7 @@ import {
   formatMovaPublicId,
   maskPhoneRdc,
   maskEmail,
+  isSeedDemoPhone,
   isTestOtpAllowedForPhone,
   matchesSeedTestOtp,
   otpCodesToIssue,
@@ -1138,6 +1139,7 @@ export class AuthService {
       accessToken: token,
       isNew: options.isNew,
       pinConfigured: Boolean(user.localPinHash),
+      needsPinSetup: Boolean(user.phone && !user.localPinHash && !isSeedDemoPhone(user.phone)),
       needsPhone: !user.phone,
       user: {
         id: user.id,

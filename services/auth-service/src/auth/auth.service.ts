@@ -357,7 +357,7 @@ export class AuthService {
     let user = await this.resolveGoogleLoginUser(identity, requestedRole);
 
     if (!user) {
-      this.assertGoogleCanAutoRegister(requestedRole);
+      this.assertGoogleCanAutoRegister(requestedRole, identity.email);
     } else {
       this.assertRoleAccess(user, requestedRole);
       if (user.status === UserStatus.SUSPENDED) {
@@ -468,7 +468,7 @@ export class AuthService {
     };
 
     if (!user) {
-      this.assertGoogleCanAutoRegister(requestedRole);
+      this.assertGoogleCanAutoRegister(requestedRole, identity.email);
       const createdRole = isAllowedPartnerSelfRegisterRole(requestedRole)
         ? requestedRole!
         : UserRole.PASSENGER;
@@ -645,13 +645,6 @@ export class AuthService {
     identity: GoogleIdentity,
     requestedRole?: UserRole,
   ): Promise<User | null> {
-    if (isPartnerPortalRole(requestedRole) && isOwnerSuperAdminEmail(identity.email)) {
-      throw new MovaHttpException(
-        MovaErrorCode.AUTH_FORBIDDEN,
-        HttpStatus.FORBIDDEN,
-        STAFF_ON_PARTNER_PORTAL_MESSAGE,
-      );
-    }
     let user = await this.prisma.user.findUnique({ where: { googleId: identity.googleId } });
     if (isStaffAuthRole(requestedRole)) {
       const owner = await this.resolveAllowlistedSuperAdmin(identity);
@@ -710,7 +703,7 @@ export class AuthService {
     let user = existing;
     let isNew = false;
     if (!user) {
-      this.assertGoogleCanAutoRegister(requestedRole);
+      this.assertGoogleCanAutoRegister(requestedRole, identity.email);
       const createdRole = isAllowedPartnerSelfRegisterRole(requestedRole)
         ? requestedRole!
         : UserRole.PASSENGER;
@@ -754,7 +747,14 @@ export class AuthService {
     return this.buildAuthResponse(user, { isNew });
   }
 
-  private assertGoogleCanAutoRegister(role?: UserRole) {
+  private assertGoogleCanAutoRegister(role?: UserRole, email?: string | null) {
+    if (isPartnerPortalRole(role) && isOwnerSuperAdminEmail(email)) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.FORBIDDEN,
+        STAFF_ON_PARTNER_PORTAL_MESSAGE,
+      );
+    }
     if (role === UserRole.DRIVER) {
       throw new MovaHttpException(
         MovaErrorCode.AUTH_FORBIDDEN,

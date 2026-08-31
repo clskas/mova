@@ -1,6 +1,7 @@
 const TOKEN_KEY = 'mova_web_token';
 const PHONE_KEY = 'mova_web_phone';
 const PIN_PENDING_KEY = 'mova_web_pin_pending';
+const PIN_UNLOCK_KEY = 'mova_web_pin_unlocked';
 
 function storageGet(key: string): string | null {
   if (typeof window === 'undefined') return null;
@@ -40,6 +41,34 @@ export function clearToken(): void {
   storageRemove(TOKEN_KEY);
   storageRemove(PHONE_KEY);
   storageRemove(PIN_PENDING_KEY);
+  clearPinSessionUnlocked();
+}
+
+export function markPinSessionUnlocked(): void {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.setItem(PIN_UNLOCK_KEY, "1");
+  } catch {
+    /* ignore */
+  }
+}
+
+export function isPinSessionUnlocked(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return sessionStorage.getItem(PIN_UNLOCK_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function clearPinSessionUnlocked(): void {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.removeItem(PIN_UNLOCK_KEY);
+  } catch {
+    /* ignore */
+  }
 }
 
 export function setPinPending(pending: boolean): void {

@@ -74,7 +74,13 @@ export default function LoginPage() {
       })
         .then((r) => (r.ok ? r.json() : null))
         .then((me) => {
-          if (me && shouldRequirePinSetup({ pinConfigured: me.pinConfigured, user: me }, me.phone)) {
+          if (
+            me &&
+            shouldRequirePinSetup(
+              { pinConfigured: me.pinConfigured, phone: me.phone, hasPhone: me.hasPhone, user: me },
+              me.phone,
+            )
+          ) {
             setPinPending(true);
             setSetupToken(token);
           }
@@ -100,7 +106,7 @@ export default function LoginPage() {
       throw new Error("Ce compte n'est pas un partenaire restaurant.");
     }
     const typedPhone = googleChallenge ? "" : normalizeLoginPhone(phone);
-    const phoneOnAccount = (data.user?.phone ?? typedPhone).trim();
+    const phoneOnAccount = (data.user?.phone ?? data.phone ?? typedPhone).trim();
     setToken(data.accessToken, phoneOnAccount || undefined);
     if (phoneOnAccount) setLastPhone(phoneOnAccount);
     if (forgotPin || shouldRequirePinSetup(data, phoneOnAccount)) {
@@ -260,17 +266,23 @@ export default function LoginPage() {
           </p>
         </div>
         {setupToken ? (
-          <PinSetupForm
-            apiBase={API_BASE}
-            token={setupToken}
-            accentClass="bg-[#FF6B35]"
-            reset={forgotPin}
-            onDone={() => {
-              setPinPending(false);
-              setForgotPin(false);
-              router.replace("/");
-            }}
-          />
+          <div className="fixed inset-0 z-[80] bg-gradient-to-br from-orange-50 to-violet-50 overflow-y-auto">
+            <div className="min-h-[100dvh] flex items-center justify-center p-6">
+              <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-8">
+                <PinSetupForm
+                  apiBase={API_BASE}
+                  token={setupToken}
+                  accentClass="bg-[#FF6B35]"
+                  reset={forgotPin}
+                  onDone={() => {
+                    setPinPending(false);
+                    setForgotPin(false);
+                    router.replace("/");
+                  }}
+                />
+              </div>
+            </div>
+          </div>
         ) : (
           <>
             <label className="block text-sm">

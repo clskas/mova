@@ -21,7 +21,24 @@ MOCK_PAYMENTS=true
 EOF
 
 echo "=== Docker compose (microservices) ==="
-docker compose up -d --build
+# Parallel npm ci against registry.npmjs.org saturates GitHub runners (exit 146 / network).
+export COMPOSE_PARALLEL_LIMIT="${COMPOSE_PARALLEL_LIMIT:-2}"
+export DOCKER_BUILDKIT=1
+compose_ok=0
+for attempt in 1 2 3; do
+  echo "docker compose up --build (attempt $attempt, parallel=$COMPOSE_PARALLEL_LIMIT)"
+  if docker compose up -d --build; then
+    compose_ok=1
+    break
+  fi
+  echo "docker compose failed on attempt $attempt — retrying" >&2
+  sleep 20
+done
+if [ "$compose_ok" -ne 1 ]; then
+  echo "docker compose failed after 3 attempts" >&2
+  docker compose ps -a || true
+  exit 1
+fi
 
 echo "=== Wait for API gateway /health/live then auth-ready /health ==="
 for i in $(seq 1 90); do

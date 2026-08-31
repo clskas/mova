@@ -5,17 +5,26 @@ import { useState } from "react";
 export type AuthPayload = {
   accessToken?: string;
   pinConfigured?: boolean;
+  needsPinSetup?: boolean;
+  phone?: string;
+  hasPhone?: boolean;
   user?: { phone?: string; hasPhone?: boolean; role?: string };
 };
 
 const SEED_DEMO_PHONE_RE = /^\+2439000000\d{2}$/;
 
+/** Empty string is missing — `??` would ignore the OTP typed phone. */
+export function accountPhone(data: AuthPayload, fallbackPhone?: string): string {
+  return String(data.user?.phone || data.phone || fallbackPhone || "").trim();
+}
+
 /** PIN obligatoire dès qu'un téléphone est connu (OTP saisi, JWT, /me). Google seul : pas de PIN. */
 export function shouldRequirePinSetup(data: AuthPayload, fallbackPhone?: string): boolean {
-  if (data.pinConfigured) return false;
-  const phone = (data.user?.phone ?? fallbackPhone ?? "").trim();
+  if (data.pinConfigured === true) return false;
+  if (data.needsPinSetup === true) return true;
+  const phone = accountPhone(data, fallbackPhone);
   if (SEED_DEMO_PHONE_RE.test(phone)) return false;
-  return Boolean(data.user?.hasPhone || phone);
+  return Boolean(data.user?.hasPhone || data.hasPhone || phone);
 }
 
 export function PinForgotLink({

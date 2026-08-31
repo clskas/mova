@@ -3,9 +3,9 @@
 import { useEffect, useState } from "react";
 import { GoogleContinueButton, googleClientId } from "@/components/GoogleContinueButton";
 import { ApiError, apiFetch, checkGatewayHealth } from "@/lib/api";
-import { clearToken, getStoredPhone, getToken, isPinPending, normalizeLoginPhone, phoneFromToken, setPinPending, setToken } from "@/lib/auth";
+import { clearToken, getStoredPhone, getToken, isPinPending, isPinSessionUnlocked, isSeedDemoPhone, markPinSessionUnlocked, normalizeLoginPhone, phoneFromToken, setPinPending, setToken } from "@/lib/auth";
 import { LOGIN_GOOGLE_UNAVAILABLE, LOGIN_OTP_UNAVAILABLE, toUserErrorMessage } from "@/lib/user-messages";
-import { AuthPayload, PinForgotLink, PinSetupForm, fetchPinEnabled, shouldRequirePinSetup } from "@/components/PinAuth";
+import { AuthPayload, PinForgotLink, PinSetupForm, accountPhone, fetchPinEnabled, shouldRequirePinSetup } from "@/components/PinAuth";
 
 type Props = { children: React.ReactNode };
 
@@ -60,21 +60,30 @@ export function OtpGate({ children }: Props) {
           { useMock },
         );
         if (cancelled) return;
-        const fallback = (me.phone ?? getStoredPhone() ?? phoneFromToken() ?? "").trim();
-        if (shouldRequirePinSetup({ pinConfigured: me.pinConfigured, user: me }, fallback)) {
+        const fallback = accountPhone(
+          { pinConfigured: me.pinConfigured, user: me, phone: me.phone, hasPhone: me.hasPhone },
+          (getStoredPhone() || phoneFromToken() || "").trim(),
+        );
+        if (shouldRequirePinSetup({ pinConfigured: me.pinConfigured, phone: me.phone, hasPhone: me.hasPhone, user: me }, fallback)) {
           setPinPending(true);
           setSetupPin(true);
           setReady(true);
           return;
         }
+        if (me.pinConfigured && fallback && !isSeedDemoPhone(fallback) && !isPinSessionUnlocked()) {
+          setPhone(fallback);
+          setPinMode(true);
+          setReady(true);
+          return;
+        }
+        markPinSessionUnlocked();
         setAuthenticated(true);
       } catch (e) {
         if (cancelled) return;
         if (e instanceof ApiError && (e.status === 401 || e.status === 403)) {
           clearToken();
-        } else {
-          setAuthenticated(true);
         }
+        /* fail closed — never skip PIN/login because /me failed */
       }
       setReady(true);
     })();
@@ -89,7 +98,7 @@ export function OtpGate({ children }: Props) {
       return;
     }
     const typedPhone = googleChallenge ? "" : normalizeLoginPhone(phone);
-    const phoneOnAccount = (data.user?.phone ?? typedPhone).trim();
+    const phoneOnAccount = accountPhone(data, typedPhone);
     setToken(data.accessToken, phoneOnAccount || undefined);
     if (forgotPin || shouldRequirePinSetup(data, phoneOnAccount)) {
       setPinPending(true);
@@ -97,6 +106,7 @@ export function OtpGate({ children }: Props) {
       return;
     }
     setPinPending(false);
+    markPinSessionUnlocked();
     setAuthenticated(true);
   }
 
@@ -233,6 +243,7 @@ export function OtpGate({ children }: Props) {
           setPinPending(false);
           setForgotPin(false);
           setSetupPin(false);
+          markPinSessionUnlocked();
           setAuthenticated(true);
         }}
       />

@@ -1,7 +1,8 @@
 import { test, expect, type Page } from "@playwright/test";
-import { requireReachable } from "./helpers";
+import { dismissUpdateBanner, requireReachable } from "./helpers";
 
 async function ensureWebHome(page: Page) {
+  await dismissUpdateBanner(page);
   const homeHeading = page.getByRole("heading", { name: /SENGA — RDC/i });
   if (await homeHeading.isVisible().catch(() => false)) return;
 
@@ -31,8 +32,9 @@ test.describe("Web passager — accueil", () => {
   });
 
   test("affiche SENGA — RDC sur la page d'accueil", async ({ page }) => {
-    await page.goto("/");
-    await ensureWebHome(page);
+  await page.goto("/");
+  await dismissUpdateBanner(page);
+  await ensureWebHome(page);
     await expect(page.getByRole("heading", { name: /SENGA — RDC/i })).toBeVisible();
   });
 });

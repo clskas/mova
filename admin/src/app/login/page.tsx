@@ -69,7 +69,12 @@ export default function LoginPage() {
         .then((r) => (r.ok ? r.json() : null))
         .then((me) => {
           if (!me) return;
-          if (shouldRequirePinSetup({ pinConfigured: me.pinConfigured, user: me }, me.phone)) {
+          if (
+            shouldRequirePinSetup(
+              { pinConfigured: me.pinConfigured, phone: me.phone, hasPhone: me.hasPhone, user: me },
+              me.phone,
+            )
+          ) {
             setPinPending(true);
             setSetupToken(token);
             const role = normalizeAdminRole(me.role ?? roleFromToken(token));
@@ -129,7 +134,7 @@ export default function LoginPage() {
       throw new Error("Connexion Google impossible pour le moment. Réessayez.");
     }
     const typedPhone = googleChallenge ? "" : normalizeLoginPhone(phone);
-    const phoneOnAccount = (data.user?.phone ?? typedPhone).trim();
+    const phoneOnAccount = (data.user?.phone ?? data.phone ?? typedPhone).trim();
     setToken(data.accessToken, phoneOnAccount || undefined);
     if (phoneOnAccount) setLastPhone(phoneOnAccount);
     if (forgotPin || shouldRequirePinSetup(data, phoneOnAccount)) {
@@ -316,16 +321,22 @@ export default function LoginPage() {
           )}
 
           {setupToken ? (
-            <PinSetupForm
-              apiBase={API_BASE}
-              token={setupToken}
-              reset={forgotPin}
-              onDone={() => {
-                setPinPending(false);
-                setForgotPin(false);
-                router.replace(setupRolePath);
-              }}
-            />
+            <div className="fixed inset-0 z-[80] bg-[var(--background)] overflow-y-auto">
+              <div className="min-h-[100dvh] flex items-center justify-center p-6">
+                <div className="w-full max-w-md mova-card p-8 shadow-mova">
+                  <PinSetupForm
+                    apiBase={API_BASE}
+                    token={setupToken}
+                    reset={forgotPin}
+                    onDone={() => {
+                      setPinPending(false);
+                      setForgotPin(false);
+                      router.replace(setupRolePath);
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
           ) : mode === "otp" ? (
             <div className="space-y-4">
               <label className="block text-sm">

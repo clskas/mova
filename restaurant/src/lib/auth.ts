@@ -92,6 +92,10 @@ export function setLastPhone(phone: string): void {
   if (trimmed) storageSet(LAST_PHONE_KEY, trimmed);
 }
 
+export function clearLastPhone(): void {
+  storageRemove(LAST_PHONE_KEY);
+}
+
 export function authHeaders(): Record<string, string> {
   const token = getToken();
   return token ? { Authorization: `Bearer ${token}` } : {};

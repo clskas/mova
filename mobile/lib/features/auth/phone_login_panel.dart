@@ -352,20 +352,24 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          widget.subtitle,
+          _step == PhoneLoginStep.pin
+              ? 'Entrez votre code PIN à 6 chiffres'
+              : widget.subtitle,
           textAlign: TextAlign.center,
           style: const TextStyle(color: MovaColors.textSecondary),
         ),
         const SizedBox(height: 24),
-        TextField(
-          controller: _phoneController,
-          keyboardType: TextInputType.phone,
-          decoration: const InputDecoration(
-            labelText: 'Téléphone',
-            prefixIcon: Icon(Icons.phone),
+        if (_step == PhoneLoginStep.phone) ...[
+          TextField(
+            controller: _phoneController,
+            keyboardType: TextInputType.phone,
+            decoration: const InputDecoration(
+              labelText: 'Téléphone',
+              prefixIcon: Icon(Icons.phone),
+            ),
+            enabled: _step == PhoneLoginStep.phone && !_loading,
           ),
-          enabled: _step == PhoneLoginStep.phone && !_loading,
-        ),
+        ],
         if (_step == PhoneLoginStep.pin) ...[
           const SizedBox(height: 16),
           SixDigitPinField(
@@ -379,8 +383,12 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
             alignment: Alignment.centerRight,
             child: TextButton(
               onPressed: _loading ? null : _switchToSms,
-              child: const Text('Code PIN oublié ?'),
+              child: const Text('PIN oublié'),
             ),
+          ),
+          TextButton(
+            onPressed: _loading ? null : _backToPhone,
+            child: const Text('Ce n\'est pas moi'),
           ),
         ],
         if (_step == PhoneLoginStep.otp || _step == PhoneLoginStep.googleOtp) ...[
@@ -443,7 +451,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
             PhoneLoginStep.otp || PhoneLoginStep.googleOtp => Icons.check,
           },
         ),
-        if (_step != PhoneLoginStep.phone) ...[
+        if (_step != PhoneLoginStep.phone && _step != PhoneLoginStep.pin) ...[
           const SizedBox(height: 8),
           TextButton(
             onPressed: _loading ? null : _backToPhone,

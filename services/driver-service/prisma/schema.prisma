@@ -57,6 +57,7 @@ model DriverProfile {
   onboardingCompleted       Boolean   @default(false)
   activationPin             String?
   activationPinVerifiedAt   DateTime?
+  activationPinExpiresAt    DateTime?
   operatingCity             String    @default("Kinshasa")
   isAvailable   Boolean   @default(false)
   currentLat    Float?

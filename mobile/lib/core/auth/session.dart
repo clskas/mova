@@ -9,7 +9,7 @@ import '../../features/driver/driver_otp_screen.dart';
 /// Déconnexion complète : token, caches locaux, retour à l'écran OTP.
 Future<void> logoutPassenger(BuildContext context, WidgetRef ref) async {
   final api = ref.read(apiClientProvider);
-  await api.clearToken();
+  await api.clearToken(keepPhone: true);
   await signOutGoogle();
   if (!context.mounted) return;
   Navigator.of(context).pushAndRemoveUntil(
@@ -20,7 +20,7 @@ Future<void> logoutPassenger(BuildContext context, WidgetRef ref) async {
 
 Future<void> logoutDriver(BuildContext context, WidgetRef ref) async {
   final api = ref.read(apiClientProvider);
-  await api.clearToken();
+  await api.clearToken(keepPhone: true);
   await signOutGoogle();
   if (!context.mounted) return;
   Navigator.of(context).pushAndRemoveUntil(

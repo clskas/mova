@@ -92,12 +92,17 @@ export default function KycPage() {
 
   async function review(id: string, approved: boolean) {
     try {
-      const result = await apiFetch<{ activationPin?: string }>(`/api/admin/kyc/${id}/review`, {
+      const result = await apiFetch<{ activationPin?: string; smsSent?: boolean }>(`/api/admin/kyc/${id}/review`, {
         method: "POST",
         body: JSON.stringify({ approved }),
       });
       if (approved && result.activationPin) {
-        window.alert(`KYC approuvé.\n\nCode PIN d'activation chauffeur : ${result.activationPin}\n\nCommuniquez ce code au chauffeur pour qu'il puisse passer en ligne.`);
+        const sms = result.smsSent
+          ? "Un SMS a été envoyé au chauffeur."
+          : "SMS non envoyé — communiquez le code ci-dessous.";
+        window.alert(
+          `Dossier validé.\n\nCode PIN d'activation (6 chiffres, 72 h, usage unique) : ${result.activationPin}\n\n${sms}`,
+        );
       }
       load();
     } catch (e) {
@@ -109,7 +114,12 @@ export default function KycPage() {
     try {
       const result = await reviewDriverKyc(userId, approved);
       if (approved && result.activationPin) {
-        window.alert(`KYC approuvé.\n\nCode PIN d'activation : ${result.activationPin}`);
+        const sms = result.smsSent
+          ? "Un SMS a été envoyé au chauffeur."
+          : "SMS non envoyé — communiquez le code ci-dessous.";
+        window.alert(
+          `Dossier validé.\n\nCode PIN d'activation (6 chiffres, 72 h, usage unique) : ${result.activationPin}\n\n${sms}`,
+        );
       }
       load();
     } catch (e) {

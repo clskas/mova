@@ -39,9 +39,12 @@ export function setToken(token: string, phone?: string): void {
 
 export function clearToken(): void {
   storageRemove(TOKEN_KEY);
-  storageRemove(PHONE_KEY);
   storageRemove(PIN_PENDING_KEY);
   clearPinSessionUnlocked();
+}
+
+export function clearStoredPhone(): void {
+  storageRemove(PHONE_KEY);
 }
 
 export function dropTokenKeepPhone(phone?: string): void {

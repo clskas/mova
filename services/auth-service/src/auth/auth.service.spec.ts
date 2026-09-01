@@ -133,22 +133,36 @@ describe('AuthService', () => {
     expect(prisma.user.update).not.toHaveBeenCalled();
   });
 
-  it('does not grant DRIVER just from OTP body role', async () => {
+  it('creates a pending DRIVER applicant on first driver-app OTP (not ACTIVE)', async () => {
     prisma.user.findUnique.mockResolvedValue(null);
     await seedHashedOtp('+243811111111', '847291');
-    await expect(service.verifyOtp('+243811111111', '847291', UserRole.DRIVER)).rejects.toMatchObject({
-      response: { code: MovaErrorCode.AUTH_FORBIDDEN },
+    const created = makeUser({
+      id: 'applicant-1',
+      phone: '+243811111111',
+      role: UserRole.DRIVER,
+      status: UserStatus.PENDING_KYC,
     });
-    expect(prisma.user.create).not.toHaveBeenCalled();
+    prisma.user.create.mockResolvedValue(created);
+    const result = await service.verifyOtp('+243811111111', '847291', UserRole.DRIVER);
+    expect(result.user.role).toBe(UserRole.DRIVER);
+    expect(result.user.status).toBe(UserStatus.PENDING_KYC);
+    expect(prisma.user.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          phone: '+243811111111',
+          role: UserRole.DRIVER,
+          status: UserStatus.PENDING_KYC,
+        }),
+      }),
+    );
   });
 
-  it('refuses DRIVER OTP request when no chauffeur account exists', async () => {
+  it('sends DRIVER OTP when no chauffeur account exists yet', async () => {
     prisma.user.findUnique.mockResolvedValue(null);
-    await expect(service.requestOtp('+243893515173', UserRole.DRIVER)).rejects.toMatchObject({
-      response: { code: MovaErrorCode.AUTH_FORBIDDEN },
+    await expect(service.requestOtp('+243893515173', UserRole.DRIVER)).resolves.toMatchObject({
+      success: true,
     });
-    expect(sms.sendOtp).not.toHaveBeenCalled();
-    expect(prisma.otpCode.create).not.toHaveBeenCalled();
+    expect(prisma.otpCode.create).toHaveBeenCalled();
   });
 
   it('allows SUPER_ADMIN on the passenger app without changing role', async () => {

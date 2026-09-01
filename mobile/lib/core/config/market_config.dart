@@ -34,14 +34,15 @@ class MarketConfig {
   /// Web OAuth client ID (Google Cloud). Required as `serverClientId` so Android
   /// returns an ID token the backend can verify. Same value as `GOOGLE_CLIENT_ID`.
   ///
-  /// Android OAuth clients (Play / Cloud Console) — SHA-1 of the upload keystore:
-  /// `keytool -list -v -keystore <upload.jks> -alias <alias>`
+  /// Google Cloud: **one SHA-1 per Android OAuth client**. Do not replace the
+  /// upload SHA-1 with Play App Signing — create a second Android client
+  /// (same package) for the Play **classical SHA-1** (not SHA-256 / not PQC).
   /// Packages: `cd.mova.mova.passenger`, `cd.mova.mova.driver`.
   /// `--dart-define=GOOGLE_SERVER_CLIENT_ID=....apps.googleusercontent.com`
   ///
   /// Must be the **Web** OAuth client (same as Render `GOOGLE_CLIENT_ID`).
-  /// Android OAuth clients stay in Google Cloud (package + SHA-1) and on
-  /// Render (`GOOGLE_ANDROID_CLIENT_ID` / `_DRIVER`) — not in this binary.
+  /// Android OAuth client IDs stay in Cloud + Render audiences
+  /// (`…ijgdi98i14vntarcpefpu7rl23an12fi` passenger, `…ajtjt0p267gh6ab2jjj4dul0orkh03do` driver).
   static const googleServerClientId = String.fromEnvironment(
     'GOOGLE_SERVER_CLIENT_ID',
     defaultValue: '58917716638-rbgibno8pdvlud8dd00pdfjdv3q1dh4k.apps.googleusercontent.com',

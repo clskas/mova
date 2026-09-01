@@ -68,9 +68,62 @@ export function PinForgotLink({
   disabled?: boolean;
 }) {
   return (
-    <button type="button" className="w-full text-sm text-gray-500 underline" disabled={disabled} onClick={onClick}>
+    <button type="button" data-testid="pin-forgot" className="w-full text-sm text-gray-500 underline" disabled={disabled} onClick={onClick}>
       PIN oublié
     </button>
+  );
+}
+
+export function maskPhoneDisplay(phone: string): string {
+  const n = phone.replace(/\s/g, "");
+  if (n.length < 7) return "votre numéro";
+  return `${n.slice(0, 4)} ••• ${n.slice(-3)}`;
+}
+
+export function PinDigitPad({
+  value,
+  onChange,
+  disabled,
+  accentClass = "bg-[#6C63FF]",
+}: {
+  value: string;
+  onChange: (next: string) => void;
+  disabled?: boolean;
+  accentClass?: string;
+}) {
+  const keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "⌫"] as const;
+  function press(key: string) {
+    if (disabled || !key) return;
+    if (key === "⌫") {
+      onChange(value.slice(0, -1));
+      return;
+    }
+    if (value.length < 6) onChange(`${value}${key}`);
+  }
+  return (
+    <div data-testid="pin-pad" className="space-y-4">
+      <div className="flex justify-center gap-2" aria-hidden>
+        {Array.from({ length: 6 }).map((_, i) => (
+          <span
+            key={i}
+            className={`h-3.5 w-3.5 rounded-full ${i < value.length ? accentClass : "bg-gray-200"}`}
+          />
+        ))}
+      </div>
+      <div className="grid grid-cols-3 gap-2 max-w-[240px] mx-auto">
+        {keys.map((key, i) => (
+          <button
+            key={`${key}-${i}`}
+            type="button"
+            disabled={disabled || key === ""}
+            onClick={() => press(key)}
+            className="h-14 rounded-xl bg-white border border-gray-100 shadow-sm text-xl font-semibold text-[#1A1A2E] disabled:opacity-0"
+          >
+            {key}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 

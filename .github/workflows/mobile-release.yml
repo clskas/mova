@@ -111,12 +111,11 @@ jobs:
         id: playver
         run: |
           set -euo pipefail
-          # Play rejected Mobile Release #26: "Version code 7 has already been used".
-          # github.run_number is unique per Mobile Release workflow (currently 26+).
+          # Play last published versionCode was 28+. github.run_number must stay above that.
           CODE="${{ github.run_number }}"
-          if [ "$CODE" -lt 8 ]; then CODE=8; fi
+          if [ "$CODE" -lt 29 ]; then CODE=29; fi
           echo "code=$CODE" >> "$GITHUB_OUTPUT"
-          echo "Play versionCode=$CODE (pubspec 1.0.3; run_number=${{ github.run_number }})"
+          echo "Play versionCode=$CODE (pubspec 1.0.4; run_number=${{ github.run_number }})"
 
       - name: Build passenger AAB
         working-directory: mobile
@@ -130,7 +129,7 @@ jobs:
           flutter build appbundle --release \
             --flavor passenger \
             -t lib/main_passenger.dart \
-            --build-name=1.0.3 \
+            --build-name=1.0.4 \
             --build-number=${{ steps.playver.outputs.code }} \
             --dart-define=API_URL=${{ steps.urls.outputs.api }} \
             --dart-define=WS_URL=${{ steps.urls.outputs.ws }} \
@@ -149,7 +148,7 @@ jobs:
           flutter build appbundle --release \
             --flavor driver \
             -t lib/main_driver.dart \
-            --build-name=1.0.3 \
+            --build-name=1.0.4 \
             --build-number=${{ steps.playver.outputs.code }} \
             --dart-define=API_URL=${{ steps.urls.outputs.api }} \
             --dart-define=WS_URL=${{ steps.urls.outputs.ws }} \

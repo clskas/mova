@@ -25,7 +25,7 @@ export default defineConfig({
     },
     {
       name: "web",
-      testMatch: [/web-.*\.spec\.ts/, /health\.spec\.ts/],
+      testMatch: [/web-.*\.spec\.ts/, /health\.spec\.ts/, /pin-only-live\.spec\.ts/],
       use: {
         ...devices["Desktop Chrome"],
         baseURL: webBaseUrl,

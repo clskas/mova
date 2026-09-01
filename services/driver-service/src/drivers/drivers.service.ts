@@ -534,15 +534,31 @@ export class DriversService {
     const profile = await this.prisma.driverProfile.findUnique({ where: { userId } });
     if (!profile) throw new MovaHttpException(MovaErrorCode.DRIVER_KYC_PENDING);
     if (profile.kycStatus !== KycStatus.APPROVED) {
-      throw new MovaHttpException(MovaErrorCode.DRIVER_KYC_PENDING, undefined, 'KYC non encore approuvé.');
+      throw new MovaHttpException(MovaErrorCode.DRIVER_KYC_PENDING, undefined, 'Dossier pas encore validé par SENGA.');
     }
     if (!profile.activationPin || profile.activationPin !== pin.trim()) {
       throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Code PIN incorrect.');
     }
+    if (profile.activationPinExpiresAt && profile.activationPinExpiresAt.getTime() < Date.now()) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        undefined,
+        'Ce code a expiré. Demandez un nouveau PIN à l\'administration SENGA.',
+      );
+    }
     await this.prisma.driverProfile.update({
       where: { userId },
-      data: { activationPinVerifiedAt: new Date() },
+      data: {
+        activationPinVerifiedAt: new Date(),
+        activationPin: null,
+        activationPinExpiresAt: null,
+      },
     });
+    await fetch(serviceUrl('auth', `/internal/users/${userId}`), {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'x-internal-api-key': INTERNAL_API_KEY },
+      body: JSON.stringify({ status: 'ACTIVE', role: 'DRIVER' }),
+    }).catch((e) => this.logger.warn(`Could not activate auth user ${userId}`, e));
     return this.getProfileWithUser(userId);
   }
 
@@ -571,9 +587,41 @@ export class DriversService {
     return crypto.randomInt(100000, 999999).toString();
   }
 
+  private activationPinExpiry() {
+    return new Date(Date.now() + 72 * 60 * 60 * 1000);
+  }
+
+  private async sendActivationPinSms(userId: string, pin: string): Promise<boolean> {
+    const user = await this.fetchAuthUser(userId);
+    const phone = user?.phone?.trim();
+    if (!phone) {
+      this.logger.warn(`Activation PIN SMS skipped — no phone for ${userId}`);
+      return false;
+    }
+    try {
+      const res = await fetch(serviceUrl('notification', '/internal/sms'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-internal-api-key': INTERNAL_API_KEY },
+        body: JSON.stringify({
+          phone,
+          text: `SENGA chauffeur — code d'activation : ${pin}. Valable 72 h, usage unique. Saisissez-le dans l'application après validation de votre dossier.`,
+        }),
+      });
+      if (!res.ok) {
+        this.logger.warn(`Activation PIN SMS HTTP ${res.status} for ${userId}`);
+        return false;
+      }
+      return true;
+    } catch (e) {
+      this.logger.warn(`Activation PIN SMS failed for ${userId}: ${(e as Error).message}`);
+      return false;
+    }
+  }
+
   private async applyKycApproval(userId: string) {
     const pin = this.generateActivationPin();
     const now = new Date();
+    const expiresAt = this.activationPinExpiry();
     const defaultExpiry = new Date(now);
     defaultExpiry.setUTCFullYear(defaultExpiry.getUTCFullYear() + 2);
     const existing = await this.prisma.driverProfile.findUnique({ where: { userId } });
@@ -584,6 +632,7 @@ export class DriversService {
         kycStatus: KycStatus.APPROVED,
         activationPin: pin,
         activationPinVerifiedAt: null,
+        activationPinExpiresAt: expiresAt,
         licenseExpiry: defaultExpiry,
         insuranceExpiry: defaultExpiry,
         technicalInspectionExpiry: defaultExpiry,
@@ -592,6 +641,7 @@ export class DriversService {
         kycStatus: KycStatus.APPROVED,
         activationPin: pin,
         activationPinVerifiedAt: null,
+        activationPinExpiresAt: expiresAt,
         ...(existing?.licenseExpiry == null ? { licenseExpiry: defaultExpiry } : {}),
         ...(existing?.insuranceExpiry == null ? { insuranceExpiry: defaultExpiry } : {}),
         ...(existing?.technicalInspectionExpiry == null ? { technicalInspectionExpiry: defaultExpiry } : {}),
@@ -600,8 +650,8 @@ export class DriversService {
     await fetch(serviceUrl('auth', `/internal/users/${userId}`), {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', 'x-internal-api-key': INTERNAL_API_KEY },
-      body: JSON.stringify({ status: 'ACTIVE', role: 'DRIVER' }),
-    }).catch((e) => this.logger.warn(`Could not promote auth user ${userId} to DRIVER`, e));
+      body: JSON.stringify({ role: 'DRIVER' }),
+    }).catch((e) => this.logger.warn(`Could not confirm DRIVER role for ${userId}`, e));
     const profile = await this.prisma.driverProfile.findUnique({ where: { userId } });
     if (profile) {
       await this.ensureDefaultVehicle(profile.id);
@@ -610,7 +660,8 @@ export class DriversService {
         data: { typeApprovalStatus: KycStatus.APPROVED, typeApprovedAt: now, typeApprovalNotes: null },
       });
     }
-    return pin;
+    const smsSent = await this.sendActivationPinSms(userId, pin);
+    return { pin, smsSent };
   }
 
   async getProfile(userId: string) {
@@ -759,8 +810,8 @@ export class DriversService {
         where: { userId: doc.userId, status: KycStatus.PENDING },
         data: { status: KycStatus.APPROVED },
       });
-      const activationPin = await this.applyKycApproval(doc.userId);
-      return { ...doc, activationPin };
+      const issued = await this.applyKycApproval(doc.userId);
+      return { ...doc, activationPin: issued.pin, smsSent: issued.smsSent };
     } else {
       const approvedCount = await this.prisma.kycDocument.count({
         where: { userId: doc.userId, status: KycStatus.APPROVED },
@@ -783,17 +834,20 @@ export class DriversService {
       data: { status, ...(notes ? { notes } : {}) },
     });
     let activationPin: string | undefined;
+    let smsSent = false;
     if (approved) {
-      activationPin = await this.applyKycApproval(userId);
+      const issued = await this.applyKycApproval(userId);
+      activationPin = issued.pin;
+      smsSent = issued.smsSent;
     } else {
       await this.prisma.driverProfile.upsert({
         where: { userId },
         create: { userId, kycStatus: status },
-        update: { kycStatus: status, activationPin: null, activationPinVerifiedAt: null },
+        update: { kycStatus: status, activationPin: null, activationPinVerifiedAt: null, activationPinExpiresAt: null },
       });
     }
     const profile = await this.prisma.driverProfile.findUnique({ where: { userId }, include: { vehicles: true } });
-    return { ...profile, activationPin };
+    return { ...profile, activationPin, smsSent };
   }
 
   async updateRating(userId: string, ratingAvg: number) {
@@ -825,11 +879,13 @@ export class DriversService {
       );
     }
     const pin = this.generateActivationPin();
+    const expiresAt = this.activationPinExpiry();
     await this.prisma.driverProfile.update({
       where: { userId },
-      data: { activationPin: pin, activationPinVerifiedAt: null },
+      data: { activationPin: pin, activationPinVerifiedAt: null, activationPinExpiresAt: expiresAt },
     });
-    return { activationPin: pin, userId, publicId: formatMovaPublicId(userId, 'DRIVER') };
+    const smsSent = await this.sendActivationPinSms(userId, pin);
+    return { activationPin: pin, smsSent, userId, publicId: formatMovaPublicId(userId, 'DRIVER') };
   }
 
   private kycUploadSummary(userId: string, docs: { userId: string; type: string }[]) {

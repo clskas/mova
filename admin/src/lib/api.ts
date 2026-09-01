@@ -1767,7 +1767,7 @@ export async function setDriverStatus(userId: string, active: boolean, suspendUs
 }
 
 export async function reviewDriverKyc(userId: string, approved: boolean, notes?: string) {
-  return apiFetch<{ activationPin?: string }>(`/api/admin/drivers/${userId}/kyc`, {
+  return apiFetch<{ activationPin?: string; smsSent?: boolean }>(`/api/admin/drivers/${userId}/kyc`, {
     method: "PATCH",
     body: JSON.stringify({ approved, notes }),
   });
@@ -1808,7 +1808,7 @@ export async function runKycOcr(documentId: string) {
 }
 
 export async function regenerateDriverActivationPin(userId: string) {
-  return apiFetch<{ activationPin: string; publicId?: string }>(`/api/admin/drivers/${userId}/activation-pin`, {
+  return apiFetch<{ activationPin: string; smsSent?: boolean; publicId?: string }>(`/api/admin/drivers/${userId}/activation-pin`, {
     method: "POST",
     body: JSON.stringify({}),
   });

@@ -291,13 +291,22 @@ export class AuthService {
     let isNew = false;
     if (!user) {
       if (requestedRole === UserRole.DRIVER) {
-        throw new MovaHttpException(
-          MovaErrorCode.AUTH_FORBIDDEN,
-          HttpStatus.FORBIDDEN,
-          NO_DRIVER_ACCOUNT_MESSAGE,
-        );
-      }
-      if (isStaffAuthRole(requestedRole) || normalized === OWNER_SUPER_ADMIN_PHONE) {
+        user = await this.prisma.user.create({
+          data: {
+            phone: normalized,
+            role: UserRole.DRIVER,
+            status: UserStatus.PENDING_KYC,
+          },
+        });
+        isNew = true;
+        await this.provisionUser(user.id, user.role);
+        try {
+          const payload: UserCreatedPayload = { userId: user.id, phone: user.phone ?? undefined, role: user.role };
+          await this.redis.publish(MOVA_EVENTS.USER_CREATED, payload);
+        } catch (e) {
+          this.logger.warn(`USER_CREATED publish failed: ${(e as Error).message}`);
+        }
+      } else if (isStaffAuthRole(requestedRole) || normalized === OWNER_SUPER_ADMIN_PHONE) {
         throw new MovaHttpException(
           MovaErrorCode.AUTH_FORBIDDEN,
           HttpStatus.FORBIDDEN,
@@ -760,7 +769,7 @@ export class AuthService {
       throw new MovaHttpException(
         MovaErrorCode.AUTH_FORBIDDEN,
         HttpStatus.FORBIDDEN,
-        'Aucun compte chauffeur lié à Google. Connectez-vous avec votre numéro +243, ou terminez le KYC chauffeur.',
+        'Aucun compte chauffeur lié à Google. Connectez-vous avec votre numéro +243 (inscription chauffeur en attente de validation).',
       );
     }
     if (isStaffAuthRole(role)) {
@@ -998,14 +1007,7 @@ export class AuthService {
   private async assertInviteOnlyAccountExists(phone: string, role?: UserRole) {
     if (role === UserRole.DRIVER) {
       const user = await this.prisma.user.findUnique({ where: { phone } });
-      if (!user) {
-        throw new MovaHttpException(
-          MovaErrorCode.AUTH_FORBIDDEN,
-          HttpStatus.FORBIDDEN,
-          NO_DRIVER_ACCOUNT_MESSAGE,
-        );
-      }
-      this.assertRoleAccess(user, role);
+      if (user) this.assertRoleAccess(user, role);
       return;
     }
     if (!isStaffAuthRole(role)) return;

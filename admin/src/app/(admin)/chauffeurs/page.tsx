@@ -451,7 +451,7 @@ export default function ChauffeursPage() {
                 <p className="font-mono text-2xl tracking-widest mt-2 text-amber-950">{activationPin}</p>
                 {!selected.activationPinVerified && (
                   <p className="text-amber-800 mt-1 text-xs">
-                    Le chauffeur saisit ce code dans l&apos;app (accueil → popup PIN) avant de passer en ligne.
+                    Le chauffeur saisit ce code dans l&apos;app (72 h, usage unique). Un SMS a aussi été tenté.
                   </p>
                 )}
               </div>
@@ -459,14 +459,14 @@ export default function ChauffeursPage() {
 
             {"canGenerateActivationPin" in selected && selected.canGenerateActivationPin && !activationPin && canReviewKyc && (
               <div className="rounded-xl bg-blue-50 border border-blue-200 p-4 text-sm">
-                <p className="text-blue-900">KYC approuvé mais aucun PIN actif. Générez un code pour ce chauffeur existant.</p>
+                <p className="text-blue-900">KYC approuvé mais aucun PIN actif. Envoyez un code SMS à ce chauffeur.</p>
                 <button
                   type="button"
                   onClick={generatePin}
                   disabled={saving}
                   className="mt-2 px-4 py-2 rounded-lg bg-[#6C63FF] text-white text-sm font-medium disabled:opacity-50"
                 >
-                  Générer code PIN
+                  Envoyer le PIN d&apos;activation
                 </button>
               </div>
             )}
@@ -478,7 +478,7 @@ export default function ChauffeursPage() {
                 disabled={saving}
                 className="text-sm text-[#6C63FF] hover:underline"
               >
-                Régénérer un nouveau PIN
+                Renvoyer le PIN par SMS
               </button>
             )}
 

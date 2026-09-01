@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { GoogleContinueButton, googleClientId } from "@/components/GoogleContinueButton";
 import { apiFetch } from "@/lib/api";
-import { clearToken, normalizeLoginPhone, setToken } from "@/lib/auth";
+import { dropTokenKeepPhone, getStoredPhone, normalizeLoginPhone, setToken } from "@/lib/auth";
 import { toUserErrorMessage } from "@/lib/user-messages";
 
 type Me = {
@@ -254,7 +254,7 @@ export function AccountView({ onBack, mock }: Props) {
             disabled={busy}
             onClick={() => {
               void apiFetch("/api/auth/logout", { method: "POST" }, { useMock: mock }).catch(() => undefined);
-              clearToken();
+              dropTokenKeepPhone(getStoredPhone() || "");
               window.location.reload();
             }}
             className="w-full mt-4 text-sm text-gray-600 underline"

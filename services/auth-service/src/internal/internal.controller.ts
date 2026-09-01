@@ -21,6 +21,10 @@ class UpdateUserAdminDto {
   @IsOptional() @IsString() phone?: string;
 }
 
+class PurgeUserDto {
+  @IsOptional() @IsString() actorId?: string;
+}
+
 @ApiTags('internal')
 @Controller('internal')
 @UseGuards(InternalApiGuard)
@@ -43,4 +47,8 @@ export class InternalController {
   update(@Param('id') id: string, @Body() dto: UpdateUserAdminDto) { return this.users.updateAdmin(id, dto); }
   @Delete('users/:id')
   deactivate(@Param('id') id: string) { return this.users.deactivateUser(id); }
+  @Post('users/:id/purge')
+  purge(@Param('id') id: string, @Body() body: PurgeUserDto) {
+    return this.users.purgeUser(id, body?.actorId);
+  }
 }

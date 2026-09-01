@@ -1603,6 +1603,13 @@ export async function deactivateUser(id: string) {
   return apiFetch<AdminUser>(`/api/admin/users/${id}`, { method: "DELETE" });
 }
 
+export async function purgeUser(id: string) {
+  return apiFetch<{ deleted: boolean; id: string }>(`/api/admin/users/${id}/purge`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+}
+
 export async function fetchUser(id: string) {
   return apiFetch<AdminUser>(`/api/admin/users/${id}`);
 }

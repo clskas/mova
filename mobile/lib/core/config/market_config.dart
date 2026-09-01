@@ -41,8 +41,8 @@ class MarketConfig {
   /// `--dart-define=GOOGLE_SERVER_CLIENT_ID=....apps.googleusercontent.com`
   ///
   /// Must be the **Web** OAuth client (same as Render `GOOGLE_CLIENT_ID`).
-  /// Android OAuth client IDs stay in Cloud + Render audiences
-  /// (`…ijgdi98i14vntarcpefpu7rl23an12fi` passenger, `…ajtjt0p267gh6ab2jjj4dul0orkh03do` driver).
+  /// Android OAuth client IDs stay in Google Cloud + Render `GOOGLE_ANDROID_CLIENT_ID`
+  /// (comma-separated audiences on mova-auth). Do not use an Android ID as `serverClientId`.
   static const googleServerClientId = String.fromEnvironment(
     'GOOGLE_SERVER_CLIENT_ID',
     defaultValue: '58917716638-rbgibno8pdvlud8dd00pdfjdv3q1dh4k.apps.googleusercontent.com',

@@ -95,6 +95,17 @@ export class WalletService {
     return this.prisma.wallet.upsert({ where: { userId }, create: { userId, balanceCdf: 0 }, update: {} });
   }
 
+  async purgeUserData(userId: string) {
+    await this.prisma.userSubscription.deleteMany({ where: { userId } });
+    const wallet = await this.prisma.wallet.findUnique({ where: { userId } });
+    if (!wallet) return { frozen: false, heldCdf: 0, userId };
+    const available = wallet.balanceCdf - (wallet.heldBalanceCdf ?? 0);
+    if (available > 0) {
+      await this.holdFunds(userId, available, 'DELETED_USER', userId, 'Compte supprimé — solde gelé');
+    }
+    return { frozen: true, heldCdf: Math.max(0, available), userId };
+  }
+
   async getWallet(userId: string) {
     const id = userId?.trim();
     if (!id) {

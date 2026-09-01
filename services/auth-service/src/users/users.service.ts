@@ -189,12 +189,51 @@ export class UsersService {
     return updated;
   }
 
+  async purgeUser(id: string, actorId?: string) {
+    const existing = await this.prisma.user.findUnique({ where: { id } });
+    if (!existing) throw new MovaHttpException(MovaErrorCode.USER_NOT_FOUND, HttpStatus.NOT_FOUND);
+    if (actorId && existing.id === actorId) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.FORBIDDEN,
+        'Vous ne pouvez pas supprimer votre propre compte.',
+      );
+    }
+    this.assertNotOwnerDelete(existing.phone);
+    if (existing.role === UserRole.SUPER_ADMIN) {
+      const superAdmins = await this.prisma.user.count({ where: { role: UserRole.SUPER_ADMIN } });
+      if (superAdmins <= 1) {
+        throw new MovaHttpException(
+          MovaErrorCode.AUTH_FORBIDDEN,
+          HttpStatus.FORBIDDEN,
+          'Impossible de supprimer le dernier compte SUPER_ADMIN.',
+        );
+      }
+    }
+    if (existing.phone) {
+      await this.prisma.otpCode.deleteMany({ where: { phone: existing.phone } });
+    }
+    await this.denySuspendedUser(existing.id);
+    await this.prisma.user.delete({ where: { id } });
+    return { deleted: true, id };
+  }
+
   private assertNotOwnerSuspend(phone?: string | null) {
     if (phone && normalizePhoneRdc(phone) === OWNER_SUPER_ADMIN_PHONE) {
       throw new MovaHttpException(
         MovaErrorCode.AUTH_FORBIDDEN,
         HttpStatus.FORBIDDEN,
         'Impossible de suspendre le compte propriétaire SUPER_ADMIN.',
+      );
+    }
+  }
+
+  private assertNotOwnerDelete(phone?: string | null) {
+    if (phone && normalizePhoneRdc(phone) === OWNER_SUPER_ADMIN_PHONE) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.FORBIDDEN,
+        'Impossible de supprimer le compte propriétaire SUPER_ADMIN.',
       );
     }
   }

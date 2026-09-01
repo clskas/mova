@@ -64,8 +64,8 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const pinSubmitLock = useRef(false);
-  const pinOnly = pinMode && !codeSent && !googleChallenge && !setupToken;
-  const hideIdentity = pinOnly || (forgotPin && !googleChallenge);
+  const pinOnly = pinMode && !codeSent && !googleChallenge && !setupToken && !forgotPin;
+  const hideIdentity = pinOnly;
 
   useEffect(() => {
     const token = getToken();
@@ -126,7 +126,7 @@ export default function LoginPage() {
     setError(null);
     try {
       const msisdn = normalizeLoginPhone(phone);
-      if (!opts?.forceSms && !pinMode) {
+      if (!opts?.forceSms && !pinMode && !forgotPin) {
         const enabled = await fetchPinEnabled(API_BASE, msisdn, { role: "ADMIN" });
         if (enabled) {
           setPinMode(true);
@@ -332,7 +332,11 @@ export default function LoginPage() {
           <div>
             <h2 className="text-2xl font-semibold text-mova-midnight">Connexion</h2>
             <p className="text-sm text-gray-500 mt-1">
-              {pinOnly ? `Entrez le PIN pour ${maskPhoneDisplay(phone)}` : "Accès réservé au personnel autorisé"}
+              {pinOnly
+                ? `Entrez le PIN pour ${maskPhoneDisplay(phone)}`
+                : forgotPin && !codeSent
+                  ? "Récupérez l'accès par SMS ou Google, puis définissez un nouveau PIN."
+                  : "Accès réservé au personnel autorisé"}
             </p>
           </div>
 
@@ -397,6 +401,18 @@ export default function LoginPage() {
                 />
               </label>
               )}
+              {forgotPin && !codeSent && !googleChallenge && (
+                <button
+                  type="button"
+                  className="w-full text-sm text-gray-500 underline"
+                  onClick={() => {
+                    setPhone("");
+                    setError(null);
+                  }}
+                >
+                  Utiliser un autre numéro
+                </button>
+              )}
               {pinMode && !codeSent && (
                 <PinDigitPad value={pin} onChange={setPin} disabled={loading} />
               )}
@@ -431,7 +447,7 @@ export default function LoginPage() {
                 onClick={() => {
                   if (codeSent) void loginWithOtp();
                   else if (pinMode && pin.length === 6) void loginWithPin();
-                  else void requestOtp();
+                  else void requestOtp({ forceSms: forgotPin });
                 }}
                 className="mova-btn-primary w-full"
               >
@@ -443,7 +459,9 @@ export default function LoginPage() {
                     ? "Se connecter"
                     : pinMode
                       ? "Se connecter avec le PIN"
-                      : "Continuer"}
+                      : forgotPin
+                        ? "Recevoir un SMS"
+                        : "Continuer"}
               </button>
               )}
               {pinMode && !codeSent && (
@@ -453,9 +471,22 @@ export default function LoginPage() {
                     setForgotPin(true);
                     setPinMode(false);
                     setPin("");
-                    void requestOtp({ forceSms: true });
+                    setError(null);
                   }}
                 />
+              )}
+              {forgotPin && !codeSent && !googleChallenge && (
+                <button
+                  type="button"
+                  className="w-full text-sm text-gray-400 underline"
+                  onClick={() => {
+                    setForgotPin(false);
+                    setPinMode(true);
+                    setError(null);
+                  }}
+                >
+                  Retour au PIN
+                </button>
               )}
               {pinOnly && (
                 <button
@@ -471,6 +502,19 @@ export default function LoginPage() {
                   }}
                 >
                   Ce n&apos;est pas moi
+                </button>
+              )}
+              {forgotPin && !codeSent && !googleChallenge && (
+                <button
+                  type="button"
+                  className="w-full text-sm text-gray-500 underline"
+                  onClick={() => {
+                    setForgotPin(false);
+                    if (getLastPhone()) setPinMode(true);
+                    setError(null);
+                  }}
+                >
+                  Retour au PIN
                 </button>
               )}
               {googleClientId() && !codeSent && !googleChallenge && !hideIdentity && (
@@ -521,8 +565,8 @@ export default function LoginPage() {
 
           <p className="text-xs text-gray-400 text-center leading-relaxed">
             Téléphone : code par SMS. Google : code par e-mail (boîte Google), même si un numéro est lié.
-            Après la première connexion avec un téléphone, le PIN à 6 chiffres est obligatoire. PIN oublié : un SMS
-            permet de définir un nouveau code.
+            Après la première connexion avec un téléphone, le PIN à 6 chiffres est obligatoire. PIN oublié : SMS
+            ou Google, puis un nouveau code.
           </p>
         </div>
       </main>

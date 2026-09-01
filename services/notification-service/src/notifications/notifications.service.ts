@@ -451,4 +451,10 @@ export class NotificationsService implements OnModuleInit {
 
   list(userId: string) { return this.prisma.notification.findMany({ where: { userId }, orderBy: { createdAt: 'desc' }, take: 50 }); }
   markRead(id: string) { return this.prisma.notification.update({ where: { id }, data: { read: true } }); }
+
+  async purgeUserData(userId: string) {
+    await this.prisma.notification.deleteMany({ where: { userId } });
+    await this.prisma.pushDevice.deleteMany({ where: { userId } });
+    return { deleted: true, userId };
+  }
 }

@@ -29,8 +29,8 @@ export function OtpGate({ children }: Props) {
   const [error, setError] = useState<string | null>(null);
   const pinSubmitLock = useRef(false);
 
-  const pinOnly = pinMode && !codeSent && !googleChallenge && !setupPin;
-  const hideIdentity = pinOnly || (forgotPin && !googleChallenge);
+  const pinOnly = pinMode && !codeSent && !googleChallenge && !setupPin && !forgotPin;
+  const hideIdentity = pinOnly;
 
   useEffect(() => {
     const allowMock = process.env.NODE_ENV !== "production";
@@ -139,7 +139,7 @@ export function OtpGate({ children }: Props) {
         setError("Numéro invalide. Format : +243XXXXXXXXX");
         return;
       }
-      if (!opts?.forceSms && !pinMode) {
+      if (!opts?.forceSms && !pinMode && !forgotPin) {
         const enabled = await fetchPinEnabled(apiFetch, msisdn);
         if (enabled) {
           setPinMode(true);
@@ -288,8 +288,10 @@ export function OtpGate({ children }: Props) {
             : pinOnly
               ? `Entrez le PIN pour ${maskPhoneDisplay(phone)}`
               : forgotPin && codeSent
-                ? "Code SMS envoyé au numéro mémorisé. Vous définirez ensuite un nouveau PIN."
-                : "Entrez votre numéro +243. Un SMS avec le code vous sera envoyé."}
+                ? "Code SMS envoyé. Vous définirez ensuite un nouveau PIN."
+                : forgotPin
+                  ? "Récupérez l'accès par SMS (vous pouvez changer de numéro) ou avec Google, puis définissez un nouveau PIN."
+                  : "Entrez votre numéro +243. Un SMS avec le code vous sera envoyé."}
         </p>
         {mock && (
           <p className="text-sm text-[#FF6B35] bg-orange-50 rounded-lg py-2 px-3 mb-4 text-center">
@@ -315,6 +317,18 @@ export function OtpGate({ children }: Props) {
             }}
             disabled={codeSent || Boolean(googleChallenge)}
           />
+        )}
+        {forgotPin && !codeSent && !googleChallenge && (
+          <button
+            type="button"
+            className="w-full mb-3 text-sm text-gray-500 underline"
+            onClick={() => {
+              setPhone("");
+              setError(null);
+            }}
+          >
+            Utiliser un autre numéro
+          </button>
         )}
         {pinMode && !codeSent && (
           <div className="mb-3">
@@ -356,21 +370,36 @@ export function OtpGate({ children }: Props) {
                 ? "Se connecter"
                 : pinMode
                   ? "Se connecter avec le PIN"
-                  : "Continuer"}
+                  : forgotPin
+                    ? "Recevoir un SMS"
+                    : "Continuer"}
           </button>
         )}
         {pinMode && !codeSent && (
-          <PinForgotLink
-            disabled={loading}
-            onClick={() => {
-              setForgotPin(true);
-              setPinMode(false);
-              setPin("");
-              void requestOtp({ forceSms: true });
-            }}
-          />
-        )}
-        {pinOnly && (
+                <PinForgotLink
+                  disabled={loading}
+                  onClick={() => {
+                    setForgotPin(true);
+                    setPinMode(false);
+                    setPin("");
+                    setError(null);
+                  }}
+                />
+              )}
+              {forgotPin && !codeSent && !googleChallenge && (
+                <button
+                  type="button"
+                  className="w-full mt-3 text-sm text-gray-400 underline"
+                  onClick={() => {
+                    setForgotPin(false);
+                    setPinMode(true);
+                    setError(null);
+                  }}
+                >
+                  Retour au PIN
+                </button>
+              )}
+              {pinOnly && (
           <button
             type="button"
             className="w-full mt-3 text-sm text-gray-400 underline"

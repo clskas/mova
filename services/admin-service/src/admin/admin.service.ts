@@ -7,7 +7,7 @@ import {
   serviceUrl,
 } from '@mova/shared';
 
-type MovaService = 'auth' | 'ride' | 'driver' | 'payment';
+type MovaService = 'auth' | 'ride' | 'driver' | 'payment' | 'notification';
 
 @Injectable()
 export class AdminService {
@@ -188,6 +188,47 @@ export class AdminService {
       );
     }
     return this.proxy('auth', `/internal/users/${id}`, { method: 'DELETE' });
+  }
+
+  async purgeUser(id: string, actorRole: string, actorId: string) {
+    if (actorRole !== UserRole.SUPER_ADMIN) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.FORBIDDEN,
+        'Seul un SUPER_ADMIN peut supprimer définitivement un utilisateur.',
+      );
+    }
+    if (id === actorId) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.FORBIDDEN,
+        'Vous ne pouvez pas supprimer votre propre compte.',
+      );
+    }
+    const target = await this.getUser(id).catch(() => null);
+    if (!target) {
+      throw new MovaHttpException(MovaErrorCode.USER_NOT_FOUND, HttpStatus.NOT_FOUND, 'Utilisateur introuvable.');
+    }
+    await Promise.allSettled([
+      this.proxy('driver', `/internal/users/${id}/data`, { method: 'DELETE' }),
+      this.proxy('payment', `/internal/users/${id}/data`, { method: 'DELETE' }),
+      this.proxy('notification', `/internal/users/${id}/data`, { method: 'DELETE' }),
+      this.proxy('ride', `/internal/users/${id}/data`, { method: 'DELETE' }),
+    ]);
+    try {
+      return await this.proxy('auth', `/internal/users/${id}/purge`, {
+        method: 'POST',
+        body: JSON.stringify({ actorId }),
+      });
+    } catch (e) {
+      const message = e instanceof Error ? e.message : '';
+      const forbidden = /SUPER_ADMIN|propre compte|propriétaire/i.test(message);
+      throw new MovaHttpException(
+        forbidden ? MovaErrorCode.AUTH_FORBIDDEN : MovaErrorCode.INTERNAL_ERROR,
+        forbidden ? HttpStatus.FORBIDDEN : HttpStatus.BAD_REQUEST,
+        message && message.length < 180 ? message : "Impossible de supprimer l'utilisateur. Réessayez.",
+      );
+    }
   }
 
   listDrivers(skip = 0, take = 50, filters?: { kycStatus?: string; isAvailable?: string }) {

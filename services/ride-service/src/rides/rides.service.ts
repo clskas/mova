@@ -1,5 +1,5 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { CommissionServiceType, DeliveryStatus, DeliveryType, ErrandOrderStatus, MovingRequestStatus, RentalInquiryStatus, RideStatus, ScheduledRideStatus, TrackingReferenceType, VehicleType } from '@prisma/client';
+import { CommissionServiceType, CarpoolStatus, DeliveryStatus, DeliveryType, ErrandOrderStatus, MovingRequestStatus, RentalInquiryStatus, RideStatus, ScheduledRideStatus, TrackingReferenceType, VehicleType } from '@prisma/client';
 import {
   formatCdf,
   fromMobileRideStatus,
@@ -1514,5 +1514,68 @@ export class RidesService {
     const updated = await this.prisma.ride.update({ where: { id: rideId }, data: updates });
     await this.prisma.rideEvent.create({ data: { rideId, event: status, metadata: { reason, by: 'ADMIN' } } });
     return { ride: this.formatRideDetail(updated), message: 'Statut mis à jour par l\'administration.' };
+  }
+
+  async purgeUserData(userId: string) {
+    const now = new Date();
+    const cancelReason = 'Compte utilisateur supprimé';
+    await this.prisma.ride.updateMany({
+      where: {
+        OR: [{ passengerId: userId }, { driverId: userId }],
+        status: { in: [RideStatus.REQUESTED, RideStatus.SEARCHING, RideStatus.ACCEPTED, RideStatus.DRIVER_ARRIVED, RideStatus.IN_PROGRESS] },
+      },
+      data: { status: RideStatus.CANCELLED, cancelledAt: now, cancelReason, cancelledBy: 'ADMIN' },
+    });
+    await this.prisma.delivery.updateMany({
+      where: {
+        OR: [{ userId }, { driverId: userId }],
+        status: { notIn: [DeliveryStatus.DELIVERED, DeliveryStatus.CANCELLED] },
+      },
+      data: { status: DeliveryStatus.CANCELLED, cancelledAt: now },
+    });
+    await this.prisma.scheduledRide.updateMany({
+      where: {
+        OR: [{ passengerId: userId }, { driverId: userId }],
+        status: { in: [ScheduledRideStatus.SCHEDULED, ScheduledRideStatus.CONFIRMED, ScheduledRideStatus.IN_PROGRESS] },
+      },
+      data: { status: ScheduledRideStatus.CANCELLED, cancelledAt: now, cancelReason },
+    });
+    await this.prisma.errandOrder.updateMany({
+      where: {
+        OR: [{ userId }, { driverId: userId }],
+        status: { notIn: [ErrandOrderStatus.COMPLETED, ErrandOrderStatus.CANCELLED] },
+      },
+      data: { status: ErrandOrderStatus.CANCELLED, cancelledAt: now },
+    });
+    await this.prisma.movingRequest.updateMany({
+      where: {
+        OR: [{ userId }, { driverId: userId }],
+        status: { notIn: [MovingRequestStatus.COMPLETED, MovingRequestStatus.CANCELLED] },
+      },
+      data: { status: MovingRequestStatus.CANCELLED, cancelledAt: now },
+    });
+    await this.prisma.rentalInquiry.updateMany({
+      where: {
+        userId,
+        status: { notIn: [RentalInquiryStatus.RETURNED, RentalInquiryStatus.PAID, RentalInquiryStatus.CLOSED] },
+      },
+      data: { status: RentalInquiryStatus.CLOSED },
+    });
+    await this.prisma.carpoolTrip.updateMany({
+      where: {
+        driverId: userId,
+        status: { in: [CarpoolStatus.OPEN, CarpoolStatus.MATCHED, CarpoolStatus.IN_PROGRESS] },
+      },
+      data: { status: CarpoolStatus.CANCELLED },
+    });
+    await this.prisma.restaurant.updateMany({
+      where: { ownerUserId: userId },
+      data: { ownerUserId: null, isActive: false, isAcceptingOrders: false },
+    });
+    await this.prisma.rentalVehicle.updateMany({
+      where: { ownerUserId: userId },
+      data: { ownerUserId: null, isActive: false },
+    });
+    return { deleted: true, userId };
   }
 }

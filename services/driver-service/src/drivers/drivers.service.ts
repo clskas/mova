@@ -1044,6 +1044,13 @@ export class DriversService {
     });
   }
 
+  async purgeUserData(userId: string) {
+    await this.prisma.kycDocument.deleteMany({ where: { userId } });
+    await this.prisma.incident.deleteMany({ where: { userId } });
+    await this.prisma.driverProfile.deleteMany({ where: { userId } });
+    return { deleted: true, userId };
+  }
+
   private computeScore(distanceKm: number, rating: number, totalRides: number, acceptanceRate = 0.85): number {
     const matching = this.matchingConfig.get();
     const w = matching.scoreWeights;

@@ -5,6 +5,7 @@ export enum AdminPermission {
   METRICS_READ = 'metrics:read',
   USERS_READ = 'users:read',
   USERS_WRITE = 'users:write',
+  USERS_DELETE = 'users:delete',
   DRIVERS_READ = 'drivers:read',
   DRIVERS_WRITE = 'drivers:write',
   KYC_READ = 'kyc:read',

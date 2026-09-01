@@ -84,6 +84,11 @@ export class InternalController {
     return this.rides.getStats();
   }
 
+  @Delete('users/:userId/data')
+  purgeUserData(@Param('userId') userId: string) {
+    return this.rides.purgeUserData(userId);
+  }
+
   @Get('rides/reports')
   reports(@Query('days') days?: string) {
     return this.rides.getReportAnalytics(Number(days ?? 30));

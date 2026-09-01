@@ -94,6 +94,13 @@ export class AdminController {
     return this.adminService.deactivateUser(id, req.user.role);
   }
 
+  @Post('users/:id/purge')
+  @RequirePermissions(AdminPermission.USERS_DELETE)
+  @ApiOperation({ summary: 'Supprimer définitivement un utilisateur (SUPER_ADMIN)' })
+  purgeUser(@Param('id') id: string, @Request() req: { user: { id: string; role: string } }) {
+    return this.adminService.purgeUser(id, req.user.role, req.user.id);
+  }
+
   @Get('drivers')
   @RequirePermissions(AdminPermission.DRIVERS_READ)
   @ApiOperation({ summary: 'Liste chauffeurs' })

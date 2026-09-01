@@ -27,11 +27,9 @@ function splitClientIds(value?: string): string[] {
     .filter(Boolean);
 }
 
-/** Public OAuth client IDs (not secrets). Always accepted so Render env drift cannot drop Android. */
+/** Public Web OAuth client ID (not a secret). Android IDs live in Render env (comma-separated). */
 export const PRODUCTION_GOOGLE_CLIENT_IDS = [
   '58917716638-rbgibno8pdvlud8dd00pdfjdv3q1dh4k.apps.googleusercontent.com',
-  '58917716638-ijgdi98i14vntarcpefpu7rl23an12fi.apps.googleusercontent.com',
-  '58917716638-ajtjt0p267gh6ab2jjj4dul0orkh03do.apps.googleusercontent.com',
 ] as const;
 
 export function collectGoogleAudiences(env: NodeJS.ProcessEnv = process.env): string[] {

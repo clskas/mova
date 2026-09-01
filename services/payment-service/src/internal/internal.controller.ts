@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { SubscriptionStatus, SubscriptionTarget } from '@prisma/client';
 import { IsBoolean, IsEnum, IsInt, IsNumber, IsOptional, IsString, Min } from 'class-validator';
@@ -60,6 +60,11 @@ export class InternalController {
   @Post('wallets')
   create(@Body() dto: CreateWalletDto) {
     return this.wallet.createWallet(dto.userId);
+  }
+
+  @Delete('users/:userId/data')
+  purgeUserData(@Param('userId') userId: string) {
+    return this.wallet.purgeUserData(userId);
   }
 
   @Get('wallets/overview')

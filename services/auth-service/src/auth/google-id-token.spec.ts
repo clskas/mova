@@ -13,7 +13,7 @@ function mockClient(payload: { sub?: string; email?: string; email_verified?: bo
 }
 
 describe('google-id-token', () => {
-  it('always includes production Android and Web client ids', () => {
+  it('always includes the production Web client id', () => {
     expect(collectGoogleAudiences({})).toEqual([...PRODUCTION_GOOGLE_CLIENT_IDS]);
   });
 
@@ -31,12 +31,14 @@ describe('google-id-token', () => {
   it('accepts comma-separated Android client ids and a dedicated driver var', () => {
     const passenger = 'passenger-android.apps.googleusercontent.com';
     const driver = 'driver-android.apps.googleusercontent.com';
+    const extraA = 'android-a.apps.googleusercontent.com';
+    const extraB = 'android-b.apps.googleusercontent.com';
     expect(
       collectGoogleAudiences({
         GOOGLE_CLIENT_ID: WEB_AUD,
-        GOOGLE_ANDROID_CLIENT_ID: `${passenger},${driver}`,
+        GOOGLE_ANDROID_CLIENT_ID: `${passenger},${driver},${extraA},${extraB}`,
       }),
-    ).toEqual([...PRODUCTION_GOOGLE_CLIENT_IDS, WEB_AUD, passenger, driver]);
+    ).toEqual([...PRODUCTION_GOOGLE_CLIENT_IDS, WEB_AUD, passenger, driver, extraA, extraB]);
     expect(
       collectGoogleAudiences({
         GOOGLE_CLIENT_ID: WEB_AUD,

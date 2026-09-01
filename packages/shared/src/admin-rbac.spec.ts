@@ -4,7 +4,14 @@ import { UserRole } from './enums';
 describe('admin-rbac', () => {
   it('autorise SUPER_ADMIN sur toutes les permissions', () => {
     expect(hasAdminPermission(UserRole.SUPER_ADMIN, AdminPermission.USERS_WRITE)).toBe(true);
+    expect(hasAdminPermission(UserRole.SUPER_ADMIN, AdminPermission.USERS_DELETE)).toBe(true);
     expect(hasAdminPermission(UserRole.SUPER_ADMIN, AdminPermission.SUBSCRIPTIONS_WRITE)).toBe(true);
+  });
+
+  it('seul SUPER_ADMIN peut supprimer définitivement un utilisateur', () => {
+    expect(hasAdminPermission(UserRole.ADMIN, AdminPermission.USERS_DELETE)).toBe(false);
+    expect(hasAdminPermission(UserRole.SUPPORT, AdminPermission.USERS_DELETE)).toBe(false);
+    expect(hasAdminPermission(UserRole.FINANCE, AdminPermission.USERS_DELETE)).toBe(false);
   });
 
   it('restreint CONTENT aux restaurants et tarifs lecture', () => {

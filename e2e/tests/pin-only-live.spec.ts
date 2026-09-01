@@ -43,6 +43,25 @@ test.describe("PIN-only after remembered phone + PIN", () => {
     await assertPinOnly(page);
   });
 
+  test("PIN oublié affiche téléphone + Google", async ({ page, request }) => {
+    await requireReachable(request, LIVE.web, `Web indisponible: ${LIVE.web}`);
+    await interceptPinEnabled(page);
+    await page.goto(LIVE.web);
+    await page.evaluate(() => {
+      localStorage.removeItem("mova_web_token");
+      localStorage.setItem("mova_web_phone", "+243812345678");
+      sessionStorage.removeItem("mova_web_pin_unlocked");
+    });
+    await page.reload();
+    await assertPinOnly(page);
+    await page.getByTestId("pin-forgot").click();
+    await expect(page.getByTestId("login-phone")).toBeVisible();
+    await expect(page.getByTestId("pin-pad")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /Recevoir un SMS/i })).toBeVisible();
+    await expect(page.getByTestId("google-continue")).toBeVisible();
+    await expect(page.getByRole("button", { name: /Retour au PIN/i })).toBeVisible();
+  });
+
   test("restaurant", async ({ page, request }) => {
     await requireReachable(request, `${LIVE.restaurant}/login`, `Restaurant indisponible: ${LIVE.restaurant}`);
     await interceptPinEnabled(page);

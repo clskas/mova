@@ -10,7 +10,7 @@ import '../../core/widgets/mova_widgets.dart';
 import 'local_pin_setup_screen.dart';
 import 'widgets/six_digit_pin_field.dart';
 
-enum PhoneLoginStep { phone, pin, otp, googleOtp }
+enum PhoneLoginStep { phone, pin, forgot, otp, googleOtp }
 
 /// Écran de connexion téléphone : PIN local ou SMS OTP.
 class PhoneLoginPanel extends ConsumerStatefulWidget {
@@ -115,7 +115,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
       case Success(:final data):
         final pinEnabled = data['pinEnabled'] == true;
         _normalizedPhone = phone;
-        if (pinEnabled) {
+        if (pinEnabled && !_forgotPinRecovery) {
           setState(() {
             _loading = false;
             _forgotPinRecovery = false;
@@ -207,6 +207,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
     setState(() {
       _loading = true;
       _error = null;
+      _forgotPinRecovery = false;
     });
     try {
       final idToken = await signInWithGoogleIdToken();
@@ -322,14 +323,32 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
     }
   }
 
-  void _switchToSms() {
+  void _openForgotOptions() {
     setState(() {
       _forgotPinRecovery = true;
-      _step = PhoneLoginStep.otp;
+      _step = PhoneLoginStep.forgot;
       _error = null;
       _pinController.clear();
     });
-    _requestOtp();
+  }
+
+  void _backToPin() {
+    setState(() {
+      _forgotPinRecovery = false;
+      _step = PhoneLoginStep.pin;
+      _error = null;
+    });
+  }
+
+  Future<void> _sendForgotSms() async {
+    final phone = MarketConfig.normalizePhone(_phoneController.text);
+    if (!MarketConfig.validatePhone(phone)) {
+      setState(() => _error = 'Numéro invalide. Format: +243XXXXXXXXX');
+      return;
+    }
+    _normalizedPhone = phone;
+    _forgotPinRecovery = true;
+    await _requestOtp();
   }
 
   void _backToPhone() {
@@ -354,21 +373,35 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
         Text(
           _step == PhoneLoginStep.pin
               ? 'Entrez votre code PIN à 6 chiffres'
-              : widget.subtitle,
+              : _step == PhoneLoginStep.forgot
+                  ? 'PIN oublié : SMS, autre numéro, ou Google.'
+                  : widget.subtitle,
           textAlign: TextAlign.center,
           style: const TextStyle(color: MovaColors.textSecondary),
         ),
         const SizedBox(height: 24),
-        if (_step == PhoneLoginStep.phone) ...[
+        if (_step == PhoneLoginStep.phone || _step == PhoneLoginStep.forgot) ...[
           TextField(
             controller: _phoneController,
             keyboardType: TextInputType.phone,
-            decoration: const InputDecoration(
-              labelText: 'Téléphone',
-              prefixIcon: Icon(Icons.phone),
+            decoration: InputDecoration(
+              labelText: _step == PhoneLoginStep.forgot ? 'Numéro pour le SMS' : 'Téléphone',
+              prefixIcon: const Icon(Icons.phone),
             ),
-            enabled: _step == PhoneLoginStep.phone && !_loading,
+            enabled: !_loading,
           ),
+          if (_step == PhoneLoginStep.forgot) ...[
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: _loading
+                  ? null
+                  : () {
+                      _phoneController.clear();
+                      setState(() => _error = null);
+                    },
+              child: const Text('Utiliser un autre numéro'),
+            ),
+          ],
         ],
         if (_step == PhoneLoginStep.pin) ...[
           const SizedBox(height: 16),
@@ -382,7 +415,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
           Align(
             alignment: Alignment.centerRight,
             child: TextButton(
-              onPressed: _loading ? null : _switchToSms,
+              onPressed: _loading ? null : _openForgotOptions,
               child: const Text('PIN oublié'),
             ),
           ),
@@ -432,33 +465,43 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
           MovaErrorBanner(message: _error!),
         ],
         const SizedBox(height: 24),
-        MovaButton(
+          MovaButton(
           label: switch (_step) {
             PhoneLoginStep.phone => 'Continuer',
             PhoneLoginStep.pin => 'Se connecter',
+            PhoneLoginStep.forgot => 'Recevoir un SMS',
             PhoneLoginStep.otp || PhoneLoginStep.googleOtp => 'Vérifier le code',
           },
           isLoading: _loading,
           onPressed: switch (_step) {
             PhoneLoginStep.phone => _continueFromPhone,
             PhoneLoginStep.pin => _loginWithPin,
+            PhoneLoginStep.forgot => _sendForgotSms,
             PhoneLoginStep.otp => _verifyOtp,
             PhoneLoginStep.googleOtp => _verifyGoogleOtp,
           },
           icon: switch (_step) {
             PhoneLoginStep.phone => Icons.arrow_forward,
             PhoneLoginStep.pin => Icons.login,
+            PhoneLoginStep.forgot => Icons.sms,
             PhoneLoginStep.otp || PhoneLoginStep.googleOtp => Icons.check,
           },
         ),
-        if (_step != PhoneLoginStep.phone && _step != PhoneLoginStep.pin) ...[
+        if (_step == PhoneLoginStep.forgot) ...[
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: _loading ? null : _backToPin,
+            child: const Text('Retour au PIN'),
+          ),
+        ],
+        if (_step != PhoneLoginStep.phone && _step != PhoneLoginStep.pin && _step != PhoneLoginStep.forgot) ...[
           const SizedBox(height: 8),
           TextButton(
             onPressed: _loading ? null : _backToPhone,
             child: Text(_step == PhoneLoginStep.googleOtp ? 'Retour' : 'Changer de numéro'),
           ),
         ],
-        if (_step == PhoneLoginStep.phone) ...[
+        if (_step == PhoneLoginStep.phone || _step == PhoneLoginStep.forgot) ...[
           const SizedBox(height: 20),
           Row(
             children: [

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 type ModalProps = {
   open: boolean;
@@ -45,17 +45,48 @@ type ConfirmProps = {
   confirmLabel?: string;
   danger?: boolean;
   loading?: boolean;
+  requireMatch?: string[];
+  typedLabel?: string;
 };
 
-export function ConfirmDialog({ open, onClose, onConfirm, title, message, confirmLabel = "Confirmer", danger, loading }: ConfirmProps) {
+export function ConfirmDialog({
+  open,
+  onClose,
+  onConfirm,
+  title,
+  message,
+  confirmLabel = "Confirmer",
+  danger,
+  loading,
+  requireMatch,
+  typedLabel,
+}: ConfirmProps) {
+  const [typed, setTyped] = useState("");
+  useEffect(() => {
+    if (!open) setTyped("");
+  }, [open]);
+  const matches =
+    !requireMatch?.length ||
+    requireMatch.some((value) => value.trim().toLowerCase() === typed.trim().toLowerCase());
   return (
     <Modal open={open} onClose={onClose} title={title}>
-      <p className="text-gray-600 mb-6">{message}</p>
+      <p className="text-gray-600 mb-4">{message}</p>
+      {requireMatch && requireMatch.length > 0 && (
+        <label className="block mb-6">
+          <span className="text-sm font-medium text-gray-700">{typedLabel ?? "Saisissez le téléphone ou le nom pour confirmer"}</span>
+          <input
+            className="mt-2 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
+            value={typed}
+            onChange={(e) => setTyped(e.target.value)}
+            autoComplete="off"
+          />
+        </label>
+      )}
       <div className="flex gap-3 justify-end">
         <button type="button" onClick={onClose} className="px-4 py-2 rounded-xl text-sm text-gray-600 hover:bg-gray-100">Annuler</button>
         <button
           type="button"
-          disabled={loading}
+          disabled={loading || !matches}
           onClick={onConfirm}
           className={`px-4 py-2 rounded-xl text-sm text-white disabled:opacity-60 ${danger ? "bg-[#FF6B35]" : "bg-[#6C63FF]"}`}
         >

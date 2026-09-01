@@ -88,7 +88,7 @@ export function GoogleContinueButton({ onCredential, disabled }: Props) {
   if (!clientId) return null;
 
   return (
-    <div className={`google-gis-wrap${disabled ? " pointer-events-none opacity-50" : ""}`}>
+    <div data-testid="google-continue" className={`google-gis-wrap${disabled ? " pointer-events-none opacity-50" : ""}`}>
       <div ref={hostRef} className="google-gis-host" />
       {!ready && <p className="text-xs text-gray-400 text-center mt-1">Chargement Google…</p>}
     </div>

@@ -6,6 +6,7 @@ import {
   deactivateUser as deactivateUserApi,
   fetchUsers,
   formatUserName,
+  purgeUser as purgeUserApi,
   updateUser,
   type AdminUser,
 } from "@/lib/api";
@@ -28,8 +29,9 @@ import {
 } from "@/components/ui";
 
 export default function UtilisateursPage() {
-  const { canWrite } = useAdmin();
+  const { canWrite, role, user } = useAdmin();
   const readOnly = !canWrite("utilisateurs");
+  const canPurge = role === "SUPER_ADMIN";
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState("");
@@ -43,6 +45,7 @@ export default function UtilisateursPage() {
   const [editLast, setEditLast] = useState("");
   const [saving, setSaving] = useState(false);
   const [deactivateTarget, setDeactivateTarget] = useState<AdminUser | null>(null);
+  const [purgeTarget, setPurgeTarget] = useState<AdminUser | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [createPhone, setCreatePhone] = useState("");
   const [createRole, setCreateRole] = useState("RESTAURANT");
@@ -142,6 +145,22 @@ export default function UtilisateursPage() {
       load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Échec de la désactivation");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function purgeUser() {
+    if (!purgeTarget) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await purgeUserApi(purgeTarget.id);
+      setPurgeTarget(null);
+      setSelected(null);
+      load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Impossible de supprimer cet utilisateur.");
     } finally {
       setSaving(false);
     }
@@ -294,6 +313,9 @@ export default function UtilisateursPage() {
                 {editStatus !== "SUSPENDED" && (
                   <BtnDanger onClick={() => setDeactivateTarget(selected)} disabled={saving}>Désactiver</BtnDanger>
                 )}
+                {canPurge && selected.id !== user?.id && (
+                  <BtnDanger onClick={() => setPurgeTarget(selected)} disabled={saving}>Supprimer cet utilisateur</BtnDanger>
+                )}
               </div>
             )}
           </div>
@@ -309,6 +331,22 @@ export default function UtilisateursPage() {
         confirmLabel="Désactiver"
         danger
         loading={saving}
+      />
+      <ConfirmDialog
+        open={!!purgeTarget}
+        onClose={() => setPurgeTarget(null)}
+        onConfirm={purgeUser}
+        title="Supprimer cet utilisateur"
+        message={`Action irréversible. Le compte disparaît de la base auth (connexion impossible, JWT révoqué). Le profil chauffeur est effacé. Les courses historiques restent pour l’audit ; le solde portefeuille est gelé, pas versé automatiquement. La personne pourra se réinscrire avec le même numéro. Pour confirmer, saisissez le téléphone ou le nom de ${purgeTarget ? formatUserName(purgeTarget) : ""}.`}
+        confirmLabel="Supprimer définitivement"
+        danger
+        loading={saving}
+        requireMatch={
+          purgeTarget
+            ? [purgeTarget.phone, formatUserName(purgeTarget)].filter((v): v is string => Boolean(v && v.trim()))
+            : []
+        }
+        typedLabel="Téléphone ou nom exact"
       />
     </div>
   );

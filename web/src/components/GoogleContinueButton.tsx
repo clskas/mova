@@ -86,7 +86,19 @@ export function GoogleContinueButton({ onCredential, disabled }: Props) {
     };
   }, [clientId]);
 
-  if (!clientId) return null;
+  if (!clientId) {
+    return (
+      <div data-testid="google-continue">
+        <button
+          type="button"
+          disabled
+          className="w-full rounded-xl border border-gray-200 bg-white py-3 text-sm font-medium text-gray-700"
+        >
+          Continuer avec Google
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div data-testid="google-continue" className={`google-gis-wrap${disabled ? " pointer-events-none opacity-50" : ""}`}>

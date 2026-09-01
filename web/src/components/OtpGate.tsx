@@ -415,7 +415,7 @@ export function OtpGate({ children }: Props) {
             Ce n&apos;est pas moi
           </button>
         )}
-        {googleClientId() && !codeSent && !googleChallenge && !hideIdentity && (
+        {(googleClientId() || forgotPin) && !codeSent && !googleChallenge && !hideIdentity && (
           <>
             <p className="text-center text-xs text-gray-400 my-4">ou</p>
             <GoogleContinueButton onCredential={loginWithGoogle} disabled={loading} />

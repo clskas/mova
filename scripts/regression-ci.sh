@@ -77,7 +77,7 @@ echo "=== Seed staff roles (+243900000001-005) ==="
 export DATABASE_URL="${DATABASE_URL_AUTH:-postgresql://mova:mova@localhost:48080/mova_auth}"
 cd "$ROOT/services/auth-service"
 npm ci --no-workspaces --silent
-npx ts-node prisma/seed-staff-roles.ts
+npx ts-node --compiler-options '{"ignoreDeprecations":"5.0"}' prisma/seed-staff-roles.ts
 
 echo "=== Build and start admin (:3002) + web (:3001) ==="
 cd "$ROOT/admin"

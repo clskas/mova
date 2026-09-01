@@ -55,6 +55,7 @@ test.describe("PIN-only after remembered phone + PIN", () => {
     await page.reload();
     await assertPinOnly(page);
     await page.getByTestId("pin-forgot").click();
+    await expect(page.getByText(/Récupérez l'accès par SMS.*Google/i)).toBeVisible();
     await expect(page.getByTestId("login-phone")).toBeVisible();
     await expect(page.getByTestId("pin-pad")).toHaveCount(0);
     await expect(page.getByRole("button", { name: /Recevoir un SMS/i })).toBeVisible();

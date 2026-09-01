@@ -78,8 +78,9 @@ export default function LoginPage() {
           if (!me) return;
           if (
             shouldRequirePinSetup(
-              { pinConfigured: me.pinConfigured, phone: me.phone, hasPhone: me.hasPhone, user: me },
+              { pinConfigured: me.pinConfigured, needsPinSetup: me.needsPinSetup, phone: me.phone, hasPhone: me.hasPhone, user: me },
               me.phone || phoneFromToken(token) || getLastPhone() || "",
+              token,
             )
           ) {
             setPinPending(true);
@@ -151,7 +152,11 @@ export default function LoginPage() {
     const phoneOnAccount = accountPhone(data, typedPhone);
     setToken(data.accessToken, phoneOnAccount || undefined);
     if (phoneOnAccount) setLastPhone(phoneOnAccount);
-    if (forgotPin || mustSetupPinAfterPhoneLogin(data, typedPhone) || shouldRequirePinSetup(data, phoneOnAccount)) {
+    if (
+      forgotPin ||
+      mustSetupPinAfterPhoneLogin(data, typedPhone, !googleChallenge) ||
+      shouldRequirePinSetup(data, phoneOnAccount, data.accessToken)
+    ) {
       setPinPending(true);
       setSetupRolePath(defaultPathForRole(role));
       setSetupToken(data.accessToken);

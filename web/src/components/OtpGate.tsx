@@ -54,7 +54,7 @@ export function OtpGate({ children }: Props) {
         return;
       }
       try {
-        const me = await apiFetch<{ pinConfigured?: boolean; phone?: string; hasPhone?: boolean }>(
+        const me = await apiFetch<{ pinConfigured?: boolean; needsPinSetup?: boolean; phone?: string; hasPhone?: boolean }>(
           "/api/users/me",
           undefined,
           { useMock },
@@ -64,7 +64,11 @@ export function OtpGate({ children }: Props) {
           { pinConfigured: me.pinConfigured, user: me, phone: me.phone, hasPhone: me.hasPhone },
           (getStoredPhone() || phoneFromToken() || "").trim(),
         );
-        if (shouldRequirePinSetup({ pinConfigured: me.pinConfigured, phone: me.phone, hasPhone: me.hasPhone, user: me }, fallback)) {
+        if (shouldRequirePinSetup(
+          { pinConfigured: me.pinConfigured, needsPinSetup: me.needsPinSetup, phone: me.phone, hasPhone: me.hasPhone, user: me },
+          fallback,
+          token,
+        )) {
           setPinPending(true);
           setSetupPin(true);
           setReady(true);
@@ -101,7 +105,11 @@ export function OtpGate({ children }: Props) {
     const typedPhone = googleChallenge ? "" : normalizeLoginPhone(phone);
     const phoneOnAccount = accountPhone(data, typedPhone);
     setToken(data.accessToken, phoneOnAccount || undefined);
-    if (forgotPin || mustSetupPinAfterPhoneLogin(data, typedPhone) || shouldRequirePinSetup(data, phoneOnAccount)) {
+    if (
+      forgotPin ||
+      mustSetupPinAfterPhoneLogin(data, typedPhone, !googleChallenge) ||
+      shouldRequirePinSetup(data, phoneOnAccount, data.accessToken)
+    ) {
       setPinPending(true);
       setSetupPin(true);
       return;
@@ -237,17 +245,19 @@ export function OtpGate({ children }: Props) {
 
   if (setupPin && !authenticated) {
     return (
-      <PinSetupForm
-        apiFetchFn={apiFetch}
-        reset={forgotPin}
-        onDone={() => {
-          setPinPending(false);
-          setForgotPin(false);
-          setSetupPin(false);
-          markPinSessionUnlocked();
-          setAuthenticated(true);
-        }}
-      />
+      <div className="fixed inset-0 z-[10050] bg-[#F5F5F7] overflow-y-auto">
+        <PinSetupForm
+          apiFetchFn={apiFetch}
+          reset={forgotPin}
+          onDone={() => {
+            setPinPending(false);
+            setForgotPin(false);
+            setSetupPin(false);
+            markPinSessionUnlocked();
+            setAuthenticated(true);
+          }}
+        />
+      </div>
     );
   }
 

@@ -99,22 +99,40 @@ void main() {
       expect(state.showBanner, isTrue);
     });
 
-    test('versionCode behind current triggers an optional update', () {
+    test('matching versionName hides banner even if versionCode looks behind', () {
       final state = AppUpdateService.parseRemote(
         {
           'passenger': {
-            'currentVersion': '1.0.2',
+            'currentVersion': '1.0.3',
             'minVersion': '1.0.0',
-            'currentVersionCode': 12,
+            'currentVersionCode': 28,
             'storeUrl': 'https://play.google.com/store/apps/details?id=cd.mova.mova.passenger',
           },
         },
         isDriver: false,
-        localVersion: '1.0.2',
+        localVersion: '1.0.3',
         localBuild: 8,
       );
-      expect(state!.updateAvailable, isTrue);
-      expect(state.forceUpdate, isFalse);
+      expect(state!.updateAvailable, isFalse);
+      expect(state.showBanner, isFalse);
+    });
+
+    test('minVersionCode still forces an update', () {
+      final state = AppUpdateService.parseRemote(
+        {
+          'passenger': {
+            'currentVersion': '1.0.3',
+            'minVersion': '1.0.3',
+            'minVersionCode': 20,
+            'storeUrl': 'https://play.google.com/store/apps/details?id=cd.mova.mova.passenger',
+          },
+        },
+        isDriver: false,
+        localVersion: '1.0.3',
+        localBuild: 8,
+      );
+      expect(state!.forceUpdate, isTrue);
+      expect(state.showBanner, isTrue);
     });
   });
 }

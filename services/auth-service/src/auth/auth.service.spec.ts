@@ -142,6 +142,15 @@ describe('AuthService', () => {
     expect(prisma.user.create).not.toHaveBeenCalled();
   });
 
+  it('refuses DRIVER OTP request when no chauffeur account exists', async () => {
+    prisma.user.findUnique.mockResolvedValue(null);
+    await expect(service.requestOtp('+243893515173', UserRole.DRIVER)).rejects.toMatchObject({
+      response: { code: MovaErrorCode.AUTH_FORBIDDEN },
+    });
+    expect(sms.sendOtp).not.toHaveBeenCalled();
+    expect(prisma.otpCode.create).not.toHaveBeenCalled();
+  });
+
   it('allows SUPER_ADMIN on the passenger app without changing role', async () => {
     const admin = makeUser({
       id: 'owner-1',
@@ -316,7 +325,11 @@ describe('AuthService', () => {
     await seedHashedOtp(passenger.phone);
     await service.verifyOtp(passenger.phone, '847291', UserRole.PASSENGER);
     expect(jwt.sign).toHaveBeenCalledWith(
-      expect.objectContaining({ sub: passenger.id, role: UserRole.PASSENGER }),
+      expect.objectContaining({
+        sub: passenger.id,
+        role: UserRole.PASSENGER,
+        needsPinSetup: true,
+      }),
       expect.objectContaining({ jwtid: expect.any(String) }),
     );
   });

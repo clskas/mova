@@ -600,8 +600,8 @@ export class DriversService {
     await fetch(serviceUrl('auth', `/internal/users/${userId}`), {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', 'x-internal-api-key': INTERNAL_API_KEY },
-      body: JSON.stringify({ status: 'ACTIVE' }),
-    }).catch((e) => this.logger.warn(`Could not activate auth user ${userId}`, e));
+      body: JSON.stringify({ status: 'ACTIVE', role: 'DRIVER' }),
+    }).catch((e) => this.logger.warn(`Could not promote auth user ${userId} to DRIVER`, e));
     const profile = await this.prisma.driverProfile.findUnique({ where: { userId } });
     if (profile) {
       await this.ensureDefaultVehicle(profile.id);

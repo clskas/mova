@@ -49,6 +49,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
           shouldRequirePinSetup(
             { pinConfigured: me.pinConfigured, needsPinSetup: me.needsPinSetup, phone: me.phone, hasPhone: me.hasPhone, user: me },
             fallback,
+            token,
           )
         ) {
           setPinPending(true);

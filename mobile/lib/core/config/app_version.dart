@@ -1,8 +1,8 @@
 /// Version client — alignée sur `mobile/pubspec.yaml` (`version: 1.0.3+8`).
-/// Play versionCode is overridden in CI (`github.run_number`, floor 8).
+/// Play versionCode is overridden in CI (`--build-number` + `--dart-define=APP_BUILD`).
 class AppVersion {
   static const name = '1.0.3';
-  static const build = 8;
+  static const build = int.fromEnvironment('APP_BUILD', defaultValue: 8);
 
   static int compare(String a, String b) {
     List<int> parts(String raw) => raw

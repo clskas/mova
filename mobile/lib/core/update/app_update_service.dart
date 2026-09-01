@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../api/api_client.dart';
@@ -80,7 +81,8 @@ final appUpdateServiceProvider =
     NotifierProvider<AppUpdateService, AppUpdateState>(AppUpdateService.new);
 
 class AppUpdateService extends Notifier<AppUpdateState> {
-  static const softDismissDuration = Duration(minutes: 15);
+  static const softDismissDuration = Duration(days: 7);
+  static const _snoozePrefKey = 'senga_update_snoozed_version';
 
   Timer? _timer;
   Timer? _retryTimer;
@@ -110,12 +112,8 @@ class AppUpdateService extends Notifier<AppUpdateState> {
     _timer = Timer.periodic(const Duration(minutes: 5), (_) => unawaited(check()));
   }
 
-  /// Resume from background: re-check Play / backend and show the soft banner again.
+  /// Resume from background: re-check Play / backend. Keep "Plus tard" until a newer version.
   void onAppResumed() {
-    _softDismissTimer?.cancel();
-    if (state.dismissedUntil != null && !state.forceUpdate) {
-      state = state.copyWith(dismissedUntil: null);
-    }
     unawaited(check());
   }
 
@@ -141,14 +139,32 @@ class AppUpdateService extends Notifier<AppUpdateState> {
           localBuild: AppVersion.build,
         );
         if (parsed != null) {
+          var dismissed = state.dismissedUntil;
+          try {
+            final prefs = await SharedPreferences.getInstance();
+            final snoozed = prefs.getString(_snoozePrefKey);
+            if (snoozed != null &&
+                snoozed == parsed.remoteVersion &&
+                !parsed.forceUpdate) {
+              dismissed = DateTime.now().add(softDismissDuration);
+            } else if (snoozed != null && snoozed != parsed.remoteVersion) {
+              await prefs.remove(_snoozePrefKey);
+              dismissed = null;
+            }
+          } catch (_) {
+            /* ignore storage */
+          }
           next = parsed.copyWith(
-            dismissedUntil: state.dismissedUntil,
+            dismissedUntil: dismissed,
             flexibleDownloaded: state.flexibleDownloaded,
           );
         }
       }
       final playUpdate = await PlayInAppUpdate.hasUpdate();
-      if (playUpdate && !next.updateAvailable) {
+      final localAtOrAhead = next.remoteVersion != null &&
+          AppVersion.compare(AppVersion.name, next.remoteVersion!) >= 0 &&
+          !next.updateAvailable;
+      if (playUpdate && !next.updateAvailable && !localAtOrAhead) {
         next = next.copyWith(
           updateAvailable: true,
           storeUrl: (next.storeUrl == null || next.storeUrl!.isEmpty)
@@ -184,9 +200,17 @@ class AppUpdateService extends Notifier<AppUpdateState> {
   void dismiss() {
     if (!state.updateAvailable || state.forceUpdate) return;
     _softDismissTimer?.cancel();
+    final remote = state.remoteVersion;
     state = state.copyWith(
       dismissedUntil: DateTime.now().add(softDismissDuration),
     );
+    if (remote != null && remote.isNotEmpty) {
+      unawaited(
+        SharedPreferences.getInstance().then((prefs) {
+          return prefs.setString(_snoozePrefKey, remote);
+        }),
+      );
+    }
     _softDismissTimer = Timer(softDismissDuration, () {
       if (!state.forceUpdate) {
         state = state.copyWith(dismissedUntil: null);
@@ -235,14 +259,14 @@ class AppUpdateService extends Notifier<AppUpdateState> {
     final min = block['minVersion']?.toString().trim() ?? '1.0.0';
     final storeUrl = block['storeUrl']?.toString();
     if (current.isEmpty) return null;
-    final remoteCode = _asInt(block['currentVersionCode']);
     final minCode = _asInt(block['minVersionCode']);
     final behindCurrent = AppVersion.compare(localVersion, current) < 0;
-    final behindCode = remoteCode > 0 && localBuild > 0 && localBuild < remoteCode;
     final belowMin = AppVersion.compare(localVersion, min) < 0 ||
         (minCode > 0 && localBuild > 0 && localBuild < minCode);
+    // Same versionName as advertised = up to date. Do not use versionCode alone:
+    // Play 1.0.3/28 vs compile-time AppVersion.build=8 was keeping the banner forever.
     return AppUpdateState(
-      updateAvailable: behindCurrent || behindCode || belowMin,
+      updateAvailable: behindCurrent || belowMin,
       forceUpdate: belowMin,
       storeUrl: storeUrl,
       remoteVersion: current,

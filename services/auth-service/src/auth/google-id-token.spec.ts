@@ -1,4 +1,4 @@
-import { audienceAllowed, collectGoogleAudiences, verifyGoogleIdToken } from './google-id-token';
+import { audienceAllowed, collectGoogleAudiences, PRODUCTION_GOOGLE_CLIENT_IDS, verifyGoogleIdToken } from './google-id-token';
 
 const WEB_AUD = 'web-client.apps.googleusercontent.com';
 const ANDROID_AUD = 'android-client.apps.googleusercontent.com';
@@ -13,6 +13,10 @@ function mockClient(payload: { sub?: string; email?: string; email_verified?: bo
 }
 
 describe('google-id-token', () => {
+  it('always includes production Android and Web client ids', () => {
+    expect(collectGoogleAudiences({})).toEqual([...PRODUCTION_GOOGLE_CLIENT_IDS]);
+  });
+
   it('collects configured audiences and ignores blanks', () => {
     expect(
       collectGoogleAudiences({
@@ -21,7 +25,7 @@ describe('google-id-token', () => {
         GOOGLE_IOS_CLIENT_ID: '  ',
         GOOGLE_OAUTH_CLIENT_ID: WEB_AUD,
       }),
-    ).toEqual([WEB_AUD, ANDROID_AUD]);
+    ).toEqual([...PRODUCTION_GOOGLE_CLIENT_IDS, WEB_AUD, ANDROID_AUD]);
   });
 
   it('accepts comma-separated Android client ids and a dedicated driver var', () => {
@@ -32,14 +36,14 @@ describe('google-id-token', () => {
         GOOGLE_CLIENT_ID: WEB_AUD,
         GOOGLE_ANDROID_CLIENT_ID: `${passenger},${driver}`,
       }),
-    ).toEqual([WEB_AUD, passenger, driver]);
+    ).toEqual([...PRODUCTION_GOOGLE_CLIENT_IDS, WEB_AUD, passenger, driver]);
     expect(
       collectGoogleAudiences({
         GOOGLE_CLIENT_ID: WEB_AUD,
         GOOGLE_ANDROID_CLIENT_ID: passenger,
         GOOGLE_ANDROID_CLIENT_ID_DRIVER: driver,
       }),
-    ).toEqual([WEB_AUD, passenger, driver]);
+    ).toEqual([...PRODUCTION_GOOGLE_CLIENT_IDS, WEB_AUD, passenger, driver]);
   });
 
   it('rejects a token whose audience is not allow-listed', async () => {

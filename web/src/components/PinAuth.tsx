@@ -18,20 +18,45 @@ export function accountPhone(data: AuthPayload, fallbackPhone?: string): string 
   return String(data.user?.phone || data.phone || fallbackPhone || "").trim();
 }
 
+export function jwtNeedsPinSetup(token: string | null | undefined): boolean {
+  if (!token) return false;
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) return false;
+    const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const json = typeof atob !== "undefined" ? atob(base64) : Buffer.from(base64, "base64").toString("utf8");
+    const payload = JSON.parse(json) as { needsPinSetup?: unknown; phone?: unknown };
+    if (payload.needsPinSetup !== true) return false;
+    const phone = typeof payload.phone === "string" ? payload.phone : "";
+    return !SEED_DEMO_PHONE_RE.test(phone);
+  } catch {
+    return false;
+  }
+}
+
 /** PIN obligatoire dès qu'un téléphone est connu (OTP saisi, JWT, /me). Google seul : pas de PIN. */
-export function shouldRequirePinSetup(data: AuthPayload, fallbackPhone?: string): boolean {
+export function shouldRequirePinSetup(
+  data: AuthPayload,
+  fallbackPhone?: string,
+  token?: string | null,
+): boolean {
   if (data.pinConfigured === true) return false;
   const phone = accountPhone(data, fallbackPhone);
   if (SEED_DEMO_PHONE_RE.test(phone)) return false;
-  if (data.needsPinSetup === true) return true;
+  if (data.needsPinSetup === true || jwtNeedsPinSetup(token)) return true;
   return Boolean(data.user?.hasPhone || data.hasPhone || phone);
 }
 
-/** Phone OTP: always create PIN. Do not depend on API user.phone / hasPhone (those were empty in prod). */
-export function mustSetupPinAfterPhoneLogin(data: AuthPayload, typedPhone: string): boolean {
+/** Phone OTP: always create PIN. `fromPhoneOtp` ignores empty API phone (prod bug). */
+export function mustSetupPinAfterPhoneLogin(
+  data: AuthPayload,
+  typedPhone: string,
+  fromPhoneOtp = false,
+): boolean {
   if (data.pinConfigured === true) return false;
   const phone = accountPhone(data, typedPhone);
   if (SEED_DEMO_PHONE_RE.test(phone) || (typedPhone && SEED_DEMO_PHONE_RE.test(typedPhone))) return false;
+  if (fromPhoneOtp) return true;
   return Boolean(typedPhone);
 }
 

@@ -134,6 +134,7 @@ jobs:
             --build-number=${{ steps.playver.outputs.code }} \
             --dart-define=API_URL=${{ steps.urls.outputs.api }} \
             --dart-define=WS_URL=${{ steps.urls.outputs.ws }} \
+            --dart-define=APP_BUILD=${{ steps.playver.outputs.code }} \
             $EXTRA
 
       - name: Build driver AAB
@@ -152,6 +153,7 @@ jobs:
             --build-number=${{ steps.playver.outputs.code }} \
             --dart-define=API_URL=${{ steps.urls.outputs.api }} \
             --dart-define=WS_URL=${{ steps.urls.outputs.ws }} \
+            --dart-define=APP_BUILD=${{ steps.playver.outputs.code }} \
             $EXTRA
 
       # Upload AABs before optional APKs so Play upload is not blocked by APK OOM/cancel.

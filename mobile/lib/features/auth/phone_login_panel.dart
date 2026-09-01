@@ -150,18 +150,25 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
     }
     _normalizedPhone = phone;
     final api = ref.read(apiClientProvider);
-    final result = await api.post('/auth/otp/request', {'phone': phone});
-    if (!mounted) return;
-    setState(() {
-      _loading = false;
-      _step = PhoneLoginStep.otp;
-      switch (result) {
-        case Success(:final data):
-          _mockHint = kDebugMode ? data['mockCode'] as String? : null;
-        case Failure(:final error):
-          _error = error.message;
-      }
+    final result = await api.post('/auth/otp/request', {
+      'phone': phone,
+      'role': widget.appRole,
     });
+    if (!mounted) return;
+    switch (result) {
+      case Success(:final data):
+        setState(() {
+          _loading = false;
+          _step = PhoneLoginStep.otp;
+          _error = null;
+          _mockHint = kDebugMode ? data['mockCode'] as String? : null;
+        });
+      case Failure(:final error):
+        setState(() {
+          _loading = false;
+          _error = error.message;
+        });
+    }
   }
 
   Future<void> _loginWithPin() async {
@@ -245,7 +252,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = 'Impossible de se connecter avec Google. Réessayez ou utilisez le SMS.';
+        _error = googleSignInErrorMessage(e);
       });
     }
   }

@@ -1131,6 +1131,7 @@ export class AuthService {
         phone: user.phone ?? undefined,
         role: user.role,
         status: user.status,
+        needsPinSetup: Boolean(user.phone && !user.localPinHash && !isSeedDemoPhone(user.phone)),
       },
       { jwtid: crypto.randomUUID() },
     );

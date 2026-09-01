@@ -9,6 +9,7 @@ import {
   isPinPending,
   isRestaurantRole,
   normalizeLoginPhone,
+  phoneFromToken,
   markPinSessionUnlocked,
   setPinPending,
   setLastPhone,
@@ -80,8 +81,15 @@ export default function LoginPage() {
           if (
             me &&
             shouldRequirePinSetup(
-              { pinConfigured: me.pinConfigured, phone: me.phone, hasPhone: me.hasPhone, user: me },
-              me.phone,
+              {
+                pinConfigured: me.pinConfigured,
+                needsPinSetup: me.needsPinSetup,
+                phone: me.phone,
+                hasPhone: me.hasPhone,
+                user: me,
+              },
+              me.phone || phoneFromToken() || getLastPhone() || "",
+              token,
             )
           ) {
             setPinPending(true);
@@ -112,7 +120,11 @@ export default function LoginPage() {
     const phoneOnAccount = accountPhone(data, typedPhone);
     setToken(data.accessToken, phoneOnAccount || undefined);
     if (phoneOnAccount) setLastPhone(phoneOnAccount);
-    if (forgotPin || mustSetupPinAfterPhoneLogin(data, typedPhone) || shouldRequirePinSetup(data, phoneOnAccount)) {
+    if (
+      forgotPin ||
+      mustSetupPinAfterPhoneLogin(data, typedPhone, !googleChallenge) ||
+      shouldRequirePinSetup(data, phoneOnAccount, data.accessToken)
+    ) {
       setPinPending(true);
       setSetupToken(data.accessToken);
       return;

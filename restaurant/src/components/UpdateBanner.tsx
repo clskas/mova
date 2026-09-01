@@ -46,6 +46,16 @@ export function UpdateBanner({ accentClass = "bg-orange-600" }: { accentClass?: 
       const remote = await readRemoteBuildId();
       if (!remote || remote === LOCAL_BUILD) return;
       if (sessionStorage.getItem(DISMISS_KEY) === remote) return;
+      const autoKey = `mova-auto-reloaded-${remote}`;
+      try {
+        if (sessionStorage.getItem(autoKey) !== "1") {
+          sessionStorage.setItem(autoKey, "1");
+          await reloadWithServiceWorker();
+          return;
+        }
+      } catch {
+        /* Safari private mode */
+      }
       show();
     }
 

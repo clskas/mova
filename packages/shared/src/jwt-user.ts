@@ -7,6 +7,8 @@ export type MovaJwtPayload = {
   status?: UserStatus | string;
   /** Present on tokens issued after logout/denylist support. Old 7d tokens omit it. */
   jti?: string;
+  /** Phone account without a local PIN (seed demo phones omit this). */
+  needsPinSetup?: boolean;
 };
 
 /** Refuse l'accès aux comptes suspendus (JWT ou login). */

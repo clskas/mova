@@ -35,8 +35,24 @@ jobs:
         with:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
+      # Render mova-db-auth is PostgreSQL 18; Ubuntu noble's postgresql-client is 16.
+      # pg_dump refuses to dump a newer major version, which previously failed Deploy.
       - name: Install PostgreSQL client
-        run: sudo apt-get update && sudo apt-get install -y postgresql-client jq
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y jq ca-certificates
+          if sudo apt-get install -y postgresql-common \
+            && [ -x /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh ] \
+            && sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y \
+            && sudo apt-get install -y postgresql-client-18; then
+            echo "Installed postgresql-client-18"
+          else
+            echo "::warning::postgresql-client-18 unavailable — falling back to distro postgresql-client (dump is skipped on version mismatch)"
+            sudo apt-get install -y postgresql-client
+          fi
+          pg_dump --version || true
+          ls /usr/lib/postgresql/*/bin/pg_dump 2>/dev/null || true
 
       # Pre-deploy pg_dump. Production is Render Postgres mova-db-auth
       # (dpg-daa5u3on74is739uken0-a): mova_auth, mova_rides, mova_payments,
@@ -48,7 +64,8 @@ jobs:
       #   DATABASE_URL_DRIVERS       → …/mova_drivers
       #   DATABASE_URL_NOTIFICATIONS → …/mova_notifications
       # Internal hostnames (dpg-…-a, no domain) are unreachable from GitHub.
-      # Neon (*.neon.tech) is skipped with a warning so deploy still proceeds.
+      # Neon (*.neon.tech) and pg_dump/server version mismatch are skipped with a
+      # warning so deploy of web/auth still proceeds.
       - name: Backup databases before deploy (required before migrations)
         env:
           DATABASE_URL_AUTH: ${{ secrets.DATABASE_URL_AUTH }}
@@ -71,7 +88,7 @@ jobs:
             exit 1
           fi
           # Host policy in scripts/backup-db.sh:
-          #   *.render.com → pg_dump; *.neon.tech → skip with warning (do not fail deploy).
+          #   *.render.com → pg_dump; *.neon.tech / version mismatch → skip (do not fail deploy).
           ./scripts/backup-db.sh
 
       - name: Upload DB backup artifact

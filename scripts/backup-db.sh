@@ -9,6 +9,7 @@
 # Host policy (CI / production):
 #   *.render.com / dpg-*.render.com  → pg_dump (production Render Postgres)
 #   *.neon.tech                      → skip with a warning (legacy, not prod; do not fail)
+#   pg_dump older than the server    → skip with a warning (do not fail deploy / migrate)
 # GitHub Actions cannot reach Render Internal hostnames (dpg-…-a with no domain);
 # those are skipped with a warning so deploy still proceeds. Use External URLs in secrets.
 set -euo pipefail
@@ -57,6 +58,31 @@ should_skip_backup_url() {
 
   return 1
 }
+
+# Prefer the newest PGDG/distro pg_dump (Ubuntu noble is 16; Render mova-db-auth is 18).
+resolve_pg_dump() {
+  local newest="" newest_ver=0 candidate ver
+  for candidate in /usr/lib/postgresql/*/bin/pg_dump; do
+    [ -x "$candidate" ] || continue
+    ver="${candidate#/usr/lib/postgresql/}"
+    ver="${ver%%/*}"
+    ver="${ver%%.*}"
+    if [ "${ver:-0}" -gt "$newest_ver" ] 2>/dev/null; then
+      newest_ver="$ver"
+      newest="$candidate"
+    fi
+  done
+  if [ -n "$newest" ]; then
+    printf '%s' "$newest"
+    return 0
+  fi
+  command -v pg_dump
+}
+
+PG_DUMP_BIN="${PG_DUMP_BIN:-}"
+if [ -z "$PG_DUMP_BIN" ]; then
+  PG_DUMP_BIN="$(resolve_pg_dump || true)"
+fi
 
 POSTGRES_HOST="${POSTGRES_HOST:-localhost}"
 POSTGRES_PORT="${POSTGRES_PORT:-54320}"
@@ -110,10 +136,33 @@ backup_via_docker() {
   docker exec "$POSTGRES_CONTAINER" pg_dump -U "$POSTGRES_USER" -d "$db_name" --no-owner --no-acl >"$out"
 }
 
+# Returns 0 on success, 2 on server/client version mismatch (caller should skip), 1 otherwise.
+# Must be invoked from `if`/`||` so a non-zero return does not trip `set -e`.
 backup_via_pg_dump() {
   local url="$1"
   local out="$2"
-  pg_dump "$url" --no-owner --no-acl -f "$out"
+  local err
+  if [ -z "${PG_DUMP_BIN:-}" ]; then
+    echo "ERROR: pg_dump not found" >&2
+    return 1
+  fi
+  err="$(mktemp)"
+  if "$PG_DUMP_BIN" "$url" --no-owner --no-acl -f "$out" 2>"$err"; then
+    rm -f "$err"
+    return 0
+  fi
+  cat "$err" >&2
+  if grep -qiE 'server version mismatch|aborting because of server version' "$err"; then
+    rm -f "$err" "$out"
+    return 2
+  fi
+  rm -f "$err" "$out"
+  return 1
+}
+
+skip_version_mismatch() {
+  local label="$1"
+  backup_warn "Skipping $label backup: pg_dump is older than the Postgres server (version mismatch). Deploy/migrate continues. Point CI at postgresql-client matching the server, or rely on Render automatic backups."
 }
 
 # Docker entrypoint : une seule base via DATABASE_URL (ex. postgres:5432)
@@ -126,7 +175,20 @@ if [ -n "${BACKUP_ONLY:-}" ] && [ -n "${DATABASE_URL:-}" ]; then
     exit 0
   fi
   echo "Backing up $BACKUP_ONLY ($db_name) via DATABASE_URL -> $out"
-  backup_via_pg_dump "$DATABASE_URL" "$out"
+  dump_rc=0
+  if backup_via_pg_dump "$DATABASE_URL" "$out"; then
+    dump_rc=0
+  else
+    dump_rc=$?
+  fi
+  if [ "$dump_rc" -eq 2 ]; then
+    skip_version_mismatch "$BACKUP_ONLY"
+    echo "=== Backups skipped (pg_dump/server version mismatch) ==="
+    exit 0
+  fi
+  if [ "$dump_rc" -ne 0 ]; then
+    exit "$dump_rc"
+  fi
   gzip -f "$out"
   echo "  -> ${out}.gz"
   echo "=== Backups complete ==="
@@ -149,7 +211,20 @@ for key in "${keys[@]}"; do
   if [ -n "${POSTGRES_CONTAINER:-}" ]; then
     backup_via_docker "$db_name" "$out"
   else
-    backup_via_pg_dump "$url" "$out"
+    dump_rc=0
+    if backup_via_pg_dump "$url" "$out"; then
+      dump_rc=0
+    else
+      dump_rc=$?
+    fi
+    if [ "$dump_rc" -eq 2 ]; then
+      skip_version_mismatch "$key"
+      skipped=$((skipped + 1))
+      continue
+    fi
+    if [ "$dump_rc" -ne 0 ]; then
+      exit "$dump_rc"
+    fi
   fi
   gzip -f "$out"
   echo "  -> ${out}.gz"

@@ -12,6 +12,7 @@ import '../../core/media/image_pick_util.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
+import '../profile/profile_screen.dart';
 import 'driver_home_screen.dart';
 
 /// Parcours d'enregistrement chauffeur — 6 étapes SENGA.
@@ -599,6 +600,23 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
                     'Identifiant chauffeur : $publicId',
                     style: const TextStyle(fontWeight: FontWeight.bold, color: MovaColors.violet),
                   ),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.link, color: MovaColors.violet),
+                  title: const Text(
+                    'Compte et connexion',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: const Text('Lier Google ou un numéro +243 — un seul compte chauffeur'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const ProfileScreen(title: 'Compte et connexion'),
+                      ),
+                    );
+                  },
+                ),
                 if (_state?['kyc'] != null) ...[
                   const SizedBox(height: 8),
                   Text(

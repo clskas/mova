@@ -899,6 +899,40 @@ describe('AuthService', () => {
     );
   });
 
+  it('linkGoogle attaches to a phone-first pending DRIVER without creating a second user', async () => {
+    const driver = makeUser({
+      id: 'drv-1',
+      role: UserRole.DRIVER,
+      status: UserStatus.PENDING_KYC,
+    });
+    prisma.user.findUnique.mockResolvedValue(driver);
+    prisma.user.update.mockResolvedValue({
+      ...driver,
+      googleId: 'gid-new',
+      email: 'new.user@gmail.com',
+    });
+    const result = await service.linkGoogle(driver.id, 'id-token');
+    expect(result.user.role).toBe(UserRole.DRIVER);
+    expect(result.user.status).toBe(UserStatus.PENDING_KYC);
+    expect(result.user.googleLinked).toBe(true);
+    expect(result.user.hasPhone).toBe(true);
+    expect(prisma.user.create).not.toHaveBeenCalled();
+  });
+
+  it('linkGoogle attaches to an ACTIVE DRIVER without changing role', async () => {
+    const driver = makeUser({
+      id: 'drv-active',
+      role: UserRole.DRIVER,
+      status: UserStatus.ACTIVE,
+    });
+    prisma.user.findUnique.mockResolvedValue(driver);
+    prisma.user.update.mockResolvedValue({ ...driver, googleId: 'gid-new' });
+    const result = await service.linkGoogle(driver.id, 'id-token');
+    expect(result.user.role).toBe(UserRole.DRIVER);
+    expect(result.user.status).toBe(UserStatus.ACTIVE);
+    expect(prisma.user.create).not.toHaveBeenCalled();
+  });
+
   it('linkGoogle on SUPER_ADMIN keeps SUPER_ADMIN (no second admin)', async () => {
     const admin = makeUser({
       id: 'owner-1',
@@ -936,6 +970,57 @@ describe('AuthService', () => {
     const result = await service.linkPhone(googleOnly.id, '+243812345678', '847291');
     expect(result.user.hasPhone).toBe(true);
     expect(result.user.role).toBe(UserRole.PASSENGER);
+    expect(prisma.user.create).not.toHaveBeenCalled();
+  });
+
+  it('linkPhone attaches +243 to a Google-first pending DRIVER without creating a user', async () => {
+    const driver = makeUser({
+      id: 'drv-g',
+      phone: null,
+      googleId: 'gid-new',
+      email: 'driver@gmail.com',
+      role: UserRole.DRIVER,
+      status: UserStatus.PENDING_KYC,
+    });
+    await seedHashedOtp('+243812345678', '847291');
+    prisma.user.findUnique.mockImplementation(({ where }: { where: { id?: string; phone?: string } }) => {
+      if (where.id === 'drv-g') return Promise.resolve(driver);
+      if (where.phone === '+243812345678') return Promise.resolve(null);
+      return Promise.resolve(null);
+    });
+    prisma.user.update.mockResolvedValue({ ...driver, phone: '+243812345678' });
+    const result = await service.linkPhone(driver.id, '+243812345678', '847291');
+    expect(result.user.hasPhone).toBe(true);
+    expect(result.user.googleLinked).toBe(true);
+    expect(result.user.role).toBe(UserRole.DRIVER);
+    expect(result.user.status).toBe(UserStatus.PENDING_KYC);
+    expect(result.needsPinSetup).toBe(true);
+    expect(prisma.user.create).not.toHaveBeenCalled();
+  });
+
+  it('linkGoogle on DRIVER rejects a Gmail already used by a PASSENGER', async () => {
+    const driver = makeUser({
+      id: 'drv-1',
+      role: UserRole.DRIVER,
+      status: UserStatus.PENDING_KYC,
+    });
+    const passenger = makeUser({
+      id: 'pax-1',
+      phone: '+243822222222',
+      googleId: 'gid-new',
+      email: 'new.user@gmail.com',
+      role: UserRole.PASSENGER,
+    });
+    prisma.user.findUnique
+      .mockResolvedValueOnce(driver)
+      .mockResolvedValueOnce(passenger);
+    await expect(service.linkGoogle(driver.id, 'id-token')).rejects.toMatchObject({
+      response: {
+        code: MovaErrorCode.AUTH_IDENTITY_TAKEN,
+        message: 'Cet e-mail Google est déjà lié à un autre compte SENGA.',
+      },
+    });
+    expect(prisma.user.update).not.toHaveBeenCalled();
     expect(prisma.user.create).not.toHaveBeenCalled();
   });
 

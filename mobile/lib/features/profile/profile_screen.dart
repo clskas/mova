@@ -11,7 +11,9 @@ import '../../core/widgets/mova_widgets.dart';
 import 'account_link_card.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
-  const ProfileScreen({super.key});
+  const ProfileScreen({super.key, this.title = 'Mon profil'});
+
+  final String title;
 
   @override
   ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
@@ -154,7 +156,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final offline = ref.watch(offlineStateProvider).valueOrNull?.isOffline == true;
 
     return MovaScreen(
-      title: 'Mon profil',
+      title: widget.title,
       child: _loading
           ? const Center(child: CircularProgressIndicator(color: MovaColors.violet))
           : Column(

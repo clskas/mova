@@ -1141,7 +1141,9 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
               case _DriverMenuAction.profile:
                 await Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => const ProfileScreen()),
+                  MaterialPageRoute(
+                    builder: (_) => const ProfileScreen(title: 'Compte et connexion'),
+                  ),
                 );
               case _DriverMenuAction.help:
                 await Navigator.push(
@@ -1211,7 +1213,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
               value: _DriverMenuAction.profile,
               child: ListTile(
                 leading: Icon(Icons.person_outline),
-                title: Text('Connexion'),
+                title: Text('Compte et connexion'),
                 contentPadding: EdgeInsets.zero,
                 visualDensity: VisualDensity.compact,
               ),

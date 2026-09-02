@@ -246,7 +246,7 @@ class _AccountLinkCardState extends ConsumerState<AccountLinkCard> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'Connexion',
+            'Compte et connexion',
             style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 4),

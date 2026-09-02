@@ -54,6 +54,7 @@ export function mustSetupPinAfterPhoneLogin(
   typedPhone: string,
   _fromPhoneOtp = false,
 ): boolean {
+  void _fromPhoneOtp;
   if (data.pinConfigured === true) return false;
   const phone = accountPhone(data, typedPhone);
   if (SEED_DEMO_PHONE_RE.test(phone) || (typedPhone && SEED_DEMO_PHONE_RE.test(typedPhone))) return false;

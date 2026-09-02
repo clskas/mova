@@ -34,6 +34,9 @@ function splitClientIds(value?: string): string[] {
  */
 export const PRODUCTION_GOOGLE_CLIENT_IDS = [
   '58917716638-rbgibno8pdvlud8dd00pdfjdv3q1dh4k.apps.googleusercontent.com',
+  '58917716638-c4a0anvhl78872oaogc6sfrcrrb6ge1u.apps.googleusercontent.com',
+  '58917716638-nm49bc1e4g364gsu5g351bc5kufmnjg7.apps.googleusercontent.com',
+  '58917716638-a9fnlm17k3lv09ahabde0gcmakhee9l0.apps.googleusercontent.com',
   '58917716638-h0rc1c3nej5n68clebbriph4nftprr09.apps.googleusercontent.com',
   '58917716638-9ljd3pbhhlshe7vqmivla9vic5tjb692.apps.googleusercontent.com',
   '58917716638-puc6hs2tlpv93qan7qmv7d0v53jjf72g.apps.googleusercontent.com',

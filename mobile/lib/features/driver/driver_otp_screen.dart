@@ -70,7 +70,7 @@ class DriverOtpScreen extends ConsumerWidget {
           const SizedBox(height: 8),
           PhoneLoginPanel(
             appRole: 'DRIVER',
-            subtitle: 'Connectez-vous avec votre PIN ou un code SMS',
+            subtitle: 'Connectez-vous avec votre PIN, un code SMS ou Google',
             onAuthenticated: (_) => _onDriverAuthenticated(context, ref),
           ),
         ],

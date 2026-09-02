@@ -501,7 +501,9 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
             child: Text(_step == PhoneLoginStep.googleOtp ? 'Retour' : 'Changer de numéro'),
           ),
         ],
-        if (_step == PhoneLoginStep.phone || _step == PhoneLoginStep.forgot) ...[
+        if (_step == PhoneLoginStep.phone ||
+            _step == PhoneLoginStep.forgot ||
+            _step == PhoneLoginStep.pin) ...[
           const SizedBox(height: 20),
           Row(
             children: [

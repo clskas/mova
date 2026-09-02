@@ -115,11 +115,11 @@ class _AccountLinkCardState extends ConsumerState<AccountLinkCard> {
             _error = error.message;
           });
       }
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
       setState(() {
         _busy = false;
-        _error = 'Impossible de lier Google. Réessayez.';
+        _error = googleSignInErrorMessage(e);
       });
     }
   }

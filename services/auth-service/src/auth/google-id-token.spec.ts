@@ -13,8 +13,15 @@ function mockClient(payload: { sub?: string; email?: string; email_verified?: bo
 }
 
 describe('google-id-token', () => {
-  it('always includes the production Web client id', () => {
+  it('always includes the production Web client id and all four Android clients', () => {
     expect(collectGoogleAudiences({})).toEqual([...PRODUCTION_GOOGLE_CLIENT_IDS]);
+    expect(PRODUCTION_GOOGLE_CLIENT_IDS).toEqual([
+      '58917716638-rbgibno8pdvlud8dd00pdfjdv3q1dh4k.apps.googleusercontent.com',
+      '58917716638-h0rc1c3nej5n68clebbriph4nftprr09.apps.googleusercontent.com',
+      '58917716638-9ljd3pbhhlshe7vqmivla9vic5tjb692.apps.googleusercontent.com',
+      '58917716638-puc6hs2tlpv93qan7qmv7d0v53jjf72g.apps.googleusercontent.com',
+      '58917716638-picm13g7u9td6vjuljjuknfvf90pp6up.apps.googleusercontent.com',
+    ]);
   });
 
   it('collects configured audiences and ignores blanks', () => {

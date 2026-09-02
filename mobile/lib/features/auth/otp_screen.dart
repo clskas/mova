@@ -49,7 +49,7 @@ class OtpScreen extends ConsumerWidget {
           const SizedBox(height: 8),
           PhoneLoginPanel(
             appRole: 'PASSENGER',
-            subtitle: 'Mobilité partout en RDC — PIN ou code SMS',
+            subtitle: 'Mobilité partout en RDC — PIN, SMS ou Google',
             onAuthenticated: (_) async {
               if (!context.mounted) return;
               Navigator.of(context).pushReplacement(

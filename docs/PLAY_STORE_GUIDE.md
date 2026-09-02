@@ -108,6 +108,40 @@ Si l’upload est **skipped** : aucun secret Play (`PLAY_STORE_JSON_KEY` / alias
 
 ---
 
+## 6. « Interne » sur SENGA Driver (Play, pas l’app)
+
+Le launcher et `applicationId` s’appellent **SENGA Driver** (`cd.mova.mova.driver`). Il n’y a **pas** de badge « Interne » dans le binaire release.
+
+Le libellé **Interne** vient du track Play **Tests internes** (`fastlane` `track: "internal"`). Sur la fiche Play (FR), les testeurs voient « Interne » / « Tests internes ». Ce n’est pas un flavor Gradle ni un titre store « SENGA Driver (internal) ».
+
+Pour que les chauffeurs ne voient plus « Interne » :
+
+1. Play Console → **SENGA Driver** (`cd.mova.mova.driver`) → **Tests** → **Tests internes**.
+2. Ouvrir la version publiée → **Promouvoir la version** → **Production** (ou d’abord **Tests ouverts** si la fiche / le questionnaire contenu n’est pas encore validé).
+3. Répéter pour **Senga** (`cd.mova.mova.passenger`) si besoin.
+
+La CI n’auto-promouvait **pas** vers production. Option : Actions → **Mobile Release** → cocher **promote_to_production** (après upload internal). Ne cocher que si la fiche store, la politique et le questionnaire contenu sont complets — sinon Play refusera.
+
+---
+
+## 7. Google Sign-In — SHA-1 (Cloud, pas un rebuild AAB)
+
+`DEVELOPER_ERROR` / ApiException **10** est Play Services (package + empreinte), **pas** l’API SENGA. Reconstruire l’AAB ne change pas le SHA-1.
+
+Google Cloud → APIs et services → Identifiants → **Client OAuth Android** (un SHA-1 par client, même package) :
+
+| Package | SHA-1 | Usage |
+|---------|-------|--------|
+| `cd.mova.mova.passenger` | `6A:4B:2A:B7:88:F4:1C:41:9D:63:31:06:73:43:67:C8:4E:6D:2E:40` | Debug / sideload |
+| `cd.mova.mova.driver` | `6A:4B:2A:B7:88:F4:1C:41:9D:63:31:06:73:43:67:C8:4E:6D:2E:40` | Debug / sideload |
+| `cd.mova.mova.passenger` | `D5:7A:0F:7F:3C:A2:99:60:A2:24:C3:28:86:77:F6:89:F6:71:CD:BF` | Keystore upload |
+| `cd.mova.mova.driver` | `D5:7A:0F:7F:3C:A2:99:60:A2:24:C3:28:86:77:F6:89:F6:71:CD:BF` | Keystore upload |
+| les deux packages | Play Console → **Intégrité de l’app** → **SHA-1 classique** (pas SHA-256, pas PQC) | Install depuis Play |
+
+Les 4 clients Android déjà créés couvrent debug + upload. **Il manque souvent le SHA-1 Play App Signing** (5e / 6e client). Après ajout, attendre quelques minutes. Le client **Web** `58917716638-rbgibno8pdvlud8dd00pdfjdv3q1dh4k` est le `serverClientId` Flutter (ne pas le remplacer par un ID Android).
+
+---
+
 ## Checklist rapide
 
 - [ ] Apps Senga + SENGA Driver créées avec les bons package IDs  

@@ -27,9 +27,17 @@ function splitClientIds(value?: string): string[] {
     .filter(Boolean);
 }
 
-/** Public Web OAuth client ID (not a secret). Android IDs live in Render env (comma-separated). */
+/**
+ * Public OAuth client IDs (not secrets). ID token `aud` is the Web client when
+ * Flutter uses `serverClientId`; Android IDs appear as `azp` / extra `aud`.
+ * Render env vars are merged on top (comma-separated extras still work).
+ */
 export const PRODUCTION_GOOGLE_CLIENT_IDS = [
   '58917716638-rbgibno8pdvlud8dd00pdfjdv3q1dh4k.apps.googleusercontent.com',
+  '58917716638-h0rc1c3nej5n68clebbriph4nftprr09.apps.googleusercontent.com',
+  '58917716638-9ljd3pbhhlshe7vqmivla9vic5tjb692.apps.googleusercontent.com',
+  '58917716638-puc6hs2tlpv93qan7qmv7d0v53jjf72g.apps.googleusercontent.com',
+  '58917716638-picm13g7u9td6vjuljjuknfvf90pp6up.apps.googleusercontent.com',
 ] as const;
 
 export function collectGoogleAudiences(env: NodeJS.ProcessEnv = process.env): string[] {

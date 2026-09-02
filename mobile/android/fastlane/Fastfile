@@ -73,4 +73,41 @@ platform :android do
       UI.user_error!("Play internal partial/complete failure: #{summary}")
     end
   end
+
+  desc "Promouvoir la dernière version internal → production (les testeurs ne voient plus « Interne »)"
+  lane :promote_internal_to_production do
+    UI.user_error!("JSON Play Store introuvable : #{play_json_key}") unless File.exist?(play_json_key)
+    results = {}
+    {
+      driver: DRIVER_PACKAGE,
+      passenger: PASSENGER_PACKAGE
+    }.each do |app, package_name|
+      begin
+        upload_to_play_store(
+          package_name: package_name,
+          track: "internal",
+          track_promote_to: "production",
+          json_key: play_json_key,
+          skip_upload_apk: true,
+          skip_upload_aab: true,
+          skip_upload_metadata: true,
+          skip_upload_images: true,
+          skip_upload_screenshots: true,
+          skip_upload_changelogs: true
+        )
+        results[app] = :ok
+        UI.success("Play promote internal→production OK: #{app}")
+      rescue => e
+        results[app] = e.message
+        UI.error("Play promote FAILED: #{app} — #{e.message}")
+      end
+    end
+    failed = results.select { |_app, status| status != :ok }
+    if failed.empty?
+      UI.success("Play production: driver + passenger promus")
+    else
+      summary = results.map { |app, status| "#{app}=#{status == :ok ? 'OK' : 'FAIL'}" }.join(", ")
+      UI.user_error!("Play promote partial/complete failure: #{summary}")
+    end
+  end
 end

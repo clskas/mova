@@ -39,6 +39,7 @@ android {
         create("driver") {
             dimension = "app"
             applicationIdSuffix = ".driver"
+            // Play listing / launcher — never "Internal" / "Interne" (that's the Play track).
             resValue("string", "app_name", "SENGA Driver")
         }
     }
@@ -53,6 +54,12 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        // Fallback if Dart `serverClientId` is unset — must be the Web OAuth client.
+        resValue(
+            "string",
+            "default_web_client_id",
+            "58917716638-rbgibno8pdvlud8dd00pdfjdv3q1dh4k.apps.googleusercontent.com",
+        )
     }
 
     signingConfigs {

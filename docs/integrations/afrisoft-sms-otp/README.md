@@ -1,12 +1,14 @@
 # Pack d’intégration — SMS OTP AfriSoft (app sœur)
 
+**Handoff canonique :** [../afrisoft-sms-hub-otp.md](../afrisoft-sms-hub-otp.md) · env [../afrisoft-sms-hub.env.example](../afrisoft-sms-hub.env.example)
+
 **Public :** équipe d’une **autre application AfriSoft** qui veut le même canal SMS / OTP que SENGA, **sans** réutiliser les comptes SENGA.  
 **Langue :** français  
 **Version :** septembre 2026 — contrat réel du hub `sms-hub-service`  
 **URL de base :** `https://sms.afri-soft.com`  
 **Ne pas utiliser :** `pay.afri-soft.com` (paiements) · `api.afri-soft.com` (identité SENGA)
 
-Ce dossier est **autonome**. Contrat détaillé : [AFRISOFT_SMS_OTP_HUB_API.md](../../AFRISOFT_SMS_OTP_HUB_API.md).
+Ce dossier reste un pack (snippet Node + note ops). Contrat détaillé : [AFRISOFT_SMS_OTP_HUB_API.md](../../AFRISOFT_SMS_OTP_HUB_API.md).
 
 ---
 

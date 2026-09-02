@@ -5,7 +5,7 @@
 **Statut :** contrat cible multi-apps (architecture B) + état réel SENGA documenté  
 **Langue :** français (en-têtes bilingues FR / EN)  
 **Companion :** [AFRISOFT_PAYMENT_HUB_API.md](./AFRISOFT_PAYMENT_HUB_API.md) (même pattern auth / `app_id`)  
-**Pack apps sœurs (OTP local + `/v1/sms/send`) :** [integrations/afrisoft-sms-otp/](./integrations/afrisoft-sms-otp/README.md)
+**Pack apps sœurs (OTP local + `/v1/sms/send`) :** [integrations/afrisoft-sms-hub-otp.md](./integrations/afrisoft-sms-hub-otp.md) · env [afrisoft-sms-hub.env.example](./integrations/afrisoft-sms-hub.env.example)
 
 ---
 

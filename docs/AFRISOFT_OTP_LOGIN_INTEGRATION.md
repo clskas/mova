@@ -6,7 +6,7 @@
 
 Ce fichier est **autonome**. Vous n’avez pas besoin du dépôt Mova ni d’un compte SMS.
 
-**Autre application AfriSoft avec ses propres utilisateurs** (pas les comptes SENGA) : ne suivez pas ce document. Utilisez le hub SMS `https://sms.afri-soft.com` — pack [integrations/afrisoft-sms-otp/](./integrations/afrisoft-sms-otp/README.md).
+**Autre application AfriSoft avec ses propres utilisateurs** (pas les comptes SENGA) : ne suivez pas ce document. Utilisez le hub SMS `https://sms.afri-soft.com` — [integrations/afrisoft-sms-hub-otp.md](./integrations/afrisoft-sms-hub-otp.md).
 
 ---
 

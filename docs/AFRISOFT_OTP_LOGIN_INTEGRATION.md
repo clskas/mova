@@ -172,7 +172,7 @@ Affichez uniquement un message du type « Un code a été envoyé par SMS », ja
 
 Stockez `accessToken`. Durée de vie du JWT : **7 jours** (sauf indication contraire d’AfriSoft).
 
-`needsPinSetup: true` signifie que l’utilisateur n’a pas encore de PIN local SENGA. **Le flux principal reste l’OTP SMS.** Vous pouvez ignorer le PIN. Si vous voulez le proposer plus tard :
+`needsPinSetup: true` signifie que l’utilisateur n’a pas encore de PIN local SENGA. **Le PIN est obligatoire** après la première connexion (OTP SMS ou Google), y compris pour un compte Google sans numéro. Seuls les numéros démo seed `+2439000000xx` peuvent ignorer le PIN (E2E). Si vous voulez le proposer plus tard :
 
 - `POST /api/auth/pin/setup` (JWT requis) — corps `{ "pin": "847291", "confirmPin": "847291" }` (6 chiffres)
 - `POST /api/auth/login/options` puis `POST /api/auth/pin/login` — connexion sans SMS si un PIN existe

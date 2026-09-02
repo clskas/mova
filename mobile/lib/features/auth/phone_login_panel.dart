@@ -8,6 +8,7 @@ import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_widgets.dart';
 import 'local_pin_setup_screen.dart';
+import 'pin_session.dart';
 import 'widgets/six_digit_pin_field.dart';
 
 enum PhoneLoginStep { phone, pin, forgot, otp, googleOtp }
@@ -294,12 +295,24 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
         }
         final api = ref.read(apiClientProvider);
         await api.saveToken(token);
-        if (MarketConfig.validatePhone(phone)) {
-          await api.saveUserPhone(phone);
+        final user = data['user'];
+        final accountPhone = user is Map
+            ? (user['phone']?.toString() ?? '').trim()
+            : (data['phone']?.toString() ?? '').trim();
+        final accountEmail = user is Map
+            ? (user['email']?.toString() ?? '').trim()
+            : (data['email']?.toString() ?? '').trim();
+        final identity = MarketConfig.validatePhone(accountPhone)
+            ? accountPhone
+            : (MarketConfig.validatePhone(phone)
+                ? phone
+                : (accountEmail.contains('@') ? accountEmail : phone));
+        if (identity.isNotEmpty) {
+          await api.saveUserPhone(identity);
+          _normalizedPhone = identity;
         }
-        final seedDemo = RegExp(r'^\+2439000000\d{2}$').hasMatch(phone);
+        final seedDemo = isSeedDemoPhone(accountPhone.isNotEmpty ? accountPhone : phone);
         final mustSetupPin = !seedDemo &&
-            MarketConfig.validatePhone(phone) &&
             (_forgotPinRecovery || data['pinConfigured'] != true);
         if (mustSetupPin && mounted) {
           await Navigator.of(context).push(
@@ -362,6 +375,10 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
       _googleDestinationMasked = null;
       _codeController.clear();
       _pinController.clear();
+      if (_phoneController.text.contains('@')) {
+        _phoneController.clear();
+        _normalizedPhone = null;
+      }
     });
   }
 
@@ -501,9 +518,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
             child: Text(_step == PhoneLoginStep.googleOtp ? 'Retour' : 'Changer de numéro'),
           ),
         ],
-        if (_step == PhoneLoginStep.phone ||
-            _step == PhoneLoginStep.forgot ||
-            _step == PhoneLoginStep.pin) ...[
+        if (_step == PhoneLoginStep.phone || _step == PhoneLoginStep.forgot) ...[
           const SizedBox(height: 20),
           Row(
             children: [

@@ -102,8 +102,10 @@ export function phoneFromToken(): string | null {
     if (parts.length !== 3) return null;
     const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
     const json = typeof atob !== "undefined" ? atob(base64) : Buffer.from(base64, "base64").toString("utf8");
-    const payload = JSON.parse(json) as { phone?: unknown };
-    return typeof payload.phone === "string" ? payload.phone : null;
+    const payload = JSON.parse(json) as { phone?: unknown; email?: unknown };
+    if (typeof payload.phone === "string" && payload.phone.trim()) return payload.phone.trim();
+    if (typeof payload.email === "string" && payload.email.trim()) return payload.email.trim();
+    return null;
   } catch {
     return null;
   }

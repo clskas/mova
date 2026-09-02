@@ -109,7 +109,10 @@ export function phoneFromToken(token?: string | null): string | null {
   const t = token ?? getToken();
   if (!t) return null;
   const payload = decodeJwtPayload(t);
-  return typeof payload?.phone === "string" ? payload.phone : null;
+  const phone = typeof payload?.phone === "string" ? payload.phone.trim() : "";
+  if (phone) return phone;
+  const email = typeof payload?.email === "string" ? payload.email.trim() : "";
+  return email || null;
 }
 
 export function setLastPhone(phone: string): void {

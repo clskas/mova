@@ -633,10 +633,46 @@ describe('AuthService', () => {
         }),
       }),
     );
+    expect(result.needsPinSetup).toBe(true);
+    expect(result.pinConfigured).toBe(false);
     expect(jwt.sign).toHaveBeenCalledWith(
-      expect.objectContaining({ sub: 'g-user', role: UserRole.PASSENGER }),
+      expect.objectContaining({ sub: 'g-user', role: UserRole.PASSENGER, needsPinSetup: true }),
       expect.objectContaining({ jwtid: expect.any(String) }),
     );
+  });
+
+  it('flags needsPinSetup after Google-only login even without a phone', async () => {
+    seedGoogleChallenge();
+    await seedHashedOtp('new.user@gmail.com', '847291');
+    const created = makeUser({
+      id: 'g-pin',
+      phone: null,
+      googleId: 'gid-new',
+      email: 'new.user@gmail.com',
+      localPinHash: null,
+    });
+    prisma.user.create.mockResolvedValue(created);
+    const result = await service.verifyGoogleOtp('challenge-1', '847291', UserRole.PASSENGER);
+    expect(result.needsPinSetup).toBe(true);
+    expect(result.needsPhone).toBe(true);
+    expect(result.user.hasPhone).toBe(false);
+  });
+
+  it('resolves PIN login options by remembered Google email', async () => {
+    const googleOnly = makeUser({
+      id: 'g-user',
+      phone: null,
+      email: 'marie@gmail.com',
+      googleId: 'gid-new',
+      localPinHash: hashLocalPin('847291'),
+    });
+    prisma.user.findFirst.mockResolvedValue(googleOnly);
+    const options = await service.getLoginOptions('marie@gmail.com', UserRole.PASSENGER);
+    expect(options.pinEnabled).toBe(true);
+    const session = await service.loginWithPin('marie@gmail.com', '847291', UserRole.PASSENGER);
+    expect(session.pinConfigured).toBe(true);
+    expect(session.needsPinSetup).toBe(false);
+    expect(session.user.email).toBe('marie@gmail.com');
   });
 
   it('Google login of a phone user sends email OTP (not SMS) and keeps the same userId after verify', async () => {

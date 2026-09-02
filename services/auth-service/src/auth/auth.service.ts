@@ -15,7 +15,7 @@ import {
   formatMovaPublicId,
   maskPhoneRdc,
   maskEmail,
-  isSeedDemoPhone,
+  userNeedsPinSetup,
   isTestOtpAllowedForPhone,
   matchesSeedTestOtp,
   otpCodesToIssue,
@@ -177,24 +177,23 @@ export class AuthService {
 
   async getLoginOptions(phone: string, role?: UserRole, portal?: string, intendedRole?: string) {
     const requestedRole = this.resolveRequestedAuthRole(role, portal, intendedRole);
-    const normalized = this.normalizePhoneOrThrow(phone);
-    const user = await this.prisma.user.findUnique({ where: { phone: normalized } });
-    if (!user || !user.localPinHash) {
-      return { success: true, phone: normalized, pinEnabled: false };
+    const found = await this.findUserByLoginHandle(phone);
+    if (!found.user || !found.user.localPinHash) {
+      return { success: true, phone: found.normalized, pinEnabled: false };
     }
     try {
-      this.assertRoleAccess(user, requestedRole);
+      this.assertRoleAccess(found.user, requestedRole);
     } catch {
-      return { success: true, phone: normalized, pinEnabled: false };
+      return { success: true, phone: found.normalized, pinEnabled: false };
     }
-    return { success: true, phone: normalized, pinEnabled: true };
+    return { success: true, phone: found.normalized, pinEnabled: true };
   }
 
   async loginWithPin(phone: string, pin: string, role?: UserRole, portal?: string, intendedRole?: string) {
     const requestedRole = this.resolveRequestedAuthRole(role, portal, intendedRole);
-    const normalized = this.normalizePhoneOrThrow(phone);
-    await this.assertPinNotLocked(normalized);
-    const user = await this.prisma.user.findUnique({ where: { phone: normalized } });
+    const found = await this.findUserByLoginHandle(phone);
+    await this.assertPinNotLocked(found.lockKey);
+    const user = found.user;
     if (!user?.localPinHash) {
       throw new MovaHttpException(
         MovaErrorCode.AUTH_PIN_NOT_SET,
@@ -204,10 +203,10 @@ export class AuthService {
     }
     this.assertRoleAccess(user, requestedRole);
     if (!verifyLocalPin(pin, user.localPinHash)) {
-      await this.registerPinFailure(normalized);
+      await this.registerPinFailure(found.lockKey);
       throw new MovaHttpException(MovaErrorCode.AUTH_INVALID_PIN, HttpStatus.UNAUTHORIZED);
     }
-    await this.clearPinFailures(normalized);
+    await this.clearPinFailures(found.lockKey);
     if (user.status === UserStatus.SUSPENDED) {
       throw new MovaHttpException(MovaErrorCode.AUTH_FORBIDDEN, HttpStatus.FORBIDDEN, 'Compte suspendu. Contactez le support SENGA.');
     }
@@ -953,6 +952,31 @@ export class AuthService {
     return normalized;
   }
 
+  /** Phone +243 or remembered Google email. */
+  private isEmailLoginHandle(value: string): boolean {
+    const trimmed = value.trim();
+    const at = trimmed.indexOf('@');
+    return at > 0 && at < trimmed.length - 1 && trimmed.includes('.');
+  }
+
+  private async findUserByLoginHandle(handle: string): Promise<{
+    user: User | null;
+    normalized: string;
+    lockKey: string;
+  }> {
+    const trimmed = (handle ?? '').trim();
+    if (this.isEmailLoginHandle(trimmed)) {
+      const email = trimmed.toLowerCase();
+      const user = await this.prisma.user.findFirst({
+        where: { email: { equals: email, mode: 'insensitive' } },
+      });
+      return { user, normalized: email, lockKey: user?.phone ?? email };
+    }
+    const normalized = this.normalizePhoneOrThrow(trimmed);
+    const user = await this.prisma.user.findUnique({ where: { phone: normalized } });
+    return { user, normalized, lockKey: normalized };
+  }
+
   private async assertInviteOnlyAccountExists(phone: string, role?: UserRole) {
     if (role === UserRole.DRIVER) {
       const user = await this.prisma.user.findUnique({ where: { phone } });
@@ -1094,13 +1118,15 @@ export class AuthService {
   }
 
   private buildAuthResponse(user: User, options: { isNew: boolean }) {
+    const needsPinSetup = userNeedsPinSetup(user.phone, user.localPinHash);
     const token = this.jwt.sign(
       {
         sub: user.id,
         phone: user.phone ?? undefined,
+        email: user.email ?? undefined,
         role: user.role,
         status: user.status,
-        needsPinSetup: Boolean(user.phone && !user.localPinHash && !isSeedDemoPhone(user.phone)),
+        needsPinSetup,
       },
       { jwtid: crypto.randomUUID() },
     );
@@ -1109,7 +1135,7 @@ export class AuthService {
       accessToken: token,
       isNew: options.isNew,
       pinConfigured: Boolean(user.localPinHash),
-      needsPinSetup: Boolean(user.phone && !user.localPinHash && !isSeedDemoPhone(user.phone)),
+      needsPinSetup,
       needsPhone: !user.phone,
       user: {
         id: user.id,

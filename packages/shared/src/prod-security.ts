@@ -165,6 +165,16 @@ export function isSeedDemoPhone(phone: string): boolean {
   return SEED_DEMO_PHONE_RE.test(normalized) || DEFAULT_TEST_OTP_PHONE_SET.has(normalized);
 }
 
+/**
+ * PIN setup is required after the first login (phone OTP or Google), including
+ * Google-only accounts with no phone. Seed demo `+2439000000xx` may skip for E2E.
+ */
+export function userNeedsPinSetup(phone?: string | null, localPinHash?: string | null): boolean {
+  if (localPinHash) return false;
+  if (phone && isSeedDemoPhone(phone)) return false;
+  return true;
+}
+
 export function getTestOtpPhones(): Set<string> {
   const raw = process.env.TEST_OTP_PHONES?.trim();
   const extras = raw

@@ -7,15 +7,16 @@ export type AuthPayload = {
   pinConfigured?: boolean;
   needsPinSetup?: boolean;
   phone?: string;
+  email?: string;
   hasPhone?: boolean;
-  user?: { phone?: string; hasPhone?: boolean; role?: string };
+  user?: { phone?: string; email?: string; hasPhone?: boolean; role?: string };
 };
 
 const SEED_DEMO_PHONE_RE = /^\+2439000000\d{2}$/;
 
-/** Empty string is missing — `??` would ignore the OTP typed phone. */
+/** Empty string is missing — `??` would ignore the OTP typed phone. Email is the Google-only identity. */
 export function accountPhone(data: AuthPayload, fallbackPhone?: string): string {
-  return String(data.user?.phone || data.phone || fallbackPhone || "").trim();
+  return String(data.user?.phone || data.phone || data.user?.email || data.email || fallbackPhone || "").trim();
 }
 
 export function jwtNeedsPinSetup(token: string | null | undefined): boolean {
@@ -34,7 +35,7 @@ export function jwtNeedsPinSetup(token: string | null | undefined): boolean {
   }
 }
 
-/** PIN obligatoire dès qu'un téléphone est connu (OTP saisi, JWT, /me). Google seul : pas de PIN. */
+/** PIN obligatoire après OTP ou Google, même sans téléphone. Seed démo : pas de PIN. */
 export function shouldRequirePinSetup(
   data: AuthPayload,
   fallbackPhone?: string,
@@ -43,21 +44,20 @@ export function shouldRequirePinSetup(
   if (data.pinConfigured === true) return false;
   const phone = accountPhone(data, fallbackPhone);
   if (SEED_DEMO_PHONE_RE.test(phone)) return false;
-  if (data.needsPinSetup === true || jwtNeedsPinSetup(token)) return true;
-  return Boolean(data.user?.hasPhone || data.hasPhone || phone);
+  void token;
+  return true;
 }
 
-/** Phone OTP: always create PIN. `fromPhoneOtp` ignores empty API phone (prod bug). */
+/** First login (phone OTP or Google): always create PIN except seed demo phones. */
 export function mustSetupPinAfterPhoneLogin(
   data: AuthPayload,
   typedPhone: string,
-  fromPhoneOtp = false,
+  _fromPhoneOtp = false,
 ): boolean {
   if (data.pinConfigured === true) return false;
   const phone = accountPhone(data, typedPhone);
   if (SEED_DEMO_PHONE_RE.test(phone) || (typedPhone && SEED_DEMO_PHONE_RE.test(typedPhone))) return false;
-  if (fromPhoneOtp) return true;
-  return Boolean(typedPhone);
+  return true;
 }
 
 export function PinForgotLink({
@@ -82,6 +82,13 @@ export function PinForgotLink({
 
 export function maskPhoneDisplay(phone: string): string {
   const n = phone.replace(/\s/g, "");
+  if (n.includes("@")) {
+    const at = n.indexOf("@");
+    const local = n.slice(0, at);
+    const domain = n.slice(at + 1);
+    const keep = local.length <= 2 ? 1 : 2;
+    return `${local.slice(0, keep)}***@${domain}`;
+  }
   if (n.length < 7) return "votre numéro";
   return `${n.slice(0, 4)} ••• ${n.slice(-3)}`;
 }

@@ -39,16 +39,16 @@ export class VerifyOtpDto extends AuthIntentDto {
 }
 
 export class LoginOptionsDto extends AuthIntentDto {
-  @ApiProperty({ example: '+243812345678' })
-  @IsString({ message: 'Numéro de téléphone requis.' })
-  @IsNotEmpty({ message: 'Numéro de téléphone requis.' })
+  @ApiProperty({ example: '+243812345678', description: 'Téléphone +243 ou e-mail Google mémorisé' })
+  @IsString({ message: 'Numéro de téléphone ou e-mail requis.' })
+  @IsNotEmpty({ message: 'Numéro de téléphone ou e-mail requis.' })
   phone: string;
 }
 
 export class PinLoginDto extends AuthIntentDto {
-  @ApiProperty({ example: '+243812345678' })
-  @IsString({ message: 'Numéro de téléphone requis.' })
-  @IsNotEmpty({ message: 'Numéro de téléphone requis.' })
+  @ApiProperty({ example: '+243812345678', description: 'Téléphone +243 ou e-mail Google mémorisé' })
+  @IsString({ message: 'Numéro de téléphone ou e-mail requis.' })
+  @IsNotEmpty({ message: 'Numéro de téléphone ou e-mail requis.' })
   phone: string;
   @ApiProperty({ example: '847291' })
   @IsString()

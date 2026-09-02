@@ -106,7 +106,11 @@ class ApiClient {
 
   Future<void> saveUserPhone(String phone) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('user_phone', MarketConfig.normalizePhone(phone));
+    final trimmed = phone.trim();
+    final value = trimmed.contains('@')
+        ? trimmed.toLowerCase()
+        : MarketConfig.normalizePhone(trimmed);
+    await prefs.setString('user_phone', value);
   }
 
   Future<String?> loadUserPhone() async {

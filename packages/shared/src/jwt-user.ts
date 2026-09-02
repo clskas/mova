@@ -3,11 +3,12 @@ import { UserStatus } from './enums';
 export type MovaJwtPayload = {
   sub: string;
   phone?: string;
+  email?: string;
   role: string;
   status?: UserStatus | string;
   /** Present on tokens issued after logout/denylist support. Old 7d tokens omit it. */
   jti?: string;
-  /** Phone account without a local PIN (seed demo phones omit this). */
+  /** Account without a local PIN (seed demo phones omit this). True for Google-only too. */
   needsPinSetup?: boolean;
 };
 

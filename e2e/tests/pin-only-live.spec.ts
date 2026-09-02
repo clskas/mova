@@ -88,4 +88,17 @@ test.describe("PIN-only after remembered phone + PIN", () => {
     await page.reload();
     await assertPinOnly(page);
   });
+
+  test("SENGA web PIN-only with remembered Google email", async ({ page, request }) => {
+    await requireReachable(request, LIVE.web, `Web indisponible: ${LIVE.web}`);
+    await interceptPinEnabled(page);
+    await page.goto(LIVE.web);
+    await page.evaluate(() => {
+      localStorage.removeItem("mova_web_token");
+      localStorage.setItem("mova_web_phone", "marie@gmail.com");
+      sessionStorage.removeItem("mova_web_pin_unlocked");
+    });
+    await page.reload();
+    await assertPinOnly(page);
+  });
 });

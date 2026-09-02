@@ -12,6 +12,7 @@ import '../home/home_screen.dart';
 import '../../core/config/market_config.dart';
 import 'local_pin_setup_screen.dart';
 import 'otp_screen.dart';
+import 'pin_session.dart';
 
 enum AuthSessionRole { passenger, driver }
 
@@ -67,14 +68,24 @@ class _AuthSessionGateState extends ConsumerState<AuthSessionGate> {
           return;
         }
         final phone = (data['phone']?.toString() ?? '').trim();
-        final seedDemo = RegExp(r'^\+2439000000\d{2}$').hasMatch(phone);
-        final hasPhone = data['hasPhone'] == true || MarketConfig.validatePhone(phone);
+        final email = (data['email']?.toString() ?? '').trim();
         final pinConfigured = data['pinConfigured'] == true;
-        if (!pinConfigured && hasPhone && !seedDemo) {
+        final identity = MarketConfig.validatePhone(phone)
+            ? phone
+            : (email.contains('@') ? email : phone);
+        if (identity.isNotEmpty) {
+          await api.saveUserPhone(identity);
+        }
+        if (sessionNeedsPinSetup(pinConfigured: pinConfigured, phone: phone)) {
           setState(() {
             _checking = false;
             _needsPinSetup = true;
           });
+          return;
+        }
+        if (sessionRequiresPinUnlock(pinConfigured: pinConfigured, phone: phone)) {
+          await api.clearToken(keepPhone: true);
+          if (mounted) setState(() => _checking = false);
           return;
         }
         setState(() {

@@ -140,13 +140,19 @@ describe('prod-security', () => {
     delete process.env.TEST_OTP_PHONES;
     process.env.AFRISOFT_SMS_HUB_URL = 'https://sms.afri-soft.com';
     process.env.AFRISOFT_HUB_API_KEY = 'hub-key';
-    const { isTestOtpAllowedForPhone, isSeedDemoPhone, matchesSeedTestOtp } =
+    const { isTestOtpAllowedForPhone, isSeedDemoPhone, matchesSeedTestOtp, userNeedsPinSetup } =
       await import('./prod-security');
     expect(isSeedDemoPhone('+243900000001')).toBe(true);
     expect(isSeedDemoPhone('243900000010')).toBe(true);
     expect(isSeedDemoPhone('+243900000030')).toBe(true);
     expect(isSeedDemoPhone('+243900000031')).toBe(true);
     expect(isSeedDemoPhone('+243812345678')).toBe(false);
+    expect(userNeedsPinSetup('+243812345678', null)).toBe(true);
+    expect(userNeedsPinSetup(null, null)).toBe(true);
+    expect(userNeedsPinSetup('', null)).toBe(true);
+    expect(userNeedsPinSetup('+243900000010', null)).toBe(false);
+    expect(userNeedsPinSetup(null, 'hash')).toBe(false);
+    expect(userNeedsPinSetup('+243812345678', 'hash')).toBe(false);
     expect(isTestOtpAllowedForPhone('+243900000001')).toBe(true);
     expect(isTestOtpAllowedForPhone('+243900000010')).toBe(true);
     expect(isTestOtpAllowedForPhone('+243900000030')).toBe(true);

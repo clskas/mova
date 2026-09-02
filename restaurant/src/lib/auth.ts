@@ -147,5 +147,8 @@ export function phoneFromToken(): string | null {
   const token = getToken();
   if (!token) return null;
   const payload = decodeJwtPayload(token);
-  return typeof payload?.phone === "string" ? payload.phone : null;
+  const phone = typeof payload?.phone === "string" ? payload.phone.trim() : "";
+  if (phone) return phone;
+  const email = typeof payload?.email === "string" ? payload.email.trim() : "";
+  return email || null;
 }

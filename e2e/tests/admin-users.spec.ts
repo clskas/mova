@@ -23,5 +23,8 @@ test.describe("Admin — liste utilisateurs", () => {
     await expect(
       page.getByRole("columnheader", { name: "Téléphone" }).or(page.getByText("Aucun utilisateur"))
     ).toBeVisible({ timeout: 15_000 });
+    await expect(
+      page.getByRole("columnheader", { name: "E-mail" }).or(page.getByText("Aucun utilisateur"))
+    ).toBeVisible();
   });
 });

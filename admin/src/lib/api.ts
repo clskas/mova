@@ -846,6 +846,7 @@ function mockFor<T>(path: string, init?: RequestInit): T {
       status: "ACTIVE",
       firstName: "Marie",
       lastName: "Kabongo",
+      email: "marie.kabongo@example.com",
     } as T;
   }
   if (path.includes("/users") && method === "PATCH") {
@@ -853,9 +854,9 @@ function mockFor<T>(path: string, init?: RequestInit): T {
   }
   if (path.includes("/users")) {
     return [
-      { id: "1", phone: "+243812345678", role: "PASSENGER", status: "ACTIVE", firstName: "Marie", lastName: "K." },
+      { id: "1", phone: "+243812345678", role: "PASSENGER", status: "ACTIVE", firstName: "Marie", lastName: "K.", email: "marie.kabongo@example.com" },
       { id: "2", phone: "+243998765432", role: "DRIVER", status: "ACTIVE", firstName: "Jean", lastName: "M." },
-      { id: "3", phone: "+243900000001", role: "SUPER_ADMIN", status: "ACTIVE", firstName: "Admin", lastName: "SENGA" },
+      { id: "3", phone: "+243900000001", role: "SUPER_ADMIN", status: "ACTIVE", firstName: "Admin", lastName: "SENGA", email: "celestinkas@gmail.com" },
     ] as T;
   }
   if (path.match(/\/drivers\/[^/?]+/) && method === "GET") {

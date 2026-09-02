@@ -184,7 +184,7 @@ export default function UtilisateursPage() {
       {error && <div className="mb-4"><ErrorBanner message={error} onRetry={load} /></div>}
       <div className="space-y-4">
         <div className="flex flex-wrap gap-2 items-end">
-          <SearchInput value={search} onChange={setSearch} placeholder="Rechercher par nom, téléphone ou rôle…" />
+          <SearchInput value={search} onChange={setSearch} placeholder="Rechercher par nom, téléphone, e-mail ou rôle…" />
           <BtnPrimary onClick={applySearch}>Rechercher</BtnPrimary>
         </div>
         {loading ? (
@@ -199,6 +199,7 @@ export default function UtilisateursPage() {
                 <tr className="border-b text-left text-gray-500">
                   <th className="p-3">Nom</th>
                   <th className="p-3">Téléphone</th>
+                  <th className="p-3">E-mail</th>
                   <th className="p-3">Rôle</th>
                   <th className="p-3">Statut</th>
                   <th className="p-3"></th>
@@ -209,6 +210,7 @@ export default function UtilisateursPage() {
                   <tr key={u.id} className="border-b hover:bg-gray-50">
                     <td className="p-3 font-medium">{formatUserName(u)}</td>
                     <td className="p-3">{u.phone ?? "—"}</td>
+                    <td className="p-3">{u.email?.trim() ? u.email : "—"}</td>
                     <td className="p-3"><StatusBadge status={u.role} /></td>
                     <td className="p-3"><StatusBadge status={u.status ?? "ACTIVE"} /></td>
                     <td className="p-3">
@@ -284,6 +286,10 @@ export default function UtilisateursPage() {
               <label><FieldLabel>Prénom</FieldLabel><TextInput value={editFirst} onChange={setEditFirst} disabled={readOnly} /></label>
               <label><FieldLabel>Nom</FieldLabel><TextInput value={editLast} onChange={setEditLast} disabled={readOnly} /></label>
               <label><FieldLabel>Téléphone</FieldLabel><TextInput value={editPhone} onChange={setEditPhone} disabled={readOnly} /></label>
+              <label>
+                <FieldLabel>E-mail</FieldLabel>
+                <TextInput value={selected.email?.trim() ? selected.email : "—"} onChange={() => undefined} disabled />
+              </label>
               <label>
                 <FieldLabel>Rôle</FieldLabel>
                 <SelectInput value={editRole} onChange={setEditRole} disabled={readOnly} options={[

@@ -379,13 +379,102 @@ describe('AuthService', () => {
     expect(prisma.user.create).not.toHaveBeenCalled();
   });
 
-  it('does not create a DRIVER from Google', async () => {
+  it('allows first Google login on driver app (OTP challenge, no user yet)', async () => {
     prisma.user.findUnique.mockResolvedValue(null);
     prisma.user.findFirst.mockResolvedValue(null);
+    const start = googleOtpChallenge(await service.loginWithGoogle('id-token', UserRole.DRIVER));
+    expect(start.otpRequired).toBe(true);
+    expect(start.challengeId).toEqual(expect.any(String));
+    expect(prisma.user.create).not.toHaveBeenCalled();
+    expect(jwt.sign).not.toHaveBeenCalled();
+  });
+
+  it('creates a pending DRIVER after Google email OTP from the driver app', async () => {
+    seedGoogleChallenge({ role: UserRole.DRIVER });
+    await seedHashedOtp('new.user@gmail.com', '847291');
+    const created = makeUser({
+      id: 'g-driver',
+      phone: null,
+      googleId: 'gid-new',
+      email: 'new.user@gmail.com',
+      role: UserRole.DRIVER,
+      status: UserStatus.PENDING_KYC,
+    });
+    prisma.user.create.mockResolvedValue(created);
+    const result = await service.verifyGoogleOtp('challenge-1', '847291', UserRole.DRIVER);
+    expect(result.isNew).toBe(true);
+    expect(result.user.role).toBe(UserRole.DRIVER);
+    expect(result.user.status).toBe(UserStatus.PENDING_KYC);
+    expect(result.needsPhone).toBe(true);
+    expect(prisma.user.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          googleId: 'gid-new',
+          role: UserRole.DRIVER,
+          status: UserStatus.PENDING_KYC,
+        }),
+      }),
+    );
+  });
+
+  it('does not promote PASSENGER to DRIVER via Google', async () => {
+    const passenger = makeUser({
+      role: UserRole.PASSENGER,
+      googleId: 'gid-new',
+      email: 'new.user@gmail.com',
+    });
+    prisma.user.findUnique.mockResolvedValue(passenger);
+    await expect(service.loginWithGoogle('id-token', UserRole.DRIVER)).rejects.toMatchObject({
+      response: {
+        code: MovaErrorCode.AUTH_FORBIDDEN,
+        message: expect.stringMatching(/compte passager/i),
+      },
+    });
+    expect(prisma.user.create).not.toHaveBeenCalled();
+    expect(prisma.user.update).not.toHaveBeenCalled();
+  });
+
+  it('does not create a DRIVER from SUPER_ADMIN Google on the driver app', async () => {
+    const admin = makeUser({
+      role: UserRole.SUPER_ADMIN,
+      googleId: 'gid-new',
+      email: 'new.user@gmail.com',
+    });
+    prisma.user.findUnique.mockResolvedValue(admin);
     await expect(service.loginWithGoogle('id-token', UserRole.DRIVER)).rejects.toMatchObject({
       response: { code: MovaErrorCode.AUTH_FORBIDDEN },
     });
     expect(prisma.user.create).not.toHaveBeenCalled();
+  });
+
+  it('allows an existing DRIVER Google login on the driver app', async () => {
+    const driver = makeUser({
+      role: UserRole.DRIVER,
+      status: UserStatus.PENDING_KYC,
+      googleId: 'gid-new',
+      email: 'new.user@gmail.com',
+    });
+    prisma.user.findUnique.mockResolvedValue(driver);
+    const start = googleOtpChallenge(await service.loginWithGoogle('id-token', UserRole.DRIVER));
+    expect(start.otpRequired).toBe(true);
+    expect(prisma.user.create).not.toHaveBeenCalled();
+
+    seedGoogleChallenge({
+      userId: driver.id,
+      isNew: false,
+      role: UserRole.DRIVER,
+      destination: 'new.user@gmail.com',
+      channel: 'email',
+      email: 'new.user@gmail.com',
+    });
+    await seedHashedOtp('new.user@gmail.com', '847291');
+    prisma.user.findUnique.mockResolvedValue(driver);
+    prisma.user.update.mockResolvedValue(driver);
+    const done = await service.verifyGoogleOtp('challenge-1', '847291', UserRole.DRIVER);
+    expect(done.user.role).toBe(UserRole.DRIVER);
+    expect(done.isNew).toBe(false);
+    expect(prisma.user.create).not.toHaveBeenCalled();
+    expect(jwt.sign).toHaveBeenCalled();
   });
 
   it('allows first Google login on restaurant portal (OTP challenge, no JWT yet)', async () => {

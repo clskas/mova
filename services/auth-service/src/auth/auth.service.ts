@@ -85,6 +85,11 @@ type GoogleChallenge = {
 
 const PASSENGER_ON_DRIVER_APP_MESSAGE =
   'Ce numéro est un compte passager. Utilisez l\'application SENGA passager, ou attendez qu\'un administrateur vous promeuve chauffeur (après KYC).';
+const PASSENGER_GOOGLE_ON_DRIVER_APP_MESSAGE =
+  'Ce Google est un compte passager. Inscrivez-vous chauffeur avec votre numéro, puis liez Google dans Compte.';
+const STAFF_ON_DRIVER_APP_MESSAGE = 'Compte staff — connexion réservée à la console admin.';
+const STAFF_GOOGLE_ON_DRIVER_APP_MESSAGE =
+  'Compte administrateur. Utilisez la console admin, ou inscrivez-vous chauffeur avec votre numéro.';
 const NO_DRIVER_ACCOUNT_MESSAGE =
   'Aucun compte chauffeur pour ce numéro. Utilisez l\'application SENGA passager, ou attendez une promotion chauffeur après validation KYC.';
 
@@ -354,8 +359,9 @@ export class AuthService {
   /**
    * Step 1: verify Google ID token, issue email OTP to the Google mailbox.
    * A linked phone does not change the channel — SMS OTP is only for POST /auth/otp/request.
-   * Does not return a session JWT. Never creates DRIVER or staff. Partner roles only
-   * from restaurant / rental portals (explicit role or portal).
+   * Does not return a session JWT. Driver app (`role=DRIVER`) may create a pending KYC
+   * chauffeur on verify — never staff, never a silent promote of PASSENGER / SUPER_ADMIN.
+   * Partner roles only from restaurant / rental portals (explicit role or portal).
    */
   async loginWithGoogle(
     idToken: string,
@@ -370,7 +376,7 @@ export class AuthService {
     if (!user) {
       this.assertGoogleCanAutoRegister(requestedRole, identity.email);
     } else {
-      this.assertRoleAccess(user, requestedRole);
+      this.assertRoleAccess(user, requestedRole, 'google');
       if (user.status === UserStatus.SUSPENDED) {
         throw new MovaHttpException(
           MovaErrorCode.AUTH_FORBIDDEN,
@@ -445,7 +451,8 @@ export class AuthService {
 
   /**
    * Step 2: consume the Google OTP challenge and issue the session JWT.
-   * New Google-only passengers are created here (one wallet). Existing users keep the same id.
+   * New Google-only passengers or pending drivers are created here (one wallet).
+   * Existing users keep the same id — no silent role promote.
    */
   async verifyGoogleOtp(
     challengeId: string,
@@ -458,10 +465,9 @@ export class AuthService {
     const requestedRole = this.resolveRequestedAuthRole(role ?? challenge.role, portal, intendedRole);
     await this.consumeValidOtp(challenge.destination, code, { email: challenge.channel === 'email' });
 
-    let user: User | null = challenge.userId
+    const existing = challenge.userId
       ? await this.prisma.user.findUnique({ where: { id: challenge.userId } })
       : null;
-    let isNew = false;
 
     const identity: GoogleIdentity = {
       googleId: challenge.googleId,
@@ -473,51 +479,9 @@ export class AuthService {
       audience: '',
     };
 
-    if (!user) {
-      this.assertGoogleCanAutoRegister(requestedRole, identity.email);
-      const createdRole = isAllowedPartnerSelfRegisterRole(requestedRole)
-        ? requestedRole!
-        : UserRole.PASSENGER;
-      user = await this.prisma.user.create({
-        data: {
-          googleId: identity.googleId,
-          email: identity.email,
-          firstName: identity.givenName,
-          lastName: identity.familyName,
-          avatarUrl: identity.picture,
-          role: createdRole,
-          status: UserStatus.ACTIVE,
-        },
-      });
-      isNew = true;
-      await this.provisionUser(user.id, user.role);
-      try {
-        const payload: UserCreatedPayload = { userId: user.id, phone: user.phone ?? undefined, role: user.role };
-        await this.redis.publish(MOVA_EVENTS.USER_CREATED, payload);
-      } catch (e) {
-        this.logger.warn(`USER_CREATED publish failed: ${(e as Error).message}`);
-      }
-    } else {
-      user = await this.attachGoogleIdentity(user, identity);
-    }
-
-    this.assertRoleAccess(user, requestedRole);
-    if (user.status === UserStatus.SUSPENDED) {
-      throw new MovaHttpException(
-        MovaErrorCode.AUTH_FORBIDDEN,
-        HttpStatus.FORBIDDEN,
-        'Compte suspendu. Contactez le support SENGA.',
-      );
-    }
+    const result = await this.finalizeGoogleSession(identity, existing, requestedRole);
     await this.clearGoogleChallenge(challengeId);
-    if (user.phone) {
-      try {
-        await this.clearPinFailures(user.phone);
-      } catch (e) {
-        this.logger.warn(`clearPinFailures failed: ${(e as Error).message}`);
-      }
-    }
-    return this.buildAuthResponse(user, { isNew });
+    return result;
   }
 
   /**
@@ -714,19 +678,8 @@ export class AuthService {
     let isNew = false;
     if (!user) {
       this.assertGoogleCanAutoRegister(requestedRole, identity.email);
-      const createdRole = isAllowedPartnerSelfRegisterRole(requestedRole)
-        ? requestedRole!
-        : UserRole.PASSENGER;
       user = await this.prisma.user.create({
-        data: {
-          googleId: identity.googleId,
-          email: identity.email,
-          firstName: identity.givenName,
-          lastName: identity.familyName,
-          avatarUrl: identity.picture,
-          role: createdRole,
-          status: UserStatus.ACTIVE,
-        },
+        data: this.googleAutoRegisterCreateData(identity, requestedRole),
       });
       isNew = true;
       await this.provisionUser(user.id, user.role);
@@ -739,7 +692,7 @@ export class AuthService {
     } else {
       user = await this.attachGoogleIdentity(user, identity);
     }
-    this.assertRoleAccess(user, requestedRole);
+    this.assertRoleAccess(user, requestedRole, 'google');
     if (user.status === UserStatus.SUSPENDED) {
       throw new MovaHttpException(
         MovaErrorCode.AUTH_FORBIDDEN,
@@ -766,11 +719,7 @@ export class AuthService {
       );
     }
     if (role === UserRole.DRIVER) {
-      throw new MovaHttpException(
-        MovaErrorCode.AUTH_FORBIDDEN,
-        HttpStatus.FORBIDDEN,
-        'Aucun compte chauffeur lié à Google. Connectez-vous avec votre numéro +243 (inscription chauffeur en attente de validation).',
-      );
+      return;
     }
     if (isStaffAuthRole(role)) {
       throw new MovaHttpException(
@@ -1022,7 +971,25 @@ export class AuthService {
     this.assertRoleAccess(user, role);
   }
 
-  private assertRoleAccess(user: User, role?: UserRole) {
+  private googleAutoRegisterCreateData(identity: GoogleIdentity, requestedRole?: UserRole) {
+    const isDriverApplicant = requestedRole === UserRole.DRIVER;
+    const createdRole = isDriverApplicant
+      ? UserRole.DRIVER
+      : isAllowedPartnerSelfRegisterRole(requestedRole)
+        ? requestedRole!
+        : UserRole.PASSENGER;
+    return {
+      googleId: identity.googleId,
+      email: identity.email,
+      firstName: identity.givenName,
+      lastName: identity.familyName,
+      avatarUrl: identity.picture,
+      role: createdRole,
+      status: isDriverApplicant ? UserStatus.PENDING_KYC : UserStatus.ACTIVE,
+    };
+  }
+
+  private assertRoleAccess(user: User, role?: UserRole, via: 'phone' | 'google' = 'phone') {
     const staffRoles: UserRole[] = [
       UserRole.SUPER_ADMIN,
       UserRole.ADMIN,
@@ -1051,14 +1018,14 @@ export class AuthService {
       throw new MovaHttpException(
         MovaErrorCode.AUTH_FORBIDDEN,
         HttpStatus.FORBIDDEN,
-        PASSENGER_ON_DRIVER_APP_MESSAGE,
+        via === 'google' ? PASSENGER_GOOGLE_ON_DRIVER_APP_MESSAGE : PASSENGER_ON_DRIVER_APP_MESSAGE,
       );
     }
     if (role === UserRole.DRIVER && staffRoles.includes(user.role)) {
       throw new MovaHttpException(
         MovaErrorCode.AUTH_FORBIDDEN,
         HttpStatus.FORBIDDEN,
-        'Compte staff — connexion réservée à la console admin.',
+        via === 'google' ? STAFF_GOOGLE_ON_DRIVER_APP_MESSAGE : STAFF_ON_DRIVER_APP_MESSAGE,
       );
     }
     if (role === UserRole.PASSENGER && staffRoles.includes(user.role)) {
@@ -1069,7 +1036,7 @@ export class AuthService {
       throw new MovaHttpException(
         MovaErrorCode.AUTH_FORBIDDEN,
         HttpStatus.FORBIDDEN,
-        'Compte staff — connexion réservée à la console admin.',
+        STAFF_ON_DRIVER_APP_MESSAGE,
       );
     }
     if ((role === UserRole.PASSENGER || role === UserRole.DRIVER) && user.role === UserRole.RENTAL_PARTNER) {

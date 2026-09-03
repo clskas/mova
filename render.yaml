@@ -131,6 +131,8 @@ services:
         fromService: { name: mova-gateway, type: web, envVarKey: JWT_SECRET }
       - key: RIDE_SERVICE_URL
         fromService: { name: mova-ride, type: web, property: hostport }
+      - key: AUTH_SERVICE_URL
+        fromService: { name: mova-auth, type: web, property: hostport }
       - key: MOCK_PAYMENTS
         value: "false"
       - key: AFRISOFT_PAY_HUB_URL

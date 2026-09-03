@@ -270,6 +270,15 @@ export function assertProductionSecurity(serviceName = 'service'): void {
     );
   }
 
+  if (serviceName === 'payment-service') {
+    const authUrl = (process.env.AUTH_SERVICE_URL ?? '').trim();
+    if (!authUrl || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/?$/i.test(authUrl)) {
+      throw new Error(
+        `[${serviceName}] AUTH_SERVICE_URL must point to mova-auth in production (not localhost). Payment JWT revalidation requires it.`,
+      );
+    }
+  }
+
   // Only auth-service sends OTP; other services warn if SMS env is missing.
   if (!isProductionSmsConfigured() && !isTestOtpModeEnabled()) {
     const msg =

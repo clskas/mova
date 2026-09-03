@@ -43,6 +43,18 @@ describe('prod-security', () => {
     expect(() => assertProductionSecurity('auth-service')).not.toThrow();
   });
 
+  it('rejects payment-service without AUTH_SERVICE_URL in production', async () => {
+    process.env.NODE_ENV = 'production';
+    process.env.JWT_SECRET = 'a'.repeat(32);
+    process.env.INTERNAL_API_KEY = 'b'.repeat(24);
+    delete process.env.MOCK_PAYMENTS;
+    delete process.env.AUTH_SERVICE_URL;
+    const { assertProductionSecurity } = await import('./prod-security');
+    expect(() => assertProductionSecurity('payment-service')).toThrow(/AUTH_SERVICE_URL/);
+    process.env.AUTH_SERVICE_URL = 'https://mova-auth.onrender.com';
+    expect(() => assertProductionSecurity('payment-service')).not.toThrow();
+  });
+
   it('rejects MOCK_SMS in production', async () => {
     process.env.NODE_ENV = 'production';
     process.env.JWT_SECRET = 'a'.repeat(32);

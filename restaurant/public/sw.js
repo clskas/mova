@@ -1,4 +1,4 @@
-const CACHE = "mova-resto-v11";
+const CACHE = "mova-resto-v12";
 const SHELL = [
   "/manifest.webmanifest",
   "/icon-192.png",

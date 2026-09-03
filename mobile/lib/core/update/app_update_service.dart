@@ -81,7 +81,7 @@ final appUpdateServiceProvider =
     NotifierProvider<AppUpdateService, AppUpdateState>(AppUpdateService.new);
 
 class AppUpdateService extends Notifier<AppUpdateState> {
-  static const softDismissDuration = Duration(days: 7);
+  static const softDismissDuration = Duration(minutes: 15);
   static const _snoozePrefKey = 'senga_update_snoozed_version';
 
   Timer? _timer;
@@ -162,8 +162,7 @@ class AppUpdateService extends Notifier<AppUpdateState> {
       }
       final playUpdate = await PlayInAppUpdate.hasUpdate();
       final localAtOrAhead = next.remoteVersion != null &&
-          AppVersion.compare(AppVersion.name, next.remoteVersion!) >= 0 &&
-          !next.updateAvailable;
+          AppVersion.compare(AppVersion.name, next.remoteVersion!) >= 0;
       if (playUpdate && !next.updateAvailable && !localAtOrAhead) {
         next = next.copyWith(
           updateAvailable: true,
@@ -260,13 +259,18 @@ class AppUpdateService extends Notifier<AppUpdateState> {
     final storeUrl = block['storeUrl']?.toString();
     if (current.isEmpty) return null;
     final minCode = _asInt(block['minVersionCode']);
-    final behindCurrent = AppVersion.compare(localVersion, current) < 0;
+    final currentCode = _asInt(block['currentVersionCode']);
+    final nameCmp = AppVersion.compare(localVersion, current);
+    final behindName = nameCmp < 0;
+    final atOrAheadCode =
+        currentCode > 0 && localBuild > 0 && localBuild >= currentCode;
     final belowMin = AppVersion.compare(localVersion, min) < 0 ||
         (minCode > 0 && localBuild > 0 && localBuild < minCode);
-    // Same versionName as advertised = up to date. Do not use versionCode alone:
-    // Play 1.0.3/28 vs compile-time AppVersion.build=8 was keeping the banner forever.
+    // Hide when versionName is already latest and/or versionCode is at/ahead.
+    // Do not treat a stale compile-time build (e.g. 8 vs 28) as behind when
+    // versionName already matches — that kept the 1.0.3 banner forever.
     return AppUpdateState(
-      updateAvailable: behindCurrent || belowMin,
+      updateAvailable: belowMin || (behindName && !atOrAheadCode),
       forceUpdate: belowMin,
       storeUrl: storeUrl,
       remoteVersion: current,

@@ -22,6 +22,12 @@ function parseVersionCode(raw: string | undefined, fallback: number): number {
   return Number.isFinite(n) && n >= 0 ? n : fallback;
 }
 
+/** Play store versionCode must never be advertised as 0 (that hid in-app banners). */
+function advertisedVersionCode(raw: string | undefined, fallback: number): number {
+  const n = parseVersionCode(raw, fallback);
+  return n > 0 ? n : fallback;
+}
+
 /** Versions store exposées aux apps (sans auth). Lever MOBILE_*_VERSION après un upload Play. */
 export function buildMobileAppVersionResponse(
   env: NodeJS.ProcessEnv = process.env,
@@ -32,17 +38,17 @@ export function buildMobileAppVersionResponse(
   return {
     generatedAt: now.toISOString(),
     passenger: {
-      currentVersion: env.MOBILE_PASSENGER_VERSION?.trim() || '1.0.2',
+      currentVersion: env.MOBILE_PASSENGER_VERSION?.trim() || '1.0.4',
       minVersion,
       storeUrl: env.PLAY_STORE_PASSENGER_URL?.trim() || DEFAULT_PASSENGER_STORE,
-      currentVersionCode: parseVersionCode(env.MOBILE_PASSENGER_VERSION_CODE, 0),
+      currentVersionCode: advertisedVersionCode(env.MOBILE_PASSENGER_VERSION_CODE, 39),
       minVersionCode,
     },
     driver: {
-      currentVersion: env.MOBILE_DRIVER_VERSION?.trim() || '1.0.2',
+      currentVersion: env.MOBILE_DRIVER_VERSION?.trim() || '1.0.4',
       minVersion,
       storeUrl: env.PLAY_STORE_DRIVER_URL?.trim() || DEFAULT_DRIVER_STORE,
-      currentVersionCode: parseVersionCode(env.MOBILE_DRIVER_VERSION_CODE, 0),
+      currentVersionCode: advertisedVersionCode(env.MOBILE_DRIVER_VERSION_CODE, 39),
       minVersionCode,
     },
   };

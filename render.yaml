@@ -361,17 +361,17 @@ envVarGroups:
         sync: false
       # In-app update banner (ride-service GET /api/public/app-version). Raise after Play upload.
       - key: MOBILE_PASSENGER_VERSION
-        value: "1.0.3"
+        value: "1.0.4"
       - key: MOBILE_DRIVER_VERSION
-        value: "1.0.3"
+        value: "1.0.4"
       - key: MOBILE_MIN_VERSION
         value: "1.0.0"
-      # Raise after Play accepts a new AAB. 0 = ignore versionCode.
-      # Installed 1.0.3 apps compile AppVersion.build=8; advertising 28 kept the banner up.
+      # Latest uploaded Play versionCode (afri-soft Mobile Release 2026-09-02: 1.0.4 / 39).
+      # Never leave 0 — that hid banners. Flutter hides when versionName is already latest.
       - key: MOBILE_PASSENGER_VERSION_CODE
-        value: "0"
+        value: "39"
       - key: MOBILE_DRIVER_VERSION_CODE
-        value: "0"
+        value: "39"
       - key: MOBILE_MIN_VERSION_CODE
         value: "0"
       - key: PLAY_STORE_PASSENGER_URL

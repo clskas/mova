@@ -6,10 +6,10 @@ describe('buildMobileAppVersionResponse', () => {
   it('uses defaults when env is empty', () => {
     const payload = buildMobileAppVersionResponse({}, now);
     expect(payload.generatedAt).toBe('2026-08-15T10:00:00.000Z');
-    expect(payload.passenger.currentVersion).toBe('1.0.2');
-    expect(payload.driver.currentVersion).toBe('1.0.2');
+    expect(payload.passenger.currentVersion).toBe('1.0.4');
+    expect(payload.driver.currentVersion).toBe('1.0.4');
     expect(payload.passenger.minVersion).toBe('1.0.0');
-    expect(payload.passenger.currentVersionCode).toBe(0);
+    expect(payload.passenger.currentVersionCode).toBe(39);
     expect(payload.passenger.minVersionCode).toBe(0);
     expect(payload.passenger.storeUrl).toContain('cd.mova.mova.passenger');
     expect(payload.driver.storeUrl).toContain('cd.mova.mova.driver');
@@ -38,5 +38,17 @@ describe('buildMobileAppVersionResponse', () => {
     expect(payload.passenger.minVersionCode).toBe(8);
     expect(payload.passenger.storeUrl).toBe('https://play.example/passenger');
     expect(payload.driver.storeUrl).toBe('https://play.example/driver');
+  });
+
+  it('never advertises currentVersionCode 0', () => {
+    const payload = buildMobileAppVersionResponse(
+      {
+        MOBILE_PASSENGER_VERSION_CODE: '0',
+        MOBILE_DRIVER_VERSION_CODE: '0',
+      },
+      now,
+    );
+    expect(payload.passenger.currentVersionCode).toBe(39);
+    expect(payload.driver.currentVersionCode).toBe(39);
   });
 });

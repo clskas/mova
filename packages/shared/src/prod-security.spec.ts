@@ -126,18 +126,18 @@ describe('prod-security', () => {
     const { assertProductionSecurity, isTestOtpAllowedForPhone, TEST_OTP_CODE } =
       await import('./prod-security');
     expect(() => assertProductionSecurity('auth-service')).not.toThrow();
-    expect(isTestOtpAllowedForPhone('+243900000010')).toBe(true);
-    expect(isTestOtpAllowedForPhone('+243900000040')).toBe(true);
-    expect(isTestOtpAllowedForPhone('+243900000050')).toBe(true);
+    expect(isTestOtpAllowedForPhone('+243900000010')).toBe(false);
+    expect(isTestOtpAllowedForPhone('+243900000040')).toBe(false);
+    expect(isTestOtpAllowedForPhone('+243900000050')).toBe(false);
     expect(isTestOtpAllowedForPhone('+243812345678')).toBe(false);
     expect(TEST_OTP_CODE).toBe('123456');
   });
 
-  it('seed demo phones always allow 123456 even when SMS hub is live and ALLOW_TEST_OTP is off', async () => {
+  it('production never allows hardcoded 123456, even for seed demo phones', async () => {
     process.env.NODE_ENV = 'production';
-    delete process.env.ALLOW_TEST_OTP;
-    delete process.env.MOCK_OTP;
-    delete process.env.TEST_OTP_PHONES;
+    process.env.ALLOW_TEST_OTP = 'true';
+    process.env.MOCK_OTP = 'true';
+    process.env.TEST_OTP_PHONES = '+243900000010,+243811111111';
     process.env.AFRISOFT_SMS_HUB_URL = 'https://sms.afri-soft.com';
     process.env.AFRISOFT_HUB_API_KEY = 'hub-key';
     const { isTestOtpAllowedForPhone, isSeedDemoPhone, matchesSeedTestOtp, userNeedsPinSetup } =
@@ -150,40 +150,44 @@ describe('prod-security', () => {
     expect(userNeedsPinSetup('+243812345678', null)).toBe(true);
     expect(userNeedsPinSetup(null, null)).toBe(true);
     expect(userNeedsPinSetup('', null)).toBe(true);
-    expect(userNeedsPinSetup('+243900000010', null)).toBe(false);
+    expect(userNeedsPinSetup('+243900000010', null)).toBe(true);
     expect(userNeedsPinSetup(null, 'hash')).toBe(false);
     expect(userNeedsPinSetup('+243812345678', 'hash')).toBe(false);
-    expect(isTestOtpAllowedForPhone('+243900000001')).toBe(true);
-    expect(isTestOtpAllowedForPhone('+243900000010')).toBe(true);
-    expect(isTestOtpAllowedForPhone('+243900000030')).toBe(true);
-    expect(isTestOtpAllowedForPhone('+243900000031')).toBe(true);
+    expect(isTestOtpAllowedForPhone('+243900000001')).toBe(false);
+    expect(isTestOtpAllowedForPhone('+243900000010')).toBe(false);
+    expect(isTestOtpAllowedForPhone('+243900000030')).toBe(false);
+    expect(isTestOtpAllowedForPhone('+243900000031')).toBe(false);
     expect(isTestOtpAllowedForPhone('+243812345678')).toBe(false);
-    expect(matchesSeedTestOtp('+243900000031', '123456')).toBe(true);
-    expect(matchesSeedTestOtp('+243900000031', ' 123456 ')).toBe(true);
-    expect(matchesSeedTestOtp('+243900000031', '000000')).toBe(false);
+    expect(matchesSeedTestOtp('+243900000031', '123456')).toBe(false);
     expect(matchesSeedTestOtp('+243812345678', '123456')).toBe(false);
   });
 
-  it('otpCodesToIssue stores only 123456 for seed phones (no live SMS code)', async () => {
+  it('otpCodesToIssue stores live SMS code for seed phones in production', async () => {
     process.env.NODE_ENV = 'production';
     delete process.env.ALLOW_TEST_OTP;
     delete process.env.MOCK_OTP;
     const { otpCodesToIssue, TEST_OTP_CODE } = await import('./prod-security');
-    expect(otpCodesToIssue('+243900000031', '847291')).toEqual([TEST_OTP_CODE]);
+    expect(otpCodesToIssue('+243900000031', '847291')).toEqual(['847291']);
     expect(otpCodesToIssue('+243812345678', '847291')).toEqual(['847291']);
+    expect(TEST_OTP_CODE).toBe('123456');
   });
 
-  it('keeps seed phones when TEST_OTP_PHONES adds extras', async () => {
-    process.env.NODE_ENV = 'production';
-    process.env.ALLOW_TEST_OTP = 'true';
-    process.env.TEST_OTP_PHONES = '+243811111111';
+  it('seed phones keep 123456 outside production; extras need ALLOW_TEST_OTP', async () => {
+    process.env.NODE_ENV = 'development';
+    delete process.env.ALLOW_TEST_OTP;
     delete process.env.MOCK_OTP;
-    const { isTestOtpAllowedForPhone } = await import('./prod-security');
+    delete process.env.TEST_OTP_PHONES;
+    const { isTestOtpAllowedForPhone, matchesSeedTestOtp, userNeedsPinSetup, otpCodesToIssue, TEST_OTP_CODE } =
+      await import('./prod-security');
     expect(isTestOtpAllowedForPhone('+243900000031')).toBe(true);
     expect(isTestOtpAllowedForPhone('+243811111111')).toBe(false);
-    expect(isTestOtpAllowedForPhone('+243822222222')).toBe(false);
+    expect(matchesSeedTestOtp('+243900000031', '123456')).toBe(true);
+    expect(matchesSeedTestOtp('+243900000031', ' 123456 ')).toBe(true);
+    expect(userNeedsPinSetup('+243900000010', null)).toBe(false);
+    expect(otpCodesToIssue('+243900000031', '847291')).toEqual([TEST_OTP_CODE]);
 
-    process.env.NODE_ENV = 'development';
+    process.env.ALLOW_TEST_OTP = 'true';
+    process.env.TEST_OTP_PHONES = '+243811111111';
     jest.resetModules();
     const { isTestOtpAllowedForPhone: isTestOtpDev } = await import('./prod-security');
     expect(isTestOtpDev('+243900000031')).toBe(true);

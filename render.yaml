@@ -55,9 +55,9 @@ services:
         fromService: { name: mova-gateway, type: web, envVarKey: JWT_SECRET }
       - key: MOCK_OTP
         value: "false"
-      # Seed phones (+2439000000xx): 123456, no SMS. Real +243 receive SMS. ALLOW_TEST_OTP only adds extra TEST_OTP_PHONES.
+      # Production: real AfriSoft SMS hub only. Seed 123456 is local/E2E (Playwright), never prod DB.
       - key: ALLOW_TEST_OTP
-        value: "true"
+        value: "false"
       - key: AFRISOFT_SMS_HUB_URL
         value: "https://sms.afri-soft.com"
       - key: AFRISOFT_HUB_APP_ID
@@ -111,6 +111,8 @@ services:
         fromService: { name: mova-auth, type: web, property: hostport }
       - key: PAY_HUB_URL
         value: "https://pay.afri-soft.com"
+      - key: MOCK_PAYMENTS
+        value: "false"
       - fromGroup: mova-external-apis
 
   - type: web
@@ -176,6 +178,12 @@ services:
         value: "https://sms.afri-soft.com"
       - key: AFRISOFT_HUB_APP_ID
         value: "senga"
+      - key: MOCK_SMS
+        value: "false"
+      - key: MOCK_OTP
+        value: "false"
+      - key: MOCK_EMAIL
+        value: "false"
       - fromGroup: mova-external-apis
 
   - type: web

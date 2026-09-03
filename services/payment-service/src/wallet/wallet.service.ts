@@ -458,7 +458,14 @@ export class WalletService {
       throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Montant minimum : 500 FC.');
     }
     await this.acquireTopUpLock(userId, amountCdf);
-    const providerKey = provider.trim().toUpperCase();
+    const providerKey = (provider ?? '').trim().toUpperCase();
+    if (!providerKey) {
+      throw new MovaHttpException(
+        MovaErrorCode.PAYMENT_INVALID_METHOD,
+        undefined,
+        'Opérateur Mobile Money requis (ORANGE_MONEY, MPESA, AIRTEL_MONEY ou AFRIMONEY).',
+      );
+    }
     const ref = afrisoftHubReference('senga', 'topup', randomUUID());
 
     const walletForLock = await this.createWallet(userId);

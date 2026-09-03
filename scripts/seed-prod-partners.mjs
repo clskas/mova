@@ -1,18 +1,30 @@
 /**
- * Restore demo partner accounts on production (or any) auth + rides DBs.
+ * Restore demo partner accounts on local (or any) auth + rides DBs.
  *
  * Usage:
+ *   $env:CONFIRM_PROD_SEED="YES"
  *   $env:AUTH_DATABASE_URL="postgresql://..."
  *   $env:RIDE_DATABASE_URL="postgresql://..."
  *   node scripts/seed-prod-partners.mjs
  *
  * Or with Render API (fetches external connection strings):
+ *   $env:CONFIRM_PROD_SEED="YES"
  *   $env:RENDER_API_KEY="rnd_..."
  *   node scripts/seed-prod-partners.mjs
+ *
+ * Not part of Deploy. Refuses unless CONFIRM_PROD_SEED=YES.
  */
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+
+if (process.env.CONFIRM_PROD_SEED !== 'YES') {
+  console.error(
+    'Refusing to seed. This script is not part of Deploy and must not re-create demo users in production.',
+  );
+  console.error('Local/emergency only: CONFIRM_PROD_SEED=YES');
+  process.exit(1);
+}
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const RESTAURANT_PHONE = '+243900000030';

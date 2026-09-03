@@ -98,7 +98,7 @@ export const SEED_DEMO_PHONE_RE = /^\+2439000000\d{2}$/;
 export const OWNER_SUPER_ADMIN_PHONE = '+243971163574';
 
 /**
- * Seed / demo phones (Play Internal, partner portals). Always treated as test OTP.
+ * Seed / demo phones (local Docker, Playwright). Never treated as test OTP in production.
  * `TEST_OTP_PHONES` extras apply only outside production when `ALLOW_TEST_OTP=true`.
  */
 export const DEFAULT_TEST_OTP_PHONES: readonly string[] = [
@@ -167,11 +167,12 @@ export function isSeedDemoPhone(phone: string): boolean {
 
 /**
  * PIN setup is required after the first login (phone OTP or Google), including
- * Google-only accounts with no phone. Seed demo `+2439000000xx` may skip for E2E.
+ * Google-only accounts with no phone. Seed demo `+2439000000xx` may skip PIN
+ * only outside production (Playwright / local Docker).
  */
 export function userNeedsPinSetup(phone?: string | null, localPinHash?: string | null): boolean {
   if (localPinHash) return false;
-  if (phone && isSeedDemoPhone(phone)) return false;
+  if (!isProductionRuntime() && phone && isSeedDemoPhone(phone)) return false;
   return true;
 }
 
@@ -187,16 +188,16 @@ export function getTestOtpPhones(): Set<string> {
 }
 
 /**
- * Fixed OTP 123456: seed `+2439000000xx` always (SMS hub live or not).
- * Extra TEST_OTP_PHONES: only outside production when ALLOW_TEST_OTP=true.
- * Owner phone is never eligible. Production never honors extras.
+ * Fixed OTP 123456: local MOCK_OTP, or seed `+2439000000xx` / ALLOW_TEST_OTP extras
+ * outside production. Production always uses the real SMS hub — never 123456.
+ * Owner phone is never eligible.
  */
 export function isTestOtpAllowedForPhone(phone: string): boolean {
   const normalized = normalizeTestOtpPhone(phone);
   if (normalized === OWNER_SUPER_ADMIN_PHONE) return false;
+  if (isProductionRuntime()) return false;
   if (isMockOtpAllowed()) return true;
   if (isSeedDemoPhone(normalized)) return true;
-  if (isProductionRuntime()) return false;
   if (!isTestOtpModeEnabled()) return false;
   return getTestOtpPhones().has(normalized);
 }
@@ -243,7 +244,7 @@ export function assertProductionSecurity(serviceName = 'service'): void {
 
   if (process.env.MOCK_OTP === 'true') {
     throw new Error(
-      `[${serviceName}] MOCK_OTP=true is forbidden in production. Use ALLOW_TEST_OTP=true (seed phones + code 123456) for Play testing, or configure SerdiPay.`,
+      `[${serviceName}] MOCK_OTP=true is forbidden in production. Configure the AfriSoft SMS hub (or SerdiPay / Africa's Talking).`,
     );
   }
   if (process.env.MOCK_SMS === 'true') {
@@ -265,7 +266,7 @@ export function assertProductionSecurity(serviceName = 'service'): void {
   if (isTestOtpModeEnabled()) {
     // eslint-disable-next-line no-console
     console.warn(
-      `[${serviceName}] ALLOW_TEST_OTP=true: seed +2439000000xx keep 123456. Extra TEST_OTP_PHONES are ignored in production; real +243 numbers use the SMS code.`,
+      `[${serviceName}] ALLOW_TEST_OTP=true is ignored in production for OTP codes. Real +243 numbers use the AfriSoft SMS hub. Seed 123456 exists only in local/E2E.`,
     );
   }
 

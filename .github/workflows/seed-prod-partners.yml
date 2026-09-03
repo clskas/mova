@@ -1,3 +1,5 @@
+# Manual only — NOT part of Deploy. Disabled by default so prod is never re-seeded.
+# To run: workflow_dispatch AND set secret/var CONFIRM_PROD_SEED=YES (script also requires it).
 name: Seed production partners
 
 on:
@@ -5,6 +7,7 @@ on:
 
 jobs:
   seed:
+    if: false
     runs-on: ubuntu-latest
     environment: production
     steps:
@@ -17,6 +20,7 @@ jobs:
         env:
           DATABASE_URL_AUTH: ${{ secrets.DATABASE_URL_AUTH }}
           DATABASE_URL_RIDES: ${{ secrets.DATABASE_URL_RIDES }}
+          CONFIRM_PROD_SEED: ${{ vars.CONFIRM_PROD_SEED }}
         run: |
           set -euo pipefail
           chmod +x scripts/seed-prod-partners.sh

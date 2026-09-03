@@ -50,7 +50,10 @@ async function put(id, k, v) {
 }
 
 const env = parseEnv('config/external-apis.env');
-env.MOCK_PAYMENTS ||= 'false';
+env.MOCK_PAYMENTS = 'false';
+env.MOCK_OTP = 'false';
+env.MOCK_SMS = 'false';
+env.ALLOW_TEST_OTP = 'false';
 env.SMS_PROVIDER ||= 'africastalking';
 env.MOBILE_MONEY_GATEWAY ||= 'serdipay';
 env.SERDIPAY_BASE_URL ||= 'https://serdipay.com';
@@ -97,6 +100,9 @@ const needed = [
   'SUPABASE_KYC_BUCKET',
   'CORS_ORIGIN',
   'MOCK_PAYMENTS',
+  'MOCK_OTP',
+  'MOCK_SMS',
+  'ALLOW_TEST_OTP',
   'AFRISOFT_PAY_HUB_URL',
   'AFRISOFT_PAY_HUB_APP_ID',
   'AFRISOFT_PAY_HUB_API_KEY',
@@ -148,6 +154,8 @@ const targets = {
     'SUPABASE_SERVICE_ROLE_KEY',
     'SUPABASE_UPLOADS_BUCKET',
     'SUPABASE_KYC_BUCKET',
+    'MOCK_OTP',
+    'ALLOW_TEST_OTP',
   ],
   'srv-d8slrlernols73b4bcq0': [
     'SERDIPAY_CLIENT_ID',
@@ -170,6 +178,7 @@ const targets = {
     'SUPABASE_SERVICE_ROLE_KEY',
     'SUPABASE_UPLOADS_BUCKET',
     'SUPABASE_KYC_BUCKET',
+    'MOCK_PAYMENTS',
   ],
   'srv-d8slrm8g4nts73bq9pj0': [
     'PAY_HUB_URL',
@@ -198,6 +207,8 @@ const targets = {
     'AFRICAS_TALKING_API_KEY',
     'AFRICAS_TALKING_ENV',
     'AFRICAS_TALKING_SMS_SENDER',
+    'MOCK_SMS',
+    'MOCK_OTP',
   ],
   'srv-d8slprv7f7vs73d2qn50': ['CORS_ORIGIN'],
 };

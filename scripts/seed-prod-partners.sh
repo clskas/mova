@@ -1,7 +1,14 @@
 #!/usr/bin/env bash
 # Seed partner + admin accounts on auth DB, then link restaurant/vehicle on rides DB.
+# NEVER invoked from Deploy. Local / explicit restore only.
 # Env: AUTH_DATABASE_URL or DATABASE_URL_AUTH, RIDE_DATABASE_URL or DATABASE_URL_RIDES
+#      CONFIRM_PROD_SEED=YES required (prevents accidental prod re-seed).
 set -euo pipefail
+if [[ "${CONFIRM_PROD_SEED:-}" != "YES" ]]; then
+  echo "Refusing to seed. This script is not part of Deploy and must not re-create demo users in production." >&2
+  echo "Local/emergency only: CONFIRM_PROD_SEED=YES AUTH_DATABASE_URL=... RIDE_DATABASE_URL=..." >&2
+  exit 1
+fi
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 AUTH="${AUTH_DATABASE_URL:-${DATABASE_URL_AUTH:-}}"
 RIDES="${RIDE_DATABASE_URL:-${DATABASE_URL_RIDES:-}}"

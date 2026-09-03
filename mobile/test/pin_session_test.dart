@@ -5,6 +5,8 @@ void main() {
   test('Google-only (no phone) must set a PIN', () {
     expect(sessionNeedsPinSetup(pinConfigured: false, phone: ''), isTrue);
     expect(sessionNeedsPinSetup(pinConfigured: false, phone: 'marie@gmail.com'), isTrue);
+    expect(isEmailIdentity('marie@gmail.com'), isTrue);
+    expect(isEmailIdentity('+243812345678'), isFalse);
   });
 
   test('phone OTP without PIN must set a PIN', () {

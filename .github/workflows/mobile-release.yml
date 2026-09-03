@@ -116,9 +116,9 @@ jobs:
         id: playver
         run: |
           set -euo pipefail
-          # Play last published versionCode was 38 (Google linking). Never upload below 39.
+          # Play last published versionCode was 40. PIN-without-phone needs > 40.
           CODE="${{ github.run_number }}"
-          if [ "$CODE" -lt 39 ]; then CODE=39; fi
+          if [ "$CODE" -lt 41 ]; then CODE=41; fi
           echo "code=$CODE" >> "$GITHUB_OUTPUT"
           echo "Play versionCode=$CODE (pubspec 1.0.4; run_number=${{ github.run_number }})"
 

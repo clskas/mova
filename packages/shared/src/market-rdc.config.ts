@@ -176,6 +176,36 @@ export function validatePhoneRdc(phone: string): boolean {
   return MARKET_RDC.phoneRegex.test(phone);
 }
 
+/** Google-only PIN login: anything with `@` is an e-mail, even if dots were stripped. */
+export function isEmailLoginHandle(value: string): boolean {
+  const trimmed = (value ?? '').trim();
+  const at = trimmed.indexOf('@');
+  return at > 0 && at < trimmed.length - 1;
+}
+
+const USER_ID_UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export type ParsedLoginHandle =
+  | { kind: 'email'; value: string }
+  | { kind: 'phone'; value: string }
+  | { kind: 'userId'; value: string };
+
+/**
+ * PIN / login-options identity: userId, Google e-mail, or +243.
+ * Garbage (empty, "foo", "+243") returns null — callers must reject.
+ */
+export function parseLoginHandle(raw?: string | null, userId?: string | null): ParsedLoginHandle | null {
+  const id = (userId ?? '').trim();
+  if (id && USER_ID_UUID_RE.test(id)) return { kind: 'userId', value: id };
+  const trimmed = (raw ?? '').trim();
+  if (!trimmed) return null;
+  if (isEmailLoginHandle(trimmed)) return { kind: 'email', value: trimmed.toLowerCase() };
+  const phone = normalizePhoneRdc(trimmed);
+  if (validatePhoneRdc(phone)) return { kind: 'phone', value: phone };
+  return null;
+}
+
 export function normalizePhoneRdc(phone: string): string {
   if (typeof phone !== 'string') return '';
   let cleaned = phone.replace(/[\s\-\.\(\)\u00a0]/g, '');

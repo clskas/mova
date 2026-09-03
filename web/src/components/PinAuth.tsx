@@ -13,10 +13,23 @@ export type AuthPayload = {
 };
 
 const SEED_DEMO_PHONE_RE = /^\+2439000000\d{2}$/;
+const RDC_PHONE_RE = /^\+243\d{9}$/;
 
-/** Empty string is missing — `??` would ignore the OTP typed phone. Email is the Google-only identity. */
+export function isEmailIdentity(value: string): boolean {
+  const n = value.trim();
+  const at = n.indexOf("@");
+  return at > 0 && at < n.length - 1;
+}
+
+/** Valid +243, else Google e-mail. Never store leftover "+243" or other garbage. */
 export function accountPhone(data: AuthPayload, fallbackPhone?: string): string {
-  return String(data.user?.phone || data.phone || data.user?.email || data.email || fallbackPhone || "").trim();
+  const phone = String(data.user?.phone || data.phone || "").trim();
+  if (RDC_PHONE_RE.test(phone)) return phone;
+  const email = String(data.user?.email || data.email || "").trim();
+  if (isEmailIdentity(email)) return email;
+  const fallback = String(fallbackPhone || "").trim();
+  if (RDC_PHONE_RE.test(fallback) || isEmailIdentity(fallback)) return fallback;
+  return "";
 }
 
 export function jwtNeedsPinSetup(token: string | null | undefined): boolean {

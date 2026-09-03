@@ -235,7 +235,9 @@ class MarketConfig {
   }
 
   static String normalizePhone(String phone) {
-    final cleaned = phone.replaceAll(' ', '');
+    final raw = phone.trim();
+    if (raw.contains('@')) return raw.toLowerCase();
+    final cleaned = raw.replaceAll(' ', '');
     if (cleaned.startsWith('0')) return '+243${cleaned.substring(1)}';
     if (cleaned.startsWith('243')) return '+$cleaned';
     return cleaned;

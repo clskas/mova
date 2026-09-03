@@ -5,7 +5,7 @@ import { GoogleContinueButton, googleClientId } from "@/components/GoogleContinu
 import { ApiError, apiFetch, checkGatewayHealth } from "@/lib/api";
 import { clearStoredPhone, dropTokenKeepPhone, getStoredPhone, getToken, isPinPending, isPinSessionUnlocked, isSeedDemoPhone, markPinSessionUnlocked, normalizeLoginPhone, phoneFromToken, setPinPending, setToken } from "@/lib/auth";
 import { LOGIN_GOOGLE_UNAVAILABLE, LOGIN_OTP_UNAVAILABLE, toUserErrorMessage } from "@/lib/user-messages";
-import { AuthPayload, PinDigitPad, PinForgotLink, PinSetupForm, accountPhone, fetchPinEnabled, maskPhoneDisplay, mustSetupPinAfterPhoneLogin, shouldRequirePinSetup } from "@/components/PinAuth";
+import { AuthPayload, PinDigitPad, PinForgotLink, PinSetupForm, accountPhone, fetchPinEnabled, isEmailIdentity, maskPhoneDisplay, mustSetupPinAfterPhoneLogin, shouldRequirePinSetup } from "@/components/PinAuth";
 
 type Props = { children: React.ReactNode };
 
@@ -135,6 +135,17 @@ export function OtpGate({ children }: Props) {
     setError(null);
     try {
       const msisdn = normalizeLoginPhone(phone);
+      if (isEmailIdentity(msisdn)) {
+        if (!opts?.forceSms && !pinMode && !forgotPin) {
+          const enabled = await fetchPinEnabled(apiFetch, msisdn);
+          if (enabled) {
+            setPinMode(true);
+            return;
+          }
+        }
+        setError("Ce compte n'a pas de numéro. Utilisez Continuer avec Google.");
+        return;
+      }
       if (!/^\+243\d{9}$/.test(msisdn)) {
         setError("Numéro invalide. Format : +243XXXXXXXXX");
         return;

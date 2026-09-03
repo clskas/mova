@@ -675,6 +675,64 @@ describe('AuthService', () => {
     expect(session.user.email).toBe('marie@gmail.com');
   });
 
+  it('treats a handle with @ as e-mail, not a phone (even without a dot)', async () => {
+    prisma.user.findFirst.mockResolvedValue(null);
+    await expect(service.loginWithPin('marie@gmailcom', '847291', UserRole.PASSENGER)).rejects.toMatchObject({
+      response: { code: MovaErrorCode.AUTH_PIN_NOT_SET },
+    });
+    expect(prisma.user.findUnique).not.toHaveBeenCalled();
+  });
+
+  it('rejects garbage PIN login handles that are neither +243 nor e-mail', async () => {
+    await expect(service.loginWithPin('not-a-phone', '847291', UserRole.PASSENGER)).rejects.toMatchObject({
+      response: { code: MovaErrorCode.AUTH_INVALID_PHONE },
+    });
+    await expect(service.loginWithPin('+243', '847291', UserRole.PASSENGER)).rejects.toMatchObject({
+      response: { code: MovaErrorCode.AUTH_INVALID_PHONE },
+    });
+  });
+
+  it('logs in with PIN by userId for a Google-only account', async () => {
+    const googleOnly = makeUser({
+      id: 'a1b2c3d4-e5f6-47a8-9abc-def012345678',
+      phone: null,
+      email: 'marie@gmail.com',
+      googleId: 'gid-new',
+      localPinHash: hashLocalPin('847291'),
+    });
+    prisma.user.findUnique.mockResolvedValue(googleOnly);
+    const session = await service.loginWithPin(
+      undefined,
+      '847291',
+      UserRole.PASSENGER,
+      undefined,
+      undefined,
+      googleOnly.id as string,
+    );
+    expect(session.user.email).toBe('marie@gmail.com');
+    expect(session.needsPinSetup).toBe(false);
+  });
+
+  it('sets a PIN on a Google-only user with no phone', async () => {
+    const googleOnly = makeUser({
+      id: 'g-pin-setup',
+      phone: null,
+      email: 'marie@gmail.com',
+      googleId: 'gid-new',
+      localPinHash: null,
+    });
+    prisma.user.findUnique.mockResolvedValue(googleOnly);
+    prisma.user.update.mockResolvedValue({ ...googleOnly, localPinHash: 'hashed' });
+    const result = await service.setupLocalPin('g-pin-setup', '847291', '847291');
+    expect(result.pinConfigured).toBe(true);
+    expect(prisma.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'g-pin-setup' },
+        data: expect.objectContaining({ localPinHash: expect.any(String) }),
+      }),
+    );
+  });
+
   it('Google login of a phone user sends email OTP (not SMS) and keeps the same userId after verify', async () => {
     const existing = makeUser({
       id: 'phone-user',

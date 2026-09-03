@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEnum, IsIn, IsNotEmpty, IsOptional, IsString, Length, Matches } from 'class-validator';
+import { IsEnum, IsIn, IsNotEmpty, IsOptional, IsString, IsUUID, Length, Matches, ValidateIf } from 'class-validator';
 import { UserRole } from '@prisma/client';
 import { PARTNER_PORTALS, PartnerPortalId } from './partner-auth.util';
 
@@ -40,16 +40,28 @@ export class VerifyOtpDto extends AuthIntentDto {
 
 export class LoginOptionsDto extends AuthIntentDto {
   @ApiProperty({ example: '+243812345678', description: 'Téléphone +243 ou e-mail Google mémorisé' })
+  @ValidateIf((o: LoginOptionsDto) => !o.userId)
   @IsString({ message: 'Numéro de téléphone ou e-mail requis.' })
   @IsNotEmpty({ message: 'Numéro de téléphone ou e-mail requis.' })
-  phone: string;
+  phone?: string;
+
+  @ApiProperty({ required: false, description: 'userId du compte (Google sans téléphone)' })
+  @IsOptional()
+  @IsUUID()
+  userId?: string;
 }
 
 export class PinLoginDto extends AuthIntentDto {
   @ApiProperty({ example: '+243812345678', description: 'Téléphone +243 ou e-mail Google mémorisé' })
+  @ValidateIf((o: PinLoginDto) => !o.userId)
   @IsString({ message: 'Numéro de téléphone ou e-mail requis.' })
   @IsNotEmpty({ message: 'Numéro de téléphone ou e-mail requis.' })
-  phone: string;
+  phone?: string;
+
+  @ApiProperty({ required: false, description: 'userId du compte (Google sans téléphone)' })
+  @IsOptional()
+  @IsUUID()
+  userId?: string;
   @ApiProperty({ example: '847291' })
   @IsString()
   @Length(6, 6)

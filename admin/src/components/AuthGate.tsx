@@ -62,6 +62,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
           return;
         }
       } catch {
+        dropTokenKeepPhone(phoneFromToken() || getLastPhone() || "");
         router.replace("/login");
         return;
       }

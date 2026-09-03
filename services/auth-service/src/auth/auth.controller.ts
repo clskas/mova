@@ -43,13 +43,13 @@ export class AuthController {
   @Post('login/options')
   @ApiOperation({ summary: 'Options de connexion (PIN local ou SMS)' })
   loginOptions(@Body() dto: LoginOptionsDto) {
-    return this.authService.getLoginOptions(dto.phone, dto.role, dto.portal, dto.intendedRole);
+    return this.authService.getLoginOptions(dto.phone, dto.role, dto.portal, dto.intendedRole, dto.userId);
   }
 
   @Post('pin/login')
   @ApiOperation({ summary: 'Connexion par code PIN local (sans SMS)' })
   pinLogin(@Body() dto: PinLoginDto) {
-    return this.authService.loginWithPin(dto.phone, dto.pin, dto.role, dto.portal, dto.intendedRole);
+    return this.authService.loginWithPin(dto.phone, dto.pin, dto.role, dto.portal, dto.intendedRole, dto.userId);
   }
 
   @Post('google')

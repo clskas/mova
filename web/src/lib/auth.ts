@@ -115,7 +115,9 @@ export function phoneFromToken(): string | null {
 const SEED_DEMO_PHONE_RE = /^\+2439000000\d{2}$/;
 
 export function normalizeLoginPhone(phone: string): string {
-  let n = (phone ?? "").replace(/[\s\-.\(\)\u00a0]/g, "");
+  const raw = (phone ?? "").trim();
+  if (raw.includes("@")) return raw.toLowerCase();
+  let n = raw.replace(/[\s\-.\(\)\u00a0]/g, "");
   if (n.startsWith("00")) n = `+${n.slice(2)}`;
   if (n.startsWith("+2430") && n.length === 14) n = `+243${n.slice(5)}`;
   if (n.startsWith("2430") && n.length === 13) n = `243${n.slice(4)}`;

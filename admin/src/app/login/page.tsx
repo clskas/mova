@@ -29,6 +29,7 @@ import {
   PinSetupForm,
   accountPhone,
   fetchPinEnabled,
+  isEmailIdentity,
   loginWithPinRequest,
   maskPhoneDisplay,
   mustSetupPinAfterPhoneLogin,
@@ -81,7 +82,10 @@ export default function LoginPage() {
       })
         .then((r) => (r.ok ? r.json() : null))
         .then((me) => {
-          if (!me) return;
+          if (!me) {
+            dropTokenKeepPhone(phoneFromToken(token) || getLastPhone() || "");
+            return;
+          }
           if (
             shouldRequirePinSetup(
               { pinConfigured: me.pinConfigured, needsPinSetup: me.needsPinSetup, phone: me.phone, hasPhone: me.hasPhone, user: me },
@@ -95,14 +99,19 @@ export default function LoginPage() {
             if (role) setSetupRolePath(defaultPathForRole(role));
             return;
           }
-          const remembered = (me.phone || phoneFromToken(token) || getLastPhone() || "").trim();
+          const remembered = accountPhone(
+            { pinConfigured: me.pinConfigured, phone: me.phone, hasPhone: me.hasPhone, user: me, email: me.email },
+            phoneFromToken(token) || getLastPhone() || "",
+          );
           if (me.pinConfigured && remembered && !isSeedDemoPhone(remembered) && !isPinSessionUnlocked()) {
             dropTokenKeepPhone(remembered);
             setPhone(remembered);
             setPinMode(true);
           }
         })
-        .catch(() => undefined);
+        .catch(() => {
+          dropTokenKeepPhone(phoneFromToken(token) || getLastPhone() || "");
+        });
       return;
     }
     const last = getLastPhone();
@@ -126,6 +135,17 @@ export default function LoginPage() {
     setError(null);
     try {
       const msisdn = normalizeLoginPhone(phone);
+      if (isEmailIdentity(msisdn)) {
+        if (!opts?.forceSms && !pinMode && !forgotPin) {
+          const enabled = await fetchPinEnabled(API_BASE, msisdn, { role: "ADMIN" });
+          if (enabled) {
+            setPinMode(true);
+            return;
+          }
+        }
+        setError("Ce compte n'a pas de numéro. Utilisez Continuer avec Google.");
+        return;
+      }
       if (!opts?.forceSms && !pinMode && !forgotPin) {
         const enabled = await fetchPinEnabled(API_BASE, msisdn, { role: "ADMIN" });
         if (enabled) {

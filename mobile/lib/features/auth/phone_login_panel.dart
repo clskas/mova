@@ -98,37 +98,55 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
     });
     final api = ref.read(apiClientProvider);
     await api.checkHealth();
-    final phone = MarketConfig.normalizePhone(_phoneController.text);
-    if (!MarketConfig.validatePhone(phone)) {
-      setState(() {
-        _loading = false;
-        _error = 'Numéro invalide. Format: +243XXXXXXXXX';
-      });
-      return;
+    final raw = _phoneController.text.trim();
+    String identity;
+    if (isEmailIdentity(raw)) {
+      identity = raw.toLowerCase();
+    } else {
+      final phone = MarketConfig.normalizePhone(raw);
+      if (!MarketConfig.validatePhone(phone)) {
+        setState(() {
+          _loading = false;
+          _error = 'Numéro invalide. Format: +243XXXXXXXXX';
+        });
+        return;
+      }
+      identity = phone;
     }
-    _normalizedPhone = phone;
+    _normalizedPhone = identity;
     final result = await api.post('/auth/login/options', {
-      'phone': phone,
+      'phone': identity,
       'role': widget.appRole,
     });
     if (!mounted) return;
     switch (result) {
       case Success(:final data):
         final pinEnabled = data['pinEnabled'] == true;
-        _normalizedPhone = phone;
+        _normalizedPhone = identity;
         if (pinEnabled && !_forgotPinRecovery) {
           setState(() {
             _loading = false;
             _forgotPinRecovery = false;
             _step = PhoneLoginStep.pin;
           });
+        } else if (isEmailIdentity(identity)) {
+          setState(() {
+            _loading = false;
+            _error = 'Aucun PIN pour cet e-mail. Connectez-vous avec Google.';
+          });
         } else {
           setState(() => _step = PhoneLoginStep.otp);
           await _requestOtp(silent: true);
         }
       case Failure():
-        // Backend sans route PIN (déploiement auth en retard) → SMS OTP.
-        _normalizedPhone = phone;
+        if (isEmailIdentity(identity)) {
+          setState(() {
+            _loading = false;
+            _error = 'Impossible de vérifier le PIN. Utilisez Continuer avec Google.';
+          });
+          return;
+        }
+        _normalizedPhone = identity;
         setState(() => _step = PhoneLoginStep.otp);
         await _requestOtp(silent: true);
     }
@@ -354,7 +372,12 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
   }
 
   Future<void> _sendForgotSms() async {
-    final phone = MarketConfig.normalizePhone(_phoneController.text);
+    final raw = _phoneController.text.trim();
+    if (isEmailIdentity(raw) || isEmailIdentity(_normalizedPhone ?? '')) {
+      setState(() => _error = 'Pas de SMS pour un e-mail. Utilisez Continuer avec Google.');
+      return;
+    }
+    final phone = MarketConfig.normalizePhone(raw);
     if (!MarketConfig.validatePhone(phone)) {
       setState(() => _error = 'Numéro invalide. Format: +243XXXXXXXXX');
       return;

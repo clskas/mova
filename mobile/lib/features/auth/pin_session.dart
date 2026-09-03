@@ -2,6 +2,12 @@
 bool isSeedDemoPhone(String phone) =>
     RegExp(r'^\+2439000000\d{2}$').hasMatch(phone.trim());
 
+bool isEmailIdentity(String value) {
+  final t = value.trim();
+  final at = t.indexOf('@');
+  return at > 0 && at < t.length - 1;
+}
+
 /// First login (OTP or Google, including no phone) must create a PIN. Seed demo skips.
 bool sessionNeedsPinSetup({required bool pinConfigured, required String phone}) {
   if (pinConfigured) return false;

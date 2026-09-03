@@ -35,6 +35,7 @@ import {
   PinSetupForm,
   accountPhone,
   fetchPinEnabled,
+  isEmailIdentity,
   loginWithPinRequest,
   maskPhoneDisplay,
   mustSetupPinAfterPhoneLogin,
@@ -109,7 +110,10 @@ export default function LoginPage() {
             setSetupToken(token);
             return;
           }
-          const remembered = String(me?.phone || phoneFromToken() || getLastPhone() || "").trim();
+          const remembered = accountPhone(
+            { pinConfigured: me?.pinConfigured, phone: me?.phone, hasPhone: me?.hasPhone, user: me, email: me?.email },
+            phoneFromToken() || getLastPhone() || "",
+          );
           if (me?.pinConfigured && remembered && !isSeedDemoPhone(remembered) && !isPinSessionUnlocked()) {
             dropTokenKeepPhone(remembered);
             setPhone(remembered);
@@ -175,6 +179,17 @@ export default function LoginPage() {
     let lastStatus = 0;
     try {
       const msisdn = normalizeLoginPhone(phone);
+      if (isEmailIdentity(msisdn)) {
+        if (!opts?.forceSms && !pinMode && !forgotPin) {
+          const enabled = await fetchPinEnabled(API_BASE, msisdn, INTENT);
+          if (enabled) {
+            setPinMode(true);
+            return;
+          }
+        }
+        setError("Ce compte n'a pas de numéro. Utilisez Continuer avec Google.");
+        return;
+      }
       if (!opts?.forceSms && !pinMode && !forgotPin) {
         const enabled = await fetchPinEnabled(API_BASE, msisdn, INTENT);
         if (enabled) {

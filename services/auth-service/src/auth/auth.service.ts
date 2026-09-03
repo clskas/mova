@@ -9,6 +9,7 @@ import {
   MovaHttpException,
   UserCreatedPayload,
   normalizePhoneRdc,
+  parseLoginHandle,
   serviceUrl,
   validatePhoneRdc,
   INTERNAL_API_KEY,
@@ -175,9 +176,15 @@ export class AuthService {
     return { success: true, message: smsResult.message ?? 'Code OTP envoyé', phone: normalized };
   }
 
-  async getLoginOptions(phone: string, role?: UserRole, portal?: string, intendedRole?: string) {
+  async getLoginOptions(
+    phone: string | undefined,
+    role?: UserRole,
+    portal?: string,
+    intendedRole?: string,
+    userId?: string,
+  ) {
     const requestedRole = this.resolveRequestedAuthRole(role, portal, intendedRole);
-    const found = await this.findUserByLoginHandle(phone);
+    const found = await this.findUserByLoginHandle(phone, userId);
     if (!found.user || !found.user.localPinHash) {
       return { success: true, phone: found.normalized, pinEnabled: false };
     }
@@ -189,9 +196,16 @@ export class AuthService {
     return { success: true, phone: found.normalized, pinEnabled: true };
   }
 
-  async loginWithPin(phone: string, pin: string, role?: UserRole, portal?: string, intendedRole?: string) {
+  async loginWithPin(
+    phone: string | undefined,
+    pin: string,
+    role?: UserRole,
+    portal?: string,
+    intendedRole?: string,
+    userId?: string,
+  ) {
     const requestedRole = this.resolveRequestedAuthRole(role, portal, intendedRole);
-    const found = await this.findUserByLoginHandle(phone);
+    const found = await this.findUserByLoginHandle(phone, userId);
     await this.assertPinNotLocked(found.lockKey);
     const user = found.user;
     if (!user?.localPinHash) {
@@ -952,29 +966,34 @@ export class AuthService {
     return normalized;
   }
 
-  /** Phone +243 or remembered Google email. */
-  private isEmailLoginHandle(value: string): boolean {
-    const trimmed = value.trim();
-    const at = trimmed.indexOf('@');
-    return at > 0 && at < trimmed.length - 1 && trimmed.includes('.');
-  }
-
-  private async findUserByLoginHandle(handle: string): Promise<{
+  private async findUserByLoginHandle(
+    handle?: string,
+    userId?: string,
+  ): Promise<{
     user: User | null;
     normalized: string;
     lockKey: string;
   }> {
-    const trimmed = (handle ?? '').trim();
-    if (this.isEmailLoginHandle(trimmed)) {
-      const email = trimmed.toLowerCase();
-      const user = await this.prisma.user.findFirst({
-        where: { email: { equals: email, mode: 'insensitive' } },
-      });
-      return { user, normalized: email, lockKey: user?.phone ?? email };
+    const parsed = parseLoginHandle(handle, userId);
+    if (!parsed) {
+      throw new MovaHttpException(MovaErrorCode.AUTH_INVALID_PHONE, HttpStatus.BAD_REQUEST);
     }
-    const normalized = this.normalizePhoneOrThrow(trimmed);
-    const user = await this.prisma.user.findUnique({ where: { phone: normalized } });
-    return { user, normalized, lockKey: normalized };
+    if (parsed.kind === 'userId') {
+      const user = await this.prisma.user.findUnique({ where: { id: parsed.value } });
+      return {
+        user,
+        normalized: user?.phone ?? user?.email ?? parsed.value,
+        lockKey: user?.phone ?? user?.email ?? parsed.value,
+      };
+    }
+    if (parsed.kind === 'email') {
+      const user = await this.prisma.user.findFirst({
+        where: { email: { equals: parsed.value, mode: 'insensitive' } },
+      });
+      return { user, normalized: parsed.value, lockKey: user?.phone ?? parsed.value };
+    }
+    const user = await this.prisma.user.findUnique({ where: { phone: parsed.value } });
+    return { user, normalized: parsed.value, lockKey: parsed.value };
   }
 
   private async assertInviteOnlyAccountExists(phone: string, role?: UserRole) {

@@ -6,6 +6,9 @@ String sanitizeUserMessage(
   if (raw == null || raw.trim().isEmpty) return fallback;
   final msg = raw.trim();
   if (RegExp(r'^HTTP \d', caseSensitive: false).hasMatch(msg)) return fallback;
+  if (RegExp(r'https?://', caseSensitive: false).hasMatch(msg)) return fallback;
+  if (msg.toLowerCase().contains('onrender.com')) return fallback;
+  if (RegExp(r'localhost:\d+').hasMatch(msg)) return fallback;
   if (RegExp(r'^Erreur \d{3}$').hasMatch(msg)) return fallback;
   if (RegExp(r'^PDF \d+$', caseSensitive: false).hasMatch(msg)) return fallback;
   if (msg.contains('Exception:') ||

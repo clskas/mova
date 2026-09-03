@@ -1,7 +1,6 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
-import type { Socket } from "socket.io-client";
 import { getToken } from "@/lib/auth";
 import { alertNewRentalBooking, initPartnerAudioUnlock, onPartnerAlertsUnlocked } from "@/lib/partner-alerts";
 import { registerPartnerWebPush } from "@/lib/partner-web-push";
@@ -34,41 +33,32 @@ export function PartnerLiveProvider({ children }: { children: React.ReactNode })
   }, []);
 
   useEffect(() => {
-    if (!getToken()) return;
+    if (!getToken() || typeof window === "undefined") return;
 
-    let socket: Socket | null = null;
-    let pollId: number | null = null;
-
-    if (typeof window !== "undefined") {
-      initPartnerAudioUnlock();
-      if (typeof Notification !== "undefined" && Notification.permission === "granted") {
-        void registerPartnerWebPush("rental_partner");
-      }
-      const offUnlock = onPartnerAlertsUnlocked(() => {
-        void registerPartnerWebPush("rental_partner");
-      });
-      pollId = window.setInterval(triggerRefresh, POLL_MS);
-      socket = connectPartnerSocket({
-        onConnect: () => setConnected(true),
-        onDisconnect: () => setConnected(false),
-        onRentalEvent: (payload) => {
-          if (payload.type === "rental" && payload.status === "PENDING") {
-            alertNewRentalBooking(payload.inquiryId);
-          }
-          triggerRefresh();
-        },
-        onVehicleEvent: triggerRefresh,
-      });
-      return () => {
-        offUnlock();
-        if (pollId != null) window.clearInterval(pollId);
-        socket?.disconnect();
-        setConnected(false);
-      };
+    initPartnerAudioUnlock();
+    if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+      void registerPartnerWebPush("rental_partner");
     }
+    const offUnlock = onPartnerAlertsUnlocked(() => {
+      void registerPartnerWebPush("rental_partner");
+    });
+    const pollId = window.setInterval(triggerRefresh, POLL_MS);
+    const socket = connectPartnerSocket({
+      onConnect: () => setConnected(true),
+      onDisconnect: () => setConnected(false),
+      onRentalEvent: (payload) => {
+        if (payload.type === "rental" && payload.status === "PENDING") {
+          alertNewRentalBooking(payload.inquiryId);
+        }
+        triggerRefresh();
+      },
+      onVehicleEvent: triggerRefresh,
+    });
 
     return () => {
-      socket?.disconnect();
+      offUnlock();
+      window.clearInterval(pollId);
+      socket.disconnect();
       setConnected(false);
     };
   }, [triggerRefresh]);

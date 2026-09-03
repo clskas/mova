@@ -1,7 +1,6 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
-import type { Socket } from "socket.io-client";
 import { getToken } from "@/lib/auth";
 import { alertNewRestaurantOrder, initPartnerAudioUnlock, onPartnerAlertsUnlocked } from "@/lib/partner-alerts";
 import { registerPartnerWebPush } from "@/lib/partner-web-push";
@@ -34,40 +33,31 @@ export function RestaurantLiveProvider({ children }: { children: React.ReactNode
   }, []);
 
   useEffect(() => {
-    if (!getToken()) return;
+    if (!getToken() || typeof window === "undefined") return;
 
-    let socket: Socket | null = null;
-    let pollId: number | null = null;
-
-    if (typeof window !== "undefined") {
-      initPartnerAudioUnlock();
-      if (typeof Notification !== "undefined" && Notification.permission === "granted") {
-        void registerPartnerWebPush("restaurant");
-      }
-      const offUnlock = onPartnerAlertsUnlocked(() => {
-        void registerPartnerWebPush("restaurant");
-      });
-      pollId = window.setInterval(triggerRefresh, POLL_MS);
-      socket = connectRestaurantSocket({
-        onConnect: () => setConnected(true),
-        onDisconnect: () => setConnected(false),
-        onOrderEvent: (payload) => {
-          if (payload.type === "order" && payload.status === "PENDING") {
-            alertNewRestaurantOrder(payload.deliveryId);
-          }
-          triggerRefresh();
-        },
-      });
-      return () => {
-        offUnlock();
-        if (pollId != null) window.clearInterval(pollId);
-        socket?.disconnect();
-        setConnected(false);
-      };
+    initPartnerAudioUnlock();
+    if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+      void registerPartnerWebPush("restaurant");
     }
+    const offUnlock = onPartnerAlertsUnlocked(() => {
+      void registerPartnerWebPush("restaurant");
+    });
+    const pollId = window.setInterval(triggerRefresh, POLL_MS);
+    const socket = connectRestaurantSocket({
+      onConnect: () => setConnected(true),
+      onDisconnect: () => setConnected(false),
+      onOrderEvent: (payload) => {
+        if (payload.type === "order" && payload.status === "PENDING") {
+          alertNewRestaurantOrder(payload.deliveryId);
+        }
+        triggerRefresh();
+      },
+    });
 
     return () => {
-      socket?.disconnect();
+      offUnlock();
+      window.clearInterval(pollId);
+      socket.disconnect();
       setConnected(false);
     };
   }, [triggerRefresh]);

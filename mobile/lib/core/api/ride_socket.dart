@@ -25,6 +25,8 @@ class RideSocket {
   void Function(Map<String, dynamic> payload)? _onChat;
   void Function(Map<String, dynamic> payload)? _onCashPending;
   void Function(Map<String, dynamic> payload)? _onPaymentCompleted;
+  void Function(Map<String, dynamic> payload)? _onRideNew;
+  void Function(Map<String, dynamic> payload)? _onRideCancelled;
   void Function()? _onConnected;
   void Function()? _onDisconnected;
   final List<Completer<bool>> _connectWaiters = [];
@@ -44,6 +46,8 @@ class RideSocket {
     _onChat = null;
     _onCashPending = null;
     _onPaymentCompleted = null;
+    _onRideNew = null;
+    _onRideCancelled = null;
     _onConnected = null;
     _onDisconnected = null;
   }
@@ -203,6 +207,16 @@ class RideSocket {
             _onPaymentCompleted?.call(Map<String, dynamic>.from(data));
           }
         })
+        ..on('ride:new', (data) {
+          if (data is Map) {
+            _onRideNew?.call(Map<String, dynamic>.from(data));
+          }
+        })
+        ..on('ride:cancelled', (data) {
+          if (data is Map) {
+            _onRideCancelled?.call(Map<String, dynamic>.from(data));
+          }
+        })
         ..onConnectError((_) {
           isConnected = false;
           _scheduleReconnect();
@@ -270,6 +284,8 @@ class RideSocket {
     required String userId,
     String? token,
     void Function(Map<String, dynamic> payload)? onCashPending,
+    void Function(Map<String, dynamic> payload)? onRideNew,
+    void Function(Map<String, dynamic> payload)? onRideCancelled,
     void Function()? onConnected,
     void Function()? onDisconnected,
   }) {
@@ -277,6 +293,8 @@ class RideSocket {
     _referenceType = 'DRIVER';
     if (token != null && token.isNotEmpty) _token = token;
     if (onCashPending != null) _onCashPending = onCashPending;
+    if (onRideNew != null) _onRideNew = onRideNew;
+    if (onRideCancelled != null) _onRideCancelled = onRideCancelled;
     if (onConnected != null) _onConnected = onConnected;
     if (onDisconnected != null) _onDisconnected = onDisconnected;
 

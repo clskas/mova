@@ -262,15 +262,24 @@ export class RidesService {
     const attempts = await this.prisma.rideEvent.count({ where: { rideId: ride.id, event: 'SEARCH_ATTEMPT' } });
     const drivers = await this.matching.findDrivers(ride.pickupLat, ride.pickupLng, ride.vehicleType, attempts);
     await this.prisma.rideEvent.create({
-      data: { rideId: ride.id, event: 'SEARCH_ATTEMPT', metadata: { attempt: attempts + 1, driversFound: drivers.length } },
+      data: {
+        rideId: ride.id,
+        event: 'SEARCH_ATTEMPT',
+        metadata: {
+          attempt: attempts + 1,
+          driversFound: drivers.length,
+          driverUserIds: drivers.map((d) => d.userId),
+        },
+      },
     });
     if (drivers.length > 0) {
       const pickup = ride.pickupAddress?.trim() || 'près de vous';
       const fare = ride.estimatedFareCdf != null ? ` · ${ride.estimatedFareCdf} FC` : '';
+      const driverUserIds = drivers.map((d) => d.userId);
       const alert: DriverJobAlertPayload = {
         jobKind: 'RIDE_OFFER',
         referenceId: ride.id,
-        driverUserIds: drivers.map((d) => d.userId),
+        driverUserIds,
         title: 'Nouvelle course SENGA',
         body: `Course disponible · ${pickup}${fare}`,
         pickupAddress: ride.pickupAddress ?? undefined,
@@ -278,6 +287,13 @@ export class RidesService {
         pickupLng: ride.pickupLng,
       };
       await publishDriverJobAlert(this.redis, alert).catch(() => undefined);
+      this.trackingGateway.broadcastDriverJob(driverUserIds, 'ride:new', {
+        rideId: ride.id,
+        jobKind: 'RIDE_OFFER',
+        pickupAddress: ride.pickupAddress,
+        pickupLat: ride.pickupLat,
+        pickupLng: ride.pickupLng,
+      });
     }
     const meta = this.matching.getMatchingMeta(attempts);
 
@@ -513,7 +529,14 @@ export class RidesService {
   async cancelRide(rideId: string, userId: string, reason?: string) {
     const ride = await this.prisma.ride.findUnique({ where: { id: rideId } });
     if (!ride) throw new MovaHttpException(MovaErrorCode.RIDE_NOT_FOUND, HttpStatus.NOT_FOUND);
-    if (ride.passengerId !== userId && ride.driverId !== userId) {
+    const unmatched =
+      !ride.driverId &&
+      (ride.status === RideStatus.REQUESTED || ride.status === RideStatus.SEARCHING);
+    if (unmatched) {
+      if (ride.passengerId !== userId) {
+        throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
+      }
+    } else if (ride.passengerId !== userId && ride.driverId !== userId) {
       throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
     }
     if (ride.status === RideStatus.COMPLETED || ride.status === RideStatus.CANCELLED) {
@@ -541,6 +564,8 @@ export class RidesService {
       }
     }
 
+    const notifiedDriverIds = unmatched ? await this.driverIdsNotifiedForRide(rideId) : [];
+
     const updated = await this.prisma.ride.update({
       where: { id: rideId },
       data: {
@@ -552,6 +577,9 @@ export class RidesService {
     });
     await this.prisma.rideEvent.create({ data: { rideId, event: RideStatus.CANCELLED, metadata: { feeCdf, reason } } });
     this.emitStatusChange(rideId, RideStatus.CANCELLED);
+    if (notifiedDriverIds.length > 0) {
+      this.trackingGateway.broadcastDriverJob(notifiedDriverIds, 'ride:cancelled', { rideId });
+    }
 
     return {
       ride: this.formatRideDetail(updated),
@@ -559,6 +587,23 @@ export class RidesService {
       cancellationFeeFormatted: formatCdf(feeCdf),
       message: feeMessage,
     };
+  }
+
+  private async driverIdsNotifiedForRide(rideId: string): Promise<string[]> {
+    const attempts = await this.prisma.rideEvent.findMany({
+      where: { rideId, event: 'SEARCH_ATTEMPT' },
+      select: { metadata: true },
+    });
+    const ids = new Set<string>();
+    for (const attempt of attempts) {
+      const meta = attempt.metadata as { driverUserIds?: unknown } | null;
+      const list = meta?.driverUserIds;
+      if (!Array.isArray(list)) continue;
+      for (const id of list) {
+        if (typeof id === 'string' && id) ids.add(id);
+      }
+    }
+    return [...ids];
   }
 
   /** Course active du passager (REQUESTED → IN_PROGRESS) pour reprise après fermeture de l'app. */

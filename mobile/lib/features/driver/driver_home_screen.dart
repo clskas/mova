@@ -402,6 +402,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                           }
                           Navigator.of(ctx, rootNavigator: true).pop();
                           await _loadProfile(clearCache: true);
+                          await _connectDriverCashInbox();
                           if (mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(content: Text('Compte activé — vous pouvez passer en ligne.')),
@@ -515,6 +516,17 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
     ref.read(rideSocketProvider).connectDriverInbox(
       userId: userId,
       token: token,
+      onRideNew: (_) {
+        if (!mounted || !_available) return;
+        _pollOffers();
+      },
+      onRideCancelled: (payload) {
+        final id = payload['rideId']?.toString();
+        if (id == null || id.isEmpty || !mounted) return;
+        setState(() {
+          _rideOffers = _rideOffers.where((o) => o['id']?.toString() != id).toList();
+        });
+      },
       onCashPending: (payload) {
         final deliveryId = payload['deliveryId']?.toString();
         if (deliveryId == null || deliveryId.isEmpty) return;

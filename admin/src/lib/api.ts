@@ -1775,7 +1775,7 @@ export async function setDriverStatus(userId: string, active: boolean, suspendUs
 }
 
 export async function reviewDriverKyc(userId: string, approved: boolean, notes?: string) {
-  return apiFetch<{ activationPin?: string; smsSent?: boolean }>(`/api/admin/drivers/${userId}/kyc`, {
+  return apiFetch<{ activationPin?: string; smsSent?: boolean; hasPhone?: boolean; smsError?: string }>(`/api/admin/drivers/${userId}/kyc`, {
     method: "PATCH",
     body: JSON.stringify({ approved, notes }),
   });
@@ -1816,10 +1816,31 @@ export async function runKycOcr(documentId: string) {
 }
 
 export async function regenerateDriverActivationPin(userId: string) {
-  return apiFetch<{ activationPin: string; smsSent?: boolean; publicId?: string }>(`/api/admin/drivers/${userId}/activation-pin`, {
+  return apiFetch<{
+    activationPin: string;
+    smsSent?: boolean;
+    hasPhone?: boolean;
+    smsError?: string;
+    publicId?: string;
+  }>(`/api/admin/drivers/${userId}/activation-pin`, {
     method: "POST",
     body: JSON.stringify({}),
   });
+}
+
+export function activationPinSmsCopy(result: {
+  smsSent?: boolean;
+  hasPhone?: boolean;
+  smsError?: string;
+}): string {
+  if (result.smsSent) return "Un SMS a été envoyé au chauffeur.";
+  if (result.hasPhone === false) {
+    return "Aucun numéro de téléphone lié à ce compte (souvent une connexion Google). Le SMS n'a pas été envoyé — communiquez le PIN ci-dessous.";
+  }
+  if (result.smsError) {
+    return `SMS non envoyé : ${result.smsError}. Communiquez le PIN ci-dessous.`;
+  }
+  return "SMS non envoyé — communiquez le PIN ci-dessous.";
 }
 
 export async function cancelRide(id: string, reason?: string) {

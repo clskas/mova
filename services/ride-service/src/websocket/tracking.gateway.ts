@@ -5,6 +5,7 @@ import {
   AdminPermission,
   assertActiveUserStatus,
   hasAdminPermission,
+  INTERNAL_API_KEY,
   resolveCorsOrigin,
   serviceUrl,
   type MovaJwtPayload,
@@ -66,8 +67,8 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
     private jwt: JwtService,
   ) {}
 
-  handleConnection(client: Socket) {
-    const user = this.authenticateSocket(client);
+  async handleConnection(client: Socket) {
+    const user = await this.authenticateSocket(client);
     if (!user) {
       this.logger.warn(`WS rejected (invalid JWT): ${client.id}`);
       client.disconnect(true);
@@ -213,6 +214,18 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
 
   broadcastRideStatus(rideId: string, status: string) {
     this.server.to(`ride:${rideId}`).emit('ride:status', { rideId, status });
+  }
+
+  /** Push a job offer / cancel to online drivers subscribed to `driver:{userId}`. */
+  broadcastDriverJob(
+    driverUserIds: string[],
+    event: 'ride:new' | 'ride:cancelled',
+    payload: Record<string, unknown>,
+  ) {
+    for (const userId of driverUserIds) {
+      if (!userId) continue;
+      this.server.to(`driver:${userId}`).emit(event, { ...payload, ts: Date.now() });
+    }
   }
 
   /** Notifie la room de la course qu'un paiement espèces est en attente de confirmation PIN. */
@@ -427,14 +440,42 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
     );
   }
 
-  private authenticateSocket(client: Socket): SocketAuthUser | null {
+  private async authenticateSocket(client: Socket): Promise<SocketAuthUser | null> {
     const token = extractHandshakeToken(client);
     if (!token) return null;
     try {
       const decoded = this.jwt.verify<MovaJwtPayload>(token);
       if (!decoded.sub) return null;
       assertActiveUserStatus(decoded.status);
+      const live = await this.fetchLiveSocketUser(decoded.sub);
+      if (live) {
+        assertActiveUserStatus(live.status);
+        return { id: live.id, role: live.role || decoded.role || '' };
+      }
       return { id: decoded.sub, role: decoded.role ?? '' };
+    } catch {
+      return null;
+    }
+  }
+
+  private async fetchLiveSocketUser(
+    userId: string,
+  ): Promise<{ id: string; role?: string; status?: string } | null> {
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 1500);
+      try {
+        const res = await fetch(serviceUrl('auth', `/internal/users/${userId}`), {
+          headers: { 'x-internal-api-key': INTERNAL_API_KEY },
+          signal: controller.signal,
+        });
+        if (!res.ok) return null;
+        const user = (await res.json()) as { id?: string; role?: string; status?: string };
+        if (!user?.id) return null;
+        return { id: user.id, role: user.role, status: user.status };
+      } finally {
+        clearTimeout(timer);
+      }
     } catch {
       return null;
     }

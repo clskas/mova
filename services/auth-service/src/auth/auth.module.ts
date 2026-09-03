@@ -6,6 +6,7 @@ import { resolveJwtSecret } from '@mova/shared';
 import { PrismaModule } from '../prisma/prisma.module';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
+import { SmsInternalController } from './sms-internal.controller';
 import { JwtStrategy } from './jwt.strategy';
 import { GoogleTokenVerifier } from './google-id-token';
 import { EmailOtpMailer } from './email-otp.mailer';
@@ -31,7 +32,7 @@ import {
       inject: [ConfigService],
     }),
   ],
-  controllers: [AuthController],
+  controllers: [AuthController, SmsInternalController],
   providers: [
     AuthService,
     GoogleTokenVerifier,

@@ -14,7 +14,7 @@ describe('RidesService', () => {
       count: jest.fn(),
       aggregate: jest.fn(),
     },
-    rideEvent: { create: jest.fn(), count: jest.fn() },
+    rideEvent: { create: jest.fn(), count: jest.fn(), findMany: jest.fn().mockResolvedValue([]) },
     cancellationPolicy: { findUnique: jest.fn() },
   };
   const pricing = {
@@ -42,7 +42,7 @@ describe('RidesService', () => {
     computeRadiusKm: jest.fn().mockReturnValue(10),
   };
   const redis = { publish: jest.fn() };
-  const trackingGateway = { broadcastRideStatus: jest.fn() };
+  const trackingGateway = { broadcastRideStatus: jest.fn(), broadcastDriverJob: jest.fn() };
   const trackingService = { getTrace: jest.fn().mockResolvedValue([]) };
   const commission = {
     get: jest.fn().mockResolvedValue({ platformPercent: 15, driverPercent: 85 }),
@@ -139,6 +139,11 @@ describe('RidesService', () => {
     expect(result.status).toBe('MATCHING');
     expect(result.driversFound).toBe(1);
     expect(trackingGateway.broadcastRideStatus).toHaveBeenCalledWith('ride-1', 'MATCHING');
+    expect(trackingGateway.broadcastDriverJob).toHaveBeenCalledWith(
+      ['u1'],
+      'ride:new',
+      expect.objectContaining({ rideId: 'ride-1' }),
+    );
   });
 
   it('records driver rejection without changing ride status', async () => {
@@ -303,5 +308,61 @@ describe('RidesService', () => {
     );
     expect(result.ride.status).toBe('CANCELLED');
     expect(trackingGateway.broadcastRideStatus).toHaveBeenCalledWith('ride-1', 'CANCELLED');
+  });
+
+  it('notifies matched drivers when passenger cancels an unmatched ride', async () => {
+    prisma.ride.findUnique.mockResolvedValue({
+      id: 'ride-1',
+      passengerId: 'p1',
+      driverId: null,
+      status: RideStatus.SEARCHING,
+      vehicleType: VehicleType.MOTO_TAXI,
+      acceptedAt: null,
+    });
+    prisma.rideEvent.findMany.mockResolvedValue([
+      { metadata: { driverUserIds: ['d1', 'd2'] } },
+    ]);
+    prisma.cancellationPolicy.findUnique.mockResolvedValue(null);
+    prisma.ride.update.mockResolvedValue({
+      id: 'ride-1',
+      passengerId: 'p1',
+      driverId: null,
+      vehicleId: null,
+      status: RideStatus.CANCELLED,
+      vehicleType: VehicleType.MOTO_TAXI,
+      pickupLat: -4.32,
+      pickupLng: 15.31,
+      dropoffLat: -4.34,
+      dropoffLng: 15.33,
+      pickupAddress: 'Gombe',
+      dropoffAddress: 'Limete',
+      estimatedFareCdf: 6200,
+      finalFareCdf: null,
+      distanceKm: 4.5,
+      durationMin: 11,
+      cancelledAt: new Date(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    await service.cancelRide('ride-1', 'p1', 'Annulé par le passager');
+    expect(trackingGateway.broadcastDriverJob).toHaveBeenCalledWith(
+      ['d1', 'd2'],
+      'ride:cancelled',
+      { rideId: 'ride-1' },
+    );
+  });
+
+  it('refuses unmatched cancel from anyone except the passenger', async () => {
+    prisma.ride.findUnique.mockResolvedValue({
+      id: 'ride-1',
+      passengerId: 'p1',
+      driverId: null,
+      status: RideStatus.SEARCHING,
+      vehicleType: VehicleType.MOTO_TAXI,
+    });
+    await expect(service.cancelRide('ride-1', 'stranger', 'nope')).rejects.toMatchObject({
+      response: { code: 'MOVA_AUTH_003' },
+    });
   });
 });

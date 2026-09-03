@@ -15,6 +15,8 @@ import { fetchDriverDebtStatus } from './driver-debt.util';
 export type DriverProfileSnapshot = {
   isAvailable?: boolean;
   kycStatus?: string;
+  activationPinVerified?: boolean;
+  activationPinVerifiedAt?: string | Date | null;
   documentsStatus?: {
     canOperate?: boolean;
     blockReason?: string;
@@ -40,6 +42,10 @@ export async function fetchDriverProfileSnapshot(userId: string): Promise<Driver
 
 export function driverCanReceiveJobs(profile: DriverProfileSnapshot | null | undefined): boolean {
   if (!profile || profile.kycStatus !== 'APPROVED') return false;
+  const pinVerified =
+    profile.activationPinVerified === true ||
+    profile.activationPinVerifiedAt != null;
+  if (!pinVerified) return false;
   return profile.documentsStatus?.canOperate === true;
 }
 
@@ -53,6 +59,16 @@ export async function assertDriverCanReceiveJobs(userId: string): Promise<Driver
       MovaErrorCode.DRIVER_DOCUMENTS_EXPIRED,
       HttpStatus.FORBIDDEN,
       profile.documentsStatus?.blockReason,
+    );
+  }
+  const pinVerified =
+    profile.activationPinVerified === true ||
+    profile.activationPinVerifiedAt != null;
+  if (!pinVerified) {
+    throw new MovaHttpException(
+      MovaErrorCode.VALIDATION_ERROR,
+      HttpStatus.FORBIDDEN,
+      'Activez votre compte avec le code PIN reçu après validation SENGA.',
     );
   }
   const debtStatus = await fetchDriverDebtStatus(userId);

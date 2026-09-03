@@ -238,6 +238,26 @@ export class SmsService {
     }
   }
 
+  /** Transactional SMS (activation PIN, alerts) — same AfriSoft hub as OTP. */
+  async sendSms(phone: string, text: string, purpose = 'notify'): Promise<SmsSendResult> {
+    if (isTestOtpAllowedForPhone(phone)) {
+      this.logger.warn(`Skip live SMS for seed/test phone ${maskPhoneRdc(phone)}`);
+      return { success: true, message: 'SMS simulé (mode test)' };
+    }
+    if (isAfrisoftSmsHubClientConfigured(this.get)) {
+      try {
+        const result = await afrisoftSmsHubSendSms(this.get, { phone, text, purpose });
+        if (!result.success) this.logger.error(`SMS hub failed: ${result.message}`);
+        return { success: result.success, message: result.message };
+      } catch (e) {
+        this.logger.error(`SMS hub threw: ${(e as Error).message}`);
+        return { success: false, message: SMS_UNAVAILABLE_USER_MESSAGE };
+      }
+    }
+    this.logger.error('SMS failed: AfriSoft SMS hub not configured');
+    return { success: false, message: SMS_UNAVAILABLE_USER_MESSAGE };
+  }
+
   isProductionReady(): boolean {
     if (isMockOtpAllowed()) return false;
     const provider = this.resolveProvider();

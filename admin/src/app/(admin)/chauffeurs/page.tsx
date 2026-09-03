@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
+  activationPinSmsCopy,
   fetchDriverDetail,
   fetchDrivers,
   regenerateDriverActivationPin,
@@ -178,6 +179,7 @@ export default function ChauffeursPage() {
   const [actionTarget, setActionTarget] = useState<{ driver: AdminDriver; activate: boolean } | null>(null);
   const [saving, setSaving] = useState(false);
   const [activationPin, setActivationPin] = useState<string | null>(null);
+  const [smsNotice, setSmsNotice] = useState<string | null>(null);
   const [vehicleTypeRejectNotes, setVehicleTypeRejectNotes] = useState("");
 
   const load = useCallback(async () => {
@@ -199,6 +201,7 @@ export default function ChauffeursPage() {
     if (!selectedId) {
       setDetail(null);
       setActivationPin(null);
+      setSmsNotice(null);
       return;
     }
     let cancelled = false;
@@ -255,8 +258,10 @@ export default function ChauffeursPage() {
       const result = await reviewDriverKyc(selectedId, approved);
       if (approved && result.activationPin) {
         setActivationPin(result.activationPin);
+        setSmsNotice(activationPinSmsCopy(result));
       } else {
         setActivationPin(null);
+        setSmsNotice(null);
       }
       load();
       const refreshed = await fetchDriverDetail(selectedId);
@@ -327,6 +332,7 @@ export default function ChauffeursPage() {
     try {
       const result = await regenerateDriverActivationPin(selectedId);
       setActivationPin(result.activationPin);
+      setSmsNotice(activationPinSmsCopy(result));
       const refreshed = await fetchDriverDetail(selectedId);
       setDetail(refreshed);
     } catch (e) {
@@ -451,7 +457,8 @@ export default function ChauffeursPage() {
                 <p className="font-mono text-2xl tracking-widest mt-2 text-amber-950">{activationPin}</p>
                 {!selected.activationPinVerified && (
                   <p className="text-amber-800 mt-1 text-xs">
-                    Le chauffeur saisit ce code dans l&apos;app (72 h, usage unique). Un SMS a aussi été tenté.
+                    {smsNotice ??
+                      "Le chauffeur saisit ce code dans l'app (72 h, usage unique)."}
                   </p>
                 )}
               </div>

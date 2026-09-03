@@ -211,7 +211,13 @@ class _MatchingScreenState extends ConsumerState<MatchingScreen>
 
   @override
   Widget build(BuildContext context) {
-    return MovaScreen(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop || _cancelling) return;
+        await _cancel();
+      },
+      child: MovaScreen(
       title: 'Recherche',
       scrollable: false,
       child: Column(
@@ -359,6 +365,7 @@ class _MatchingScreenState extends ConsumerState<MatchingScreen>
           ),
         ],
       ),
+    ),
     );
   }
 }

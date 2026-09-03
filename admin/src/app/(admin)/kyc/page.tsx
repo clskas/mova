@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { apiFetch, fetchDrivers, reviewDriverKyc, type AdminDriver, type KycItem } from "@/lib/api";
+import { apiFetch, activationPinSmsCopy, fetchDrivers, reviewDriverKyc, type AdminDriver, type KycItem } from "@/lib/api";
 import { authHeaders } from "@/lib/auth";
 import { useAdmin } from "@/components/AdminProvider";
 import {
@@ -92,16 +92,18 @@ export default function KycPage() {
 
   async function review(id: string, approved: boolean) {
     try {
-      const result = await apiFetch<{ activationPin?: string; smsSent?: boolean }>(`/api/admin/kyc/${id}/review`, {
+      const result = await apiFetch<{
+        activationPin?: string;
+        smsSent?: boolean;
+        hasPhone?: boolean;
+        smsError?: string;
+      }>(`/api/admin/kyc/${id}/review`, {
         method: "POST",
         body: JSON.stringify({ approved }),
       });
       if (approved && result.activationPin) {
-        const sms = result.smsSent
-          ? "Un SMS a été envoyé au chauffeur."
-          : "SMS non envoyé — communiquez le code ci-dessous.";
         window.alert(
-          `Dossier validé.\n\nCode PIN d'activation (6 chiffres, 72 h, usage unique) : ${result.activationPin}\n\n${sms}`,
+          `Dossier validé.\n\nCode PIN d'activation (6 chiffres, 72 h, usage unique) : ${result.activationPin}\n\n${activationPinSmsCopy(result)}`,
         );
       }
       load();
@@ -114,11 +116,8 @@ export default function KycPage() {
     try {
       const result = await reviewDriverKyc(userId, approved);
       if (approved && result.activationPin) {
-        const sms = result.smsSent
-          ? "Un SMS a été envoyé au chauffeur."
-          : "SMS non envoyé — communiquez le code ci-dessous.";
         window.alert(
-          `Dossier validé.\n\nCode PIN d'activation (6 chiffres, 72 h, usage unique) : ${result.activationPin}\n\n${sms}`,
+          `Dossier validé.\n\nCode PIN d'activation (6 chiffres, 72 h, usage unique) : ${result.activationPin}\n\n${activationPinSmsCopy(result)}`,
         );
       }
       load();

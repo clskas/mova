@@ -31,7 +31,7 @@ describe('TrackingGateway', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     gateway.server = { to: jest.fn().mockReturnValue({ emit: jest.fn() }) } as never;
-    global.fetch = jest.fn().mockResolvedValue({ ok: true }) as never;
+    global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => ({}) }) as never;
   });
 
   afterAll(() => {
@@ -71,20 +71,20 @@ describe('TrackingGateway', () => {
     expect(extractHandshakeToken({ handshake: { auth: {}, headers: {} } } as never)).toBeNull();
   });
 
-  it('disconnects when JWT is missing or invalid', () => {
+  it('disconnects when JWT is missing or invalid', async () => {
     jwt.verify.mockImplementation(() => {
       throw new Error('bad');
     });
     const client = mockSocket({ data: {}, handshake: { auth: { token: 'bad' }, headers: {} } });
-    gateway.handleConnection(client as never);
+    await gateway.handleConnection(client as never);
     expect(client.disconnect).toHaveBeenCalledWith(true);
     expect(client.emit).not.toHaveBeenCalled();
   });
 
-  it('stores JWT user on connect', () => {
+  it('stores JWT user on connect', async () => {
     jwt.verify.mockReturnValue({ sub: 'u1', role: 'PASSENGER' });
     const client = mockSocket({ data: {}, handshake: { auth: { token: 'ok' }, headers: {} } });
-    gateway.handleConnection(client as never);
+    await gateway.handleConnection(client as never);
     expect(client.data.user).toEqual({ id: 'u1', role: 'PASSENGER' });
     expect(client.disconnect).not.toHaveBeenCalled();
   });

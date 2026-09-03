@@ -269,6 +269,12 @@ function mockFor<T>(path: string, init?: RequestInit): T {
   if (path.includes('/rides/estimate')) {
     return { priceCdf: 8500, estimatedFareCdf: 8500, distanceKm: 3.2, durationMin: 12 } as T;
   }
+  if (path.includes('/rides/') && path.includes('/search') && method === 'POST') {
+    return { status: 'MATCHING', driversFound: 1, attempt: 1 } as T;
+  }
+  if (path.includes('/rides/') && path.includes('/cancel') && method === 'POST') {
+    return { ride: { status: 'CANCELLED' }, cancellationFeeCdf: 0 } as T;
+  }
   if (path.includes('/rides') && method === 'POST') {
     return { id: `ride-${Date.now()}`, status: 'SEARCHING', priceCdf: 8500 } as T;
   }

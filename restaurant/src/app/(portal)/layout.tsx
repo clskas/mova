@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { AuthGate } from "@/components/AuthGate";
 import { PortalShell } from "@/components/PortalShell";
 import { PwaInstallBanner } from "@/components/PwaInstallBanner";
+import { PartnerAlertHost } from "@/components/PartnerAlertHost";
 import { RestaurantLiveProvider } from "@/components/RestaurantLiveProvider";
 import { fetchProfile } from "@/lib/api";
 
@@ -34,6 +35,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
   return (
     <AuthGate>
       <RestaurantLiveProvider>
+        <PartnerAlertHost />
         <RestaurantPortalFrame>{children}</RestaurantPortalFrame>
       </RestaurantLiveProvider>
     </AuthGate>

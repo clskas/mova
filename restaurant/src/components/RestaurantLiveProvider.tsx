@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import type { Socket } from "socket.io-client";
 import { getToken } from "@/lib/auth";
-import { alertNewRestaurantOrder, initPartnerAudioUnlock, requestPartnerNotificationPermission } from "@/lib/partner-alerts";
+import { alertNewRestaurantOrder, initPartnerAudioUnlock, onPartnerAlertsUnlocked } from "@/lib/partner-alerts";
 import { registerPartnerWebPush } from "@/lib/partner-web-push";
 import { connectRestaurantSocket } from "@/lib/restaurant-socket";
 
@@ -41,8 +41,12 @@ export function RestaurantLiveProvider({ children }: { children: React.ReactNode
 
     if (typeof window !== "undefined") {
       initPartnerAudioUnlock();
-      requestPartnerNotificationPermission();
-      void registerPartnerWebPush("restaurant");
+      if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+        void registerPartnerWebPush("restaurant");
+      }
+      const offUnlock = onPartnerAlertsUnlocked(() => {
+        void registerPartnerWebPush("restaurant");
+      });
       pollId = window.setInterval(triggerRefresh, POLL_MS);
       socket = connectRestaurantSocket({
         onConnect: () => setConnected(true),
@@ -54,10 +58,15 @@ export function RestaurantLiveProvider({ children }: { children: React.ReactNode
           triggerRefresh();
         },
       });
+      return () => {
+        offUnlock();
+        if (pollId != null) window.clearInterval(pollId);
+        socket?.disconnect();
+        setConnected(false);
+      };
     }
 
     return () => {
-      if (pollId != null) window.clearInterval(pollId);
       socket?.disconnect();
       setConnected(false);
     };

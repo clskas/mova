@@ -7,7 +7,6 @@ import { ChatPanel } from "@/components/ChatPanel";
 import {
   alertNewRentalBooking,
   notifyPartnerAlert,
-  requestPartnerNotificationPermission,
 } from "@/lib/partner-alerts";
 import {
   confirmBookingCash,
@@ -189,10 +188,6 @@ export default function ReservationsPage() {
   const [filterQ, setFilterQ] = useState("");
   const [paginationTotal, setPaginationTotal] = useState<number | null>(null);
   const seenPendingIds = useRef<Set<string> | null>(null);
-
-  useEffect(() => {
-    requestPartnerNotificationPermission();
-  }, []);
 
   useEffect(() => {
     const status = searchParams.get("status");

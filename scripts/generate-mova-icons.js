@@ -119,7 +119,7 @@ async function mobileFlavor(flavor, master) {
 
 async function main() {
   // Apps web
-  await webApp("web", MASTERS.passenger, { apple: false, appFavicon: true });
+  await webApp("web", MASTERS.passenger, { apple: true, appFavicon: true });
   await webApp("admin", MASTERS.passenger, { apple: true, svg: true, appFavicon: true });
   await webApp("restaurant", MASTERS.restaurant, { maskableIcon: true, apple: true, svg: true });
   await webApp("rental-partner", MASTERS.location, { maskableIcon: true, apple: true, svg: true });

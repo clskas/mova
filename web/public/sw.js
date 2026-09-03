@@ -1,5 +1,5 @@
-const CACHE = "mova-web-v8";
-const SHELL = ["/manifest.json", "/favicon.png", "/icon-192.png", "/icon-512.png"];
+const CACHE = "mova-web-v9";
+const SHELL = ["/manifest.json", "/favicon.png", "/icon-192.png", "/icon-512.png", "/apple-touch-icon.png"];
 
 function isVersionRequest(url) {
   return url.pathname === "/version.json" || url.pathname === "/api/version";

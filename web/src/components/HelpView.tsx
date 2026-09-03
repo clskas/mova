@@ -21,7 +21,7 @@ const FAQ = [
   },
   {
     q: "Puis-je utiliser SENGA sur iPhone ?",
-    a: "Oui, dans Safari (senga.afri-soft.com). Pour l'installer : Partager → Sur l'écran d'accueil. Les notifications push et le GPS en arrière-plan restent réservés à l'app mobile.",
+    a: "Oui, dans Safari (senga.afri-soft.com). Pour l'installer : Partager → Sur l'écran d'accueil. Il n'y a pas d'application native sur l'App Store iOS. Les notifications push, le GPS en arrière-plan et parfois Connexion Google restent plus fiables dans l'app Android ou dans Safari (pas en plein écran).",
   },
   {
     q: "Comment contacter le support ?",

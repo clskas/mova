@@ -18,8 +18,7 @@ export async function registerPartnerWebPush(appFlavor: "restaurant" | "rental_p
   if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
 
   try {
-    const permission = await Notification.requestPermission();
-    if (permission !== "granted") return;
+    if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
 
     const registration = await navigator.serviceWorker.ready;
     const keyRes = await fetch(`${API_BASE}/api/notifications/push/vapid-public-key`);

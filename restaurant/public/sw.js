@@ -1,10 +1,11 @@
-const CACHE = "mova-resto-v12";
+const CACHE = "mova-resto-v13";
 const SHELL = [
   "/manifest.webmanifest",
   "/icon-192.png",
   "/icon-512.png",
   "/icon-512-maskable.png",
   "/apple-touch-icon.png",
+  "/alert-chime.wav",
 ];
 
 function isVersionRequest(url) {

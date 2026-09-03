@@ -34,7 +34,6 @@ function formatItems(items: unknown): string {
 import {
   alertNewRestaurantOrder,
   notifyPartnerAlert,
-  requestPartnerNotificationPermission,
 } from "@/lib/partner-alerts";
 
 export default function OrdersPage() {
@@ -136,10 +135,6 @@ export default function OrdersPage() {
       setLoading(false);
     }
   }, [notifyNewOrders, filtersActive, filterStatus, filterFrom, filterTo, filterQ]);
-
-  useEffect(() => {
-    requestPartnerNotificationPermission();
-  }, []);
 
   useEffect(() => {
     load();

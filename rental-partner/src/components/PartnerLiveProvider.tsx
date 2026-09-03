@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import type { Socket } from "socket.io-client";
 import { getToken } from "@/lib/auth";
-import { alertNewRentalBooking, initPartnerAudioUnlock, requestPartnerNotificationPermission } from "@/lib/partner-alerts";
+import { alertNewRentalBooking, initPartnerAudioUnlock, onPartnerAlertsUnlocked } from "@/lib/partner-alerts";
 import { registerPartnerWebPush } from "@/lib/partner-web-push";
 import { connectPartnerSocket } from "@/lib/partner-socket";
 
@@ -41,8 +41,12 @@ export function PartnerLiveProvider({ children }: { children: React.ReactNode })
 
     if (typeof window !== "undefined") {
       initPartnerAudioUnlock();
-      requestPartnerNotificationPermission();
-      void registerPartnerWebPush("rental_partner");
+      if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+        void registerPartnerWebPush("rental_partner");
+      }
+      const offUnlock = onPartnerAlertsUnlocked(() => {
+        void registerPartnerWebPush("rental_partner");
+      });
       pollId = window.setInterval(triggerRefresh, POLL_MS);
       socket = connectPartnerSocket({
         onConnect: () => setConnected(true),
@@ -55,10 +59,15 @@ export function PartnerLiveProvider({ children }: { children: React.ReactNode })
         },
         onVehicleEvent: triggerRefresh,
       });
+      return () => {
+        offUnlock();
+        if (pollId != null) window.clearInterval(pollId);
+        socket?.disconnect();
+        setConnected(false);
+      };
     }
 
     return () => {
-      if (pollId != null) window.clearInterval(pollId);
       socket?.disconnect();
       setConnected(false);
     };

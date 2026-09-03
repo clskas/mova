@@ -13,7 +13,7 @@ export const metadata: Metadata = {
   appleWebApp: { capable: true, title: "SENGA", statusBarStyle: "black-translucent" },
   icons: {
     icon: [{ url: "/favicon.png", sizes: "32x32", type: "image/png" }, { url: "/icon-192.png", sizes: "192x192", type: "image/png" }],
-    apple: "/icon-192.png",
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
   },
 };
 
@@ -30,6 +30,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         {/* Plain manifest link: Next metadata adds crossorigin=use-credentials, which breaks iOS Add to Home Screen. */}
         <link rel="manifest" href="/manifest.json" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
       </head>
       <body className="min-h-[100dvh] antialiased overflow-x-hidden">
         <PwaRegister />

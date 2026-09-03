@@ -12,7 +12,10 @@ import {
   serviceUrl,
 } from '@mova/shared';
 
-const AUTH_REVALIDATE_TIMEOUT_MS = 2000;
+function authRevalidateTimeoutMs(): number {
+  const raw = Number(process.env.AUTH_REVALIDATE_TIMEOUT_MS);
+  return Number.isFinite(raw) && raw > 0 ? raw : 8000;
+}
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
@@ -27,6 +30,26 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
+  private async fetchAuthUser(userId: string): Promise<Response> {
+    const attempts = 2;
+    let lastError: unknown;
+    for (let i = 0; i < attempts; i++) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), authRevalidateTimeoutMs());
+      try {
+        return await fetch(serviceUrl('auth', `/internal/users/${userId}`), {
+          headers: { 'x-internal-api-key': INTERNAL_API_KEY },
+          signal: controller.signal,
+        });
+      } catch (e) {
+        lastError = e;
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+    throw lastError instanceof Error ? lastError : new Error('auth revalidate failed');
+  }
+
   async validate(payload: MovaJwtPayload) {
     if (await isJwtDenied(this.redis, payload)) {
       throw new UnauthorizedException('Session révoquée');
@@ -34,16 +57,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
     let res: Response;
     try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), AUTH_REVALIDATE_TIMEOUT_MS);
-      try {
-        res = await fetch(serviceUrl('auth', `/internal/users/${payload.sub}`), {
-          headers: { 'x-internal-api-key': INTERNAL_API_KEY },
-          signal: controller.signal,
-        });
-      } finally {
-        clearTimeout(timer);
-      }
+      res = await this.fetchAuthUser(payload.sub);
     } catch {
       throw new ServiceUnavailableException("Service d'authentification indisponible. Réessayez.");
     }
@@ -52,7 +66,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       if (res.status >= 500) {
         throw new ServiceUnavailableException("Service d'authentification indisponible. Réessayez.");
       }
-      throw new UnauthorizedException();
+      if (res.status === 404) {
+        throw new UnauthorizedException('Session expirée. Reconnectez-vous.');
+      }
+      throw new UnauthorizedException('Session expirée. Reconnectez-vous.');
     }
 
     const user = (await res.json()) as {

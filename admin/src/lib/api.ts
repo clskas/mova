@@ -737,8 +737,10 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   try {
     res = await fetch(url, {
       ...init,
+      cache: "no-store",
       headers: {
         "Content-Type": "application/json",
+        "Cache-Control": "no-cache",
         ...authHeaders(),
         ...init?.headers,
       },
@@ -746,6 +748,9 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   } catch {
     if (!hasToken && USE_API_MOCK) return mockFor<T>(path, init);
     throw new ApiError(adminErrorFallback(0), 0);
+  }
+  if (res.status === 304) {
+    return [] as T;
   }
   if (!res.ok) {
     let message = `HTTP ${res.status}`;

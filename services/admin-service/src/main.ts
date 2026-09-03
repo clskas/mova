@@ -6,6 +6,8 @@ import { HttpExceptionFilter, assertProductionSecurity, resolveCorsOrigin } from
 async function bootstrap() {
   assertProductionSecurity('admin-service');
   const app = await NestFactory.create(AppModule);
+  const http = app.getHttpAdapter().getInstance() as { set?: (k: string, v: unknown) => void };
+  http.set?.('etag', false);
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true, transformOptions: { enableImplicitConversion: true } }));
   app.useGlobalFilters(new HttpExceptionFilter());
   app.enableCors({ origin: resolveCorsOrigin(), credentials: true });

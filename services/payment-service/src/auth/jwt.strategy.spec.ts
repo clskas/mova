@@ -8,12 +8,14 @@ describe('Payment JwtStrategy fail-closed', () => {
 
   beforeEach(() => {
     process.env.NODE_ENV = 'test';
+    process.env.AUTH_REVALIDATE_TIMEOUT_MS = '30';
     jest.clearAllMocks();
     strategy = new JwtStrategy(config as never);
   });
 
   afterEach(() => {
     delete (global as { fetch?: unknown }).fetch;
+    delete process.env.AUTH_REVALIDATE_TIMEOUT_MS;
   });
 
   it('returns live claims from auth-service', async () => {

@@ -1507,16 +1507,27 @@ export class RidesService {
 
   async listForAdmin(opts: { status?: string; from?: string; to?: string; skip?: number; take?: number }) {
     const where: { status?: RideStatus; createdAt?: { gte?: Date; lte?: Date } } = {};
-    if (opts.status) where.status = opts.status as RideStatus;
+    if (opts.status && Object.values(RideStatus).includes(opts.status as RideStatus)) {
+      where.status = opts.status as RideStatus;
+    }
     if (opts.from || opts.to) {
       where.createdAt = {};
-      if (opts.from) where.createdAt.gte = new Date(opts.from);
-      if (opts.to) where.createdAt.lte = new Date(opts.to);
+      if (opts.from) {
+        const from = new Date(opts.from);
+        if (!Number.isNaN(from.getTime())) where.createdAt.gte = from;
+      }
+      if (opts.to) {
+        const to = new Date(opts.to);
+        if (!Number.isNaN(to.getTime())) where.createdAt.lte = to;
+      }
+      if (!where.createdAt.gte && !where.createdAt.lte) delete where.createdAt;
     }
+    const skip = Number.isFinite(opts.skip) ? Math.max(0, opts.skip ?? 0) : 0;
+    const take = Number.isFinite(opts.take) ? Math.min(200, Math.max(1, opts.take ?? 50)) : 50;
     const rides = await this.prisma.ride.findMany({
       where,
-      skip: opts.skip ?? 0,
-      take: opts.take ?? 50,
+      skip,
+      take,
       orderBy: { createdAt: 'desc' },
     });
     return rides.map((r) => ({

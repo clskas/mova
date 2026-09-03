@@ -14,12 +14,30 @@ export class AdminService {
   private headers = { 'x-internal-api-key': INTERNAL_API_KEY };
 
   private async fetchJson<T>(service: MovaService, path: string, init?: RequestInit): Promise<T> {
-    const res = await fetch(serviceUrl(service, path), {
-      ...init,
-      headers: { ...this.headers, ...(init?.headers as Record<string, string>) },
-    });
-    if (!res.ok) throw new Error(`Admin proxy failed: ${service}${path}`);
-    return res.json();
+    let res: Response;
+    try {
+      res = await fetch(serviceUrl(service, path), {
+        ...init,
+        cache: 'no-store',
+        headers: { ...this.headers, ...(init?.headers as Record<string, string>) },
+      });
+    } catch {
+      throw new MovaHttpException(
+        MovaErrorCode.INTERNAL_ERROR,
+        HttpStatus.BAD_GATEWAY,
+        `Service ${service} injoignable.`,
+      );
+    }
+    if (!res.ok) {
+      throw new MovaHttpException(
+        MovaErrorCode.INTERNAL_ERROR,
+        HttpStatus.BAD_GATEWAY,
+        `Admin proxy failed: ${service}${path}`,
+      );
+    }
+    const text = await res.text();
+    if (!text.trim()) return [] as T;
+    return JSON.parse(text) as T;
   }
 
   private jsonHeaders = { ...this.headers, 'Content-Type': 'application/json' };
@@ -287,9 +305,13 @@ export class AdminService {
     if (query.status) params.set('status', query.status);
     if (query.from) params.set('from', query.from);
     if (query.to) params.set('to', query.to);
-    params.set('skip', String(query.skip ?? 0));
-    params.set('take', String(query.take ?? 50));
-    return this.fetchJson('ride', `/internal/rides?${params}`);
+    const skip = Number.isFinite(query.skip) ? Number(query.skip) : 0;
+    const take = Number.isFinite(query.take) && Number(query.take) > 0 ? Number(query.take) : 50;
+    params.set('skip', String(Math.max(0, skip)));
+    params.set('take', String(Math.min(200, take)));
+    return this.fetchJson<unknown[]>('ride', `/internal/rides?${params}`).then((data) =>
+      Array.isArray(data) ? data : [],
+    );
   }
   getRide(id: string) {
     return this.fetchJson('ride', `/internal/rides/${id}`);

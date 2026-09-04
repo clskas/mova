@@ -412,7 +412,10 @@ export class PaymentsService {
       };
     }
     const amountCdf = ride.finalFareCdf ?? ride.estimatedFareCdf ?? ride.priceCdf ?? 0;
-    if (amountCdf <= 0) throw new MovaHttpException(MovaErrorCode.PAYMENT_FAILED);
+    if (!Number.isInteger(amountCdf) || amountCdf <= 0) {
+      throw new MovaHttpException(MovaErrorCode.PAYMENT_FAILED);
+    }
+    // C2B : le montant envoyé à SerdiPay/hub est exclusivement le tarif serveur (jamais le client).
     const paymentPhone = this.resolvePaymentPhone(method, phone);
 
     if (method === PaymentMethod.WALLET) {
@@ -1020,7 +1023,12 @@ export class PaymentsService {
 
     if (this.hubPayments?.isEnabled()) {
       for (const ref of refs) {
-        const hub = await this.hubPayments.finalizeFromAggregator(ref, outcome, message);
+        const hub = await this.hubPayments.finalizeFromAggregator(
+          ref,
+          outcome,
+          message,
+          confirmedAmountCdf,
+        );
         if (hub.found) {
           return { success: true, kind: 'HUB', ...hub };
         }
@@ -1044,12 +1052,25 @@ export class PaymentsService {
       if (ridePayment.status !== PaymentStatus.PENDING) {
         return { success: false, message: `Statut course inattendu: ${ridePayment.status}` };
       }
-      const nextStatus = outcome === 'COMPLETED' ? PaymentStatus.COMPLETED : PaymentStatus.FAILED;
+
+      const amountReject = this.mobileMoneyAmountMismatchReason(
+        'course',
+        ridePayment.amountCdf,
+        confirmedAmountCdf,
+        ridePayment.rideId,
+      );
+      const effectiveOutcome = amountReject ? 'FAILED' : outcome;
+      const failureReason = amountReject
+        ? amountReject
+        : outcome === 'FAILED'
+          ? message ?? 'Paiement Mobile Money refusé'
+          : null;
+      const nextStatus = effectiveOutcome === 'COMPLETED' ? PaymentStatus.COMPLETED : PaymentStatus.FAILED;
       const claimed = await this.prisma.payment.updateMany({
         where: { id: ridePayment.id, status: PaymentStatus.PENDING },
         data: {
           status: nextStatus,
-          failureReason: outcome === 'FAILED' ? message ?? 'Paiement Mobile Money refusé' : null,
+          failureReason,
         },
       });
       if (claimed.count !== 1) {
@@ -1061,7 +1082,7 @@ export class PaymentsService {
           rideId: ridePayment.rideId,
         };
       }
-      if (outcome === 'COMPLETED') {
+      if (effectiveOutcome === 'COMPLETED') {
         await this.publishPaymentCompleted({
           rideId: ridePayment.rideId,
           userId: ridePayment.userId,
@@ -1091,12 +1112,25 @@ export class PaymentsService {
       if (servicePayment.status !== PaymentStatus.PENDING) {
         return { success: false, message: `Statut service inattendu: ${servicePayment.status}` };
       }
-      const nextStatus = outcome === 'COMPLETED' ? PaymentStatus.COMPLETED : PaymentStatus.FAILED;
+
+      const amountReject = this.mobileMoneyAmountMismatchReason(
+        'service',
+        servicePayment.amountCdf,
+        confirmedAmountCdf,
+        `${servicePayment.referenceType}/${servicePayment.referenceId}`,
+      );
+      const effectiveOutcome = amountReject ? 'FAILED' : outcome;
+      const failureReason = amountReject
+        ? amountReject
+        : outcome === 'FAILED'
+          ? message ?? 'Paiement Mobile Money refusé'
+          : null;
+      const nextStatus = effectiveOutcome === 'COMPLETED' ? PaymentStatus.COMPLETED : PaymentStatus.FAILED;
       const claimed = await this.prisma.servicePayment.updateMany({
         where: { id: servicePayment.id, status: PaymentStatus.PENDING },
         data: {
           status: nextStatus,
-          failureReason: outcome === 'FAILED' ? message ?? 'Paiement Mobile Money refusé' : null,
+          failureReason,
         },
       });
       if (claimed.count !== 1) {
@@ -1109,7 +1143,7 @@ export class PaymentsService {
           referenceId: servicePayment.referenceId,
         };
       }
-      if (outcome === 'COMPLETED') {
+      if (effectiveOutcome === 'COMPLETED') {
         await this.publishPaymentCompleted({
           referenceType: servicePayment.referenceType,
           referenceId: servicePayment.referenceId,
@@ -1148,6 +1182,28 @@ export class PaymentsService {
 
     this.logger.warn(`Webhook Mobile Money: aucune intention pour providerRef=${refs.join(',')}`);
     return { success: false, message: 'Référence Mobile Money inconnue' };
+  }
+
+  /**
+   * Fail-closed amount check for ride/service MM webhooks (same policy as top-ups).
+   * Missing confirmed amount → allow (provider may omit); mismatch → reject, no credit.
+   */
+  private mobileMoneyAmountMismatchReason(
+    kind: 'course' | 'service',
+    expectedCdf: number,
+    confirmedAmountCdf: number | undefined,
+    refLabel: string,
+  ): string | null {
+    if (confirmedAmountCdf == null || !Number.isFinite(confirmedAmountCdf)) return null;
+    const paid = Math.round(confirmedAmountCdf);
+    if (paid === expectedCdf) return null;
+    this.logger.error(
+      `Ride/service MM amount mismatch kind=${kind} ref=${refLabel} expected=${expectedCdf} paid=${paid}`,
+    );
+    if (paid < expectedCdf) {
+      return `Montant Mobile Money insuffisant (${paid} CDF) — tarif ${kind} ${expectedCdf} CDF. Course/service non payé.`;
+    }
+    return `Montant Mobile Money supérieur (${paid} CDF) — tarif ${kind} ${expectedCdf} CDF. Paiement non validé (aucun crédit).`;
   }
 
   async getPassengerRidePaymentStatus(rideId: string, userId: string) {

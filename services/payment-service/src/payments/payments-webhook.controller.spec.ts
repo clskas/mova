@@ -99,6 +99,41 @@ describe('PaymentsWebhookController aggregator gate', () => {
       found: true,
       status: 'COMPLETED',
     });
-    expect(finalizeFromAggregator).toHaveBeenCalledWith('SD260829CPHOG', 'COMPLETED', undefined);
+    expect(finalizeFromAggregator).toHaveBeenCalledWith('SD260829CPHOG', 'COMPLETED', undefined, undefined);
+  });
+
+  it('passes confirmed amount from SerdiPay payload to hub finalize', async () => {
+    const secret = 'whsec_test';
+    const finalizeFromAggregator = jest.fn().mockResolvedValue({
+      found: true,
+      notified: true,
+      payment_id: 'pay_amount',
+      status: 'COMPLETED',
+    });
+    const hubOn = { isEnabled: () => true, finalizeFromAggregator } as never;
+    const config = {
+      get: (key: string) => {
+        if (key === 'AFRISOFT_PAY_HUB_MODE') return 'true';
+        if (key === 'SERDIPAY_WEBHOOK_SECRET') return secret;
+        return undefined;
+      },
+    } as never;
+    const ctl = new PaymentsWebhookController({} as never, config, hubOn);
+    const body = {
+      status: 200,
+      amount: 8500,
+      payment: {
+        status: 'success',
+        transactionId: 'SD260829AMT',
+        amountCdf: 8500,
+      },
+    };
+    const raw = JSON.stringify(body);
+    const headers = { 'x-serdipay-signature': signSerdiPay(secret, raw) };
+    await expect(ctl.serdiPay(body, headers, { rawBody: Buffer.from(raw) })).resolves.toMatchObject({
+      success: true,
+      found: true,
+    });
+    expect(finalizeFromAggregator).toHaveBeenCalledWith('SD260829AMT', 'COMPLETED', undefined, 8500);
   });
 });

@@ -64,14 +64,17 @@ export class PaymentsWebhookController {
   }
 
   private extractConfirmedAmountCdf(payload: Record<string, unknown>): number | undefined {
+    const nested =
+      payload.payment && typeof payload.payment === 'object'
+        ? (payload.payment as Record<string, unknown>)
+        : undefined;
     const raw =
       payload.amount_cdf ??
       payload.amountCdf ??
       payload.amount ??
-      (payload.payment && typeof payload.payment === 'object'
-        ? (payload.payment as Record<string, unknown>).amount_cdf ??
-          (payload.payment as Record<string, unknown>).amountCdf
-        : undefined);
+      nested?.amount_cdf ??
+      nested?.amountCdf ??
+      nested?.amount;
     const n = typeof raw === 'number' ? raw : typeof raw === 'string' ? Number(raw) : NaN;
     return Number.isFinite(n) && n > 0 ? Math.round(n) : undefined;
   }
@@ -109,7 +112,12 @@ export class PaymentsWebhookController {
     const failure = pickString(payload, ['message', 'description', 'failureReason']);
     const confirmedAmountCdf = this.extractConfirmedAmountCdf(payload);
     if (this.hub.isEnabled()) {
-      const hubResult = await this.hub.finalizeFromAggregator(providerRef, outcome, failure);
+      const hubResult = await this.hub.finalizeFromAggregator(
+        providerRef,
+        outcome,
+        failure,
+        confirmedAmountCdf,
+      );
       if (hubResult.found) return { success: true, ...hubResult };
     }
     const result = await this.payments.completeMobileMoneyFromWebhook(
@@ -220,12 +228,17 @@ export class PaymentsWebhookController {
 
     const outcome = checked.status === 'ACCEPTED' ? 'COMPLETED' : 'FAILED';
     const providerRef = transId.startsWith('cp_') ? transId : `cp_${transId}`;
+    const confirmedAmountCdf =
+      checked.amount != null && Number.isFinite(checked.amount) && checked.amount > 0
+        ? Math.round(checked.amount)
+        : this.extractConfirmedAmountCdf(payload);
     this.logger.log(`CinetPay webhook ${outcome} ref=${providerRef}`);
     if (this.hub.isEnabled()) {
       const hubResult = await this.hub.finalizeFromAggregator(
         providerRef,
         outcome,
         checked.message ?? pickString(payload, ['cpm_error_message', 'message']),
+        confirmedAmountCdf,
       );
       if (hubResult.found) return { success: true, ...hubResult };
     }
@@ -233,6 +246,8 @@ export class PaymentsWebhookController {
       providerRef,
       outcome,
       checked.message ?? pickString(payload, ['cpm_error_message', 'message']),
+      [],
+      confirmedAmountCdf,
     );
   }
 

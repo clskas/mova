@@ -18,6 +18,7 @@ describe('PaymentsService', () => {
     payment: {
       upsert: jest.fn().mockResolvedValue({ id: 'pay-1', rideId: 'ride-1', status: 'COMPLETED' }),
       findUnique: jest.fn().mockResolvedValue(null),
+      findFirst: jest.fn().mockResolvedValue(null),
       update: jest.fn().mockResolvedValue({ id: 'pay-1', rideId: 'ride-1', status: 'COMPLETED' }),
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       findMany: jest.fn().mockResolvedValue([]),
@@ -25,6 +26,7 @@ describe('PaymentsService', () => {
     servicePayment: {
       upsert: jest.fn().mockResolvedValue({ id: 'spay-1', referenceType: 'DELIVERY', referenceId: 'del-1', status: 'COMPLETED' }),
       findUnique: jest.fn().mockResolvedValue(null),
+      findFirst: jest.fn().mockResolvedValue(null),
       update: jest.fn().mockResolvedValue({ id: 'spay-1', status: 'COMPLETED' }),
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       findMany: jest.fn().mockResolvedValue([]),
@@ -34,6 +36,8 @@ describe('PaymentsService', () => {
     debit: jest.fn().mockResolvedValue({ balanceCdf: 0 }),
     consumeHoldOrDebit: jest.fn().mockResolvedValue({ consumed: true, via: 'DEBIT' }),
     creditPlatformFee: jest.fn().mockResolvedValue(null),
+    completePendingTopUp: jest.fn().mockResolvedValue({ found: false }),
+    refundFailedPayout: jest.fn().mockResolvedValue({ found: false }),
   };
   const driverPayouts = {
     fetchRidePayout: jest.fn().mockResolvedValue(null),
@@ -194,5 +198,70 @@ describe('PaymentsService', () => {
     await expect(service.payService('DELIVERY', 'del-1', 'user-1', PaymentMethod.CASH)).rejects.toMatchObject({
       code: MovaErrorCode.VALIDATION_ERROR,
     });
+  });
+
+  it('webhook course : refuse si montant SerdiPay ≠ tarif (sous-paiement)', async () => {
+    prisma.payment.findFirst.mockResolvedValueOnce({
+      id: 'pay-mm',
+      rideId: 'ride-1',
+      userId: 'user-1',
+      amountCdf: 8500,
+      method: PaymentMethod.ORANGE_MONEY,
+      status: 'PENDING',
+      providerRef: 'sp_ride1',
+    });
+    const result = await service.completeMobileMoneyFromWebhook('sp_ride1', 'COMPLETED', undefined, [], 5000);
+    expect(result).toMatchObject({ success: true, kind: 'RIDE', status: 'FAILED', rideId: 'ride-1' });
+    expect(prisma.payment.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: 'FAILED',
+          failureReason: expect.stringContaining('insuffisant'),
+        }),
+      }),
+    );
+    expect(driverPayouts.creditRidePayoutFromPayment).not.toHaveBeenCalled();
+  });
+
+  it('webhook course : refuse si montant SerdiPay ≠ tarif (surpaiement, fail-closed)', async () => {
+    prisma.payment.findFirst.mockResolvedValueOnce({
+      id: 'pay-mm',
+      rideId: 'ride-1',
+      userId: 'user-1',
+      amountCdf: 8500,
+      method: PaymentMethod.MPESA,
+      status: 'PENDING',
+      providerRef: 'sp_ride2',
+    });
+    const result = await service.completeMobileMoneyFromWebhook('sp_ride2', 'COMPLETED', undefined, [], 9000);
+    expect(result).toMatchObject({ success: true, kind: 'RIDE', status: 'FAILED' });
+    expect(prisma.payment.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: 'FAILED',
+          failureReason: expect.stringContaining('supérieur'),
+        }),
+      }),
+    );
+    expect(redis.publish).not.toHaveBeenCalled();
+  });
+
+  it('webhook course : valide si montant confirmé = tarif', async () => {
+    prisma.payment.findFirst.mockResolvedValueOnce({
+      id: 'pay-mm',
+      rideId: 'ride-1',
+      userId: 'user-1',
+      amountCdf: 8500,
+      method: PaymentMethod.AIRTEL_MONEY,
+      status: 'PENDING',
+      providerRef: 'sp_ride3',
+    });
+    const result = await service.completeMobileMoneyFromWebhook('sp_ride3', 'COMPLETED', undefined, [], 8500);
+    expect(result).toMatchObject({ success: true, kind: 'RIDE', status: 'COMPLETED', rideId: 'ride-1' });
+    expect(prisma.payment.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: 'COMPLETED', failureReason: null }),
+      }),
+    );
   });
 });

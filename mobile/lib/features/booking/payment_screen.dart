@@ -394,6 +394,14 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                     color: MovaColors.green,
                   ),
                 ),
+                if (_needsPhone) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    'Montant fixé par SENGA — sur votre téléphone Mobile Money, confirmez uniquement le PIN (ne saisissez pas un autre montant).',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: MovaColors.textSecondary.withValues(alpha: 0.95), fontSize: 12),
+                  ),
+                ],
                 if (_loadingPin)
                   const Padding(
                     padding: EdgeInsets.only(top: 12),

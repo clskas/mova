@@ -225,6 +225,7 @@ export class HubPaymentsService {
     providerRef: string,
     outcome: 'COMPLETED' | 'FAILED',
     message?: string,
+    confirmedAmountCdf?: number,
   ): Promise<{ found: boolean; notified?: boolean; payment_id?: string; status?: string }> {
     const ref = providerRef.trim();
     if (!ref) return { found: false };
@@ -245,12 +246,35 @@ export class HubPaymentsService {
       return { found: true, notified: true, payment_id: row.id, status: row.status };
     }
 
+    let finalOutcome = outcome;
+    let failureReason =
+      outcome === 'FAILED' ? message ?? 'Paiement Mobile Money refusé' : null;
+
+    // Fail-closed: agrégateur a encaissé un montant ≠ intention hub (course / top-up / payout).
+    // Sous-paiement et surpaiement : ne jamais marquer COMPLETED (pas de crédit métier incorrect).
+    if (
+      outcome === 'COMPLETED' &&
+      confirmedAmountCdf != null &&
+      Number.isFinite(confirmedAmountCdf) &&
+      Math.round(confirmedAmountCdf) !== row.amountCdf
+    ) {
+      const paid = Math.round(confirmedAmountCdf);
+      this.logger.error(
+        `Hub amount mismatch payment=${row.id} ref=${row.reference} expected=${row.amountCdf} paid=${paid} purpose=${row.purpose}`,
+      );
+      finalOutcome = 'FAILED';
+      failureReason =
+        paid < row.amountCdf
+          ? `Montant Mobile Money insuffisant (${paid} CDF) — attendu ${row.amountCdf} CDF. Paiement non validé.`
+          : `Montant Mobile Money supérieur (${paid} CDF) — attendu ${row.amountCdf} CDF. Paiement non validé (aucun crédit).`;
+    }
+
     const claimed = await this.prisma.hubPayment.updateMany({
       where: { id: row.id, status: 'PENDING' },
       data: {
-        status: outcome,
-        failureReason: outcome === 'FAILED' ? message ?? 'Paiement Mobile Money refusé' : null,
-        completedAt: outcome === 'COMPLETED' ? new Date() : row.completedAt,
+        status: finalOutcome,
+        failureReason,
+        completedAt: finalOutcome === 'COMPLETED' ? new Date() : row.completedAt,
       },
     });
     if (claimed.count !== 1) {
@@ -258,7 +282,7 @@ export class HubPaymentsService {
       return { found: true, notified: Boolean(current?.notifiedAt), payment_id: row.id, status: current?.status };
     }
     const notified = await this.notifyApp(row.id);
-    return { found: true, notified, payment_id: row.id, status: outcome };
+    return { found: true, notified, payment_id: row.id, status: finalOutcome };
   }
 
   async notifyApp(paymentId: string): Promise<boolean> {

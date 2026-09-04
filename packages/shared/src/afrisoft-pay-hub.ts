@@ -263,6 +263,19 @@ function pickStr(obj: Record<string, unknown>, keys: string[]): string | undefin
   return undefined;
 }
 
+/** Hub errors are often `{ error: { message } }` (Nest filter), not a top-level string. */
+function pickHubErrorMessage(json: Record<string, unknown>, fallback: string): string {
+  const top = pickStr(json, ['message', 'failure_reason']);
+  if (top) return top;
+  const err = json.error;
+  if (typeof err === 'string' && err.trim()) return err.trim();
+  if (err && typeof err === 'object') {
+    const nested = pickStr(err as Record<string, unknown>, ['message', 'error']);
+    if (nested) return nested;
+  }
+  return fallback;
+}
+
 function mapHubJson(json: Record<string, unknown>, fallbackMsg: string): AfriSoftHubPaymentResult {
   const statusRaw = pickStr(json, ['status'])?.toUpperCase();
   const status: AfriSoftHubPaymentStatus | undefined =
@@ -272,7 +285,7 @@ function mapHubJson(json: Record<string, unknown>, fallbackMsg: string): AfriSof
   const paymentId = pickStr(json, ['payment_id', 'paymentId']);
   const aggregatorRef = pickStr(json, ['provider_ref', 'providerRef']);
   const providerRef = paymentId ?? aggregatorRef;
-  const message = pickStr(json, ['message', 'error', 'failure_reason']) ?? fallbackMsg;
+  const message = pickHubErrorMessage(json, fallbackMsg);
   const amount = json.amount_cdf ?? json.amountCdf;
   return {
     success: status !== 'FAILED' && Boolean(paymentId || providerRef),
@@ -321,7 +334,10 @@ export async function afrisoftPayHubInitiate(
   if (!ok) {
     return {
       success: false,
-      message: pickStr(json, ['message', 'error']) ?? 'Échec de l’initiation Mobile Money via le hub AfriSoft.',
+      message: pickHubErrorMessage(
+        json,
+        'Échec de l’initiation Mobile Money via le hub AfriSoft.',
+      ),
     };
   }
   const mapped = mapHubJson(json, 'Confirmez le paiement sur votre téléphone Mobile Money.');
@@ -354,7 +370,7 @@ export async function afrisoftPayHubGetStatus(
   if (!ok) {
     return {
       success: false,
-      message: pickStr(json, ['message', 'error']) ?? 'Paiement introuvable sur le hub.',
+      message: pickHubErrorMessage(json, 'Paiement introuvable sur le hub.'),
     };
   }
   return mapHubJson(json, 'Statut hub');

@@ -239,6 +239,44 @@ describe('serdipay Public API', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it('maps get-token 400 to French merchant-auth message (no C2B call)', async () => {
+    env.SERDIPAY_EMAIL = 'm@example.com';
+    env.SERDIPAY_PASSWORD = 'pw';
+    env.SERDIPAY_API_ID = 'APIX';
+    env.SERDIPAY_MERCHANT_CODE = '466551';
+    env.SERDIPAY_MERCHANT_PIN = '1234';
+
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 400,
+      json: async () => ({
+        message: 'Failed to get the token',
+        error: 'Something went wrong, Please Try later',
+      }),
+    });
+    (global as unknown as { fetch: typeof fetch }).fetch = fetchMock as unknown as typeof fetch;
+
+    const auth = await serdiPayGetAccessToken(get);
+    expect(auth.ok).toBe(false);
+    if (auth.ok === false) {
+      expect(auth.message).toMatch(/Authentification marchand SerdiPay/i);
+      expect(auth.message).not.toMatch(/Failed to get the token/i);
+    }
+
+    const mm = await serdiPayInitiateMobileMoney(get, {
+      operator: 'ORANGE_MONEY',
+      amountCdf: 500,
+      phone: '+243970000001',
+      reference: 'senga_topup_test',
+    });
+    expect(mm.success).toBe(false);
+    expect(mm.message).toMatch(/Authentification marchand SerdiPay/i);
+    // Only get-token, never payment-merchant
+    expect(fetchMock).toHaveBeenCalledTimes(2); // token attempted twice (no cache on failure)
+    expect(String(fetchMock.mock.calls[0][0])).toMatch(/get-token/);
+    expect(String(fetchMock.mock.calls[1][0])).toMatch(/get-token/);
+  });
+
   it('surfaces 403 credit errors from SMS API', async () => {
     env.SERDIPAY_SMS_API_ID = 'APISMSDEMO';
     env.SERDIPAY_SMS_API_KEY = 'test-sms-key';

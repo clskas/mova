@@ -40,7 +40,8 @@ const movaErrorMessages = <String, String>{
   'MOVA_REN_002': 'Véhicule de location introuvable.',
   'MOVA_MOV_001': 'Demande de déménagement introuvable.',
   'MOVA_MOV_002': 'Statut de déménagement invalide pour cette action.',
-  'MOVA_PAY_001': 'Le paiement a échoué. Vérifiez votre solde.',
+  'MOVA_PAY_001':
+      'Le paiement ou la recharge a échoué. Réessayez ou contactez le support SENGA.',
   'MOVA_PAY_002': 'Solde insuffisant dans votre portefeuille.',
   'MOVA_PAY_003': 'Méthode de paiement non supportée.',
   'MOVA_PAY_004': 'Numéro Mobile Money requis. Format: +243XXXXXXXXX',
@@ -75,7 +76,9 @@ MovaFailure failureFromApiResponse(int statusCode, Map<String, dynamic> body) {
           return AuthFailure(mapped);
         }
         if (code == 'MOVA_RIDE_003') return NoDriversFailure(mapped);
-        if (code.startsWith('MOVA_PAY_')) return PaymentFailure(mapped);
+        if (code.startsWith('MOVA_PAY_')) {
+          return PaymentFailure(sanitizeUserMessage(apiMessage, fallback: mapped));
+        }
         if (code == 'MOVA_VAL_001') {
           return ValidationFailure(sanitizeUserMessage(apiMessage, fallback: mapped));
         }

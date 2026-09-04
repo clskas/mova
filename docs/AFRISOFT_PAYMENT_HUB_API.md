@@ -488,7 +488,7 @@ curl -sS https://pay.afri-soft.com/health
 - [x] Wallet top-up async + poll Flutter  
 - [x] Endpoints `/v1/*` + HMAC `app_id` + webhook sortant vers SENGA  
 - [x] Credentials marchand SerdiPay posés sur le VPS hub (prod `https://serdipay.com`)  
-- [ ] `get-token` prod accepté par SerdiPay (encore 400 « Failed to get the token »)  
+- [ ] `get-token` prod accepté par SerdiPay (encore 400 « Failed to get the token » — **reconfirmé 2026-09-04** malgré statut ACTIVE annoncé)  
 - [ ] Test C2B réel ≥ 500 FC (OM / MP / AM) une fois le token 200
 - [ ] Flutter : ouvrir `paymentUrl` CinetPay  
 

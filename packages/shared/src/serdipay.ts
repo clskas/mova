@@ -194,6 +194,26 @@ export function serdiPayTelecomCode(operator: MobileMoneyOperator | string): str
 
 let cachedToken: { accessToken: string; expiresAtMs: number } | null = null;
 
+/** User-facing French when SerdiPay get-token rejects (often merchant not fully active). */
+export function mapSerdiPayTokenFailure(status: number, raw?: string): string {
+  const msg = (raw ?? '').trim();
+  const lower = msg.toLowerCase();
+  if (
+    lower.includes('failed to get the token') ||
+    lower.includes('something went wrong') ||
+    status === 400 ||
+    status === 401 ||
+    status === 403
+  ) {
+    return (
+      'Authentification marchand SerdiPay refusée. ' +
+      'Recharge / paiement Mobile Money temporairement indisponible — contactez le support SENGA.'
+    );
+  }
+  if (msg && msg.length <= 160 && !/^https?:\/\//i.test(msg)) return msg;
+  return `Échec auth SerdiPay (${status || 'réseau'}). Réessayez plus tard.`;
+}
+
 /** Merchant get-token → Bearer access_token. */
 export async function serdiPayGetAccessToken(
   get: EnvGetter,
@@ -236,7 +256,7 @@ export async function serdiPayGetAccessToken(
     if (!res.ok || !token) {
       return {
         ok: false,
-        message: data.message ?? data.error ?? `Échec auth SerdiPay (${res.status})`,
+        message: mapSerdiPayTokenFailure(res.status, data.message ?? data.error),
       };
     }
     // Doc does not specify TTL; refresh proactively after 50 minutes.

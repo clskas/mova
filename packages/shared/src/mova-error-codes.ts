@@ -108,7 +108,8 @@ export const MOVA_ERROR_MESSAGES: Record<MovaErrorCode, string> = {
   [MovaErrorCode.MOVING_NOT_FOUND]: 'Demande de déménagement introuvable.',
   [MovaErrorCode.MOVING_INVALID_STATUS]: 'Statut de déménagement invalide pour cette action.',
 
-  [MovaErrorCode.PAYMENT_FAILED]: 'Le paiement a échoué. Vérifiez votre solde.',
+  [MovaErrorCode.PAYMENT_FAILED]:
+    'Le paiement ou la recharge a échoué. Réessayez ou contactez le support SENGA.',
   [MovaErrorCode.PAYMENT_INSUFFICIENT_BALANCE]: 'Solde insuffisant dans votre portefeuille.',
   [MovaErrorCode.PAYMENT_INVALID_METHOD]: 'Méthode de paiement non supportée.',
   [MovaErrorCode.PAYMENT_PHONE_REQUIRED]:

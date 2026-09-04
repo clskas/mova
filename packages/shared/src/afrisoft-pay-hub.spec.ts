@@ -101,4 +101,33 @@ describe('afrisoft-pay-hub', () => {
     expect(body.telecom).toBe('OM');
     expect(body.amount_cdf).toBe(500);
   });
+
+  it('reads nested Nest error.message when hub returns 502', async () => {
+    const env: Record<string, string> = {
+      PAY_HUB_URL: 'https://pay.afri-soft.com',
+      AFRISOFT_HUB_APP_ID: 'senga',
+      AFRISOFT_HUB_API_KEY: 'test-key',
+    };
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 502,
+      json: async () => ({
+        success: false,
+        error: {
+          code: 'MOVA_INT_001',
+          message:
+            'Authentification marchand SerdiPay refusée. Recharge / paiement Mobile Money temporairement indisponible — contactez le support SENGA.',
+        },
+      }),
+    }) as unknown as typeof fetch;
+
+    const result = await afrisoftPayHubInitiate((k) => env[k], {
+      amountCdf: 1000,
+      phone: '+243970000001',
+      operator: 'ORANGE_MONEY',
+      purpose: 'topup',
+    });
+    expect(result.success).toBe(false);
+    expect(result.message).toMatch(/Authentification marchand SerdiPay/i);
+  });
 });

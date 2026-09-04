@@ -158,8 +158,13 @@ export class HubPaymentsService {
     }
 
     if (!mm.success) {
+      const reason =
+        mm.message?.trim() ||
+        (kind === 'PAYOUT'
+          ? 'Retrait Mobile Money échoué.'
+          : 'Recharge / encaissement Mobile Money échoué.');
       throw new HttpException(
-        { message: mm.message ?? 'Échec initiation Mobile Money', code: 'HUB_PROVIDER_FAILED' },
+        { message: reason, code: 'HUB_PROVIDER_FAILED' },
         HttpStatus.BAD_GATEWAY,
       );
     }

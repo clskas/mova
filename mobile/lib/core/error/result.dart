@@ -31,7 +31,7 @@ class NoDriversFailure extends MovaFailure {
 class PaymentFailure extends MovaFailure {
   const PaymentFailure([
     super.message =
-        'Le paiement a échoué. Vérifiez votre solde.',
+        'Le paiement ou la recharge a échoué. Réessayez ou contactez le support SENGA.',
   ]);
 }
 

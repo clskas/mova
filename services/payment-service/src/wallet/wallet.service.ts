@@ -13,6 +13,7 @@ import {
   isAfrisoftHubAsyncRef,
   isAfrisoftPayHubClientConfigured,
   isAfrisoftPayHubMode,
+  SERDIPAY_MIN_AMOUNT_CDF,
   type MobileMoneyOperator,
 } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
@@ -454,8 +455,13 @@ export class WalletService {
 
   async topUp(userId: string, amountCdf: number, provider: string, phone?: string) {
     this.assertPositiveIntAmount(amountCdf, 'Montant de recharge');
-    if (amountCdf < 500) {
-      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Montant minimum : 500 FC.');
+    // SerdiPay Public API floor (402 below min) — see SERDIPAY_MIN_AMOUNT_CDF.
+    if (amountCdf < SERDIPAY_MIN_AMOUNT_CDF) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        undefined,
+        `Montant minimum : ${SERDIPAY_MIN_AMOUNT_CDF.toLocaleString('fr-FR')} FC (contrainte Mobile Money).`,
+      );
     }
     await this.acquireTopUpLock(userId, amountCdf);
     const providerKey = (provider ?? '').trim().toUpperCase();
@@ -623,8 +629,12 @@ export class WalletService {
     if (!normalizedPhone) {
       throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Numéro Mobile Money requis.');
     }
-    if (amountCdf < 500) {
-      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Montant minimum : 500 FC.');
+    if (amountCdf < SERDIPAY_MIN_AMOUNT_CDF) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        undefined,
+        `Montant minimum : ${SERDIPAY_MIN_AMOUNT_CDF.toLocaleString('fr-FR')} FC (contrainte Mobile Money).`,
+      );
     }
 
     const reference = afrisoftHubReference('senga', 'withdraw', randomUUID());

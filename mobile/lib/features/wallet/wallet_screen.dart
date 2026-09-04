@@ -191,9 +191,9 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
   }
 
   Future<void> _showWithdrawSheet() async {
-    if (_balance < 500) {
+    if (_balance < 2300) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Solde insuffisant — minimum 500 FC pour retirer')),
+        const SnackBar(content: Text('Solde insuffisant — minimum 2 300 FC pour retirer')),
       );
       return;
     }
@@ -425,7 +425,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                   icon: Icons.arrow_upward,
                   isSecondary: true,
                   isLoading: _withdrawLoading,
-                  onPressed: _withdrawLoading || _topUpLoading || _loading || _balance < 500
+                  onPressed: _withdrawLoading || _topUpLoading || _loading || _balance < 2300
                       ? null
                       : _showWithdrawSheet,
                 ),
@@ -672,9 +672,9 @@ class _WalletWithdrawSheetState extends State<_WalletWithdrawSheet> {
 
   void _confirm() {
     final amount = int.tryParse(_amountController.text.trim()) ?? 0;
-    if (amount < 500) {
+    if (amount < 2300) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Montant minimum : 500 FC')),
+        const SnackBar(content: Text('Montant minimum : 2 300 FC')),
       );
       return;
     }
@@ -791,9 +791,9 @@ class _WalletTopUpSheetState extends State<_WalletTopUpSheet> {
 
   void _confirm() {
     final amount = int.tryParse(_amountController.text.trim()) ?? 0;
-    if (amount < 500) {
+    if (amount < 2300) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Montant minimum : 500 FC')),
+        const SnackBar(content: Text('Montant minimum : 2 300 FC')),
       );
       return;
     }

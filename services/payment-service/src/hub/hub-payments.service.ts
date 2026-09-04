@@ -163,9 +163,11 @@ export class HubPaymentsService {
         (kind === 'PAYOUT'
           ? 'Retrait Mobile Money échoué.'
           : 'Recharge / encaissement Mobile Money échoué.');
+      this.logger.warn(`Hub ${kind} provider failed app=${appId} ref=${dto.reference}: ${reason}`);
+      // 400 (not 502): Nest filter maps ≥500 → MOVA_INT_001 and hides provider copy.
       throw new HttpException(
         { message: reason, code: 'HUB_PROVIDER_FAILED' },
-        HttpStatus.BAD_GATEWAY,
+        HttpStatus.BAD_REQUEST,
       );
     }
 

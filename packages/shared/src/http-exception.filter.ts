@@ -123,16 +123,26 @@ export class HttpExceptionFilter implements ExceptionFilter {
       const body = exception.getResponse();
       const rawMessage = extractHttpMessage(body);
       const message = toPublicHttpMessage(rawMessage, status);
+      const bodyCode =
+        typeof body === 'object' &&
+        body !== null &&
+        typeof (body as { code?: unknown }).code === 'string'
+          ? (body as { code: string }).code
+          : undefined;
       const code =
-        status === HttpStatus.NOT_FOUND
-          ? MovaErrorCode.NOT_FOUND
-          : status === HttpStatus.UNAUTHORIZED
-            ? MovaErrorCode.AUTH_UNAUTHORIZED
-            : status === HttpStatus.FORBIDDEN
-              ? MovaErrorCode.AUTH_FORBIDDEN
-              : status >= 500
-                ? MovaErrorCode.INTERNAL_ERROR
-                : MovaErrorCode.VALIDATION_ERROR;
+        bodyCode && bodyCode.startsWith('MOVA_')
+          ? bodyCode
+          : status === HttpStatus.NOT_FOUND
+            ? MovaErrorCode.NOT_FOUND
+            : status === HttpStatus.UNAUTHORIZED
+              ? MovaErrorCode.AUTH_UNAUTHORIZED
+              : status === HttpStatus.FORBIDDEN
+                ? MovaErrorCode.AUTH_FORBIDDEN
+                : status >= 500
+                  ? MovaErrorCode.INTERNAL_ERROR
+                  : bodyCode === 'HUB_PROVIDER_FAILED'
+                    ? MovaErrorCode.PAYMENT_FAILED
+                    : MovaErrorCode.VALIDATION_ERROR;
       if (status >= 500) this.logger.error(`${tag}${code}: ${rawMessage}`, exception);
       else this.logger.warn(`${tag}${code}: ${rawMessage}`);
       return response.status(status).json({

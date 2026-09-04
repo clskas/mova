@@ -447,7 +447,7 @@ Voir aussi `deploy/afrisoft-pay/.env.example`, `config/external-apis.env.example
 
 **Production SerdiPay (août 2026) :** le hub VPS pointe vers `https://serdipay.com` (`SERDIPAY_BASE_URL`) avec `MOCK_PAYMENTS=false` et les clés de la fiche *SerdipayAPIKey*. `https://apis.serdipay.com` n’est **pas** dans le PDF ni le Word — ne plus l’utiliser. Staging Word : `https://api.serdipay.cloud` (hôte distinct ; actuellement 500).
 
-Le PDF « API USSD - documentation » contient **deux** produits : (1) **Public API** (pp. 1–15) — Mobile Money marchand, ce que le Word documente et ce que le hub appelle ; (2) **SERDIPAY USSD** (pp. 16–25) — dépôt/retrait wallet `{ username, account }`, endpoints non fournis (« Share the Endpoint »). `get-token` Public API : `POST {BASE}/api/public-api/v1/merchant/get-token` avec `{ email, password }` (un champ `username` seul → 400 `email required`). Fiche Word : C2B = `payment-merchant`, B2C = `payment-client`. Pas de sandbox dans ces deux fichiers : un C2B réel (≥ 500 FC SENGA) est le test suivant une fois `get-token` en 200.
+Le PDF « API USSD - documentation » contient **deux** produits : (1) **Public API** (pp. 1–15) — Mobile Money marchand, ce que le Word documente et ce que le hub appelle ; (2) **SERDIPAY USSD** (pp. 16–25) — dépôt/retrait wallet `{ username, account }`, endpoints non fournis (« Share the Endpoint »). `get-token` Public API : `POST {BASE}/api/public-api/v1/merchant/get-token` avec `{ email, password }` (un champ `username` seul → 400 `email required`). Fiche Word : C2B = `payment-merchant`, B2C = `payment-client`. Pas de sandbox dans ces deux fichiers : un C2B réel (≥ 2 300 FC — plancher SerdiPay production) est le test suivant une fois `get-token` en 200.
 
 **Checklist VPS (copier-coller) — ne pas committer les valeurs :**
 
@@ -489,7 +489,7 @@ curl -sS https://pay.afri-soft.com/health
 - [x] Endpoints `/v1/*` + HMAC `app_id` + webhook sortant vers SENGA  
 - [x] Credentials marchand SerdiPay posés sur le VPS hub (prod `https://serdipay.com`)  
 - [ ] `get-token` prod accepté par SerdiPay (encore 400 « Failed to get the token » — **reconfirmé 2026-09-04** malgré statut ACTIVE annoncé)  
-- [ ] Test C2B réel ≥ 500 FC (OM / MP / AM) une fois le token 200
+- [ ] Test C2B réel ≥ 2 300 FC (OM / MP / AM) une fois le token 200
 - [ ] Flutter : ouvrir `paymentUrl` CinetPay  
 
 ---

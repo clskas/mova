@@ -29,6 +29,13 @@
 export const SMS_UNAVAILABLE_USER_MESSAGE =
   "Impossible d'envoyer le code par SMS. Réessayez dans quelques minutes.";
 
+/**
+ * SerdiPay Public API C2B/B2C floor (402 when below).
+ * SENGA previously used 500 FC; production merchant rejects under 2300 CDF.
+ */
+export const SERDIPAY_MIN_AMOUNT_CDF = 2300;
+export const SERDIPAY_MAX_AMOUNT_CDF = 5_750_000;
+
 export const SERDIPAY_ENV_KEYS = {
   baseUrl: 'SERDIPAY_BASE_URL',
   /** Merchant portal login email (get-token). Alias: SERDIPAY_CLIENT_ID */
@@ -212,6 +219,34 @@ export function mapSerdiPayTokenFailure(status: number, raw?: string): string {
   }
   if (msg && msg.length <= 160 && !/^https?:\/\//i.test(msg)) return msg;
   return `Échec auth SerdiPay (${status || 'réseau'}). Réessayez plus tard.`;
+}
+
+/** Prefer SerdiPay `error` detail over generic `message` ("Failed to process the payment"). */
+export function mapSerdiPayPaymentFailure(
+  status: number,
+  message?: string,
+  error?: string,
+  description?: string,
+): string {
+  const detail = (error ?? '').trim() || (description ?? '').trim() || (message ?? '').trim();
+  const lower = detail.toLowerCase();
+  const range = lower.match(/min\s*:\s*(\d+)\s*-\s*max\s*:\s*(\d+)/i);
+  if (lower.includes('not within allowed range') || (status === 402 && range)) {
+    const min = range?.[1] ? Number(range[1]) : SERDIPAY_MIN_AMOUNT_CDF;
+    const max = range?.[2] ? Number(range[2]) : SERDIPAY_MAX_AMOUNT_CDF;
+    return `Montant hors plage Mobile Money : minimum ${min.toLocaleString('fr-FR')} FC, maximum ${max.toLocaleString('fr-FR')} FC.`;
+  }
+  if (lower.includes('failed to process the payment') && !error?.trim()) {
+    return 'Le paiement Mobile Money a été refusé. Vérifiez le montant (≥ 2 300 FC) et réessayez.';
+  }
+  if (detail && detail.length <= 180 && !/^https?:\/\//i.test(detail)) {
+    // Keep French as-is; translate common English shells.
+    if (/^failed to process the payment$/i.test(detail)) {
+      return 'Le paiement Mobile Money a été refusé. Vérifiez le montant (≥ 2 300 FC) et réessayez.';
+    }
+    return detail;
+  }
+  return `Échec paiement SerdiPay (${status || 'réseau'}). Réessayez plus tard.`;
 }
 
 /** Merchant get-token → Bearer access_token. */
@@ -444,11 +479,12 @@ async function postMerchantPayment(
         success: false,
         transactionId: '',
         providerRef: '',
-        message:
-          data.message ??
-          data.error ??
-          data.description ??
-          `Échec paiement SerdiPay (${res.status})`,
+        message: mapSerdiPayPaymentFailure(
+          res.status,
+          data.message,
+          data.error,
+          data.description,
+        ),
       };
     }
 

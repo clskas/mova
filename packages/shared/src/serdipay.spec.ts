@@ -1,4 +1,7 @@
 import {
+  mapSerdiPayPaymentFailure,
+  mapSerdiPayTokenFailure,
+  SERDIPAY_MIN_AMOUNT_CDF,
   __resetSerdiPayTokenCache,
   isSerdiPayAuthConfigured,
   isSerdiPayPaymentConfigured,
@@ -200,6 +203,57 @@ describe('serdipay Public API', () => {
     expect(result.message).toMatch(/Impossible d'envoyer le code par SMS/);
     expect(result.message).not.toMatch(/SERDIPAY_/);
     expect(isSerdiPaySmsConfigured(get)).toBe(false);
+  });
+
+  it('maps SerdiPay 402 amount-range errors to French min/max copy', () => {
+    expect(SERDIPAY_MIN_AMOUNT_CDF).toBe(2300);
+    expect(
+      mapSerdiPayPaymentFailure(
+        402,
+        'Failed to process the payment',
+        'Payment Failed, The amount is not within allowed range! min: 2300 -  max : 5750000 CDF',
+      ),
+    ).toMatch(/minimum 2[\s\u202f]?300 FC/i);
+    expect(mapSerdiPayPaymentFailure(402, 'Failed to process the payment')).toMatch(/2[\s\u202f]?300/);
+  });
+
+  it('maps get-token failures away from debit-style solde copy', () => {
+    expect(mapSerdiPayTokenFailure(400, 'Failed to get the token')).toMatch(/Authentification marchand/);
+  });
+
+  it('surfaces SerdiPay C2B 402 amount detail instead of generic Failed to process', async () => {
+    env.SERDIPAY_EMAIL = 'm@example.com';
+    env.SERDIPAY_PASSWORD = 'portal-pw';
+    env.SERDIPAY_API_ID = 'APIX';
+    env.SERDIPAY_MERCHANT_CODE = '466551';
+    env.SERDIPAY_MERCHANT_PIN = '1234';
+
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ access_token: 'tok-abc' }),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 402,
+        json: async () => ({
+          message: 'Failed to process the payment',
+          error: 'Payment Failed, The amount is not within allowed range! min: 2300 -  max : 5750000 CDF',
+        }),
+      });
+    (global as unknown as { fetch: typeof fetch }).fetch = fetchMock as unknown as typeof fetch;
+
+    const result = await serdiPayInitiateMobileMoney(get, {
+      operator: 'ORANGE_MONEY',
+      amountCdf: 500,
+      phone: '+243970000001',
+      reference: 'senga_topup_test',
+    });
+    expect(result.success).toBe(false);
+    expect(result.message).toMatch(/minimum 2[\s\u202f]?300 FC/i);
+    expect(result.message).not.toMatch(/Failed to process/i);
   });
 
   it('posts SMS body per sms-api.pdf (apiId, apiKey, phone, senderId, text)', async () => {

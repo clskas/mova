@@ -271,11 +271,17 @@ export function assertProductionSecurity(serviceName = 'service'): void {
   }
 
   if (serviceName === 'payment-service') {
-    const authUrl = (process.env.AUTH_SERVICE_URL ?? '').trim();
-    if (!authUrl || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/?$/i.test(authUrl)) {
-      throw new Error(
-        `[${serviceName}] AUTH_SERVICE_URL must point to mova-auth in production (not localhost). Payment JWT revalidation requires it.`,
-      );
+    // VPS AfriSoft pay hub talks SerdiPay via HMAC apps; JWT revalidation is for SENGA
+    // Render mova-payment (client of the hub), not required when AFRISOFT_PAY_HUB_MODE=true.
+    const hubMode = (process.env.AFRISOFT_PAY_HUB_MODE ?? '').trim().toLowerCase();
+    const isHub = hubMode === 'true' || hubMode === '1' || hubMode === 'yes';
+    if (!isHub) {
+      const authUrl = (process.env.AUTH_SERVICE_URL ?? '').trim();
+      if (!authUrl || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/?$/i.test(authUrl)) {
+        throw new Error(
+          `[${serviceName}] AUTH_SERVICE_URL must point to mova-auth in production (not localhost). Payment JWT revalidation requires it.`,
+        );
+      }
     }
   }
 

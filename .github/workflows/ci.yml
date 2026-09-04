@@ -199,19 +199,25 @@ jobs:
       - name: npm audit (shared + gateway)
         run: |
           set -euo pipefail
-          # Retry only transient registry/audit-endpoint failures (e.g. 503).
-          # Real critical findings still fail the job; high remains warning-only.
+          # Retry only transient registry/audit-endpoint failures (e.g. 503 / hung audit).
+          # Critical findings still fail the job. High remains warning-only (never blocks),
+          # including when the registry is unavailable — matches prior non-blocking high policy.
           npm_audit_retry() {
             local level="$1"
             local label="$2"
             local soft_high="${3:-0}"
+            # High is advisory-only: fewer retries. Critical gets more attempts before failing CI.
             local max_attempts=5
+            if [ "$soft_high" = "1" ]; then
+              max_attempts=2
+            fi
             local attempt=1
             local out rc delay
+            local per_try=120
             while [ "$attempt" -le "$max_attempts" ]; do
               set +e
-              # Cap each attempt so a hung audit endpoint cannot stall the job for many minutes.
-              out="$(timeout 90s npm audit --audit-level="$level" 2>&1)"
+              # Cap each attempt so a hung audit endpoint cannot stall the job indefinitely.
+              out="$(timeout "${per_try}s" npm audit --audit-level="$level" 2>&1)"
               rc=$?
               set -e
               printf '%s\n' "$out"
@@ -219,7 +225,7 @@ jobs:
                 return 0
               fi
               if [ "$rc" -eq 124 ] || printf '%s' "$out" | grep -qiE '503|Service Unavailable|ECONNRESET|ETIMEDOUT|ENOTFOUND|audit endpoint returned an error'; then
-                delay=$((attempt * 15))
+                delay=$((attempt * 10))
                 echo "::warning::npm audit ${level} transient registry failure (${label}, attempt ${attempt}/${max_attempts}, rc=${rc}); retry in ${delay}s"
                 sleep "$delay"
                 attempt=$((attempt + 1))
@@ -231,6 +237,10 @@ jobs:
               fi
               return "$rc"
             done
+            if [ "$soft_high" = "1" ]; then
+              echo "::warning::npm audit high skipped after ${max_attempts} transient failures (${label}); not blocking CI"
+              return 0
+            fi
             echo "::error::npm audit ${level} failed after ${max_attempts} attempts due to registry unavailability (${label})"
             return 1
           }

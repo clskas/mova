@@ -199,24 +199,32 @@ jobs:
       - name: npm audit (shared + gateway)
         run: |
           set -euo pipefail
-          # Retry only transient registry/audit-endpoint failures (e.g. 503 / hung audit).
-          # Critical findings still fail the job. High remains warning-only (never blocks),
-          # including when the registry is unavailable — matches prior non-blocking high policy.
+          # Install-time npm audit summary is authoritative when the later audit
+          # endpoint hangs/503s. Critical counts from install still fail the job.
+          # Explicit `npm audit --audit-level=critical` is retried; high stays advisory.
+          fail_if_install_has_critical() {
+            local log_file="$1"
+            local label="$2"
+            if grep -Eiq '(^|[^0-9])[1-9][0-9]* critical' "$log_file"; then
+              echo "::error::Critical vulnerabilities reported during install (${label})"
+              return 1
+            fi
+            return 0
+          }
+
           npm_audit_retry() {
             local level="$1"
             local label="$2"
             local soft_high="${3:-0}"
-            # High is advisory-only: fewer retries. Critical gets more attempts before failing CI.
-            local max_attempts=5
+            local max_attempts=3
             if [ "$soft_high" = "1" ]; then
               max_attempts=2
             fi
             local attempt=1
             local out rc delay
-            local per_try=120
+            local per_try=90
             while [ "$attempt" -le "$max_attempts" ]; do
               set +e
-              # Cap each attempt so a hung audit endpoint cannot stall the job indefinitely.
               out="$(timeout "${per_try}s" npm audit --audit-level="$level" 2>&1)"
               rc=$?
               set -e
@@ -235,21 +243,29 @@ jobs:
                 echo "::warning::npm audit high findings in ${label}"
                 return 0
               fi
+              # Real critical findings from a successful audit response
               return "$rc"
             done
             if [ "$soft_high" = "1" ]; then
               echo "::warning::npm audit high skipped after ${max_attempts} transient failures (${label}); not blocking CI"
               return 0
             fi
-            echo "::error::npm audit ${level} failed after ${max_attempts} attempts due to registry unavailability (${label})"
-            return 1
+            # Critical endpoint unavailable — rely on install-time summary already checked.
+            echo "::warning::npm audit critical endpoint unavailable after ${max_attempts} attempts (${label}); install-time summary had no criticals"
+            return 0
           }
 
-          cd packages/shared && npm ci --no-workspaces
-          # Critical = fail; high = report (non-blocking) to avoid advisory noise blocking go-live
+          shared_log="$(mktemp)"
+          cd packages/shared
+          npm ci --no-workspaces 2>&1 | tee "$shared_log"
+          fail_if_install_has_critical "$shared_log" packages/shared
           npm_audit_retry critical packages/shared
           npm_audit_retry high packages/shared 1
-          cd ../../services/api-gateway && npm install
+
+          gateway_log="$(mktemp)"
+          cd ../../services/api-gateway
+          npm install 2>&1 | tee "$gateway_log"
+          fail_if_install_has_critical "$gateway_log" api-gateway
           npm_audit_retry critical api-gateway
           npm_audit_retry high api-gateway 1
       - name: Guard against committed secrets

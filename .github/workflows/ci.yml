@@ -198,14 +198,49 @@ jobs:
           node-version: '22'
       - name: npm audit (shared + gateway)
         run: |
-          set -e
+          set -euo pipefail
+          # Retry only transient registry/audit-endpoint failures (e.g. 503).
+          # Real critical findings still fail the job; high remains warning-only.
+          npm_audit_retry() {
+            local level="$1"
+            local label="$2"
+            local soft_high="${3:-0}"
+            local max_attempts=5
+            local attempt=1
+            local out rc delay
+            while [ "$attempt" -le "$max_attempts" ]; do
+              set +e
+              out="$(npm audit --audit-level="$level" 2>&1)"
+              rc=$?
+              set -e
+              printf '%s\n' "$out"
+              if [ "$rc" -eq 0 ]; then
+                return 0
+              fi
+              if printf '%s' "$out" | grep -qiE '503|Service Unavailable|ECONNRESET|ETIMEDOUT|ENOTFOUND|audit endpoint returned an error'; then
+                delay=$((attempt * 20))
+                echo "::warning::npm audit ${level} transient registry failure (${label}, attempt ${attempt}/${max_attempts}); retry in ${delay}s"
+                sleep "$delay"
+                attempt=$((attempt + 1))
+                continue
+              fi
+              if [ "$soft_high" = "1" ]; then
+                echo "::warning::npm audit high findings in ${label}"
+                return 0
+              fi
+              return "$rc"
+            done
+            echo "::error::npm audit ${level} failed after ${max_attempts} attempts due to registry unavailability (${label})"
+            return 1
+          }
+
           cd packages/shared && npm ci --no-workspaces
           # Critical = fail; high = report (non-blocking) to avoid advisory noise blocking go-live
-          npm audit --audit-level=critical
-          npm audit --audit-level=high || echo "::warning::npm audit high findings in packages/shared"
+          npm_audit_retry critical packages/shared
+          npm_audit_retry high packages/shared 1
           cd ../../services/api-gateway && npm install
-          npm audit --audit-level=critical
-          npm audit --audit-level=high || echo "::warning::npm audit high findings in api-gateway"
+          npm_audit_retry critical api-gateway
+          npm_audit_retry high api-gateway 1
       - name: Guard against committed secrets
         run: |
           set -euo pipefail

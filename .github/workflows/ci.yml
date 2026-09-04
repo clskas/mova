@@ -210,16 +210,17 @@ jobs:
             local out rc delay
             while [ "$attempt" -le "$max_attempts" ]; do
               set +e
-              out="$(npm audit --audit-level="$level" 2>&1)"
+              # Cap each attempt so a hung audit endpoint cannot stall the job for many minutes.
+              out="$(timeout 90s npm audit --audit-level="$level" 2>&1)"
               rc=$?
               set -e
               printf '%s\n' "$out"
               if [ "$rc" -eq 0 ]; then
                 return 0
               fi
-              if printf '%s' "$out" | grep -qiE '503|Service Unavailable|ECONNRESET|ETIMEDOUT|ENOTFOUND|audit endpoint returned an error'; then
-                delay=$((attempt * 20))
-                echo "::warning::npm audit ${level} transient registry failure (${label}, attempt ${attempt}/${max_attempts}); retry in ${delay}s"
+              if [ "$rc" -eq 124 ] || printf '%s' "$out" | grep -qiE '503|Service Unavailable|ECONNRESET|ETIMEDOUT|ENOTFOUND|audit endpoint returned an error'; then
+                delay=$((attempt * 15))
+                echo "::warning::npm audit ${level} transient registry failure (${label}, attempt ${attempt}/${max_attempts}, rc=${rc}); retry in ${delay}s"
                 sleep "$delay"
                 attempt=$((attempt + 1))
                 continue

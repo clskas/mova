@@ -119,8 +119,35 @@ abstract final class MockData {
     return currentUser();
   }
 
+  static Map<String, dynamic> nearbyVehicles(Map<String, String> query) {
+    final type = MarketConfig.normalizeVehicleType(query['vehicleType'] ?? 'MOTO_TAXI');
+    final lat = double.tryParse(query['lat'] ?? '') ?? MarketConfig.defaultLat;
+    final lng = double.tryParse(query['lng'] ?? '') ?? MarketConfig.defaultLng;
+    final moto = type == 'MOTO_TAXI';
+    return {
+      'vehicleType': moto ? 'MOTO' : 'STANDARD',
+      'count': 2,
+      'vehicles': [
+        {
+          'lat': lat + 0.002,
+          'lng': lng + 0.0015,
+          'vehicleType': moto ? 'MOTO' : 'STANDARD',
+          'distanceKm': 0.4,
+        },
+        {
+          'lat': lat - 0.0015,
+          'lng': lng + 0.0025,
+          'vehicleType': moto ? 'MOTO' : 'STANDARD',
+          'distanceKm': 0.7,
+        },
+      ],
+    };
+  }
+
   static Map<String, dynamic> estimate([Map<String, dynamic>? body]) {
-    final vehicleType = body?['vehicleType']?.toString() ?? 'MOTO_TAXI';
+    final vehicleType = MarketConfig.normalizeVehicleType(
+      body?['vehicleType']?.toString() ?? 'MOTO_TAXI',
+    );
     final distanceKm = 3.2;
     final durationMin = 12.0;
     final base = switch (vehicleType) {
@@ -267,6 +294,44 @@ abstract final class MockData {
     }
 
     return out.take(12).toList();
+  }
+
+  static List<Map<String, dynamic>> geoPlaces({
+    String? city,
+    String? category,
+    double? lat,
+    double? lng,
+  }) {
+    final focus = city != null && city.trim().isNotEmpty
+        ? ServiceAreas.byName(city.trim())
+        : (lat != null && lng != null ? ServiceAreas.nearest(LatLng(lat, lng)) : null);
+    final areas = [
+      if (focus != null) focus,
+      ...ServiceAreas.all.where((a) => focus == null || a.id != focus.id).take(3),
+    ];
+    const templates = <(String, String, double, double)>[
+      ('MARKET', 'Marché', 0.004, 0.003),
+      ('HOSPITAL', 'Hôpital Général', -0.003, 0.002),
+      ('UNIVERSITY', 'Université de', 0.002, -0.004),
+      ('PHARMACY', 'Pharmacie Centre', 0, 0),
+    ];
+    final out = <Map<String, dynamic>>[];
+    for (final area in areas) {
+      for (final t in templates) {
+        if (category != null && t.$1 != category) continue;
+        out.add({
+          'id': 'mock-${area.id}-${t.$1}',
+          'name': '${t.$2} ${area.name}',
+          'category': t.$1,
+          'lat': area.center.latitude + t.$3,
+          'lng': area.center.longitude + t.$4,
+          'city': area.name,
+          'address': '${area.name}, RDC',
+          'source': 'MOCK',
+        });
+      }
+    }
+    return out;
   }
 
   static List<Map<String, dynamic>> communes() =>

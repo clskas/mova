@@ -182,15 +182,63 @@ class MarketConfig {
     VehicleTypeOption(id: 'VIP', label: 'VIP', icon: '👑'),
   ];
 
+  static const vehicleCategories = [
+    VehicleTypeOption(id: 'MOTO', label: 'Moto', icon: '🏍️'),
+    VehicleTypeOption(id: 'TAXI', label: 'Taxi', icon: '🚗'),
+  ];
+
+  static const _vehicleAliases = {
+    'MOTO': 'MOTO_TAXI',
+    'MOTO_TAXI': 'MOTO_TAXI',
+    'MOTO-TAXI': 'MOTO_TAXI',
+    'BIKE': 'MOTO_TAXI',
+    'MOTORCYCLE': 'MOTO_TAXI',
+    'STANDARD': 'STANDARD',
+    'TAXI': 'STANDARD',
+    'CAR': 'STANDARD',
+    'BERLINE': 'STANDARD',
+    'CONFORT': 'COMFORT',
+    'COMFORT': 'COMFORT',
+    'VIP': 'VIP',
+  };
+
   /// Alias UI / contrat mobile → enum Prisma ride-service (`MOTO_TAXI`, `COMFORT`, …).
-  static String apiVehicleType(String uiType) {
-    switch (uiType.toUpperCase()) {
-      case 'MOTO':
-        return 'MOTO_TAXI';
-      case 'CONFORT':
-        return 'COMFORT';
+  static String normalizeVehicleType(String uiType) {
+    final key = uiType.trim().toUpperCase().replaceAll(RegExp(r'\s+'), '_');
+    if (key.isEmpty) return 'STANDARD';
+    return _vehicleAliases[key] ?? _vehicleAliases[key.replaceAll('-', '_')] ?? key;
+  }
+
+  static String apiVehicleType(String uiType) => normalizeVehicleType(uiType);
+
+  static bool isMotoType(String type) => normalizeVehicleType(type) == 'MOTO_TAXI';
+
+  /// `MOTO` ou `TAXI` — filtre passager Taxi / Moto.
+  static String vehicleCategory(String type) => isMotoType(type) ? 'MOTO' : 'TAXI';
+
+  static String defaultTypeForCategory(String category) =>
+      category.toUpperCase() == 'MOTO' ? 'MOTO_TAXI' : 'STANDARD';
+
+  static List<VehicleTypeOption> vehicleTypesForCategory(String category) {
+    if (category.toUpperCase() == 'MOTO') {
+      return vehicleTypes.where((v) => v.id == 'MOTO_TAXI').toList();
+    }
+    return vehicleTypes.where((v) => v.id != 'MOTO_TAXI').toList();
+  }
+
+  /// Véhicules chauffeur compatibles avec une course (même règle que le backend).
+  static List<String> driverVehicleTypesForRide(String rideType) {
+    switch (normalizeVehicleType(rideType)) {
+      case 'MOTO_TAXI':
+        return const ['MOTO_TAXI'];
+      case 'STANDARD':
+        return const ['STANDARD', 'COMFORT', 'VIP'];
+      case 'COMFORT':
+        return const ['COMFORT', 'VIP'];
+      case 'VIP':
+        return const ['VIP'];
       default:
-        return uiType;
+        return const [];
     }
   }
 

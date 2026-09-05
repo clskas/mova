@@ -304,6 +304,10 @@ class ApiClient {
     if (path.contains('/rides/estimate')) {
       return Success(MockData.estimate(body ?? {}));
     }
+    if (path.contains('/rides/nearby-vehicles') && method == 'GET') {
+      final uri = Uri.parse('http://x$path');
+      return Success(MockData.nearbyVehicles(uri.queryParameters));
+    }
     if (path.contains('/geo/autocomplete')) {
       final uri = Uri.parse('http://x$path');
       final q = uri.queryParameters['q'] ??
@@ -313,6 +317,17 @@ class ApiClient {
     }
     if (path.contains('/geo/communes')) {
       return Success({'data': MockData.communes()});
+    }
+    if (path.contains('/geo/places')) {
+      final uri = Uri.parse('http://x$path');
+      return Success({
+        'data': MockData.geoPlaces(
+          city: uri.queryParameters['city'],
+          category: uri.queryParameters['category'],
+          lat: double.tryParse(uri.queryParameters['lat'] ?? ''),
+          lng: double.tryParse(uri.queryParameters['lng'] ?? ''),
+        ),
+      });
     }
     if (RegExp(r'^/rides/[^/]+/search$').hasMatch(path) && method == 'POST') {
       final id = path.split('/')[2];
@@ -370,7 +385,8 @@ class ApiClient {
         method == 'GET' &&
         path != '/rides/history' &&
         path != '/rides/offers' &&
-        !path.contains('scheduled')) {
+        !path.contains('scheduled') &&
+        !path.contains('nearby-vehicles')) {
       final id = path.split('/').last.split('?').first;
       return Success({'ride': MockData.rideDetail(id)});
     }
@@ -1038,13 +1054,23 @@ class ApiClient {
     }
   }
 
-  Future<Result<List<Map<String, dynamic>>>> geoAutocomplete(String query, {String? city}) async {
+  Future<Result<List<Map<String, dynamic>>>> geoAutocomplete(
+    String query, {
+    String? city,
+    double? lat,
+    double? lng,
+    String? category,
+  }) async {
     if (query.trim().length < 2) return const Success([]);
     await ensureReady();
     final trimmed = query.trim();
     final encoded = Uri.encodeQueryComponent(trimmed);
     final cityParam = city != null ? '&city=${Uri.encodeQueryComponent(city)}' : '';
-    final mock = _mockFor('GET', '/geo/autocomplete?q=$encoded$cityParam', null);
+    final proximityParam =
+        lat != null && lng != null ? '&lat=$lat&lng=$lng' : '';
+    final categoryParam =
+        category != null && category.isNotEmpty ? '&category=$category' : '';
+    final mock = _mockFor('GET', '/geo/autocomplete?q=$encoded$cityParam$proximityParam$categoryParam', null);
     if (mock != null) {
       return switch (mock) {
         Success(:final data) => Success(_mergeGeoSuggestions(
@@ -1079,7 +1105,7 @@ class ApiClient {
       final cParam = cityName != null ? '&city=${Uri.encodeQueryComponent(cityName)}' : '';
       final response = await _client
           .get(
-            Uri.parse('$apiBase/geo/autocomplete?q=$encoded$cParam'),
+            Uri.parse('$apiBase/geo/autocomplete?q=$encoded$cParam$proximityParam$categoryParam'),
             headers: _headers,
           )
           .timeout(const Duration(seconds: 8));
@@ -1132,7 +1158,7 @@ class ApiClient {
 
     addAll(remote);
     addAll(MockData.geoAutocomplete(query, city: city));
-    return merged.take(12).toList();
+    return merged.take(16).toList();
   }
 
   Future<Result<Map<String, dynamic>>> createRide(Map<String, dynamic> body) async {
@@ -1469,7 +1495,7 @@ class ApiClient {
       return List<Map<String, dynamic>>.from(data);
     }
     if (data is Map) {
-      final raw = data['data'] ?? data['items'] ?? data['suggestions'];
+      final raw = data['data'] ?? data['items'] ?? data['suggestions'] ?? data['vehicles'];
       if (raw is List) return List<Map<String, dynamic>>.from(raw);
     }
     return [];
@@ -1485,6 +1511,22 @@ class ApiClient {
 
   Future<Result<Map<String, dynamic>>> volunteerScheduledRide(String scheduledId) async {
     return post('/rides/scheduled/$scheduledId/volunteer', {});
+  }
+
+  Future<Result<List<Map<String, dynamic>>>> nearbyRideVehicles({
+    required double lat,
+    required double lng,
+    required String vehicleType,
+  }) async {
+    final type = Uri.encodeQueryComponent(MarketConfig.apiVehicleType(vehicleType));
+    final result = await get(
+      '/rides/nearby-vehicles?lat=$lat&lng=$lng&vehicleType=$type',
+      skipCache: true,
+    );
+    return switch (result) {
+      Success(:final data) => Success(_extractList(data is Map ? data['vehicles'] : data)),
+      Failure(:final error) => Failure(error),
+    };
   }
 
   Future<Result<Map<String, dynamic>>> searchDrivers(String rideId) async {
@@ -1809,6 +1851,18 @@ class ApiClient {
       'method': method,
       'phone': MarketConfig.normalizePhone(userPhone),
     });
+  }
+
+  Future<Result<Map<String, dynamic>>> confirmDeliveryReceipt(String deliveryId) async {
+    return post('/deliveries/$deliveryId/confirm-receipt', {});
+  }
+
+  Future<Result<Map<String, dynamic>>> confirmErrandReceipt(String errandId) async {
+    return post('/errands/$errandId/confirm-receipt', {});
+  }
+
+  Future<Result<Map<String, dynamic>>> markDeliveryUnreachable(String deliveryId) async {
+    return post('/deliveries/$deliveryId/unreachable', {});
   }
 
   Future<Result<Map<String, dynamic>>> cancelDelivery(String deliveryId) async {

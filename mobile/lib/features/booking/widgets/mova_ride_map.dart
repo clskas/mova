@@ -24,6 +24,7 @@ class MovaRideMap extends StatefulWidget {
     this.dropoffLabel,
     this.places,
     this.placesCategoryFilter,
+    this.nearbyVehicles,
   });
 
   final LatLng pickup;
@@ -34,6 +35,8 @@ class MovaRideMap extends StatefulWidget {
   final List<Map<String, dynamic>>? places;
   /// Filtre catégorie POI (`MARKET`, `HOSPITAL`, …) — null = toutes.
   final String? placesCategoryFilter;
+  /// Chauffeurs à proximité filtrés par type (Taxi / Moto) — pins carte.
+  final List<Map<String, dynamic>>? nearbyVehicles;
   /// Cible d'approche (pickup puis dropoff) — ligne pointillée chauffeur → cible.
   final LatLng? approachTarget;
   /// Recentre la caméra quand le chauffeur se déplace (suivi temps réel).
@@ -316,6 +319,7 @@ class _MovaRideMapState extends State<MovaRideMap> {
                     ),
                   ),
                 ..._poiMarkers(),
+                ..._nearbyVehicleMarkers(),
               ],
             ),
           ],
@@ -346,6 +350,46 @@ class _MovaRideMapState extends State<MovaRideMap> {
         ],
       ),
     );
+  }
+
+  List<Marker> _nearbyVehicleMarkers() {
+    final vehicles = widget.nearbyVehicles;
+    if (vehicles == null || vehicles.isEmpty) return const [];
+    final out = <Marker>[];
+    for (final v in vehicles) {
+      final lat = (v['lat'] as num?)?.toDouble();
+      final lng = (v['lng'] as num?)?.toDouble();
+      if (lat == null || lng == null) continue;
+      if (!MovaRideMap.isFiniteCoord(lat, lng)) continue;
+      final moto = MarketConfig.isMotoType(v['vehicleType']?.toString() ?? '');
+      out.add(
+        Marker(
+          point: LatLng(lat, lng),
+          width: 28,
+          height: 28,
+          child: Container(
+            decoration: BoxDecoration(
+              color: moto ? MovaColors.green : MovaColors.violet,
+              shape: BoxShape.circle,
+              border: Border.all(color: MovaColors.white, width: 1.5),
+              boxShadow: [
+                BoxShadow(
+                  color: MovaColors.midnight.withValues(alpha: 0.2),
+                  blurRadius: 3,
+                  offset: const Offset(0, 1),
+                ),
+              ],
+            ),
+            child: Icon(
+              moto ? Icons.two_wheeler : Icons.local_taxi,
+              color: MovaColors.white,
+              size: 14,
+            ),
+          ),
+        ),
+      );
+    }
+    return out;
   }
 
   List<Marker> _poiMarkers() {

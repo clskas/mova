@@ -66,4 +66,34 @@ describe('PhotonService', () => {
     const service = new PhotonService();
     expect(await service.search('Gombe')).toEqual([]);
   });
+
+  it('searchByCategory sends Photon osm_tag filters and national bbox', async () => {
+    process.env.PHOTON_ENABLED = 'true';
+    jest.spyOn(httpFetch, 'httpGetJson').mockResolvedValue({
+      features: [
+        {
+          properties: {
+            name: 'Hôpital Général de Référence',
+            city: 'Lubumbashi',
+            countrycode: 'CD',
+          },
+          geometry: { coordinates: [27.4794, -11.6647] },
+        },
+      ],
+    });
+
+    const service = new PhotonService();
+    const results = await service.searchByCategory('HOSPITAL', {
+      centerLat: -11.6647,
+      centerLng: 27.4794,
+    });
+    expect(results).toHaveLength(1);
+    expect(results[0].category).toBe('HOSPITAL');
+    expect(results[0].city).toBe('Lubumbashi');
+
+    const calledUrl = (httpFetch.httpGetJson as jest.Mock).mock.calls[0][0] as string;
+    expect(calledUrl).toContain('osm_tag=amenity%3Ahospital');
+    expect(calledUrl).toContain('bbox=12');
+    expect(calledUrl).toContain('lat=-11.6647');
+  });
 });

@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { RDC_TERRITORY_BOUNDS } from '@mova/shared';
 import { httpGetJson } from '../common/http-fetch.util';
+import { resolveDrcProximity } from './drc-proximity';
+import { poiCategorySpec, type PoiCategory } from './poi-category.map';
 
 export type PhotonPlace = {
   label: string;
@@ -11,6 +13,7 @@ export type PhotonPlace = {
   city: string | null;
   osmType?: string;
   osmId?: number;
+  category?: PoiCategory;
 };
 
 type PhotonFeature = {
@@ -56,6 +59,7 @@ export class PhotonService {
       centerLng?: number;
       viewbox?: { minLng: number; minLat: number; maxLng: number; maxLat: number };
       limit?: number;
+      osmTags?: string[];
     },
   ): Promise<PhotonPlace[]> {
     if (!this.enabled) return [];
@@ -70,11 +74,17 @@ export class PhotonService {
       limit: String(Math.min(opts?.limit ?? 5, 10)),
       lang: 'fr',
     });
-
-    if (opts?.centerLat != null && opts?.centerLng != null) {
-      params.set('lat', String(opts.centerLat));
-      params.set('lon', String(opts.centerLng));
+    for (const tag of opts?.osmTags ?? []) {
+      params.append('osm_tag', tag);
     }
+
+    const proximity = resolveDrcProximity({
+      lat: opts?.centerLat,
+      lng: opts?.centerLng,
+      city,
+    });
+    params.set('lat', String(proximity.lat));
+    params.set('lon', String(proximity.lng));
     const viewbox = opts?.viewbox ?? {
       minLng: RDC_TERRITORY_BOUNDS.minLng,
       minLat: RDC_TERRITORY_BOUNDS.minLat,
@@ -103,6 +113,28 @@ export class PhotonService {
     const feature = data?.features?.[0];
     if (!feature) return null;
     return this.mapFeature(feature);
+  }
+
+  /** POI d'une catégorie (tags OSM) — marchés, hôpitaux, universités, pharmacies… */
+  async searchByCategory(
+    category: PoiCategory,
+    opts?: {
+      city?: string;
+      centerLat?: number;
+      centerLng?: number;
+      viewbox?: { minLng: number; minLat: number; maxLng: number; maxLat: number };
+      limit?: number;
+    },
+  ): Promise<PhotonPlace[]> {
+    const spec = poiCategorySpec(category);
+    const query = spec.queries[0];
+    if (!query) return [];
+    const hits = await this.search(query, {
+      ...opts,
+      osmTags: spec.photonTags,
+      limit: opts?.limit ?? 10,
+    });
+    return hits.map((p) => ({ ...p, category: p.category ?? category }));
   }
 
   private mapFeature(feature: PhotonFeature, fallbackCity?: string): PhotonPlace | null {

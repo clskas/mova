@@ -14,31 +14,75 @@ class VehicleEstimate {
   final bool loading;
 }
 
+class VehicleCategoryChips extends StatelessWidget {
+  const VehicleCategoryChips({
+    super.key,
+    required this.category,
+    required this.onSelected,
+  });
+
+  /// `MOTO` ou `TAXI`.
+  final String category;
+  final ValueChanged<String> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        for (final option in MarketConfig.vehicleCategories) ...[
+          if (option.id != MarketConfig.vehicleCategories.first.id) const SizedBox(width: 8),
+          Expanded(
+            child: FilterChip(
+              avatar: Text(option.icon, style: const TextStyle(fontSize: 16)),
+              label: Text(option.label),
+              selected: category == option.id,
+              showCheckmark: false,
+              selectedColor: option.id == 'MOTO'
+                  ? MovaColors.green.withValues(alpha: 0.18)
+                  : MovaColors.violet.withValues(alpha: 0.18),
+              side: BorderSide(
+                color: category == option.id
+                    ? (option.id == 'MOTO' ? MovaColors.green : MovaColors.violet)
+                    : Colors.grey.shade300,
+              ),
+              onSelected: (_) => onSelected(option.id),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
 class VehicleSelector extends StatelessWidget {
   const VehicleSelector({
     super.key,
     required this.selected,
     required this.estimates,
     required this.onSelected,
+    this.types,
   });
 
   final String selected;
   final Map<String, VehicleEstimate> estimates;
   final ValueChanged<String> onSelected;
+  final List<VehicleTypeOption>? types;
 
   @override
   Widget build(BuildContext context) {
+    final options = types ?? MarketConfig.vehicleTypes;
+    if (options.isEmpty) return const SizedBox.shrink();
     return SizedBox(
       height: 124,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),
-        itemCount: MarketConfig.vehicleTypes.length,
+        itemCount: options.length,
         separatorBuilder: (_, __) => const SizedBox(width: 10),
         itemBuilder: (context, index) {
-          final option = MarketConfig.vehicleTypes[index];
+          final option = options[index];
           final estimate = estimates[option.id];
-          final isSelected = selected == option.id;
+          final isSelected = MarketConfig.normalizeVehicleType(selected) == option.id;
           final accentColor = switch (option.id) {
             'MOTO_TAXI' => MovaColors.green,
             'VIP' => MovaColors.orange,

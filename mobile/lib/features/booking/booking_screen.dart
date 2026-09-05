@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
@@ -61,6 +63,9 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   List<Map<String, dynamic>> _poiPlaces = [];
   String? _poiCategoryFilter;
   int _poiLoadGeneration = 0;
+  List<Map<String, dynamic>> _nearbyVehicles = [];
+  int _nearbyLoadGeneration = 0;
+  Timer? _nearbyPollTimer;
 
   static const _poiFilters = [
     (null, 'Tous'),
@@ -81,14 +86,18 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
       _destinationController.text = widget.initialDropoffAddress!.trim();
     }
     if (widget.initialVehicleType != null && widget.initialVehicleType!.trim().isNotEmpty) {
-      _vehicleType = widget.initialVehicleType!.trim();
+      _vehicleType = MarketConfig.normalizeVehicleType(widget.initialVehicleType!);
     }
     if (!movaDisableAutoGps && widget.initialPickupAddress == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _useMyLocation());
     } else {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _loadNearbyPoi());
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _loadNearbyPoi();
+        _loadNearbyVehicles();
+      });
     }
     WidgetsBinding.instance.addPostFrameCallback((_) => _checkUnpaidRide());
+    _nearbyPollTimer = Timer.periodic(const Duration(seconds: 12), (_) => _loadNearbyVehicles());
   }
 
   Future<void> _loadNearbyPoi() async {
@@ -96,9 +105,10 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
     final city = ServiceAreas.cityNameForCoords(_pickup);
     final result = await ref.read(apiClientProvider).geoPlaces(
       city: city,
+      category: _poiCategoryFilter,
       lat: _pickup.latitude,
       lng: _pickup.longitude,
-      radiusKm: 8,
+      radiusKm: _poiCategoryFilter == null ? 8 : 15,
       skipCache: true,
     );
     if (!mounted || generation != _poiLoadGeneration) return;
@@ -146,10 +156,26 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
 
   @override
   void dispose() {
+    _nearbyPollTimer?.cancel();
     _pickupController.dispose();
     _destinationController.dispose();
     _promoController.dispose();
     super.dispose();
+  }
+
+  String get _vehicleCategory => MarketConfig.vehicleCategory(_vehicleType);
+
+  Future<void> _loadNearbyVehicles() async {
+    final generation = ++_nearbyLoadGeneration;
+    final result = await ref.read(apiClientProvider).nearbyRideVehicles(
+          lat: _pickup.latitude,
+          lng: _pickup.longitude,
+          vehicleType: _vehicleType,
+        );
+    if (!mounted || generation != _nearbyLoadGeneration) return;
+    if (result case Success(:final data)) {
+      setState(() => _nearbyVehicles = data);
+    }
   }
 
   String get _autocompleteCity => ServiceAreas.autocompleteCity(
@@ -176,6 +202,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
       _fetchAllEstimates();
     }
     _loadNearbyPoi();
+    _loadNearbyVehicles();
   }
 
   void _onPickupUserInput() {
@@ -278,6 +305,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
       await _fetchAllEstimates();
     }
     await _loadNearbyPoi();
+    await _loadNearbyVehicles();
   }
 
   Future<String?> _resolveCoords() async {
@@ -297,6 +325,8 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
           final result = await api.geoAutocomplete(
             _pickupController.text.trim(),
             city: ServiceAreas.cityNameForCoords(_pickup),
+            lat: _pickup.latitude,
+            lng: _pickup.longitude,
           );
           if (result case Success(:final data) when data.isNotEmpty) {
             final s = data.first;
@@ -352,6 +382,8 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
         final result = await api.geoAutocomplete(
           _destinationController.text.trim(),
           city: ServiceAreas.cityNameForCoords(_pickup),
+          lat: _pickup.latitude,
+          lng: _pickup.longitude,
         );
         if (result case Success(:final data) when data.isNotEmpty) {
           final s = data.first;
@@ -479,15 +511,22 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   }
 
   void _onVehicleSelected(String type) {
+    final normalized = MarketConfig.normalizeVehicleType(type);
     setState(() {
-      _vehicleType = type;
-      _selectedEstimate = _estimateDetails[type];
+      _vehicleType = normalized;
+      _selectedEstimate = _estimateDetails[normalized];
     });
+    _loadNearbyVehicles();
+  }
+
+  void _onCategorySelected(String category) {
+    if (MarketConfig.vehicleCategory(_vehicleType) == category) return;
+    _onVehicleSelected(MarketConfig.defaultTypeForCategory(category));
   }
 
   String _selectedVehicleLabel() {
     for (final v in MarketConfig.vehicleTypes) {
-      if (v.id == _vehicleType) return v.label;
+      if (v.id == MarketConfig.normalizeVehicleType(_vehicleType)) return v.label;
     }
     return _vehicleType;
   }
@@ -600,6 +639,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
           dropoffLabel: _destinationController.text,
           places: _poiPlaces,
           placesCategoryFilter: _poiCategoryFilter,
+          nearbyVehicles: _nearbyVehicles,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -615,7 +655,10 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                     child: FilterChip(
                       label: Text(f.$2),
                       selected: selected,
-                      onSelected: (on) => setState(() => _poiCategoryFilter = on ? f.$1 : null),
+                      onSelected: (on) {
+                        setState(() => _poiCategoryFilter = on ? f.$1 : null);
+                        _loadNearbyPoi();
+                      },
                     ),
                   );
                 }),
@@ -645,6 +688,9 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
               controller: _pickupController,
               api: api,
               city: autocompleteCity,
+              category: _poiCategoryFilter,
+              proximityLat: _pickup.latitude,
+              proximityLng: _pickup.longitude,
               label: 'Départ',
               hint: 'Point de prise en charge',
               prefixIcon: Icons.my_location,
@@ -661,8 +707,11 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
               controller: _destinationController,
               api: api,
               city: autocompleteCity,
+              category: _poiCategoryFilter,
+              proximityLat: _pickup.latitude,
+              proximityLng: _pickup.longitude,
               label: 'Destination',
-              hint: 'Ex: Gombe, Limete, Masina…',
+              hint: 'Ex: Goma, Lubumbashi, Gombe…',
               prefixIcon: Icons.place,
               onUserInput: _onDestinationUserInput,
               onSelected: _onDestinationSuggestionSelected,
@@ -673,13 +722,33 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                     onApply: _setDropoffFromCoords,
                   ),
                   const SizedBox(height: 16),
-                  Text('Choisissez votre véhicule', style: theme.textTheme.titleSmall),
+                  Text('Taxi ou moto', style: theme.textTheme.titleSmall),
                   const SizedBox(height: 8),
-                  VehicleSelector(
-                    selected: _vehicleType,
-                    estimates: _estimates,
-                    onSelected: _onVehicleSelected,
+                  VehicleCategoryChips(
+                    category: _vehicleCategory,
+                    onSelected: _onCategorySelected,
                   ),
+                  if (_nearbyVehicles.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Text(
+                        _vehicleCategory == 'MOTO'
+                            ? '${_nearbyVehicles.length} moto(s) à proximité'
+                            : '${_nearbyVehicles.length} taxi(s) à proximité',
+                        style: const TextStyle(fontSize: 11, color: MovaColors.textSecondary),
+                      ),
+                    ),
+                  if (_vehicleCategory == 'TAXI') ...[
+                    const SizedBox(height: 12),
+                    Text('Gamme', style: theme.textTheme.titleSmall),
+                    const SizedBox(height: 8),
+                    VehicleSelector(
+                      selected: _vehicleType,
+                      estimates: _estimates,
+                      onSelected: _onVehicleSelected,
+                      types: MarketConfig.vehicleTypesForCategory('TAXI'),
+                    ),
+                  ],
                   if (_selectedEstimate != null && total != null) ...[
                     const SizedBox(height: 16),
                     MovaCard(

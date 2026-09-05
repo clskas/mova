@@ -2,9 +2,11 @@ import { Injectable, Logger } from '@nestjs/common';
 import { MapboxPlace, MapboxService } from './mapbox.service';
 import { NominatimPlace, NominatimService } from './nominatim.service';
 import { PhotonPlace, PhotonService } from './photon.service';
+import { poiCategorySpec, type PoiCategory } from './poi-category.map';
 
 export type GeocodePlace = (NominatimPlace | PhotonPlace | MapboxPlace) & {
   provider: 'nominatim' | 'photon' | 'mapbox';
+  category?: PoiCategory;
 };
 
 type GeocodeSearchOpts = {
@@ -14,12 +16,16 @@ type GeocodeSearchOpts = {
   viewbox?: { minLng: number; minLat: number; maxLng: number; maxLat: number };
   bounded?: boolean;
   limit?: number;
+  poiCategory?: PoiCategory;
 };
 
 /**
  * Fournisseur géocodage unifié :
- * 1. Mapbox si MAPBOX_ACCESS_TOKEN (meilleure couverture RDC)
- * 2. Nominatim (OSM) avec repli Photon
+ * 1. Mapbox Search Box (POI + adresses) en parallèle de Photon (OSM)
+ * 2. Nominatim si les deux sont vides
+ *
+ * Ne plus court-circuiter sur le premier hit Mapbox : Geocoding v5 ne
+ * renvoie plus de POI, et même Search Box est lacunaire à Kinshasa.
  */
 @Injectable()
 export class GeocodeProvider {
@@ -38,37 +44,67 @@ export class GeocodeProvider {
   }
 
   async search(query: string, opts?: GeocodeSearchOpts): Promise<GeocodePlace[]> {
-    if (this.mapbox.isConfigured()) {
-      const mapboxHits = await this.mapbox.search(query, {
-        centerLat: opts?.centerLat,
-        centerLng: opts?.centerLng,
-        limit: opts?.limit,
-      });
-      if (mapboxHits.length > 0) {
-        return mapboxHits.map((p) => ({ ...p, provider: 'mapbox' as const }));
-      }
-      this.logger.debug('Mapbox empty — falling back to Nominatim/Photon');
-    }
+    const limit = Math.min(opts?.limit ?? 10, 10);
+    const searchOpts = { ...opts, limit };
 
-    if (this.preferPhoton) {
-      const photonHits = await this.photon.search(query, opts);
-      if (photonHits.length > 0) {
-        return photonHits.map((p) => ({ ...p, provider: 'photon' as const }));
-      }
-    }
+    const mapboxPromise = this.mapbox.isConfigured()
+      ? this.mapbox.search(query, {
+          centerLat: searchOpts.centerLat,
+          centerLng: searchOpts.centerLng,
+          city: searchOpts.city,
+          limit,
+          poiCategory: searchOpts.poiCategory,
+        })
+      : Promise.resolve([] as MapboxPlace[]);
 
-    if (Date.now() >= this.nominatimUnavailableUntil) {
-      const nominatimHits = await this.nominatim.search(query, opts);
-      if (nominatimHits.length > 0) {
-        return nominatimHits.map((p) => ({ ...p, provider: 'nominatim' as const }));
-      }
-      this.markNominatimUnavailable('empty or failed');
-    } else {
-      this.logger.debug('Nominatim circuit open — skipping to Photon');
-    }
+    const photonOsmTags = searchOpts.poiCategory
+      ? poiCategorySpec(searchOpts.poiCategory).photonTags
+      : undefined;
+    const photonPromise = this.withTimeout(
+      this.photon.search(query, { ...searchOpts, osmTags: photonOsmTags }),
+      3500,
+      [],
+    );
 
-    const photonHits = await this.photon.search(query, opts);
-    return photonHits.map((p) => ({ ...p, provider: 'photon' as const }));
+    const [mapboxHits, photonHits] = await Promise.all([mapboxPromise, photonPromise]);
+
+    const merged = this.mergePlaces([
+      ...mapboxHits.map((p) => ({ ...p, provider: 'mapbox' as const })),
+      ...photonHits.map((p) => ({ ...p, provider: 'photon' as const })),
+    ]);
+    if (merged.length > 0) return merged;
+
+    return this.searchNominatim(query, searchOpts);
+  }
+
+  /** Browse POI par catégorie (puces Taxi/Moto) — Mapbox Search Box + Photon OSM. */
+  async searchCategory(
+    category: PoiCategory,
+    opts?: GeocodeSearchOpts,
+  ): Promise<GeocodePlace[]> {
+    const limit = Math.min(opts?.limit ?? 15, 25);
+    const searchOpts = { ...opts, limit };
+
+    const mapboxPromise = this.mapbox.isConfigured()
+      ? this.mapbox.searchCategory(category, {
+          centerLat: searchOpts.centerLat,
+          centerLng: searchOpts.centerLng,
+          city: searchOpts.city,
+          limit,
+        })
+      : Promise.resolve([] as MapboxPlace[]);
+
+    const photonPromise = this.withTimeout(
+      this.photon.searchByCategory(category, searchOpts),
+      3500,
+      [],
+    );
+
+    const [mapboxHits, photonHits] = await Promise.all([mapboxPromise, photonPromise]);
+    return this.mergePlaces([
+      ...mapboxHits.map((p) => ({ ...p, provider: 'mapbox' as const, category: p.category ?? category })),
+      ...photonHits.map((p) => ({ ...p, provider: 'photon' as const, category: p.category ?? category })),
+    ]);
   }
 
   async reverse(lat: number, lng: number): Promise<GeocodePlace | null> {
@@ -85,6 +121,44 @@ export class GeocodeProvider {
 
     const photonPlace = await this.photon.reverse(lat, lng);
     return photonPlace ? { ...photonPlace, provider: 'photon' } : null;
+  }
+
+  private async searchNominatim(query: string, opts?: GeocodeSearchOpts): Promise<GeocodePlace[]> {
+    if (Date.now() < this.nominatimUnavailableUntil) {
+      this.logger.debug('Nominatim circuit open — skipping');
+      return [];
+    }
+    const nominatimHits = await this.nominatim.search(query, opts);
+    if (nominatimHits.length > 0) {
+      return nominatimHits.map((p) => ({ ...p, provider: 'nominatim' as const }));
+    }
+    this.markNominatimUnavailable('empty or failed');
+    return [];
+  }
+
+  private mergePlaces(places: GeocodePlace[]): GeocodePlace[] {
+    const seen = new Set<string>();
+    const out: GeocodePlace[] = [];
+    for (const p of places) {
+      const key = `${p.lat.toFixed(4)},${p.lng.toFixed(4)}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(p);
+    }
+    return out;
+  }
+
+  private async withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<T>((resolve) => {
+      timer = setTimeout(() => resolve(fallback), ms);
+      timer.unref();
+    });
+    try {
+      return await Promise.race([promise, timeout]);
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
   }
 
   private markNominatimUnavailable(reason: string): void {

@@ -5,12 +5,13 @@ import { apiFetch, formatCdf } from "@/lib/api";
 import { toUserErrorMessage } from "@/lib/user-messages";
 import { GeoAutocompleteInput } from "./GeoAutocompleteInput";
 import { PromoCodeInput, promoPayload } from "./PromoCodeInput";
-
-const VEHICLES = [
-  { id: "MOTO_TAXI", label: "Moto-taxi", icon: "🏍️" },
-  { id: "STANDARD", label: "Standard", icon: "🚗" },
-  { id: "COMFORT", label: "Confort", icon: "✨" },
-];
+import {
+  VEHICLE_CATEGORIES,
+  defaultTypeForCategory,
+  normalizeVehicleType,
+  vehicleCategory,
+  vehicleTypesForCategory,
+} from "@/lib/vehicle-type";
 
 type Props = { onBack: () => void; mock: boolean };
 
@@ -39,7 +40,7 @@ export function TaxiBooking({ onBack, mock }: Props) {
           pickupLng: 15.3125,
           dropoffLat: -4.35,
           dropoffLng: 15.35,
-          vehicleType,
+          vehicleType: normalizeVehicleType(vehicleType),
           ...promoPayload(promoCode),
         }),
       }, { useMock: mock });
@@ -64,7 +65,7 @@ export function TaxiBooking({ onBack, mock }: Props) {
           pickupLng: 15.3125,
           dropoffLat: -4.35,
           dropoffLng: 15.35,
-          vehicleType,
+          vehicleType: normalizeVehicleType(vehicleType),
           ...promoPayload(promoCode),
         }),
       }, { useMock: mock });
@@ -156,23 +157,47 @@ export function TaxiBooking({ onBack, mock }: Props) {
 
       <label className="block text-sm font-medium">Destination</label>
       <GeoAutocompleteInput
-        placeholder="Ex: Gombe, Limete, Masina…"
+        placeholder="Ex: Goma, Lubumbashi, Gombe, Kisangani…"
         value={destination}
         onChange={(v) => { setDestination(v); setEstimate(null); }}
       />
 
-      <p className="text-sm font-medium">Type de véhicule</p>
-      {VEHICLES.map((v) => (
-        <label key={v.id} className="flex items-center gap-3 bg-white rounded-xl p-3 shadow-sm cursor-pointer">
-          <input
-            type="radio"
-            name="vehicle"
-            checked={vehicleType === v.id}
-            onChange={() => { setVehicleType(v.id); setEstimate(null); }}
-          />
-          <span>{v.icon} {v.label}</span>
-        </label>
-      ))}
+      <p className="text-sm font-medium">Taxi ou moto</p>
+      <div className="flex gap-2">
+        {VEHICLE_CATEGORIES.map((c) => (
+          <button
+            key={c.id}
+            type="button"
+            className={`flex-1 rounded-xl p-3 text-sm font-medium shadow-sm ${
+              vehicleCategory(vehicleType) === c.id
+                ? "bg-[#6C63FF] text-white"
+                : "bg-white"
+            }`}
+            onClick={() => {
+              setVehicleType(defaultTypeForCategory(c.id));
+              setEstimate(null);
+            }}
+          >
+            {c.icon} {c.label}
+          </button>
+        ))}
+      </div>
+      {vehicleCategory(vehicleType) === "TAXI" && (
+        <>
+          <p className="text-sm font-medium">Gamme</p>
+          {vehicleTypesForCategory("TAXI").map((v) => (
+            <label key={v.id} className="flex items-center gap-3 bg-white rounded-xl p-3 shadow-sm cursor-pointer">
+              <input
+                type="radio"
+                name="vehicle"
+                checked={normalizeVehicleType(vehicleType) === v.id}
+                onChange={() => { setVehicleType(v.id); setEstimate(null); }}
+              />
+              <span>{v.icon} {v.label}</span>
+            </label>
+          ))}
+        </>
+      )}
 
       <PromoCodeInput value={promoCode} onChange={(v) => { setPromoCode(v); setEstimate(null); }} />
 

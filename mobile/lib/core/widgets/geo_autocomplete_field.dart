@@ -24,6 +24,9 @@ class GeoAutocompleteField extends StatefulWidget {
     this.blockedQueries = const {'Ma position'},
     this.textInputAction,
     this.debounceMs = 350,
+    this.proximityLat,
+    this.proximityLng,
+    this.category,
   });
 
   final TextEditingController controller;
@@ -38,6 +41,9 @@ class GeoAutocompleteField extends StatefulWidget {
   final Set<String> blockedQueries;
   final TextInputAction? textInputAction;
   final int debounceMs;
+  final double? proximityLat;
+  final double? proximityLng;
+  final String? category;
 
   @override
   State<GeoAutocompleteField> createState() => _GeoAutocompleteFieldState();
@@ -126,7 +132,7 @@ class _GeoAutocompleteFieldState extends State<GeoAutocompleteField> {
       seen.add(label);
       merged.add(item);
     }
-    return merged.take(12).toList();
+    return merged.take(16).toList();
   }
 
   List<Map<String, dynamic>> _mergeSuggestions(
@@ -141,7 +147,7 @@ class _GeoAutocompleteFieldState extends State<GeoAutocompleteField> {
       seen.add(label);
       merged.add(item);
     }
-    return merged.take(12).toList();
+    return merged.take(16).toList();
   }
 
   void _presentSuggestions(List<Map<String, dynamic>> items) {
@@ -186,7 +192,13 @@ class _GeoAutocompleteFieldState extends State<GeoAutocompleteField> {
   }
 
   Future<void> _fetch(String query, String city, int generation) async {
-    final result = await widget.api.geoAutocomplete(query, city: city);
+    final result = await widget.api.geoAutocomplete(
+      query,
+      city: city,
+      lat: widget.proximityLat,
+      lng: widget.proximityLng,
+      category: widget.category,
+    );
     if (!mounted || generation != _fetchGeneration || !_focusNode.hasFocus) return;
     if (_pendingQuery != query || _normalizeQuery(widget.controller.text) != query) return;
 
@@ -225,7 +237,7 @@ class _GeoAutocompleteFieldState extends State<GeoAutocompleteField> {
       return const SizedBox.shrink();
     }
 
-    final items = _suggestions.take(6).toList();
+    final items = _suggestions.take(10).toList();
 
     return Padding(
       padding: const EdgeInsets.only(top: 4),

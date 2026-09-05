@@ -1,6 +1,5 @@
 import { Controller, Get, HttpStatus, Post, Query, Request, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { PlaceOfInterestCategory } from '@prisma/client';
 import {
   AdminPermission,
   hasAdminPermission,
@@ -9,6 +8,7 @@ import {
 } from '@mova/shared';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { GeoService } from './geo.service';
+import { parsePoiCategory } from './poi-category.map';
 
 @ApiTags('geo')
 @Controller('geo')
@@ -28,9 +28,19 @@ export class GeoController {
   }
 
   @Get('autocomplete')
-  @ApiOperation({ summary: 'Autocomplétion adresses par ville (communes + POI + Nominatim OSM)' })
-  autocomplete(@Query('q') query?: string, @Query('city') city?: string) {
-    return this.geo.autocomplete(query ?? '', city);
+  @ApiOperation({ summary: 'Autocomplétion adresses par ville (communes + POI + Mapbox Search Box / OSM)' })
+  autocomplete(
+    @Query('q') query?: string,
+    @Query('city') city?: string,
+    @Query('lat') lat?: string,
+    @Query('lng') lng?: string,
+    @Query('category') category?: string,
+  ) {
+    const latN = lat != null ? parseFloat(lat) : NaN;
+    const lngN = lng != null ? parseFloat(lng) : NaN;
+    const near =
+      Number.isFinite(latN) && Number.isFinite(lngN) ? { lat: latN, lng: lngN } : undefined;
+    return this.geo.autocomplete(query ?? '', city, near, parsePoiCategory(category));
   }
 
   @Get('reverse')
@@ -45,7 +55,7 @@ export class GeoController {
   @ApiOperation({ summary: 'Points d\'intérêt (marchés, hôpitaux, universités…)' })
   places(
     @Query('city') city?: string,
-    @Query('category') category?: PlaceOfInterestCategory,
+    @Query('category') category?: string,
     @Query('lat') lat?: string,
     @Query('lng') lng?: string,
     @Query('radiusKm') radiusKm?: string,
@@ -53,7 +63,7 @@ export class GeoController {
   ) {
     return this.geo.listPlaces({
       city,
-      category,
+      category: parsePoiCategory(category),
       lat: lat ? parseFloat(lat) : undefined,
       lng: lng ? parseFloat(lng) : undefined,
       radiusKm: radiusKm ? parseFloat(radiusKm) : undefined,

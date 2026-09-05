@@ -1,5 +1,4 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { PlaceOfInterestCategory } from '@prisma/client';
 import {
   DRC_SERVICE_AREAS,
   findServiceAreaByName,
@@ -15,7 +14,9 @@ import {
 import { addressToCoords } from '../common/address.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { CityActivationService } from './city-activation.service';
+import { resolveDrcProximity } from './drc-proximity';
 import { GeocodeProvider } from './geocode.provider';
+import { TAXI_POI_CHIP_CATEGORIES, type PoiCategory } from './poi-category.map';
 import { PoiImportService } from './poi-import.service';
 
 type AutocompleteResult = {
@@ -264,7 +265,12 @@ export class GeoService implements OnModuleInit {
     return this.prisma.commune.update({ where: { id }, data });
   }
 
-  async autocomplete(query: string, city?: string) {
+  async autocomplete(
+    query: string,
+    city?: string,
+    near?: { lat: number; lng: number },
+    category?: PoiCategory,
+  ) {
     const q = query.trim();
     if (q.length < 2) return [] as AutocompleteResult[];
 
@@ -305,7 +311,7 @@ export class GeoService implements OnModuleInit {
       lat: number;
       lng: number;
       city: string;
-      category: PlaceOfInterestCategory;
+      category: PoiCategory;
     }) => {
       push({
         source: 'poi',
@@ -341,7 +347,7 @@ export class GeoService implements OnModuleInit {
       if (areaId) addSeedMatches(areaId, cityName, communeNames);
 
       const pois = await this.prisma.placeOfInterest.findMany({
-        where: { city: cityName },
+        where: { city: cityName, ...(category ? { category } : {}) },
         orderBy: { name: 'asc' },
       });
       for (const p of pois) {
@@ -381,6 +387,7 @@ export class GeoService implements OnModuleInit {
           take: 12,
         }),
         this.prisma.placeOfInterest.findMany({
+          where: category ? { category } : undefined,
           orderBy: { name: 'asc' },
           take: 200,
         }),
@@ -400,17 +407,27 @@ export class GeoService implements OnModuleInit {
       }
     }
 
-    // Toujours enrichir via géocodage externe (Mapbox / Nominatim / Photon)
+    // Toujours enrichir via géocodage externe (Mapbox Search Box / Photon / Nominatim)
     // sur le territoire RDC entier — le catalogue local (communes/POI) ne couvre
     // pas tous les lieux ; l'ancien viewbox ville + bounded=1 masquait le reste du pays.
     const biasArea =
       primaryArea ??
-      DRC_SERVICE_AREAS.find((a) => a.name.toLowerCase() === requestedCity.toLowerCase());
+      DRC_SERVICE_AREAS.find((a) => a.name.toLowerCase() === requestedCity.toLowerCase()) ??
+      (near != null ? DRC_SERVICE_AREAS.find((a) => {
+        const b = a.bounds;
+        return near.lat >= b.minLat && near.lat <= b.maxLat && near.lng >= b.minLng && near.lng <= b.maxLng;
+      }) : undefined);
+    const proximity = resolveDrcProximity({
+      lat: near?.lat,
+      lng: near?.lng,
+      city: requestedCity || biasArea?.name,
+    });
     const geocodeHits = await this.geocodeWithTimeout(
       q,
       {
-        centerLat: biasArea?.centerLat,
-        centerLng: biasArea?.centerLng,
+        city: requestedCity || biasArea?.name,
+        centerLat: proximity.lat,
+        centerLng: proximity.lng,
         viewbox: {
           minLng: RDC_TERRITORY_BOUNDS.minLng,
           minLat: RDC_TERRITORY_BOUNDS.minLat,
@@ -418,7 +435,8 @@ export class GeoService implements OnModuleInit {
           maxLat: RDC_TERRITORY_BOUNDS.maxLat,
         },
         bounded: true,
-        limit: 8,
+        limit: 10,
+        poiCategory: category,
       },
       6000,
     );
@@ -438,10 +456,13 @@ export class GeoService implements OnModuleInit {
         lng: p.lng,
         commune: p.commune ?? p.city,
         city: resolvedCity,
+        category: p.category ?? category,
       });
     }
 
-    return results.slice(0, 12);
+    const local = results.filter((r) => r.source === 'commune' || r.source === 'poi');
+    const remote = results.filter((r) => r.source !== 'commune' && r.source !== 'poi');
+    return [...local.slice(0, 8), ...remote.slice(0, 10)].slice(0, 16);
   }
 
   /** Géocodage externe avec timeout — évite de bloquer l'autocomplete SENGA. */
@@ -454,6 +475,7 @@ export class GeoService implements OnModuleInit {
       viewbox?: { minLng: number; minLat: number; maxLng: number; maxLat: number };
       bounded?: boolean;
       limit?: number;
+      poiCategory?: PoiCategory;
     },
     timeoutMs: number,
   ) {
@@ -542,7 +564,7 @@ export class GeoService implements OnModuleInit {
 
   async listPlaces(opts: {
     city?: string;
-    category?: PlaceOfInterestCategory;
+    category?: PoiCategory;
     lat?: number;
     lng?: number;
     radiusKm?: number;
@@ -553,8 +575,8 @@ export class GeoService implements OnModuleInit {
     if (opts.category) where.category = opts.category;
 
     const hasGps = opts.lat != null && opts.lng != null;
+    const radiusKm = opts.radiusKm ?? (opts.category ? 15 : 8);
     if (hasGps) {
-      const radiusKm = opts.radiusKm ?? 5;
       const latDelta = radiusKm / 111;
       const lngDelta = radiusKm / (111 * Math.cos((opts.lat! * Math.PI) / 180));
       where.lat = { gte: opts.lat! - latDelta, lte: opts.lat! + latDelta };
@@ -569,20 +591,128 @@ export class GeoService implements OnModuleInit {
       take: hasGps ? undefined : limit,
     });
 
-    if (hasGps) {
-      const radiusKm = opts.radiusKm ?? 5;
-      const filtered = rows
-        .map((p) => ({
-          ...p,
-          distanceKm: this.haversineKm(opts.lat!, opts.lng!, p.lat, p.lng),
-        }))
-        .filter((p) => p.distanceKm <= radiusKm)
-        .sort((a, b) => a.distanceKm - b.distanceKm)
-        .slice(0, limit);
-      return filtered.map(({ distanceKm, ...p }) => ({ ...p, distanceKm: Math.round(distanceKm * 100) / 100 }));
-    }
+    const live = await this.fetchLivePlaces(opts, radiusKm, limit);
+    const merged = this.mergePlaceRows(rows, live, {
+      lat: opts.lat,
+      lng: opts.lng,
+      radiusKm: hasGps ? radiusKm : undefined,
+      limit,
+    });
+    return merged;
+  }
 
-    return rows;
+  private async fetchLivePlaces(
+    opts: {
+      city?: string;
+      category?: PoiCategory;
+      lat?: number;
+      lng?: number;
+    },
+    _radiusKm: number,
+    limit: number,
+  ) {
+    const categories = opts.category ? [opts.category] : TAXI_POI_CHIP_CATEGORIES;
+    const proximity = resolveDrcProximity({
+      lat: opts.lat,
+      lng: opts.lng,
+      city: opts.city,
+    });
+    const viewbox = {
+      minLng: RDC_TERRITORY_BOUNDS.minLng,
+      minLat: RDC_TERRITORY_BOUNDS.minLat,
+      maxLng: RDC_TERRITORY_BOUNDS.maxLng,
+      maxLat: RDC_TERRITORY_BOUNDS.maxLat,
+    };
+
+    const batches = await Promise.all(
+      categories.map(async (category) => {
+        try {
+          const hits = await Promise.race([
+            this.geocode.searchCategory(category, {
+              city: opts.city,
+              centerLat: proximity.lat,
+              centerLng: proximity.lng,
+              viewbox,
+              bounded: true,
+              limit: Math.min(limit, 15),
+            }),
+            new Promise<Awaited<ReturnType<GeocodeProvider['searchCategory']>>>((resolve) =>
+              setTimeout(() => resolve([]), 5000),
+            ),
+          ]);
+          return hits.map((p) => ({
+            id: `live-${p.provider}-${p.lat.toFixed(5)}-${p.lng.toFixed(5)}`,
+            osmId: null as string | null,
+            name: p.label.split(',')[0]?.trim() || p.label,
+            category: (p.category ?? category) as PoiCategory,
+            lat: p.lat,
+            lng: p.lng,
+            city:
+              (p.city && findServiceAreaByName(p.city)?.name) ||
+              resolveCityFromCoords(p.lat, p.lng) ||
+              p.city ||
+              opts.city ||
+              'RDC',
+            address: p.address,
+            source: p.provider === 'mapbox' ? 'MAPBOX' : 'OSM',
+          }));
+        } catch {
+          return [];
+        }
+      }),
+    );
+    return batches.flat();
+  }
+
+  private mergePlaceRows(
+    dbRows: Array<{
+      id: string;
+      osmId?: string | null;
+      name: string;
+      category: PoiCategory;
+      lat: number;
+      lng: number;
+      city: string;
+      address: string | null;
+      source: string;
+    }>,
+    liveRows: Array<{
+      id: string;
+      osmId?: string | null;
+      name: string;
+      category: PoiCategory;
+      lat: number;
+      lng: number;
+      city: string;
+      address: string | null;
+      source: string;
+    }>,
+    opts: { lat?: number; lng?: number; radiusKm?: number; limit: number },
+  ) {
+    const seen = new Set<string>();
+    const out: Array<(typeof liveRows)[number] & { distanceKm?: number }> = [];
+    const push = (row: (typeof dbRows)[number]) => {
+      const key = `${row.lat.toFixed(4)},${row.lng.toFixed(4)}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      const distanceKm =
+        opts.lat != null && opts.lng != null
+          ? this.haversineKm(opts.lat, opts.lng, row.lat, row.lng)
+          : undefined;
+      if (distanceKm != null && opts.radiusKm != null && distanceKm > opts.radiusKm) return;
+      out.push({
+        ...row,
+        ...(distanceKm != null ? { distanceKm: Math.round(distanceKm * 100) / 100 } : {}),
+      });
+    };
+
+    for (const row of dbRows) push(row);
+    for (const row of liveRows) push(row);
+
+    if (opts.lat != null && opts.lng != null) {
+      out.sort((a, b) => (a.distanceKm ?? 0) - (b.distanceKm ?? 0));
+    }
+    return out.slice(0, opts.limit);
   }
 
   async importPois(city = 'Kinshasa', useOverpass = false) {

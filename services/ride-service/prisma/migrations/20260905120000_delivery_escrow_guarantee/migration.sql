@@ -1,0 +1,23 @@
+-- Two-sided delivery guarantee: escrow before dispatch, PIN before payout.
+
+ALTER TABLE "deliveries"
+  ADD COLUMN IF NOT EXISTS "guaranteed" BOOLEAN NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS "escrowReady" BOOLEAN NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS "escrowAmountCdf" INTEGER,
+  ADD COLUMN IF NOT EXISTS "receiptConfirmedAt" TIMESTAMP(3),
+  ADD COLUMN IF NOT EXISTS "receiptConfirmedBy" TEXT,
+  ADD COLUMN IF NOT EXISTS "payoutReleasedAt" TIMESTAMP(3),
+  ADD COLUMN IF NOT EXISTS "fundsFrozenAt" TIMESTAMP(3),
+  ADD COLUMN IF NOT EXISTS "pinAttemptCount" INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS "unreachableAttempts" INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS "firstUnreachableAt" TIMESTAMP(3);
+
+ALTER TABLE "errand_orders"
+  ADD COLUMN IF NOT EXISTS "guaranteed" BOOLEAN NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS "escrowReady" BOOLEAN NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS "escrowAmountCdf" INTEGER,
+  ADD COLUMN IF NOT EXISTS "receiptConfirmedAt" TIMESTAMP(3),
+  ADD COLUMN IF NOT EXISTS "receiptConfirmedBy" TEXT,
+  ADD COLUMN IF NOT EXISTS "payoutReleasedAt" TIMESTAMP(3),
+  ADD COLUMN IF NOT EXISTS "fundsFrozenAt" TIMESTAMP(3),
+  ADD COLUMN IF NOT EXISTS "pinAttemptCount" INTEGER NOT NULL DEFAULT 0;

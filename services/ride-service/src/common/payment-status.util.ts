@@ -12,6 +12,10 @@ export type ServicePaymentStatus = {
   isPaid: boolean;
   paymentStatus: string | null;
   paymentMethod?: string | null;
+  amountCdf?: number | null;
+  escrowHeld?: boolean;
+  payoutReleased?: boolean;
+  fundsFrozen?: boolean;
 };
 
 export async function fetchServicePaymentStatuses(

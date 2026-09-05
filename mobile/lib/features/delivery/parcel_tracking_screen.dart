@@ -168,6 +168,26 @@ class _ParcelTrackingScreenState extends ConsumerState<ParcelTrackingScreen> {
 
   bool get _canCancel => CancelEligibility.delivery(_delivery);
 
+  bool get _canConfirmReceipt {
+    final status = _delivery?['status']?.toString();
+    return status == 'IN_TRANSIT' || status == 'PICKED_UP';
+  }
+
+  Future<void> _confirmReceipt() async {
+    final api = ref.read(apiClientProvider);
+    final result = await api.confirmDeliveryReceipt(widget.parcelId);
+    if (!mounted) return;
+    switch (result) {
+      case Success():
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Réception confirmée. Le livreur est payé.')),
+        );
+        await _load(silent: true);
+      case Failure(:final error):
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
+    }
+  }
+
   bool get _paymentDue {
     if (deliveryIsPaid(_delivery)) return false;
     if (_cashPaymentPending) return false;
@@ -330,6 +350,15 @@ class _ParcelTrackingScreenState extends ConsumerState<ParcelTrackingScreen> {
                               ),
                               const SizedBox(height: 12),
                             ],
+                            if (_paymentDue && !deliveryIsPaid(_delivery)) ...[
+                              const MovaCard(
+                                child: Text(
+                                  'Payez maintenant pour séquestrer le montant. Aucun livreur n\'est contacté avant paiement.',
+                                  style: TextStyle(fontWeight: FontWeight.w600),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                            ],
                             if (deliveryIsPaid(_delivery)) ...[
                               MovaCard(
                                 child: Row(
@@ -340,12 +369,31 @@ class _ParcelTrackingScreenState extends ConsumerState<ParcelTrackingScreen> {
                                       child: Text(
                                         _delivery?['paymentMethod']?.toString().toUpperCase() == 'CASH'
                                             ? 'Livraison payée (espèces confirmées)'
-                                            : 'Livraison payée',
+                                            : (_delivery?['guaranteed'] == true &&
+                                                    _delivery?['status']?.toString() != 'DELIVERED')
+                                                ? 'Montant séquestré. Donnez le PIN uniquement au livreur à la réception.'
+                                                : 'Livraison payée',
                                         style: const TextStyle(fontWeight: FontWeight.w600),
                                       ),
                                     ),
                                   ],
                                 ),
+                              ),
+                              const SizedBox(height: 12),
+                            ],
+                            if (_delivery?['guaranteed'] == false) ...[
+                              const MovaCard(
+                                child: Text(
+                                  'Livraison non garantie (espèces). SENGA ne séquestre pas les fonds.',
+                                  style: TextStyle(fontSize: 13),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                            ],
+                            if (_canConfirmReceipt) ...[
+                              MovaButton(
+                                label: 'J\'ai reçu le colis',
+                                onPressed: _confirmReceipt,
                               ),
                               const SizedBox(height: 12),
                             ],

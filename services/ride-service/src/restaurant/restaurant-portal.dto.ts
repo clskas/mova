@@ -32,6 +32,21 @@ export class RejectOrderDto {
   @ApiPropertyOptional() @IsOptional() @IsString() reason?: string;
 }
 
+export class UpdateCourierModeDto {
+  @ApiProperty({ enum: ['PLATFORM', 'OWN', 'HYBRID'] })
+  @IsString()
+  courierMode: 'PLATFORM' | 'OWN' | 'HYBRID';
+}
+
+export class AddRestaurantDriverDto {
+  @ApiPropertyOptional() @IsOptional() @IsString() driverUserId?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() phone?: string;
+}
+
+export class AssignOwnDriverDto {
+  @ApiProperty() @IsString() driverUserId: string;
+}
+
 export class UpdateRestaurantLocationDto {
   @ApiPropertyOptional() @IsOptional() @IsString() name?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() cuisine?: string;

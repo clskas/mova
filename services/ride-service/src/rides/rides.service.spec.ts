@@ -119,6 +119,21 @@ describe('RidesService', () => {
     expect(matching.findDrivers).not.toHaveBeenCalled();
   });
 
+  it('lists nearby vehicles without exposing driver ids', async () => {
+    matching.findDrivers.mockResolvedValue([
+      { driverId: 'd1', userId: 'u1', lat: -4.321, lng: 15.313, rating: 4.8, distanceKm: 0.4, score: 0.9 },
+    ]);
+    const result = await service.listNearbyVehicles(-4.32, 15.31, VehicleType.MOTO_TAXI);
+    expect(matching.findDrivers).toHaveBeenCalledWith(-4.32, 15.31, VehicleType.MOTO_TAXI, 0);
+    expect(result.vehicleType).toBe('MOTO');
+    expect(result.count).toBe(1);
+    expect(result.vehicles[0]).toEqual(
+      expect.objectContaining({ lat: -4.321, lng: 15.313, vehicleType: 'MOTO' }),
+    );
+    expect(result.vehicles[0]).not.toHaveProperty('driverId');
+    expect(result.vehicles[0]).not.toHaveProperty('userId');
+  });
+
   it('transitions to MATCHING on search', async () => {
     prisma.ride.findUnique.mockResolvedValue({
       id: 'ride-1',

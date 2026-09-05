@@ -1,4 +1,5 @@
 import {
+  applyOwnCourierRouting,
   computeFoodSettlementPools,
   parseFoodItemShares,
   parseOrderPlacedMetadata,
@@ -34,6 +35,19 @@ describe('food-delivery-settlement.util', () => {
     expect(pools.scale).toBeCloseTo(0.9);
     expect(pools.itemsNetPool).toBeCloseTo(18000);
     expect(pools.deliveryNetPool).toBeCloseTo(9000);
+  });
+
+  it('flotte resto : frais de livraison → restaurant, pas le livreur SENGA', () => {
+    const routed = applyOwnCourierRouting(
+      {
+        driver: { userId: 'd1', grossCdf: 4000, netCdf: 3200, platformFeeCdf: 800 },
+        restaurants: [{ restaurantId: 'r1', ownerUserId: 'o1', grossCdf: 10000, netCdf: 8500, platformFeeCdf: 1500 }],
+      },
+      'RESTAURANT',
+    );
+    expect(routed.driver).toBeNull();
+    expect(routed.restaurants[0].netCdf).toBe(11700);
+    expect(applyOwnCourierRouting({ driver: { userId: 'd1', grossCdf: 4000, netCdf: 3200, platformFeeCdf: 800 }, restaurants: [] }, 'PLATFORM').driver?.userId).toBe('d1');
   });
 
   it('parseOrderPlacedMetadata', () => {

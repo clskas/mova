@@ -46,6 +46,12 @@ export class ErrandsController {
     return this.errandsService.cancel(id, req.user.id);
   }
 
+  @Post(':id/confirm-receipt')
+  @ApiOperation({ summary: 'Le demandeur confirme la réception de la course' })
+  confirmReceipt(@Request() req: { user: { id: string } }, @Param('id') id: string) {
+    return this.errandsService.confirmReceipt(id, req.user.id);
+  }
+
   @Post(':id/rate')
   @ApiOperation({ summary: 'Noter le livreur après course/commission' })
   rate(@Request() req: { user: { id: string } }, @Param('id') id: string, @Body() dto: RateErrandDto) {
@@ -77,6 +83,7 @@ export class ErrandsController {
       dto.status,
       dto.purchaseTotalCdf,
       dto.proofPhotoUrl,
+      dto.completionPin,
     );
   }
 

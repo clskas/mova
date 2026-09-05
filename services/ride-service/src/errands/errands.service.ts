@@ -14,6 +14,9 @@ import { tripDistanceKm } from '../common/geo.util';
 import { fetchAuthUserBrief } from '../common/internal-lookup.util';
 import { notifyNearbyDrivers, DELIVERY_ALERT_VEHICLE_TYPES } from '../common/driver-job-alert.util';
 import { holdWalletFunds, releaseWalletHold } from '../common/wallet-hold.util';
+import { recordWalletEscrow, refundEscrow, releaseEscrowPayout, settleEscrowPartial, freezeEscrow } from '../common/escrow.util';
+import { assertEscrowAllowsDispatch, assertPinMatches, cancelPhase, isPinTimeoutDue, settleGuaranteedCancel } from '../deliveries/delivery-guarantee.util';
+import { deliveryPinSms, sendPlatformSms } from '../common/sms-notify.util';
 import { buildErrandTimeline, enrichErrandTrackingFields } from '../deliveries/parcel.util';
 import { MatchingService } from '../matching/matching.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -182,7 +185,8 @@ export class ErrandsService {
     }).catch(() => undefined);
   }
 
-  private async maybeHoldBudget(userId: string, orderId: string, budgetCdf: number) {
+  private async maybeHoldBudget(userId: string, orderId: string, budgetCdf: number, deliveryFeeCdf = 0) {
+    const total = budgetCdf + Math.max(0, deliveryFeeCdf);
     if (budgetCdf <= 0) {
       throw new MovaHttpException(
         MovaErrorCode.VALIDATION_ERROR,
@@ -190,8 +194,14 @@ export class ErrandsService {
         'Budget achats max obligatoire pour les courses & commissions.',
       );
     }
-    await holdWalletFunds(userId, budgetCdf, 'ERRAND', orderId, `Séquestre budget course ${orderId}`);
-    return budgetCdf;
+    await holdWalletFunds(
+      userId,
+      total,
+      'ERRAND',
+      orderId,
+      `Séquestre course ${orderId} (budget ${budgetCdf} + frais ${deliveryFeeCdf})`,
+    );
+    return total;
   }
 
   private assertErrandBudget(budgetCdf: number | undefined | null, estimatedPurchaseCdf: number) {
@@ -236,13 +246,25 @@ export class ErrandsService {
         discountCdf: estimate.discountCdf || undefined,
         distanceKm: estimate.distanceKm,
         durationMin: estimate.durationMin,
+        guaranteed: true,
+        escrowReady: false,
+        escrowAmountCdf: (dto.budgetCdf ?? 0) + estimate.estimatedPriceCdf,
       },
     });
-    const walletHoldCdf = await this.maybeHoldBudget(userId, order.id, dto.budgetCdf).catch((err) => {
+    const walletHoldCdf = await this.maybeHoldBudget(userId, order.id, dto.budgetCdf, estimate.estimatedPriceCdf).catch((err) => {
       void this.prisma.errandOrder.delete({ where: { id: order.id } }).catch(() => undefined);
       throw err;
     });
-    await this.prisma.errandOrder.update({ where: { id: order.id }, data: { walletHoldCdf } });
+    await recordWalletEscrow({
+      referenceType: 'ERRAND',
+      referenceId: order.id,
+      userId,
+      amountCdf: walletHoldCdf,
+    }).catch(() => undefined);
+    await this.prisma.errandOrder.update({
+      where: { id: order.id },
+      data: { walletHoldCdf, escrowReady: true, escrowAmountCdf: walletHoldCdf, guaranteed: true },
+    });
     const finalOrder = await this.prisma.errandOrder.findUniqueOrThrow({ where: { id: order.id } });
     await this.alertErrandOffer(finalOrder);
     await this.redis.publish(MOVA_EVENTS.ERRAND_CREATED, {
@@ -400,7 +422,14 @@ export class ErrandsService {
       createdAt: order.createdAt.toISOString(),
       timeline,
       tracking: timeline,
-      paymentReady: order.status === ErrandOrderStatus.COMPLETED,
+      guaranteed: order.guaranteed,
+      escrowReady: order.escrowReady,
+      escrowAmountCdf: order.escrowAmountCdf ?? (order.walletHoldCdf ?? 0),
+      fundsFrozen: Boolean(order.fundsFrozenAt),
+      payoutReleased: Boolean(order.payoutReleasedAt),
+      paymentReady: order.guaranteed
+        ? false
+        : order.status === ErrandOrderStatus.COMPLETED,
       currency: 'CDF',
       city: 'Kinshasa',
       ...canCancelErrand({ status: order.status }),
@@ -508,6 +537,7 @@ export class ErrandsService {
         ...formatted,
         driverGrossCdf: gross,
         driverNetCdf: Math.round(this.commission.splitGross(gross, errandRule.platformPercent).driverNetCdf),
+        completionPin: null,
       };
     }
     return {
@@ -536,7 +566,12 @@ export class ErrandsService {
 
     const [pendingErrands, assignedErrands] = await Promise.all([
       this.prisma.errandOrder.findMany({
-        where: { status: ErrandOrderStatus.PENDING, driverId: null },
+        where: {
+          status: ErrandOrderStatus.PENDING,
+          driverId: null,
+          fundsFrozenAt: null,
+          OR: [{ guaranteed: false }, { escrowReady: true }],
+        },
         orderBy: { createdAt: 'desc' },
         take: 30,
       }),
@@ -637,10 +672,14 @@ export class ErrandsService {
     if (order.status !== ErrandOrderStatus.PENDING || order.driverId) {
       throw new MovaHttpException(MovaErrorCode.ERRAND_INVALID_STATUS);
     }
+    assertEscrowAllowsDispatch(order);
+    const pin = order.completionPin ?? this.tripShare.generateCompletionPin();
     const updated = await this.prisma.errandOrder.update({
       where: { id: errandId },
-      data: { driverId: driverUserId, status: ErrandOrderStatus.ASSIGNED, completionPin: this.tripShare.generateCompletionPin() },
+      data: { driverId: driverUserId, status: ErrandOrderStatus.ASSIGNED, completionPin: pin },
     });
+    const requester = await fetchAuthUserBrief(updated.userId);
+    await sendPlatformSms(requester?.phone, deliveryPinSms(pin, 'course'), 'delivery_pin');
     const formatted = this.formatErrand(updated);
     await this.redis.publish(MOVA_EVENTS.SERVICE_ASSIGNED, {
       serviceType: 'ERRAND',
@@ -675,6 +714,7 @@ export class ErrandsService {
     status: ErrandOrderStatus,
     purchaseTotalCdf?: number,
     proofPhotoUrl?: string,
+    completionPin?: string,
   ) {
     const order = await this.prisma.errandOrder.findUnique({ where: { id } });
     if (!order) throw new MovaHttpException(MovaErrorCode.ERRAND_NOT_FOUND, HttpStatus.NOT_FOUND);
@@ -694,13 +734,30 @@ export class ErrandsService {
     if (status === ErrandOrderStatus.IN_PROGRESS) {
       await assertDriverCanReceiveJobs(driverId);
     }
+    if (status === ErrandOrderStatus.IN_PROGRESS) {
+      assertEscrowAllowsDispatch(order);
+    }
     if (status === ErrandOrderStatus.COMPLETED) {
+      if (order.fundsFrozenAt) {
+        throw new MovaHttpException(MovaErrorCode.DELIVERY_FUNDS_FROZEN);
+      }
       const proof = proofPhotoUrl?.trim() || order.proofPhotoUrl;
       if (!proof) {
         throw new MovaHttpException(
           MovaErrorCode.ERRAND_INVALID_STATUS,
           HttpStatus.BAD_REQUEST,
           'Photo preuve d\'achat obligatoire avant complétion.',
+        );
+      }
+      if (order.guaranteed && !assertPinMatches(order.completionPin, completionPin)) {
+        await this.prisma.errandOrder.update({
+          where: { id },
+          data: { pinAttemptCount: { increment: 1 } },
+        });
+        throw new MovaHttpException(
+          MovaErrorCode.VALIDATION_ERROR,
+          undefined,
+          'Code PIN de réception incorrect. Le tap « Terminé » seul ne paie pas le livreur.',
         );
       }
     }
@@ -712,9 +769,16 @@ export class ErrandsService {
         updates.purchaseTotalCdf = Math.round(purchaseTotalCdf);
       }
       if (proofPhotoUrl?.trim()) updates.proofPhotoUrl = proofPhotoUrl.trim();
+      if (order.guaranteed) {
+        updates.receiptConfirmedAt = new Date();
+        updates.receiptConfirmedBy = 'PIN';
+      }
     }
     const updated = await this.prisma.errandOrder.update({ where: { id }, data: updates });
-    // Keep the hold until payService — never capture here (would debit twice).
+    if (status === ErrandOrderStatus.COMPLETED && updated.guaranteed && !updated.payoutReleasedAt) {
+      await releaseEscrowPayout('ERRAND', id).catch(() => undefined);
+      await this.prisma.errandOrder.update({ where: { id }, data: { payoutReleasedAt: new Date() } });
+    }
     const formatted = this.formatErrand(updated);
     await this.redis.publish(MOVA_EVENTS.SERVICE_STATUS_UPDATED, {
       serviceType: 'ERRAND',
@@ -906,7 +970,27 @@ export class ErrandsService {
       where: { id },
       data: { status: ErrandOrderStatus.CANCELLED, cancelledAt: new Date() },
     });
-    if (updated.walletHoldCdf) {
+    if (order.guaranteed) {
+      const phase = cancelPhase(order.status);
+      const settlement = settleGuaranteedCancel({
+        phase,
+        escrowAmountCdf: order.escrowAmountCdf ?? order.walletHoldCdf ?? 0,
+        deliveryFeeCdf: order.estimatedPriceCdf,
+      });
+      if (settlement.action === 'REFUND') {
+        await refundEscrow('ERRAND', id, settlement.reason).catch(() =>
+          releaseWalletHold('ERRAND', id).catch(() => undefined),
+        );
+      } else if (settlement.action === 'PARTIAL') {
+        await settleEscrowPartial({
+          referenceType: 'ERRAND',
+          referenceId: id,
+          courierFeeCdf: settlement.courierFeeCdf,
+          refundCdf: settlement.refundCdf,
+          reason: settlement.reason,
+        }).catch(() => undefined);
+      }
+    } else if (updated.walletHoldCdf) {
       await releaseWalletHold('ERRAND', updated.id).catch(() => undefined);
     }
     return { success: true, errand: this.formatErrand(updated) };
@@ -922,5 +1006,77 @@ export class ErrandsService {
       );
     }
     return this.cancel(id, userId);
+  }
+
+  async confirmReceipt(id: string, userId: string) {
+    const order = await this.prisma.errandOrder.findUnique({ where: { id } });
+    if (!order) throw new MovaHttpException(MovaErrorCode.ERRAND_NOT_FOUND, HttpStatus.NOT_FOUND);
+    if (order.userId !== userId) {
+      throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
+    }
+    if (order.status === ErrandOrderStatus.COMPLETED && order.payoutReleasedAt) {
+      return { success: true, already: true, errand: this.formatErrand(order) };
+    }
+    if (order.status !== ErrandOrderStatus.IN_PROGRESS && order.status !== ErrandOrderStatus.COMPLETED) {
+      throw new MovaHttpException(
+        MovaErrorCode.ERRAND_INVALID_STATUS,
+        undefined,
+        'Confirmez la réception une fois la course effectuée.',
+      );
+    }
+    const updated = await this.prisma.errandOrder.update({
+      where: { id },
+      data: {
+        status: ErrandOrderStatus.COMPLETED,
+        completedAt: order.completedAt ?? new Date(),
+        receiptConfirmedAt: new Date(),
+        receiptConfirmedBy: 'REQUESTER',
+      },
+    });
+    if (updated.guaranteed && !updated.payoutReleasedAt) {
+      await releaseEscrowPayout('ERRAND', id).catch(() => undefined);
+      await this.prisma.errandOrder.update({ where: { id }, data: { payoutReleasedAt: new Date() } });
+    }
+    return { success: true, errand: this.formatErrand(updated) };
+  }
+
+  async freezeOverduePins() {
+    const candidates = await this.prisma.errandOrder.findMany({
+      where: {
+        guaranteed: true,
+        payoutReleasedAt: null,
+        fundsFrozenAt: null,
+        status: { in: [ErrandOrderStatus.IN_PROGRESS, ErrandOrderStatus.COMPLETED] },
+      },
+      take: 50,
+    });
+    let frozen = 0;
+    for (const o of candidates) {
+      if (
+        !isPinTimeoutDue({
+          type: 'ERRAND',
+          status: 'COMPLETED',
+          inTransitSince: o.completedAt ?? o.updatedAt,
+        }) &&
+        o.status === ErrandOrderStatus.IN_PROGRESS
+      ) {
+        continue;
+      }
+      if (
+        o.status === ErrandOrderStatus.COMPLETED &&
+        !isPinTimeoutDue({
+          type: 'ERRAND',
+          status: 'COMPLETED',
+          inTransitSince: o.completedAt ?? o.updatedAt,
+        })
+      ) {
+        continue;
+      }
+      if (o.status === ErrandOrderStatus.IN_PROGRESS) continue;
+      await freezeEscrow('ERRAND', o.id, 'Délai PIN course dépassé — fonds gelés.').catch(() => undefined);
+      await this.prisma.errandOrder.update({ where: { id: o.id }, data: { fundsFrozenAt: new Date() } });
+      frozen += 1;
+    }
+    return frozen;
   }
 }

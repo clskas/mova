@@ -38,6 +38,11 @@ export class UpdateErrandStatusDto {
   @IsOptional()
   @IsString()
   proofPhotoUrl?: string;
+
+  @ApiPropertyOptional({ description: 'PIN destinataire — requis pour COMPLETED (livreur)' })
+  @IsOptional()
+  @IsString()
+  completionPin?: string;
 }
 
 export class UpdateErrandProofDto {

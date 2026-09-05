@@ -10,8 +10,8 @@ Inspiré des pratiques Uber/Bolt (courses), Deliveroo (livraisons), AnyVan/Lugg 
 | Service | API backend | App mobile passager | Quand payer | Statut |
 |---------|-------------|---------------------|-------------|--------|
 | Course taxi/moto | ✅ | ✅ | Après `COMPLETED` | OK |
-| Colis / food / express | ✅ | ✅ | Après `DELIVERED` | OK |
-| Course & commission (errand) | ✅ | ✅ | Après `COMPLETED` | ⚠️ montant = estimation seule |
+| Colis / food / express | ✅ | ✅ | **Séquestre avant dispatch** ; split après PIN | Garantie 2 verrous |
+| Course & commission (errand) | ✅ | ✅ | Hold **budget + frais** à la commande ; split après PIN | Aligné |
 | **Déménagement** | ✅ | ✅ (corrigé) | Après `COMPLETED` | Corrigé |
 | Location véhicule | ✅ | ❌ | Trop tôt côté API | À faire |
 | Covoiturage | ✅ | ❌ | Après trajet | À faire |

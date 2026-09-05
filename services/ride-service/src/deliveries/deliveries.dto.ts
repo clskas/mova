@@ -22,6 +22,13 @@ export class CreateParcelDeliveryDto {
   @Max(50)
   weightKg?: number;
   @ApiProperty({ required: false }) @IsOptional() @IsString() promoCode?: string;
+  @ApiProperty({
+    required: false,
+    description: 'CASH = livraison non garantie. Défaut = prépayé (séquestre obligatoire).',
+  })
+  @IsOptional()
+  @IsString()
+  paymentMethod?: string;
 }
 
 export class FoodOrderItemDto {
@@ -52,6 +59,10 @@ export class CreateFoodDeliveryDto {
   @ApiProperty() @IsNumber() deliveryLat: number;
   @ApiProperty() @IsNumber() deliveryLng: number;
   @ApiProperty({ required: false }) @IsOptional() @IsString() promoCode?: string;
+  @ApiProperty({ required: false, description: 'CASH = non garantie. Défaut = prépayé.' })
+  @IsOptional()
+  @IsString()
+  paymentMethod?: string;
 }
 
 export class CreateFoodMultiDeliveryDto {
@@ -64,6 +75,10 @@ export class CreateFoodMultiDeliveryDto {
   @ApiProperty() @IsNumber() deliveryLat: number;
   @ApiProperty() @IsNumber() deliveryLng: number;
   @ApiProperty({ required: false }) @IsOptional() @IsString() promoCode?: string;
+  @ApiProperty({ required: false, description: 'CASH = non garantie. Défaut = prépayé.' })
+  @IsOptional()
+  @IsString()
+  paymentMethod?: string;
 }
 
 export class ValidatePromoDto {

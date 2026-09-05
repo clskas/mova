@@ -307,7 +307,12 @@ export function formatParcelDelivery(
   courier?: CourierProfile | null,
 ) {
   const priceCdf = delivery.finalPriceCdf ?? delivery.estimatedPriceCdf;
-  const paymentReady = delivery.status === DeliveryStatus.DELIVERED;
+  const guaranteed = Boolean((delivery as Delivery & { guaranteed?: boolean }).guaranteed);
+  const fundsFrozen = Boolean((delivery as Delivery & { fundsFrozenAt?: Date | null }).fundsFrozenAt);
+  const escrowReady = Boolean((delivery as Delivery & { escrowReady?: boolean }).escrowReady);
+  const paymentReady = guaranteed
+    ? delivery.status !== DeliveryStatus.CANCELLED && !fundsFrozen && !escrowReady
+    : delivery.status === DeliveryStatus.DELIVERED;
   const city = resolveCityFromCoords(delivery.pickupLat ?? 0, delivery.pickupLng ?? 0);
   const dropLat = delivery.dropoffLat ?? delivery.deliveryLat;
   const dropLng = delivery.dropoffLng ?? delivery.deliveryLng;
@@ -374,6 +379,12 @@ export function formatParcelDelivery(
     restaurant: delivery.restaurant ? { id: delivery.restaurant.id, name: delivery.restaurant.name, cuisine: delivery.restaurant.cuisine } : undefined,
     createdAt: delivery.createdAt.toISOString(),
     deliveryPin: delivery.deliveryPin ?? null,
+    guaranteed,
+    escrowReady,
+    escrowAmountCdf: (delivery as Delivery & { escrowAmountCdf?: number | null }).escrowAmountCdf ?? priceCdf,
+    fundsFrozen,
+    payoutReleased: Boolean((delivery as Delivery & { payoutReleasedAt?: Date | null }).payoutReleasedAt),
+    receiptConfirmedAt: (delivery as Delivery & { receiptConfirmedAt?: Date | null }).receiptConfirmedAt?.toISOString?.() ?? null,
     etaMinutes,
     timeline: buildParcelTimeline(delivery, delivery.events),
     courierLocation: courierLoc,
@@ -387,6 +398,6 @@ export function formatParcelDelivery(
           phone: courier.phone ?? '',
         }
       : null,
-    ...canCancelDelivery({ status: delivery.status, type: delivery.type }),
+    ...canCancelDelivery({ status: delivery.status, type: delivery.type, guaranteed }),
   };
 }

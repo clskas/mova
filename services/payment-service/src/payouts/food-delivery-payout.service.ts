@@ -71,6 +71,22 @@ export class FoodDeliveryPayoutService {
     }
   }
 
+  /** Pickup repas : crédite uniquement les restaurants (idempotent). Le livreur attend le PIN. */
+  async creditRestaurantSharesOnly(deliveryId: string) {
+    const settlement = await this.fetchSettlement(deliveryId);
+    if (!settlement || settlement.deliveryType !== 'FOOD') {
+      return { handled: false as const };
+    }
+    const restaurantResults = [];
+    for (const restaurant of settlement.restaurants) {
+      if (!restaurant.ownerUserId || restaurant.netCdf <= 0) continue;
+      restaurantResults.push(
+        await this.creditRestaurant(restaurant.ownerUserId, deliveryId, restaurant.restaurantId, restaurant.netCdf),
+      );
+    }
+    return { handled: true as const, restaurants: restaurantResults };
+  }
+
   async creditFoodDeliverySettlement(
     deliveryId: string,
     paymentMethod: PaymentMethod = PaymentMethod.WALLET,

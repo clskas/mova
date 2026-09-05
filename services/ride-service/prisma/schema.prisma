@@ -50,6 +50,17 @@ enum DeliveryStatus {
   CANCELLED
 }
 
+enum RestaurantCourierMode {
+  PLATFORM
+  OWN
+  HYBRID
+}
+
+enum DeliveryCourierSource {
+  PLATFORM
+  RESTAURANT
+}
+
 enum ScheduledRideStatus {
   SCHEDULED
   CONFIRMED
@@ -233,14 +244,29 @@ model Restaurant {
   isAcceptingOrders Boolean  @default(true)
   prepTimeMin       Int      @default(25)
   ownerUserId       String?
+  courierMode       RestaurantCourierMode @default(PLATFORM)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
   deliveries Delivery[]
   promoCodes       PromoCode[]
+  drivers          RestaurantDriver[]
 
   @@index([ownerUserId])
   @@map("restaurants")
+}
+
+model RestaurantDriver {
+  id           String     @id @default(uuid())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  driverUserId String
+  isActive     Boolean    @default(true)
+  createdAt    DateTime   @default(now())
+
+  @@unique([restaurantId, driverUserId])
+  @@index([driverUserId])
+  @@map("restaurant_drivers")
 }
 
 model Delivery {
@@ -264,6 +290,18 @@ model Delivery {
   deliveryLng       Float?
   driverId          String?
   deliveryPin       String?
+  guaranteed        Boolean          @default(false)
+  escrowReady       Boolean          @default(false)
+  escrowAmountCdf   Int?
+  courierSource     DeliveryCourierSource?
+  restaurantCreditedAt DateTime?
+  receiptConfirmedAt DateTime?
+  receiptConfirmedBy String?
+  payoutReleasedAt  DateTime?
+  fundsFrozenAt     DateTime?
+  pinAttemptCount   Int              @default(0)
+  unreachableAttempts Int            @default(0)
+  firstUnreachableAt DateTime?
   estimatedPriceCdf Int
   finalPriceCdf     Int?
   promoCode         String?
@@ -532,6 +570,14 @@ model ErrandOrder {
   distanceKm        Float?
   durationMin       Float?
   driverId          String?
+  guaranteed        Boolean           @default(false)
+  escrowReady       Boolean           @default(false)
+  escrowAmountCdf   Int?
+  receiptConfirmedAt DateTime?
+  receiptConfirmedBy String?
+  payoutReleasedAt  DateTime?
+  fundsFrozenAt     DateTime?
+  pinAttemptCount   Int               @default(0)
   completedAt       DateTime?
   cancelledAt       DateTime?
   createdAt         DateTime          @default(now())

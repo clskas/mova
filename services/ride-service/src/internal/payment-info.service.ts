@@ -23,6 +23,9 @@ export interface ServicePaymentInfo {
   driverId?: string | null;
   ownerUserId?: string | null;
   cashPin?: string | null;
+  guaranteed?: boolean;
+  escrowCollect?: boolean;
+  cashAllowed?: boolean;
 }
 
 @Injectable()
@@ -75,34 +78,51 @@ export class PaymentInfoService {
   private async deliveryInfo(deliveryId: string): Promise<ServicePaymentInfo> {
     const delivery = await this.prisma.delivery.findUnique({ where: { id: deliveryId } });
     if (!delivery) throw new MovaHttpException(MovaErrorCode.DELIVERY_NOT_FOUND, HttpStatus.NOT_FOUND);
-    const amountCdf = delivery.finalPriceCdf ?? delivery.estimatedPriceCdf;
+    const amountCdf = delivery.escrowAmountCdf ?? delivery.finalPriceCdf ?? delivery.estimatedPriceCdf;
+    const cancelled = delivery.status === DeliveryStatus.CANCELLED;
+    const frozen = Boolean(delivery.fundsFrozenAt);
+    const guaranteed = delivery.guaranteed === true;
+    const escrowCollect = guaranteed && !cancelled && !frozen && !delivery.escrowReady && !delivery.payoutReleasedAt;
     return {
       referenceType: 'DELIVERY',
       referenceId: deliveryId,
       userId: delivery.userId,
       amountCdf,
       status: delivery.status,
-      paymentReady: delivery.status === DeliveryStatus.DELIVERED,
+      paymentReady: escrowCollect || (!guaranteed && delivery.status === DeliveryStatus.DELIVERED),
       driverId: delivery.driverId,
       cashPin: delivery.deliveryPin,
       title: delivery.dropoffAddress ?? delivery.deliveryAddress ?? 'Livraison',
+      guaranteed,
+      escrowCollect,
+      cashAllowed: !guaranteed,
     };
   }
 
   private async errandInfo(errandId: string): Promise<ServicePaymentInfo> {
     const order = await this.prisma.errandOrder.findUnique({ where: { id: errandId } });
     if (!order) throw new MovaHttpException(MovaErrorCode.ERRAND_NOT_FOUND, HttpStatus.NOT_FOUND);
-    const amountCdf = (order.finalPriceCdf ?? order.estimatedPriceCdf) + (order.purchaseTotalCdf ?? 0);
+    const amountCdf =
+      order.escrowAmountCdf ??
+      (order.finalPriceCdf ?? order.estimatedPriceCdf) + (order.budgetCdf ?? order.purchaseTotalCdf ?? 0);
+    const cancelled = order.status === ErrandOrderStatus.CANCELLED;
+    const frozen = Boolean(order.fundsFrozenAt);
+    const guaranteed = order.guaranteed === true;
+    const escrowCollect =
+      guaranteed && !cancelled && !frozen && !order.payoutReleasedAt && order.status !== ErrandOrderStatus.COMPLETED;
     return {
       referenceType: 'ERRAND',
       referenceId: errandId,
       userId: order.userId,
       amountCdf,
       status: order.status,
-      paymentReady: order.status === ErrandOrderStatus.COMPLETED,
+      paymentReady: escrowCollect || (!guaranteed && order.status === ErrandOrderStatus.COMPLETED),
       driverId: order.driverId,
       cashPin: order.completionPin,
       title: order.description,
+      guaranteed,
+      escrowCollect,
+      cashAllowed: !guaranteed,
     };
   }
 

@@ -21,7 +21,7 @@ import {
 } from '@mova/shared';
 import { RedisService } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
-import { parseOrderPlacedMetadata, computeFoodSettlementPools } from '../deliveries/food-delivery-settlement.util';
+import { parseOrderPlacedMetadata, computeFoodSettlementPools, applyOwnCourierRouting } from '../deliveries/food-delivery-settlement.util';
 import { deliveryDriverGross } from '../deliveries/delivery-driver-gross.util';
 import { PricingService } from './pricing.service';
 import { CommissionService } from './commission.service';
@@ -110,6 +110,25 @@ export class RidesService {
       isInterCity,
       pickupCity: pickupArea.name,
       distanceSource: route.source,
+    };
+  }
+
+  /** Pins carte passager — lat/lng + type uniquement (pas d'identité chauffeur). */
+  async listNearbyVehicles(lat: number, lng: number, vehicleType: VehicleType) {
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, HttpStatus.BAD_REQUEST);
+    }
+    const drivers = await this.matching.findDrivers(lat, lng, vehicleType, 0);
+    const mobileType = toMobileVehicleType(vehicleType);
+    return {
+      vehicleType: mobileType,
+      count: drivers.length,
+      vehicles: drivers.slice(0, 24).map((d) => ({
+        lat: d.lat,
+        lng: d.lng,
+        vehicleType: mobileType,
+        distanceKm: Math.round(d.distanceKm * 100) / 100,
+      })),
     };
   }
 
@@ -943,7 +962,6 @@ export class RidesService {
     });
     if (!d) return empty();
     if (d.type !== DeliveryType.FOOD) return empty(d.type);
-    if (d.status !== DeliveryStatus.DELIVERED) return empty('FOOD');
 
     const totalPaidCdf = d.finalPriceCdf ?? d.estimatedPriceCdf ?? 0;
     const metadata = parseOrderPlacedMetadata(d.events);
@@ -1007,7 +1025,7 @@ export class RidesService {
     // car totalPaidCdf est déjà net de la promo tandis que restaurants/livreur sont au brut).
     const platformFeeCdf = Math.max(0, totalPaidCdf - restaurantNetTotal - driverNet);
 
-    return {
+    const raw = {
       referenceType: 'DELIVERY' as const,
       referenceId: deliveryId,
       deliveryType: 'FOOD' as const,
@@ -1023,6 +1041,8 @@ export class RidesService {
         : null,
       restaurants,
     };
+    // Flotte resto : frais de livraison → restaurant (pas le pool livreurs SENGA).
+    return applyOwnCourierRouting(raw, d.courierSource);
   }
 
   async getRidePayout(rideId: string) {

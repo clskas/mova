@@ -26,6 +26,15 @@ export type RestaurantProfile = {
   isAcceptingOrders?: boolean;
   prepTimeMin?: number;
   menuItems?: MenuItem[];
+  courierMode?: "PLATFORM" | "OWN" | "HYBRID";
+};
+
+export type CourierMode = "PLATFORM" | "OWN" | "HYBRID";
+
+export type RestaurantFleetDriver = {
+  id: string;
+  driverUserId: string;
+  isActive: boolean;
 };
 
 export type RestaurantOrder = {
@@ -45,6 +54,8 @@ export type RestaurantOrder = {
   paymentStatus?: string | null;
   paymentMethod?: string | null;
   paymentStatusLabel?: string | null;
+  guaranteed?: boolean;
+  escrowReady?: boolean;
 };
 
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
@@ -198,6 +209,41 @@ export function rejectOrder(id: string, reason?: string) {
   return apiFetch(`/api/restaurant/orders/${id}/reject`, {
     method: "POST",
     body: JSON.stringify({ reason }),
+  });
+}
+
+export function fetchRestaurantDrivers() {
+  return apiFetch<{
+    restaurantId: string;
+    courierMode: "PLATFORM" | "OWN" | "HYBRID";
+    drivers: RestaurantFleetDriver[];
+  }>("/api/restaurant/drivers");
+}
+
+export function addRestaurantDriver(data: { driverUserId?: string; phone?: string }) {
+  return apiFetch<RestaurantFleetDriver>("/api/restaurant/drivers", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export function removeRestaurantDriver(driverUserId: string) {
+  return apiFetch<{ removed: boolean }>(`/api/restaurant/drivers/${driverUserId}/remove`, {
+    method: "POST",
+  });
+}
+
+export function updateCourierMode(courierMode: "PLATFORM" | "OWN" | "HYBRID") {
+  return apiFetch<{ id: string; courierMode: string }>("/api/restaurant/courier-mode", {
+    method: "PATCH",
+    body: JSON.stringify({ courierMode }),
+  });
+}
+
+export function assignOwnDriver(orderId: string, driverUserId: string) {
+  return apiFetch(`/api/restaurant/orders/${orderId}/assign-driver`, {
+    method: "POST",
+    body: JSON.stringify({ driverUserId }),
   });
 }
 

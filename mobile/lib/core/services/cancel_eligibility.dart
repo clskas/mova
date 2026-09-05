@@ -53,6 +53,9 @@ class CancelEligibility {
     if (status == null || status == 'CANCELLED' || status == 'DELIVERED' || status == 'IN_TRANSIT') {
       return false;
     }
+    if (data['guaranteed'] == true) {
+      return true;
+    }
     if (type == 'FOOD') {
       return status == 'PENDING';
     }

@@ -7,7 +7,15 @@ import { PartnerPromoService } from '../promo/partner-promo.service';
 import { PartnerBillingService } from '../billing/partner-billing.service';
 import { DeliveryChatService } from '../chat/delivery-chat.service';
 import { SendRideChatDto } from '../chat/ride-chat.dto';
-import { RejectOrderDto, UpdateRestaurantLocationDto, UpdateRestaurantMenuDto, UploadMenuPhotoDto } from './restaurant-portal.dto';
+import {
+  AddRestaurantDriverDto,
+  AssignOwnDriverDto,
+  RejectOrderDto,
+  UpdateCourierModeDto,
+  UpdateRestaurantLocationDto,
+  UpdateRestaurantMenuDto,
+  UploadMenuPhotoDto,
+} from './restaurant-portal.dto';
 import { RestaurantPortalService } from './restaurant-portal.service';
 import { RestaurantRoleGuard } from './restaurant-role.guard';
 
@@ -129,6 +137,40 @@ export class RestaurantPortalController {
   @ApiOperation({ summary: 'Refuser / annuler une commande' })
   reject(@Request() req: { user: { id: string } }, @Param('id') id: string, @Body() dto: RejectOrderDto) {
     return this.portal.rejectOrder(id, req.user.id, dto.reason);
+  }
+
+  @Post('orders/:id/assign-driver')
+  @ApiOperation({ summary: 'Assigner un livreur de la flotte restaurant' })
+  assignDriver(
+    @Request() req: { user: { id: string } },
+    @Param('id') id: string,
+    @Body() dto: AssignOwnDriverDto,
+  ) {
+    return this.portal.assignOwnDriver(id, req.user.id, dto.driverUserId);
+  }
+
+  @Get('drivers')
+  @ApiOperation({ summary: 'Livreurs internes du restaurant' })
+  drivers(@Request() req: { user: { id: string } }) {
+    return this.portal.listDrivers(req.user.id);
+  }
+
+  @Post('drivers')
+  @ApiOperation({ summary: 'Ajouter un livreur à la flotte' })
+  addDriver(@Request() req: { user: { id: string } }, @Body() dto: AddRestaurantDriverDto) {
+    return this.portal.addDriver(req.user.id, dto);
+  }
+
+  @Post('drivers/:driverUserId/remove')
+  @ApiOperation({ summary: 'Retirer un livreur de la flotte' })
+  removeDriver(@Request() req: { user: { id: string } }, @Param('driverUserId') driverUserId: string) {
+    return this.portal.removeDriver(req.user.id, driverUserId);
+  }
+
+  @Patch('courier-mode')
+  @ApiOperation({ summary: 'Mode livreurs : PLATFORM, OWN ou HYBRID' })
+  courierMode(@Request() req: { user: { id: string } }, @Body() dto: UpdateCourierModeDto) {
+    return this.portal.updateCourierMode(req.user.id, dto.courierMode);
   }
 
   @Get('orders/:id/chat')

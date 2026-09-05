@@ -17,6 +17,7 @@ import '../../core/widgets/geo_autocomplete_field.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import '../../core/widgets/service_area_selector.dart';
+import '../booking/payment_screen.dart';
 import 'food_tracking_screen.dart';
 
 class FoodDeliveryScreen extends ConsumerStatefulWidget {
@@ -191,6 +192,8 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
       controller: _addressController,
       api: api,
       city: _deliveryCityName,
+      proximityLat: _deliveryLat,
+      proximityLng: _deliveryLng,
       label: 'Adresse de livraison',
       hint: 'Ex: Gombe, Bandal, Limete…',
       prefixIcon: Icons.delivery_dining,
@@ -239,7 +242,12 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
       return null;
     }
     final api = ref.read(apiClientProvider);
-    final result = await api.geoAutocomplete(text, city: _deliveryCityName);
+    final result = await api.geoAutocomplete(
+      text,
+      city: _deliveryCityName,
+      lat: _deliveryLat,
+      lng: _deliveryLng,
+    );
     if (result case Success(:final data) when data.isNotEmpty) {
       _onAddressSuggestionSelected(data.first);
       return null;
@@ -880,14 +888,29 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
         if (mounted) {
           final delivery = data['delivery'] as Map<String, dynamic>? ??
               data['order'] as Map<String, dynamic>?;
+          final deliveryId = delivery?['id']?.toString() ?? '';
           final total = delivery?['estimatedPriceCdf'] as int? ??
               _estimatedTotal ??
               _cartSubtotal + 3500;
+          final needsEscrow = data['needsEscrow'] == true;
+          if (needsEscrow && deliveryId.isNotEmpty) {
+            await Navigator.push<bool>(
+              context,
+              MaterialPageRoute(
+                builder: (_) => PaymentScreen(
+                  serviceType: 'DELIVERY',
+                  serviceId: deliveryId,
+                  amountCdf: total,
+                ),
+              ),
+            );
+            if (!mounted) return;
+          }
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
               builder: (_) => FoodTrackingScreen(
-                orderId: delivery?['id']?.toString() ?? '',
+                orderId: deliveryId,
                 restaurantName: isMulti ? 'Multi-restaurants' : (_selectedRestaurant!['name']?.toString() ?? ''),
                 totalCdf: total,
                 deliveryAddress: _addressController.text.trim(),

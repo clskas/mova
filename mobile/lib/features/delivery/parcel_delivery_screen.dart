@@ -21,6 +21,7 @@ import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import '../../widgets/promo_code_field.dart';
 import '../booking/widgets/mova_ride_map.dart';
+import '../booking/payment_screen.dart';
 import 'parcel_tracking_screen.dart';
 
 const _weightCategories = [
@@ -248,6 +249,8 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
       final pickupResult = await api.geoAutocomplete(
         pickupText,
         city: ServiceAreas.cityNameForCoords(_pickup),
+        lat: _pickup.latitude,
+        lng: _pickup.longitude,
       );
       if (pickupResult case Success(:final data) when data.isNotEmpty) {
         final s = data.first;
@@ -286,6 +289,8 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
       final result = await api.geoAutocomplete(
         _dropoffController.text.trim(),
         city: ServiceAreas.cityNameForCoords(_pickup),
+        lat: _pickup.latitude,
+        lng: _pickup.longitude,
       );
       if (result case Success(:final data) when data.isNotEmpty) {
         final s = data.first;
@@ -483,12 +488,28 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
       case Success(:final data):
         final delivery = data['delivery'] as Map<String, dynamic>?;
         if (delivery != null && mounted) {
+          final deliveryId = delivery['id'] as String;
+          final estimate = data['estimate'] as Map<String, dynamic>?;
+          final total = (delivery['estimatedPriceCdf'] as num?)?.toInt() ??
+              (estimate?['estimatedPriceCdf'] as num?)?.toInt() ??
+              0;
+          if (data['needsEscrow'] == true && total > 0) {
+            await Navigator.push<bool>(
+              context,
+              MaterialPageRoute(
+                builder: (_) => PaymentScreen(
+                  serviceType: 'DELIVERY',
+                  serviceId: deliveryId,
+                  amountCdf: total,
+                ),
+              ),
+            );
+            if (!mounted) return;
+          }
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
-              builder: (_) => ParcelTrackingScreen(
-                parcelId: delivery['id'] as String,
-              ),
+              builder: (_) => ParcelTrackingScreen(parcelId: deliveryId),
             ),
           );
         }
@@ -525,6 +546,8 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
                     controller: _pickupController,
                     api: api,
                     city: autocompleteCity,
+                    proximityLat: _pickup.latitude,
+                    proximityLng: _pickup.longitude,
                     label: 'Adresse d\'enlèvement',
                     hint: 'Ma position ou nom du lieu',
                     prefixIcon: Icons.upload_outlined,
@@ -541,6 +564,8 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
                     controller: _dropoffController,
                     api: api,
                     city: autocompleteCity,
+                    proximityLat: _pickup.latitude,
+                    proximityLng: _pickup.longitude,
                     label: 'Adresse de livraison',
                     hint: 'Ex: Gombe, Limete, Masina…',
                     prefixIcon: Icons.place_outlined,

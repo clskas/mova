@@ -259,4 +259,22 @@ export class InternalController {
   getDriverDebtStatus(@Param('userId') userId: string) {
     return this.debtLedger.getDebtStatus(userId);
   }
+
+  @Post('services/:referenceType/:referenceId/escrow')
+  settleEscrow(
+    @Param('referenceType') referenceType: string,
+    @Param('referenceId') referenceId: string,
+    @Body()
+    body: {
+      action: 'RELEASE' | 'REFUND' | 'PARTIAL' | 'FREEZE' | 'RECORD' | 'CREDIT_RESTAURANT';
+      userId?: string;
+      amountCdf?: number;
+      method?: string;
+      courierFeeCdf?: number;
+      refundCdf?: number;
+      reason?: string;
+    },
+  ) {
+    return this.payments.settleEscrow(referenceType, referenceId, body);
+  }
 }

@@ -268,9 +268,24 @@ export class PaymentsService {
     );
   }
 
-  private async creditDriverAfterServicePayment(referenceType: string, referenceId: string) {
+  private async creditDriverAfterServicePayment(
+    referenceType: string,
+    referenceId: string,
+    opts?: { releaseEscrow?: boolean },
+  ) {
     const type = referenceType.toUpperCase();
     try {
+      const gate = await this.prisma.servicePayment.findUnique({
+        where: { referenceType_referenceId: { referenceType: type, referenceId } },
+      });
+      if (gate?.fundsFrozen) {
+        this.logger.warn(`skip payout ${type}/${referenceId} — funds frozen`);
+        return;
+      }
+      if (gate?.escrowHeld && !gate.payoutReleased && !opts?.releaseEscrow) {
+        this.logger.log(`skip payout ${type}/${referenceId} — escrow held until receipt PIN`);
+        return;
+      }
       if (type === 'RENTAL') {
         await this.syncRentalPaidStatus(referenceId);
       }
@@ -475,6 +490,9 @@ export class PaymentsService {
         driverId?: string | null;
         ownerUserId?: string | null;
         cashPin?: string | null;
+        guaranteed?: boolean;
+        escrowCollect?: boolean;
+        cashAllowed?: boolean;
       }>;
     } catch (e) {
       if (e instanceof MovaHttpException) throw e;
@@ -506,6 +524,9 @@ export class PaymentsService {
       paymentReady: info.paymentReady,
       cashPin: info.cashPin ?? null,
       title: info.title ?? null,
+      guaranteed: Boolean(info.guaranteed),
+      escrowCollect: Boolean(info.escrowCollect),
+      cashAllowed: info.cashAllowed !== false && !info.escrowCollect,
     };
   }
 
@@ -531,6 +552,14 @@ export class PaymentsService {
     }
     const amountCdf = info.amountCdf;
     if (amountCdf <= 0) throw new MovaHttpException(MovaErrorCode.PAYMENT_FAILED);
+    const escrowCollect = Boolean(info.escrowCollect);
+    if (method === PaymentMethod.CASH && escrowCollect) {
+      throw new MovaHttpException(
+        MovaErrorCode.PAYMENT_INVALID_METHOD,
+        undefined,
+        'Livraison garantie : payez par portefeuille ou Mobile Money. Les espèces ne sont pas couvertes par le séquestre.',
+      );
+    }
     const paymentPhone = this.resolvePaymentPhone(method, phone);
     const refKey = `${type}:${referenceId}`;
 
@@ -564,21 +593,59 @@ export class PaymentsService {
     }
 
     if (method === PaymentMethod.WALLET) {
-      await this.walletService.consumeHoldOrDebit(
-        userId,
-        amountCdf,
-        type,
-        referenceId,
-        `Paiement ${type} ${referenceId}`,
-      );
+      if (escrowCollect) {
+        // Débit immédiat : l'argent est sur la plateforme (comme un C2B MM).
+        // Pas de hold — sinon on ne pourrait pas créditer le resto à l'enlèvement
+        // sans libérer le reliquat livreur. Remboursement = crédit wallet.
+        await this.walletService.consumeHoldOrDebit(
+          userId,
+          amountCdf,
+          type,
+          referenceId,
+          `Séquestre ${type} ${referenceId}`,
+        );
+      } else {
+        await this.walletService.consumeHoldOrDebit(
+          userId,
+          amountCdf,
+          type,
+          referenceId,
+          `Paiement ${type} ${referenceId}`,
+        );
+      }
       const payment = await this.prisma.servicePayment.upsert({
         where: { referenceType_referenceId: { referenceType: type, referenceId } },
-        create: { referenceType: type, referenceId, userId, amountCdf, method, status: PaymentStatus.COMPLETED, providerRef: `wallet_${refKey}` },
-        update: { status: PaymentStatus.COMPLETED, method, amountCdf },
+        create: {
+          referenceType: type,
+          referenceId,
+          userId,
+          amountCdf,
+          method,
+          status: PaymentStatus.COMPLETED,
+          providerRef: escrowCollect ? `wallet_escrow_${refKey}` : `wallet_${refKey}`,
+          escrowHeld: escrowCollect,
+          payoutReleased: false,
+        },
+        update: {
+          status: PaymentStatus.COMPLETED,
+          method,
+          amountCdf,
+          escrowHeld: escrowCollect || undefined,
+          failureReason: null,
+        },
       });
       await this.publishPaymentCompleted({ referenceType: type, referenceId, userId, amountCdf, method: method.toString() });
       await this.creditDriverAfterServicePayment(type, referenceId);
-      return { success: true, payment, message: 'Paiement portefeuille effectué', amountCdf, currency: 'CDF' };
+      return {
+        success: true,
+        payment,
+        escrowHeld: escrowCollect,
+        message: escrowCollect
+          ? 'Montant séquestré. Le livreur part dès confirmation du séquestre — il n\'est payé qu\'après votre code PIN.'
+          : 'Paiement portefeuille effectué',
+        amountCdf,
+        currency: 'CDF',
+      };
     }
     if (method === PaymentMethod.CASH) {
       const payment = await this.prisma.servicePayment.upsert({
@@ -633,6 +700,8 @@ export class PaymentsService {
         status,
         providerRef: result.providerRef,
         failureReason: null,
+        escrowHeld: escrowCollect,
+        payoutReleased: false,
       },
       update: {
         status,
@@ -640,6 +709,7 @@ export class PaymentsService {
         amountCdf,
         providerRef: result.providerRef,
         failureReason: null,
+        escrowHeld: escrowCollect || undefined,
       },
     });
 
@@ -840,6 +910,10 @@ export class PaymentsService {
       isPaid,
       paymentStatus: payment?.status ?? null,
       paymentMethod: payment?.method ?? null,
+      amountCdf: payment?.amountCdf ?? null,
+      escrowHeld: payment?.escrowHeld ?? false,
+      payoutReleased: payment?.payoutReleased ?? false,
+      fundsFrozen: payment?.fundsFrozen ?? false,
     };
   }
 
@@ -852,7 +926,17 @@ export class PaymentsService {
     const byId = new Map(payments.map((p) => [p.referenceId, p]));
     const result: Record<
       string,
-      { referenceType: string; referenceId: string; isPaid: boolean; paymentStatus: string | null; paymentMethod: string | null }
+      {
+        referenceType: string;
+        referenceId: string;
+        isPaid: boolean;
+        paymentStatus: string | null;
+        paymentMethod: string | null;
+        amountCdf: number | null;
+        escrowHeld: boolean;
+        payoutReleased: boolean;
+        fundsFrozen: boolean;
+      }
     > = {};
     for (const referenceId of unique) {
       const payment = byId.get(referenceId);
@@ -862,6 +946,10 @@ export class PaymentsService {
         isPaid: payment?.status === PaymentStatus.COMPLETED,
         paymentStatus: payment?.status ?? null,
         paymentMethod: payment?.method ?? null,
+        amountCdf: payment?.amountCdf ?? null,
+        escrowHeld: payment?.escrowHeld ?? false,
+        payoutReleased: payment?.payoutReleased ?? false,
+        fundsFrozen: payment?.fundsFrozen ?? false,
       };
     }
     return result;
@@ -1246,6 +1334,180 @@ export class PaymentsService {
         MOBILE_MONEY_METHODS.has(payment.method),
       failureReason: payment?.failureReason ?? null,
       amountCdf: payment?.amountCdf ?? null,
+      escrowHeld: payment?.escrowHeld ?? false,
+      payoutReleased: payment?.payoutReleased ?? false,
+      fundsFrozen: payment?.fundsFrozen ?? false,
     };
+  }
+
+  /**
+   * Escrow ledger: collect is already on ServicePayment.
+   * RELEASE = PIN/receipt split. REFUND = cancel before pickup.
+   * PARTIAL = cancel after pickup / return-to-sender (courier fee only, no restaurant).
+   * FREEZE = PIN timeout / dispute — no auto-payout.
+   * RECORD = errand wallet hold already taken; mark COMPLETED + escrowHeld.
+   */
+  async settleEscrow(
+    referenceType: string,
+    referenceId: string,
+    body: {
+      action: 'RELEASE' | 'REFUND' | 'PARTIAL' | 'FREEZE' | 'RECORD' | 'CREDIT_RESTAURANT';
+      userId?: string;
+      amountCdf?: number;
+      method?: PaymentMethod | string;
+      courierFeeCdf?: number;
+      refundCdf?: number;
+      reason?: string;
+    },
+  ) {
+    const type = referenceType.toUpperCase();
+    const existing = await this.prisma.servicePayment.findUnique({
+      where: { referenceType_referenceId: { referenceType: type, referenceId } },
+    });
+
+    if (body.action === 'RECORD') {
+      const amountCdf = Math.round(body.amountCdf ?? existing?.amountCdf ?? 0);
+      const userId = body.userId ?? existing?.userId;
+      if (!userId || amountCdf <= 0) {
+        throw new MovaHttpException(MovaErrorCode.PAYMENT_FAILED, undefined, 'Séquestre : montant ou utilisateur manquant.');
+      }
+      const payment = await this.prisma.servicePayment.upsert({
+        where: { referenceType_referenceId: { referenceType: type, referenceId } },
+        create: {
+          referenceType: type,
+          referenceId,
+          userId,
+          amountCdf,
+          method: PaymentMethod.WALLET,
+          status: PaymentStatus.COMPLETED,
+          providerRef: `wallet_escrow_${type}:${referenceId}`,
+          escrowHeld: true,
+          payoutReleased: false,
+        },
+        update: {
+          status: PaymentStatus.COMPLETED,
+          amountCdf,
+          escrowHeld: true,
+          failureReason: null,
+        },
+      });
+      return { success: true, action: 'RECORD', payment };
+    }
+
+    if (!existing) {
+      throw new MovaHttpException(MovaErrorCode.PAYMENT_FAILED, undefined, 'Aucun séquestre pour cette commande.');
+    }
+    if (existing.fundsFrozen && body.action !== 'FREEZE') {
+      throw new MovaHttpException(
+        MovaErrorCode.PAYMENT_FAILED,
+        undefined,
+        'Fonds gelés — intervention support requise. Aucun versement automatique.',
+      );
+    }
+
+    if (body.action === 'CREDIT_RESTAURANT') {
+      if (existing.status !== PaymentStatus.COMPLETED) {
+        throw new MovaHttpException(MovaErrorCode.PAYMENT_FAILED, undefined, 'Séquestre non confirmé.');
+      }
+      const result = await this.foodPayouts.creditRestaurantSharesOnly(referenceId);
+      return { success: true, action: 'CREDIT_RESTAURANT', ...result };
+    }
+
+    if (body.action === 'FREEZE') {
+      const payment = await this.prisma.servicePayment.update({
+        where: { id: existing.id },
+        data: { fundsFrozen: true, failureReason: body.reason ?? 'Fonds gelés (délai PIN / litige)' },
+      });
+      return { success: true, action: 'FREEZE', payment };
+    }
+
+    if (body.action === 'RELEASE') {
+      if (existing.payoutReleased) {
+        return { success: true, action: 'RELEASE', already: true, payment: existing };
+      }
+      if (existing.status !== PaymentStatus.COMPLETED) {
+        throw new MovaHttpException(MovaErrorCode.PAYMENT_FAILED, undefined, 'Séquestre non confirmé.');
+      }
+      if (existing.method === PaymentMethod.WALLET) {
+        await this.walletService.captureHold(type, referenceId);
+      }
+      await this.creditDriverAfterServicePayment(type, referenceId, { releaseEscrow: true });
+      const payment = await this.prisma.servicePayment.update({
+        where: { id: existing.id },
+        data: { payoutReleased: true, fundsFrozen: false },
+      });
+      return { success: true, action: 'RELEASE', payment };
+    }
+
+    if (body.action === 'REFUND') {
+      if (existing.payoutReleased) {
+        throw new MovaHttpException(MovaErrorCode.PAYMENT_FAILED, undefined, 'Le versement a déjà été libéré.');
+      }
+      if (existing.method === PaymentMethod.WALLET) {
+        const released = await this.walletService.releaseHold(type, referenceId);
+        if (!released.released) {
+          await this.walletService.credit(
+            existing.userId,
+            existing.amountCdf,
+            body.reason ?? `Remboursement ${type} ${referenceId}`,
+            `ESCROW_REFUND:${type}:${referenceId}`,
+          );
+        }
+      } else {
+        await this.walletService.credit(
+          existing.userId,
+          existing.amountCdf,
+          body.reason ?? `Remboursement ${type} ${referenceId}`,
+          `ESCROW_REFUND:${type}:${referenceId}`,
+        );
+      }
+      const payment = await this.prisma.servicePayment.update({
+        where: { id: existing.id },
+        data: { status: PaymentStatus.REFUNDED, payoutReleased: false, failureReason: body.reason ?? 'Remboursé' },
+      });
+      return { success: true, action: 'REFUND', payment };
+    }
+
+    if (body.action === 'PARTIAL') {
+      if (existing.payoutReleased) {
+        return { success: true, action: 'PARTIAL', already: true, payment: existing };
+      }
+      const courierFeeCdf = Math.max(0, Math.round(body.courierFeeCdf ?? 0));
+      const refundCdf = Math.max(0, Math.round(body.refundCdf ?? existing.amountCdf - courierFeeCdf));
+      if (existing.method === PaymentMethod.WALLET) {
+        if (courierFeeCdf > 0) {
+          await this.walletService.captureHold(type, referenceId, courierFeeCdf);
+        } else {
+          await this.walletService.releaseHold(type, referenceId);
+        }
+      } else if (refundCdf > 0) {
+        await this.walletService.credit(
+          existing.userId,
+          refundCdf,
+          body.reason ?? `Remboursement partiel ${type} ${referenceId}`,
+          `ESCROW_REFUND:${type}:${referenceId}`,
+        );
+      }
+      if (courierFeeCdf > 0) {
+        const info = await this.fetchServicePaymentInfo(type, referenceId).catch(() => null);
+        if (info?.driverId) {
+          await this.driverPayouts.creditPayout(info.driverId, {
+            referenceType: type,
+            referenceId,
+            driverNetCdf: courierFeeCdf,
+          });
+        }
+      }
+      const payment = await this.prisma.servicePayment.update({
+        where: { id: existing.id },
+        data: {
+          payoutReleased: true,
+          failureReason: body.reason ?? 'Règlement partiel (annulation après enlèvement)',
+        },
+      });
+      return { success: true, action: 'PARTIAL', courierFeeCdf, refundCdf, payment };
+    }
+
+    throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Action séquestre inconnue.');
   }
 }

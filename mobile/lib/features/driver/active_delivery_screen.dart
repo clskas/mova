@@ -225,6 +225,7 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
       result = await api.patch('/errands/$_deliveryId/driver-status', {
         'status': nextStatus,
         if (purchaseTotalCdf != null) 'purchaseTotalCdf': purchaseTotalCdf,
+        if (deliveryPin != null && deliveryPin.isNotEmpty) 'completionPin': deliveryPin,
       });
     } else {
       result = await api.updateDeliveryStatus(_deliveryId, nextStatus, deliveryPin: deliveryPin);
@@ -257,7 +258,29 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
       builder: (ctx) => const _ErrandPurchaseTotalDialog(),
     );
     if (purchase == null || !mounted) return;
-    await _advanceStatus('COMPLETED', 'Courses terminées', purchaseTotalCdf: purchase);
+    final api = ref.read(apiClientProvider);
+    final pin = await DriverCashPinDialog.show(
+      context,
+      title: 'PIN destinataire',
+      label: 'Code PIN du demandeur',
+      validate: (enteredPin) async {
+        final result = await api.patch('/errands/$_deliveryId/driver-status', {
+          'status': 'COMPLETED',
+          'purchaseTotalCdf': purchase,
+          'completionPin': enteredPin,
+        });
+        return switch (result) {
+          Success() => (ok: true, message: null),
+          Failure(:final error) => (ok: false, message: error.message),
+        };
+      },
+    );
+    if (pin == null || pin.isEmpty || !mounted) return;
+    await _refresh();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Courses terminées — fonds libérés après PIN')),
+    );
   }
 
   Future<void> _uploadProofPhoto() async {
@@ -330,6 +353,28 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
         _nextAction!,
         'Statut mis à jour',
       );
+    }
+  }
+
+  Future<void> _markUnreachable() async {
+    final api = ref.read(apiClientProvider);
+    final result = await api.markDeliveryUnreachable(_deliveryId);
+    if (!mounted) return;
+    switch (result) {
+      case Success(:final data):
+        final returned = data['returnedToSender'] == true;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              returned
+                  ? 'Retour expéditeur : frais de course pour vous, reliquat remboursé au client.'
+                  : 'Tentative enregistrée (${data['unreachableAttempts'] ?? '?'}/3). Après 30 min et 3 essais : retour.',
+            ),
+          ),
+        );
+        await _refresh();
+      case Failure(:final error):
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
     }
   }
 
@@ -546,6 +591,15 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
               icon: Icons.delivery_dining,
               onPressed: _loading ? null : _handleNextAction,
             ),
+          if (!_isErrand && (_status == 'IN_TRANSIT' || _status == 'PICKED_UP')) ...[
+            const SizedBox(height: 8),
+            MovaButton(
+              label: 'Destinataire injoignable',
+              isSecondary: true,
+              icon: Icons.phone_disabled_outlined,
+              onPressed: _loading ? null : _markUnreachable,
+            ),
+          ],
           if (_awaitingCashConfirm) ...[
             const SizedBox(height: 8),
             MovaButton(

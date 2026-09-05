@@ -157,6 +157,26 @@ class _ErrandTrackingScreenState extends ConsumerState<ErrandTrackingScreen> {
 
   bool get _canCancel => CancelEligibility.errand(_order);
 
+  bool get _canConfirmReceipt {
+    final status = _order?['status']?.toString();
+    return status == 'IN_PROGRESS' || status == 'COMPLETED';
+  }
+
+  Future<void> _confirmReceipt() async {
+    final api = ref.read(apiClientProvider);
+    final result = await api.confirmErrandReceipt(widget.errandId);
+    if (!mounted) return;
+    switch (result) {
+      case Success():
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Réception confirmée. Le livreur est payé.')),
+        );
+        await _load(silent: true);
+      case Failure(:final error):
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
+    }
+  }
+
   int get _serviceFeeCdf =>
       _order?['serviceFeeCdf'] as int? ??
       _order?['finalPriceCdf'] as int? ??
@@ -527,12 +547,22 @@ class _ErrandTrackingScreenState extends ConsumerState<ErrandTrackingScreen> {
                                       child: Text(
                                         _order?['paymentMethod']?.toString().toUpperCase() == 'CASH'
                                             ? 'Course payée (espèces confirmées)'
-                                            : 'Course payée',
+                                            : (_order?['guaranteed'] == true &&
+                                                    _order?['status']?.toString() != 'COMPLETED')
+                                                ? 'Budget + frais séquestrés. PIN à la réception uniquement.'
+                                                : 'Course payée',
                                         style: const TextStyle(fontWeight: FontWeight.w600),
                                       ),
                                     ),
                                   ],
                                 ),
+                              ),
+                              const SizedBox(height: 12),
+                            ],
+                            if (_canConfirmReceipt && _order?['payoutReleased'] != true) ...[
+                              MovaButton(
+                                label: 'J\'ai reçu ma course',
+                                onPressed: _confirmReceipt,
                               ),
                               const SizedBox(height: 12),
                             ],

@@ -26,6 +26,8 @@ export enum MovaErrorCode {
   DELIVERY_NOT_FOUND = 'MOVA_DEL_001',
   DELIVERY_INVALID_STATUS = 'MOVA_DEL_002',
   RESTAURANT_NOT_FOUND = 'MOVA_DEL_003',
+  DELIVERY_ESCROW_REQUIRED = 'MOVA_DEL_004',
+  DELIVERY_FUNDS_FROZEN = 'MOVA_DEL_005',
 
   CARPOOL_NOT_FOUND = 'MOVA_CAR_001',
   CARPOOL_NO_SEATS = 'MOVA_CAR_002',
@@ -92,6 +94,10 @@ export const MOVA_ERROR_MESSAGES: Record<MovaErrorCode, string> = {
   [MovaErrorCode.DELIVERY_NOT_FOUND]: 'Livraison introuvable.',
   [MovaErrorCode.DELIVERY_INVALID_STATUS]: 'Statut de livraison invalide pour cette action.',
   [MovaErrorCode.RESTAURANT_NOT_FOUND]: 'Restaurant introuvable.',
+  [MovaErrorCode.DELIVERY_ESCROW_REQUIRED]:
+    'Le restaurant ne prépare et le livreur ne part qu\'après séquestre du montant total (portefeuille ou Mobile Money).',
+  [MovaErrorCode.DELIVERY_FUNDS_FROZEN]:
+    'Les fonds sont gelés (litige ou délai dépassé). Le support SENGA interviendra — aucun versement automatique.',
 
   [MovaErrorCode.CARPOOL_NOT_FOUND]: 'Trajet covoiturage introuvable.',
   [MovaErrorCode.CARPOOL_NO_SEATS]: 'Plus de places disponibles sur ce trajet.',

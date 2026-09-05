@@ -75,12 +75,17 @@ export function canCancelCarpoolTrip(params: {
   return allowed();
 }
 
-export function canCancelDelivery(params: { status: string; type?: string }): CancelEligibility {
+export function canCancelDelivery(params: { status: string; type?: string; guaranteed?: boolean }): CancelEligibility {
   if (params.status === 'CANCELLED' || params.status === 'DELIVERED') {
     return blocked('Cette commande est déjà terminée ou annulée.');
   }
   if (params.status === 'IN_TRANSIT') {
-    return blocked('La livraison est en cours — annulation impossible.');
+    return blocked(
+      'La livraison est en cours — annulation impossible. Si le destinataire est injoignable, le livreur signale le retour ; les fonds restent gelés jusqu\'au traitement.',
+    );
+  }
+  if (params.guaranteed) {
+    return allowed();
   }
   if (params.type === 'FOOD') {
     if (params.status === 'PENDING') return allowed();

@@ -5,9 +5,20 @@ import { CommissionServiceType } from '@prisma/client';
 import { mockPlatformConfig } from '../platform/platform-config.mock';
 
 jest.mock('../common/wallet-hold.util', () => ({
-  holdWalletFunds: jest.fn().mockResolvedValue({ holdId: 'hold-1', amountCdf: 50000, status: 'ACTIVE' }),
+  holdWalletFunds: jest.fn().mockResolvedValue({ holdId: 'hold-1', amountCdf: 60500, status: 'ACTIVE' }),
   releaseWalletHold: jest.fn(),
   captureWalletHold: jest.fn(),
+}));
+jest.mock('../common/escrow.util', () => ({
+  recordWalletEscrow: jest.fn().mockResolvedValue({}),
+  refundEscrow: jest.fn(),
+  releaseEscrowPayout: jest.fn(),
+  settleEscrowPartial: jest.fn(),
+  freezeEscrow: jest.fn(),
+}));
+jest.mock('../common/sms-notify.util', () => ({
+  sendPlatformSms: jest.fn().mockResolvedValue({ sent: true }),
+  deliveryPinSms: jest.fn().mockReturnValue('PIN'),
 }));
 
 describe('ErrandsService', () => {
@@ -104,6 +115,16 @@ describe('ErrandsService', () => {
     const result = await service.create('user-1', dto);
     expect(result.order.status).toBe('PENDING');
     expect(prisma.errandOrder.create).toHaveBeenCalled();
+    const { holdWalletFunds } = jest.requireMock('../common/wallet-hold.util') as {
+      holdWalletFunds: jest.Mock;
+    };
+    expect(holdWalletFunds).toHaveBeenCalledWith(
+      'user-1',
+      60500,
+      'ERRAND',
+      'e1',
+      expect.stringContaining('budget'),
+    );
   });
 
   it('retourne une liste vide si le chauffeur est indisponible', async () => {

@@ -57,6 +57,8 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   bool _loading = false;
   bool _loadingPin = true;
   bool _paymentReady = true;
+  bool _escrowCollect = false;
+  bool _cashAllowed = true;
   String? _error;
   String? _cashPin;
   late int _amountCdf;
@@ -111,6 +113,9 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
             if (amount != null && amount > 0) _amountCdf = amount;
             if (pin != null && pin.isNotEmpty) _cashPin = pin;
             _paymentReady = ready;
+            _escrowCollect = data['escrowCollect'] == true;
+            _cashAllowed = data['cashAllowed'] != false && data['escrowCollect'] != true;
+            if (_escrowCollect && _method == 'CASH') _method = 'WALLET';
             if (!ready && widget.serviceType == 'RENTAL') {
               _error =
                   'Le paiement sera disponible après le retour du véhicule. Le partenaire doit cliquer « Véhicule rendu ».';
@@ -214,6 +219,15 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       return;
     }
     final isErrand = widget.serviceType?.toUpperCase() == 'ERRAND';
+    if (_escrowCollect) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Montant séquestré. Le livreur peut partir — il sera payé après votre code PIN.'),
+        ),
+      );
+      Navigator.pop(context, true);
+      return;
+    }
     if (!pendingCash && !isErrand) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Paiement effectué avec succès')),
@@ -440,9 +454,16 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
             ),
           ),
           const SizedBox(height: 20),
+          if (_escrowCollect) ...[
+            const Text(
+              'Livraison garantie : le livreur ne part qu\'après ce paiement. Il n\'est payé qu\'à la réception (PIN).',
+              style: TextStyle(color: MovaColors.textSecondary, fontSize: 13),
+            ),
+            const SizedBox(height: 12),
+          ],
           Text('Mode de paiement', style: Theme.of(context).textTheme.titleSmall),
           const SizedBox(height: 8),
-          ..._paymentMethods.map((m) {
+          ..._paymentMethods.where((m) => _cashAllowed || m.$1 != 'CASH').map((m) {
             final (id, label, icon, color) = m;
             return Padding(
               padding: const EdgeInsets.only(bottom: 8),

@@ -2,7 +2,17 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { ConnectionCard } from "@/components/ConnectionCard";
-import { fetchProfile, updateMenuSettings, updateRestaurantLocation } from "@/lib/api";
+import {
+  addRestaurantDriver,
+  fetchProfile,
+  fetchRestaurantDrivers,
+  removeRestaurantDriver,
+  updateCourierMode,
+  updateMenuSettings,
+  updateRestaurantLocation,
+  type CourierMode,
+  type RestaurantFleetDriver,
+} from "@/lib/api";
 import { toUserErrorMessage } from "@/lib/user-messages";
 
 export default function SettingsPage() {
@@ -19,6 +29,10 @@ export default function SettingsPage() {
   const [locating, setLocating] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [courierMode, setCourierMode] = useState<CourierMode>("PLATFORM");
+  const [drivers, setDrivers] = useState<RestaurantFleetDriver[]>([]);
+  const [driverPhone, setDriverPhone] = useState("");
+  const [fleetBusy, setFleetBusy] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -31,6 +45,14 @@ export default function SettingsPage() {
       setAddress(p.address ?? "");
       setLat(p.lat != null ? String(p.lat) : "");
       setLng(p.lng != null ? String(p.lng) : "");
+      setCourierMode((p.courierMode as CourierMode) ?? "PLATFORM");
+      try {
+        const fleet = await fetchRestaurantDrivers();
+        setDrivers(fleet.drivers ?? []);
+        if (fleet.courierMode) setCourierMode(fleet.courierMode);
+      } catch {
+        /* flotte optionnelle */
+      }
     } catch (e) {
       setError(toUserErrorMessage(e, "Erreur"));
     } finally {
@@ -222,6 +244,99 @@ export default function SettingsPage() {
             <p className="text-xs text-gray-400">
               Gérez les plats et photos dans l&apos;onglet <a href="/menu" className="text-orange-600 underline">Menu</a>.
             </p>
+          </div>
+        )}
+
+        {!loading && (
+          <div className="bg-white rounded-2xl border p-6 space-y-4">
+            <h3 className="font-semibold text-sm text-gray-700">Livreurs du restaurant</h3>
+            <p className="text-xs text-gray-500">
+              Le paiement est déjà séquestré avant préparation. Vos livreurs internes ou les livreurs SENGA
+              reçoivent les frais selon le mode choisi — le restaurant est payé à l&apos;enlèvement.
+            </p>
+            <label className="block text-sm">
+              <span className="text-gray-600">Qui livre ?</span>
+              <select
+                className="mt-1 w-full rounded-xl border p-3"
+                value={courierMode}
+                disabled={fleetBusy}
+                onChange={async (e) => {
+                  const mode = e.target.value as CourierMode;
+                  setFleetBusy(true);
+                  setError(null);
+                  try {
+                    await updateCourierMode(mode);
+                    setCourierMode(mode);
+                  } catch (err) {
+                    setError(toUserErrorMessage(err, "Impossible de changer le mode livreurs."));
+                  } finally {
+                    setFleetBusy(false);
+                  }
+                }}
+              >
+                <option value="PLATFORM">Livreurs SENGA uniquement</option>
+                <option value="OWN">Mes livreurs uniquement</option>
+                <option value="HYBRID">Mes livreurs d&apos;abord, puis SENGA</option>
+              </select>
+            </label>
+            <div className="flex gap-2">
+              <input
+                className="flex-1 rounded-xl border p-3 text-sm"
+                placeholder="Téléphone livreur SENGA (+243…)"
+                value={driverPhone}
+                onChange={(e) => setDriverPhone(e.target.value)}
+              />
+              <button
+                type="button"
+                disabled={fleetBusy || !driverPhone.trim()}
+                onClick={async () => {
+                  setFleetBusy(true);
+                  setError(null);
+                  try {
+                    await addRestaurantDriver({ phone: driverPhone.trim() });
+                    setDriverPhone("");
+                    const fleet = await fetchRestaurantDrivers();
+                    setDrivers(fleet.drivers ?? []);
+                  } catch (err) {
+                    setError(toUserErrorMessage(err, "Livreur introuvable. Il doit déjà avoir un compte SENGA."));
+                  } finally {
+                    setFleetBusy(false);
+                  }
+                }}
+                className="px-4 rounded-xl bg-orange-600 text-white text-sm disabled:opacity-60"
+              >
+                Ajouter
+              </button>
+            </div>
+            {drivers.length === 0 ? (
+              <p className="text-xs text-gray-400">Aucun livreur interne. Les commandes iront aux livreurs SENGA si le mode le permet.</p>
+            ) : (
+              <ul className="space-y-2">
+                {drivers.map((d) => (
+                  <li key={d.id} className="flex items-center justify-between text-sm border rounded-xl px-3 py-2">
+                    <span className="font-mono text-xs">{d.driverUserId.slice(0, 8)}… {d.isActive ? "" : "(inactif)"}</span>
+                    <button
+                      type="button"
+                      disabled={fleetBusy}
+                      onClick={async () => {
+                        setFleetBusy(true);
+                        try {
+                          await removeRestaurantDriver(d.driverUserId);
+                          setDrivers((prev) => prev.filter((x) => x.id !== d.id));
+                        } catch (err) {
+                          setError(toUserErrorMessage(err, "Retrait impossible."));
+                        } finally {
+                          setFleetBusy(false);
+                        }
+                      }}
+                      className="text-red-600 text-xs"
+                    >
+                      Retirer
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         )}
     </div>

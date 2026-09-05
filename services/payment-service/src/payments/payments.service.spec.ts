@@ -35,6 +35,10 @@ describe('PaymentsService', () => {
   const wallet = {
     debit: jest.fn().mockResolvedValue({ balanceCdf: 0 }),
     consumeHoldOrDebit: jest.fn().mockResolvedValue({ consumed: true, via: 'DEBIT' }),
+    holdFunds: jest.fn().mockResolvedValue({ holdId: 'h1', amountCdf: 12000, status: 'ACTIVE' }),
+    captureHold: jest.fn().mockResolvedValue({ captured: true, amountCdf: 12000 }),
+    releaseHold: jest.fn().mockResolvedValue({ released: true, amountCdf: 12000 }),
+    credit: jest.fn().mockResolvedValue({ balanceCdf: 12000 }),
     creditPlatformFee: jest.fn().mockResolvedValue(null),
     completePendingTopUp: jest.fn().mockResolvedValue({ found: false }),
     refundFailedPayout: jest.fn().mockResolvedValue({ found: false }),
@@ -45,6 +49,8 @@ describe('PaymentsService', () => {
   };
   const foodPayouts = {
     creditFromServicePayment: jest.fn().mockResolvedValue({ credited: false }),
+    creditRestaurantSharesOnly: jest.fn().mockResolvedValue({ handled: true, restaurants: [{ credited: true }] }),
+    creditFoodDeliverySettlement: jest.fn().mockResolvedValue({ handled: true, driver: { credited: true } }),
   };
   const debtLedger = {
     recordCashDebt: jest.fn().mockResolvedValue(undefined),
@@ -263,5 +269,66 @@ describe('PaymentsService', () => {
         data: expect.objectContaining({ status: 'COMPLETED', failureReason: null }),
       }),
     );
+  });
+
+  it('séquestre wallet : débit immédiat sans verser le livreur', async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        userId: 'user-1',
+        amountCdf: 12000,
+        paymentReady: true,
+        escrowCollect: true,
+        guaranteed: true,
+        referenceType: 'DELIVERY',
+        referenceId: 'del-1',
+      }),
+    });
+    const result = await service.payService('DELIVERY', 'del-1', 'user-1', PaymentMethod.WALLET);
+    expect(result.success).toBe(true);
+    expect((result as { escrowHeld?: boolean }).escrowHeld).toBe(true);
+    expect(wallet.consumeHoldOrDebit).toHaveBeenCalledWith(
+      'user-1',
+      12000,
+      'DELIVERY',
+      'del-1',
+      expect.any(String),
+    );
+    expect(wallet.credit).not.toHaveBeenCalled();
+  });
+
+  it('refuse CASH sur un flux garanti (séquestre)', async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        userId: 'user-1',
+        amountCdf: 12000,
+        paymentReady: true,
+        escrowCollect: true,
+        guaranteed: true,
+        referenceType: 'DELIVERY',
+        referenceId: 'del-1',
+      }),
+    });
+    await expect(service.payService('DELIVERY', 'del-1', 'user-1', PaymentMethod.CASH)).rejects.toMatchObject({
+      code: MovaErrorCode.PAYMENT_INVALID_METHOD,
+    });
+  });
+
+  it('CREDIT_RESTAURANT à l\'enlèvement : resto payé, livreur pas encore', async () => {
+    prisma.servicePayment.findUnique.mockResolvedValueOnce({
+      id: 'sp-1',
+      status: 'COMPLETED',
+      fundsFrozen: false,
+      escrowHeld: true,
+      payoutReleased: false,
+    });
+    const result = await service.settleEscrow('DELIVERY', 'del-1', { action: 'CREDIT_RESTAURANT' });
+    expect(result).toMatchObject({ success: true, action: 'CREDIT_RESTAURANT' });
+    expect(foodPayouts.creditRestaurantSharesOnly).toHaveBeenCalledWith('del-1');
+    expect(foodPayouts.creditFoodDeliverySettlement).not.toHaveBeenCalled();
+    expect(driverPayouts.creditRidePayoutFromPayment).not.toHaveBeenCalled();
   });
 });

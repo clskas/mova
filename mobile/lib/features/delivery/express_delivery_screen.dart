@@ -19,6 +19,7 @@ import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import '../../widgets/promo_code_field.dart';
 import '../booking/widgets/mova_ride_map.dart';
+import '../booking/payment_screen.dart';
 import 'parcel_tracking_screen.dart';
 
 /// Livraison express — flux colis simplifié (petit colis, sans photo).
@@ -98,7 +99,12 @@ class _ExpressDeliveryScreenState extends ConsumerState<ExpressDeliveryScreen> {
       coords: _pickup,
       preferredArea: ref.read(selectedServiceAreaProvider),
     );
-    final result = await api.geoAutocomplete(query, city: city);
+    final result = await api.geoAutocomplete(
+      query,
+      city: city,
+      lat: _pickup.latitude,
+      lng: _pickup.longitude,
+    );
     if (!mounted) return;
     setState(() {
       _loadingPickupSuggestions = false;
@@ -157,7 +163,12 @@ class _ExpressDeliveryScreenState extends ConsumerState<ExpressDeliveryScreen> {
       coords: _pickup,
       preferredArea: ref.read(selectedServiceAreaProvider),
     );
-    final result = await api.geoAutocomplete(query, city: city);
+    final result = await api.geoAutocomplete(
+      query,
+      city: city,
+      lat: _pickup.latitude,
+      lng: _pickup.longitude,
+    );
     if (!mounted) return;
     setState(() {
       _loadingSuggestions = false;
@@ -225,6 +236,8 @@ class _ExpressDeliveryScreenState extends ConsumerState<ExpressDeliveryScreen> {
       final pickupResult = await api.geoAutocomplete(
         pickupText,
         city: ServiceAreas.cityNameForCoords(_pickup),
+        lat: _pickup.latitude,
+        lng: _pickup.longitude,
       );
       if (pickupResult case Success(:final data) when data.isNotEmpty) {
         final s = data.first;
@@ -269,6 +282,8 @@ class _ExpressDeliveryScreenState extends ConsumerState<ExpressDeliveryScreen> {
     final result = await api.geoAutocomplete(
       _dropoffController.text.trim(),
       city: ServiceAreas.cityNameForCoords(_pickup),
+      lat: _pickup.latitude,
+      lng: _pickup.longitude,
     );
     if (result case Success(:final data) when data.isNotEmpty) {
       final s = data.first;
@@ -441,10 +456,29 @@ class _ExpressDeliveryScreenState extends ConsumerState<ExpressDeliveryScreen> {
       case Success(:final data):
         final delivery = data['delivery'] as Map<String, dynamic>?;
         if (delivery != null && mounted) {
+          final deliveryId = delivery['id'] as String;
+          final estimate = data['estimate'] as Map<String, dynamic>?;
+          final total = (delivery['estimatedPriceCdf'] as num?)?.toInt() ??
+              (estimate?['estimatedPriceCdf'] as num?)?.toInt() ??
+              _estimatedPrice ??
+              0;
+          if (data['needsEscrow'] == true && total > 0) {
+            await Navigator.push<bool>(
+              context,
+              MaterialPageRoute(
+                builder: (_) => PaymentScreen(
+                  serviceType: 'DELIVERY',
+                  serviceId: deliveryId,
+                  amountCdf: total,
+                ),
+              ),
+            );
+            if (!mounted) return;
+          }
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
-              builder: (_) => ParcelTrackingScreen(parcelId: delivery['id'] as String),
+              builder: (_) => ParcelTrackingScreen(parcelId: deliveryId),
             ),
           );
         }

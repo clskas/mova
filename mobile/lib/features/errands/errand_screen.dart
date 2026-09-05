@@ -209,7 +209,12 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
             preferredArea: ref.read(selectedServiceAreaProvider),
           )
         : _autocompleteCity;
-    final result = await api.geoAutocomplete(text, city: city);
+    final result = await api.geoAutocomplete(
+      text,
+      city: city,
+      lat: nearLat ?? _pickupPoint.latitude,
+      lng: nearLng ?? _pickupPoint.longitude,
+    );
     if (result case Success(:final data) when data.isNotEmpty) {
       final s = data.first;
       final resolvedLat = (s['lat'] as num?)?.toDouble();
@@ -479,6 +484,8 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
             controller: _pickupController,
             api: api,
             city: autocompleteCity,
+            proximityLat: _pickupPoint.latitude,
+            proximityLng: _pickupPoint.longitude,
             label: compact ? 'Retrait (commerce)' : 'Point de retrait (commerce)',
             hint: 'Ex: Pharmacie, Marché…',
             prefixIcon: Icons.store_outlined,
@@ -490,6 +497,8 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
             controller: _dropoffController,
             api: api,
             city: autocompleteCity,
+            proximityLat: _pickupPoint.latitude,
+            proximityLng: _pickupPoint.longitude,
             label: compact ? 'Livraison' : 'Lieu de livraison',
             hint: 'Ex: Gombe, Bandal…',
             prefixIcon: Icons.home_outlined,

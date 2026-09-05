@@ -80,3 +80,39 @@ export function computeFoodSettlementPools(input: {
     deliveryNetPool: deliveryFeeGross * scale,
   };
 }
+
+export type SettlementParty = {
+  restaurantId: string;
+  ownerUserId: string | null;
+  grossCdf: number;
+  netCdf: number;
+  platformFeeCdf: number;
+};
+
+export type CourierShare = {
+  userId: string;
+  grossCdf: number;
+  netCdf: number;
+  platformFeeCdf: number;
+};
+
+/**
+ * Flotte resto : les frais de livraison vont au restaurant (pas au pool livreurs SENGA).
+ * La commission plateforme reste inchangée.
+ */
+export function applyOwnCourierRouting<T extends {
+  driver: CourierShare | null;
+  restaurants: SettlementParty[];
+}>(settlement: T, courierSource?: string | null): T {
+  if (courierSource !== 'RESTAURANT' || !settlement.driver || settlement.restaurants.length === 0) {
+    return settlement;
+  }
+  const fee = settlement.driver.netCdf;
+  const feeGross = settlement.driver.grossCdf;
+  const restaurants = settlement.restaurants.map((row, index) =>
+    index === 0
+      ? { ...row, netCdf: row.netCdf + fee, grossCdf: row.grossCdf + feeGross }
+      : row,
+  );
+  return { ...settlement, driver: null, restaurants };
+}

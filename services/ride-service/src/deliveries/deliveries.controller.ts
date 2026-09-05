@@ -248,6 +248,18 @@ export class DeliveriesController {
     return this.deliveriesService.updateStatus(id, dto.status, req.user.id, dto.deliveryPin);
   }
 
+  @Post(':id/confirm-receipt')
+  @ApiOperation({ summary: 'Le demandeur confirme la réception (libère le séquestre)' })
+  confirmReceipt(@Request() req: { user: { id: string } }, @Param('id') id: string) {
+    return this.deliveriesService.confirmReceipt(id, req.user.id);
+  }
+
+  @Post(':id/unreachable')
+  @ApiOperation({ summary: 'Destinataire injoignable (livreur) — retour expéditeur après 3 essais + 30 min' })
+  markUnreachable(@Request() req: { user: { id: string } }, @Param('id') id: string) {
+    return this.deliveriesService.markUnreachable(id, req.user.id);
+  }
+
   @Post(':id/rate')
   @ApiOperation({ summary: 'Noter restaurant et livreur après livraison repas' })
   rate(@Request() req: { user: { id: string } }, @Param('id') id: string, @Body() dto: RateDeliveryDto) {

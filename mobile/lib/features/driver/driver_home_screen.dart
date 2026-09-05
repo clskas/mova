@@ -780,12 +780,15 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
   }
 
   String? _vehicleIdForOffer(Map<String, dynamic> offer) {
-    final rideType = (offer['vehicleType']?.toString() ?? 'STANDARD').toUpperCase();
-    final normalized = rideType == 'MOTO' ? 'MOTO_TAXI' : rideType;
+    final rideType = MarketConfig.normalizeVehicleType(
+      offer['vehicleType']?.toString() ?? 'STANDARD',
+    );
+    final eligible = MarketConfig.driverVehicleTypesForRide(rideType);
     final vehicles = (_profile?['vehicles'] as List?)?.cast<Map<String, dynamic>>() ?? [];
     for (final v in vehicles) {
       if (v['isActive'] == false) continue;
-      if ((v['type']?.toString() ?? '').toUpperCase() == normalized) {
+      final type = MarketConfig.normalizeVehicleType(v['type']?.toString() ?? '');
+      if (eligible.contains(type)) {
         return v['id']?.toString();
       }
     }

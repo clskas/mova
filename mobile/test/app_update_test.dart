@@ -99,7 +99,7 @@ void main() {
       expect(state.showBanner, isTrue);
     });
 
-    test('matching versionName hides banner even if versionCode looks behind', () {
+    test('matching versionName still shows banner when compile-time build is behind', () {
       final state = AppUpdateService.parseRemote(
         {
           'passenger': {
@@ -113,8 +113,8 @@ void main() {
         localVersion: '1.0.3',
         localBuild: 8,
       );
-      expect(state!.updateAvailable, isFalse);
-      expect(state.showBanner, isFalse);
+      expect(state!.updateAvailable, isTrue);
+      expect(state.showBanner, isTrue);
     });
 
     test('older versionName shows banner even with a stale compile-time build', () {
@@ -154,13 +154,13 @@ void main() {
       expect(state.showBanner, isTrue);
     });
 
-    test('same 1.0.4 name hides banner even if local versionCode is 36 vs 39', () {
+    test('same versionName still shows banner when versionCode is behind', () {
       final state = AppUpdateService.parseRemote(
         {
           'passenger': {
             'currentVersion': '1.0.4',
             'minVersion': '1.0.0',
-            'currentVersionCode': 39,
+            'currentVersionCode': 42,
             'storeUrl': 'https://play.google.com/store/apps/details?id=cd.mova.mova.passenger',
           },
         },
@@ -168,8 +168,45 @@ void main() {
         localVersion: '1.0.4',
         localBuild: 36,
       );
+      expect(state!.updateAvailable, isTrue);
+      expect(state.showBanner, isTrue);
+    });
+
+    test('same 1.0.5 name and versionCode hides the banner', () {
+      final state = AppUpdateService.parseRemote(
+        {
+          'passenger': {
+            'currentVersion': '1.0.5',
+            'minVersion': '1.0.0',
+            'currentVersionCode': 42,
+            'storeUrl': 'https://play.google.com/store/apps/details?id=cd.mova.mova.passenger',
+          },
+        },
+        isDriver: false,
+        localVersion: '1.0.5',
+        localBuild: 42,
+      );
       expect(state!.updateAvailable, isFalse);
       expect(state.showBanner, isFalse);
+    });
+
+    test('1.0.4 / 39 is behind advertised 1.0.5 / 42', () {
+      final state = AppUpdateService.parseRemote(
+        {
+          'passenger': {
+            'currentVersion': '1.0.5',
+            'minVersion': '1.0.0',
+            'currentVersionCode': 42,
+            'storeUrl': 'https://play.google.com/store/apps/details?id=cd.mova.mova.passenger',
+          },
+        },
+        isDriver: false,
+        localVersion: '1.0.4',
+        localBuild: 39,
+      );
+      expect(state!.updateAvailable, isTrue);
+      expect(state.forceUpdate, isFalse);
+      expect(state.showBanner, isTrue);
     });
 
     test('minVersionCode still forces an update', () {

@@ -116,11 +116,11 @@ jobs:
         id: playver
         run: |
           set -euo pipefail
-          # Play last published versionCode was 40. PIN-without-phone needs > 40.
+          # Play last published versionCode was 41. pubspec is 1.0.5+42.
           CODE="${{ github.run_number }}"
-          if [ "$CODE" -lt 41 ]; then CODE=41; fi
+          if [ "$CODE" -lt 42 ]; then CODE=42; fi
           echo "code=$CODE" >> "$GITHUB_OUTPUT"
-          echo "Play versionCode=$CODE (pubspec 1.0.4; run_number=${{ github.run_number }})"
+          echo "Play versionCode=$CODE (pubspec 1.0.5; run_number=${{ github.run_number }})"
 
       - name: Build passenger AAB
         working-directory: mobile
@@ -130,7 +130,7 @@ jobs:
           flutter build appbundle --release \
             --flavor passenger \
             -t lib/main_passenger.dart \
-            --build-name=1.0.4 \
+            --build-name=1.0.5 \
             --build-number=${{ steps.playver.outputs.code }} \
             --dart-define=API_URL=${{ steps.urls.outputs.api }} \
             --dart-define=WS_URL=${{ steps.urls.outputs.ws }} \
@@ -144,7 +144,7 @@ jobs:
           flutter build appbundle --release \
             --flavor driver \
             -t lib/main_driver.dart \
-            --build-name=1.0.4 \
+            --build-name=1.0.5 \
             --build-number=${{ steps.playver.outputs.code }} \
             --dart-define=API_URL=${{ steps.urls.outputs.api }} \
             --dart-define=WS_URL=${{ steps.urls.outputs.ws }} \

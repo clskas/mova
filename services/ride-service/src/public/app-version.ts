@@ -17,15 +17,43 @@ const DEFAULT_PASSENGER_STORE =
 const DEFAULT_DRIVER_STORE =
   'https://play.google.com/store/apps/details?id=cd.mova.mova.driver';
 
+/** Floor aligned on `mobile/pubspec.yaml` (`1.0.5+42`). Stale Render env must not hide banners. */
+const CURRENT_VERSION_FLOOR = '1.0.5';
+const CURRENT_VERSION_CODE_FLOOR = 42;
+
 function parseVersionCode(raw: string | undefined, fallback: number): number {
   const n = Number.parseInt(raw?.trim() || '', 10);
   return Number.isFinite(n) && n >= 0 ? n : fallback;
 }
 
-/** Play store versionCode must never be advertised as 0 (that hid in-app banners). */
-function advertisedVersionCode(raw: string | undefined, fallback: number): number {
-  const n = parseVersionCode(raw, fallback);
-  return n > 0 ? n : fallback;
+export function compareSemver(a: string, b: string): number {
+  const parts = (raw: string) =>
+    raw
+      .split('+')[0]
+      .split('.')
+      .map((p) => Number.parseInt(p, 10) || 0);
+  const left = parts(a);
+  const right = parts(b);
+  const len = Math.max(left.length, right.length);
+  for (let i = 0; i < len; i++) {
+    const l = left[i] ?? 0;
+    const r = right[i] ?? 0;
+    if (l !== r) return l - r;
+  }
+  return 0;
+}
+
+/** Never advertise an older store version than the shipped floor (that hid in-app banners). */
+function advertisedVersion(raw: string | undefined, floor: string): string {
+  const v = raw?.trim();
+  if (!v) return floor;
+  return compareSemver(v, floor) >= 0 ? v : floor;
+}
+
+/** Play store versionCode must never be advertised below the shipped floor. */
+function advertisedVersionCode(raw: string | undefined, floor: number): number {
+  const n = parseVersionCode(raw, floor);
+  return n >= floor ? n : floor;
 }
 
 /** Versions store exposées aux apps (sans auth). Lever MOBILE_*_VERSION après un upload Play. */
@@ -38,17 +66,23 @@ export function buildMobileAppVersionResponse(
   return {
     generatedAt: now.toISOString(),
     passenger: {
-      currentVersion: env.MOBILE_PASSENGER_VERSION?.trim() || '1.0.4',
+      currentVersion: advertisedVersion(env.MOBILE_PASSENGER_VERSION, CURRENT_VERSION_FLOOR),
       minVersion,
       storeUrl: env.PLAY_STORE_PASSENGER_URL?.trim() || DEFAULT_PASSENGER_STORE,
-      currentVersionCode: advertisedVersionCode(env.MOBILE_PASSENGER_VERSION_CODE, 39),
+      currentVersionCode: advertisedVersionCode(
+        env.MOBILE_PASSENGER_VERSION_CODE,
+        CURRENT_VERSION_CODE_FLOOR,
+      ),
       minVersionCode,
     },
     driver: {
-      currentVersion: env.MOBILE_DRIVER_VERSION?.trim() || '1.0.4',
+      currentVersion: advertisedVersion(env.MOBILE_DRIVER_VERSION, CURRENT_VERSION_FLOOR),
       minVersion,
       storeUrl: env.PLAY_STORE_DRIVER_URL?.trim() || DEFAULT_DRIVER_STORE,
-      currentVersionCode: advertisedVersionCode(env.MOBILE_DRIVER_VERSION_CODE, 39),
+      currentVersionCode: advertisedVersionCode(
+        env.MOBILE_DRIVER_VERSION_CODE,
+        CURRENT_VERSION_CODE_FLOOR,
+      ),
       minVersionCode,
     },
   };

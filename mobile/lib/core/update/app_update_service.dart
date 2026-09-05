@@ -161,9 +161,7 @@ class AppUpdateService extends Notifier<AppUpdateState> {
         }
       }
       final playUpdate = await PlayInAppUpdate.hasUpdate();
-      final localAtOrAhead = next.remoteVersion != null &&
-          AppVersion.compare(AppVersion.name, next.remoteVersion!) >= 0;
-      if (playUpdate && !next.updateAvailable && !localAtOrAhead) {
+      if (playUpdate && !next.updateAvailable) {
         next = next.copyWith(
           updateAvailable: true,
           storeUrl: (next.storeUrl == null || next.storeUrl!.isEmpty)
@@ -260,17 +258,13 @@ class AppUpdateService extends Notifier<AppUpdateState> {
     if (current.isEmpty) return null;
     final minCode = _asInt(block['minVersionCode']);
     final currentCode = _asInt(block['currentVersionCode']);
-    final nameCmp = AppVersion.compare(localVersion, current);
-    final behindName = nameCmp < 0;
-    final atOrAheadCode =
-        currentCode > 0 && localBuild > 0 && localBuild >= currentCode;
+    final behindName = AppVersion.compare(localVersion, current) < 0;
+    final behindCode =
+        currentCode > 0 && localBuild > 0 && localBuild < currentCode;
     final belowMin = AppVersion.compare(localVersion, min) < 0 ||
         (minCode > 0 && localBuild > 0 && localBuild < minCode);
-    // Hide when versionName is already latest and/or versionCode is at/ahead.
-    // Do not treat a stale compile-time build (e.g. 8 vs 28) as behind when
-    // versionName already matches — that kept the 1.0.3 banner forever.
     return AppUpdateState(
-      updateAvailable: belowMin || (behindName && !atOrAheadCode),
+      updateAvailable: belowMin || behindName || behindCode,
       forceUpdate: belowMin,
       storeUrl: storeUrl,
       remoteVersion: current,

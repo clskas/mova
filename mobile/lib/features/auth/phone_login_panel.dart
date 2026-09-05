@@ -54,6 +54,12 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
       _phoneController.text = widget.phoneHint;
     }
     _restoreSavedPhone();
+    _pinController.addListener(_onPinOrOtpChanged);
+    _codeController.addListener(_onPinOrOtpChanged);
+  }
+
+  void _onPinOrOtpChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _restoreSavedPhone() async {
@@ -85,6 +91,8 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
 
   @override
   void dispose() {
+    _pinController.removeListener(_onPinOrOtpChanged);
+    _codeController.removeListener(_onPinOrOtpChanged);
     _phoneController.dispose();
     _codeController.dispose();
     _pinController.dispose();
@@ -191,6 +199,11 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
   }
 
   Future<void> _loginWithPin() async {
+    final pin = _pinController.text.trim();
+    if (!RegExp(r'^\d{6}$').hasMatch(pin)) {
+      setState(() => _error = 'Le code PIN doit contenir 6 chiffres.');
+      return;
+    }
     setState(() {
       _loading = true;
       _error = null;
@@ -200,7 +213,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
     final api = ref.read(apiClientProvider);
     final result = await api.post('/auth/pin/login', {
       'phone': phone,
-      'pin': _pinController.text.trim(),
+      'pin': pin,
       'role': widget.appRole,
     });
     await _handleAuthResult(result, phone);
@@ -515,10 +528,13 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
           isLoading: _loading,
           onPressed: switch (_step) {
             PhoneLoginStep.phone => _continueFromPhone,
-            PhoneLoginStep.pin => _loginWithPin,
+            PhoneLoginStep.pin =>
+              _pinController.text.trim().length == 6 ? _loginWithPin : null,
             PhoneLoginStep.forgot => _sendForgotSms,
-            PhoneLoginStep.otp => _verifyOtp,
-            PhoneLoginStep.googleOtp => _verifyGoogleOtp,
+            PhoneLoginStep.otp =>
+              _codeController.text.trim().length == 6 ? _verifyOtp : null,
+            PhoneLoginStep.googleOtp =>
+              _codeController.text.trim().length == 6 ? _verifyGoogleOtp : null,
           },
           icon: switch (_step) {
             PhoneLoginStep.phone => Icons.arrow_forward,

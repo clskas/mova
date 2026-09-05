@@ -36,6 +36,16 @@ function isNestHttpException(exception: unknown): exception is HttpException {
   );
 }
 
+/** Aligné sur PinAuth / LocalPinSetup / auth PinLoginDto. */
+export const PIN_SIX_DIGITS_FR = 'Le code PIN doit contenir 6 chiffres.';
+
+const CLASS_VALIDATOR_ENGLISH = [
+  /must match .+ regular expression/i,
+  /must be longer than or equal to/i,
+  /must be shorter than or equal to/i,
+  /must be a (string|number|boolean)/i,
+];
+
 const TECHNICAL_OR_NEST_ENGLISH = [
   /^Forbidden resource$/i,
   /^Unauthorized$/i,
@@ -56,19 +66,35 @@ const TECHNICAL_OR_NEST_ENGLISH = [
   /AFRICAS_TALKING/i,
   /TWILIO_(ACCOUNT_SID|AUTH_TOKEN|PHONE_NUMBER|VERIFY)/i,
   /Définissez [A-Z0-9_]+/,
+  ...CLASS_VALIDATOR_ENGLISH,
 ];
 
 function extractHttpMessage(body: string | object): string {
   if (typeof body === 'string') return body;
   const msg = (body as { message?: string | string[] }).message;
-  if (Array.isArray(msg)) return msg.join('. ');
+  if (Array.isArray(msg)) return [...new Set(msg)].join('. ');
   if (typeof msg === 'string') return msg;
   return 'Erreur de validation';
 }
 
+function isPinFormatValidationMessage(msg: string): boolean {
+  const lower = msg.toLowerCase();
+  if (!/\bpin\b|confirmpin/.test(lower)) return false;
+  return (
+    /must match/.test(lower) ||
+    /regular expression/.test(lower) ||
+    /must be longer than or equal to/.test(lower) ||
+    /must be shorter than or equal to/.test(lower) ||
+    /must be a string/.test(lower)
+  );
+}
+
 /** Never expose Nest/Prisma/English internals to API clients. */
-function toPublicHttpMessage(raw: string, status: number): string {
+export function toPublicHttpMessage(raw: string, status: number): string {
   const msg = (raw ?? '').trim();
+  if (isPinFormatValidationMessage(msg)) {
+    return PIN_SIX_DIGITS_FR;
+  }
   if (!msg || msg.length > 180 || TECHNICAL_OR_NEST_ENGLISH.some((re) => re.test(msg))) {
     if (status === HttpStatus.UNAUTHORIZED) {
       return MOVA_ERROR_MESSAGES[MovaErrorCode.AUTH_UNAUTHORIZED];

@@ -1,3 +1,16 @@
+/// Aligné sur PinAuth / LocalPinSetup / API PIN_SIX_DIGITS_FR.
+const pinSixDigitsFr = 'Le code PIN doit contenir 6 chiffres.';
+
+bool _isClassValidatorPinMessage(String msg) {
+  final lower = msg.toLowerCase();
+  if (!RegExp(r'\bpin\b|confirmpin').hasMatch(lower)) return false;
+  return lower.contains('must match') ||
+      lower.contains('regular expression') ||
+      lower.contains('must be longer than or equal to') ||
+      lower.contains('must be shorter than or equal to') ||
+      lower.contains('must be a string');
+}
+
 /// Messages utilisateur sans détails techniques (HTTP, exceptions, codes internes).
 String sanitizeUserMessage(
   String? raw, {
@@ -5,6 +18,7 @@ String sanitizeUserMessage(
 }) {
   if (raw == null || raw.trim().isEmpty) return fallback;
   final msg = raw.trim();
+  if (_isClassValidatorPinMessage(msg)) return pinSixDigitsFr;
   if (RegExp(r'^HTTP \d', caseSensitive: false).hasMatch(msg)) return fallback;
   if (RegExp(r'https?://', caseSensitive: false).hasMatch(msg)) return fallback;
   if (msg.toLowerCase().contains('onrender.com')) return fallback;
@@ -47,6 +61,10 @@ String sanitizeUserMessage(
   }
   if (RegExp(r'^\s*at\s+\S+', multiLine: true).hasMatch(msg)) return fallback;
   if (RegExp(r'\.dart:\d+').hasMatch(msg)) return fallback;
+  if (RegExp(r'must match .+ regular expression', caseSensitive: false).hasMatch(msg) ||
+      RegExp(r'must be longer than or equal to', caseSensitive: false).hasMatch(msg)) {
+    return fallback;
+  }
   if (msg.length > 180) return fallback;
   return msg;
 }

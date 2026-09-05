@@ -29,7 +29,20 @@ class _LocalPinSetupScreenState extends ConsumerState<LocalPinSetupScreen> {
   String? _error;
 
   @override
+  void initState() {
+    super.initState();
+    _pinController.addListener(_onPinChanged);
+    _confirmController.addListener(_onPinChanged);
+  }
+
+  void _onPinChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
   void dispose() {
+    _pinController.removeListener(_onPinChanged);
+    _confirmController.removeListener(_onPinChanged);
     _pinController.dispose();
     _confirmController.dispose();
     super.dispose();
@@ -110,7 +123,10 @@ class _LocalPinSetupScreenState extends ConsumerState<LocalPinSetupScreen> {
           MovaButton(
             label: 'Enregistrer mon PIN',
             isLoading: _loading,
-            onPressed: _submit,
+            onPressed: _pinController.text.trim().length == 6 &&
+                    _confirmController.text.trim().length == 6
+                ? _submit
+                : null,
             icon: Icons.check,
           ),
         ],

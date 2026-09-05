@@ -47,7 +47,24 @@ const TECHNICAL_PATTERNS = [
   /AFRICAS_TALKING/i,
   /TWILIO_(ACCOUNT_SID|AUTH_TOKEN|PHONE_NUMBER|VERIFY)/i,
   /Définissez [A-Z0-9_]+/,
+  /must match .+ regular expression/i,
+  /must be longer than or equal to/i,
+  /must be shorter than or equal to/i,
 ];
+
+export const PIN_SIX_DIGITS_FR = "Le code PIN doit contenir 6 chiffres.";
+
+function isClassValidatorPinMessage(msg: string): boolean {
+  const lower = msg.toLowerCase();
+  if (!/\bpin\b|confirmpin/.test(lower)) return false;
+  return (
+    /must match/.test(lower) ||
+    /regular expression/.test(lower) ||
+    /must be longer than or equal to/.test(lower) ||
+    /must be shorter than or equal to/.test(lower) ||
+    /must be a string/.test(lower)
+  );
+}
 
 export const LOGIN_GOOGLE_UNAVAILABLE = "Connexion Google impossible pour le moment. Réessayez.";
 export const LOGIN_OTP_UNAVAILABLE = "Impossible d'envoyer le code. Réessayez.";
@@ -70,6 +87,7 @@ export function sanitizeUserMessage(
   if (raw == null) return fallback;
   const msg = String(raw).trim();
   if (!msg) return fallback;
+  if (isClassValidatorPinMessage(msg)) return PIN_SIX_DIGITS_FR;
   if (msg.length > 180) return fallback;
   if (TECHNICAL_PATTERNS.some((re) => re.test(msg))) return fallback;
   return msg;

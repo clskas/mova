@@ -3,6 +3,9 @@ import { IsEnum, IsIn, IsNotEmpty, IsOptional, IsString, IsUUID, Length, Matches
 import { UserRole } from '@prisma/client';
 import { PARTNER_PORTALS, PartnerPortalId } from './partner-auth.util';
 
+/** Aligné sur PinAuth / LocalPinSetup — jamais de message class-validator anglais. */
+const PIN_SIX_DIGITS_FR = 'Le code PIN doit contenir 6 chiffres.';
+
 export class AuthIntentDto {
   @ApiProperty({ required: false, enum: UserRole })
   @IsOptional()
@@ -63,9 +66,9 @@ export class PinLoginDto extends AuthIntentDto {
   @IsUUID()
   userId?: string;
   @ApiProperty({ example: '847291' })
-  @IsString()
-  @Length(6, 6)
-  @Matches(/^\d{6}$/)
+  @IsString({ message: PIN_SIX_DIGITS_FR })
+  @Length(6, 6, { message: PIN_SIX_DIGITS_FR })
+  @Matches(/^\d{6}$/, { message: PIN_SIX_DIGITS_FR })
   pin: string;
 }
 
@@ -106,13 +109,13 @@ export class LinkPhoneDto {
 
 export class SetupLocalPinDto {
   @ApiProperty({ example: '847291' })
-  @IsString()
-  @Length(6, 6)
-  @Matches(/^\d{6}$/)
+  @IsString({ message: PIN_SIX_DIGITS_FR })
+  @Length(6, 6, { message: PIN_SIX_DIGITS_FR })
+  @Matches(/^\d{6}$/, { message: PIN_SIX_DIGITS_FR })
   pin: string;
   @ApiProperty({ example: '847291' })
-  @IsString()
-  @Length(6, 6)
-  @Matches(/^\d{6}$/)
+  @IsString({ message: PIN_SIX_DIGITS_FR })
+  @Length(6, 6, { message: PIN_SIX_DIGITS_FR })
+  @Matches(/^\d{6}$/, { message: PIN_SIX_DIGITS_FR })
   confirmPin: string;
 }

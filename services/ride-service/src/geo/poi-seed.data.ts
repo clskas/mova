@@ -9,6 +9,7 @@ export type PoiSeedRow = {
   lng: number;
   city: string;
   address?: string;
+  source?: string;
 };
 
 /** POI Kinshasa — import OSM ciblé (marchés, hôpitaux, universités, pharmacies). */
@@ -36,6 +37,8 @@ export const KINSHASA_POI_SEED: PoiSeedRow[] = [
 /** Mapping tags Overpass → catégorie SENGA. */
 export const OSM_TAG_TO_CATEGORY: Record<string, PlaceOfInterestCategory> = {
   marketplace: 'MARKET',
+  supermarket: 'MARKET',
+  mall: 'MARKET',
   hospital: 'HOSPITAL',
   clinic: 'HOSPITAL',
   university: 'UNIVERSITY',

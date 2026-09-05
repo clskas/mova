@@ -91,9 +91,10 @@ describe('PhotonService', () => {
     expect(results[0].category).toBe('HOSPITAL');
     expect(results[0].city).toBe('Lubumbashi');
 
-    const calledUrl = (httpFetch.httpGetJson as jest.Mock).mock.calls[0][0] as string;
-    expect(calledUrl).toContain('osm_tag=amenity%3Ahospital');
-    expect(calledUrl).toContain('bbox=12');
-    expect(calledUrl).toContain('lat=-11.6647');
+    const urls = (httpFetch.httpGetJson as jest.Mock).mock.calls.map((c) => c[0] as string);
+    expect(urls.length).toBeGreaterThanOrEqual(2);
+    expect(urls.every((u) => u.includes('osm_tag=amenity%3Ahospital'))).toBe(true);
+    expect(urls[0]).toContain('bbox=12');
+    expect(urls[0]).toContain('lat=-11.6647');
   });
 });

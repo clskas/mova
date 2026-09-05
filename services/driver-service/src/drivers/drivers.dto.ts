@@ -23,6 +23,7 @@ export class UpdateOnboardingDto {
   @ApiPropertyOptional() @IsOptional() @IsString() payoutPhone?: string;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() charterAccepted?: boolean;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() trainingCompleted?: boolean;
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() cguAccepted?: boolean;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() onboardingCompleted?: boolean;
   @ApiPropertyOptional() @IsOptional() @IsString() plateNumber?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() vehicleMake?: string;

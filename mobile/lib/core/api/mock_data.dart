@@ -622,6 +622,7 @@ abstract final class MockData {
           'make': 'Toyota',
           'model': 'Corolla',
           'plateNumber': 'KIN-1234',
+          'imageUrl': 'https://example.cd/vehicle.jpg',
         },
         'kyc': {
           'requiredComplete': false,

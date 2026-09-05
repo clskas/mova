@@ -62,7 +62,10 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
-    expect(find.text('Hôpitaux'), findsOneWidget);
+    final hospitalChip = tester.widget<FilterChip>(find.widgetWithText(FilterChip, 'Hôpitaux'));
+    expect(hospitalChip.selected, isTrue);
+    expect(find.textContaining('filtrent les marqueurs orange uniquement'), findsOneWidget);
+    expect(find.textContaining('Lieux sur la carte :'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

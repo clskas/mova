@@ -71,7 +71,7 @@ export class PhotonService {
     const searchText = `${q}, RDC`;
     const params = new URLSearchParams({
       q: searchText,
-      limit: String(Math.min(opts?.limit ?? 5, 10)),
+      limit: String(Math.min(opts?.limit ?? 5, 15)),
       lang: 'fr',
     });
     for (const tag of opts?.osmTags ?? []) {
@@ -115,7 +115,7 @@ export class PhotonService {
     return this.mapFeature(feature);
   }
 
-  /** POI d'une catégorie (tags OSM) — marchés, hôpitaux, universités, pharmacies… */
+  /** POI d'une catégorie (tags OSM) — toutes les requêtes FR en parallèle, bbox RDC. */
   async searchByCategory(
     category: PoiCategory,
     opts?: {
@@ -127,14 +127,29 @@ export class PhotonService {
     },
   ): Promise<PhotonPlace[]> {
     const spec = poiCategorySpec(category);
-    const query = spec.queries[0];
-    if (!query) return [];
-    const hits = await this.search(query, {
-      ...opts,
-      osmTags: spec.photonTags,
-      limit: opts?.limit ?? 10,
-    });
-    return hits.map((p) => ({ ...p, category: p.category ?? category }));
+    const queries = spec.queries.length > 0 ? spec.queries : [];
+    if (queries.length === 0) return [];
+    const limit = Math.min(opts?.limit ?? 15, 15);
+    const batches = await Promise.all(
+      queries.map((query) =>
+        this.search(query, {
+          ...opts,
+          osmTags: spec.photonTags,
+          limit,
+        }),
+      ),
+    );
+    const seen = new Set<string>();
+    const out: PhotonPlace[] = [];
+    for (const hits of batches) {
+      for (const p of hits) {
+        const key = `${p.lat.toFixed(4)},${p.lng.toFixed(4)}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push({ ...p, category: p.category ?? category });
+      }
+    }
+    return out;
   }
 
   private mapFeature(feature: PhotonFeature, fallbackCity?: string): PhotonPlace | null {

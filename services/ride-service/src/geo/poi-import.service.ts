@@ -60,7 +60,7 @@ export class PoiImportService {
           lng: row.lng,
           city: row.city,
           address: row.address,
-          source: 'OSM',
+          source: row.source ?? 'OSM',
         },
       });
       imported++;
@@ -90,6 +90,8 @@ export class PoiImportService {
       (
         node["amenity"~"marketplace|hospital|clinic|university|college|pharmacy|school|bus_station|train_station"](${targetBox.south},${targetBox.west},${targetBox.north},${targetBox.east});
         way["amenity"~"marketplace|hospital|clinic|university|college|pharmacy|school|bus_station|train_station"](${targetBox.south},${targetBox.west},${targetBox.north},${targetBox.east});
+        node["shop"~"supermarket|mall|marketplace"](${targetBox.south},${targetBox.west},${targetBox.north},${targetBox.east});
+        way["shop"~"supermarket|mall|marketplace"](${targetBox.south},${targetBox.west},${targetBox.north},${targetBox.east});
       );
       out center;
     `;
@@ -119,7 +121,7 @@ export class PoiImportService {
       const tags = el.tags ?? {};
       const name = tags.name ?? tags['name:fr'];
       if (!lat || !lng || !name) continue;
-      const amenity = tags.amenity ?? '';
+      const amenity = tags.amenity ?? tags.shop ?? '';
       const category = OSM_TAG_TO_CATEGORY[amenity] ?? 'OTHER';
       rows.push({
         osmId: `osm-${el.id}`,
@@ -209,5 +211,40 @@ export class PoiImportService {
 
   async seedAllCities() {
     return this.upsertRows(buildRegionalPoiSeed());
+  }
+
+  /** Persiste les hits live Mapbox / Photon pour enrichir le catalogue `placeOfInterest`. */
+  async persistLivePlaces(
+    rows: Array<{
+      osmId?: string | null;
+      name: string;
+      category: PlaceOfInterestCategory | string;
+      lat: number;
+      lng: number;
+      city: string;
+      address?: string | null;
+      source: string;
+    }>,
+  ): Promise<{ imported: number; skipped: number }> {
+    const mapped: PoiSeedRow[] = [];
+    for (const row of rows) {
+      const name = row.name.trim();
+      if (!name) continue;
+      const osmId =
+        row.osmId?.trim() ||
+        `live-${row.source.toLowerCase()}-${row.lat.toFixed(5)}-${row.lng.toFixed(5)}`;
+      mapped.push({
+        osmId,
+        name,
+        category: row.category as PlaceOfInterestCategory,
+        lat: row.lat,
+        lng: row.lng,
+        city: row.city || 'RDC',
+        address: row.address ?? undefined,
+        source: row.source || 'OSM',
+      });
+    }
+    if (mapped.length === 0) return { imported: 0, skipped: 0 };
+    return this.upsertRows(mapped);
   }
 }

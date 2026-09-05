@@ -34,6 +34,7 @@ type AutocompleteResult = {
 @Injectable()
 export class GeoService implements OnModuleInit {
   private readonly logger = new Logger(GeoService.name);
+  private readonly overpassCooldown = new Map<string, number>();
 
   constructor(
     private prisma: PrismaService,
@@ -598,7 +599,29 @@ export class GeoService implements OnModuleInit {
       radiusKm: hasGps ? radiusKm : undefined,
       limit,
     });
+    if (live.length > 0) {
+      void this.poiImport.persistLivePlaces(live).catch((err: unknown) => {
+        this.logger.warn(`POI live persist skipped: ${err instanceof Error ? err.message : String(err)}`);
+      });
+    }
+    const refreshCity =
+      opts.city?.trim() ||
+      (hasGps ? resolveCityFromCoords(opts.lat!, opts.lng!) : undefined);
+    if (refreshCity && rows.length < 8) {
+      this.maybeRefreshOverpass(refreshCity);
+    }
     return merged;
+  }
+
+  private maybeRefreshOverpass(city: string) {
+    const key = city.trim().toLowerCase();
+    if (!key) return;
+    const last = this.overpassCooldown.get(key) ?? 0;
+    if (Date.now() - last < 30 * 60 * 1000) return;
+    this.overpassCooldown.set(key, Date.now());
+    void this.poiImport.importFromOverpass(city).catch((err: unknown) => {
+      this.logger.warn(`Overpass refresh ${city} skipped: ${err instanceof Error ? err.message : String(err)}`);
+    });
   }
 
   private async fetchLivePlaces(
@@ -640,22 +663,25 @@ export class GeoService implements OnModuleInit {
               setTimeout(() => resolve([]), 5000),
             ),
           ]);
-          return hits.map((p) => ({
-            id: `live-${p.provider}-${p.lat.toFixed(5)}-${p.lng.toFixed(5)}`,
-            osmId: null as string | null,
-            name: p.label.split(',')[0]?.trim() || p.label,
-            category: (p.category ?? category) as PoiCategory,
-            lat: p.lat,
-            lng: p.lng,
-            city:
-              (p.city && findServiceAreaByName(p.city)?.name) ||
-              resolveCityFromCoords(p.lat, p.lng) ||
-              p.city ||
-              opts.city ||
-              'RDC',
-            address: p.address,
-            source: p.provider === 'mapbox' ? 'MAPBOX' : 'OSM',
-          }));
+          return hits.map((p) => {
+            const osmNumeric = 'osmId' in p && typeof p.osmId === 'number' ? p.osmId : null;
+            return {
+              id: `live-${p.provider}-${p.lat.toFixed(5)}-${p.lng.toFixed(5)}`,
+              osmId: osmNumeric != null ? `osm-${osmNumeric}` : (`live-${p.provider}-${p.lat.toFixed(5)}-${p.lng.toFixed(5)}` as string | null),
+              name: p.label.split(',')[0]?.trim() || p.label,
+              category: (p.category ?? category) as PoiCategory,
+              lat: p.lat,
+              lng: p.lng,
+              city:
+                (p.city && findServiceAreaByName(p.city)?.name) ||
+                resolveCityFromCoords(p.lat, p.lng) ||
+                p.city ||
+                opts.city ||
+                'RDC',
+              address: p.address,
+              source: p.provider === 'mapbox' ? 'MAPBOX' : 'OSM',
+            };
+          });
         } catch {
           return [];
         }

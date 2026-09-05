@@ -17,9 +17,9 @@ const DEFAULT_PASSENGER_STORE =
 const DEFAULT_DRIVER_STORE =
   'https://play.google.com/store/apps/details?id=cd.mova.mova.driver';
 
-/** Floor aligned on `mobile/pubspec.yaml` (`1.0.5+42`). Stale Render env must not hide banners. */
+/** Floor aligned on `mobile/pubspec.yaml` (`1.0.5+46`). Stale Render env must not hide banners. */
 const CURRENT_VERSION_FLOOR = '1.0.5';
-const CURRENT_VERSION_CODE_FLOOR = 42;
+const CURRENT_VERSION_CODE_FLOOR = 46;
 
 function parseVersionCode(raw: string | undefined, fallback: number): number {
   const n = Number.parseInt(raw?.trim() || '', 10);

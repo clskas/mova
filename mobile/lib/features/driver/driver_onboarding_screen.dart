@@ -12,6 +12,7 @@ import '../../core/media/image_pick_util.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
+import '../help/legal_screen.dart';
 import '../profile/profile_screen.dart';
 import 'driver_home_screen.dart';
 
@@ -51,9 +52,11 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
   String _payoutProvider = 'ORANGE_MONEY';
   bool _charterAccepted = false;
   bool _trainingCompleted = false;
+  bool _cguAccepted = false;
   bool _isEditingDossier = false;
 
   static const _stepStorageKey = 'driver_onboarding_step';
+  static const _cguStorageKey = 'driver_onboarding_cgu_accepted';
   static const double _fieldGap = 12;
   static const double _docGap = 12;
 
@@ -138,6 +141,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
           _loading = false;
         });
         await _restoreOnboardingStep();
+        await _restoreCguAccepted();
         final done = data['profile']?['onboardingCompleted'] == true;
         if (done && !widget.canSkipToHome && mounted) {
           Navigator.of(context).pushReplacement(
@@ -179,6 +183,11 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
         }
         if (!_isEditingDossier && (_vehicleImageUrl == null || _vehicleImageUrl!.isEmpty)) {
           return 'Ajoutez une photo de votre véhicule.';
+        }
+        return null;
+      case 3:
+        if (!_activationConsentsAccepted) {
+          return 'Cochez la formation sécurité, la charte et les CGU pour continuer.';
         }
         return null;
       case 4:
@@ -234,6 +243,31 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
     _charterAccepted = profile?['charterAcceptedAt'] != null;
     _trainingCompleted = profile?['trainingCompletedAt'] != null;
     _isEditingDossier = profile?['onboardingCompleted'] == true;
+  }
+
+  bool get _activationConsentsAccepted =>
+      _trainingCompleted && _charterAccepted && _cguAccepted;
+
+  bool get _continueEnabled {
+    if (_loading) return false;
+    if (_step == 3 && !_activationConsentsAccepted) return false;
+    if (_step == _steps.length - 1 && !_isEditingDossier && !_activationConsentsAccepted) {
+      return false;
+    }
+    return true;
+  }
+
+  Future<void> _persistCguAccepted() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_cguStorageKey, _cguAccepted);
+  }
+
+  Future<void> _restoreCguAccepted() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getBool(_cguStorageKey);
+    if (saved == true && mounted) {
+      setState(() => _cguAccepted = true);
+    }
   }
 
   String _dateOnly(dynamic raw) {
@@ -384,8 +418,8 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
   }
 
   Future<void> _finishOnboarding() async {
-    if (!_isEditingDossier && (!_charterAccepted || !_trainingCompleted)) {
-      setState(() => _error = 'Acceptez la charte et confirmez la formation.');
+    if (!_isEditingDossier && !_activationConsentsAccepted) {
+      setState(() => _error = 'Cochez la formation sécurité, la charte et les CGU.');
       return;
     }
     setState(() {
@@ -397,6 +431,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
       final result = await api.patch('/drivers/onboarding', {
         if (_charterAccepted) 'charterAccepted': true,
         if (_trainingCompleted) 'trainingCompleted': true,
+        if (_cguAccepted) 'cguAccepted': true,
       });
       if (!mounted) return;
       setState(() => _loading = false);
@@ -414,6 +449,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
     final result = await api.patch('/drivers/onboarding', {
       'charterAccepted': true,
       'trainingCompleted': true,
+      'cguAccepted': true,
       'onboardingCompleted': true,
     });
     if (!mounted) return;
@@ -662,6 +698,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
                         child: MovaButton(
                           label: 'Retour',
                           isSecondary: true,
+                          icon: Icons.arrow_back_rounded,
                           onPressed: _loading ? null : _back,
                         ),
                       ),
@@ -671,8 +708,9 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
                         label: _step == _steps.length - 1
                             ? (_isEditingDossier ? 'Enregistrer' : 'Envoyer le dossier')
                             : 'Continuer',
+                        icon: Icons.arrow_forward_rounded,
                         isLoading: _loading,
-                        onPressed: _loading ? null : _next,
+                        onPressed: _continueEnabled ? _next : null,
                       ),
                     ),
                   ],
@@ -845,6 +883,32 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
           onChanged: (v) => setState(() => _charterAccepted = v ?? false),
           contentPadding: const EdgeInsets.symmetric(vertical: 4),
           title: const Text('J\'accepte la charte de bonne conduite SENGA'),
+          controlAffinity: ListTileControlAffinity.leading,
+        ),
+        CheckboxListTile(
+          value: _cguAccepted,
+          onChanged: (v) {
+            setState(() => _cguAccepted = v ?? false);
+            _persistCguAccepted();
+          },
+          contentPadding: const EdgeInsets.symmetric(vertical: 4),
+          title: const Text('J\'accepte les Conditions Générales d\'Utilisation (CGU) SENGA'),
+          subtitle: GestureDetector(
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const LegalScreen(title: 'CGU', asset: 'assets/legal/cgu_fr.md'),
+                ),
+              );
+            },
+            child: const Text(
+              'Lire les CGU',
+              style: TextStyle(
+                color: MovaColors.violet,
+                decoration: TextDecoration.underline,
+              ),
+            ),
+          ),
           controlAffinity: ListTileControlAffinity.leading,
         ),
       ],

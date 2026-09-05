@@ -126,9 +126,10 @@ describe('GeocodeProvider', () => {
       reverse: jest.fn(),
     };
 
+    const nominatim = { search: jest.fn().mockResolvedValue([]), reverse: jest.fn() };
     const provider = new GeocodeProvider(
       mapbox as unknown as MapboxService,
-      { search: jest.fn(), reverse: jest.fn() } as unknown as NominatimService,
+      nominatim as unknown as NominatimService,
       photon as unknown as PhotonService,
     );
 
@@ -142,5 +143,46 @@ describe('GeocodeProvider', () => {
       expect.objectContaining({ centerLat: -1.6788, centerLng: 29.2175 }),
     );
     expect(photon.searchByCategory).toHaveBeenCalled();
+    expect(nominatim.search).toHaveBeenCalled();
+  });
+
+  it('searchCategory falls back to Nominatim when Mapbox and Photon are thin', async () => {
+    const mapbox = {
+      isConfigured: () => true,
+      search: jest.fn(),
+      searchCategory: jest.fn().mockResolvedValue([]),
+    };
+    const photon = {
+      search: jest.fn(),
+      searchByCategory: jest.fn().mockResolvedValue([]),
+      reverse: jest.fn(),
+    };
+    const nominatim = {
+      search: jest.fn().mockResolvedValue([
+        {
+          label: 'Hôpital Général de Kinshasa',
+          address: 'Gombe, Kinshasa',
+          lat: -4.3278,
+          lng: 15.3089,
+          commune: 'Gombe',
+          city: 'Kinshasa',
+        },
+      ]),
+      reverse: jest.fn(),
+    };
+
+    const provider = new GeocodeProvider(
+      mapbox as unknown as MapboxService,
+      nominatim as unknown as NominatimService,
+      photon as unknown as PhotonService,
+    );
+
+    const results = await provider.searchCategory('HOSPITAL', {
+      centerLat: -4.32,
+      centerLng: 15.31,
+    });
+    expect(results).toHaveLength(1);
+    expect(results[0].provider).toBe('nominatim');
+    expect(results[0].category).toBe('HOSPITAL');
   });
 });

@@ -244,10 +244,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
     _fetchAllEstimates();
   }
 
-  int get _visiblePoiCount {
-    if (_poiCategoryFilter == null) return _poiPlaces.length;
-    return _poiPlaces.where((p) => p['category']?.toString() == _poiCategoryFilter).length;
-  }
+  int get _visiblePoiCount => _poiPlaces.length;
 
   void _setDropoffFromCoords(LatLng coords, String label) {
     _dropoff = ServiceAreaLocation.ensureInServiceArea(coords, address: label);

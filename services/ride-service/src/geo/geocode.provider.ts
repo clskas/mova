@@ -96,14 +96,23 @@ export class GeocodeProvider {
 
     const photonPromise = this.withTimeout(
       this.photon.searchByCategory(category, searchOpts),
-      3500,
+      5000,
       [],
     );
 
     const [mapboxHits, photonHits] = await Promise.all([mapboxPromise, photonPromise]);
-    return this.mergePlaces([
+    const merged = this.mergePlaces([
       ...mapboxHits.map((p) => ({ ...p, provider: 'mapbox' as const, category: p.category ?? category })),
       ...photonHits.map((p) => ({ ...p, provider: 'photon' as const, category: p.category ?? category })),
+    ]);
+    if (merged.length >= 6) return merged;
+
+    const fallbackQuery = poiCategorySpec(category).queries[0];
+    if (!fallbackQuery) return merged;
+    const nominatimHits = await this.searchNominatim(fallbackQuery, searchOpts);
+    return this.mergePlaces([
+      ...merged,
+      ...nominatimHits.map((p) => ({ ...p, category })),
     ]);
   }
 

@@ -7,6 +7,10 @@ describe('service-areas', () => {
     expect(DRC_SERVICE_AREAS.some((a) => a.id === 'lubumbashi')).toBe(true);
   });
 
+  it('toutes les villes officielles RDC sont actives (lancement national)', () => {
+    expect(DRC_SERVICE_AREAS.every((a) => a.active)).toBe(true);
+  });
+
   it('detects Kinshasa coords', () => {
     expect(isInServiceArea(-4.3217, 15.3125)).toBe(true);
     expect(findServiceAreaByCoords(-4.3217, 15.3125)?.name).toBe('Kinshasa');

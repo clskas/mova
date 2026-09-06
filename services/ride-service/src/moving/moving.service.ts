@@ -194,6 +194,8 @@ export class MovingService {
       volumeM3: number;
       vehicleCategory?: MovingVehicleCategory | null;
       discountCdf?: number | null;
+      pickupLat: number;
+      pickupLng: number;
       [key: string]: unknown;
     },
     viewerUserId?: string,
@@ -223,7 +225,7 @@ export class MovingService {
       priceCdf: request.estimatedPriceCdf,
       formattedPrice: formatCdf(request.estimatedPriceCdf),
       currency: 'CDF',
-      city: resolveCityFromCoords(request.pickupLat, request.pickupLng),
+      city: resolveCityFromCoords(Number(request.pickupLat), Number(request.pickupLng)),
       ...canCancelMoving({ status: request.status }),
     };
   }

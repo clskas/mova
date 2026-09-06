@@ -111,6 +111,8 @@ const needed = [
   'AFRISOFT_HUB_API_KEY',
   'AFRISOFT_HUB_WEBHOOK_SECRET',
   'PAY_HUB_URL',
+  'MAPBOX_ACCESS_TOKEN',
+  'MAPBOX_GEOCODE_ENABLED',
 ];
 
 console.log(
@@ -179,6 +181,8 @@ const targets = {
     'SUPABASE_UPLOADS_BUCKET',
     'SUPABASE_KYC_BUCKET',
     'MOCK_PAYMENTS',
+    'MAPBOX_ACCESS_TOKEN',
+    'MAPBOX_GEOCODE_ENABLED',
   ],
   'srv-d8slrm8g4nts73bq9pj0': [
     'PAY_HUB_URL',

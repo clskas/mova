@@ -248,7 +248,7 @@ export class SeedService implements OnModuleInit {
           const p = await this.prisma.province.upsert({
             where: { name: area.province },
             create: { name: area.province, isActive: true },
-            update: {},
+            update: { isActive: true },
           });
           provinceId = p.id;
           provinceIds.set(area.province, provinceId);
@@ -277,9 +277,18 @@ export class SeedService implements OnModuleInit {
             maxLat: b.maxLat,
             minLng: b.minLng,
             maxLng: b.maxLng,
+            isActive: area.active,
           },
         });
       }
+      await this.prisma.city.updateMany({
+        where: { slug: { in: DRC_SERVICE_AREAS.map((a) => a.id) } },
+        data: { isActive: true },
+      });
+      await this.prisma.province.updateMany({
+        where: { name: { in: [...new Set(DRC_SERVICE_AREAS.map((a) => a.province))] } },
+        data: { isActive: true },
+      });
       const cities = await this.prisma.city.findMany({
         select: { slug: true, name: true, isActive: true },
       });

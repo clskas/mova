@@ -17,4 +17,27 @@ void main() {
       'Le code PIN doit contenir 6 chiffres.',
     );
   });
+
+  test('maps payment gateway English to French', () {
+    expect(
+      sanitizeUserMessage('Payment Failed, Merchant is not allowed to use this channel0'),
+      'Le paiement Mobile Money a échoué. Réessayez ou contactez le support SENGA.',
+    );
+  });
+
+  test('maps class-validator English and Prisma codes without leaking internals', () {
+    expect(sanitizeUserMessage('phone must be a string'), 'Données invalides. Vérifiez les champs.');
+    expect(
+      sanitizeUserMessage('Unique constraint failed P2002 on escrowReady'),
+      'Une erreur est survenue. Veuillez réessayer.',
+    );
+    expect(
+      sanitizeUserMessage('Internal server error'),
+      'Une erreur est survenue. Veuillez réessayer.',
+    );
+    expect(
+      sanitizeUserMessage('MOVA_DEL_004'),
+      'Une erreur est survenue. Veuillez réessayer.',
+    );
+  });
 }

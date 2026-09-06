@@ -44,9 +44,25 @@ const TECHNICAL_PATTERNS = [
   /must match .+ regular expression/i,
   /must be longer than or equal to/i,
   /must be shorter than or equal to/i,
+  /must be an? (string|number|boolean|integer|uuid|array|object|email)/i,
+  /\bP20\d{2}\b/,
+  /\bescrowReady\b/,
+  /\bchannel0\b/,
+  /Payment Failed/i,
+  /Merchant is not allowed/i,
+  /Failed to process the payment/i,
+  /\bmapbox\b/i,
+  /Invalid Token/i,
+  /CinetPay non configuré/i,
+  /Échec init CinetPay/i,
+  /SERDIPAY_/i,
+  /SMS_PROVIDER/i,
 ];
 
 export const PIN_SIX_DIGITS_FR = "Le code PIN doit contenir 6 chiffres.";
+export const PAYMENT_FAILED_FR =
+  "Le paiement Mobile Money a échoué. Réessayez ou contactez le support SENGA.";
+export const VALIDATION_FAILED_FR = "Données invalides. Vérifiez les champs.";
 
 function isClassValidatorPinMessage(msg: string): boolean {
   const lower = msg.toLowerCase();
@@ -82,6 +98,16 @@ export function sanitizeUserMessage(
   const msg = String(raw).trim();
   if (!msg) return fallback;
   if (isClassValidatorPinMessage(msg)) return PIN_SIX_DIGITS_FR;
+  if (/payment failed|merchant is not allowed|failed to process the payment|channel0/i.test(msg)) {
+    return PAYMENT_FAILED_FR;
+  }
+  if (
+    /must match .+ regular expression|must be longer than or equal to|must be shorter than or equal to|must be an? (string|number|boolean|integer|uuid|array|object|email)/i.test(
+      msg,
+    )
+  ) {
+    return VALIDATION_FAILED_FR;
+  }
   if (msg.length > 180) return fallback;
   if (TECHNICAL_PATTERNS.some((re) => re.test(msg))) return fallback;
   return msg;

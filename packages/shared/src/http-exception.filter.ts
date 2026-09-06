@@ -44,7 +44,7 @@ const CLASS_VALIDATOR_ENGLISH = [
   /must match .+ regular expression/i,
   /must be longer than or equal to/i,
   /must be shorter than or equal to/i,
-  /must be a (string|number|boolean)/i,
+  /must be an? (string|number|boolean|integer|uuid|array|object|email)/i,
 ];
 
 const TECHNICAL_OR_NEST_ENGLISH = [
@@ -56,6 +56,14 @@ const TECHNICAL_OR_NEST_ENGLISH = [
   /^Internal server error$/i,
   /PrismaClient/i,
   /\bPrisma\b/,
+  /\bP20\d{2}\b/,
+  /\bescrowReady\b/,
+  /\bchannel0\b/,
+  /\bmapbox\b/i,
+  /Invalid Token/i,
+  /"features"\s*:/,
+  /CinetPay non configuré/i,
+  /Échec init CinetPay/i,
   /NestJS/i,
   /ECONNREFUSED/i,
   /Unique constraint/i,
@@ -67,6 +75,7 @@ const TECHNICAL_OR_NEST_ENGLISH = [
   /AFRICAS_TALKING/i,
   /TWILIO_(ACCOUNT_SID|AUTH_TOKEN|PHONE_NUMBER|VERIFY)/i,
   /Définissez [A-Z0-9_]+/,
+  /MOVA_[A-Z]+_\d+/,
   ...CLASS_VALIDATOR_ENGLISH,
 ];
 
@@ -112,7 +121,11 @@ export function toPublicHttpMessage(raw: string, status: number): string {
     if (status === HttpStatus.NOT_FOUND) {
       return MOVA_ERROR_MESSAGES[MovaErrorCode.NOT_FOUND];
     }
-    if (status === HttpStatus.SERVICE_UNAVAILABLE) {
+    if (
+      status === HttpStatus.BAD_GATEWAY ||
+      status === HttpStatus.SERVICE_UNAVAILABLE ||
+      status === HttpStatus.GATEWAY_TIMEOUT
+    ) {
       return 'Service temporairement indisponible. Réessayez dans quelques minutes.';
     }
     if (status >= 500) {

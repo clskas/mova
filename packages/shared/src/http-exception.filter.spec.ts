@@ -43,4 +43,22 @@ describe('toPublicHttpMessage', () => {
       ),
     ).not.toMatch(/channel0|Payment Failed/i);
   });
+
+  it('hides Prisma / field-name / geo JSON internals', () => {
+    expect(toPublicHttpMessage('Unique constraint failed on the fields: (`phone`) P2002', 409)).toBe(
+      MOVA_ERROR_MESSAGES[MovaErrorCode.VALIDATION_ERROR],
+    );
+    expect(toPublicHttpMessage('escrowReady must be a boolean', HttpStatus.BAD_REQUEST)).toBe(
+      MOVA_ERROR_MESSAGES[MovaErrorCode.VALIDATION_ERROR],
+    );
+    expect(
+      toPublicHttpMessage('{"message":"Not Authorized - Invalid Token","features":[]}', HttpStatus.BAD_GATEWAY),
+    ).toBe('Service temporairement indisponible. Réessayez dans quelques minutes.');
+    expect(toPublicHttpMessage('Internal server error', HttpStatus.INTERNAL_SERVER_ERROR)).toBe(
+      MOVA_ERROR_MESSAGES[MovaErrorCode.INTERNAL_ERROR],
+    );
+    expect(toPublicHttpMessage('MOVA_DEL_004', HttpStatus.CONFLICT)).toBe(
+      MOVA_ERROR_MESSAGES[MovaErrorCode.VALIDATION_ERROR],
+    );
+  });
 });

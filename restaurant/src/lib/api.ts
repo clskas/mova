@@ -35,6 +35,8 @@ export type RestaurantFleetDriver = {
   id: string;
   driverUserId: string;
   isActive: boolean;
+  phone?: string;
+  name?: string;
 };
 
 export type RestaurantOrder = {

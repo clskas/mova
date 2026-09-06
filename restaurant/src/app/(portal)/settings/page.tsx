@@ -251,8 +251,9 @@ export default function SettingsPage() {
           <div className="bg-white rounded-2xl border p-6 space-y-4">
             <h3 className="font-semibold text-sm text-gray-700">Livreurs du restaurant</h3>
             <p className="text-xs text-gray-500">
-              Le paiement est déjà séquestré avant préparation. Vos livreurs internes ou les livreurs SENGA
-              reçoivent les frais selon le mode choisi — le restaurant est payé à l&apos;enlèvement.
+              Le client paie d&apos;abord (portefeuille ou Mobile Money) avant que vous prépariez.
+              Vous êtes payé quand le plat part. Un livreur SENGA est payé après le code PIN du client.
+              Si c&apos;est votre livreur, les frais de course restent au restaurant.
             </p>
             <label className="block text-sm">
               <span className="text-gray-600">Qui livre ?</span>
@@ -298,7 +299,7 @@ export default function SettingsPage() {
                     const fleet = await fetchRestaurantDrivers();
                     setDrivers(fleet.drivers ?? []);
                   } catch (err) {
-                    setError(toUserErrorMessage(err, "Livreur introuvable. Il doit déjà avoir un compte SENGA."));
+                    setError(toUserErrorMessage(err, "Livreur introuvable. Il doit déjà avoir un compte livreur SENGA."));
                   } finally {
                     setFleetBusy(false);
                   }
@@ -308,13 +309,19 @@ export default function SettingsPage() {
                 Ajouter
               </button>
             </div>
+            <p className="text-xs text-gray-400">
+              Ajoutez un livreur par son numéro. Il doit déjà être inscrit comme livreur dans l&apos;application SENGA.
+            </p>
             {drivers.length === 0 ? (
               <p className="text-xs text-gray-400">Aucun livreur interne. Les commandes iront aux livreurs SENGA si le mode le permet.</p>
             ) : (
               <ul className="space-y-2">
                 {drivers.map((d) => (
                   <li key={d.id} className="flex items-center justify-between text-sm border rounded-xl px-3 py-2">
-                    <span className="font-mono text-xs">{d.driverUserId.slice(0, 8)}… {d.isActive ? "" : "(inactif)"}</span>
+                    <span className="text-sm">
+                      {d.phone || d.name || "Livreur SENGA"}
+                      {d.isActive ? "" : " (inactif)"}
+                    </span>
                     <button
                       type="button"
                       disabled={fleetBusy}

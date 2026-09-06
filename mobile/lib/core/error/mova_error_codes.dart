@@ -30,6 +30,10 @@ const movaErrorMessages = <String, String>{
   'MOVA_DEL_001': 'Livraison introuvable.',
   'MOVA_DEL_002': 'Statut de livraison invalide pour cette action.',
   'MOVA_DEL_003': 'Restaurant introuvable.',
+  'MOVA_DEL_004':
+      'Le client doit d\'abord payer (portefeuille ou Mobile Money). Ensuite seulement le restaurant prépare et le livreur part.',
+  'MOVA_DEL_005':
+      'Les fonds sont bloqués (litige ou délai dépassé). Le support SENGA interviendra — aucun versement automatique.',
   'MOVA_CAR_001': 'Trajet covoiturage introuvable.',
   'MOVA_CAR_002': 'Plus de places disponibles sur ce trajet.',
   'MOVA_CAR_003': 'Vous avez déjà rejoint ce trajet.',

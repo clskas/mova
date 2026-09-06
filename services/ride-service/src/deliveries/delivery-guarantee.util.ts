@@ -142,11 +142,7 @@ export function assertEscrowAllowsDispatch(params: {
   }
   const due = params.escrowAmountCdf ?? params.estimatedPriceCdf ?? 0;
   if (!params.escrowReady || due <= 0) {
-    throw new MovaHttpException(
-      MovaErrorCode.DELIVERY_ESCROW_REQUIRED,
-      HttpStatus.CONFLICT,
-      'Dispatch interdit : le montant total n\'est pas encore séquestré (paiement SUCCESS requis).',
-    );
+    throw new MovaHttpException(MovaErrorCode.DELIVERY_ESCROW_REQUIRED, HttpStatus.CONFLICT);
   }
 }
 

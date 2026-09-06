@@ -95,9 +95,9 @@ export const MOVA_ERROR_MESSAGES: Record<MovaErrorCode, string> = {
   [MovaErrorCode.DELIVERY_INVALID_STATUS]: 'Statut de livraison invalide pour cette action.',
   [MovaErrorCode.RESTAURANT_NOT_FOUND]: 'Restaurant introuvable.',
   [MovaErrorCode.DELIVERY_ESCROW_REQUIRED]:
-    'Le restaurant ne prépare et le livreur ne part qu\'après séquestre du montant total (portefeuille ou Mobile Money).',
+    'Le client doit d\'abord payer (portefeuille ou Mobile Money). Ensuite seulement le restaurant prépare et le livreur part.',
   [MovaErrorCode.DELIVERY_FUNDS_FROZEN]:
-    'Les fonds sont gelés (litige ou délai dépassé). Le support SENGA interviendra — aucun versement automatique.',
+    'Les fonds sont bloqués (litige ou délai dépassé). Le support SENGA interviendra — aucun versement automatique.',
 
   [MovaErrorCode.CARPOOL_NOT_FOUND]: 'Trajet covoiturage introuvable.',
   [MovaErrorCode.CARPOOL_NO_SEATS]: 'Plus de places disponibles sur ce trajet.',

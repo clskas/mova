@@ -695,6 +695,20 @@ const ADMIN_TECHNICAL_PATTERNS = [
   /EACCES|ENOENT|EPERM/i,
   /^\s*at\s+\S+/m,
   /\.(ts|js|tsx|jsx):\d+/i,
+  /must match .+ regular expression/i,
+  /must be longer than or equal to/i,
+  /must be shorter than or equal to/i,
+  /must be an? (string|number|boolean|integer|uuid|array|object|email)/i,
+  /\bP20\d{2}\b/,
+  /\bescrowReady\b/,
+  /\bchannel0\b/,
+  /Payment Failed/i,
+  /Merchant is not allowed/i,
+  /Failed to process the payment/i,
+  /\bmapbox\b/i,
+  /Invalid Token/i,
+  /CinetPay non configuré/i,
+  /Échec init CinetPay/i,
 ];
 
 function adminErrorFallback(status?: number): string {
@@ -711,6 +725,12 @@ export function sanitizeAdminError(message: string, status?: number): string {
   const fallback = adminErrorFallback(status);
   const msg = (message ?? "").trim();
   if (!msg) return fallback;
+  if (/\bpin\b|confirmpin/i.test(msg) && /must match|regular expression|must be a string/i.test(msg)) {
+    return "Le code PIN doit contenir 6 chiffres.";
+  }
+  if (/payment failed|merchant is not allowed|failed to process the payment|channel0/i.test(msg)) {
+    return "Le paiement Mobile Money a échoué. Réessayez ou contactez le support SENGA.";
+  }
   if (msg.length > 180) return fallback;
   if (ADMIN_TECHNICAL_PATTERNS.some((re) => re.test(msg))) return fallback;
   if (msg.includes("MOVA_") && msg.includes("_")) return fallback;

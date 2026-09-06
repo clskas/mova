@@ -457,14 +457,14 @@ function OrderCard({
             </option>
             {fleetDrivers.filter((d) => d.isActive).map((d) => (
               <option key={d.id} value={d.driverUserId}>
-                {d.driverUserId.slice(0, 8)}
+                {d.phone || d.name || "Livreur SENGA"}
               </option>
             ))}
           </select>
         </div>
       )}
       {order.status === "PENDING" && !order.isPaid && (
-        <p className="mt-3 text-xs text-amber-700">En attente du paiement séquestré du client.</p>
+        <p className="mt-3 text-xs text-amber-700">En attente du paiement du client. Préparez seulement après confirmation.</p>
       )}
     </div>
   );

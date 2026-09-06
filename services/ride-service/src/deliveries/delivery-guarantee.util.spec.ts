@@ -20,6 +20,9 @@ describe('delivery-guarantee.util', () => {
       assertEscrowAllowsDispatch({ guaranteed: true, escrowReady: false, estimatedPriceCdf: 8000 });
     } catch (e) {
       expect((e as MovaHttpException).code).toBe(MovaErrorCode.DELIVERY_ESCROW_REQUIRED);
+      const body = (e as MovaHttpException).getResponse() as { message?: string };
+      expect(body.message).toMatch(/payer/i);
+      expect(body.message).not.toMatch(/SUCCESS|escrowReady|Dispatch/i);
     }
   });
 

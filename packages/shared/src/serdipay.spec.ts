@@ -1,9 +1,12 @@
 import {
   mapSerdiPayPaymentFailure,
   mapSerdiPayTokenFailure,
+  SERDIPAY_B2C_CHANNEL_DISABLED_FR,
+  SERDIPAY_CHANNEL_DISABLED_FR,
   SERDIPAY_MIN_AMOUNT_CDF,
   __resetSerdiPayTokenCache,
   isSerdiPayAuthConfigured,
+  isSerdiPayChannelDisabledError,
   isSerdiPayPaymentConfigured,
   isSerdiPaySmsConfigured,
   serdiPayDisburseMobileMoney,
@@ -41,6 +44,9 @@ describe('serdipay Public API', () => {
     expect(serdiPayTelecomCode('AIRTEL_MONEY')).toBe('AM');
     expect(serdiPayTelecomCode('ORANGE_MONEY')).toBe('OM');
     expect(serdiPayTelecomCode('MPESA')).toBe('MP');
+    expect(serdiPayTelecomCode('AFRIMONEY')).toBe('AF');
+    expect(serdiPayTelecomCode('MP')).toBe('MP');
+    expect(serdiPayTelecomCode('OM')).toBe('OM');
   });
 
   it('requires full payment credentials for MM gateway', () => {
@@ -192,7 +198,11 @@ describe('serdipay Public API', () => {
     expect(fetchMock.mock.calls[1][0]).toBe(
       'https://serdipay.com/api/public-api/v1/merchant/payment-client',
     );
-    expect(JSON.parse(fetchMock.mock.calls[1][1].body as string).telecom).toBe('MP');
+    const b2cBody = JSON.parse(fetchMock.mock.calls[1][1].body as string);
+    expect(b2cBody.telecom).toBe('MP');
+    expect(b2cBody.currency).toBe('CDF');
+    expect(b2cBody).not.toHaveProperty('channel');
+    expect(b2cBody.channel).toBeUndefined();
   });
 
   it('refuses SMS when SERDIPAY_SMS_API_ID/KEY unset', async () => {
@@ -219,6 +229,58 @@ describe('serdipay Public API', () => {
 
   it('maps get-token failures away from debit-style solde copy', () => {
     expect(mapSerdiPayTokenFailure(400, 'Failed to get the token')).toMatch(/Authentification marchand/);
+  });
+
+  it('maps AfriMomo channel0 merchant-not-allowed to French (B2C vs C2B)', () => {
+    const raw = 'Payment Failed, Merchant is not allowed to use this channel0';
+    expect(isSerdiPayChannelDisabledError(raw)).toBe(true);
+    expect(mapSerdiPayPaymentFailure(400, raw, raw, undefined, 'b2c')).toBe(
+      SERDIPAY_B2C_CHANNEL_DISABLED_FR,
+    );
+    expect(mapSerdiPayPaymentFailure(400, raw, raw, undefined, 'c2b')).toBe(
+      SERDIPAY_CHANNEL_DISABLED_FR,
+    );
+    expect(mapSerdiPayPaymentFailure(400, raw)).toBe(SERDIPAY_B2C_CHANNEL_DISABLED_FR);
+    expect(mapSerdiPayPaymentFailure(400, raw)).not.toMatch(/channel0/i);
+    expect(mapSerdiPayPaymentFailure(400, raw)).not.toMatch(/Payment Failed/i);
+  });
+
+  it('surfaces SerdiPay B2C channel0 as French and never sends channel:0', async () => {
+    env.SERDIPAY_EMAIL = 'm@example.com';
+    env.SERDIPAY_PASSWORD = 'portal-pw';
+    env.SERDIPAY_API_ID = 'APIX';
+    env.SERDIPAY_MERCHANT_CODE = '466551';
+    env.SERDIPAY_MERCHANT_PIN = '1234';
+
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ access_token: 'tok-abc' }),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        json: async () => ({
+          message: 'Failed to process the payment',
+          error: 'Payment Failed, Merchant is not allowed to use this channel0',
+        }),
+      });
+    (global as unknown as { fetch: typeof fetch }).fetch = fetchMock as unknown as typeof fetch;
+
+    const result = await serdiPayDisburseMobileMoney(get, {
+      operator: 'MPESA',
+      amountCdf: 2300,
+      phone: '+243810000001',
+      reference: 'senga_withdraw_test',
+    });
+    expect(result.success).toBe(false);
+    expect(result.message).toBe(SERDIPAY_B2C_CHANNEL_DISABLED_FR);
+    expect(result.message).not.toMatch(/channel0/i);
+    const payBody = JSON.parse(fetchMock.mock.calls[1][1].body as string);
+    expect(payBody.telecom).toBe('MP');
+    expect(payBody).not.toHaveProperty('channel');
   });
 
   it('surfaces SerdiPay C2B 402 amount detail instead of generic Failed to process', async () => {

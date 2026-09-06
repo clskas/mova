@@ -1,6 +1,7 @@
 import { HttpStatus } from '@nestjs/common';
 import { PIN_SIX_DIGITS_FR, toPublicHttpMessage } from './http-exception.filter';
 import { MOVA_ERROR_MESSAGES, MovaErrorCode } from './mova-error-codes';
+import { SERDIPAY_B2C_CHANNEL_DISABLED_FR } from './serdipay';
 
 describe('toPublicHttpMessage', () => {
   it('maps class-validator PIN regex/length English to French', () => {
@@ -26,5 +27,20 @@ describe('toPublicHttpMessage', () => {
 
   it('keeps an already-friendly French PIN message', () => {
     expect(toPublicHttpMessage(PIN_SIX_DIGITS_FR, HttpStatus.BAD_REQUEST)).toBe(PIN_SIX_DIGITS_FR);
+  });
+
+  it('maps SerdiPay/AfriMomo channel0 English to French (never leaks channel0)', () => {
+    expect(
+      toPublicHttpMessage(
+        'Payment Failed, Merchant is not allowed to use this channel0',
+        HttpStatus.BAD_REQUEST,
+      ),
+    ).toBe(SERDIPAY_B2C_CHANNEL_DISABLED_FR);
+    expect(
+      toPublicHttpMessage(
+        'Payment Failed, Merchant is not allowed to use this channel0',
+        HttpStatus.BAD_REQUEST,
+      ),
+    ).not.toMatch(/channel0|Payment Failed/i);
   });
 });

@@ -5,10 +5,12 @@ import {
   afrisoftHubSign,
   afrisoftHubTimestampFresh,
   afrisoftHubVerifySignature,
+  afrisoftPayHubDisburse,
   afrisoftPayHubInitiate,
   afrisoftPayHubOperator,
   isAfriSoftPayHubConfigured,
 } from './afrisoft-pay-hub';
+import { SERDIPAY_B2C_CHANNEL_DISABLED_FR } from './serdipay';
 
 describe('afrisoft-pay-hub', () => {
   it('signs HMAC per AFRISOFT_PAYMENT_HUB_API.md §3', () => {
@@ -129,5 +131,71 @@ describe('afrisoft-pay-hub', () => {
     });
     expect(result.success).toBe(false);
     expect(result.message).toMatch(/Authentification marchand SerdiPay/i);
+  });
+
+  it('POSTs /v1/payouts for B2C with telecom MP and no channel field', async () => {
+    const env: Record<string, string> = {
+      PAY_HUB_URL: 'https://pay.afri-soft.com',
+      AFRISOFT_HUB_APP_ID: 'senga',
+      AFRISOFT_HUB_API_KEY: 'test-key',
+    };
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 201,
+      json: async () => ({
+        payment_id: 'pay_payout',
+        status: 'PENDING',
+        reference: 'senga_withdraw_1',
+        provider_ref: 'sp_payout_1',
+        amount_cdf: 2300,
+        telecom: 'MP',
+      }),
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    await afrisoftPayHubDisburse((k) => env[k], {
+      amountCdf: 2300,
+      phone: '+243810000001',
+      operator: 'MPESA',
+      reference: 'senga_withdraw_1',
+      purpose: 'withdraw',
+    });
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('https://pay.afri-soft.com/v1/payouts');
+    const body = JSON.parse(String(init.body));
+    expect(body.telecom).toBe('MP');
+    expect(body.currency).toBe('CDF');
+    expect(body.purpose).toBe('withdraw');
+    expect(body).not.toHaveProperty('channel');
+  });
+
+  it('sanitizes hub English channel0 on B2C failure (even if VPS still leaks it)', async () => {
+    const env: Record<string, string> = {
+      PAY_HUB_URL: 'https://pay.afri-soft.com',
+      AFRISOFT_HUB_APP_ID: 'senga',
+      AFRISOFT_HUB_API_KEY: 'test-key',
+    };
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 400,
+      json: async () => ({
+        success: false,
+        error: {
+          code: 'HUB_PROVIDER_FAILED',
+          message: 'Payment Failed, Merchant is not allowed to use this channel0',
+        },
+      }),
+    }) as unknown as typeof fetch;
+
+    const result = await afrisoftPayHubDisburse((k) => env[k], {
+      amountCdf: 2300,
+      phone: '+243810000001',
+      operator: 'MPESA',
+      purpose: 'withdraw',
+    });
+    expect(result.success).toBe(false);
+    expect(result.message).toBe(SERDIPAY_B2C_CHANNEL_DISABLED_FR);
+    expect(result.message).not.toMatch(/channel0/i);
   });
 });

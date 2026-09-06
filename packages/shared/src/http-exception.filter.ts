@@ -9,6 +9,7 @@ import {
 import { Response } from 'express';
 import { REQUEST_ID_HEADER, RequestWithId } from './request-id.middleware';
 import { MovaErrorCode, MOVA_ERROR_MESSAGES } from './mova-error-codes';
+import { isSerdiPayChannelDisabledError, mapSerdiPayPaymentFailure } from './serdipay';
 
 export class MovaHttpException extends HttpException {
   constructor(
@@ -94,6 +95,12 @@ export function toPublicHttpMessage(raw: string, status: number): string {
   const msg = (raw ?? '').trim();
   if (isPinFormatValidationMessage(msg)) {
     return PIN_SIX_DIGITS_FR;
+  }
+  if (
+    isSerdiPayChannelDisabledError(msg) ||
+    /payment failed|failed to process the payment/i.test(msg)
+  ) {
+    return mapSerdiPayPaymentFailure(status, msg, msg);
   }
   if (!msg || msg.length > 180 || TECHNICAL_OR_NEST_ENGLISH.some((re) => re.test(msg))) {
     if (status === HttpStatus.UNAUTHORIZED) {

@@ -215,8 +215,10 @@ Même body que §4.1. Défaut `purpose` = `withdraw`.
 POST /v1/payouts HTTP/1.1
 ```
 
-- **SerdiPay** : B2C (`payment-client`) vers le `phone` / `telecom`.
-- **CinetPay** : **non supporté** → HTTP 400, message « Retraits CinetPay non supportés sur le hub. »
+- **SerdiPay** : B2C (`payment-client`) vers le `phone` / `telecom` (`OM` / `MP` / `AM` / `AF`). Le corps Public API n’envoie **pas** de champ `channel` — `channel0` dans une erreur AfriMomo est l’id interne du rail (souvent B2C non ouvert), pas un bug de mapping SENGA.
+- **CinetPay** : **non supporté** → HTTP 400, message « Retraits CinetPay non supportés sur le hub. » SerdiPay est le seul rail payout.
+
+**Activation marchand (ops) :** C2B (`payment-merchant`) et B2C (`payment-client`) sont des **produits séparés** chez SerdiPay / AfriMomo. Un C2B M-Pesa réussi (ex. recharge 2 300 FC) ne signifie **pas** que le décaissement est ouvert. Si SerdiPay répond `Merchant is not allowed to use this channel` (souvent concaténé `channel0`), le marchand n’a pas le rail B2C. SENGA refuse le retrait, **recrédite le wallet** (idempotent, pas de double payout) et affiche un message français — **ne pas** simuler un versement. Faire activer B2C / payout (AfriMomo) sur le dashboard SerdiPay, puis réessayer.
 
 Le hub **débite le compte marchand AfriSoft**, pas le wallet de votre utilisateur. Si vous devez d’abord prélever un client, encaisser en C2B (§4.1) **puis** payout — ou tenir un ledger interne et ne payout que si le solde métier le permet (c’est ce que fait SENGA pour les retraits chauffeur).
 

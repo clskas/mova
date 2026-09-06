@@ -16,7 +16,7 @@
  */
 
 import { createHmac, randomUUID, timingSafeEqual } from 'crypto';
-import { serdiPayNormalizePhone, serdiPayTelecomCode } from './serdipay';
+import { mapSerdiPayPaymentFailure, serdiPayNormalizePhone, serdiPayTelecomCode } from './serdipay';
 import type { EnvGetter, MobileMoneyOperator } from './africas-talking';
 
 const DEFAULT_HUB_URL = 'https://pay.afri-soft.com';
@@ -264,19 +264,29 @@ function pickStr(obj: Record<string, unknown>, keys: string[]): string | undefin
 }
 
 /** Hub errors are often `{ error: { message } }` (Nest filter), not a top-level string. */
-function pickHubErrorMessage(json: Record<string, unknown>, fallback: string): string {
+function pickHubErrorMessage(
+  json: Record<string, unknown>,
+  fallback: string,
+  kind?: 'c2b' | 'b2c',
+): string {
   const top = pickStr(json, ['message', 'failure_reason']);
-  if (top) return top;
   const err = json.error;
-  if (typeof err === 'string' && err.trim()) return err.trim();
-  if (err && typeof err === 'object') {
-    const nested = pickStr(err as Record<string, unknown>, ['message', 'error']);
-    if (nested) return nested;
-  }
-  return fallback;
+  const nested =
+    typeof err === 'string' && err.trim()
+      ? err.trim()
+      : err && typeof err === 'object'
+        ? pickStr(err as Record<string, unknown>, ['message', 'error'])
+        : undefined;
+  const raw = top || nested;
+  if (!raw) return fallback;
+  return mapSerdiPayPaymentFailure(0, raw, raw, undefined, kind);
 }
 
-function mapHubJson(json: Record<string, unknown>, fallbackMsg: string): AfriSoftHubPaymentResult {
+function mapHubJson(
+  json: Record<string, unknown>,
+  fallbackMsg: string,
+  kind?: 'c2b' | 'b2c',
+): AfriSoftHubPaymentResult {
   const statusRaw = pickStr(json, ['status'])?.toUpperCase();
   const status: AfriSoftHubPaymentStatus | undefined =
     statusRaw === 'COMPLETED' || statusRaw === 'FAILED' || statusRaw === 'PENDING'
@@ -285,7 +295,7 @@ function mapHubJson(json: Record<string, unknown>, fallbackMsg: string): AfriSof
   const paymentId = pickStr(json, ['payment_id', 'paymentId']);
   const aggregatorRef = pickStr(json, ['provider_ref', 'providerRef']);
   const providerRef = paymentId ?? aggregatorRef;
-  const message = pickHubErrorMessage(json, fallbackMsg);
+  const message = pickHubErrorMessage(json, fallbackMsg, kind);
   const amount = json.amount_cdf ?? json.amountCdf;
   return {
     success: status !== 'FAILED' && Boolean(paymentId || providerRef),
@@ -330,6 +340,7 @@ export async function afrisoftPayHubInitiate(
     ...(params.metadata ? { metadata: params.metadata } : {}),
     ...(params.idempotencyKey ? { idempotency_key: params.idempotencyKey } : {}),
   };
+  const mmKind = params.kind === 'B2C' ? 'b2c' : 'c2b';
   const { ok, json } = await hubFetch(get, 'POST', path, body);
   if (!ok) {
     return {
@@ -337,10 +348,15 @@ export async function afrisoftPayHubInitiate(
       message: pickHubErrorMessage(
         json,
         'Échec de l’initiation Mobile Money via le hub AfriSoft.',
+        mmKind,
       ),
     };
   }
-  const mapped = mapHubJson(json, 'Confirmez le paiement sur votre téléphone Mobile Money.');
+  const mapped = mapHubJson(
+    json,
+    'Confirmez le paiement sur votre téléphone Mobile Money.',
+    mmKind,
+  );
   if (!mapped.success) {
     return { ...mapped, success: false, message: mapped.message };
   }

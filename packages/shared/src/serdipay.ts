@@ -221,12 +221,28 @@ export function mapSerdiPayTokenFailure(status: number, raw?: string): string {
   return `Échec auth SerdiPay (${status || 'réseau'}). Réessayez plus tard.`;
 }
 
+/** AfriMomo/SerdiPay concatenates channel id (`channel0`) — B2C product not enabled. */
+export const SERDIPAY_B2C_CHANNEL_DISABLED_FR =
+  'Le versement vers Mobile Money n’est pas encore activé. Votre solde reste dans le portefeuille SENGA. Contactez le support.';
+
+export const SERDIPAY_CHANNEL_DISABLED_FR =
+  'Ce canal Mobile Money n’est pas activé pour le marchand. Contactez le support SENGA.';
+
+export function isSerdiPayChannelDisabledError(raw?: string): boolean {
+  const lower = (raw ?? '').toLowerCase();
+  return (
+    lower.includes('not allowed to use this channel') ||
+    (lower.includes('merchant is not allowed') && lower.includes('channel'))
+  );
+}
+
 /** Prefer SerdiPay `error` detail over generic `message` ("Failed to process the payment"). */
 export function mapSerdiPayPaymentFailure(
   status: number,
   message?: string,
   error?: string,
   description?: string,
+  kind?: 'c2b' | 'b2c',
 ): string {
   const detail = (error ?? '').trim() || (description ?? '').trim() || (message ?? '').trim();
   const lower = detail.toLowerCase();
@@ -235,6 +251,9 @@ export function mapSerdiPayPaymentFailure(
     const min = range?.[1] ? Number(range[1]) : SERDIPAY_MIN_AMOUNT_CDF;
     const max = range?.[2] ? Number(range[2]) : SERDIPAY_MAX_AMOUNT_CDF;
     return `Montant hors plage Mobile Money : minimum ${min.toLocaleString('fr-FR')} FC, maximum ${max.toLocaleString('fr-FR')} FC.`;
+  }
+  if (isSerdiPayChannelDisabledError(detail)) {
+    return kind === 'c2b' ? SERDIPAY_CHANNEL_DISABLED_FR : SERDIPAY_B2C_CHANNEL_DISABLED_FR;
   }
   if (lower.includes('failed to process the payment') && !error?.trim()) {
     return 'Le paiement Mobile Money a été refusé. Vérifiez le montant (≥ 2 300 FC) et réessayez.';
@@ -484,6 +503,7 @@ async function postMerchantPayment(
           data.message,
           data.error,
           data.description,
+          kind,
         ),
       };
     }

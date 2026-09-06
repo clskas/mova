@@ -450,6 +450,8 @@ Voir aussi `deploy/afrisoft-pay/.env.example`, `config/external-apis.env.example
 
 Le PDF « API USSD - documentation » contient **deux** produits : (1) **Public API** (pp. 1–15) — Mobile Money marchand, ce que le Word documente et ce que le hub appelle ; (2) **SERDIPAY USSD** (pp. 16–25) — dépôt/retrait wallet `{ username, account }`, endpoints non fournis (« Share the Endpoint »). `get-token` Public API : `POST {BASE}/api/public-api/v1/merchant/get-token` avec `{ email, password }` (un champ `username` seul → 400 `email required`). Fiche Word : C2B = `payment-merchant`, B2C = `payment-client`. Pas de sandbox dans ces deux fichiers : un C2B réel (≥ 2 300 FC — plancher SerdiPay production) est le test suivant une fois `get-token` en 200.
 
+**B2C / AfriMomo :** C2B et B2C sont des canaux marchands distincts. `Payment Failed, Merchant is not allowed to use this channel0` (`channel` + id `0` concaténés côté agrégateur) = B2C non activé sur le compte SerdiPay/AfriMomo — pas un champ `channel` envoyé par SENGA. CinetPay n’a pas de payout sur ce hub. Tant que B2C n’est pas ouvert au dashboard, les retraits wallet restent refusés (solde recrédité, message FR).
+
 **Checklist VPS (copier-coller) — ne pas committer les valeurs :**
 
 ```bash

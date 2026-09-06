@@ -133,7 +133,7 @@ Sans provider SMS avec `MOCK_OTP=false` et sans `ALLOW_TEST_OTP`, l'API renvoie 
 | `MOCK_PAYMENTS` | Comportement |
 |-----------------|--------------|
 | `true` (dev) | Mobile money simulé, succès immédiat |
-| `false` (prod) | SerdiPay C2B (`payment-merchant`) / B2C (`payment-client`) ; telecom `OM` / `MP` / `AM` / `AF` |
+| `false` (prod) | SerdiPay C2B (`payment-merchant`) / B2C (`payment-client`) ; telecom `OM` / `MP` / `AM` / `AF`. CinetPay = collect only (pas de payout). B2C doit être **activé** sur le dashboard SerdiPay/AfriMomo — sinon `channel0` / « merchant not allowed » ; SENGA refuse et recrédite le wallet. |
 
 `SERDIPAY_BASE_URL` : **prod** `https://serdipay.com` (PDF Public API + fiche Word « API Routes PRODUCTION »). Staging Word : `https://api.serdipay.cloud`. Recreate du conteneur `payment` après changement. Auth : `POST …/merchant/get-token` `{ email, password }`.
 

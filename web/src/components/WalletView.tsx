@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { apiFetch, formatCdf } from "@/lib/api";
 import { getStoredPhone } from "@/lib/auth";
 import { toUserErrorMessage } from "@/lib/user-messages";
@@ -27,6 +27,8 @@ export function WalletView({ onBack, mock }: Props) {
   const [withdrawProvider, setWithdrawProvider] = useState("ORANGE_MONEY");
   const [error, setError] = useState<string | null>(null);
   const [historyRefresh, setHistoryRefresh] = useState(0);
+  const topUpInFlight = useRef(false);
+  const withdrawInFlight = useRef(false);
 
   async function load() {
     setLoading(true);
@@ -54,6 +56,7 @@ export function WalletView({ onBack, mock }: Props) {
   }, [mock]);
 
   async function topUp() {
+    if (topUpInFlight.current) return;
     const value = parseInt(amount, 10);
     if (value < 500) {
       setError("Montant minimum : 500 FC");
@@ -63,6 +66,7 @@ export function WalletView({ onBack, mock }: Props) {
       setError("Indiquez le numéro Mobile Money à débiter.");
       return;
     }
+    topUpInFlight.current = true;
     setTopUpLoading(true);
     setError(null);
     try {
@@ -82,11 +86,13 @@ export function WalletView({ onBack, mock }: Props) {
     } catch (e) {
       setError(toUserErrorMessage(e, "Échec de la recharge"));
     } finally {
+      topUpInFlight.current = false;
       setTopUpLoading(false);
     }
   }
 
   async function withdraw() {
+    if (withdrawInFlight.current) return;
     const value = parseInt(withdrawAmount, 10);
     if (value < 500) {
       setError("Montant minimum : 500 FC");
@@ -96,6 +102,7 @@ export function WalletView({ onBack, mock }: Props) {
       setError("Solde insuffisant");
       return;
     }
+    withdrawInFlight.current = true;
     setWithdrawLoading(true);
     setError(null);
     try {
@@ -115,6 +122,7 @@ export function WalletView({ onBack, mock }: Props) {
     } catch (e) {
       setError(toUserErrorMessage(e, "Échec du retrait"));
     } finally {
+      withdrawInFlight.current = false;
       setWithdrawLoading(false);
     }
   }

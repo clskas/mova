@@ -310,7 +310,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   }
 
   Future<void> _pay({bool skipCashPrompt = false}) async {
-    if (_awaitingMobileMoney) return;
+    if (_loading || _awaitingMobileMoney) return;
     if (!skipCashPrompt && _method == 'CASH' && _shouldPromptCashPin) {
       await _maybePromptCashPin();
       return;

@@ -17,6 +17,7 @@ import {
   type MobileMoneyOperator,
 } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
+import { isPrismaUniqueViolation } from '../prisma/prisma-errors';
 import { initiateViaGateway } from '../payments/payment-providers';
 import {
   mobileMoneyAmountDecision,
@@ -25,6 +26,8 @@ import {
 
 const TOPUP_LOCK_PREFIX = 'wallet:topup:';
 const TOPUP_LOCK_TTL_SEC = 60;
+const WITHDRAW_LOCK_PREFIX = 'wallet:withdraw:';
+const WITHDRAW_LOCK_TTL_SEC = 45;
 const STALE_PAYOUT_MIN_AGE_MS = 15 * 60 * 1000;
 
 @Injectable()
@@ -269,6 +272,11 @@ export class WalletService {
         data: { walletId, amountCdf, type: 'CREDIT', description, reference },
       });
       return updated;
+    }).catch(async (e) => {
+      if (reference && isPrismaUniqueViolation(e)) {
+        return this.prisma.wallet.findUnique({ where: { userId } });
+      }
+      throw e;
     });
   }
 
@@ -325,7 +333,14 @@ export class WalletService {
         return this.prisma.wallet.findUnique({ where: { userId } });
       }
     }
-    return this.prisma.$transaction(async (tx) => run(tx));
+    try {
+      return await this.prisma.$transaction(async (tx) => run(tx));
+    } catch (e) {
+      if (reference && isPrismaUniqueViolation(e)) {
+        return this.prisma.wallet.findUnique({ where: { userId } });
+      }
+      throw e;
+    }
   }
 
   async creditPlatformFee(amountCdf: number, description: string, reference: string) {
@@ -384,8 +399,12 @@ export class WalletService {
       where: { referenceType_referenceId: { referenceType, referenceId } },
     });
     if (!hold || hold.status !== 'ACTIVE') return { released: false };
-    await this.prisma.$transaction(async (tx) => {
-      await tx.walletHold.update({ where: { id: hold.id }, data: { status: 'RELEASED' } });
+    const released = await this.prisma.$transaction(async (tx) => {
+      const claimed = await tx.walletHold.updateMany({
+        where: { id: hold.id, status: 'ACTIVE' },
+        data: { status: 'RELEASED' },
+      });
+      if (claimed.count !== 1) return false;
       await tx.wallet.update({
         where: { id: hold.walletId },
         data: { heldBalanceCdf: { decrement: hold.amountCdf } },
@@ -399,7 +418,12 @@ export class WalletService {
           reference: `${referenceType}:${referenceId}`,
         },
       });
+      return true;
+    }).catch((e) => {
+      if (isPrismaUniqueViolation(e)) return false;
+      throw e;
     });
+    if (!released) return { released: false };
     return { released: true, amountCdf: hold.amountCdf };
   }
 
@@ -410,8 +434,12 @@ export class WalletService {
     if (!hold || hold.status !== 'ACTIVE') return { captured: false };
     const capture = Math.min(captureAmountCdf ?? hold.amountCdf, hold.amountCdf);
     const releaseRemainder = hold.amountCdf - capture;
-    await this.prisma.$transaction(async (tx) => {
-      await tx.walletHold.update({ where: { id: hold.id }, data: { status: 'CAPTURED' } });
+    const captured = await this.prisma.$transaction(async (tx) => {
+      const claimed = await tx.walletHold.updateMany({
+        where: { id: hold.id, status: 'ACTIVE' },
+        data: { status: 'CAPTURED' },
+      });
+      if (claimed.count !== 1) return false;
       await tx.wallet.update({
         where: { id: hold.walletId },
         data: {
@@ -441,7 +469,12 @@ export class WalletService {
           },
         });
       }
+      return true;
+    }).catch((e) => {
+      if (isPrismaUniqueViolation(e)) return false;
+      throw e;
     });
+    if (!captured) return { captured: false };
     return { captured: true, amountCdf: capture };
   }
 
@@ -646,6 +679,25 @@ export class WalletService {
       );
     }
 
+    const lockKey = `${WITHDRAW_LOCK_PREFIX}${userId}`;
+    await this.acquireMoneyLock(
+      lockKey,
+      WITHDRAW_LOCK_TTL_SEC,
+      'Retrait déjà en cours — patientez quelques secondes.',
+    );
+    try {
+      return await this.executeWithdraw(userId, amountCdf, normalizedProvider, normalizedPhone);
+    } finally {
+      await this.releaseMoneyLock(lockKey);
+    }
+  }
+
+  private async executeWithdraw(
+    userId: string,
+    amountCdf: number,
+    normalizedProvider: string,
+    normalizedPhone: string,
+  ) {
     const reference = afrisoftHubReference('senga', 'withdraw', randomUUID());
     const operator = this.mapProvider(normalizedProvider);
     const hubClient = isAfrisoftPayHubClientConfigured(this.envGetter) && !isAfrisoftPayHubMode(this.envGetter);
@@ -862,17 +914,17 @@ export class WalletService {
     return `${TOPUP_LOCK_PREFIX}${userId}:${amountCdf}`;
   }
 
-  /** Short Redis lock (60s) so a double-tap cannot open two C2B. Fail-closed if Redis is down. */
-  private async acquireTopUpLock(userId: string, amountCdf: number) {
+  /** Short Redis lock so a double-tap cannot open two C2B / B2C. Fail-closed if Redis is down. */
+  private async acquireMoneyLock(key: string, ttlSec: number, busyMessage: string) {
     const client = this.redis?.client;
     if (!client) return;
     try {
-      const ok = await client.set(this.topUpLockKey(userId, amountCdf), '1', 'EX', TOPUP_LOCK_TTL_SEC, 'NX');
+      const ok = await client.set(key, '1', 'EX', ttlSec, 'NX');
       if (!ok) {
         throw new MovaHttpException(
           MovaErrorCode.VALIDATION_ERROR,
           HttpStatus.TOO_MANY_REQUESTS,
-          'Recharge déjà en cours — patientez une minute.',
+          busyMessage,
         );
       }
     } catch (e) {
@@ -880,9 +932,28 @@ export class WalletService {
       throw new MovaHttpException(
         MovaErrorCode.INTERNAL_ERROR,
         HttpStatus.SERVICE_UNAVAILABLE,
-        'Recharge temporairement indisponible. Réessayez.',
+        'Opération temporairement indisponible. Réessayez.',
       );
     }
+  }
+
+  private async releaseMoneyLock(key: string) {
+    const client = this.redis?.client;
+    if (!client) return;
+    try {
+      await client.del(key);
+    } catch (e) {
+      this.logger.warn(`releaseMoneyLock ${key} failed: ${(e as Error).message}`);
+    }
+  }
+
+  /** Short Redis lock (60s) so a double-tap cannot open two C2B. Fail-closed if Redis is down. */
+  private async acquireTopUpLock(userId: string, amountCdf: number) {
+    await this.acquireMoneyLock(
+      this.topUpLockKey(userId, amountCdf),
+      TOPUP_LOCK_TTL_SEC,
+      'Recharge déjà en cours — patientez une minute.',
+    );
   }
 
   /**

@@ -28,7 +28,9 @@ void main() {
     test('shouldQueue accepts create paths only', () {
       expect(SyncQueue.shouldQueue('POST', '/rides'), isTrue);
       expect(SyncQueue.shouldQueue('POST', '/deliveries/parcel'), isTrue);
-      expect(SyncQueue.shouldQueue('POST', '/wallet/top-up'), isTrue);
+      expect(SyncQueue.shouldQueue('POST', '/wallet/top-up'), isFalse);
+      expect(SyncQueue.shouldQueue('POST', '/wallet/withdraw'), isFalse);
+      expect(SyncQueue.shouldQueue('POST', '/payments/rides/abc'), isFalse);
       expect(SyncQueue.shouldQueue('POST', '/rides/estimate'), isFalse);
       expect(SyncQueue.shouldQueue('POST', '/auth/otp/request'), isFalse);
       expect(SyncQueue.shouldQueue('GET', '/rides'), isFalse);

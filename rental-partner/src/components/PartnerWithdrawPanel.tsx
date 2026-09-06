@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { phoneFromToken } from "@/lib/auth";
 import { formatCdf, topUpPartnerWallet, withdrawPartnerWallet } from "@/lib/api";
 import { toUserErrorMessage } from "@/lib/user-messages";
@@ -27,6 +27,7 @@ export function PartnerWithdrawPanel({ balanceCdf, walletAvailable = true, onWit
   const [loading, setLoading] = useState<"withdraw" | "topup" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const inFlight = useRef(false);
 
   useEffect(() => {
     const saved = localStorage.getItem(PAYOUT_PHONE_KEY);
@@ -43,6 +44,7 @@ export function PartnerWithdrawPanel({ balanceCdf, walletAvailable = true, onWit
   }
 
   async function submitWithdraw() {
+    if (inFlight.current) return;
     const amountCdf = Number(amount);
     if (!Number.isFinite(amountCdf) || amountCdf < 500) {
       setError("Montant minimum : 500 FC.");
@@ -56,6 +58,7 @@ export function PartnerWithdrawPanel({ balanceCdf, walletAvailable = true, onWit
       setError("Numéro Mobile Money requis.");
       return;
     }
+    inFlight.current = true;
     setLoading("withdraw");
     setError(null);
     setSuccess(null);
@@ -72,11 +75,13 @@ export function PartnerWithdrawPanel({ balanceCdf, walletAvailable = true, onWit
     } catch (e) {
       setError(toUserErrorMessage(e, "Retrait impossible"));
     } finally {
+      inFlight.current = false;
       setLoading(null);
     }
   }
 
   async function submitTopUp() {
+    if (inFlight.current) return;
     const amountCdf = Number(topUpAmount);
     if (!Number.isFinite(amountCdf) || amountCdf < 500) {
       setError("Montant minimum : 500 FC.");
@@ -86,6 +91,7 @@ export function PartnerWithdrawPanel({ balanceCdf, walletAvailable = true, onWit
       setError("Numéro Mobile Money requis.");
       return;
     }
+    inFlight.current = true;
     setLoading("topup");
     setError(null);
     setSuccess(null);
@@ -102,6 +108,7 @@ export function PartnerWithdrawPanel({ balanceCdf, walletAvailable = true, onWit
     } catch (e) {
       setError(toUserErrorMessage(e, "Recharge impossible"));
     } finally {
+      inFlight.current = false;
       setLoading(null);
     }
   }

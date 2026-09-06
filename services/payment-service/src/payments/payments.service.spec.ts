@@ -96,6 +96,14 @@ describe('PaymentsService', () => {
     }) as jest.Mock;
   });
 
+  it('refuse un 2e paiement concurrent (verrou Redis)', async () => {
+    redis.client.set.mockResolvedValue(null);
+    await expect(service.payRide('ride-1', 'user-1', PaymentMethod.WALLET)).rejects.toMatchObject({
+      response: { message: expect.stringMatching(/déjà en cours/i) },
+    });
+    expect(wallet.debit).not.toHaveBeenCalled();
+  });
+
   it('accepte WALLET sans numéro de téléphone (contrat mobile)', async () => {
     const result = await service.payRide('ride-1', 'user-1', PaymentMethod.WALLET, undefined, 1);
     expect(result.success).toBe(true);

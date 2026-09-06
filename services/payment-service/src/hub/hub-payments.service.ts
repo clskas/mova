@@ -1,4 +1,5 @@
 import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { ConfigService } from '@nestjs/config';
 import { randomBytes } from 'crypto';
 import {
@@ -13,6 +14,7 @@ import {
   serdiPayNormalizePhone,
 } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
+import { isPrismaUniqueViolation } from '../prisma/prisma-errors';
 import { HubAppsRegistry } from './hub-apps.registry';
 import { CreateHubPaymentDto } from './hub-payments.dto';
 import {
@@ -112,6 +114,44 @@ export class HubPaymentsService {
     const phone = serdiPayNormalizePhone(dto.phone);
     const purpose = dto.purpose?.trim() || (kind === 'PAYOUT' ? 'withdraw' : 'pay');
 
+    // Reserve the unique (appId, reference) row BEFORE the aggregator call so a
+    // concurrent retry cannot open a second C2B / B2C for the same invoice.
+    const id = this.newPaymentId();
+    let reserved: { id: string };
+    try {
+      reserved = await this.prisma.hubPayment.create({
+        data: {
+          id,
+          appId,
+          kind,
+          reference: dto.reference,
+          purpose,
+          amountCdf: dto.amount_cdf,
+          currency: 'CDF',
+          phone,
+          telecom: dto.telecom,
+          status: 'PENDING',
+          providerRef: id,
+          idempotencyKey: idem || null,
+          metadata: (dto.metadata ?? {}) as Prisma.InputJsonValue,
+        },
+      });
+    } catch (e) {
+      if (!isPrismaUniqueViolation(e)) throw e;
+      const existing =
+        (idem
+          ? await this.prisma.hubPayment.findFirst({
+              where: { appId, idempotencyKey: idem },
+              orderBy: { createdAt: 'desc' },
+            })
+          : null) ??
+        (await this.prisma.hubPayment.findUnique({
+          where: { appId_reference: { appId, reference: dto.reference } },
+        }));
+      if (existing) return { statusCode: HttpStatus.OK, body: this.toView(existing) };
+      throw e;
+    }
+
     let mm: {
       success: boolean;
       providerRef?: string;
@@ -119,46 +159,57 @@ export class HubPaymentsService {
       message?: string;
     };
 
-    if (gateway === 'cinetpay') {
-      if (!isCinetPayConfigured(this.envGetter)) {
-        throw new HttpException(
-          { message: 'CinetPay non configuré sur le hub.', code: 'HUB_GATEWAY' },
-          HttpStatus.SERVICE_UNAVAILABLE,
-        );
+    try {
+      if (gateway === 'cinetpay') {
+        if (!isCinetPayConfigured(this.envGetter)) {
+          throw new HttpException(
+            { message: 'CinetPay non configuré sur le hub.', code: 'HUB_GATEWAY' },
+            HttpStatus.SERVICE_UNAVAILABLE,
+          );
+        }
+        if (kind === 'PAYOUT') {
+          throw new HttpException(
+            { message: 'Retraits CinetPay non supportés sur le hub.', code: 'HUB_PAYOUT_UNSUPPORTED' },
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+        mm = await cinetPayInitiateMobileMoney(this.envGetter, {
+          operator,
+          amountCdf: dto.amount_cdf,
+          phone,
+          reference: dto.reference,
+        });
+      } else {
+        if (!isSerdiPayPaymentConfigured(this.envGetter)) {
+          throw new HttpException(
+            { message: 'SerdiPay non configuré sur le hub VPS.', code: 'HUB_GATEWAY' },
+            HttpStatus.SERVICE_UNAVAILABLE,
+          );
+        }
+        mm =
+          kind === 'PAYOUT'
+            ? await serdiPayDisburseMobileMoney(this.envGetter, {
+                operator,
+                amountCdf: dto.amount_cdf,
+                phone,
+                reference: dto.reference,
+              })
+            : await serdiPayInitiateMobileMoney(this.envGetter, {
+                operator,
+                amountCdf: dto.amount_cdf,
+                phone,
+                reference: dto.reference,
+              });
       }
-      if (kind === 'PAYOUT') {
-        throw new HttpException(
-          { message: 'Retraits CinetPay non supportés sur le hub.', code: 'HUB_PAYOUT_UNSUPPORTED' },
-          HttpStatus.BAD_REQUEST,
-        );
-      }
-      mm = await cinetPayInitiateMobileMoney(this.envGetter, {
-        operator,
-        amountCdf: dto.amount_cdf,
-        phone,
-        reference: dto.reference,
-      });
-    } else {
-      if (!isSerdiPayPaymentConfigured(this.envGetter)) {
-        throw new HttpException(
-          { message: 'SerdiPay non configuré sur le hub VPS.', code: 'HUB_GATEWAY' },
-          HttpStatus.SERVICE_UNAVAILABLE,
-        );
-      }
-      mm =
-        kind === 'PAYOUT'
-          ? await serdiPayDisburseMobileMoney(this.envGetter, {
-              operator,
-              amountCdf: dto.amount_cdf,
-              phone,
-              reference: dto.reference,
-            })
-          : await serdiPayInitiateMobileMoney(this.envGetter, {
-              operator,
-              amountCdf: dto.amount_cdf,
-              phone,
-              reference: dto.reference,
-            });
+    } catch (e) {
+      const raw =
+        e instanceof HttpException
+          ? typeof e.getResponse() === 'string'
+            ? e.getResponse()
+            : (e.getResponse() as { message?: string })?.message ?? e.message
+          : (e as Error).message;
+      await this.markReservedFailed(reserved.id, typeof raw === 'string' ? raw : undefined);
+      throw e;
     }
 
     if (!mm.success) {
@@ -168,36 +219,25 @@ export class HubPaymentsService {
           ? 'Retrait Mobile Money échoué.'
           : 'Recharge / encaissement Mobile Money échoué.');
       this.logger.warn(`Hub ${kind} provider failed app=${appId} ref=${dto.reference}: ${reason}`);
-      // 400 (not 502): Nest filter maps ≥500 → MOVA_INT_001 and hides provider copy.
+      await this.markReservedFailed(reserved.id, reason);
       throw new HttpException(
         { message: reason, code: 'HUB_PROVIDER_FAILED' },
         HttpStatus.BAD_REQUEST,
       );
     }
 
-    const id = this.newPaymentId();
     const metadata = {
       ...(dto.metadata ?? {}),
       ...(mm.paymentUrl ? { paymentUrl: mm.paymentUrl } : {}),
     };
-    const row = await this.prisma.hubPayment.create({
+    const row = await this.prisma.hubPayment.update({
+      where: { id: reserved.id },
       data: {
-        id,
-        appId,
-        kind,
-        reference: dto.reference,
-        purpose,
-        amountCdf: dto.amount_cdf,
-        currency: 'CDF',
-        phone,
-        telecom: dto.telecom,
-        status: 'PENDING',
-        providerRef: mm.providerRef ?? id,
-        idempotencyKey: idem || null,
+        providerRef: mm.providerRef ?? reserved.id,
         metadata,
       },
     });
-    this.logger.log(`Hub ${kind} ${id} app=${appId} ref=${dto.reference} provider=${row.providerRef}`);
+    this.logger.log(`Hub ${kind} ${row.id} app=${appId} ref=${dto.reference} provider=${row.providerRef}`);
     return {
       statusCode: HttpStatus.CREATED,
       body: {
@@ -205,6 +245,21 @@ export class HubPaymentsService {
         message: mm.message ?? 'Confirmez le paiement sur votre téléphone Mobile Money.',
       },
     };
+  }
+
+  private async markReservedFailed(id: string, reason?: string) {
+    try {
+      await this.prisma.hubPayment.update({
+        where: { id },
+        data: {
+          status: 'FAILED',
+          failureReason: reason?.slice(0, 500) || 'Échec initiateur Mobile Money',
+          completedAt: new Date(),
+        },
+      });
+    } catch (e) {
+      this.logger.warn(`markReservedFailed ${id}: ${(e as Error).message}`);
+    }
   }
 
   async getById(appId: string, paymentId: string) {

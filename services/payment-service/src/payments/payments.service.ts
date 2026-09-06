@@ -37,6 +37,8 @@ const MOBILE_MONEY_METHODS = new Set<PaymentMethod>([
 const CASH_PIN_FAIL_PREFIX = 'pay:cashpin:fail:';
 const CASH_PIN_FAIL_MAX = 5;
 const CASH_PIN_FAIL_TTL_SEC = 15 * 60;
+const PAY_LOCK_PREFIX = 'pay:intent:';
+const PAY_LOCK_TTL_SEC = 60;
 
 @Injectable()
 export class PaymentsService {
@@ -99,6 +101,43 @@ export class PaymentsService {
 
   private cashPinLockKey(kind: string, id: string) {
     return `${CASH_PIN_FAIL_PREFIX}${kind}:${id}`;
+  }
+
+  private payLockKey(kind: string, id: string) {
+    return `${PAY_LOCK_PREFIX}${kind}:${id}`;
+  }
+
+  /** Prevents two concurrent C2B / wallet debits for the same ride or service. */
+  private async acquirePayLock(kind: string, id: string) {
+    const client = this.redis?.client;
+    if (!client) return;
+    try {
+      const ok = await client.set(this.payLockKey(kind, id), '1', 'EX', PAY_LOCK_TTL_SEC, 'NX');
+      if (!ok) {
+        throw new MovaHttpException(
+          MovaErrorCode.VALIDATION_ERROR,
+          HttpStatus.TOO_MANY_REQUESTS,
+          'Paiement déjà en cours — confirmez sur votre téléphone ou patientez une minute.',
+        );
+      }
+    } catch (e) {
+      if (e instanceof MovaHttpException) throw e;
+      throw new MovaHttpException(
+        MovaErrorCode.INTERNAL_ERROR,
+        HttpStatus.SERVICE_UNAVAILABLE,
+        'Paiement temporairement indisponible. Réessayez.',
+      );
+    }
+  }
+
+  private async releasePayLock(kind: string, id: string) {
+    const client = this.redis?.client;
+    if (!client) return;
+    try {
+      await client.del(this.payLockKey(kind, id));
+    } catch (e) {
+      this.logger.warn(`releasePayLock ${kind}/${id} failed: ${(e as Error).message}`);
+    }
   }
 
   /** Money-changing PIN: fail-closed if Redis is down (unlike login OTP/PIN). */
@@ -437,39 +476,69 @@ export class PaymentsService {
     // C2B : le montant envoyé à SerdiPay/hub est exclusivement le tarif serveur (jamais le client).
     const paymentPhone = this.resolvePaymentPhone(method, phone);
 
-    if (method === PaymentMethod.WALLET) {
-      await this.walletService.debit(userId, amountCdf, `Paiement course ${rideId}`, `RIDE:${rideId}`);
-      const payment = await this.prisma.payment.upsert({
-        where: { rideId },
-        create: { rideId, userId, amountCdf, method, status: PaymentStatus.COMPLETED, providerRef: `wallet_${rideId}` },
-        update: { status: PaymentStatus.COMPLETED, method, amountCdf },
-      });
-      await this.publishPaymentCompleted({ rideId, userId, amountCdf, method: method.toString() });
-      await this.creditDriverAfterRidePayment(rideId);
-      return { success: true, payment, message: 'Paiement portefeuille effectué' };
+    await this.acquirePayLock('RIDE', rideId);
+    const lockedExisting = await this.prisma.payment.findUnique({ where: { rideId } });
+    if (lockedExisting?.status === PaymentStatus.COMPLETED) {
+      await this.releasePayLock('RIDE', rideId);
+      return { success: true, payment: lockedExisting, alreadyPaid: true, message: 'Course déjà payée' };
     }
-    if (method === PaymentMethod.CASH) {
-      const payment = await this.prisma.payment.upsert({
-        where: { rideId },
-        create: { rideId, userId, amountCdf, method, status: PaymentStatus.PENDING, providerRef: `cash_pending_${rideId}` },
-        update: { status: PaymentStatus.PENDING, method, amountCdf },
-      });
-      // Notifie le chauffeur en temps réel pour ouvrir automatiquement la
-      // confirmation du PIN espèces (relayé par ride-service au socket).
-      await this.publishRideCashPending({
-        rideId,
-        driverId: ride.driverId ?? undefined,
-        passengerId: ride.passengerId ?? undefined,
-        amountCdf,
-      });
+    if (
+      lockedExisting?.status === PaymentStatus.PENDING &&
+      MOBILE_MONEY_METHODS.has(lockedExisting.method) &&
+      MOBILE_MONEY_METHODS.has(method)
+    ) {
+      await this.releasePayLock('RIDE', rideId);
       return {
         success: true,
-        payment,
-        pendingCash: true,
-        message: 'Paiement espèces en attente — communiquez le code PIN au chauffeur.',
+        pendingMobileMoney: true,
+        payment: lockedExisting,
+        providerRef: lockedExisting.providerRef,
+        message: 'Paiement Mobile Money déjà en cours — confirmez sur votre téléphone.',
       };
     }
-    return this.processPayment(rideId, userId, amountCdf, method, paymentPhone);
+
+    try {
+      if (method === PaymentMethod.WALLET) {
+        await this.walletService.debit(userId, amountCdf, `Paiement course ${rideId}`, `RIDE:${rideId}`);
+        const payment = await this.prisma.payment.upsert({
+          where: { rideId },
+          create: { rideId, userId, amountCdf, method, status: PaymentStatus.COMPLETED, providerRef: `wallet_${rideId}` },
+          update: { status: PaymentStatus.COMPLETED, method, amountCdf },
+        });
+        await this.publishPaymentCompleted({ rideId, userId, amountCdf, method: method.toString() });
+        await this.creditDriverAfterRidePayment(rideId);
+        await this.releasePayLock('RIDE', rideId);
+        return { success: true, payment, message: 'Paiement portefeuille effectué' };
+      }
+      if (method === PaymentMethod.CASH) {
+        const payment = await this.prisma.payment.upsert({
+          where: { rideId },
+          create: { rideId, userId, amountCdf, method, status: PaymentStatus.PENDING, providerRef: `cash_pending_${rideId}` },
+          update: { status: PaymentStatus.PENDING, method, amountCdf },
+        });
+        await this.publishRideCashPending({
+          rideId,
+          driverId: ride.driverId ?? undefined,
+          passengerId: ride.passengerId ?? undefined,
+          amountCdf,
+        });
+        await this.releasePayLock('RIDE', rideId);
+        return {
+          success: true,
+          payment,
+          pendingCash: true,
+          message: 'Paiement espèces en attente — communiquez le code PIN au chauffeur.',
+        };
+      }
+      const mm = await this.processPayment(rideId, userId, amountCdf, method, paymentPhone);
+      if (!(mm as { pendingMobileMoney?: boolean }).pendingMobileMoney) {
+        await this.releasePayLock('RIDE', rideId);
+      }
+      return mm;
+    } catch (e) {
+      await this.releasePayLock('RIDE', rideId);
+      throw e;
+    }
   }
 
   private async fetchServicePaymentInfo(referenceType: string, referenceId: string) {
@@ -596,6 +665,39 @@ export class PaymentsService {
       };
     }
 
+    await this.acquirePayLock(type, referenceId);
+    const lockedService = await this.prisma.servicePayment.findUnique({
+      where: { referenceType_referenceId: { referenceType: type, referenceId } },
+    });
+    if (lockedService?.status === PaymentStatus.COMPLETED) {
+      await this.releasePayLock(type, referenceId);
+      return {
+        success: true,
+        payment: lockedService,
+        alreadyPaid: true,
+        message: 'Service déjà payé',
+        amountCdf,
+        currency: 'CDF',
+      };
+    }
+    if (
+      lockedService?.status === PaymentStatus.PENDING &&
+      MOBILE_MONEY_METHODS.has(lockedService.method) &&
+      MOBILE_MONEY_METHODS.has(method)
+    ) {
+      await this.releasePayLock(type, referenceId);
+      return {
+        success: true,
+        pendingMobileMoney: true,
+        payment: lockedService,
+        providerRef: lockedService.providerRef,
+        message: 'Paiement Mobile Money déjà en cours — confirmez sur votre téléphone.',
+        amountCdf,
+        currency: 'CDF',
+      };
+    }
+
+    try {
     if (method === PaymentMethod.WALLET) {
       if (escrowCollect) {
         // Débit immédiat : l'argent est sur la plateforme (comme un C2B MM).
@@ -640,6 +742,7 @@ export class PaymentsService {
       });
       await this.publishPaymentCompleted({ referenceType: type, referenceId, userId, amountCdf, method: method.toString() });
       await this.creditDriverAfterServicePayment(type, referenceId);
+      await this.releasePayLock(type, referenceId);
       return {
         success: true,
         payment,
@@ -664,6 +767,7 @@ export class PaymentsService {
         userId,
         amountCdf,
       });
+      await this.releasePayLock(type, referenceId);
       return { success: true, payment, pendingCash: true, message: 'Paiement espèces en attente — communiquez le code PIN au livreur.', amountCdf, currency: 'CDF' };
     }
 
@@ -737,7 +841,12 @@ export class PaymentsService {
       method: method.toString(),
     });
     await this.creditDriverAfterServicePayment(type, referenceId);
+    await this.releasePayLock(type, referenceId);
     return { success: true, payment, message: result.message ?? 'Paiement effectué', amountCdf, currency: 'CDF' };
+    } catch (e) {
+      await this.releasePayLock(type, referenceId);
+      throw e;
+    }
   }
 
   async confirmCashService(referenceType: string, referenceId: string, driverUserId: string, pin: string) {

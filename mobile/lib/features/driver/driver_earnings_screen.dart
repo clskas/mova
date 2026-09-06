@@ -367,6 +367,7 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
   }
 
   Future<void> _withdraw() async {
+    if (_withdrawing) return;
     if (!_payoutConfigured) {
       setState(() => _error = 'Configurez votre numéro Mobile Money dans Mon dossier.');
       return;

@@ -219,6 +219,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
   }
 
   Future<void> _withdraw(int amountCdf, String provider, String phone) async {
+    if (_withdrawLoading) return;
     setState(() => _withdrawLoading = true);
     final api = ref.read(apiClientProvider);
     await api.checkHealth();
@@ -253,6 +254,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
   }
 
   Future<void> _topUp(String provider, int amountCdf, String phone) async {
+    if (_topUpLoading) return;
     setState(() => _topUpLoading = true);
     final api = ref.read(apiClientProvider);
     await api.checkHealth();

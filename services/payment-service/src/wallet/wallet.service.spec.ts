@@ -13,6 +13,9 @@ describe('WalletService', () => {
       findFirst: jest.fn(),
       updateMany: jest.fn(),
     },
+    walletHold: {
+      updateMany: jest.fn(),
+    },
     $queryRaw: jest.fn(),
   };
 
@@ -31,6 +34,7 @@ describe('WalletService', () => {
     },
     walletHold: {
       findUnique: jest.fn(),
+      updateMany: jest.fn(),
     },
     $transaction: jest.fn(async (fn: (client: typeof tx) => Promise<unknown>) => fn(tx)),
     $queryRaw: tx.$queryRaw,
@@ -211,6 +215,64 @@ describe('WalletService', () => {
     const result = await service.completePendingTopUp('pay_8137b15301ec2980b07a3388', 'COMPLETED');
     expect(result).toMatchObject({ found: true, alreadyFinal: true, status: 'COMPLETED', balanceCdf: 2300 });
     expect(tx.wallet.update).not.toHaveBeenCalled();
+  });
+
+  it('refuse un 2e retrait pendant le verrou Redis', async () => {
+    const redis = {
+      client: {
+        set: jest.fn().mockResolvedValue(null),
+        del: jest.fn().mockResolvedValue(1),
+      },
+    };
+    const locked = new WalletService(prisma as never, config, redis as never);
+    await expect(
+      locked.withdrawToMobileMoney('u1', 5000, 'ORANGE_MONEY', '+243970000001'),
+    ).rejects.toMatchObject({
+      response: { message: expect.stringMatching(/déjà en cours/i) },
+    });
+    expect(redis.client.del).not.toHaveBeenCalled();
+  });
+
+  it('ne recapture pas un séquestre déjà pris (CAS status=ACTIVE)', async () => {
+    prisma.walletHold.findUnique.mockResolvedValue({
+      id: 'h1',
+      walletId: 'w1',
+      amountCdf: 12000,
+      status: 'ACTIVE',
+    });
+    tx.walletHold.updateMany.mockResolvedValue({ count: 0 });
+    const result = await service.captureHold('DELIVERY', 'del-1');
+    expect(result).toEqual({ captured: false });
+    expect(tx.wallet.update).not.toHaveBeenCalled();
+  });
+
+  it('ne rembourse pas deux fois un retrait B2C échoué', async () => {
+    prisma.walletTransaction.findFirst
+      .mockResolvedValueOnce({
+        id: 'd1',
+        walletId: 'w1',
+        amountCdf: -5000,
+        reference: 'senga_withdraw_1',
+        type: 'DEBIT',
+        wallet: { userId: 'u1', balanceCdf: 0 },
+      })
+      .mockResolvedValueOnce({
+        id: 'c1',
+        reference: 'rollback_senga_withdraw_1',
+        type: 'CREDIT',
+      });
+    const first = await service.refundFailedPayout(['senga_withdraw_1'], 'Merchant not allowed');
+    expect(first).toEqual({ found: true, refunded: false });
+    expect(tx.wallet.update).not.toHaveBeenCalled();
+  });
+
+  it('traite P2002 crédit comme déjà crédité (pas de 500)', async () => {
+    tx.$queryRaw.mockResolvedValue([{ id: 'w1' }]);
+    tx.wallet.update.mockResolvedValue({ id: 'w1', balanceCdf: 2300 });
+    tx.walletTransaction.create.mockRejectedValue({ code: 'P2002' });
+    prisma.wallet.findUnique.mockResolvedValue({ id: 'w1', userId: 'u1', balanceCdf: 2300 });
+    const wallet = await service.credit('u1', 2300, 'Recharge', 'pay_dup');
+    expect(wallet).toMatchObject({ balanceCdf: 2300 });
   });
 
   it('crédite 2300 FC si le hub confirme 2366 (frais opérateur)', async () => {

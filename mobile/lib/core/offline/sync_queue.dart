@@ -166,6 +166,7 @@ class SyncQueue {
     if (method != 'POST') return false;
     if (path.contains('/auth/')) return false;
     if (path.contains('/payments/')) return false;
+    if (path.contains('/wallet/')) return false;
     if (path.contains('/uploads/')) return false;
     if (path.contains('/estimate')) return false;
     if (path.contains('/search')) return false;
@@ -183,8 +184,6 @@ class SyncQueue {
       '/rides/scheduled',
       '/rental/bookings',
       '/rental/inquiries',
-      '/wallet/top-up',
-      '/wallet/topup',
     };
     return exactPaths.contains(path);
   }

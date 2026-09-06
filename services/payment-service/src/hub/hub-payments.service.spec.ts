@@ -7,6 +7,8 @@ describe('HubPaymentsService.finalizeFromAggregator amount check', () => {
     hubPayment: {
       findFirst: jest.fn(),
       findUnique: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
       updateMany: jest.fn(),
     },
   };
@@ -118,5 +120,90 @@ describe('HubPaymentsService.finalizeFromAggregator amount check', () => {
         data: expect.objectContaining({ status: 'COMPLETED', failureReason: null }),
       }),
     );
+  });
+});
+
+describe('HubPaymentsService.create — réserve avant agrégateur', () => {
+  const apps = { get: () => null, isEnabled: () => true };
+  const config = { get: jest.fn(() => undefined) };
+  const prisma = {
+    hubPayment: {
+      findFirst: jest.fn(),
+      findUnique: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      updateMany: jest.fn(),
+    },
+  };
+  const service = new HubPaymentsService(prisma as never, config as never, apps as never);
+
+  const dto = {
+    app_id: 'senga',
+    amount_cdf: 2300,
+    currency: 'CDF',
+    phone: '+243970000001',
+    telecom: 'MP',
+    reference: 'senga_topup_unique_1',
+    purpose: 'topup',
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    prisma.hubPayment.findFirst.mockResolvedValue(null);
+    prisma.hubPayment.findUnique.mockResolvedValue(null);
+  });
+
+  it('réserve la ligne hub avant l’appel agrégateur (échec config → FAILED, pas de 2e C2B)', async () => {
+    prisma.hubPayment.create.mockResolvedValue({
+      id: 'pay_reserved',
+      appId: 'senga',
+      reference: dto.reference,
+      status: 'PENDING',
+      providerRef: 'pay_reserved',
+      amountCdf: 2300,
+      telecom: 'MP',
+      completedAt: null,
+      failureReason: null,
+    });
+    prisma.hubPayment.update.mockResolvedValue({});
+
+    await expect(service.createCollect('senga', dto)).rejects.toMatchObject({
+      response: { code: 'HUB_GATEWAY' },
+    });
+    expect(prisma.hubPayment.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          reference: dto.reference,
+          status: 'PENDING',
+          amountCdf: 2300,
+        }),
+      }),
+    );
+    expect(prisma.hubPayment.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'pay_reserved' },
+        data: expect.objectContaining({ status: 'FAILED' }),
+      }),
+    );
+  });
+
+  it('conflit unique (retry concurrent) : renvoie l’existant sans 2e C2B', async () => {
+    prisma.hubPayment.create.mockRejectedValue({ code: 'P2002' });
+    prisma.hubPayment.findUnique.mockResolvedValue({
+      id: 'pay_existing',
+      appId: 'senga',
+      reference: dto.reference,
+      status: 'PENDING',
+      providerRef: 'pay_existing',
+      amountCdf: 2300,
+      telecom: 'MP',
+      completedAt: null,
+      failureReason: null,
+    });
+
+    const result = await service.createCollect('senga', dto);
+    expect(result.statusCode).toBe(200);
+    expect(result.body.payment_id).toBe('pay_existing');
+    expect(prisma.hubPayment.update).not.toHaveBeenCalled();
   });
 });

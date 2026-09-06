@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   adjustWallet,
   apiFetch,
@@ -105,6 +105,8 @@ export default function PortefeuillePage() {
   const [platformSuccess, setPlatformSuccess] = useState<string | null>(null);
   const [txFilter, setTxFilter] = useState<"all" | "recharge" | "withdraw">("all");
   const [txLoadingMore, setTxLoadingMore] = useState(false);
+  const withdrawInFlight = useRef(false);
+  const platformInFlight = useRef(false);
 
   const TX_PAGE_SIZE = 100;
 
@@ -253,7 +255,9 @@ export default function PortefeuillePage() {
   }
 
   async function submitPlatformWithdraw() {
+    if (platformInFlight.current) return;
     if (!platformWithdrawAmount.trim() || !platformWithdrawPhone.trim()) return;
+    platformInFlight.current = true;
     setPlatformSaving(true);
     setError(null);
     setPlatformSuccess(null);
@@ -269,6 +273,7 @@ export default function PortefeuillePage() {
     } catch (e) {
       setError(sanitizeAdminError(e instanceof Error ? e.message : "Échec retrait trésorerie"));
     } finally {
+      platformInFlight.current = false;
       setPlatformSaving(false);
     }
   }
@@ -295,12 +300,14 @@ export default function PortefeuillePage() {
   }
 
   async function submitWithdraw() {
+    if (withdrawInFlight.current) return;
     if (!activeUserId || !withdrawAmount.trim() || !withdrawPhone.trim()) return;
     const amount = Number(withdrawAmount);
     if (!Number.isFinite(amount) || amount < 500) {
       setError("Montant minimum de retrait : 500 FC");
       return;
     }
+    withdrawInFlight.current = true;
     setWithdrawing(true);
     setError(null);
     setWithdrawSuccess(null);
@@ -317,6 +324,7 @@ export default function PortefeuillePage() {
     } catch (e) {
       setError(sanitizeAdminError(e instanceof Error ? e.message : "Échec du retrait"));
     } finally {
+      withdrawInFlight.current = false;
       setWithdrawing(false);
     }
   }

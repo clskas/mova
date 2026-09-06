@@ -11,6 +11,7 @@ describe('WalletService', () => {
     walletTransaction: {
       create: jest.fn(),
       findFirst: jest.fn(),
+      updateMany: jest.fn(),
     },
     $queryRaw: jest.fn(),
   };
@@ -170,5 +171,65 @@ describe('WalletService', () => {
         data: expect.objectContaining({ type: 'TOPUP_FAILED' }),
       }),
     );
+  });
+
+  it('crédite le wallet sur webhook SUCCESS (montant intention)', async () => {
+    prisma.walletTransaction.findFirst.mockResolvedValue({
+      id: 'tx-pending',
+      walletId: 'w1',
+      amountCdf: 2300,
+      type: 'TOPUP_PENDING',
+      description: 'Recharge MPESA en attente',
+      reference: 'pay_8137b15301ec2980b07a3388',
+      wallet: { balanceCdf: 0 },
+    });
+    tx.walletTransaction.updateMany.mockResolvedValue({ count: 1 });
+    tx.wallet.update.mockResolvedValue({ id: 'w1', balanceCdf: 2300 });
+    const result = await service.completePendingTopUp(
+      'pay_8137b15301ec2980b07a3388',
+      'COMPLETED',
+      undefined,
+      ['senga_topup_f9151069-8c12-433d-8c80-3fb02c7e7cb2'],
+      2300,
+    );
+    expect(result).toMatchObject({ found: true, status: 'COMPLETED', balanceCdf: 2300 });
+    expect(tx.wallet.update).toHaveBeenCalledWith({
+      where: { id: 'w1' },
+      data: { balanceCdf: { increment: 2300 } },
+    });
+  });
+
+  it('ne double-crédite pas un webhook SUCCESS rejoué', async () => {
+    prisma.walletTransaction.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        id: 'tx-done',
+        type: 'TOPUP_COMPLETED',
+        reference: 'pay_8137b15301ec2980b07a3388',
+        wallet: { balanceCdf: 2300 },
+      });
+    const result = await service.completePendingTopUp('pay_8137b15301ec2980b07a3388', 'COMPLETED');
+    expect(result).toMatchObject({ found: true, alreadyFinal: true, status: 'COMPLETED', balanceCdf: 2300 });
+    expect(tx.wallet.update).not.toHaveBeenCalled();
+  });
+
+  it('crédite 2300 FC si le hub confirme 2366 (frais opérateur)', async () => {
+    prisma.walletTransaction.findFirst.mockResolvedValue({
+      id: 'tx-pending',
+      walletId: 'w1',
+      amountCdf: 2300,
+      type: 'TOPUP_PENDING',
+      description: 'Recharge MPESA en attente',
+      reference: 'sp_SD2609053C7J9',
+      wallet: { balanceCdf: 0 },
+    });
+    tx.walletTransaction.updateMany.mockResolvedValue({ count: 1 });
+    tx.wallet.update.mockResolvedValue({ id: 'w1', balanceCdf: 2300 });
+    const result = await service.completePendingTopUp('sp_SD2609053C7J9', 'COMPLETED', undefined, [], 2366);
+    expect(result).toMatchObject({ found: true, status: 'COMPLETED', balanceCdf: 2300 });
+    expect(tx.wallet.update).toHaveBeenCalledWith({
+      where: { id: 'w1' },
+      data: { balanceCdf: { increment: 2300 } },
+    });
   });
 });

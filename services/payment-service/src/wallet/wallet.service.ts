@@ -18,6 +18,10 @@ import {
 } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { initiateViaGateway } from '../payments/payment-providers';
+import {
+  mobileMoneyAmountDecision,
+  mobileMoneyAmountMismatchMessage,
+} from '../payments/provider-ref.util';
 
 const TOPUP_LOCK_PREFIX = 'wallet:topup:';
 const TOPUP_LOCK_TTL_SEC = 60;
@@ -111,6 +115,11 @@ export class WalletService {
     const id = userId?.trim();
     if (!id) {
       throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'userId requis');
+    }
+    try {
+      await this.reconcilePendingTopUps(id);
+    } catch (e) {
+      this.logger.warn(`reconcilePendingTopUps failed: ${(e as Error).message}`);
     }
     try {
       await this.reconcileStalePayouts(id);
@@ -805,19 +814,17 @@ export class WalletService {
       return { found: true, status: 'FAILED', balanceCdf: pending.wallet.balanceCdf };
     }
 
-    if (
-      confirmedAmountCdf != null &&
-      Number.isFinite(confirmedAmountCdf) &&
-      Math.round(confirmedAmountCdf) !== pending.amountCdf
-    ) {
+    const amountDecision = mobileMoneyAmountDecision(pending.amountCdf, confirmedAmountCdf);
+    if (amountDecision === 'under' || amountDecision === 'over') {
+      const paid = Math.round(confirmedAmountCdf as number);
       this.logger.error(
-        `Top-up amount mismatch ref=${pending.reference} pending=${pending.amountCdf} hub=${confirmedAmountCdf}`,
+        `Top-up amount mismatch ref=${pending.reference} pending=${pending.amountCdf} hub=${paid} decision=${amountDecision}`,
       );
       const failed = await this.prisma.walletTransaction.updateMany({
         where: { id: pending.id, type: 'TOPUP_PENDING' },
         data: {
           type: 'TOPUP_FAILED',
-          description: `Montant hub (${confirmedAmountCdf}) ≠ montant en attente (${pending.amountCdf})`,
+          description: mobileMoneyAmountMismatchMessage(pending.amountCdf, paid, amountDecision, 'montant en attente'),
         },
       });
       if (failed.count !== 1) {
@@ -876,6 +883,60 @@ export class WalletService {
         'Recharge temporairement indisponible. Réessayez.',
       );
     }
+  }
+
+  /**
+   * Poll the AfriSoft hub for stuck TOPUP_PENDING rows (webhook missed / unsigned
+   * callback rejected). Completes via {@link completePendingTopUp} (idempotent).
+   */
+  private async reconcilePendingTopUps(userId: string) {
+    if (!isAfrisoftPayHubClientConfigured(this.envGetter) || isAfrisoftPayHubMode(this.envGetter)) {
+      return;
+    }
+    const wallet = await this.prisma.wallet.findUnique({ where: { userId } });
+    if (!wallet) return;
+    const cutoff = new Date(Date.now() - 20_000);
+    const pending = await this.prisma.walletTransaction.findMany({
+      where: {
+        walletId: wallet.id,
+        type: 'TOPUP_PENDING',
+        createdAt: { lte: cutoff },
+      },
+      take: 5,
+      orderBy: { createdAt: 'desc' },
+    });
+    for (const tx of pending) {
+      if (!tx.reference) continue;
+      await this.applyHubTopUpStatus(tx.reference);
+    }
+  }
+
+  private async applyHubTopUpStatus(providerRef: string) {
+    const remote = await afrisoftPayHubGetPayment(this.envGetter, providerRef);
+    if (remote.status === 'COMPLETED' || remote.status === 'FAILED') {
+      return this.completePendingTopUp(
+        providerRef,
+        remote.status,
+        remote.message,
+        [remote.paymentId ?? '', remote.providerRef ?? '', remote.reference ?? ''],
+        remote.amountCdf,
+      );
+    }
+    return { found: false as const, remoteStatus: remote.status };
+  }
+
+  /**
+   * Ops / user poll: ask the hub, then credit once if COMPLETED.
+   * Safe to replay — {@link completePendingTopUp} is idempotent.
+   */
+  async reconcileTopUpFromHub(userId: string, providerRef: string) {
+    if (!providerRef.trim()) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'providerRef requis');
+    }
+    if (isAfrisoftPayHubClientConfigured(this.envGetter) && !isAfrisoftPayHubMode(this.envGetter)) {
+      await this.applyHubTopUpStatus(providerRef);
+    }
+    return this.getTopUpStatus(userId, providerRef);
   }
 
   /**
@@ -953,16 +1014,7 @@ export class WalletService {
       throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'providerRef requis');
     }
     if (isAfrisoftPayHubClientConfigured(this.envGetter) && !isAfrisoftPayHubMode(this.envGetter)) {
-      const remote = await afrisoftPayHubGetPayment(this.envGetter, providerRef);
-      if (remote.status === 'COMPLETED' || remote.status === 'FAILED') {
-        await this.completePendingTopUp(
-          providerRef,
-          remote.status,
-          remote.message,
-          [remote.paymentId ?? '', remote.providerRef ?? '', remote.reference ?? ''],
-          remote.amountCdf,
-        );
-      }
+      await this.applyHubTopUpStatus(providerRef);
     }
     const wallet = await this.createWallet(userId);
     const tx = await this.prisma.walletTransaction.findFirst({

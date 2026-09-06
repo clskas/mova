@@ -15,7 +15,11 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { HubAppsRegistry } from './hub-apps.registry';
 import { CreateHubPaymentDto } from './hub-payments.dto';
-import { expandProviderRefKeys } from '../payments/provider-ref.util';
+import {
+  expandProviderRefKeys,
+  mobileMoneyAmountDecision,
+  mobileMoneyAmountMismatchMessage,
+} from '../payments/provider-ref.util';
 
 type HubKind = 'COLLECT' | 'PAYOUT';
 
@@ -250,23 +254,18 @@ export class HubPaymentsService {
     let failureReason =
       outcome === 'FAILED' ? message ?? 'Paiement Mobile Money refusé' : null;
 
-    // Fail-closed: agrégateur a encaissé un montant ≠ intention hub (course / top-up / payout).
-    // Sous-paiement et surpaiement : ne jamais marquer COMPLETED (pas de crédit métier incorrect).
-    if (
-      outcome === 'COMPLETED' &&
-      confirmedAmountCdf != null &&
-      Number.isFinite(confirmedAmountCdf) &&
-      Math.round(confirmedAmountCdf) !== row.amountCdf
-    ) {
-      const paid = Math.round(confirmedAmountCdf);
-      this.logger.error(
-        `Hub amount mismatch payment=${row.id} ref=${row.reference} expected=${row.amountCdf} paid=${paid} purpose=${row.purpose}`,
-      );
-      finalOutcome = 'FAILED';
-      failureReason =
-        paid < row.amountCdf
-          ? `Montant Mobile Money insuffisant (${paid} CDF) — attendu ${row.amountCdf} CDF. Paiement non validé.`
-          : `Montant Mobile Money supérieur (${paid} CDF) — attendu ${row.amountCdf} CDF. Paiement non validé (aucun crédit).`;
+    // Fail-closed underpay / large overpay. Small C2B operator/merchant fee above the
+    // intention (e.g. 2366 vs 2300) still completes — credit the intended amount.
+    if (outcome === 'COMPLETED') {
+      const decision = mobileMoneyAmountDecision(row.amountCdf, confirmedAmountCdf);
+      if (decision === 'under' || decision === 'over') {
+        const paid = Math.round(confirmedAmountCdf as number);
+        this.logger.error(
+          `Hub amount mismatch payment=${row.id} ref=${row.reference} expected=${row.amountCdf} paid=${paid} purpose=${row.purpose} decision=${decision}`,
+        );
+        finalOutcome = 'FAILED';
+        failureReason = mobileMoneyAmountMismatchMessage(row.amountCdf, paid, decision);
+      }
     }
 
     const claimed = await this.prisma.hubPayment.updateMany({

@@ -64,6 +64,83 @@ export function extractAggregatorProviderRef(payload: Record<string, unknown>): 
   );
 }
 
+const ALT_REF_KEYS = [
+  'invoice',
+  'invoiceId',
+  'invoice_id',
+  'billId',
+  'bill_id',
+  'facture',
+  'operatorRef',
+  'operator_ref',
+];
+
+/** Extra ids from SMS / biller payloads (facture AFRIMOMO, ref opérateur). */
+export function extractAggregatorAltRefs(payload: Record<string, unknown>): string[] {
+  const nested = nestedPayment(payload);
+  const out = new Set<string>();
+  for (const key of ALT_REF_KEYS) {
+    const value = pickString(nested, [key]) ?? pickString(payload, [key]);
+    if (value) out.add(value);
+  }
+  return [...out];
+}
+
+/**
+ * Parse a confirmed CDF amount. DRC SMS / some payloads use `.` as thousands
+ * (`2.366` → 2366), not a decimal.
+ */
+export function parseConfirmedAmountCdf(raw: unknown): number | undefined {
+  if (typeof raw === 'number' && Number.isFinite(raw) && raw > 0) {
+    if (raw < 100) {
+      const thousands = Math.round(raw * 1000);
+      if (thousands >= 100 && Math.abs(raw * 1000 - thousands) < 1e-6) {
+        return thousands;
+      }
+    }
+    return Math.round(raw);
+  }
+  if (typeof raw === 'string') {
+    const compact = raw.trim().replace(/[\s\u00a0\u202f]/g, '');
+    if (/^\d{1,3}(\.\d{3})+$/.test(compact)) {
+      const n = Number(compact.replace(/\./g, ''));
+      return Number.isFinite(n) && n > 0 ? n : undefined;
+    }
+    const n = Number(compact.replace(',', '.'));
+    if (Number.isFinite(n) && n > 0) return parseConfirmedAmountCdf(n);
+  }
+  return undefined;
+}
+
+/**
+ * C2B collect: missing amount → allow; underpay → reject; small operator/merchant
+ * fee above the intention → allow (credit the intended amount).
+ */
+export function mobileMoneyAmountDecision(
+  expectedCdf: number,
+  confirmedAmountCdf: number | undefined,
+): 'ok' | 'under' | 'over' | 'unknown' {
+  if (confirmedAmountCdf == null || !Number.isFinite(confirmedAmountCdf)) return 'unknown';
+  const paid = Math.round(confirmedAmountCdf);
+  if (paid === expectedCdf) return 'ok';
+  if (paid < expectedCdf) return 'under';
+  const feeCap = Math.max(200, Math.ceil(expectedCdf * 0.05));
+  if (paid <= expectedCdf + feeCap) return 'ok';
+  return 'over';
+}
+
+export function mobileMoneyAmountMismatchMessage(
+  expectedCdf: number,
+  paid: number,
+  decision: 'under' | 'over',
+  kind = 'attendu',
+): string {
+  if (decision === 'under') {
+    return `Montant Mobile Money insuffisant (${paid} CDF) — ${kind} ${expectedCdf} CDF. Paiement non validé.`;
+  }
+  return `Montant Mobile Money supérieur (${paid} CDF) — ${kind} ${expectedCdf} CDF. Paiement non validé (aucun crédit).`;
+}
+
 export function normalizeOutcome(raw?: string): 'COMPLETED' | 'FAILED' | null {
   if (!raw) return null;
   const s = raw.trim().toUpperCase();

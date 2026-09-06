@@ -16,6 +16,7 @@ import {
   asRecord,
   extractAggregatorOutcome,
   extractAggregatorProviderRef,
+  parseConfirmedAmountCdf,
   pickString,
 } from './provider-ref.util';
 
@@ -40,26 +41,39 @@ export class PaymentsWebhookController {
     return { success: false, message: 'Webhook agrégateur non accepté ici' };
   }
 
-  private verifySerdiPaySignature(rawBody: string, headers: Record<string, string | string[] | undefined>): boolean {
+  private serdiPaySignatureHeader(
+    headers: Record<string, string | string[] | undefined>,
+  ): string {
+    const raw =
+      headers['x-serdipay-signature'] ?? headers['x-signature'] ?? headers['x-hub-signature-256'] ?? '';
+    return (typeof raw === 'string' ? raw : Array.isArray(raw) ? raw[0] : '')
+      .replace(/^sha256=/i, '')
+      .trim();
+  }
+
+  /**
+   * SerdiPay Public API callbacks are unsigned (no HMAC in their PDF/Word).
+   * We still verify HMAC when a header is present. Missing header → `unsigned`
+   * (finalize only if we already have a PENDING we initiated).
+   */
+  private classifySerdiPaySignature(
+    rawBody: string,
+    headers: Record<string, string | string[] | undefined>,
+  ): 'ok' | 'unsigned' | 'invalid' {
     const secret = this.config.get<string>('SERDIPAY_WEBHOOK_SECRET')?.trim();
+    const provided = this.serdiPaySignatureHeader(headers);
+    if (!provided) return 'unsigned';
     if (!secret) {
-      this.logger.error('SERDIPAY_WEBHOOK_SECRET unset — webhook rejected (fail-closed)');
-      return false;
+      this.logger.error('SERDIPAY_WEBHOOK_SECRET unset — signed webhook rejected (fail-closed)');
+      return 'invalid';
     }
-    const header =
-      (typeof headers['x-serdipay-signature'] === 'string' && headers['x-serdipay-signature']) ||
-      (typeof headers['x-signature'] === 'string' && headers['x-signature']) ||
-      (typeof headers['x-hub-signature-256'] === 'string' && headers['x-hub-signature-256']) ||
-      '';
-    if (!header) return false;
-    const provided = header.replace(/^sha256=/i, '').trim();
     const expected = createHmac('sha256', secret).update(rawBody).digest('hex');
     try {
       const a = Buffer.from(provided, 'hex');
       const b = Buffer.from(expected, 'hex');
-      return a.length === b.length && timingSafeEqual(a, b);
+      return a.length === b.length && timingSafeEqual(a, b) ? 'ok' : 'invalid';
     } catch {
-      return false;
+      return 'invalid';
     }
   }
 
@@ -68,15 +82,21 @@ export class PaymentsWebhookController {
       payload.payment && typeof payload.payment === 'object'
         ? (payload.payment as Record<string, unknown>)
         : undefined;
-    const raw =
+    return parseConfirmedAmountCdf(
       payload.amount_cdf ??
-      payload.amountCdf ??
-      payload.amount ??
-      nested?.amount_cdf ??
-      nested?.amountCdf ??
-      nested?.amount;
-    const n = typeof raw === 'number' ? raw : typeof raw === 'string' ? Number(raw) : NaN;
-    return Number.isFinite(n) && n > 0 ? Math.round(n) : undefined;
+        payload.amountCdf ??
+        payload.amount ??
+        nested?.amount_cdf ??
+        nested?.amountCdf ??
+        nested?.amount,
+    );
+  }
+
+  private webhookRawBody(req: { rawBody?: Buffer | string }, body: unknown): string {
+    const raw = req.rawBody;
+    if (typeof raw === 'string') return raw;
+    if (raw && Buffer.isBuffer(raw) && raw.length) return raw.toString('utf8');
+    return JSON.stringify(body ?? {});
   }
 
   @Post('webhooks/serdipay')
@@ -85,17 +105,22 @@ export class PaymentsWebhookController {
   async serdiPay(
     @Body() body: unknown,
     @Headers() headers: Record<string, string | string[] | undefined>,
-    @Req() req: { rawBody?: Buffer },
+    @Req() req: { rawBody?: Buffer | string },
   ) {
     if (!this.isHubProcess()) return this.rejectAggregatorOnSenga('SerdiPay');
-    const secret = this.config.get<string>('SERDIPAY_WEBHOOK_SECRET')?.trim();
-    if (!secret) {
-      throw new UnauthorizedException({ success: false, message: 'SERDIPAY_WEBHOOK_SECRET requis' });
-    }
-    const raw = req.rawBody?.toString('utf8') ?? JSON.stringify(body ?? {});
-    if (!this.verifySerdiPaySignature(raw, headers)) {
+    const raw = this.webhookRawBody(req, body);
+    const sig = this.classifySerdiPaySignature(raw, headers);
+    if (sig === 'invalid') {
       this.logger.warn('SerdiPay webhook: signature invalide');
       throw new UnauthorizedException({ success: false, message: 'Signature invalide' });
+    }
+    if (sig === 'unsigned') {
+      const headerNames = Object.keys(headers)
+        .filter((k) => k.startsWith('x-') || k === 'authorization')
+        .join(',');
+      this.logger.warn(
+        `SerdiPay webhook unsigned (Public API n’envoie pas de HMAC) — finalize only if PENDING exists. headers=${headerNames || '(none)'}`,
+      );
     }
     const payload = asRecord(body);
     const providerRef = extractAggregatorProviderRef(payload);

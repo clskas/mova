@@ -2,6 +2,8 @@ import {
   expandProviderRefKeys,
   extractAggregatorOutcome,
   extractAggregatorProviderRef,
+  mobileMoneyAmountDecision,
+  parseConfirmedAmountCdf,
 } from './provider-ref.util';
 
 describe('expandProviderRefKeys', () => {
@@ -60,5 +62,24 @@ describe('extractAggregatorProviderRef / outcome', () => {
         payment: { sessionStatus: 3, transactionId: 'SD260829CPHOG' },
       }),
     ).toBe('COMPLETED');
+  });
+});
+
+describe('parseConfirmedAmountCdf / mobileMoneyAmountDecision', () => {
+  it('reads DRC thousands grouping 2.366 as 2366', () => {
+    expect(parseConfirmedAmountCdf('2.366')).toBe(2366);
+    expect(parseConfirmedAmountCdf(2.366)).toBe(2366);
+    expect(parseConfirmedAmountCdf(2366)).toBe(2366);
+  });
+
+  it('allows a small operator fee above the intended collect', () => {
+    expect(mobileMoneyAmountDecision(2300, 2366)).toBe('ok');
+    expect(mobileMoneyAmountDecision(2300, 2300)).toBe('ok');
+    expect(mobileMoneyAmountDecision(2300, undefined)).toBe('unknown');
+  });
+
+  it('rejects underpay and large overpay', () => {
+    expect(mobileMoneyAmountDecision(2300, 1000)).toBe('under');
+    expect(mobileMoneyAmountDecision(8500, 9000)).toBe('over');
   });
 });

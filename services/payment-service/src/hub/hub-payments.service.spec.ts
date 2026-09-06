@@ -74,6 +74,29 @@ describe('HubPaymentsService.finalizeFromAggregator amount check', () => {
     );
   });
 
+  it('completes C2B when paid is intended + small operator fee (2366 vs 2300)', async () => {
+    prisma.hubPayment.findFirst.mockResolvedValue({
+      id: 'hub-fee',
+      reference: 'senga_topup_1',
+      amountCdf: 2300,
+      purpose: 'topup',
+      status: 'PENDING',
+      completedAt: null,
+      notifiedAt: null,
+      providerRef: 'sp_SD2609053C7J9',
+    });
+    prisma.hubPayment.updateMany.mockResolvedValue({ count: 1 });
+
+    const result = await service.finalizeFromAggregator('SD2609053C7J9', 'COMPLETED', undefined, 2366);
+
+    expect(result).toMatchObject({ found: true, status: 'COMPLETED' });
+    expect(prisma.hubPayment.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: 'COMPLETED', failureReason: null }),
+      }),
+    );
+  });
+
   it('completes when confirmed amount matches', async () => {
     prisma.hubPayment.findFirst.mockResolvedValue({
       id: 'hub-3',

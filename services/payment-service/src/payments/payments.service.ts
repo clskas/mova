@@ -22,7 +22,11 @@ import { DriverDebtLedgerService } from '../ledger/driver-debt-ledger.service';
 import { HubPaymentsService } from '../hub/hub-payments.service';
 import { AirtelMoneyProvider, MockPaymentProvider, MpesaProvider, OrangeMoneyProvider, isAsyncMobileMoneyRef } from './payment-providers';
 import { PaymentProvider } from './payment-provider.interface';
-import { expandProviderRefKeys } from './provider-ref.util';
+import {
+  expandProviderRefKeys,
+  mobileMoneyAmountDecision,
+  mobileMoneyAmountMismatchMessage,
+} from './provider-ref.util';
 
 const MOBILE_MONEY_METHODS = new Set<PaymentMethod>([
   PaymentMethod.ORANGE_MONEY,
@@ -1274,7 +1278,8 @@ export class PaymentsService {
 
   /**
    * Fail-closed amount check for ride/service MM webhooks (same policy as top-ups).
-   * Missing confirmed amount → allow (provider may omit); mismatch → reject, no credit.
+   * Missing confirmed amount → allow; underpay / large overpay → reject; small
+   * operator fee above the intention → allow (no extra credit).
    */
   private mobileMoneyAmountMismatchReason(
     kind: 'course' | 'service',
@@ -1282,16 +1287,13 @@ export class PaymentsService {
     confirmedAmountCdf: number | undefined,
     refLabel: string,
   ): string | null {
-    if (confirmedAmountCdf == null || !Number.isFinite(confirmedAmountCdf)) return null;
-    const paid = Math.round(confirmedAmountCdf);
-    if (paid === expectedCdf) return null;
+    const decision = mobileMoneyAmountDecision(expectedCdf, confirmedAmountCdf);
+    if (decision === 'ok' || decision === 'unknown') return null;
+    const paid = Math.round(confirmedAmountCdf as number);
     this.logger.error(
-      `Ride/service MM amount mismatch kind=${kind} ref=${refLabel} expected=${expectedCdf} paid=${paid}`,
+      `Ride/service MM amount mismatch kind=${kind} ref=${refLabel} expected=${expectedCdf} paid=${paid} decision=${decision}`,
     );
-    if (paid < expectedCdf) {
-      return `Montant Mobile Money insuffisant (${paid} CDF) — tarif ${kind} ${expectedCdf} CDF. Course/service non payé.`;
-    }
-    return `Montant Mobile Money supérieur (${paid} CDF) — tarif ${kind} ${expectedCdf} CDF. Paiement non validé (aucun crédit).`;
+    return mobileMoneyAmountMismatchMessage(expectedCdf, paid, decision, `tarif ${kind}`);
   }
 
   async getPassengerRidePaymentStatus(rideId: string, userId: string) {

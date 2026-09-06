@@ -44,12 +44,42 @@ describe('PaymentsWebhookController aggregator gate', () => {
     ).rejects.toBeInstanceOf(UnauthorizedException);
   });
 
-  it('rejects SerdiPay webhook when secret is empty (401 fail-closed)', async () => {
+  it('rejects SerdiPay webhook when a signature header is present but secret is empty', async () => {
     const config = {
       get: (key: string) => (key === 'AFRISOFT_PAY_HUB_MODE' ? 'true' : undefined),
     } as never;
     const ctl = new PaymentsWebhookController({} as never, config, hub);
-    await expect(ctl.serdiPay({}, {}, {})).rejects.toBeInstanceOf(UnauthorizedException);
+    await expect(
+      ctl.serdiPay({ status: 'success' }, { 'x-serdipay-signature': 'deadbeef' }, {}),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it('accepts unsigned SerdiPay Public API callback and finalizes a known PENDING', async () => {
+    const finalizeFromAggregator = jest.fn().mockResolvedValue({
+      found: true,
+      notified: true,
+      payment_id: 'pay_unsigned',
+      status: 'COMPLETED',
+    });
+    const hubOn = { isEnabled: () => true, finalizeFromAggregator } as never;
+    const config = {
+      get: (key: string) => {
+        if (key === 'AFRISOFT_PAY_HUB_MODE') return 'true';
+        if (key === 'SERDIPAY_WEBHOOK_SECRET') return 'whsec_test';
+        return undefined;
+      },
+    } as never;
+    const ctl = new PaymentsWebhookController({} as never, config, hubOn);
+    const body = {
+      status: 200,
+      payment: { status: 'success', sessionStatus: 3, transactionId: 'SD2609053C7J9' },
+    };
+    await expect(ctl.serdiPay(body, {}, { rawBody: Buffer.from(JSON.stringify(body)) })).resolves.toMatchObject({
+      success: true,
+      found: true,
+      status: 'COMPLETED',
+    });
+    expect(finalizeFromAggregator).toHaveBeenCalledWith('SD2609053C7J9', 'COMPLETED', undefined, undefined);
   });
 
   it('rejects SerdiPay webhook when signature is invalid (401 not 200)', async () => {

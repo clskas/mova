@@ -252,6 +252,40 @@ describe('PaymentsService', () => {
     expect(redis.publish).not.toHaveBeenCalled();
   });
 
+  it('webhook SUCCESS : crédite une recharge PENDING', async () => {
+    wallet.completePendingTopUp.mockResolvedValueOnce({
+      found: true,
+      status: 'COMPLETED',
+      balanceCdf: 2300,
+    });
+    const result = await service.completeMobileMoneyFromWebhook(
+      'pay_8137b15301ec2980b07a3388',
+      'COMPLETED',
+      undefined,
+      ['senga_topup_f9151069-8c12-433d-8c80-3fb02c7e7cb2'],
+      2300,
+    );
+    expect(result).toMatchObject({ success: true, kind: 'TOPUP', status: 'COMPLETED', balanceCdf: 2300 });
+    expect(wallet.completePendingTopUp).toHaveBeenCalledWith(
+      expect.any(String),
+      'COMPLETED',
+      undefined,
+      expect.any(Array),
+      2300,
+    );
+  });
+
+  it('webhook SUCCESS rejoué : pas de second crédit', async () => {
+    wallet.completePendingTopUp.mockResolvedValueOnce({
+      found: true,
+      alreadyFinal: true,
+      status: 'COMPLETED',
+      balanceCdf: 2300,
+    });
+    const result = await service.completeMobileMoneyFromWebhook('pay_8137b15301ec2980b07a3388', 'COMPLETED');
+    expect(result).toMatchObject({ success: true, kind: 'TOPUP', alreadyFinal: true, status: 'COMPLETED' });
+  });
+
   it('webhook course : valide si montant confirmé = tarif', async () => {
     prisma.payment.findFirst.mockResolvedValueOnce({
       id: 'pay-mm',

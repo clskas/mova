@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { SubscriptionStatus, SubscriptionTarget } from '@prisma/client';
-import { IsBoolean, IsEnum, IsInt, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import { IsArray, IsBoolean, IsEnum, IsInt, IsNumber, IsOptional, IsString, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 import { InternalApiGuard } from '../common/internal-api.guard';
 import { WalletService } from '../wallet/wallet.service';
@@ -43,6 +43,14 @@ class InternalWithdrawDto {
   @Type(() => Number) @IsInt() @Min(500) amountCdf: number;
   @IsString() provider: string;
   @IsString() phone: string;
+}
+
+class ReconcileMobileMoneyDto {
+  @IsString() providerRef: string;
+  @IsEnum(['COMPLETED', 'FAILED']) outcome: 'COMPLETED' | 'FAILED';
+  @IsOptional() @IsString() message?: string;
+  @IsOptional() @IsArray() @IsString({ each: true }) altRefs?: string[];
+  @IsOptional() @Type(() => Number) confirmedAmountCdf?: number;
 }
 
 @ApiTags('internal')
@@ -94,6 +102,26 @@ export class InternalController {
   @Post('wallets/:userId/withdraw')
   withdraw(@Param('userId') userId: string, @Body() dto: InternalWithdrawDto) {
     return this.wallet.withdrawToMobileMoney(userId, dto.amountCdf, dto.provider, dto.phone);
+  }
+
+  /**
+   * Idempotent ops replay: hub finalize (VPS) and/or wallet/ride/service credit (SENGA).
+   * Duplicate COMPLETED → alreadyFinal, no second credit.
+   */
+  @Post('payments/reconcile-mobile-money')
+  reconcileMobileMoney(@Body() dto: ReconcileMobileMoneyDto) {
+    return this.payments.completeMobileMoneyFromWebhook(
+      dto.providerRef,
+      dto.outcome,
+      dto.message,
+      Array.isArray(dto.altRefs) ? dto.altRefs.filter((r) => typeof r === 'string') : [],
+      dto.confirmedAmountCdf,
+    );
+  }
+
+  @Post('wallets/:userId/reconcile-topup')
+  reconcileTopUp(@Param('userId') userId: string, @Body() body: { providerRef?: string }) {
+    return this.wallet.reconcileTopUpFromHub(userId, body.providerRef?.trim() ?? '');
   }
 
   @Post('wallets/:userId/hold')

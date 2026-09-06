@@ -9,7 +9,7 @@ describe('buildMobileAppVersionResponse', () => {
     expect(payload.passenger.currentVersion).toBe('1.0.5');
     expect(payload.driver.currentVersion).toBe('1.0.5');
     expect(payload.passenger.minVersion).toBe('1.0.0');
-    expect(payload.passenger.currentVersionCode).toBe(46);
+    expect(payload.passenger.currentVersionCode).toBe(47);
     expect(payload.passenger.minVersionCode).toBe(0);
     expect(payload.passenger.storeUrl).toContain('cd.mova.mova.passenger');
     expect(payload.driver.storeUrl).toContain('cd.mova.mova.driver');
@@ -48,8 +48,8 @@ describe('buildMobileAppVersionResponse', () => {
       },
       now,
     );
-    expect(payload.passenger.currentVersionCode).toBe(46);
-    expect(payload.driver.currentVersionCode).toBe(46);
+    expect(payload.passenger.currentVersionCode).toBe(47);
+    expect(payload.driver.currentVersionCode).toBe(47);
   });
 
   it('raises stale Render env below the shipped floor so banners can show', () => {
@@ -64,7 +64,7 @@ describe('buildMobileAppVersionResponse', () => {
     );
     expect(payload.passenger.currentVersion).toBe('1.0.5');
     expect(payload.driver.currentVersion).toBe('1.0.5');
-    expect(payload.passenger.currentVersionCode).toBe(46);
-    expect(payload.driver.currentVersionCode).toBe(46);
+    expect(payload.passenger.currentVersionCode).toBe(47);
+    expect(payload.driver.currentVersionCode).toBe(47);
   });
 });

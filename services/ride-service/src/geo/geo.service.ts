@@ -16,20 +16,9 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CityActivationService } from './city-activation.service';
 import { resolveDrcProximity } from './drc-proximity';
 import { GeocodeProvider } from './geocode.provider';
+import { rankAutocompleteResults, type AutocompleteResult } from './geo-autocomplete.rank';
 import { TAXI_POI_CHIP_CATEGORIES, type PoiCategory } from './poi-category.map';
 import { PoiImportService } from './poi-import.service';
-
-type AutocompleteResult = {
-  source: 'commune' | 'nominatim' | 'photon' | 'mapbox' | 'poi';
-  label: string;
-  address: string;
-  lat: number;
-  lng: number;
-  commune: string | null;
-  city: string;
-  category?: string;
-  poiId?: string;
-};
 
 @Injectable()
 export class GeoService implements OnModuleInit {
@@ -313,6 +302,7 @@ export class GeoService implements OnModuleInit {
       lng: number;
       city: string;
       category: PoiCategory;
+      source?: string | null;
     }) => {
       push({
         source: 'poi',
@@ -324,6 +314,7 @@ export class GeoService implements OnModuleInit {
         city: p.city,
         category: p.category,
         poiId: p.id,
+        catalogSource: p.source ?? undefined,
       });
     };
 
@@ -461,9 +452,7 @@ export class GeoService implements OnModuleInit {
       });
     }
 
-    const local = results.filter((r) => r.source === 'commune' || r.source === 'poi');
-    const remote = results.filter((r) => r.source !== 'commune' && r.source !== 'poi');
-    return [...local.slice(0, 8), ...remote.slice(0, 10)].slice(0, 16);
+    return rankAutocompleteResults(results);
   }
 
   /** Géocodage externe avec timeout — évite de bloquer l'autocomplete SENGA. */

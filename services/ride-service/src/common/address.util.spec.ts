@@ -40,6 +40,15 @@ describe('address.util', () => {
     expect(() => assertKinshasaDestination('Aéroport', { lat: -4.4, lng: 15.4167 })).not.toThrow();
   });
 
+  it('accepte un pin GPS sans nom de POI', () => {
+    expect(() =>
+      assertServiceAreaDestination('', { lat: -4.3217, lng: 15.3125 }),
+    ).not.toThrow();
+    expect(() =>
+      assertServiceAreaDestination('-4.32170, 15.31250', { lat: -4.3217, lng: 15.3125 }),
+    ).not.toThrow();
+  });
+
   it('accepte des coords Lubumbashi', () => {
     expect(() =>
       assertServiceAreaDestination('Centre', { lat: -11.6647, lng: 27.4794 }),

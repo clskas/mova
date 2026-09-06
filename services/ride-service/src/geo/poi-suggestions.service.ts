@@ -34,6 +34,18 @@ export class PoiSuggestionsService {
     const area = findServiceAreaByName(dto.city) ?? findServiceAreaByCoords(dto.lat, dto.lng);
     const city = area?.name ?? dto.city.trim();
 
+    if (dto.category === PlaceOfInterestCategory.OTHER) {
+      return this.publishInformalPlace(userId, {
+        name,
+        category: dto.category,
+        lat: dto.lat,
+        lng: dto.lng,
+        city,
+        address: dto.address?.trim() || null,
+        notes: dto.notes?.trim() || null,
+      });
+    }
+
     const pendingCount = await this.prisma.poiSuggestion.count({
       where: { userId, status: PoiSuggestionStatus.PENDING },
     });
@@ -62,7 +74,91 @@ export class PoiSuggestionsService {
 
     return {
       ...this.formatSuggestion(row),
+      autoPublished: false,
       message: 'Suggestion envoyée. Un administrateur validera le lieu avant publication.',
+    };
+  }
+
+  /** Noms locaux / pins (« chez Mama X ») : publication immédiate dans le catalogue SENGA. */
+  private async publishInformalPlace(
+    userId: string,
+    data: {
+      name: string;
+      category: PlaceOfInterestCategory;
+      lat: number;
+      lng: number;
+      city: string;
+      address: string | null;
+      notes: string | null;
+    },
+  ) {
+    const existing = await this.prisma.placeOfInterest.findFirst({
+      where: {
+        city: data.city,
+        name: { equals: data.name, mode: 'insensitive' },
+      },
+    });
+    if (existing && this.haversineKm(data.lat, data.lng, existing.lat, existing.lng) <= DUPLICATE_RADIUS_KM) {
+      return {
+        ...this.formatSuggestion({
+          id: existing.id,
+          userId,
+          name: existing.name,
+          category: existing.category,
+          lat: existing.lat,
+          lng: existing.lng,
+          city: existing.city,
+          address: existing.address,
+          notes: data.notes,
+          status: PoiSuggestionStatus.APPROVED,
+          rejectionReason: null,
+          reviewedBy: 'auto',
+          reviewedAt: existing.updatedAt,
+          publishedPoiId: existing.id,
+          createdAt: existing.createdAt,
+          updatedAt: existing.updatedAt,
+        }),
+        poi: existing,
+        autoPublished: true,
+        reused: true as const,
+        message: 'Lieu déjà dans le catalogue SENGA — il reste prioritaire dans la recherche.',
+      };
+    }
+
+    const poi = await this.prisma.placeOfInterest.create({
+      data: {
+        name: data.name,
+        category: data.category,
+        lat: data.lat,
+        lng: data.lng,
+        city: data.city,
+        address: data.address ?? `${data.name}, ${data.city}, RDC`,
+        source: 'USER',
+      },
+    });
+
+    const row = await this.prisma.poiSuggestion.create({
+      data: {
+        userId,
+        name: data.name,
+        category: data.category,
+        lat: data.lat,
+        lng: data.lng,
+        city: data.city,
+        address: data.address,
+        notes: data.notes,
+        status: PoiSuggestionStatus.APPROVED,
+        reviewedBy: 'auto',
+        reviewedAt: new Date(),
+        publishedPoiId: poi.id,
+      },
+    });
+
+    return {
+      ...this.formatSuggestion(row),
+      poi,
+      autoPublished: true,
+      message: 'Lieu enregistré — il apparaîtra en tête de la recherche SENGA.',
     };
   }
 

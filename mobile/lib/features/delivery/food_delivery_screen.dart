@@ -14,6 +14,7 @@ import '../../core/location/service_area_prefs.dart';
 import '../../core/location/service_areas.dart';
 import '../../core/widgets/destination_coord_panel.dart';
 import '../../core/widgets/geo_autocomplete_field.dart';
+import '../../core/widgets/saved_places_bar.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import '../../core/widgets/service_area_selector.dart';
@@ -188,23 +189,41 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
 
   Widget _buildDeliveryAddressField() {
     final api = ref.read(apiClientProvider);
-    return GeoAutocompleteField(
-      controller: _addressController,
-      api: api,
-      city: _deliveryCityName,
-      proximityLat: _deliveryLat,
-      proximityLng: _deliveryLng,
-      label: 'Adresse de livraison',
-      hint: 'Ex: Gombe, Bandal, Limete…',
-      prefixIcon: Icons.delivery_dining,
-      textInputAction: TextInputAction.done,
-      onUserInput: _onAddressUserInput,
-      onSelected: _onAddressSuggestionSelected,
-      suffixIcon: IconButton(
-        icon: const Icon(Icons.gps_fixed, color: MovaColors.violet),
-        tooltip: 'Ma position',
-        onPressed: _loadingGps ? null : _useMyLocationForDelivery,
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SavedPlacesBar(
+          onSelected: (place) {
+            _addressController.text = place.name;
+            setState(() {
+              _deliveryLat = place.lat;
+              _deliveryLng = place.lng;
+              _addressCoordsResolved = true;
+              _estimatedTotal = null;
+            });
+          },
+          assignableCoords: LatLng(_deliveryLat, _deliveryLng),
+          assignableLabel: _addressController.text,
+        ),
+        GeoAutocompleteField(
+          controller: _addressController,
+          api: api,
+          city: _deliveryCityName,
+          proximityLat: _deliveryLat,
+          proximityLng: _deliveryLng,
+          label: 'Adresse de livraison',
+          hint: 'Ex: Gombe, chez Mama X, Bandal…',
+          prefixIcon: Icons.delivery_dining,
+          textInputAction: TextInputAction.done,
+          onUserInput: _onAddressUserInput,
+          onSelected: _onAddressSuggestionSelected,
+          suffixIcon: IconButton(
+            icon: const Icon(Icons.gps_fixed, color: MovaColors.violet),
+            tooltip: 'Ma position',
+            onPressed: _loadingGps ? null : _useMyLocationForDelivery,
+          ),
+        ),
+      ],
     );
   }
 

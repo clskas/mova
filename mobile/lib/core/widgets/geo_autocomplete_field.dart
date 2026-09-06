@@ -27,6 +27,7 @@ class GeoAutocompleteField extends StatefulWidget {
     this.proximityLat,
     this.proximityLng,
     this.category,
+    this.userCatalog = const [],
   });
 
   final TextEditingController controller;
@@ -44,6 +45,8 @@ class GeoAutocompleteField extends StatefulWidget {
   final double? proximityLat;
   final double? proximityLng;
   final String? category;
+  /// Catalogue SENGA local (Maison, Bureau, lieux nommés) — rangé avant Mapbox.
+  final List<Map<String, dynamic>> userCatalog;
 
   @override
   State<GeoAutocompleteField> createState() => _GeoAutocompleteFieldState();
@@ -123,7 +126,13 @@ class _GeoAutocompleteFieldState extends State<GeoAutocompleteField> {
   List<Map<String, dynamic>> _localSuggestions(String query, String city) {
     final seen = <String>{};
     final merged = <Map<String, dynamic>>[];
+    final q = query.toLowerCase();
+    final catalogHits = widget.userCatalog.where((item) {
+      final label = item['label']?.toString() ?? item['address']?.toString() ?? '';
+      return label.toLowerCase().contains(q);
+    });
     for (final item in [
+      ...catalogHits,
       ...MockData.geoAutocomplete(query, city: city),
       ...MockData.geoAutocomplete(query),
     ]) {
@@ -141,7 +150,9 @@ class _GeoAutocompleteFieldState extends State<GeoAutocompleteField> {
   ) {
     final seen = <String>{};
     final merged = <Map<String, dynamic>>[];
-    for (final item in [...incoming, ...current]) {
+    final userIncoming = incoming.where((i) => i['catalogSource']?.toString() == 'USER');
+    final otherIncoming = incoming.where((i) => i['catalogSource']?.toString() != 'USER');
+    for (final item in [...userIncoming, ...otherIncoming, ...current]) {
       final label = item['label']?.toString() ?? item['address']?.toString() ?? '';
       if (label.isEmpty || seen.contains(label)) continue;
       seen.add(label);

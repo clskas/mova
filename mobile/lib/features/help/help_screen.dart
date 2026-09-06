@@ -80,8 +80,8 @@ class HelpScreen extends ConsumerWidget {
           _HelpLink(
             icon: Icons.place_outlined,
             iconColor: MovaColors.green,
-            title: 'Suggérer un lieu',
-            subtitle: 'Marché, pharmacie, arrêt… validation SENGA',
+            title: 'Nommer un lieu',
+            subtitle: 'Chez Mama X, pin GPS — ou marché / hôpital à valider',
             onTap: () => _open(context, const SuggestPlaceScreen()),
           ),
           _HelpLink(

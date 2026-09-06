@@ -19,6 +19,7 @@ import '../../core/widgets/mova_widgets.dart';
 import '../chat/ride_chat_screen.dart';
 import '../chat/chat_alert_service.dart';
 import '../passenger/passenger_alert_service.dart';
+import '../geo/suggest_place_screen.dart';
 import 'payment_screen.dart';
 import 'widgets/mova_ride_map.dart';
 
@@ -905,6 +906,25 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
                               );
                             }),
                             const SizedBox(height: 16),
+                            if (_status.toUpperCase() == 'COMPLETED') ...[
+                              const SizedBox(height: 8),
+                              MovaButton(
+                                label: 'Nommer ce lieu',
+                                isSecondary: true,
+                                icon: Icons.edit_location_alt_outlined,
+                                onPressed: () {
+                                  final lat = (_ride?['dropoffLat'] as num?)?.toDouble();
+                                  final lng = (_ride?['dropoffLng'] as num?)?.toDouble();
+                                  SuggestPlaceScreen.open(
+                                    context,
+                                    lat: lat,
+                                    lng: lng,
+                                    name: _ride?['dropoffAddress']?.toString(),
+                                    address: _ride?['dropoffAddress']?.toString(),
+                                  );
+                                },
+                              ),
+                            ],
                             if (_canCancel)
                               MovaButton(
                                 label: 'Annuler la course',

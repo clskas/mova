@@ -14,7 +14,9 @@ import '../../core/location/service_area_prefs.dart';
 import '../../core/location/service_areas.dart';
 import '../../core/location/location_service.dart';
 import '../../core/widgets/destination_coord_panel.dart';
+import '../../core/widgets/saved_places_bar.dart';
 import '../../core/theme/mova_colors.dart';
+import '../geo/suggest_place_screen.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import '../../widgets/promo_code_field.dart';
@@ -61,6 +63,22 @@ class _ExpressDeliveryScreenState extends ConsumerState<ExpressDeliveryScreen> {
     super.initState();
     _dropoffController.addListener(_onDropoffChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) => _useMyLocation());
+  }
+
+  Future<void> _nameMapPin(LatLng raw) async {
+    if (!ServiceAreaLocation.isInBounds(raw)) {
+      if (mounted) setState(() => _validationError = ServiceAreaLocation.outOfAreaMessage());
+      return;
+    }
+    _setDropoffFromCoords(raw, LocationService.coordsLabel(raw));
+    if (!mounted) return;
+    await SuggestPlaceScreen.open(
+      context,
+      lat: raw.latitude,
+      lng: raw.longitude,
+      city: ServiceAreas.cityNameForCoords(raw),
+      address: LocationService.coordsLabel(raw),
+    );
   }
 
   @override
@@ -502,6 +520,7 @@ class _ExpressDeliveryScreenState extends ConsumerState<ExpressDeliveryScreen> {
           dropoff: _dropoff,
           height: height,
           onDropoffTap: _onMapDropoffTap,
+          onNamePlace: _nameMapPin,
           dropoffEditable: true,
           pickupLabel: _pickupController.text,
           dropoffLabel: _dropoffController.text,
@@ -516,6 +535,11 @@ class _ExpressDeliveryScreenState extends ConsumerState<ExpressDeliveryScreen> {
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 16),
+                  SavedPlacesBar(
+                    onSelected: (place) => _setDropoffFromCoords(place.coords, place.name),
+                    assignableCoords: _dropoff,
+                    assignableLabel: _dropoffController.text,
+                  ),
                   TextField(
                     controller: _pickupController,
                     decoration: InputDecoration(

@@ -14,6 +14,7 @@ import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import '../chat/chat_alert_service.dart';
 import '../chat/ride_chat_screen.dart';
+import '../geo/suggest_place_screen.dart';
 import 'widgets/driver_cash_pin_dialog.dart';
 
 class ActiveRideScreen extends ConsumerStatefulWidget {
@@ -387,6 +388,21 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
             ),
           ],
           if (_status == 'COMPLETED') ...[
+            const SizedBox(height: 12),
+            MovaButton(
+              label: 'Nommer ce lieu',
+              isSecondary: true,
+              icon: Icons.edit_location_alt_outlined,
+              onPressed: () {
+                SuggestPlaceScreen.open(
+                  context,
+                  lat: (_ride['dropoffLat'] as num?)?.toDouble(),
+                  lng: (_ride['dropoffLng'] as num?)?.toDouble(),
+                  name: _ride['dropoffAddress']?.toString(),
+                  address: _ride['dropoffAddress']?.toString(),
+                );
+              },
+            ),
             const SizedBox(height: 12),
             MovaButton(
               label: 'Chat avec le passager',

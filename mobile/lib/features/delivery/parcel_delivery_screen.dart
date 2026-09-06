@@ -16,6 +16,9 @@ import '../../core/location/destination_coords.dart';
 import '../../core/location/location_service.dart';
 import '../../core/widgets/destination_coord_panel.dart';
 import '../../core/widgets/geo_autocomplete_field.dart';
+import '../../core/widgets/saved_places_bar.dart';
+import '../../core/location/saved_places_store.dart';
+import '../geo/suggest_place_screen.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
@@ -83,7 +86,35 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
     if (widget.initialWeightCategory != null) {
       _weightCategory = widget.initialWeightCategory!;
     }
-    WidgetsBinding.instance.addPostFrameCallback((_) => _useMyLocation());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _useMyLocation();
+      _loadUserCatalog();
+    });
+  }
+
+  List<Map<String, dynamic>> _userCatalog = [];
+
+  Future<void> _loadUserCatalog() async {
+    final chips = await SavedPlacesStore.chips();
+    if (!mounted) return;
+    setState(() => _userCatalog = chips.map((p) => p.toSuggestion()).toList());
+  }
+
+  Future<void> _nameMapPin(LatLng raw) async {
+    if (!ServiceAreaLocation.isInBounds(raw)) {
+      if (mounted) setState(() => _validationError = ServiceAreaLocation.outOfAreaMessage());
+      return;
+    }
+    _setDropoffFromCoords(raw, LocationService.coordsLabel(raw));
+    if (!mounted) return;
+    await SuggestPlaceScreen.open(
+      context,
+      lat: raw.latitude,
+      lng: raw.longitude,
+      city: ServiceAreas.cityNameForCoords(raw),
+      address: LocationService.coordsLabel(raw),
+    );
+    if (mounted) await _loadUserCatalog();
   }
 
   @override
@@ -535,6 +566,7 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
           dropoff: _dropoff,
           height: height,
           onDropoffTap: _onMapDropoffTap,
+          onNamePlace: _nameMapPin,
           dropoffEditable: true,
           pickupLabel: _pickupController.text,
           dropoffLabel: _dropoffController.text,
@@ -542,10 +574,16 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+                  SavedPlacesBar(
+                    onSelected: (place) => _setDropoffFromCoords(place.coords, place.name),
+                    assignableCoords: _dropoff,
+                    assignableLabel: _dropoffController.text,
+                  ),
                   GeoAutocompleteField(
                     controller: _pickupController,
                     api: api,
                     city: autocompleteCity,
+                    userCatalog: _userCatalog,
                     proximityLat: _pickup.latitude,
                     proximityLng: _pickup.longitude,
                     label: 'Adresse d\'enlèvement',
@@ -567,8 +605,9 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
                     proximityLat: _pickup.latitude,
                     proximityLng: _pickup.longitude,
                     label: 'Adresse de livraison',
-                    hint: 'Ex: Gombe, Limete, Masina…',
+                    hint: 'Ex: Gombe, chez Mama X, ou pin sur la carte',
                     prefixIcon: Icons.place_outlined,
+                    userCatalog: _userCatalog,
                     textInputAction: TextInputAction.done,
                     onUserInput: _onDropoffUserInput,
                     onSelected: _selectSuggestion,

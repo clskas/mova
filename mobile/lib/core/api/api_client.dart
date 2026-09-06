@@ -1156,7 +1156,8 @@ class ApiClient {
       }
     }
 
-    addAll(remote);
+    addAll(remote.where((i) => i['catalogSource']?.toString() == 'USER'));
+    addAll(remote.where((i) => i['catalogSource']?.toString() != 'USER'));
     addAll(MockData.geoAutocomplete(query, city: city));
     return merged.take(16).toList();
   }

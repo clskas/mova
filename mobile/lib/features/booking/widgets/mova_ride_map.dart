@@ -6,6 +6,7 @@ import 'package:latlong2/latlong.dart';
 import '../../../core/config/test_runtime_config.dart';
 import '../../../core/config/market_config.dart';
 import '../../../core/theme/mova_colors.dart';
+import '../../../core/widgets/map_pin_confirm_bar.dart';
 
 class MovaRideMap extends StatefulWidget {
   const MovaRideMap({
@@ -19,6 +20,7 @@ class MovaRideMap extends StatefulWidget {
     this.height = 220,
     this.driverIcon = Icons.two_wheeler,
     this.onDropoffTap,
+    this.onNamePlace,
     this.dropoffEditable = false,
     this.pickupLabel,
     this.dropoffLabel,
@@ -47,8 +49,10 @@ class MovaRideMap extends StatefulWidget {
   final String? pickupLabel;
   /// Libellé affiché près du marqueur arrivée.
   final String? dropoffLabel;
-  /// Tap sur la carte pour placer la destination (pin violet).
+  /// Confirmation « Utiliser cet emplacement » après tap / appui long.
   final ValueChanged<LatLng>? onDropoffTap;
+  /// « Nommer ce lieu » depuis le pin (catalogue SENGA).
+  final ValueChanged<LatLng>? onNamePlace;
   final bool dropoffEditable;
 
   static LatLng mapDefaultCenter() =>
@@ -119,6 +123,7 @@ class MovaRideMap extends StatefulWidget {
 class _MovaRideMapState extends State<MovaRideMap> {
   final MapController _mapController = MapController();
   LatLng? _prevDriver;
+  LatLng? _pendingPin;
   double _driverBearing = 0;
 
   @override
@@ -156,6 +161,11 @@ class _MovaRideMapState extends State<MovaRideMap> {
         if (mounted) _recenterCamera();
       });
     }
+  }
+
+  void _dropPendingPin(LatLng point) {
+    if (!MovaRideMap.isFiniteCoord(point.latitude, point.longitude)) return;
+    setState(() => _pendingPin = point);
   }
 
   void _recenterCamera() {
@@ -233,9 +243,8 @@ class _MovaRideMapState extends State<MovaRideMap> {
                     ? CameraFit.bounds(bounds: bounds, padding: const EdgeInsets.all(48))
                     : null,
                 onMapReady: _recenterCamera,
-                onTap: widget.onDropoffTap != null
-                    ? (_, point) => widget.onDropoffTap!(point)
-                    : null,
+                onTap: widget.dropoffEditable ? (_, point) => _dropPendingPin(point) : null,
+                onLongPress: widget.dropoffEditable ? (_, point) => _dropPendingPin(point) : null,
                 interactionOptions: const InteractionOptions(
                   flags: InteractiveFlag.pinchZoom | InteractiveFlag.drag,
                 ),
@@ -294,6 +303,18 @@ class _MovaRideMapState extends State<MovaRideMap> {
                       label: MovaRideMap.mapLabel(widget.dropoffLabel, fallback: 'Arrivée'),
                     ),
                   ),
+                if (_pendingPin != null)
+                  Marker(
+                    point: _pendingPin!,
+                    width: 140,
+                    height: 72,
+                    alignment: Alignment.topCenter,
+                    child: const _LabeledPin(
+                      color: Color(0xFFE67E22),
+                      icon: Icons.push_pin,
+                      label: 'Pin',
+                    ),
+                  ),
                 if (driver != null)
                   Marker(
                     point: driver,
@@ -325,7 +346,29 @@ class _MovaRideMapState extends State<MovaRideMap> {
           ],
             ),
           ),
-          if (widget.dropoffEditable)
+          if (widget.dropoffEditable && _pendingPin != null)
+            Positioned(
+              left: 8,
+              right: 8,
+              bottom: 8,
+              child: MapPinConfirmBar(
+                coords: _pendingPin!,
+                onUseLocation: () {
+                  final pin = _pendingPin!;
+                  setState(() => _pendingPin = null);
+                  widget.onDropoffTap?.call(pin);
+                },
+                onNamePlace: widget.onNamePlace == null
+                    ? null
+                    : () {
+                        final pin = _pendingPin!;
+                        setState(() => _pendingPin = null);
+                        widget.onNamePlace!(pin);
+                      },
+                onCancel: () => setState(() => _pendingPin = null),
+              ),
+            )
+          else if (widget.dropoffEditable)
             Positioned(
               left: 8,
               right: 8,
@@ -338,9 +381,9 @@ class _MovaRideMapState extends State<MovaRideMap> {
                 child: const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   child: Text(
-                    'Appuyez sur la carte pour la destination',
+                    'Appui long ou tap : pin, puis « Utiliser cet emplacement »',
                     style: TextStyle(color: MovaColors.white, fontSize: 11),
-                    maxLines: 1,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.center,
                   ),

@@ -8,6 +8,8 @@ import '../../core/config/test_runtime_config.dart';
 import '../../core/location/destination_coords.dart';
 import '../../core/location/location_service.dart';
 import '../../core/widgets/destination_coord_panel.dart';
+import '../../core/widgets/saved_places_bar.dart';
+import '../../core/location/saved_places_store.dart';
 import '../../core/location/service_area_location.dart';
 import '../../core/location/service_area_prefs.dart';
 import '../../core/location/service_areas.dart';
@@ -30,11 +32,15 @@ class BookingScreen extends ConsumerStatefulWidget {
     this.initialPickupAddress,
     this.initialDropoffAddress,
     this.initialVehicleType,
+    this.initialDropoffLat,
+    this.initialDropoffLng,
   });
 
   final String? initialPickupAddress;
   final String? initialDropoffAddress;
   final String? initialVehicleType;
+  final double? initialDropoffLat;
+  final double? initialDropoffLng;
 
   @override
   ConsumerState<BookingScreen> createState() => _BookingScreenState();
@@ -64,6 +70,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   String? _poiCategoryFilter;
   int _poiLoadGeneration = 0;
   List<Map<String, dynamic>> _nearbyVehicles = [];
+  List<Map<String, dynamic>> _userCatalog = [];
   int _nearbyLoadGeneration = 0;
   Timer? _nearbyPollTimer;
 
@@ -88,6 +95,15 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
     if (widget.initialVehicleType != null && widget.initialVehicleType!.trim().isNotEmpty) {
       _vehicleType = MarketConfig.normalizeVehicleType(widget.initialVehicleType!);
     }
+    final initLat = widget.initialDropoffLat;
+    final initLng = widget.initialDropoffLng;
+    if (initLat != null && initLng != null) {
+      _dropoff = LatLng(initLat, initLng);
+      _dropoffFromManualCoords = true;
+      if (_destinationController.text.trim().isEmpty) {
+        _destinationController.text = LocationService.coordsLabel(_dropoff!);
+      }
+    }
     if (!movaDisableAutoGps && widget.initialPickupAddress == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _useMyLocation());
     } else {
@@ -96,8 +112,17 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
         _loadNearbyVehicles();
       });
     }
-    WidgetsBinding.instance.addPostFrameCallback((_) => _checkUnpaidRide());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkUnpaidRide();
+      _loadUserCatalog();
+    });
     _nearbyPollTimer = Timer.periodic(const Duration(seconds: 12), (_) => _loadNearbyVehicles());
+  }
+
+  Future<void> _loadUserCatalog() async {
+    final chips = await SavedPlacesStore.chips();
+    if (!mounted) return;
+    setState(() => _userCatalog = chips.map((p) => p.toSuggestion()).toList());
   }
 
   Future<void> _loadNearbyPoi() async {
@@ -256,6 +281,28 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
       _estimates = {};
     });
     _fetchAllEstimates();
+  }
+
+  void _applySavedPlace(SavedPlace place) {
+    _setDropoffFromCoords(place.coords, place.name);
+  }
+
+  Future<void> _nameMapPin(LatLng raw) async {
+    if (!ServiceAreaLocation.isInBounds(raw)) {
+      if (mounted) setState(() => _validationError = ServiceAreaLocation.outOfAreaMessage());
+      return;
+    }
+    _setDropoffFromCoords(raw, LocationService.coordsLabel(raw));
+    if (!mounted) return;
+    await SuggestPlaceScreen.open(
+      context,
+      lat: raw.latitude,
+      lng: raw.longitude,
+      city: ServiceAreas.cityNameForCoords(raw),
+      address: LocationService.coordsLabel(raw),
+    );
+    if (!mounted) return;
+    await _loadUserCatalog();
   }
 
   Future<void> _onMapDropoffTap(LatLng raw) async {
@@ -631,6 +678,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
           dropoff: _dropoff,
           height: height,
           onDropoffTap: _onMapDropoffTap,
+          onNamePlace: _nameMapPin,
           dropoffEditable: true,
           pickupLabel: _pickupController.text,
           dropoffLabel: _destinationController.text,
@@ -681,11 +729,17 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                 style: const TextStyle(fontSize: 11, color: MovaColors.textSecondary),
               ),
             ),
+            SavedPlacesBar(
+              onSelected: _applySavedPlace,
+              assignableCoords: _dropoff,
+              assignableLabel: _destinationController.text,
+            ),
             GeoAutocompleteField(
               controller: _pickupController,
               api: api,
               city: autocompleteCity,
               category: _poiCategoryFilter,
+              userCatalog: _userCatalog,
               proximityLat: _pickup.latitude,
               proximityLng: _pickup.longitude,
               label: 'Départ',
@@ -708,8 +762,9 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
               proximityLat: _pickup.latitude,
               proximityLng: _pickup.longitude,
               label: 'Destination',
-              hint: 'Ex: Goma, Lubumbashi, Gombe…',
+              hint: 'Ex: Goma, chez Mama X, ou pin sur la carte',
               prefixIcon: Icons.place,
+              userCatalog: _userCatalog,
               onUserInput: _onDestinationUserInput,
               onSelected: _onDestinationSuggestionSelected,
             ),

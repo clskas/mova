@@ -52,6 +52,52 @@ describe('PoiSuggestionsService', () => {
     expect(prisma.poiSuggestion.create).toHaveBeenCalled();
   });
 
+  it('publie immédiatement un lieu informal (OTHER) dans le catalogue USER', async () => {
+    prisma.placeOfInterest.create.mockResolvedValue({
+      id: 'p-user',
+      name: 'Chez Mama X',
+      category: PlaceOfInterestCategory.OTHER,
+      lat: -4.32,
+      lng: 15.31,
+      city: 'Kinshasa',
+      source: 'USER',
+    });
+    prisma.poiSuggestion.create.mockResolvedValue({
+      id: 's-auto',
+      userId: 'u1',
+      name: 'Chez Mama X',
+      category: PlaceOfInterestCategory.OTHER,
+      lat: -4.32,
+      lng: 15.31,
+      city: 'Kinshasa',
+      address: null,
+      notes: null,
+      status: PoiSuggestionStatus.APPROVED,
+      rejectionReason: null,
+      reviewedBy: 'auto',
+      reviewedAt: new Date(),
+      publishedPoiId: 'p-user',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const result = await service.create('u1', {
+      name: 'Chez Mama X',
+      category: PlaceOfInterestCategory.OTHER,
+      lat: -4.32,
+      lng: 15.31,
+      city: 'Kinshasa',
+    });
+
+    expect(result.autoPublished).toBe(true);
+    expect(result.status).toBe('APPROVED');
+    expect(prisma.placeOfInterest.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ source: 'USER', category: PlaceOfInterestCategory.OTHER }),
+      }),
+    );
+  });
+
   it('publie un POI à l\'approbation', async () => {
     prisma.poiSuggestion.findUnique.mockResolvedValue({
       id: 's1',

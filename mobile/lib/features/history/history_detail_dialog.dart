@@ -11,6 +11,7 @@ import '../errands/errand_tracking_screen.dart';
 import '../moving/moving_tracking_screen.dart';
 import '../rides/scheduled_ride_screen.dart';
 import '../booking/booking_screen.dart';
+import '../geo/suggest_place_screen.dart';
 import '../booking/payment_screen.dart';
 import '../booking/tracking_screen.dart';
 import '../rating/rating_screen.dart';
@@ -297,11 +298,30 @@ Future<void> showHistoryDetailDialog(
                     initialPickupAddress: meta['pickupAddress']?.toString(),
                     initialDropoffAddress: meta['dropoffAddress']?.toString(),
                     initialVehicleType: meta['vehicleType']?.toString(),
+                    initialDropoffLat: (meta['dropoffLat'] as num?)?.toDouble(),
+                    initialDropoffLng: (meta['dropoffLng'] as num?)?.toDouble(),
                   ),
                 ),
               );
             },
             child: const Text('Commander à nouveau'),
+          ),
+        if (status == 'COMPLETED' || status == 'DELIVERED')
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              SuggestPlaceScreen.open(
+                context,
+                lat: (meta['dropoffLat'] as num?)?.toDouble() ??
+                    (meta['deliveryLat'] as num?)?.toDouble(),
+                lng: (meta['dropoffLng'] as num?)?.toDouble() ??
+                    (meta['deliveryLng'] as num?)?.toDouble(),
+                name: meta['dropoffAddress']?.toString(),
+                address: meta['dropoffAddress']?.toString() ??
+                    meta['deliveryAddress']?.toString(),
+              );
+            },
+            child: const Text('Nommer ce lieu'),
           ),
         if (type == 'RIDE' && status == 'COMPLETED' && id.isNotEmpty)
           TextButton(

@@ -55,8 +55,8 @@ class DriverHelpScreen extends ConsumerWidget {
           ),
           ListTile(
             leading: const Icon(Icons.place_outlined, color: MovaColors.green),
-            title: const Text('Suggérer un lieu', style: TextStyle(fontWeight: FontWeight.w600)),
-            subtitle: const Text('Marché, pharmacie, arrêt…'),
+            title: const Text('Nommer un lieu', style: TextStyle(fontWeight: FontWeight.w600)),
+            subtitle: const Text('Chez Mama X, pin GPS — ou marché / hôpital à valider'),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => _open(context, const SuggestPlaceScreen()),
           ),

@@ -5,6 +5,7 @@ import 'package:latlong2/latlong.dart';
 import '../../core/api/api_client.dart';
 import '../../core/error/result.dart';
 import '../../core/location/location_service.dart';
+import '../../core/location/saved_places_store.dart';
 import '../../core/location/service_area_location.dart';
 import '../../core/location/service_area_prefs.dart';
 import '../../core/location/service_areas.dart';
@@ -24,7 +25,46 @@ const _categories = [
 ];
 
 class SuggestPlaceScreen extends ConsumerStatefulWidget {
-  const SuggestPlaceScreen({super.key});
+  const SuggestPlaceScreen({
+    super.key,
+    this.initialName,
+    this.initialLat,
+    this.initialLng,
+    this.initialCity,
+    this.initialAddress,
+    this.initialCategory = 'OTHER',
+  });
+
+  final String? initialName;
+  final double? initialLat;
+  final double? initialLng;
+  final String? initialCity;
+  final String? initialAddress;
+  final String initialCategory;
+
+  static Future<void> open(
+    BuildContext context, {
+    String? name,
+    double? lat,
+    double? lng,
+    String? city,
+    String? address,
+    String category = 'OTHER',
+  }) {
+    return Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => SuggestPlaceScreen(
+          initialName: name,
+          initialLat: lat,
+          initialLng: lng,
+          initialCity: city,
+          initialAddress: address,
+          initialCategory: category,
+        ),
+      ),
+    );
+  }
 
   @override
   ConsumerState<SuggestPlaceScreen> createState() => _SuggestPlaceScreenState();
@@ -34,7 +74,7 @@ class _SuggestPlaceScreenState extends ConsumerState<SuggestPlaceScreen> {
   final _nameController = TextEditingController();
   final _addressController = TextEditingController();
   final _notesController = TextEditingController();
-  String _category = 'OTHER';
+  late String _category;
   String _city = 'RDC';
   LatLng? _coords;
   bool _loadingGps = false;
@@ -45,7 +85,16 @@ class _SuggestPlaceScreenState extends ConsumerState<SuggestPlaceScreen> {
   @override
   void initState() {
     super.initState();
-    _city = ref.read(selectedServiceAreaProvider).name;
+    _category = widget.initialCategory;
+    _city = widget.initialCity?.trim().isNotEmpty == true
+        ? widget.initialCity!.trim()
+        : ref.read(selectedServiceAreaProvider).name;
+    if (widget.initialName != null) _nameController.text = widget.initialName!;
+    if (widget.initialAddress != null) _addressController.text = widget.initialAddress!;
+    if (widget.initialLat != null && widget.initialLng != null) {
+      _coords = LatLng(widget.initialLat!, widget.initialLng!);
+      _city = ServiceAreas.cityNameForCoords(_coords!);
+    }
     _loadMine();
   }
 
@@ -123,9 +172,21 @@ class _SuggestPlaceScreenState extends ConsumerState<SuggestPlaceScreen> {
     if (!mounted) return;
     switch (result) {
       case Success(:final data):
+        if (coords != null) {
+          await SavedPlacesStore.saveNamed(
+            name: name,
+            lat: coords.latitude,
+            lng: coords.longitude,
+            address: _addressController.text.trim().isEmpty ? name : _addressController.text.trim(),
+          );
+        }
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(data['message']?.toString() ?? 'Suggestion envoyée.')),
+          SnackBar(content: Text(data['message']?.toString() ?? 'Lieu enregistré.')),
         );
+        if (mounted && Navigator.canPop(context) && widget.initialLat != null) {
+          Navigator.pop(context, data);
+          return;
+        }
         _nameController.clear();
         _notesController.clear();
         setState(() {
@@ -157,12 +218,14 @@ class _SuggestPlaceScreenState extends ConsumerState<SuggestPlaceScreen> {
   @override
   Widget build(BuildContext context) {
     return MovaScreen(
-      title: 'Suggérer un lieu',
+      title: 'Nommer ce lieu',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const Text(
-            'Proposez un marché, une pharmacie, un arrêt… Après validation par SENGA, le lieu apparaîtra dans la recherche d\'adresses.',
+            'Donnez un nom local (chez Mama X, carrefour…) — il est publié tout de suite dans SENGA. '
+            'Pour un hôpital, un hôtel ou un grand marché, choisissez la catégorie : validation SENGA, '
+            'Mapbox/OSM restent la référence officielle.',
             style: TextStyle(color: MovaColors.textSecondary, fontSize: 14),
           ),
           const SizedBox(height: 16),
@@ -174,7 +237,7 @@ class _SuggestPlaceScreenState extends ConsumerState<SuggestPlaceScreen> {
             controller: _nameController,
             decoration: const InputDecoration(
               labelText: 'Nom du lieu',
-              hintText: 'Ex. Marché Gambela',
+              hintText: 'Ex. Chez Mama X, carrefour Victoire',
               border: OutlineInputBorder(),
             ),
           ),
@@ -242,7 +305,7 @@ class _SuggestPlaceScreenState extends ConsumerState<SuggestPlaceScreen> {
           ],
           const SizedBox(height: 16),
           MovaButton(
-            label: 'Envoyer la suggestion',
+            label: _category == 'OTHER' ? 'Enregistrer le lieu' : 'Envoyer la suggestion',
             icon: Icons.place_outlined,
             isLoading: _submitting,
             onPressed: _submitting ? null : _submit,

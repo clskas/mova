@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { apiFetch, formatCdf } from "@/lib/api";
+import { GPS_OR_SUGGESTION_FR, suggestionPoint, useDrcPickup } from "@/lib/drc-location";
 import { toUserErrorMessage } from "@/lib/user-messages";
 import { GeoAutocompleteInput } from "./GeoAutocompleteInput";
 import { PromoCodeInput, promoPayload } from "./PromoCodeInput";
@@ -16,8 +17,11 @@ const WEIGHT_CATEGORIES = [
 type Props = { onBack: () => void; mock: boolean };
 
 export function ParcelDelivery({ onBack, mock }: Props) {
+  const { pickup: gpsPickup } = useDrcPickup();
   const [pickup, setPickup] = useState("Ma position");
+  const [pickupPoint, setPickupPoint] = useState<{ lat: number; lng: number } | null>(null);
   const [dropoff, setDropoff] = useState("");
+  const [dropoffPoint, setDropoffPoint] = useState<{ lat: number; lng: number } | null>(null);
   const [weightCategory, setWeightCategory] = useState("LIGHT");
   const [estimate, setEstimate] = useState<number | null>(null);
   const [promoCode, setPromoCode] = useState("");
@@ -46,16 +50,22 @@ export function ParcelDelivery({ onBack, mock }: Props) {
     setLoading(true);
     setError(null);
     try {
+      const from = pickupPoint ?? gpsPickup;
+      if (!from || !dropoffPoint) {
+        setError(GPS_OR_SUGGESTION_FR);
+        setLoading(false);
+        return;
+      }
       await apiFetch("/api/deliveries/parcel", {
         method: "POST",
         body: JSON.stringify({
           pickupAddress: pickup,
           dropoffAddress: dropoff,
           weightCategory,
-          pickupLat: -4.3217,
-          pickupLng: 15.3125,
-          dropoffLat: -4.35,
-          dropoffLng: 15.35,
+          pickupLat: from.lat,
+          pickupLng: from.lng,
+          dropoffLat: dropoffPoint.lat,
+          dropoffLng: dropoffPoint.lng,
           ...promoPayload(promoCode),
         }),
       }, { useMock: mock });
@@ -87,11 +97,21 @@ export function ParcelDelivery({ onBack, mock }: Props) {
       <h2 className="text-lg font-semibold">Livraison colis</h2>
       {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg p-3">{error}</p>}
 
-      <GeoAutocompleteInput placeholder="Adresse d'enlèvement" value={pickup} onChange={setPickup} />
+      <GeoAutocompleteInput
+        placeholder="Adresse d'enlèvement"
+        value={pickup}
+        proximityLat={gpsPickup?.lat}
+        proximityLng={gpsPickup?.lng}
+        onChange={setPickup}
+        onSelect={(s) => setPickupPoint(suggestionPoint(s))}
+      />
       <GeoAutocompleteInput
         placeholder="Adresse de livraison"
         value={dropoff}
-        onChange={(v) => { setDropoff(v); setEstimate(null); }}
+        proximityLat={(pickupPoint ?? gpsPickup)?.lat}
+        proximityLng={(pickupPoint ?? gpsPickup)?.lng}
+        onChange={(v) => { setDropoff(v); setDropoffPoint(null); setEstimate(null); }}
+        onSelect={(s) => setDropoffPoint(suggestionPoint(s))}
       />
 
       <p className="text-sm font-medium">Catégorie de poids</p>

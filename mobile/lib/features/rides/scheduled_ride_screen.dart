@@ -13,6 +13,7 @@ import '../../core/location/destination_field_sync.dart';
 import '../../core/location/location_service.dart';
 import '../../core/theme/mova_colors.dart';
 import '../booking/widgets/mova_ride_map.dart';
+import '../booking/widgets/vehicle_selector.dart';
 import '../../core/location/destination_coords.dart';
 import '../../core/widgets/destination_coord_panel.dart';
 import '../../core/widgets/mova_screen.dart';
@@ -56,8 +57,9 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
   Timer? _pollTimer;
 
   String _vehicleLabel(String id) {
+    final normalized = MarketConfig.normalizeVehicleType(id);
     for (final v in MarketConfig.vehicleTypes) {
-      if (v.id == id) return v.label;
+      if (v.id == normalized) return v.label;
     }
     return id;
   }
@@ -861,20 +863,33 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
             onApply: _setDropoffFromCoords,
           ),
           const SizedBox(height: 16),
-          Text('Type de véhicule', style: theme.textTheme.titleSmall),
+          Text('Taxi ou moto', style: theme.textTheme.titleSmall),
           const SizedBox(height: 8),
-          ...MarketConfig.vehicleTypes.map((v) => RadioListTile<String>(
-                title: Text('${v.icon} ${v.label}'),
-                value: v.id,
-                groupValue: _vehicleType,
-                onChanged: (val) {
-                  setState(() {
-                    _vehicleType = val!;
-                    _estimatedPrice = null;
-                    _estimateBreakdown = null;
-                  });
-                },
-              )),
+          VehicleCategoryChips(
+            category: MarketConfig.vehicleCategory(_vehicleType),
+            onSelected: (category) {
+              setState(() {
+                _vehicleType = MarketConfig.defaultTypeForCategory(category);
+                _estimatedPrice = null;
+                _estimateBreakdown = null;
+              });
+            },
+          ),
+          if (MarketConfig.vehicleCategory(_vehicleType) == 'TAXI') ...[
+            const SizedBox(height: 8),
+            ...MarketConfig.vehicleTypesForCategory('TAXI').map((v) => RadioListTile<String>(
+                  title: Text('${v.icon} ${v.label}'),
+                  value: v.id,
+                  groupValue: _vehicleType,
+                  onChanged: (val) {
+                    setState(() {
+                      _vehicleType = MarketConfig.normalizeVehicleType(val ?? 'STANDARD');
+                      _estimatedPrice = null;
+                      _estimateBreakdown = null;
+                    });
+                  },
+                )),
+          ],
           if (_estimatedPrice != null) ...[
             const SizedBox(height: 16),
             ServicePriceDisplay.passengerCard(

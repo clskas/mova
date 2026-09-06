@@ -109,6 +109,18 @@ describe('MapboxService', () => {
     expect(urls.some((u) => u.includes('proximity=23.66'))).toBe(true);
   });
 
+  it('biases Search Box to Lubumbashi GPS, not Kinshasa', async () => {
+    process.env.MAPBOX_ACCESS_TOKEN = 'pk.test';
+    jest.spyOn(httpFetch, 'httpGetJson').mockResolvedValue({ features: [] });
+    const service = new MapboxService();
+    await service.search('Kenya', { centerLat: -11.6647, centerLng: 27.4794, city: 'Lubumbashi' });
+    const urls = (httpFetch.httpGetJson as jest.Mock).mock.calls.map((c) => c[0] as string);
+    expect(urls.every((u) => u.includes('country=cd'))).toBe(true);
+    expect(urls.every((u) => u.includes('bbox=12'))).toBe(true);
+    expect(urls.every((u) => u.includes('proximity=27.4794'))).toBe(true);
+    expect(urls.every((u) => !u.includes('proximity=15.31'))).toBe(true);
+  });
+
   it('browses POI category via Search Box /category with national bbox', async () => {
     process.env.MAPBOX_ACCESS_TOKEN = 'pk.test';
     jest.spyOn(httpFetch, 'httpGetJson').mockImplementation(async (url: string) => {

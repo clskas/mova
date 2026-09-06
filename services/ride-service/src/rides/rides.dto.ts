@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Transform } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { IsEnum, IsNumber, IsOptional, IsString } from 'class-validator';
 import { RideStatus, VehicleType } from '@prisma/client';
 import { normalizeVehicleType } from '@mova/shared';
@@ -14,7 +14,7 @@ export class EstimateRideDto {
   @ApiProperty() @IsNumber() pickupLng: number;
   @ApiProperty() @IsNumber() dropoffLat: number;
   @ApiProperty() @IsNumber() dropoffLng: number;
-  @ApiProperty({ enum: ['MOTO', 'MOTO_TAXI', 'STANDARD', 'CONFORT', 'COMFORT', 'VIP'] })
+  @ApiProperty({ enum: ['MOTO', 'MOTO_TAXI', 'STANDARD', 'TAXI', 'CONFORT', 'COMFORT', 'VIP'] })
   @Transform(({ value }) => toVehicleType(value))
   @IsEnum(VehicleType)
   vehicleType: VehicleType;
@@ -45,4 +45,13 @@ export class UpdateRideStatusDto {
 
 export class CancelRideDto {
   @ApiProperty({ required: false }) @IsOptional() @IsString() reason?: string;
+}
+
+export class NearbyVehiclesQueryDto {
+  @ApiProperty() @Type(() => Number) @IsNumber() lat: number;
+  @ApiProperty() @Type(() => Number) @IsNumber() lng: number;
+  @ApiProperty({ enum: ['MOTO', 'MOTO_TAXI', 'STANDARD', 'TAXI', 'CONFORT', 'COMFORT', 'VIP'] })
+  @Transform(({ value }) => toVehicleType(value))
+  @IsEnum(VehicleType)
+  vehicleType: VehicleType;
 }

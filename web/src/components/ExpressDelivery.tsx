@@ -2,42 +2,51 @@
 
 import { useState } from "react";
 import { apiFetch, formatCdf } from "@/lib/api";
+import { GPS_OR_SUGGESTION_FR, suggestionPoint, useDrcPickup } from "@/lib/drc-location";
 import { toUserErrorMessage } from "@/lib/user-messages";
 import { GeoAutocompleteInput } from "./GeoAutocompleteInput";
 
 type Props = { onBack: () => void; mock: boolean };
 
-const DEFAULT_COORDS = {
-  pickupLat: -4.3217,
-  pickupLng: 15.3125,
-  dropoffLat: -4.35,
-  dropoffLng: 15.35,
-};
-
 export function ExpressDelivery({ onBack, mock }: Props) {
+  const { pickup: gpsPickup } = useDrcPickup();
   const [pickup, setPickup] = useState("Ma position");
+  const [pickupPoint, setPickupPoint] = useState<{ lat: number; lng: number } | null>(null);
   const [dropoff, setDropoff] = useState("");
+  const [dropoffPoint, setDropoffPoint] = useState<{ lat: number; lng: number } | null>(null);
   const [estimate, setEstimate] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState(false);
   const [trackingId, setTrackingId] = useState<string | null>(null);
 
-  const payload = () => ({
-    pickupAddress: pickup,
-    dropoffAddress: dropoff,
-    weightCategory: "LIGHT",
-    ...DEFAULT_COORDS,
-  });
+  const payload = () => {
+    const from = pickupPoint ?? gpsPickup;
+    if (!from || !dropoffPoint) return null;
+    return {
+      pickupAddress: pickup,
+      dropoffAddress: dropoff,
+      weightCategory: "LIGHT",
+      pickupLat: from.lat,
+      pickupLng: from.lng,
+      dropoffLat: dropoffPoint.lat,
+      dropoffLng: dropoffPoint.lng,
+    };
+  };
 
   async function handleEstimate() {
     if (!dropoff.trim()) return;
+    const body = payload();
+    if (!body) {
+      setError(GPS_OR_SUGGESTION_FR);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
       const data = await apiFetch<{ estimatedPriceCdf?: number }>(
         "/api/express/estimate",
-        { method: "POST", body: JSON.stringify(payload()) },
+        { method: "POST", body: JSON.stringify(body) },
         { useMock: mock },
       );
       setEstimate(data.estimatedPriceCdf ?? 7500);
@@ -49,12 +58,17 @@ export function ExpressDelivery({ onBack, mock }: Props) {
   }
 
   async function handleConfirm() {
+    const body = payload();
+    if (!body) {
+      setError(GPS_OR_SUGGESTION_FR);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
       const data = await apiFetch<{ delivery?: { id?: string } }>(
         "/api/express",
-        { method: "POST", body: JSON.stringify(payload()) },
+        { method: "POST", body: JSON.stringify(body) },
         { useMock: mock },
       );
       setTrackingId(data.delivery?.id ?? null);
@@ -86,11 +100,21 @@ export function ExpressDelivery({ onBack, mock }: Props) {
       <h2 className="text-lg font-semibold">Livraison express</h2>
       <p className="text-sm text-gray-500">Petit colis, livraison prioritaire</p>
       {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg py-2 px-3">{error}</p>}
-      <GeoAutocompleteInput placeholder="Adresse d'enlèvement" value={pickup} onChange={setPickup} />
+      <GeoAutocompleteInput
+        placeholder="Adresse d'enlèvement"
+        value={pickup}
+        proximityLat={gpsPickup?.lat}
+        proximityLng={gpsPickup?.lng}
+        onChange={setPickup}
+        onSelect={(s) => setPickupPoint(suggestionPoint(s))}
+      />
       <GeoAutocompleteInput
         placeholder="Adresse de livraison"
         value={dropoff}
-        onChange={(v) => { setDropoff(v); setEstimate(null); }}
+        proximityLat={(pickupPoint ?? gpsPickup)?.lat}
+        proximityLng={(pickupPoint ?? gpsPickup)?.lng}
+        onChange={(v) => { setDropoff(v); setDropoffPoint(null); setEstimate(null); }}
+        onSelect={(s) => setDropoffPoint(suggestionPoint(s))}
       />
       {estimate != null && (
         <div className="bg-white rounded-xl p-4 shadow-sm">

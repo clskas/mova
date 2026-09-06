@@ -249,6 +249,6 @@ export class HistoryService {
     }
 
     items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-    return { data: items.slice(0, take), currency: 'CDF', city: 'Kinshasa' };
+    return { data: items.slice(0, take), currency: 'CDF', city: 'RDC' };
   }
 }

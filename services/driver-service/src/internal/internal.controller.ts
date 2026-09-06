@@ -1,8 +1,9 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { IsBoolean, IsEnum, IsNumber, IsOptional, IsString } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { IncidentType, KycStatus, VehicleType } from '@prisma/client';
+import { normalizeVehicleType } from '@mova/shared';
 import { DriversService } from '../drivers/drivers.service';
 import { IncidentsService } from '../incidents/incidents.service';
 import { InternalApiGuard } from '../common/internal-api.guard';
@@ -11,6 +12,13 @@ class CreateProfileDto { @IsString() userId: string; }
 class NearbyQuery {
   @Type(() => Number) @IsNumber() lat: number;
   @Type(() => Number) @IsNumber() lng: number;
+  @Transform(({ value }) => {
+    try {
+      return normalizeVehicleType(String(value));
+    } catch {
+      return value;
+    }
+  })
   @IsString() vehicleType: VehicleType;
   @IsOptional() @Type(() => Number) @IsNumber() searchAttempt?: number;
   @IsOptional() @IsString() city?: string;

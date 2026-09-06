@@ -141,6 +141,7 @@ export class DriversService {
     );
     const pickupCity = city ?? resolveCityFromCoords(lat, lng);
     const compatibleTypes = driverVehicleTypesForRide(vehicleType) as VehicleType[];
+    if (!compatibleTypes.length) return [];
     const drivers = await this.prisma.driverProfile.findMany({
       where: {
         isAvailable: true,

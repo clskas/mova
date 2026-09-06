@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { apiFetch, formatCdf } from "@/lib/api";
+import { GPS_OR_SUGGESTION_FR, suggestionPoint, useDrcPickup } from "@/lib/drc-location";
 import { toUserErrorMessage } from "@/lib/user-messages";
 import { GeoAutocompleteInput } from "./GeoAutocompleteInput";
 import { PromoCodeInput, promoPayload } from "./PromoCodeInput";
@@ -18,7 +19,9 @@ type Props = { onBack: () => void; mock: boolean };
 type RideCreated = { id?: string; status?: string };
 
 export function TaxiBooking({ onBack, mock }: Props) {
+  const { pickup } = useDrcPickup();
   const [destination, setDestination] = useState("");
+  const [dropoff, setDropoff] = useState<{ lat: number; lng: number } | null>(null);
   const [vehicleType, setVehicleType] = useState("MOTO_TAXI");
   const [estimate, setEstimate] = useState<number | null>(null);
   const [promoCode, setPromoCode] = useState("");
@@ -30,16 +33,20 @@ export function TaxiBooking({ onBack, mock }: Props) {
 
   async function handleEstimate() {
     if (!destination) return;
+    if (!pickup || !dropoff) {
+      setError(GPS_OR_SUGGESTION_FR);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
       const data = await apiFetch<{ priceCdf?: number; estimatedFareCdf?: number }>("/api/rides/estimate", {
         method: "POST",
         body: JSON.stringify({
-          pickupLat: -4.3217,
-          pickupLng: 15.3125,
-          dropoffLat: -4.35,
-          dropoffLng: 15.35,
+          pickupLat: pickup.lat,
+          pickupLng: pickup.lng,
+          dropoffLat: dropoff.lat,
+          dropoffLng: dropoff.lng,
           vehicleType: normalizeVehicleType(vehicleType),
           ...promoPayload(promoCode),
         }),
@@ -53,6 +60,10 @@ export function TaxiBooking({ onBack, mock }: Props) {
   }
 
   async function handleConfirm() {
+    if (!pickup || !dropoff) {
+      setError(GPS_OR_SUGGESTION_FR);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -61,10 +72,10 @@ export function TaxiBooking({ onBack, mock }: Props) {
         body: JSON.stringify({
           pickupAddress: "Ma position",
           dropoffAddress: destination,
-          pickupLat: -4.3217,
-          pickupLng: 15.3125,
-          dropoffLat: -4.35,
-          dropoffLng: 15.35,
+          pickupLat: pickup.lat,
+          pickupLng: pickup.lng,
+          dropoffLat: dropoff.lat,
+          dropoffLng: dropoff.lng,
           vehicleType: normalizeVehicleType(vehicleType),
           ...promoPayload(promoCode),
         }),
@@ -159,7 +170,10 @@ export function TaxiBooking({ onBack, mock }: Props) {
       <GeoAutocompleteInput
         placeholder="Ex: Goma, Lubumbashi, Gombe, Kisangani…"
         value={destination}
-        onChange={(v) => { setDestination(v); setEstimate(null); }}
+        proximityLat={pickup?.lat}
+        proximityLng={pickup?.lng}
+        onChange={(v) => { setDestination(v); setDropoff(null); setEstimate(null); }}
+        onSelect={(s) => setDropoff(suggestionPoint(s))}
       />
 
       <p className="text-sm font-medium">Taxi ou moto</p>

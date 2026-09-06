@@ -10,6 +10,8 @@ type Props = {
   placeholder?: string;
   className?: string;
   city?: string;
+  proximityLat?: number;
+  proximityLng?: number;
 };
 
 export function GeoAutocompleteInput({
@@ -19,6 +21,8 @@ export function GeoAutocompleteInput({
   placeholder,
   className = "w-full rounded-xl border-0 bg-white p-3 shadow-sm",
   city,
+  proximityLat,
+  proximityLng,
 }: Props) {
   const [suggestions, setSuggestions] = useState<GeoSuggestion[]>([]);
   const [open, setOpen] = useState(false);
@@ -35,7 +39,13 @@ export function GeoAutocompleteInput({
     }
     debounceRef.current = setTimeout(async () => {
       setLoading(true);
-      const list = await fetchGeoAutocomplete(q, city);
+      const list = await fetchGeoAutocomplete(
+        q,
+        city,
+        proximityLat != null && proximityLng != null
+          ? { lat: proximityLat, lng: proximityLng }
+          : undefined,
+      );
       setSuggestions(list);
       setOpen(list.length > 0);
       setLoading(false);
@@ -43,7 +53,7 @@ export function GeoAutocompleteInput({
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [value, city]);
+  }, [value, city, proximityLat, proximityLng]);
 
   function pick(s: GeoSuggestion) {
     const label = s.label || s.address || "";
@@ -67,7 +77,7 @@ export function GeoAutocompleteInput({
       )}
       {open && suggestions.length > 0 && (
         <ul className="absolute z-20 mt-1 w-full rounded-xl bg-white shadow-lg border border-gray-100 max-h-48 overflow-y-auto">
-          {suggestions.slice(0, 6).map((s, i) => (
+          {suggestions.slice(0, 10).map((s, i) => (
             <li key={`${s.label}-${i}`}>
               <button
                 type="button"

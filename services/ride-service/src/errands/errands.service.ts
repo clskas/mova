@@ -1,6 +1,6 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { CommissionServiceType, ErrandCategory, ErrandOrder, ErrandOrderStatus, Prisma, TrackingReferenceType, VehicleType } from '@prisma/client';
-import { INTERNAL_API_KEY, MovaErrorCode, MovaHttpException, MOVA_EVENTS, canCancelErrand, estimateTripDurationMin, serviceUrl } from '@mova/shared';
+import { INTERNAL_API_KEY, MovaErrorCode, MovaHttpException, MOVA_EVENTS, canCancelErrand, estimateTripDurationMin, resolveCityFromCoords, serviceUrl } from '@mova/shared';
 import { RedisService } from '@mova/shared';
 import { DEFAULT_PICKUP } from '../common/address.util';
 import { fetchServicePaymentStatus } from '../common/payment-status.util';
@@ -431,7 +431,10 @@ export class ErrandsService {
         ? false
         : order.status === ErrandOrderStatus.COMPLETED,
       currency: 'CDF',
-      city: 'Kinshasa',
+      city:
+        order.pickupLat != null && order.pickupLng != null
+          ? resolveCityFromCoords(order.pickupLat, order.pickupLng)
+          : 'RDC',
       ...canCancelErrand({ status: order.status }),
       ...extra,
     };

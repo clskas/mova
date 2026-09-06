@@ -2,7 +2,12 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 export const fetchCache = "force-no-store";
 
-const BUILD_ID = process.env.NEXT_PUBLIC_BUILD_ID ?? "dev";
+const BUILD_ID = (
+  process.env.NEXT_PUBLIC_BUILD_ID ||
+  process.env.RENDER_GIT_COMMIT ||
+  process.env.GITHUB_SHA ||
+  "dev"
+).trim();
 
 export function GET() {
   return Response.json(

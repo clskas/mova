@@ -231,7 +231,12 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
       // Coordonnées déjà fixées par GPS ou autocomplétion.
     } else if (pickupText.isNotEmpty && pickupText != 'Ma position') {
       final api = ref.read(apiClientProvider);
-      final pickupResult = await api.geoAutocomplete(pickupText, city: _autocompleteCity);
+      final pickupResult = await api.geoAutocomplete(
+        pickupText,
+        city: _autocompleteCity,
+        lat: _pickup.latitude,
+        lng: _pickup.longitude,
+      );
       if (pickupResult case Success(:final data) when data.isNotEmpty) {
         final s = data.first;
         _pickup = ServiceAreaLocation.ensureInServiceArea(
@@ -264,6 +269,8 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
         final result = await api.geoAutocomplete(
           _toController.text.trim(),
           city: _autocompleteCity,
+          lat: _pickup.latitude,
+          lng: _pickup.longitude,
         );
         if (result case Success(:final data) when data.isNotEmpty) {
           final s = data.first;
@@ -513,6 +520,8 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
                   controller: _fromController,
                   api: api,
                   city: autocompleteCity,
+                  proximityLat: _pickup.latitude,
+                  proximityLng: _pickup.longitude,
                   label: 'Adresse de départ',
                   hint: 'Ma position ou nom du lieu',
                   prefixIcon: Icons.home_outlined,
@@ -534,6 +543,8 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
             controller: _toController,
             api: api,
             city: autocompleteCity,
+            proximityLat: _pickup.latitude,
+            proximityLng: _pickup.longitude,
             label: 'Adresse d\'arrivée',
             hint: 'Rechercher une commune, quartier…',
             prefixIcon: Icons.place_outlined,

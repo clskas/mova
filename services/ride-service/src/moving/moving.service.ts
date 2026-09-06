@@ -1,6 +1,6 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { CommissionServiceType, MovingRequestStatus, MovingVehicleCategory, SurchargeType, VehicleType } from '@prisma/client';
-import { MovaErrorCode, MovaHttpException, MOVA_EVENTS, canCancelMoving, estimateTripDurationMin, formatCdf } from '@mova/shared';
+import { MovaErrorCode, MovaHttpException, MOVA_EVENTS, canCancelMoving, estimateTripDurationMin, formatCdf, resolveCityFromCoords } from '@mova/shared';
 import { RedisService } from '@mova/shared';
 import { buildMovingTimeline } from '../deliveries/parcel.util';
 import { assertServiceAreaPair } from '../common/address.util';
@@ -223,7 +223,7 @@ export class MovingService {
       priceCdf: request.estimatedPriceCdf,
       formattedPrice: formatCdf(request.estimatedPriceCdf),
       currency: 'CDF',
-      city: 'Kinshasa',
+      city: resolveCityFromCoords(request.pickupLat, request.pickupLng),
       ...canCancelMoving({ status: request.status }),
     };
   }

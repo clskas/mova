@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { VehicleType } from '@prisma/client';
-import { INTERNAL_API_KEY, resolveCityFromCoords, serviceUrl } from '@mova/shared';
+import { INTERNAL_API_KEY, normalizeVehicleType, resolveCityFromCoords, serviceUrl } from '@mova/shared';
 import { PlatformConfigService } from '../platform/platform-config.service';
 
 export interface DriverCandidate {
@@ -27,11 +27,17 @@ export class MatchingService {
    * Courses inter-villes : matching initial à la ville de départ ; le trajet longue distance
    * est traité comme course planifiée / long-haul côté dispatch.
    */
-  async findDrivers(lat: number, lng: number, vehicleType: VehicleType, searchAttempt = 0): Promise<DriverCandidate[]> {
+  async findDrivers(lat: number, lng: number, vehicleType: VehicleType | string, searchAttempt = 0): Promise<DriverCandidate[]> {
+    let normalized: VehicleType;
+    try {
+      normalized = normalizeVehicleType(String(vehicleType)) as VehicleType;
+    } catch {
+      return [];
+    }
     const city = resolveCityFromCoords(lat, lng);
     const url = serviceUrl(
       'driver',
-      `/internal/drivers/nearby?lat=${lat}&lng=${lng}&vehicleType=${vehicleType}&searchAttempt=${searchAttempt}&city=${encodeURIComponent(city)}`,
+      `/internal/drivers/nearby?lat=${lat}&lng=${lng}&vehicleType=${normalized}&searchAttempt=${searchAttempt}&city=${encodeURIComponent(city)}`,
     );
     const res = await fetch(url, { headers: { 'x-internal-api-key': INTERNAL_API_KEY } });
     if (!res.ok) return [];

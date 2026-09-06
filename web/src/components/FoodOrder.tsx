@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { apiFetch, formatCdf } from "@/lib/api";
+import { GPS_OR_SUGGESTION_FR, suggestionPoint, useDrcPickup } from "@/lib/drc-location";
 import { toUserErrorMessage } from "@/lib/user-messages";
 import { GeoAutocompleteInput } from "./GeoAutocompleteInput";
 
@@ -44,7 +45,9 @@ export function FoodOrder({ onBack, mock }: Props) {
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [selected, setSelected] = useState<Restaurant | null>(null);
   const [cart, setCart] = useState<Record<string, number>>({});
+  const { pickup: gpsPickup } = useDrcPickup();
   const [address, setAddress] = useState("Ma position");
+  const [deliveryPoint, setDeliveryPoint] = useState<{ lat: number; lng: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [ordering, setOrdering] = useState(false);
   const [orderError, setOrderError] = useState<string | null>(null);
@@ -86,13 +89,19 @@ export function FoodOrder({ onBack, mock }: Props) {
         const item = selected.items.find((i) => i.id === id)!;
         return { name: item.name, unitPriceCdf: item.priceCdf, quantity };
       });
+      const dest = deliveryPoint ?? gpsPickup;
+      if (!dest) {
+        setOrderError(GPS_OR_SUGGESTION_FR);
+        setOrdering(false);
+        return;
+      }
       const res = await apiFetch<{ delivery?: { estimatedPriceCdf?: number }; order?: { priceCdf?: number } }>("/api/deliveries/food", {
         method: "POST",
         body: JSON.stringify({
           restaurantId: selected.id,
           deliveryAddress: address,
-          deliveryLat: -4.3217,
-          deliveryLng: 15.3125,
+          deliveryLat: dest.lat,
+          deliveryLng: dest.lng,
           items,
         }),
       }, { useMock: mock });
@@ -172,7 +181,14 @@ export function FoodOrder({ onBack, mock }: Props) {
       {orderError && <p className="text-sm text-red-600 bg-red-50 rounded-lg p-3">{orderError}</p>}
       {cartTotal > 0 && (
         <>
-          <GeoAutocompleteInput placeholder="Adresse de livraison" value={address} onChange={setAddress} />
+          <GeoAutocompleteInput
+            placeholder="Adresse de livraison"
+            value={address}
+            proximityLat={gpsPickup?.lat}
+            proximityLng={gpsPickup?.lng}
+            onChange={setAddress}
+            onSelect={(s) => setDeliveryPoint(suggestionPoint(s))}
+          />
           <div className="bg-white rounded-xl p-4 shadow-sm space-y-1 text-sm">
             <div className="flex justify-between"><span>Sous-total</span><span>{formatCdf(cartTotal)}</span></div>
             <div className="flex justify-between"><span>Livraison</span><span>{formatCdf(deliveryFee)}</span></div>

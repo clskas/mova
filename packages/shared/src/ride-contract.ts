@@ -24,7 +24,13 @@ export type RideStatusValue =
 const VEHICLE_ALIASES: Record<string, VehicleTypeValue> = {
   MOTO: 'MOTO_TAXI',
   MOTO_TAXI: 'MOTO_TAXI',
+  'MOTO-TAXI': 'MOTO_TAXI',
+  BIKE: 'MOTO_TAXI',
+  MOTORCYCLE: 'MOTO_TAXI',
   STANDARD: 'STANDARD',
+  TAXI: 'STANDARD',
+  CAR: 'STANDARD',
+  BERLINE: 'STANDARD',
   CONFORT: 'COMFORT',
   COMFORT: 'COMFORT',
   VIP: 'VIP',
@@ -33,9 +39,22 @@ const VEHICLE_ALIASES: Record<string, VehicleTypeValue> = {
 };
 
 export function normalizeVehicleType(input: string): VehicleTypeValue {
-  const mapped = VEHICLE_ALIASES[input?.toUpperCase?.() ?? ''];
+  const key = String(input ?? '')
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, '_');
+  const mapped = VEHICLE_ALIASES[key] ?? VEHICLE_ALIASES[key.replace(/-/g, '_')];
   if (!mapped) throw new Error(`Invalid vehicle type: ${input}`);
   return mapped;
+}
+
+/** Filtre passager : moto vs voiture (Taxi / Standard / Confort / VIP). */
+export function vehicleCategory(type: string): 'MOTO' | 'TAXI' {
+  try {
+    return normalizeVehicleType(type) === 'MOTO_TAXI' ? 'MOTO' : 'TAXI';
+  } catch {
+    return 'TAXI';
+  }
 }
 
 export function toMobileVehicleType(type: VehicleTypeValue): MobileVehicleType {
@@ -83,8 +102,14 @@ export function rideTypesDriverCanServe(driverVehicleTypes: VehicleTypeValue[]):
 }
 
 /** Véhicules chauffeur éligibles pour une course d'un type donné (matching inverse). */
-export function driverVehicleTypesForRide(rideType: VehicleTypeValue): VehicleTypeValue[] {
-  switch (rideType) {
+export function driverVehicleTypesForRide(rideType: VehicleTypeValue | string): VehicleTypeValue[] {
+  let normalized: VehicleTypeValue;
+  try {
+    normalized = normalizeVehicleType(String(rideType));
+  } catch {
+    return [];
+  }
+  switch (normalized) {
     case 'MOTO_TAXI':
       return ['MOTO_TAXI'];
     case 'STANDARD':
@@ -93,6 +118,8 @@ export function driverVehicleTypesForRide(rideType: VehicleTypeValue): VehicleTy
       return ['COMFORT', 'VIP'];
     case 'VIP':
       return ['VIP'];
+    default:
+      return [];
   }
 }
 

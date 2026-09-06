@@ -2,7 +2,7 @@ import { Body, Controller, Get, Param, Patch, Post, Query, Request, UseGuards } 
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ScheduledRideStatus, VehicleType } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { CancelRideDto, CreateRideDto, EstimateRideDto, UpdateRideStatusDto } from './rides.dto';
+import { CancelRideDto, CreateRideDto, EstimateRideDto, NearbyVehiclesQueryDto, UpdateRideStatusDto } from './rides.dto';
 import { CancelScheduledRideDto, CreateScheduledRideDto } from './scheduled-rides.dto';
 import { MobileScheduledEstimateDto } from '../deliveries/deliveries-mobile.dto';
 import { ScheduledRidesService } from './scheduled-rides.service';
@@ -114,6 +114,12 @@ export class RidesController {
   @ApiOperation({ summary: 'Course active du passager (reprise après fermeture)' })
   active(@Request() req: { user: { id: string } }) {
     return this.ridesService.getActiveRide(req.user.id);
+  }
+
+  @Get('nearby-vehicles')
+  @ApiOperation({ summary: 'Pins véhicules à proximité (filtrés Taxi / Moto)' })
+  nearbyVehicles(@Query() q: NearbyVehiclesQueryDto) {
+    return this.ridesService.listNearbyVehicles(q.lat, q.lng, q.vehicleType);
   }
 
   @Post()

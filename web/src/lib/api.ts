@@ -141,17 +141,23 @@ function localGeoFallback(query: string, city?: string): GeoSuggestion[] {
   return out.slice(0, 12);
 }
 
-export async function fetchGeoAutocomplete(query: string, city?: string): Promise<GeoSuggestion[]> {
+export async function fetchGeoAutocomplete(
+  query: string,
+  city?: string,
+  proximity?: { lat: number; lng: number },
+): Promise<GeoSuggestion[]> {
   const q = query.trim();
   if (q.length < 2) return [];
 
   async function fetchForCity(targetCity?: string): Promise<GeoSuggestion[]> {
     const cityParam = targetCity ? `&city=${encodeURIComponent(targetCity)}` : '';
+    const proximityParam =
+      proximity != null ? `&lat=${proximity.lat}&lng=${proximity.lng}` : '';
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 8000);
     try {
       const res = await fetch(
-        `${API_BASE}/api/geo/autocomplete?q=${encodeURIComponent(q)}${cityParam}`,
+        `${API_BASE}/api/geo/autocomplete?q=${encodeURIComponent(q)}${cityParam}${proximityParam}`,
         { signal: controller.signal },
       );
       clearTimeout(timer);
@@ -179,7 +185,7 @@ export async function fetchGeoAutocomplete(query: string, city?: string): Promis
       seen.add(label);
       merged.push(item);
     }
-    return merged.slice(0, 12);
+    return merged.slice(0, 16);
   } catch {
     return localGeoFallback(q, city);
   }
@@ -267,7 +273,10 @@ function mockFor<T>(path: string, init?: RequestInit): T {
     ] as T;
   }
   if (path.includes('/rides/estimate')) {
-    return { priceCdf: 8500, estimatedFareCdf: 8500, distanceKm: 3.2, durationMin: 12 } as T;
+    const body = init?.body ? JSON.parse(init.body as string) : {};
+    const type = String(body.vehicleType ?? 'MOTO_TAXI').toUpperCase();
+    const price = type === 'VIP' ? 18000 : type === 'COMFORT' || type === 'CONFORT' ? 14000 : type === 'STANDARD' || type === 'TAXI' ? 8500 : 5200;
+    return { priceCdf: price, estimatedFareCdf: price, distanceKm: 3.2, durationMin: 12, vehicleType: type } as T;
   }
   if (path.includes('/rides/') && path.includes('/search') && method === 'POST') {
     return { status: 'MATCHING', driversFound: 1, attempt: 1 } as T;

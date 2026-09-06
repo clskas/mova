@@ -5,6 +5,7 @@ import {
   fromMobileRideStatus,
   normalizeVehicleType,
   rideTypesDriverCanServe,
+  vehicleCategory,
   toMobileRideStatus,
   toMobileVehicleType,
 } from './ride-contract';
@@ -12,8 +13,15 @@ import {
 describe('ride-contract', () => {
   it('normalizes mobile vehicle aliases', () => {
     expect(normalizeVehicleType('MOTO')).toBe('MOTO_TAXI');
+    expect(normalizeVehicleType('moto-taxi')).toBe('MOTO_TAXI');
+    expect(normalizeVehicleType('BIKE')).toBe('MOTO_TAXI');
+    expect(normalizeVehicleType('TAXI')).toBe('STANDARD');
+    expect(normalizeVehicleType('BERLINE')).toBe('STANDARD');
     expect(normalizeVehicleType('CONFORT')).toBe('COMFORT');
     expect(normalizeVehicleType('VIP')).toBe('VIP');
+    expect(vehicleCategory('MOTO')).toBe('MOTO');
+    expect(vehicleCategory('TAXI')).toBe('TAXI');
+    expect(vehicleCategory('CONFORT')).toBe('TAXI');
   });
 
   it('maps ride statuses for mobile', () => {
@@ -34,6 +42,9 @@ describe('ride-contract', () => {
     expect(rideTypesDriverCanServe(['VIP']).sort()).toEqual(['COMFORT', 'STANDARD', 'VIP'].sort());
     expect(driverVehicleTypesForRide('COMFORT').sort()).toEqual(['COMFORT', 'VIP'].sort());
     expect(driverVehicleTypesForRide('STANDARD').sort()).toEqual(['COMFORT', 'STANDARD', 'VIP'].sort());
+    expect(driverVehicleTypesForRide('MOTO')).toEqual(['MOTO_TAXI']);
+    expect(driverVehicleTypesForRide('TAXI').sort()).toEqual(['COMFORT', 'STANDARD', 'VIP'].sort());
+    expect(driverVehicleTypesForRide('UNKNOWN')).toEqual([]);
   });
 
   it('builds fare breakdown with surcharge', () => {

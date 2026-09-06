@@ -6,6 +6,7 @@ import '../../core/api/api_client.dart';
 import '../../core/error/result.dart';
 import '../../core/location/location_service.dart';
 import '../../core/location/service_area_location.dart';
+import '../../core/location/service_area_prefs.dart';
 import '../../core/location/service_areas.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
@@ -34,7 +35,7 @@ class _SuggestPlaceScreenState extends ConsumerState<SuggestPlaceScreen> {
   final _addressController = TextEditingController();
   final _notesController = TextEditingController();
   String _category = 'OTHER';
-  String _city = 'Kinshasa';
+  String _city = 'RDC';
   LatLng? _coords;
   bool _loadingGps = false;
   bool _submitting = false;
@@ -44,6 +45,7 @@ class _SuggestPlaceScreenState extends ConsumerState<SuggestPlaceScreen> {
   @override
   void initState() {
     super.initState();
+    _city = ref.read(selectedServiceAreaProvider).name;
     _loadMine();
   }
 

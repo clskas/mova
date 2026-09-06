@@ -512,27 +512,13 @@ export class GeoService implements OnModuleInit {
       // Continue avec Nominatim / POI
     }
 
-    const city =
-      opts?.city ??
-      (opts?.nearLat != null && opts?.nearLng != null
-        ? resolveCityFromCoords(opts.nearLat, opts.nearLng)
-        : undefined);
-    const area =
-      (city ? findServiceAreaByName(city) ?? getServiceArea(city) : null) ??
-      (opts?.nearLat != null && opts?.nearLng != null
-        ? DRC_SERVICE_AREAS.find((a) => {
-            const b = a.bounds;
-            return (
-              opts.nearLat! >= b.minLat &&
-              opts.nearLat! <= b.maxLat &&
-              opts.nearLng! >= b.minLng &&
-              opts.nearLng! <= b.maxLng
-            );
-          })
-        : null) ??
-      getActiveServiceAreas()[0];
-
-    const suggestions = await this.autocomplete(trimmed, area?.name);
+    const city = opts?.city?.trim() || undefined;
+    const near =
+      opts?.nearLat != null && opts?.nearLng != null
+        ? { lat: opts.nearLat, lng: opts.nearLng }
+        : undefined;
+    // Ne jamais forcer Kinshasa (1re zone du catalogue) : bias GPS / ville explicite / centroïde RDC.
+    const suggestions = await this.autocomplete(trimmed, city, near);
     if (suggestions.length > 0) {
       return { lat: suggestions[0].lat, lng: suggestions[0].lng };
     }

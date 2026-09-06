@@ -290,8 +290,11 @@ databases:
 envVarGroups:
   - name: mova-external-apis
     envVars:
+      # Token public pk. — dashboard Render. Sans token : OSM only (POI lacunaires hors Kinshasa).
       - key: MAPBOX_ACCESS_TOKEN
         sync: false
+      - key: MAPBOX_GEOCODE_ENABLED
+        value: "true"
       - key: MAPBOX_STYLE_URL
         value: mapbox://styles/mova/midnight-violet
       # OTP SMS switch : africastalking | serdipay (docs/SMS_OTP_PROVIDERS.md). Sticky — no silent fallback.

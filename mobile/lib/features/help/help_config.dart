@@ -160,7 +160,7 @@ const kManualChapters = <ManualChapter>[
     steps: [
       'Appuyez sur Taxi / Moto-taxi.',
       'Indiquez votre position (GPS ou saisie manuelle) et la destination (ex. Gombe, Limete, Masina).',
-      'Choisissez Moto-taxi, Standard, Confort ou VIP.',
+      'Choisissez Moto ou Taxi. Pour un taxi, sélectionnez ensuite Standard, Confort ou VIP.',
       'Appuyez sur Estimer le prix puis Confirmer la course.',
       'Suivez le chauffeur en temps réel et payez à l\'arrivée ou via Wallet.',
     ],

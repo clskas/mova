@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { apiFetch, formatCdf } from "@/lib/api";
+import { useDrcPickup } from "@/lib/drc-location";
 import { toUserErrorMessage } from "@/lib/user-messages";
 
 type CarpoolTrip = {
@@ -27,10 +28,7 @@ export function CarpoolView({ onBack, mock }: Props) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const pickupLat = -4.3217;
-  const pickupLng = 15.3125;
-  const dropoffLat = -4.35;
-  const dropoffLng = 15.35;
+  const { pickup } = useDrcPickup();
 
   function normalizeTrip(t: CarpoolTrip): CarpoolTrip {
     return {
@@ -46,7 +44,9 @@ export function CarpoolView({ onBack, mock }: Props) {
     setError(null);
     try {
       const res = await apiFetch<{ matches?: CarpoolTrip[]; trips?: CarpoolTrip[]; data?: CarpoolTrip[] }>(
-        `/api/carpool?pickupLat=${pickupLat}&pickupLng=${pickupLng}&dropoffLat=${dropoffLat}&dropoffLng=${dropoffLng}`,
+        pickup
+          ? `/api/carpool?pickupLat=${pickup.lat}&pickupLng=${pickup.lng}`
+          : "/api/carpool",
         undefined,
         { useMock: mock },
       );
@@ -60,8 +60,8 @@ export function CarpoolView({ onBack, mock }: Props) {
   }
 
   useEffect(() => {
-    loadTrips();
-  }, []);
+    void loadTrips();
+  }, [pickup?.lat, pickup?.lng]);
 
   async function joinTrip(id: string) {
     setBusy(true);

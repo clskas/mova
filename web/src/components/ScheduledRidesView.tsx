@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { apiFetch, formatCdf } from "@/lib/api";
+import { GPS_OR_SUGGESTION_FR, suggestionPoint, useDrcPickup } from "@/lib/drc-location";
 import { toUserErrorMessage } from "@/lib/user-messages";
 import { GeoAutocompleteInput } from "./GeoAutocompleteInput";
+import { VEHICLE_CATEGORIES, defaultTypeForCategory, normalizeVehicleType, vehicleCategory, vehicleTypesForCategory } from "@/lib/vehicle-type";
 
 type ScheduledRide = {
   id: string;
@@ -20,8 +22,11 @@ type Props = { onBack: () => void; mock: boolean };
 export function ScheduledRidesView({ onBack, mock }: Props) {
   const [rides, setRides] = useState<ScheduledRide[]>([]);
   const [loading, setLoading] = useState(true);
+  const { pickup } = useDrcPickup();
   const [destination, setDestination] = useState("");
+  const [dropoff, setDropoff] = useState<{ lat: number; lng: number } | null>(null);
   const [scheduledAt, setScheduledAt] = useState("");
+  const [vehicleType, setVehicleType] = useState("MOTO_TAXI");
   const [estimate, setEstimate] = useState<number | null>(null);
   const [booking, setBooking] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -46,19 +51,23 @@ export function ScheduledRidesView({ onBack, mock }: Props) {
 
   async function handleEstimate() {
     if (!destination.trim()) return;
+    if (!pickup || !dropoff) {
+      setError(GPS_OR_SUGGESTION_FR);
+      return;
+    }
     setBooking(true);
     setError(null);
     try {
       const data = await apiFetch<{ estimatedPriceCdf?: number }>("/api/rides/scheduled/estimate", {
         method: "POST",
         body: JSON.stringify({
-          pickupLat: -4.3217,
-          pickupLng: 15.3125,
-          dropoffLat: -4.35,
-          dropoffLng: 15.35,
+          pickupLat: pickup.lat,
+          pickupLng: pickup.lng,
+          dropoffLat: dropoff.lat,
+          dropoffLng: dropoff.lng,
           pickupAddress: "Ma position",
           dropoffAddress: destination,
-          vehicleType: "STANDARD",
+          vehicleType: normalizeVehicleType(vehicleType),
           scheduledAt: new Date(scheduledAt).toISOString(),
         }),
       }, { useMock: mock });
@@ -71,19 +80,23 @@ export function ScheduledRidesView({ onBack, mock }: Props) {
   }
 
   async function handleBook() {
+    if (!pickup || !dropoff) {
+      setError(GPS_OR_SUGGESTION_FR);
+      return;
+    }
     setBooking(true);
     setError(null);
     try {
       await apiFetch("/api/rides/scheduled", {
         method: "POST",
         body: JSON.stringify({
-          pickupLat: -4.3217,
-          pickupLng: 15.3125,
-          dropoffLat: -4.35,
-          dropoffLng: 15.35,
+          pickupLat: pickup.lat,
+          pickupLng: pickup.lng,
+          dropoffLat: dropoff.lat,
+          dropoffLng: dropoff.lng,
           pickupAddress: "Ma position",
           dropoffAddress: destination,
-          vehicleType: "STANDARD",
+          vehicleType: normalizeVehicleType(vehicleType),
           scheduledAt: new Date(scheduledAt).toISOString(),
         }),
       }, { useMock: mock });
@@ -108,7 +121,10 @@ export function ScheduledRidesView({ onBack, mock }: Props) {
         <GeoAutocompleteInput
           placeholder="Destination"
           value={destination}
-          onChange={(v) => { setDestination(v); setEstimate(null); }}
+          proximityLat={pickup?.lat}
+          proximityLng={pickup?.lng}
+          onChange={(v) => { setDestination(v); setDropoff(null); setEstimate(null); }}
+          onSelect={(s) => setDropoff(suggestionPoint(s))}
           className="w-full rounded-xl border-0 bg-gray-50 p-3"
         />
         <input
@@ -117,6 +133,36 @@ export function ScheduledRidesView({ onBack, mock }: Props) {
           value={scheduledAt}
           onChange={(e) => { setScheduledAt(e.target.value); setEstimate(null); }}
         />
+        <p className="text-sm font-medium">Taxi ou moto</p>
+        <div className="flex gap-2">
+          {VEHICLE_CATEGORIES.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              className={`flex-1 rounded-xl p-2 text-sm font-medium ${
+                vehicleCategory(vehicleType) === c.id ? "bg-[#6C63FF] text-white" : "bg-gray-50"
+              }`}
+              onClick={() => {
+                setVehicleType(defaultTypeForCategory(c.id));
+                setEstimate(null);
+              }}
+            >
+              {c.icon} {c.label}
+            </button>
+          ))}
+        </div>
+        {vehicleCategory(vehicleType) === "TAXI" &&
+          vehicleTypesForCategory("TAXI").map((v) => (
+            <label key={v.id} className="flex items-center gap-2 text-sm">
+              <input
+                type="radio"
+                name="scheduled-vehicle"
+                checked={normalizeVehicleType(vehicleType) === v.id}
+                onChange={() => { setVehicleType(v.id); setEstimate(null); }}
+              />
+              {v.icon} {v.label}
+            </label>
+          ))}
         {estimate == null ? (
           <button type="button" onClick={handleEstimate} disabled={booking} className="w-full bg-[#6C63FF] text-white rounded-xl py-3 font-medium">
             Estimer

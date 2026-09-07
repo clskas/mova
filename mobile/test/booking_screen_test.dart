@@ -46,8 +46,8 @@ void main() {
     expect(find.text('Hôpitaux'), findsOneWidget);
     expect(find.text('Universités'), findsOneWidget);
     expect(find.text('Pharmacies'), findsOneWidget);
-    expect(find.textContaining('Maison'), findsOneWidget);
-    expect(find.textContaining('Bureau'), findsOneWidget);
+    expect(find.textContaining('Maison'), findsNothing);
+    expect(find.textContaining('Bureau'), findsNothing);
     expect(find.textContaining('Appui long ou tap'), findsOneWidget);
     expect(find.textContaining('Utiliser cet emplacement'), findsOneWidget);
     expect(tester.takeException(), isNull);

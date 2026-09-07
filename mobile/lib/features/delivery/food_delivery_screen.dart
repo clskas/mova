@@ -202,8 +202,6 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
               _estimatedTotal = null;
             });
           },
-          assignableCoords: LatLng(_deliveryLat, _deliveryLng),
-          assignableLabel: _addressController.text,
         ),
         GeoAutocompleteField(
           controller: _addressController,

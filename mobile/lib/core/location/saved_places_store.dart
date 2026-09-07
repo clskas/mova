@@ -6,7 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../cache/unified_history_cache.dart';
 import '../storage/local_cache.dart';
 
-/// Maison, Bureau, lieux nommés et récents GPS (historique de courses).
+/// Lieux nommés et récents GPS (historique de courses).
 class SavedPlace {
   const SavedPlace({
     required this.id,
@@ -173,13 +173,9 @@ class SavedPlacesStore {
   }
 
   static Future<List<SavedPlace>> chips() async {
-    final home = await getHome();
-    final work = await getWork();
     final named = await namedPlaces();
     final recents = await recentsFromHistory();
     return [
-      if (home != null) home,
-      if (work != null) work,
       ...named.take(4),
       ...recents.take(4),
     ];

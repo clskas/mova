@@ -576,8 +576,6 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
           children: [
                   SavedPlacesBar(
                     onSelected: (place) => _setDropoffFromCoords(place.coords, place.name),
-                    assignableCoords: _dropoff,
-                    assignableLabel: _dropoffController.text,
                   ),
                   GeoAutocompleteField(
                     controller: _pickupController,

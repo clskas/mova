@@ -537,8 +537,6 @@ class _ExpressDeliveryScreenState extends ConsumerState<ExpressDeliveryScreen> {
                   const SizedBox(height: 16),
                   SavedPlacesBar(
                     onSelected: (place) => _setDropoffFromCoords(place.coords, place.name),
-                    assignableCoords: _dropoff,
-                    assignableLabel: _dropoffController.text,
                   ),
                   TextField(
                     controller: _pickupController,

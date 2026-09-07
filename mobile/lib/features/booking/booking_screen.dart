@@ -731,8 +731,6 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
             ),
             SavedPlacesBar(
               onSelected: _applySavedPlace,
-              assignableCoords: _dropoff,
-              assignableLabel: _destinationController.text,
             ),
             GeoAutocompleteField(
               controller: _pickupController,

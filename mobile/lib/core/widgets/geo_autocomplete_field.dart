@@ -45,7 +45,7 @@ class GeoAutocompleteField extends StatefulWidget {
   final double? proximityLat;
   final double? proximityLng;
   final String? category;
-  /// Catalogue SENGA local (Maison, Bureau, lieux nommés) — rangé avant Mapbox.
+  /// Catalogue SENGA local (lieux nommés) — rangé avant Mapbox.
   final List<Map<String, dynamic>> userCatalog;
 
   @override

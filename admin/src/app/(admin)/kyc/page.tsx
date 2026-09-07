@@ -63,7 +63,7 @@ function groupDriverDocs(items: KycItem[]): DriverDossier[] {
     list.push(item);
     map.set(key, list);
   }
-  return [...map.entries()].map(([userId, docs]) => {
+  return Array.from(map.entries()).map(([userId, docs]) => {
     const first = docs[0];
     return {
       userId,

@@ -269,7 +269,7 @@ export default function ContactsPage() {
               checked={form.isPublic}
               onChange={(e) => setForm({ ...form, isPublic: e.target.checked })}
             />
-            Visible sur le site (page d'aide)
+            {"Visible sur le site (page d'aide)"}
           </label>
           <div className="flex justify-end gap-2 pt-2">
             <BtnGhost onClick={() => setModal(null)}>Annuler</BtnGhost>

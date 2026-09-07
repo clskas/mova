@@ -3,10 +3,14 @@ import {
   afrisoftSmsHubSendOtp,
   afrisoftSmsHubSendSms,
   isAfrisoftSmsHubClientConfigured,
+  mapSmsDeliveryFailureToUserMessage,
+  SMS_CREDIT_USER_MESSAGE,
+  SMS_RATE_LIMIT_USER_MESSAGE,
 } from './afrisoft-sms-hub';
+import { SMS_UNAVAILABLE_USER_MESSAGE } from './serdipay';
 
 describe('afrisoft-sms-hub', () => {
-  it('is configured only when URL + api_key are set', () => {
+  it('is configured when the HMAC api_key is set (URL defaults to sms.afri-soft.com)', () => {
     const env: Record<string, string> = {};
     const get = (k: string) => env[k];
     expect(isAfrisoftSmsHubClientConfigured(get)).toBe(false);
@@ -15,6 +19,25 @@ describe('afrisoft-sms-hub', () => {
     expect(isAfrisoftSmsHubClientConfigured(get)).toBe(false);
     env.AFRISOFT_HUB_API_KEY = 'k';
     expect(isAfrisoftSmsHubClientConfigured(get)).toBe(true);
+    delete env.AFRISOFT_SMS_HUB_URL;
+    expect(isAfrisoftSmsHubClientConfigured(get)).toBe(true);
+  });
+
+  it('maps hub failures to user-safe French instead of leaking HMAC / English', () => {
+    expect(mapSmsDeliveryFailureToUserMessage('OTP cooldown active')).toBe(SMS_RATE_LIMIT_USER_MESSAGE);
+    expect(mapSmsDeliveryFailureToUserMessage('OTP rate limit exceeded for this phone')).toBe(
+      SMS_RATE_LIMIT_USER_MESSAGE,
+    );
+    expect(mapSmsDeliveryFailureToUserMessage('Crédit SMS SerdiPay insuffisant (403).')).toBe(
+      SMS_CREDIT_USER_MESSAGE,
+    );
+    expect(mapSmsDeliveryFailureToUserMessage('Invalid HMAC signature')).toBe(SMS_UNAVAILABLE_USER_MESSAGE);
+    expect(mapSmsDeliveryFailureToUserMessage('An error occor while processing the sms')).toBe(
+      SMS_UNAVAILABLE_USER_MESSAGE,
+    );
+    expect(mapSmsDeliveryFailureToUserMessage("Trop de codes envoyés. Réessayez.")).toBe(
+      "Trop de codes envoyés. Réessayez.",
+    );
   });
 
   it('POSTs /v1/sms/send with AfriSoft HMAC (SENGA OTP transport)', async () => {

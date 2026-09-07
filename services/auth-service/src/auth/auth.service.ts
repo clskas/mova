@@ -22,10 +22,12 @@ import {
   otpCodesToIssue,
   TEST_OTP_CODE,
   SMS_UNAVAILABLE_USER_MESSAGE,
+  mapSmsDeliveryFailureToUserMessage,
   denyJwtJti,
   isMockOtpAllowed,
   isProductionRuntime,
   isDemoUserInsertForbidden,
+  isPlayPrelaunchAccount,
 } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '@mova/shared';
@@ -163,7 +165,7 @@ export class AuthService {
       throw new MovaHttpException(
         MovaErrorCode.VALIDATION_ERROR,
         HttpStatus.SERVICE_UNAVAILABLE,
-        SMS_UNAVAILABLE_USER_MESSAGE,
+        mapSmsDeliveryFailureToUserMessage((e as Error).message),
       );
     }
     if (!smsResult.success) {
@@ -171,7 +173,7 @@ export class AuthService {
       throw new MovaHttpException(
         MovaErrorCode.VALIDATION_ERROR,
         HttpStatus.SERVICE_UNAVAILABLE,
-        SMS_UNAVAILABLE_USER_MESSAGE,
+        mapSmsDeliveryFailureToUserMessage(smsResult.message),
       );
     }
     return { success: true, message: smsResult.message ?? 'Code OTP envoyé', phone: normalized };
@@ -746,6 +748,13 @@ export class AuthService {
   }
 
   private assertGoogleCanAutoRegister(role?: UserRole, email?: string | null) {
+    if (isPlayPrelaunchAccount({ email, phone: null })) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.FORBIDDEN,
+        'Compte de test Google Play / Test Lab refusé. Utilisez un numéro +243 ou un compte Google personnel.',
+      );
+    }
     if (isPartnerPortalRole(role) && isOwnerSuperAdminEmail(email)) {
       throw new MovaHttpException(
         MovaErrorCode.AUTH_FORBIDDEN,
@@ -813,7 +822,7 @@ export class AuthService {
         throw new MovaHttpException(
           MovaErrorCode.VALIDATION_ERROR,
           HttpStatus.SERVICE_UNAVAILABLE,
-          SMS_UNAVAILABLE_USER_MESSAGE,
+          mapSmsDeliveryFailureToUserMessage((e as Error).message),
         );
       }
       if (!smsResult.success) {
@@ -821,7 +830,7 @@ export class AuthService {
         throw new MovaHttpException(
           MovaErrorCode.VALIDATION_ERROR,
           HttpStatus.SERVICE_UNAVAILABLE,
-          SMS_UNAVAILABLE_USER_MESSAGE,
+          mapSmsDeliveryFailureToUserMessage(smsResult.message),
         );
       }
       return { mock: false as const };

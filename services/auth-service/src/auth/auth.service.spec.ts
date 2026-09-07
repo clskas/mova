@@ -297,6 +297,26 @@ describe('AuthService', () => {
     });
   });
 
+  it('surfaces hub rate-limit instead of a generic retry-later SMS line', async () => {
+    sms.sendOtp.mockResolvedValue({ success: false, message: 'OTP cooldown active' });
+    await expect(service.requestOtp('+243812345678')).rejects.toMatchObject({
+      response: {
+        code: MovaErrorCode.VALIDATION_ERROR,
+        message: 'Trop de codes envoyés vers ce numéro. Réessayez dans une minute.',
+      },
+    });
+  });
+
+  it('keeps a generic SMS line when the hub leaks HMAC / English', async () => {
+    sms.sendOtp.mockResolvedValue({ success: false, message: 'Invalid HMAC signature' });
+    await expect(service.requestOtp('+243812345678')).rejects.toMatchObject({
+      response: {
+        code: MovaErrorCode.VALIDATION_ERROR,
+        message: expect.stringMatching(/Impossible d'envoyer le code par SMS/),
+      },
+    });
+  });
+
   it('looks up OTP by SHA-256 hash, not plaintext', async () => {
     const passenger = makeUser();
     prisma.user.findUnique.mockResolvedValue(passenger);
@@ -382,6 +402,55 @@ describe('AuthService', () => {
       response: { code: MovaErrorCode.AUTH_FORBIDDEN },
     });
     expect(prisma.user.create).not.toHaveBeenCalled();
+  });
+
+  it('refuses Play pre-launch virtual Gmail auto-register (passenger and driver)', async () => {
+    prisma.user.findUnique.mockResolvedValue(null);
+    prisma.user.findFirst.mockResolvedValue(null);
+    googleTokens.verify.mockResolvedValue({
+      googleId: 'gid-play',
+      email: 'martinpearson.39569@gmail.com',
+      emailVerified: true,
+      givenName: 'Martin',
+      familyName: 'Pearson',
+      picture: null,
+      audience: 'web-client.apps.googleusercontent.com',
+    });
+    await expect(service.loginWithGoogle('id-token', UserRole.PASSENGER)).rejects.toMatchObject({
+      response: { code: MovaErrorCode.AUTH_FORBIDDEN, message: expect.stringMatching(/Play|Test Lab/i) },
+    });
+    await expect(service.loginWithGoogle('id-token', UserRole.DRIVER)).rejects.toMatchObject({
+      response: { code: MovaErrorCode.AUTH_FORBIDDEN, message: expect.stringMatching(/Play|Test Lab|\+243/i) },
+    });
+    expect(prisma.user.create).not.toHaveBeenCalled();
+    expect(mailer.sendOtp).not.toHaveBeenCalled();
+  });
+
+  it('refuses Cloud Test Lab mailbox auto-register on the driver app', async () => {
+    prisma.user.findUnique.mockResolvedValue(null);
+    prisma.user.findFirst.mockResolvedValue(null);
+    googleTokens.verify.mockResolvedValue({
+      googleId: 'gid-lab',
+      email: 'aqwza7hpyxgwc3pve4yeil-lvl-02@cloudtestlabaccounts.com',
+      emailVerified: true,
+      givenName: 'Nuage',
+      familyName: 'Laboratoire',
+      picture: null,
+      audience: 'android-client.apps.googleusercontent.com',
+    });
+    await expect(service.loginWithGoogle('id-token', UserRole.DRIVER)).rejects.toMatchObject({
+      response: { code: MovaErrorCode.AUTH_FORBIDDEN },
+    });
+    expect(prisma.user.create).not.toHaveBeenCalled();
+  });
+
+  it('still sends SMS OTP for a real +243 when linking a phone (same path as login)', async () => {
+    prisma.user.findUnique.mockResolvedValue(null);
+    await expect(service.requestOtp('+243812345678')).resolves.toMatchObject({
+      success: true,
+      phone: '+243812345678',
+    });
+    expect(sms.sendOtp).toHaveBeenCalledWith('+243812345678', expect.any(String));
   });
 
   it('allows first Google login on driver app (OTP challenge, no user yet)', async () => {

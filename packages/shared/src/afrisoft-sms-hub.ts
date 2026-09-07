@@ -18,7 +18,7 @@ import {
   afrisoftHubSign,
 } from './afrisoft-pay-hub';
 import type { EnvGetter } from './africas-talking';
-import { serdiPayNormalizePhone, SMS_UNAVAILABLE_USER_MESSAGE } from './serdipay';
+import { serdiPayNormalizePhone, serdiPaySanitizeSmsText, SMS_UNAVAILABLE_USER_MESSAGE } from './serdipay';
 
 const DEFAULT_SMS_HUB_URL = 'https://sms.afri-soft.com';
 
@@ -37,11 +37,47 @@ export function afrisoftSmsHubBaseUrl(get: EnvGetter): string {
   );
 }
 
-/** True when SENGA/app should send SMS/OTP via sms.afri-soft.com (not SerdiPay directly). */
+/**
+ * True when SENGA/app should send SMS/OTP via sms.afri-soft.com (not SerdiPay directly).
+ * API key is enough — URL defaults to https://sms.afri-soft.com.
+ */
 export function isAfrisoftSmsHubClientConfigured(get: EnvGetter): boolean {
-  const url = firstEnv(get, 'AFRISOFT_SMS_HUB_URL', 'SMS_HUB_URL');
-  const apiKey = afrisoftHubApiKey(get);
-  return Boolean(url && apiKey);
+  return Boolean(afrisoftHubApiKey(get));
+}
+
+export const SMS_RATE_LIMIT_USER_MESSAGE =
+  'Trop de codes envoyés vers ce numéro. Réessayez dans une minute.';
+export const SMS_CREDIT_USER_MESSAGE =
+  'Envoi SMS temporairement indisponible. Contactez le support SENGA.';
+
+/**
+ * Hub / SerdiPay errors must not leak HMAC, env names, or English Nest text.
+ * Known rate-limit / credit / invalid-phone cases get a specific French line.
+ */
+export function mapSmsDeliveryFailureToUserMessage(raw?: string): string {
+  const msg = (raw ?? '').trim();
+  const lower = msg.toLowerCase();
+  if (!msg) return SMS_UNAVAILABLE_USER_MESSAGE;
+  if (/cooldown|rate limit|too many|retry_after/i.test(lower)) {
+    return SMS_RATE_LIMIT_USER_MESSAGE;
+  }
+  if (/(crédit|credit).*(sms)|sms.*(insuffisant)|not enough sms/i.test(lower)) {
+    return SMS_CREDIT_USER_MESSAGE;
+  }
+  if (/invalid phone|phone_invalid|phone \(expect/i.test(lower)) {
+    return 'Numéro de téléphone invalide. Format : +243XXXXXXXXX';
+  }
+  if (
+    /hmac|api[_ ]?key|signature|hub_auth|afrisoft_|serdipay_|econnrefused|non configuré|missing afrisoft/i.test(
+      lower,
+    )
+  ) {
+    return SMS_UNAVAILABLE_USER_MESSAGE;
+  }
+  if (/[àâäéèêëïîôùûüç]/i.test(msg) && msg.length <= 180 && !/^https?:\/\//i.test(msg)) {
+    return msg;
+  }
+  return SMS_UNAVAILABLE_USER_MESSAGE;
 }
 
 export type AfriSoftSmsHubResult = {
@@ -61,14 +97,13 @@ async function smsHubFetch(
 ): Promise<{ ok: boolean; status: number; json: Record<string, unknown> }> {
   const apiKey = afrisoftHubApiKey(get);
   const appId = afrisoftHubAppId(get);
-  const url = firstEnv(get, 'AFRISOFT_SMS_HUB_URL', 'SMS_HUB_URL');
-  if (!apiKey || !url) {
+  if (!apiKey) {
     return {
       ok: false,
       status: 0,
       json: {
         message:
-          'Hub SMS AfriSoft non configuré (AFRISOFT_SMS_HUB_URL, AFRISOFT_HUB_APP_ID, AFRISOFT_HUB_API_KEY).',
+          'Hub SMS AfriSoft non configuré (AFRISOFT_HUB_API_KEY / AFRISOFT_PAY_HUB_API_KEY).',
       },
     };
   }
@@ -136,7 +171,7 @@ export async function afrisoftSmsHubSendSms(
   const body = {
     app_id: appId,
     phone: serdiPayNormalizePhone(params.phone),
-    text: params.text,
+    text: serdiPaySanitizeSmsText(params.text),
     reference,
     ...(params.idempotencyKey ? { idempotency_key: params.idempotencyKey } : {}),
   };

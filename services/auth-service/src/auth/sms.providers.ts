@@ -13,6 +13,7 @@ import {
   maskPhoneRdc,
   resolveSmsBackend,
   serdiPaySendSms,
+  mapSmsDeliveryFailureToUserMessage,
   SMS_UNAVAILABLE_USER_MESSAGE,
 } from '@mova/shared';
 
@@ -220,21 +221,25 @@ export class SmsService {
     }
     const provider = this.resolveProvider();
     if (!provider) {
-      this.logger.error('SMS OTP failed: no provider configured');
+      this.logger.error(
+        `SMS OTP rejected locally (no provider) for ${maskPhoneRdc(phone)} — set AFRISOFT_HUB_API_KEY on mova-auth`,
+      );
       return {
         success: false,
         message: SMS_UNAVAILABLE_USER_MESSAGE,
       };
     }
+    this.logger.log(`SMS OTP attempting via ${provider.name} to ${maskPhoneRdc(phone)}`);
     try {
       const result = await provider.sendOtp(phone, code);
-      if (!result.success && this.config.get('MOCK_OTP') !== 'true') {
+      if (!result.success) {
         this.logger.error(`SMS OTP failed (${provider.name}): ${result.message}`);
+        return { success: false, message: mapSmsDeliveryFailureToUserMessage(result.message) };
       }
       return result;
     } catch (e) {
       this.logger.error(`SMS OTP threw (${provider.name}): ${(e as Error).message}`);
-      return { success: false, message: SMS_UNAVAILABLE_USER_MESSAGE };
+      return { success: false, message: mapSmsDeliveryFailureToUserMessage((e as Error).message) };
     }
   }
 

@@ -9,6 +9,8 @@
 |--------|----------|-------|
 | **Passager** | [passager.md](user-manual/passager.md) | App mobile Passager, Web PWA — taxi, colis, repas, location, suivi GPS… |
 | **Chauffeur** | [chauffeur.md](user-manual/chauffeur.md) | App mobile Chauffeur — KYC, missions, position GPS, revenus |
+| **Restaurant** | [restaurant.md](user-manual/restaurant.md) | Portail restaurant.afri-soft.com — dossier, PIN, menu, commandes |
+| **Location** | [location.md](user-manual/location.md) | Portail loueur — dossier, PIN, véhicules, réservations |
 | **Équipe interne** | [admin.md](user-manual/admin.md) | Console admin — **5 rôles** avec menus et droits différents |
 
 ## Niveaux d'accès — vue d'ensemble

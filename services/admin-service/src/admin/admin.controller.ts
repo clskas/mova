@@ -146,8 +146,13 @@ export class AdminController {
     @Query('take') take?: string,
     @Query('kycStatus') kycStatus?: string,
     @Query('isAvailable') isAvailable?: string,
+    @Query('includeHidden') includeHidden?: string,
   ) {
-    return this.adminService.listDrivers(Number(skip ?? 0), Number(take ?? 50), { kycStatus, isAvailable });
+    return this.adminService.listDrivers(Number(skip ?? 0), Number(take ?? 50), {
+      kycStatus,
+      isAvailable,
+      includeHidden: includeHidden === 'true' || includeHidden === '1',
+    });
   }
 
   @Get('drivers/:userId')
@@ -221,6 +226,13 @@ export class AdminController {
   @ApiOperation({ summary: 'Générer ou régénérer le PIN d\'activation chauffeur' })
   regenerateDriverPin(@Param('userId') userId: string) {
     return this.adminService.regenerateDriverActivationPin(userId);
+  }
+
+  @Delete('drivers/:userId')
+  @RequirePermissions(AdminPermission.USERS_DELETE)
+  @ApiOperation({ summary: 'Retirer un profil chauffeur fantôme (SUPER_ADMIN)' })
+  purgeDriverProfile(@Param('userId') userId: string, @Request() req: { user: { role: string } }) {
+    return this.adminService.purgeDriverProfile(userId, req.user.role);
   }
 
   @Get('rides')
@@ -442,6 +454,13 @@ export class AdminController {
     @Body() dto: ApproveKycDto,
   ) {
     return this.adminService.reviewPartnerKycSubject(subject, userId, dto.approved, dto.notes);
+  }
+
+  @Post('partner-kyc/:subject/:userId/login-pin')
+  @RequirePermissions(AdminPermission.KYC_WRITE)
+  @ApiOperation({ summary: 'Générer ou renvoyer le PIN de connexion restaurant / loueur' })
+  issuePartnerLoginPin(@Param('subject') subject: string, @Param('userId') userId: string) {
+    return this.adminService.issuePartnerLoginPin(subject, userId);
   }
 
   @Get('publicites')

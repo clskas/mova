@@ -73,8 +73,18 @@ export default function RentalAidePage() {
         <p className="text-sm text-gray-500 mt-1">Manuel location et contacts AfriSoft.</p>
       </div>
 
+      <section className="bg-white border rounded-xl p-4">
+        <h3 className="font-semibold text-[#1A1A2E]">Manuel utilisateur</h3>
+        <p className="text-sm text-gray-600 mt-1">
+          Connexion, PIN après validation, dossier, véhicules et réservations.
+        </p>
+        <a href="/manuel" className="inline-block mt-2 text-indigo-700 underline font-medium text-sm">
+          Ouvrir le manuel utilisateur
+        </a>
+      </section>
+
       <section className="space-y-2">
-        <h3 className="font-semibold text-[#1A1A2E]">Manuel</h3>
+        <h3 className="font-semibold text-[#1A1A2E]">Aide rapide</h3>
         {MANUAL.map((chapter) => (
           <details key={chapter.title} className="bg-white border rounded-xl p-3">
             <summary className="font-medium text-sm cursor-pointer">{chapter.title}</summary>

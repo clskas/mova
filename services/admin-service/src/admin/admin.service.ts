@@ -280,10 +280,11 @@ export class AdminService {
     }
   }
 
-  listDrivers(skip = 0, take = 50, filters?: { kycStatus?: string; isAvailable?: string }) {
+  listDrivers(skip = 0, take = 50, filters?: { kycStatus?: string; isAvailable?: string; includeHidden?: boolean }) {
     const params = new URLSearchParams({ skip: String(skip), take: String(take) });
     if (filters?.kycStatus) params.set('kycStatus', filters.kycStatus);
     if (filters?.isAvailable) params.set('isAvailable', filters.isAvailable);
+    if (filters?.includeHidden) params.set('includeHidden', 'true');
     return this.fetchJson('driver', `/internal/drivers?${params}`);
   }
   getDriver(userId: string) {
@@ -339,6 +340,22 @@ export class AdminService {
   }
   regenerateDriverActivationPin(userId: string) {
     return this.proxy('driver', `/internal/drivers/${userId}/activation-pin`, { method: 'POST', body: JSON.stringify({}) });
+  }
+  purgeDriverProfile(userId: string, actorRole: string) {
+    if (actorRole !== UserRole.SUPER_ADMIN) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.FORBIDDEN,
+        'Seul un SUPER_ADMIN peut retirer un profil chauffeur fantôme.',
+      );
+    }
+    return this.proxy('driver', `/internal/users/${userId}/data`, { method: 'DELETE' });
+  }
+  issuePartnerLoginPin(subject: string, userId: string) {
+    return this.proxy('ride', `/internal/partner-kyc/${subject}/${userId}/login-pin`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    });
   }
   listIncidents() {
     return this.fetchJson('driver', '/internal/incidents');

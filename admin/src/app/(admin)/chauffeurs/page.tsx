@@ -7,6 +7,7 @@ import {
   apiFetch,
   fetchDriverDetail,
   fetchDrivers,
+  purgeDriverProfile,
   regenerateDriverActivationPin,
   reviewDriverKyc,
   reviewDriverDocumentsRenewal,
@@ -148,6 +149,7 @@ export default function ChauffeursPage() {
   const canSetVehicleType = role === "SUPER_ADMIN" || role === "ADMIN";
   const [drivers, setDrivers] = useState<AdminDriver[]>([]);
   const [search, setSearch] = useState("");
+  const [includeHidden, setIncludeHidden] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -164,14 +166,14 @@ export default function ChauffeursPage() {
     setLoading(true);
     setError(null);
     try {
-      const data = await fetchDrivers();
+      const data = await fetchDrivers(includeHidden);
       setDrivers(Array.isArray(data) ? data : []);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur de chargement");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [includeHidden]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -212,6 +214,8 @@ export default function ChauffeursPage() {
         d.userId.toLowerCase().includes(q) ||
         d.publicId?.toLowerCase().includes(q) ||
         d.kycStatus?.toLowerCase().includes(q) ||
+        d.phone?.toLowerCase().includes(q) ||
+        `${d.firstName ?? ""} ${d.lastName ?? ""}`.toLowerCase().includes(q) ||
         d.vehicles?.some((v) => v.plateNumber.toLowerCase().includes(q))
     );
   }, [drivers, search]);
@@ -319,6 +323,21 @@ export default function ChauffeursPage() {
     }
   }
 
+  async function removeGhost() {
+    if (!selectedId) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await purgeDriverProfile(selectedId);
+      setSelectedId(null);
+      load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Impossible de retirer ce profil");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function generatePin() {
     if (!selectedId) return;
     setSaving(true);
@@ -343,10 +362,30 @@ export default function ChauffeursPage() {
 
   return (
     <div className="max-w-6xl mx-auto">
-      <PageHeader title="Chauffeurs" subtitle={readOnly ? "Consultation profils chauffeurs" : "Profils chauffeurs, KYC et disponibilité"} />
+      <PageHeader
+        title="Chauffeurs"
+        subtitle={readOnly ? "Consultation profils chauffeurs" : "Profils véhicule / KYC — distincts des comptes de connexion"}
+      />
+      <p className="text-sm text-gray-600 mb-4">
+        <strong>Chauffeurs</strong> = dossier véhicule et KYC. <strong>Utilisateurs</strong> = comptes de connexion.
+        Un chauffeur réel apparaît ici <em>et</em> dans Utilisateurs avec le rôle Chauffeur. Les profils sans compte
+        (orphelins, Test Lab) sont masqués.
+      </p>
       {error && <div className="mb-4"><ErrorBanner message={error} onRetry={load} /></div>}
       <div className="space-y-4">
-        <SearchInput value={search} onChange={setSearch} placeholder="Rechercher par ID SENGA, plaque ou statut KYC…" />
+        <div className="flex flex-wrap gap-3 items-end">
+          <SearchInput value={search} onChange={setSearch} placeholder="Rechercher par ID SENGA, nom, téléphone, plaque ou statut KYC…" />
+          {role === "SUPER_ADMIN" && (
+            <label className="flex items-center gap-2 text-sm text-gray-600 pb-1">
+              <input
+                type="checkbox"
+                checked={includeHidden}
+                onChange={(e) => setIncludeHidden(e.target.checked)}
+              />
+              Afficher les profils fantômes / Test Lab
+            </label>
+          )}
+        </div>
         {loading ? (
           <LoadingState />
         ) : filtered.length === 0 ? (
@@ -357,6 +396,7 @@ export default function ChauffeursPage() {
               <thead>
                 <tr className="border-b text-left text-gray-500">
                   <th className="p-3">Identifiant</th>
+                  <th className="p-3">Compte</th>
                   <th className="p-3">Étape</th>
                   <th className="p-3">Docs</th>
                   <th className="p-3">KYC</th>
@@ -368,6 +408,21 @@ export default function ChauffeursPage() {
                 {filtered.map((d) => (
                   <tr key={d.id} className="border-b hover:bg-gray-50">
                     <td className="p-3 font-mono text-xs">{d.publicId ?? d.userId.slice(0, 8)}</td>
+                    <td className="p-3 text-xs">
+                      {d.orphan || d.hiddenReason === "orphan" ? (
+                        <span className="text-amber-800">Sans compte (fantôme)</span>
+                      ) : (
+                        <>
+                          <span className="block font-medium text-gray-800">
+                            {[d.firstName, d.lastName].filter(Boolean).join(" ") || d.phone || "—"}
+                          </span>
+                          {d.phone && <span className="block text-gray-500">{d.phone}</span>}
+                          {d.userRole && d.userRole !== "DRIVER" && (
+                            <span className="block text-amber-700">Rôle compte : {d.userRole}</span>
+                          )}
+                        </>
+                      )}
+                    </td>
                     <td className="p-3 text-xs">{driverStageLabel(d)}</td>
                     <td className="p-3 text-xs">
                       {d.kycDocumentsUploaded ?? 0}/{d.kycDocumentsRequired ?? 6}
@@ -395,8 +450,16 @@ export default function ChauffeursPage() {
           <div className="space-y-4">
             <div className="grid sm:grid-cols-2 gap-3 text-sm">
               <p><span className="text-gray-500">Identifiant SENGA:</span> <span className="font-mono font-medium">{selected.publicId ?? "—"}</span></p>
-              <p><span className="text-gray-500">Téléphone:</span> {detail?.user?.phone ?? "—"}</p>
-              <p><span className="text-gray-500">Nom:</span> {[detail?.user?.firstName, detail?.user?.lastName].filter(Boolean).join(" ") || "—"}</p>
+              <p><span className="text-gray-500">Téléphone:</span> {detail?.user?.phone ?? selected.phone ?? "—"}</p>
+              <p><span className="text-gray-500">Nom:</span> {[detail?.user?.firstName, detail?.user?.lastName].filter(Boolean).join(" ") || [selected.firstName, selected.lastName].filter(Boolean).join(" ") || "—"}</p>
+              <p>
+                <span className="text-gray-500">Compte Utilisateurs:</span>{" "}
+                {selected.orphan || !detail?.user
+                  ? "Aucun — profil fantôme"
+                  : selected.userRole === "DRIVER"
+                    ? "Chauffeur"
+                    : `présent, rôle ${selected.userRole ?? detail.user?.role ?? "?"}`}
+              </p>
               <p><span className="text-gray-500">KYC:</span> <StatusBadge status={selected.kycStatus} /></p>
               <p><span className="text-gray-500">Étape:</span> {driverStageLabel(selected)}</p>
               <p><span className="text-gray-500">Dossier enregistrement:</span> {selected.onboardingCompleted ? "Soumis ✓" : "En cours"}</p>
@@ -441,6 +504,17 @@ export default function ChauffeursPage() {
                 <p><span className="text-gray-500">Retrait:</span> {selected.payoutProvider} · {selected.payoutPhone ?? "—"}</p>
               )}
             </div>
+
+            {(selected.orphan || selected.hiddenReason === "orphan" || selected.hiddenReason === "leftover") && role === "SUPER_ADMIN" && (
+              <div className="rounded-xl bg-amber-50 border border-amber-200 p-4 text-sm space-y-2">
+                <p className="font-semibold text-amber-950">Profil fantôme</p>
+                <p className="text-amber-900">
+                  Ce dossier n&apos;a pas de compte chauffeur dans Utilisateurs (compte supprimé, Test Lab, ou essai
+                  d&apos;app chauffeur). Il ne doit pas apparaître comme un chauffeur réel.
+                </p>
+                <BtnDanger onClick={removeGhost} disabled={saving}>Retirer ce profil</BtnDanger>
+              </div>
+            )}
 
             {activationPin && (
               <div className="rounded-xl bg-amber-50 border border-amber-200 p-4 text-sm">

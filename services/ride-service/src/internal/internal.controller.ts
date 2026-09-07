@@ -329,6 +329,11 @@ export class InternalController {
     return this.partnerKyc.reviewSubject(userId, sub, body.approved === true, body.notes);
   }
 
+  @Post('partner-kyc/:subject/:userId/login-pin')
+  issuePartnerLoginPin(@Param('subject') subject: string, @Param('userId') userId: string) {
+    return this.partnerKyc.issueLoginPin(userId);
+  }
+
   @Post('rental-partners/ensure')
   ensureRentalPartner(@Body() body: { ownerUserId?: string }) {
     const ownerUserId = body.ownerUserId?.trim();

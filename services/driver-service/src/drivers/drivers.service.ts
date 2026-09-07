@@ -26,6 +26,7 @@ import { UpdateOnboardingDto } from './drivers.dto';
 import { notifyDriverActivationPin, notifyDriverKycReject } from './kyc-notify';
 import { OcrService } from '../ocr/ocr.service';
 import { MatchingConfigService } from '../common/matching-config.service';
+import { classifyAdminDriver } from './driver-admin-visibility';
 
 export interface DriverCandidate {
   driverId: string;
@@ -1031,22 +1032,17 @@ export class DriversService {
   async listDriversAdmin(
     skip = 0,
     take = 50,
-    filters?: { kycStatus?: KycStatus; isAvailable?: boolean },
+    filters?: { kycStatus?: KycStatus; isAvailable?: boolean; includeHidden?: boolean },
   ) {
     const where = {
       ...(filters?.kycStatus ? { kycStatus: filters.kycStatus } : {}),
       ...(filters?.isAvailable !== undefined ? { isAvailable: filters.isAvailable } : {}),
     };
-    const [rows, total] = await Promise.all([
-      this.prisma.driverProfile.findMany({
-        where,
-        skip,
-        take,
-        orderBy: { createdAt: 'desc' },
-        include: { vehicles: true },
-      }),
-      this.prisma.driverProfile.count({ where }),
-    ]);
+    const rows = await this.prisma.driverProfile.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      include: { vehicles: true },
+    });
     const userIds = rows.map((p) => p.userId);
     const allDocs =
       userIds.length > 0
@@ -1057,10 +1053,14 @@ export class DriversService {
         : [];
     const users = await Promise.all(userIds.map((id) => this.fetchAuthUser(id)));
     const userById = new Map(users.filter(Boolean).map((u) => [u!.id, u!]));
-    const data = rows.map((p) => {
+    const mapped = rows.map((p) => {
       const kycSummary = this.kycUploadSummary(p.userId, allDocs);
       const documentsStatus = this.documentsStatusFor(p);
-      const user = userById.get(p.userId);
+      const user = userById.get(p.userId) ?? null;
+      const visibility = classifyAdminDriver(user, {
+        onboardingCompleted: p.onboardingCompleted,
+        kycDocumentsUploaded: kycSummary.kycDocumentsUploaded,
+      });
       return {
         ...p,
         publicId: formatMovaPublicId(p.userId, 'DRIVER'),
@@ -1068,29 +1068,46 @@ export class DriversService {
         lastName: user?.lastName ?? null,
         phone: user?.phone ?? null,
         email: user?.email ?? null,
+        userRole: visibility.userRole ?? user?.role ?? null,
+        orphan: visibility.reason === 'orphan',
+        hiddenReason: visibility.reason,
         activationPinVerified: !!p.activationPinVerifiedAt,
         ...kycSummary,
         readyForReview: p.onboardingCompleted && p.kycStatus === KycStatus.PENDING,
         documentsStatus,
         documentsCanOperate: documentsStatus.canOperate,
         documentsRenewalPending: p.documentsRenewalPending ?? false,
+        _hidden: visibility.hidden,
       };
     });
+    const visible = filters?.includeHidden ? mapped : mapped.filter((d) => !d._hidden);
+    const total = visible.length;
+    const data = visible.slice(skip, skip + take).map(({ _hidden, ...row }) => row);
     return { data, total, skip, take };
   }
 
   async getDriverAdminDetail(userId: string) {
     const [profile, kyc, user] = await Promise.all([
-      this.getOrCreateProfile(userId),
+      this.prisma.driverProfile.findUnique({ where: { userId }, include: { vehicles: true } }),
       this.getKycStatus(userId),
       this.fetchAuthUser(userId),
     ]);
-    const vehicle = profile?.vehicles.find((v) => v.isActive) ?? profile?.vehicles[0];
-    const documentsStatus = profile ? this.documentsStatusFor(profile) : evaluateDriverDocuments({});
+    if (!profile) {
+      throw new MovaHttpException(MovaErrorCode.DRIVER_KYC_PENDING, undefined, 'Profil chauffeur introuvable.');
+    }
+    const vehicle = profile.vehicles.find((v) => v.isActive) ?? profile.vehicles[0];
+    const documentsStatus = this.documentsStatusFor(profile);
+    const visibility = classifyAdminDriver(user, {
+      onboardingCompleted: profile.onboardingCompleted,
+      kycDocumentsUploaded: kyc.checklist.filter((c) => c.required && c.uploaded).length,
+    });
     return {
-      id: profile?.id,
+      id: profile.id,
       userId,
       publicId: formatMovaPublicId(userId, 'DRIVER'),
+      userRole: visibility.userRole ?? user?.role ?? null,
+      orphan: visibility.reason === 'orphan',
+      hiddenReason: visibility.reason,
       user: user
         ? {
             firstName: user.firstName,
@@ -1098,6 +1115,7 @@ export class DriversService {
             email: user.email,
             phone: user.phone,
             phoneMasked: maskPhoneRdc(user.phone),
+            role: user.role,
           }
         : null,
       licenseNumber: profile?.licenseNumber,

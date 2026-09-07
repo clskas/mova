@@ -37,9 +37,9 @@ Source technique : `admin/src/lib/rbac.ts`.
 | Module | Usage |
 |--------|-------|
 | **Métriques** | Utilisateurs, chauffeurs, courses, revenus, litiges |
-| **Utilisateurs** | Recherche par nom, téléphone, rôle ; réactivation compte suspendu |
-| **Chauffeurs** | Profils, véhicules, KYC, **validation type d'engin** (VIP, Confort…) |
-| **KYC** | Approbation ou rejet des dossiers ; indicateurs OCR si documents analysés |
+| **Utilisateurs** | Comptes de connexion (rôle Passager, Chauffeur, Restaurant, Location, staff). Les robots Test Lab sont masqués. |
+| **Chauffeurs** | Profils véhicule / KYC uniquement. Un chauffeur réel a aussi le rôle Chauffeur dans Utilisateurs. Les profils sans compte (fantômes) sont masqués. |
+| **KYC** | Approbation dossiers chauffeur / resto / location. Après validation partenaire : PIN affiché + renvoyer SMS/e-mail. |
 | **Restaurants** | Partenaires livraison repas |
 | **Courses** | Trajets en cours ; **trace GPS** dans le détail |
 | **Livraisons** | Colis, repas, courses & commissions (ERRAND) ; trace GPS ; assignation chauffeur |
@@ -74,7 +74,9 @@ La carte se rafraîchit automatiquement toutes les 10 secondes tant que la missi
 ### Validation KYC
 
 1. **KYC** ou **Chauffeurs → Détail** → **Approuver KYC**.
-2. Le chauffeur peut alors passer **En ligne** (sous réserve du type d'engin).
+2. Un PIN d'activation s'affiche (et part en SMS / e-mail). Le chauffeur le saisit dans l'app.
+3. Pour un **restaurant** ou **loueur**, le même écran affiche le PIN de connexion et permet de le renvoyer si le SMS échoue.
+4. Le chauffeur peut alors passer **En ligne** (sous réserve du type d'engin).
 
 Des champs OCR (nom, numéro permis…) peuvent apparaître si le service d'analyse de documents est activé.
 

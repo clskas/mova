@@ -205,6 +205,7 @@ describe('PartnerKycService', () => {
         lastName: 'Kabila',
         phone: '+243810000001',
         email: 'flore@example.com',
+        pinConfigured: false,
       }),
     });
 
@@ -218,6 +219,8 @@ describe('PartnerKycService', () => {
     expect(result.restaurants[0].displayName).toBe('Chez Flore');
     expect(result.restaurants[0].partnerKindLabel).toBe('Restaurant');
     expect(result.restaurants[0].email).toBe('flore@example.com');
+    expect(result.restaurants[0].pinConfigured).toBe(false);
+    expect(result.restaurants[0].pinPending).toBe(false);
   });
 
   it('filtre les dossiers partenaires par statut', async () => {

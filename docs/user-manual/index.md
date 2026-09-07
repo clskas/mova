@@ -14,6 +14,8 @@ SENGA est une plateforme de mobilité urbaine pour Kinshasa et la RDC. Réservez
 | SENGA Driver (mobile) | Chauffeurs partenaires | Compte **DRIVER** — missions, KYC, revenus | [Chauffeur](chauffeur.md) |
 | SENGA Web (PWA) | Passagers | Même accès que l'app Passager | [Passager](passager.md) |
 | SENGA Admin (web) | Équipe interne uniquement | Rôles staff : SUPER_ADMIN, ADMIN, SUPPORT, FINANCE, CONTENT | [Admin](admin.md) |
+| Portail restaurant | Partenaires repas | Compte **RESTAURANT** | [Restaurant](restaurant.md) |
+| Portail location | Loueurs | Compte **RENTAL_PARTNER** | [Location](location.md) |
 
 Les comptes **passager** et **chauffeur** sont distincts : un même numéro ne peut pas cumuler les deux rôles sur la même application.
 

@@ -68,10 +68,12 @@ export class InternalController {
     @Query('take') take?: string,
     @Query('kycStatus') kycStatus?: KycStatus,
     @Query('isAvailable') isAvailable?: string,
+    @Query('includeHidden') includeHidden?: string,
   ) {
     return this.drivers.listDriversAdmin(Number(skip ?? 0), Number(take ?? 50), {
       kycStatus,
       isAvailable: isAvailable === undefined ? undefined : isAvailable === 'true',
+      includeHidden: includeHidden === 'true' || includeHidden === '1',
     });
   }
   @Get('kyc/pending') pendingKyc(@Query('status') status?: string) {

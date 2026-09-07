@@ -8,6 +8,7 @@ import {
   fetchKycPending,
   fetchPartnerKycPending,
   reviewDriverKyc,
+  regeneratePartnerLoginPin,
   reviewPartnerKycDocument,
   reviewPartnerKycSubject,
   apiFetch,
@@ -187,6 +188,14 @@ const DOC_TYPE_OPTIONS = [
   ...Object.entries(KYC_DOC_LABELS).map(([value, label]) => ({ value, label })),
 ];
 
+function partnerStageLabel(r: PartnerKycDossier) {
+  if (r.kycStatus === "APPROVED") {
+    return r.pinPending || !r.pinConfigured ? "KYC OK — PIN à transmettre" : "Actif (PIN configuré)";
+  }
+  if (r.kycStatus === "REJECTED") return "Dossier refusé";
+  return "Dossier en attente";
+}
+
 export default function KycPage() {
   const { canWrite } = useAdmin();
   const [items, setItems] = useState<KycItem[]>([]);
@@ -201,6 +210,7 @@ export default function KycPage() {
   const [kindFilter, setKindFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("PENDING");
   const [docTypeFilter, setDocTypeFilter] = useState("");
+  const [pinBanner, setPinBanner] = useState<{ title: string; pin?: string; notice: string } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -329,15 +339,48 @@ export default function KycPage() {
         }
         notes = motif.trim();
       }
+      if (approved) {
+        const dossier = [...restaurants, ...rentalPartners].find((d) => d.userId === userId);
+        const hasPhone = Boolean(dossier?.phoneVerified || dossier?.phone);
+        const hasEmail = Boolean(dossier?.email?.trim());
+        if (!hasPhone && !hasEmail) {
+          setError("Liez un +243 ou un e-mail avant d'approuver / pour envoyer le PIN.");
+          return;
+        }
+        if (!hasPhone && hasEmail) {
+          const ok = window.confirm(
+            "Aucun numéro +243 lié. Le PIN partira uniquement par e-mail. Continuer ?",
+          );
+          if (!ok) return;
+        }
+      }
       const result = await reviewPartnerKycSubject(subject, userId, approved, notes);
-      if (approved && result.loginPin) {
-        window.alert(kycApprovedPinAlert(result));
-      } else if (!approved) {
+      if (approved) {
+        setPinBanner({
+          title: result.loginPin ? "Dossier validé — PIN à transmettre" : "Dossier validé",
+          pin: result.loginPin,
+          notice: activationPinSmsCopy(result) || "PIN généré. Transmettez-le au partenaire si le SMS / e-mail n'arrive pas.",
+        });
+        if (result.loginPin) window.alert(kycApprovedPinAlert(result));
+      } else {
         window.alert(`Refus enregistré.\n\n${activationPinSmsCopy(result)}`);
       }
       load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Échec de la validation");
+    }
+  }
+
+  async function resendPartnerPin(subject: "RESTAURANT" | "RENTAL_PARTNER", userId: string, name: string) {
+    try {
+      const result = await regeneratePartnerLoginPin(subject, userId);
+      setPinBanner({
+        title: `PIN ${name}`,
+        pin: result.loginPin,
+        notice: activationPinSmsCopy(result),
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Impossible de renvoyer le PIN");
     }
   }
 
@@ -421,6 +464,18 @@ export default function KycPage() {
   return (
     <div className="max-w-4xl mx-auto">
       <PageHeader title="KYC" subtitle="Validation des dossiers chauffeurs, restaurants et loueurs" />
+      <div className="mb-4 rounded-xl border border-violet-200 bg-violet-50 p-4 text-sm text-violet-950 space-y-1">
+        <p className="font-semibold">PIN après validation</p>
+        <p>
+          En approuvant un restaurant ou un loueur, SENGA génère un PIN à 6 chiffres s&apos;il n&apos;existe pas encore,
+          puis l&apos;envoie par SMS au +243 lié et/ou par e-mail. Le PIN s&apos;affiche ici (et dans l&apos;alerte)
+          pour que vous puissiez le transmettre à la voix si le message n&apos;arrive pas.
+        </p>
+        <p>
+          Sans +243 ni e-mail, l&apos;approbation est bloquée — message : « Liez un +243 ou un e-mail avant
+          d&apos;approuver / pour envoyer le PIN ». Sur un dossier déjà validé, utilisez « Renvoyer le PIN ».
+        </p>
+      </div>
       <div className="mb-4 space-y-3">
         <SearchInput
           value={search}
@@ -459,6 +514,15 @@ export default function KycPage() {
         </div>
       </div>
       {error && <div className="mb-4"><ErrorBanner message={error} onRetry={load} /></div>}
+      {pinBanner && (
+        <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm">
+          <p className="font-semibold text-amber-950">{pinBanner.title}</p>
+          {pinBanner.pin && (
+            <p className="font-mono text-2xl tracking-widest mt-2 text-amber-950">{pinBanner.pin}</p>
+          )}
+          <p className="text-amber-800 mt-1 text-xs">{pinBanner.notice}</p>
+        </div>
+      )}
       {loading ? (
         <LoadingState />
       ) : empty ? (
@@ -562,13 +626,32 @@ export default function KycPage() {
                       <div>
                         <IdentityHeader kind={kind} name={name} phone={r.phone} email={r.email} />
                         <div className="mt-1"><StatusBadge status={r.kycStatus} /></div>
-                        {!r.phoneVerified && <p className="text-xs text-amber-700 mt-1">Téléphone +243 non lié</p>}
+                        <p className="text-xs text-gray-600 mt-1">{partnerStageLabel(r)}</p>
+                        {!r.phoneVerified && !r.email?.trim() && (
+                          <p className="text-xs text-red-700 mt-1">
+                            Liez un +243 ou un e-mail avant d&apos;approuver / pour envoyer le PIN
+                          </p>
+                        )}
+                        {!r.phoneVerified && r.email?.trim() && (
+                          <p className="text-xs text-amber-700 mt-1">
+                            Téléphone +243 non lié — le PIN partira par e-mail uniquement
+                          </p>
+                        )}
                       </div>
                       {canWrite("kyc") && r.userId && r.kycStatus !== "APPROVED" && (
                         <div className="flex gap-2">
                           <BtnSuccess onClick={() => reviewPartner("RESTAURANT", r.userId!, true)}>Approuver</BtnSuccess>
                           <BtnDanger onClick={() => reviewPartner("RESTAURANT", r.userId!, false)}>Rejeter</BtnDanger>
                         </div>
+                      )}
+                      {canWrite("kyc") && r.userId && r.kycStatus === "APPROVED" && (
+                        <button
+                          type="button"
+                          className="text-sm text-[#6C63FF] hover:underline"
+                          onClick={() => resendPartnerPin("RESTAURANT", r.userId!, name)}
+                        >
+                          {r.pinPending ? "Générer / renvoyer le PIN" : "Renvoyer le PIN"}
+                        </button>
                       )}
                     </div>
                     <ul className="text-sm space-y-2">
@@ -611,12 +694,32 @@ export default function KycPage() {
                       <div>
                         <IdentityHeader kind={kind} name={name} phone={r.phone} email={r.email} />
                         <div className="mt-1"><StatusBadge status={r.kycStatus} /></div>
+                        <p className="text-xs text-gray-600 mt-1">{partnerStageLabel(r)}</p>
+                        {!r.phoneVerified && !r.email?.trim() && (
+                          <p className="text-xs text-red-700 mt-1">
+                            Liez un +243 ou un e-mail avant d&apos;approuver / pour envoyer le PIN
+                          </p>
+                        )}
+                        {!r.phoneVerified && r.email?.trim() && (
+                          <p className="text-xs text-amber-700 mt-1">
+                            Téléphone +243 non lié — le PIN partira par e-mail uniquement
+                          </p>
+                        )}
                       </div>
                       {canWrite("kyc") && r.userId && r.kycStatus !== "APPROVED" && (
                         <div className="flex gap-2">
                           <BtnSuccess onClick={() => reviewPartner("RENTAL_PARTNER", r.userId!, true)}>Approuver</BtnSuccess>
                           <BtnDanger onClick={() => reviewPartner("RENTAL_PARTNER", r.userId!, false)}>Rejeter</BtnDanger>
                         </div>
+                      )}
+                      {canWrite("kyc") && r.userId && r.kycStatus === "APPROVED" && (
+                        <button
+                          type="button"
+                          className="text-sm text-[#6C63FF] hover:underline"
+                          onClick={() => resendPartnerPin("RENTAL_PARTNER", r.userId!, name)}
+                        >
+                          {r.pinPending ? "Générer / renvoyer le PIN" : "Renvoyer le PIN"}
+                        </button>
                       )}
                     </div>
                     <ul className="text-sm space-y-2">

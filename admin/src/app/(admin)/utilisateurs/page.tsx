@@ -2,12 +2,15 @@
 
 import { useCallback, useEffect, useState } from "react";
 import {
+  activationPinSmsCopy,
   createUser,
   deactivateUser as deactivateUserApi,
+  fetchDrivers,
   fetchUsers,
   formatUserName,
   purgePlayPrelaunchUsers,
   purgeUser as purgeUserApi,
+  regeneratePartnerLoginPin,
   updateUser,
   type AdminUser,
 } from "@/lib/api";
@@ -34,6 +37,7 @@ export default function UtilisateursPage() {
   const readOnly = !canWrite("utilisateurs");
   const canPurge = role === "SUPER_ADMIN";
   const [users, setUsers] = useState<AdminUser[]>([]);
+  const [driverUserIds, setDriverUserIds] = useState<Set<string>>(new Set());
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
@@ -52,6 +56,8 @@ export default function UtilisateursPage() {
   const [createRole, setCreateRole] = useState("RESTAURANT");
   const [createFirst, setCreateFirst] = useState("");
   const [createLast, setCreateLast] = useState("");
+  const [loginPin, setLoginPin] = useState<string | null>(null);
+  const [pinNotice, setPinNotice] = useState<string | null>(null);
 
   const [page, setPage] = useState(0);
   const pageSize = 50;
@@ -63,14 +69,18 @@ export default function UtilisateursPage() {
     setLoading(true);
     setError(null);
     try {
-      const { data, total: count } = await fetchUsers(
-        page * pageSize,
-        pageSize,
-        searchQuery.trim() || undefined,
-        showPlayPrelaunch,
-      );
+      const [{ data, total: count }, drivers] = await Promise.all([
+        fetchUsers(
+          page * pageSize,
+          pageSize,
+          searchQuery.trim() || undefined,
+          showPlayPrelaunch,
+        ),
+        fetchDrivers(true).catch(() => []),
+      ]);
       setUsers(data);
       setTotal(count);
+      setDriverUserIds(new Set(drivers.map((d) => d.userId)));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur de chargement");
     } finally {
@@ -94,6 +104,8 @@ export default function UtilisateursPage() {
     setEditStatus(u.status ?? "ACTIVE");
     setEditFirst(u.firstName ?? "");
     setEditLast(u.lastName ?? "");
+    setLoginPin(null);
+    setPinNotice(null);
   }
 
   async function saveNewUser() {
@@ -176,6 +188,28 @@ export default function UtilisateursPage() {
     }
   }
 
+  async function resendPartnerPin() {
+    if (!selected) return;
+    const subject =
+      selected.role === "RESTAURANT"
+        ? "RESTAURANT"
+        : selected.role === "RENTAL_PARTNER"
+          ? "RENTAL_PARTNER"
+          : null;
+    if (!subject) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const result = await regeneratePartnerLoginPin(subject, selected.id);
+      setLoginPin(result.loginPin ?? null);
+      setPinNotice(activationPinSmsCopy(result));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Impossible de générer le PIN");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function purgeUser() {
     if (!purgeTarget) return;
     setSaving(true);
@@ -199,7 +233,7 @@ export default function UtilisateursPage() {
         subtitle={
           readOnly
             ? `Consultation des comptes (${total} au total)`
-            : `Gestion des comptes passagers, chauffeurs, partenaires et admins — ${total} au total`
+            : `Comptes de connexion (login) — ${total} au total. Les dossiers KYC chauffeur sont dans Chauffeurs.`
         }
         action={
           !readOnly ? (
@@ -207,6 +241,11 @@ export default function UtilisateursPage() {
           ) : undefined
         }
       />
+      <p className="text-sm text-gray-600 mb-4">
+        <strong>Utilisateurs</strong> = qui peut se connecter (rôle Passager, Chauffeur, Restaurant, Location, staff).
+        <strong> Chauffeurs</strong> = profils véhicule / KYC. Un chauffeur réel a les deux : rôle Chauffeur ici, et une
+        ligne dans Chauffeurs. Les robots Google Play / Test Lab sont masqués des deux listes.
+      </p>
       {error && <div className="mb-4"><ErrorBanner message={error} onRetry={load} /></div>}
       <div className="space-y-4">
         <div className="flex flex-wrap gap-2 items-end">
@@ -269,6 +308,11 @@ export default function UtilisateursPage() {
                       {u.playPrelaunch && (
                         <span className="ml-2 text-[11px] font-medium text-amber-800 bg-amber-100 rounded-full px-2 py-0.5">
                           Test Lab
+                        </span>
+                      )}
+                      {driverUserIds.has(u.id) && u.role !== "DRIVER" && (
+                        <span className="ml-2 text-[11px] font-medium text-violet-800 bg-violet-100 rounded-full px-2 py-0.5">
+                          Profil chauffeur
                         </span>
                       )}
                     </td>
@@ -376,6 +420,33 @@ export default function UtilisateursPage() {
                 ]} />
               </label>
             </div>
+            {(selected.role === "RESTAURANT" || selected.role === "RENTAL_PARTNER") && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm space-y-2">
+                <p className="font-semibold text-amber-950">
+                  {selected.pinConfigured
+                    ? "PIN de connexion configuré"
+                    : "KYC OK — PIN à transmettre"}
+                </p>
+                <p className="text-amber-900 text-xs">
+                  Après validation KYC, un PIN à 6 chiffres est généré et envoyé par SMS / e-mail.
+                  S&apos;il n&apos;arrive pas, un SUPER_ADMIN peut le renvoyer ici — le code s&apos;affiche une fois.
+                </p>
+                {loginPin && (
+                  <p className="font-mono text-2xl tracking-widest text-amber-950">{loginPin}</p>
+                )}
+                {pinNotice && <p className="text-amber-800 text-xs">{pinNotice}</p>}
+                {canPurge && (
+                  <button
+                    type="button"
+                    onClick={resendPartnerPin}
+                    disabled={saving}
+                    className="text-sm text-[#6C63FF] hover:underline disabled:opacity-50"
+                  >
+                    {selected.pinConfigured ? "Renvoyer un nouveau PIN" : "Générer et afficher le PIN"}
+                  </button>
+                )}
+              </div>
+            )}
             {!readOnly && (
               <div className="flex flex-wrap gap-2 pt-2">
                 <BtnPrimary onClick={saveUser} disabled={saving}>{saving ? "Enregistrement…" : "Enregistrer"}</BtnPrimary>

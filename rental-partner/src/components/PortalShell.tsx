@@ -13,7 +13,8 @@ const NAV = [
   { href: "/revenus", label: "Revenus", short: "Revenus", icon: "💰" },
   { href: "/promos", label: "Codes promo", short: "Promos", icon: "🏷️" },
   { href: "/compte", label: "Compte et connexion", short: "Compte", icon: "👤" },
-  { href: "/aide", label: "Aide", short: "Aide", icon: "❓" },
+  { href: "/aide", label: "Aide / Manuel", short: "Manuel", icon: "❓" },
+  { href: "/manuel", label: "Manuel utilisateur", short: "Manuel", icon: "📘" },
 ];
 
 function navActive(pathname: string, href: string) {

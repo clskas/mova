@@ -72,6 +72,8 @@ export class PartnerKycService {
       phoneVerified,
       hasEmail,
       canOperate: restaurant.kycStatus === PartnerKycStatus.APPROVED,
+      pinConfigured: user?.pinConfigured === true,
+      pinPending: restaurant.kycStatus === PartnerKycStatus.APPROVED && user?.pinConfigured !== true,
       checklist,
       requiredComplete: this.requiredComplete(checklist) && (phoneVerified || hasEmail),
     };
@@ -103,6 +105,8 @@ export class PartnerKycService {
       phoneVerified,
       hasEmail,
       canOperate: profile.kycStatus === PartnerKycStatus.APPROVED,
+      pinConfigured: user?.pinConfigured === true,
+      pinPending: profile.kycStatus === PartnerKycStatus.APPROVED && user?.pinConfigured !== true,
       checklist,
       requiredComplete: this.requiredComplete(checklist) && (phoneVerified || hasEmail),
     };
@@ -236,7 +240,7 @@ export class PartnerKycService {
           throw new MovaHttpException(
             MovaErrorCode.VALIDATION_ERROR,
             undefined,
-            'Dossier incomplet : documents ou téléphone +243 manquants.',
+            'Dossier incomplet : justificatifs manquants, ou aucun +243 / e-mail pour envoyer le PIN.',
           );
         }
         await this.prisma.partnerKycDocument.updateMany({
@@ -271,7 +275,7 @@ export class PartnerKycService {
         throw new MovaHttpException(
           MovaErrorCode.VALIDATION_ERROR,
           undefined,
-          'Dossier incomplet : documents ou téléphone +243 manquants.',
+          'Dossier incomplet : justificatifs manquants, ou aucun +243 / e-mail pour envoyer le PIN.',
         );
       }
       await this.prisma.partnerKycDocument.updateMany({

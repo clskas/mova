@@ -108,13 +108,16 @@ export class UsersService {
   }
 
   async listUsers(skip = 0, take = 50, search?: string, includePlayPrelaunch = false) {
-    const searchWhere = search?.trim()
+    const q = search?.trim();
+    const roleFromSearch = this.roleFromSearch(q);
+    const searchWhere = q
       ? {
           OR: [
-            { phone: { contains: search.trim(), mode: 'insensitive' as const } },
-            { firstName: { contains: search.trim(), mode: 'insensitive' as const } },
-            { lastName: { contains: search.trim(), mode: 'insensitive' as const } },
-            { email: { contains: search.trim(), mode: 'insensitive' as const } },
+            { phone: { contains: q, mode: 'insensitive' as const } },
+            { firstName: { contains: q, mode: 'insensitive' as const } },
+            { lastName: { contains: q, mode: 'insensitive' as const } },
+            { email: { contains: q, mode: 'insensitive' as const } },
+            ...(roleFromSearch ? [{ role: roleFromSearch }] : []),
           ],
         }
       : undefined;
@@ -128,11 +131,40 @@ export class UsersService {
       this.prisma.user.count({ where }),
     ]);
     return {
-      data: data.map((u) => ({ ...u, playPrelaunch: isPlayPrelaunchAccount(u) })),
+      data: data.map((u) => {
+        const { googleId: _g, localPinHash, ...safe } = u;
+        return {
+          ...safe,
+          playPrelaunch: isPlayPrelaunchAccount(u),
+          pinConfigured: Boolean(localPinHash),
+        };
+      }),
       total,
       skip,
       take,
     };
+  }
+
+  private roleFromSearch(q?: string): UserRole | undefined {
+    if (!q) return undefined;
+    const key = q.trim().toLowerCase();
+    const aliases: Record<string, UserRole> = {
+      chauffeur: UserRole.DRIVER,
+      chauffeurs: UserRole.DRIVER,
+      driver: UserRole.DRIVER,
+      passager: UserRole.PASSENGER,
+      passenger: UserRole.PASSENGER,
+      restaurant: UserRole.RESTAURANT,
+      resto: UserRole.RESTAURANT,
+      location: UserRole.RENTAL_PARTNER,
+      loueur: UserRole.RENTAL_PARTNER,
+      partenaire: UserRole.RENTAL_PARTNER,
+      rental: UserRole.RENTAL_PARTNER,
+      admin: UserRole.ADMIN,
+    };
+    if (aliases[key]) return aliases[key];
+    const upper = q.trim().toUpperCase();
+    return (Object.values(UserRole) as string[]).includes(upper) ? (upper as UserRole) : undefined;
   }
 
   async listPlayPrelaunchUsers() {
@@ -143,7 +175,10 @@ export class UsersService {
       orderBy: { createdAt: 'desc' },
     });
     return {
-      data: data.filter(isPlayPrelaunchAccount).map((u) => ({ ...u, playPrelaunch: true })),
+      data: data.filter(isPlayPrelaunchAccount).map((u) => {
+        const { googleId: _g, localPinHash, ...safe } = u;
+        return { ...safe, playPrelaunch: true, pinConfigured: Boolean(localPinHash) };
+      }),
       total: data.filter(isPlayPrelaunchAccount).length,
     };
   }

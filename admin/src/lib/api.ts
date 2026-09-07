@@ -81,6 +81,7 @@ export type AdminUser = {
   email?: string;
   createdAt?: string;
   playPrelaunch?: boolean;
+  pinConfigured?: boolean;
 };
 
 export type AdminDriver = {
@@ -91,6 +92,9 @@ export type AdminDriver = {
   lastName?: string | null;
   phone?: string | null;
   email?: string | null;
+  userRole?: string | null;
+  orphan?: boolean;
+  hiddenReason?: "orphan" | "play_prelaunch" | "seed_demo" | "leftover" | null;
   licenseNumber?: string | null;
   isAvailable?: boolean;
   ratingAvg?: number;
@@ -136,6 +140,7 @@ export type AdminDriverDetail = AdminDriver & {
     email?: string | null;
     phone?: string;
     phoneMasked?: string;
+    role?: string;
   } | null;
   idDocumentNumber?: string | null;
   licenseExpiry?: string | null;
@@ -1914,9 +1919,18 @@ export async function purgePlayPrelaunchUsers() {
   );
 }
 
-export async function fetchDrivers(): Promise<AdminDriver[]> {
-  const data = await apiFetch<AdminDriver[] | { data?: AdminDriver[] }>("/api/admin/drivers");
+export async function fetchDrivers(includeHidden = false): Promise<AdminDriver[]> {
+  const params = new URLSearchParams();
+  if (includeHidden) params.set("includeHidden", "true");
+  const q = params.toString();
+  const data = await apiFetch<AdminDriver[] | { data?: AdminDriver[] }>(
+    `/api/admin/drivers${q ? `?${q}` : ""}`,
+  );
   return Array.isArray(data) ? data : data.data ?? [];
+}
+
+export async function purgeDriverProfile(userId: string) {
+  return apiFetch<{ deleted?: boolean }>(`/api/admin/drivers/${userId}`, { method: "DELETE" });
 }
 
 export async function fetchDriversForAssignment(): Promise<AdminDriver[]> {
@@ -2064,12 +2078,24 @@ export type PartnerKycDossier = {
   canOperate?: boolean;
   requiredComplete?: boolean;
   checklist?: PartnerKycChecklistItem[];
+  pinConfigured?: boolean;
+  pinPending?: boolean;
   loginPin?: string;
   smsSent?: boolean;
   emailSent?: boolean;
   hasPhone?: boolean;
   hasEmail?: boolean;
 };
+
+export async function regeneratePartnerLoginPin(
+  subject: "RESTAURANT" | "RENTAL_PARTNER",
+  userId: string,
+) {
+  return apiFetch<{ loginPin?: string } & KycNotifyResult>(
+    `/api/admin/partner-kyc/${subject}/${userId}/login-pin`,
+    { method: "POST", body: JSON.stringify({}) },
+  );
+}
 
 export async function fetchKycPending(status?: string): Promise<KycItem[]> {
   const params = new URLSearchParams();

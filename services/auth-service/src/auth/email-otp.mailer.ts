@@ -7,10 +7,47 @@ import { isMockOtpAllowed, maskEmail } from '@mova/shared';
 export const EMAIL_UNAVAILABLE_USER_MESSAGE =
   'Impossible d\'envoyer le code par e-mail. Réessayez plus tard, ou connectez-vous avec un numéro +243.';
 
+/** Exact Render keys for mova-auth — listed when transport is incomplete. */
+export const EMAIL_SMTP_ENV_HINT =
+  'E-mail non configuré sur mova-auth. Définissez SMTP_HOST, SMTP_USER, SMTP_PASS (SMTP_PORT=587, SMTP_FROM) ou RESEND_API_KEY et RESEND_FROM.';
+
 export type EmailOtpSendResult = {
   success: boolean;
   message: string;
 };
+
+/**
+ * SMTP host when SMTP_HOST is omitted.
+ * Gmail / Microsoft / Yahoo / Zoho have well-known hosts.
+ * Other domains (cPanel, SmarterASP/site4now) use mail.{domain}.
+ */
+export function inferSmtpHost(userOrFrom: string, explicitHost?: string): string | undefined {
+  const explicit = (explicitHost ?? '').trim();
+  if (explicit) return explicit;
+  const domain = (userOrFrom.split('@')[1] ?? '').trim().toLowerCase();
+  if (!domain) return undefined;
+  if (domain === 'gmail.com' || domain === 'googlemail.com') return 'smtp.gmail.com';
+  if (domain === 'outlook.com' || domain === 'hotmail.com' || domain === 'live.com') {
+    return 'smtp.office365.com';
+  }
+  if (domain === 'yahoo.com' || domain.endsWith('.yahoo.com')) return 'smtp.mail.yahoo.com';
+  if (domain === 'zoho.com' || domain.endsWith('.zoho.com')) return 'smtp.zoho.com';
+  return `mail.${domain}`;
+}
+
+export function mapSmtpFailureToAdminMessage(raw: string): string {
+  const lower = raw.toLowerCase();
+  if (/535|534|535-5\.7|authentication|auth invalid|invalid login|incorrect password/.test(lower)) {
+    return 'Authentification SMTP refusée. Vérifiez SMTP_USER et SMTP_PASS sur mova-auth.';
+  }
+  if (/timeout/.test(lower)) {
+    return 'Délai SMTP dépassé. Vérifiez SMTP_HOST et SMTP_PORT=587 sur mova-auth.';
+  }
+  if (/econnrefused|enotfound|getaddrinfo/.test(lower)) {
+    return 'SMTP_HOST injoignable. Vérifiez SMTP_HOST sur mova-auth (ex. mail.votredomaine.com).';
+  }
+  return EMAIL_UNAVAILABLE_USER_MESSAGE;
+}
 
 @Injectable()
 export class EmailOtpMailer {
@@ -30,7 +67,8 @@ export class EmailOtpMailer {
       return { success: true, message: 'E-mail simulé (MOCK_OTP)' };
     }
     if (!this.isConfigured()) {
-      return { success: false, message: 'E-mail non configuré' };
+      this.logger.error(`EMAIL not sent to ${maskEmail(dest)} — ${EMAIL_SMTP_ENV_HINT}`);
+      return { success: false, message: EMAIL_SMTP_ENV_HINT };
     }
     const from = this.fromAddress();
     const safeHtml = html ?? `<p>${escapeHtml(text).replace(/\n/g, '<br/>')}</p>`;
@@ -40,8 +78,9 @@ export class EmailOtpMailer {
       }
       return await this.sendSmtp(dest, from, subject, text);
     } catch (e) {
-      this.logger.error(`EMAIL send failed for ${maskEmail(dest)}: ${(e as Error).message}`);
-      return { success: false, message: EMAIL_UNAVAILABLE_USER_MESSAGE };
+      const detail = (e as Error).message;
+      this.logger.error(`EMAIL send failed for ${maskEmail(dest)}: ${detail}`);
+      return { success: false, message: mapSmtpFailureToAdminMessage(detail) };
     }
   }
 
@@ -63,12 +102,9 @@ export class EmailOtpMailer {
 
     if (!this.isConfigured()) {
       this.logger.error(
-        `EMAIL OTP not sent to ${maskEmail(dest)} — SMTP_* or RESEND_API_KEY missing. OTP was still issued; do not skip verification.`,
+        `EMAIL OTP not sent to ${maskEmail(dest)} — ${EMAIL_SMTP_ENV_HINT} OTP was still issued; do not skip verification.`,
       );
-      return {
-        success: false,
-        message: 'E-mail OTP non configuré (SMTP_HOST/SMTP_USER/SMTP_PASS ou RESEND_API_KEY)',
-      };
+      return { success: false, message: EMAIL_SMTP_ENV_HINT };
     }
 
     const subject = 'Votre code SENGA';
@@ -84,8 +120,9 @@ export class EmailOtpMailer {
       }
       return await this.sendSmtp(dest, from, subject, text);
     } catch (e) {
-      this.logger.error(`EMAIL OTP send failed for ${maskEmail(dest)}: ${(e as Error).message}`);
-      return { success: false, message: EMAIL_UNAVAILABLE_USER_MESSAGE };
+      const detail = (e as Error).message;
+      this.logger.error(`EMAIL OTP send failed for ${maskEmail(dest)}: ${detail}`);
+      return { success: false, message: mapSmtpFailureToAdminMessage(detail) };
     }
   }
 
@@ -93,14 +130,22 @@ export class EmailOtpMailer {
     return (this.config.get<string>('RESEND_API_KEY') ?? '').trim();
   }
 
+  private smtpUser(): string {
+    return (this.config.get<string>('SMTP_USER') ?? '').trim();
+  }
+
   private fromAddress(): string {
-    return (this.config.get<string>('SMTP_FROM') ?? this.config.get<string>('RESEND_FROM') ?? 'noreply@mova.cd').trim();
+    const from = (this.config.get<string>('SMTP_FROM') ?? this.config.get<string>('RESEND_FROM') ?? '').trim();
+    if (from) return from;
+    const user = this.smtpUser();
+    if (user.includes('@')) return user;
+    return 'noreply@mova.cd';
   }
 
   private smtpReady(): boolean {
-    const host = (this.config.get<string>('SMTP_HOST') ?? '').trim();
-    const user = (this.config.get<string>('SMTP_USER') ?? '').trim();
+    const user = this.smtpUser();
     const pass = (this.config.get<string>('SMTP_PASS') ?? '').trim();
+    const host = inferSmtpHost(user, this.config.get<string>('SMTP_HOST'));
     return Boolean(host && user && pass);
   }
 
@@ -134,21 +179,28 @@ export class EmailOtpMailer {
   }
 
   private async sendSmtp(to: string, from: string, subject: string, text: string): Promise<EmailOtpSendResult> {
-    const host = (this.config.get<string>('SMTP_HOST') ?? '').trim();
+    const user = this.smtpUser();
+    const host = inferSmtpHost(user, this.config.get<string>('SMTP_HOST'))!;
+    const explicitHost = (this.config.get<string>('SMTP_HOST') ?? '').trim();
+    if (!explicitHost) {
+      this.logger.warn(`SMTP_HOST unset — using inferred ${host}`);
+    }
     const port = Number(this.config.get('SMTP_PORT') ?? 587);
-    const user = (this.config.get<string>('SMTP_USER') ?? '').trim();
     const pass = this.config.get<string>('SMTP_PASS') ?? '';
+    const envelopeFrom = user.includes('@') ? user : from;
     const message = [
       `From: SENGA <${from}>`,
       `To: ${to}`,
-      `Subject: ${subject}`,
+      `Subject: ${encodeRfc2047(subject)}`,
+      `Date: ${new Date().toUTCString()}`,
       'MIME-Version: 1.0',
       'Content-Type: text/plain; charset=utf-8',
+      'Content-Transfer-Encoding: 8bit',
       '',
       text,
     ].join('\r\n');
 
-    await smtpSend({ host, port, user, pass, from, to, message });
+    await smtpSend({ host, port, user, pass, from: envelopeFrom, to, message });
     return { success: true, message: 'Code OTP envoyé par e-mail' };
   }
 }
@@ -173,6 +225,24 @@ function escapeHtml(value: string) {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
+}
+
+function encodeRfc2047(value: string): string {
+  if (/^[\x20-\x7E]*$/.test(value)) return value;
+  return `=?UTF-8?B?${b64(value)}?=`;
+}
+
+function ehloAuthMethods(reply: string): Set<string> {
+  const methods = new Set<string>();
+  for (const line of reply.split(/\r?\n/)) {
+    const match = line.match(/^\d{3}[\s-]AUTH\s+(.+)/i);
+    if (!match) continue;
+    for (const part of match[1].split(/\s+/)) {
+      const name = part.trim().toUpperCase();
+      if (name) methods.add(name);
+    }
+  }
+  return methods;
 }
 
 /** True when the buffer holds a complete SMTP reply (last line is `NNN ` not `NNN-`). */
@@ -259,11 +329,25 @@ async function smtpSend(opts: SmtpOpts): Promise<void> {
     state.socket.write(`${cmd}\r\n`);
   };
 
+  const authPlain = async () => {
+    write(`AUTH PLAIN ${b64(`\u0000${opts.user}\u0000${opts.pass}`)}`);
+    await expect(['235']);
+  };
+
+  const authLogin = async () => {
+    write('AUTH LOGIN');
+    await expect(['334']);
+    write(b64(opts.user));
+    await expect(['334']);
+    write(b64(opts.pass));
+    await expect(['235']);
+  };
+
   try {
     await expect(['220']);
     write('EHLO senga');
-    await expect(['250']);
-    if (!implicitTls && (opts.port === 587 || opts.port === 25)) {
+    let ehlo = await expect(['250']);
+    if (!implicitTls && (opts.port === 587 || opts.port === 25 || opts.port === 2525)) {
       write('STARTTLS');
       await expect(['220']);
       const upgraded = await timed(
@@ -279,14 +363,22 @@ async function smtpSend(opts: SmtpOpts): Promise<void> {
       buf = '';
       attach(state.socket);
       write('EHLO senga');
-      await expect(['250']);
+      ehlo = await expect(['250']);
     }
-    write('AUTH LOGIN');
-    await expect(['334']);
-    write(b64(opts.user));
-    await expect(['334']);
-    write(b64(opts.pass));
-    await expect(['235']);
+    const auth = ehloAuthMethods(ehlo);
+    try {
+      if (auth.has('PLAIN') || auth.size === 0) {
+        await authPlain();
+      } else {
+        await authLogin();
+      }
+    } catch (first) {
+      if (auth.has('LOGIN') && (auth.has('PLAIN') || auth.size === 0)) {
+        await authLogin();
+      } else {
+        throw first;
+      }
+    }
     write(`MAIL FROM:<${opts.from}>`);
     await expect(['250']);
     write(`RCPT TO:<${opts.to}>`);

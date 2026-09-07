@@ -1991,13 +1991,29 @@ export async function regenerateDriverActivationPin(userId: string) {
 export function activationPinSmsCopy(result: KycNotifyResult): string {
   const parts: string[] = [];
   if (result.smsSent) parts.push("Un SMS a été envoyé.");
-  else if (result.hasPhone === false) parts.push("Aucun numéro +243 lié — le SMS n'a pas été envoyé.");
-  else if (result.smsError) parts.push(`SMS non envoyé : ${result.smsError}.`);
+  else if (result.hasPhone === false) {
+    parts.push(
+      result.emailSent
+        ? "Aucun numéro +243 lié — envoi par e-mail."
+        : "Aucun numéro +243 lié — le SMS n'a pas été envoyé.",
+    );
+  } else if (result.smsError) parts.push(`SMS non envoyé : ${result.smsError}.`);
   else parts.push("SMS non envoyé.");
   if (result.emailSent) parts.push("Un e-mail a été envoyé.");
   else if (result.hasEmail === false) parts.push("Aucun e-mail lié.");
   else if (result.emailError) parts.push(`E-mail non envoyé : ${result.emailError}.`);
   return parts.join(" ");
+}
+
+export function kycApprovedPinAlert(result: {
+  activationPin?: string;
+  loginPin?: string;
+} & KycNotifyResult): string {
+  const lines: string[] = [];
+  if (result.activationPin) lines.push(`PIN d'activation : ${result.activationPin}`);
+  if (result.loginPin) lines.push(`PIN de connexion : ${result.loginPin}`);
+  if (!lines.length) lines.push("PIN : —");
+  return `Dossier validé.\n\n${lines.join("\n")}\n\n${activationPinSmsCopy(result)}`;
 }
 
 export type PartnerKycChecklistItem = {

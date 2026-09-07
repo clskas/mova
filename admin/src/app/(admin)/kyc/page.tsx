@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   activationPinSmsCopy,
+  kycApprovedPinAlert,
   fetchDrivers,
   fetchKycPending,
   fetchPartnerKycPending,
@@ -263,9 +264,7 @@ export default function KycPage() {
         body: JSON.stringify({ approved, notes }),
       });
       if (approved && (result.activationPin || result.loginPin)) {
-        window.alert(
-          `Dossier validé.\n\nPIN d'activation : ${result.activationPin ?? "—"}\nPIN de connexion : ${result.loginPin ?? "—"}\n\n${activationPinSmsCopy(result)}`,
-        );
+        window.alert(kycApprovedPinAlert(result));
       } else if (!approved) {
         window.alert(`Refus enregistré.\n\n${activationPinSmsCopy(result)}`);
       }
@@ -288,9 +287,7 @@ export default function KycPage() {
       }
       const result = await reviewDriverKyc(userId, approved, notes);
       if (approved && (result.activationPin || result.loginPin)) {
-        window.alert(
-          `Dossier validé.\n\nPIN d'activation : ${result.activationPin ?? "—"}\nPIN de connexion : ${result.loginPin ?? "—"}\n\n${activationPinSmsCopy(result)}`,
-        );
+        window.alert(kycApprovedPinAlert(result));
       } else if (!approved) {
         window.alert(`Refus enregistré.\n\n${activationPinSmsCopy(result)}`);
       }
@@ -334,7 +331,7 @@ export default function KycPage() {
       }
       const result = await reviewPartnerKycSubject(subject, userId, approved, notes);
       if (approved && result.loginPin) {
-        window.alert(`Dossier validé.\n\nPIN de connexion : ${result.loginPin}\n\n${activationPinSmsCopy(result)}`);
+        window.alert(kycApprovedPinAlert(result));
       } else if (!approved) {
         window.alert(`Refus enregistré.\n\n${activationPinSmsCopy(result)}`);
       }

@@ -9,6 +9,7 @@ import '../../core/widgets/mova_widgets.dart';
 import '../../core/api/api_client.dart';
 import '../../core/cache/wallet_cache.dart';
 import '../../core/error/result.dart';
+import '../../core/error/user_friendly_error.dart';
 import '../../core/widgets/offline_shell.dart';
 import '../../core/wallet/wallet_movements.dart';
 
@@ -207,7 +208,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
     }
   }
 
-  Future<void> _showWithdrawSheet() async {
+  Future<void> _showWithdrawSheet({bool resumeOtp = false}) async {
     if (_balance < 2300) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Solde insuffisant — minimum 2 300 FC pour retirer')),
@@ -218,7 +219,10 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
         await ref.read(apiClientProvider).loadUserPhone() ?? '+243812345678';
     if (!mounted) return;
 
-    setState(() => _withdrawSheetOpen = true);
+    setState(() {
+      _withdrawSheetOpen = true;
+      if (resumeOtp) _error = null;
+    });
     final confirmed = await showModalBottomSheet<
         ({int amount, String phone, String provider, String otp})>(
       context: context,
@@ -226,6 +230,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
       builder: (ctx) => _WalletWithdrawSheet(
         maxAmount: _balance,
         initialPhone: initialPhone,
+        startOnOtpStep: resumeOtp,
       ),
     );
     if (!mounted) return;
@@ -268,7 +273,12 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
           );
         }
       case Failure(:final error):
-        setState(() => _error = error.message);
+        if (isWithdrawOtpChallengeMessage(error.message)) {
+          setState(() => _error = null);
+          await _showWithdrawSheet(resumeOtp: true);
+        } else {
+          setState(() => _error = error.message);
+        }
     }
   }
 
@@ -455,7 +465,12 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
           ),
           if (_error != null) ...[
             const SizedBox(height: 16),
-            MovaErrorBanner(message: _error!, onRetry: _loadWallet),
+            MovaErrorBanner(
+              message: isWithdrawOtpChallengeMessage(_error) ? withdrawOtpPromptFr : _error!,
+              onRetry: isWithdrawOtpChallengeMessage(_error)
+                  ? () => _showWithdrawSheet(resumeOtp: true)
+                  : _loadWallet,
+            ),
           ],
           const SizedBox(height: 24),
           Text('Recharger avec', style: Theme.of(context).textTheme.titleMedium),
@@ -660,10 +675,12 @@ class _WalletWithdrawSheet extends ConsumerStatefulWidget {
   const _WalletWithdrawSheet({
     required this.maxAmount,
     required this.initialPhone,
+    this.startOnOtpStep = false,
   });
 
   final int maxAmount;
   final String initialPhone;
+  final bool startOnOtpStep;
 
   @override
   ConsumerState<_WalletWithdrawSheet> createState() => _WalletWithdrawSheetState();
@@ -688,6 +705,10 @@ class _WalletWithdrawSheetState extends ConsumerState<_WalletWithdrawSheet> {
     _phoneController = TextEditingController(text: widget.initialPhone);
     _otpController = TextEditingController();
     _providerId = MarketConfig.mobileMoneyProviders.first.id;
+    if (widget.startOnOtpStep) {
+      _otpSent = true;
+      _otpPhone = MarketConfig.normalizePhone(widget.initialPhone);
+    }
   }
 
   @override
@@ -756,7 +777,7 @@ class _WalletWithdrawSheetState extends ConsumerState<_WalletWithdrawSheet> {
     }
     final otp = _otpController.text.trim();
     if (!RegExp(r'^\d{6}$').hasMatch(otp)) {
-      setState(() => _formError = 'Code OTP requis (6 chiffres envoyé au numéro Mobile Money).');
+      setState(() => _formError = withdrawOtpPromptFr);
       return;
     }
     Navigator.pop(
@@ -844,23 +865,26 @@ class _WalletWithdrawSheetState extends ConsumerState<_WalletWithdrawSheet> {
                 prefixIcon: Icon(Icons.phone_outlined),
               ),
             ),
-            if (_otpSent) ...[
-              const SizedBox(height: 12),
-              Text(
-                'Code envoyé au $_otpPhone. Saisissez-le pour confirmer le versement.',
-                style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
+            const SizedBox(height: 12),
+            Text(
+              _otpSent
+                  ? 'Code envoyé au $_otpPhone. Saisissez les 6 chiffres pour confirmer le versement.'
+                  : 'Le code SMS à 6 chiffres s’affiche ici après envoi — ce n’est pas une erreur.',
+              style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _otpController,
+              enabled: !_otpLoading,
+              keyboardType: TextInputType.number,
+              maxLength: 6,
+              decoration: const InputDecoration(
+                labelText: 'Code SMS (6 chiffres)',
+                prefixIcon: Icon(Icons.sms_outlined),
+                counterText: '',
               ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: _otpController,
-                keyboardType: TextInputType.number,
-                maxLength: 6,
-                decoration: const InputDecoration(
-                  labelText: 'Code SMS (6 chiffres)',
-                  prefixIcon: Icon(Icons.sms_outlined),
-                  counterText: '',
-                ),
-              ),
+            ),
+            if (_otpSent)
               TextButton(
                 onPressed: _otpLoading
                     ? null
@@ -868,15 +892,20 @@ class _WalletWithdrawSheetState extends ConsumerState<_WalletWithdrawSheet> {
                           _otpSent = false;
                           _otpPhone = null;
                           _otpController.clear();
+                          _formError = null;
                         }),
-                child: const Text('Modifier le numéro'),
+                child: const Text('Renvoyer le code / modifier le numéro'),
               ),
-            ],
             if (_formError != null) ...[
               const SizedBox(height: 12),
               Text(
                 _formError!,
-                style: const TextStyle(color: MovaColors.error, fontSize: 13),
+                style: TextStyle(
+                  color: isWithdrawOtpChallengeMessage(_formError)
+                      ? MovaColors.textSecondary
+                      : MovaColors.error,
+                  fontSize: 13,
+                ),
               ),
             ],
             const SizedBox(height: 20),

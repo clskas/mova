@@ -3,6 +3,25 @@ const pinSixDigitsFr = 'Le code PIN doit contenir 6 chiffres.';
 const paymentFailedFr =
     'Le paiement Mobile Money a échoué. Réessayez ou contactez le support SENGA.';
 const validationFailedFr = 'Données invalides. Vérifiez les champs.';
+const withdrawOtpPromptFr =
+    'Saisissez le code SMS à 6 chiffres envoyé au numéro Mobile Money.';
+const merchantFloatLowFr =
+    'Le compte de versement n’a pas assez de fonds. Votre solde SENGA n’a pas été débité.';
+
+/// Backend « OTP requis / invalide / expiré » is a withdraw *step*, not a wallet crash.
+bool isWithdrawOtpChallengeMessage(String? raw) {
+  final msg = (raw ?? '').trim().toLowerCase();
+  if (msg.isEmpty) return false;
+  if (msg.contains('code otp requis')) return true;
+  if (msg.contains('demandez un nouveau code')) return true;
+  if (!RegExp(r'\botp\b').hasMatch(msg)) return false;
+  return msg.contains('requis') ||
+      msg.contains('required') ||
+      msg.contains('expir') ||
+      msg.contains('invalide') ||
+      msg.contains('invalid') ||
+      msg.contains('must match');
+}
 
 bool _isClassValidatorPinMessage(String msg) {
   final lower = msg.toLowerCase();
@@ -12,6 +31,18 @@ bool _isClassValidatorPinMessage(String msg) {
       lower.contains('must be longer than or equal to') ||
       lower.contains('must be shorter than or equal to') ||
       lower.contains('must be a string');
+}
+
+bool _isMerchantFloatEnglish(String msg) {
+  final lower = msg.toLowerCase();
+  if (lower.contains('not allowed to use this channel')) return false;
+  return lower.contains('your balance is low') ||
+      lower.contains('balance is low') ||
+      lower.contains('low balance') ||
+      RegExp(r'\binsufficient (funds|balance|float)\b').hasMatch(lower) ||
+      lower.contains('not enough funds') ||
+      lower.contains('not enough balance') ||
+      (lower.contains('merchant') && (lower.contains('float') || lower.contains('insufficient')));
 }
 
 bool _isPaymentGatewayEnglish(String msg) {
@@ -56,6 +87,7 @@ String sanitizeUserMessage(
   if (raw == null || raw.trim().isEmpty) return fallback;
   final msg = raw.trim();
   if (_isClassValidatorPinMessage(msg)) return pinSixDigitsFr;
+  if (_isMerchantFloatEnglish(msg)) return merchantFloatLowFr;
   if (_isPaymentGatewayEnglish(msg)) return paymentFailedFr;
   final withdrawField = _withdrawFieldMessage(msg);
   if (withdrawField != null) return withdrawField;

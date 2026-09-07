@@ -399,4 +399,29 @@ describe('WalletService', () => {
       }),
     );
   });
+
+  it('maps hub English when withdraw OTP SMS cannot be sent', async () => {
+    configGet.mockImplementation((key: string) => {
+      if (key === 'NODE_ENV') return 'test';
+      if (key === 'AFRISOFT_HUB_API_KEY') return 'test-key';
+      if (key === 'AFRISOFT_HUB_APP_ID') return 'senga';
+      return undefined;
+    });
+    const prevFetch = global.fetch;
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 429,
+      json: async () => ({ message: 'OTP cooldown active' }),
+    });
+    (global as unknown as { fetch: typeof fetch }).fetch = fetchMock as unknown as typeof fetch;
+    try {
+      await expect(
+        service.requestWithdrawOtp('u1', 2300, 'ORANGE_MONEY', '+243970000001'),
+      ).rejects.toMatchObject({
+        response: { message: expect.stringMatching(/Trop de codes|une minute/i) },
+      });
+    } finally {
+      (global as unknown as { fetch: typeof fetch | undefined }).fetch = prevFetch;
+    }
+  });
 });

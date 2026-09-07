@@ -19,6 +19,7 @@ import {
   isAfrisoftSmsHubClientConfigured,
   isMockOtpAllowed,
   isTestOtpAllowedForPhone,
+  mapSmsDeliveryFailureToUserMessage,
   normalizePhoneRdc,
   SERDIPAY_MIN_AMOUNT_CDF,
   serdiPaySanitizeSmsText,
@@ -761,7 +762,7 @@ export class WalletService {
       throw new MovaHttpException(
         MovaErrorCode.VALIDATION_ERROR,
         HttpStatus.SERVICE_UNAVAILABLE,
-        SMS_UNAVAILABLE_USER_MESSAGE,
+        mapSmsDeliveryFailureToUserMessage(sms.message),
       );
     }
     return {

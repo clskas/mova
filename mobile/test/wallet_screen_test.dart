@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mova/core/api/api_client.dart';
 import 'package:mova/core/api/mock_data.dart';
+import 'package:mova/core/error/user_friendly_error.dart';
 import 'package:mova/core/theme/mova_theme.dart';
 import 'package:mova/features/wallet/wallet_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -62,6 +63,8 @@ void main() {
 
     expect(find.text('Envoyer le code SMS'), findsOneWidget);
     expect(find.text('Confirmer le retrait'), findsNothing);
+    expect(find.text('Code SMS (6 chiffres)'), findsOneWidget);
+    expect(find.text('Réessayer'), findsNothing);
 
     await tester.enterText(find.byType(TextField).first, '2500');
     await tester.pump();
@@ -72,7 +75,16 @@ void main() {
 
     expect(find.text('Code SMS (6 chiffres)'), findsOneWidget);
     expect(find.text('Confirmer le retrait'), findsOneWidget);
+    expect(find.text('Réessayer'), findsNothing);
     expect(tester.takeException(), isNull);
+
+    await tester.tap(find.text('Confirmer le retrait'));
+    await tester.pump();
+    expect(
+      find.text(withdrawOtpPromptFr),
+      findsOneWidget,
+    );
+    expect(find.text('Réessayer'), findsNothing);
   });
 
   testWidgets('Partial withdraw below the MM floor shows an in-sheet error', (tester) async {

@@ -51,4 +51,28 @@ void main() {
       'Une erreur est survenue. Veuillez réessayer.',
     );
   });
+
+  test('OTP-required copy is a withdraw step, not a wallet crash', () {
+    expect(
+      isWithdrawOtpChallengeMessage(
+        'Code OTP requis (6 chiffres envoyé au numéro Mobile Money).',
+      ),
+      isTrue,
+    );
+    expect(
+      isWithdrawOtpChallengeMessage(
+        r'otp must match /^\d{6}$/ regular expression',
+      ),
+      isTrue,
+    );
+    expect(isWithdrawOtpChallengeMessage('Recharge Mobile Money refusée.'), isFalse);
+  });
+
+  test('maps SerdiPay merchant-float English to French (not the user SENGA wallet)', () {
+    expect(
+      sanitizeUserMessage('Your Balance is low'),
+      'Le compte de versement n’a pas assez de fonds. Votre solde SENGA n’a pas été débité.',
+    );
+    expect(sanitizeUserMessage('Your Balance is low'), isNot(contains('2301')));
+  });
 }

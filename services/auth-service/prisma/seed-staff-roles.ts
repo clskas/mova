@@ -1,5 +1,19 @@
 import { PrismaClient, UserRole } from '@prisma/client';
-import { isFakeUserSeedAllowed } from '@mova/shared';
+
+/**
+ * Local copy of `@mova/shared` isFakeUserSeedAllowed.
+ * CI runs `npm ci --no-workspaces` then ts-node on this file; shared dist is not built.
+ * Keep the production refuse: never seed +2439000000xx when NODE_ENV/APP_ENV=production.
+ */
+function isFakeUserSeedAllowed(env: NodeJS.ProcessEnv = process.env): boolean {
+  if ((env.RUN_SEED ?? '').trim().toLowerCase() === 'false') return false;
+  const skip = (env.SKIP_DEMO_SEED ?? '').trim().toLowerCase();
+  if (skip === 'true' || skip === '1' || skip === 'yes') return false;
+  const nodeEnv = (env.NODE_ENV ?? '').trim().toLowerCase();
+  const appEnv = (env.APP_ENV ?? '').trim().toLowerCase();
+  if (nodeEnv === 'production' || appEnv === 'production') return false;
+  return true;
+}
 
 /** Staff demo accounts for local RBAC testing (OTP 123456 with MOCK_OTP=true). */
 export const STAFF_DEMO_ACCOUNTS = [

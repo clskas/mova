@@ -325,7 +325,7 @@ describe('AuthService', () => {
     await expect(service.requestOtp('+243978685317', UserRole.RESTAURANT, 'restaurant')).rejects.toMatchObject({
       response: {
         code: MovaErrorCode.VALIDATION_ERROR,
-        message: expect.stringMatching(/Impossible d'envoyer le code par SMS/),
+        message: expect.stringMatching(/SerdiPay a refusé l'envoi SMS/),
       },
     });
   });

@@ -9,6 +9,7 @@ const NAV = [
   { href: "/dashboard", label: "Tableau de bord", short: "Accueil", icon: "📊" },
   { href: "/", label: "Commandes", short: "Commandes", icon: "🧾" },
   { href: "/menu", label: "Menu", short: "Menu", icon: "🍽️" },
+  { href: "/dossier", label: "Mon dossier", short: "Dossier", icon: "📁" },
   { href: "/promos", label: "Codes promo", short: "Promos", icon: "🏷️" },
   { href: "/earnings", label: "Revenus", short: "Revenus", icon: "💰" },
   { href: "/compte", label: "Compte et connexion", short: "Compte", icon: "👤" },

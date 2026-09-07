@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { apiFetch, activationPinSmsCopy, fetchDrivers, reviewDriverKyc, type AdminDriver, type KycItem } from "@/lib/api";
+import { apiFetch, activationPinSmsCopy, fetchDrivers, fetchPartnerKycPending, reviewDriverKyc, reviewPartnerKycDocument, reviewPartnerKycSubject, type AdminDriver, type KycItem, type PartnerKycDossier } from "@/lib/api";
 import { authHeaders } from "@/lib/auth";
 import { useAdmin } from "@/components/AdminProvider";
 import {
@@ -27,6 +27,8 @@ export default function KycPage() {
   const { canWrite } = useAdmin();
   const [items, setItems] = useState<KycItem[]>([]);
   const [pendingDrivers, setPendingDrivers] = useState<AdminDriver[]>([]);
+  const [restaurants, setRestaurants] = useState<PartnerKycDossier[]>([]);
+  const [rentalPartners, setRentalPartners] = useState<PartnerKycDossier[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState<KycItem | null>(null);
@@ -36,9 +38,10 @@ export default function KycPage() {
     setLoading(true);
     setError(null);
     try {
-      const [data, drivers] = await Promise.all([
+      const [data, drivers, partners] = await Promise.all([
         apiFetch<KycItem[]>("/api/admin/kyc/pending"),
         fetchDrivers(),
+        fetchPartnerKycPending().catch(() => ({ restaurants: [], rentalPartners: [] })),
       ]);
       setItems(Array.isArray(data) ? data : []);
       setPendingDrivers(
@@ -49,6 +52,8 @@ export default function KycPage() {
             (d.readyForReview && d.kycStatus === "PENDING"),
         ),
       );
+      setRestaurants(partners.restaurants ?? []);
+      setRentalPartners(partners.rentalPartners ?? []);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur de chargement");
     } finally {
@@ -92,18 +97,29 @@ export default function KycPage() {
 
   async function review(id: string, approved: boolean) {
     try {
+      let notes: string | undefined;
+      if (!approved) {
+        const motif = window.prompt("Motif du refus (visible par le chauffeur) :");
+        if (!motif || motif.trim().length < 8) {
+          setError("Indiquez le motif du refus (au moins 8 caractères).");
+          return;
+        }
+        notes = motif.trim();
+      }
       const result = await apiFetch<{
         activationPin?: string;
+        loginPin?: string;
         smsSent?: boolean;
         hasPhone?: boolean;
         smsError?: string;
+        emailSent?: boolean;
       }>(`/api/admin/kyc/${id}/review`, {
         method: "POST",
-        body: JSON.stringify({ approved }),
+        body: JSON.stringify({ approved, notes }),
       });
-      if (approved && result.activationPin) {
+      if (approved && (result.activationPin || result.loginPin)) {
         window.alert(
-          `Dossier validé.\n\nCode PIN d'activation (6 chiffres, 72 h, usage unique) : ${result.activationPin}\n\n${activationPinSmsCopy(result)}`,
+          `Dossier validé.\n\nPIN d'activation : ${result.activationPin ?? "—"}\nPIN de connexion : ${result.loginPin ?? "—"}\n\n${activationPinSmsCopy(result)}`,
         );
       }
       load();
@@ -114,10 +130,19 @@ export default function KycPage() {
 
   async function reviewDriver(userId: string, approved: boolean) {
     try {
-      const result = await reviewDriverKyc(userId, approved);
-      if (approved && result.activationPin) {
+      let notes: string | undefined;
+      if (!approved) {
+        const motif = window.prompt("Motif du refus (visible par le chauffeur) :");
+        if (!motif || motif.trim().length < 8) {
+          setError("Indiquez le motif du refus (au moins 8 caractères).");
+          return;
+        }
+        notes = motif.trim();
+      }
+      const result = await reviewDriverKyc(userId, approved, notes);
+      if (approved && (result.activationPin || result.loginPin)) {
         window.alert(
-          `Dossier validé.\n\nCode PIN d'activation (6 chiffres, 72 h, usage unique) : ${result.activationPin}\n\n${activationPinSmsCopy(result)}`,
+          `Dossier validé.\n\nPIN d'activation : ${result.activationPin ?? "—"}\nPIN de connexion : ${result.loginPin ?? "—"}\n\n${activationPinSmsCopy(result)}`,
         );
       }
       load();
@@ -126,13 +151,55 @@ export default function KycPage() {
     }
   }
 
+  async function reviewPartnerDoc(id: string, approved: boolean) {
+    try {
+      let notes: string | undefined;
+      if (!approved) {
+        const motif = window.prompt("Motif du refus (visible par le partenaire) :");
+        if (!motif || motif.trim().length < 8) {
+          setError("Indiquez le motif du refus (au moins 8 caractères).");
+          return;
+        }
+        notes = motif.trim();
+      }
+      await reviewPartnerKycDocument(id, approved, notes);
+      load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Échec de la validation");
+    }
+  }
+
+  async function reviewPartner(subject: "RESTAURANT" | "RENTAL_PARTNER", userId: string, approved: boolean) {
+    try {
+      let notes: string | undefined;
+      if (!approved) {
+        const motif = window.prompt("Motif du refus (visible par le partenaire) :");
+        if (!motif || motif.trim().length < 8) {
+          setError("Indiquez le motif du refus (au moins 8 caractères).");
+          return;
+        }
+        notes = motif.trim();
+      }
+      const result = await reviewPartnerKycSubject(subject, userId, approved, notes);
+      if (approved && result.loginPin) {
+        window.alert(`Dossier validé.\n\nPIN de connexion : ${result.loginPin}\n\n${activationPinSmsCopy(result)}`);
+      }
+      load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Échec de la validation");
+    }
+  }
+
+  const empty =
+    items.length === 0 && pendingDrivers.length === 0 && restaurants.length === 0 && rentalPartners.length === 0;
+
   return (
     <div className="max-w-4xl mx-auto">
-      <PageHeader title="KYC" subtitle="Validation des documents chauffeurs" />
+      <PageHeader title="KYC" subtitle="Validation des dossiers chauffeurs, restaurants et loueurs" />
       {error && <div className="mb-4"><ErrorBanner message={error} onRetry={load} /></div>}
       {loading ? (
         <LoadingState />
-      ) : items.length === 0 && pendingDrivers.length === 0 ? (
+      ) : empty ? (
         <EmptyState message="Aucun KYC en attente" />
       ) : (
         <div className="space-y-6">
@@ -145,6 +212,7 @@ export default function KycPage() {
                     <p className="font-medium">{k.type}</p>
                     <p className="text-sm text-gray-500">Utilisateur {k.userId?.slice(0, 8)}…</p>
                     <StatusBadge status={k.status} />
+                    {k.notes && <p className="text-xs text-red-700 mt-1">Motif : {k.notes}</p>}
                     {k.url && (
                       <button type="button" onClick={() => setPreview(k)} className="block mt-2 text-sm text-[#6C63FF] hover:underline">
                         Aperçu document
@@ -193,6 +261,94 @@ export default function KycPage() {
                       )}
                     </div>
                   )}
+                </Card>
+              ))}
+            </div>
+          )}
+          {restaurants.length > 0 && (
+            <div className="space-y-3">
+              <h2 className="text-sm font-semibold text-gray-700">Restaurants</h2>
+              {restaurants.map((r) => (
+                <Card key={r.restaurantId ?? r.userId ?? r.name} className="p-4 space-y-3">
+                  <div className="flex flex-wrap justify-between gap-2">
+                    <div>
+                      <p className="font-medium">{r.name ?? "Restaurant"}</p>
+                      <StatusBadge status={r.kycStatus} />
+                      {!r.phoneVerified && <p className="text-xs text-amber-700 mt-1">Téléphone +243 non lié</p>}
+                    </div>
+                    {canWrite("kyc") && r.userId && (
+                      <div className="flex gap-2">
+                        <BtnSuccess onClick={() => reviewPartner("RESTAURANT", r.userId!, true)}>Approuver</BtnSuccess>
+                        <BtnDanger onClick={() => reviewPartner("RESTAURANT", r.userId!, false)}>Rejeter</BtnDanger>
+                      </div>
+                    )}
+                  </div>
+                  <ul className="text-sm space-y-2">
+                    {(r.checklist ?? []).map((item) => (
+                      <li key={item.type} className="bg-gray-50 rounded-lg px-3 py-2">
+                        <div className="flex justify-between gap-2">
+                          <span>{item.label}</span>
+                          <span>{item.status ?? (item.uploaded ? "Envoyé" : "Manquant")}</span>
+                        </div>
+                        {item.notes && <p className="text-xs text-red-700 mt-1">Motif : {item.notes}</p>}
+                        {item.url && (
+                          <a href={resolveDocumentUrl(item.url) ?? "#"} target="_blank" rel="noreferrer" className="text-xs text-[#6C63FF]">
+                            Voir
+                          </a>
+                        )}
+                        {canWrite("kyc") && item.documentId && item.status !== "APPROVED" && (
+                          <div className="flex gap-2 mt-2">
+                            <BtnSuccess onClick={() => reviewPartnerDoc(item.documentId!, true)}>Valider ce justificatif</BtnSuccess>
+                            <BtnDanger onClick={() => reviewPartnerDoc(item.documentId!, false)}>Refuser ce justificatif</BtnDanger>
+                          </div>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </Card>
+              ))}
+            </div>
+          )}
+          {rentalPartners.length > 0 && (
+            <div className="space-y-3">
+              <h2 className="text-sm font-semibold text-gray-700">Loueurs</h2>
+              {rentalPartners.map((r) => (
+                <Card key={r.userId} className="p-4 space-y-3">
+                  <div className="flex flex-wrap justify-between gap-2">
+                    <div>
+                      <p className="font-medium font-mono text-sm">{r.userId?.slice(0, 8)}…</p>
+                      <p className="text-xs text-gray-500">{r.partnerType === "COMPANY" ? "Entreprise" : "Particulier"}</p>
+                      <StatusBadge status={r.kycStatus} />
+                    </div>
+                    {canWrite("kyc") && r.userId && (
+                      <div className="flex gap-2">
+                        <BtnSuccess onClick={() => reviewPartner("RENTAL_PARTNER", r.userId!, true)}>Approuver</BtnSuccess>
+                        <BtnDanger onClick={() => reviewPartner("RENTAL_PARTNER", r.userId!, false)}>Rejeter</BtnDanger>
+                      </div>
+                    )}
+                  </div>
+                  <ul className="text-sm space-y-2">
+                    {(r.checklist ?? []).map((item) => (
+                      <li key={item.type} className="bg-gray-50 rounded-lg px-3 py-2">
+                        <div className="flex justify-between gap-2">
+                          <span>{item.label}</span>
+                          <span>{item.status ?? (item.uploaded ? "Envoyé" : "Manquant")}</span>
+                        </div>
+                        {item.notes && <p className="text-xs text-red-700 mt-1">Motif : {item.notes}</p>}
+                        {item.url && (
+                          <a href={resolveDocumentUrl(item.url) ?? "#"} target="_blank" rel="noreferrer" className="text-xs text-[#6C63FF]">
+                            Voir
+                          </a>
+                        )}
+                        {canWrite("kyc") && item.documentId && item.status !== "APPROVED" && (
+                          <div className="flex gap-2 mt-2">
+                            <BtnSuccess onClick={() => reviewPartnerDoc(item.documentId!, true)}>Valider ce justificatif</BtnSuccess>
+                            <BtnDanger onClick={() => reviewPartnerDoc(item.documentId!, false)}>Refuser ce justificatif</BtnDanger>
+                          </div>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
                 </Card>
               ))}
             </div>

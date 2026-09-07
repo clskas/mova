@@ -7,6 +7,7 @@ import { usePartnerLiveConnected } from "@/components/PartnerLiveProvider";
 
 const NAV = [
   { href: "/", label: "Tableau de bord", short: "Accueil", icon: "📊" },
+  { href: "/dossier", label: "Mon dossier", short: "Dossier", icon: "📁" },
   { href: "/vehicules", label: "Véhicules", short: "Véhicules", icon: "🚗" },
   { href: "/reservations", label: "Réservations", short: "Reservation", icon: "📅" },
   { href: "/revenus", label: "Revenus", short: "Revenus", icon: "💰" },

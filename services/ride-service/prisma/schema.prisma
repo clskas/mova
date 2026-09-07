@@ -61,6 +61,22 @@ enum DeliveryCourierSource {
   RESTAURANT
 }
 
+enum PartnerKycStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum PartnerKycSubject {
+  RESTAURANT
+  RENTAL_PARTNER
+}
+
+enum RentalPartnerType {
+  COMPANY
+  INDIVIDUAL
+}
+
 enum ScheduledRideStatus {
   SCHEDULED
   CONFIRMED
@@ -245,6 +261,12 @@ model Restaurant {
   prepTimeMin       Int      @default(25)
   ownerUserId       String?
   courierMode       RestaurantCourierMode @default(PLATFORM)
+  kycStatus         PartnerKycStatus @default(PENDING)
+  kycNotes          String?
+  nif               String?
+  rccm              String?
+  payoutProvider    String?
+  payoutPhone       String?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
@@ -689,6 +711,35 @@ model RentalVehicle {
   @@index([city, category, isActive])
   @@index([ownerUserId])
   @@map("rental_vehicles")
+}
+
+model RentalPartnerProfile {
+  id          String            @id @default(uuid())
+  userId      String            @unique
+  partnerType RentalPartnerType @default(INDIVIDUAL)
+  kycStatus   PartnerKycStatus  @default(PENDING)
+  kycNotes    String?
+  nif         String?
+  rccm        String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@map("rental_partner_profiles")
+}
+
+model PartnerKycDocument {
+  id        String            @id @default(uuid())
+  userId    String
+  subject   PartnerKycSubject
+  type      String
+  url       String
+  status    PartnerKycStatus  @default(PENDING)
+  notes     String?
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  @@index([userId, subject])
+  @@map("partner_kyc_documents")
 }
 
 enum RentalVehicleApprovalStatus {

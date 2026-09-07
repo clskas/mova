@@ -5,12 +5,13 @@ import { MatchingModule } from '../matching/matching.module';
 import { PromoModule } from '../promo/promo.module';
 import { BillingModule } from '../billing/billing.module';
 import { DeliveriesModule } from '../deliveries/deliveries.module';
+import { PartnerKycModule } from '../partner-kyc/partner-kyc.module';
 import { RestaurantPortalController } from './restaurant-portal.controller';
 import { RestaurantPortalService } from './restaurant-portal.service';
 import { RestaurantRoleGuard } from './restaurant-role.guard';
 
 @Module({
-  imports: [AuthModule, UploadsModule, MatchingModule, PromoModule, BillingModule, DeliveriesModule],
+  imports: [AuthModule, UploadsModule, MatchingModule, PromoModule, BillingModule, DeliveriesModule, PartnerKycModule],
   controllers: [RestaurantPortalController],
   providers: [RestaurantPortalService, RestaurantRoleGuard],
   exports: [RestaurantPortalService],

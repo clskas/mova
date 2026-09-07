@@ -372,6 +372,31 @@ export class AdminController {
     return this.adminService.deleteRestaurant(id);
   }
 
+  @Get('partner-kyc/pending')
+  @RequirePermissions(AdminPermission.KYC_READ)
+  @ApiOperation({ summary: 'Dossiers restaurant et location en attente' })
+  partnerKycPending() {
+    return this.adminService.listPartnerKycPending();
+  }
+
+  @Post('partner-kyc/documents/:id/review')
+  @RequirePermissions(AdminPermission.KYC_WRITE)
+  @ApiOperation({ summary: 'Valider ou refuser un justificatif partenaire' })
+  reviewPartnerKycDocument(@Param('id') id: string, @Body() dto: ApproveKycDto) {
+    return this.adminService.reviewPartnerKycDocument(id, dto.approved, dto.notes);
+  }
+
+  @Patch('partner-kyc/:subject/:userId')
+  @RequirePermissions(AdminPermission.KYC_WRITE)
+  @ApiOperation({ summary: 'Valider ou refuser un dossier restaurant / loueur' })
+  reviewPartnerKycSubject(
+    @Param('subject') subject: string,
+    @Param('userId') userId: string,
+    @Body() dto: ApproveKycDto,
+  ) {
+    return this.adminService.reviewPartnerKycSubject(subject, userId, dto.approved, dto.notes);
+  }
+
   @Get('publicites')
   @RequirePermissions(AdminPermission.PUBLICITES_READ)
   @ApiOperation({ summary: 'Liste des publicités' })

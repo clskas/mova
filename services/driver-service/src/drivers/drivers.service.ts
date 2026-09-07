@@ -12,6 +12,7 @@ import {
   REQUIRED_DRIVER_KYC_TYPES,
   OPTIONAL_DRIVER_KYC_TYPES,
   normalizeKycDocumentType,
+  normalizeKycRejectNotes,
   driverVehicleTypesForRide,
   formatMovaPublicId,
   maskPhoneRdc,
@@ -321,6 +322,8 @@ export class DriversService {
         required: REQUIRED_DRIVER_KYC_TYPES.includes(type),
         uploaded: !!doc,
         status: doc?.status ?? null,
+        notes: doc?.notes ?? null,
+        documentId: doc?.id ?? null,
         url: doc?.url ?? null,
         ocr: this.ocrFieldsFor(doc),
       };
@@ -651,6 +654,34 @@ export class DriversService {
     }
   }
 
+  private async issueAccountLoginPin(userId: string): Promise<{
+    loginPin?: string;
+    smsSent?: boolean;
+    emailSent?: boolean;
+    hasPhone?: boolean;
+    hasEmail?: boolean;
+  }> {
+    try {
+      const res = await fetch(serviceUrl('auth', `/internal/users/${userId}/issue-login-pin`), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-internal-api-key': INTERNAL_API_KEY },
+        body: JSON.stringify({ purpose: 'driver_kyc' }),
+      });
+      const json = (await res.json().catch(() => ({}))) as {
+        loginPin?: string;
+        smsSent?: boolean;
+        emailSent?: boolean;
+        hasPhone?: boolean;
+        hasEmail?: boolean;
+      };
+      if (!res.ok) return { smsSent: false };
+      return json;
+    } catch (e) {
+      this.logger.warn(`Account login PIN issue failed for ${userId}: ${(e as Error).message}`);
+      return { smsSent: false };
+    }
+  }
+
   private async applyKycApproval(userId: string) {
     const pin = this.generateActivationPin();
     const now = new Date();
@@ -696,7 +727,8 @@ export class DriversService {
       });
     }
     const sms = await this.sendActivationPinSms(userId, pin);
-    return { pin, ...sms };
+    const loginPin = await this.issueAccountLoginPin(userId);
+    return { pin, ...sms, loginPin: loginPin.loginPin, loginPinSmsSent: loginPin.smsSent, loginPinEmailSent: loginPin.emailSent, loginPinHasEmail: loginPin.hasEmail };
   }
 
   async getProfile(userId: string) {
@@ -836,9 +868,15 @@ export class DriversService {
   }
 
   async approveKyc(documentId: string, approved: boolean, notes?: string) {
+    let reason: string | undefined;
+    try {
+      reason = normalizeKycRejectNotes(approved, notes);
+    } catch (e) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, (e as Error).message);
+    }
     const doc = await this.prisma.kycDocument.update({
       where: { id: documentId },
-      data: { status: approved ? KycStatus.APPROVED : KycStatus.REJECTED, notes },
+      data: { status: approved ? KycStatus.APPROVED : KycStatus.REJECTED, notes: reason ?? notes ?? null },
     });
     if (approved) {
       await this.prisma.kycDocument.updateMany({
@@ -854,36 +892,39 @@ export class DriversService {
         smsError: issued.smsError,
       };
     } else {
-      const approvedCount = await this.prisma.kycDocument.count({
-        where: { userId: doc.userId, status: KycStatus.APPROVED },
+      await this.prisma.driverProfile.upsert({
+        where: { userId: doc.userId },
+        create: { userId: doc.userId, kycStatus: KycStatus.PENDING },
+        update: { kycStatus: KycStatus.PENDING },
       });
-      if (approvedCount === 0) {
-        await this.prisma.driverProfile.upsert({
-          where: { userId: doc.userId },
-          create: { userId: doc.userId, kycStatus: KycStatus.REJECTED },
-          update: { kycStatus: KycStatus.REJECTED },
-        });
-      }
     }
     return doc;
   }
 
   async setDriverKycStatus(userId: string, approved: boolean, notes?: string) {
+    let reason: string | undefined;
+    try {
+      reason = normalizeKycRejectNotes(approved, notes);
+    } catch (e) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, (e as Error).message);
+    }
     const status = approved ? KycStatus.APPROVED : KycStatus.REJECTED;
     await this.prisma.kycDocument.updateMany({
       where: { userId },
-      data: { status, ...(notes ? { notes } : {}) },
+      data: { status, ...(reason ? { notes: reason } : {}) },
     });
     let activationPin: string | undefined;
     let smsSent = false;
     let hasPhone: boolean | undefined;
     let smsError: string | undefined;
+    let loginPin: string | undefined;
     if (approved) {
       const issued = await this.applyKycApproval(userId);
       activationPin = issued.pin;
       smsSent = issued.smsSent;
       hasPhone = issued.hasPhone;
       smsError = issued.smsError;
+      loginPin = issued.loginPin;
     } else {
       await this.prisma.driverProfile.upsert({
         where: { userId },
@@ -892,7 +933,7 @@ export class DriversService {
       });
     }
     const profile = await this.prisma.driverProfile.findUnique({ where: { userId }, include: { vehicles: true } });
-    return { ...profile, activationPin, smsSent, hasPhone, smsError };
+    return { ...profile, activationPin, smsSent, hasPhone, smsError, loginPin };
   }
 
   async updateRating(userId: string, ratingAvg: number) {

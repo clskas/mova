@@ -3,6 +3,7 @@ import { ApiTags } from '@nestjs/swagger';
 import { UserRole, UserStatus } from '@prisma/client';
 import { IsEnum, IsOptional, IsString } from 'class-validator';
 import { UsersService } from '../users/users.service';
+import { AuthService } from '../auth/auth.service';
 import { InternalApiGuard } from '../common/internal-api.guard';
 
 class CreateUserAdminDto {
@@ -29,7 +30,7 @@ class PurgeUserDto {
 @Controller('internal')
 @UseGuards(InternalApiGuard)
 export class InternalController {
-  constructor(private users: UsersService) {}
+  constructor(private users: UsersService, private auth: AuthService) {}
   @Get('users/count')
   async count() {
     const { total } = await this.users.listUsers(0, 1);
@@ -50,5 +51,9 @@ export class InternalController {
   @Post('users/:id/purge')
   purge(@Param('id') id: string, @Body() body: PurgeUserDto) {
     return this.users.purgeUser(id, body?.actorId);
+  }
+  @Post('users/:id/issue-login-pin')
+  issueLoginPin(@Param('id') id: string) {
+    return this.auth.issueLoginPin(id);
   }
 }

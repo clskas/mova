@@ -157,6 +157,7 @@ describe('DeliveriesService', () => {
       lng: 15.3,
       isActive: true,
       isAcceptingOrders: true,
+      kycStatus: 'APPROVED',
       menuItems: [{ name: 'Poulet', priceCdf: 5000, isAvailable: true }],
     });
     const result = await service.estimateFood({
@@ -168,6 +169,28 @@ describe('DeliveriesService', () => {
     });
     expect(result.itemsSubtotalCdf).toBe(10000);
     expect(result.estimatedPriceCdf).toBeGreaterThan(10000);
+  });
+
+  it('refuse un restaurant non validé par SENGA', async () => {
+    prisma.restaurant.findUnique.mockResolvedValue({
+      id: 'r-pending',
+      name: 'Chez Flore',
+      lat: -4.31,
+      lng: 15.3,
+      isActive: true,
+      isAcceptingOrders: true,
+      kycStatus: 'PENDING',
+      menuItems: [{ name: 'Poulet', priceCdf: 5000, isAvailable: true }],
+    });
+    await expect(
+      service.estimateFood({
+        restaurantId: 'r-pending',
+        items: [{ name: 'Poulet', quantity: 1, unitPriceCdf: 5000 }],
+        deliveryAddress: 'Gombe',
+        deliveryLat: -4.32,
+        deliveryLng: 15.31,
+      }),
+    ).rejects.toBeInstanceOf(MovaHttpException);
   });
 
   it('createParcel assigns a 4-digit delivery pin', async () => {

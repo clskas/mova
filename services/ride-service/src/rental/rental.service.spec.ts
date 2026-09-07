@@ -1,4 +1,5 @@
 import { RentalService } from './rental.service';
+import { MovaHttpException } from '@mova/shared';
 
 describe('RentalService', () => {
   const prisma = {
@@ -10,7 +11,8 @@ describe('RentalService', () => {
       update: jest.fn(),
       findFirst: jest.fn(),
     },
-    rentalVehicle: { findMany: jest.fn(), findUnique: jest.fn() },
+    rentalVehicle: { findMany: jest.fn(), findUnique: jest.fn(), create: jest.fn() },
+    rentalPartnerProfile: { findMany: jest.fn().mockResolvedValue([]), findUnique: jest.fn() },
   };
   const redis = { publish: jest.fn().mockResolvedValue(1) };
   const promo = {
@@ -337,5 +339,30 @@ describe('RentalService', () => {
 
     expect(prisma.rentalInquiry.update).toHaveBeenCalled();
     expect(result.status).toBe('IN_PROGRESS');
+  });
+
+  it('bloque la publication d\'un véhicule tant que le loueur n\'est pas validé', async () => {
+    prisma.rentalPartnerProfile.findUnique.mockResolvedValue({ userId: 'owner-1', kycStatus: 'PENDING' });
+    await expect(
+      service.createVehicleForOwner('owner-1', { name: 'RAV4', category: 'SUV', dailyRateCdf: 75000 }),
+    ).rejects.toBeInstanceOf(MovaHttpException);
+    expect(prisma.rentalVehicle.create).not.toHaveBeenCalled();
+  });
+
+  it('refuse une location si le loueur n\'est pas validé', async () => {
+    const { start, end } = futureDates(2);
+    prisma.rentalVehicle.findUnique.mockResolvedValue({
+      ...baseVehicle,
+      ownerUserId: 'owner-1',
+      approvalStatus: 'APPROVED',
+    });
+    prisma.rentalPartnerProfile.findUnique.mockResolvedValue({ userId: 'owner-1', kycStatus: 'PENDING' });
+    await expect(
+      service.quote({
+        vehicleId: 'v1',
+        startDate: start.toISOString(),
+        endDate: end.toISOString(),
+      }),
+    ).rejects.toBeInstanceOf(MovaHttpException);
   });
 });

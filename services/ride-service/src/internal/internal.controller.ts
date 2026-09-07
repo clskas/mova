@@ -36,6 +36,7 @@ import { RidesService } from '../rides/rides.service';
 import { FraudService } from '../fraud/fraud.service';
 import { TrackingService } from '../tracking/tracking.service';
 import { PublicitesService } from '../publicites/publicites.service';
+import { PartnerKycService } from '../partner-kyc/partner-kyc.service';
 
 @ApiTags('internal')
 @Controller('internal')
@@ -61,6 +62,7 @@ export class InternalController {
     private tracking: TrackingService,
     private fraud: FraudService,
     private publicites: PublicitesService,
+    private partnerKyc: PartnerKycService,
   ) {}
 
   @Get('fraud/signals')
@@ -298,6 +300,38 @@ export class InternalController {
   @Delete('restaurants/:id')
   deleteRestaurant(@Param('id') id: string) {
     return this.deliveries.deleteRestaurant(id);
+  }
+
+  @Get('partner-kyc/pending')
+  partnerKycPending() {
+    return this.partnerKyc.listPendingAdmin();
+  }
+
+  @Post('partner-kyc/documents/:id/review')
+  reviewPartnerKycDocument(
+    @Param('id') id: string,
+    @Body() body: { approved?: boolean; notes?: string },
+  ) {
+    return this.partnerKyc.reviewDocument(id, body.approved === true, body.notes);
+  }
+
+  @Patch('partner-kyc/:subject/:userId')
+  reviewPartnerKycSubject(
+    @Param('subject') subject: string,
+    @Param('userId') userId: string,
+    @Body() body: { approved?: boolean; notes?: string },
+  ) {
+    const sub = subject === 'RENTAL_PARTNER' ? 'RENTAL_PARTNER' : 'RESTAURANT';
+    return this.partnerKyc.reviewSubject(userId, sub, body.approved === true, body.notes);
+  }
+
+  @Post('rental-partners/ensure')
+  ensureRentalPartner(@Body() body: { ownerUserId?: string }) {
+    const ownerUserId = body.ownerUserId?.trim();
+    if (!ownerUserId) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'ownerUserId requis.');
+    }
+    return this.partnerKyc.ensureRentalProfile(ownerUserId);
   }
 
   @Get('publicites')

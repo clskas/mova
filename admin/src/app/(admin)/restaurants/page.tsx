@@ -310,6 +310,11 @@ export default function RestaurantsPage() {
                     <span className={`text-xs px-2 py-0.5 rounded-full ${r.isActive !== false ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-600"}`}>
                       {r.isActive !== false ? "Actif" : "Inactif"}
                     </span>
+                    {r.kycStatus && r.kycStatus !== "APPROVED" && (
+                      <span className="ml-1 text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
+                        {r.kycStatus === "REJECTED" ? "Dossier refusé" : "Dossier à valider"}
+                      </span>
+                    )}
                   </td>
                   <td className="p-3 text-gray-600 text-xs max-w-[180px] truncate" title={partnerLabel(r.ownerUserId)}>
                     {partnerLabel(r.ownerUserId)}

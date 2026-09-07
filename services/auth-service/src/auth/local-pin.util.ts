@@ -1,4 +1,4 @@
-import { randomBytes, scryptSync, timingSafeEqual } from 'crypto';
+import { randomBytes, randomInt, scryptSync, timingSafeEqual } from 'crypto';
 
 const KEY_LEN = 32;
 const SCRYPT_OPTIONS = { N: 16384, r: 8, p: 1, maxmem: 64 * 1024 * 1024 } as const;
@@ -10,6 +10,14 @@ export function isValidLocalPin(pin: string): boolean {
   const ascending = digits.every((d, i) => i === 0 || d === digits[i - 1]! + 1);
   const descending = digits.every((d, i) => i === 0 || d === digits[i - 1]! - 1);
   return !ascending && !descending;
+}
+
+export function generateSecureLocalPin(): string {
+  for (let i = 0; i < 40; i += 1) {
+    const pin = randomInt(100000, 1000000).toString();
+    if (isValidLocalPin(pin)) return pin;
+  }
+  return '847291';
 }
 
 export function hashLocalPin(pin: string): string {

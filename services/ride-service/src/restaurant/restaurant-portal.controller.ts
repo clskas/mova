@@ -18,6 +18,7 @@ import {
 } from './restaurant-portal.dto';
 import { RestaurantPortalService } from './restaurant-portal.service';
 import { RestaurantRoleGuard } from './restaurant-role.guard';
+import { PartnerKycService } from '../partner-kyc/partner-kyc.service';
 
 @ApiTags('restaurant')
 @Controller('restaurant')
@@ -29,6 +30,7 @@ export class RestaurantPortalController {
     private partnerPromo: PartnerPromoService,
     private partnerBilling: PartnerBillingService,
     private deliveryChat: DeliveryChatService,
+    private partnerKyc: PartnerKycService,
   ) {}
 
   @Get('menu')
@@ -41,6 +43,36 @@ export class RestaurantPortalController {
   @ApiOperation({ summary: 'Profil restaurant du compte connecté' })
   profile(@Request() req: { user: { id: string } }) {
     return this.portal.getProfile(req.user.id);
+  }
+
+  @Get('kyc')
+  @ApiOperation({ summary: 'Dossier de validation restaurant' })
+  kyc(@Request() req: { user: { id: string } }) {
+    return this.partnerKyc.getRestaurantDossier(req.user.id);
+  }
+
+  @Patch('kyc')
+  @ApiOperation({ summary: 'Mettre à jour RCCM, NIF et paiement' })
+  kycProfile(
+    @Request() req: { user: { id: string } },
+    @Body() body: { nif?: string; rccm?: string; payoutProvider?: string; payoutPhone?: string },
+  ) {
+    return this.partnerKyc.updateRestaurantProfile(req.user.id, body);
+  }
+
+  @Post('kyc/document')
+  @ApiOperation({ summary: 'Téléverser un justificatif du dossier' })
+  kycDocument(
+    @Request() req: { user: { id: string } },
+    @Body() body: { type: string; imageBase64: string; mimeType?: string },
+  ) {
+    return this.partnerKyc.uploadDocument(
+      req.user.id,
+      'RESTAURANT',
+      body.type,
+      body.imageBase64,
+      body.mimeType,
+    );
   }
 
   @Get('dashboard')

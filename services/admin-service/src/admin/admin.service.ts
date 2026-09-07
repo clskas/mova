@@ -384,6 +384,22 @@ export class AdminService {
     return this.proxy('ride', `/internal/restaurants/${id}`, { method: 'DELETE' });
   }
 
+  listPartnerKycPending() {
+    return this.fetchJson('ride', '/internal/partner-kyc/pending');
+  }
+  reviewPartnerKycDocument(id: string, approved: boolean, notes?: string) {
+    return this.proxy('ride', `/internal/partner-kyc/documents/${id}/review`, {
+      method: 'POST',
+      body: JSON.stringify({ approved, notes }),
+    });
+  }
+  reviewPartnerKycSubject(subject: string, userId: string, approved: boolean, notes?: string) {
+    return this.proxy('ride', `/internal/partner-kyc/${subject}/${userId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ approved, notes }),
+    });
+  }
+
   listPublicites() {
     return this.fetchJson('ride', '/internal/publicites');
   }

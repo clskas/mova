@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { usePartnerLiveRegister } from "@/components/PartnerLiveProvider";
 import {
   deleteVehicle,
+  fetchProfile,
   fetchVehicles,
   formatCdf,
   mediaUrl,
@@ -36,16 +37,21 @@ export default function VehiclesPage() {
   const [filterQ, setFilterQ] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
   const [filterCity, setFilterCity] = useState("");
+  const [canOperate, setCanOperate] = useState(true);
 
   const load = useCallback(async () => {
     setError(null);
     try {
-      const list = await fetchVehicles({
-        q: filterQ.trim() || undefined,
-        status: filterStatus || undefined,
-        city: filterCity.trim() || undefined,
-      });
+      const [list, profile] = await Promise.all([
+        fetchVehicles({
+          q: filterQ.trim() || undefined,
+          status: filterStatus || undefined,
+          city: filterCity.trim() || undefined,
+        }),
+        fetchProfile().catch(() => null),
+      ]);
       setVehicles(Array.isArray(list) ? list : []);
+      if (profile) setCanOperate(profile.canOperate !== false);
     } catch (e) {
       setError(toUserErrorMessage(e, "Impossible de charger vos véhicules."));
     } finally {
@@ -80,13 +86,24 @@ export default function VehiclesPage() {
           <h2 className="text-xl font-semibold">Mes véhicules</h2>
           <p className="text-sm text-gray-500">Catalogue partenaire — modifications visibles en temps réel après validation SENGA.</p>
         </div>
-        <Link
-          href="/vehicules/nouveau"
-          className="px-5 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 shadow-sm"
-        >
-          + Ajouter un véhicule
-        </Link>
+        {canOperate ? (
+          <Link
+            href="/vehicules/nouveau"
+            className="px-5 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 shadow-sm"
+          >
+            + Ajouter un véhicule
+          </Link>
+        ) : (
+          <Link href="/dossier" className="px-5 py-2.5 rounded-xl bg-amber-100 text-amber-900 text-sm font-semibold">
+            Compléter mon dossier
+          </Link>
+        )}
       </div>
+      {!canOperate && (
+        <p className="text-sm text-amber-900 bg-amber-50 rounded-xl px-3 py-2">
+          SENGA doit valider votre dossier avant la publication de véhicules.
+        </p>
+      )}
 
       <section className="rounded-xl border border-gray-100 bg-white p-4 space-y-3">
         <div className="grid gap-3 sm:grid-cols-3">

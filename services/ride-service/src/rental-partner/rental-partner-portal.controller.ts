@@ -8,6 +8,7 @@ import { PartnerBillingService } from '../billing/partner-billing.service';
 import { CreatePartnerVehicleDto, PartnerBookingActionDto, PartnerConfirmCashDto, PartnerLogisticsDto, UploadPartnerVehiclePhotoDto } from './rental-partner-portal.dto';
 import { RentalPartnerPortalService } from './rental-partner-portal.service';
 import { RentalPartnerRoleGuard } from './rental-partner-role.guard';
+import { PartnerKycService } from '../partner-kyc/partner-kyc.service';
 
 @ApiTags('rental-partner')
 @Controller('rental-partner')
@@ -18,12 +19,43 @@ export class RentalPartnerPortalController {
     private portal: RentalPartnerPortalService,
     private partnerPromo: PartnerPromoService,
     private partnerBilling: PartnerBillingService,
+    private partnerKyc: PartnerKycService,
   ) {}
 
   @Get('profile')
   @ApiOperation({ summary: 'Profil partenaire location' })
   profile(@Request() req: { user: { id: string } }) {
     return this.portal.getProfile(req.user.id);
+  }
+
+  @Get('kyc')
+  @ApiOperation({ summary: 'Dossier de validation loueur' })
+  kyc(@Request() req: { user: { id: string } }) {
+    return this.partnerKyc.getRentalDossier(req.user.id);
+  }
+
+  @Patch('kyc')
+  @ApiOperation({ summary: 'Type de partenaire et informations société' })
+  kycProfile(
+    @Request() req: { user: { id: string } },
+    @Body() body: { partnerType?: 'COMPANY' | 'INDIVIDUAL'; nif?: string; rccm?: string },
+  ) {
+    return this.partnerKyc.updateRentalProfile(req.user.id, body);
+  }
+
+  @Post('kyc/document')
+  @ApiOperation({ summary: 'Téléverser un justificatif du dossier loueur' })
+  kycDocument(
+    @Request() req: { user: { id: string } },
+    @Body() body: { type: string; imageBase64: string; mimeType?: string },
+  ) {
+    return this.partnerKyc.uploadDocument(
+      req.user.id,
+      'RENTAL_PARTNER',
+      body.type,
+      body.imageBase64,
+      body.mimeType,
+    );
   }
 
   @Get('dashboard')

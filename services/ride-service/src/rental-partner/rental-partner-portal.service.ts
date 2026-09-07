@@ -14,6 +14,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { RentalService } from '../rental/rental.service';
 import { UploadsService } from '../uploads/uploads.service';
 import { CreatePartnerVehicleDto, PartnerLogisticsDto } from './rental-partner-portal.dto';
+import { PartnerKycService } from '../partner-kyc/partner-kyc.service';
 
 @Injectable()
 export class RentalPartnerPortalService {
@@ -22,6 +23,7 @@ export class RentalPartnerPortalService {
     private rental: RentalService,
     private uploads: UploadsService,
     private partnerBilling: PartnerBillingService,
+    private partnerKyc: PartnerKycService,
   ) {}
 
   async getDashboard(ownerUserId: string) {
@@ -121,6 +123,7 @@ export class RentalPartnerPortalService {
 
   async getProfile(ownerUserId: string) {
     const user = await fetchAuthUserBrief(ownerUserId);
+    const partner = await this.partnerKyc.ensureRentalProfile(ownerUserId);
     const counts = await this.prisma.rentalVehicle.groupBy({
       by: ['approvalStatus'],
       where: { ownerUserId },
@@ -137,6 +140,9 @@ export class RentalPartnerPortalService {
       userId: ownerUserId,
       name: user?.name,
       phone: user?.phone,
+      kycStatus: partner.kycStatus,
+      partnerType: partner.partnerType,
+      canOperate: partner.kycStatus === 'APPROVED',
       vehicleCounts: {
         pending: byStatus[RentalVehicleApprovalStatus.PENDING] ?? 0,
         approved: byStatus[RentalVehicleApprovalStatus.APPROVED] ?? 0,

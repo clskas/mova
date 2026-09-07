@@ -33,6 +33,7 @@ export default function SettingsPage() {
   const [drivers, setDrivers] = useState<RestaurantFleetDriver[]>([]);
   const [driverPhone, setDriverPhone] = useState("");
   const [fleetBusy, setFleetBusy] = useState(false);
+  const [canOperate, setCanOperate] = useState(true);
 
   const load = useCallback(async () => {
     try {
@@ -46,6 +47,7 @@ export default function SettingsPage() {
       setLat(p.lat != null ? String(p.lat) : "");
       setLng(p.lng != null ? String(p.lng) : "");
       setCourierMode((p.courierMode as CourierMode) ?? "PLATFORM");
+      setCanOperate(p.canOperate !== false && p.kycStatus !== "PENDING" && p.kycStatus !== "REJECTED");
       try {
         const fleet = await fetchRestaurantDrivers();
         setDrivers(fleet.drivers ?? []);
@@ -141,6 +143,12 @@ export default function SettingsPage() {
   return (
     <div className="max-w-lg space-y-6">
         <h2 className="text-xl font-bold">Paramètres</h2>
+        {!canOperate && (
+          <p className="text-sm text-amber-900 bg-amber-50 rounded-xl px-3 py-2">
+            Votre dossier n&apos;est pas encore validé. Vous ne pouvez pas accepter de commandes — ouvrez{" "}
+            <a href="/dossier" className="underline font-medium">Mon dossier</a>.
+          </p>
+        )}
         <ConnectionCard />
         {loading ? (
           <p className="text-gray-400">Chargement…</p>
@@ -209,7 +217,7 @@ export default function SettingsPage() {
             </div>
             <label className="flex items-center justify-between gap-4">
               <span className="text-sm">Accepter les commandes</span>
-              <input type="checkbox" checked={accepting} onChange={(e) => setAccepting(e.target.checked)} className="w-5 h-5" />
+              <input type="checkbox" checked={accepting} disabled={!canOperate} onChange={(e) => setAccepting(e.target.checked)} className="w-5 h-5" />
             </label>
             <label className="block text-sm">
               <span className="text-gray-600">Temps de préparation (minutes)</span>

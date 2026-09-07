@@ -22,6 +22,32 @@ export class EmailOtpMailer {
     return this.resendKey() !== '' || this.smtpReady();
   }
 
+  async sendLoginPin(to: string, pin: string): Promise<EmailOtpSendResult> {
+    const dest = to.trim().toLowerCase();
+    if (isMockOtpAllowed()) {
+      this.logger.log(`[MOCK EMAIL PIN] → ${maskEmail(dest)}`);
+      return { success: true, message: 'Code PIN e-mail simulé (MOCK_OTP)' };
+    }
+    if (!this.isConfigured()) {
+      return { success: false, message: 'E-mail non configuré' };
+    }
+    const subject = 'Votre code PIN SENGA';
+    const text =
+      `Votre code PIN de connexion SENGA est prêt. Saisissez-le pour ouvrir l'application.\n\n` +
+      `Code : ${pin}\n\nSi vous n'êtes pas à l'origine de cette demande, ignorez cet e-mail.`;
+    const html = `<p>Votre code PIN de connexion SENGA est <strong>${pin}</strong>.</p><p>Saisissez-le pour ouvrir l'application.</p>`;
+    const from = this.fromAddress();
+    try {
+      if (this.resendKey()) {
+        return await this.sendResend(dest, from, subject, text, html);
+      }
+      return await this.sendSmtp(dest, from, subject, text);
+    } catch (e) {
+      this.logger.error(`EMAIL PIN send failed for ${maskEmail(dest)}: ${(e as Error).message}`);
+      return { success: false, message: EMAIL_UNAVAILABLE_USER_MESSAGE };
+    }
+  }
+
   async sendOtp(to: string, code: string): Promise<EmailOtpSendResult> {
     const dest = to.trim().toLowerCase();
     if (isMockOtpAllowed()) {

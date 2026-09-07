@@ -97,6 +97,8 @@ export class RestaurantPortalService {
       promotionLabel: restaurant.promotionLabel,
       menuItems: restaurant.menuItems ?? [],
       courierMode: restaurant.courierMode ?? 'PLATFORM',
+      kycStatus: restaurant.kycStatus,
+      canOperate: restaurant.kycStatus === 'APPROVED',
     };
   }
 
@@ -505,6 +507,13 @@ export class RestaurantPortalService {
 
   async updateMenu(ownerUserId: string, dto: UpdateRestaurantMenuDto) {
     const restaurant = await this.getRestaurantForOwner(ownerUserId);
+    if (dto.isAcceptingOrders === true && restaurant.kycStatus !== 'APPROVED') {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        undefined,
+        "Votre dossier n'est pas encore validé par SENGA. Vous ne pouvez pas accepter de commandes.",
+      );
+    }
     const menuItems =
       dto.menuItems != null ? this.normalizeMenuItems(dto.menuItems) : undefined;
     const updated = await this.prisma.restaurant.update({

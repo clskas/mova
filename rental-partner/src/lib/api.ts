@@ -14,6 +14,9 @@ export type PartnerProfile = {
   phone?: string;
   vehicleCounts?: { pending?: number; approved?: number; rejected?: number };
   pendingBookings?: number;
+  kycStatus?: string;
+  partnerType?: "COMPANY" | "INDIVIDUAL";
+  canOperate?: boolean;
 };
 
 export type PartnerBooking = {
@@ -175,6 +178,54 @@ export async function uploadVehiclePhoto(file: File): Promise<string> {
   });
   if (!result.photoUrl) throw new Error("Impossible d'enregistrer la photo.");
   return result.photoUrl;
+}
+
+export type KycChecklistItem = {
+  type: string;
+  label: string;
+  required: boolean;
+  uploaded: boolean;
+  status?: string | null;
+  notes?: string | null;
+  url?: string | null;
+  documentId?: string | null;
+};
+
+export type RentalKycDossier = {
+  kycStatus?: string;
+  kycNotes?: string | null;
+  partnerType?: "COMPANY" | "INDIVIDUAL";
+  nif?: string | null;
+  rccm?: string | null;
+  phone?: string | null;
+  phoneVerified?: boolean;
+  canOperate?: boolean;
+  requiredComplete?: boolean;
+  checklist?: KycChecklistItem[];
+};
+
+export function fetchKyc() {
+  return apiFetch<RentalKycDossier>("/api/rental-partner/kyc");
+}
+
+export function updateKycProfile(data: {
+  partnerType?: "COMPANY" | "INDIVIDUAL";
+  nif?: string;
+  rccm?: string;
+}) {
+  return apiFetch<RentalKycDossier>("/api/rental-partner/kyc", {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function uploadKycDocument(type: string, file: File) {
+  const bytes = await file.arrayBuffer();
+  const base64 = arrayBufferToBase64(bytes);
+  return apiFetch<RentalKycDossier>("/api/rental-partner/kyc/document", {
+    method: "POST",
+    body: JSON.stringify({ type, imageBase64: base64, mimeType: file.type || "image/jpeg" }),
+  });
 }
 
 export function fetchBookings(params?: {

@@ -27,6 +27,8 @@ export type RestaurantProfile = {
   prepTimeMin?: number;
   menuItems?: MenuItem[];
   courierMode?: "PLATFORM" | "OWN" | "HYBRID";
+  kycStatus?: string;
+  canOperate?: boolean;
 };
 
 export type CourierMode = "PLATFORM" | "OWN" | "HYBRID";
@@ -286,6 +288,60 @@ export async function uploadMenuPhoto(file: File): Promise<string> {
     body: JSON.stringify({ imageBase64: base64, mimeType: file.type || "image/jpeg" }),
   });
   return result.photoUrl;
+}
+
+export type KycChecklistItem = {
+  type: string;
+  label: string;
+  required: boolean;
+  uploaded: boolean;
+  status?: string | null;
+  notes?: string | null;
+  url?: string | null;
+  documentId?: string | null;
+};
+
+export type RestaurantKycDossier = {
+  kycStatus?: string;
+  kycNotes?: string | null;
+  nif?: string | null;
+  rccm?: string | null;
+  payoutProvider?: string | null;
+  payoutPhone?: string | null;
+  phone?: string | null;
+  phoneVerified?: boolean;
+  canOperate?: boolean;
+  requiredComplete?: boolean;
+  checklist?: KycChecklistItem[];
+};
+
+export function fetchKyc() {
+  return apiFetch<RestaurantKycDossier>("/api/restaurant/kyc");
+}
+
+export function updateKycProfile(data: {
+  nif?: string;
+  rccm?: string;
+  payoutProvider?: string;
+  payoutPhone?: string;
+}) {
+  return apiFetch<RestaurantKycDossier>("/api/restaurant/kyc", {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function uploadKycDocument(type: string, file: File) {
+  const base64 = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result ?? ""));
+    reader.onerror = () => reject(new Error("Lecture fichier impossible"));
+    reader.readAsDataURL(file);
+  });
+  return apiFetch<RestaurantKycDossier>("/api/restaurant/kyc/document", {
+    method: "POST",
+    body: JSON.stringify({ type, imageBase64: base64, mimeType: file.type || "image/jpeg" }),
+  });
 }
 
 export type PartnerPromo = {

@@ -1,5 +1,5 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { DeliveryStatus, DeliveryType, Prisma, SurchargeType, TrackingReferenceType, VehicleType, WeightCategory, CommissionServiceType } from '@prisma/client';
+import { DeliveryStatus, DeliveryType, PartnerKycStatus, Prisma, SurchargeType, TrackingReferenceType, VehicleType, WeightCategory, CommissionServiceType } from '@prisma/client';
 import { driverEligibleForParcelWeight, INTERNAL_API_KEY, MOVA_EVENTS, MovaErrorCode, MovaHttpException, canCancelDelivery, estimateTripDurationMin, formatCdf, normalizeVehicleType, resolveCityFromCoords, serviceUrl, VehicleTypeValue } from '@mova/shared';
 import { RedisService } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
@@ -419,9 +419,7 @@ export class DeliveriesService {
   async estimateFood(dto: CreateFoodDeliveryDto) {
     const restaurant = await this.prisma.restaurant.findUnique({ where: { id: dto.restaurantId } });
     if (!restaurant || !restaurant.isActive) throw new MovaHttpException(MovaErrorCode.RESTAURANT_NOT_FOUND, HttpStatus.NOT_FOUND);
-    if (!restaurant.isAcceptingOrders) {
-      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Ce restaurant n\'accepte pas de commandes pour le moment.');
-    }
+    this.assertRestaurantCanOperate(restaurant);
     const foodSurcharge = await this.surcharges.get(SurchargeType.DELIVERY_FOOD);
     const { subtotalCdf: itemsSubtotal } = this.resolveFoodItemsSubtotalCdf(restaurant.menuItems, dto.items);
     const { distanceKm, durationMin, deliveryFeeCdf } = await this.computeFoodDeliveryQuote(
@@ -448,9 +446,7 @@ export class DeliveriesService {
   async createFood(userId: string, dto: CreateFoodDeliveryDto) {
     const restaurant = await this.prisma.restaurant.findUnique({ where: { id: dto.restaurantId } });
     if (!restaurant || !restaurant.isActive) throw new MovaHttpException(MovaErrorCode.RESTAURANT_NOT_FOUND, HttpStatus.NOT_FOUND);
-    if (!restaurant.isAcceptingOrders) {
-      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Ce restaurant n\'accepte pas de commandes pour le moment.');
-    }
+    this.assertRestaurantCanOperate(restaurant);
     if (!dto.items.length) throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR);
     const { subtotalCdf, normalizedItems } = this.resolveFoodItemsSubtotalCdf(restaurant.menuItems, dto.items);
     const estimate = await this.estimateFood({ ...dto, items: normalizedItems });
@@ -521,6 +517,7 @@ export class DeliveriesService {
     if (restaurants.length !== dto.orders.length) {
       throw new MovaHttpException(MovaErrorCode.RESTAURANT_NOT_FOUND, HttpStatus.NOT_FOUND);
     }
+    for (const r of restaurants) this.assertRestaurantCanOperate(r);
 
     const foodSurcharge = await this.surcharges.get(SurchargeType.DELIVERY_FOOD);
     let itemsSubtotalCdf = 0;
@@ -563,6 +560,7 @@ export class DeliveriesService {
     if (restaurants.length !== dto.orders.length) {
       throw new MovaHttpException(MovaErrorCode.RESTAURANT_NOT_FOUND, HttpStatus.NOT_FOUND);
     }
+    for (const r of restaurants) this.assertRestaurantCanOperate(r);
 
     // Normalize items and compute subtotal
     const normalizedOrders = dto.orders.map((o) => {
@@ -825,9 +823,7 @@ export class DeliveriesService {
   async getRestaurant(id: string) {
     const restaurant = await this.prisma.restaurant.findUnique({ where: { id } });
     if (!restaurant || !restaurant.isActive) throw new MovaHttpException(MovaErrorCode.RESTAURANT_NOT_FOUND, HttpStatus.NOT_FOUND);
-    if (!restaurant.isAcceptingOrders) {
-      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Ce restaurant n\'accepte pas de commandes pour le moment.');
-    }
+    this.assertRestaurantCanOperate(restaurant);
     const menu = this.publicMenuItems(restaurant.menuItems);
     return {
       ...restaurant,
@@ -985,6 +981,7 @@ export class DeliveriesService {
       where: {
         isActive: true,
         isAcceptingOrders: true,
+        kycStatus: PartnerKycStatus.APPROVED,
         ...(cuisine?.trim() ? { cuisine: { contains: cuisine.trim(), mode: 'insensitive' } } : {}),
       },
       orderBy: { rating: 'desc' },
@@ -1487,6 +1484,26 @@ export class DeliveriesService {
 
   async listRestaurantsAdmin() {
     return this.prisma.restaurant.findMany({ orderBy: { name: 'asc' } });
+  }
+
+  private assertRestaurantCanOperate(restaurant: {
+    isAcceptingOrders: boolean;
+    kycStatus?: string | null;
+  }) {
+    if (restaurant.kycStatus !== PartnerKycStatus.APPROVED) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        undefined,
+        "Ce restaurant n'est pas encore validé par SENGA.",
+      );
+    }
+    if (!restaurant.isAcceptingOrders) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        undefined,
+        "Ce restaurant n'accepte pas de commandes pour le moment.",
+      );
+    }
   }
 
   /** First restaurant-portal login creates a stub profile the partner can edit. */

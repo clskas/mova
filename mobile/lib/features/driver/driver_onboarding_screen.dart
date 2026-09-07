@@ -973,15 +973,38 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
 
   Widget _docButton(String type, String label) {
     final done = _docUploaded(type);
+    final notes = _docRejectNotes(type);
     return Padding(
       padding: const EdgeInsets.only(bottom: _docGap),
-      child: MovaButton(
-        label: done ? '$label ✓' : label,
-        isSecondary: true,
-        icon: done ? Icons.check_circle_outline : Icons.camera_alt,
-        isLoading: _uploadingDoc == type,
-        onPressed: _uploadingDoc != null ? null : () => _uploadDoc(type, label),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          MovaButton(
+            label: done ? '$label ✓' : label,
+            isSecondary: true,
+            icon: done ? Icons.check_circle_outline : Icons.camera_alt,
+            isLoading: _uploadingDoc == type,
+            onPressed: _uploadingDoc != null ? null : () => _uploadDoc(type, label),
+          ),
+          if (notes != null && notes.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text('Motif du refus : $notes', style: const TextStyle(color: Colors.red, fontSize: 13)),
+            ),
+        ],
       ),
     );
+  }
+
+  String? _docRejectNotes(String type) {
+    final checklist = _state?['kyc']?['checklist'] as List? ?? [];
+    for (final item in checklist) {
+      if (item is Map && item['type'] == type) {
+        final status = item['status']?.toString();
+        final notes = item['notes']?.toString();
+        if (status == 'REJECTED' && notes != null && notes.isNotEmpty) return notes;
+      }
+    }
+    return null;
   }
 }

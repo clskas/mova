@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   activationPinSmsCopy,
+  apiFetch,
   fetchDriverDetail,
   fetchDrivers,
   regenerateDriverActivationPin,
@@ -252,12 +253,21 @@ export default function ChauffeursPage() {
 
   async function reviewKyc(approved: boolean) {
     if (!selectedId) return;
+    let notes: string | undefined;
+    if (!approved) {
+      const motif = window.prompt("Motif du refus (visible par le chauffeur) :");
+      if (!motif || motif.trim().length < 8) {
+        setError("Indiquez le motif du refus (au moins 8 caractères).");
+        return;
+      }
+      notes = motif.trim();
+    }
     setSaving(true);
     setError(null);
     try {
-      const result = await reviewDriverKyc(selectedId, approved);
-      if (approved && result.activationPin) {
-        setActivationPin(result.activationPin);
+      const result = await reviewDriverKyc(selectedId, approved, notes);
+      if (approved && (result.activationPin || result.loginPin)) {
+        setActivationPin(result.activationPin ?? result.loginPin ?? null);
         setSmsNotice(activationPinSmsCopy(result));
       } else {
         setActivationPin(null);
@@ -582,6 +592,38 @@ export default function ChauffeursPage() {
                           {item.uploaded ? `✓ ${item.status ?? "uploadé"}` : item.required ? "Manquant" : "Optionnel"}
                         </span>
                       </div>
+                      {item.notes && item.status === "REJECTED" && (
+                        <p className="text-xs text-red-700">Motif : {item.notes}</p>
+                      )}
+                      {canReviewKyc && item.documentId && item.status !== "APPROVED" && item.uploaded && (
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            className="text-xs text-red-700 underline"
+                            onClick={async () => {
+                              const motif = window.prompt("Motif du refus (visible par le chauffeur) :");
+                              if (!motif || motif.trim().length < 8) {
+                                setError("Indiquez le motif du refus (au moins 8 caractères).");
+                                return;
+                              }
+                              setSaving(true);
+                              try {
+                                await apiFetch(`/api/admin/kyc/${item.documentId}/review`, {
+                                  method: "POST",
+                                  body: JSON.stringify({ approved: false, notes: motif.trim() }),
+                                });
+                                if (selectedId) setDetail(await fetchDriverDetail(selectedId));
+                              } catch (e) {
+                                setError(e instanceof Error ? e.message : "Refus impossible");
+                              } finally {
+                                setSaving(false);
+                              }
+                            }}
+                          >
+                            Refuser ce justificatif
+                          </button>
+                        </div>
+                      )}
                       {RENEWAL_DOC_TYPES.includes(item.type as (typeof RENEWAL_DOC_TYPES)[number]) && item.uploaded && (
                         <>
                           <OcrBadge ocr={item.ocr} />

@@ -73,7 +73,13 @@ export class UploadsController {
     return this.serveUploadedFile('moving', filename, res);
   }
 
-  private serveUploadedFile(category: 'parcels' | 'menu' | 'vehicles' | 'moving', filename: string, res: Response) {
+  @Get('kyc/:filename')
+  @ApiOperation({ summary: 'Télécharger un justificatif KYC stocké localement' })
+  serveKycPhoto(@Param('filename') filename: string, @Res() res: Response) {
+    return this.serveUploadedFile('kyc', filename, res);
+  }
+
+  private serveUploadedFile(category: 'parcels' | 'menu' | 'vehicles' | 'moving' | 'kyc', filename: string, res: Response) {
     const safe = filename.replace(/[^a-zA-Z0-9._-]/g, '');
     const filePath = join(process.cwd(), 'uploads', category, safe);
     if (!existsSync(filePath)) throw new NotFoundException('Fichier introuvable');

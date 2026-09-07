@@ -57,8 +57,8 @@ describe('AuthService', () => {
     publish: jest.Mock;
     client: { get: jest.Mock; set: jest.Mock; del: jest.Mock };
   };
-  let sms: { sendOtp: jest.Mock };
-  let mailer: { sendOtp: jest.Mock; isConfigured: jest.Mock };
+  let sms: { sendOtp: jest.Mock; sendSms: jest.Mock };
+  let mailer: { sendOtp: jest.Mock; sendLoginPin: jest.Mock; isConfigured: jest.Mock };
   let service: AuthService;
 
   beforeEach(() => {
@@ -96,9 +96,13 @@ describe('AuthService', () => {
         del: jest.fn().mockResolvedValue(1),
       },
     };
-    sms = { sendOtp: jest.fn().mockResolvedValue({ success: true, message: 'ok' }) };
+    sms = {
+      sendOtp: jest.fn().mockResolvedValue({ success: true, message: 'ok' }),
+      sendSms: jest.fn().mockResolvedValue({ success: true, message: 'ok' }),
+    };
     mailer = {
       sendOtp: jest.fn().mockResolvedValue({ success: true, message: 'ok' }),
+      sendLoginPin: jest.fn().mockResolvedValue({ success: true, message: 'ok' }),
       isConfigured: jest.fn().mockReturnValue(true),
     };
     service = new AuthService(
@@ -1179,5 +1183,21 @@ describe('AuthService', () => {
         data: { googleId: null },
       }),
     );
+  });
+
+  it('issues a login PIN and sends SMS without logging the code', async () => {
+    const logSpy = jest.spyOn(console, 'log').mockImplementation(() => undefined);
+    prisma.user.findUnique.mockResolvedValue(makeUser({ phone: '+243811111111', email: 'a@b.cd' }));
+    prisma.user.update.mockResolvedValue(makeUser());
+    const result = await service.issueLoginPin('user-1');
+    expect(result.smsSent).toBe(true);
+    expect(result.emailSent).toBe(true);
+    expect(result.hasPhone).toBe(true);
+    expect(result.loginPin).toMatch(/^\d{6}$/);
+    expect(sms.sendSms).toHaveBeenCalledWith('+243811111111', expect.stringContaining(result.loginPin!), 'login_pin');
+    expect(mailer.sendLoginPin).toHaveBeenCalledWith('a@b.cd', result.loginPin);
+    const logged = logSpy.mock.calls.flat().map(String).join(' ');
+    expect(logged).not.toContain(result.loginPin);
+    logSpy.mockRestore();
   });
 });

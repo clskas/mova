@@ -1,5 +1,5 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { Prisma, RentalInquiryStatus, RentalLogisticsMode, RentalVehicleApprovalStatus } from '@prisma/client';
+import { Prisma, PartnerKycStatus, RentalInquiryStatus, RentalLogisticsMode, RentalVehicleApprovalStatus } from '@prisma/client';
 import { MARKET_RDC, MOVA_EVENTS, MovaErrorCode, MovaHttpException, canCancelRentalBooking, formatCdf, formatRentalRemaining, isRentalCancelBlockedByStatus, shouldChargeGpsAddOn, vehicleHasBuiltInGps, type RentalBookingEventKind } from '@mova/shared';
 import { RedisService } from '@mova/shared';
 import { fetchAuthUserBrief } from '../common/internal-lookup.util';
@@ -535,9 +535,11 @@ export class RentalService {
 
   async listVehicles(query: RentalVehicleQueryDto = {}) {
     const category = this.normalizeCategory(query.category);
+    const approvedOwners = await this.approvedRentalOwnerIds();
     const where: Prisma.RentalVehicleWhereInput = {
       isActive: true,
       approvalStatus: RentalVehicleApprovalStatus.APPROVED,
+      OR: [{ ownerUserId: null }, { ownerUserId: { in: approvedOwners } }],
       ...(query.city ? { city: { equals: query.city, mode: 'insensitive' } } : {}),
       ...(category ? { category: { equals: category, mode: 'insensitive' } } : {}),
       ...(query.transmission ? { transmission: query.transmission } : {}),
@@ -745,6 +747,7 @@ export class RentalService {
     if (!vehicle || !vehicle.isActive) {
       throw new MovaHttpException(MovaErrorCode.RENTAL_VEHICLE_NOT_FOUND, HttpStatus.NOT_FOUND);
     }
+    await this.assertVehiclePubliclyBookable(vehicle);
     const startDate = new Date(dto.startDate);
     const endDate = new Date(dto.endDate);
     this.validateDates(startDate, endDate, dto.rentalPeriod);
@@ -1766,7 +1769,54 @@ export class RentalService {
     }
   }
 
+  private async approvedRentalOwnerIds(): Promise<string[]> {
+    if (!this.prisma.rentalPartnerProfile?.findMany) return [];
+    const rows = await this.prisma.rentalPartnerProfile.findMany({
+      where: { kycStatus: PartnerKycStatus.APPROVED },
+      select: { userId: true },
+    });
+    return rows.map((r) => r.userId);
+  }
+
+  async assertRentalPartnerApproved(ownerUserId: string) {
+    if (!this.prisma.rentalPartnerProfile?.findUnique) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        undefined,
+        "Votre dossier loueur n'est pas encore validé par SENGA.",
+      );
+    }
+    const profile = await this.prisma.rentalPartnerProfile.findUnique({ where: { userId: ownerUserId } });
+    if (!profile || profile.kycStatus !== PartnerKycStatus.APPROVED) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        undefined,
+        "Votre dossier loueur n'est pas encore validé par SENGA.",
+      );
+    }
+  }
+
+  private async assertVehiclePubliclyBookable(vehicle: {
+    approvalStatus?: RentalVehicleApprovalStatus | string;
+    ownerUserId?: string | null;
+  }) {
+    if (
+      vehicle.approvalStatus === RentalVehicleApprovalStatus.PENDING ||
+      vehicle.approvalStatus === RentalVehicleApprovalStatus.REJECTED
+    ) {
+      throw new MovaHttpException(
+        MovaErrorCode.RENTAL_VEHICLE_NOT_FOUND,
+        HttpStatus.NOT_FOUND,
+        "Ce véhicule n'est pas encore disponible à la location.",
+      );
+    }
+    if (vehicle.ownerUserId) {
+      await this.assertRentalPartnerApproved(vehicle.ownerUserId);
+    }
+  }
+
   async createVehicleForOwner(ownerUserId: string, data: Record<string, unknown>) {
+    await this.assertRentalPartnerApproved(ownerUserId);
     const payload = this.normalizeVehicleAdminPayload(data);
     const created = await this.prisma.rentalVehicle.create({
       data: {

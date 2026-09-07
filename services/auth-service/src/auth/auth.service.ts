@@ -30,7 +30,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '@mova/shared';
 import { SmsService } from './sms.providers';
 import { EMAIL_UNAVAILABLE_USER_MESSAGE, EmailOtpMailer } from './email-otp.mailer';
-import { hashLocalPin, isValidLocalPin, verifyLocalPin } from './local-pin.util';
+import { generateSecureLocalPin, hashLocalPin, isValidLocalPin, verifyLocalPin } from './local-pin.util';
 import {
   defaultPartnerDisplayName,
   isAllowedPartnerSelfRegisterRole,
@@ -297,6 +297,20 @@ export class AuthService {
         }
       } catch (e) {
         this.logger.warn(`Restaurant profile provision failed for ${userId}: ${(e as Error).message}`);
+      }
+    }
+    if (role === UserRole.RENTAL_PARTNER) {
+      try {
+        const rentalRes = await fetch(serviceUrl('ride', '/internal/rental-partners/ensure'), {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ ownerUserId: userId }),
+        });
+        if (!rentalRes.ok) {
+          this.logger.warn(`Rental partner profile provision HTTP ${rentalRes.status} for ${userId}`);
+        }
+      } catch (e) {
+        this.logger.warn(`Rental partner profile provision failed for ${userId}: ${(e as Error).message}`);
       }
     }
   }
@@ -1265,5 +1279,52 @@ export class AuthService {
     } catch (e) {
       this.logger.warn(`clearOtpFailures failed: ${(e as Error).message}`);
     }
+  }
+
+  /** Issues a new 6-digit login PIN and notifies by SMS and/or e-mail. Never logs the PIN. */
+  async issueLoginPin(userId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new MovaHttpException(MovaErrorCode.USER_NOT_FOUND, HttpStatus.NOT_FOUND);
+    const pin = generateSecureLocalPin();
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { localPinHash: hashLocalPin(pin), localPinSetAt: new Date() },
+    });
+    const phone = user.phone?.trim() || '';
+    const email = user.email?.trim() || '';
+    let smsSent = false;
+    let emailSent = false;
+    let smsError: string | undefined;
+    let emailError: string | undefined;
+    if (phone) {
+      const text =
+        `SENGA : votre code PIN de connexion est ${pin}. Conservez-le précieusement. Ne le communiquez à personne.`;
+      try {
+        const sms = await this.sms.sendSms(phone, text, 'login_pin');
+        smsSent = sms.success === true;
+        if (!smsSent) smsError = sms.message;
+      } catch (e) {
+        smsError = (e as Error).message;
+      }
+    }
+    if (email) {
+      try {
+        const mailed = await this.emailOtp.sendLoginPin(email, pin);
+        emailSent = mailed.success === true;
+        if (!emailSent) emailError = mailed.message;
+      } catch (e) {
+        emailError = (e as Error).message;
+      }
+    }
+    return {
+      success: true,
+      loginPin: pin,
+      smsSent,
+      emailSent,
+      hasPhone: Boolean(phone),
+      hasEmail: Boolean(email),
+      smsError,
+      emailError,
+    };
   }
 }

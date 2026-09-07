@@ -1,4 +1,4 @@
-import { isValidLocalPin, hashLocalPin, verifyLocalPin } from './local-pin.util';
+import { isValidLocalPin, hashLocalPin, verifyLocalPin, generateSecureLocalPin } from './local-pin.util';
 
 describe('local-pin.util', () => {
   it('rejects weak pins', () => {
@@ -13,5 +13,10 @@ describe('local-pin.util', () => {
     const stored = hashLocalPin(pin);
     expect(verifyLocalPin(pin, stored)).toBe(true);
     expect(verifyLocalPin('111111', stored)).toBe(false);
+  });
+
+  it('generates a valid 6-digit PIN', () => {
+    const pin = generateSecureLocalPin();
+    expect(isValidLocalPin(pin)).toBe(true);
   });
 });

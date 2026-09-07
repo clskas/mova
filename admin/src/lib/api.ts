@@ -171,6 +171,8 @@ export type AdminDriverDetail = AdminDriver & {
       required: boolean;
       uploaded: boolean;
       status?: string | null;
+      notes?: string | null;
+      documentId?: string | null;
       url?: string | null;
       ocr?: {
         documentId?: string;
@@ -330,6 +332,8 @@ export type Restaurant = {
   isAcceptingOrders?: boolean;
   prepTimeMin?: number;
   ownerUserId?: string | null;
+  kycStatus?: string;
+  kycNotes?: string | null;
 };
 
 export type PubliciteCible = "TOUS" | "PASSENGER" | "DRIVER" | "RESTAURANT" | "RENTAL_PARTNER";
@@ -1800,7 +1804,15 @@ export async function setDriverStatus(userId: string, active: boolean, suspendUs
 }
 
 export async function reviewDriverKyc(userId: string, approved: boolean, notes?: string) {
-  return apiFetch<{ activationPin?: string; smsSent?: boolean; hasPhone?: boolean; smsError?: string }>(`/api/admin/drivers/${userId}/kyc`, {
+  return apiFetch<{
+    activationPin?: string;
+    loginPin?: string;
+    smsSent?: boolean;
+    hasPhone?: boolean;
+    smsError?: string;
+    emailSent?: boolean;
+    hasEmail?: boolean;
+  }>(`/api/admin/drivers/${userId}/kyc`, {
     method: "PATCH",
     body: JSON.stringify({ approved, notes }),
   });
@@ -1857,15 +1869,77 @@ export function activationPinSmsCopy(result: {
   smsSent?: boolean;
   hasPhone?: boolean;
   smsError?: string;
+  emailSent?: boolean;
+  hasEmail?: boolean;
+  emailError?: string;
 }): string {
-  if (result.smsSent) return "Un SMS a été envoyé au chauffeur.";
-  if (result.hasPhone === false) {
-    return "Aucun numéro de téléphone lié à ce compte (souvent une connexion Google). Le SMS n'a pas été envoyé — communiquez le PIN ci-dessous.";
-  }
-  if (result.smsError) {
-    return `SMS non envoyé : ${result.smsError}. Communiquez le PIN ci-dessous.`;
-  }
-  return "SMS non envoyé — communiquez le PIN ci-dessous.";
+  const parts: string[] = [];
+  if (result.smsSent) parts.push("Un SMS a été envoyé.");
+  else if (result.hasPhone === false) parts.push("Aucun numéro +243 lié — le SMS n'a pas été envoyé.");
+  else if (result.smsError) parts.push(`SMS non envoyé : ${result.smsError}.`);
+  else parts.push("SMS non envoyé.");
+  if (result.emailSent) parts.push("Un e-mail a été envoyé.");
+  else if (result.hasEmail === false) parts.push("Aucun e-mail lié.");
+  else if (result.emailError) parts.push(`E-mail non envoyé : ${result.emailError}.`);
+  return parts.join(" ");
+}
+
+export type PartnerKycChecklistItem = {
+  type: string;
+  label: string;
+  required: boolean;
+  uploaded: boolean;
+  status?: string | null;
+  notes?: string | null;
+  url?: string | null;
+  documentId?: string | null;
+};
+
+export type PartnerKycDossier = {
+  subject?: "RESTAURANT" | "RENTAL_PARTNER";
+  userId?: string;
+  restaurantId?: string;
+  name?: string;
+  kycStatus?: string;
+  kycNotes?: string | null;
+  partnerType?: string;
+  phone?: string | null;
+  phoneVerified?: boolean;
+  canOperate?: boolean;
+  requiredComplete?: boolean;
+  checklist?: PartnerKycChecklistItem[];
+  loginPin?: string;
+  smsSent?: boolean;
+  emailSent?: boolean;
+  hasPhone?: boolean;
+  hasEmail?: boolean;
+};
+
+export async function fetchPartnerKycPending() {
+  return apiFetch<{
+    restaurants?: PartnerKycDossier[];
+    rentalPartners?: PartnerKycDossier[];
+    documents?: KycItem[];
+  }>("/api/admin/partner-kyc/pending");
+}
+
+export async function reviewPartnerKycDocument(id: string, approved: boolean, notes?: string) {
+  return apiFetch(`/api/admin/partner-kyc/documents/${id}/review`, {
+    method: "POST",
+    body: JSON.stringify({ approved, notes }),
+  });
+}
+
+export async function reviewPartnerKycSubject(
+  subject: "RESTAURANT" | "RENTAL_PARTNER",
+  userId: string,
+  approved: boolean,
+  notes?: string,
+) {
+  return apiFetch<PartnerKycDossier>(`/api/admin/partner-kyc/${subject}/${userId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ approved, notes }),
+  });
 }
 
 export async function cancelRide(id: string, reason?: string) {

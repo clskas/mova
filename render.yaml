@@ -397,11 +397,11 @@ envVarGroups:
         value: "1.0.5"
       - key: MOBILE_MIN_VERSION
         value: "1.0.0"
-      # Latest uploaded Play versionCode (pubspec 1.0.6+49). Never leave below the shipped floor.
+      # Latest intended Play versionCode (pubspec 1.0.6+50). Name stays 1.0.5 (Dart AppVersion.name).
       - key: MOBILE_PASSENGER_VERSION_CODE
-        value: "48"
+        value: "50"
       - key: MOBILE_DRIVER_VERSION_CODE
-        value: "48"
+        value: "50"
       - key: MOBILE_MIN_VERSION_CODE
         value: "0"
       - key: PLAY_STORE_PASSENGER_URL

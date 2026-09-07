@@ -17,9 +17,13 @@ const DEFAULT_PASSENGER_STORE =
 const DEFAULT_DRIVER_STORE =
   'https://play.google.com/store/apps/details?id=cd.mova.mova.driver';
 
-/** Floor aligned on `mobile/pubspec.yaml` (`1.0.5+48`). Stale Render env must not hide banners. */
+/**
+ * Name floor stays `1.0.5`: Play 1.0.6 AABs still compile `AppVersion.name = '1.0.5'`.
+ * Advertising `1.0.6` would show the banner on phones already on latest Play.
+ * versionCode floor is pubspec / last intended Play (`1.0.6+50`) so 1.0.5 builds still see it.
+ */
 const CURRENT_VERSION_FLOOR = '1.0.5';
-const CURRENT_VERSION_CODE_FLOOR = 48;
+const CURRENT_VERSION_CODE_FLOOR = 50;
 
 function parseVersionCode(raw: string | undefined, fallback: number): number {
   const n = Number.parseInt(raw?.trim() || '', 10);

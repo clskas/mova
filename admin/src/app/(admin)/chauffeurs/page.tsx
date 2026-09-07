@@ -251,7 +251,7 @@ export default function ChauffeursPage() {
         setSmsNotice(activationPinSmsCopy(result));
       } else {
         setActivationPin(null);
-        setSmsNotice(null);
+        setSmsNotice(activationPinSmsCopy(result) || null);
       }
       load();
       const refreshed = await fetchDriverDetail(selectedId);

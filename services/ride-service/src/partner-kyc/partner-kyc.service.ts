@@ -12,6 +12,9 @@ import {
   rentalKycTypes,
   restaurantKycTypes,
   serviceUrl,
+  kycRejectNotifyCopy,
+  notifyAuthUser,
+  type AuthUserNotifyResult,
   type KycPartnerKind,
   type PartnerKycSubject as PartnerSubject,
   type RentalPartnerKind,
@@ -47,6 +50,7 @@ export class PartnerKycService {
     const types = restaurantKycTypes();
     const checklist = await this.buildChecklist(ownerUserId, PartnerKycSubject.RESTAURANT, types);
     const phoneVerified = PHONE_OK.test(user?.phone?.trim() ?? '');
+    const hasEmail = Boolean(user?.email?.trim());
     const partnerKind: KycPartnerKind = 'RESTAURANT';
     return {
       subject: 'RESTAURANT' as const,
@@ -66,9 +70,10 @@ export class PartnerKycService {
       phone: user?.phone ?? null,
       email: user?.email ?? null,
       phoneVerified,
+      hasEmail,
       canOperate: restaurant.kycStatus === PartnerKycStatus.APPROVED,
       checklist,
-      requiredComplete: this.requiredComplete(checklist) && phoneVerified,
+      requiredComplete: this.requiredComplete(checklist) && (phoneVerified || hasEmail),
     };
   }
 
@@ -79,6 +84,7 @@ export class PartnerKycService {
     const types = rentalKycTypes(kind);
     const checklist = await this.buildChecklist(ownerUserId, PartnerKycSubject.RENTAL_PARTNER, types);
     const phoneVerified = PHONE_OK.test(user?.phone?.trim() ?? '');
+    const hasEmail = Boolean(user?.email?.trim());
     const partnerKind = rentalKycPartnerKind(kind);
     const displayName = user?.name || null;
     return {
@@ -95,9 +101,10 @@ export class PartnerKycService {
       phone: user?.phone ?? null,
       email: user?.email ?? null,
       phoneVerified,
+      hasEmail,
       canOperate: profile.kycStatus === PartnerKycStatus.APPROVED,
       checklist,
-      requiredComplete: this.requiredComplete(checklist) && phoneVerified,
+      requiredComplete: this.requiredComplete(checklist) && (phoneVerified || hasEmail),
     };
   }
 
@@ -190,6 +197,12 @@ export class PartnerKycService {
     if (!approved) {
       await this.markSubjectPending(doc.userId, doc.subject);
     }
+    const notified = approved
+      ? undefined
+      : await this.notifyKycReject(doc.userId, doc.subject, {
+          documentType: doc.type,
+          reason: reason ?? '',
+        });
     return {
       id: updated.id,
       userId: updated.userId,
@@ -198,6 +211,7 @@ export class PartnerKycService {
       status: updated.status,
       notes: updated.notes,
       url: updated.url,
+      ...notified,
     };
   }
 
@@ -244,7 +258,10 @@ export class PartnerKycService {
           isAcceptingOrders: false,
         },
       });
-      return { ...(await this.getRestaurantDossier(userId)), kycStatus: PartnerKycStatus.REJECTED };
+      const notified = await this.notifyKycReject(userId, PartnerKycSubject.RESTAURANT, {
+        reason: reason ?? '',
+      });
+      return { ...(await this.getRestaurantDossier(userId)), kycStatus: PartnerKycStatus.REJECTED, ...notified };
     }
 
     const profile = await this.ensureRentalProfile(userId);
@@ -272,7 +289,10 @@ export class PartnerKycService {
       where: { id: profile.id },
       data: { kycStatus: PartnerKycStatus.REJECTED, kycNotes: reason ?? null },
     });
-    return { ...(await this.getRentalDossier(userId)), kycStatus: PartnerKycStatus.REJECTED };
+    const notified = await this.notifyKycReject(userId, PartnerKycSubject.RENTAL_PARTNER, {
+      reason: reason ?? '',
+    });
+    return { ...(await this.getRentalDossier(userId)), kycStatus: PartnerKycStatus.REJECTED, ...notified };
   }
 
   async listPendingAdmin(status?: string) {
@@ -400,6 +420,23 @@ export class PartnerKycService {
       this.logger.warn(`Issue login PIN threw for ${userId}: ${(e as Error).message}`);
       return { smsSent: false, emailSent: false };
     }
+  }
+
+  private async notifyKycReject(
+    userId: string,
+    subject: PartnerKycSubject,
+    opts: { documentType?: string; reason: string },
+  ): Promise<AuthUserNotifyResult> {
+    const partnerKind =
+      subject === PartnerKycSubject.RESTAURANT
+        ? ('RESTAURANT' as KycPartnerKind)
+        : rentalKycPartnerKind((await this.prisma.rentalPartnerProfile.findUnique({ where: { userId } }))?.partnerType);
+    const copy = kycRejectNotifyCopy({
+      partnerKindLabel: kycPartnerKindLabel(partnerKind),
+      documentLabel: opts.documentType ? kycDocumentLabel(opts.documentType) : undefined,
+      reason: opts.reason,
+    });
+    return notifyAuthUser(userId, { ...copy, purpose: 'kyc_reject' });
   }
 
   private rejectNotes(approved: boolean, notes?: string) {

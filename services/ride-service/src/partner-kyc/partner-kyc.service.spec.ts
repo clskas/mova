@@ -54,8 +54,21 @@ describe('PartnerKycService', () => {
       url: '/api/uploads/kyc/a.jpg',
     });
     prisma.restaurant.updateMany.mockResolvedValue({ count: 1 });
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({ smsSent: false, emailSent: true, hasPhone: false, hasEmail: true }),
+    });
     const result = await service.reviewDocument('doc-1', false, 'RCCM illisible, renvoyer une photo nette');
     expect(result.notes).toBe('RCCM illisible, renvoyer une photo nette');
+    expect(result.emailSent).toBe(true);
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/internal/users/u1/notify'),
+      expect.objectContaining({ method: 'POST' }),
+    );
+    const notifyBody = JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body as string);
+    expect(notifyBody.smsText).toContain('RCCM illisible, renvoyer une photo nette');
+    expect(notifyBody.emailText).toContain('RCCM illisible, renvoyer une photo nette');
+    expect(notifyBody.purpose).toBe('kyc_reject');
     expect(prisma.partnerKycDocument.update).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({

@@ -256,6 +256,8 @@ export default function KycPage() {
         hasPhone?: boolean;
         smsError?: string;
         emailSent?: boolean;
+        hasEmail?: boolean;
+        emailError?: string;
       }>(`/api/admin/kyc/${id}/review`, {
         method: "POST",
         body: JSON.stringify({ approved, notes }),
@@ -264,6 +266,8 @@ export default function KycPage() {
         window.alert(
           `Dossier validé.\n\nPIN d'activation : ${result.activationPin ?? "—"}\nPIN de connexion : ${result.loginPin ?? "—"}\n\n${activationPinSmsCopy(result)}`,
         );
+      } else if (!approved) {
+        window.alert(`Refus enregistré.\n\n${activationPinSmsCopy(result)}`);
       }
       load();
     } catch (e) {
@@ -287,6 +291,8 @@ export default function KycPage() {
         window.alert(
           `Dossier validé.\n\nPIN d'activation : ${result.activationPin ?? "—"}\nPIN de connexion : ${result.loginPin ?? "—"}\n\n${activationPinSmsCopy(result)}`,
         );
+      } else if (!approved) {
+        window.alert(`Refus enregistré.\n\n${activationPinSmsCopy(result)}`);
       }
       load();
     } catch (e) {
@@ -305,7 +311,10 @@ export default function KycPage() {
         }
         notes = motif.trim();
       }
-      await reviewPartnerKycDocument(id, approved, notes);
+      const result = await reviewPartnerKycDocument(id, approved, notes);
+      if (!approved) {
+        window.alert(`Refus enregistré.\n\n${activationPinSmsCopy(result)}`);
+      }
       load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Échec de la validation");
@@ -326,6 +335,8 @@ export default function KycPage() {
       const result = await reviewPartnerKycSubject(subject, userId, approved, notes);
       if (approved && result.loginPin) {
         window.alert(`Dossier validé.\n\nPIN de connexion : ${result.loginPin}\n\n${activationPinSmsCopy(result)}`);
+      } else if (!approved) {
+        window.alert(`Refus enregistré.\n\n${activationPinSmsCopy(result)}`);
       }
       load();
     } catch (e) {

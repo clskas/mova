@@ -26,6 +26,20 @@ class PurgeUserDto {
   @IsOptional() @IsString() actorId?: string;
 }
 
+class NotifyUserDto {
+  @IsString() smsText: string;
+  @IsString() emailSubject: string;
+  @IsString() emailText: string;
+  @IsOptional() @IsString() emailHtml?: string;
+  @IsOptional() @IsString() purpose?: string;
+}
+
+class IssueLoginPinDto {
+  @IsOptional() @IsString() pin?: string;
+  @IsOptional() notify?: boolean;
+  @IsOptional() @IsString() purpose?: string;
+}
+
 @ApiTags('internal')
 @Controller('internal')
 @UseGuards(InternalApiGuard)
@@ -53,7 +67,13 @@ export class InternalController {
     return this.users.purgeUser(id, body?.actorId);
   }
   @Post('users/:id/issue-login-pin')
-  issueLoginPin(@Param('id') id: string) {
-    return this.auth.issueLoginPin(id);
+  issueLoginPin(@Param('id') id: string, @Body() dto: IssueLoginPinDto) {
+    return this.auth.issueLoginPin(id, { pin: dto?.pin, notify: dto?.notify });
+  }
+
+  /** SMS hub + mailer from User.phone / User.email. */
+  @Post('users/:id/notify')
+  notifyUser(@Param('id') id: string, @Body() dto: NotifyUserDto) {
+    return this.auth.notifyUser(id, dto);
   }
 }

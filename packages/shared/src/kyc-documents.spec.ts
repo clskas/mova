@@ -7,6 +7,8 @@ import {
   kycDocumentLabel,
   kycPartnerKindLabel,
   rentalKycPartnerKind,
+  kycRejectNotifyCopy,
+  driverActivationPinNotifyCopy,
 } from './kyc-documents';
 
 describe('partner KYC checklists', () => {
@@ -54,5 +56,33 @@ describe('normalizeKycRejectNotes', () => {
   it('laisse le motif optionnel lors d\'une approbation', () => {
     expect(normalizeKycRejectNotes(true)).toBeUndefined();
     expect(normalizeKycRejectNotes(true, '  ok  ')).toBe('ok');
+  });
+});
+
+describe('KYC notify copy', () => {
+  it('inclut le motif de refus pour chauffeur et partenaire', () => {
+    const driver = kycRejectNotifyCopy({
+      partnerKindLabel: 'Chauffeur',
+      documentLabel: 'Permis de conduire',
+      reason: 'Photo floue, recommencer',
+    });
+    expect(driver.smsText).toContain('Permis de conduire');
+    expect(driver.smsText).toContain('Photo floue, recommencer');
+    expect(driver.emailText).toContain('Photo floue, recommencer');
+    const resto = kycRejectNotifyCopy({
+      partnerKindLabel: 'Restaurant',
+      documentLabel: "RCCM ou preuve d'activité",
+      reason: 'RCCM illisible, renvoyer une photo nette',
+    });
+    expect(resto.smsText).toContain('Restaurant');
+    expect(resto.smsText).toContain('RCCM illisible');
+  });
+
+  it('ne met pas le PIN dans le sujet e-mail', () => {
+    const copy = driverActivationPinNotifyCopy('111657');
+    expect(copy.smsText).toContain('111657');
+    expect(copy.emailText).toContain('111657');
+    expect(copy.emailSubject).not.toContain('111657');
+    expect(copy.smsText).toMatch(/activation et connexion/);
   });
 });

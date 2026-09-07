@@ -194,6 +194,58 @@ export function normalizeKycRejectNotes(approved: boolean, notes?: string | null
   return reason;
 }
 
+export function driverActivationPinNotifyCopy(pin: string): {
+  smsText: string;
+  emailSubject: string;
+  emailText: string;
+  emailHtml: string;
+} {
+  return {
+    smsText:
+      `SENGA — votre code PIN (activation et connexion) : ${pin}. ` +
+      `Valable 72 h pour l'activation chauffeur. Ne le communiquez à personne.`,
+    emailSubject: 'Votre code PIN SENGA',
+    emailText:
+      `Votre code PIN SENGA (activation chauffeur et connexion) est ${pin}. ` +
+      `L'activation est valable 72 heures. Saisissez-le dans l'application.\n\n` +
+      `Si vous n'êtes pas à l'origine de cette demande, ignorez cet e-mail.`,
+    emailHtml:
+      `<p>Votre code PIN SENGA (activation chauffeur et connexion) est <strong>${pin}</strong>.</p>` +
+      `<p>L'activation est valable 72 heures. Saisissez-le dans l'application.</p>`,
+  };
+}
+
+export function kycRejectNotifyCopy(opts: {
+  partnerKindLabel: string;
+  documentLabel?: string;
+  reason: string;
+}): { smsText: string; emailSubject: string; emailText: string; emailHtml: string } {
+  const who = opts.partnerKindLabel;
+  const what = opts.documentLabel
+    ? `votre justificatif « ${opts.documentLabel} » (${who})`
+    : `votre dossier ${who}`;
+  const motif = opts.reason;
+  return {
+    smsText: `SENGA : ${what} a été refusé. Motif : ${motif}. Déposez un nouveau document dans l'application.`,
+    emailSubject: 'SENGA : justificatif refusé',
+    emailText:
+      `Bonjour,\n\n${what.charAt(0).toUpperCase()}${what.slice(1)} a été refusé.\n\n` +
+      `Motif : ${motif}\n\nDéposez un nouveau document dans l'application SENGA.`,
+    emailHtml:
+      `<p>Bonjour,</p><p>${what.charAt(0).toUpperCase()}${what.slice(1)} a été refusé.</p>` +
+      `<p>Motif : ${escapeNotifyHtml(motif)}</p>` +
+      `<p>Déposez un nouveau document dans l'application SENGA.</p>`,
+  };
+}
+
+function escapeNotifyHtml(value: string) {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
 const LEGACY_TYPE_MAP: Record<string, KycDocumentType> = {
   permis_de_conduire: KYC_DOCUMENT_TYPES.DRIVERS_LICENSE,
   carte_grise: KYC_DOCUMENT_TYPES.VEHICLE_REGISTRATION,

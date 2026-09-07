@@ -1920,16 +1920,20 @@ export async function setDriverStatus(userId: string, active: boolean, suspendUs
   });
 }
 
+export type KycNotifyResult = {
+  smsSent?: boolean;
+  hasPhone?: boolean;
+  smsError?: string;
+  emailSent?: boolean;
+  hasEmail?: boolean;
+  emailError?: string;
+};
+
 export async function reviewDriverKyc(userId: string, approved: boolean, notes?: string) {
   return apiFetch<{
     activationPin?: string;
     loginPin?: string;
-    smsSent?: boolean;
-    hasPhone?: boolean;
-    smsError?: string;
-    emailSent?: boolean;
-    hasEmail?: boolean;
-  }>(`/api/admin/drivers/${userId}/kyc`, {
+  } & KycNotifyResult>(`/api/admin/drivers/${userId}/kyc`, {
     method: "PATCH",
     body: JSON.stringify({ approved, notes }),
   });
@@ -1977,24 +1981,14 @@ export async function runKycOcr(documentId: string) {
 export async function regenerateDriverActivationPin(userId: string) {
   return apiFetch<{
     activationPin: string;
-    smsSent?: boolean;
-    hasPhone?: boolean;
-    smsError?: string;
     publicId?: string;
-  }>(`/api/admin/drivers/${userId}/activation-pin`, {
+  } & KycNotifyResult>(`/api/admin/drivers/${userId}/activation-pin`, {
     method: "POST",
     body: JSON.stringify({}),
   });
 }
 
-export function activationPinSmsCopy(result: {
-  smsSent?: boolean;
-  hasPhone?: boolean;
-  smsError?: string;
-  emailSent?: boolean;
-  hasEmail?: boolean;
-  emailError?: string;
-}): string {
+export function activationPinSmsCopy(result: KycNotifyResult): string {
   const parts: string[] = [];
   if (result.smsSent) parts.push("Un SMS a été envoyé.");
   else if (result.hasPhone === false) parts.push("Aucun numéro +243 lié — le SMS n'a pas été envoyé.");
@@ -2061,7 +2055,7 @@ export async function fetchPartnerKycPending(status?: string) {
 }
 
 export async function reviewPartnerKycDocument(id: string, approved: boolean, notes?: string) {
-  return apiFetch(`/api/admin/partner-kyc/documents/${id}/review`, {
+  return apiFetch<KycNotifyResult>(`/api/admin/partner-kyc/documents/${id}/review`, {
     method: "POST",
     body: JSON.stringify({ approved, notes }),
   });
@@ -2073,7 +2067,7 @@ export async function reviewPartnerKycSubject(
   approved: boolean,
   notes?: string,
 ) {
-  return apiFetch<PartnerKycDossier>(`/api/admin/partner-kyc/${subject}/${userId}`, {
+  return apiFetch<PartnerKycDossier & KycNotifyResult>(`/api/admin/partner-kyc/${subject}/${userId}`, {
     method: "PATCH",
     body: JSON.stringify({ approved, notes }),
   });

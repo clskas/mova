@@ -10,6 +10,7 @@ export * from './service-areas';
 export * from './territory/rdc-territory';
 export * from './kinshasa-bounds';
 export * from './service-urls';
+export * from './auth-notify';
 export * from './prod-security';
 export * from './timing-safe';
 export * from './jwt-user';

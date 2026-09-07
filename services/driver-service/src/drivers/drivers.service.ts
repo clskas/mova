@@ -19,9 +19,11 @@ import {
   maskPhoneRdc,
   evaluateDriverDocuments,
   type DriverDocumentsStatus,
+  type AuthUserNotifyResult,
 } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateOnboardingDto } from './drivers.dto';
+import { notifyDriverActivationPin, notifyDriverKycReject } from './kyc-notify';
 import { OcrService } from '../ocr/ocr.service';
 import { MatchingConfigService } from '../common/matching-config.service';
 
@@ -608,65 +610,21 @@ export class DriversService {
     return new Date(Date.now() + 72 * 60 * 60 * 1000);
   }
 
-  private async sendActivationPinSms(
-    userId: string,
-    pin: string,
-  ): Promise<{ smsSent: boolean; hasPhone: boolean; smsError?: string }> {
-    const user = await this.fetchAuthUser(userId);
-    const phone = user?.phone?.trim();
-    if (!phone) {
-      this.logger.warn(`Activation PIN SMS skipped — no phone for ${userId}`);
-      return {
-        smsSent: false,
-        hasPhone: false,
-        smsError:
-          "Aucun numéro de téléphone lié à ce compte (souvent une connexion Google). Le SMS n'a pas été envoyé.",
-      };
-    }
-    const text =
-      `SENGA chauffeur — code d'activation : ${pin}. Valable 72 h, usage unique. Saisissez-le dans l'application.`;
-    const body = JSON.stringify({ phone, text, purpose: 'driver_activation' });
-    const headers = { 'Content-Type': 'application/json', 'x-internal-api-key': INTERNAL_API_KEY };
-
-    const postSms = async (service: 'auth' | 'notification', path: string) => {
-      const res = await fetch(serviceUrl(service, path), { method: 'POST', headers, body });
-      let json: { success?: boolean; message?: string } = {};
-      try {
-        json = (await res.json()) as { success?: boolean; message?: string };
-      } catch {
-        json = {};
-      }
-      return { res, json };
-    };
-
-    try {
-      // Same AfriSoft hub path as OTP login (mova-auth).
-      const authAttempt = await postSms('auth', '/internal/sms');
-      if (authAttempt.res.ok && authAttempt.json.success === true) {
-        return { smsSent: true, hasPhone: true };
-      }
-      const authErr =
-        authAttempt.json.message ||
-        `Hub SMS HTTP ${authAttempt.res.status || 'indisponible'}`;
-      this.logger.warn(`Activation PIN SMS via auth failed for ${userId}: ${authErr}`);
-
-      const notifAttempt = await postSms('notification', '/internal/sms');
-      if (notifAttempt.res.ok && notifAttempt.json.success === true) {
-        return { smsSent: true, hasPhone: true };
-      }
-      const notifErr =
-        notifAttempt.json.message ||
-        `Hub SMS HTTP ${notifAttempt.res.status || 'indisponible'}`;
-      this.logger.warn(`Activation PIN SMS via notification failed for ${userId}: ${notifErr}`);
-      return { smsSent: false, hasPhone: true, smsError: authErr || notifErr };
-    } catch (e) {
-      const smsError = (e as Error).message;
-      this.logger.warn(`Activation PIN SMS failed for ${userId}: ${smsError}`);
-      return { smsSent: false, hasPhone: true, smsError };
-    }
+  private sendActivationPinNotify(userId: string, pin: string): Promise<AuthUserNotifyResult> {
+    return notifyDriverActivationPin(userId, pin);
   }
 
-  private async issueAccountLoginPin(userId: string): Promise<{
+  private sendKycRejectNotify(
+    userId: string,
+    opts: { documentType?: string; reason: string },
+  ): Promise<AuthUserNotifyResult> {
+    return notifyDriverKycReject(userId, opts);
+  }
+
+  private async issueAccountLoginPin(
+    userId: string,
+    opts?: { pin?: string; notify?: boolean },
+  ): Promise<{
     loginPin?: string;
     smsSent?: boolean;
     emailSent?: boolean;
@@ -677,7 +635,11 @@ export class DriversService {
       const res = await fetch(serviceUrl('auth', `/internal/users/${userId}/issue-login-pin`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-internal-api-key': INTERNAL_API_KEY },
-        body: JSON.stringify({ purpose: 'driver_kyc' }),
+        body: JSON.stringify({
+          purpose: 'driver_kyc',
+          pin: opts?.pin,
+          notify: opts?.notify === true,
+        }),
       });
       const json = (await res.json().catch(() => ({}))) as {
         loginPin?: string;
@@ -694,8 +656,18 @@ export class DriversService {
     }
   }
 
-  private async applyKycApproval(userId: string) {
+  private async resolveOnePin(userId: string): Promise<string> {
+    const issued = await this.issueAccountLoginPin(userId, { notify: false });
+    if (typeof issued.loginPin === 'string' && /^\d{6}$/.test(issued.loginPin)) {
+      return issued.loginPin;
+    }
     const pin = this.generateActivationPin();
+    await this.issueAccountLoginPin(userId, { pin, notify: false });
+    return pin;
+  }
+
+  private async applyKycApproval(userId: string) {
+    const pin = await this.resolveOnePin(userId);
     const now = new Date();
     const expiresAt = this.activationPinExpiry();
     const defaultExpiry = new Date(now);
@@ -738,9 +710,12 @@ export class DriversService {
         data: { typeApprovalStatus: KycStatus.APPROVED, typeApprovedAt: now, typeApprovalNotes: null },
       });
     }
-    const sms = await this.sendActivationPinSms(userId, pin);
-    const loginPin = await this.issueAccountLoginPin(userId);
-    return { pin, ...sms, loginPin: loginPin.loginPin, loginPinSmsSent: loginPin.smsSent, loginPinEmailSent: loginPin.emailSent, loginPinHasEmail: loginPin.hasEmail };
+    const notified = await this.sendActivationPinNotify(userId, pin);
+    return {
+      pin,
+      loginPin: pin,
+      ...notified,
+    };
   }
 
   async getProfile(userId: string) {
@@ -929,17 +904,24 @@ export class DriversService {
         ...doc,
         activationPin: issued.pin,
         smsSent: issued.smsSent,
+        emailSent: issued.emailSent,
         hasPhone: issued.hasPhone,
+        hasEmail: issued.hasEmail,
         smsError: issued.smsError,
+        emailError: issued.emailError,
+        loginPin: issued.loginPin,
       };
-    } else {
-      await this.prisma.driverProfile.upsert({
-        where: { userId: doc.userId },
-        create: { userId: doc.userId, kycStatus: KycStatus.PENDING },
-        update: { kycStatus: KycStatus.PENDING },
-      });
     }
-    return doc;
+    await this.prisma.driverProfile.upsert({
+      where: { userId: doc.userId },
+      create: { userId: doc.userId, kycStatus: KycStatus.PENDING },
+      update: { kycStatus: KycStatus.PENDING },
+    });
+    const notified = await this.sendKycRejectNotify(doc.userId, {
+      documentType: doc.type,
+      reason: reason ?? notes ?? '',
+    });
+    return { ...doc, ...notified };
   }
 
   async setDriverKycStatus(userId: string, approved: boolean, notes?: string) {
@@ -955,26 +937,28 @@ export class DriversService {
       data: { status, ...(reason ? { notes: reason } : {}) },
     });
     let activationPin: string | undefined;
-    let smsSent = false;
-    let hasPhone: boolean | undefined;
-    let smsError: string | undefined;
     let loginPin: string | undefined;
+    let notified: AuthUserNotifyResult = {
+      smsSent: false,
+      emailSent: false,
+      hasPhone: false,
+      hasEmail: false,
+    };
     if (approved) {
       const issued = await this.applyKycApproval(userId);
       activationPin = issued.pin;
-      smsSent = issued.smsSent;
-      hasPhone = issued.hasPhone;
-      smsError = issued.smsError;
       loginPin = issued.loginPin;
+      notified = issued;
     } else {
       await this.prisma.driverProfile.upsert({
         where: { userId },
         create: { userId, kycStatus: status },
         update: { kycStatus: status, activationPin: null, activationPinVerifiedAt: null, activationPinExpiresAt: null },
       });
+      notified = await this.sendKycRejectNotify(userId, { reason: reason ?? notes ?? '' });
     }
     const profile = await this.prisma.driverProfile.findUnique({ where: { userId }, include: { vehicles: true } });
-    return { ...profile, activationPin, smsSent, hasPhone, smsError, loginPin };
+    return { ...profile, activationPin, loginPin, ...notified };
   }
 
   async updateRating(userId: string, ratingAvg: number) {
@@ -1005,7 +989,7 @@ export class DriversService {
         'Le KYC doit être approuvé avant de générer un PIN.',
       );
     }
-    const pin = this.generateActivationPin();
+    const pin = await this.resolveOnePin(userId);
     const expiresAt = this.activationPinExpiry();
     await this.prisma.driverProfile.update({
       where: { userId },
@@ -1016,12 +1000,11 @@ export class DriversService {
         isAvailable: false,
       },
     });
-    const sms = await this.sendActivationPinSms(userId, pin);
+    const notified = await this.sendActivationPinNotify(userId, pin);
     return {
       activationPin: pin,
-      smsSent: sms.smsSent,
-      hasPhone: sms.hasPhone,
-      smsError: sms.smsError,
+      loginPin: pin,
+      ...notified,
       userId,
       publicId: formatMovaPublicId(userId, 'DRIVER'),
     };

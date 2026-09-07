@@ -58,7 +58,7 @@ describe('AuthService', () => {
     client: { get: jest.Mock; set: jest.Mock; del: jest.Mock };
   };
   let sms: { sendOtp: jest.Mock; sendSms: jest.Mock };
-  let mailer: { sendOtp: jest.Mock; sendLoginPin: jest.Mock; isConfigured: jest.Mock };
+  let mailer: { sendOtp: jest.Mock; sendLoginPin: jest.Mock; sendNotice: jest.Mock; isConfigured: jest.Mock };
   let service: AuthService;
 
   beforeEach(() => {
@@ -103,6 +103,7 @@ describe('AuthService', () => {
     mailer = {
       sendOtp: jest.fn().mockResolvedValue({ success: true, message: 'ok' }),
       sendLoginPin: jest.fn().mockResolvedValue({ success: true, message: 'ok' }),
+      sendNotice: jest.fn().mockResolvedValue({ success: true, message: 'ok' }),
       isConfigured: jest.fn().mockReturnValue(true),
     };
     service = new AuthService(
@@ -1199,5 +1200,52 @@ describe('AuthService', () => {
     const logged = logSpy.mock.calls.flat().map(String).join(' ');
     expect(logged).not.toContain(result.loginPin);
     logSpy.mockRestore();
+  });
+
+  it('envoie le PIN de connexion par e-mail si le compte n\'a pas de +243', async () => {
+    prisma.user.findUnique.mockResolvedValue(makeUser({ phone: null, email: 'only@ex.com' }));
+    prisma.user.update.mockResolvedValue(makeUser({ phone: null, email: 'only@ex.com' }));
+    const result = await service.issueLoginPin('user-1');
+    expect(result.hasPhone).toBe(false);
+    expect(result.hasEmail).toBe(true);
+    expect(result.emailSent).toBe(true);
+    expect(sms.sendSms).not.toHaveBeenCalled();
+    expect(mailer.sendLoginPin).toHaveBeenCalledWith('only@ex.com', result.loginPin);
+  });
+
+  it('envoie un avis KYC par e-mail si seul l\'e-mail est lié', async () => {
+    prisma.user.findUnique.mockResolvedValue(makeUser({ phone: null, email: 'only@ex.com' }));
+    const result = await service.notifyUser('user-1', {
+      smsText: 'SENGA : code 111657',
+      emailSubject: "Votre code d'activation SENGA",
+      emailText: 'Votre code d\'activation chauffeur SENGA est 111657.',
+      purpose: 'driver_activation',
+    });
+    expect(result.hasPhone).toBe(false);
+    expect(result.hasEmail).toBe(true);
+    expect(result.emailSent).toBe(true);
+    expect(result.smsSent).toBe(false);
+    expect(sms.sendSms).not.toHaveBeenCalled();
+    expect(mailer.sendNotice).toHaveBeenCalledWith(
+      'only@ex.com',
+      "Votre code d'activation SENGA",
+      expect.stringContaining('111657'),
+      undefined,
+    );
+  });
+
+  it('envoie le motif de refus par SMS quand le +243 est sur User', async () => {
+    prisma.user.findUnique.mockResolvedValue(makeUser({ phone: '0810000001', email: null }));
+    const motif = 'RCCM illisible, renvoyer une photo nette';
+    const result = await service.notifyUser('user-1', {
+      smsText: `SENGA : justificatif refusé. Motif : ${motif}.`,
+      emailSubject: 'SENGA : justificatif refusé',
+      emailText: `Motif : ${motif}`,
+      purpose: 'kyc_reject',
+    });
+    expect(result.hasPhone).toBe(true);
+    expect(result.smsSent).toBe(true);
+    expect(sms.sendSms).toHaveBeenCalledWith('+243810000001', expect.stringContaining(motif), 'kyc_reject');
+    expect(mailer.sendNotice).not.toHaveBeenCalled();
   });
 });

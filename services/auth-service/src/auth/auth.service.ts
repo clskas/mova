@@ -1281,22 +1281,79 @@ export class AuthService {
     }
   }
 
-  /** Issues a new 6-digit login PIN and notifies by SMS and/or e-mail. Never logs the PIN. */
-  async issueLoginPin(userId: string) {
+  /**
+   * Looks up User.phone / User.email (not a KYC row) and sends SMS and/or e-mail.
+   * SMS only for a valid +243. If both exist, both are sent. Never logs the body.
+   */
+  async notifyUser(
+    userId: string,
+    payload: {
+      smsText: string;
+      emailSubject: string;
+      emailText: string;
+      emailHtml?: string;
+      purpose?: string;
+    },
+  ) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new MovaHttpException(MovaErrorCode.USER_NOT_FOUND, HttpStatus.NOT_FOUND);
-    const pin = generateSecureLocalPin();
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: { localPinHash: hashLocalPin(pin), localPinSetAt: new Date() },
-    });
-    const phone = user.phone?.trim() || '';
+    const phone = normalizePhoneRdc(user.phone?.trim() ?? '');
     const email = user.email?.trim() || '';
+    const hasPhone = validatePhoneRdc(phone);
+    const hasEmail = Boolean(email);
     let smsSent = false;
     let emailSent = false;
     let smsError: string | undefined;
     let emailError: string | undefined;
-    if (phone) {
+    if (hasPhone && payload.smsText) {
+      try {
+        const sms = await this.sms.sendSms(phone, payload.smsText, payload.purpose ?? 'notify');
+        smsSent = sms.success === true;
+        if (!smsSent) smsError = sms.message;
+      } catch (e) {
+        smsError = (e as Error).message;
+      }
+    }
+    if (hasEmail && payload.emailText) {
+      try {
+        const mailed = await this.emailOtp.sendNotice(
+          email,
+          payload.emailSubject,
+          payload.emailText,
+          payload.emailHtml,
+        );
+        emailSent = mailed.success === true;
+        if (!emailSent) emailError = mailed.message;
+      } catch (e) {
+        emailError = (e as Error).message;
+      }
+    }
+    return { smsSent, emailSent, hasPhone, hasEmail, smsError, emailError };
+  }
+
+  /**
+   * Issues a 6-digit login PIN (or reuses `opts.pin`) and optionally notifies SMS/e-mail.
+   * Never logs the PIN.
+   */
+  async issueLoginPin(userId: string, opts?: { pin?: string; notify?: boolean }) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new MovaHttpException(MovaErrorCode.USER_NOT_FOUND, HttpStatus.NOT_FOUND);
+    const requested = opts?.pin?.trim() ?? '';
+    const pin = /^\d{6}$/.test(requested) ? requested : generateSecureLocalPin();
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { localPinHash: hashLocalPin(pin), localPinSetAt: new Date() },
+    });
+    const phone = normalizePhoneRdc(user.phone?.trim() ?? '');
+    const email = user.email?.trim() || '';
+    const hasPhone = validatePhoneRdc(phone);
+    const hasEmail = Boolean(email);
+    const shouldNotify = opts?.notify !== false;
+    let smsSent = false;
+    let emailSent = false;
+    let smsError: string | undefined;
+    let emailError: string | undefined;
+    if (shouldNotify && hasPhone) {
       const text =
         `SENGA : votre code PIN de connexion est ${pin}. Conservez-le précieusement. Ne le communiquez à personne.`;
       try {
@@ -1307,7 +1364,7 @@ export class AuthService {
         smsError = (e as Error).message;
       }
     }
-    if (email) {
+    if (shouldNotify && hasEmail) {
       try {
         const mailed = await this.emailOtp.sendLoginPin(email, pin);
         emailSent = mailed.success === true;
@@ -1321,8 +1378,8 @@ export class AuthService {
       loginPin: pin,
       smsSent,
       emailSent,
-      hasPhone: Boolean(phone),
-      hasEmail: Boolean(email),
+      hasPhone,
+      hasEmail,
       smsError,
       emailError,
     };

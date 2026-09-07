@@ -107,7 +107,12 @@ void main() {
     await tester.tap(find.text('Envoyer le code SMS'));
     await tester.pump();
 
-    expect(find.textContaining('Minimum SerdiPay'), findsOneWidget);
+    expect(
+      find.text(
+        'Minimum SerdiPay : 2 300 FC. Vous pouvez retirer une partie du solde si ce montant reste ≥ 2 300 FC.',
+      ),
+      findsOneWidget,
+    );
     expect(find.text('Confirmer le retrait'), findsNothing);
   });
 

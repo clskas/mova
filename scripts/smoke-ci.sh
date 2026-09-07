@@ -11,7 +11,7 @@ for f in scripts/backup-db.sh scripts/migrate-with-backup.sh scripts/migrate-all
   echo "OK $f"
 done
 
-if grep -E '^[^#]*prisma[[:space:]]+db[[:space:]]+seed' scripts/migrate-with-backup.sh; then
+if grep -E '^[[:space:]]*(npx[[:space:]]+)?(\./node_modules/\.bin/)?prisma[[:space:]]+db[[:space:]]+seed' scripts/migrate-with-backup.sh; then
   echo "FORBIDDEN: migrate-with-backup must not run prisma db seed" >&2
   exit 1
 fi

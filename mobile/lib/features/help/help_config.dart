@@ -39,7 +39,7 @@ const kFaqItems = <FaqItem>[
   FaqItem(
     question: 'Le prix affiché est-il définitif ?',
     answer:
-        'Non, c\'est une estimation. Le montant final peut varier selon la distance réelle, le trafic, les embouteillages ou les suppléments (nuit, pluie, inter-villes, etc.).',
+        'Oui. Le prix que vous voyez avant de confirmer est le prix facturé. Ce n\'est pas un compteur qui augmente pendant le trajet.',
   ),
   FaqItem(
     question: 'Comment annuler une course ou une livraison ?',
@@ -137,14 +137,15 @@ class ManualChapter {
 const kManualChapters = <ManualChapter>[
   ManualChapter(
     id: 'account',
-    title: 'Créer un compte',
+    title: 'Connexion et code PIN',
     icon: '👤',
     steps: [
-      'Ouvrez Senga.',
-      'Saisissez votre numéro +243 (9 chiffres après l\'indicatif).',
-      'Entrez le code OTP reçu par SMS.',
-      'Accédez à l\'écran d\'accueil avec tous les services.',
+      'Ouvrez SENGA. Entrez votre numéro +243, ou continuez avec Google.',
+      'Au premier accès, créez un code PIN à 6 chiffres.',
+      'Les prochaines fois, ouvrez l\'app et saisissez ce PIN.',
+      'Ne donnez jamais votre PIN de connexion à quelqu\'un.',
     ],
+    tip: 'Si vous oubliez le PIN, reconnectez-vous par SMS pour en créer un autre.',
   ),
   ManualChapter(
     id: 'taxi',
@@ -152,35 +153,43 @@ const kManualChapters = <ManualChapter>[
     icon: '🏍️',
     steps: [
       'Appuyez sur Taxi / Moto-taxi.',
-      'Indiquez votre position (GPS ou saisie manuelle) et la destination (ex. Gombe, Limete, Masina).',
-      'Choisissez Moto ou Taxi. Pour un taxi, sélectionnez ensuite Standard, Confort ou VIP.',
-      'Appuyez sur Estimer le prix puis Confirmer la course.',
-      'Suivez le chauffeur en temps réel et payez à l\'arrivée ou via Wallet.',
+      'Indiquez le départ et l\'arrivée. Vous pouvez aussi poser un pin sur la carte (appui long), puis « Utiliser cet emplacement ».',
+      'Choisissez Moto ou Taxi (Standard, Confort ou VIP).',
+      'Regardez le prix, puis confirmez.',
+      'Suivez le chauffeur et payez le prix affiché (portefeuille, Mobile Money ou espèces).',
     ],
-    tip: 'En heure de pointe, prévoyez un délai supplémentaire.',
+    tip: 'Le prix vu avant confirmation est le prix facturé. Il n\'y a pas de compteur qui augmente pendant le trajet.',
+  ),
+  ManualChapter(
+    id: 'price',
+    title: 'Le prix affiché',
+    icon: '💵',
+    steps: [
+      'SENGA calcule le prix avant que vous confirmiez.',
+      'Ce prix est bloqué : c\'est celui que vous payez.',
+      'Ce n\'est pas un taxi à compteur qui change en route.',
+    ],
   ),
   ManualChapter(
     id: 'parcel',
-    title: 'Livraison colis',
+    title: 'Livraisons (colis et repas)',
     icon: '📦',
     steps: [
-      'Appuyez sur Livraison colis.',
-      'Renseignez l\'adresse d\'enlèvement et de livraison.',
-      'Sélectionnez la catégorie de poids du colis.',
-      'Ajoutez une photo et des instructions (optionnel).',
-      'Estimez, confirmez et suivez le livreur.',
+      'Appuyez sur Livraisons, puis colis ou repas.',
+      'Indiquez l\'enlèvement et la livraison (ou choisissez un restaurant).',
+      'Confirmez le prix affiché — c\'est le montant à payer.',
+      'Suivez le livreur. Pour un colis, donnez le code PIN seulement quand vous avez bien reçu.',
     ],
   ),
   ManualChapter(
     id: 'wallet',
-    title: 'Wallet SENGA',
+    title: 'Recharger le portefeuille',
     icon: '💳',
     steps: [
-      'Ouvrez Wallet SENGA depuis l\'accueil ou la barre de navigation.',
-      'Consultez votre solde en CDF.',
-      'Rechargez via Orange Money, M-Pesa ou Airtel Money.',
-      'Payez vos courses directement depuis le portefeuille.',
-      'Consultez l\'historique des transactions.',
+      'Ouvrez Wallet SENGA.',
+      'Appuyez sur Recharger.',
+      'Choisissez Orange Money, M-Pesa ou Airtel Money.',
+      'Validez le paiement sur votre téléphone. Le solde apparaît en CDF.',
     ],
   ),
   ManualChapter(
@@ -277,6 +286,91 @@ const kManualChapters = <ManualChapter>[
       'Ajoutez options : manutention, étage sans ascenseur.',
       'Confirmez — un camion et une équipe vous sont affectés.',
       'Suivez les étapes : chargement, transit, déchargement.',
+    ],
+  ),
+];
+
+const kDriverManualChapters = <ManualChapter>[
+  ManualChapter(
+    id: 'kyc',
+    title: 'Dossier et documents',
+    icon: '📁',
+    steps: [
+      'Ouvrez Mon dossier.',
+      'Envoyez votre pièce d\'identité, votre permis et les papiers du véhicule.',
+      'Attendez la validation SENGA avant de travailler.',
+    ],
+    tip: 'Sans dossier validé, vous ne pouvez pas vous mettre en ligne.',
+  ),
+  ManualChapter(
+    id: 'vehicle',
+    title: 'Type d\'engin',
+    icon: '🛵',
+    steps: [
+      'Indiquez si vous roulez en moto, taxi, Confort ou VIP.',
+      'Pour Confort et VIP, SENGA doit encore valider le type.',
+      'Ensuite seulement, vous pouvez recevoir ces courses.',
+    ],
+  ),
+  ManualChapter(
+    id: 'pin',
+    title: 'Connexion avec le PIN',
+    icon: '🔐',
+    steps: [
+      'Après validation, créez ou utilisez votre code PIN à 6 chiffres.',
+      'Ouvrez SENGA Driver et saisissez ce PIN.',
+      'Ne donnez jamais votre PIN de connexion.',
+    ],
+  ),
+  ManualChapter(
+    id: 'online',
+    title: 'Se mettre en ligne',
+    icon: '🟢',
+    steps: [
+      'Sur l\'accueil, activez En ligne.',
+      'Gardez le GPS allumé.',
+      'Vous recevez alors les demandes près de vous.',
+    ],
+  ),
+  ManualChapter(
+    id: 'accept',
+    title: 'Accepter une course',
+    icon: '🚕',
+    steps: [
+      'Une demande arrive : acceptez ou refusez.',
+      'Allez au point de départ indiqué.',
+      'Suivez les étapes jusqu\'à la fin de la course.',
+    ],
+  ),
+  ManualChapter(
+    id: 'delivery-pin',
+    title: 'PIN de livraison',
+    icon: '📦',
+    steps: [
+      'Pour un colis ou un repas, le client a un code PIN.',
+      'Il vous le donne seulement à la remise.',
+      'Saisissez ce PIN quand le client a bien reçu.',
+    ],
+    tip: 'Ne demandez pas le PIN avant d\'être arrivé et d\'avoir remis le colis.',
+  ),
+  ManualChapter(
+    id: 'earnings',
+    title: 'Revenus',
+    icon: '💰',
+    steps: [
+      'Ouvrez Revenus pour voir vos gains du jour en CDF.',
+      'Consultez l\'historique des courses et livraisons.',
+      'Vous pouvez demander un retrait quand le minimum est atteint.',
+    ],
+  ),
+  ManualChapter(
+    id: 'charter',
+    title: 'Charte et CGU',
+    icon: '📜',
+    steps: [
+      'La charte, ce sont les règles de conduite avec les clients (respect, sécurité).',
+      'Les CGU, c\'est le contrat d\'utilisation de SENGA (compte, paiements, responsabilités).',
+      'Les deux sont à accepter pour travailler.',
     ],
   ),
 ];

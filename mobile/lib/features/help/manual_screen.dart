@@ -6,38 +6,51 @@ import 'help_config.dart';
 import 'legal_screen.dart';
 
 class ManualScreen extends StatelessWidget {
-  const ManualScreen({super.key});
+  const ManualScreen({
+    super.key,
+    this.title = 'Manuel utilisateur',
+    this.subtitle,
+    this.chapters,
+    this.showFullManual = true,
+  });
+
+  final String title;
+  final String? subtitle;
+  final List<ManualChapter>? chapters;
+  final bool showFullManual;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final items = chapters ?? kManualChapters;
 
     return MovaScreen(
-      title: 'Manuel utilisateur',
+      title: title,
       actions: [
-        IconButton(
-          icon: const Icon(Icons.article_outlined),
-          tooltip: 'Version complète',
-          onPressed: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => const LegalScreen(
-                title: 'Manuel complet',
-                asset: 'assets/legal/manuel_fr.md',
+        if (showFullManual)
+          IconButton(
+            icon: const Icon(Icons.article_outlined),
+            tooltip: 'Version complète',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const LegalScreen(
+                  title: 'Manuel complet',
+                  asset: 'assets/legal/manuel_fr.md',
+                ),
               ),
             ),
           ),
-        ),
       ],
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'Guide pas à pas — ${MarketConfig.coverageLabel}, ${MarketConfig.currency}',
+            subtitle ?? 'Guide pas à pas — ${MarketConfig.coverageLabel}, ${MarketConfig.currency}',
             style: theme.textTheme.bodyMedium?.copyWith(color: MovaColors.textSecondary),
           ),
           const SizedBox(height: 12),
-          ...kManualChapters.map((chapter) => _ChapterTile(chapter: chapter)),
+          ...items.map((chapter) => _ChapterTile(chapter: chapter)),
         ],
       ),
     );

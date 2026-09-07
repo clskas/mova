@@ -4,6 +4,52 @@ import { useEffect, useState } from "react";
 import { HelpIcon } from "./ServiceIcons";
 import { apiFetch } from "@/lib/api";
 
+const MANUAL = [
+  {
+    title: "Connexion et code PIN",
+    steps: [
+      "Ouvrez SENGA. Entrez votre numéro +243, ou continuez avec Google.",
+      "Au premier accès, créez un code PIN à 6 chiffres.",
+      "Les prochaines fois, ouvrez le site et saisissez ce PIN.",
+      "Ne donnez jamais votre PIN de connexion.",
+    ],
+  },
+  {
+    title: "Commander un taxi ou une moto",
+    steps: [
+      "Appuyez sur Taxi / Moto-taxi.",
+      "Indiquez le départ et l’arrivée. Vous pouvez poser un pin sur la carte, puis « Utiliser cet emplacement ».",
+      "Choisissez Moto ou Taxi (Standard, Confort ou VIP).",
+      "Regardez le prix, puis confirmez.",
+    ],
+  },
+  {
+    title: "Le prix affiché",
+    steps: [
+      "Le prix que vous voyez avant de confirmer est le prix facturé.",
+      "Ce n’est pas un compteur qui augmente pendant le trajet.",
+    ],
+  },
+  {
+    title: "Recharger le portefeuille",
+    steps: [
+      "Ouvrez Wallet SENGA.",
+      "Appuyez sur Recharger.",
+      "Choisissez Orange Money, M-Pesa ou Airtel Money.",
+      "Validez le paiement sur votre téléphone. Le solde apparaît en CDF.",
+    ],
+  },
+  {
+    title: "Livraisons (colis et repas)",
+    steps: [
+      "Ouvrez Livraisons, puis colis ou repas.",
+      "Indiquez l’enlèvement et la livraison (ou un restaurant).",
+      "Confirmez le prix affiché — c’est le montant à payer.",
+      "Pour un colis, donnez le code PIN seulement quand vous avez bien reçu.",
+    ],
+  },
+];
+
 const FAQ = [
   {
     q: "Comment créer un compte SENGA ?",
@@ -111,11 +157,33 @@ export function HelpView({ onBack }: Props) {
         <h2 className="text-lg font-bold">Centre d&apos;aide SENGA</h2>
       </div>
       <p className="text-sm text-gray-500">
-        Documentation et support — RDC
+        Manuel et contacts — RDC
       </p>
 
+      <section className="space-y-2">
+        <h3 className="font-semibold text-[#1A1A2E]">Manuel</h3>
+        <p className="text-sm text-gray-500">
+          Guide court : courses, pin sur la carte, portefeuille, livraisons, PIN.
+        </p>
+        {MANUAL.map((chapter) => (
+          <details
+            key={chapter.title}
+            className="bg-white border border-gray-100 rounded-lg p-3"
+          >
+            <summary className="font-medium text-sm cursor-pointer">
+              {chapter.title}
+            </summary>
+            <ol className="mt-2 list-decimal pl-5 space-y-1 text-sm text-gray-600">
+              {chapter.steps.map((step) => (
+                <li key={step}>{step}</li>
+              ))}
+            </ol>
+          </details>
+        ))}
+      </section>
+
       <section className="bg-[#F5F4FF] rounded-xl p-4 space-y-3">
-        <h3 className="font-semibold text-[#1A1A2E]">Contacter le support</h3>
+        <h3 className="font-semibold text-[#1A1A2E]">Contacts</h3>
         {!loaded ? (
           <p className="text-sm text-gray-500">Chargement des contacts…</p>
         ) : contacts.length === 0 ? (
@@ -180,11 +248,7 @@ export function HelpView({ onBack }: Props) {
       </section>
 
       <section className="text-sm text-gray-500 space-y-1">
-        <p>
-          <strong className="text-[#1A1A2E]">Manuel complet</strong> — disponible
-          dans l&apos;application mobile Senga.
-        </p>
-        <p>CGU et politique de confidentialité : voir l&apos;app mobile.</p>
+        <p>CGU et politique de confidentialité : voir aussi l&apos;app mobile SENGA.</p>
       </section>
     </div>
   );

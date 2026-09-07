@@ -143,6 +143,17 @@ export default function SettingsPage() {
   return (
     <div className="max-w-lg space-y-6">
         <h2 className="text-xl font-bold">Paramètres</h2>
+        <p className="text-sm text-gray-500">
+          Besoin d&apos;aide ? Ouvrez le{" "}
+          <a href="/aide" className="text-orange-700 underline font-medium">
+            Manuel
+          </a>{" "}
+          ou les{" "}
+          <a href="/aide" className="text-orange-700 underline font-medium">
+            Contacts
+          </a>
+          .
+        </p>
         {!canOperate && (
           <p className="text-sm text-amber-900 bg-amber-50 rounded-xl px-3 py-2">
             Votre dossier n&apos;est pas encore validé. Vous ne pouvez pas accepter de commandes — ouvrez{" "}

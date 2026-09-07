@@ -95,7 +95,7 @@ class HelpScreen extends ConsumerWidget {
             icon: Icons.menu_book_outlined,
             iconColor: MovaColors.violet,
             title: 'Manuel utilisateur',
-            subtitle: 'Tous les modules SENGA, pas à pas',
+            subtitle: 'Courses, pin carte, portefeuille, livraisons, PIN',
             onTap: () => _open(context, const ManualScreen()),
           ),
           _HelpLink(

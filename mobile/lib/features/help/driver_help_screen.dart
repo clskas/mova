@@ -5,7 +5,9 @@ import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import 'contact_support_screen.dart';
 import 'faq_screen.dart';
+import 'help_config.dart';
 import 'legal_screen.dart';
+import 'manual_screen.dart';
 import '../geo/suggest_place_screen.dart';
 import '../profile/profile_screen.dart';
 
@@ -29,22 +31,21 @@ class DriverHelpScreen extends ConsumerWidget {
             style: TextStyle(color: MovaColors.textSecondary, height: 1.4),
           ),
           const SizedBox(height: 16),
-          _Tile(
-            icon: Icons.verified_user_outlined,
-            title: 'Documents KYC',
-            subtitle: 'Permis, carte grise, pièce d\'identité — obligatoires avant mise en ligne.',
+          ListTile(
+            leading: const Icon(Icons.menu_book_outlined, color: MovaColors.violet),
+            title: const Text('Manuel utilisateur', style: TextStyle(fontWeight: FontWeight.w600)),
+            subtitle: const Text('En ligne, courses, dossier, PIN, revenus'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => _open(
+              context,
+              const ManualScreen(
+                title: 'Manuel chauffeur',
+                subtitle: 'Guide SENGA Driver — simple et court',
+                chapters: kDriverManualChapters,
+                showFullManual: false,
+              ),
+            ),
           ),
-          _Tile(
-            icon: Icons.toggle_on_outlined,
-            title: 'Disponibilité',
-            subtitle: 'Activez le switch pour recevoir des courses, colis et repas.',
-          ),
-          _Tile(
-            icon: Icons.account_balance_wallet_outlined,
-            title: 'Revenus',
-            subtitle: 'Consultez vos gains du jour en CDF et l\'historique des prestations.',
-          ),
-          const Divider(height: 24),
           ListTile(
             leading: const Icon(Icons.person_outline, color: MovaColors.violet),
             title: const Text('Compte et connexion', style: TextStyle(fontWeight: FontWeight.w600)),
@@ -108,38 +109,6 @@ class DriverHelpScreen extends ConsumerWidget {
             },
             icon: const Icon(Icons.logout, color: MovaColors.orange),
             label: const Text('Se déconnecter', style: TextStyle(color: MovaColors.orange)),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Tile extends StatelessWidget {
-  const _Tile({required this.icon, required this.title, required this.subtitle});
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: MovaColors.violet, size: 22),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-                const SizedBox(height: 2),
-                Text(subtitle, style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13)),
-              ],
-            ),
           ),
         ],
       ),

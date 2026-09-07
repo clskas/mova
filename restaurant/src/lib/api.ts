@@ -445,6 +445,45 @@ export type Publicite = {
   description?: string | null;
 };
 
+export type CompanyContact = {
+  id?: string;
+  name?: string;
+  title?: string | null;
+  department?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  notes?: string | null;
+};
+
+function parseCompanyContacts(raw: unknown): CompanyContact[] {
+  const list = Array.isArray(raw)
+    ? raw
+    : raw && typeof raw === "object" && Array.isArray((raw as { data?: unknown }).data)
+      ? (raw as { data: unknown[] }).data
+      : [];
+  return list
+    .filter((item): item is Record<string, unknown> => !!item && typeof item === "object")
+    .map((item) => ({
+      id: String(item.id ?? ""),
+      name: String(item.name ?? "Contact"),
+      title: item.title ? String(item.title) : null,
+      department: item.department ? String(item.department) : null,
+      phone: item.phone ? String(item.phone) : null,
+      email: item.email ? String(item.email) : null,
+      notes: item.notes ? String(item.notes) : null,
+    }));
+}
+
+export async function fetchCompanyContacts(): Promise<CompanyContact[]> {
+  try {
+    const res = await fetch(`${API_BASE}/api/company-contacts`);
+    if (!res.ok) return [];
+    return parseCompanyContacts(await res.json());
+  } catch {
+    return [];
+  }
+}
+
 export async function fetchActivePublicites(cible?: string): Promise<Publicite[]> {
   const q = cible ? `?cible=${encodeURIComponent(cible)}` : "";
   try {

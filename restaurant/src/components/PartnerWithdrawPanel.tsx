@@ -102,8 +102,8 @@ export function PartnerWithdrawPanel({ balanceCdf, walletAvailable = true, onWit
   async function submitTopUp() {
     if (inFlight.current) return;
     const amountCdf = Number(topUpAmount);
-    if (!Number.isFinite(amountCdf) || amountCdf < 500) {
-      setError("Montant minimum : 500 FC.");
+    if (!Number.isFinite(amountCdf) || amountCdf < 2300) {
+      setError("Minimum SerdiPay : 2 300 FC.");
       return;
     }
     if (!phone.trim()) {
@@ -148,7 +148,7 @@ export function PartnerWithdrawPanel({ balanceCdf, walletAvailable = true, onWit
       <div>
         <h3 className="font-medium text-[#1A1A2E]">Portefeuille Mobile Money</h3>
         <p className="text-xs text-gray-500 mt-1">
-          Orange Money, M-Pesa ou Airtel Money. Minimum 500 FC. Solde :{" "}
+          Orange Money, M-Pesa ou Airtel Money. Minimum SerdiPay 2 300 FC. Solde :{" "}
           <strong>{formatCdf(balanceCdf)}</strong>
         </p>
       </div>
@@ -182,9 +182,9 @@ export function PartnerWithdrawPanel({ balanceCdf, walletAvailable = true, onWit
           <p className="text-sm font-medium text-[#1A1A2E]">Recharger</p>
           <input
             type="number"
-            min={500}
+            min={2300}
             className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-            placeholder="500"
+            placeholder="2300"
             value={topUpAmount}
             onChange={(e) => setTopUpAmount(e.target.value)}
           />
@@ -194,14 +194,14 @@ export function PartnerWithdrawPanel({ balanceCdf, walletAvailable = true, onWit
             onClick={submitTopUp}
             className="px-4 py-2.5 min-h-11 rounded-xl bg-emerald-600 text-white text-sm font-medium disabled:opacity-50 w-full"
           >
-            {loading === "topup" ? "Recharge…" : "Recharger (min. 500 FC)"}
+            {loading === "topup" ? "Recharge…" : "Recharger (min. 2 300 FC)"}
           </button>
         </div>
         <div className="space-y-2">
           <p className="text-sm font-medium text-[#1A1A2E]">Retirer</p>
           <input
             type="number"
-            min={500}
+            min={2300}
             className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
             placeholder="5000"
             value={amount}

@@ -6,10 +6,10 @@ const CHAPTERS = [
   {
     title: "Première connexion et PIN",
     steps: [
-      "Connectez-vous sur restaurant.afri-soft.com avec votre numéro +243 (code SMS).",
-      "Complétez Mon dossier et attendez la validation SENGA.",
-      "Après validation, vous recevez un PIN à 6 chiffres par SMS ou e-mail. Conservez-le : il sert à ouvrir le portail.",
-      "Si le SMS n'arrive pas, l'équipe SENGA peut renvoyer le PIN depuis l'admin (KYC ou fiche Utilisateur).",
+      "Ouvrez https://restaurant.afri-soft.com — champ « Téléphone (+243) ou e-mail » puis « Code PIN (reçu par e-mail / SMS) ».",
+      "Après validation KYC, saisissez le PIN à 6 chiffres envoyé par e-mail ou SMS (même compte Google possible).",
+      "Première visite avant KYC : numéro +243 + code SMS, ou Continuer avec Google, puis Mon dossier.",
+      "Si le PIN n'arrive pas, l'équipe SENGA le renvoie depuis l'admin (KYC ou fiche Utilisateur) — vérifiez aussi le spam Gmail.",
     ],
   },
   {

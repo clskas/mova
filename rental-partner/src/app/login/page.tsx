@@ -30,6 +30,9 @@ import {
 } from "@/lib/user-messages";
 import {
   AuthPayload,
+  KYC_PIN_LOGIN_HINT_FR,
+  LOGIN_IDENTITY_LABEL_FR,
+  PartnerLoginHelp,
   PinDigitPad,
   PinForgotLink,
   PinSetupForm,
@@ -75,7 +78,8 @@ export default function LoginPage() {
   const pinSubmitLock = useRef(false);
 
   const pinOnly = pinMode && !codeSent && !googleChallenge && !setupToken && !forgotPin;
-  const hideIdentity = pinOnly;
+  const hideIdentity = pinOnly && Boolean(phone.trim());
+  const showPinField = !codeSent && !setupToken && !forgotPin;
 
   useEffect(() => {
     let cancelled = false;
@@ -141,11 +145,11 @@ export default function LoginPage() {
   }, [setupToken, router]);
 
   useEffect(() => {
-    if (pinOnly && pin.length === 6 && !loading) {
+    if (showPinField && pin.length === 6 && !loading && phone.trim()) {
       void loginWithPin();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- auto-submit when pad reaches 6 digits
-  }, [pin, pinOnly]);
+  }, [pin, showPinField, phone]);
 
   function finishRentalSession(data: AuthPayload) {
     if (!data.accessToken) {
@@ -187,7 +191,7 @@ export default function LoginPage() {
             return;
           }
         }
-        setError("Ce compte n'a pas de numéro. Utilisez Continuer avec Google.");
+        setError("Saisissez le PIN reçu par e-mail, ou utilisez Continuer avec Google.");
         return;
       }
       if (!opts?.forceSms && !pinMode && !forgotPin) {
@@ -318,7 +322,7 @@ export default function LoginPage() {
   function primaryAction() {
     if (setupToken) return;
     if (codeSent) return void verifyOtp();
-    if (pinMode && pin.length === 6) return void loginWithPin();
+    if (pin.length === 6) return void loginWithPin();
     return void requestOtp();
   }
 
@@ -349,7 +353,7 @@ export default function LoginPage() {
                   ? "Code SMS envoyé. Vous définirez ensuite un nouveau PIN."
                   : forgotPin
                     ? "Récupérez l'accès par SMS (vous pouvez changer de numéro) ou avec Google, puis définissez un nouveau PIN."
-                    : "Portail partenaire — inscription véhicules"}
+                    : KYC_PIN_LOGIN_HINT_FR}
           </p>
         </div>
         {setupToken ? (
@@ -375,7 +379,7 @@ export default function LoginPage() {
           <>
             {!hideIdentity && (
               <label className="block text-sm">
-                <span className="text-gray-600">Téléphone partenaire</span>
+                <span className="text-gray-600">{LOGIN_IDENTITY_LABEL_FR}</span>
                 <input
                   data-testid="login-phone"
                   className="mt-1 w-full rounded-xl border border-gray-200 p-3"
@@ -385,10 +389,10 @@ export default function LoginPage() {
                     setPinMode(false);
                     setPin("");
                   }}
-                  placeholder="+243 8XX XXX XXX"
-                  type="tel"
-                  inputMode="tel"
-                  autoComplete="tel"
+                  placeholder="+243 8XX XXX XXX ou e-mail"
+                  type="text"
+                  inputMode="text"
+                  autoComplete="username"
                   disabled={codeSent || Boolean(googleChallenge)}
                 />
               </label>
@@ -405,7 +409,7 @@ export default function LoginPage() {
                   Utiliser un autre numéro
                 </button>
               )}
-            {pinMode && !codeSent && (
+            {showPinField && (
               <PinDigitPad value={pin} onChange={setPin} disabled={loading} accentClass="bg-indigo-600" />
             )}
             {codeSent && (
@@ -435,25 +439,25 @@ export default function LoginPage() {
                   loading ||
                   (!googleChallenge && !phone.trim()) ||
                   (codeSent && !code.trim()) ||
-                  (pinMode && !codeSent && pin.length !== 6)
+                  (showPinField && pin.length > 0 && pin.length !== 6)
                 }
                 onClick={primaryAction}
                 className="w-full py-3 rounded-xl bg-indigo-600 text-white font-medium disabled:opacity-60"
               >
                 {loading
-                  ? codeSent || pinMode
+                  ? codeSent || pin.length === 6
                     ? "Connexion…"
                     : "Envoi…"
                   : codeSent
                     ? "Se connecter"
-                    : pinMode
+                    : pin.length === 6
                       ? "Se connecter avec le PIN"
                       : forgotPin
                         ? "Recevoir un SMS"
                         : "Continuer"}
               </button>
             )}
-            {pinMode && !codeSent && (
+            {showPinField && (
               <PinForgotLink
                 disabled={loading}
                 onClick={() => {
@@ -510,11 +514,13 @@ export default function LoginPage() {
         )}
         {error && <p className="text-sm text-red-600 text-center">{error}</p>}
         {!setupToken && (
-          <p className="text-xs text-gray-400 text-center">
-            {pinOnly
-              ? "PIN oublié : SMS, autre numéro ou Google."
-              : "Numéro +243 : le code arrive par SMS. Après la première connexion, un PIN à 6 chiffres est obligatoire."}
-          </p>
+          pinOnly ? (
+            <p className="text-xs text-gray-400 text-center">
+              PIN oublié : SMS, autre numéro ou Google.
+            </p>
+          ) : (
+            <PartnerLoginHelp />
+          )
         )}
       </div>
     </div>

@@ -1,6 +1,8 @@
 import {
+  EMAIL_SMTP_ACCEPTED_ADMIN_MESSAGE,
   EMAIL_SMTP_ENV_HINT,
   allowsSharedMailCertFallback,
+  emailInboxHintFor,
   inferSmtpHost,
   mapSmtpFailureToAdminMessage,
   smtpConnectHost,
@@ -64,6 +66,14 @@ describe('site4now TLS hostname mismatch', () => {
     expect(opts.servername).toBe('mail5013.site4now.net');
     expect(opts.rejectUnauthorized).not.toBe(false);
     expect(typeof opts.checkServerIdentity).toBe('function');
+  });
+});
+
+describe('emailInboxHintFor', () => {
+  it('warns Gmail about spam and DMARC reject', () => {
+    expect(emailInboxHintFor('jscelestinkas@gmail.com')).toMatch(/Spam/);
+    expect(emailInboxHintFor('jscelestinkas@gmail.com')).toMatch(/DMARC/);
+    expect(EMAIL_SMTP_ACCEPTED_ADMIN_MESSAGE).toMatch(/pas une preuve d'arrivée/);
   });
 });
 

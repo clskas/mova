@@ -60,8 +60,8 @@ export function WalletView({ onBack, mock }: Props) {
   async function topUp() {
     if (topUpInFlight.current) return;
     const value = parseInt(amount, 10);
-    if (value < 500) {
-      setError("Montant minimum : 500 FC");
+    if (value < 2300) {
+      setError("Montant minimum SerdiPay : 2 300 FC");
       return;
     }
     if (!mock && !topUpPhone.trim()) {
@@ -195,7 +195,7 @@ export function WalletView({ onBack, mock }: Props) {
           type="number"
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
-          placeholder="Montant FC (min. 500)"
+          placeholder="Montant FC (min. 2 300)"
         />
         <select
           className="w-full rounded-xl border-0 bg-gray-50 p-3"

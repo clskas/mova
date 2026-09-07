@@ -30,8 +30,13 @@ export const SMS_UNAVAILABLE_USER_MESSAGE =
   "Impossible d'envoyer le code par SMS. Réessayez dans quelques minutes.";
 
 /**
- * SerdiPay Public API C2B/B2C floor (402 when below).
- * SENGA previously used 500 FC; production merchant rejects under 2300 CDF.
+ * Merchant AfriMomo amount floor. Evidence (do not invent a lower public-doc min):
+ * - Production C2B (recharge / payment-merchant) returned HTTP 402 with
+ *   `error: "Payment Failed, The amount is not within allowed range! min: 2300 -  max : 5750000 CDF"`
+ *   (commit 5c67b42, 2026-09-04). Official serdipay.com marketing sample uses `amount: 100` —
+ *   that is NOT this merchant’s limit.
+ * - B2C (withdraw / payment-client) uses the same Public API `amount` field and the same
+ *   402 mapper. No separate captured B2C 402 payload is in-repo; do not lower either side.
  */
 export const SERDIPAY_MIN_AMOUNT_CDF = 2300;
 export const SERDIPAY_MAX_AMOUNT_CDF = 5_750_000;

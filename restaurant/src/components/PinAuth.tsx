@@ -74,6 +74,36 @@ export function mustSetupPinAfterPhoneLogin(
   return true;
 }
 
+export const KYC_PIN_LOGIN_HINT_FR =
+  "Après validation KYC, saisissez le PIN à 6 chiffres envoyé par e-mail ou SMS.";
+
+export const PIN_FIELD_LABEL_FR = "Code PIN (reçu par e-mail / SMS)";
+
+export const LOGIN_IDENTITY_LABEL_FR = "Téléphone (+243) ou e-mail";
+
+export function PartnerLoginHelp({
+  manuelHref = "/manuel",
+  aideHref = "/aide",
+  linkClass = "text-orange-700 underline",
+}: {
+  manuelHref?: string;
+  aideHref?: string;
+  linkClass?: string;
+}) {
+  return (
+    <p className="text-xs text-gray-400 text-center">
+      {KYC_PIN_LOGIN_HINT_FR}{" "}
+      <a href={manuelHref} className={linkClass}>
+        Manuel
+      </a>
+      {" · "}
+      <a href={aideHref} className={linkClass}>
+        Aide
+      </a>
+    </p>
+  );
+}
+
 export function PinForgotLink({
   onClick,
   disabled,
@@ -123,6 +153,20 @@ export function PinDigitPad({
   }
   return (
     <div data-testid="pin-pad" className="space-y-4">
+      <label className="block text-sm">
+        <span className="text-gray-600">{PIN_FIELD_LABEL_FR}</span>
+        <input
+          data-testid="login-pin"
+          className="mt-1 w-full rounded-xl border border-gray-200 p-3 tracking-[0.4em] text-center text-lg"
+          value={value}
+          onChange={(e) => onChange(e.target.value.replace(/\D/g, "").slice(0, 6))}
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          maxLength={6}
+          placeholder="••••••"
+          disabled={disabled}
+        />
+      </label>
       <div className="flex justify-center gap-2" aria-hidden>
         {Array.from({ length: 6 }).map((_, i) => (
           <span

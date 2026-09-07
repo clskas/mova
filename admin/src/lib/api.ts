@@ -2033,9 +2033,13 @@ export function activationPinSmsCopy(result: KycNotifyResult): string {
     );
   } else if (result.smsError) parts.push(`SMS non envoyé : ${result.smsError}.`);
   else parts.push("SMS non envoyé.");
-  if (result.emailSent) parts.push("Un e-mail a été envoyé.");
-  else if (result.hasEmail === false) parts.push("Aucun e-mail lié.");
+  if (result.emailSent) {
+    parts.push(
+      "Le serveur SMTP a accepté l'e-mail — ce n'est pas une preuve d'arrivée en boîte. Si Gmail : ouvrez Spam / Courrier indésirable. Expéditeur : SENGA <noreply@afri-soft.com>.",
+    );
+  } else if (result.hasEmail === false) parts.push("Aucun e-mail lié.");
   else if (result.emailError) parts.push(`E-mail non envoyé : ${result.emailError}.`);
+  else if (result.hasEmail) parts.push("E-mail non envoyé (le serveur SMTP n'a pas accepté le message).");
   return parts.join(" ");
 }
 

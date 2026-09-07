@@ -52,7 +52,12 @@ class WithdrawDto extends WithdrawRequestDto {
 }
 
 class TopUpDto {
-  @ApiProperty() @IsInt() @Min(500) amountCdf: number;
+  @ApiProperty()
+  @Transform(({ value }) => coerceCdfInteger(value))
+  @Type(() => Number)
+  @IsInt({ message: AMOUNT_INT_FR })
+  @Min(2300, { message: AMOUNT_MIN_FR })
+  amountCdf: number;
   @ApiPropertyOptional({ enum: ['ORANGE_MONEY', 'MPESA', 'AIRTEL_MONEY', 'AFRIMONEY', 'MOCK'] })
   @IsOptional()
   @IsEnum(['ORANGE_MONEY', 'MPESA', 'AIRTEL_MONEY', 'AFRIMONEY', 'MOCK'])

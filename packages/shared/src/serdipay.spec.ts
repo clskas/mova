@@ -303,6 +303,7 @@ describe('serdipay Public API', () => {
   });
 
   it('maps SerdiPay 402 amount-range errors to French min/max copy', () => {
+    // Production C2B quote (commit 5c67b42) — not a serdipay.com marketing sample.
     expect(SERDIPAY_MIN_AMOUNT_CDF).toBe(2300);
     expect(
       mapSerdiPayPaymentFailure(

@@ -8,6 +8,22 @@ import { isMockOtpAllowed, maskEmail } from '@mova/shared';
 export const EMAIL_UNAVAILABLE_USER_MESSAGE =
   'Impossible d\'envoyer le code par e-mail. Réessayez plus tard, ou connectez-vous avec un numéro +243.';
 
+/** SMTP 250 = accepted by the relay, not "in the inbox". */
+export const EMAIL_SMTP_ACCEPTED_ADMIN_MESSAGE =
+  "Le serveur SMTP a accepté le message. Ce n'est pas une preuve d'arrivée en boîte. Si Gmail : ouvrez Spam / Courrier indésirable.";
+
+export function emailInboxHintFor(to: string): string {
+  const dest = to.trim().toLowerCase();
+  if (dest.endsWith('@gmail.com') || dest.endsWith('@googlemail.com')) {
+    return (
+      'Destinataire Gmail : vérifiez Spam. ' +
+      'From SENGA (noreply@afri-soft.com via site4now). ' +
+      'DMARC p=reject sur afri-soft.com — sans alignement SPF/DKIM, Gmail jette le message (pas même en spam).'
+    );
+  }
+  return 'Vérifiez la boîte et le dossier spam.';
+}
+
 /** Exact Render keys for mova-auth — listed when transport is incomplete. */
 export const EMAIL_SMTP_ENV_HINT =
   'E-mail non configuré sur mova-auth. Définissez SMTP_HOST, SMTP_USER, SMTP_PASS (SMTP_PORT=587, SMTP_FROM) ou RESEND_API_KEY et RESEND_FROM.';
@@ -285,7 +301,7 @@ export class EmailOtpMailer {
       this.logger.error(`Resend HTTP ${res.status}: ${body.slice(0, 200)}`);
       return { success: false, message: EMAIL_UNAVAILABLE_USER_MESSAGE };
     }
-    return { success: true, message: 'Code OTP envoyé par e-mail' };
+    return { success: true, message: EMAIL_SMTP_ACCEPTED_ADMIN_MESSAGE };
   }
 
   private async sendSmtp(to: string, from: string, subject: string, text: string): Promise<EmailOtpSendResult> {
@@ -305,11 +321,13 @@ export class EmailOtpMailer {
     const port = Number(this.config.get('SMTP_PORT') ?? 587);
     const pass = this.config.get<string>('SMTP_PASS') ?? '';
     const envelopeFrom = user.includes('@') ? user : from;
+    const messageId = `<${Date.now()}.${Math.random().toString(36).slice(2)}@${(from.split('@')[1] || 'afri-soft.com').replace(/[>]/g, '')}>`;
     const message = [
       `From: SENGA <${from}>`,
       `To: ${to}`,
       `Subject: ${encodeRfc2047(subject)}`,
       `Date: ${new Date().toUTCString()}`,
+      `Message-ID: ${messageId}`,
       'MIME-Version: 1.0',
       'Content-Type: text/plain; charset=utf-8',
       'Content-Transfer-Encoding: 8bit',
@@ -318,7 +336,10 @@ export class EmailOtpMailer {
     ].join('\r\n');
 
     await smtpSend({ host, tlsServername, configuredHost, port, user, pass, from: envelopeFrom, to, message });
-    return { success: true, message: 'Code OTP envoyé par e-mail' };
+    this.logger.log(
+      `SMTP accepted (250) for ${maskEmail(to)} from=${from} envelope=${envelopeFrom} — not inbox proof. ${emailInboxHintFor(to)}`,
+    );
+    return { success: true, message: EMAIL_SMTP_ACCEPTED_ADMIN_MESSAGE };
   }
 }
 

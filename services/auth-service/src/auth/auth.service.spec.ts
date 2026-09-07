@@ -1295,6 +1295,16 @@ describe('AuthService', () => {
     expect(mailer.sendLoginPin).toHaveBeenCalledWith('only@ex.com', result.loginPin);
   });
 
+  it('ne marque pas emailSent si SMTP refuse le PIN', async () => {
+    mailer.sendLoginPin.mockResolvedValue({ success: false, message: 'Authentification SMTP refusée.' });
+    prisma.user.findUnique.mockResolvedValue(makeUser({ phone: null, email: 'only@ex.com' }));
+    prisma.user.update.mockResolvedValue(makeUser({ phone: null, email: 'only@ex.com' }));
+    const result = await service.issueLoginPin('user-1');
+    expect(result.emailSent).toBe(false);
+    expect(result.emailError).toMatch(/SMTP/);
+    expect(result.loginPin).toMatch(/^\d{6}$/);
+  });
+
   it('enregistre un PIN fourni sans renvoyer SMS ni e-mail', async () => {
     prisma.user.findUnique.mockResolvedValue(makeUser({ phone: '+243811111111', email: 'a@b.cd' }));
     prisma.user.update.mockResolvedValue(makeUser());

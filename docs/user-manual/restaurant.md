@@ -4,11 +4,11 @@ Portail web : [restaurant.afri-soft.com](https://restaurant.afri-soft.com)
 
 ## Connexion et PIN
 
-1. Ouvrez le portail et saisissez votre numéro **+243**.
-2. Validez le code SMS.
-3. Complétez **Mon dossier** (justificatifs). Tant que SENGA n'a pas validé, vous ne pouvez pas vendre.
-4. Après **Approuver** dans l'admin KYC, un **PIN à 6 chiffres** est envoyé par SMS et/ou e-mail. Il sert à rouvrir le portail.
-5. Si le message n'arrive pas, l'équipe SENGA le renvoie depuis **KYC** ou **Utilisateurs** (le PIN s'affiche une fois à l'écran admin).
+1. Ouvrez [restaurant.afri-soft.com](https://restaurant.afri-soft.com).
+2. Saisissez votre **téléphone +243 ou e-mail**, puis le **Code PIN (reçu par e-mail / SMS)** — 6 chiffres.
+3. Première visite avant KYC : code SMS ou Continuer avec Google, puis **Mon dossier**.
+4. Après **Approuver** dans l'admin KYC, le PIN part par SMS et/ou e-mail. Un compte déjà lié à Google peut aussi se connecter avec ce PIN.
+5. Si l'e-mail n'est pas dans la boîte, ouvrez **Spam**. L'admin n'a que la preuve SMTP (accepté), pas l'arrivée Gmail.
 
 ## Manuel dans le portail
 

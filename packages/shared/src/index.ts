@@ -12,6 +12,7 @@ export * from './kinshasa-bounds';
 export * from './service-urls';
 export * from './auth-notify';
 export * from './prod-security';
+export * from './play-prelaunch';
 export * from './timing-safe';
 export * from './jwt-user';
 export * from './jwt-denylist';

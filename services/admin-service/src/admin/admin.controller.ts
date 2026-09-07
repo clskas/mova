@@ -71,8 +71,32 @@ export class AdminController {
   @Get('users')
   @RequirePermissions(AdminPermission.USERS_READ)
   @ApiOperation({ summary: 'Liste utilisateurs' })
-  users(@Query('skip') skip?: string, @Query('take') take?: string, @Query('search') search?: string) {
-    return this.adminService.listUsers(Number(skip ?? 0), Number(take ?? 50), search);
+  users(
+    @Query('skip') skip?: string,
+    @Query('take') take?: string,
+    @Query('search') search?: string,
+    @Query('includePlayPrelaunch') includePlayPrelaunch?: string,
+  ) {
+    return this.adminService.listUsers(
+      Number(skip ?? 0),
+      Number(take ?? 50),
+      search,
+      includePlayPrelaunch === 'true' || includePlayPrelaunch === '1',
+    );
+  }
+
+  @Get('users/play-prelaunch')
+  @RequirePermissions(AdminPermission.USERS_READ)
+  @ApiOperation({ summary: 'Comptes Google Play / Firebase Test Lab (sans téléphone)' })
+  playPrelaunchUsers() {
+    return this.adminService.listPlayPrelaunchUsers();
+  }
+
+  @Post('users/purge-play-prelaunch')
+  @RequirePermissions(AdminPermission.USERS_DELETE)
+  @ApiOperation({ summary: 'Supprimer les comptes Play Test Lab (SUPER_ADMIN, après revue)' })
+  purgePlayPrelaunch(@Request() req: { user: { id: string; role: string } }) {
+    return this.adminService.purgePlayPrelaunchUsers(req.user.role, req.user.id);
   }
 
   @Get('users/:id')

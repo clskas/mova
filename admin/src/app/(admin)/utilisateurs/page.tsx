@@ -6,6 +6,7 @@ import {
   deactivateUser as deactivateUserApi,
   fetchUsers,
   formatUserName,
+  purgePlayPrelaunchUsers,
   purgeUser as purgeUserApi,
   updateUser,
   type AdminUser,
@@ -55,12 +56,19 @@ export default function UtilisateursPage() {
   const [page, setPage] = useState(0);
   const pageSize = 50;
   const [searchQuery, setSearchQuery] = useState("");
+  const [showPlayPrelaunch, setShowPlayPrelaunch] = useState(false);
+  const [purgePlayOpen, setPurgePlayOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const { data, total: count } = await fetchUsers(page * pageSize, pageSize, searchQuery.trim() || undefined);
+      const { data, total: count } = await fetchUsers(
+        page * pageSize,
+        pageSize,
+        searchQuery.trim() || undefined,
+        showPlayPrelaunch,
+      );
       setUsers(data);
       setTotal(count);
     } catch (e) {
@@ -68,7 +76,7 @@ export default function UtilisateursPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, searchQuery]);
+  }, [page, searchQuery, showPlayPrelaunch]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -150,6 +158,24 @@ export default function UtilisateursPage() {
     }
   }
 
+  async function purgePlayBots() {
+    setSaving(true);
+    setError(null);
+    try {
+      const result = await purgePlayPrelaunchUsers();
+      setPurgePlayOpen(false);
+      setShowPlayPrelaunch(false);
+      load();
+      if (result.skipped.length > 0) {
+        setError(`${result.deleted} compte(s) Test Lab supprimé(s), ${result.skipped.length} ignoré(s).`);
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Impossible de nettoyer les comptes Test Lab.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function purgeUser() {
     if (!purgeTarget) return;
     setSaving(true);
@@ -186,7 +212,32 @@ export default function UtilisateursPage() {
         <div className="flex flex-wrap gap-2 items-end">
           <SearchInput value={search} onChange={setSearch} placeholder="Rechercher par nom, téléphone, e-mail ou rôle…" />
           <BtnPrimary onClick={applySearch}>Rechercher</BtnPrimary>
+          <label className="flex items-center gap-2 text-sm text-gray-600 pb-1">
+            <input
+              type="checkbox"
+              checked={showPlayPrelaunch}
+              onChange={(e) => {
+                setPage(0);
+                setShowPlayPrelaunch(e.target.checked);
+              }}
+            />
+            Afficher les comptes Google Play / Test Lab
+          </label>
+          {canPurge && showPlayPrelaunch && (
+            <BtnDanger onClick={() => setPurgePlayOpen(true)} disabled={saving}>
+              Nettoyer les comptes Test Lab
+            </BtnDanger>
+          )}
         </div>
+        {showPlayPrelaunch && (
+          <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+            Ces lignes viennent du rapport pré-lancement Google Play / Firebase Test Lab
+            (e-mails <code className="text-xs">prenomsnom.12345@gmail.com</code> et{" "}
+            <code className="text-xs">@cloudtestlabaccounts.com</code>, sans téléphone).
+            Ce n’est pas le seed démo <code className="text-xs">+2439000000xx</code>.
+            Ils sont masqués par défaut. Vous pouvez les ignorer ou les supprimer après revue.
+          </p>
+        )}
         {loading ? (
           <LoadingState />
         ) : users.length === 0 ? (
@@ -208,7 +259,14 @@ export default function UtilisateursPage() {
               <tbody>
                 {users.map((u) => (
                   <tr key={u.id} className="border-b hover:bg-gray-50">
-                    <td className="p-3 font-medium">{formatUserName(u)}</td>
+                    <td className="p-3 font-medium">
+                      {formatUserName(u)}
+                      {u.playPrelaunch && (
+                        <span className="ml-2 text-[11px] font-medium text-amber-800 bg-amber-100 rounded-full px-2 py-0.5">
+                          Test Lab
+                        </span>
+                      )}
+                    </td>
                     <td className="p-3">{u.phone ?? "—"}</td>
                     <td className="p-3">{u.email?.trim() ? u.email : "—"}</td>
                     <td className="p-3"><StatusBadge status={u.role} /></td>
@@ -337,6 +395,18 @@ export default function UtilisateursPage() {
         confirmLabel="Désactiver"
         danger
         loading={saving}
+      />
+      <ConfirmDialog
+        open={purgePlayOpen}
+        onClose={() => setPurgePlayOpen(false)}
+        onConfirm={purgePlayBots}
+        title="Supprimer les comptes Google Play / Test Lab"
+        message="Uniquement les comptes sans téléphone dont l'e-mail est @cloudtestlabaccounts.com ou prenom.nom.12345@gmail.com. Les vrais utilisateurs avec un numéro +243 ne sont pas touchés. Action irréversible."
+        confirmLabel="Supprimer les comptes Test Lab"
+        danger
+        loading={saving}
+        requireMatch={["TEST LAB"]}
+        typedLabel="Saisissez TEST LAB pour confirmer"
       />
       <ConfirmDialog
         open={!!purgeTarget}

@@ -136,10 +136,41 @@ export class AdminService {
     return this.fetchJson('ride', `/internal/rides/reports?days=${days}`);
   }
 
-  listUsers(skip = 0, take = 50, search?: string) {
+  listUsers(skip = 0, take = 50, search?: string, includePlayPrelaunch = false) {
     const params = new URLSearchParams({ skip: String(skip), take: String(take) });
     if (search) params.set('search', search);
+    if (includePlayPrelaunch) params.set('includePlayPrelaunch', 'true');
     return this.fetchJson('auth', `/internal/users?${params}`);
+  }
+  listPlayPrelaunchUsers() {
+    return this.fetchJson('auth', '/internal/users/play-prelaunch');
+  }
+  async purgePlayPrelaunchUsers(actorRole: string, actorId: string) {
+    if (actorRole !== UserRole.SUPER_ADMIN) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.FORBIDDEN,
+        'Seul un SUPER_ADMIN peut supprimer les comptes Google Play / Test Lab.',
+      );
+    }
+    const listed = await this.listPlayPrelaunchUsers() as {
+      data?: { id: string }[];
+    };
+    const ids = (listed.data ?? []).map((u) => u.id);
+    const deleted: string[] = [];
+    const skipped: { id: string; reason: string }[] = [];
+    for (const id of ids) {
+      try {
+        await this.purgeUser(id, actorRole, actorId);
+        deleted.push(id);
+      } catch (e) {
+        skipped.push({
+          id,
+          reason: e instanceof Error ? e.message : 'refus de suppression',
+        });
+      }
+    }
+    return { deleted: deleted.length, ids: deleted, skipped };
   }
   getUser(id: string) {
     return this.fetchJson('auth', `/internal/users/${id}`);

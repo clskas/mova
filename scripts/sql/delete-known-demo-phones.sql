@@ -1,4 +1,5 @@
--- OPTIONAL one-shot cleanup of known SENGA demo phones.
+-- OPTIONAL one-shot cleanup of known SENGA demo phones (+2439000000xx).
+-- Play / Test Lab Google accounts: see scripts/sql/list-store-testers.sql
 -- Do NOT run from Deploy. Do NOT run blindly against production.
 --
 -- 1) Review rows first (auth DB):

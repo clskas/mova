@@ -51,8 +51,28 @@ export class InternalController {
     return { count: total };
   }
   @Get('users')
-  list(@Query('skip') skip?: string, @Query('take') take?: string, @Query('search') search?: string) {
-    return this.users.listUsers(Number(skip ?? 0), Number(take ?? 50), search);
+  list(
+    @Query('skip') skip?: string,
+    @Query('take') take?: string,
+    @Query('search') search?: string,
+    @Query('includePlayPrelaunch') includePlayPrelaunch?: string,
+  ) {
+    return this.users.listUsers(
+      Number(skip ?? 0),
+      Number(take ?? 50),
+      search,
+      includePlayPrelaunch === 'true' || includePlayPrelaunch === '1',
+    );
+  }
+
+  @Get('users/play-prelaunch')
+  listPlayPrelaunch() {
+    return this.users.listPlayPrelaunchUsers();
+  }
+
+  @Post('users/purge-play-prelaunch')
+  purgePlayPrelaunch(@Body() body: PurgeUserDto) {
+    return this.users.purgePlayPrelaunchUsers(body?.actorId);
   }
   @Get('users/:id')
   get(@Param('id') id: string) { return this.users.findById(id); }

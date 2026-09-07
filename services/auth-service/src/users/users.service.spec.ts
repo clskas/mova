@@ -5,6 +5,7 @@ describe('UsersService owner lock', () => {
   const prisma = {
     user: {
       findUnique: jest.fn(),
+      findMany: jest.fn(),
       update: jest.fn(),
       delete: jest.fn(),
       count: jest.fn(),
@@ -12,6 +13,7 @@ describe('UsersService owner lock', () => {
     otpCode: {
       deleteMany: jest.fn(),
     },
+    $queryRaw: jest.fn(),
   };
   const redis = { client: { set: jest.fn().mockResolvedValue('OK') } };
   const service = new UsersService(prisma as never, redis as never);
@@ -86,5 +88,51 @@ describe('UsersService owner lock', () => {
     await expect(service.purgeUser('pax-1', 'admin-2')).resolves.toEqual({ deleted: true, id: 'pax-1' });
     expect(prisma.otpCode.deleteMany).toHaveBeenCalledWith({ where: { phone: '+243810000099' } });
     expect(prisma.user.delete).toHaveBeenCalledWith({ where: { id: 'pax-1' } });
+  });
+
+  it('hides Play Test Lab accounts from the default user list', async () => {
+    prisma.$queryRaw.mockResolvedValue([{ id: 'bot-1' }]);
+    prisma.user.findMany.mockImplementation(async (args: { where?: { phone?: { startsWith?: string } } }) => {
+      if (args?.where?.phone?.startsWith === '+2439000000') return [];
+      return [{ id: 'real-1', email: 'celestinkas@gmail.com', phone: '+243971163574', firstName: 'Célestin' }];
+    });
+    prisma.user.count.mockResolvedValue(1);
+    const result = await service.listUsers(0, 50);
+    expect(prisma.user.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { AND: [{ id: { notIn: ['bot-1'] } }] },
+      }),
+    );
+    expect(result.total).toBe(1);
+    expect(result.data[0].playPrelaunch).toBe(false);
+  });
+
+  it('lists Play Test Lab rows when includePlayPrelaunch is true', async () => {
+    prisma.user.findMany.mockImplementation(async (args: { where?: { phone?: { startsWith?: string } } }) => {
+      if (args?.where?.phone?.startsWith === '+2439000000') return [];
+      return [
+        {
+          id: 'bot-1',
+          email: 'martinpearson.39569@gmail.com',
+          phone: null,
+          firstName: 'Martin',
+          lastName: 'Pearson',
+        },
+      ];
+    });
+    prisma.user.count.mockResolvedValue(1);
+    const result = await service.listUsers(0, 50, undefined, true);
+    expect(prisma.$queryRaw).not.toHaveBeenCalled();
+    expect(result.data[0].playPrelaunch).toBe(true);
+  });
+
+  it('refuses to purge a Play bot that does not match the safe pattern', async () => {
+    prisma.$queryRaw.mockResolvedValue([{ id: 'real-gmail' }]);
+    prisma.user.findMany.mockResolvedValue([
+      { id: 'real-gmail', email: 'marie.kabila@gmail.com', phone: null, firstName: 'Marie', lastName: 'Kabila' },
+    ]);
+    const result = await service.purgePlayPrelaunchUsers('admin-2');
+    expect(result.deleted).toBe(0);
+    expect(prisma.user.delete).not.toHaveBeenCalled();
   });
 });

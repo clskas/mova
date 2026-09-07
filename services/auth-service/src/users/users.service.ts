@@ -13,6 +13,8 @@ import {
   normalizePhoneRdc,
   validatePhoneRdc,
   isDemoUserInsertForbidden,
+  isPlayPrelaunchAccount,
+  isSeedDemoPhone,
 } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -49,6 +51,7 @@ export class UsersService {
       canUnlinkPhone: Boolean(user.phone && googleId && user.phone !== OWNER_SUPER_ADMIN_PHONE),
       pinConfigured: Boolean(_pin),
       needsPinSetup: userNeedsPinSetup(user.phone, _pin),
+      playPrelaunch: isPlayPrelaunchAccount(user),
     };
   }
 
@@ -71,8 +74,41 @@ export class UsersService {
     return this.enrichUser(user);
   }
 
-  async listUsers(skip = 0, take = 50, search?: string) {
-    const where = search?.trim()
+  private async playPrelaunchUserIds(): Promise<string[]> {
+    try {
+      const rows = await this.prisma.$queryRaw<{ id: string }[]>`
+        SELECT id FROM users
+        WHERE phone IS NULL
+          AND email IS NOT NULL
+          AND (
+            LOWER(email) LIKE '%@cloudtestlabaccounts.com'
+            OR LOWER(email) ~ '^[a-z0-9]+([._][a-z0-9]+)*\\.[0-9]{5}@gmail\\.com$'
+          )
+      `;
+      return rows.map((r) => r.id);
+    } catch {
+      const candidates = await this.prisma.user.findMany({
+        where: { phone: null, NOT: { email: null } },
+        select: { id: true, email: true, phone: true, firstName: true, lastName: true },
+      });
+      return candidates.filter(isPlayPrelaunchAccount).map((u) => u.id);
+    }
+  }
+
+  private async hiddenAdminUserIds(includePlayPrelaunch: boolean): Promise<string[]> {
+    const [playIds, demoRows] = await Promise.all([
+      includePlayPrelaunch ? Promise.resolve([] as string[]) : this.playPrelaunchUserIds(),
+      this.prisma.user.findMany({
+        where: { phone: { startsWith: '+2439000000' } },
+        select: { id: true, phone: true },
+      }),
+    ]);
+    const demoIds = demoRows.filter((u) => u.phone && isSeedDemoPhone(u.phone)).map((u) => u.id);
+    return [...new Set([...playIds, ...demoIds])];
+  }
+
+  async listUsers(skip = 0, take = 50, search?: string, includePlayPrelaunch = false) {
+    const searchWhere = search?.trim()
       ? {
           OR: [
             { phone: { contains: search.trim(), mode: 'insensitive' as const } },
@@ -82,11 +118,58 @@ export class UsersService {
           ],
         }
       : undefined;
+    const hiddenIds = await this.hiddenAdminUserIds(includePlayPrelaunch);
+    const where =
+      hiddenIds.length > 0
+        ? { AND: [...(searchWhere ? [searchWhere] : []), { id: { notIn: hiddenIds } }] }
+        : searchWhere;
     const [data, total] = await Promise.all([
       this.prisma.user.findMany({ where, skip, take, orderBy: { createdAt: 'desc' } }),
       this.prisma.user.count({ where }),
     ]);
-    return { data, total, skip, take };
+    return {
+      data: data.map((u) => ({ ...u, playPrelaunch: isPlayPrelaunchAccount(u) })),
+      total,
+      skip,
+      take,
+    };
+  }
+
+  async listPlayPrelaunchUsers() {
+    const hiddenIds = await this.playPrelaunchUserIds();
+    if (hiddenIds.length === 0) return { data: [], total: 0 };
+    const data = await this.prisma.user.findMany({
+      where: { id: { in: hiddenIds } },
+      orderBy: { createdAt: 'desc' },
+    });
+    return {
+      data: data.filter(isPlayPrelaunchAccount).map((u) => ({ ...u, playPrelaunch: true })),
+      total: data.filter(isPlayPrelaunchAccount).length,
+    };
+  }
+
+  async purgePlayPrelaunchUsers(actorId?: string) {
+    const { data } = await this.listPlayPrelaunchUsers();
+    const deleted: string[] = [];
+    const skipped: { id: string; reason: string }[] = [];
+    for (const user of data) {
+      if (!isPlayPrelaunchAccount(user)) {
+        skipped.push({ id: user.id, reason: 'hors motif Test Lab' });
+        continue;
+      }
+      try {
+        await this.purgeUser(user.id, actorId);
+        deleted.push(user.id);
+      } catch (e) {
+        const body = e instanceof MovaHttpException ? e.getResponse() : null;
+        const reason =
+          body && typeof body === 'object' && 'message' in body
+            ? String((body as { message?: string }).message)
+            : 'refus de suppression';
+        skipped.push({ id: user.id, reason });
+      }
+    }
+    return { deleted: deleted.length, ids: deleted, skipped };
   }
 
   private assertAssignableRole(role?: UserRole) {

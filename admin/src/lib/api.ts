@@ -80,6 +80,7 @@ export type AdminUser = {
   lastName?: string;
   email?: string;
   createdAt?: string;
+  playPrelaunch?: boolean;
 };
 
 export type AdminDriver = {
@@ -1886,12 +1887,31 @@ export async function updateUser(id: string, data: Partial<AdminUser>) {
   return apiFetch<AdminUser>(`/api/admin/users/${id}`, { method: "PATCH", body: JSON.stringify(data) });
 }
 
-export async function fetchUsers(skip = 0, take = 100, search?: string): Promise<{ data: AdminUser[]; total: number }> {
+export async function fetchUsers(
+  skip = 0,
+  take = 100,
+  search?: string,
+  includePlayPrelaunch = false,
+): Promise<{ data: AdminUser[]; total: number }> {
   const params = new URLSearchParams({ skip: String(skip), take: String(take) });
   if (search?.trim()) params.set("search", search.trim());
+  if (includePlayPrelaunch) params.set("includePlayPrelaunch", "true");
   const raw = await apiFetch<AdminUser[] | { data?: AdminUser[]; total?: number }>(`/api/admin/users?${params}`);
   if (Array.isArray(raw)) return { data: raw, total: raw.length };
   return { data: raw.data ?? [], total: raw.total ?? raw.data?.length ?? 0 };
+}
+
+export async function fetchPlayPrelaunchUsers(): Promise<{ data: AdminUser[]; total: number }> {
+  const raw = await apiFetch<AdminUser[] | { data?: AdminUser[]; total?: number }>("/api/admin/users/play-prelaunch");
+  if (Array.isArray(raw)) return { data: raw, total: raw.length };
+  return { data: raw.data ?? [], total: raw.total ?? raw.data?.length ?? 0 };
+}
+
+export async function purgePlayPrelaunchUsers() {
+  return apiFetch<{ deleted: number; ids: string[]; skipped: { id: string; reason: string }[] }>(
+    "/api/admin/users/purge-play-prelaunch",
+    { method: "POST", body: JSON.stringify({}) },
+  );
 }
 
 export async function fetchDrivers(): Promise<AdminDriver[]> {

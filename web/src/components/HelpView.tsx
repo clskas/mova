@@ -1,6 +1,8 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { HelpIcon } from "./ServiceIcons";
+import { apiFetch } from "@/lib/api";
 
 const FAQ = [
   {
@@ -25,7 +27,7 @@ const FAQ = [
   },
   {
     q: "Comment contacter le support ?",
-    a: "WhatsApp +243 900 000 000, support@mova.cd, Lun–Sam 8h–20h (Africa/Kinshasa).",
+    a: "Les coordonnées sont celles publiées par AfriSoft (Contacts de l'entreprise). Si la liste ci-dessus est vide, aucun contact n'a encore été ajouté.",
   },
   {
     q: "Comment annuler une course ?",
@@ -33,9 +35,67 @@ const FAQ = [
   },
 ];
 
+type CompanyContact = {
+  id?: string;
+  name?: string;
+  title?: string | null;
+  department?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  notes?: string | null;
+};
+
+function parseContacts(raw: unknown): CompanyContact[] {
+  const list = Array.isArray(raw)
+    ? raw
+    : raw && typeof raw === "object" && Array.isArray((raw as { data?: unknown }).data)
+      ? (raw as { data: unknown[] }).data
+      : [];
+  return list
+    .filter((item): item is Record<string, unknown> => !!item && typeof item === "object")
+    .map((item) => ({
+      id: String(item.id ?? ""),
+      name: String(item.name ?? "Contact"),
+      title: item.title ? String(item.title) : null,
+      department: item.department ? String(item.department) : null,
+      phone: item.phone ? String(item.phone) : null,
+      email: item.email ? String(item.email) : null,
+      notes: item.notes ? String(item.notes) : null,
+    }));
+}
+
+function telHref(phone: string) {
+  return `tel:${phone.replace(/\s/g, "")}`;
+}
+
+function waHref(phone: string) {
+  const digits = phone.replace(/\D/g, "");
+  return digits ? `https://wa.me/${digits}` : null;
+}
+
 type Props = { onBack: () => void };
 
 export function HelpView({ onBack }: Props) {
+  const [contacts, setContacts] = useState<CompanyContact[]>([]);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    apiFetch<unknown>("/api/company-contacts")
+      .then((raw) => {
+        if (!cancelled) setContacts(parseContacts(raw));
+      })
+      .catch(() => {
+        if (!cancelled) setContacts([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoaded(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
     <div className="space-y-4">
       <button
@@ -54,32 +114,52 @@ export function HelpView({ onBack }: Props) {
         Documentation et support — RDC
       </p>
 
-      <section className="bg-[#F5F4FF] rounded-xl p-4 space-y-2">
+      <section className="bg-[#F5F4FF] rounded-xl p-4 space-y-3">
         <h3 className="font-semibold text-[#1A1A2E]">Contacter le support</h3>
-        <p className="text-sm">
-          <span className="text-gray-500">Téléphone :</span>{" "}
-          <a href="tel:+243900000000" className="text-[#6C63FF]">
-            +243 900 000 000
-          </a>
-        </p>
-        <p className="text-sm">
-          <span className="text-gray-500">E-mail :</span>{" "}
-          <a href="mailto:support@mova.cd" className="text-[#6C63FF]">
-            support@mova.cd
-          </a>
-        </p>
-        <p className="text-sm">
-          <span className="text-gray-500">WhatsApp :</span>{" "}
-          <a
-            href="https://wa.me/243900000000"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-[#6C63FF]"
-          >
-            +243 900 000 000
-          </a>
-        </p>
-        <p className="text-xs text-gray-500">Lun–Sam 8h–20h (Africa/Kinshasa)</p>
+        {!loaded ? (
+          <p className="text-sm text-gray-500">Chargement des contacts…</p>
+        ) : contacts.length === 0 ? (
+          <p className="text-sm text-gray-500">Aucun contact pour le moment.</p>
+        ) : (
+          contacts.map((contact) => {
+            const wa = contact.phone ? waHref(contact.phone) : null;
+            return (
+              <div key={contact.id || contact.name} className="text-sm space-y-1 border-t border-white/60 pt-2 first:border-0 first:pt-0">
+                <p className="font-medium text-[#1A1A2E]">{contact.name}</p>
+                {(contact.title || contact.department) && (
+                  <p className="text-gray-500 text-xs">
+                    {[contact.title, contact.department].filter(Boolean).join(" · ")}
+                  </p>
+                )}
+                {contact.notes && <p className="text-xs text-gray-500">{contact.notes}</p>}
+                {contact.phone && (
+                  <p>
+                    <span className="text-gray-500">Téléphone :</span>{" "}
+                    <a href={telHref(contact.phone)} className="text-[#6C63FF]">
+                      {contact.phone}
+                    </a>
+                  </p>
+                )}
+                {contact.email && (
+                  <p>
+                    <span className="text-gray-500">E-mail :</span>{" "}
+                    <a href={`mailto:${contact.email}`} className="text-[#6C63FF]">
+                      {contact.email}
+                    </a>
+                  </p>
+                )}
+                {wa && (
+                  <p>
+                    <span className="text-gray-500">WhatsApp :</span>{" "}
+                    <a href={wa} target="_blank" rel="noopener noreferrer" className="text-[#6C63FF]">
+                      {contact.phone}
+                    </a>
+                  </p>
+                )}
+              </div>
+            );
+          })
+        )}
       </section>
 
       <section>

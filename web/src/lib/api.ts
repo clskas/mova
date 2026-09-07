@@ -226,6 +226,10 @@ function recordMockWalletTx(type: string, amountCdf: number, description: string
 function mockFor<T>(path: string, init?: RequestInit): T {
   const method = init?.method ?? 'GET';
 
+  if (path.includes('/company-contacts')) {
+    return { data: [] } as T;
+  }
+
   if (path.includes('/auth/otp/request')) {
     return { success: true, message: 'Code OTP envoyé', mockCode: '123456' } as T;
   }

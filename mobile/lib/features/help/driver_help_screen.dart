@@ -5,7 +5,6 @@ import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import 'contact_support_screen.dart';
 import 'faq_screen.dart';
-import 'help_config.dart';
 import 'legal_screen.dart';
 import '../geo/suggest_place_screen.dart';
 import '../profile/profile_screen.dart';
@@ -69,7 +68,7 @@ class DriverHelpScreen extends ConsumerWidget {
           ListTile(
             leading: const Icon(Icons.support_agent_outlined, color: MovaColors.orange),
             title: const Text('Contacter le support', style: TextStyle(fontWeight: FontWeight.w600)),
-            subtitle: Text(HelpConfig.supportPhone),
+            subtitle: const Text('Coordonnées publiées par AfriSoft'),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => _open(context, const ContactSupportScreen()),
           ),

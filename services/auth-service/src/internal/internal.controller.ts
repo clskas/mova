@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { UserRole, UserStatus } from '@prisma/client';
-import { IsEnum, IsOptional, IsString } from 'class-validator';
+import { IsBoolean, IsEnum, IsOptional, IsString } from 'class-validator';
 import { UsersService } from '../users/users.service';
 import { AuthService } from '../auth/auth.service';
 import { InternalApiGuard } from '../common/internal-api.guard';
@@ -36,7 +36,7 @@ class NotifyUserDto {
 
 class IssueLoginPinDto {
   @IsOptional() @IsString() pin?: string;
-  @IsOptional() notify?: boolean;
+  @IsOptional() @IsBoolean() notify?: boolean;
   @IsOptional() @IsString() purpose?: string;
 }
 

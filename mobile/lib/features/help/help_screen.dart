@@ -109,7 +109,7 @@ class HelpScreen extends ConsumerWidget {
             icon: Icons.support_agent_outlined,
             iconColor: MovaColors.orange,
             title: 'Contacter le support',
-            subtitle: HelpConfig.supportPhone,
+            subtitle: 'Coordonnées publiées par AfriSoft',
             onTap: () => _open(context, const ContactSupportScreen()),
           ),
           const Padding(

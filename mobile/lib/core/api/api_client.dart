@@ -829,6 +829,9 @@ class ApiClient {
     if (path.contains('/moving/') && path.endsWith('/cancel') && method == 'POST') {
       return Success({'status': 'CANCELLED', 'cancelled': true});
     }
+    if (path.contains('/company-contacts') && method == 'GET') {
+      return const Success({'data': <dynamic>[]});
+    }
     return null;
   }
 
@@ -2047,6 +2050,15 @@ class ApiClient {
           }
           return const Success<List<Map<String, dynamic>>>([]);
         }(),
+      Failure(:final error) => Failure(error),
+    };
+  }
+
+  /// Contacts publics AfriSoft / SENGA (admin « Contacts de l'entreprise », isPublic).
+  Future<Result<List<Map<String, dynamic>>>> getCompanyContacts() async {
+    final result = await get('/company-contacts');
+    return switch (result) {
+      Success(:final data) => Success(_extractList(data)),
       Failure(:final error) => Failure(error),
     };
   }

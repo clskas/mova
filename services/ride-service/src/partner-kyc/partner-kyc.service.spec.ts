@@ -117,6 +117,41 @@ describe('PartnerKycService', () => {
     );
   });
 
+  it('envoie le PIN par e-mail si le partenaire n\'a pas de +243', async () => {
+    prisma.restaurant.findFirst.mockResolvedValue({
+      id: 'r1',
+      ownerUserId: 'u1',
+      kycStatus: 'PENDING',
+      kycNotes: null,
+      nif: 'NIF-1',
+      rccm: 'CD/KIN/RCCM/1',
+      payoutProvider: 'ORANGE_MONEY',
+      payoutPhone: '+243810000001',
+      address: 'Gombe',
+    });
+    prisma.partnerKycDocument.findMany.mockResolvedValue([
+      { type: 'MANAGER_ID', status: 'PENDING', notes: null, url: '/a', id: 'd1' },
+      { type: 'RCCM', status: 'PENDING', notes: null, url: '/b', id: 'd2' },
+      { type: 'PREMISES_PHOTO', status: 'PENDING', notes: null, url: '/c', id: 'd3' },
+    ]);
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ phone: null, email: 'resto@ex.com', name: 'Chez Flore' }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ loginPin: '847291', smsSent: false, emailSent: true, hasPhone: false, hasEmail: true }),
+      });
+    prisma.partnerKycDocument.updateMany.mockResolvedValue({ count: 3 });
+    prisma.restaurant.update.mockResolvedValue({});
+
+    const result = await service.reviewSubject('u1', 'RESTAURANT', true);
+    expect(result.loginPin).toBe('847291');
+    expect(result.emailSent).toBe(true);
+    expect(result.smsSent).toBe(false);
+  });
+
   it('attribue chaque justificatif au partenaire (nom, téléphone, type français)', async () => {
     prisma.restaurant.findMany.mockResolvedValue([
       {

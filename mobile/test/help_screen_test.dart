@@ -3,13 +3,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mova/core/api/api_client.dart';
 import 'package:mova/core/theme/mova_theme.dart';
+import 'package:mova/features/help/contact_support_screen.dart';
 import 'package:mova/features/help/faq_screen.dart';
 import 'package:mova/features/help/help_config.dart';
 import 'package:mova/features/help/help_screen.dart';
 import 'package:mova/features/help/manual_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   final widths = [320.0, 360.0, 375.0, 390.0, 428.0];
+
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+  });
 
   Widget testApp(Widget home) {
     return ProviderScope(
@@ -35,6 +41,20 @@ void main() {
     expect(find.text('Contacter le support'), findsOneWidget);
     expect(find.text('Conditions d\'utilisation'), findsOneWidget);
     expect(find.text('Politique de confidentialité'), findsOneWidget);
+    expect(find.text('+243 900 000 000'), findsNothing);
+  });
+
+  testWidgets('ContactSupportScreen stays empty without published contacts', (tester) async {
+    tester.view.physicalSize = const Size(400, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+
+    await tester.pumpWidget(testApp(const ContactSupportScreen()));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Aucun contact pour le moment.'), findsOneWidget);
+    expect(find.text('+243 900 000 000'), findsNothing);
+    expect(find.text('support@mova.cd'), findsNothing);
   });
 
   testWidgets('HelpScreen navigates to FAQ and Manual', (tester) async {

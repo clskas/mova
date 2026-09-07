@@ -1,13 +1,6 @@
 /// Configuration partagée du centre d'aide SENGA (RDC).
 class HelpConfig {
   static const hubTitle = "Centre d'aide SENGA";
-  static const supportPhone = '+243 900 000 000';
-  static const supportPhoneDial = '+243900000000';
-  static const supportEmail = 'support@mova.cd';
-  static const privacyEmail = 'privacy@mova.cd';
-  static const whatsAppUrl = 'https://wa.me/243900000000';
-  static const supportHours = 'Lun–Sam 8h–20h (Africa/Kinshasa)';
-  static const supportAddress = 'République Démocratique du Congo';
 }
 
 class FaqItem {
@@ -31,7 +24,7 @@ const kFaqItems = <FaqItem>[
   FaqItem(
     question: 'Je n\'ai pas reçu le code OTP, que faire ?',
     answer:
-        'Vérifiez votre réseau (Orange, Vodacom, Airtel). Attendez 60 secondes puis demandez un nouveau code. Si le problème persiste, contactez support@mova.cd.',
+        'Vérifiez votre réseau (Orange, Vodacom, Airtel). Attendez 60 secondes puis demandez un nouveau code. Si le problème persiste, ouvrez Aide → Contacter le support.',
   ),
   FaqItem(
     question: 'Quels moyens de paiement sont acceptés ?',
@@ -76,7 +69,7 @@ const kFaqItems = <FaqItem>[
   FaqItem(
     question: 'Que faire en cas de objet oublié dans le véhicule ?',
     answer:
-        'Contactez immédiatement le support via WhatsApp +243 900 000 000 ou support@mova.cd en indiquant la date, l\'heure et le trajet concerné.',
+        'Contactez immédiatement le support via Aide → Contacter le support en indiquant la date, l\'heure et le trajet concerné.',
   ),
   FaqItem(
     question: 'Comment noter un chauffeur ou livreur ?',
@@ -106,22 +99,22 @@ const kFaqItems = <FaqItem>[
   FaqItem(
     question: 'Mes données personnelles sont-elles protégées ?',
     answer:
-        'Oui. Consultez la Politique de confidentialité dans Aide. SENGA ne vend pas vos données. Contact DPO : privacy@mova.cd.',
+        'Oui. Consultez la Politique de confidentialité dans Aide. SENGA ne vend pas vos données. Pour le DPO, utilisez Aide → Contacter le support.',
   ),
   FaqItem(
     question: 'Comment supprimer mon compte ?',
     answer:
-        'Envoyez une demande à privacy@mova.cd ou via WhatsApp support. Votre historique sera traité conformément à la politique de conservation.',
+        'Envoyez une demande via Aide → Contacter le support. Votre historique sera traité conformément à la politique de conservation.',
   ),
   FaqItem(
     question: 'Le paiement mobile money a échoué, que faire ?',
     answer:
-        'Vérifiez votre solde et réessayez. Si le débit a eu lieu sans confirmation SENGA, contactez votre opérateur puis support@mova.cd avec la référence transaction.',
+        'Vérifiez votre solde et réessayez. Si le débit a eu lieu sans confirmation SENGA, contactez votre opérateur puis le support via Aide avec la référence transaction.',
   ),
   FaqItem(
     question: 'Comment contacter le support ?',
     answer:
-        'WhatsApp +243 900 000 000, e-mail support@mova.cd, du lundi au samedi 8h–20h (fuseau Africa/Kinshasa).',
+        'Ouvrez Aide → Contacter le support. Les coordonnées affichées sont celles publiées par AfriSoft.',
   ),
 ];
 

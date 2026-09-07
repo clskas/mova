@@ -1213,6 +1213,17 @@ describe('AuthService', () => {
     expect(mailer.sendLoginPin).toHaveBeenCalledWith('only@ex.com', result.loginPin);
   });
 
+  it('enregistre un PIN fourni sans renvoyer SMS ni e-mail', async () => {
+    prisma.user.findUnique.mockResolvedValue(makeUser({ phone: '+243811111111', email: 'a@b.cd' }));
+    prisma.user.update.mockResolvedValue(makeUser());
+    const result = await service.issueLoginPin('user-1', { pin: '111657', notify: false });
+    expect(result.loginPin).toBe('111657');
+    expect(result.smsSent).toBe(false);
+    expect(result.emailSent).toBe(false);
+    expect(sms.sendSms).not.toHaveBeenCalled();
+    expect(mailer.sendLoginPin).not.toHaveBeenCalled();
+  });
+
   it('envoie un avis KYC par e-mail si seul l\'e-mail est lié', async () => {
     prisma.user.findUnique.mockResolvedValue(makeUser({ phone: null, email: 'only@ex.com' }));
     const result = await service.notifyUser('user-1', {

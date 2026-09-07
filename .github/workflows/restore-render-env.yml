@@ -121,6 +121,7 @@ jobs:
               {key:"APP_ENV", value:"production"},
               {key:"RUN_SEED", value:"false"},
               {key:"SKIP_DEMO_SEED", value:"true"},
+              {key:"SEED_DEMO_CATALOG", value:"false"},
               {key:"SMS_PROVIDER", value:"africastalking"},
               {key:"MOBILE_MONEY_GATEWAY", value:"serdipay"},
               {key:"SERDIPAY_BASE_URL", value:"https://serdipay.com"},

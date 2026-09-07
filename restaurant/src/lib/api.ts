@@ -1,6 +1,29 @@
 import { authHeaders } from "./auth";
 import { PUBLIC_API_BASE } from "./public-api-base";
-import { sanitizeUserMessage } from "./user-messages";
+import { httpStatusUserMessage, sanitizeUserMessage } from "./user-messages";
+
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+  }
+}
+
+function extractErrorMessage(data: Record<string, unknown>, status: number): string {
+  const err = data?.error;
+  let raw: unknown;
+  if (err && typeof err === "object" && err !== null && "message" in err) {
+    raw = (err as { message?: unknown }).message;
+  } else if (typeof err === "string") {
+    raw = err;
+  } else {
+    raw = data?.message;
+  }
+  if (Array.isArray(raw)) raw = raw.filter(Boolean).join(". ");
+  return sanitizeUserMessage(raw ?? `Erreur ${status}`, httpStatusUserMessage(status));
+}
 
 const API_BASE = PUBLIC_API_BASE;
 
@@ -76,10 +99,9 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   } catch {
     throw new Error("Réseau indisponible. Vérifiez votre connexion.");
   }
-  const data = await res.json().catch(() => ({}));
+  const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   if (!res.ok) {
-    const raw = data?.error?.message ?? data?.message ?? `Erreur ${res.status}`;
-    throw new Error(sanitizeUserMessage(raw));
+    throw new ApiError(extractErrorMessage(data, res.status), res.status);
   }
   return data as T;
 }

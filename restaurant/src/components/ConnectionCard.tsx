@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { GoogleContinueButton, googleClientId } from "@/components/GoogleContinueButton";
 import { apiFetch } from "@/lib/api";
-import { normalizeLoginPhone, setToken } from "@/lib/auth";
+import { RESTAURANT_AUTH_INTENT, normalizeLoginPhone, setToken } from "@/lib/auth";
 import { toUserErrorMessage } from "@/lib/user-messages";
 
 type Me = {
@@ -80,7 +80,7 @@ export function ConnectionCard() {
     try {
       await apiFetch("/api/auth/otp/request", {
         method: "POST",
-        body: JSON.stringify({ phone: normalizeLoginPhone(phone) }),
+        body: JSON.stringify({ phone: normalizeLoginPhone(phone), ...RESTAURANT_AUTH_INTENT }),
       });
       setOtpSent(true);
     } catch (e) {

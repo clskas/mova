@@ -317,6 +317,19 @@ describe('AuthService', () => {
     });
   });
 
+  it('maps the live SerdiPay 400 wrapper to French instead of leaking (400)', async () => {
+    sms.sendOtp.mockResolvedValue({
+      success: false,
+      message: 'Échec SMS SerdiPay (400): An error occor while processing the sms',
+    });
+    await expect(service.requestOtp('+243978685317', UserRole.RESTAURANT, 'restaurant')).rejects.toMatchObject({
+      response: {
+        code: MovaErrorCode.VALIDATION_ERROR,
+        message: expect.stringMatching(/Impossible d'envoyer le code par SMS/),
+      },
+    });
+  });
+
   it('looks up OTP by SHA-256 hash, not plaintext', async () => {
     const passenger = makeUser();
     prisma.user.findUnique.mockResolvedValue(passenger);

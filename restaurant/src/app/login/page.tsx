@@ -14,6 +14,7 @@ import {
   isSeedDemoPhone,
   normalizeLoginPhone,
   phoneFromToken,
+  RESTAURANT_AUTH_INTENT,
   markPinSessionUnlocked,
   setPinPending,
   setLastPhone,
@@ -43,7 +44,7 @@ import {
 } from "@/components/PinAuth";
 
 const API_BASE = PUBLIC_API_BASE;
-const INTENT = { role: "RESTAURANT", intendedRole: "RESTAURANT", portal: "restaurant" };
+const INTENT = RESTAURANT_AUTH_INTENT;
 
 async function readErrorMessage(res: Response, fallback: string): Promise<string> {
   try {

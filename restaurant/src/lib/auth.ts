@@ -28,6 +28,13 @@ function storageRemove(key: string): void {
   }
 }
 
+/** Same intent as login — OTP / link-phone on a Google-first restaurant account. */
+export const RESTAURANT_AUTH_INTENT = {
+  role: "RESTAURANT",
+  intendedRole: "RESTAURANT",
+  portal: "restaurant",
+} as const;
+
 export function getToken(): string | null {
   return storageGet(TOKEN_KEY);
 }

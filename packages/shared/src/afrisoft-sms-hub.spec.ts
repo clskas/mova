@@ -35,8 +35,13 @@ describe('afrisoft-sms-hub', () => {
     expect(mapSmsDeliveryFailureToUserMessage('An error occor while processing the sms')).toBe(
       SMS_UNAVAILABLE_USER_MESSAGE,
     );
+    expect(
+      mapSmsDeliveryFailureToUserMessage(
+        'Échec SMS SerdiPay (400): An error occor while processing the sms',
+      ),
+    ).toBe(SMS_UNAVAILABLE_USER_MESSAGE);
     expect(mapSmsDeliveryFailureToUserMessage("Trop de codes envoyés. Réessayez.")).toBe(
-      "Trop de codes envoyés. Réessayez.",
+      SMS_RATE_LIMIT_USER_MESSAGE,
     );
   });
 

@@ -79,6 +79,32 @@ function isClassValidatorPinMessage(msg: string): boolean {
 export const LOGIN_GOOGLE_UNAVAILABLE = "Connexion Google impossible pour le moment. Réessayez.";
 export const LOGIN_OTP_UNAVAILABLE = "Impossible d'envoyer le code. Réessayez.";
 export const LOGIN_GENERIC = "Connexion impossible. Réessayez.";
+export const SMS_RATE_LIMIT_FR = "Trop de codes envoyés vers ce numéro. Réessayez dans une minute.";
+export const SMS_CREDIT_FR = "Envoi SMS temporairement indisponible. Contactez le support SENGA.";
+export const SMS_UNAVAILABLE_FR = "Impossible d'envoyer le code par SMS. Réessayez dans quelques minutes.";
+export const SMS_INVALID_PHONE_FR = "Numéro de téléphone invalide. Format : +243XXXXXXXXX";
+
+/** Hub / SerdiPay leftovers → French the founder can act on (not « Une erreur est survenue »). */
+export function mapSmsOrOtpFailure(msg: string): string | null {
+  const lower = msg.toLowerCase();
+  if (/cooldown|rate limit|too many|trop de (codes|tentatives)|retry_after/i.test(lower)) {
+    return SMS_RATE_LIMIT_FR;
+  }
+  if (/(crédit|credit).*(sms)|sms.*(insuffisant)|not enough sms/i.test(lower)) {
+    return SMS_CREDIT_FR;
+  }
+  if (/invalid phone|phone_invalid|phone \(expect|numéro de téléphone invalide/i.test(lower)) {
+    return SMS_INVALID_PHONE_FR;
+  }
+  if (
+    /hmac|api[_ ]?key|signature|hub_auth|afrisoft_|serdipay|econnrefused|non configuré|missing afrisoft|error occor|processing the sms|échec sms/i.test(
+      lower,
+    )
+  ) {
+    return SMS_UNAVAILABLE_FR;
+  }
+  return null;
+}
 
 export function httpStatusUserMessage(status: number): string {
   if (status === 401) return "Non autorisé. Veuillez vous connecter.";
@@ -98,6 +124,8 @@ export function sanitizeUserMessage(
   const msg = String(raw).trim();
   if (!msg) return fallback;
   if (isClassValidatorPinMessage(msg)) return PIN_SIX_DIGITS_FR;
+  const smsMapped = mapSmsOrOtpFailure(msg);
+  if (smsMapped) return smsMapped;
   if (/payment failed|merchant is not allowed|failed to process the payment|channel0/i.test(msg)) {
     return PAYMENT_FAILED_FR;
   }

@@ -58,7 +58,7 @@ export function mapSmsDeliveryFailureToUserMessage(raw?: string): string {
   const msg = (raw ?? '').trim();
   const lower = msg.toLowerCase();
   if (!msg) return SMS_UNAVAILABLE_USER_MESSAGE;
-  if (/cooldown|rate limit|too many|retry_after/i.test(lower)) {
+  if (/cooldown|rate limit|too many|trop de (codes|tentatives)|retry_after/i.test(lower)) {
     return SMS_RATE_LIMIT_USER_MESSAGE;
   }
   if (/(crédit|credit).*(sms)|sms.*(insuffisant)|not enough sms/i.test(lower)) {
@@ -68,13 +68,21 @@ export function mapSmsDeliveryFailureToUserMessage(raw?: string): string {
     return 'Numéro de téléphone invalide. Format : +243XXXXXXXXX';
   }
   if (
-    /hmac|api[_ ]?key|signature|hub_auth|afrisoft_|serdipay_|econnrefused|non configuré|missing afrisoft/i.test(
+    /hmac|api[_ ]?key|signature|hub_auth|afrisoft_|serdipay|econnrefused|non configuré|missing afrisoft|error occor|processing the sms|échec sms/i.test(
       lower,
     )
   ) {
     return SMS_UNAVAILABLE_USER_MESSAGE;
   }
-  if (/[àâäéèêëïîôùûüç]/i.test(msg) && msg.length <= 180 && !/^https?:\/\//i.test(msg)) {
+  // Pure French user copy only — do not pass through mixed EN / HTTP leftovers
+  // such as « Échec SMS SerdiPay (400): An error occor… » just because of « É ».
+  if (
+    /[àâäéèêëïîôùûüç]/i.test(msg) &&
+    msg.length <= 180 &&
+    !/^https?:\/\//i.test(msg) &&
+    !/\(\s*\d{3}\s*\)/.test(msg) &&
+    !/\b(error|failed|exception)\b/i.test(msg)
+  ) {
     return msg;
   }
   return SMS_UNAVAILABLE_USER_MESSAGE;

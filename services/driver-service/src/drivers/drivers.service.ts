@@ -13,6 +13,7 @@ import {
   OPTIONAL_DRIVER_KYC_TYPES,
   normalizeKycDocumentType,
   normalizeKycRejectNotes,
+  kycDocumentLabel,
   driverVehicleTypesForRide,
   formatMovaPublicId,
   maskPhoneRdc,
@@ -864,7 +865,28 @@ export class DriversService {
   }
 
   async pendingKyc() {
-    return this.prisma.kycDocument.findMany({ where: { status: KycStatus.PENDING }, orderBy: { createdAt: 'desc' } });
+    const docs = await this.prisma.kycDocument.findMany({
+      where: { status: KycStatus.PENDING },
+      orderBy: { createdAt: 'desc' },
+    });
+    const userIds = [...new Set(docs.map((d) => d.userId))];
+    const users = await Promise.all(userIds.map((id) => this.fetchAuthUser(id)));
+    const userById = new Map(users.filter(Boolean).map((u) => [u!.id, u!]));
+    return docs.map((doc) => {
+      const user = userById.get(doc.userId);
+      const displayName = [user?.firstName, user?.lastName].filter(Boolean).join(' ').trim();
+      const publicId = formatMovaPublicId(doc.userId, 'DRIVER');
+      return {
+        ...doc,
+        typeLabel: KYC_DOCUMENT_LABELS[doc.type as keyof typeof KYC_DOCUMENT_LABELS] ?? kycDocumentLabel(doc.type),
+        partnerKind: 'DRIVER' as const,
+        partnerKindLabel: 'Chauffeur',
+        displayName: displayName || publicId,
+        publicId,
+        phone: user?.phone ?? null,
+        email: user?.email ?? null,
+      };
+    });
   }
 
   async approveKyc(documentId: string, approved: boolean, notes?: string) {
@@ -1042,6 +1064,8 @@ export class DriversService {
         publicId: formatMovaPublicId(p.userId, 'DRIVER'),
         firstName: user?.firstName ?? null,
         lastName: user?.lastName ?? null,
+        phone: user?.phone ?? null,
+        email: user?.email ?? null,
         activationPinVerified: !!p.activationPinVerifiedAt,
         ...kycSummary,
         readyForReview: p.onboardingCompleted && p.kycStatus === KycStatus.PENDING,

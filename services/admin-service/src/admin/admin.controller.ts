@@ -425,6 +425,34 @@ export class AdminController {
     return this.adminService.deletePublicite(id);
   }
 
+  @Get('company-contacts')
+  @RequirePermissions(AdminPermission.CONTACTS_READ)
+  @ApiOperation({ summary: 'Liste des contacts AfriSoft / SENGA' })
+  companyContacts(@Query('search') search?: string) {
+    return this.adminService.listCompanyContacts(search);
+  }
+
+  @Post('company-contacts')
+  @RequirePermissions(AdminPermission.CONTACTS_WRITE)
+  @ApiOperation({ summary: 'Créer un contact entreprise' })
+  createCompanyContact(@Body() body: Record<string, unknown>) {
+    return this.adminService.createCompanyContact(body);
+  }
+
+  @Patch('company-contacts/:id')
+  @RequirePermissions(AdminPermission.CONTACTS_WRITE)
+  @ApiOperation({ summary: 'Modifier un contact entreprise' })
+  updateCompanyContact(@Param('id') id: string, @Body() body: Record<string, unknown>) {
+    return this.adminService.updateCompanyContact(id, body);
+  }
+
+  @Delete('company-contacts/:id')
+  @RequirePermissions(AdminPermission.CONTACTS_WRITE)
+  @ApiOperation({ summary: 'Supprimer un contact entreprise' })
+  deleteCompanyContact(@Param('id') id: string) {
+    return this.adminService.deleteCompanyContact(id);
+  }
+
   @Get('pricing-rules')
   @RequirePermissions(AdminPermission.PRICING_READ)
   @ApiOperation({ summary: 'Règles tarifaires véhicules' })

@@ -19,7 +19,8 @@ export type AdminSection =
   | "locations"
   | "demenagements"
   | "covoiturage"
-  | "publicites";
+  | "publicites"
+  | "contacts";
 
 export const ADMIN_ROLES: AdminRole[] = ["SUPER_ADMIN", "ADMIN", "SUPPORT", "FINANCE", "CONTENT"];
 
@@ -50,6 +51,7 @@ const ALL_SECTIONS: AdminSection[] = [
   "demenagements",
   "covoiturage",
   "publicites",
+  "contacts",
 ];
 
 /** Sections visibles dans le menu par rôle. */
@@ -99,6 +101,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/catalogue-location", label: "Catalogue location", short: "Catal.", section: "locations" },
   { href: "/demenagements", label: "Déménagements", short: "Démén.", section: "demenagements" },
   { href: "/covoiturage", label: "Covoiturage", short: "Covoit.", section: "covoiturage" },
+  { href: "/contacts", label: "Contacts", short: "Contacts", section: "contacts" },
 ];
 
 export function normalizeAdminRole(role?: string | null): AdminRole | null {

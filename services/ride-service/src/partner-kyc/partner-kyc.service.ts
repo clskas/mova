@@ -6,9 +6,13 @@ import {
   MovaHttpException,
   normalizeKycRejectNotes,
   normalizePartnerKycDocumentType,
+  kycDocumentLabel,
+  kycPartnerKindLabel,
+  rentalKycPartnerKind,
   rentalKycTypes,
   restaurantKycTypes,
   serviceUrl,
+  type KycPartnerKind,
   type PartnerKycSubject as PartnerSubject,
   type RentalPartnerKind,
 } from '@mova/shared';
@@ -43,10 +47,15 @@ export class PartnerKycService {
     const types = restaurantKycTypes();
     const checklist = await this.buildChecklist(ownerUserId, PartnerKycSubject.RESTAURANT, types);
     const phoneVerified = PHONE_OK.test(user?.phone?.trim() ?? '');
+    const partnerKind: KycPartnerKind = 'RESTAURANT';
     return {
       subject: 'RESTAURANT' as const,
       userId: ownerUserId,
       restaurantId: restaurant.id,
+      name: restaurant.name,
+      displayName: restaurant.name,
+      partnerKind,
+      partnerKindLabel: kycPartnerKindLabel(partnerKind),
       kycStatus: restaurant.kycStatus,
       kycNotes: restaurant.kycNotes,
       nif: restaurant.nif,
@@ -55,6 +64,7 @@ export class PartnerKycService {
       payoutPhone: restaurant.payoutPhone,
       address: restaurant.address,
       phone: user?.phone ?? null,
+      email: user?.email ?? null,
       phoneVerified,
       canOperate: restaurant.kycStatus === PartnerKycStatus.APPROVED,
       checklist,
@@ -69,15 +79,21 @@ export class PartnerKycService {
     const types = rentalKycTypes(kind);
     const checklist = await this.buildChecklist(ownerUserId, PartnerKycSubject.RENTAL_PARTNER, types);
     const phoneVerified = PHONE_OK.test(user?.phone?.trim() ?? '');
+    const partnerKind = rentalKycPartnerKind(kind);
+    const displayName = user?.name || null;
     return {
       subject: 'RENTAL_PARTNER' as const,
       userId: ownerUserId,
       partnerType: profile.partnerType,
+      partnerKind,
+      partnerKindLabel: kycPartnerKindLabel(partnerKind),
+      displayName,
       kycStatus: profile.kycStatus,
       kycNotes: profile.kycNotes,
       nif: profile.nif,
       rccm: profile.rccm,
       phone: user?.phone ?? null,
+      email: user?.email ?? null,
       phoneVerified,
       canOperate: profile.kycStatus === PartnerKycStatus.APPROVED,
       checklist,
@@ -292,6 +308,7 @@ export class PartnerKycService {
         .map(async (r) => ({
           ...(await this.getRestaurantDossier(r.ownerUserId!)),
           name: r.name,
+          displayName: r.name,
         })),
     );
     const rentalDossiers = await Promise.all(
@@ -300,10 +317,46 @@ export class PartnerKycService {
         userId: p.userId,
       })),
     );
+    const dossierByKey = new Map<string, (typeof restaurantDossiers)[number] | (typeof rentalDossiers)[number]>();
+    for (const d of restaurantDossiers) {
+      if (d.userId) dossierByKey.set(`${d.userId}:RESTAURANT`, d);
+    }
+    for (const d of rentalDossiers) {
+      dossierByKey.set(`${d.userId}:RENTAL_PARTNER`, d);
+    }
+    const attributedDocuments = documents.map((doc) => {
+      const dossier = dossierByKey.get(`${doc.userId}:${doc.subject}`);
+      const partnerKind: KycPartnerKind =
+        doc.subject === PartnerKycSubject.RESTAURANT
+          ? 'RESTAURANT'
+          : rentalKycPartnerKind(
+              dossier && 'partnerType' in dossier ? (dossier.partnerType as string | undefined) : undefined,
+            );
+      const displayName =
+        (dossier && 'name' in dossier ? dossier.name : undefined) ||
+        (dossier && 'displayName' in dossier ? dossier.displayName : undefined) ||
+        null;
+      return {
+        id: doc.id,
+        userId: doc.userId,
+        subject: doc.subject,
+        type: doc.type,
+        typeLabel: kycDocumentLabel(doc.type),
+        status: doc.status,
+        notes: doc.notes,
+        url: doc.url,
+        createdAt: doc.createdAt,
+        partnerKind,
+        partnerKindLabel: kycPartnerKindLabel(partnerKind),
+        displayName,
+        phone: dossier?.phone ?? null,
+        email: dossier?.email ?? null,
+      };
+    });
     return {
       restaurants: restaurantDossiers,
       rentalPartners: rentalDossiers,
-      documents,
+      documents: attributedDocuments,
     };
   }
 

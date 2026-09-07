@@ -4,6 +4,9 @@ import {
   rentalKycTypes,
   REQUIRED_RESTAURANT_KYC_TYPES,
   PARTNER_KYC_DOCUMENT_TYPES,
+  kycDocumentLabel,
+  kycPartnerKindLabel,
+  rentalKycPartnerKind,
 } from './kyc-documents';
 
 describe('partner KYC checklists', () => {
@@ -21,6 +24,23 @@ describe('partner KYC checklists', () => {
     expect(company).toContain(PARTNER_KYC_DOCUMENT_TYPES.RCCM);
     expect(company).toContain(PARTNER_KYC_DOCUMENT_TYPES.COMPANY_STATUTES);
     expect(individual).toEqual(['ID_PHOTO']);
+  });
+});
+
+describe('libellés KYC admin', () => {
+  it('traduit RCCM et identité gérant, pas l\'enum brut', () => {
+    expect(kycDocumentLabel('RCCM')).toBe("RCCM ou preuve d'activité");
+    expect(kycDocumentLabel('MANAGER_ID')).toMatch(/Identité du gérant/);
+    expect(kycDocumentLabel('DRIVERS_LICENSE')).toBe('Permis de conduire');
+  });
+
+  it('distingue chauffeur, restaurant et location entreprise / particulier', () => {
+    expect(kycPartnerKindLabel('DRIVER')).toBe('Chauffeur');
+    expect(kycPartnerKindLabel('RESTAURANT')).toBe('Restaurant');
+    expect(kycPartnerKindLabel('RENTAL_COMPANY')).toBe('Location (entreprise)');
+    expect(kycPartnerKindLabel('RENTAL_INDIVIDUAL')).toBe('Location (particulier)');
+    expect(rentalKycPartnerKind('COMPANY')).toBe('RENTAL_COMPANY');
+    expect(rentalKycPartnerKind('INDIVIDUAL')).toBe('RENTAL_INDIVIDUAL');
   });
 });
 

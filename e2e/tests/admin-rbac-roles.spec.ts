@@ -17,11 +17,11 @@ const STAFF_ACCOUNTS: { phone: string; role: StaffRole; label: string }[] = [
 const MENU_BY_ROLE: Record<StaffRole, string[]> = {
   SUPER_ADMIN: [
     "Tableau de bord", "Utilisateurs", "Chauffeurs", "KYC", "Courses", "Livraisons",
-    "Restaurants", "Tarifs", "Abonnements", "Portefeuille", "Litiges", "Planifiées", "Zones géographiques", "Locations",
+    "Restaurants", "Tarifs", "Abonnements", "Portefeuille", "Litiges", "Planifiées", "Zones géographiques", "Locations", "Contacts",
   ],
   ADMIN: [
     "Tableau de bord", "Utilisateurs", "Chauffeurs", "KYC", "Courses", "Livraisons",
-    "Restaurants", "Tarifs", "Abonnements", "Portefeuille", "Litiges", "Planifiées", "Zones géographiques", "Locations",
+    "Restaurants", "Tarifs", "Abonnements", "Portefeuille", "Litiges", "Planifiées", "Zones géographiques", "Locations", "Contacts",
   ],
   SUPPORT: [
     "Utilisateurs", "Chauffeurs", "KYC", "Litiges", "Courses", "Livraisons", "Planifiées", "Locations",

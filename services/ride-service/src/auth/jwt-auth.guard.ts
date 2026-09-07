@@ -20,6 +20,7 @@ function isPublicPath(path: string, method?: string): boolean {
   if (pathOnly.includes('/geo') && (m === 'GET' || m === 'HEAD' || m === 'OPTIONS')) return true;
   if (pathOnly.includes('/rental/vehicles') && (m === 'GET' || m === 'HEAD' || m === 'OPTIONS')) return true;
   if (m === 'GET' && pathOnly.includes('/publicites')) return true;
+  if (m === 'GET' && pathOnly.includes('/company-contacts')) return true;
   if (m === 'GET' && pathOnly.includes('/public/')) return true;
   return false;
 }

@@ -94,6 +94,35 @@ export const OPTIONAL_RENTAL_INDIVIDUAL_KYC_TYPES: PartnerKycDocumentType[] = [
 export type PartnerKycSubject = 'RESTAURANT' | 'RENTAL_PARTNER';
 export type RentalPartnerKind = 'COMPANY' | 'INDIVIDUAL';
 
+/** Type de partenaire pour l'attribution des justificatifs en revue admin. */
+export type KycPartnerKind = 'DRIVER' | 'RESTAURANT' | 'RENTAL_COMPANY' | 'RENTAL_INDIVIDUAL';
+
+export const KYC_PARTNER_KIND_LABELS: Record<KycPartnerKind, string> = {
+  DRIVER: 'Chauffeur',
+  RESTAURANT: 'Restaurant',
+  RENTAL_COMPANY: 'Location (entreprise)',
+  RENTAL_INDIVIDUAL: 'Location (particulier)',
+};
+
+export function kycPartnerKindLabel(kind: KycPartnerKind): string {
+  return KYC_PARTNER_KIND_LABELS[kind];
+}
+
+export function rentalKycPartnerKind(partnerType?: string | null): KycPartnerKind {
+  return partnerType === 'COMPANY' ? 'RENTAL_COMPANY' : 'RENTAL_INDIVIDUAL';
+}
+
+/** Libellé français d'un type de document (chauffeur ou partenaire), jamais l'enum brut. */
+export function kycDocumentLabel(type?: string | null): string {
+  const upper = (type ?? '').trim().toUpperCase();
+  if (!upper) return 'Justificatif';
+  if (upper in KYC_DOCUMENT_LABELS) return KYC_DOCUMENT_LABELS[upper as KycDocumentType];
+  if (upper in PARTNER_KYC_DOCUMENT_LABELS) {
+    return PARTNER_KYC_DOCUMENT_LABELS[upper as PartnerKycDocumentType];
+  }
+  return type ?? 'Justificatif';
+}
+
 export function restaurantKycTypes(): Array<{ type: PartnerKycDocumentType; required: boolean; label: string }> {
   return [
     ...REQUIRED_RESTAURANT_KYC_TYPES.map((type) => ({

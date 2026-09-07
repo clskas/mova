@@ -413,6 +413,20 @@ export class AdminService {
     return this.proxy('ride', `/internal/publicites/${id}`, { method: 'DELETE' });
   }
 
+  listCompanyContacts(search?: string) {
+    const q = search?.trim() ? `?search=${encodeURIComponent(search.trim())}` : '';
+    return this.fetchJson('ride', `/internal/company-contacts${q}`);
+  }
+  createCompanyContact(body: Record<string, unknown>) {
+    return this.proxy('ride', '/internal/company-contacts', { method: 'POST', body: JSON.stringify(body) });
+  }
+  updateCompanyContact(id: string, body: Record<string, unknown>) {
+    return this.proxy('ride', `/internal/company-contacts/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
+  }
+  deleteCompanyContact(id: string) {
+    return this.proxy('ride', `/internal/company-contacts/${id}`, { method: 'DELETE' });
+  }
+
   listPricingRules(city?: string) {
     const q = city ? `?city=${encodeURIComponent(city)}` : '';
     return this.fetchJson('ride', `/internal/pricing-rules${q}`);

@@ -37,6 +37,7 @@ import { FraudService } from '../fraud/fraud.service';
 import { TrackingService } from '../tracking/tracking.service';
 import { PublicitesService } from '../publicites/publicites.service';
 import { PartnerKycService } from '../partner-kyc/partner-kyc.service';
+import { CompanyContactsService } from '../company-contacts/company-contacts.service';
 
 @ApiTags('internal')
 @Controller('internal')
@@ -63,6 +64,7 @@ export class InternalController {
     private fraud: FraudService,
     private publicites: PublicitesService,
     private partnerKyc: PartnerKycService,
+    private companyContacts: CompanyContactsService,
   ) {}
 
   @Get('fraud/signals')
@@ -352,6 +354,26 @@ export class InternalController {
   @Delete('publicites/:id')
   deletePublicite(@Param('id') id: string) {
     return this.publicites.remove(id);
+  }
+
+  @Get('company-contacts')
+  listCompanyContacts(@Query('search') search?: string) {
+    return this.companyContacts.listAdmin(search);
+  }
+
+  @Post('company-contacts')
+  createCompanyContact(@Body() body: Record<string, unknown>) {
+    return this.companyContacts.create(body as { name?: string; title?: string | null; department?: string | null; phone?: string | null; email?: string | null; notes?: string | null; isPublic?: boolean; sortOrder?: number });
+  }
+
+  @Patch('company-contacts/:id')
+  updateCompanyContact(@Param('id') id: string, @Body() body: Record<string, unknown>) {
+    return this.companyContacts.update(id, body as { name?: string; title?: string | null; department?: string | null; phone?: string | null; email?: string | null; notes?: string | null; isPublic?: boolean; sortOrder?: number });
+  }
+
+  @Delete('company-contacts/:id')
+  deleteCompanyContact(@Param('id') id: string) {
+    return this.companyContacts.remove(id);
   }
 
   @Get('pricing-rules')

@@ -88,6 +88,8 @@ export type AdminDriver = {
   publicId?: string;
   firstName?: string | null;
   lastName?: string | null;
+  phone?: string | null;
+  email?: string | null;
   licenseNumber?: string | null;
   isAvailable?: boolean;
   ratingAvg?: number;
@@ -192,10 +194,17 @@ export type KycItem = {
   id: string;
   userId?: string;
   type?: string;
+  typeLabel?: string;
   status?: string;
   url?: string;
   notes?: string;
   createdAt?: string;
+  partnerKind?: "DRIVER" | "RESTAURANT" | "RENTAL_COMPANY" | "RENTAL_INDIVIDUAL";
+  partnerKindLabel?: string;
+  displayName?: string | null;
+  publicId?: string;
+  phone?: string | null;
+  email?: string | null;
 };
 
 export type Incident = {
@@ -348,6 +357,20 @@ export type Publicite = {
   isActive: boolean;
   dateDebut: string;
   dateFin?: string | null;
+  sortOrder?: number;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type CompanyContact = {
+  id: string;
+  name: string;
+  title?: string | null;
+  department?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  notes?: string | null;
+  isPublic: boolean;
   sortOrder?: number;
   createdAt?: string;
   updatedAt?: string;
@@ -921,13 +944,41 @@ function mockFor<T>(path: string, init?: RequestInit): T {
         id: "kyc-1",
         userId: "2",
         type: "DRIVERS_LICENSE",
+        typeLabel: "Permis de conduire",
         status: "PENDING",
         url: "https://placehold.co/600x400/png?text=Permis",
+        partnerKind: "DRIVER",
+        partnerKindLabel: "Chauffeur",
+        displayName: "Jean Mukendi",
+        publicId: "SG-DRV-2",
+        phone: "+243998765432",
+        email: "jean.m@example.com",
       },
     ] as T;
   }
   if (path.includes("/kyc/") && method === "POST") {
     return { id: path.split("/").pop(), status: body.approved ? "APPROVED" : "REJECTED" } as T;
+  }
+  if (path.includes("/company-contacts") && method === "POST") {
+    return { id: "cc-new", isPublic: false, ...body } as T;
+  }
+  if (path.includes("/company-contacts") && (method === "PATCH" || method === "DELETE")) {
+    return { id: path.split("/").pop(), ...body, success: true } as T;
+  }
+  if (path.includes("/company-contacts")) {
+    return [
+      {
+        id: "cc-1",
+        name: "Accueil SENGA",
+        title: "Support client",
+        department: "Support",
+        phone: "+243900000000",
+        email: "support@senga.cd",
+        notes: "Lun–Sam 8h–20h",
+        isPublic: true,
+        sortOrder: 0,
+      },
+    ] as T;
   }
   if (path.match(/\/rides\/[^/?]+/) && method === "GET") {
     return {
@@ -1900,10 +1951,14 @@ export type PartnerKycDossier = {
   userId?: string;
   restaurantId?: string;
   name?: string;
+  displayName?: string | null;
+  partnerKind?: string;
+  partnerKindLabel?: string;
   kycStatus?: string;
   kycNotes?: string | null;
   partnerType?: string;
   phone?: string | null;
+  email?: string | null;
   phoneVerified?: boolean;
   canOperate?: boolean;
   requiredComplete?: boolean;
@@ -2020,6 +2075,29 @@ export async function savePublicite(data: Partial<Publicite>, id?: string) {
 
 export async function deletePublicite(id: string) {
   return apiFetch(`/api/admin/publicites/${id}`, { method: "DELETE" });
+}
+
+export async function fetchCompanyContacts(search?: string): Promise<CompanyContact[]> {
+  const q = search?.trim() ? `?search=${encodeURIComponent(search.trim())}` : "";
+  const raw = await apiFetch<CompanyContact[]>(`/api/admin/company-contacts${q}`);
+  return Array.isArray(raw) ? raw : [];
+}
+
+export async function saveCompanyContact(data: Partial<CompanyContact>, id?: string) {
+  if (id) {
+    return apiFetch<CompanyContact>(`/api/admin/company-contacts/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    });
+  }
+  return apiFetch<CompanyContact>("/api/admin/company-contacts", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteCompanyContact(id: string) {
+  return apiFetch(`/api/admin/company-contacts/${id}`, { method: "DELETE" });
 }
 
 export async function fetchCurrentUser(): Promise<AdminSessionUser> {

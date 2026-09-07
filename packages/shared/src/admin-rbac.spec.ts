@@ -40,4 +40,15 @@ describe('admin-rbac', () => {
     expect(hasAdminPermission(UserRole.SUPPORT, AdminPermission.USERS_WRITE)).toBe(false);
     expect(hasAdminPermission(UserRole.SUPPORT, AdminPermission.PRICING_WRITE)).toBe(false);
   });
+
+  it('contacts entreprise : SUPER_ADMIN et ADMIN seulement', () => {
+    expect(hasAdminPermission(UserRole.SUPER_ADMIN, AdminPermission.CONTACTS_READ)).toBe(true);
+    expect(hasAdminPermission(UserRole.SUPER_ADMIN, AdminPermission.CONTACTS_WRITE)).toBe(true);
+    expect(hasAdminPermission(UserRole.ADMIN, AdminPermission.CONTACTS_READ)).toBe(true);
+    expect(hasAdminPermission(UserRole.ADMIN, AdminPermission.CONTACTS_WRITE)).toBe(true);
+    expect(hasAdminPermission(UserRole.SUPPORT, AdminPermission.CONTACTS_READ)).toBe(false);
+    expect(hasAdminPermission(UserRole.SUPPORT, AdminPermission.CONTACTS_WRITE)).toBe(false);
+    expect(hasAdminPermission(UserRole.FINANCE, AdminPermission.CONTACTS_READ)).toBe(false);
+    expect(hasAdminPermission(UserRole.CONTENT, AdminPermission.CONTACTS_READ)).toBe(false);
+  });
 });

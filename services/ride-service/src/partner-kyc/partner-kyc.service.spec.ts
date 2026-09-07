@@ -5,6 +5,7 @@ describe('PartnerKycService', () => {
   const prisma = {
     restaurant: {
       findFirst: jest.fn(),
+      findMany: jest.fn(),
       update: jest.fn(),
       updateMany: jest.fn(),
     },
@@ -101,5 +102,73 @@ describe('PartnerKycService', () => {
       expect.stringContaining('/internal/users/u1/issue-login-pin'),
       expect.objectContaining({ method: 'POST' }),
     );
+  });
+
+  it('attribue chaque justificatif au partenaire (nom, téléphone, type français)', async () => {
+    prisma.restaurant.findMany.mockResolvedValue([
+      {
+        id: 'r1',
+        name: 'Chez Flore',
+        ownerUserId: 'u1',
+        kycStatus: 'PENDING',
+        kycNotes: null,
+        address: 'Gombe',
+        nif: null,
+        rccm: null,
+        payoutProvider: null,
+        payoutPhone: null,
+      },
+    ]);
+    prisma.rentalPartnerProfile.findMany.mockResolvedValue([]);
+    prisma.partnerKycDocument.findMany
+      .mockResolvedValueOnce([
+        {
+          id: 'doc-rccm',
+          userId: 'u1',
+          subject: 'RESTAURANT',
+          type: 'RCCM',
+          status: 'PENDING',
+          notes: null,
+          url: '/b',
+          createdAt: new Date('2026-09-07T10:00:00.000Z'),
+        },
+      ])
+      .mockResolvedValue([
+        { type: 'MANAGER_ID', status: 'PENDING', notes: null, url: '/a', id: 'd1' },
+        { type: 'RCCM', status: 'PENDING', notes: null, url: '/b', id: 'doc-rccm' },
+        { type: 'PREMISES_PHOTO', status: 'PENDING', notes: null, url: '/c', id: 'd3' },
+      ]);
+    prisma.restaurant.findFirst.mockResolvedValue({
+      id: 'r1',
+      name: 'Chez Flore',
+      ownerUserId: 'u1',
+      kycStatus: 'PENDING',
+      kycNotes: null,
+      nif: null,
+      rccm: null,
+      payoutProvider: null,
+      payoutPhone: null,
+      address: 'Gombe',
+    });
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        firstName: 'Flore',
+        lastName: 'Kabila',
+        phone: '+243810000001',
+        email: 'flore@example.com',
+      }),
+    });
+
+    const result = await service.listPendingAdmin();
+    expect(result.documents[0].typeLabel).toMatch(/RCCM/);
+    expect(result.documents[0].typeLabel).not.toBe('RCCM');
+    expect(result.documents[0].displayName).toBe('Chez Flore');
+    expect(result.documents[0].partnerKindLabel).toBe('Restaurant');
+    expect(result.documents[0].phone).toBe('+243810000001');
+    expect(result.documents[0].email).toBe('flore@example.com');
+    expect(result.restaurants[0].displayName).toBe('Chez Flore');
+    expect(result.restaurants[0].partnerKindLabel).toBe('Restaurant');
+    expect(result.restaurants[0].email).toBe('flore@example.com');
   });
 });

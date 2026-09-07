@@ -1038,3 +1038,21 @@ model Publicite {
   @@index([isActive, dateDebut, dateFin])
   @@map("publicites")
 }
+
+// Contacts AfriSoft / SENGA (support, exploitation, juridique) — pas le carnet d'adresses utilisateur.
+model CompanyContact {
+  id         String   @id @default(uuid())
+  name       String
+  title      String?
+  department String?
+  phone      String?
+  email      String?
+  notes      String?
+  isPublic   Boolean  @default(false)
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([isPublic, sortOrder])
+  @@map("company_contacts")
+}

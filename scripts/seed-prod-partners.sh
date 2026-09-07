@@ -9,6 +9,10 @@ if [[ "${CONFIRM_PROD_SEED:-}" != "YES" ]]; then
   echo "Local/emergency only: CONFIRM_PROD_SEED=YES AUTH_DATABASE_URL=... RIDE_DATABASE_URL=..." >&2
   exit 1
 fi
+if [[ "${NODE_ENV:-}" == "production" || "${APP_ENV:-}" == "production" || -n "${RENDER:-}" || -n "${RENDER_SERVICE_ID:-}" ]]; then
+  echo "FORBIDDEN: will not insert demo users (+2439000000xx) in production/Render." >&2
+  exit 1
+fi
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 AUTH="${AUTH_DATABASE_URL:-${DATABASE_URL_AUTH:-}}"
 RIDES="${RIDE_DATABASE_URL:-${DATABASE_URL_RIDES:-}}"

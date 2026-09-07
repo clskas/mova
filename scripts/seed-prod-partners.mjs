@@ -25,6 +25,15 @@ if (process.env.CONFIRM_PROD_SEED !== 'YES') {
   console.error('Local/emergency only: CONFIRM_PROD_SEED=YES');
   process.exit(1);
 }
+if (
+  process.env.NODE_ENV === 'production' ||
+  process.env.APP_ENV === 'production' ||
+  process.env.RENDER ||
+  process.env.RENDER_SERVICE_ID
+) {
+  console.error('FORBIDDEN: will not insert demo users (+2439000000xx) in production/Render.');
+  process.exit(1);
+}
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const RESTAURANT_PHONE = '+243900000030';

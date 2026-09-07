@@ -1,0 +1,39 @@
+# Playwright / GitHub Actions overlay. Never used on Render.
+# Staff seed (+2439000000xx) is allowed here because APP_ENV=test + PLAYWRIGHT=1.
+# Production Render command is migrate-with-backup.sh && node — no prisma db seed.
+services:
+  auth-service:
+    environment:
+      NODE_ENV: test
+      APP_ENV: test
+      PLAYWRIGHT: '1'
+      RUN_SEED: 'true'
+      MOCK_OTP: 'true'
+      ALLOW_TEST_OTP: 'true'
+  ride-service:
+    environment:
+      NODE_ENV: test
+      APP_ENV: test
+      PLAYWRIGHT: '1'
+      RUN_SEED: 'false'
+      SEED_DEMO_CATALOG: 'false'
+  payment-service:
+    environment:
+      NODE_ENV: test
+      APP_ENV: test
+      PLAYWRIGHT: '1'
+      RUN_SEED: 'false'
+      MOCK_PAYMENTS: 'true'
+  driver-service:
+    environment:
+      NODE_ENV: test
+      APP_ENV: test
+      PLAYWRIGHT: '1'
+      RUN_SEED: 'false'
+  notification-service:
+    environment:
+      NODE_ENV: test
+      APP_ENV: test
+  api-gateway:
+    environment:
+      NODE_ENV: test

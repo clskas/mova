@@ -13,5 +13,8 @@ if [ -f "$PID_FILE" ]; then
   rm -f "$PID_FILE"
 fi
 
+if [ -f docker-compose.ci.yml ]; then
+  docker compose -f docker-compose.yml -f docker-compose.ci.yml down -v --remove-orphans 2>/dev/null || true
+fi
 docker compose down -v --remove-orphans 2>/dev/null || true
 echo "=== Regression stack stopped ==="

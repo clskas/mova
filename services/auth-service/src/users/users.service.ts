@@ -12,6 +12,7 @@ import {
   maskPhoneRdc,
   normalizePhoneRdc,
   validatePhoneRdc,
+  isDemoUserInsertForbidden,
 } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -115,6 +116,13 @@ export class UsersService {
     const phone = normalizePhoneRdc(data.phone);
     if (!validatePhoneRdc(phone)) {
       throw new MovaHttpException(MovaErrorCode.AUTH_INVALID_PHONE, HttpStatus.BAD_REQUEST);
+    }
+    if (isDemoUserInsertForbidden(phone)) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.FORBIDDEN,
+        'Les comptes démo (+2439000000xx) ne peuvent pas être créés en production.',
+      );
     }
     this.assertAssignableRole(data.role);
     const existing = await this.prisma.user.findUnique({ where: { phone } });

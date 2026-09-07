@@ -278,8 +278,12 @@ describe('prod-security', () => {
   });
 
   it('production seed of fake phones is forbidden (opt-in local only)', async () => {
-    const { isFakeUserSeedAllowed, isProductionOrRenderEnv, resolveBootstrapSuperadminPhone } =
-      await import('./prod-security');
+    const {
+      isFakeUserSeedAllowed,
+      isProductionOrRenderEnv,
+      resolveBootstrapSuperadminPhone,
+      isDemoUserInsertForbidden,
+    } = await import('./prod-security');
     expect(isFakeUserSeedAllowed({ NODE_ENV: 'production' })).toBe(false);
     expect(isFakeUserSeedAllowed({ APP_ENV: 'production' })).toBe(false);
     expect(isFakeUserSeedAllowed({ NODE_ENV: 'development', RUN_SEED: 'false' })).toBe(false);
@@ -314,5 +318,9 @@ describe('prod-security', () => {
     expect(resolveBootstrapSuperadminPhone({})).toBeNull();
     expect(resolveBootstrapSuperadminPhone({ BOOTSTRAP_SUPERADMIN_PHONE: '+243900000001' })).toBeNull();
     expect(resolveBootstrapSuperadminPhone({ BOOTSTRAP_SUPERADMIN_PHONE: '+243971163574' })).toBe('+243971163574');
+    expect(isDemoUserInsertForbidden('+243900000010', { NODE_ENV: 'production' })).toBe(true);
+    expect(isDemoUserInsertForbidden('+243900000010', { RENDER: 'true' })).toBe(true);
+    expect(isDemoUserInsertForbidden('+243812345678', { NODE_ENV: 'production' })).toBe(false);
+    expect(isDemoUserInsertForbidden('+243900000010', { NODE_ENV: 'development' })).toBe(false);
   });
 });

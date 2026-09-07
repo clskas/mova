@@ -207,6 +207,15 @@ export function isSeedDemoPhone(phone: string): boolean {
   return SEED_DEMO_PHONE_RE.test(normalized) || DEFAULT_TEST_OTP_PHONE_SET.has(normalized);
 }
 
+/** Production / Render must never INSERT a +2439000000xx demo account (seed, OTP signup, or admin create). */
+export function isDemoUserInsertForbidden(
+  phone: string | null | undefined,
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
+  if (!phone) return false;
+  return isProductionOrRenderEnv(env) && isSeedDemoPhone(phone);
+}
+
 /**
  * Real superadmin bootstrap phone. Set BOOTSTRAP_SUPERADMIN_PHONE in prod to create
  * one account — never a demo +2439000000xx / admin123 fixture.

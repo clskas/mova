@@ -10,6 +10,11 @@ permissions:
   contents: read
   security-events: write
 
+# Cancel superseded runs so overlapping CI + Build + Deploy does not exhaust the Actions budget.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   shared:
     runs-on: ubuntu-latest
@@ -103,15 +108,26 @@ jobs:
 
   regression:
     name: Playwright regression
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     needs: [clients, services]
     timeout-minutes: 60
+    env:
+      # CI-only staff seed (regression-ci.sh). Do not set NODE_ENV=test here —
+      # Next.js `next start` after build expects an unforced host NODE_ENV.
+      PLAYWRIGHT: '1'
+      APP_ENV: test
+      RUN_SEED: 'true'
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+
+      - name: Check regression scripts
+        run: |
+          bash -n scripts/regression-ci.sh
+          bash -n scripts/regression-ci-teardown.sh
 
       # Install browsers before the stack so Docker services are not idle
       # (and memory-pressured) during Playwright setup.
@@ -148,8 +164,8 @@ jobs:
       - name: Dump stack logs on failure
         if: failure()
         run: |
-          docker compose ps -a || true
-          docker compose logs --tail 80 api-gateway auth-service payment-service ride-service || true
+          docker compose -f docker-compose.yml -f docker-compose.ci.yml ps -a || true
+          docker compose -f docker-compose.yml -f docker-compose.ci.yml logs --tail 80 api-gateway auth-service payment-service ride-service || true
 
       - name: Upload Playwright report on failure
         if: failure()
@@ -280,6 +296,8 @@ jobs:
   codeql:
     runs-on: ubuntu-latest
     # GHAS / code scanning may be disabled on the org — do not block Deploy.
+    # Skip on push to main to save Actions minutes for Deploy (still runs on PRs).
+    if: github.event_name == 'pull_request'
     continue-on-error: true
     permissions:
       actions: read

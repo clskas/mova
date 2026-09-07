@@ -25,6 +25,7 @@ import {
   denyJwtJti,
   isMockOtpAllowed,
   isProductionRuntime,
+  isDemoUserInsertForbidden,
 } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '@mova/shared';
@@ -322,6 +323,13 @@ export class AuthService {
     let user = await this.prisma.user.findUnique({ where: { phone: normalized } });
     let isNew = false;
     if (!user) {
+      if (isDemoUserInsertForbidden(normalized)) {
+        throw new MovaHttpException(
+          MovaErrorCode.AUTH_FORBIDDEN,
+          HttpStatus.FORBIDDEN,
+          'Les comptes démo (+2439000000xx) ne peuvent pas être créés en production.',
+        );
+      }
       if (requestedRole === UserRole.DRIVER) {
         user = await this.prisma.user.create({
           data: {

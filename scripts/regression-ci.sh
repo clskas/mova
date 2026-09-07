@@ -1,33 +1,49 @@
 #!/usr/bin/env bash
 # CI regression stack: Docker microservices + Next.js admin/web for Playwright.
 # Tear down with: docker compose down -v ; kill admin/web PIDs saved in /tmp/mova-regression.pids
+#
+# Staff demo users are created ONLY in this CI/local path (APP_ENV=test PLAYWRIGHT=1).
+# Never invoked from Render Deploy / migrate-with-backup.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
+# CI-only seed flags. Do not export NODE_ENV=test for the whole script — admin/web
+# `next build` / `next start` run on the host. Seed below uses an env prefix.
+export PLAYWRIGHT=1
+export APP_ENV=test
+export RUN_SEED=true
+unset SKIP_DEMO_SEED || true
+unset RENDER RENDER_SERVICE_ID RENDER_INSTANCE_ID RENDER_SERVICE_NAME RENDER_EXTERNAL_URL || true
+
+COMPOSE=(docker compose -f docker-compose.yml -f docker-compose.ci.yml)
+
 ADMIN_PID=""
 WEB_PID=""
 PID_FILE="/tmp/mova-regression.pids"
 
-echo "=== MOVA regression stack ==="
+echo "=== MOVA regression stack (APP_ENV=test PLAYWRIGHT=1) ==="
 
 mkdir -p config
 cat > config/external-apis.env <<'EOF'
-NODE_ENV=development
+NODE_ENV=test
+APP_ENV=test
+PLAYWRIGHT=1
+RUN_SEED=true
 MOCK_OTP=true
 ALLOW_TEST_OTP=true
 MOCK_PAYMENTS=true
 EOF
 
-echo "=== Docker compose (microservices) ==="
+echo "=== Docker compose (microservices, CI overlay) ==="
 # Parallel npm ci against registry.npmjs.org saturates GitHub runners (exit 146 / network).
 export COMPOSE_PARALLEL_LIMIT="${COMPOSE_PARALLEL_LIMIT:-2}"
 export DOCKER_BUILDKIT=1
 compose_ok=0
 for attempt in 1 2 3; do
   echo "docker compose up --build (attempt $attempt, parallel=$COMPOSE_PARALLEL_LIMIT)"
-  if docker compose up -d --build; then
+  if "${COMPOSE[@]}" up -d --build; then
     compose_ok=1
     break
   fi
@@ -36,7 +52,7 @@ for attempt in 1 2 3; do
 done
 if [ "$compose_ok" -ne 1 ]; then
   echo "docker compose failed after 3 attempts" >&2
-  docker compose ps -a || true
+  "${COMPOSE[@]}" ps -a || true
   exit 1
 fi
 
@@ -51,8 +67,8 @@ for i in $(seq 1 90); do
   fi
   if [ "$i" -eq 90 ]; then
     echo "Gateway timeout after 90 attempts" >&2
-    docker compose ps -a || true
-    docker compose logs api-gateway auth-service payment-service --tail 80 || true
+    "${COMPOSE[@]}" ps -a || true
+    "${COMPOSE[@]}" logs api-gateway auth-service payment-service --tail 80 || true
     exit 1
   fi
   sleep 5
@@ -60,26 +76,26 @@ done
 
 echo "=== Wait for Postgres (host port 48080) ==="
 for i in $(seq 1 30); do
-  if docker compose exec -T postgres pg_isready -U mova -d mova_auth >/dev/null 2>&1; then
+  if "${COMPOSE[@]}" exec -T postgres pg_isready -U mova -d mova_auth >/dev/null 2>&1; then
     echo "Postgres ready (attempt $i)"
     break
   fi
   if [ "$i" -eq 30 ]; then
     echo "Postgres timeout" >&2
-    docker compose logs postgres --tail 40 || true
+    "${COMPOSE[@]}" logs postgres --tail 40 || true
     exit 1
   fi
   sleep 2
 done
 
-echo "=== Seed staff roles (+243900000001-005) ==="
+echo "=== Seed staff roles (+243900000001-005) — CI/test only, not Render ==="
 # Host publish port must match docker-compose.yml (48080:5432).
 export DATABASE_URL="${DATABASE_URL_AUTH:-postgresql://mova:mova@localhost:48080/mova_auth}"
-export APP_ENV="${APP_ENV:-development}"
-export RUN_SEED=true
 cd "$ROOT/services/auth-service"
 npm ci --no-workspaces --silent
-npx ts-node --compiler-options '{"ignoreDeprecations":"5.0"}' prisma/seed-staff-roles.ts
+# Prefix NODE_ENV=test so a production-valued runner cannot refuse/crash this seed.
+PLAYWRIGHT=1 APP_ENV=test NODE_ENV=test RUN_SEED=true \
+  npx ts-node --compiler-options '{"ignoreDeprecations":"5.0"}' prisma/seed-staff-roles.ts
 
 echo "=== Build and start admin (:3002) + web (:3001) ==="
 cd "$ROOT/admin"

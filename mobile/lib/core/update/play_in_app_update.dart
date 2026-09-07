@@ -1,19 +1,31 @@
 import 'package:flutter/foundation.dart';
 import 'package:in_app_update/in_app_update.dart';
 
+/// Snapshot of Play Core in-app update (versionCode only — the boolean
+/// `updateAvailable` stays true after a store install and kept the banner).
+class PlayUpdateProbe {
+  const PlayUpdateProbe({this.availableVersionCode = 0});
+  final int availableVersionCode;
+}
+
 /// Google Play In-App Updates (Android). No-op on iOS / web / sideload.
 class PlayInAppUpdate {
   static bool get supported =>
       !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
 
-  static Future<bool> hasUpdate() async {
-    if (!supported) return false;
+  static Future<PlayUpdateProbe> inspect() async {
+    if (!supported) return const PlayUpdateProbe();
     try {
       final info = await InAppUpdate.checkForUpdate();
-      return info.updateAvailability == UpdateAvailability.updateAvailable;
+      return PlayUpdateProbe(availableVersionCode: info.availableVersionCode ?? 0);
     } catch (_) {
-      return false;
+      return const PlayUpdateProbe();
     }
+  }
+
+  static Future<bool> hasUpdate() async {
+    final probe = await inspect();
+    return probe.availableVersionCode > 0;
   }
 
   /// Background flexible download. Completes when the AAB is on device.

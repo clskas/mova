@@ -229,6 +229,11 @@ export default function UtilisateursPage() {
             </BtnDanger>
           )}
         </div>
+        {!showPlayPrelaunch && (
+          <p className="text-xs text-gray-500">
+            Les comptes robots Google Play / Firebase Test Lab (sans téléphone) sont masqués — ce ne sont pas des clients SENGA.
+          </p>
+        )}
         {showPlayPrelaunch && (
           <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
             Ces lignes viennent du rapport pré-lancement Google Play / Firebase Test Lab

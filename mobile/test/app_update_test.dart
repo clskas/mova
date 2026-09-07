@@ -253,6 +253,78 @@ void main() {
       expect(state.showBanner, isTrue);
     });
 
+    test('Play stale updateAvailable does not keep the banner after install', () {
+      final fromApi = AppUpdateService.parseRemote(
+        {
+          'passenger': {
+            'currentVersion': '1.0.5',
+            'minVersion': '1.0.0',
+            'currentVersionCode': 51,
+            'storeUrl': 'https://play.google.com/store/apps/details?id=cd.mova.mova.passenger',
+          },
+        },
+        isDriver: false,
+        localVersion: '1.0.5',
+        localBuild: 50,
+      )!;
+      expect(fromApi.updateAvailable, isTrue);
+      final afterPlay = AppUpdateService.reconcileWithPlay(
+        fromApi,
+        playCode: 50,
+        localBuild: 50,
+      );
+      expect(afterPlay.updateAvailable, isFalse);
+      expect(afterPlay.showBanner, isFalse);
+    });
+
+    test('Play newer versionCode still shows an optional banner', () {
+      final current = AppUpdateService.parseRemote(
+        {
+          'passenger': {
+            'currentVersion': '1.0.5',
+            'minVersion': '1.0.0',
+            'currentVersionCode': 50,
+          },
+        },
+        isDriver: false,
+        localVersion: '1.0.5',
+        localBuild: 50,
+      )!;
+      expect(current.updateAvailable, isFalse);
+      final afterPlay = AppUpdateService.reconcileWithPlay(
+        current,
+        playCode: 51,
+        localBuild: 50,
+        fallbackStoreUrl: 'https://play.google.com/store/apps/details?id=cd.mova.mova.passenger',
+      );
+      expect(afterPlay.updateAvailable, isTrue);
+      expect(afterPlay.showBanner, isTrue);
+    });
+
+    test('forced min-version banner stays even if Play says current', () {
+      final forced = AppUpdateService.parseRemote(
+        {
+          'passenger': {
+            'currentVersion': '1.0.5',
+            'minVersion': '1.0.5',
+            'minVersionCode': 50,
+            'currentVersionCode': 50,
+          },
+        },
+        isDriver: false,
+        localVersion: '1.0.4',
+        localBuild: 46,
+      )!;
+      expect(forced.forceUpdate, isTrue);
+      final afterPlay = AppUpdateService.reconcileWithPlay(
+        forced,
+        playCode: 46,
+        localBuild: 46,
+      );
+      expect(afterPlay.forceUpdate, isTrue);
+      expect(afterPlay.showBanner, isTrue);
+    });
+
     test('minVersionCode still forces an update', () {
       final state = AppUpdateService.parseRemote(
         {

@@ -9,7 +9,7 @@ describe('buildMobileAppVersionResponse', () => {
     expect(payload.passenger.currentVersion).toBe('1.0.5');
     expect(payload.driver.currentVersion).toBe('1.0.5');
     expect(payload.passenger.minVersion).toBe('1.0.0');
-    expect(payload.passenger.currentVersionCode).toBe(51);
+    expect(payload.passenger.currentVersionCode).toBe(50);
     expect(payload.passenger.minVersionCode).toBe(0);
     expect(payload.passenger.storeUrl).toContain('cd.mova.mova.passenger');
     expect(payload.driver.storeUrl).toContain('cd.mova.mova.driver');
@@ -48,8 +48,8 @@ describe('buildMobileAppVersionResponse', () => {
       },
       now,
     );
-    expect(payload.passenger.currentVersionCode).toBe(51);
-    expect(payload.driver.currentVersionCode).toBe(51);
+    expect(payload.passenger.currentVersionCode).toBe(50);
+    expect(payload.driver.currentVersionCode).toBe(50);
   });
 
   it('raises stale Render env below the shipped floor so banners can show', () => {
@@ -58,13 +58,25 @@ describe('buildMobileAppVersionResponse', () => {
         MOBILE_PASSENGER_VERSION: '1.0.4',
         MOBILE_DRIVER_VERSION: '1.0.4',
         MOBILE_PASSENGER_VERSION_CODE: '39',
-        MOBILE_DRIVER_VERSION_CODE: '50',
+        MOBILE_DRIVER_VERSION_CODE: '49',
       },
       now,
     );
     expect(payload.passenger.currentVersion).toBe('1.0.5');
     expect(payload.driver.currentVersion).toBe('1.0.5');
-    expect(payload.passenger.currentVersionCode).toBe(51);
-    expect(payload.driver.currentVersionCode).toBe(51);
+    expect(payload.passenger.currentVersionCode).toBe(50);
+    expect(payload.driver.currentVersionCode).toBe(50);
+  });
+
+  it('does not advertise a planned code above last confirmed Play', () => {
+    const payload = buildMobileAppVersionResponse(
+      {
+        MOBILE_PASSENGER_VERSION_CODE: '50',
+        MOBILE_DRIVER_VERSION_CODE: '50',
+      },
+      now,
+    );
+    expect(payload.passenger.currentVersionCode).toBe(50);
+    expect(payload.driver.currentVersionCode).toBe(50);
   });
 });

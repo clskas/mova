@@ -159,15 +159,13 @@ class AppUpdateService extends Notifier<AppUpdateState> {
           );
         }
       }
-      final playUpdate = await PlayInAppUpdate.hasUpdate();
-      if (playUpdate && !next.updateAvailable) {
-        next = next.copyWith(
-          updateAvailable: true,
-          storeUrl: (next.storeUrl == null || next.storeUrl!.isEmpty)
-              ? defaultStoreUrl
-              : next.storeUrl,
-        );
-      }
+      final play = await PlayInAppUpdate.inspect();
+      next = reconcileWithPlay(
+        next,
+        playCode: play.availableVersionCode,
+        localBuild: AppVersion.build,
+        fallbackStoreUrl: defaultStoreUrl,
+      );
       if (next.storeUrl == null || next.storeUrl!.isEmpty) {
         next = next.copyWith(storeUrl: defaultStoreUrl);
       }
@@ -220,6 +218,33 @@ class AppUpdateService extends Notifier<AppUpdateState> {
     final uri = Uri.tryParse(raw);
     if (uri == null) return;
     await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  /// Play Core's `updateAvailable` stays true after a store install.
+  /// Compare versionCodes: hide an optional banner once the phone is on (or past)
+  /// the latest Play build, even if `/public/app-version` advertised a planned code.
+  static AppUpdateState reconcileWithPlay(
+    AppUpdateState next, {
+    required int playCode,
+    required int localBuild,
+    String? fallbackStoreUrl,
+  }) {
+    if (playCode <= 0 || localBuild <= 0) return next;
+    if (localBuild >= playCode) {
+      if (!next.forceUpdate && next.updateAvailable) {
+        return next.copyWith(updateAvailable: false);
+      }
+      return next;
+    }
+    if (!next.updateAvailable) {
+      return next.copyWith(
+        updateAvailable: true,
+        storeUrl: (next.storeUrl == null || next.storeUrl!.isEmpty)
+            ? fallbackStoreUrl
+            : next.storeUrl,
+      );
+    }
+    return next;
   }
 
   /// Accepte le JSON brut ou un enveloppe `{ data: { passenger, driver } }`.

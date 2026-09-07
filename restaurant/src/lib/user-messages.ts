@@ -82,6 +82,8 @@ export const LOGIN_GENERIC = "Connexion impossible. Réessayez.";
 export const SMS_RATE_LIMIT_FR = "Trop de codes envoyés vers ce numéro. Réessayez dans une minute.";
 export const SMS_CREDIT_FR = "Envoi SMS temporairement indisponible. Contactez le support SENGA.";
 export const SMS_UNAVAILABLE_FR = "Impossible d'envoyer le code par SMS. Réessayez dans quelques minutes.";
+export const SMS_SERDIPAY_REJECTED_FR =
+  "SerdiPay a refusé l'envoi SMS. Vérifiez le sender ID approuvé, le crédit SMS et l'identifiant API SMS dans le tableau de bord SerdiPay.";
 export const SMS_INVALID_PHONE_FR = "Numéro de téléphone invalide. Format : +243XXXXXXXXX";
 
 /** Hub / SerdiPay leftovers → French the founder can act on (not « Une erreur est survenue »). */
@@ -96,8 +98,11 @@ export function mapSmsOrOtpFailure(msg: string): string | null {
   if (/invalid phone|phone_invalid|phone \(expect|numéro de téléphone invalide/i.test(lower)) {
     return SMS_INVALID_PHONE_FR;
   }
+  if (/error occor|processing the sms|échec sms serdipay\s*\(\s*400/i.test(lower)) {
+    return SMS_SERDIPAY_REJECTED_FR;
+  }
   if (
-    /hmac|api[_ ]?key|signature|hub_auth|afrisoft_|serdipay|econnrefused|non configuré|missing afrisoft|error occor|processing the sms|échec sms/i.test(
+    /hmac|api[_ ]?key|signature|hub_auth|afrisoft_|serdipay|econnrefused|non configuré|missing afrisoft|échec sms/i.test(
       lower,
     )
   ) {

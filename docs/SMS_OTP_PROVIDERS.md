@@ -77,6 +77,7 @@ Numéro **hors** whitelist seed → SMS réel. Logs `mova-auth` : provider `SERD
 | Blocage | Action |
 |---------|--------|
 | AT `InvalidSenderId` | Attendre approbation alphanumeric RDC ; ou basculer temporairement sur SerdiPay SMS. |
+| SerdiPay SMS 400 « An error occor while processing the sms » | Le texte ne doit pas contenir `.` `:` `;` `!` `?` (sanitize + retry). Si ça continue : sender ID non approuvé (`SERDIPAY_SMS_SENDER_ID` vide ou `SerdiPay`), ou API SMS non activée / mauvaises clés. Recréer le conteneur hub VPS après déploiement du code. |
 | SerdiPay SMS 403 | Recharger / augmenter crédit SMS chez SerdiPay. |
 | Credentials paiement vs SMS | `SERDIPAY_EMAIL` ne suffit pas pour l’OTP — il faut `SERDIPAY_SMS_API_ID` / `KEY`. |
 | Admin SMS non activé | Demander à SerdiPay d’activer l’API SMS sur le compte marchand. |

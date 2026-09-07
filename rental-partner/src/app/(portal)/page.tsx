@@ -71,6 +71,14 @@ export default function DashboardPage() {
       cta: "Gérer les codes",
       accent: "bg-slate-600 hover:bg-slate-700",
     },
+    {
+      href: "/aide",
+      title: "Aide / Manuel",
+      desc: "Comment valider le dossier, publier un véhicule et suivre les réservations.",
+      stat: "Manuel utilisateur",
+      cta: "Ouvrir le manuel",
+      accent: "bg-amber-600 hover:bg-amber-700",
+    },
   ];
 
   return (

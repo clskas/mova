@@ -68,7 +68,7 @@ export class AfriSoftSmsHubProvider implements SmsProvider {
     const brand = this.config.get<string>('APP_BRAND_NAME')?.trim() || 'SENGA';
     const result = await afrisoftSmsHubSendSms(this.get, {
       phone,
-      text: `Votre code ${brand} : ${code} Valide 10 minutes`,
+      text: `Votre code ${brand} ${code} Valide 10 minutes`,
       purpose: 'login',
     });
     if (!result.success) this.logger.warn(`SMS hub: ${result.message}`);
@@ -92,7 +92,7 @@ export class SerdiPaySmsProvider implements SmsProvider {
   async sendOtp(phone: string, code: string): Promise<SmsSendResult> {
     const result = await serdiPaySendSms(this.get, {
       to: phone,
-      message: `Votre code MOVA : ${code} Valide 10 minutes`,
+      message: `Votre code MOVA ${code} Valide 10 minutes`,
     });
     if (!result.success) this.logger.warn(`SerdiPay SMS: ${result.message}`);
     return result;
@@ -115,7 +115,7 @@ export class AfricasTalkingSmsProvider implements SmsProvider {
   async sendOtp(phone: string, code: string): Promise<SmsSendResult> {
     const result = await africasTalkingSendSms(this.get, {
       to: phone,
-      message: `Votre code MOVA : ${code} Valide 10 minutes`,
+      message: `Votre code MOVA ${code} Valide 10 minutes`,
     });
     if (!result.success) this.logger.warn(`Africa's Talking SMS: ${result.message}`);
     return result;
@@ -173,7 +173,7 @@ export class TwilioSmsProvider implements SmsProvider {
         body: new URLSearchParams({
           To: phone,
           From: from!,
-          Body: `Votre code MOVA : ${code} Valide 10 minutes`,
+          Body: `Votre code MOVA ${code} Valide 10 minutes`,
         }),
       });
       if (!res.ok) {

@@ -168,11 +168,30 @@ export function serdiPayNormalizeSmsPhone(phone: string): string {
 
 /**
  * SerdiPay/Dream Digital returns HTTP 400 "An error occor while processing the sms"
- * when `text` contains a sentence-ending period (`.` followed by space or end).
+ * when `text` contains sentence punctuation (`.` `:` `;` `!` `?`).
  * Keep decimals (`50.00`) and abbreviations (`No.Jeton`).
  */
 export function serdiPaySanitizeSmsText(text: string): string {
-  return text.replace(/\.(\s|$)/g, ' $1').replace(/\s+/g, ' ').trim();
+  return text
+    .replace(/\.(\s|$)/g, ' $1')
+    .replace(/[:;!?]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** User-facing copy when SerdiPay SMS API returns the generic 400 processing error. */
+export const SERDIPAY_SMS_REJECTED_FR =
+  "SerdiPay a refusé l'envoi SMS. Vérifiez le sender ID approuvé, le crédit SMS et l'identifiant API SMS dans le tableau de bord SerdiPay.";
+
+export function isSerdiPaySmsProcessingError(status: number, raw?: string): boolean {
+  const lower = (raw ?? '').toLowerCase();
+  return (
+    status === 400 &&
+    (lower.includes('occor') ||
+      lower.includes('processing the sms') ||
+      lower.includes('api id') ||
+      /\bapiid\b/.test(lower))
+  );
 }
 
 function smsBaseUrl(get: EnvGetter): string {
@@ -352,10 +371,54 @@ export function __resetSerdiPayTokenCache(): void {
 
 export type SerdiPaySmsResult = { success: boolean; message?: string };
 
+type SerdiPaySmsJson = {
+  success?: boolean;
+  status?: string | number;
+  message?: string;
+  error?: string;
+  data?: unknown;
+};
+
+async function postSerdiPaySms(
+  url: string,
+  body: Record<string, string>,
+): Promise<{ status: number; data: SerdiPaySmsJson }> {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+  const data = (await res.json().catch(() => ({}))) as SerdiPaySmsJson;
+  return { status: res.status, data };
+}
+
+function mapSerdiPaySmsFailure(status: number, data: SerdiPaySmsJson): SerdiPaySmsResult {
+  if (status === 403) {
+    return {
+      success: false,
+      message: data.message ?? data.error ?? 'Crédit SMS SerdiPay insuffisant (403).',
+    };
+  }
+  const detail = data.message ?? data.error ?? 'échec fournisseur';
+  if (isSerdiPaySmsProcessingError(status, detail)) {
+    return { success: false, message: SERDIPAY_SMS_REJECTED_FR };
+  }
+  return {
+    success: false,
+    message: `Échec SMS SerdiPay (${status}): ${detail}`.slice(0, 180),
+  };
+}
+
 /**
  * Envoi SMS — SerdiPay SMS API (sms-api.pdf).
  * POST {base}/api/sms-api/v1/send with { apiId, apiKey, phone, senderId?, text }.
  * Does not use payment get-token / Bearer auth.
+ *
+ * On HTTP 400 "An error occor…", retry without senderId then with 243… (no +).
+ * An unapproved alphanumeric sender is a frequent production cause.
  */
 export async function serdiPaySendSms(
   get: EnvGetter,
@@ -372,47 +435,42 @@ export async function serdiPaySendSms(
   const apiKey = firstEnv(get, SERDIPAY_ENV_KEYS.smsApiKey)!;
   const senderId = firstEnv(get, SERDIPAY_ENV_KEYS.smsSenderId, 'SERDIPAY_SMS_SENDER');
   const url = `${smsBaseUrl(get)}${pathOr(get, 'smsPath', '/api/sms-api/v1/send')}`;
-  const phone = serdiPayNormalizeSmsPhone(params.to);
+  const phonePlus = serdiPayNormalizeSmsPhone(params.to);
+  const phoneDigits = serdiPayNormalizePhone(params.to);
   const text = serdiPaySanitizeSmsText(params.message);
 
+  const attempts: Array<{ phone: string; senderId?: string }> = [
+    { phone: phonePlus, senderId },
+    { phone: phonePlus },
+    { phone: phoneDigits },
+  ];
+  const seen = new Set<string>();
+
   try {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
+    let last: { status: number; data: SerdiPaySmsJson } | undefined;
+    for (const attempt of attempts) {
+      const key = `${attempt.phone}|${attempt.senderId ?? ''}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const { status, data } = await postSerdiPaySms(url, {
         apiId,
         apiKey,
-        phone,
+        phone: attempt.phone,
         text,
-        ...(senderId ? { senderId } : {}),
-      }),
-    });
-    const data = (await res.json().catch(() => ({}))) as {
-      success?: boolean;
-      status?: string | number;
-      message?: string;
-      error?: string;
-      data?: unknown;
-    };
-
-    // Doc HTTP: 200 sent; 400 API ID; 403 not enough SMS; 404 bad request; 406 Not Acceptable
-    if (res.status === 403) {
-      return {
-        success: false,
-        message: data.message ?? data.error ?? 'Crédit SMS SerdiPay insuffisant (403).',
-      };
+        ...(attempt.senderId ? { senderId: attempt.senderId } : {}),
+      });
+      last = { status, data };
+      if (status === 200 && data.success !== false) {
+        return { success: true, message: data.message ?? 'SMS envoyé via SerdiPay' };
+      }
+      const detail = data.message ?? data.error ?? '';
+      if (!isSerdiPaySmsProcessingError(status, detail)) {
+        return mapSerdiPaySmsFailure(status, data);
+      }
     }
-    if (!res.ok || data.success === false) {
-      const detail = data.message ?? data.error ?? 'échec fournisseur';
-      return {
-        success: false,
-        message: `Échec SMS SerdiPay (${res.status}): ${detail}`.slice(0, 180),
-      };
-    }
-    return { success: true, message: data.message ?? 'SMS envoyé via SerdiPay' };
+    return last
+      ? mapSerdiPaySmsFailure(last.status, last.data)
+      : { success: false, message: SERDIPAY_SMS_REJECTED_FR };
   } catch {
     return { success: false, message: 'Service SMS SerdiPay temporairement indisponible.' };
   }

@@ -1372,7 +1372,7 @@ export class AuthService {
     let emailError: string | undefined;
     if (shouldNotify && hasPhone) {
       const text =
-        `SENGA : votre code PIN de connexion est ${pin}. Conservez-le précieusement. Ne le communiquez à personne.`;
+        `SENGA votre code PIN de connexion est ${pin} Conservez-le precieusement Ne le communiquez a personne`;
       try {
         const sms = await this.sms.sendSms(phone, text, 'login_pin');
         smsSent = sms.success === true;

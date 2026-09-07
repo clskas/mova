@@ -7,7 +7,7 @@ import {
   SMS_CREDIT_USER_MESSAGE,
   SMS_RATE_LIMIT_USER_MESSAGE,
 } from './afrisoft-sms-hub';
-import { SMS_UNAVAILABLE_USER_MESSAGE } from './serdipay';
+import { SERDIPAY_SMS_REJECTED_FR, SMS_UNAVAILABLE_USER_MESSAGE } from './serdipay';
 
 describe('afrisoft-sms-hub', () => {
   it('is configured when the HMAC api_key is set (URL defaults to sms.afri-soft.com)', () => {
@@ -33,13 +33,13 @@ describe('afrisoft-sms-hub', () => {
     );
     expect(mapSmsDeliveryFailureToUserMessage('Invalid HMAC signature')).toBe(SMS_UNAVAILABLE_USER_MESSAGE);
     expect(mapSmsDeliveryFailureToUserMessage('An error occor while processing the sms')).toBe(
-      SMS_UNAVAILABLE_USER_MESSAGE,
+      SERDIPAY_SMS_REJECTED_FR,
     );
     expect(
       mapSmsDeliveryFailureToUserMessage(
         'Échec SMS SerdiPay (400): An error occor while processing the sms',
       ),
-    ).toBe(SMS_UNAVAILABLE_USER_MESSAGE);
+    ).toBe(SERDIPAY_SMS_REJECTED_FR);
     expect(mapSmsDeliveryFailureToUserMessage("Trop de codes envoyés. Réessayez.")).toBe(
       SMS_RATE_LIMIT_USER_MESSAGE,
     );

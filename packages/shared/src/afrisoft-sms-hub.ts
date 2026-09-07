@@ -18,7 +18,12 @@ import {
   afrisoftHubSign,
 } from './afrisoft-pay-hub';
 import type { EnvGetter } from './africas-talking';
-import { serdiPayNormalizePhone, serdiPaySanitizeSmsText, SMS_UNAVAILABLE_USER_MESSAGE } from './serdipay';
+import {
+  serdiPayNormalizePhone,
+  serdiPaySanitizeSmsText,
+  SERDIPAY_SMS_REJECTED_FR,
+  SMS_UNAVAILABLE_USER_MESSAGE,
+} from './serdipay';
 
 const DEFAULT_SMS_HUB_URL = 'https://sms.afri-soft.com';
 
@@ -67,8 +72,11 @@ export function mapSmsDeliveryFailureToUserMessage(raw?: string): string {
   if (/invalid phone|phone_invalid|phone \(expect/i.test(lower)) {
     return 'Numéro de téléphone invalide. Format : +243XXXXXXXXX';
   }
+  if (/error occor|processing the sms|échec sms serdipay\s*\(\s*400/i.test(lower)) {
+    return SERDIPAY_SMS_REJECTED_FR;
+  }
   if (
-    /hmac|api[_ ]?key|signature|hub_auth|afrisoft_|serdipay|econnrefused|non configuré|missing afrisoft|error occor|processing the sms|échec sms/i.test(
+    /hmac|api[_ ]?key|signature|hub_auth|afrisoft_|serdipay|econnrefused|non configuré|missing afrisoft|échec sms/i.test(
       lower,
     )
   ) {

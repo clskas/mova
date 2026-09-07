@@ -38,7 +38,7 @@ describe('serdipay Public API', () => {
     expect(serdiPayNormalizeSmsPhone('+243994972450')).toBe('+243994972450');
     expect(serdiPayNormalizeSmsPhone('0994972450')).toBe('+243994972450');
     expect(serdiPaySanitizeSmsText('Votre code SENGA : 111111. Valide 10 minutes.')).toBe(
-      'Votre code SENGA : 111111 Valide 10 minutes',
+      'Votre code SENGA 111111 Valide 10 minutes',
     );
     expect(serdiPaySanitizeSmsText('RECU Token Montant 50.00 USD No.Jeton 12')).toBe(
       'RECU Token Montant 50.00 USD No.Jeton 12',
@@ -435,7 +435,7 @@ describe('serdipay Public API', () => {
       apiKey: 'test-sms-key',
       phone: '+243994972450',
       senderId: 'SerdiPay',
-      text: 'Votre code MOVA : 123456 Valide 10 minutes',
+      text: 'Votre code MOVA 123456 Valide 10 minutes',
     });
     // No Bearer / get-token for SMS API
     expect(fetchMock.mock.calls[0][1].headers.Authorization).toBeUndefined();
@@ -492,6 +492,41 @@ describe('serdipay Public API', () => {
     const result = await serdiPaySendSms(get, { to: '+243812345678', message: 'hi' });
     expect(result.success).toBe(false);
     expect(result.message).toMatch(/Crédit SMS|not enough sms/i);
+  });
+
+  it('retries SMS without senderId then without + when SerdiPay returns occor 400', async () => {
+    env.SERDIPAY_SMS_API_ID = 'APISMSDEMO';
+    env.SERDIPAY_SMS_API_KEY = 'test-sms-key';
+    env.SERDIPAY_SMS_SENDER_ID = 'SENGA';
+    const occor = {
+      ok: false,
+      status: 400,
+      json: async () => ({ message: 'An error occor while processing the sms' }),
+    };
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce(occor)
+      .mockResolvedValueOnce(occor)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ message: 'SMS sent successfully.' }),
+      });
+    (global as unknown as { fetch: typeof fetch }).fetch = fetchMock as unknown as typeof fetch;
+
+    const result = await serdiPaySendSms(get, { to: '+243812345678', message: 'Votre code SENGA : 123456' });
+    expect(result.success).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    const first = JSON.parse(fetchMock.mock.calls[0][1].body as string);
+    const second = JSON.parse(fetchMock.mock.calls[1][1].body as string);
+    const third = JSON.parse(fetchMock.mock.calls[2][1].body as string);
+    expect(first.senderId).toBe('SENGA');
+    expect(first.phone).toBe('+243812345678');
+    expect(first.text).toBe('Votre code SENGA 123456');
+    expect(second.senderId).toBeUndefined();
+    expect(second.phone).toBe('+243812345678');
+    expect(third.senderId).toBeUndefined();
+    expect(third.phone).toBe('243812345678');
   });
 
   it('accepts SERDIPAY_SMS_SENDER alias for senderId', async () => {

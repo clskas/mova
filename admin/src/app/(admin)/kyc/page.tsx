@@ -1,9 +1,23 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import { apiFetch, activationPinSmsCopy, fetchDrivers, fetchPartnerKycPending, reviewDriverKyc, reviewPartnerKycDocument, reviewPartnerKycSubject, type AdminDriver, type KycItem, type PartnerKycChecklistItem, type PartnerKycDossier } from "@/lib/api";
-import { authHeaders } from "@/lib/auth";
+import {
+  activationPinSmsCopy,
+  fetchDrivers,
+  fetchKycPending,
+  fetchPartnerKycPending,
+  reviewDriverKyc,
+  reviewPartnerKycDocument,
+  reviewPartnerKycSubject,
+  apiFetch,
+  type AdminDriver,
+  type KycItem,
+  type PartnerKycChecklistItem,
+  type PartnerKycDossier,
+} from "@/lib/api";
 import { useAdmin } from "@/components/AdminProvider";
+import { AuthenticatedMedia } from "@/components/AuthenticatedMedia";
+import { KYC_DOC_LABELS, kycDocLabel, personDisplayName } from "@/lib/kyc-labels";
 import {
   BtnDanger,
   BtnSuccess,
@@ -12,24 +26,26 @@ import {
   ErrorBanner,
   LoadingState,
   PageHeader,
+  SearchInput,
   StatusBadge,
 } from "@/components/ui";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
-
-function resolveDocumentUrl(url?: string | null): string | null {
-  if (!url) return null;
-  if (url.startsWith("http://") || url.startsWith("https://")) return url;
-  return `${API_BASE}${url.startsWith("/") ? url : `/${url}`}`;
-}
-
-function driverDisplayName(d: AdminDriver) {
-  const full = [d.firstName, d.lastName].filter(Boolean).join(" ").trim();
-  return full || d.publicId || `${d.userId.slice(0, 8)}…`;
+function driverNameFromProfile(d?: AdminDriver | null) {
+  if (!d) return "";
+  return personDisplayName({
+    firstName: d.firstName,
+    lastName: d.lastName,
+    phone: d.phone,
+    publicId: d.publicId,
+    fallback: "",
+  });
 }
 
 function dossierName(r: PartnerKycDossier) {
-  return r.displayName || r.name || r.userId?.slice(0, 8) || "Partenaire";
+  return personDisplayName({
+    displayName: r.displayName,
+    fallback: r.name || r.phone || "Partenaire",
+  });
 }
 
 function dossierKind(r: PartnerKycDossier) {
@@ -45,6 +61,11 @@ function contactLine(phone?: string | null, email?: string | null) {
   return parts.length ? parts.join(" · ") : "Coordonnées non renseignées";
 }
 
+function matchesSearch(q: string, ...values: Array<string | null | undefined>) {
+  if (!q) return true;
+  return values.some((v) => (v ?? "").toLowerCase().includes(q));
+}
+
 type DriverDossier = {
   userId: string;
   displayName: string;
@@ -55,7 +76,8 @@ type DriverDossier = {
   docs: KycItem[];
 };
 
-function groupDriverDocs(items: KycItem[]): DriverDossier[] {
+function groupDriverDocs(items: KycItem[], drivers: AdminDriver[]): DriverDossier[] {
+  const byUser = new Map(drivers.map((d) => [d.userId, d]));
   const map = new Map<string, KycItem[]>();
   for (const item of items) {
     const key = item.userId ?? item.id;
@@ -65,12 +87,20 @@ function groupDriverDocs(items: KycItem[]): DriverDossier[] {
   }
   return Array.from(map.entries()).map(([userId, docs]) => {
     const first = docs[0];
+    const driver = byUser.get(userId);
     return {
       userId,
-      displayName: first.displayName || first.publicId || `Chauffeur ${userId.slice(0, 8)}…`,
-      publicId: first.publicId,
-      phone: first.phone,
-      email: first.email,
+      displayName: personDisplayName({
+        displayName: first.displayName,
+        firstName: driver?.firstName,
+        lastName: driver?.lastName,
+        phone: first.phone || driver?.phone,
+        publicId: first.publicId || driver?.publicId,
+        fallback: "Chauffeur",
+      }),
+      publicId: first.publicId || driver?.publicId,
+      phone: first.phone || driver?.phone,
+      email: first.email || driver?.email,
       partnerKindLabel: first.partnerKindLabel || "Chauffeur",
       docs,
     };
@@ -127,43 +157,61 @@ function DocumentRow({
         {status ? <StatusBadge status={status} /> : null}
       </div>
       {notes && <p className="text-xs text-red-700 mt-1">Motif : {notes}</p>}
-      {url && (
-        onPreview ? (
-          <button type="button" onClick={onPreview} className="mt-2 text-xs text-[#6C63FF] hover:underline">
-            Voir le justificatif
-          </button>
-        ) : (
-          <a href={resolveDocumentUrl(url) ?? "#"} target="_blank" rel="noreferrer" className="text-xs text-[#6C63FF]">
-            Voir le justificatif
-          </a>
-        )
+      {url && onPreview && (
+        <button type="button" onClick={onPreview} className="mt-2 text-xs text-[#6C63FF] hover:underline">
+          Voir le justificatif
+        </button>
       )}
       {actions}
     </li>
   );
 }
 
+const KIND_OPTIONS = [
+  { value: "", label: "Tous les types" },
+  { value: "DRIVER", label: "Chauffeur" },
+  { value: "RESTAURANT", label: "Restaurant" },
+  { value: "RENTAL", label: "Location" },
+];
+
+const STATUS_OPTIONS = [
+  { value: "PENDING", label: "En attente" },
+  { value: "APPROVED", label: "Approuvé" },
+  { value: "REJECTED", label: "Rejeté" },
+  { value: "ALL", label: "Tous les statuts" },
+];
+
+const DOC_TYPE_OPTIONS = [
+  { value: "", label: "Tous les justificatifs" },
+  ...Object.entries(KYC_DOC_LABELS).map(([value, label]) => ({ value, label })),
+];
+
 export default function KycPage() {
   const { canWrite } = useAdmin();
   const [items, setItems] = useState<KycItem[]>([]);
   const [pendingDrivers, setPendingDrivers] = useState<AdminDriver[]>([]);
+  const [allDrivers, setAllDrivers] = useState<AdminDriver[]>([]);
   const [restaurants, setRestaurants] = useState<PartnerKycDossier[]>([]);
   const [rentalPartners, setRentalPartners] = useState<PartnerKycDossier[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState<KycItem | null>(null);
-  const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [kindFilter, setKindFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("PENDING");
+  const [docTypeFilter, setDocTypeFilter] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const [data, drivers, partners] = await Promise.all([
-        apiFetch<KycItem[]>("/api/admin/kyc/pending"),
+        fetchKycPending(statusFilter),
         fetchDrivers(),
-        fetchPartnerKycPending().catch(() => ({ restaurants: [], rentalPartners: [] })),
+        fetchPartnerKycPending(statusFilter).catch(() => ({ restaurants: [], rentalPartners: [] })),
       ]);
       setItems(Array.isArray(data) ? data : []);
+      setAllDrivers(drivers);
       setPendingDrivers(
         drivers.filter(
           (d) =>
@@ -179,7 +227,7 @@ export default function KycPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [statusFilter]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -189,31 +237,6 @@ export default function KycPage() {
     }, 15000);
     return () => clearInterval(timer);
   }, [load, loading]);
-
-  useEffect(() => {
-    if (!preview?.url) {
-      setPreviewBlobUrl(null);
-      return;
-    }
-    const full = resolveDocumentUrl(preview.url);
-    if (!full) return;
-    let objectUrl: string | null = null;
-    let cancelled = false;
-    fetch(full, { headers: authHeaders() })
-      .then((res) => (res.ok ? res.blob() : Promise.reject(new Error("HTTP " + res.status))))
-      .then((blob) => {
-        if (cancelled) return;
-        objectUrl = URL.createObjectURL(blob);
-        setPreviewBlobUrl(objectUrl);
-      })
-      .catch(() => {
-        if (!cancelled) setPreviewBlobUrl(full);
-      });
-    return () => {
-      cancelled = true;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-  }, [preview]);
 
   async function review(id: string, approved: boolean) {
     try {
@@ -310,12 +333,72 @@ export default function KycPage() {
     }
   }
 
-  const driverDossiers = useMemo(() => groupDriverDocs(items), [items]);
+  const q = search.trim().toLowerCase();
+
+  const driverDossiers = useMemo(() => {
+    const grouped = groupDriverDocs(items, allDrivers);
+    return grouped
+      .map((dossier) => ({
+        ...dossier,
+        docs: dossier.docs.filter((d) => !docTypeFilter || d.type === docTypeFilter),
+      }))
+      .filter((dossier) => {
+        if (kindFilter && kindFilter !== "DRIVER") return false;
+        if (!dossier.docs.length) return false;
+        return matchesSearch(q, dossier.displayName, dossier.phone, dossier.email, dossier.publicId);
+      });
+  }, [items, allDrivers, kindFilter, docTypeFilter, q]);
+
   const driverDocUserIds = useMemo(() => new Set(driverDossiers.map((d) => d.userId)), [driverDossiers]);
-  const driversWithoutDocs = pendingDrivers.filter((d) => !driverDocUserIds.has(d.userId));
+  const showDriversWithoutDocs =
+    (statusFilter === "PENDING" || statusFilter === "ALL") &&
+    (!kindFilter || kindFilter === "DRIVER") &&
+    !docTypeFilter;
+  const driversWithoutDocs = showDriversWithoutDocs
+    ? pendingDrivers.filter((d) => {
+        if (driverDocUserIds.has(d.userId)) return false;
+        if (statusFilter === "PENDING" && d.kycStatus !== "PENDING" && !d.readyForReview) return false;
+        return matchesSearch(
+          q,
+          driverNameFromProfile(d),
+          d.phone,
+          d.email,
+          d.publicId,
+        );
+      })
+    : [];
+
+  const filteredRestaurants = useMemo(() => {
+    if (kindFilter && kindFilter !== "RESTAURANT") return [];
+    return restaurants
+      .map((r) => ({
+        ...r,
+        checklist: (r.checklist ?? []).filter((item) => !docTypeFilter || item.type === docTypeFilter),
+      }))
+      .filter((r) => {
+        if (docTypeFilter && !(r.checklist ?? []).length) return false;
+        return matchesSearch(q, dossierName(r), r.phone, r.email, r.name);
+      });
+  }, [restaurants, kindFilter, docTypeFilter, q]);
+
+  const filteredRentals = useMemo(() => {
+    if (kindFilter && kindFilter !== "RENTAL") return [];
+    return rentalPartners
+      .map((r) => ({
+        ...r,
+        checklist: (r.checklist ?? []).filter((item) => !docTypeFilter || item.type === docTypeFilter),
+      }))
+      .filter((r) => {
+        if (docTypeFilter && !(r.checklist ?? []).length) return false;
+        return matchesSearch(q, dossierName(r), r.phone, r.email, r.name);
+      });
+  }, [rentalPartners, kindFilter, docTypeFilter, q]);
 
   const empty =
-    items.length === 0 && pendingDrivers.length === 0 && restaurants.length === 0 && rentalPartners.length === 0;
+    driverDossiers.length === 0 &&
+    driversWithoutDocs.length === 0 &&
+    filteredRestaurants.length === 0 &&
+    filteredRentals.length === 0;
 
   function partnerDocActions(item: PartnerKycChecklistItem) {
     if (!canWrite("kyc") || !item.documentId || item.status === "APPROVED") return null;
@@ -330,16 +413,53 @@ export default function KycPage() {
   return (
     <div className="max-w-4xl mx-auto">
       <PageHeader title="KYC" subtitle="Validation des dossiers chauffeurs, restaurants et loueurs" />
+      <div className="mb-4 space-y-3">
+        <SearchInput
+          value={search}
+          onChange={setSearch}
+          placeholder="Rechercher par nom, téléphone ou e-mail…"
+          className="max-w-none"
+        />
+        <div className="flex flex-wrap gap-2">
+          <select
+            value={kindFilter}
+            onChange={(e) => setKindFilter(e.target.value)}
+            className="rounded-xl border-0 bg-white p-3 shadow-sm text-sm"
+          >
+            {KIND_OPTIONS.map((o) => (
+              <option key={o.value || "all"} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="rounded-xl border-0 bg-white p-3 shadow-sm text-sm"
+          >
+            {STATUS_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+          <select
+            value={docTypeFilter}
+            onChange={(e) => setDocTypeFilter(e.target.value)}
+            className="rounded-xl border-0 bg-white p-3 shadow-sm text-sm min-w-[12rem]"
+          >
+            {DOC_TYPE_OPTIONS.map((o) => (
+              <option key={o.value || "all-docs"} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+        </div>
+      </div>
       {error && <div className="mb-4"><ErrorBanner message={error} onRetry={load} /></div>}
       {loading ? (
         <LoadingState />
       ) : empty ? (
-        <EmptyState message="Aucun KYC en attente" />
+        <EmptyState message={q || kindFilter || docTypeFilter ? "Aucun dossier ne correspond aux filtres" : "Aucun KYC en attente"} />
       ) : (
         <div className="space-y-6">
           {driverDossiers.length > 0 && (
             <div className="space-y-3">
-              <h2 className="text-sm font-semibold text-gray-700">Chauffeurs — justificatifs en attente</h2>
+              <h2 className="text-sm font-semibold text-gray-700">Chauffeurs</h2>
               {driverDossiers.map((dossier) => (
                 <Card key={dossier.userId} className="p-4 space-y-3">
                   <div className="flex flex-wrap justify-between gap-2">
@@ -350,19 +470,25 @@ export default function KycPage() {
                       email={dossier.email}
                       extra={dossier.publicId}
                     />
+                    {canWrite("kyc") && statusFilter !== "APPROVED" && (
+                      <div className="flex gap-2">
+                        <BtnSuccess onClick={() => reviewDriver(dossier.userId, true)}>Approuver le dossier</BtnSuccess>
+                        <BtnDanger onClick={() => reviewDriver(dossier.userId, false)}>Rejeter le dossier</BtnDanger>
+                      </div>
+                    )}
                   </div>
                   <ul className="text-sm space-y-2">
                     {dossier.docs.map((k) => (
                       <DocumentRow
                         key={k.id}
-                        label={k.typeLabel || k.type || "Justificatif"}
+                        label={kycDocLabel(k.type, k.typeLabel)}
                         forWhom={`Pour ${dossier.partnerKindLabel} ${dossier.displayName}`}
                         status={k.status}
                         notes={k.notes}
                         url={k.url}
                         onPreview={k.url ? () => setPreview(k) : undefined}
                         actions={
-                          canWrite("kyc") ? (
+                          canWrite("kyc") && k.status !== "APPROVED" ? (
                             <div className="flex gap-2 mt-2">
                               <BtnSuccess onClick={() => review(k.id, true)}>Approuver</BtnSuccess>
                               <BtnDanger onClick={() => review(k.id, false)}>Rejeter</BtnDanger>
@@ -390,7 +516,7 @@ export default function KycPage() {
                 <Card key={d.id} className="p-4 flex flex-wrap justify-between items-center gap-4">
                   <IdentityHeader
                     kind="Chauffeur"
-                    name={driverDisplayName(d)}
+                    name={driverNameFromProfile(d) || "Chauffeur"}
                     phone={d.phone}
                     email={d.email}
                     extra={d.publicId}
@@ -416,10 +542,10 @@ export default function KycPage() {
               ))}
             </div>
           )}
-          {restaurants.length > 0 && (
+          {filteredRestaurants.length > 0 && (
             <div className="space-y-3">
               <h2 className="text-sm font-semibold text-gray-700">Restaurants</h2>
-              {restaurants.map((r) => {
+              {filteredRestaurants.map((r) => {
                 const name = dossierName(r);
                 const kind = dossierKind(r);
                 return (
@@ -430,7 +556,7 @@ export default function KycPage() {
                         <div className="mt-1"><StatusBadge status={r.kycStatus} /></div>
                         {!r.phoneVerified && <p className="text-xs text-amber-700 mt-1">Téléphone +243 non lié</p>}
                       </div>
-                      {canWrite("kyc") && r.userId && (
+                      {canWrite("kyc") && r.userId && r.kycStatus !== "APPROVED" && (
                         <div className="flex gap-2">
                           <BtnSuccess onClick={() => reviewPartner("RESTAURANT", r.userId!, true)}>Approuver</BtnSuccess>
                           <BtnDanger onClick={() => reviewPartner("RESTAURANT", r.userId!, false)}>Rejeter</BtnDanger>
@@ -441,11 +567,21 @@ export default function KycPage() {
                       {(r.checklist ?? []).map((item) => (
                         <DocumentRow
                           key={item.type}
-                          label={item.label}
+                          label={kycDocLabel(item.type, item.label)}
                           forWhom={`Pour ${kind} ${name}`}
                           status={item.status ?? (item.uploaded ? "Envoyé" : "Manquant")}
                           notes={item.notes}
                           url={item.url}
+                          onPreview={item.url ? () => setPreview({
+                            id: item.documentId ?? item.type,
+                            type: item.type,
+                            typeLabel: kycDocLabel(item.type, item.label),
+                            url: item.url ?? undefined,
+                            displayName: name,
+                            phone: r.phone,
+                            email: r.email,
+                            partnerKindLabel: kind,
+                          }) : undefined}
                           actions={partnerDocActions(item)}
                         />
                       ))}
@@ -455,10 +591,10 @@ export default function KycPage() {
               })}
             </div>
           )}
-          {rentalPartners.length > 0 && (
+          {filteredRentals.length > 0 && (
             <div className="space-y-3">
               <h2 className="text-sm font-semibold text-gray-700">Loueurs</h2>
-              {rentalPartners.map((r) => {
+              {filteredRentals.map((r) => {
                 const name = dossierName(r);
                 const kind = dossierKind(r);
                 return (
@@ -468,7 +604,7 @@ export default function KycPage() {
                         <IdentityHeader kind={kind} name={name} phone={r.phone} email={r.email} />
                         <div className="mt-1"><StatusBadge status={r.kycStatus} /></div>
                       </div>
-                      {canWrite("kyc") && r.userId && (
+                      {canWrite("kyc") && r.userId && r.kycStatus !== "APPROVED" && (
                         <div className="flex gap-2">
                           <BtnSuccess onClick={() => reviewPartner("RENTAL_PARTNER", r.userId!, true)}>Approuver</BtnSuccess>
                           <BtnDanger onClick={() => reviewPartner("RENTAL_PARTNER", r.userId!, false)}>Rejeter</BtnDanger>
@@ -479,11 +615,21 @@ export default function KycPage() {
                       {(r.checklist ?? []).map((item) => (
                         <DocumentRow
                           key={item.type}
-                          label={item.label}
+                          label={kycDocLabel(item.type, item.label)}
                           forWhom={`Pour ${kind} ${name}`}
                           status={item.status ?? (item.uploaded ? "Envoyé" : "Manquant")}
                           notes={item.notes}
                           url={item.url}
+                          onPreview={item.url ? () => setPreview({
+                            id: item.documentId ?? item.type,
+                            type: item.type,
+                            typeLabel: kycDocLabel(item.type, item.label),
+                            url: item.url ?? undefined,
+                            displayName: name,
+                            phone: r.phone,
+                            email: r.email,
+                            partnerKindLabel: kind,
+                          }) : undefined}
                           actions={partnerDocActions(item)}
                         />
                       ))}
@@ -499,14 +645,18 @@ export default function KycPage() {
       {preview?.url && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setPreview(null)}>
           <div className="bg-white rounded-2xl p-4 max-w-2xl w-full max-h-[90vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
-            <p className="font-medium mb-1">{preview.typeLabel || preview.type}</p>
+            <p className="font-medium mb-1">{kycDocLabel(preview.type, preview.typeLabel)}</p>
             <p className="text-sm text-gray-600 mb-3">
-              {preview.partnerKindLabel || "Chauffeur"} {preview.displayName || preview.publicId || preview.userId}
+              {preview.partnerKindLabel || "Chauffeur"} {preview.displayName || preview.phone || preview.publicId}
               {preview.phone ? ` · ${preview.phone}` : ""}
               {preview.email ? ` · ${preview.email}` : ""}
             </p>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={previewBlobUrl ?? resolveDocumentUrl(preview.url) ?? preview.url} alt="Document KYC" className="w-full rounded-lg border" />
+            <AuthenticatedMedia
+              url={preview.url}
+              alt="Document KYC"
+              className="w-full rounded-lg border"
+              fallback="Justificatif introuvable."
+            />
             <button type="button" onClick={() => setPreview(null)} className="mt-4 text-sm text-gray-500 underline">Fermer</button>
           </div>
         </div>

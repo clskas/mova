@@ -17,6 +17,8 @@ import {
   type AdminDriverDetail,
 } from "@/lib/api";
 import { useAdmin } from "@/components/AdminProvider";
+import { AuthenticatedMedia, resolveMediaUrl } from "@/components/AuthenticatedMedia";
+import { kycDocLabel, VEHICLE_TYPE_LABELS, VEHICLE_TYPE_OPTIONS } from "@/lib/kyc-labels";
 import {
   BtnDanger,
   BtnSuccess,
@@ -31,26 +33,7 @@ import {
   StatusBadge,
 } from "@/components/ui";
 
-const KYC_DOC_LABELS: Record<string, string> = {
-  ID_PHOTO: "Carte d'identité",
-  SELFIE: "Photo profil",
-  DRIVERS_LICENSE: "Permis",
-  VEHICLE_REGISTRATION: "Carte grise",
-  VEHICLE_INSURANCE: "Assurance",
-  TECHNICAL_INSPECTION: "Visite technique",
-  CRIMINAL_RECORD: "Casier judiciaire",
-};
-
 const RENEWAL_DOC_TYPES = ["DRIVERS_LICENSE", "VEHICLE_INSURANCE", "TECHNICAL_INSPECTION"] as const;
-
-const VEHICLE_TYPE_LABELS: Record<string, string> = {
-  MOTO_TAXI: "Moto-taxi",
-  STANDARD: "Standard",
-  COMFORT: "Confort",
-  VIP: "VIP",
-  UTILITAIRE: "Utilitaire",
-  CAMION: "Camion",
-};
 
 function activeDriverVehicle(driver?: AdminDriver | AdminDriverDetail | null) {
   if (!driver?.vehicles?.length) return null;
@@ -141,14 +124,6 @@ function OcrBadge({ ocr }: { ocr?: KycOcrInfo | null }) {
   );
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
-
-function resolveDocumentUrl(url?: string | null): string | null {
-  if (!url) return null;
-  if (url.startsWith("http://") || url.startsWith("https://")) return url;
-  return `${API_BASE}${url.startsWith("/") ? url : `/${url}`}`;
-}
-
 function driverStageLabel(d: AdminDriver | AdminDriverDetail): string {
   const vehicle = activeDriverVehicle(d);
   if (vehicle?.typeApprovalStatus === "REJECTED") return "Type engin refusé";
@@ -167,9 +142,10 @@ function driverStageLabel(d: AdminDriver | AdminDriverDetail): string {
 }
 
 export default function ChauffeursPage() {
-  const { canWrite } = useAdmin();
+  const { canWrite, role } = useAdmin();
   const readOnly = !canWrite("chauffeurs");
   const canReviewKyc = canWrite("kyc");
+  const canSetVehicleType = role === "SUPER_ADMIN" || role === "ADMIN";
   const [drivers, setDrivers] = useState<AdminDriver[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
@@ -182,6 +158,7 @@ export default function ChauffeursPage() {
   const [activationPin, setActivationPin] = useState<string | null>(null);
   const [smsNotice, setSmsNotice] = useState<string | null>(null);
   const [vehicleTypeRejectNotes, setVehicleTypeRejectNotes] = useState("");
+  const [selectedVehicleType, setSelectedVehicleType] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -211,6 +188,9 @@ export default function ChauffeursPage() {
       .then((d) => {
         if (!cancelled) {
           setDetail(d);
+          const vehicle = activeDriverVehicle(d);
+          setSelectedVehicleType(vehicle?.type ?? "");
+          setVehicleTypeRejectNotes("");
           if (d.activationPin) setActivationPin(d.activationPin);
           else setActivationPin(null);
         }
@@ -304,15 +284,19 @@ export default function ChauffeursPage() {
     setSaving(true);
     setError(null);
     try {
+      const nextType = canSetVehicleType && selectedVehicleType ? selectedVehicleType : undefined;
       await reviewVehicleTypeApproval(
         selectedId,
         approved,
         approved ? undefined : vehicleTypeRejectNotes.trim() || undefined,
+        approved ? nextType : undefined,
       );
       if (approved) setVehicleTypeRejectNotes("");
       load();
       const refreshed = await fetchDriverDetail(selectedId);
       setDetail(refreshed);
+      const vehicle = activeDriverVehicle(refreshed);
+      setSelectedVehicleType(vehicle?.type ?? selectedVehicleType);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Échec validation type d'engin");
     } finally {
@@ -538,7 +522,7 @@ export default function ChauffeursPage() {
                       .map((item) => (
                         <li key={item.type} className="flex flex-col gap-2 bg-white/70 rounded-lg px-3 py-2">
                           <div className="flex flex-wrap items-center justify-between gap-2">
-                            <span>{item.label ?? KYC_DOC_LABELS[item.type] ?? item.type}</span>
+                            <span>{item.label ?? kycDocLabel(item.type) ?? item.type}</span>
                             <div className="flex flex-wrap items-center gap-2">
                               {item.ocr?.documentId && canReviewKyc && (
                                 <button
@@ -552,7 +536,7 @@ export default function ChauffeursPage() {
                               )}
                               {item.url ? (
                                 <a
-                                  href={resolveDocumentUrl(item.url) ?? "#"}
+                                  href={resolveMediaUrl(item.url) ?? "#"}
                                   target="_blank"
                                   rel="noreferrer"
                                   className="text-[#6C63FF] hover:underline text-sm"
@@ -587,7 +571,7 @@ export default function ChauffeursPage() {
                   {selected.kyc.checklist.map((item) => (
                     <li key={item.type} className="bg-gray-50 rounded-lg px-3 py-2 space-y-1">
                       <div className="flex justify-between">
-                        <span>{item.label ?? KYC_DOC_LABELS[item.type] ?? item.type}</span>
+                        <span>{item.label ?? kycDocLabel(item.type)}</span>
                         <span className={item.uploaded ? "text-green-600" : "text-gray-400"}>
                           {item.uploaded ? `✓ ${item.status ?? "uploadé"}` : item.required ? "Manquant" : "Optionnel"}
                         </span>
@@ -659,20 +643,34 @@ export default function ChauffeursPage() {
                 </p>
                 <p className="text-xs opacity-90">
                   Comparez la photo de l&apos;engin avec la catégorie (ex. refuser VIP si la photo montre une moto).
-                  Le chauffeur ne peut pas passer en ligne tant que le type n&apos;est pas validé.
+                  Vous pouvez corriger le type avant de valider. Le chauffeur ne peut pas passer en ligne tant que le type n&apos;est pas validé.
                 </p>
-                {(() => {
-                  const photo = resolveDocumentUrl(selectedVehicle.imageUrl);
-                  return photo ? (
-                    <img
-                      src={photo}
-                      alt="Photo engin"
-                      className="w-full max-w-xs h-36 object-cover rounded-lg border bg-white"
-                    />
-                  ) : (
-                    <p className="text-xs">Photo de l&apos;engin non fournie — demandez une mise à jour au chauffeur.</p>
-                  );
-                })()}
+                <AuthenticatedMedia
+                  url={selectedVehicle.imageUrl}
+                  alt="Photo engin"
+                  className="w-full max-w-xs h-36 object-cover rounded-lg border bg-white"
+                  fallback="Photo de l'engin non fournie — demandez une mise à jour au chauffeur."
+                />
+                {canSetVehicleType && (
+                  <label className="block space-y-1">
+                    <span className="text-xs font-medium">Type d&apos;engin à enregistrer</span>
+                    <select
+                      value={selectedVehicleType || selectedVehicle.type}
+                      onChange={(e) => setSelectedVehicleType(e.target.value)}
+                      className="w-full max-w-xs rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-800 bg-white"
+                    >
+                      {VEHICLE_TYPE_OPTIONS.map((opt) => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+                    {selectedVehicleType && selectedVehicleType !== selectedVehicle.type && (
+                      <span className="block text-xs text-amber-800">
+                        Le type déclaré ({VEHICLE_TYPE_LABELS[selectedVehicle.type] ?? selectedVehicle.type}) sera
+                        remplacé par {VEHICLE_TYPE_LABELS[selectedVehicleType] ?? selectedVehicleType}.
+                      </span>
+                    )}
+                  </label>
+                )}
                 {selectedVehicle.typeApprovalNotes && vehicleTypeStatus === "REJECTED" && (
                   <p className="text-xs">
                     Motif du refus : <em>{selectedVehicle.typeApprovalNotes}</em>
@@ -694,7 +692,9 @@ export default function ChauffeursPage() {
                     />
                     <div className="flex flex-wrap gap-2">
                       <BtnSuccess onClick={() => reviewVehicleType(true)} disabled={saving}>
-                        Valider ce type d&apos;engin
+                        {canSetVehicleType && selectedVehicleType && selectedVehicleType !== selectedVehicle.type
+                          ? "Valider et enregistrer ce type"
+                          : "Valider ce type d'engin"}
                       </BtnSuccess>
                       <BtnDanger onClick={() => reviewVehicleType(false)} disabled={saving}>
                         Refuser le type déclaré
@@ -704,6 +704,11 @@ export default function ChauffeursPage() {
                 )}
                 {canReviewKyc && vehicleTypeStatus === "APPROVED" && (
                   <div className="flex flex-wrap gap-2 pt-1 border-t border-green-200/80">
+                    {canSetVehicleType && selectedVehicleType && selectedVehicleType !== selectedVehicle.type && (
+                      <BtnSuccess onClick={() => reviewVehicleType(true)} disabled={saving}>
+                        Enregistrer le nouveau type
+                      </BtnSuccess>
+                    )}
                     <BtnDanger onClick={() => reviewVehicleType(false)} disabled={saving}>
                       Révoquer la validation du type
                     </BtnDanger>
@@ -716,17 +721,15 @@ export default function ChauffeursPage() {
               <div>
                 <p className="text-sm font-medium mb-2">Véhicules</p>
                 <ul className="text-sm space-y-2">
-                  {selected.vehicles.map((v) => {
-                    const photo = v.imageUrl?.startsWith("http")
-                      ? v.imageUrl
-                      : v.imageUrl
-                        ? `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000"}${v.imageUrl}`
-                        : null;
-                    return (
+                  {selected.vehicles.map((v) => (
                       <li key={v.id} className="bg-gray-50 rounded-lg px-3 py-2">
                         <div className="flex gap-3 items-start">
-                          {photo ? (
-                            <img src={photo} alt="" className="w-16 h-12 object-cover rounded border shrink-0" />
+                          {v.imageUrl ? (
+                            <AuthenticatedMedia
+                              url={v.imageUrl}
+                              alt=""
+                              className="w-16 h-12 object-cover rounded border shrink-0"
+                            />
                           ) : null}
                           <div>
                             {VEHICLE_TYPE_LABELS[v.type] ?? v.type} · {v.plateNumber} {v.make && `· ${v.make} ${v.model ?? ""}`}
@@ -735,12 +738,11 @@ export default function ChauffeursPage() {
                                 Validation type : {vehicleTypeApprovalLabel(v.typeApprovalStatus)}
                               </span>
                             )}
-                            {!photo && <span className="block text-xs text-gray-400 mt-1">Photo non fournie</span>}
+                            {!v.imageUrl && <span className="block text-xs text-gray-400 mt-1">Photo non fournie</span>}
                           </div>
                         </div>
                       </li>
-                    );
-                  })}
+                    ))}
                 </ul>
               </div>
             )}

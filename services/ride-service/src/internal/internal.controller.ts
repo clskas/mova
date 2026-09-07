@@ -307,8 +307,8 @@ export class InternalController {
   }
 
   @Get('partner-kyc/pending')
-  partnerKycPending() {
-    return this.partnerKyc.listPendingAdmin();
+  partnerKycPending(@Query('status') status?: string) {
+    return this.partnerKyc.listPendingAdmin(status);
   }
 
   @Post('partner-kyc/documents/:id/review')

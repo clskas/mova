@@ -266,8 +266,11 @@ export class AdminService {
         : Promise.resolve(null),
     ]).then(([driver]) => driver);
   }
-  pendingKyc() {
-    return this.fetchJson('driver', '/internal/kyc/pending');
+  pendingKyc(status?: string) {
+    const params = new URLSearchParams();
+    if (status) params.set('status', status);
+    const q = params.toString();
+    return this.fetchJson('driver', `/internal/kyc/pending${q ? `?${q}` : ''}`);
   }
   approveKyc(id: string, approved: boolean, notes?: string) {
     return this.proxy('driver', `/internal/kyc/${id}/review`, { method: 'POST', body: JSON.stringify({ approved, notes }) });
@@ -281,10 +284,23 @@ export class AdminService {
       body: JSON.stringify({ approved, notes }),
     });
   }
-  reviewVehicleTypeApproval(userId: string, approved: boolean, notes?: string) {
+  reviewVehicleTypeApproval(
+    userId: string,
+    approved: boolean,
+    notes?: string,
+    vehicleType?: string,
+    actorRole?: string,
+  ) {
+    if (vehicleType && actorRole !== UserRole.SUPER_ADMIN && actorRole !== UserRole.ADMIN) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.FORBIDDEN,
+        'Seul un administrateur peut modifier le type d\'engin.',
+      );
+    }
     return this.proxy('driver', `/internal/drivers/${userId}/vehicle-type`, {
       method: 'PATCH',
-      body: JSON.stringify({ approved, notes }),
+      body: JSON.stringify({ approved, notes, vehicleType }),
     });
   }
   runKycOcr(documentId: string) {
@@ -384,8 +400,11 @@ export class AdminService {
     return this.proxy('ride', `/internal/restaurants/${id}`, { method: 'DELETE' });
   }
 
-  listPartnerKycPending() {
-    return this.fetchJson('ride', '/internal/partner-kyc/pending');
+  listPartnerKycPending(status?: string) {
+    const params = new URLSearchParams();
+    if (status) params.set('status', status);
+    const q = params.toString();
+    return this.fetchJson('ride', `/internal/partner-kyc/pending${q ? `?${q}` : ''}`);
   }
   reviewPartnerKycDocument(id: string, approved: boolean, notes?: string) {
     return this.proxy('ride', `/internal/partner-kyc/documents/${id}/review`, {

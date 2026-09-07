@@ -3,14 +3,9 @@
 import { useState } from "react";
 import { uploadVehiclePhoto } from "@/lib/api";
 import { ImageSourcePicker } from "@/components/ImageSourcePicker";
+import { resolveMediaUrl } from "@/components/AuthenticatedMedia";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
-
-export function resolveMediaUrl(url?: string | null): string | null {
-  if (!url) return null;
-  if (url.startsWith("http://") || url.startsWith("https://")) return url;
-  return `${API_BASE}${url.startsWith("/") ? url : `/${url}`}`;
-}
+export { resolveMediaUrl };
 
 type Props = {
   value?: string | null;

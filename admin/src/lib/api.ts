@@ -967,6 +967,34 @@ function mockFor<T>(path: string, init?: RequestInit): T {
         phone: "+243998765432",
         email: "jean.m@example.com",
       },
+      {
+        id: "kyc-2",
+        userId: "2",
+        type: "SELFIE",
+        typeLabel: "Photo récente (profil)",
+        status: "PENDING",
+        url: "https://placehold.co/400x400/png?text=Selfie",
+        partnerKind: "DRIVER",
+        partnerKindLabel: "Chauffeur",
+        displayName: "Jean Mukendi",
+        publicId: "SG-DRV-2",
+        phone: "+243998765432",
+        email: "jean.m@example.com",
+      },
+      {
+        id: "kyc-3",
+        userId: "3",
+        type: "ID_PHOTO",
+        typeLabel: "Carte d'identité / passeport",
+        status: "PENDING",
+        url: "https://placehold.co/600x400/png?text=ID",
+        partnerKind: "DRIVER",
+        partnerKindLabel: "Chauffeur",
+        displayName: "Amina Nsimba",
+        publicId: "SG-DRV-3",
+        phone: "+243811223344",
+        email: "amina.n@example.com",
+      },
     ] as T;
   }
   if (path.includes("/kyc/") && method === "POST") {
@@ -1914,10 +1942,15 @@ export async function reviewDriverDocumentsRenewal(userId: string, approved: boo
   });
 }
 
-export async function reviewVehicleTypeApproval(userId: string, approved: boolean, notes?: string) {
+export async function reviewVehicleTypeApproval(
+  userId: string,
+  approved: boolean,
+  notes?: string,
+  vehicleType?: string,
+) {
   return apiFetch(`/api/admin/drivers/${userId}/vehicle-type`, {
     method: "PATCH",
-    body: JSON.stringify({ approved, notes }),
+    body: JSON.stringify({ approved, notes, vehicleType }),
   });
 }
 
@@ -2008,12 +2041,23 @@ export type PartnerKycDossier = {
   hasEmail?: boolean;
 };
 
-export async function fetchPartnerKycPending() {
+export async function fetchKycPending(status?: string): Promise<KycItem[]> {
+  const params = new URLSearchParams();
+  if (status) params.set("status", status);
+  const q = params.toString();
+  const data = await apiFetch<KycItem[]>(`/api/admin/kyc/pending${q ? `?${q}` : ""}`);
+  return Array.isArray(data) ? data : [];
+}
+
+export async function fetchPartnerKycPending(status?: string) {
+  const params = new URLSearchParams();
+  if (status) params.set("status", status);
+  const q = params.toString();
   return apiFetch<{
     restaurants?: PartnerKycDossier[];
     rentalPartners?: PartnerKycDossier[];
     documents?: KycItem[];
-  }>("/api/admin/partner-kyc/pending");
+  }>(`/api/admin/partner-kyc/pending${q ? `?${q}` : ""}`);
 }
 
 export async function reviewPartnerKycDocument(id: string, approved: boolean, notes?: string) {

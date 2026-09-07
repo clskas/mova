@@ -495,7 +495,12 @@ export class DriversService {
     };
   }
 
-  async reviewVehicleTypeApproval(userId: string, approved: boolean, notes?: string) {
+  async reviewVehicleTypeApproval(
+    userId: string,
+    approved: boolean,
+    notes?: string,
+    vehicleType?: VehicleType,
+  ) {
     const profile = await this.prisma.driverProfile.findUnique({
       where: { userId },
       include: { vehicles: true },
@@ -510,9 +515,11 @@ export class DriversService {
       );
     }
     const status = approved ? KycStatus.APPROVED : KycStatus.REJECTED;
+    const nextType = vehicleType ?? vehicle.type;
     await this.prisma.vehicle.update({
       where: { id: vehicle.id },
       data: {
+        ...(vehicleType ? { type: vehicleType } : {}),
         typeApprovalStatus: status,
         typeApprovalNotes: notes?.trim() || null,
         typeApprovedAt: approved ? new Date() : null,
@@ -523,15 +530,19 @@ export class DriversService {
     }
     const refreshed = await this.getOrCreateProfile(userId);
     const documentsStatus = this.documentsStatusFor(refreshed ?? { vehicles: [] });
+    const typeChanged = Boolean(vehicleType && vehicleType !== vehicle.type);
     return {
       userId,
       vehicleId: vehicle.id,
-      vehicleType: vehicle.type,
+      previousVehicleType: vehicle.type,
+      vehicleType: nextType,
       typeApprovalStatus: status,
       typeApprovalNotes: notes?.trim() || null,
       documentsStatus,
       message: approved
-        ? 'Type d\'engin validé — le chauffeur peut passer en ligne si le reste du dossier est conforme.'
+        ? typeChanged
+          ? `Type d'engin modifié (${vehicle.type} → ${nextType}) et validé — le chauffeur peut passer en ligne si le reste du dossier est conforme.`
+          : 'Type d\'engin validé — le chauffeur peut passer en ligne si le reste du dossier est conforme.'
         : 'Type d\'engin refusé — le chauffeur doit corriger sa déclaration ou sa photo.',
     };
   }
@@ -864,10 +875,18 @@ export class DriversService {
     };
   }
 
-  async pendingKyc() {
+  async pendingKyc(status?: string) {
+    const normalized = String(status ?? 'PENDING').trim().toUpperCase();
+    const where =
+      normalized === 'ALL'
+        ? {}
+        : normalized === 'APPROVED' || normalized === 'REJECTED' || normalized === 'PENDING'
+          ? { status: normalized as KycStatus }
+          : { status: KycStatus.PENDING };
     const docs = await this.prisma.kycDocument.findMany({
-      where: { status: KycStatus.PENDING },
+      where,
       orderBy: { createdAt: 'desc' },
+      take: 500,
     });
     const userIds = [...new Set(docs.map((d) => d.userId))];
     const users = await Promise.all(userIds.map((id) => this.fetchAuthUser(id)));

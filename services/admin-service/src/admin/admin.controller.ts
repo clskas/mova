@@ -1,7 +1,8 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Request, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiProperty, ApiTags } from '@nestjs/swagger';
-import { AdminPermission } from '@mova/shared';
-import { IsBoolean, IsOptional, IsString } from 'class-validator';
+import { AdminPermission, VehicleType, normalizeVehicleType } from '@mova/shared';
+import { IsBoolean, IsEnum, IsOptional, IsString } from 'class-validator';
+import { Transform } from 'class-transformer';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RequirePermissions } from '../auth/permissions.decorator';
 import { RolesGuard } from '../auth/roles.guard';
@@ -11,6 +12,18 @@ import { FraudService } from './fraud.service';
 class ApproveKycDto {
   @ApiProperty() @IsBoolean() approved: boolean;
   @ApiProperty({ required: false }) @IsOptional() @IsString() notes?: string;
+  @ApiProperty({ required: false, enum: ['MOTO_TAXI', 'STANDARD', 'COMFORT', 'VIP', 'UTILITAIRE', 'CAMION'] })
+  @Transform(({ value }) => {
+    if (value == null || value === '') return undefined;
+    try {
+      return normalizeVehicleType(String(value));
+    } catch {
+      return value;
+    }
+  })
+  @IsOptional()
+  @IsEnum(VehicleType)
+  vehicleType?: VehicleType;
 }
 
 class UpdateUserDto {
@@ -129,9 +142,9 @@ export class AdminController {
 
   @Get('kyc/pending')
   @RequirePermissions(AdminPermission.KYC_READ)
-  @ApiOperation({ summary: 'KYC en attente' })
-  pendingKyc() {
-    return this.adminService.pendingKyc();
+  @ApiOperation({ summary: 'Justificatifs KYC (filtre statut : PENDING, APPROVED, REJECTED, ALL)' })
+  pendingKyc(@Query('status') status?: string) {
+    return this.adminService.pendingKyc(status);
   }
 
   @Post('kyc/:id/review')
@@ -157,9 +170,19 @@ export class AdminController {
 
   @Patch('drivers/:userId/vehicle-type')
   @RequirePermissions(AdminPermission.KYC_WRITE)
-  @ApiOperation({ summary: 'Valider/rejeter le type d\'engin déclaré (Moto-taxi, Standard, Confort, VIP)' })
-  reviewVehicleType(@Param('userId') userId: string, @Body() dto: ApproveKycDto) {
-    return this.adminService.reviewVehicleTypeApproval(userId, dto.approved, dto.notes);
+  @ApiOperation({ summary: 'Valider, refuser ou modifier le type d\'engin (Moto-taxi, Standard, Confort, VIP)' })
+  reviewVehicleType(
+    @Param('userId') userId: string,
+    @Body() dto: ApproveKycDto,
+    @Request() req: { user: { role: string } },
+  ) {
+    return this.adminService.reviewVehicleTypeApproval(
+      userId,
+      dto.approved,
+      dto.notes,
+      dto.vehicleType,
+      req.user.role,
+    );
   }
 
   @Post('kyc/:id/ocr')
@@ -374,9 +397,9 @@ export class AdminController {
 
   @Get('partner-kyc/pending')
   @RequirePermissions(AdminPermission.KYC_READ)
-  @ApiOperation({ summary: 'Dossiers restaurant et location en attente' })
-  partnerKycPending() {
-    return this.adminService.listPartnerKycPending();
+  @ApiOperation({ summary: 'Dossiers restaurant et location (filtre statut)' })
+  partnerKycPending(@Query('status') status?: string) {
+    return this.adminService.listPartnerKycPending(status);
   }
 
   @Post('partner-kyc/documents/:id/review')

@@ -181,10 +181,10 @@ export function Card({ children, className = "" }: { children: React.ReactNode; 
   return <div className={`bg-white rounded-xl shadow-sm ${className}`}>{children}</div>;
 }
 
-export function SearchInput({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
+export function SearchInput({ value, onChange, placeholder, className = "" }: { value: string; onChange: (v: string) => void; placeholder?: string; className?: string }) {
   return (
     <input
-      className="w-full max-w-sm rounded-xl border-0 bg-white p-3 shadow-sm text-sm"
+      className={`w-full rounded-xl border-0 bg-white p-3 shadow-sm text-sm ${className || "max-w-sm"}`}
       placeholder={placeholder ?? "Rechercher…"}
       value={value}
       onChange={(e) => onChange(e.target.value)}

@@ -275,11 +275,24 @@ export class PartnerKycService {
     return { ...(await this.getRentalDossier(userId)), kycStatus: PartnerKycStatus.REJECTED };
   }
 
-  async listPendingAdmin() {
+  async listPendingAdmin(status?: string) {
+    const normalized = String(status ?? '').trim().toUpperCase();
+    const all = normalized === 'ALL';
+    const exact =
+      normalized === 'PENDING' || normalized === 'APPROVED' || normalized === 'REJECTED'
+        ? (normalized as PartnerKycStatus)
+        : null;
+    const dossierWhere = all
+      ? {}
+      : exact
+        ? { kycStatus: exact }
+        : { kycStatus: { in: [PartnerKycStatus.PENDING, PartnerKycStatus.REJECTED] } };
+    const documentWhere = all ? {} : { status: exact ?? PartnerKycStatus.PENDING };
     const [restaurants, rentalProfiles, documents] = await Promise.all([
       this.prisma.restaurant.findMany({
-        where: { ownerUserId: { not: null }, kycStatus: { in: [PartnerKycStatus.PENDING, PartnerKycStatus.REJECTED] } },
+        where: { ownerUserId: { not: null }, ...dossierWhere },
         orderBy: { updatedAt: 'desc' },
+        take: 200,
         select: {
           id: true,
           name: true,
@@ -294,12 +307,14 @@ export class PartnerKycService {
         },
       }),
       this.prisma.rentalPartnerProfile.findMany({
-        where: { kycStatus: { in: [PartnerKycStatus.PENDING, PartnerKycStatus.REJECTED] } },
+        where: dossierWhere,
         orderBy: { updatedAt: 'desc' },
+        take: 200,
       }),
       this.prisma.partnerKycDocument.findMany({
-        where: { status: PartnerKycStatus.PENDING },
+        where: documentWhere,
         orderBy: { createdAt: 'desc' },
+        take: 500,
       }),
     ]);
     const restaurantDossiers = await Promise.all(

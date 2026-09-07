@@ -171,4 +171,21 @@ describe('PartnerKycService', () => {
     expect(result.restaurants[0].partnerKindLabel).toBe('Restaurant');
     expect(result.restaurants[0].email).toBe('flore@example.com');
   });
+
+  it('filtre les dossiers partenaires par statut', async () => {
+    prisma.restaurant.findMany.mockResolvedValue([]);
+    prisma.rentalPartnerProfile.findMany.mockResolvedValue([]);
+    prisma.partnerKycDocument.findMany.mockResolvedValue([]);
+    await service.listPendingAdmin('APPROVED');
+    expect(prisma.restaurant.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ kycStatus: 'APPROVED' }),
+      }),
+    );
+    expect(prisma.partnerKycDocument.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { status: 'APPROVED' },
+      }),
+    );
+  });
 });

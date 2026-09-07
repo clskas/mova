@@ -27,6 +27,17 @@ class RatingDto { @IsNumber() ratingAvg: number; }
 class ReviewKycDto {
   @IsBoolean() approved: boolean;
   @IsOptional() @IsString() notes?: string;
+  @Transform(({ value }) => {
+    if (value == null || value === '') return undefined;
+    try {
+      return normalizeVehicleType(String(value));
+    } catch {
+      return value;
+    }
+  })
+  @IsOptional()
+  @IsEnum(VehicleType)
+  vehicleType?: VehicleType;
 }
 class UpdateDriverStatusDto {
   @IsOptional() @IsBoolean() isAvailable?: boolean;
@@ -63,7 +74,9 @@ export class InternalController {
       isAvailable: isAvailable === undefined ? undefined : isAvailable === 'true',
     });
   }
-  @Get('kyc/pending') pendingKyc() { return this.drivers.pendingKyc(); }
+  @Get('kyc/pending') pendingKyc(@Query('status') status?: string) {
+    return this.drivers.pendingKyc(status);
+  }
   @Post('kyc/:id/review') reviewKyc(@Param('id') id: string, @Body() dto: ReviewKycDto) { return this.drivers.approveKyc(id, dto.approved, dto.notes); }
   @Post('kyc/:id/ocr') runKycOcr(@Param('id') id: string) { return this.drivers.runKycOcr(id); }
   @Patch('drivers/:userId/kyc')
@@ -76,7 +89,7 @@ export class InternalController {
   }
   @Patch('drivers/:userId/vehicle-type')
   reviewVehicleType(@Param('userId') userId: string, @Body() dto: ReviewKycDto) {
-    return this.drivers.reviewVehicleTypeApproval(userId, dto.approved, dto.notes);
+    return this.drivers.reviewVehicleTypeApproval(userId, dto.approved, dto.notes, dto.vehicleType);
   }
   @Post('drivers/:userId/activation-pin')
   regenerateActivationPin(@Param('userId') userId: string) {

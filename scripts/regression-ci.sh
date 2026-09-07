@@ -75,6 +75,8 @@ done
 echo "=== Seed staff roles (+243900000001-005) ==="
 # Host publish port must match docker-compose.yml (48080:5432).
 export DATABASE_URL="${DATABASE_URL_AUTH:-postgresql://mova:mova@localhost:48080/mova_auth}"
+export APP_ENV="${APP_ENV:-development}"
+export RUN_SEED=true
 cd "$ROOT/services/auth-service"
 npm ci --no-workspaces --silent
 npx ts-node --compiler-options '{"ignoreDeprecations":"5.0"}' prisma/seed-staff-roles.ts

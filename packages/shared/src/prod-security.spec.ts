@@ -277,15 +277,42 @@ describe('prod-security', () => {
     expect(isProductionSmsConfigured()).toBe(true);
   });
 
-  it('isFakeUserSeedAllowed is false in production and when RUN_SEED=false', async () => {
-    const { isFakeUserSeedAllowed } = await import('./prod-security');
+  it('production seed of fake phones is forbidden (opt-in local only)', async () => {
+    const { isFakeUserSeedAllowed, isProductionOrRenderEnv, resolveBootstrapSuperadminPhone } =
+      await import('./prod-security');
     expect(isFakeUserSeedAllowed({ NODE_ENV: 'production' })).toBe(false);
     expect(isFakeUserSeedAllowed({ APP_ENV: 'production' })).toBe(false);
     expect(isFakeUserSeedAllowed({ NODE_ENV: 'development', RUN_SEED: 'false' })).toBe(false);
-    expect(isFakeUserSeedAllowed({ NODE_ENV: 'production', APP_ENV: 'development' })).toBe(false);
-    expect(isFakeUserSeedAllowed({ NODE_ENV: 'development', SKIP_DEMO_SEED: 'true' })).toBe(false);
-    expect(isFakeUserSeedAllowed({ NODE_ENV: 'development' })).toBe(true);
-    expect(isFakeUserSeedAllowed({ NODE_ENV: 'development', SKIP_DEMO_SEED: 'true' })).toBe(false);
-    expect(isFakeUserSeedAllowed({})).toBe(true);
+    expect(isFakeUserSeedAllowed({ NODE_ENV: 'production', APP_ENV: 'development', RUN_SEED: 'true' })).toBe(false);
+    expect(isFakeUserSeedAllowed({ NODE_ENV: 'development', SKIP_DEMO_SEED: 'true', RUN_SEED: 'true' })).toBe(false);
+    expect(isFakeUserSeedAllowed({ NODE_ENV: 'development' })).toBe(false);
+    expect(isFakeUserSeedAllowed({})).toBe(false);
+    expect(isFakeUserSeedAllowed({ RUN_SEED: 'true' })).toBe(false);
+    expect(isFakeUserSeedAllowed({ APP_ENV: 'development', RUN_SEED: 'true' })).toBe(true);
+    expect(isFakeUserSeedAllowed({ NODE_ENV: 'development', RUN_SEED: 'true' })).toBe(true);
+    expect(isFakeUserSeedAllowed({ APP_ENV: 'test' })).toBe(true);
+    expect(isFakeUserSeedAllowed({ NODE_ENV: 'test', PLAYWRIGHT: '1' })).toBe(true);
+    expect(isFakeUserSeedAllowed({ PLAYWRIGHT: '1' })).toBe(true);
+    expect(isFakeUserSeedAllowed({ PLAYWRIGHT: '1', NODE_ENV: 'production' })).toBe(false);
+    expect(isFakeUserSeedAllowed({ APP_ENV: 'test', RENDER: 'true' })).toBe(false);
+    expect(isFakeUserSeedAllowed({ PLAYWRIGHT: '1', GITHUB_ACTIONS: 'true', NODE_ENV: 'production' })).toBe(false);
+    expect(isProductionOrRenderEnv({ RENDER: 'true' })).toBe(true);
+    expect(
+      isFakeUserSeedAllowed({
+        APP_ENV: 'development',
+        RUN_SEED: 'true',
+        RENDER: 'true',
+      }),
+    ).toBe(false);
+    expect(
+      isFakeUserSeedAllowed({
+        APP_ENV: 'development',
+        RUN_SEED: 'true',
+        RENDER_SERVICE_ID: 'srv-test',
+      }),
+    ).toBe(false);
+    expect(resolveBootstrapSuperadminPhone({})).toBeNull();
+    expect(resolveBootstrapSuperadminPhone({ BOOTSTRAP_SUPERADMIN_PHONE: '+243900000001' })).toBeNull();
+    expect(resolveBootstrapSuperadminPhone({ BOOTSTRAP_SUPERADMIN_PHONE: '+243971163574' })).toBe('+243971163574');
   });
 });

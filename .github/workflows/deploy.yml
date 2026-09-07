@@ -144,7 +144,7 @@ jobs:
         run: |
           echo "Prisma migrate deploy runs inside each Prisma service container via"
           echo "scripts/migrate-with-backup.sh (backup-then-migrate; fails if backup fails)."
-          echo "CI already took a full pg_dump artifact above before deploy trigger."
+          echo "prisma db seed is FORBIDDEN on production — never create +2439000000xx demo users."
 
       - name: Wait for Render deploy (gateway)
         env:

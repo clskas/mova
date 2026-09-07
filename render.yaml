@@ -44,6 +44,7 @@ services:
     runtime: docker
     dockerfilePath: ./docker/auth.Dockerfile
     dockerContext: .
+    dockerCommand: sh -c "/app/scripts/migrate-with-backup.sh && node dist/main.js"
     plan: starter
     healthCheckPath: /health
     envVars:
@@ -58,6 +59,10 @@ services:
       # Production: real AfriSoft SMS hub only. Seed 123456 is local/E2E (Playwright), never prod DB.
       - key: ALLOW_TEST_OTP
         value: "false"
+      - key: NODE_ENV
+        value: "production"
+      - key: APP_ENV
+        value: "production"
       - key: SKIP_DEMO_SEED
         value: "true"
       - key: RUN_SEED
@@ -98,6 +103,7 @@ services:
     runtime: docker
     dockerfilePath: ./docker/ride.Dockerfile
     dockerContext: .
+    dockerCommand: sh -c "/app/scripts/migrate-with-backup.sh && node dist/main.js"
     plan: starter
     healthCheckPath: /health
     envVars:
@@ -117,6 +123,10 @@ services:
         value: "https://pay.afri-soft.com"
       - key: MOCK_PAYMENTS
         value: "false"
+      - key: NODE_ENV
+        value: "production"
+      - key: APP_ENV
+        value: "production"
       - key: SKIP_DEMO_SEED
         value: "true"
       - key: RUN_SEED
@@ -130,6 +140,7 @@ services:
     runtime: docker
     dockerfilePath: ./docker/payment.Dockerfile
     dockerContext: .
+    dockerCommand: sh -c "/app/scripts/migrate-with-backup.sh && node dist/main.js"
     plan: starter
     healthCheckPath: /health
     envVars:
@@ -145,6 +156,10 @@ services:
         fromService: { name: mova-auth, type: web, property: hostport }
       - key: MOCK_PAYMENTS
         value: "false"
+      - key: NODE_ENV
+        value: "production"
+      - key: APP_ENV
+        value: "production"
       - key: SKIP_DEMO_SEED
         value: "true"
       - key: RUN_SEED
@@ -160,6 +175,7 @@ services:
     runtime: docker
     dockerfilePath: ./docker/driver.Dockerfile
     dockerContext: .
+    dockerCommand: sh -c "/app/scripts/migrate-with-backup.sh && node dist/main.js"
     plan: starter
     healthCheckPath: /health
     envVars:
@@ -175,6 +191,10 @@ services:
         fromService: { name: mova-auth, type: web, property: hostport }
       - key: NOTIFICATION_SERVICE_URL
         fromService: { name: mova-notification, type: web, property: hostport }
+      - key: NODE_ENV
+        value: "production"
+      - key: APP_ENV
+        value: "production"
       - key: SKIP_DEMO_SEED
         value: "true"
       - key: RUN_SEED
@@ -185,6 +205,7 @@ services:
     runtime: docker
     dockerfilePath: ./docker/notification.Dockerfile
     dockerContext: .
+    dockerCommand: sh -c "/app/scripts/migrate-with-backup.sh && node dist/main.js"
     plan: starter
     healthCheckPath: /health
     envVars:
@@ -203,6 +224,14 @@ services:
       - key: MOCK_OTP
         value: "false"
       - key: MOCK_EMAIL
+        value: "false"
+      - key: NODE_ENV
+        value: "production"
+      - key: APP_ENV
+        value: "production"
+      - key: SKIP_DEMO_SEED
+        value: "true"
+      - key: RUN_SEED
         value: "false"
       - fromGroup: mova-external-apis
 

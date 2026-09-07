@@ -460,7 +460,9 @@ export class SeedService implements OnModuleInit {
         }
       });
     } else {
-      this.logger.log('Demo catalog seed skipped (SEED_DEMO_CATALOG is not true)');
+      this.logger.log(
+        'Demo catalog seed skipped (production/Render or SEED_DEMO_CATALOG is not true; local needs APP_ENV=development AND RUN_SEED=true)',
+      );
     }
 
     this.logger.log('Ride service seed data ensured');

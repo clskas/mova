@@ -22,7 +22,9 @@ async function userIdByPhone(phone: string): Promise<string | null> {
 
 async function main() {
   if (!isFakeUserSeedAllowed()) {
-    console.log('Ride demo seed skipped (production / RUN_SEED=false / SKIP_DEMO_SEED).');
+    console.error(
+      'FORBIDDEN: production/Render ride demo seed is skipped. Local only: APP_ENV=development AND RUN_SEED=true.',
+    );
     return;
   }
   const prisma = new PrismaClient();

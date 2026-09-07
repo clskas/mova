@@ -5,6 +5,9 @@
 #   MOVA_SERVICE     — auth|rides|payments|drivers|notifications (required in Docker)
 #   DATABASE_URL     — connection string (set by compose / Render)
 #   MOVA_SKIP_BACKUP — set to 1 to skip backup (tests only)
+#
+# FORBIDDEN: production seed of fake phones (+2439000000xx). This script must NEVER
+# run `prisma db seed`. Local seed is explicit: APP_ENV=development RUN_SEED=true npm run prisma:seed
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -36,6 +39,15 @@ if [ "${MOVA_SKIP_BACKUP:-}" != "1" ]; then
   fi
 fi
 
+# Prisma migrate deploy does not seed; still skip seed if a leftover wrapper calls it.
+export PRISMA_MIGRATE_SKIP_SEED=1
+if [ "${NODE_ENV:-}" = "production" ] || [ "${APP_ENV:-}" = "production" ] \
+  || [ -n "${RENDER:-}" ] || [ -n "${RENDER_SERVICE_ID:-}" ] || [ -n "${RENDER_INSTANCE_ID:-}" ]; then
+  export SKIP_DEMO_SEED=true
+  export RUN_SEED=false
+  echo "=== migrate-with-backup: production/Render — prisma db seed is FORBIDDEN (fake phones +2439000000xx) ==="
+fi
+
 echo "=== prisma migrate deploy ==="
 ./node_modules/.bin/prisma migrate deploy
-# Never run `prisma db seed` here — production must not create demo users.
+# Do not run `prisma db seed` here. Production must never create demo users.

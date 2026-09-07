@@ -4,10 +4,12 @@
 
 $ErrorActionPreference = "Stop"
 
-if ($env:NODE_ENV -eq "production" -or $env:SKIP_DEMO_SEED -eq "true") {
-  Write-Host "Skipping demo admin seed (NODE_ENV=production or SKIP_DEMO_SEED)."
+if ($env:NODE_ENV -eq "production" -or $env:APP_ENV -eq "production" -or $env:SKIP_DEMO_SEED -eq "true") {
+  Write-Host "FORBIDDEN: skipping demo admin seed (production / SKIP_DEMO_SEED)."
   exit 0
 }
+if (-not $env:APP_ENV) { $env:APP_ENV = "development" }
+if (-not $env:RUN_SEED) { $env:RUN_SEED = "true" }
 $root = Split-Path -Parent $PSScriptRoot
 $authDir = Join-Path $root "services\auth-service"
 

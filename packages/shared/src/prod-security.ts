@@ -20,20 +20,36 @@ function envFlagTrue(env: NodeJS.ProcessEnv, key: string): boolean {
   return v === 'true' || v === '1' || v === 'yes';
 }
 
+/** True when NODE_ENV/APP_ENV is production/staging, or the process is on Render. */
+export function isProductionOrRenderEnv(env: NodeJS.ProcessEnv = process.env): boolean {
+  const nodeEnv = (env.NODE_ENV ?? '').trim().toLowerCase();
+  const appEnv = (env.APP_ENV ?? '').trim().toLowerCase();
+  if (nodeEnv === 'production' || appEnv === 'production' || appEnv === 'staging') return true;
+  const render = (env.RENDER ?? '').trim().toLowerCase();
+  if (render === 'true' || render === '1' || render === 'yes') return true;
+  if ((env.RENDER_SERVICE_ID ?? '').trim()) return true;
+  if ((env.RENDER_INSTANCE_ID ?? '').trim()) return true;
+  if ((env.RENDER_SERVICE_NAME ?? '').trim()) return true;
+  if ((env.RENDER_EXTERNAL_URL ?? '').trim()) return true;
+  return false;
+}
+
 /**
  * Fake / demo user seed (prisma seed, seed-demo, seed-staff-roles).
- * Allowed only for local/dev. Production deploy must never create +2439000000xx accounts.
- * - APP_ENV=development → allow
- * - RUN_SEED=false or SKIP_DEMO_SEED=true → refuse
- * - NODE_ENV/APP_ENV=production → refuse
+ * Default DENY. Production / Render / RUN_SEED=false must never create +2439000000xx.
+ * Allowed:
+ * - Playwright CI container: PLAYWRIGHT=1 or APP_ENV=test / NODE_ENV=test (never on Render)
+ * - Local: APP_ENV=development (or NODE_ENV=development) AND RUN_SEED=true
  */
 export function isFakeUserSeedAllowed(env: NodeJS.ProcessEnv = process.env): boolean {
   if ((env.RUN_SEED ?? '').trim().toLowerCase() === 'false') return false;
   if (envFlagTrue(env, 'SKIP_DEMO_SEED')) return false;
+  if (isProductionOrRenderEnv(env)) return false;
   const nodeEnv = (env.NODE_ENV ?? '').trim().toLowerCase();
   const appEnv = (env.APP_ENV ?? '').trim().toLowerCase();
-  if (nodeEnv === 'production' || appEnv === 'production') return false;
-  return true;
+  if (envFlagTrue(env, 'PLAYWRIGHT') || appEnv === 'test' || nodeEnv === 'test') return true;
+  if ((env.RUN_SEED ?? '').trim().toLowerCase() !== 'true') return false;
+  return appEnv === 'development' || nodeEnv === 'development';
 }
 
 /** @deprecated use isFakeUserSeedAllowed */
@@ -189,6 +205,24 @@ export function isTestOtpModeEnabled(): boolean {
 export function isSeedDemoPhone(phone: string): boolean {
   const normalized = normalizeTestOtpPhone(phone);
   return SEED_DEMO_PHONE_RE.test(normalized) || DEFAULT_TEST_OTP_PHONE_SET.has(normalized);
+}
+
+/**
+ * Real superadmin bootstrap phone. Set BOOTSTRAP_SUPERADMIN_PHONE in prod to create
+ * one account — never a demo +2439000000xx / admin123 fixture.
+ */
+export function resolveBootstrapSuperadminPhone(env: NodeJS.ProcessEnv = process.env): string | null {
+  const phone = (env.BOOTSTRAP_SUPERADMIN_PHONE ?? '').trim();
+  if (!phone) return null;
+  const normalized = normalizeTestOtpPhone(phone);
+  if (!normalized || isSeedDemoPhone(normalized)) {
+    // eslint-disable-next-line no-console
+    console.error(
+      'FORBIDDEN: BOOTSTRAP_SUPERADMIN_PHONE must not be a demo +2439000000xx number (no admin123 / fake staff).',
+    );
+    return null;
+  }
+  return normalized;
 }
 
 /**

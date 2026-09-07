@@ -14,9 +14,6 @@
     "prisma:deploy": "prisma migrate deploy",
     "prisma:seed": "ts-node prisma/seed.ts"
   },
-  "prisma": {
-    "seed": "ts-node prisma/seed.ts"
-  },
   "dependencies": {
     "@mova/shared": "file:../../packages/shared",
     "@nestjs/common": "^10.0.0",

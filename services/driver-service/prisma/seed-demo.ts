@@ -195,7 +195,9 @@ async function ensureExtraVehicle(
 
 async function main() {
   if (!isFakeUserSeedAllowed()) {
-    console.log('Driver demo seed skipped (production / RUN_SEED=false / SKIP_DEMO_SEED).');
+    console.error(
+      'FORBIDDEN: production/Render driver demo seed is skipped. Local only: APP_ENV=development AND RUN_SEED=true.',
+    );
     return;
   }
   const prisma = new PrismaClient();

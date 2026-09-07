@@ -1,3 +1,8 @@
+/**
+ * Ride catalog seed.
+ * FORBIDDEN in production / Render: never create Chez Flore / demo vehicles / +2439000000xx owners.
+ * Local: APP_ENV=development RUN_SEED=true npm run prisma:seed
+ */
 import { PrismaClient, VehicleType } from '@prisma/client';
 import { isFakeUserSeedAllowed, KINSHASA_COMMUNES } from '@mova/shared';
 const prisma = new PrismaClient();
@@ -224,7 +229,9 @@ async function main() {
   }
 
   if (!isFakeUserSeedAllowed()) {
-    console.log('Ride catalog seed complete (communes, tarifs). Demo restaurants/vehicles skipped.');
+    console.error(
+      'FORBIDDEN: production/Render seed of fake catalog (Chez Flore, +2439000000xx owners) is skipped. Communes/tarifs only. Local catalog: APP_ENV=development AND RUN_SEED=true.',
+    );
     return;
   }
 

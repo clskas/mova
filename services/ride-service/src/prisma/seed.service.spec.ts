@@ -12,9 +12,27 @@ describe('isDemoCatalogSeedEnabled', () => {
     expect(isDemoCatalogSeedEnabled({ NODE_ENV: 'production', SEED_DEMO_CATALOG: 'true' })).toBe(false);
   });
 
-  it('runs only when SEED_DEMO_CATALOG=true outside production', () => {
-    expect(isDemoCatalogSeedEnabled({ SEED_DEMO_CATALOG: 'true' })).toBe(true);
-    expect(isDemoCatalogSeedEnabled({ NODE_ENV: 'development', SEED_DEMO_CATALOG: 'true' })).toBe(true);
+  it('runs only when SEED_DEMO_CATALOG=true AND local RUN_SEED=true', () => {
+    expect(isDemoCatalogSeedEnabled({ SEED_DEMO_CATALOG: 'true' })).toBe(false);
+    expect(isDemoCatalogSeedEnabled({ NODE_ENV: 'development', SEED_DEMO_CATALOG: 'true' })).toBe(false);
+    expect(
+      isDemoCatalogSeedEnabled({
+        APP_ENV: 'development',
+        RUN_SEED: 'true',
+        SEED_DEMO_CATALOG: 'true',
+      }),
+    ).toBe(true);
+  });
+
+  it('never runs on Render even with RUN_SEED=true', () => {
+    expect(
+      isDemoCatalogSeedEnabled({
+        APP_ENV: 'development',
+        RUN_SEED: 'true',
+        SEED_DEMO_CATALOG: 'true',
+        RENDER: 'true',
+      }),
+    ).toBe(false);
   });
 
   it('respects SKIP_DEMO_SEED', () => {

@@ -1,6 +1,8 @@
 import { PrismaClient, UserRole, UserStatus } from '@prisma/client';
 import { isFakeUserSeedAllowed } from '@mova/shared';
 
+/** FORBIDDEN in production / Render: Marie Kabila, Jean Mukendi, +2439000000xx. Local: APP_ENV=development RUN_SEED=true. */
+
 /** Fixed IDs so driver/ride demo seeds can reference the same users across DBs. */
 export const DEMO_USER_IDS = {
   passenger1: '11111111-1111-1111-1111-111111111101',
@@ -72,7 +74,9 @@ const DEMO_USERS = [
 
 async function main() {
   if (!isFakeUserSeedAllowed()) {
-    console.log('Auth demo users skipped (production / RUN_SEED=false / SKIP_DEMO_SEED).');
+    console.error(
+      'FORBIDDEN: production/Render seed of fake phones (Marie Kabila, Jean Mukendi, +2439000000xx) is skipped. Local only: APP_ENV=development AND RUN_SEED=true.',
+    );
     return;
   }
   const prisma = new PrismaClient();

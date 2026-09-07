@@ -28,6 +28,6 @@ COPY --from=builder /app/services/driver-service/node_modules/.prisma ./node_mod
 COPY --from=builder /app/services/driver-service/prisma ./prisma
 COPY scripts/backup-db.sh scripts/migrate-with-backup.sh /app/scripts/
 RUN chmod +x /app/scripts/*.sh
-ENV NODE_ENV=production MOVA_SERVICE=drivers
+ENV NODE_ENV=production APP_ENV=production MOVA_SERVICE=drivers
 EXPOSE 3000
 CMD ["sh", "-c", "/app/scripts/migrate-with-backup.sh && node dist/main.js"]

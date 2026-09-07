@@ -2,6 +2,12 @@
 # Usage: .\scripts\seed-test-data.ps1
 
 $ErrorActionPreference = "Stop"
+if ($env:NODE_ENV -eq "production" -or $env:APP_ENV -eq "production" -or $env:SKIP_DEMO_SEED -eq "true") {
+  Write-Host "FORBIDDEN: skipping test-data seed (production / SKIP_DEMO_SEED)."
+  exit 0
+}
+if (-not $env:APP_ENV) { $env:APP_ENV = "development" }
+if (-not $env:RUN_SEED) { $env:RUN_SEED = "true" }
 $root = Split-Path -Parent $PSScriptRoot
 $compose = Join-Path $root "docker-compose.yml"
 $pgHost = if ($env:POSTGRES_HOST) { $env:POSTGRES_HOST } else { "localhost:54320" }

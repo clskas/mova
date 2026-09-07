@@ -24,7 +24,9 @@ export class WalletSeedService implements OnModuleInit {
     if (hubMode === 'true' || hubMode === '1' || hubMode === 'yes') return;
     if (this.config.get('MOCK_PAYMENTS') !== 'true') return;
     if (!isFakeUserSeedAllowed()) {
-      this.logger.log('Wallet demo seed skipped (production / RUN_SEED=false / SKIP_DEMO_SEED)');
+      this.logger.log(
+        'FORBIDDEN: wallet demo seed skipped (production / Render / missing APP_ENV=development+RUN_SEED=true)',
+      );
       return;
     }
     for (const demo of DEMO_WALLET_CREDITS) {

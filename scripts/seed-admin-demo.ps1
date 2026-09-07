@@ -4,10 +4,12 @@
 
 $ErrorActionPreference = "Stop"
 
-if ($env:NODE_ENV -eq "production" -or $env:SKIP_DEMO_SEED -eq "true") {
-  Write-Host "Skipping demo dataset seed (NODE_ENV=production or SKIP_DEMO_SEED). Real users are not touched."
+if ($env:NODE_ENV -eq "production" -or $env:APP_ENV -eq "production" -or $env:SKIP_DEMO_SEED -eq "true") {
+  Write-Host "FORBIDDEN: skipping demo dataset seed (production / SKIP_DEMO_SEED). Real users are not touched."
   exit 0
 }
+if (-not $env:APP_ENV) { $env:APP_ENV = "development" }
+if (-not $env:RUN_SEED) { $env:RUN_SEED = "true" }
 $root = Split-Path -Parent $PSScriptRoot
 
 $pgHost = if ($env:POSTGRES_HOST) { $env:POSTGRES_HOST } else { "localhost:54320" }

@@ -1,4 +1,5 @@
 import { PrismaClient, UserRole, UserStatus } from '@prisma/client';
+import { isFakeUserSeedAllowed } from '@mova/shared';
 
 /** Fixed IDs so driver/ride demo seeds can reference the same users across DBs. */
 export const DEMO_USER_IDS = {
@@ -70,9 +71,8 @@ const DEMO_USERS = [
 ];
 
 async function main() {
-  const skip = (process.env.SKIP_DEMO_SEED ?? '').trim().toLowerCase();
-  if (skip === 'true' || skip === '1' || skip === 'yes' || process.env.NODE_ENV === 'production') {
-    console.log('Auth demo users skipped (NODE_ENV=production or SKIP_DEMO_SEED).');
+  if (!isFakeUserSeedAllowed()) {
+    console.log('Auth demo users skipped (production / RUN_SEED=false / SKIP_DEMO_SEED).');
     return;
   }
   const prisma = new PrismaClient();

@@ -128,7 +128,11 @@ class HelpScreen extends ConsumerWidget {
             subtitle: 'CGU SENGA RDC',
             onTap: () => _open(
               context,
-              const LegalScreen(title: 'CGU', asset: 'assets/legal/cgu_fr.md'),
+              const LegalScreen(
+                title: 'CGU',
+                asset: 'assets/legal/cgu_fr.md',
+                apiPath: '/public/cgu',
+              ),
             ),
           ),
           _HelpLink(

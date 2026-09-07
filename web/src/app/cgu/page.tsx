@@ -8,7 +8,55 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
 };
 
-export default function CguPage() {
+type PublishedCgu = { title?: string; version?: string; body?: string; format?: string };
+
+async function loadPublishedCgu(): Promise<PublishedCgu | null> {
+  const raw = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000").trim();
+  const base = raw.replace(/\/+$/, "").replace(/\/api$/i, "");
+  try {
+    const res = await fetch(`${base}/api/public/cgu`, { next: { revalidate: 120 } });
+    if (!res.ok) return null;
+    return (await res.json()) as PublishedCgu;
+  } catch {
+    return null;
+  }
+}
+
+export default async function CguPage() {
+  const published = await loadPublishedCgu();
+  if (published?.body?.trim()) {
+    return (
+      <main className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
+        <p className="mb-6 text-sm text-[var(--mova-violet)]">
+          <Link href="/" className="hover:underline">
+            ← SENGA
+          </Link>
+          {" · "}
+          <Link href="/privacy" className="hover:underline">
+            Confidentialité
+          </Link>
+        </p>
+        <article className="space-y-6 text-[15px] leading-relaxed text-[var(--foreground)]">
+          <header className="space-y-2 border-b border-black/10 pb-6">
+            <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+              {published.title ?? "Conditions Générales d'Utilisation — SENGA RDC"}
+            </h1>
+            {published.version && (
+              <p>
+                <strong>Version :</strong> {published.version}
+              </p>
+            )}
+          </header>
+          {published.format === "html" ? (
+            <div dangerouslySetInnerHTML={{ __html: published.body }} />
+          ) : (
+            <div className="whitespace-pre-wrap">{published.body}</div>
+          )}
+        </article>
+      </main>
+    );
+  }
+
   return (
     <main className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
       <p className="mb-6 text-sm text-[var(--mova-violet)]">

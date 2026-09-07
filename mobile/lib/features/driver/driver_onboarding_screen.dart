@@ -876,7 +876,11 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
             onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute(
-                  builder: (_) => const LegalScreen(title: 'CGU', asset: 'assets/legal/cgu_fr.md'),
+                  builder: (_) => const LegalScreen(
+                    title: 'CGU',
+                    asset: 'assets/legal/cgu_fr.md',
+                    apiPath: '/public/cgu',
+                  ),
                 ),
               );
             },

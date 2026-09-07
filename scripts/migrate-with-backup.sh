@@ -38,3 +38,4 @@ fi
 
 echo "=== prisma migrate deploy ==="
 ./node_modules/.bin/prisma migrate deploy
+# Never run `prisma db seed` here — production must not create demo users.

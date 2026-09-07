@@ -1,5 +1,5 @@
 import { PrismaClient, VehicleType } from '@prisma/client';
-import { KINSHASA_COMMUNES } from '@mova/shared';
+import { isFakeUserSeedAllowed, KINSHASA_COMMUNES } from '@mova/shared';
 const prisma = new PrismaClient();
 
 const KINSHASA_RESTAURANTS = [
@@ -223,10 +223,7 @@ async function main() {
     await prisma.cancellationPolicy.upsert({ where: { vehicleType: p.vehicleType }, create: p, update: p });
   }
 
-  const skipDemo =
-    process.env.NODE_ENV === 'production' ||
-    ['true', '1', 'yes'].includes((process.env.SKIP_DEMO_SEED ?? '').trim().toLowerCase());
-  if (skipDemo) {
+  if (!isFakeUserSeedAllowed()) {
     console.log('Ride catalog seed complete (communes, tarifs). Demo restaurants/vehicles skipped.');
     return;
   }

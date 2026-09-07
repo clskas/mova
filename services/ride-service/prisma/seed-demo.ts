@@ -1,4 +1,5 @@
 import { DeliveryStatus, DeliveryType, PrismaClient, RideStatus, ScheduledRideStatus, VehicleType, WeightCategory } from '@prisma/client';
+import { isFakeUserSeedAllowed } from '@mova/shared';
 
 const AUTH_SERVICE_URL = process.env.AUTH_SERVICE_URL ?? 'http://localhost:3011';
 const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY ?? 'mova-internal-dev';
@@ -20,9 +21,8 @@ async function userIdByPhone(phone: string): Promise<string | null> {
 }
 
 async function main() {
-  const skip = (process.env.SKIP_DEMO_SEED ?? '').trim().toLowerCase();
-  if (skip === 'true' || skip === '1' || skip === 'yes' || process.env.NODE_ENV === 'production') {
-    console.log('Ride demo seed skipped (NODE_ENV=production or SKIP_DEMO_SEED).');
+  if (!isFakeUserSeedAllowed()) {
+    console.log('Ride demo seed skipped (production / RUN_SEED=false / SKIP_DEMO_SEED).');
     return;
   }
   const prisma = new PrismaClient();

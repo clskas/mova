@@ -26,6 +26,7 @@ import {
   WalletIcon,
   AccountIcon,
   ContactsIcon,
+  CguIcon,
 } from "@/components/AdminIcons";
 import { DemoBadge } from "@/components/ui";
 import { checkGatewayHealth } from "@/lib/api";
@@ -38,6 +39,7 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   "/chauffeurs": DriversIcon,
   "/kyc": KycIcon,
   "/contacts": ContactsIcon,
+  "/cgu": CguIcon,
   "/courses": RidesIcon,
   "/livraisons": DeliveriesIcon,
   "/restaurants": RestaurantsIcon,

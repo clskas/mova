@@ -51,4 +51,13 @@ describe('admin-rbac', () => {
     expect(hasAdminPermission(UserRole.FINANCE, AdminPermission.CONTACTS_READ)).toBe(false);
     expect(hasAdminPermission(UserRole.CONTENT, AdminPermission.CONTACTS_READ)).toBe(false);
   });
+
+  it('CGU : SUPER_ADMIN et ADMIN seulement', () => {
+    expect(hasAdminPermission(UserRole.SUPER_ADMIN, AdminPermission.CGU_READ)).toBe(true);
+    expect(hasAdminPermission(UserRole.SUPER_ADMIN, AdminPermission.CGU_WRITE)).toBe(true);
+    expect(hasAdminPermission(UserRole.ADMIN, AdminPermission.CGU_READ)).toBe(true);
+    expect(hasAdminPermission(UserRole.ADMIN, AdminPermission.CGU_WRITE)).toBe(true);
+    expect(hasAdminPermission(UserRole.SUPPORT, AdminPermission.CGU_READ)).toBe(false);
+    expect(hasAdminPermission(UserRole.CONTENT, AdminPermission.CGU_WRITE)).toBe(false);
+  });
 });

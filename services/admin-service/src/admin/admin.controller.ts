@@ -453,6 +453,48 @@ export class AdminController {
     return this.adminService.deleteCompanyContact(id);
   }
 
+  @Get('cgu')
+  @RequirePermissions(AdminPermission.CGU_READ)
+  @ApiOperation({ summary: 'Liste des versions CGU' })
+  listCgu() {
+    return this.adminService.listCgu();
+  }
+
+  @Post('cgu')
+  @RequirePermissions(AdminPermission.CGU_WRITE)
+  @ApiOperation({ summary: 'Créer une version CGU' })
+  createCgu(@Body() body: Record<string, unknown>) {
+    return this.adminService.createCgu(body);
+  }
+
+  @Patch('cgu/:id')
+  @RequirePermissions(AdminPermission.CGU_WRITE)
+  @ApiOperation({ summary: 'Modifier une version CGU' })
+  updateCgu(@Param('id') id: string, @Body() body: Record<string, unknown>) {
+    return this.adminService.updateCgu(id, body);
+  }
+
+  @Post('cgu/:id/publish')
+  @RequirePermissions(AdminPermission.CGU_WRITE)
+  @ApiOperation({ summary: 'Publier une version CGU' })
+  publishCgu(@Param('id') id: string) {
+    return this.adminService.publishCgu(id);
+  }
+
+  @Post('cgu/:id/unpublish')
+  @RequirePermissions(AdminPermission.CGU_WRITE)
+  @ApiOperation({ summary: 'Retirer une version CGU de la publication' })
+  unpublishCgu(@Param('id') id: string) {
+    return this.adminService.unpublishCgu(id);
+  }
+
+  @Delete('cgu/:id')
+  @RequirePermissions(AdminPermission.CGU_WRITE)
+  @ApiOperation({ summary: 'Supprimer une version CGU non publiée' })
+  deleteCgu(@Param('id') id: string) {
+    return this.adminService.deleteCgu(id);
+  }
+
   @Get('pricing-rules')
   @RequirePermissions(AdminPermission.PRICING_READ)
   @ApiOperation({ summary: 'Règles tarifaires véhicules' })

@@ -13,9 +13,10 @@ import { TrackingModule } from '../tracking/tracking.module';
 import { PublicitesModule } from '../publicites/publicites.module';
 import { PartnerKycModule } from '../partner-kyc/partner-kyc.module';
 import { CompanyContactsModule } from '../company-contacts/company-contacts.module';
+import { LegalDocumentsModule } from '../legal-documents/legal-documents.module';
 
 @Module({
-  imports: [PrismaModule, RidesModule, DeliveriesModule, ErrandsModule, GeoModule, CarpoolModule, MovingModule, RentalModule, TrackingModule, PublicitesModule, PartnerKycModule, CompanyContactsModule],
+  imports: [PrismaModule, RidesModule, DeliveriesModule, ErrandsModule, GeoModule, CarpoolModule, MovingModule, RentalModule, TrackingModule, PublicitesModule, PartnerKycModule, CompanyContactsModule, LegalDocumentsModule],
   controllers: [InternalController],
   providers: [PaymentInfoService],
   exports: [PaymentInfoService],

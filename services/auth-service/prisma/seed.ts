@@ -1,4 +1,5 @@
 import { PrismaClient, UserRole } from '@prisma/client';
+import { isFakeUserSeedAllowed } from '@mova/shared';
 
 const ADMIN_PHONE = process.env.ADMIN_PHONE ?? '+243900000001';
 const ADMIN_ROLE = (process.env.ADMIN_ROLE as UserRole) ?? UserRole.SUPER_ADMIN;
@@ -6,13 +7,12 @@ const OWNER_SUPER_ADMIN_PHONE = process.env.OWNER_SUPER_ADMIN_PHONE ?? '+2439711
 const RESTAURANT_PHONE = process.env.RESTAURANT_PHONE ?? '+243900000030';
 const RENTAL_PARTNER_PHONE = process.env.RENTAL_PARTNER_PHONE ?? '+243900000031';
 
-function skipDemoUsers(): boolean {
-  const v = (process.env.SKIP_DEMO_SEED ?? '').trim().toLowerCase();
-  if (v === 'true' || v === '1' || v === 'yes') return true;
-  return process.env.NODE_ENV === 'production';
-}
-
 async function main() {
+  if (!isFakeUserSeedAllowed()) {
+    console.log('Seed skipped: fake users disabled in production (APP_ENV=development for local, RUN_SEED=false / SKIP_DEMO_SEED in prod).');
+    return;
+  }
+
   const prisma = new PrismaClient();
   const owner = await prisma.user.upsert({
     where: { phone: OWNER_SUPER_ADMIN_PHONE },
@@ -25,14 +25,6 @@ async function main() {
     },
     update: { role: UserRole.SUPER_ADMIN, email: 'celestinkas@gmail.com' },
   });
-  console.log(`Owner superadmin ready: ${owner.phone} (${owner.role})`);
-
-  if (skipDemoUsers()) {
-    console.log('Demo users skipped (NODE_ENV=production or SKIP_DEMO_SEED). Cities/catalog seeds are unchanged.');
-    await prisma.$disconnect();
-    return;
-  }
-
   const user = await prisma.user.upsert({
     where: { phone: ADMIN_PHONE },
     create: { phone: ADMIN_PHONE, role: ADMIN_ROLE, firstName: 'Admin', lastName: 'SENGA' },
@@ -58,6 +50,7 @@ async function main() {
     },
     update: { role: UserRole.RENTAL_PARTNER },
   });
+  console.log(`Owner superadmin ready: ${owner.phone} (${owner.role})`);
   console.log(`Admin user ready: ${user.phone} (${user.role})`);
   console.log(`Restaurant user ready: ${restaurantUser.phone} (${restaurantUser.id})`);
   console.log(`Rental partner ready: ${rentalPartner.phone} (${rentalPartner.id})`);

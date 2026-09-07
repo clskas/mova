@@ -7,16 +7,27 @@ import { HttpStatus } from '@nestjs/common';
 import { toMobileRideStatus } from '@mova/shared';
 import { TrackingService } from '../tracking/tracking.service';
 import { buildMobileAppVersionResponse } from './app-version';
+import { LegalDocumentsService } from '../legal-documents/legal-documents.service';
 
 @ApiTags('public')
 @Controller('public')
 export class PublicController {
-  constructor(private prisma: PrismaService, private tracking: TrackingService) {}
+  constructor(
+    private prisma: PrismaService,
+    private tracking: TrackingService,
+    private legalDocuments: LegalDocumentsService,
+  ) {}
 
   @Get('app-version')
   @ApiOperation({ summary: 'Versions courantes / minimales (apps mobiles + web)' })
   getAppVersion() {
     return buildMobileAppVersionResponse();
+  }
+
+  @Get('cgu')
+  @ApiOperation({ summary: 'CGU publiées (markdown / HTML / texte)' })
+  getCgu() {
+    return this.legalDocuments.getPublished();
   }
 
   @Get('trips/:token')

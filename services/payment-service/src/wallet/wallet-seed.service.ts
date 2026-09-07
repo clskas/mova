@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { isFakeUserSeedAllowed } from '@mova/shared';
 import { WalletService } from './wallet.service';
 
 /** Soldes de test pour comptes démo lorsque MOCK_PAYMENTS=true. */
@@ -22,9 +23,8 @@ export class WalletSeedService implements OnModuleInit {
     const hubMode = (this.config.get('AFRISOFT_PAY_HUB_MODE') ?? '').trim().toLowerCase();
     if (hubMode === 'true' || hubMode === '1' || hubMode === 'yes') return;
     if (this.config.get('MOCK_PAYMENTS') !== 'true') return;
-    const skip = (this.config.get('SKIP_DEMO_SEED') ?? '').toString().trim().toLowerCase();
-    if (this.config.get('NODE_ENV') === 'production' || skip === 'true' || skip === '1' || skip === 'yes') {
-      this.logger.log('Wallet demo seed skipped (production / SKIP_DEMO_SEED)');
+    if (!isFakeUserSeedAllowed()) {
+      this.logger.log('Wallet demo seed skipped (production / RUN_SEED=false / SKIP_DEMO_SEED)');
       return;
     }
     for (const demo of DEMO_WALLET_CREDITS) {

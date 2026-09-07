@@ -20,4 +20,8 @@ describe('isDemoCatalogSeedEnabled', () => {
   it('respects SKIP_DEMO_SEED', () => {
     expect(isDemoCatalogSeedEnabled({ SEED_DEMO_CATALOG: 'true', SKIP_DEMO_SEED: 'true' })).toBe(false);
   });
+
+  it('respects RUN_SEED=false', () => {
+    expect(isDemoCatalogSeedEnabled({ SEED_DEMO_CATALOG: 'true', RUN_SEED: 'false' })).toBe(false);
+  });
 });

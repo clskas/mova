@@ -1,4 +1,5 @@
 import { PrismaClient, UserRole } from '@prisma/client';
+import { isFakeUserSeedAllowed } from '@mova/shared';
 
 /** Staff demo accounts for local RBAC testing (OTP 123456 with MOCK_OTP=true). */
 export const STAFF_DEMO_ACCOUNTS = [
@@ -10,23 +11,8 @@ export const STAFF_DEMO_ACCOUNTS = [
 ] as const;
 
 async function main() {
-  const skip = (process.env.SKIP_DEMO_SEED ?? '').trim().toLowerCase();
-  if (skip === 'true' || skip === '1' || skip === 'yes' || process.env.NODE_ENV === 'production') {
-    console.log('Demo staff accounts skipped (NODE_ENV=production or SKIP_DEMO_SEED).');
-    const prisma = new PrismaClient();
-    const owner = await prisma.user.upsert({
-      where: { phone: '+243971163574' },
-      create: {
-        phone: '+243971163574',
-        role: UserRole.SUPER_ADMIN,
-        firstName: 'Super',
-        lastName: 'Admin',
-        email: 'celestinkas@gmail.com',
-      },
-      update: { role: UserRole.SUPER_ADMIN, email: 'celestinkas@gmail.com' },
-    });
-    console.log(`Owner superadmin ready: ${owner.phone} (${owner.role})`);
-    await prisma.$disconnect();
+  if (!isFakeUserSeedAllowed()) {
+    console.log('Demo staff accounts skipped (production / RUN_SEED=false / SKIP_DEMO_SEED).');
     return;
   }
 

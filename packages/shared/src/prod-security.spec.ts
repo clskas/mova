@@ -285,6 +285,7 @@ describe('prod-security', () => {
     expect(isFakeUserSeedAllowed({ NODE_ENV: 'production', APP_ENV: 'development' })).toBe(false);
     expect(isFakeUserSeedAllowed({ NODE_ENV: 'development', SKIP_DEMO_SEED: 'true' })).toBe(false);
     expect(isFakeUserSeedAllowed({ NODE_ENV: 'development' })).toBe(true);
+    expect(isFakeUserSeedAllowed({ NODE_ENV: 'development', SKIP_DEMO_SEED: 'true' })).toBe(false);
     expect(isFakeUserSeedAllowed({})).toBe(true);
   });
 });

@@ -208,3 +208,13 @@ export function ContactsIcon({ className }: IconProps) {
     </Svg>
   );
 }
+
+export function CguIcon({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <path d="M7 3h7l5 5v13H7z" />
+      <path d="M14 3v5h5" />
+      <path d="M10 12h6M10 16h6" />
+    </Svg>
+  );
+}

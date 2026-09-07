@@ -376,6 +376,19 @@ export type CompanyContact = {
   updatedAt?: string;
 };
 
+export type LegalDocument = {
+  id: string;
+  slug: string;
+  version: string;
+  title: string;
+  body: string;
+  format: "markdown" | "html" | "plain" | string;
+  isPublished: boolean;
+  publishedAt?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
 export type PricingRule = {
   id?: string;
   vehicleType: string;
@@ -977,6 +990,31 @@ function mockFor<T>(path: string, init?: RequestInit): T {
         notes: "Lun–Sam 8h–20h",
         isPublic: true,
         sortOrder: 0,
+      },
+    ] as T;
+  }
+  if (path.includes("/cgu") && path.includes("/unpublish") && method === "POST") {
+    return { id: "cgu-1", slug: "cgu", isPublished: false, ...body } as T;
+  }
+  if (path.includes("/cgu") && path.includes("/publish") && method === "POST") {
+    return { id: "cgu-1", slug: "cgu", isPublished: true, publishedAt: new Date().toISOString(), ...body } as T;
+  }
+  if (path.includes("/cgu") && method === "POST") {
+    return { id: "cgu-new", slug: "cgu", isPublished: false, ...body } as T;
+  }
+  if (path.includes("/cgu") && (method === "PATCH" || method === "DELETE")) {
+    return { id: path.split("/").pop(), ...body, success: true } as T;
+  }
+  if (path.includes("/cgu")) {
+    return [
+      {
+        id: "cgu-1",
+        slug: "cgu",
+        version: "1.0",
+        title: "Conditions Générales d'Utilisation — SENGA RDC",
+        body: "Texte CGU",
+        format: "markdown",
+        isPublished: true,
       },
     ] as T;
   }
@@ -2098,6 +2136,36 @@ export async function saveCompanyContact(data: Partial<CompanyContact>, id?: str
 
 export async function deleteCompanyContact(id: string) {
   return apiFetch(`/api/admin/company-contacts/${id}`, { method: "DELETE" });
+}
+
+export async function fetchCguVersions(): Promise<LegalDocument[]> {
+  const raw = await apiFetch<LegalDocument[]>("/api/admin/cgu");
+  return Array.isArray(raw) ? raw : [];
+}
+
+export async function saveCgu(data: Partial<LegalDocument>, id?: string) {
+  if (id) {
+    return apiFetch<LegalDocument>(`/api/admin/cgu/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    });
+  }
+  return apiFetch<LegalDocument>("/api/admin/cgu", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function publishCgu(id: string) {
+  return apiFetch<LegalDocument>(`/api/admin/cgu/${id}/publish`, { method: "POST" });
+}
+
+export async function unpublishCgu(id: string) {
+  return apiFetch<LegalDocument>(`/api/admin/cgu/${id}/unpublish`, { method: "POST" });
+}
+
+export async function deleteCgu(id: string) {
+  return apiFetch(`/api/admin/cgu/${id}`, { method: "DELETE" });
 }
 
 export async function fetchCurrentUser(): Promise<AdminSessionUser> {

@@ -38,6 +38,7 @@ import { TrackingService } from '../tracking/tracking.service';
 import { PublicitesService } from '../publicites/publicites.service';
 import { PartnerKycService } from '../partner-kyc/partner-kyc.service';
 import { CompanyContactsService } from '../company-contacts/company-contacts.service';
+import { LegalDocumentsService } from '../legal-documents/legal-documents.service';
 
 @ApiTags('internal')
 @Controller('internal')
@@ -65,6 +66,7 @@ export class InternalController {
     private publicites: PublicitesService,
     private partnerKyc: PartnerKycService,
     private companyContacts: CompanyContactsService,
+    private legalDocuments: LegalDocumentsService,
   ) {}
 
   @Get('fraud/signals')
@@ -374,6 +376,36 @@ export class InternalController {
   @Delete('company-contacts/:id')
   deleteCompanyContact(@Param('id') id: string) {
     return this.companyContacts.remove(id);
+  }
+
+  @Get('cgu')
+  listCgu() {
+    return this.legalDocuments.listAdmin();
+  }
+
+  @Post('cgu')
+  createCgu(@Body() body: Record<string, unknown>) {
+    return this.legalDocuments.create(body as { version?: string; title?: string; body?: string; format?: string });
+  }
+
+  @Patch('cgu/:id')
+  updateCgu(@Param('id') id: string, @Body() body: Record<string, unknown>) {
+    return this.legalDocuments.update(id, body as { version?: string; title?: string; body?: string; format?: string });
+  }
+
+  @Post('cgu/:id/publish')
+  publishCgu(@Param('id') id: string) {
+    return this.legalDocuments.publish(id);
+  }
+
+  @Post('cgu/:id/unpublish')
+  unpublishCgu(@Param('id') id: string) {
+    return this.legalDocuments.unpublish(id);
+  }
+
+  @Delete('cgu/:id')
+  deleteCgu(@Param('id') id: string) {
+    return this.legalDocuments.remove(id);
   }
 
   @Get('pricing-rules')

@@ -427,6 +427,25 @@ export class AdminService {
     return this.proxy('ride', `/internal/company-contacts/${id}`, { method: 'DELETE' });
   }
 
+  listCgu() {
+    return this.fetchJson('ride', '/internal/cgu');
+  }
+  createCgu(body: Record<string, unknown>) {
+    return this.proxy('ride', '/internal/cgu', { method: 'POST', body: JSON.stringify(body) });
+  }
+  updateCgu(id: string, body: Record<string, unknown>) {
+    return this.proxy('ride', `/internal/cgu/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
+  }
+  publishCgu(id: string) {
+    return this.proxy('ride', `/internal/cgu/${id}/publish`, { method: 'POST' });
+  }
+  unpublishCgu(id: string) {
+    return this.proxy('ride', `/internal/cgu/${id}/unpublish`, { method: 'POST' });
+  }
+  deleteCgu(id: string) {
+    return this.proxy('ride', `/internal/cgu/${id}`, { method: 'DELETE' });
+  }
+
   listPricingRules(city?: string) {
     const q = city ? `?city=${encodeURIComponent(city)}` : '';
     return this.fetchJson('ride', `/internal/pricing-rules${q}`);

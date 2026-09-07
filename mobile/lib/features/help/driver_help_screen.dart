@@ -79,7 +79,11 @@ class DriverHelpScreen extends ConsumerWidget {
             trailing: const Icon(Icons.chevron_right),
             onTap: () => _open(
               context,
-              const LegalScreen(title: 'CGU', asset: 'assets/legal/cgu_fr.md'),
+              const LegalScreen(
+                title: 'CGU',
+                asset: 'assets/legal/cgu_fr.md',
+                apiPath: '/public/cgu',
+              ),
             ),
           ),
           const SizedBox(height: 16),

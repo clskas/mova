@@ -35,6 +35,7 @@ services:
     environment:
       # Dockerfile defaults to NODE_ENV=production, which forbids MOCK_OTP and breaks Playwright.
       NODE_ENV: development
+      APP_ENV: development
       MOCK_OTP: "true"
       ALLOW_TEST_OTP: "true"
       DATABASE_URL: postgresql://mova:mova@postgres:5432/mova_auth
@@ -67,6 +68,7 @@ services:
       DATABASE_URL: postgresql://mova:mova@postgres:5432/mova_rides
       REDIS_URL: redis://redis:6379
       JWT_SECRET: local_dev_jwt_secret_32chars_min_ok
+      APP_ENV: development
       DRIVER_SERVICE_URL: http://driver-service:3000
       AUTH_SERVICE_URL: http://auth-service:3000
       INTERNAL_API_KEY: mova-internal-dev-key-24
@@ -126,6 +128,7 @@ services:
     environment:
       DATABASE_URL: postgresql://mova:mova@postgres:5432/mova_drivers
       JWT_SECRET: local_dev_jwt_secret_32chars_min_ok
+      APP_ENV: development
       AUTH_SERVICE_URL: http://auth-service:3000
       RIDE_SERVICE_URL: http://ride-service:3000
       PAYMENT_SERVICE_URL: http://payment-service:3000

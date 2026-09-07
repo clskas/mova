@@ -28,8 +28,9 @@ import { BillingModule } from './billing/billing.module';
 import { PlatformConfigModule } from './platform/platform-config.module';
 import { PublicitesModule } from './publicites/publicites.module';
 import { CompanyContactsModule } from './company-contacts/company-contacts.module';
+import { LegalDocumentsModule } from './legal-documents/legal-documents.module';
 
-@Module({ imports: [ConfigModule.forRoot({ isGlobal: true }), RedisModule, PrismaModule, PlatformConfigModule, HealthModule, AuthModule, RidesModule, DeliveriesModule, ServicesCatalogModule, CarpoolModule, ErrandsModule, RentalModule, GeoModule, RatingsModule, MatchingModule, WebsocketModule, InternalModule, HistoryModule, MovingModule, ExpressModule, UploadsModule, RestaurantModule, RentalPartnerModule, TrackingModule, PublicModule, PromoModule, BillingModule, PublicitesModule, CompanyContactsModule] })
+@Module({ imports: [ConfigModule.forRoot({ isGlobal: true }), RedisModule, PrismaModule, PlatformConfigModule, HealthModule, AuthModule, RidesModule, DeliveriesModule, ServicesCatalogModule, CarpoolModule, ErrandsModule, RentalModule, GeoModule, RatingsModule, MatchingModule, WebsocketModule, InternalModule, HistoryModule, MovingModule, ExpressModule, UploadsModule, RestaurantModule, RentalPartnerModule, TrackingModule, PublicModule, PromoModule, BillingModule, PublicitesModule, CompanyContactsModule, LegalDocumentsModule] })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
     consumer.apply(RequestIdMiddleware).forRoutes({ path: '*', method: RequestMethod.ALL });

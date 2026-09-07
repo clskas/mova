@@ -228,11 +228,31 @@ export const SERDIPAY_B2C_CHANNEL_DISABLED_FR =
 export const SERDIPAY_CHANNEL_DISABLED_FR =
   'Ce canal Mobile Money n’est pas activé pour le marchand. Contactez le support SENGA.';
 
+/** SerdiPay payment-client (B2C) checks merchant float, not the user SENGA wallet. */
+export const SERDIPAY_B2C_MERCHANT_FLOAT_LOW_FR =
+  'Le compte de versement n’a pas assez de fonds. Votre solde SENGA n’a pas été débité.';
+
 export function isSerdiPayChannelDisabledError(raw?: string): boolean {
   const lower = (raw ?? '').toLowerCase();
   return (
     lower.includes('not allowed to use this channel') ||
     (lower.includes('merchant is not allowed') && lower.includes('channel'))
+  );
+}
+
+/** Gateway English when the SerdiPay merchant disbursement wallet is empty / too low. */
+export function isSerdiPayMerchantFloatLowError(raw?: string): boolean {
+  const lower = (raw ?? '').toLowerCase();
+  if (isSerdiPayChannelDisabledError(raw)) return false;
+  return (
+    lower.includes('your balance is low') ||
+    lower.includes('balance is low') ||
+    lower.includes('low balance') ||
+    /\binsufficient (funds|balance|float)\b/.test(lower) ||
+    lower.includes('not enough funds') ||
+    lower.includes('not enough balance') ||
+    (lower.includes('merchant') &&
+      (lower.includes('float') || lower.includes('insufficient')))
   );
 }
 
@@ -254,6 +274,9 @@ export function mapSerdiPayPaymentFailure(
   }
   if (isSerdiPayChannelDisabledError(detail)) {
     return kind === 'c2b' ? SERDIPAY_CHANNEL_DISABLED_FR : SERDIPAY_B2C_CHANNEL_DISABLED_FR;
+  }
+  if (isSerdiPayMerchantFloatLowError(detail)) {
+    return SERDIPAY_B2C_MERCHANT_FLOAT_LOW_FR;
   }
   if (lower.includes('failed to process the payment') && !error?.trim()) {
     return 'Le paiement Mobile Money a été refusé. Vérifiez le montant (≥ 2 300 FC) et réessayez.';

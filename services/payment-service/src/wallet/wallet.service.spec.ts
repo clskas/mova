@@ -1,5 +1,6 @@
 import { ConfigService } from '@nestjs/config';
-import { WalletService } from './wallet.service';
+import { WalletService, __resetWithdrawOtpMemoryForTests } from './wallet.service';
+import { SERDIPAY_B2C_MERCHANT_FLOAT_LOW_FR, TEST_OTP_CODE } from '@mova/shared';
 
 describe('WalletService', () => {
   const tx = {
@@ -51,6 +52,7 @@ describe('WalletService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    __resetWithdrawOtpMemoryForTests();
     configGet.mockImplementation((key: string) => {
       if (key === 'MOCK_PAYMENTS') return 'true';
       if (key === 'NODE_ENV') return 'test';
@@ -226,7 +228,7 @@ describe('WalletService', () => {
     };
     const locked = new WalletService(prisma as never, config, redis as never);
     await expect(
-      locked.withdrawToMobileMoney('u1', 5000, 'ORANGE_MONEY', '+243970000001'),
+      locked.withdrawToMobileMoney('u1', 5000, 'ORANGE_MONEY', '+243970000001', { skipOtp: true }),
     ).rejects.toMatchObject({
       response: { message: expect.stringMatching(/déjà en cours/i) },
     });
@@ -293,5 +295,82 @@ describe('WalletService', () => {
       where: { id: 'w1' },
       data: { balanceCdf: { increment: 2300 } },
     });
+  });
+
+  it('autorise le retrait simulé après OTP envoyé au numéro de versement', async () => {
+    tx.$queryRaw.mockResolvedValue([{ id: 'w1', balanceCdf: 5000, heldBalanceCdf: 0 }]);
+    tx.wallet.update.mockResolvedValue({ id: 'w1', userId: 'u1', balanceCdf: 2700 });
+    const otp = await service.requestWithdrawOtp('u1', 2300, 'ORANGE_MONEY', '+243970000001');
+    expect(otp.phone).toBe('+243970000001');
+    expect(otp.message).toMatch(/243970000001/);
+    const result = await service.withdrawToMobileMoney('u1', 2300, 'ORANGE_MONEY', '+243970000001', {
+      otp: TEST_OTP_CODE,
+    });
+    expect(result.success).toBe(true);
+    expect(result.simulated).toBe(true);
+    expect(tx.wallet.update).toHaveBeenCalledTimes(1);
+  });
+
+  it('refuse un retrait B2C sans OTP', async () => {
+    await expect(
+      service.withdrawToMobileMoney('u1', 2300, 'ORANGE_MONEY', '+243970000001'),
+    ).rejects.toMatchObject({
+      response: { code: 'MOVA_AUTH_001' },
+    });
+    expect(tx.wallet.update).not.toHaveBeenCalled();
+  });
+
+  it('refuse un retrait si l’OTP a été envoyé vers un autre numéro', async () => {
+    await service.requestWithdrawOtp('u1', 2300, 'ORANGE_MONEY', '+243970000001');
+    await expect(
+      service.withdrawToMobileMoney('u1', 2300, 'ORANGE_MONEY', '+243810000002', {
+        otp: TEST_OTP_CODE,
+      }),
+    ).rejects.toMatchObject({
+      response: { message: expect.stringMatching(/ne correspond pas à ce numéro/i) },
+    });
+    expect(tx.wallet.update).not.toHaveBeenCalled();
+  });
+
+  it('ne double-débite pas si le B2C SerdiPay échoue (float marchand)', async () => {
+    configGet.mockImplementation((key: string) => {
+      if (key === 'NODE_ENV') return 'test';
+      if (key === 'PAY_HUB_URL') return 'https://pay.test.local';
+      if (key === 'AFRISOFT_HUB_APP_ID') return 'senga';
+      if (key === 'AFRISOFT_HUB_API_KEY') return 'test-key';
+      return undefined;
+    });
+    prisma.walletTransaction.findFirst.mockResolvedValue(null);
+    tx.$queryRaw
+      .mockResolvedValueOnce([{ id: 'w1', balanceCdf: 5000, heldBalanceCdf: 0 }])
+      .mockResolvedValueOnce([{ id: 'w1' }]);
+    tx.wallet.update
+      .mockResolvedValueOnce({ id: 'w1', userId: 'u1', balanceCdf: 2700 })
+      .mockResolvedValueOnce({ id: 'w1', userId: 'u1', balanceCdf: 5000 });
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 400,
+      json: async () => ({ message: 'Your Balance is low' }),
+    });
+    (global as unknown as { fetch: typeof fetch }).fetch = fetchMock as unknown as typeof fetch;
+
+    await expect(
+      service.withdrawToMobileMoney('u1', 2300, 'ORANGE_MONEY', '+243970000001', { skipOtp: true }),
+    ).rejects.toMatchObject({
+      response: { message: SERDIPAY_B2C_MERCHANT_FLOAT_LOW_FR },
+    });
+    expect(tx.wallet.update).toHaveBeenCalledWith({
+      where: { id: 'w1' },
+      data: { balanceCdf: { decrement: 2300 } },
+    });
+    expect(tx.wallet.update).toHaveBeenCalledWith({
+      where: { id: 'w1' },
+      data: { balanceCdf: { increment: 2300 } },
+    });
+    expect(tx.walletTransaction.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ type: 'CREDIT', amountCdf: 2300 }),
+      }),
+    );
   });
 });

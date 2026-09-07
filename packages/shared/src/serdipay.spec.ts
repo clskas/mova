@@ -2,11 +2,13 @@ import {
   mapSerdiPayPaymentFailure,
   mapSerdiPayTokenFailure,
   SERDIPAY_B2C_CHANNEL_DISABLED_FR,
+  SERDIPAY_B2C_MERCHANT_FLOAT_LOW_FR,
   SERDIPAY_CHANNEL_DISABLED_FR,
   SERDIPAY_MIN_AMOUNT_CDF,
   __resetSerdiPayTokenCache,
   isSerdiPayAuthConfigured,
   isSerdiPayChannelDisabledError,
+  isSerdiPayMerchantFloatLowError,
   isSerdiPayPaymentConfigured,
   isSerdiPaySmsConfigured,
   serdiPayDisburseMobileMoney,
@@ -201,8 +203,93 @@ describe('serdipay Public API', () => {
     const b2cBody = JSON.parse(fetchMock.mock.calls[1][1].body as string);
     expect(b2cBody.telecom).toBe('MP');
     expect(b2cBody.currency).toBe('CDF');
+    expect(b2cBody.amount).toBe(500);
     expect(b2cBody).not.toHaveProperty('channel');
     expect(b2cBody.channel).toBeUndefined();
+  });
+
+  it('B2C sends integer CDF (2300) not major units (2.30)', async () => {
+    env.SERDIPAY_EMAIL = 'm@example.com';
+    env.SERDIPAY_PASSWORD = 'secret';
+    env.SERDIPAY_API_ID = 'APIX';
+    env.SERDIPAY_API_PASSWORD = 'apipw';
+    env.SERDIPAY_MERCHANT_CODE = '466551';
+    env.SERDIPAY_MERCHANT_PIN = '1234';
+
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ access_token: 'tok-abc' }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 102,
+        json: async () => ({ message: 'ok', payment: { transactionId: 'SERD2300' } }),
+      });
+    (global as unknown as { fetch: typeof fetch }).fetch = fetchMock as unknown as typeof fetch;
+
+    await serdiPayDisburseMobileMoney(get, {
+      operator: 'ORANGE_MONEY',
+      amountCdf: 2300,
+      phone: '+243970000001',
+      reference: 'senga_withdraw_2300',
+    });
+    const body = JSON.parse(fetchMock.mock.calls[1][1].body as string);
+    expect(body.amount).toBe(2300);
+    expect(body.amount).not.toBe(2.3);
+    expect(body.currency).toBe('CDF');
+    expect(body.telecom).toBe('OM');
+    expect(body.clientPhone).toBe('243970000001');
+  });
+
+  it('maps SerdiPay merchant-float English to French (not the user SENGA wallet)', () => {
+    expect(isSerdiPayMerchantFloatLowError('Your Balance is low')).toBe(true);
+    expect(mapSerdiPayPaymentFailure(400, 'Your Balance is low', 'Your Balance is low', undefined, 'b2c')).toBe(
+      SERDIPAY_B2C_MERCHANT_FLOAT_LOW_FR,
+    );
+    expect(mapSerdiPayPaymentFailure(400, 'Failed to process the payment', 'Your Balance is low', undefined, 'b2c')).toBe(
+      SERDIPAY_B2C_MERCHANT_FLOAT_LOW_FR,
+    );
+    expect(SERDIPAY_B2C_MERCHANT_FLOAT_LOW_FR).toMatch(/compte de versement/i);
+    expect(SERDIPAY_B2C_MERCHANT_FLOAT_LOW_FR).toMatch(/n’a pas été débité|n'a pas été débité/);
+    expect(SERDIPAY_B2C_MERCHANT_FLOAT_LOW_FR).not.toMatch(/Your Balance is low/i);
+  });
+
+  it('surfaces merchant-float English from payment-client as French', async () => {
+    env.SERDIPAY_EMAIL = 'm@example.com';
+    env.SERDIPAY_PASSWORD = 'portal-pw';
+    env.SERDIPAY_API_ID = 'APIX';
+    env.SERDIPAY_MERCHANT_CODE = '466551';
+    env.SERDIPAY_MERCHANT_PIN = '1234';
+
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ access_token: 'tok-abc' }),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        json: async () => ({
+          message: 'Failed to process the payment',
+          error: 'Your Balance is low',
+        }),
+      });
+    (global as unknown as { fetch: typeof fetch }).fetch = fetchMock as unknown as typeof fetch;
+
+    const result = await serdiPayDisburseMobileMoney(get, {
+      operator: 'ORANGE_MONEY',
+      amountCdf: 2300,
+      phone: '+243970000001',
+      reference: 'senga_withdraw_float',
+    });
+    expect(result.success).toBe(false);
+    expect(result.message).toBe(SERDIPAY_B2C_MERCHANT_FLOAT_LOW_FR);
+    expect(result.message).not.toMatch(/Your Balance is low/i);
   });
 
   it('refuses SMS when SERDIPAY_SMS_API_ID/KEY unset', async () => {

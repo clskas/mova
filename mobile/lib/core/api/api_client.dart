@@ -545,7 +545,18 @@ class ApiClient {
     if (path.contains('/wallet/top-up') || path.contains('/wallet/topup')) {
       return Success(MockData.walletTopUp(body ?? {}));
     }
+    if (path.contains('/wallet/withdraw/otp') && method == 'POST') {
+      return Success(MockData.walletWithdrawOtp(body ?? {}));
+    }
     if (path.contains('/wallet/withdraw') && method == 'POST') {
+      final otp = body?['otp']?.toString() ?? '';
+      if (!RegExp(r'^\d{6}$').hasMatch(otp)) {
+        return const Failure(
+          ValidationFailure(
+            'Code OTP requis (6 chiffres envoyé au numéro Mobile Money).',
+          ),
+        );
+      }
       return Success(MockData.walletWithdraw(body ?? {}));
     }
     if (path == '/history' || path.startsWith('/history?')) {

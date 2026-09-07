@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mova/core/api/api_client.dart';
+import 'package:mova/core/api/mock_data.dart';
 import 'package:mova/core/theme/mova_theme.dart';
 import 'package:mova/features/wallet/wallet_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -42,5 +43,32 @@ void main() {
 
     expect(tester.takeException(), isNull);
     expect(find.text('25000'), findsOneWidget);
+  });
+
+  testWidgets('Withdraw requires OTP sent to the destination MM number', (tester) async {
+    tester.view.physicalSize = const Size(400, 1100);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    MockData.seedWalletForTest(5000);
+
+    await tester.pumpWidget(_testApp(const WalletScreen()));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    await tester.ensureVisible(find.text('Retirer vers Mobile Money'));
+    await tester.tap(find.text('Retirer vers Mobile Money'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('Envoyer le code SMS'), findsOneWidget);
+    expect(find.text('Confirmer le retrait'), findsNothing);
+
+    await tester.tap(find.text('Envoyer le code SMS'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('Code SMS (6 chiffres)'), findsOneWidget);
+    expect(find.text('Confirmer le retrait'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }

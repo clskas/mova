@@ -1,19 +1,29 @@
 import { HttpStatus, Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { randomUUID } from 'crypto';
+import { createHash, randomInt, randomUUID } from 'crypto';
 import {
   MOVA_PLATFORM_USER_ID,
   MovaErrorCode,
   MovaHttpException,
   RedisService,
+  SMS_UNAVAILABLE_USER_MESSAGE,
+  TEST_OTP_CODE,
   afrisoftHubReference,
   afrisoftPayHubGetPayment,
   afrisoftPayHubInitiatePayout,
+  afrisoftSmsHubSendSms,
   formatCdf,
   isAfrisoftHubAsyncRef,
   isAfrisoftPayHubClientConfigured,
   isAfrisoftPayHubMode,
+  isAfrisoftSmsHubClientConfigured,
+  isMockOtpAllowed,
+  isTestOtpAllowedForPhone,
+  normalizePhoneRdc,
   SERDIPAY_MIN_AMOUNT_CDF,
+  serdiPaySanitizeSmsText,
+  timingSafeEqualString,
+  validatePhoneRdc,
   type MobileMoneyOperator,
 } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
@@ -28,7 +38,32 @@ const TOPUP_LOCK_PREFIX = 'wallet:topup:';
 const TOPUP_LOCK_TTL_SEC = 60;
 const WITHDRAW_LOCK_PREFIX = 'wallet:withdraw:';
 const WITHDRAW_LOCK_TTL_SEC = 45;
+const WITHDRAW_OTP_PREFIX = 'wallet:withdraw-otp:';
+const WITHDRAW_OTP_CD_PREFIX = 'wallet:withdraw-otp-cd:';
+const WITHDRAW_OTP_PHONE_CD_PREFIX = 'wallet:withdraw-otp-phone-cd:';
+const WITHDRAW_OTP_HOUR_PREFIX = 'wallet:withdraw-otp-hr:';
+const WITHDRAW_OTP_TTL_SEC = 10 * 60;
+const WITHDRAW_OTP_COOLDOWN_SEC = 45;
+const WITHDRAW_OTP_HOUR_LIMIT = 5;
 const STALE_PAYOUT_MIN_AGE_MS = 15 * 60 * 1000;
+
+type WithdrawOtpChallenge = {
+  h: string;
+  p: string;
+  a: number;
+  v: string;
+};
+
+const withdrawOtpMemory = new Map<string, { value: string; expiresAtMs: number }>();
+
+/** @internal test helper */
+export function __resetWithdrawOtpMemoryForTests(): void {
+  withdrawOtpMemory.clear();
+}
+
+function hashWithdrawOtp(code: string): string {
+  return createHash('sha256').update(String(code ?? '').replace(/\s/g, '')).digest('hex');
+}
 
 @Injectable()
 export class WalletService {
@@ -664,19 +699,95 @@ export class WalletService {
     };
   }
 
-  async withdrawToMobileMoney(userId: string, amountCdf: number, provider: string, phone: string) {
-    this.assertPositiveIntAmount(amountCdf, 'Montant de retrait');
-    const normalizedProvider = provider?.trim().toUpperCase() || 'ORANGE_MONEY';
-    const normalizedPhone = phone?.trim();
-    if (!normalizedPhone) {
-      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Numéro Mobile Money requis.');
+  async requestWithdrawOtp(
+    userId: string,
+    amountCdf: number,
+    provider: string,
+    phone: string,
+  ) {
+    const { amount, normalizedProvider, normalizedPhone } = this.assertWithdrawParams(
+      amountCdf,
+      provider,
+      phone,
+    );
+    await this.assertWithdrawOtpRateLimit(userId, normalizedPhone);
+
+    const useTestOtp =
+      isTestOtpAllowedForPhone(normalizedPhone) ||
+      isMockOtpAllowed() ||
+      (this.isMockPayments() && !this.isProductionLike());
+    const liveCode = useTestOtp ? TEST_OTP_CODE : randomInt(100000, 999999).toString();
+    const challenge: WithdrawOtpChallenge = {
+      h: hashWithdrawOtp(liveCode),
+      p: normalizedPhone,
+      a: amount,
+      v: normalizedProvider,
+    };
+    await this.storeWithdrawOtp(userId, challenge);
+
+    if (useTestOtp) {
+      this.logger.warn(`TEST OTP retrait pour ${normalizedPhone.slice(0, 6)}…`);
+      return {
+        success: true,
+        message: `Code envoyé au ${normalizedPhone} pour confirmer le retrait.`,
+        phone: normalizedPhone,
+        amountCdf: amount,
+        provider: normalizedProvider,
+        expiresInSec: WITHDRAW_OTP_TTL_SEC,
+        ...(this.isProductionLike() ? {} : { mockCode: TEST_OTP_CODE }),
+      };
     }
-    if (amountCdf < SERDIPAY_MIN_AMOUNT_CDF) {
+
+    if (!isAfrisoftSmsHubClientConfigured(this.envGetter)) {
       throw new MovaHttpException(
         MovaErrorCode.VALIDATION_ERROR,
-        undefined,
-        `Montant minimum : ${SERDIPAY_MIN_AMOUNT_CDF.toLocaleString('fr-FR')} FC (contrainte Mobile Money).`,
+        HttpStatus.SERVICE_UNAVAILABLE,
+        SMS_UNAVAILABLE_USER_MESSAGE,
       );
+    }
+
+    const amountLabel = amount.toLocaleString('fr-FR');
+    const text = serdiPaySanitizeSmsText(
+      `SENGA : code ${liveCode} pour confirmer le retrait de ${amountLabel} FC vers ce numero Valable 10 min`,
+    );
+    const sms = await afrisoftSmsHubSendSms(this.envGetter, {
+      phone: normalizedPhone,
+      text,
+      purpose: 'withdraw-otp',
+      idempotencyKey: `senga:withdraw-otp:${userId}:${normalizedPhone}:${amount}`,
+    });
+    if (!sms.success) {
+      this.logger.error(`Withdraw OTP SMS failed: ${sms.message}`);
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        HttpStatus.SERVICE_UNAVAILABLE,
+        SMS_UNAVAILABLE_USER_MESSAGE,
+      );
+    }
+    return {
+      success: true,
+      message: `Code envoyé au ${normalizedPhone} pour confirmer le retrait.`,
+      phone: normalizedPhone,
+      amountCdf: amount,
+      provider: normalizedProvider,
+      expiresInSec: WITHDRAW_OTP_TTL_SEC,
+    };
+  }
+
+  async withdrawToMobileMoney(
+    userId: string,
+    amountCdf: number,
+    provider: string,
+    phone: string,
+    opts: { otp?: string; skipOtp?: boolean } = {},
+  ) {
+    const { amount, normalizedProvider, normalizedPhone } = this.assertWithdrawParams(
+      amountCdf,
+      provider,
+      phone,
+    );
+    if (!opts.skipOtp) {
+      await this.consumeWithdrawOtp(userId, amount, normalizedProvider, normalizedPhone, opts.otp);
     }
 
     const lockKey = `${WITHDRAW_LOCK_PREFIX}${userId}`;
@@ -686,9 +797,164 @@ export class WalletService {
       'Retrait déjà en cours — patientez quelques secondes.',
     );
     try {
-      return await this.executeWithdraw(userId, amountCdf, normalizedProvider, normalizedPhone);
+      return await this.executeWithdraw(userId, amount, normalizedProvider, normalizedPhone);
     } finally {
       await this.releaseMoneyLock(lockKey);
+    }
+  }
+
+  private assertWithdrawParams(amountCdf: number, provider: string, phone: string) {
+    this.assertPositiveIntAmount(amountCdf, 'Montant de retrait');
+    const normalizedProvider = provider?.trim().toUpperCase() || '';
+    this.mapProvider(normalizedProvider);
+    const rawPhone = phone?.trim();
+    if (!rawPhone) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Numéro Mobile Money requis.');
+    }
+    const normalizedPhone = normalizePhoneRdc(rawPhone);
+    if (!validatePhoneRdc(normalizedPhone)) {
+      throw new MovaHttpException(MovaErrorCode.AUTH_INVALID_PHONE, HttpStatus.BAD_REQUEST);
+    }
+    if (amountCdf < SERDIPAY_MIN_AMOUNT_CDF) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        undefined,
+        `Montant minimum : ${SERDIPAY_MIN_AMOUNT_CDF.toLocaleString('fr-FR')} FC (contrainte Mobile Money).`,
+      );
+    }
+    return { amount: amountCdf, normalizedProvider, normalizedPhone };
+  }
+
+  private async consumeWithdrawOtp(
+    userId: string,
+    amountCdf: number,
+    provider: string,
+    phone: string,
+    otp?: string,
+  ) {
+    const digits = String(otp ?? '').replace(/\s/g, '');
+    if (!/^\d{6}$/.test(digits)) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_INVALID_OTP,
+        HttpStatus.BAD_REQUEST,
+        'Code OTP requis (6 chiffres envoyé au numéro Mobile Money).',
+      );
+    }
+    const raw = await this.readAndDeleteWithdrawOtp(userId);
+    if (!raw) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_EXPIRED_OTP,
+        HttpStatus.BAD_REQUEST,
+        'Code OTP expiré ou manquant. Demandez un nouveau code envoyé au numéro de versement.',
+      );
+    }
+    let challenge: WithdrawOtpChallenge;
+    try {
+      challenge = JSON.parse(raw) as WithdrawOtpChallenge;
+    } catch {
+      throw new MovaHttpException(MovaErrorCode.AUTH_EXPIRED_OTP, HttpStatus.BAD_REQUEST);
+    }
+    if (challenge.p !== phone || challenge.a !== amountCdf || challenge.v !== provider) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_INVALID_OTP,
+        HttpStatus.BAD_REQUEST,
+        'Le code ne correspond pas à ce numéro ou ce montant. Demandez un nouveau code.',
+      );
+    }
+    if (!timingSafeEqualString(challenge.h, hashWithdrawOtp(digits))) {
+      throw new MovaHttpException(MovaErrorCode.AUTH_INVALID_OTP, HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  private async storeWithdrawOtp(userId: string, challenge: WithdrawOtpChallenge) {
+    const key = `${WITHDRAW_OTP_PREFIX}${userId}`;
+    const payload = JSON.stringify(challenge);
+    const client = this.redis?.client;
+    if (client) {
+      try {
+        await client.set(key, payload, 'EX', WITHDRAW_OTP_TTL_SEC);
+        return;
+      } catch (e) {
+        if (this.isProductionLike()) {
+          throw new MovaHttpException(
+            MovaErrorCode.INTERNAL_ERROR,
+            HttpStatus.SERVICE_UNAVAILABLE,
+            'Opération temporairement indisponible. Réessayez.',
+          );
+        }
+        this.logger.warn(`storeWithdrawOtp Redis failed: ${(e as Error).message}`);
+      }
+    } else if (this.isProductionLike()) {
+      throw new MovaHttpException(
+        MovaErrorCode.INTERNAL_ERROR,
+        HttpStatus.SERVICE_UNAVAILABLE,
+        'Opération temporairement indisponible. Réessayez.',
+      );
+    }
+    withdrawOtpMemory.set(key, { value: payload, expiresAtMs: Date.now() + WITHDRAW_OTP_TTL_SEC * 1000 });
+  }
+
+  private async readAndDeleteWithdrawOtp(userId: string): Promise<string | null> {
+    const key = `${WITHDRAW_OTP_PREFIX}${userId}`;
+    const client = this.redis?.client;
+    if (client) {
+      try {
+        const raw = await client.get(key);
+        if (raw) await client.del(key);
+        return raw;
+      } catch (e) {
+        if (this.isProductionLike()) {
+          throw new MovaHttpException(
+            MovaErrorCode.INTERNAL_ERROR,
+            HttpStatus.SERVICE_UNAVAILABLE,
+            'Opération temporairement indisponible. Réessayez.',
+          );
+        }
+        this.logger.warn(`readWithdrawOtp Redis failed: ${(e as Error).message}`);
+      }
+    }
+    const mem = withdrawOtpMemory.get(key);
+    withdrawOtpMemory.delete(key);
+    if (!mem || mem.expiresAtMs < Date.now()) return null;
+    return mem.value;
+  }
+
+  private async assertWithdrawOtpRateLimit(userId: string, phone: string) {
+    const client = this.redis?.client;
+    if (!client) return;
+    try {
+      const userCd = `${WITHDRAW_OTP_CD_PREFIX}${userId}`;
+      const phoneCd = `${WITHDRAW_OTP_PHONE_CD_PREFIX}${phone}`;
+      const hourKey = `${WITHDRAW_OTP_HOUR_PREFIX}${userId}`;
+      const [userOk, phoneOk] = await Promise.all([
+        client.set(userCd, '1', 'EX', WITHDRAW_OTP_COOLDOWN_SEC, 'NX'),
+        client.set(phoneCd, '1', 'EX', WITHDRAW_OTP_COOLDOWN_SEC, 'NX'),
+      ]);
+      if (!userOk || !phoneOk) {
+        throw new MovaHttpException(
+          MovaErrorCode.VALIDATION_ERROR,
+          HttpStatus.TOO_MANY_REQUESTS,
+          'Patientez avant de demander un nouveau code (un SMS toutes les 45 secondes).',
+        );
+      }
+      const count = await client.incr(hourKey);
+      if (count === 1) await client.expire(hourKey, 3600);
+      if (count > WITHDRAW_OTP_HOUR_LIMIT) {
+        throw new MovaHttpException(
+          MovaErrorCode.VALIDATION_ERROR,
+          HttpStatus.TOO_MANY_REQUESTS,
+          'Trop de codes demandés. Réessayez dans une heure.',
+        );
+      }
+    } catch (e) {
+      if (e instanceof MovaHttpException) throw e;
+      if (this.isProductionLike()) {
+        throw new MovaHttpException(
+          MovaErrorCode.INTERNAL_ERROR,
+          HttpStatus.SERVICE_UNAVAILABLE,
+          'Opération temporairement indisponible. Réessayez.',
+        );
+      }
     }
   }
 

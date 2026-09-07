@@ -101,7 +101,9 @@ export class InternalController {
 
   @Post('wallets/:userId/withdraw')
   withdraw(@Param('userId') userId: string, @Body() dto: InternalWithdrawDto) {
-    return this.wallet.withdrawToMobileMoney(userId, dto.amountCdf, dto.provider, dto.phone);
+    return this.wallet.withdrawToMobileMoney(userId, dto.amountCdf, dto.provider, dto.phone, {
+      skipOtp: true,
+    });
   }
 
   /**

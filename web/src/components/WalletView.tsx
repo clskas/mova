@@ -25,6 +25,8 @@ export function WalletView({ onBack, mock }: Props) {
   const [withdrawAmount, setWithdrawAmount] = useState("5000");
   const [withdrawPhone, setWithdrawPhone] = useState("");
   const [withdrawProvider, setWithdrawProvider] = useState("ORANGE_MONEY");
+  const [withdrawOtp, setWithdrawOtp] = useState("");
+  const [withdrawOtpSent, setWithdrawOtpSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [historyRefresh, setHistoryRefresh] = useState(0);
   const topUpInFlight = useRef(false);
@@ -91,15 +93,51 @@ export function WalletView({ onBack, mock }: Props) {
     }
   }
 
-  async function withdraw() {
+  async function requestWithdrawOtp() {
     if (withdrawInFlight.current) return;
     const value = parseInt(withdrawAmount, 10);
-    if (value < 500) {
-      setError("Montant minimum : 500 FC");
+    if (value < 2300) {
+      setError("Montant minimum : 2 300 FC");
       return;
     }
     if (value > (wallet?.balanceCdf ?? 0)) {
       setError("Solde insuffisant");
+      return;
+    }
+    if (!withdrawPhone.trim()) {
+      setError("Numéro Mobile Money requis.");
+      return;
+    }
+    withdrawInFlight.current = true;
+    setWithdrawLoading(true);
+    setError(null);
+    try {
+      await apiFetch<{ message?: string }>("/api/wallet/withdraw/otp", {
+        method: "POST",
+        body: JSON.stringify({
+          provider: withdrawProvider,
+          amountCdf: value,
+          phone: withdrawPhone.trim(),
+        }),
+      }, { useMock: mock });
+      setWithdrawOtpSent(true);
+    } catch (e) {
+      setError(toUserErrorMessage(e, "Impossible d’envoyer le code"));
+    } finally {
+      withdrawInFlight.current = false;
+      setWithdrawLoading(false);
+    }
+  }
+
+  async function withdraw() {
+    if (withdrawInFlight.current) return;
+    if (!withdrawOtpSent) {
+      await requestWithdrawOtp();
+      return;
+    }
+    const value = parseInt(withdrawAmount, 10);
+    if (!/^\d{6}$/.test(withdrawOtp.trim())) {
+      setError("Entrez le code à 6 chiffres reçu sur le numéro de versement.");
       return;
     }
     withdrawInFlight.current = true;
@@ -112,11 +150,14 @@ export function WalletView({ onBack, mock }: Props) {
           provider: withdrawProvider,
           amountCdf: value,
           phone: withdrawPhone.trim(),
+          otp: withdrawOtp.trim(),
         }),
       }, { useMock: mock });
       if (res.balanceCdf != null) {
         setWallet((w) => ({ ...w, balanceCdf: res.balanceCdf }));
       }
+      setWithdrawOtp("");
+      setWithdrawOtpSent(false);
       await load();
       setHistoryRefresh((n) => n + 1);
     } catch (e) {
@@ -202,16 +243,30 @@ export function WalletView({ onBack, mock }: Props) {
         <input
           className="w-full rounded-xl border-0 bg-gray-50 p-3"
           value={withdrawPhone}
-          onChange={(e) => setWithdrawPhone(e.target.value)}
+          onChange={(e) => {
+            setWithdrawPhone(e.target.value);
+            setWithdrawOtpSent(false);
+            setWithdrawOtp("");
+          }}
           placeholder="+243…"
         />
+        {withdrawOtpSent && (
+          <input
+            className="w-full rounded-xl border-0 bg-gray-50 p-3"
+            value={withdrawOtp}
+            onChange={(e) => setWithdrawOtp(e.target.value)}
+            inputMode="numeric"
+            maxLength={6}
+            placeholder="Code SMS (6 chiffres)"
+          />
+        )}
         <button
           type="button"
           onClick={withdraw}
-          disabled={withdrawLoading || (wallet?.balanceCdf ?? 0) < 500}
+          disabled={withdrawLoading || (wallet?.balanceCdf ?? 0) < 2300}
           className="w-full border border-[#6C63FF] text-[#6C63FF] rounded-xl py-3 font-medium disabled:opacity-50"
         >
-          {withdrawLoading ? "Retrait…" : "Retirer"}
+          {withdrawLoading ? "Retrait…" : withdrawOtpSent ? "Confirmer le retrait" : "Envoyer le code SMS"}
         </button>
       </div>
 

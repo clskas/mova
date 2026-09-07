@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { phoneFromToken } from "@/lib/auth";
-import { formatCdf, topUpPartnerWallet, withdrawPartnerWallet } from "@/lib/api";
+import { formatCdf, requestWithdrawOtp, topUpPartnerWallet, withdrawPartnerWallet } from "@/lib/api";
 import { toUserErrorMessage } from "@/lib/user-messages";
 
 const PAYOUT_PHONE_KEY = "mova_rental_partner_payout_phone";
@@ -24,6 +24,8 @@ export function PartnerWithdrawPanel({ balanceCdf, walletAvailable = true, onWit
   const [topUpAmount, setTopUpAmount] = useState("");
   const [provider, setProvider] = useState("ORANGE_MONEY");
   const [phone, setPhone] = useState("");
+  const [otp, setOtp] = useState("");
+  const [otpSent, setOtpSent] = useState(false);
   const [loading, setLoading] = useState<"withdraw" | "topup" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -46,8 +48,8 @@ export function PartnerWithdrawPanel({ balanceCdf, walletAvailable = true, onWit
   async function submitWithdraw() {
     if (inFlight.current) return;
     const amountCdf = Number(amount);
-    if (!Number.isFinite(amountCdf) || amountCdf < 500) {
-      setError("Montant minimum : 500 FC.");
+    if (!Number.isFinite(amountCdf) || amountCdf < 2300) {
+      setError("Montant minimum : 2 300 FC.");
       return;
     }
     if (amountCdf > balanceCdf) {
@@ -63,14 +65,31 @@ export function PartnerWithdrawPanel({ balanceCdf, walletAvailable = true, onWit
     setError(null);
     setSuccess(null);
     try {
+      if (!otpSent) {
+        const sent = await requestWithdrawOtp({
+          amountCdf,
+          provider,
+          phone: phone.trim(),
+        });
+        setOtpSent(true);
+        setSuccess(sent.message ?? "Code envoyé au numéro de versement.");
+        return;
+      }
+      if (!/^\d{6}$/.test(otp.trim())) {
+        setError("Entrez le code à 6 chiffres reçu sur ce numéro.");
+        return;
+      }
       const result = await withdrawPartnerWallet({
         amountCdf,
         provider,
         phone: phone.trim(),
+        otp: otp.trim(),
       });
       rememberPhone();
       setSuccess(result.message ?? "Retrait initié avec succès.");
       setAmount("");
+      setOtp("");
+      setOtpSent(false);
       onWithdrawn?.();
     } catch (e) {
       setError(toUserErrorMessage(e, "Retrait impossible"));
@@ -188,13 +207,27 @@ export function PartnerWithdrawPanel({ balanceCdf, walletAvailable = true, onWit
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
           />
+          {otpSent && (
+            <input
+              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+              inputMode="numeric"
+              maxLength={6}
+              placeholder="Code SMS (6 chiffres)"
+              value={otp}
+              onChange={(e) => setOtp(e.target.value)}
+            />
+          )}
           <button
             type="button"
-            disabled={loading !== null || balanceCdf < 500}
+            disabled={loading !== null || balanceCdf < 2300}
             onClick={submitWithdraw}
             className="px-4 py-2.5 min-h-11 rounded-xl bg-indigo-600 text-white text-sm font-medium disabled:opacity-50 w-full"
           >
-            {loading === "withdraw" ? "Retrait en cours…" : "Retirer mes revenus"}
+            {loading === "withdraw"
+              ? "Retrait en cours…"
+              : otpSent
+                ? "Confirmer le retrait"
+                : "Envoyer le code SMS"}
           </button>
         </div>
       </div>

@@ -1,14 +1,22 @@
 import { Body, Controller, Get, Post, Query, Request, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { IsEnum, IsInt, IsOptional, IsString, Min } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsEnum, IsInt, IsOptional, IsString, Matches, Min } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { WalletService } from './wallet.service';
 
-class WithdrawDto {
-  @ApiProperty() @IsInt() @Min(500) amountCdf: number;
+class WithdrawRequestDto {
+  @ApiProperty() @Type(() => Number) @IsInt() @Min(2300) amountCdf: number;
   @ApiProperty() @IsString() provider: string;
   @ApiProperty() @IsString() phone: string;
+}
+
+class WithdrawDto extends WithdrawRequestDto {
+  @ApiProperty({ description: 'Code OTP à 6 chiffres envoyé au numéro Mobile Money' })
+  @IsString()
+  @Matches(/^\d{6}$/)
+  otp: string;
 }
 
 class TopUpDto {
@@ -74,9 +82,17 @@ export class WalletController {
     return this.walletService.payFromWallet(req.user.id, dto.amountCdf, dto.referenceType, dto.referenceId, dto.description);
   }
 
+  @Post('withdraw/otp')
+  @ApiOperation({ summary: 'Envoyer un code OTP au numéro Mobile Money de versement' })
+  requestWithdrawOtp(@Request() req: { user: { id: string } }, @Body() dto: WithdrawRequestDto) {
+    return this.walletService.requestWithdrawOtp(req.user.id, dto.amountCdf, dto.provider, dto.phone);
+  }
+
   @Post('withdraw')
-  @ApiOperation({ summary: 'Retrait mobile money' })
+  @ApiOperation({ summary: 'Retrait mobile money (OTP requis)' })
   async withdraw(@Request() req: { user: { id: string } }, @Body() dto: WithdrawDto) {
-    return this.walletService.withdrawToMobileMoney(req.user.id, dto.amountCdf, dto.provider, dto.phone);
+    return this.walletService.withdrawToMobileMoney(req.user.id, dto.amountCdf, dto.provider, dto.phone, {
+      otp: dto.otp,
+    });
   }
 }

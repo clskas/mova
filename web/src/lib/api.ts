@@ -413,8 +413,22 @@ function mockFor<T>(path: string, init?: RequestInit): T {
     recordMockWalletTx('CREDIT', amount, `Recharge ${provider}`, `topup_${String(provider).toLowerCase()}_${Date.now()}`);
     return { success: true, balanceCdf: amount, message: `Recharge de ${amount} FC` } as T;
   }
+  if (path.includes('/wallet/withdraw/otp') && method === 'POST') {
+    const body = init?.body ? JSON.parse(init.body as string) : {};
+    const phone = body.phone ?? '';
+    return {
+      success: true,
+      message: `Code envoyé au ${phone} pour confirmer le retrait.`,
+      phone,
+      mockCode: '123456',
+    } as T;
+  }
   if (path.includes('/wallet/withdraw') && method === 'POST') {
     const body = init?.body ? JSON.parse(init.body as string) : {};
+    const otp = String(body.otp ?? '');
+    if (!/^\d{6}$/.test(otp)) {
+      throw new Error('Code OTP requis (6 chiffres envoyé au numéro Mobile Money).');
+    }
     const amount = body.amountCdf ?? 0;
     const provider = body.provider ?? 'MOBILE_MONEY';
     const phone = body.phone ?? 'Mobile Money';

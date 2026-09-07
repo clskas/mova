@@ -1,7 +1,7 @@
 import { HttpStatus } from '@nestjs/common';
 import { PIN_SIX_DIGITS_FR, toPublicHttpMessage } from './http-exception.filter';
 import { MOVA_ERROR_MESSAGES, MovaErrorCode } from './mova-error-codes';
-import { SERDIPAY_B2C_CHANNEL_DISABLED_FR } from './serdipay';
+import { SERDIPAY_B2C_CHANNEL_DISABLED_FR, SERDIPAY_B2C_MERCHANT_FLOAT_LOW_FR } from './serdipay';
 
 describe('toPublicHttpMessage', () => {
   it('maps class-validator PIN regex/length English to French', () => {
@@ -42,6 +42,15 @@ describe('toPublicHttpMessage', () => {
         HttpStatus.BAD_REQUEST,
       ),
     ).not.toMatch(/channel0|Payment Failed/i);
+  });
+
+  it('maps SerdiPay merchant-float English to French (never leaks Balance is low)', () => {
+    expect(toPublicHttpMessage('Your Balance is low', HttpStatus.BAD_REQUEST)).toBe(
+      SERDIPAY_B2C_MERCHANT_FLOAT_LOW_FR,
+    );
+    expect(toPublicHttpMessage('Your Balance is low', HttpStatus.BAD_REQUEST)).not.toMatch(
+      /Your Balance is low|Balance is low/i,
+    );
   });
 
   it('hides Prisma / field-name / geo JSON internals', () => {

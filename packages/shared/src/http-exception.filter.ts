@@ -9,7 +9,11 @@ import {
 import { Response } from 'express';
 import { REQUEST_ID_HEADER, RequestWithId } from './request-id.middleware';
 import { MovaErrorCode, MOVA_ERROR_MESSAGES } from './mova-error-codes';
-import { isSerdiPayChannelDisabledError, mapSerdiPayPaymentFailure } from './serdipay';
+import {
+  isSerdiPayChannelDisabledError,
+  isSerdiPayMerchantFloatLowError,
+  mapSerdiPayPaymentFailure,
+} from './serdipay';
 
 export class MovaHttpException extends HttpException {
   constructor(
@@ -107,6 +111,7 @@ export function toPublicHttpMessage(raw: string, status: number): string {
   }
   if (
     isSerdiPayChannelDisabledError(msg) ||
+    isSerdiPayMerchantFloatLowError(msg) ||
     /payment failed|failed to process the payment/i.test(msg)
   ) {
     return mapSerdiPayPaymentFailure(status, msg, msg);

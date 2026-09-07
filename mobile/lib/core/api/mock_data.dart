@@ -548,6 +548,21 @@ abstract final class MockData {
 
   static int _mockWalletBalance = 0;
 
+  static void seedWalletForTest(int balanceCdf) {
+    _mockWalletBalance = balanceCdf;
+  }
+
+  static Map<String, dynamic> walletWithdrawOtp(Map<String, dynamic> body) {
+    final phone = body['phone']?.toString() ?? '';
+    return {
+      'success': true,
+      'message': 'Code envoyé au $phone pour confirmer le retrait.',
+      'phone': phone,
+      'amountCdf': body['amountCdf'],
+      'mockCode': '123456',
+    };
+  }
+
   static Map<String, dynamic> walletWithdraw(Map<String, dynamic> body) {
     final amount = body['amountCdf'] as int? ?? 0;
     final provider = body['provider']?.toString() ?? 'MOBILE_MONEY';

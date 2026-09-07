@@ -202,7 +202,8 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
     if (!mounted) return;
 
     setState(() => _withdrawSheetOpen = true);
-    final confirmed = await showModalBottomSheet<({int amount, String phone, String provider})>(
+    final confirmed = await showModalBottomSheet<
+        ({int amount, String phone, String provider, String otp})>(
       context: context,
       isScrollControlled: true,
       builder: (ctx) => _WalletWithdrawSheet(
@@ -214,11 +215,11 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
     setState(() => _withdrawSheetOpen = false);
 
     if (confirmed != null) {
-      await _withdraw(confirmed.amount, confirmed.provider, confirmed.phone);
+      await _withdraw(confirmed.amount, confirmed.provider, confirmed.phone, confirmed.otp);
     }
   }
 
-  Future<void> _withdraw(int amountCdf, String provider, String phone) async {
+  Future<void> _withdraw(int amountCdf, String provider, String phone, String otp) async {
     if (_withdrawLoading) return;
     setState(() => _withdrawLoading = true);
     final api = ref.read(apiClientProvider);
@@ -227,6 +228,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
       'provider': provider,
       'amountCdf': amountCdf,
       'phone': MarketConfig.normalizePhone(phone),
+      'otp': otp,
     });
     if (!mounted) return;
     setState(() => _withdrawLoading = false);
@@ -637,7 +639,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
   }
 }
 
-class _WalletWithdrawSheet extends StatefulWidget {
+class _WalletWithdrawSheet extends ConsumerStatefulWidget {
   const _WalletWithdrawSheet({
     required this.maxAmount,
     required this.initialPhone,
@@ -647,13 +649,17 @@ class _WalletWithdrawSheet extends StatefulWidget {
   final String initialPhone;
 
   @override
-  State<_WalletWithdrawSheet> createState() => _WalletWithdrawSheetState();
+  ConsumerState<_WalletWithdrawSheet> createState() => _WalletWithdrawSheetState();
 }
 
-class _WalletWithdrawSheetState extends State<_WalletWithdrawSheet> {
+class _WalletWithdrawSheetState extends ConsumerState<_WalletWithdrawSheet> {
   late final TextEditingController _amountController;
   late final TextEditingController _phoneController;
+  late final TextEditingController _otpController;
   late String _providerId;
+  bool _otpSent = false;
+  bool _otpLoading = false;
+  String? _otpPhone;
 
   @override
   void initState() {
@@ -662,6 +668,7 @@ class _WalletWithdrawSheetState extends State<_WalletWithdrawSheet> {
       text: widget.maxAmount >= 5000 ? '5000' : '${widget.maxAmount}',
     );
     _phoneController = TextEditingController(text: widget.initialPhone);
+    _otpController = TextEditingController();
     _providerId = MarketConfig.mobileMoneyProviders.first.id;
   }
 
@@ -669,26 +676,76 @@ class _WalletWithdrawSheetState extends State<_WalletWithdrawSheet> {
   void dispose() {
     _amountController.dispose();
     _phoneController.dispose();
+    _otpController.dispose();
     super.dispose();
   }
 
-  void _confirm() {
+  ({int amount, String phone})? _validatedAmountPhone() {
     final amount = int.tryParse(_amountController.text.trim()) ?? 0;
     if (amount < 2300) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Montant minimum : 2 300 FC')),
       );
-      return;
+      return null;
     }
     if (amount > widget.maxAmount) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Maximum : ${MarketConfig.formatCdf(widget.maxAmount)}')),
       );
+      return null;
+    }
+    final phone = MarketConfig.normalizePhone(_phoneController.text.trim());
+    if (!MarketConfig.validatePhone(phone)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Numéro invalide. Format : +243XXXXXXXXX')),
+      );
+      return null;
+    }
+    return (amount: amount, phone: phone);
+  }
+
+  Future<void> _sendOtp() async {
+    final parsed = _validatedAmountPhone();
+    if (parsed == null || _otpLoading) return;
+    setState(() => _otpLoading = true);
+    final api = ref.read(apiClientProvider);
+    final result = await api.post('/wallet/withdraw/otp', {
+      'provider': _providerId,
+      'amountCdf': parsed.amount,
+      'phone': parsed.phone,
+    });
+    if (!mounted) return;
+    setState(() => _otpLoading = false);
+    switch (result) {
+      case Success():
+        setState(() {
+          _otpSent = true;
+          _otpPhone = parsed.phone;
+        });
+      case Failure(:final error):
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error.message)),
+        );
+    }
+  }
+
+  void _confirm() {
+    final parsed = _validatedAmountPhone();
+    if (parsed == null) return;
+    if (!_otpSent || _otpPhone != parsed.phone) {
+      _sendOtp();
+      return;
+    }
+    final otp = _otpController.text.trim();
+    if (!RegExp(r'^\d{6}$').hasMatch(otp)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Entrez le code à 6 chiffres reçu sur ce numéro.')),
+      );
       return;
     }
     Navigator.pop(
       context,
-      (amount: amount, phone: _phoneController.text.trim(), provider: _providerId),
+      (amount: parsed.amount, phone: parsed.phone, provider: _providerId, otp: otp),
     );
   }
 
@@ -715,6 +772,11 @@ class _WalletWithdrawSheetState extends State<_WalletWithdrawSheet> {
               'Solde disponible : ${MarketConfig.formatCdf(widget.maxAmount)}',
               style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
             ),
+            const SizedBox(height: 8),
+            const Text(
+              'Un code SMS sera envoyé au numéro de versement pour confirmer que vous ne vous êtes pas trompé.',
+              style: TextStyle(color: MovaColors.textSecondary, fontSize: 13),
+            ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
               value: _providerId,
@@ -725,13 +787,16 @@ class _WalletWithdrawSheetState extends State<_WalletWithdrawSheet> {
               items: MarketConfig.mobileMoneyProviders
                   .map((p) => DropdownMenuItem(value: p.id, child: Text(p.name)))
                   .toList(),
-              onChanged: (v) {
-                if (v != null) setState(() => _providerId = v);
-              },
+              onChanged: _otpSent
+                  ? null
+                  : (v) {
+                      if (v != null) setState(() => _providerId = v);
+                    },
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _amountController,
+              enabled: !_otpSent,
               keyboardType: TextInputType.number,
               decoration: const InputDecoration(
                 labelText: 'Montant (FC)',
@@ -741,17 +806,51 @@ class _WalletWithdrawSheetState extends State<_WalletWithdrawSheet> {
             const SizedBox(height: 12),
             TextField(
               controller: _phoneController,
+              enabled: !_otpSent,
               keyboardType: TextInputType.phone,
               decoration: const InputDecoration(
                 labelText: 'Numéro Mobile Money',
                 prefixIcon: Icon(Icons.phone_outlined),
               ),
             ),
+            if (_otpSent) ...[
+              const SizedBox(height: 12),
+              Text(
+                'Code envoyé au $_otpPhone. Saisissez-le pour confirmer le versement.',
+                style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _otpController,
+                keyboardType: TextInputType.number,
+                maxLength: 6,
+                decoration: const InputDecoration(
+                  labelText: 'Code SMS (6 chiffres)',
+                  prefixIcon: Icon(Icons.sms_outlined),
+                  counterText: '',
+                ),
+              ),
+              TextButton(
+                onPressed: _otpLoading
+                    ? null
+                    : () => setState(() {
+                          _otpSent = false;
+                          _otpPhone = null;
+                          _otpController.clear();
+                        }),
+                child: const Text('Modifier le numéro'),
+              ),
+            ],
             const SizedBox(height: 20),
             MovaButton(
-              label: 'Confirmer le retrait',
-              icon: Icons.check,
-              onPressed: _confirm,
+              label: _otpLoading
+                  ? 'Envoi du code…'
+                  : _otpSent
+                      ? 'Confirmer le retrait'
+                      : 'Envoyer le code SMS',
+              icon: _otpSent ? Icons.check : Icons.sms_outlined,
+              isLoading: _otpLoading,
+              onPressed: _otpLoading ? null : (_otpSent ? _confirm : _sendOtp),
             ),
           ],
         ),

@@ -10,7 +10,7 @@ import {
   afrisoftPayHubOperator,
   isAfriSoftPayHubConfigured,
 } from './afrisoft-pay-hub';
-import { SERDIPAY_B2C_CHANNEL_DISABLED_FR } from './serdipay';
+import { SERDIPAY_B2C_CHANNEL_DISABLED_FR, SERDIPAY_B2C_MERCHANT_FLOAT_LOW_FR } from './serdipay';
 
 describe('afrisoft-pay-hub', () => {
   it('signs HMAC per AFRISOFT_PAYMENT_HUB_API.md §3', () => {
@@ -197,5 +197,31 @@ describe('afrisoft-pay-hub', () => {
     expect(result.success).toBe(false);
     expect(result.message).toBe(SERDIPAY_B2C_CHANNEL_DISABLED_FR);
     expect(result.message).not.toMatch(/channel0/i);
+  });
+
+  it('sanitizes hub English merchant-float on B2C failure', async () => {
+    const env: Record<string, string> = {
+      PAY_HUB_URL: 'https://pay.afri-soft.com',
+      AFRISOFT_HUB_APP_ID: 'senga',
+      AFRISOFT_HUB_API_KEY: 'test-key',
+    };
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 400,
+      json: async () => ({
+        success: false,
+        error: { code: 'HUB_PROVIDER_FAILED', message: 'Your Balance is low' },
+      }),
+    }) as unknown as typeof fetch;
+
+    const result = await afrisoftPayHubDisburse((k) => env[k], {
+      amountCdf: 2300,
+      phone: '+243970000001',
+      operator: 'ORANGE_MONEY',
+      purpose: 'withdraw',
+    });
+    expect(result.success).toBe(false);
+    expect(result.message).toBe(SERDIPAY_B2C_MERCHANT_FLOAT_LOW_FR);
+    expect(result.message).not.toMatch(/Your Balance is low/i);
   });
 });

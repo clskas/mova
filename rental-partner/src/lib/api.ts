@@ -270,7 +270,19 @@ export type WalletWithdrawResult = {
   formattedBalance?: string;
 };
 
-export function withdrawPartnerWallet(data: { amountCdf: number; provider: string; phone: string }) {
+export function requestWithdrawOtp(data: { amountCdf: number; provider: string; phone: string }) {
+  return apiFetch<WalletWithdrawResult>("/api/wallet/withdraw/otp", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export function withdrawPartnerWallet(data: {
+  amountCdf: number;
+  provider: string;
+  phone: string;
+  otp: string;
+}) {
   return apiFetch<WalletWithdrawResult>("/api/wallet/withdraw", {
     method: "POST",
     body: JSON.stringify(data),

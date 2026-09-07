@@ -1,5 +1,5 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { DeliveryStatus, DeliveryType, Prisma } from '@prisma/client';
+import { DeliveryStatus, DeliveryType, PartnerKycStatus, Prisma } from '@prisma/client';
 import {
   MOVA_EVENTS,
   MovaErrorCode,
@@ -76,6 +76,16 @@ export class RestaurantPortalService {
 
   async getRestaurantForOwner(ownerUserId: string) {
     return this.ensureRestaurantForOwner(ownerUserId);
+  }
+
+  private assertRestaurantKycApproved(restaurant: { kycStatus?: string | null }) {
+    if (restaurant.kycStatus !== PartnerKycStatus.APPROVED) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        undefined,
+        'Votre compte doit être validé avant de publier le menu.',
+      );
+    }
   }
 
   async ensureRestaurantForOwner(ownerUserId: string, name?: string) {
@@ -276,7 +286,8 @@ export class RestaurantPortalService {
   }
 
   async confirmOrder(deliveryId: string, ownerUserId: string) {
-    const { delivery } = await this.assertOrderAccess(deliveryId, ownerUserId);
+    const { delivery, restaurant } = await this.assertOrderAccess(deliveryId, ownerUserId);
+    this.assertRestaurantKycApproved(restaurant);
     if (delivery.status !== DeliveryStatus.PENDING) {
       throw new MovaHttpException(MovaErrorCode.DELIVERY_INVALID_STATUS);
     }
@@ -291,7 +302,8 @@ export class RestaurantPortalService {
   }
 
   async markReady(deliveryId: string, ownerUserId: string) {
-    const { delivery } = await this.assertOrderAccess(deliveryId, ownerUserId);
+    const { delivery, restaurant } = await this.assertOrderAccess(deliveryId, ownerUserId);
+    this.assertRestaurantKycApproved(restaurant);
     if (delivery.status !== DeliveryStatus.RESTAURANT_CONFIRMED) {
       throw new MovaHttpException(MovaErrorCode.DELIVERY_INVALID_STATUS);
     }
@@ -429,7 +441,8 @@ export class RestaurantPortalService {
   }
 
   async uploadMenuPhoto(ownerUserId: string, imageBase64: string, mimeType?: string) {
-    await this.getRestaurantForOwner(ownerUserId);
+    const restaurant = await this.getRestaurantForOwner(ownerUserId);
+    this.assertRestaurantKycApproved(restaurant);
     return this.uploads.uploadMenuPhoto(imageBase64, mimeType);
   }
 
@@ -507,12 +520,13 @@ export class RestaurantPortalService {
 
   async updateMenu(ownerUserId: string, dto: UpdateRestaurantMenuDto) {
     const restaurant = await this.getRestaurantForOwner(ownerUserId);
-    if (dto.isAcceptingOrders === true && restaurant.kycStatus !== 'APPROVED') {
-      throw new MovaHttpException(
-        MovaErrorCode.VALIDATION_ERROR,
-        undefined,
-        "Votre dossier n'est pas encore validé par SENGA. Vous ne pouvez pas accepter de commandes.",
-      );
+    if (
+      dto.menuItems != null ||
+      dto.isAcceptingOrders === true ||
+      dto.promotionLabel !== undefined ||
+      dto.prepTimeMin !== undefined
+    ) {
+      this.assertRestaurantKycApproved(restaurant);
     }
     const menuItems =
       dto.menuItems != null ? this.normalizeMenuItems(dto.menuItems) : undefined;
@@ -552,6 +566,7 @@ export class RestaurantPortalService {
 
   async updateCourierMode(ownerUserId: string, courierMode: 'PLATFORM' | 'OWN' | 'HYBRID') {
     const restaurant = await this.getRestaurantForOwner(ownerUserId);
+    this.assertRestaurantKycApproved(restaurant);
     const mode = courierMode.toUpperCase();
     if (!['PLATFORM', 'OWN', 'HYBRID'].includes(mode)) {
       throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Mode livreurs invalide.');
@@ -590,6 +605,7 @@ export class RestaurantPortalService {
 
   async addDriver(ownerUserId: string, dto: { driverUserId?: string; phone?: string }) {
     const restaurant = await this.getRestaurantForOwner(ownerUserId);
+    this.assertRestaurantKycApproved(restaurant);
     const driver = await this.resolveSengaDriverAccount(dto);
     if (!driver) {
       throw new MovaHttpException(
@@ -683,6 +699,7 @@ export class RestaurantPortalService {
 
   async assignOwnDriver(deliveryId: string, ownerUserId: string, driverUserId: string) {
     const { delivery, restaurant } = await this.assertOrderAccess(deliveryId, ownerUserId);
+    this.assertRestaurantKycApproved(restaurant);
     if (delivery.guaranteed && !delivery.escrowReady) {
       throw new MovaHttpException(MovaErrorCode.DELIVERY_ESCROW_REQUIRED);
     }

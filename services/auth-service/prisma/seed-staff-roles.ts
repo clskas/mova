@@ -10,6 +10,26 @@ export const STAFF_DEMO_ACCOUNTS = [
 ] as const;
 
 async function main() {
+  const skip = (process.env.SKIP_DEMO_SEED ?? '').trim().toLowerCase();
+  if (skip === 'true' || skip === '1' || skip === 'yes' || process.env.NODE_ENV === 'production') {
+    console.log('Demo staff accounts skipped (NODE_ENV=production or SKIP_DEMO_SEED).');
+    const prisma = new PrismaClient();
+    const owner = await prisma.user.upsert({
+      where: { phone: '+243971163574' },
+      create: {
+        phone: '+243971163574',
+        role: UserRole.SUPER_ADMIN,
+        firstName: 'Super',
+        lastName: 'Admin',
+        email: 'celestinkas@gmail.com',
+      },
+      update: { role: UserRole.SUPER_ADMIN, email: 'celestinkas@gmail.com' },
+    });
+    console.log(`Owner superadmin ready: ${owner.phone} (${owner.role})`);
+    await prisma.$disconnect();
+    return;
+  }
+
   const prisma = new PrismaClient();
   for (const u of STAFF_DEMO_ACCOUNTS) {
     await prisma.user.upsert({

@@ -198,28 +198,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
     }
   }
 
-  Future<ImageSource?> _pickDocSource() async {
-    return showModalBottomSheet<ImageSource>(
-      context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.camera_alt),
-              title: const Text('Prendre une photo'),
-              onTap: () => Navigator.pop(ctx, ImageSource.camera),
-            ),
-            ListTile(
-              leading: const Icon(Icons.photo_library),
-              title: const Text('Choisir depuis la galerie'),
-              onTap: () => Navigator.pop(ctx, ImageSource.gallery),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  Future<ImageSource?> _pickDocSource() => showMovaImageSourceSheet(context);
 
   void _applyState(Map<String, dynamic> data) {
     final user = data['user'] as Map<String, dynamic>?;

@@ -15,6 +15,32 @@ export function isProductionRuntime(): boolean {
   return process.env.NODE_ENV === 'production';
 }
 
+function envFlagTrue(env: NodeJS.ProcessEnv, key: string): boolean {
+  const v = (env[key] ?? '').trim().toLowerCase();
+  return v === 'true' || v === '1' || v === 'yes';
+}
+
+/**
+ * Fake / demo user seed (prisma seed, seed-demo, seed-staff-roles).
+ * Allowed only for local/dev. Production deploy must never create +2439000000xx accounts.
+ * - APP_ENV=development → allow
+ * - RUN_SEED=false or SKIP_DEMO_SEED=true → refuse
+ * - NODE_ENV/APP_ENV=production → refuse
+ */
+export function isFakeUserSeedAllowed(env: NodeJS.ProcessEnv = process.env): boolean {
+  if ((env.RUN_SEED ?? '').trim().toLowerCase() === 'false') return false;
+  if (envFlagTrue(env, 'SKIP_DEMO_SEED')) return false;
+  const nodeEnv = (env.NODE_ENV ?? '').trim().toLowerCase();
+  const appEnv = (env.APP_ENV ?? '').trim().toLowerCase();
+  if (nodeEnv === 'production' || appEnv === 'production') return false;
+  return true;
+}
+
+/** @deprecated use isFakeUserSeedAllowed */
+export function isDemoUserSeedEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  return isFakeUserSeedAllowed(env);
+}
+
 /** JWT secret: weak/missing values are rejected in production. */
 export function resolveJwtSecret(explicit?: string | null): string {
   const secret = (explicit ?? process.env.JWT_SECRET ?? '').trim();

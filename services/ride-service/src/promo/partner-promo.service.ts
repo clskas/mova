@@ -1,5 +1,5 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { PromoAbsorbedBy, PromoOwnerType, PromoScope } from '@prisma/client';
+import { PromoAbsorbedBy, PromoOwnerType, PromoScope, PartnerKycStatus } from '@prisma/client';
 import { MovaErrorCode, MovaHttpException } from '@mova/shared';
 import { formatPromoRow } from '../common/promo-context.util';
 import { PrismaService } from '../prisma/prisma.service';
@@ -60,6 +60,16 @@ export class PartnerPromoService {
     }
   }
 
+  private assertRestaurantKycApproved(restaurant: { kycStatus?: string | null }) {
+    if (restaurant.kycStatus !== PartnerKycStatus.APPROVED) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        undefined,
+        'Votre compte doit être validé avant de publier le menu.',
+      );
+    }
+  }
+
   async listRestaurantPromos(ownerUserId: string) {
     const restaurant = await this.prisma.restaurant.findFirst({ where: { ownerUserId, isActive: true } });
     if (!restaurant) {
@@ -77,6 +87,7 @@ export class PartnerPromoService {
     if (!restaurant) {
       throw new MovaHttpException(MovaErrorCode.RESTAURANT_NOT_FOUND, HttpStatus.NOT_FOUND);
     }
+    this.assertRestaurantKycApproved(restaurant);
     this.validateDiscount(data);
     const code = this.normalizeCode(data.code);
     const scope = data.scope ?? PromoScope.FOOD_MENU_ONLY;
@@ -105,6 +116,7 @@ export class PartnerPromoService {
     if (!restaurant) {
       throw new MovaHttpException(MovaErrorCode.RESTAURANT_NOT_FOUND, HttpStatus.NOT_FOUND);
     }
+    this.assertRestaurantKycApproved(restaurant);
     const existing = await this.prisma.promoCode.findFirst({
       where: { id, ownerType: PromoOwnerType.RESTAURANT, restaurantId: restaurant.id },
     });

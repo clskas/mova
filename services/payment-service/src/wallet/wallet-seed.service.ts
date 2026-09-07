@@ -22,6 +22,11 @@ export class WalletSeedService implements OnModuleInit {
     const hubMode = (this.config.get('AFRISOFT_PAY_HUB_MODE') ?? '').trim().toLowerCase();
     if (hubMode === 'true' || hubMode === '1' || hubMode === 'yes') return;
     if (this.config.get('MOCK_PAYMENTS') !== 'true') return;
+    const skip = (this.config.get('SKIP_DEMO_SEED') ?? '').toString().trim().toLowerCase();
+    if (this.config.get('NODE_ENV') === 'production' || skip === 'true' || skip === '1' || skip === 'yes') {
+      this.logger.log('Wallet demo seed skipped (production / SKIP_DEMO_SEED)');
+      return;
+    }
     for (const demo of DEMO_WALLET_CREDITS) {
       try {
         const current = await this.wallet.getWallet(demo.userId);

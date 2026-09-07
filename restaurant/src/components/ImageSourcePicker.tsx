@@ -16,7 +16,7 @@ const srOnlyFileInput =
 
 /**
  * Bouton de sélection d'image offrant un choix explicite : « Prendre une photo »
- * (appareil photo) ou « Choisir dans la galerie ». Deux <input> distincts
+ * (appareil photo) ou « Galerie ». Deux <input> distincts
  * garantissent le bon comportement sur tous les navigateurs / PWA installées,
  * où un simple `capture` force la caméra sans laisser le choix de la galerie.
  */
@@ -84,7 +84,7 @@ export function ImageSourcePicker({
             onClick={() => pick(galleryRef)}
             className="flex w-full items-center gap-3 border-t border-gray-100 px-4 py-3 text-left text-sm hover:bg-gray-50"
           >
-            <span className="text-lg">🖼️</span> Choisir dans la galerie
+            <span className="text-lg">🖼️</span> Galerie
           </button>
         </div>
       )}

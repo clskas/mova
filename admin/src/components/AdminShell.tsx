@@ -25,6 +25,7 @@ import {
   UsersIcon,
   WalletIcon,
   AccountIcon,
+  ContactsIcon,
 } from "@/components/AdminIcons";
 import { DemoBadge } from "@/components/ui";
 import { checkGatewayHealth } from "@/lib/api";
@@ -36,6 +37,7 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   "/utilisateurs": UsersIcon,
   "/chauffeurs": DriversIcon,
   "/kyc": KycIcon,
+  "/contacts": ContactsIcon,
   "/courses": RidesIcon,
   "/livraisons": DeliveriesIcon,
   "/restaurants": RestaurantsIcon,
@@ -72,7 +74,7 @@ function ShellInner({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen flex overflow-x-hidden">
       <aside
         data-desktop-nav
-        className="senga-nav-desktop w-64 text-white flex-col overflow-hidden"
+        className="senga-nav-desktop w-64 h-screen sticky top-0 text-white flex flex-col overflow-hidden shrink-0"
         style={{ background: "var(--sidebar-gradient)" }}
       >
         <div className="p-5 border-b border-white/10 shrink-0">
@@ -85,7 +87,7 @@ function ShellInner({ children }: { children: React.ReactNode }) {
             </div>
           </div>
         </div>
-        <nav className="flex-1 p-3 overflow-y-auto">
+        <nav className="flex-1 min-h-0 p-3 overflow-y-auto">
           {loading ? (
             <p className="text-xs text-white/50 px-3 py-2">Chargement menu…</p>
           ) : (

@@ -20,7 +20,8 @@ export type AdminSection =
   | "demenagements"
   | "covoiturage"
   | "publicites"
-  | "contacts";
+  | "contacts"
+  | "cgu";
 
 export const ADMIN_ROLES: AdminRole[] = ["SUPER_ADMIN", "ADMIN", "SUPPORT", "FINANCE", "CONTENT"];
 
@@ -52,6 +53,7 @@ const ALL_SECTIONS: AdminSection[] = [
   "covoiturage",
   "publicites",
   "contacts",
+  "cgu",
 ];
 
 /** Sections visibles dans le menu par rôle. */
@@ -84,6 +86,8 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/utilisateurs", label: "Utilisateurs", short: "Utilis.", section: "utilisateurs" },
   { href: "/chauffeurs", label: "Chauffeurs", short: "Chauff.", section: "chauffeurs" },
   { href: "/kyc", label: "KYC", short: "KYC", section: "kyc" },
+  { href: "/contacts", label: "Contacts", short: "Contacts", section: "contacts" },
+  { href: "/cgu", label: "CGU", short: "CGU", section: "cgu" },
   { href: "/courses", label: "Courses", short: "Courses", section: "courses" },
   { href: "/livraisons", label: "Livraisons", short: "Livr.", section: "livraisons" },
   { href: "/restaurants", label: "Restaurants", short: "Restos", section: "restaurants" },
@@ -101,7 +105,6 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/catalogue-location", label: "Catalogue location", short: "Catal.", section: "locations" },
   { href: "/demenagements", label: "Déménagements", short: "Démén.", section: "demenagements" },
   { href: "/covoiturage", label: "Covoiturage", short: "Covoit.", section: "covoiturage" },
-  { href: "/contacts", label: "Contacts", short: "Contacts", section: "contacts" },
 ];
 
 export function normalizeAdminRole(role?: string | null): AdminRole | null {

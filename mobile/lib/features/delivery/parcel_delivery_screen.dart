@@ -411,7 +411,7 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
             ),
             ListTile(
               leading: const Icon(Icons.photo_library_outlined),
-              title: const Text('Choisir dans la galerie'),
+              title: const Text('Galerie'),
               onTap: () {
                 Navigator.pop(ctx);
                 _pickPhoto(ImageSource.gallery);

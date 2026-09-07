@@ -6,13 +6,14 @@ const OWNER_SUPER_ADMIN_PHONE = process.env.OWNER_SUPER_ADMIN_PHONE ?? '+2439711
 const RESTAURANT_PHONE = process.env.RESTAURANT_PHONE ?? '+243900000030';
 const RENTAL_PARTNER_PHONE = process.env.RENTAL_PARTNER_PHONE ?? '+243900000031';
 
+function skipDemoUsers(): boolean {
+  const v = (process.env.SKIP_DEMO_SEED ?? '').trim().toLowerCase();
+  if (v === 'true' || v === '1' || v === 'yes') return true;
+  return process.env.NODE_ENV === 'production';
+}
+
 async function main() {
   const prisma = new PrismaClient();
-  const user = await prisma.user.upsert({
-    where: { phone: ADMIN_PHONE },
-    create: { phone: ADMIN_PHONE, role: ADMIN_ROLE, firstName: 'Admin', lastName: 'SENGA' },
-    update: { role: ADMIN_ROLE },
-  });
   const owner = await prisma.user.upsert({
     where: { phone: OWNER_SUPER_ADMIN_PHONE },
     create: {
@@ -23,6 +24,19 @@ async function main() {
       email: 'celestinkas@gmail.com',
     },
     update: { role: UserRole.SUPER_ADMIN, email: 'celestinkas@gmail.com' },
+  });
+  console.log(`Owner superadmin ready: ${owner.phone} (${owner.role})`);
+
+  if (skipDemoUsers()) {
+    console.log('Demo users skipped (NODE_ENV=production or SKIP_DEMO_SEED). Cities/catalog seeds are unchanged.');
+    await prisma.$disconnect();
+    return;
+  }
+
+  const user = await prisma.user.upsert({
+    where: { phone: ADMIN_PHONE },
+    create: { phone: ADMIN_PHONE, role: ADMIN_ROLE, firstName: 'Admin', lastName: 'SENGA' },
+    update: { role: ADMIN_ROLE },
   });
   const restaurantUser = await prisma.user.upsert({
     where: { phone: RESTAURANT_PHONE },
@@ -45,7 +59,6 @@ async function main() {
     update: { role: UserRole.RENTAL_PARTNER },
   });
   console.log(`Admin user ready: ${user.phone} (${user.role})`);
-  console.log(`Owner superadmin ready: ${owner.phone} (${owner.role})`);
   console.log(`Restaurant user ready: ${restaurantUser.phone} (${restaurantUser.id})`);
   console.log(`Rental partner ready: ${rentalPartner.phone} (${rentalPartner.id})`);
   console.log('Link restaurant ownerUserId in admin or ride DB to this user id.');

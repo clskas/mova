@@ -193,6 +193,11 @@ async function ensureExtraVehicle(
 }
 
 async function main() {
+  const skip = (process.env.SKIP_DEMO_SEED ?? '').trim().toLowerCase();
+  if (skip === 'true' || skip === '1' || skip === 'yes' || process.env.NODE_ENV === 'production') {
+    console.log('Driver demo seed skipped (NODE_ENV=production or SKIP_DEMO_SEED).');
+    return;
+  }
   const prisma = new PrismaClient();
   let synced = 0;
 

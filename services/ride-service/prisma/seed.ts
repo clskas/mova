@@ -222,6 +222,15 @@ async function main() {
   for (const p of CANCELLATION_POLICIES) {
     await prisma.cancellationPolicy.upsert({ where: { vehicleType: p.vehicleType }, create: p, update: p });
   }
+
+  const skipDemo =
+    process.env.NODE_ENV === 'production' ||
+    ['true', '1', 'yes'].includes((process.env.SKIP_DEMO_SEED ?? '').trim().toLowerCase());
+  if (skipDemo) {
+    console.log('Ride catalog seed complete (communes, tarifs). Demo restaurants/vehicles skipped.');
+    return;
+  }
+
   for (const r of KINSHASA_RESTAURANTS) {
     const existing = await prisma.restaurant.findFirst({ where: { name: r.name } });
     if (existing) {

@@ -1,6 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { CommissionServiceType, ErrandCategory, MovingVehicleCategory, SurchargeType, VehicleType } from '@prisma/client';
-import { DRC_SERVICE_AREAS, getCommunesForArea, KINSHASA_COMMUNES, setCityActivationOverrides } from '@mova/shared';
+import { DRC_SERVICE_AREAS, getCommunesForArea, isFakeUserSeedAllowed, KINSHASA_COMMUNES, setCityActivationOverrides } from '@mova/shared';
 import { MOVING_VEHICLE_CATEGORY_DEFAULTS } from '../moving/moving-vehicle-pricing.service';
 import { PARCEL_WEIGHT_BAND_DEFAULTS } from '../platform/parcel-weight-band.service';
 import { PricingTimeWindowService } from '../rides/pricing-time-window.service';
@@ -212,8 +212,9 @@ const ERRAND_CATEGORY_ESTIMATES = [
   },
 ];
 
-/** Demo restaurants / rental vehicles / phantom inquiries. Off unless explicitly enabled. */
+/** Demo restaurants / rental vehicles / phantom inquiries. Off unless explicitly enabled. Never on production deploy. */
 export function isDemoCatalogSeedEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  if (!isFakeUserSeedAllowed(env)) return false;
   return env.SEED_DEMO_CATALOG === 'true';
 }
 

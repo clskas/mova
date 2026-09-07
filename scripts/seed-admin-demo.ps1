@@ -3,6 +3,11 @@
 # Requires: Docker Postgres on localhost:5432 or DATABASE_URL env vars
 
 $ErrorActionPreference = "Stop"
+
+if ($env:NODE_ENV -eq "production" -or $env:SKIP_DEMO_SEED -eq "true") {
+  Write-Host "Skipping demo dataset seed (NODE_ENV=production or SKIP_DEMO_SEED). Real users are not touched."
+  exit 0
+}
 $root = Split-Path -Parent $PSScriptRoot
 
 $pgHost = if ($env:POSTGRES_HOST) { $env:POSTGRES_HOST } else { "localhost:54320" }

@@ -77,7 +77,7 @@ export function ImageSourcePicker({
             onClick={() => pick(galleryRef)}
             className="flex w-full items-center gap-3 border-t border-gray-100 px-4 py-3 text-left text-sm hover:bg-gray-50"
           >
-            Choisir dans la galerie
+            Galerie
           </button>
         </div>
       )}

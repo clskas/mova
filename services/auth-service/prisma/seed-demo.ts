@@ -70,6 +70,11 @@ const DEMO_USERS = [
 ];
 
 async function main() {
+  const skip = (process.env.SKIP_DEMO_SEED ?? '').trim().toLowerCase();
+  if (skip === 'true' || skip === '1' || skip === 'yes' || process.env.NODE_ENV === 'production') {
+    console.log('Auth demo users skipped (NODE_ENV=production or SKIP_DEMO_SEED).');
+    return;
+  }
   const prisma = new PrismaClient();
   for (const u of DEMO_USERS) {
     await prisma.user.upsert({

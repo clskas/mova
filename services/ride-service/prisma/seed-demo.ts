@@ -20,6 +20,11 @@ async function userIdByPhone(phone: string): Promise<string | null> {
 }
 
 async function main() {
+  const skip = (process.env.SKIP_DEMO_SEED ?? '').trim().toLowerCase();
+  if (skip === 'true' || skip === '1' || skip === 'yes' || process.env.NODE_ENV === 'production') {
+    console.log('Ride demo seed skipped (NODE_ENV=production or SKIP_DEMO_SEED).');
+    return;
+  }
   const prisma = new PrismaClient();
   const [passenger1, passenger2, passenger3, driver1] = await Promise.all([
     userIdByPhone(DEMO_PHONES.passenger1),

@@ -3,6 +3,11 @@
 # For full demo data also run: .\scripts\seed-admin-demo.ps1
 
 $ErrorActionPreference = "Stop"
+
+if ($env:NODE_ENV -eq "production" -or $env:SKIP_DEMO_SEED -eq "true") {
+  Write-Host "Skipping demo admin seed (NODE_ENV=production or SKIP_DEMO_SEED)."
+  exit 0
+}
 $root = Split-Path -Parent $PSScriptRoot
 $authDir = Join-Path $root "services\auth-service"
 

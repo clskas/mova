@@ -276,4 +276,15 @@ describe('prod-security', () => {
     const { isProductionSmsConfigured } = await import('./prod-security');
     expect(isProductionSmsConfigured()).toBe(true);
   });
+
+  it('isFakeUserSeedAllowed is false in production and when RUN_SEED=false', async () => {
+    const { isFakeUserSeedAllowed } = await import('./prod-security');
+    expect(isFakeUserSeedAllowed({ NODE_ENV: 'production' })).toBe(false);
+    expect(isFakeUserSeedAllowed({ APP_ENV: 'production' })).toBe(false);
+    expect(isFakeUserSeedAllowed({ NODE_ENV: 'development', RUN_SEED: 'false' })).toBe(false);
+    expect(isFakeUserSeedAllowed({ NODE_ENV: 'production', APP_ENV: 'development' })).toBe(false);
+    expect(isFakeUserSeedAllowed({ NODE_ENV: 'development', SKIP_DEMO_SEED: 'true' })).toBe(false);
+    expect(isFakeUserSeedAllowed({ NODE_ENV: 'development' })).toBe(true);
+    expect(isFakeUserSeedAllowed({})).toBe(true);
+  });
 });

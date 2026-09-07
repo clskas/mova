@@ -8,6 +8,7 @@ import {
   type RestaurantKycDossier,
 } from "@/lib/api";
 import { toUserErrorMessage } from "@/lib/user-messages";
+import { ImageSourcePicker } from "@/components/ImageSourcePicker";
 
 const STATUS_LABEL: Record<string, string> = {
   PENDING: "En attente de validation",
@@ -156,11 +157,11 @@ export default function RestaurantDossierPage() {
             {item.notes && item.status === "REJECTED" && (
               <p className="text-red-700">Motif : {item.notes}</p>
             )}
-            <input
-              type="file"
-              accept="image/*,.pdf"
+            <ImageSourcePicker
               disabled={uploading === item.type}
-              onChange={(e) => onFile(item.type, e.target.files?.[0])}
+              onSelect={(file) => onFile(item.type, file)}
+              label={uploading === item.type ? "Envoi…" : item.uploaded ? "Remplacer" : "Joindre un justificatif"}
+              accept="image/*,.pdf"
             />
           </div>
         ))}

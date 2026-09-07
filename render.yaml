@@ -58,6 +58,8 @@ services:
       # Production: real AfriSoft SMS hub only. Seed 123456 is local/E2E (Playwright), never prod DB.
       - key: ALLOW_TEST_OTP
         value: "false"
+      - key: SKIP_DEMO_SEED
+        value: "true"
       - key: AFRISOFT_SMS_HUB_URL
         value: "https://sms.afri-soft.com"
       - key: AFRISOFT_HUB_APP_ID
@@ -113,6 +115,10 @@ services:
         value: "https://pay.afri-soft.com"
       - key: MOCK_PAYMENTS
         value: "false"
+      - key: SKIP_DEMO_SEED
+        value: "true"
+      - key: SEED_DEMO_CATALOG
+        value: "false"
       - fromGroup: mova-external-apis
 
   - type: web
@@ -135,6 +141,8 @@ services:
         fromService: { name: mova-auth, type: web, property: hostport }
       - key: MOCK_PAYMENTS
         value: "false"
+      - key: SKIP_DEMO_SEED
+        value: "true"
       - key: AFRISOFT_PAY_HUB_URL
         value: "https://pay.afri-soft.com"
       - key: AFRISOFT_PAY_HUB_APP_ID
@@ -161,6 +169,8 @@ services:
         fromService: { name: mova-auth, type: web, property: hostport }
       - key: NOTIFICATION_SERVICE_URL
         fromService: { name: mova-notification, type: web, property: hostport }
+      - key: SKIP_DEMO_SEED
+        value: "true"
 
   - type: web
     name: mova-notification

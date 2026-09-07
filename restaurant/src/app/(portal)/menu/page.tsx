@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   fetchMenu,
+  fetchProfile,
   formatCdf,
   mediaUrl,
   saveMenu,
@@ -29,12 +30,16 @@ export default function MenuPage() {
   const [uploadingTarget, setUploadingTarget] = useState<"draft" | number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [canOperate, setCanOperate] = useState(true);
 
   const load = useCallback(async () => {
     setError(null);
     try {
-      const menu = await fetchMenu();
+      const [menu, profile] = await Promise.all([fetchMenu(), fetchProfile().catch(() => null)]);
       setItems(menu.menuItems ?? []);
+      if (profile) {
+        setCanOperate(profile.canOperate !== false && profile.kycStatus !== "PENDING" && profile.kycStatus !== "REJECTED");
+      }
     } catch (e) {
       setError(toUserErrorMessage(e, "Erreur de chargement"));
     } finally {
@@ -47,6 +52,10 @@ export default function MenuPage() {
   }, [load]);
 
   async function handlePhoto(file: File, target: "draft" | number) {
+    if (!canOperate) {
+      setError("Votre compte doit être validé avant de publier le menu.");
+      return;
+    }
     setUploadingTarget(target);
     setError(null);
     try {
@@ -77,6 +86,10 @@ export default function MenuPage() {
   }
 
   function applyDraft() {
+    if (!canOperate) {
+      setError("Votre compte doit être validé avant de publier le menu.");
+      return;
+    }
     const name = draft.name.trim();
     if (!name) {
       setError("Nom du plat requis");
@@ -103,6 +116,10 @@ export default function MenuPage() {
   }
 
   async function persist() {
+    if (!canOperate) {
+      setError("Votre compte doit être validé avant de publier le menu.");
+      return;
+    }
     if (items.length === 0) {
       setError("Ajoutez au moins un plat");
       return;
@@ -131,7 +148,7 @@ export default function MenuPage() {
           </div>
           <button
             type="button"
-            disabled={saving || loading}
+            disabled={saving || loading || !canOperate}
             onClick={persist}
             className="px-5 py-2.5 rounded-xl bg-[#FF6B35] text-white text-sm font-medium disabled:opacity-60"
           >
@@ -141,6 +158,15 @@ export default function MenuPage() {
 
         {error && <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-4 text-sm">{error}</div>}
         {message && <div className="bg-green-50 border border-green-200 text-green-800 rounded-xl p-4 text-sm">{message}</div>}
+        {!canOperate && (
+          <div className="bg-amber-50 border border-amber-200 text-amber-900 rounded-xl p-4 text-sm">
+            Votre compte doit être validé avant de publier le menu. Ouvrez{" "}
+            <a href="/dossier" className="underline font-medium">
+              Mon dossier
+            </a>{" "}
+            pour envoyer vos justificatifs.
+          </div>
+        )}
 
         <div className="bg-white rounded-2xl border p-5 space-y-4">
           <h3 className="font-semibold">{editIndex != null ? "Modifier le plat" : "Ajouter un plat"}</h3>
@@ -176,7 +202,7 @@ export default function MenuPage() {
           </label>
           <div className="flex flex-wrap items-center gap-4">
             <ImageSourcePicker
-              disabled={uploadingTarget !== null}
+              disabled={!canOperate || uploadingTarget !== null}
               onSelect={(file) => handlePhoto(file, "draft")}
               label={uploadingTarget === "draft" ? "Upload…" : "Photo du plat"}
               accept="image/jpeg,image/png,image/webp"
@@ -195,7 +221,7 @@ export default function MenuPage() {
             </label>
           </div>
           <div className="flex gap-2">
-            <button type="button" onClick={applyDraft} className="px-4 py-2 rounded-xl bg-[#6C63FF] text-white text-sm">
+            <button type="button" disabled={!canOperate} onClick={applyDraft} className="px-4 py-2 rounded-xl bg-[#6C63FF] text-white text-sm disabled:opacity-60">
               {editIndex != null ? "Mettre à jour" : "Ajouter au menu"}
             </button>
             {editIndex != null && (
@@ -232,17 +258,17 @@ export default function MenuPage() {
                   <p className="text-[#6C63FF] text-sm font-medium">{formatCdf(item.unitPriceCdf)}</p>
                   {item.description && <p className="text-xs text-gray-500 mt-1 line-clamp-2">{item.description}</p>}
                   <div className="flex flex-wrap gap-2 mt-3">
-                    <button type="button" onClick={() => startEdit(index)} className="text-xs text-[#6C63FF] underline">
+                    <button type="button" disabled={!canOperate} onClick={() => startEdit(index)} className="text-xs text-[#6C63FF] underline disabled:opacity-60">
                       Modifier
                     </button>
                     <ImageSourcePicker
-                      disabled={uploadingTarget !== null}
+                      disabled={!canOperate || uploadingTarget !== null}
                       onSelect={(file) => handlePhoto(file, index)}
                       label={uploadingTarget === index ? "Upload…" : "Photo"}
                       className="text-xs text-gray-600 underline disabled:opacity-60"
                       accept="image/jpeg,image/png,image/webp"
                     />
-                    <button type="button" onClick={() => removeItem(index)} className="text-xs text-red-600 underline">
+                    <button type="button" disabled={!canOperate} onClick={() => removeItem(index)} className="text-xs text-red-600 underline disabled:opacity-60">
                       Supprimer
                     </button>
                   </div>

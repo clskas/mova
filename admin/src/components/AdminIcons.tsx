@@ -198,3 +198,13 @@ export function AccountIcon({ className }: IconProps) {
     </Svg>
   );
 }
+
+export function ContactsIcon({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <rect x="5" y="4" width="14" height="16" rx="2" />
+      <circle cx="12" cy="10" r="2.25" />
+      <path d="M8 16.5c.8-1.4 2-2 4-2s3.2.6 4 2" />
+    </Svg>
+  );
+}

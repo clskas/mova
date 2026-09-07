@@ -26,7 +26,18 @@ void main() {
   });
 
   test('maps class-validator English and Prisma codes without leaking internals', () {
-    expect(sanitizeUserMessage('phone must be a string'), 'Données invalides. Vérifiez les champs.');
+    expect(
+      sanitizeUserMessage('phone must be a string'),
+      'Numéro Mobile Money invalide. Format : +243XXXXXXXXX.',
+    );
+    expect(
+      sanitizeUserMessage(r'otp must match /^\d{6}$/ regular expression'),
+      'Code OTP requis (6 chiffres envoyé au numéro Mobile Money).',
+    );
+    expect(
+      sanitizeUserMessage('amountCdf must be an integer number'),
+      'Montant invalide. Entrez un nombre entier d’au moins 2 300 FC.',
+    );
     expect(
       sanitizeUserMessage('Unique constraint failed P2002 on escrowReady'),
       'Une erreur est survenue. Veuillez réessayer.',

@@ -12,6 +12,23 @@ import '../../core/error/result.dart';
 import '../../core/widgets/offline_shell.dart';
 import '../../core/wallet/wallet_movements.dart';
 
+int _readCdf(dynamic value) {
+  if (value is int) return value;
+  if (value is num) return value.round();
+  return int.tryParse(value?.toString().replaceAll(RegExp(r'[\s\u00A0\u202F]'), '') ?? '') ?? 0;
+}
+
+int? parseWithdrawAmountCdf(String raw) {
+  final cleaned = raw.trim().replaceAll(RegExp(r'[\s\u00A0\u202F]'), '').replaceAll(',', '.');
+  if (cleaned.isEmpty) return null;
+  final asInt = int.tryParse(cleaned);
+  if (asInt != null) return asInt;
+  final asDouble = double.tryParse(cleaned);
+  if (asDouble == null) return null;
+  if (asDouble != asDouble.roundToDouble()) return null;
+  return asDouble.round();
+}
+
 class WalletScreen extends ConsumerStatefulWidget {
   const WalletScreen({super.key});
 
@@ -96,7 +113,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
     List<Map<String, dynamic>> txs = _transactions;
     switch (results[0]) {
       case Success(:final data):
-        _balance = data['balanceCdf'] as int? ?? 0;
+        _balance = _readCdf(data['availableBalanceCdf'] ?? data['balanceCdf']);
         _fromCache = data['cached'] == true;
         final syncedRaw = data['syncedAt']?.toString();
         _lastSync = syncedRaw != null
@@ -660,6 +677,7 @@ class _WalletWithdrawSheetState extends ConsumerState<_WalletWithdrawSheet> {
   bool _otpSent = false;
   bool _otpLoading = false;
   String? _otpPhone;
+  String? _formError;
 
   @override
   void initState() {
@@ -681,26 +699,26 @@ class _WalletWithdrawSheetState extends ConsumerState<_WalletWithdrawSheet> {
   }
 
   ({int amount, String phone})? _validatedAmountPhone() {
-    final amount = int.tryParse(_amountController.text.trim()) ?? 0;
+    final amount = parseWithdrawAmountCdf(_amountController.text);
+    if (amount == null) {
+      setState(() => _formError = 'Montant invalide. Entrez un nombre entier en FC.');
+      return null;
+    }
     if (amount < 2300) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Montant minimum : 2 300 FC')),
-      );
+      setState(() => _formError =
+          'Montant minimum : 2 300 FC (contrainte Mobile Money). Vous pouvez retirer une partie du solde si ce montant reste ≥ 2 300 FC.');
       return null;
     }
     if (amount > widget.maxAmount) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Maximum : ${MarketConfig.formatCdf(widget.maxAmount)}')),
-      );
+      setState(() => _formError = 'Maximum : ${MarketConfig.formatCdf(widget.maxAmount)}');
       return null;
     }
     final phone = MarketConfig.normalizePhone(_phoneController.text.trim());
     if (!MarketConfig.validatePhone(phone)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Numéro invalide. Format : +243XXXXXXXXX')),
-      );
+      setState(() => _formError = 'Numéro Mobile Money invalide. Format : +243XXXXXXXXX');
       return null;
     }
+    setState(() => _formError = null);
     return (amount: amount, phone: phone);
   }
 
@@ -721,26 +739,24 @@ class _WalletWithdrawSheetState extends ConsumerState<_WalletWithdrawSheet> {
         setState(() {
           _otpSent = true;
           _otpPhone = parsed.phone;
+          _formError = null;
         });
       case Failure(:final error):
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(error.message)),
-        );
+        setState(() => _formError = error.message);
     }
   }
 
   void _confirm() {
     final parsed = _validatedAmountPhone();
     if (parsed == null) return;
+    // Same button triggers OTP first, then confirms after the code is entered.
     if (!_otpSent || _otpPhone != parsed.phone) {
       _sendOtp();
       return;
     }
     final otp = _otpController.text.trim();
     if (!RegExp(r'^\d{6}$').hasMatch(otp)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Entrez le code à 6 chiffres reçu sur ce numéro.')),
-      );
+      setState(() => _formError = 'Code OTP requis (6 chiffres envoyé au numéro Mobile Money).');
       return;
     }
     Navigator.pop(
@@ -774,6 +790,11 @@ class _WalletWithdrawSheetState extends ConsumerState<_WalletWithdrawSheet> {
             ),
             const SizedBox(height: 8),
             const Text(
+              'Vous pouvez retirer une partie du solde (minimum 2 300 FC). Le reste reste sur le portefeuille.',
+              style: TextStyle(color: MovaColors.textSecondary, fontSize: 13),
+            ),
+            const SizedBox(height: 8),
+            const Text(
               'Un code SMS sera envoyé au numéro de versement pour confirmer que vous ne vous êtes pas trompé.',
               style: TextStyle(color: MovaColors.textSecondary, fontSize: 13),
             ),
@@ -798,9 +819,19 @@ class _WalletWithdrawSheetState extends ConsumerState<_WalletWithdrawSheet> {
               controller: _amountController,
               enabled: !_otpSent,
               keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'Montant (FC)',
-                prefixIcon: Icon(Icons.payments_outlined),
+                helperText: 'Minimum 2 300 FC — pas besoin de vider tout le solde',
+                prefixIcon: const Icon(Icons.payments_outlined),
+                suffixIcon: !_otpSent && widget.maxAmount >= 2300
+                    ? TextButton(
+                        onPressed: () => setState(() {
+                          _amountController.text = '${widget.maxAmount}';
+                          _formError = null;
+                        }),
+                        child: const Text('Tout'),
+                      )
+                    : null,
               ),
             ),
             const SizedBox(height: 12),
@@ -841,6 +872,13 @@ class _WalletWithdrawSheetState extends ConsumerState<_WalletWithdrawSheet> {
                 child: const Text('Modifier le numéro'),
               ),
             ],
+            if (_formError != null) ...[
+              const SizedBox(height: 12),
+              Text(
+                _formError!,
+                style: const TextStyle(color: MovaColors.error, fontSize: 13),
+              ),
+            ],
             const SizedBox(height: 20),
             MovaButton(
               label: _otpLoading
@@ -850,7 +888,7 @@ class _WalletWithdrawSheetState extends ConsumerState<_WalletWithdrawSheet> {
                       : 'Envoyer le code SMS',
               icon: _otpSent ? Icons.check : Icons.sms_outlined,
               isLoading: _otpLoading,
-              onPressed: _otpLoading ? null : (_otpSent ? _confirm : _sendOtp),
+              onPressed: _otpLoading ? null : _confirm,
             ),
           ],
         ),

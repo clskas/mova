@@ -32,6 +32,22 @@ bool _isClassValidatorEnglish(String msg) {
       ).hasMatch(msg);
 }
 
+String? _withdrawFieldMessage(String msg) {
+  final lower = msg.toLowerCase();
+  if (RegExp(r'\botp\b').hasMatch(lower) &&
+      (_isClassValidatorEnglish(msg) || lower.contains('required') || lower.contains('must'))) {
+    return 'Code OTP requis (6 chiffres envoyé au numéro Mobile Money).';
+  }
+  if (RegExp(r'\bphone\b').hasMatch(lower) && _isClassValidatorEnglish(msg)) {
+    return 'Numéro Mobile Money invalide. Format : +243XXXXXXXXX.';
+  }
+  if (RegExp(r'amountcdf|amount_cdf').hasMatch(lower) &&
+      (_isClassValidatorEnglish(msg) || lower.contains('must not be less'))) {
+    return 'Montant invalide. Entrez un nombre entier d’au moins 2 300 FC.';
+  }
+  return null;
+}
+
 /// Messages utilisateur sans détails techniques (HTTP, exceptions, codes internes).
 String sanitizeUserMessage(
   String? raw, {
@@ -41,6 +57,8 @@ String sanitizeUserMessage(
   final msg = raw.trim();
   if (_isClassValidatorPinMessage(msg)) return pinSixDigitsFr;
   if (_isPaymentGatewayEnglish(msg)) return paymentFailedFr;
+  final withdrawField = _withdrawFieldMessage(msg);
+  if (withdrawField != null) return withdrawField;
   if (_isClassValidatorEnglish(msg)) return validationFailedFr;
   if (RegExp(r'^HTTP \d', caseSensitive: false).hasMatch(msg)) return fallback;
   if (RegExp(r'https?://', caseSensitive: false).hasMatch(msg)) return fallback;

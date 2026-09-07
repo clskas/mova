@@ -1,5 +1,5 @@
 import { HttpStatus } from '@nestjs/common';
-import { PIN_SIX_DIGITS_FR, toPublicHttpMessage } from './http-exception.filter';
+import { PIN_SIX_DIGITS_FR, toPublicHttpMessage, WITHDRAW_AMOUNT_INVALID_FR, WITHDRAW_OTP_REQUIRED_FR, WITHDRAW_PHONE_INVALID_FR } from './http-exception.filter';
 import { MOVA_ERROR_MESSAGES, MovaErrorCode } from './mova-error-codes';
 import { SERDIPAY_B2C_CHANNEL_DISABLED_FR, SERDIPAY_B2C_MERCHANT_FLOAT_LOW_FR } from './serdipay';
 
@@ -21,8 +21,23 @@ describe('toPublicHttpMessage', () => {
 
   it('hides other class-validator English as a generic validation error', () => {
     expect(
-      toPublicHttpMessage('phone must match /^\\+243/ regular expression', HttpStatus.BAD_REQUEST),
+      toPublicHttpMessage('escrowReady must be a boolean', HttpStatus.BAD_REQUEST),
     ).toBe(MOVA_ERROR_MESSAGES[MovaErrorCode.VALIDATION_ERROR]);
+  });
+
+  it('maps withdraw OTP / phone / amount class-validator English to a specific French message', () => {
+    expect(
+      toPublicHttpMessage('otp must match /^\\d{6}$/ regular expression', HttpStatus.BAD_REQUEST),
+    ).toBe(WITHDRAW_OTP_REQUIRED_FR);
+    expect(toPublicHttpMessage('otp must be a string', HttpStatus.BAD_REQUEST)).toBe(
+      WITHDRAW_OTP_REQUIRED_FR,
+    );
+    expect(
+      toPublicHttpMessage('phone must match /^\\+243/ regular expression', HttpStatus.BAD_REQUEST),
+    ).toBe(WITHDRAW_PHONE_INVALID_FR);
+    expect(
+      toPublicHttpMessage('amountCdf must be an integer number', HttpStatus.BAD_REQUEST),
+    ).toBe(WITHDRAW_AMOUNT_INVALID_FR);
   });
 
   it('keeps an already-friendly French PIN message', () => {

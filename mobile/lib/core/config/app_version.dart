@@ -1,8 +1,8 @@
-/// Version client — alignée sur `mobile/pubspec.yaml` (`version: 1.0.5+48`).
-/// Play versionCode is overridden in CI (`--build-number` + `--dart-define=APP_BUILD`).
+/// Version client — le *nom* reste `1.0.5` (AABs Play 1.0.6 compilent encore ce const).
+/// Le versionCode Play est `pubspec` / CI (`--build-number` + `--dart-define=APP_BUILD`).
 class AppVersion {
   static const name = '1.0.5';
-  static const build = int.fromEnvironment('APP_BUILD', defaultValue: 48);
+  static const build = int.fromEnvironment('APP_BUILD', defaultValue: 51);
 
   static int compare(String a, String b) {
     List<int> parts(String raw) => raw

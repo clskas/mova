@@ -1,22 +1,54 @@
 import { Body, Controller, Get, Post, Query, Request, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
-import { IsEnum, IsInt, IsOptional, IsString, Matches, Min } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+import { IsEnum, IsInt, IsNotEmpty, IsOptional, IsString, Matches, Min } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { WalletService } from './wallet.service';
 
+const OTP_REQUIRED_FR = 'Code OTP requis (6 chiffres envoyé au numéro Mobile Money).';
+const PHONE_REQUIRED_FR = 'Numéro Mobile Money requis. Format : +243XXXXXXXXX.';
+const AMOUNT_INT_FR = 'Montant invalide. Entrez un nombre entier en FC.';
+const AMOUNT_MIN_FR = 'Montant minimum : 2 300 FC.';
+
+/** Whole CDF only — do not round 2300.6 → 2301 (that 400 looked like « Données invalides »). */
+export function coerceCdfInteger(value: unknown): unknown {
+  if (value === null || value === undefined || value === '') return value;
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return Number.isInteger(value) ? value : value;
+  }
+  if (typeof value === 'string') {
+    const n = Number(value.replace(/[\s\u00A0\u202F]/g, '').replace(',', '.'));
+    if (Number.isInteger(n)) return n;
+  }
+  return value;
+}
+
 class WithdrawRequestDto {
-  @ApiProperty() @Type(() => Number) @IsInt() @Min(2300) amountCdf: number;
-  @ApiProperty() @IsString() provider: string;
-  @ApiProperty() @IsString() phone: string;
+  @ApiProperty()
+  @Transform(({ value }) => coerceCdfInteger(value))
+  @Type(() => Number)
+  @IsInt({ message: AMOUNT_INT_FR })
+  @Min(2300, { message: AMOUNT_MIN_FR })
+  amountCdf: number;
+
+  @ApiProperty()
+  @IsString({ message: 'Opérateur Mobile Money requis (ORANGE_MONEY, MPESA, AIRTEL_MONEY).' })
+  @IsNotEmpty({ message: 'Opérateur Mobile Money requis (ORANGE_MONEY, MPESA, AIRTEL_MONEY).' })
+  provider: string;
+
+  @ApiProperty()
+  @IsString({ message: PHONE_REQUIRED_FR })
+  @IsNotEmpty({ message: PHONE_REQUIRED_FR })
+  phone: string;
 }
 
 class WithdrawDto extends WithdrawRequestDto {
   @ApiProperty({ description: 'Code OTP à 6 chiffres envoyé au numéro Mobile Money' })
-  @IsString()
-  @Matches(/^\d{6}$/)
-  otp: string;
+  @IsOptional()
+  @IsString({ message: OTP_REQUIRED_FR })
+  @Matches(/^\d{6}$/, { message: OTP_REQUIRED_FR })
+  otp?: string;
 }
 
 class TopUpDto {

@@ -311,11 +311,37 @@ describe('WalletService', () => {
     expect(tx.wallet.update).toHaveBeenCalledTimes(1);
   });
 
+  it('autorise un retrait partiel (pas seulement le solde entier)', async () => {
+    tx.$queryRaw.mockResolvedValue([{ id: 'w1', balanceCdf: 5000, heldBalanceCdf: 0 }]);
+    tx.wallet.update.mockResolvedValue({ id: 'w1', userId: 'u1', balanceCdf: 2700 });
+    await service.requestWithdrawOtp('u1', 2300, 'MPESA', '+243810000002');
+    const result = await service.withdrawToMobileMoney('u1', 2300, 'MPESA', '+243810000002', {
+      otp: TEST_OTP_CODE,
+    });
+    expect(result.success).toBe(true);
+    expect(tx.wallet.update).toHaveBeenCalledWith({
+      where: { id: 'w1' },
+      data: { balanceCdf: { decrement: 2300 } },
+    });
+  });
+
+  it('refuse un retrait sous le plancher Mobile Money (2000 de 2300)', async () => {
+    await expect(
+      service.withdrawToMobileMoney('u1', 2000, 'MPESA', '+243810000002', { skipOtp: true }),
+    ).rejects.toMatchObject({
+      response: { message: expect.stringMatching(/2300|2[\s\u00A0\u202F]?300/) },
+    });
+    expect(tx.wallet.update).not.toHaveBeenCalled();
+  });
+
   it('refuse un retrait B2C sans OTP', async () => {
     await expect(
       service.withdrawToMobileMoney('u1', 2300, 'ORANGE_MONEY', '+243970000001'),
     ).rejects.toMatchObject({
-      response: { code: 'MOVA_AUTH_001' },
+      response: {
+        code: 'MOVA_AUTH_001',
+        message: expect.stringMatching(/Code OTP requis/i),
+      },
     });
     expect(tx.wallet.update).not.toHaveBeenCalled();
   });

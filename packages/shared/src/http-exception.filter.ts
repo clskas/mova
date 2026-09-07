@@ -43,6 +43,12 @@ function isNestHttpException(exception: unknown): exception is HttpException {
 
 /** Aligné sur PinAuth / LocalPinSetup / auth PinLoginDto. */
 export const PIN_SIX_DIGITS_FR = 'Le code PIN doit contenir 6 chiffres.';
+export const WITHDRAW_OTP_REQUIRED_FR =
+  'Code OTP requis (6 chiffres envoyé au numéro Mobile Money).';
+export const WITHDRAW_PHONE_INVALID_FR =
+  'Numéro Mobile Money invalide. Format : +243XXXXXXXXX.';
+export const WITHDRAW_AMOUNT_INVALID_FR =
+  'Montant invalide. Entrez un nombre entier d’au moins 2 300 FC.';
 
 const CLASS_VALIDATOR_ENGLISH = [
   /must match .+ regular expression/i,
@@ -103,12 +109,24 @@ function isPinFormatValidationMessage(msg: string): boolean {
   );
 }
 
+/** class-validator English on withdraw fields → say *what* is wrong, not « Données invalides ». */
+function classValidatorFieldMessage(msg: string): string | null {
+  if (!CLASS_VALIDATOR_ENGLISH.some((re) => re.test(msg))) return null;
+  const lower = msg.toLowerCase();
+  if (/\botp\b/.test(lower)) return WITHDRAW_OTP_REQUIRED_FR;
+  if (/\bphone\b/.test(lower)) return WITHDRAW_PHONE_INVALID_FR;
+  if (/amountcdf|amount_cdf/.test(lower)) return WITHDRAW_AMOUNT_INVALID_FR;
+  return null;
+}
+
 /** Never expose Nest/Prisma/English internals to API clients. */
 export function toPublicHttpMessage(raw: string, status: number): string {
   const msg = (raw ?? '').trim();
   if (isPinFormatValidationMessage(msg)) {
     return PIN_SIX_DIGITS_FR;
   }
+  const fieldMsg = classValidatorFieldMessage(msg);
+  if (fieldMsg) return fieldMsg;
   if (
     isSerdiPayChannelDisabledError(msg) ||
     isSerdiPayMerchantFloatLowError(msg) ||

@@ -89,7 +89,6 @@ class AppUpdateService extends Notifier<AppUpdateState> {
   Timer? _softDismissTimer;
   bool _started = false;
   bool _checking = false;
-  bool _flexibleKickStarted = false;
   bool _alive = true;
 
   @override
@@ -173,25 +172,11 @@ class AppUpdateService extends Notifier<AppUpdateState> {
         next = next.copyWith(storeUrl: defaultStoreUrl);
       }
       if (next != state) state = next;
-      if (next.updateAvailable) _kickFlexibleDownload();
+      // Do not auto-download / auto-reload: the chauffeur must see
+      // « Une nouvelle version de SENGA est disponible » until they tap Mettre à jour.
     } finally {
       _checking = false;
     }
-  }
-
-  void _kickFlexibleDownload() {
-    if (_flexibleKickStarted || state.forceUpdate || state.flexibleDownloaded) {
-      return;
-    }
-    _flexibleKickStarted = true;
-    unawaited(() async {
-      final downloaded = await PlayInAppUpdate.startFlexible();
-      if (downloaded && _alive) {
-        state = state.copyWith(flexibleDownloaded: true);
-      } else {
-        _flexibleKickStarted = false;
-      }
-    }());
   }
 
   void dismiss() {
@@ -247,9 +232,18 @@ class AppUpdateService extends Notifier<AppUpdateState> {
     final root = _asMap(raw);
     if (root == null) return null;
     final flavor = isDriver ? 'driver' : 'passenger';
+    final other = isDriver ? 'passenger' : 'driver';
     var block = _asMap(root[flavor]);
     if (block == null) {
       block = _asMap(_asMap(root['data'])?[flavor]);
+    }
+    if (block == null) {
+      // Older payloads / gateway envelope without a driver key must not hide the banner.
+      block = _asMap(root[other]) ?? _asMap(_asMap(root['data'])?[other]);
+    }
+    if (block == null &&
+        (root['currentVersion'] != null || root['currentVersionCode'] != null)) {
+      block = root;
     }
     if (block == null) return null;
     final current = block['currentVersion']?.toString().trim() ?? '';

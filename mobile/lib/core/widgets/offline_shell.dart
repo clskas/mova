@@ -46,152 +46,158 @@ class _MovaOfflineShellState extends ConsumerState<MovaOfflineShell>
     final state = offlineAsync.valueOrNull;
     final update = ref.watch(appUpdateServiceProvider);
     final showSoftBanner = update.showBanner && !update.forceUpdate;
+    final showOffline = state != null && state.isOffline;
+    final showSync = state != null && state.pendingSyncCount > 0;
+    final showTopChrome = showSoftBanner || showOffline || showSync;
+
+    // Column (not a Stack overlay): Android Maps platform views paint over
+    // Flutter siblings and hid the driver update banner.
+    final banners = Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (showSoftBanner)
+          Material(
+            color: MovaColors.violet,
+            child: SafeArea(
+              bottom: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 8, 4),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.system_update, color: Colors.white, size: 18),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            update.flexibleDownloaded
+                                ? 'La mise à jour de SENGA est prête. Redémarrez pour l\'installer.'
+                                : 'Une nouvelle version de SENGA est disponible.',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        if (!update.forceUpdate)
+                          TextButton(
+                            onPressed: () =>
+                                ref.read(appUpdateServiceProvider.notifier).dismiss(),
+                            child: const Text(
+                              'Plus tard',
+                              style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        TextButton(
+                          onPressed: () =>
+                              ref.read(appUpdateServiceProvider.notifier).openStore(),
+                          child: Text(
+                            update.flexibleDownloaded ? 'Redémarrer' : 'Mettre à jour',
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        if (showOffline)
+          Material(
+            color: state!.reason == OfflineReason.noNetwork
+                ? MovaColors.orange
+                : MovaColors.midnight,
+            child: SafeArea(
+              bottom: false,
+              child: InkWell(
+                onTap: state.reason == OfflineReason.serverUnavailable
+                    ? () => ref.read(apiClientProvider).checkHealth(resetFailures: true)
+                    : null,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Row(
+                    children: [
+                      Icon(
+                        state.reason == OfflineReason.noNetwork
+                            ? Icons.wifi_off
+                            : Icons.cloud_off,
+                        color: Colors.white,
+                        size: 18,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          kDebugMode && state.reason == OfflineReason.serverUnavailable
+                              ? '${state.bannerMessage}\nAPI: ${MarketConfig.effectiveApiBaseUrl}\nTouchez pour réessayer'
+                              : state.reason == OfflineReason.serverUnavailable
+                                  ? '${state.bannerMessage}\nTouchez pour réessayer'
+                                  : state.bannerMessage,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        if (showSync)
+          Material(
+            color: MovaColors.violet.withValues(alpha: 0.95),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              child: Row(
+                children: [
+                  const Icon(Icons.sync, size: 16, color: Colors.white),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '${state!.pendingSyncCount} action${state.pendingSyncCount > 1 ? 's' : ''} en attente de synchronisation',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ],
+    );
+
+    Widget body = widget.child ?? const SizedBox.shrink();
+    if (showTopChrome) {
+      body = MediaQuery.removePadding(
+        context: context,
+        removeTop: true,
+        child: body,
+      );
+    }
 
     return Stack(
       fit: StackFit.expand,
       children: [
-        widget.child ?? const SizedBox.shrink(),
-        if ((state != null && (state.isOffline || state.pendingSyncCount > 0)) ||
-            showSoftBanner)
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (showSoftBanner)
-                  Material(
-                    color: MovaColors.violet,
-                    child: SafeArea(
-                      bottom: false,
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 8, 8, 4),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Row(
-                              children: [
-                                const Icon(Icons.system_update, color: Colors.white, size: 18),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    update.flexibleDownloaded
-                                        ? 'La mise à jour de SENGA est prête. Redémarrez pour l\'installer.'
-                                        : 'Une nouvelle version de SENGA est disponible.',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.end,
-                              children: [
-                                if (!update.forceUpdate)
-                                  TextButton(
-                                    onPressed: () =>
-                                        ref.read(appUpdateServiceProvider.notifier).dismiss(),
-                                    child: const Text(
-                                      'Plus tard',
-                                      style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600),
-                                    ),
-                                  ),
-                                TextButton(
-                                  onPressed: () =>
-                                      ref.read(appUpdateServiceProvider.notifier).openStore(),
-                                  child: Text(
-                                    update.flexibleDownloaded ? 'Redémarrer' : 'Mettre à jour',
-                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                if (state != null && state.isOffline)
-                  Material(
-                    color: state.reason == OfflineReason.noNetwork
-                        ? MovaColors.orange
-                        : MovaColors.midnight,
-                    child: SafeArea(
-                      bottom: false,
-                      child: InkWell(
-                        onTap: state.reason == OfflineReason.serverUnavailable
-                            ? () => ref
-                                .read(apiClientProvider)
-                                .checkHealth(resetFailures: true)
-                            : null,
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 8,
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                state.reason == OfflineReason.noNetwork
-                                    ? Icons.wifi_off
-                                    : Icons.cloud_off,
-                                color: Colors.white,
-                                size: 18,
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  kDebugMode && state.reason == OfflineReason.serverUnavailable
-                                      ? '${state.bannerMessage}\nAPI: ${MarketConfig.effectiveApiBaseUrl}\nTouchez pour réessayer'
-                                      : state.reason == OfflineReason.serverUnavailable
-                                          ? '${state.bannerMessage}\nTouchez pour réessayer'
-                                          : state.bannerMessage,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                if (state != null && state.pendingSyncCount > 0)
-                  Material(
-                    color: MovaColors.violet.withValues(alpha: 0.95),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 6,
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.sync, size: 16, color: Colors.white),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              '${state.pendingSyncCount} action${state.pendingSyncCount > 1 ? 's' : ''} en attente de synchronisation',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (showTopChrome) banners,
+            Expanded(child: body),
+          ],
+        ),
         if (update.forceUpdate)
           const Positioned.fill(child: _ForceUpdateBarrier()),
       ],

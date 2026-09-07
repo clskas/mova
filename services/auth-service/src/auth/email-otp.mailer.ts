@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import * as dns from 'dns';
 import * as net from 'net';
 import * as tls from 'tls';
 import { isMockOtpAllowed, maskEmail } from '@mova/shared';
@@ -33,6 +34,115 @@ export function inferSmtpHost(userOrFrom: string, explicitHost?: string): string
   if (domain === 'yahoo.com' || domain.endsWith('.yahoo.com')) return 'smtp.mail.yahoo.com';
   if (domain === 'zoho.com' || domain.endsWith('.zoho.com')) return 'smtp.zoho.com';
   return `mail.${domain}`;
+}
+
+const SHARED_MAIL_CERT_SUFFIXES = ['.site4now.net', '.smarterasp.net'] as const;
+
+/**
+ * SmarterASP documents SSL SMTP as mail####.site4now.net (matches *.site4now.net).
+ * Customer CNAME mail.afri-soft.com presents that cert, so Node's hostname check
+ * fails unless we connect / set tls.servername to the shared host.
+ */
+const KNOWN_SHARED_SMTP_HOSTS: Record<string, string> = {
+  'mail.afri-soft.com': 'mail5013.site4now.net',
+};
+
+function normalizeSmtpHost(host: string): string {
+  return host.trim().toLowerCase().replace(/\.$/, '');
+}
+
+export function isSharedMailCertHost(host: string): boolean {
+  const h = normalizeSmtpHost(host);
+  return SHARED_MAIL_CERT_SUFFIXES.some((suffix) => h.endsWith(suffix));
+}
+
+function isWellKnownProviderSmtpHost(host: string): boolean {
+  const h = normalizeSmtpHost(host);
+  return (
+    h === 'smtp.gmail.com' ||
+    h === 'smtp.office365.com' ||
+    h === 'smtp.mail.yahoo.com' ||
+    h === 'smtp.zoho.com' ||
+    h.endsWith('.gmail.com') ||
+    h.endsWith('.outlook.com') ||
+    h.endsWith('.office365.com') ||
+    h.endsWith('.yahoo.com') ||
+    h.endsWith('.zoho.com')
+  );
+}
+
+/** True when SMTP_HOST is a customer mail.* CNAME in front of a shared-host cert. */
+export function allowsSharedMailCertFallback(connectHost: string): boolean {
+  const h = normalizeSmtpHost(connectHost);
+  if (!h || isWellKnownProviderSmtpHost(h)) return false;
+  if (isSharedMailCertHost(h)) return true;
+  if (KNOWN_SHARED_SMTP_HOSTS[h]) return true;
+  return h.startsWith('mail.');
+}
+
+export function smtpPeerMatchesSharedMailCert(cert: {
+  subject?: { CN?: string | string[] };
+  subjectaltname?: string;
+}): boolean {
+  const names: string[] = [];
+  const cn = cert.subject?.CN;
+  if (Array.isArray(cn)) names.push(...cn);
+  else if (cn) names.push(cn);
+  for (const part of (cert.subjectaltname ?? '').split(',')) {
+    const match = part.trim().match(/^DNS:(.+)$/i);
+    if (match) names.push(match[1]);
+  }
+  return names.some((name) => isSharedMailCertHost(name.replace(/^\*\./, 'wildcard.')));
+}
+
+/**
+ * TLS SNI / verify name. Prefer the hostname that matches *.site4now.net
+ * (CNAME or known mapping) over the customer SMTP_HOST.
+ */
+export function smtpTlsServername(connectHost: string, cnameTarget?: string): string {
+  const host = normalizeSmtpHost(connectHost);
+  const cname = normalizeSmtpHost(cnameTarget ?? '');
+  if (cname && isSharedMailCertHost(cname)) return cname;
+  if (isSharedMailCertHost(host)) return host;
+  return KNOWN_SHARED_SMTP_HOSTS[host] ?? host;
+}
+
+/** TCP host: documented SSL host when the cert is on the shared provider. */
+export function smtpConnectHost(configuredHost: string, cnameTarget?: string): string {
+  const servername = smtpTlsServername(configuredHost, cnameTarget);
+  return isSharedMailCertHost(servername) ? servername : normalizeSmtpHost(configuredHost);
+}
+
+export function smtpCheckServerIdentity(servername: string, connectHost = servername) {
+  return (hostname: string, cert: tls.PeerCertificate): Error | undefined => {
+    const err = tls.checkServerIdentity(servername || hostname, cert);
+    if (!err) return undefined;
+    if (allowsSharedMailCertFallback(connectHost) && smtpPeerMatchesSharedMailCert(cert)) {
+      return undefined;
+    }
+    return err;
+  };
+}
+
+export function smtpTlsConnectOptions(
+  configuredHost: string,
+  cnameTarget?: string,
+): tls.ConnectionOptions {
+  const servername = smtpTlsServername(configuredHost, cnameTarget);
+  return {
+    servername,
+    checkServerIdentity: smtpCheckServerIdentity(servername, configuredHost),
+  };
+}
+
+export async function lookupSmtpCname(host: string): Promise<string | undefined> {
+  try {
+    const records = await dns.promises.resolveCname(normalizeSmtpHost(host));
+    const target = normalizeSmtpHost(records[0] ?? '');
+    return target || undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 export function mapSmtpFailureToAdminMessage(raw: string): string {
@@ -180,10 +290,17 @@ export class EmailOtpMailer {
 
   private async sendSmtp(to: string, from: string, subject: string, text: string): Promise<EmailOtpSendResult> {
     const user = this.smtpUser();
-    const host = inferSmtpHost(user, this.config.get<string>('SMTP_HOST'))!;
+    const configuredHost = inferSmtpHost(user, this.config.get<string>('SMTP_HOST'))!;
     const explicitHost = (this.config.get<string>('SMTP_HOST') ?? '').trim();
     if (!explicitHost) {
-      this.logger.warn(`SMTP_HOST unset — using inferred ${host}`);
+      this.logger.warn(`SMTP_HOST unset — using inferred ${configuredHost}`);
+    }
+    const explicitTls = (this.config.get<string>('SMTP_TLS_SERVERNAME') ?? '').trim();
+    const cname = explicitTls || (await lookupSmtpCname(configuredHost));
+    const host = smtpConnectHost(configuredHost, cname);
+    const tlsServername = smtpTlsServername(configuredHost, cname);
+    if (host !== configuredHost || tlsServername !== configuredHost) {
+      this.logger.log(`SMTP TLS ${configuredHost} → host=${host} servername=${tlsServername}`);
     }
     const port = Number(this.config.get('SMTP_PORT') ?? 587);
     const pass = this.config.get<string>('SMTP_PASS') ?? '';
@@ -200,13 +317,15 @@ export class EmailOtpMailer {
       text,
     ].join('\r\n');
 
-    await smtpSend({ host, port, user, pass, from: envelopeFrom, to, message });
+    await smtpSend({ host, tlsServername, configuredHost, port, user, pass, from: envelopeFrom, to, message });
     return { success: true, message: 'Code OTP envoyé par e-mail' };
   }
 }
 
 type SmtpOpts = {
   host: string;
+  tlsServername?: string;
+  configuredHost?: string;
   port: number;
   user: string;
   pass: string;
@@ -257,9 +376,16 @@ const SMTP_TIMEOUT_MS = 20_000;
 
 async function smtpSend(opts: SmtpOpts): Promise<void> {
   const implicitTls = opts.port === 465;
+  const tlsOpts = smtpTlsConnectOptions(opts.configuredHost ?? opts.host, opts.tlsServername);
+  const servername = opts.tlsServername || tlsOpts.servername || opts.host;
   const state: { socket: net.Socket } = {
     socket: implicitTls
-      ? tls.connect({ host: opts.host, port: opts.port, servername: opts.host })
+      ? tls.connect({
+          host: opts.host,
+          port: opts.port,
+          servername,
+          checkServerIdentity: tlsOpts.checkServerIdentity,
+        })
       : net.connect(opts.port, opts.host),
   };
 
@@ -353,7 +479,14 @@ async function smtpSend(opts: SmtpOpts): Promise<void> {
       const upgraded = await timed(
         new Promise<tls.TLSSocket>((resolve, reject) => {
           let next: tls.TLSSocket;
-          next = tls.connect({ socket: state.socket, servername: opts.host }, () => resolve(next));
+          next = tls.connect(
+            {
+              socket: state.socket,
+              servername,
+              checkServerIdentity: tlsOpts.checkServerIdentity,
+            },
+            () => resolve(next),
+          );
           next.once('error', reject);
         }),
         'starttls',

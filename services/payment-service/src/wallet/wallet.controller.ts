@@ -9,7 +9,7 @@ import { WalletService } from './wallet.service';
 const OTP_REQUIRED_FR = 'Code OTP requis (6 chiffres envoyé au numéro Mobile Money).';
 const PHONE_REQUIRED_FR = 'Numéro Mobile Money requis. Format : +243XXXXXXXXX.';
 const AMOUNT_INT_FR = 'Montant invalide. Entrez un nombre entier en FC.';
-const AMOUNT_MIN_FR = 'Montant minimum : 2 300 FC.';
+const AMOUNT_MIN_FR = 'Minimum SerdiPay : 2 300 FC.';
 
 /** Whole CDF only — do not round 2300.6 → 2301 (that 400 looked like « Données invalides »). */
 export function coerceCdfInteger(value: unknown): unknown {

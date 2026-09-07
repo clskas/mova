@@ -211,7 +211,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
   Future<void> _showWithdrawSheet({bool resumeOtp = false}) async {
     if (_balance < 2300) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Solde insuffisant — minimum 2 300 FC pour retirer')),
+        const SnackBar(content: Text('Solde insuffisant — minimum SerdiPay : 2 300 FC')),
       );
       return;
     }
@@ -727,7 +727,7 @@ class _WalletWithdrawSheetState extends ConsumerState<_WalletWithdrawSheet> {
     }
     if (amount < 2300) {
       setState(() => _formError =
-          'Montant minimum : 2 300 FC (contrainte Mobile Money). Vous pouvez retirer une partie du solde si ce montant reste ≥ 2 300 FC.');
+          'Minimum SerdiPay : 2 300 FC. Vous pouvez retirer une partie du solde si ce montant reste ≥ 2 300 FC.');
       return null;
     }
     if (amount > widget.maxAmount) {
@@ -811,7 +811,7 @@ class _WalletWithdrawSheetState extends ConsumerState<_WalletWithdrawSheet> {
             ),
             const SizedBox(height: 8),
             const Text(
-              'Vous pouvez retirer une partie du solde (minimum 2 300 FC). Le reste reste sur le portefeuille.',
+              'Vous pouvez retirer une partie du solde (minimum SerdiPay : 2 300 FC). Le reste reste sur le portefeuille.',
               style: TextStyle(color: MovaColors.textSecondary, fontSize: 13),
             ),
             const SizedBox(height: 8),
@@ -842,7 +842,7 @@ class _WalletWithdrawSheetState extends ConsumerState<_WalletWithdrawSheet> {
               keyboardType: TextInputType.number,
               decoration: InputDecoration(
                 labelText: 'Montant (FC)',
-                helperText: 'Minimum 2 300 FC — pas besoin de vider tout le solde',
+                helperText: 'Minimum SerdiPay : 2 300 FC — pas besoin de vider tout le solde',
                 prefixIcon: const Icon(Icons.payments_outlined),
                 suffixIcon: !_otpSent && widget.maxAmount >= 2300
                     ? TextButton(
@@ -961,7 +961,7 @@ class _WalletTopUpSheetState extends State<_WalletTopUpSheet> {
     final amount = int.tryParse(_amountController.text.trim()) ?? 0;
     if (amount < 2300) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Montant minimum : 2 300 FC')),
+        const SnackBar(content: Text('Minimum SerdiPay : 2 300 FC')),
       );
       return;
     }

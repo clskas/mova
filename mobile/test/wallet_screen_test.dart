@@ -107,7 +107,7 @@ void main() {
     await tester.tap(find.text('Envoyer le code SMS'));
     await tester.pump();
 
-    expect(find.textContaining('Montant minimum'), findsOneWidget);
+    expect(find.textContaining('Minimum SerdiPay'), findsOneWidget);
     expect(find.text('Confirmer le retrait'), findsNothing);
   });
 

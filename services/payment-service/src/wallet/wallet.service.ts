@@ -538,7 +538,7 @@ export class WalletService {
       throw new MovaHttpException(
         MovaErrorCode.VALIDATION_ERROR,
         undefined,
-        `Montant minimum : ${SERDIPAY_MIN_AMOUNT_CDF.toLocaleString('fr-FR')} FC (contrainte Mobile Money).`,
+        `Minimum SerdiPay : ${SERDIPAY_MIN_AMOUNT_CDF.toLocaleString('fr-FR')} FC.`,
       );
     }
     await this.acquireTopUpLock(userId, amountCdf);
@@ -820,7 +820,7 @@ export class WalletService {
       throw new MovaHttpException(
         MovaErrorCode.VALIDATION_ERROR,
         undefined,
-        `Montant minimum : ${SERDIPAY_MIN_AMOUNT_CDF.toLocaleString('fr-FR')} FC (contrainte Mobile Money).`,
+        `Minimum SerdiPay : ${SERDIPAY_MIN_AMOUNT_CDF.toLocaleString('fr-FR')} FC.`,
       );
     }
     return { amount: amountCdf, normalizedProvider, normalizedPhone };

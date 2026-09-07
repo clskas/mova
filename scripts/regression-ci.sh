@@ -2,8 +2,8 @@
 # CI regression stack: Docker microservices + Next.js admin/web for Playwright.
 # Tear down with: docker compose down -v ; kill admin/web PIDs saved in /tmp/mova-regression.pids
 #
-# Staff demo users are created ONLY in this CI/local path (APP_ENV=test PLAYWRIGHT=1).
-# Never invoked from Render Deploy / migrate-with-backup.
+# Staff demo users are created ONLY in this CI/local path
+# (APP_ENV=development RUN_SEED=true PLAYWRIGHT=1). Never invoked from Render.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -12,7 +12,7 @@ cd "$ROOT"
 # CI-only seed flags. Do not export NODE_ENV=test for the whole script — admin/web
 # `next build` / `next start` run on the host. Seed below uses an env prefix.
 export PLAYWRIGHT=1
-export APP_ENV=test
+export APP_ENV="${APP_ENV:-development}"
 export RUN_SEED=true
 unset SKIP_DEMO_SEED || true
 unset RENDER RENDER_SERVICE_ID RENDER_INSTANCE_ID RENDER_SERVICE_NAME RENDER_EXTERNAL_URL || true
@@ -23,12 +23,12 @@ ADMIN_PID=""
 WEB_PID=""
 PID_FILE="/tmp/mova-regression.pids"
 
-echo "=== MOVA regression stack (APP_ENV=test PLAYWRIGHT=1) ==="
+echo "=== MOVA regression stack (APP_ENV=${APP_ENV} PLAYWRIGHT=1 RUN_SEED=true) ==="
 
 mkdir -p config
 cat > config/external-apis.env <<'EOF'
-NODE_ENV=test
-APP_ENV=test
+NODE_ENV=development
+APP_ENV=development
 PLAYWRIGHT=1
 RUN_SEED=true
 MOCK_OTP=true
@@ -93,8 +93,8 @@ echo "=== Seed staff roles (+243900000001-005) — CI/test only, not Render ==="
 export DATABASE_URL="${DATABASE_URL_AUTH:-postgresql://mova:mova@localhost:48080/mova_auth}"
 cd "$ROOT/services/auth-service"
 npm ci --no-workspaces --silent
-# Prefix NODE_ENV=test so a production-valued runner cannot refuse/crash this seed.
-PLAYWRIGHT=1 APP_ENV=test NODE_ENV=test RUN_SEED=true \
+# CI-only seed: APP_ENV=development RUN_SEED=true PLAYWRIGHT=1 (never production/Render).
+PLAYWRIGHT=1 APP_ENV="${APP_ENV}" RUN_SEED=true \
   npx ts-node --compiler-options '{"ignoreDeprecations":"5.0"}' prisma/seed-staff-roles.ts
 
 echo "=== Build and start admin (:3002) + web (:3001) ==="

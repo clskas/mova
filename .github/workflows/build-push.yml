@@ -12,6 +12,10 @@ env:
   REGISTRY: ghcr.io
   IMAGE_PREFIX: ${{ github.repository }}
 
+concurrency:
+  group: build-push-${{ github.event.workflow_run.head_branch || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     if: >

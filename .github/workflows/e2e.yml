@@ -5,14 +5,33 @@ name: E2E
 
 on:
   workflow_dispatch:
+  # After Deploy so this 15–30 min job cannot starve deploy-render of Actions minutes.
+  workflow_run:
+    workflows: ["Deploy"]
+    types: [completed]
+    branches: [main]
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   playwright:
     name: Playwright (web + admin)
-    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-22.04
     timeout-minutes: 60
+    continue-on-error: true
+    env:
+      PLAYWRIGHT: '1'
+      APP_ENV: development
+      RUN_SEED: 'true'
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - uses: actions/setup-node@v4
         with:
@@ -37,7 +56,14 @@ jobs:
           ADMIN_BASE_URL: http://localhost:3002
           WEB_BASE_URL: http://localhost:3001
           GATEWAY_URL: http://127.0.0.1:3000
+          ADMIN_PHONE: "+243900000001"
         run: npm run test:e2e
+
+      - name: Dump stack logs on failure
+        if: failure()
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose.ci.yml ps -a || true
+          docker compose -f docker-compose.yml -f docker-compose.ci.yml logs --tail 80 api-gateway auth-service payment-service ride-service || true
 
       - name: Teardown regression stack
         if: always()

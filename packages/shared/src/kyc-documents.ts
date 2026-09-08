@@ -204,14 +204,18 @@ export function driverActivationPinNotifyCopy(pin: string): {
     smsText:
       `SENGA — votre code PIN (activation et connexion) : ${pin}. ` +
       `Valable 72 h pour l'activation chauffeur. Ne le communiquez à personne.`,
-    emailSubject: 'Votre code PIN SENGA',
+    emailSubject: 'Votre accès chauffeur SENGA — AfriSoft',
     emailText:
-      `Votre code PIN SENGA (activation chauffeur et connexion) est ${pin}. ` +
-      `L'activation est valable 72 heures. Saisissez-le dans l'application.\n\n` +
-      `Si vous n'êtes pas à l'origine de cette demande, ignorez cet e-mail.`,
+      `Bonjour,\n\nAfriSoft a activé votre accès chauffeur SENGA.\n\n` +
+      `Numéro à 6 chiffres (activation 72 h et connexion) : ${pin}\n\n` +
+      `Saisissez-le dans l'application SENGA Driver. Si vous n'êtes pas à l'origine de cette demande, ignorez ce message.\n\n` +
+      `— L'équipe SENGA / AfriSoft\nhttps://afri-soft.com`,
     emailHtml:
-      `<p>Votre code PIN SENGA (activation chauffeur et connexion) est <strong>${pin}</strong>.</p>` +
-      `<p>L'activation est valable 72 heures. Saisissez-le dans l'application.</p>`,
+      `<p>Bonjour,</p>` +
+      `<p>AfriSoft a activé votre accès chauffeur SENGA.</p>` +
+      `<p>Numéro à 6 chiffres (activation 72 h et connexion) : <strong>${pin}</strong></p>` +
+      `<p>Saisissez-le dans l'application SENGA Driver.</p>` +
+      `<p>— L'équipe SENGA / AfriSoft<br/><a href="https://afri-soft.com">afri-soft.com</a></p>`,
   };
 }
 

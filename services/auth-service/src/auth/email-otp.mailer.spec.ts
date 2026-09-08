@@ -1,9 +1,12 @@
 import {
+  EMAIL_GMAIL_SMTP_UNTRUSTED_ADMIN_MESSAGE,
+  EMAIL_RESEND_ADMIN_MESSAGE,
   EMAIL_SMTP_ACCEPTED_ADMIN_MESSAGE,
   EMAIL_SMTP_ENV_HINT,
   allowsSharedMailCertFallback,
   emailInboxHintFor,
   inferSmtpHost,
+  isGmailAddress,
   mapSmtpFailureToAdminMessage,
   smtpEhloHostname,
   smtpConnectHost,
@@ -72,10 +75,15 @@ describe('site4now TLS hostname mismatch', () => {
 
 describe('emailInboxHintFor', () => {
   it('warns Gmail about site4now spam bounce and DMARC reject', () => {
+    expect(isGmailAddress('jscelestinkas@gmail.com')).toBe(true);
+    expect(isGmailAddress('resto@afri-soft.com')).toBe(false);
     expect(emailInboxHintFor('jscelestinkas@gmail.com')).toMatch(/MessageAI/);
     expect(emailInboxHintFor('jscelestinkas@gmail.com')).toMatch(/DKIM/);
     expect(EMAIL_SMTP_ACCEPTED_ADMIN_MESSAGE).toMatch(/Gmail peut rejeter \(DKIM\/DMARC\)/);
     expect(EMAIL_SMTP_ACCEPTED_ADMIN_MESSAGE).not.toMatch(/envoyé/);
+    expect(EMAIL_RESEND_ADMIN_MESSAGE).toMatch(/Resend/);
+    expect(EMAIL_GMAIL_SMTP_UNTRUSTED_ADMIN_MESSAGE).toMatch(/Copiez le PIN/);
+    expect(EMAIL_GMAIL_SMTP_UNTRUSTED_ADMIN_MESSAGE).not.toMatch(/PIN envoyé/);
   });
 });
 

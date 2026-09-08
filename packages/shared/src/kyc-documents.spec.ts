@@ -83,6 +83,7 @@ describe('KYC notify copy', () => {
     expect(copy.smsText).toContain('111657');
     expect(copy.emailText).toContain('111657');
     expect(copy.emailSubject).not.toContain('111657');
+    expect(copy.emailSubject).not.toMatch(/code PIN/i);
     expect(copy.smsText).toMatch(/activation et connexion/);
   });
 });

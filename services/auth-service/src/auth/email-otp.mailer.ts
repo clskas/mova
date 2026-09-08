@@ -16,9 +16,26 @@ export const EMAIL_UNAVAILABLE_USER_MESSAGE =
 export const EMAIL_SMTP_ACCEPTED_ADMIN_MESSAGE =
   'Le serveur a accepté mais Gmail peut rejeter (DKIM/DMARC). Vérifiez spam et DNS.';
 
-export function emailInboxHintFor(to: string): string {
+/** Resend is the only path we treat as able to reach Gmail. */
+export const EMAIL_RESEND_ADMIN_MESSAGE = 'E-mail envoyé via Resend.';
+
+/**
+ * SMTP 250 is not Gmail delivery. Production NDRs on noreply@:
+ * `550 This message cannot be delivered as it was marked as spam`
+ * + `X-MessageAI-Scan-Result: high` — site4now blocked the PIN mail before Gmail.
+ */
+export const EMAIL_GMAIL_SMTP_UNTRUSTED_ADMIN_MESSAGE =
+  "Gmail n'est pas confirmé. Copiez le PIN affiché. " +
+  'Le relais Afri-Soft a déjà rejeté les mails « code PIN » (550 spam) avant Gmail. ' +
+  'Publiez DKIM dans Cloudflare, ou posez RESEND_API_KEY sur mova-auth.';
+
+export function isGmailAddress(to: string): boolean {
   const dest = to.trim().toLowerCase();
-  if (dest.endsWith('@gmail.com') || dest.endsWith('@googlemail.com')) {
+  return dest.endsWith('@gmail.com') || dest.endsWith('@googlemail.com');
+}
+
+export function emailInboxHintFor(to: string): string {
+  if (isGmailAddress(to)) {
     return (
       'Gmail : rien en spam = souvent rejet site4now MessageAI (550) avant Gmail, ' +
       'ou DMARC p=reject sans DKIM. From SENGA <noreply@afri-soft.com> via mail5013.site4now.net.'
@@ -331,7 +348,7 @@ export class EmailOtpMailer {
       this.logger.error(`Resend HTTP ${res.status}: ${body.slice(0, 200)}`);
       return { success: false, message: EMAIL_UNAVAILABLE_USER_MESSAGE };
     }
-    return { success: true, message: EMAIL_SMTP_ACCEPTED_ADMIN_MESSAGE };
+    return { success: true, message: EMAIL_RESEND_ADMIN_MESSAGE };
   }
 
   private async sendSmtp(
@@ -401,6 +418,9 @@ export class EmailOtpMailer {
     this.logger.log(
       `SMTP accepted (250) for ${maskEmail(to)} from=${from} envelope=${envelopeFrom} ehlo=${ehloHostname} — not inbox proof. ${emailInboxHintFor(to)}`,
     );
+    if (isGmailAddress(to)) {
+      return { success: false, message: EMAIL_GMAIL_SMTP_UNTRUSTED_ADMIN_MESSAGE };
+    }
     return { success: true, message: EMAIL_SMTP_ACCEPTED_ADMIN_MESSAGE };
   }
 }

@@ -108,26 +108,17 @@ jobs:
             echo "::notice::ANDROID_KEYSTORE_BASE64 absent — build signé avec clé debug (non publiable sur Play Store)"
           fi
 
-      - name: Add swap for sequential AAB builds
+      - name: Free disk space
         run: |
           set -euo pipefail
-          # Run 34234263647: passenger AAB OK, driver AAB cancelled ("The operation
-          # was canceled") before artifacts — typical RAM pressure on ubuntu-latest
-          # with gradle.properties 8G heap + 4G metaspace.
-          sudo swapoff -a || true
-          sudo rm -f /swapfile
-          sudo fallocate -l 8G /swapfile
-          sudo chmod 600 /swapfile
-          sudo mkswap /swapfile
-          sudo swapon /swapfile
-          free -h
-
-      - name: Cap Gradle heap for the GitHub runner
-        run: |
-          set -euo pipefail
-          sed -i 's/^org.gradle.jvmargs=.*/org.gradle.jvmargs=-Xmx4G -XX:MaxMetaspaceSize=1G -XX:+HeapDumpOnOutOfMemoryError/' \
-            mobile/android/gradle.properties
-          grep '^org.gradle.jvmargs=' mobile/android/gradle.properties
+          # Run 34234263647 cancelled on the second AAB; retry 34237959757 died
+          # with "No space left on device" while unzipping NDK (an 8G swapfile
+          # on the same disk made it worse). Drop unused hosted-runner toolchains.
+          df -h /
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/powershell \
+            /usr/share/swift /opt/hostedtoolcache/CodeQL || true
+          sudo docker system prune -af || true
+          df -h /
 
       - name: Install dependencies
         working-directory: mobile
@@ -137,11 +128,8 @@ jobs:
         id: playver
         run: |
           set -euo pipefail
-          # Play production is still 1.0.6+58 (run 34223352006). Run 59 cancelled
-          # before Play upload — reuse versionCode 59 for the immediate retry
-          # (run_number 60). Later runs keep github.run_number.
-          CODE="${{ github.run_number }}"
-          if [ "$CODE" -le 60 ]; then CODE=59; fi
+          # Play production is still 1.0.6+58. Runs 59–60 never uploaded — pin 59.
+          CODE=59
           echo "code=$CODE" >> "$GITHUB_OUTPUT"
           echo "Play versionCode=$CODE (pubspec 1.0.7+59; run_number=${{ github.run_number }})"
 

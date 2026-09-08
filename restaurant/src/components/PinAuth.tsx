@@ -75,18 +75,18 @@ export function mustSetupPinAfterPhoneLogin(
 }
 
 export const KYC_PIN_LOGIN_HINT_FR =
-  "Après validation KYC, saisissez le PIN d'activation à 6 chiffres envoyé par e-mail (objet « Votre acces SENGA restaurant »).";
+  "Après validation KYC, saisissez le PIN à 6 chiffres envoyé par e-mail ou SMS.";
 
 export const ACTIVATION_PIN_HEADING_FR =
-  "PIN d'activation (6 chiffres, e-mail après validation KYC)";
+  "PIN d'activation (e-mail / SMS après validation KYC)";
 
-export const PIN_FIELD_LABEL_FR = "PIN d'activation (6 chiffres, e-mail après validation KYC)";
+export const PIN_FIELD_LABEL_FR = "Code PIN à 6 chiffres";
 
-export const PIN_SUBMIT_LABEL_FR = "Activer / Se connecter avec le PIN";
+export const PIN_SUBMIT_LABEL_FR = "Ouvrir la session avec le PIN";
 
-export const GOOGLE_OPTIONAL_LABEL_FR = "Ou continuer avec Google (compte déjà lié)";
+export const GOOGLE_OPTIONAL_LABEL_FR = "Connexion Google (optionnel)";
 
-export const COMPTE_ACTIVATE_HEADING_FR = "Activer le compte";
+export const COMPTE_ACTIVATE_HEADING_FR = "Activer avec le PIN reçu par e-mail";
 
 export const LOGIN_IDENTITY_LABEL_FR = "Téléphone (+243) ou e-mail";
 

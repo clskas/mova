@@ -6,10 +6,10 @@ const CHAPTERS = [
   {
     title: "Première connexion et PIN",
     steps: [
-      "Ouvrez https://rental.afri-soft.com/login — section « Activer le compte ».",
-      "Saisissez l'e-mail ou le +243, puis le « PIN d'activation (6 chiffres, e-mail après validation KYC) » envoyé après validation KYC.",
-      "Cliquez « Activer / Se connecter avec le PIN ». Google est plus bas : « Ou continuer avec Google (compte déjà lié) » — ne cliquez pas Google à la place du PIN.",
-      "Déjà connecté avec Google : une carte « Activer le compte » bloque le tableau de bord jusqu'au même PIN (aussi sur Compte).",
+      "Ouvrez https://rental.afri-soft.com/login — carte indigo sous SENGA Location.",
+      "Titre « PIN d'activation (e-mail / SMS après validation KYC) », champ e-mail ou +243, puis « Code PIN à 6 chiffres », bouton « Ouvrir la session avec le PIN ».",
+      "Google est plus bas, marqué « Connexion Google (optionnel) » — ne cliquez pas Google à la place du PIN.",
+      "Déjà connecté avec Google : le même formulaire « Activer avec le PIN reçu par e-mail » s'affiche (tableau de bord et Compte : https://rental.afri-soft.com/compte).",
       "Première visite avant KYC : Google ou SMS, puis Mon dossier.",
       "Si le PIN n'arrive pas, l'équipe SENGA le renvoie depuis l'admin (KYC ou fiche Utilisateur) — vérifiez aussi le spam Gmail.",
     ],

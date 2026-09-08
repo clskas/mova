@@ -5,7 +5,7 @@ import {
   SERDIPAY_B2C_CHANNEL_DISABLED_FR,
   SERDIPAY_B2C_MERCHANT_FLOAT_LOW_FR,
   SERDIPAY_C2B_MERCHANT_FLOAT_LOW_FR,
-  SERDIPAY_CHANNEL_DISABLED_FR,
+  SERDIPAY_C2B_CHANNEL_DISABLED_FR,
   AFRISOFT_HUB_HMAC_FR,
   SERDIPAY_CHANNEL_DISABLED_GENERIC_FR,
   SERDIPAY_MERCHANT_UNAUTHENTICATED_FR,
@@ -446,8 +446,9 @@ describe('serdipay Public API', () => {
       SERDIPAY_B2C_CHANNEL_DISABLED_FR,
     );
     expect(mapSerdiPayPaymentFailure(400, raw, raw, undefined, 'c2b')).toBe(
-      SERDIPAY_CHANNEL_DISABLED_FR,
+      SERDIPAY_C2B_CHANNEL_DISABLED_FR,
     );
+    expect(mapSerdiPayPaymentFailure(400, raw, raw, undefined, 'c2b')).toMatch(/Aucun push USSD/);
     expect(mapSerdiPayPaymentFailure(400, raw)).toBe(SERDIPAY_CHANNEL_DISABLED_GENERIC_FR);
     expect(mapSerdiPayPaymentFailure(400, raw)).not.toMatch(/channel0/i);
     expect(mapSerdiPayPaymentFailure(400, raw)).not.toMatch(/Payment Failed/i);

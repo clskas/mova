@@ -249,8 +249,11 @@ export function mapSerdiPayTokenFailure(status: number, raw?: string): string {
 export const SERDIPAY_B2C_CHANNEL_DISABLED_FR =
   'Le versement vers Mobile Money n’est pas encore activé. Votre solde reste dans le portefeuille SENGA. Contactez le support.';
 
-export const SERDIPAY_CHANNEL_DISABLED_FR =
-  'Ce canal Mobile Money n’est pas activé pour le marchand. Contactez le support SENGA.';
+/** C2B collect: Orange/M-Pesa/Airtel channel not enabled — no USSD is sent. */
+export const SERDIPAY_C2B_CHANNEL_DISABLED_FR =
+  'Ce canal Mobile Money n’est pas activé pour le marchand SerdiPay. Aucun push USSD n’a été envoyé. Contactez le support SENGA.';
+
+export const SERDIPAY_CHANNEL_DISABLED_FR = SERDIPAY_C2B_CHANNEL_DISABLED_FR;
 
 /**
  * Laravel/SerdiPay payment-merchant 401 `{ "message": "Unauthenticated." }`.
@@ -335,7 +338,7 @@ export function mapSerdiPayPaymentFailure(
     return `Montant hors plage Mobile Money : minimum ${min.toLocaleString('fr-FR')} FC, maximum ${max.toLocaleString('fr-FR')} FC.`;
   }
   if (isSerdiPayChannelDisabledError(detail)) {
-    if (kind === 'c2b') return SERDIPAY_CHANNEL_DISABLED_FR;
+    if (kind === 'c2b') return SERDIPAY_C2B_CHANNEL_DISABLED_FR;
     if (kind === 'b2c') return SERDIPAY_B2C_CHANNEL_DISABLED_FR;
     return SERDIPAY_CHANNEL_DISABLED_GENERIC_FR;
   }

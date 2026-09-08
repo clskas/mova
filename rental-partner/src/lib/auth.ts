@@ -1,7 +1,7 @@
 const TOKEN_KEY = "mova_rental_partner_token";
 const PIN_PENDING_KEY = "mova_rental_partner_pin_pending";
 const LAST_PHONE_KEY = "mova_rental_partner_last_phone";
-const PIN_UNLOCK_KEY = "mova_rental_partner_pin_unlocked";
+const PIN_UNLOCK_KEY = "mova_rental_partner_pin_login_unlocked";
 
 function storageGet(key: string): string | null {
   if (typeof window === "undefined") return null;
@@ -31,6 +31,13 @@ function storageRemove(key: string): void {
 export function getToken(): string | null {
   return storageGet(TOKEN_KEY);
 }
+
+/** Same intent as login — OTP / PIN / link-phone on a Google-first rental account. */
+export const RENTAL_AUTH_INTENT = {
+  role: "RENTAL_PARTNER",
+  intendedRole: "RENTAL_PARTNER",
+  portal: "rental",
+} as const;
 
 export function setToken(token: string, phone?: string) {
   storageSet(TOKEN_KEY, token);

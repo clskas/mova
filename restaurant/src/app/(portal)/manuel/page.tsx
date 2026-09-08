@@ -6,9 +6,11 @@ const CHAPTERS = [
   {
     title: "Première connexion et PIN",
     steps: [
-      "Ouvrez https://restaurant.afri-soft.com — champ « Téléphone (+243) ou e-mail » puis « Code PIN (reçu par e-mail / SMS) ».",
-      "Après validation KYC, saisissez le PIN à 6 chiffres envoyé par e-mail ou SMS (même compte Google possible).",
-      "Première visite avant KYC : numéro +243 + code SMS, ou Continuer avec Google, puis Mon dossier.",
+      "Ouvrez https://restaurant.afri-soft.com/login — carte orange sous SENGA Restaurant.",
+      "Titre « PIN d'activation (e-mail / SMS après validation KYC) », champ e-mail ou +243, puis « Code PIN à 6 chiffres », bouton orange « Ouvrir la session avec le PIN ».",
+      "Google est plus bas, marqué « Connexion Google (optionnel) » — ne cliquez pas Google à la place du PIN.",
+      "Déjà connecté avec Google : le même formulaire « Activer avec le PIN reçu par e-mail » s'affiche (tableau de bord et Compte : https://restaurant.afri-soft.com/compte).",
+      "Première visite avant KYC : Google ou SMS, puis Mon dossier.",
       "Si le PIN n'arrive pas, l'équipe SENGA le renvoie depuis l'admin (KYC ou fiche Utilisateur) — vérifiez aussi le spam Gmail.",
     ],
   },

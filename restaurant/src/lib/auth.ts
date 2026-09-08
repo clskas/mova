@@ -1,7 +1,7 @@
 const TOKEN_KEY = "mova_restaurant_token";
 const PIN_PENDING_KEY = "mova_restaurant_pin_pending";
 const LAST_PHONE_KEY = "mova_restaurant_last_phone";
-const PIN_UNLOCK_KEY = "mova_restaurant_pin_unlocked";
+const PIN_UNLOCK_KEY = "mova_restaurant_pin_login_unlocked";
 
 function storageGet(key: string): string | null {
   if (typeof window === "undefined") return null;

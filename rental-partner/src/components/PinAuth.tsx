@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export type AuthPayload = {
   accessToken?: string;
@@ -75,9 +75,18 @@ export function mustSetupPinAfterPhoneLogin(
 }
 
 export const KYC_PIN_LOGIN_HINT_FR =
-  "Après validation KYC, saisissez le PIN à 6 chiffres envoyé par e-mail ou SMS.";
+  "Après validation KYC, saisissez le PIN d'activation à 6 chiffres envoyé par e-mail (objet « Votre acces SENGA »).";
 
-export const PIN_FIELD_LABEL_FR = "Code PIN (reçu par e-mail / SMS)";
+export const ACTIVATION_PIN_HEADING_FR =
+  "PIN d'activation (6 chiffres, e-mail après validation KYC)";
+
+export const PIN_FIELD_LABEL_FR = "PIN d'activation (6 chiffres, e-mail après validation KYC)";
+
+export const PIN_SUBMIT_LABEL_FR = "Activer / Se connecter avec le PIN";
+
+export const GOOGLE_OPTIONAL_LABEL_FR = "Ou continuer avec Google (compte déjà lié)";
+
+export const COMPTE_ACTIVATE_HEADING_FR = "Activer le compte";
 
 export const LOGIN_IDENTITY_LABEL_FR = "Téléphone (+243) ou e-mail";
 
@@ -136,11 +145,15 @@ export function PinDigitPad({
   onChange,
   disabled,
   accentClass = "bg-indigo-600",
+  compact = true,
+  autoFocus = false,
 }: {
   value: string;
   onChange: (next: string) => void;
   disabled?: boolean;
   accentClass?: string;
+  compact?: boolean;
+  autoFocus?: boolean;
 }) {
   const keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "⌫"] as const;
   function press(key: string) {
@@ -152,19 +165,20 @@ export function PinDigitPad({
     if (value.length < 6) onChange(`${value}${key}`);
   }
   return (
-    <div data-testid="pin-pad" className="space-y-4">
+    <div data-testid="pin-pad" className="space-y-3">
       <label className="block text-sm">
-        <span className="text-gray-600">{PIN_FIELD_LABEL_FR}</span>
+        <span className="font-semibold text-gray-800">{PIN_FIELD_LABEL_FR}</span>
         <input
           data-testid="login-pin"
-          className="mt-1 w-full rounded-xl border border-gray-200 p-3 tracking-[0.4em] text-center text-lg"
+          className="mt-1 w-full rounded-xl border-2 border-gray-300 bg-white p-4 tracking-[0.45em] text-center text-2xl font-semibold"
           value={value}
           onChange={(e) => onChange(e.target.value.replace(/\D/g, "").slice(0, 6))}
           inputMode="numeric"
-          autoComplete="one-time-code"
+          autoComplete="off"
           maxLength={6}
-          placeholder="••••••"
+          placeholder="6 chiffres"
           disabled={disabled}
+          autoFocus={autoFocus}
         />
       </label>
       <div className="flex justify-center gap-2" aria-hidden>
@@ -175,20 +189,120 @@ export function PinDigitPad({
           />
         ))}
       </div>
-      <div className="grid grid-cols-3 gap-2 max-w-[240px] mx-auto">
-        {keys.map((key, i) => (
-          <button
-            key={`${key}-${i}`}
-            type="button"
-            disabled={disabled || key === ""}
-            onClick={() => press(key)}
-            className="h-14 rounded-xl bg-white border border-gray-100 shadow-sm text-xl font-semibold text-[#1A1A2E] disabled:opacity-0"
-          >
-            {key}
-          </button>
-        ))}
-      </div>
+      {!compact && (
+        <div className="grid grid-cols-3 gap-2 max-w-[240px] mx-auto">
+          {keys.map((key, i) => (
+            <button
+              key={`${key}-${i}`}
+              type="button"
+              disabled={disabled || key === ""}
+              onClick={() => press(key)}
+              className="h-14 rounded-xl bg-white border border-gray-100 shadow-sm text-xl font-semibold text-[#1A1A2E] disabled:opacity-0"
+            >
+              {key}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
+  );
+}
+
+export function ActivationPinCard({
+  apiBase,
+  intent,
+  accentClass,
+  highlightClass,
+  defaultIdentity,
+  onActivated,
+  heading = COMPTE_ACTIVATE_HEADING_FR,
+  normalizeIdentity,
+}: {
+  apiBase: string;
+  intent: Record<string, string>;
+  accentClass: string;
+  highlightClass: string;
+  defaultIdentity?: string;
+  onActivated: (data: AuthPayload) => void;
+  heading?: string;
+  normalizeIdentity?: (raw: string) => string;
+}) {
+  const [identity, setIdentity] = useState(defaultIdentity ?? "");
+  const [pin, setPin] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (defaultIdentity) setIdentity(defaultIdentity);
+  }, [defaultIdentity]);
+
+  async function submit() {
+    if (!identity.trim()) {
+      setError("Saisissez votre e-mail ou numéro +243.");
+      return;
+    }
+    if (pin.length !== 6) {
+      setError("Saisissez le PIN à 6 chiffres reçu par e-mail ou SMS.");
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const handle = normalizeIdentity ? normalizeIdentity(identity) : identity.trim();
+      const result = await loginWithPinRequest(apiBase, handle, pin, intent);
+      if (!result.ok) {
+        throw new Error(result.data.error?.message ?? "PIN incorrect. Réessayez.");
+      }
+      onActivated(result.data);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "PIN incorrect. Réessayez.");
+      setPin("");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <section data-testid="activation-pin-card" className={`rounded-2xl border-2 p-5 space-y-4 ${highlightClass}`}>
+      <div>
+        <h2 className="text-lg font-bold text-[#1A1A2E]">{heading}</h2>
+        {heading !== ACTIVATION_PIN_HEADING_FR && (
+          <p className="text-sm text-gray-700 mt-1">{ACTIVATION_PIN_HEADING_FR}</p>
+        )}
+      </div>
+      <label className="block text-sm">
+        <span className="font-semibold text-gray-800">{LOGIN_IDENTITY_LABEL_FR}</span>
+        <input
+          data-testid="login-phone"
+          className="mt-1 w-full rounded-xl border-2 border-gray-300 bg-white p-3"
+          value={identity}
+          onChange={(e) => setIdentity(e.target.value)}
+          placeholder="+243 8XX XXX XXX ou e-mail"
+          type="text"
+          inputMode="text"
+          autoComplete="username"
+          disabled={loading}
+        />
+      </label>
+      <PinDigitPad
+        value={pin}
+        onChange={setPin}
+        disabled={loading}
+        accentClass={accentClass}
+        compact
+        autoFocus={Boolean(identity.trim())}
+      />
+      <button
+        type="button"
+        disabled={loading || !identity.trim() || pin.length !== 6}
+        onClick={() => void submit()}
+        data-testid="activation-submit"
+        className={`w-full py-3 rounded-xl text-white font-medium disabled:opacity-60 ${accentClass}`}
+      >
+        {loading ? "Activation…" : PIN_SUBMIT_LABEL_FR}
+      </button>
+      {error && <p className="text-sm text-red-600 text-center">{error}</p>}
+    </section>
   );
 }
 

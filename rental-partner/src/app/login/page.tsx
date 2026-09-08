@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  RENTAL_AUTH_INTENT,
   clearLastPhone,
   decodeJwtPayload,
   dropTokenKeepPhone,
@@ -11,7 +12,6 @@ import {
   isPinPending,
   isPinSessionUnlocked,
   isRentalPartnerRole,
-  isSeedDemoPhone,
   normalizeLoginPhone,
   phoneFromToken,
   markPinSessionUnlocked,
@@ -29,24 +29,21 @@ import {
   toUserErrorMessage,
 } from "@/lib/user-messages";
 import {
+  ACTIVATION_PIN_HEADING_FR,
+  ActivationPinCard,
   AuthPayload,
-  KYC_PIN_LOGIN_HINT_FR,
-  LOGIN_IDENTITY_LABEL_FR,
+  GOOGLE_OPTIONAL_LABEL_FR,
   PartnerLoginHelp,
-  PinDigitPad,
   PinForgotLink,
   PinSetupForm,
   accountPhone,
-  fetchPinEnabled,
   isEmailIdentity,
-  loginWithPinRequest,
-  maskPhoneDisplay,
   mustSetupPinAfterPhoneLogin,
   shouldRequirePinSetup,
 } from "@/components/PinAuth";
 
 const API_BASE = PUBLIC_API_BASE;
-const INTENT = { role: "RENTAL_PARTNER", intendedRole: "RENTAL_PARTNER", portal: "rental" };
+const INTENT = RENTAL_AUTH_INTENT;
 
 async function readErrorMessage(res: Response, fallback: string): Promise<string> {
   try {
@@ -61,9 +58,7 @@ export default function LoginPage() {
   const router = useRouter();
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
-  const [pin, setPin] = useState("");
   const [codeSent, setCodeSent] = useState(false);
-  const [pinMode, setPinMode] = useState(false);
   const [forgotPin, setForgotPin] = useState(false);
   const [setupToken, setSetupToken] = useState<string | null>(() =>
     typeof window !== "undefined" && isPinPending() ? getToken() : null,
@@ -75,11 +70,8 @@ export default function LoginPage() {
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const pinSubmitLock = useRef(false);
 
-  const pinOnly = pinMode && !codeSent && !googleChallenge && !setupToken && !forgotPin;
-  const hideIdentity = pinOnly && Boolean(phone.trim());
-  const showPinField = !codeSent && !setupToken && !forgotPin;
+  const showActivation = !codeSent && !setupToken && !forgotPin && !googleChallenge;
 
   useEffect(() => {
     let cancelled = false;
@@ -118,10 +110,8 @@ export default function LoginPage() {
             { pinConfigured: me?.pinConfigured, phone: me?.phone, hasPhone: me?.hasPhone, user: me, email: me?.email },
             phoneFromToken() || getLastPhone() || "",
           );
-          if (me?.pinConfigured && remembered && !isSeedDemoPhone(remembered) && !isPinSessionUnlocked()) {
-            dropTokenKeepPhone(remembered);
-            setPhone(remembered);
-            setPinMode(true);
+          if (me?.pinConfigured && !isPinSessionUnlocked()) {
+            if (remembered) setPhone(remembered);
             return;
           }
           if (me && isPinSessionUnlocked()) {
@@ -133,25 +123,14 @@ export default function LoginPage() {
         }
       }
       const last = getLastPhone();
-      if (last) {
-        setPhone(last);
-        const enabled = await fetchPinEnabled(API_BASE, last, INTENT);
-        if (!cancelled && enabled) setPinMode(true);
-      }
+      if (last) setPhone(last);
     })();
     return () => {
       cancelled = true;
     };
   }, [setupToken, router]);
 
-  useEffect(() => {
-    if (showPinField && pin.length === 6 && !loading && phone.trim()) {
-      void loginWithPin();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- auto-submit when pad reaches 6 digits
-  }, [pin, showPinField, phone]);
-
-  function finishRentalSession(data: AuthPayload) {
+  function finishRentalSession(data: AuthPayload, source: "pin" | "google" | "otp") {
     if (!data.accessToken) {
       throw new Error(LOGIN_GOOGLE_UNAVAILABLE);
     }
@@ -159,13 +138,13 @@ export default function LoginPage() {
     if (!isRentalPartnerRole(typeof role === "string" ? role : null)) {
       throw new Error("Ce compte n'est pas un partenaire location.");
     }
-    const typedPhone = googleChallenge ? "" : normalizeLoginPhone(phone);
+    const typedPhone = source === "google" ? "" : normalizeLoginPhone(phone);
     const phoneOnAccount = accountPhone(data, typedPhone);
     setToken(data.accessToken, phoneOnAccount || undefined);
     if (phoneOnAccount) setLastPhone(phoneOnAccount);
     if (
       forgotPin ||
-      mustSetupPinAfterPhoneLogin(data, typedPhone, !googleChallenge) ||
+      mustSetupPinAfterPhoneLogin(data, typedPhone, source !== "google") ||
       shouldRequirePinSetup(data, phoneOnAccount, data.accessToken)
     ) {
       setPinPending(true);
@@ -173,33 +152,23 @@ export default function LoginPage() {
       return;
     }
     setPinPending(false);
+    if (source === "google") {
+      router.replace("/compte");
+      return;
+    }
     markPinSessionUnlocked();
     router.replace("/");
   }
 
-  async function requestOtp(opts?: { forceSms?: boolean }) {
+  async function requestOtp() {
     setLoading(true);
     setError(null);
     let lastStatus = 0;
     try {
       const msisdn = normalizeLoginPhone(phone);
       if (isEmailIdentity(msisdn)) {
-        if (!opts?.forceSms && !pinMode && !forgotPin) {
-          const enabled = await fetchPinEnabled(API_BASE, msisdn, INTENT);
-          if (enabled) {
-            setPinMode(true);
-            return;
-          }
-        }
-        setError("Saisissez le PIN reçu par e-mail, ou utilisez Continuer avec Google.");
+        setError("Saisissez le PIN d'activation reçu par e-mail, ou utilisez Google si le compte est déjà lié.");
         return;
-      }
-      if (!opts?.forceSms && !pinMode && !forgotPin) {
-        const enabled = await fetchPinEnabled(API_BASE, msisdn, INTENT);
-        if (enabled) {
-          setPinMode(true);
-          return;
-        }
       }
       let requestRes: Response;
       try {
@@ -254,30 +223,10 @@ export default function LoginPage() {
         setCodeSent(true);
         return;
       }
-      finishRentalSession(data);
+      finishRentalSession(data, "google");
     } catch (e) {
       setError(toUserErrorMessage(e, LOGIN_GOOGLE_UNAVAILABLE));
     } finally {
-      setLoading(false);
-    }
-  }
-
-  async function loginWithPin() {
-    if (pinSubmitLock.current) return;
-    pinSubmitLock.current = true;
-    setLoading(true);
-    setError(null);
-    try {
-      const result = await loginWithPinRequest(API_BASE, normalizeLoginPhone(phone), pin, INTENT);
-      if (!result.ok) {
-        throw new Error(result.data.error?.message ?? "PIN incorrect. Réessayez ou utilisez le code SMS.");
-      }
-      finishRentalSession(result.data);
-    } catch (e) {
-      setError(toUserErrorMessage(e, "PIN incorrect. Réessayez."));
-      setPin("");
-    } finally {
-      pinSubmitLock.current = false;
       setLoading(false);
     }
   }
@@ -311,7 +260,7 @@ export default function LoginPage() {
       if (!verifyRes.ok || !data.accessToken) {
         throw new Error(data.error?.message ?? LOGIN_GENERIC);
       }
-      finishRentalSession(data);
+      finishRentalSession(data, "otp");
     } catch (e) {
       setError(toUserErrorMessage(e, lastStatus >= 500 ? LOGIN_GENERIC : "Connexion impossible. Réessayez."));
     } finally {
@@ -319,46 +268,28 @@ export default function LoginPage() {
     }
   }
 
-  function primaryAction() {
-    if (setupToken) return;
-    if (codeSent) return void verifyOtp();
-    if (pin.length === 6) return void loginWithPin();
-    return void requestOtp();
-  }
-
-  function useAnotherNumber() {
-    clearLastPhone();
-    setPhone("");
-    setPin("");
-    setPinMode(false);
-    setForgotPin(false);
-    setCodeSent(false);
-    setCode("");
-    setError(null);
-  }
-
   return (
-    <div className="min-h-screen flex items-center justify-center p-6 bg-gradient-to-br from-indigo-50 to-violet-50">
+    <div className="min-h-screen overflow-y-auto flex items-start justify-center px-4 py-8 bg-gradient-to-br from-indigo-50 to-violet-50">
       <PwaInstallBanner accentClass="bg-indigo-600" />
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-8 space-y-6">
+      <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-6 sm:p-8 space-y-5">
         <div className="text-center">
           <div className="text-3xl mb-2">🚗</div>
           <h1 className="text-2xl font-semibold text-[#1A1A2E]">SENGA Location</h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-sm text-gray-600 mt-1">
             {setupToken
               ? "Créez votre code PIN"
-              : pinOnly
-                ? `Entrez le PIN pour ${maskPhoneDisplay(phone)}`
-                : forgotPin && codeSent
-                  ? "Code SMS envoyé. Vous définirez ensuite un nouveau PIN."
-                  : forgotPin
-                    ? "Récupérez l'accès par SMS (vous pouvez changer de numéro) ou avec Google, puis définissez un nouveau PIN."
-                    : KYC_PIN_LOGIN_HINT_FR}
+              : forgotPin && codeSent
+                ? "Code SMS envoyé. Vous définirez ensuite un nouveau PIN."
+                : forgotPin
+                  ? "Récupérez l'accès par SMS (vous pouvez changer de numéro) ou avec Google, puis définissez un nouveau PIN."
+                  : googleChallenge
+                    ? "Confirmez le code reçu, puis activez avec le PIN KYC si demandé."
+                    : null}
           </p>
         </div>
         {setupToken ? (
           <div className="fixed inset-0 z-[10050] bg-gradient-to-br from-indigo-50 to-violet-50 overflow-y-auto">
-            <div className="min-h-[100dvh] flex items-center justify-center p-6">
+            <div className="min-h-[100dvh] flex items-start justify-center p-6 pt-10">
               <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-8">
                 <PinSetupForm
                   apiBase={API_BASE}
@@ -375,42 +306,61 @@ export default function LoginPage() {
               </div>
             </div>
           </div>
+        ) : showActivation ? (
+          <>
+            <ActivationPinCard
+              apiBase={API_BASE}
+              intent={{ ...INTENT }}
+              accentClass="bg-indigo-600"
+              highlightClass="border-indigo-400 bg-indigo-50"
+              heading={ACTIVATION_PIN_HEADING_FR}
+              defaultIdentity={phone}
+              normalizeIdentity={normalizeLoginPhone}
+              onActivated={(data) => finishRentalSession(data, "pin")}
+            />
+            {googleClientId() && (
+              <div className="pt-3 border-t border-gray-100 space-y-2">
+                <p className="text-center text-sm font-medium text-gray-600">{GOOGLE_OPTIONAL_LABEL_FR}</p>
+                <GoogleContinueButton onCredential={loginWithGoogle} disabled={loading} />
+              </div>
+            )}
+            <PinForgotLink
+              disabled={loading}
+              onClick={() => {
+                setForgotPin(true);
+                setError(null);
+              }}
+            />
+            <PartnerLoginHelp />
+          </>
         ) : (
           <>
-            {!hideIdentity && (
-              <label className="block text-sm">
-                <span className="text-gray-600">{LOGIN_IDENTITY_LABEL_FR}</span>
-                <input
-                  data-testid="login-phone"
-                  className="mt-1 w-full rounded-xl border border-gray-200 p-3"
-                  value={phone}
-                  onChange={(e) => {
-                    setPhone(e.target.value);
-                    setPinMode(false);
-                    setPin("");
-                  }}
-                  placeholder="+243 8XX XXX XXX ou e-mail"
-                  type="text"
-                  inputMode="text"
-                  autoComplete="username"
-                  disabled={codeSent || Boolean(googleChallenge)}
-                />
-              </label>
-              )}
-              {forgotPin && !codeSent && !googleChallenge && (
-                <button
-                  type="button"
-                  className="w-full text-sm text-gray-500 underline"
-                  onClick={() => {
-                    setPhone("");
-                    setError(null);
-                  }}
-                >
-                  Utiliser un autre numéro
-                </button>
-              )}
-            {showPinField && (
-              <PinDigitPad value={pin} onChange={setPin} disabled={loading} accentClass="bg-indigo-600" />
+            <label className="block text-sm">
+              <span className="text-gray-600">Téléphone (+243) ou e-mail</span>
+              <input
+                data-testid="login-phone"
+                className="mt-1 w-full rounded-xl border border-gray-200 p-3"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="+243 8XX XXX XXX ou e-mail"
+                type="text"
+                inputMode="text"
+                autoComplete="username"
+                disabled={codeSent || Boolean(googleChallenge)}
+              />
+            </label>
+            {forgotPin && !codeSent && !googleChallenge && (
+              <button
+                type="button"
+                className="w-full text-sm text-gray-500 underline"
+                onClick={() => {
+                  setPhone("");
+                  clearLastPhone();
+                  setError(null);
+                }}
+              >
+                Utiliser un autre numéro
+              </button>
             )}
             {codeSent && (
               <label className="block text-sm">
@@ -432,63 +382,29 @@ export default function LoginPage() {
                 />
               </label>
             )}
-            {!pinOnly && (
-              <button
-                type="button"
-                disabled={
-                  loading ||
-                  (!googleChallenge && !phone.trim()) ||
-                  (codeSent && !code.trim()) ||
-                  (showPinField && pin.length > 0 && pin.length !== 6)
-                }
-                onClick={primaryAction}
-                className="w-full py-3 rounded-xl bg-indigo-600 text-white font-medium disabled:opacity-60"
-              >
-                {loading
-                  ? codeSent || pin.length === 6
-                    ? "Connexion…"
-                    : "Envoi…"
-                  : codeSent
-                    ? "Se connecter"
-                    : pin.length === 6
-                      ? "Se connecter avec le PIN"
-                      : forgotPin
-                        ? "Recevoir un SMS"
-                        : "Continuer"}
-              </button>
-            )}
-            {showPinField && (
-              <PinForgotLink
-                disabled={loading}
-                onClick={() => {
-                  setForgotPin(true);
-                  setPinMode(false);
-                  setPin("");
-                  setError(null);
-                }}
-              />
-            )}
+            <button
+              type="button"
+              disabled={loading || (!googleChallenge && !phone.trim()) || (codeSent && !code.trim())}
+              onClick={() => (codeSent ? void verifyOtp() : void requestOtp())}
+              className="w-full py-3 rounded-xl bg-indigo-600 text-white font-medium disabled:opacity-60"
+            >
+              {loading ? (codeSent ? "Connexion…" : "Envoi…") : codeSent ? "Se connecter" : "Recevoir un SMS"}
+            </button>
             {forgotPin && !codeSent && !googleChallenge && (
               <button
                 type="button"
                 className="w-full text-sm text-gray-400 underline"
                 onClick={() => {
                   setForgotPin(false);
-                  setPinMode(true);
                   setError(null);
                 }}
               >
-                Retour au PIN
+                Retour au PIN d&apos;activation
               </button>
             )}
-            {pinOnly && (
-              <button type="button" className="w-full text-sm text-gray-400 underline" onClick={useAnotherNumber}>
-                Ce n&apos;est pas moi
-              </button>
-            )}
-            {googleClientId() && !codeSent && !googleChallenge && !hideIdentity && (
+            {googleClientId() && !codeSent && !googleChallenge && (
               <>
-                <p className="text-center text-xs text-gray-400">ou</p>
+                <p className="text-center text-sm font-medium text-gray-600">{GOOGLE_OPTIONAL_LABEL_FR}</p>
                 <GoogleContinueButton onCredential={loginWithGoogle} disabled={loading} />
               </>
             )}
@@ -502,26 +418,16 @@ export default function LoginPage() {
                   setGoogleChallenge(null);
                   setError(null);
                   if (forgotPin && getLastPhone()) {
-                    setPinMode(true);
                     setForgotPin(false);
                   }
                 }}
               >
-                {googleChallenge ? "Retour" : forgotPin ? "Retour au PIN" : "Changer de numéro"}
+                {googleChallenge ? "Retour" : "Retour au PIN d'activation"}
               </button>
             )}
           </>
         )}
         {error && <p className="text-sm text-red-600 text-center">{error}</p>}
-        {!setupToken && (
-          pinOnly ? (
-            <p className="text-xs text-gray-400 text-center">
-              PIN oublié : SMS, autre numéro ou Google.
-            </p>
-          ) : (
-            <PartnerLoginHelp />
-          )
-        )}
       </div>
     </div>
   );

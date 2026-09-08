@@ -5,6 +5,14 @@ import { fetchCompanyContacts, type CompanyContact } from "@/lib/api";
 
 const MANUAL = [
   {
+    title: "Activer le compte (PIN après KYC)",
+    steps: [
+      "Ouvrez https://restaurant.afri-soft.com/login — carte orange « PIN d'activation (e-mail / SMS après validation KYC) ».",
+      "Champ e-mail ou +243, puis « Code PIN à 6 chiffres », bouton « Ouvrir la session avec le PIN ».",
+      "Google est plus bas (optionnel). Déjà connecté : « Activer avec le PIN reçu par e-mail ».",
+    ],
+  },
+  {
     title: "Dossier avant menus et commandes",
     steps: [
       "Ouvrez Mon dossier en premier.",
@@ -78,7 +86,7 @@ export default function RestaurantAidePage() {
       <section className="bg-white border rounded-xl p-4">
         <h3 className="font-semibold text-[#1A1A2E]">Manuel utilisateur</h3>
         <p className="text-sm text-gray-600 mt-1">
-          Connexion, PIN après validation, dossier, menu et commandes.
+          Connexion, PIN d&apos;activation après validation KYC, dossier, menu et commandes.
         </p>
         <a href="/manuel" className="inline-block mt-2 text-orange-700 underline font-medium text-sm">
           Ouvrir le manuel utilisateur

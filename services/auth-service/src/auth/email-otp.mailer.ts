@@ -510,7 +510,7 @@ export function smtpReplyComplete(buffer: string): boolean {
   return /^\d{3} /.test(lines[lines.length - 1]);
 }
 
-const SMTP_TIMEOUT_MS = 20_000;
+const SMTP_TIMEOUT_MS = 45_000;
 
 async function smtpSend(opts: SmtpOpts): Promise<void> {
   const implicitTls = opts.port === 465;

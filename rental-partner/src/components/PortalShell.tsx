@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { logoutPartnerSession } from "@/lib/auth";
+import { usePathname } from "next/navigation";
+import { LOGIN_AFTER_LOGOUT_HREF, logoutPartnerSession } from "@/lib/auth";
 import { disableGoogleAutoSelect } from "@/components/GoogleContinueButton";
 import { PUBLIC_API_BASE } from "@/lib/public-api-base";
 import { usePartnerLiveConnected } from "@/components/PartnerLiveProvider";
@@ -31,13 +31,12 @@ export function PortalShell({
   partnerName?: string;
 }) {
   const pathname = usePathname();
-  const router = useRouter();
   const liveConnected = usePartnerLiveConnected();
 
   function logout() {
     disableGoogleAutoSelect();
     void logoutPartnerSession(PUBLIC_API_BASE).finally(() => {
-      router.replace("/login");
+      window.location.replace(LOGIN_AFTER_LOGOUT_HREF);
     });
   }
 

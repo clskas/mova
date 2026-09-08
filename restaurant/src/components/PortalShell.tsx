@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { logoutPartnerSession } from "@/lib/auth";
+import { usePathname } from "next/navigation";
+import { LOGIN_AFTER_LOGOUT_HREF, logoutPartnerSession } from "@/lib/auth";
 import { disableGoogleAutoSelect } from "@/components/GoogleContinueButton";
 import { PUBLIC_API_BASE } from "@/lib/public-api-base";
 import { useRestaurantLiveConnected } from "@/components/RestaurantLiveProvider";
@@ -26,13 +26,12 @@ function navActive(pathname: string, href: string) {
 
 export function PortalShell({ children, restaurantName }: { children: React.ReactNode; restaurantName?: string }) {
   const pathname = usePathname();
-  const router = useRouter();
   const liveConnected = useRestaurantLiveConnected();
 
   function logout() {
     disableGoogleAutoSelect();
     void logoutPartnerSession(PUBLIC_API_BASE).finally(() => {
-      router.replace("/login");
+      window.location.replace(LOGIN_AFTER_LOGOUT_HREF);
     });
   }
 

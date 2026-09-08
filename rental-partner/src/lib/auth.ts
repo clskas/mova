@@ -3,6 +3,11 @@ const PIN_PENDING_KEY = "mova_rental_partner_pin_pending";
 const LAST_PHONE_KEY = "mova_rental_partner_last_phone";
 const PIN_UNLOCK_KEY = "mova_rental_partner_pin_login_unlocked";
 const PIN_CONFIRMED_KEY = "mova_rental_partner_login_pin_confirmed";
+const EXPECT_PIN_KEY = "mova_rental_partner_expect_pin";
+const GOOGLE_SIGNED_OUT_KEY = "mova_rental_partner_google_signed_out";
+
+/** Full reload after Déconnexion so GIS cannot restore the session. */
+export const LOGIN_AFTER_LOGOUT_HREF = "/login?pin=1";
 
 function storageGet(key: string): string | null {
   if (typeof window === "undefined") return null;
@@ -52,7 +57,42 @@ export function clearToken() {
   clearPinSessionUnlocked();
 }
 
+export function persistGoogleSignedOut() {
+  storageSet(GOOGLE_SIGNED_OUT_KEY, "1");
+  try {
+    document.cookie = `g_state=${encodeURIComponent('{"i_l":0}')};path=/;max-age=7776000;SameSite=Lax`;
+  } catch {
+    /* ignore */
+  }
+}
+
+export function allowGoogleSignIn() {
+  storageRemove(GOOGLE_SIGNED_OUT_KEY);
+  try {
+    document.cookie = "g_state=;path=/;max-age=0";
+  } catch {
+    /* ignore */
+  }
+}
+
+export function isGoogleSignedOut(): boolean {
+  return storageGet(GOOGLE_SIGNED_OUT_KEY) === "1";
+}
+
+export function markExpectPinAfterLogout() {
+  storageSet(EXPECT_PIN_KEY, "1");
+}
+
+export function shouldExpectPinAfterLogout(): boolean {
+  return storageGet(EXPECT_PIN_KEY) === "1";
+}
+
+export function clearExpectPinAfterLogout() {
+  storageRemove(EXPECT_PIN_KEY);
+}
+
 export async function logoutPartnerSession(apiBase: string) {
+  const remembered = (phoneFromToken() || getLastPhone() || "").trim();
   const token = getToken();
   if (token) {
     try {
@@ -65,6 +105,9 @@ export async function logoutPartnerSession(apiBase: string) {
     }
   }
   clearToken();
+  if (remembered) setLastPhone(remembered);
+  markExpectPinAfterLogout();
+  persistGoogleSignedOut();
 }
 
 export function dropTokenKeepPhone(phone?: string): void {

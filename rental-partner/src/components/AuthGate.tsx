@@ -48,7 +48,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     }
     if (isPinPending() || !isPinSessionUnlocked()) {
       dropTokenKeepPhone(phoneFromToken() || getLastPhone() || "");
-      router.replace("/login");
+      router.replace("/login?pin=1");
       return;
     }
     let cancelled = false;
@@ -85,7 +85,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
         setReady(true);
       } catch {
         dropTokenKeepPhone(phoneFromToken() || getLastPhone() || "");
-        router.replace("/login");
+        router.replace("/login?pin=1");
       }
     }
 

@@ -395,11 +395,8 @@ export class AuthService {
 
   /**
    * Step 1: verify Google ID token.
-   * Restaurant / rental first login (no connection PIN yet): email OTP, then PIN window.
-   * Subsequent partner logins (PIN already set), driver, passenger, staff: session JWT.
-   * Driver app (`role=DRIVER`) may create a pending KYC chauffeur — never staff,
-   * never a silent promote of PASSENGER / SUPER_ADMIN.
-   * Partner roles only from restaurant / rental portals (explicit role or portal).
+   * Restaurant / rental: always email OTP (even if KYC already issued a login PIN),
+   * then the connection-PIN window. Driver, passenger, staff: session JWT, no extra OTP.
    */
   async loginWithGoogle(
     idToken: string,
@@ -631,11 +628,11 @@ export class AuthService {
     return (fromIntended as UserRole | undefined) ?? role ?? (fromPortal as UserRole | undefined);
   }
 
-  /** First restaurant / rental Google login: email OTP, then PIN de connexion. Driver/passenger/staff unchanged. */
+  /** Restaurant / rental Google: always email OTP, then PIN de connexion. Driver/passenger/staff unchanged. */
   private requiresPartnerGoogleEmailOtp(requestedRole: UserRole | undefined, user: User | null): boolean {
     if (!isPartnerPortalRole(requestedRole)) return false;
     if (user && !isPartnerPortalRole(user.role)) return false;
-    return userNeedsPinSetup(user?.phone, user?.localPinHash);
+    return true;
   }
 
   private accessMailPortal(role?: UserRole | null): SengaAccessMailPortal | undefined {

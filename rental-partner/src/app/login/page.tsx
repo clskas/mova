@@ -34,6 +34,7 @@ import {
   LOGIN_CLASSIC_LABEL_FR,
   LOGIN_IDENTITY_LABEL_FR,
   PartnerLoginHelp,
+  CONNECTION_PIN_HEADING_FR,
   PIN_SETUP_HINT_FR,
   PinDigitPad,
   PinForgotLink,
@@ -43,7 +44,6 @@ import {
   isEmailIdentity,
   jwtNeedsPinSetup,
   loginWithPinRequest,
-  maskPhoneDisplay,
   mustSetupPinAfterPhoneLogin,
   shouldRequirePinSetup,
 } from "@/components/PinAuth";
@@ -324,11 +324,9 @@ export default function LoginPage() {
           <div className="text-3xl mb-2">🚗</div>
           <h1 className="text-2xl font-semibold text-[#1A1A2E]">SENGA Location</h1>
           <p className="text-sm text-gray-600 mt-1">
-            {setupToken
+            {setupToken || pinOnly
               ? PIN_SETUP_HINT_FR
-              : pinOnly
-                ? `Entrez le PIN de connexion pour ${maskPhoneDisplay(phone)}`
-                : forgotPin && codeSent
+              : forgotPin && codeSent
                   ? "Code SMS envoyé. Vous définirez ensuite un nouveau PIN de connexion."
                   : forgotPin
                     ? "Récupérez l'accès par SMS (vous pouvez changer de numéro) ou avec Google, puis définissez un nouveau PIN."
@@ -340,7 +338,7 @@ export default function LoginPage() {
         {setupToken ? (
           <div className="fixed inset-0 z-[10050] bg-gradient-to-br from-indigo-50 to-violet-50 overflow-y-auto">
             <div className="min-h-[100dvh] flex items-start justify-center p-6 pt-10">
-              <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-8">
+              <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-8 space-y-4">
                 <PinSetupForm
                   apiBase={API_BASE}
                   token={setupToken}
@@ -356,37 +354,63 @@ export default function LoginPage() {
               </div>
             </div>
           </div>
+        ) : pinOnly ? (
+          <div className="fixed inset-0 z-[10050] bg-gradient-to-br from-indigo-50 to-violet-50 overflow-y-auto">
+            <div className="min-h-[100dvh] flex items-start justify-center p-6 pt-10">
+              <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-8 space-y-4">
+                <h2 className="text-lg font-semibold text-center text-[#1A1A2E]">{CONNECTION_PIN_HEADING_FR}</h2>
+                <p className="text-sm text-gray-600 text-center">{PIN_SETUP_HINT_FR}</p>
+                <PinDigitPad
+                  value={pin}
+                  onChange={setPin}
+                  disabled={loading}
+                  accentClass="bg-indigo-600"
+                  fieldLabel="PIN de connexion"
+                  autoFocus
+                />
+                <PinForgotLink
+                  disabled={loading}
+                  onClick={() => {
+                    setForgotPin(true);
+                    setPinMode(false);
+                    setPin("");
+                    setError(null);
+                  }}
+                />
+                <button type="button" className="w-full text-sm text-gray-400 underline" onClick={useAnotherNumber}>
+                  Ce n&apos;est pas moi
+                </button>
+                {error && <p className="text-sm text-red-600 text-center">{error}</p>}
+              </div>
+            </div>
+          </div>
         ) : (
           <>
-            {googleClientId() && !codeSent && !googleChallenge && !pinOnly && (
+            {googleClientId() && !codeSent && !googleChallenge && (
               <div className="space-y-2">
                 <p className="text-center text-sm font-medium text-gray-600">{GOOGLE_OPTIONAL_LABEL_FR}</p>
                 <GoogleContinueButton onCredential={loginWithGoogle} disabled={loading} />
               </div>
             )}
-            {!pinOnly && (
-              <p className="text-center text-sm font-medium text-gray-500">{LOGIN_CLASSIC_LABEL_FR}</p>
-            )}
-            {!pinOnly && (
-              <label className="block text-sm">
-                <span className="text-gray-600">{LOGIN_IDENTITY_LABEL_FR}</span>
-                <input
-                  data-testid="login-phone"
-                  className="mt-1 w-full rounded-xl border border-gray-200 p-3"
-                  value={phone}
-                  onChange={(e) => {
-                    setPhone(e.target.value);
-                    setPinMode(false);
-                    setPin("");
-                  }}
-                  placeholder="+243 8XX XXX XXX ou e-mail"
-                  type="text"
-                  inputMode="text"
-                  autoComplete="username"
-                  disabled={codeSent || Boolean(googleChallenge)}
-                />
-              </label>
-            )}
+            <p className="text-center text-sm font-medium text-gray-500">{LOGIN_CLASSIC_LABEL_FR}</p>
+            <label className="block text-sm">
+              <span className="text-gray-600">{LOGIN_IDENTITY_LABEL_FR}</span>
+              <input
+                data-testid="login-phone"
+                className="mt-1 w-full rounded-xl border border-gray-200 p-3"
+                value={phone}
+                onChange={(e) => {
+                  setPhone(e.target.value);
+                  setPinMode(false);
+                  setPin("");
+                }}
+                placeholder="+243 8XX XXX XXX ou e-mail"
+                type="text"
+                inputMode="text"
+                autoComplete="username"
+                disabled={codeSent || Boolean(googleChallenge)}
+              />
+            </label>
             {forgotPin && !codeSent && !googleChallenge && (
               <button
                 type="button"
@@ -399,16 +423,6 @@ export default function LoginPage() {
               >
                 Utiliser un autre numéro
               </button>
-            )}
-            {pinOnly && (
-              <PinDigitPad
-                value={pin}
-                onChange={setPin}
-                disabled={loading}
-                accentClass="bg-indigo-600"
-                fieldLabel="PIN de connexion"
-                autoFocus
-              />
             )}
             {codeSent && (
               <label className="block text-sm">
@@ -430,8 +444,7 @@ export default function LoginPage() {
                 />
               </label>
             )}
-            {!pinOnly && (
-              <button
+            <button
                 type="button"
                 disabled={loading || (!googleChallenge && !phone.trim()) || (codeSent && !code.trim())}
                 onClick={() => (codeSent ? void verifyOtp() : void requestOtp({ forceSms: forgotPin }))}
@@ -442,28 +455,11 @@ export default function LoginPage() {
                     ? "Connexion…"
                     : "Envoi…"
                   : codeSent
-                    ? "Se connecter"
+                    ? "Valider le code"
                     : forgotPin
                       ? "Recevoir un SMS"
                       : "Continuer"}
               </button>
-            )}
-            {pinOnly && (
-              <>
-                <PinForgotLink
-                  disabled={loading}
-                  onClick={() => {
-                    setForgotPin(true);
-                    setPinMode(false);
-                    setPin("");
-                    setError(null);
-                  }}
-                />
-                <button type="button" className="w-full text-sm text-gray-400 underline" onClick={useAnotherNumber}>
-                  Ce n&apos;est pas moi
-                </button>
-              </>
-            )}
             {forgotPin && !codeSent && !googleChallenge && (
               <button
                 type="button"

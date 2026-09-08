@@ -595,7 +595,7 @@ describe('AuthService', () => {
     expect(prisma.user.create).not.toHaveBeenCalled();
   });
 
-  it('skips Google email OTP on restaurant portal when the connection PIN is already set', async () => {
+  it('sends Google email OTP on restaurant portal even if a KYC login PIN already exists', async () => {
     const resto = makeUser({
       id: 'g-resto',
       phone: null,
@@ -605,11 +605,14 @@ describe('AuthService', () => {
       localPinHash: hashLocalPin('847291'),
     });
     prisma.user.findUnique.mockResolvedValue(resto);
-    prisma.user.update.mockResolvedValue(resto);
-    const result = googleSession(await service.loginWithGoogle('id-token', UserRole.RESTAURANT, 'restaurant'));
-    expect(result.accessToken).toBe('jwt-token');
-    expect(result).not.toHaveProperty('otpRequired');
-    expect(mailer.sendOtp).not.toHaveBeenCalled();
+    const result = googleEmailOtp(await service.loginWithGoogle('id-token', UserRole.RESTAURANT, 'restaurant'));
+    expect(result.otpRequired).toBe(true);
+    expect(jwt.sign).not.toHaveBeenCalled();
+    expect(mailer.sendOtp).toHaveBeenCalledWith(
+      'new.user@gmail.com',
+      expect.any(String),
+      expect.objectContaining({ portal: 'restaurant' }),
+    );
     expect(sms.sendOtp).not.toHaveBeenCalled();
   });
 

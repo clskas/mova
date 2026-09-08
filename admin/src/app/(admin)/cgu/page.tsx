@@ -32,20 +32,10 @@ const FORMAT_OPTIONS = [
   { value: "plain", label: "Texte" },
 ];
 
-const DEFAULT_BODY = `# Conditions Générales d'Utilisation — SENGA RDC
-
-**Dernière mise à jour :** ${new Date().toLocaleDateString("fr-FR")}
-**Éditeur :** SENGA SARL, Kinshasa, RDC
-
-## 1. Objet
-
-Les présentes Conditions Générales d'Utilisation régissent l'accès et l'utilisation de la plateforme SENGA.
-`;
-
 const emptyForm = {
   version: "1.0",
   title: "Conditions Générales d'Utilisation — SENGA RDC",
-  body: DEFAULT_BODY,
+  body: "",
   format: "markdown",
 };
 
@@ -85,8 +75,14 @@ export default function CguPage() {
   }, [load]);
 
   function openCreate() {
+    const source = items.find((i) => i.isPublished) ?? items[0];
     const nextMinor = items.length ? `${items.length + 1}.0` : "1.0";
-    setForm({ ...emptyForm, version: nextMinor });
+    setForm({
+      version: nextMinor,
+      title: source?.title || emptyForm.title,
+      body: source?.body || emptyForm.body,
+      format: source?.format || "markdown",
+    });
     setModal("create");
   }
 

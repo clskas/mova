@@ -93,4 +93,47 @@ describe('LegalDocumentsService', () => {
     await expect(service.unpublish('cgu-1')).rejects.toBeInstanceOf(MovaHttpException);
     expect(prisma.legalDocument.update).not.toHaveBeenCalled();
   });
+
+  it('insère la CGU par défaut publiée si la table est vide', async () => {
+    prisma.legalDocument.findFirst.mockResolvedValue(null);
+    prisma.legalDocument.create.mockResolvedValue(row({ isPublished: true, body: 'full' }));
+    await service.ensureDefaultPublished();
+    expect(prisma.legalDocument.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          slug: 'cgu',
+          version: '1.0',
+          format: 'markdown',
+          isPublished: true,
+        }),
+      }),
+    );
+    const created = prisma.legalDocument.create.mock.calls[0][0] as {
+      data: { body: string; title: string; publishedAt: Date };
+    };
+    expect(created.data.body.length).toBeGreaterThan(100);
+    expect(created.data.title).toBe(DEFAULT_CGU_TITLE);
+    expect(created.data.publishedAt).toBeInstanceOf(Date);
+  });
+
+  it('n’insère pas de doublon si une version existe déjà', async () => {
+    prisma.legalDocument.findFirst.mockResolvedValue({ id: 'cgu-1' });
+    await service.ensureDefaultPublished();
+    expect(prisma.legalDocument.create).not.toHaveBeenCalled();
+  });
+
+  it('ignore le conflit unique (deux instances au démarrage)', async () => {
+    prisma.legalDocument.findFirst.mockResolvedValue(null);
+    prisma.legalDocument.create.mockRejectedValue({ code: 'P2002' });
+    await expect(service.ensureDefaultPublished()).resolves.toBeUndefined();
+  });
+
+  it('liste admin déclenche le bootstrap puis renvoie les versions', async () => {
+    prisma.legalDocument.findFirst.mockResolvedValue({ id: 'cgu-1' });
+    prisma.legalDocument.findMany.mockResolvedValue([row({ isPublished: true })]);
+    const list = await service.listAdmin();
+    expect(list).toHaveLength(1);
+    expect(list[0].version).toBe('1.0');
+    expect(prisma.legalDocument.create).not.toHaveBeenCalled();
+  });
 });

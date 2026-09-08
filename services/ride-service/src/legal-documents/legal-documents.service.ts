@@ -1,4 +1,4 @@
-import { HttpStatus, Injectable } from '@nestjs/common';
+import { HttpStatus, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { MovaErrorCode, MovaHttpException } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
@@ -11,6 +11,10 @@ import {
 
 const FORMATS = new Set(['markdown', 'html', 'plain']);
 
+function isPrismaUniqueViolation(err: unknown): boolean {
+  return typeof err === 'object' && err !== null && (err as { code?: string }).code === 'P2002';
+}
+
 export type LegalDocumentInput = {
   slug?: string;
   version?: string;
@@ -20,8 +24,48 @@ export type LegalDocumentInput = {
 };
 
 @Injectable()
-export class LegalDocumentsService {
+export class LegalDocumentsService implements OnModuleInit {
+  private readonly logger = new Logger(LegalDocumentsService.name);
+
   constructor(private prisma: PrismaService) {}
+
+  async onModuleInit() {
+    await this.ensureDefaultPublished().catch((err: unknown) => {
+      this.logger.warn(`CGU bootstrap skipped: ${err instanceof Error ? err.message : String(err)}`);
+    });
+  }
+
+  /**
+   * Idempotent: inserts the in-app default CGU as published 1.0 when the table is empty.
+   * Does not duplicate or overwrite once any CGU row exists (draft or published).
+   */
+  async ensureDefaultPublished() {
+    const existing = await this.prisma.legalDocument.findFirst({
+      where: { slug: DEFAULT_CGU_SLUG },
+      select: { id: true },
+    });
+    if (existing) return;
+
+    const now = new Date();
+    try {
+      const row = await this.prisma.legalDocument.create({
+        data: {
+          slug: DEFAULT_CGU_SLUG,
+          version: DEFAULT_CGU_VERSION,
+          title: DEFAULT_CGU_TITLE,
+          body: DEFAULT_CGU_BODY,
+          format: 'markdown',
+          isPublished: true,
+          publishedAt: now,
+        },
+      });
+      this.logger.log(`CGU ${DEFAULT_CGU_VERSION} créée et publiée (texte par défaut chauffeur / aide).`);
+      return this.toRecord(row);
+    } catch (err) {
+      if (!isPrismaUniqueViolation(err)) throw err;
+      this.logger.log(`CGU ${DEFAULT_CGU_VERSION} déjà présente — bootstrap ignoré.`);
+    }
+  }
 
   private toRecord(row: {
     id: string;
@@ -73,6 +117,9 @@ export class LegalDocumentsService {
   }
 
   async listAdmin(slug = DEFAULT_CGU_SLUG) {
+    if (slug === DEFAULT_CGU_SLUG) {
+      await this.ensureDefaultPublished();
+    }
     const rows = await this.prisma.legalDocument.findMany({
       where: { slug },
       orderBy: [{ isPublished: 'desc' }, { createdAt: 'desc' }],

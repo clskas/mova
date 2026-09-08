@@ -1,6 +1,6 @@
 /// Version client — le *nom* reste `1.0.5` (AABs Play 1.0.6 compilent encore ce const).
 /// Le versionCode Play est `pubspec` / CI (`--build-number` + `--dart-define=APP_BUILD`).
-/// 57 = PIN after OTP. Do not raise `/public/app-version` until Play accepts 57.
+/// 57 = PIN after OTP (Play production 34213561877).
 class AppVersion {
   static const name = '1.0.5';
   static const build = int.fromEnvironment('APP_BUILD', defaultValue: 57);

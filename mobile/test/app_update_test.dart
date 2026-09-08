@@ -259,6 +259,31 @@ void main() {
       expect(state.showBanner, isTrue);
     });
 
+    test('57 is behind advertised 58 (same 1.0.5 name)', () {
+      final state = AppUpdateService.parseRemote(
+        {
+          'passenger': {
+            'currentVersion': '1.0.5',
+            'minVersion': '1.0.0',
+            'currentVersionCode': 58,
+            'storeUrl': 'https://play.google.com/store/apps/details?id=cd.mova.mova.passenger',
+          },
+          'driver': {
+            'currentVersion': '1.0.5',
+            'minVersion': '1.0.0',
+            'currentVersionCode': 58,
+            'storeUrl': 'https://play.google.com/store/apps/details?id=cd.mova.mova.driver',
+          },
+        },
+        isDriver: true,
+        localVersion: '1.0.5',
+        localBuild: 57,
+      );
+      expect(state!.updateAvailable, isTrue);
+      expect(state.showBanner, isTrue);
+      expect(state.storeUrl, contains('cd.mova.mova.driver'));
+    });
+
     test('57 matching advertised 57 hides the banner', () {
       final state = AppUpdateService.parseRemote(
         {

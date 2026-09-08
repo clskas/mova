@@ -426,12 +426,12 @@ envVarGroups:
         value: "1.0.5"
       - key: MOBILE_MIN_VERSION
         value: "1.0.0"
-      # Live Play production versionCode (1.0.6+57, promoted 2026-09-08, run 34213561877).
-      # Name stays 1.0.5 so phones already on 57 do not see a name-based banner.
+      # Live Play production versionCode (1.0.6+58, promoted 2026-09-08, run 34223352006).
+      # Name stays 1.0.5 so phones already on 58 do not see a name-based banner.
       - key: MOBILE_PASSENGER_VERSION_CODE
-        value: "57"
+        value: "58"
       - key: MOBILE_DRIVER_VERSION_CODE
-        value: "57"
+        value: "58"
       - key: MOBILE_MIN_VERSION_CODE
         value: "0"
       - key: PLAY_STORE_PASSENGER_URL

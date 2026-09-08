@@ -37,8 +37,6 @@ import {
   PinSetupForm,
   accountPhone,
   isEmailIdentity,
-  mustSetupPinAfterPhoneLogin,
-  shouldRequirePinSetup,
 } from "@/components/PinAuth";
 
 const API_BASE = PUBLIC_API_BASE;
@@ -87,24 +85,6 @@ export default function LoginPage() {
           });
           const me = res.ok ? await res.json() : null;
           if (cancelled) return;
-          if (
-            me &&
-            shouldRequirePinSetup(
-              {
-                pinConfigured: me.pinConfigured,
-                needsPinSetup: me.needsPinSetup,
-                phone: me.phone,
-                hasPhone: me.hasPhone,
-                user: me,
-              },
-              me.phone || phoneFromToken() || getLastPhone() || "",
-              token,
-            )
-          ) {
-            setPinPending(true);
-            setSetupToken(token);
-            return;
-          }
           const remembered = accountPhone(
             { pinConfigured: me?.pinConfigured, phone: me?.phone, hasPhone: me?.hasPhone, user: me, email: me?.email },
             phoneFromToken() || getLastPhone() || "",
@@ -113,7 +93,7 @@ export default function LoginPage() {
             if (remembered) setPhone(remembered);
             return;
           }
-          if (me && isPinSessionUnlocked()) {
+          if (me) {
             router.replace("/");
             return;
           }
@@ -141,21 +121,15 @@ export default function LoginPage() {
     const phoneOnAccount = accountPhone(data, typedPhone);
     setToken(data.accessToken, phoneOnAccount || undefined);
     if (phoneOnAccount) setLastPhone(phoneOnAccount);
-    if (
-      forgotPin ||
-      mustSetupPinAfterPhoneLogin(data, typedPhone, source !== "google") ||
-      shouldRequirePinSetup(data, phoneOnAccount, data.accessToken)
-    ) {
+    if (forgotPin) {
       setPinPending(true);
       setSetupToken(data.accessToken);
       return;
     }
     setPinPending(false);
-    if (source === "google") {
-      router.replace("/compte");
-      return;
+    if (source === "pin") {
+      markPinSessionUnlocked();
     }
-    markPinSessionUnlocked();
     router.replace("/");
   }
 

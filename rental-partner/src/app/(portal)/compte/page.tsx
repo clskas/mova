@@ -2,8 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { ConnectionCard } from "@/components/ConnectionCard";
-import { ActivationPinCard, accountPhone } from "@/components/PinAuth";
-import { apiFetch } from "@/lib/api";
+import {
+  ACTIVATION_PIN_WINDOW_HEADING_FR,
+  ACTIVATION_PIN_WINDOW_HINT_FR,
+  ActivationPinCard,
+  accountPhone,
+  partnerNeedsKycActivationPin,
+} from "@/components/PinAuth";
+import { apiFetch, fetchProfile } from "@/lib/api";
 import { PUBLIC_API_BASE } from "@/lib/public-api-base";
 import {
   RENTAL_AUTH_INTENT,
@@ -21,15 +27,24 @@ export default function ComptePage() {
   const [showActivate, setShowActivate] = useState(false);
 
   useEffect(() => {
-    setShowActivate(!isPinSessionUnlocked());
     const last = getLastPhone() || "";
     setIdentity(last);
     void (async () => {
       try {
-        const me = await apiFetch<{ email?: string; phone?: string }>("/api/users/me");
+        const [me, profile] = await Promise.all([
+          apiFetch<{ email?: string; phone?: string }>("/api/users/me"),
+          fetchProfile().catch(() => null),
+        ]);
         if (!last) setIdentity(me.phone || me.email || "");
+        setShowActivate(
+          partnerNeedsKycActivationPin({
+            kycStatus: profile?.kycStatus,
+            unlocked: isPinSessionUnlocked(),
+            identity: last || me.phone || me.email || "",
+          }),
+        );
       } catch {
-        /* ignore — PIN form still usable */
+        /* PIN form still usable after KYC via AuthGate on work pages */
       }
     })();
   }, []);
@@ -43,6 +58,9 @@ export default function ComptePage() {
           intent={{ ...RENTAL_AUTH_INTENT }}
           accentClass="bg-indigo-600"
           highlightClass="border-indigo-500 bg-indigo-50"
+          heading={ACTIVATION_PIN_WINDOW_HEADING_FR}
+          hint={ACTIVATION_PIN_WINDOW_HINT_FR}
+          lockIdentity
           defaultIdentity={identity}
           normalizeIdentity={normalizeLoginPhone}
           onActivated={(data) => {

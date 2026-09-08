@@ -38,8 +38,8 @@ export function PortalShell({
   }
 
   return (
-    <div className="min-h-screen flex flex-col overflow-x-hidden">
-      <header className="sticky top-0 z-30 overflow-x-hidden bg-white/95 backdrop-blur border-b border-indigo-100 pt-[env(safe-area-inset-top)]">
+    <div className="min-h-screen flex flex-col overflow-x-clip">
+      <header className="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-indigo-100 pt-[env(safe-area-inset-top)]">
         <div className="px-3 sm:px-4 py-2 flex flex-col items-center gap-2">
           <div data-brand>
             <p className="text-[10px] sm:text-xs text-indigo-600 font-medium uppercase tracking-wide">SENGA Partenaire</p>
@@ -69,41 +69,42 @@ export function PortalShell({
             </button>
           </nav>
         </div>
-        <nav data-mobile-nav className="senga-nav-phone" aria-label="Navigation">
-          {NAV.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              aria-label={item.label}
-              className={`flex flex-col items-center justify-center gap-0.5 min-h-10 rounded-xl text-[11px] leading-tight text-center px-1 ${
-                navActive(pathname, item.href)
-                  ? "bg-indigo-100 text-indigo-800 font-semibold"
-                  : "text-gray-600"
-              }`}
-            >
-              <span className="text-base leading-none" aria-hidden>
-                {item.icon}
-              </span>
-              {item.short}
-            </Link>
-          ))}
-          <button
-            type="button"
-            onClick={logout}
-            aria-label="Déconnexion"
-            className="flex flex-col items-center justify-center gap-0.5 min-h-10 rounded-xl text-[11px] leading-tight text-center px-1 text-gray-600"
-          >
-            <span className="text-base leading-none" aria-hidden>
-              🚪
-            </span>
-            Déconnexion
-          </button>
-        </nav>
       </header>
 
-      <main className="flex-1 p-3 sm:p-4 lg:p-6 max-w-5xl mx-auto w-full min-w-0 pb-[max(1rem,env(safe-area-inset-bottom))]">
+      <main className="senga-portal-main flex-1 p-3 sm:p-4 lg:p-6 max-w-5xl mx-auto w-full min-w-0">
         {children}
       </main>
+
+      <nav data-mobile-nav className="senga-nav-phone" aria-label="Navigation">
+        {NAV.map((item) => (
+          <Link
+            key={item.href}
+            href={item.href}
+            aria-label={item.label}
+            className={`flex flex-col items-center justify-center gap-0.5 min-h-10 rounded-xl text-[11px] leading-tight text-center px-1 ${
+              navActive(pathname, item.href)
+                ? "bg-indigo-100 text-indigo-800 font-semibold"
+                : "text-gray-600"
+            }`}
+          >
+            <span className="text-base leading-none" aria-hidden>
+              {item.icon}
+            </span>
+            {item.short}
+          </Link>
+        ))}
+        <button
+          type="button"
+          onClick={logout}
+          aria-label="Déconnexion"
+          className="flex flex-col items-center justify-center gap-0.5 min-h-10 rounded-xl text-[11px] leading-tight text-center px-1 text-gray-600"
+        >
+          <span className="text-base leading-none" aria-hidden>
+            🚪
+          </span>
+          Déconnexion
+        </button>
+      </nav>
     </div>
   );
 }

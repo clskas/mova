@@ -614,17 +614,6 @@ class ApiClient {
     if (path.contains('/drivers/profile') && method == 'GET') {
       return Success(MockData.driverProfile());
     }
-    if (path.contains('/drivers/activation-pin') && method == 'POST') {
-      final pin = body?['pin']?.toString() ?? '';
-      if (pin.length != 6) {
-        return const Failure(ValidationFailure('Le code PIN doit contenir 6 chiffres.'));
-      }
-      return Success({
-        ...MockData.driverProfile(),
-        'activationPinVerified': true,
-        'needsActivationPin': false,
-      });
-    }
     if (        path.contains('/drivers/availability') ||
         path.contains('/drivers/kyc') ||
         path.contains('/drivers/location') ||
@@ -1727,25 +1716,9 @@ class ApiClient {
         : '/drivers/profile';
     final result = await get(path, skipCache: forceRefresh);
     return switch (result) {
-      Success(:final data) => Success(_driverProfilePayload(data)),
+      Success(:final data) => Success(data['profile'] as Map<String, dynamic>? ?? data),
       Failure(:final error) => Failure(error),
     };
-  }
-
-  /// `/drivers/profile` is flat; cache wraps `{ profile: ... }`. Keep PIN/KYC flags.
-  Map<String, dynamic> _driverProfilePayload(Map<String, dynamic> data) {
-    final nested = data['profile'];
-    if (nested is Map) {
-      return {
-        ...Map<String, dynamic>.from(nested),
-        if (data.containsKey('needsActivationPin')) 'needsActivationPin': data['needsActivationPin'],
-        if (data.containsKey('activationPinVerified')) 'activationPinVerified': data['activationPinVerified'],
-        if (data.containsKey('activationPinVerifiedAt'))
-          'activationPinVerifiedAt': data['activationPinVerifiedAt'],
-        if (data.containsKey('kycStatus')) 'kycStatus': data['kycStatus'],
-      };
-    }
-    return data;
   }
 
   /// Récupère le code PIN espèces (completionPin / deliveryPin) depuis l'API.

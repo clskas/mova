@@ -88,7 +88,31 @@ export const GOOGLE_OPTIONAL_LABEL_FR = "Ou continuer avec Google (compte déjà
 
 export const COMPTE_ACTIVATE_HEADING_FR = "Activer le compte";
 
+export const ACTIVATION_PIN_WINDOW_HEADING_FR = "Code PIN d'activation";
+
+export const ACTIVATION_PIN_WINDOW_HINT_FR =
+  "Votre dossier est validé. Saisissez le code à 6 chiffres reçu par e-mail ou SMS pour commencer à travailler. Ce n'est pas un code Google.";
+
 export const LOGIN_IDENTITY_LABEL_FR = "Téléphone (+243) ou e-mail";
+
+const PIN_EXEMPT_PATHS = ["/dossier", "/aide", "/manuel", "/compte"];
+
+/** Dossier / aide stay usable; dashboard and reservations stay blocked. */
+export function isPartnerPinExemptPath(pathname: string | null | undefined): boolean {
+  if (!pathname) return false;
+  return PIN_EXEMPT_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+}
+
+export function partnerNeedsKycActivationPin(opts: {
+  kycStatus?: string | null;
+  unlocked: boolean;
+  identity?: string;
+}): boolean {
+  if (opts.unlocked) return false;
+  const id = (opts.identity ?? "").trim();
+  if (SEED_DEMO_PHONE_RE.test(id)) return false;
+  return opts.kycStatus === "APPROVED";
+}
 
 export function PartnerLoginHelp({
   manuelHref = "/manuel",
@@ -216,6 +240,8 @@ export function ActivationPinCard({
   defaultIdentity,
   onActivated,
   heading = COMPTE_ACTIVATE_HEADING_FR,
+  hint,
+  lockIdentity = false,
   normalizeIdentity,
 }: {
   apiBase: string;
@@ -225,6 +251,8 @@ export function ActivationPinCard({
   defaultIdentity?: string;
   onActivated: (data: AuthPayload) => void;
   heading?: string;
+  hint?: string;
+  lockIdentity?: boolean;
   normalizeIdentity?: (raw: string) => string;
 }) {
   const [identity, setIdentity] = useState(defaultIdentity ?? "");
@@ -266,24 +294,32 @@ export function ActivationPinCard({
     <section data-testid="activation-pin-card" className={`rounded-2xl border-2 p-5 space-y-4 ${highlightClass}`}>
       <div>
         <h2 className="text-lg font-bold text-[#1A1A2E]">{heading}</h2>
-        {heading !== ACTIVATION_PIN_HEADING_FR && (
+        {hint ? (
+          <p className="text-sm text-gray-700 mt-1">{hint}</p>
+        ) : heading !== ACTIVATION_PIN_HEADING_FR ? (
           <p className="text-sm text-gray-700 mt-1">{ACTIVATION_PIN_HEADING_FR}</p>
-        )}
+        ) : null}
       </div>
-      <label className="block text-sm">
-        <span className="font-semibold text-gray-800">{LOGIN_IDENTITY_LABEL_FR}</span>
-        <input
-          data-testid="login-phone"
-          className="mt-1 w-full rounded-xl border-2 border-gray-300 bg-white p-3"
-          value={identity}
-          onChange={(e) => setIdentity(e.target.value)}
-          placeholder="+243 8XX XXX XXX ou e-mail"
-          type="text"
-          inputMode="text"
-          autoComplete="username"
-          disabled={loading}
-        />
-      </label>
+      {lockIdentity && identity.trim() ? (
+        <p className="text-sm text-gray-600">
+          Compte : <span className="font-medium text-gray-800">{maskPhoneDisplay(identity)}</span>
+        </p>
+      ) : (
+        <label className="block text-sm">
+          <span className="font-semibold text-gray-800">{LOGIN_IDENTITY_LABEL_FR}</span>
+          <input
+            data-testid="login-phone"
+            className="mt-1 w-full rounded-xl border-2 border-gray-300 bg-white p-3"
+            value={identity}
+            onChange={(e) => setIdentity(e.target.value)}
+            placeholder="+243 8XX XXX XXX ou e-mail"
+            type="text"
+            inputMode="text"
+            autoComplete="username"
+            disabled={loading}
+          />
+        </label>
+      )}
       <PinDigitPad
         value={pin}
         onChange={setPin}

@@ -314,12 +314,12 @@ const kDriverManualChapters = <ManualChapter>[
   ),
   ManualChapter(
     id: 'pin',
-    title: 'PIN d\'activation',
+    title: 'Connexion avec le PIN',
     icon: '🔐',
     steps: [
-      'Après validation KYC, SENGA vous envoie un PIN à 6 chiffres (SMS ou e-mail).',
-      'À l\'ouverture de l\'app, une fenêtre « PIN d\'activation » s\'affiche — saisissez ce code pour commencer à travailler.',
-      'Ce n\'est pas le PIN de connexion quotidien, ni un code Google.',
+      'Après validation, créez ou utilisez votre code PIN à 6 chiffres.',
+      'Ouvrez SENGA Driver et saisissez ce PIN.',
+      'Ne donnez jamais votre PIN de connexion.',
     ],
   ),
   ManualChapter(

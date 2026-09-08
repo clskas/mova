@@ -79,8 +79,8 @@ export default function RestaurantDossierPage() {
 
   if (loading) return <p className="text-sm text-gray-500">Chargement…</p>;
 
-  return (
-    <div className="space-y-6 max-w-2xl">
+    return (
+    <div className="space-y-6 max-w-2xl pb-8">
       <div>
         <h1 className="text-xl font-semibold text-[#1A1A2E]">Mon dossier</h1>
         <p className="text-sm text-gray-600 mt-1">

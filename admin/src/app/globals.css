@@ -36,6 +36,7 @@ body {
   select,
   textarea {
     font-size: 16px;
+    scroll-margin-bottom: 8rem;
   }
 }
 

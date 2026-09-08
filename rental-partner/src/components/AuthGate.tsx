@@ -1,15 +1,18 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
+  ACTIVATION_PIN_WINDOW_HEADING_FR,
+  ACTIVATION_PIN_WINDOW_HINT_FR,
   ActivationPinCard,
-  PinSetupForm,
   accountPhone,
-  shouldRequirePinSetup,
+  isPartnerPinExemptPath,
+  partnerNeedsKycActivationPin,
   type AuthPayload,
 } from "@/components/PinAuth";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, fetchProfile } from "@/lib/api";
 import { PUBLIC_API_BASE } from "@/lib/public-api-base";
 import {
   RENTAL_AUTH_INTENT,
@@ -19,11 +22,11 @@ import {
   isPinPending,
   isPinSessionUnlocked,
   isRentalPartnerRole,
-  isSeedDemoPhone,
   markPinSessionUnlocked,
   normalizeLoginPhone,
   phoneFromToken,
   roleFromToken,
+  setLastPhone,
   setPinPending,
   setToken,
 } from "@/lib/auth";
@@ -38,8 +41,8 @@ type Me = {
 
 export function AuthGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const pathname = usePathname();
   const [ready, setReady] = useState(false);
-  const [setupToken, setSetupToken] = useState<string | null>(null);
   const [needsActivation, setNeedsActivation] = useState(false);
   const [activateIdentity, setActivateIdentity] = useState("");
 
@@ -50,13 +53,16 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
       return;
     }
     if (isPinPending()) {
-      setSetupToken(token);
-      return;
+      setPinPending(false);
     }
     let cancelled = false;
-    void (async () => {
+
+    async function check() {
       try {
-        const me = await apiFetch<Me>("/api/users/me");
+        const [me, profile] = await Promise.all([
+          apiFetch<Me>("/api/users/me"),
+          fetchProfile().catch(() => null),
+        ]);
         if (cancelled) return;
         const fallback = accountPhone(
           {
@@ -68,69 +74,39 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
           },
           phoneFromToken() || getLastPhone() || "",
         );
-        if (
-          shouldRequirePinSetup(
-            {
-              pinConfigured: me.pinConfigured,
-              needsPinSetup: me.needsPinSetup,
-              phone: me.phone,
-              hasPhone: me.hasPhone,
-              user: me,
-            },
-            fallback,
-            token,
-          )
-        ) {
-          setPinPending(true);
-          setSetupToken(token);
-          return;
-        }
-        if (me.pinConfigured && !isSeedDemoPhone(fallback) && !isPinSessionUnlocked()) {
+        const needsPin = partnerNeedsKycActivationPin({
+          kycStatus: profile?.kycStatus,
+          unlocked: isPinSessionUnlocked(),
+          identity: fallback,
+        });
+        if (needsPin) {
           setActivateIdentity(fallback);
           setNeedsActivation(true);
+          setReady(true);
           return;
         }
+        setNeedsActivation(false);
+        setReady(true);
       } catch {
         dropTokenKeepPhone(phoneFromToken() || getLastPhone() || "");
         router.replace("/login");
-        return;
       }
-      if (!cancelled) {
-        markPinSessionUnlocked();
-        setReady(true);
-      }
-    })();
+    }
+
+    void check();
+    const poll = window.setInterval(() => {
+      if (!cancelled && !isPinSessionUnlocked()) void check();
+    }, 8000);
     return () => {
       cancelled = true;
+      window.clearInterval(poll);
     };
-  }, [router]);
+  }, [router, pathname]);
 
-  if (setupToken) {
+  if (needsActivation && !isPartnerPinExemptPath(pathname)) {
     return (
       <div className="fixed inset-0 z-[10050] bg-gradient-to-br from-indigo-50 to-violet-50 overflow-y-auto">
-        <div className="min-h-[100dvh] flex items-start justify-center p-6 pt-10">
-          <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-8">
-            <PinSetupForm
-              apiBase={PUBLIC_API_BASE}
-              token={setupToken}
-              accentClass="bg-indigo-600"
-              onDone={() => {
-                setPinPending(false);
-                markPinSessionUnlocked();
-                setSetupToken(null);
-                setReady(true);
-              }}
-            />
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (needsActivation) {
-    return (
-      <div className="fixed inset-0 z-[10050] bg-gradient-to-br from-indigo-50 to-violet-50 overflow-y-auto">
-        <div className="min-h-[100dvh] flex items-start justify-center p-6 pt-10">
+        <div className="min-h-[100dvh] flex items-start justify-center p-6 pt-10 pb-16">
           <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-6 sm:p-8">
             <p className="text-center text-sm text-gray-500 mb-4">SENGA Location</p>
             <ActivationPinCard
@@ -138,16 +114,23 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
               intent={{ ...RENTAL_AUTH_INTENT }}
               accentClass="bg-indigo-600"
               highlightClass="border-indigo-400 bg-indigo-50"
+              heading={ACTIVATION_PIN_WINDOW_HEADING_FR}
+              hint={ACTIVATION_PIN_WINDOW_HINT_FR}
+              lockIdentity
               defaultIdentity={activateIdentity}
               normalizeIdentity={normalizeLoginPhone}
               onActivated={(data: AuthPayload) => {
                 const phone = accountPhone(data, activateIdentity);
                 if (data.accessToken) setToken(data.accessToken, phone || undefined);
+                if (phone) setLastPhone(phone);
                 markPinSessionUnlocked();
                 setNeedsActivation(false);
                 setReady(true);
               }}
             />
+            <Link href="/dossier" className="block text-center text-sm text-indigo-800 underline mt-4">
+              Ouvrir mon dossier
+            </Link>
           </div>
         </div>
       </div>

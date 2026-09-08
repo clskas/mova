@@ -108,6 +108,27 @@ jobs:
             echo "::notice::ANDROID_KEYSTORE_BASE64 absent — build signé avec clé debug (non publiable sur Play Store)"
           fi
 
+      - name: Add swap for sequential AAB builds
+        run: |
+          set -euo pipefail
+          # Run 34234263647: passenger AAB OK, driver AAB cancelled ("The operation
+          # was canceled") before artifacts — typical RAM pressure on ubuntu-latest
+          # with gradle.properties 8G heap + 4G metaspace.
+          sudo swapoff -a || true
+          sudo rm -f /swapfile
+          sudo fallocate -l 8G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+          free -h
+
+      - name: Cap Gradle heap for the GitHub runner
+        run: |
+          set -euo pipefail
+          sed -i 's/^org.gradle.jvmargs=.*/org.gradle.jvmargs=-Xmx4G -XX:MaxMetaspaceSize=1G -XX:+HeapDumpOnOutOfMemoryError/' \
+            mobile/android/gradle.properties
+          grep '^org.gradle.jvmargs=' mobile/android/gradle.properties
+
       - name: Install dependencies
         working-directory: mobile
         run: flutter pub get
@@ -116,9 +137,11 @@ jobs:
         id: playver
         run: |
           set -euo pipefail
-          # Play production is 1.0.6+58 (run 34223352006). This rebuild must be >= 59.
+          # Play production is still 1.0.6+58 (run 34223352006). Run 59 cancelled
+          # before Play upload — reuse versionCode 59 for the immediate retry
+          # (run_number 60). Later runs keep github.run_number.
           CODE="${{ github.run_number }}"
-          if [ "$CODE" -lt 59 ]; then CODE=59; fi
+          if [ "$CODE" -le 60 ]; then CODE=59; fi
           echo "code=$CODE" >> "$GITHUB_OUTPUT"
           echo "Play versionCode=$CODE (pubspec 1.0.7+59; run_number=${{ github.run_number }})"
 
@@ -137,6 +160,20 @@ jobs:
             --dart-define=APP_BUILD=${{ steps.playver.outputs.code }} \
             --dart-define=GOOGLE_SERVER_CLIENT_ID=$WEB_CLIENT
 
+      # Save passenger AAB before the driver build so a later cancel still leaves an artifact.
+      - name: Upload passenger AAB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mova-passenger-aab
+          path: mobile/build/app/outputs/bundle/passengerRelease/app-passenger-release.aab
+          retention-days: 30
+
+      - name: Stop Gradle before driver AAB
+        run: |
+          set -euo pipefail
+          (cd mobile/android && ./gradlew --stop) || true
+          free -h
+
       - name: Build driver AAB
         working-directory: mobile
         run: |
@@ -150,14 +187,6 @@ jobs:
             --dart-define=WS_URL=${{ steps.urls.outputs.ws }} \
             --dart-define=APP_BUILD=${{ steps.playver.outputs.code }} \
             --dart-define=GOOGLE_SERVER_CLIENT_ID=$WEB_CLIENT
-
-      # Upload AABs before optional APKs so Play upload is not blocked by APK OOM/cancel.
-      - name: Upload passenger AAB artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: mova-passenger-aab
-          path: mobile/build/app/outputs/bundle/passengerRelease/app-passenger-release.aab
-          retention-days: 30
 
       - name: Upload driver AAB artifact
         uses: actions/upload-artifact@v4

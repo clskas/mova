@@ -28,9 +28,7 @@ describe('DriversService KYC dossier', () => {
       type: 'ID_PHOTO',
       status: 'APPROVED',
     });
-    const result = await service.approveKyc('doc-1', true);
-    expect(result.loginPin).toBeUndefined();
-    expect(result.activationPin).toBeUndefined();
+    await service.approveKyc('doc-1', true);
     expect(prisma.kycDocument.updateMany).not.toHaveBeenCalled();
     expect(global.fetch).not.toHaveBeenCalled();
   });

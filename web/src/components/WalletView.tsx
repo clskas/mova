@@ -82,8 +82,8 @@ export function WalletView({ onBack, mock }: Props) {
       if (allowed && !allowed.includes(prefix)) {
         setError(
           topUpProvider === "ORANGE_MONEY"
-            ? "Ce numéro n’est pas un numéro Orange Money (préfixes 80, 84, 85, 89). Saisissez le numéro de la SIM Orange — le push USSD arrive sur CE numéro. SENGA n’ouvre pas le composeur."
-            : "Ce numéro ne correspond pas à l’opérateur choisi. Le push USSD arrive sur le numéro saisi.",
+            ? "Ce numéro n’est pas un numéro Orange Money (préfixes 80, 84, 85, 89). Saisissez le numéro de la SIM Orange."
+            : "Ce numéro ne correspond pas à l’opérateur choisi.",
         );
         return;
       }
@@ -109,6 +109,8 @@ export function WalletView({ onBack, mock }: Props) {
       }, { useMock: mock });
       if (res.paymentUrl) {
         window.open(res.paymentUrl, "_blank", "noopener,noreferrer");
+      } else if (res.ussdCode && (res.ussdCode.includes("*") || res.ussdCode.includes("#"))) {
+        window.location.href = `tel:${res.ussdCode}`;
       }
       if (res.balanceCdf != null) {
         setWallet((w) => ({ ...w, balanceCdf: res.balanceCdf }));
@@ -119,7 +121,7 @@ export function WalletView({ onBack, mock }: Props) {
         setInfo(
           res.message ??
             (topUpProvider === "ORANGE_MONEY"
-              ? "Push Orange Money demandé. SENGA n’ouvre pas le composeur : attendez *144# sur le numéro saisi (min. 2 300 FC)."
+              ? "Demande Orange Money envoyée. Si rien n’apparaît, rechargez avec M-Pesa ou Airtel Money."
               : "Confirmez le push USSD / PIN sur le numéro saisi."),
         );
       }
@@ -230,7 +232,7 @@ export function WalletView({ onBack, mock }: Props) {
       <div className="bg-white rounded-xl p-4 shadow-sm space-y-3">
         <p className="font-medium text-sm">Recharger</p>
         <p className="text-xs text-gray-500">
-          Orange Money : push USSD (*144#) sur le numéro de la SIM Orange — SENGA n’ouvre pas le composeur. Minimum 2 300 FC.
+          M-Pesa et Airtel Money envoient un push. Orange Money : si rien n’apparaît, utilisez M-Pesa ou Airtel. Minimum 2 300 FC.
         </p>
         <input
           className="w-full rounded-xl border-0 bg-gray-50 p-3"

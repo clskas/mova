@@ -377,7 +377,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
             SnackBar(
               content: Text(
                 data['message']?.toString() ??
-                    'Confirmez le paiement sur votre téléphone Mobile Money. SENGA n’ouvre pas le composeur.',
+                    'Confirmez le paiement sur votre téléphone Mobile Money.',
               ),
             ),
           );

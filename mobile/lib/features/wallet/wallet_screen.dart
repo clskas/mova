@@ -331,7 +331,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
               SnackBar(
                 content: Text(
                   data['message']?.toString() ??
-                      'Confirmez la recharge sur votre téléphone Mobile Money. SENGA n’ouvre pas le composeur.',
+                      'Confirmez la recharge sur votre téléphone Mobile Money.',
                 ),
               ),
             );
@@ -1006,8 +1006,8 @@ class _WalletTopUpSheetState extends State<_WalletTopUpSheet> {
             const SizedBox(height: 8),
             Text(
               widget.provider.id == 'ORANGE_MONEY'
-                  ? 'SENGA n’ouvre pas le composeur. Orange Money envoie un push USSD (*144#) sur le numéro ci-dessous (SIM Orange, préfixes 80 / 84 / 85 / 89). Minimum 2 300 FC.'
-                  : 'SENGA n’ouvre pas le composeur. Confirmez le push USSD / PIN sur le numéro Mobile Money ci-dessous. Minimum 2 300 FC.',
+                  ? 'Numéro Orange (80 / 84 / 85 / 89), minimum 2 300 FC. Si aucune confirmation n’apparaît, utilisez M-Pesa ou Airtel Money.'
+                  : 'Confirmez le push USSD / PIN sur le numéro Mobile Money ci-dessous. Minimum 2 300 FC.',
               style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
             ),
             const SizedBox(height: 16),

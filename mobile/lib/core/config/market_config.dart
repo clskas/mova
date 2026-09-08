@@ -300,8 +300,7 @@ class MarketConfig {
     final list = prefixes.join(', ');
     if (providerId == 'ORANGE_MONEY') {
       return 'Ce numéro n’est pas un numéro Orange Money (préfixes $list). '
-          'Saisissez le numéro de la SIM Orange — le push USSD (*144#) arrive sur CE numéro. '
-          'SENGA n’ouvre pas le composeur.';
+          'Saisissez le numéro de la SIM Orange (80, 84, 85, 89).';
     }
     if (providerId == 'MPESA') {
       return 'Ce numéro n’est pas un numéro Vodacom M-Pesa (préfixes $list). '

@@ -10,10 +10,35 @@ export const EMAIL_UNAVAILABLE_USER_MESSAGE =
 
 /** Subject that reached Gmail for the restaurant PIN (no « OTP » / « code PIN »). */
 export const SENGA_ACCESS_MAIL_SUBJECT = 'Votre accès SENGA — AfriSoft';
+export const SENGA_RESTAURANT_ACCESS_MAIL_SUBJECT = 'Votre accès SENGA restaurant';
+export const SENGA_RENTAL_ACCESS_MAIL_SUBJECT = 'Votre accès SENGA location';
 
-export function sengaAccessMailCopy(code: string, opts?: { partnerPortals?: boolean }) {
-  const portals = opts?.partnerPortals === true;
-  const who = portals ? 'votre compte partenaire SENGA' : 'votre compte SENGA';
+export type SengaAccessMailPortal = 'restaurant' | 'rental';
+
+export function sengaAccessMailSubject(opts?: {
+  partnerPortals?: boolean;
+  portal?: SengaAccessMailPortal;
+}): string {
+  if (opts?.portal === 'rental') return SENGA_RENTAL_ACCESS_MAIL_SUBJECT;
+  if (opts?.portal === 'restaurant' || opts?.partnerPortals === true) {
+    return SENGA_RESTAURANT_ACCESS_MAIL_SUBJECT;
+  }
+  return SENGA_ACCESS_MAIL_SUBJECT;
+}
+
+export function sengaAccessMailCopy(
+  code: string,
+  opts?: { partnerPortals?: boolean; portal?: SengaAccessMailPortal },
+) {
+  const portals = opts?.partnerPortals === true || Boolean(opts?.portal);
+  const who =
+    opts?.portal === 'rental'
+      ? 'votre compte SENGA location'
+      : opts?.portal === 'restaurant'
+        ? 'votre compte SENGA restaurant'
+        : portals
+          ? 'votre compte partenaire SENGA'
+          : 'votre compte SENGA';
   const portalText = portals
     ? `Restaurant : https://restaurant.afri-soft.com\nLocation : https://rental.afri-soft.com\n\n`
     : '';
@@ -22,7 +47,7 @@ export function sengaAccessMailCopy(code: string, opts?: { partnerPortals?: bool
       `Location : <a href="https://rental.afri-soft.com">rental.afri-soft.com</a></p>`
     : '';
   return {
-    subject: SENGA_ACCESS_MAIL_SUBJECT,
+    subject: sengaAccessMailSubject(opts),
     text:
       `Bonjour,\n\n` +
       `AfriSoft a généré un code d'accès pour ${who}.\n\n` +
@@ -269,8 +294,12 @@ export class EmailOtpMailer {
     }
   }
 
-  async sendLoginPin(to: string, pin: string): Promise<EmailOtpSendResult> {
-    const copy = sengaAccessMailCopy(pin, { partnerPortals: true });
+  async sendLoginPin(
+    to: string,
+    pin: string,
+    opts?: { portal?: SengaAccessMailPortal },
+  ): Promise<EmailOtpSendResult> {
+    const copy = sengaAccessMailCopy(pin, { partnerPortals: true, portal: opts?.portal });
     return this.sendNotice(to, copy.subject, copy.text, copy.html);
   }
 
@@ -278,8 +307,15 @@ export class EmailOtpMailer {
    * Same envelope as the restaurant PIN that reached Gmail (2026-09-08).
    * Never put « OTP » or « code PIN » in the subject — MessageAI 550s those.
    */
-  async sendOtp(to: string, code: string): Promise<EmailOtpSendResult> {
-    const copy = sengaAccessMailCopy(code);
+  async sendOtp(
+    to: string,
+    code: string,
+    opts?: { portal?: SengaAccessMailPortal },
+  ): Promise<EmailOtpSendResult> {
+    const copy = sengaAccessMailCopy(code, {
+      partnerPortals: Boolean(opts?.portal),
+      portal: opts?.portal,
+    });
     return this.sendNotice(to, copy.subject, copy.text, copy.html);
   }
 

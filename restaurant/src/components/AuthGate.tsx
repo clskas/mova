@@ -55,7 +55,8 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
       return;
     }
     if (isPinPending()) {
-      setPinPending(false);
+      router.replace("/login");
+      return;
     }
     let cancelled = false;
 
@@ -66,6 +67,11 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
           fetchKyc().catch(() => null),
         ]);
         if (cancelled) return;
+        if (me.needsPinSetup && me.pinConfigured !== true) {
+          setPinPending(true);
+          router.replace("/login");
+          return;
+        }
         const fallback = accountPhone(
           {
             pinConfigured: me.pinConfigured,
@@ -76,12 +82,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
           },
           phoneFromToken() || getLastPhone() || "",
         );
-        const pinConfigured =
-          me.pinConfigured === true || kyc?.pinConfigured === true
-            ? true
-            : me.pinConfigured === false && kyc?.pinConfigured !== true
-              ? false
-              : me.pinConfigured ?? kyc?.pinConfigured;
+        const pinConfigured = me.pinConfigured === true || kyc?.pinConfigured === true;
         const needsPin = partnerNeedsKycActivationPin({
           pinConfigured,
           kycStatus: kyc?.kycStatus,

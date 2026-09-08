@@ -13,6 +13,13 @@ function googleSession(result: GoogleStart) {
   return result;
 }
 
+function googleEmailOtp(result: GoogleStart) {
+  if (!('otpRequired' in result) || result.otpRequired !== true) {
+    throw new Error('expected Google email OTP challenge');
+  }
+  return result;
+}
+
 function makeUser(overrides: Record<string, unknown> = {}) {
   return {
     id: 'user-1',
@@ -557,22 +564,51 @@ describe('AuthService', () => {
     expect(sms.sendOtp).not.toHaveBeenCalled();
   });
 
-  it('allows first Google login on restaurant portal (session JWT, no email OTP)', async () => {
+  it('sends Google email OTP on first restaurant portal login (no session JWT yet)', async () => {
     prisma.user.findUnique.mockResolvedValue(null);
     prisma.user.findFirst.mockResolvedValue(null);
-    const created = makeUser({
+    const result = googleEmailOtp(await service.loginWithGoogle('id-token', UserRole.RESTAURANT, 'restaurant'));
+    expect(result.otpRequired).toBe(true);
+    expect(result.otpChannel).toBe('email');
+    expect(result.challengeId).toEqual(expect.any(String));
+    expect(prisma.user.create).not.toHaveBeenCalled();
+    expect(jwt.sign).not.toHaveBeenCalled();
+    expect(mailer.sendOtp).toHaveBeenCalledWith(
+      'new.user@gmail.com',
+      expect.any(String),
+      expect.objectContaining({ portal: 'restaurant' }),
+    );
+    expect(sms.sendOtp).not.toHaveBeenCalled();
+    expect(redis.client.set).toHaveBeenCalled();
+  });
+
+  it('sends Google email OTP on first rental portal login', async () => {
+    prisma.user.findUnique.mockResolvedValue(null);
+    prisma.user.findFirst.mockResolvedValue(null);
+    const result = googleEmailOtp(await service.loginWithGoogle('id-token', UserRole.RENTAL_PARTNER, 'rental'));
+    expect(result.otpRequired).toBe(true);
+    expect(mailer.sendOtp).toHaveBeenCalledWith(
+      'new.user@gmail.com',
+      expect.any(String),
+      expect.objectContaining({ portal: 'rental' }),
+    );
+    expect(prisma.user.create).not.toHaveBeenCalled();
+  });
+
+  it('skips Google email OTP on restaurant portal when the connection PIN is already set', async () => {
+    const resto = makeUser({
       id: 'g-resto',
       phone: null,
       googleId: 'gid-new',
       email: 'new.user@gmail.com',
       role: UserRole.RESTAURANT,
+      localPinHash: hashLocalPin('847291'),
     });
-    prisma.user.create.mockResolvedValue(created);
+    prisma.user.findUnique.mockResolvedValue(resto);
+    prisma.user.update.mockResolvedValue(resto);
     const result = googleSession(await service.loginWithGoogle('id-token', UserRole.RESTAURANT, 'restaurant'));
-    expect(result.isNew).toBe(true);
     expect(result.accessToken).toBe('jwt-token');
-    expect(result.user.role).toBe(UserRole.RESTAURANT);
-    expect(prisma.user.create).toHaveBeenCalled();
+    expect(result).not.toHaveProperty('otpRequired');
     expect(mailer.sendOtp).not.toHaveBeenCalled();
     expect(sms.sendOtp).not.toHaveBeenCalled();
   });

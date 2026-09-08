@@ -38,12 +38,7 @@ export default function ComptePage() {
           fetchKyc().catch(() => null),
         ]);
         if (!last) setIdentity(me.phone || me.email || "");
-        const pinConfigured =
-          me.pinConfigured === true || kyc?.pinConfigured === true
-            ? true
-            : me.pinConfigured === false && kyc?.pinConfigured !== true
-              ? false
-              : me.pinConfigured ?? kyc?.pinConfigured;
+        const pinConfigured = me.pinConfigured === true || kyc?.pinConfigured === true;
         setShowActivate(
           partnerNeedsKycActivationPin({
             pinConfigured,

@@ -4,6 +4,8 @@ import {
   EMAIL_SMTP_ACCEPTED_ADMIN_MESSAGE,
   EMAIL_SMTP_ENV_HINT,
   SENGA_ACCESS_MAIL_SUBJECT,
+  SENGA_RENTAL_ACCESS_MAIL_SUBJECT,
+  SENGA_RESTAURANT_ACCESS_MAIL_SUBJECT,
   allowsSharedMailCertFallback,
   emailInboxHintFor,
   inferSmtpHost,
@@ -78,14 +80,19 @@ describe('site4now TLS hostname mismatch', () => {
 describe('sengaAccessMailCopy', () => {
   it('never puts OTP or code PIN in the subject (MessageAI)', () => {
     const pin = sengaAccessMailCopy('482917', { partnerPortals: true });
+    const restaurant = sengaAccessMailCopy('482917', { portal: 'restaurant' });
+    const rental = sengaAccessMailCopy('482917', { portal: 'rental' });
     const otp = sengaAccessMailCopy('482917');
-    for (const copy of [pin, otp]) {
-      expect(copy.subject).toBe(SENGA_ACCESS_MAIL_SUBJECT);
+    for (const copy of [pin, restaurant, rental, otp]) {
       expect(copy.subject).not.toMatch(/otp|code PIN/i);
       expect(copy.text).not.toMatch(/otp|code PIN/i);
       expect(copy.html).not.toMatch(/otp|code PIN/i);
       expect(copy.text).toContain('482917');
     }
+    expect(pin.subject).toBe(SENGA_RESTAURANT_ACCESS_MAIL_SUBJECT);
+    expect(restaurant.subject).toBe(SENGA_RESTAURANT_ACCESS_MAIL_SUBJECT);
+    expect(rental.subject).toBe(SENGA_RENTAL_ACCESS_MAIL_SUBJECT);
+    expect(otp.subject).toBe(SENGA_ACCESS_MAIL_SUBJECT);
     expect(pin.text).toContain('restaurant.afri-soft.com');
   });
 });

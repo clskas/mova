@@ -7,10 +7,9 @@ const MANUAL = [
   {
     title: "Code PIN de connexion",
     steps: [
-      "Connectez-vous sur https://restaurant.afri-soft.com/login avec Google ou votre téléphone — pas avec un PIN sur l'écran d'accueil.",
-      "Après la première connexion (Google ou téléphone), une fenêtre « Code PIN de connexion » (6 chiffres) s'affiche. Ce PIN servira pour les prochaines connexions.",
-      "Si le dossier n'est pas encore validé, ouvrez Mon dossier, envoyez les justificatifs, puis revenez : le PIN reçu par e-mail ou SMS après KYC s'affiche alors.",
-      "Ce n'est pas un code Google. Aide et Manuel restent accessibles.",
+      "Connectez-vous sur https://restaurant.afri-soft.com/login avec Google ou votre téléphone.",
+      "Première fois : code SMS (téléphone) ou code e-mail (après Google), puis fenêtre PIN de connexion (6 chiffres) pour les prochaines fois.",
+      "Ce n'est pas un OTP Google, et ce n'est pas le titre « Activer le compte » sur toute la page.",
     ],
   },
   {

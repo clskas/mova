@@ -53,15 +53,19 @@ export class AuthController {
   }
 
   @Post('google')
-  @ApiOperation({ summary: 'Connexion Google — ID token vérifié, session JWT (sans OTP e-mail)' })
+  @ApiOperation({ summary: 'Connexion Google — OTP e-mail (resto/location 1re fois) puis JWT' })
   async loginGoogle(@Body() dto: GoogleLoginDto, @Res({ passthrough: true }) res: Response) {
     const result = await this.authService.loginWithGoogle(dto.idToken, dto.role, dto.portal, dto.intendedRole);
+    if ('otpRequired' in result && result.otpRequired) {
+      res.status(HttpStatus.OK);
+      return result;
+    }
     res.status(result.isNew ? HttpStatus.CREATED : HttpStatus.OK);
     return result;
   }
 
   @Post('google/verify')
-  @ApiOperation({ summary: 'Connexion Google — OTP historique (challenge déjà émis)' })
+  @ApiOperation({ summary: 'Connexion Google — vérifier le code e-mail puis JWT' })
   async verifyGoogle(@Body() dto: GoogleVerifyDto, @Res({ passthrough: true }) res: Response) {
     const result = await this.authService.verifyGoogleOtp(
       dto.challengeId,

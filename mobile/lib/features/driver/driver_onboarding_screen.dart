@@ -304,7 +304,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
     await _requirePatch(api.patch('/users/me', {
       'firstName': _firstName.text.trim(),
       'lastName': _lastName.text.trim(),
-      'email': _email.text.trim().isEmpty ? null : _email.text.trim(),
+      if (_email.text.trim().isNotEmpty) 'email': _email.text.trim(),
     }));
     await _requirePatch(api.patch('/drivers/onboarding', {
       'idDocumentNumber': _idNumber.text.trim(),

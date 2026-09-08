@@ -105,6 +105,7 @@ export type AdminDriver = {
   kycDocumentsUploaded?: number;
   kycDocumentsRequired?: number;
   kycDocumentsComplete?: boolean;
+  kycAllJustificatifsApproved?: boolean;
   vehicleTypeApprovalStatus?: string;
   readyForReview?: boolean;
   currentLat?: number | null;
@@ -159,6 +160,7 @@ export type AdminDriverDetail = AdminDriver & {
   kycDocumentsUploaded?: number;
   kycDocumentsRequired?: number;
   kycDocumentsComplete?: boolean;
+  kycAllJustificatifsApproved?: boolean;
   vehicleTypeApprovalPending?: boolean;
   vehicleTypeApprovalStatus?: string;
   vehicle?: {

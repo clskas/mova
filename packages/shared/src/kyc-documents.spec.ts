@@ -1,6 +1,7 @@
 import {
   normalizeKycRejectNotes,
   allPartnerJustificatifsApproved,
+  allDriverJustificatifsApproved,
   restaurantKycTypes,
   rentalKycTypes,
   REQUIRED_RESTAURANT_KYC_TYPES,
@@ -60,6 +61,31 @@ describe('allPartnerJustificatifsApproved', () => {
         { required: true, uploaded: true, status: 'APPROVED' },
         { required: true, uploaded: true, status: 'APPROVED' },
         { required: false, uploaded: false, status: null },
+      ]),
+    ).toBe(true);
+  });
+});
+
+describe('allDriverJustificatifsApproved', () => {
+  it('refuse le dossier tant qu\'un justificatif obligatoire n\'est pas APPROVED', () => {
+    expect(
+      allDriverJustificatifsApproved([
+        { type: 'ID_PHOTO', required: true, uploaded: true, status: 'APPROVED' },
+        { type: 'SELFIE', required: true, uploaded: true, status: 'PENDING' },
+      ]),
+    ).toBe(false);
+  });
+
+  it('accepte seulement quand tous les justificatifs obligatoires sont APPROVED', () => {
+    expect(
+      allDriverJustificatifsApproved([
+        { type: 'ID_PHOTO', required: true, uploaded: true, status: 'APPROVED' },
+        { type: 'SELFIE', required: true, uploaded: true, status: 'APPROVED' },
+        { type: 'DRIVERS_LICENSE', required: true, uploaded: true, status: 'APPROVED' },
+        { type: 'VEHICLE_REGISTRATION', required: true, uploaded: true, status: 'APPROVED' },
+        { type: 'VEHICLE_INSURANCE', required: true, uploaded: true, status: 'APPROVED' },
+        { type: 'TECHNICAL_INSPECTION', required: true, uploaded: true, status: 'APPROVED' },
+        { type: 'CRIMINAL_RECORD', required: false, uploaded: false, status: null },
       ]),
     ).toBe(true);
   });

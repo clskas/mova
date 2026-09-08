@@ -285,8 +285,31 @@ export function allPartnerJustificatifsApproved(
 }
 
 export function allDriverJustificatifsApproved(
-  docs: Array<{ status?: string | null }>,
+  items: Array<{ type?: string; required?: boolean; uploaded?: boolean; status?: string | null }>,
 ): boolean {
-  if (!docs.length) return false;
-  return docs.every((doc) => String(doc.status ?? '').trim().toUpperCase() === 'APPROVED');
+  const hasTypedRows = items.some((item) => item.type || item.required !== undefined || item.uploaded !== undefined);
+  if (hasTypedRows) {
+    const byType = new Map<string, (typeof items)[number]>();
+    for (const item of items) {
+      const type = String(item.type ?? '').trim().toUpperCase();
+      if (type && !byType.has(type)) byType.set(type, item);
+    }
+    const requiredRows = REQUIRED_DRIVER_KYC_TYPES.map((type) => {
+      const found = byType.get(type);
+      return {
+        required: true,
+        uploaded: Boolean(found?.uploaded ?? found?.status),
+        status: found?.status ?? null,
+      };
+    });
+    const extraUploaded = items
+      .filter((item) => {
+        const type = String(item.type ?? '').trim().toUpperCase();
+        return !REQUIRED_DRIVER_KYC_TYPES.includes(type as KycDocumentType) && Boolean(item.uploaded || item.status);
+      })
+      .map((item) => ({ required: false, uploaded: true, status: item.status ?? null }));
+    return allPartnerJustificatifsApproved([...requiredRows, ...extraUploaded]);
+  }
+  if (!items.length) return false;
+  return items.every((doc) => String(doc.status ?? '').trim().toUpperCase() === 'APPROVED');
 }

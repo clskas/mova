@@ -13,6 +13,7 @@ import {
   OPTIONAL_DRIVER_KYC_TYPES,
   normalizeKycDocumentType,
   normalizeKycRejectNotes,
+  allDriverJustificatifsApproved,
   kycDocumentLabel,
   driverVehicleTypesForRide,
   formatMovaPublicId,
@@ -333,7 +334,12 @@ export class DriversService {
       };
     });
     const requiredComplete = REQUIRED_DRIVER_KYC_TYPES.every((t) => latestByType.has(t));
-    return { documents: docs, checklist, requiredComplete };
+    return {
+      documents: docs,
+      checklist,
+      requiredComplete,
+      allJustificatifsApproved: allDriverJustificatifsApproved(checklist),
+    };
   }
 
   async getOnboarding(userId: string) {
@@ -896,22 +902,7 @@ export class DriversService {
       data: { status: approved ? KycStatus.APPROVED : KycStatus.REJECTED, notes: reason ?? notes ?? null },
     });
     if (approved) {
-      await this.prisma.kycDocument.updateMany({
-        where: { userId: doc.userId, status: KycStatus.PENDING },
-        data: { status: KycStatus.APPROVED },
-      });
-      const issued = await this.applyKycApproval(doc.userId);
-      return {
-        ...doc,
-        activationPin: issued.pin,
-        smsSent: issued.smsSent,
-        emailSent: issued.emailSent,
-        hasPhone: issued.hasPhone,
-        hasEmail: issued.hasEmail,
-        smsError: issued.smsError,
-        emailError: issued.emailError,
-        loginPin: issued.loginPin,
-      };
+      return { ...doc };
     }
     await this.prisma.driverProfile.upsert({
       where: { userId: doc.userId },
@@ -933,6 +924,16 @@ export class DriversService {
       throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, (e as Error).message);
     }
     const status = approved ? KycStatus.APPROVED : KycStatus.REJECTED;
+    if (approved) {
+      const kyc = await this.getKycStatus(userId);
+      if (!allDriverJustificatifsApproved(kyc.checklist)) {
+        throw new MovaHttpException(
+          MovaErrorCode.VALIDATION_ERROR,
+          undefined,
+          'Tous les justificatifs doivent être approuvés individuellement avant d\'approuver le dossier.',
+        );
+      }
+    }
     await this.prisma.kycDocument.updateMany({
       where: { userId },
       data: { status, ...(reason ? { notes: reason } : {}) },
@@ -1011,21 +1012,29 @@ export class DriversService {
     };
   }
 
-  private kycUploadSummary(userId: string, docs: { userId: string; type: string }[]) {
+  private kycUploadSummary(userId: string, docs: { userId: string; type: string; status?: string }[]) {
     const userDocs = docs.filter((d) => d.userId === userId);
-    const types = new Set<string>();
+    const latest = new Map<string, { type: string; status?: string }>();
     for (const doc of userDocs) {
       try {
-        types.add(normalizeKycDocumentType(doc.type));
+        const key = normalizeKycDocumentType(doc.type);
+        if (!latest.has(key)) latest.set(key, { type: key, status: doc.status });
       } catch {
         /* legacy */
       }
     }
-    const uploadedRequired = REQUIRED_DRIVER_KYC_TYPES.filter((t) => types.has(t)).length;
+    const checklist = [...REQUIRED_DRIVER_KYC_TYPES, ...OPTIONAL_DRIVER_KYC_TYPES].map((type) => ({
+      type,
+      required: REQUIRED_DRIVER_KYC_TYPES.includes(type),
+      uploaded: latest.has(type),
+      status: latest.get(type)?.status ?? null,
+    }));
+    const uploadedRequired = REQUIRED_DRIVER_KYC_TYPES.filter((t) => latest.has(t)).length;
     return {
       kycDocumentsUploaded: uploadedRequired,
       kycDocumentsRequired: REQUIRED_DRIVER_KYC_TYPES.length,
-      kycDocumentsComplete: REQUIRED_DRIVER_KYC_TYPES.every((t) => types.has(t)),
+      kycDocumentsComplete: REQUIRED_DRIVER_KYC_TYPES.every((t) => latest.has(t)),
+      kycAllJustificatifsApproved: allDriverJustificatifsApproved(checklist),
     };
   }
 
@@ -1048,7 +1057,8 @@ export class DriversService {
       userIds.length > 0
         ? await this.prisma.kycDocument.findMany({
             where: { userId: { in: userIds } },
-            select: { userId: true, type: true },
+            orderBy: { createdAt: 'desc' },
+            select: { userId: true, type: true, status: true },
           })
         : [];
     const users = await Promise.all(userIds.map((id) => this.fetchAuthUser(id)));
@@ -1145,6 +1155,7 @@ export class DriversService {
       kycDocumentsUploaded: kyc.checklist.filter((c) => c.required && c.uploaded).length,
       kycDocumentsRequired: kyc.checklist.filter((c) => c.required).length,
       kycDocumentsComplete: kyc.requiredComplete,
+      kycAllJustificatifsApproved: kyc.allJustificatifsApproved,
       vehicles: profile?.vehicles ?? [],
       vehicle: vehicle
         ? {

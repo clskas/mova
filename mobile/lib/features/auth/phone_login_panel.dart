@@ -9,6 +9,7 @@ import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_widgets.dart';
 import 'local_pin_setup_screen.dart';
 import 'pin_session.dart';
+import 'widgets/pin_digit_pad.dart';
 import 'widgets/six_digit_pin_field.dart';
 
 enum PhoneLoginStep { phone, pin, forgot, otp, googleOtp }
@@ -46,6 +47,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
   String? _googleChallengeId;
   String? _googleOtpChannel;
   String? _googleDestinationMasked;
+  bool _pinSubmitLock = false;
 
   @override
   void initState() {
@@ -59,13 +61,20 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
   }
 
   void _onPinOrOtpChanged() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    setState(() {});
+    if (_step == PhoneLoginStep.pin &&
+        _pinController.text.trim().length == 6 &&
+        !_loading &&
+        !_pinSubmitLock) {
+      _loginWithPin();
+    }
   }
 
   Future<void> _restoreSavedPhone() async {
     final api = ref.read(apiClientProvider);
     final savedPhone = await api.loadUserPhone();
-    if (!mounted || savedPhone == null || savedPhone.isEmpty) return;
+    if (!mounted || savedPhone == null || !isRememberedLoginIdentity(savedPhone)) return;
     _phoneController.text = savedPhone;
     _normalizedPhone = savedPhone;
     setState(() => _loading = true);
@@ -204,19 +213,25 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
       setState(() => _error = 'Le code PIN doit contenir 6 chiffres.');
       return;
     }
+    if (_pinSubmitLock) return;
+    _pinSubmitLock = true;
     setState(() {
       _loading = true;
       _error = null;
     });
     final phone = _normalizedPhone;
-    if (phone == null) return;
+    if (phone == null) {
+      _pinSubmitLock = false;
+      setState(() => _loading = false);
+      return;
+    }
     final api = ref.read(apiClientProvider);
     final result = await api.post('/auth/pin/login', {
       'phone': phone,
       'pin': pin,
       'role': widget.appRole,
     });
-    await _handleAuthResult(result, phone);
+    await _handleAuthResult(result, phone, fromPin: true);
   }
 
   Future<void> _verifyOtp() async {
@@ -310,8 +325,13 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
     await _handleAuthResult(result, phone);
   }
 
-  Future<void> _handleAuthResult(Result<Map<String, dynamic>> result, String phone) async {
+  Future<void> _handleAuthResult(
+    Result<Map<String, dynamic>> result,
+    String phone, {
+    bool fromPin = false,
+  }) async {
     if (!mounted) return;
+    _pinSubmitLock = false;
     setState(() => _loading = false);
     switch (result) {
       case Success(:final data):
@@ -325,7 +345,6 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
           return;
         }
         final api = ref.read(apiClientProvider);
-        await api.saveToken(token);
         final user = data['user'];
         final accountPhone = user is Map
             ? (user['phone']?.toString() ?? '').trim()
@@ -333,18 +352,34 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
         final accountEmail = user is Map
             ? (user['email']?.toString() ?? '').trim()
             : (data['email']?.toString() ?? '').trim();
-        final identity = MarketConfig.validatePhone(accountPhone)
-            ? accountPhone
-            : (MarketConfig.validatePhone(phone)
-                ? phone
-                : (accountEmail.contains('@') ? accountEmail : phone));
+        final identity = loginIdentityFromAuth(
+          accountPhone: accountPhone,
+          accountEmail: accountEmail,
+          fallback: phone,
+        );
         if (identity.isNotEmpty) {
           await api.saveUserPhone(identity);
           _normalizedPhone = identity;
+          if (isRdcPhoneIdentity(identity)) {
+            _phoneController.text = identity;
+          }
         }
         final seedDemo = isSeedDemoPhone(accountPhone.isNotEmpty ? accountPhone : phone);
-        final mustSetupPin = !seedDemo &&
-            (_forgotPinRecovery || data['pinConfigured'] != true);
+        final pinConfigured = data['pinConfigured'] == true;
+        if (!fromPin && !seedDemo && pinConfigured && !_forgotPinRecovery) {
+          await api.clearToken(keepPhone: true);
+          if (!mounted) return;
+          setState(() {
+            _step = PhoneLoginStep.pin;
+            _pinController.clear();
+            _codeController.clear();
+            _googleChallengeId = null;
+            _error = null;
+          });
+          return;
+        }
+        await api.saveToken(token);
+        final mustSetupPin = !seedDemo && (_forgotPinRecovery || !pinConfigured);
         if (mustSetupPin && mounted) {
           await Navigator.of(context).push(
             MaterialPageRoute(
@@ -426,7 +461,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
       children: [
         Text(
           _step == PhoneLoginStep.pin
-              ? 'Entrez votre code PIN à 6 chiffres'
+              ? connectionPinPrompt(_normalizedPhone ?? _phoneController.text)
               : _step == PhoneLoginStep.forgot
                   ? 'PIN oublié : SMS, autre numéro, ou Google.'
                   : widget.subtitle,
@@ -458,12 +493,26 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
           ],
         ],
         if (_step == PhoneLoginStep.pin) ...[
+          const SizedBox(height: 8),
+          Text(
+            connectionLoginTitleFr,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+              color: MovaColors.midnight,
+            ),
+          ),
           const SizedBox(height: 16),
-          SixDigitPinField(
-            controller: _pinController,
-            label: 'Code PIN SENGA',
-            autofocus: true,
-            enabled: !_loading,
+          PinDigitPad(
+            value: _pinController.text,
+            disabled: _loading,
+            onChanged: (next) {
+              _pinController.value = TextEditingValue(
+                text: next,
+                selection: TextSelection.collapsed(offset: next.length),
+              );
+            },
           ),
           const SizedBox(height: 8),
           Align(

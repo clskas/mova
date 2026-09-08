@@ -40,6 +40,7 @@ describe('AuthService', () => {
   let prisma: {
     otpCode: {
       findFirst: jest.Mock;
+      findMany: jest.Mock;
       create: jest.Mock;
       update: jest.Mock;
       updateMany: jest.Mock;
@@ -47,6 +48,7 @@ describe('AuthService', () => {
     user: {
       findUnique: jest.Mock;
       findFirst: jest.Mock;
+      findMany: jest.Mock;
       create: jest.Mock;
       update: jest.Mock;
     };
@@ -63,18 +65,20 @@ describe('AuthService', () => {
 
   beforeEach(() => {
     prisma = {
-      otpCode: {
-        findFirst: jest.fn(),
-        create: jest.fn().mockResolvedValue({ id: 'otp-1' }),
-        update: jest.fn().mockResolvedValue({}),
-        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
-      },
-      user: {
-        findUnique: jest.fn(),
-        findFirst: jest.fn(),
-        create: jest.fn(),
-        update: jest.fn(),
-      },
+    otpCode: {
+      findFirst: jest.fn(),
+      findMany: jest.fn().mockResolvedValue([]),
+      create: jest.fn().mockResolvedValue({ id: 'otp-1' }),
+      update: jest.fn().mockResolvedValue({}),
+      updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+    },
+    user: {
+      findUnique: jest.fn(),
+      findFirst: jest.fn(),
+      findMany: jest.fn().mockResolvedValue([]),
+      create: jest.fn(),
+      update: jest.fn(),
+    },
     };
     jwt = { sign: jest.fn().mockReturnValue('jwt-token') };
     googleTokens = {
@@ -504,6 +508,9 @@ describe('AuthService', () => {
       expect.objectContaining({
         data: expect.objectContaining({
           googleId: 'gid-new',
+          email: 'new.user@gmail.com',
+          firstName: 'Marie',
+          lastName: 'Kabila',
           role: UserRole.DRIVER,
           status: UserStatus.PENDING_KYC,
         }),

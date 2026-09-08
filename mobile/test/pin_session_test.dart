@@ -28,5 +28,20 @@ void main() {
     expect(connectionPinHeadingFr, contains('PIN de connexion'));
     expect(pinSetupHintFr, contains('Choisissez / confirmez'));
     expect(pinResetHeadingFr, contains('nouveau code PIN'));
+    expect(connectionPinPrompt('+243893515173'), 'Entrez le PIN pour +243 ••• 173');
+    expect(connectionPinPrompt('kise.ndiki@gmail.com'), 'Entrez le PIN pour ki***@gmail.com');
+  });
+
+  test('login identity prefers +243 then Google email, never leftover +243', () {
+    expect(
+      loginIdentityFromAuth(
+        accountPhone: '',
+        accountEmail: 'Kise.Ndiki@gmail.com',
+        fallback: '+243',
+      ),
+      'kise.ndiki@gmail.com',
+    );
+    expect(isRememberedLoginIdentity('+243'), isFalse);
+    expect(isRememberedLoginIdentity('kise.ndiki@gmail.com'), isTrue);
   });
 }

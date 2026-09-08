@@ -204,8 +204,22 @@ function allJustificatifsApproved(
   return relevant.length > 0 && relevant.every((item) => String(item.status ?? "").toUpperCase() === "APPROVED");
 }
 
-function allDriverDocsApproved(docs: Array<{ status?: string | null }>): boolean {
-  return docs.length > 0 && docs.every((doc) => String(doc.status ?? "").toUpperCase() === "APPROVED");
+function allDriverDocsApproved(
+  docs: Array<{ type?: string; status?: string | null }>,
+  driver?: { kycAllJustificatifsApproved?: boolean } | null,
+): boolean {
+  if (driver?.kycAllJustificatifsApproved === true) return true;
+  const required = [
+    "ID_PHOTO",
+    "SELFIE",
+    "DRIVERS_LICENSE",
+    "VEHICLE_REGISTRATION",
+    "VEHICLE_INSURANCE",
+    "TECHNICAL_INSPECTION",
+  ];
+  return required.every((type) =>
+    docs.some((doc) => String(doc.type ?? "").toUpperCase() === type && String(doc.status ?? "").toUpperCase() === "APPROVED"),
+  );
 }
 
 function partnerAccountLabel(r: PartnerKycDossier) {
@@ -577,7 +591,7 @@ export default function KycPage() {
                     {canWrite("kyc") && statusFilter !== "APPROVED" && (
                       <div className="flex gap-2">
                         <BtnSuccess
-                          disabled={!allDriverDocsApproved(dossier.docs)}
+                          disabled={!allDriverDocsApproved(dossier.docs, allDrivers.find((d) => d.userId === dossier.userId))}
                           onClick={() => reviewDriver(dossier.userId, true)}
                         >
                           Approuver le dossier
@@ -641,7 +655,12 @@ export default function KycPage() {
                   </div>
                   {canWrite("kyc") && (
                     <div className="flex gap-2">
-                      <BtnSuccess onClick={() => reviewDriver(d.userId, true)}>Approuver</BtnSuccess>
+                      <BtnSuccess
+                        disabled={!d.kycAllJustificatifsApproved}
+                        onClick={() => reviewDriver(d.userId, true)}
+                      >
+                        Approuver le dossier
+                      </BtnSuccess>
                       {d.kycStatus !== "REJECTED" && (
                         <BtnDanger onClick={() => reviewDriver(d.userId, false)}>Rejeter</BtnDanger>
                       )}

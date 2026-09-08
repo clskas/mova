@@ -9,7 +9,6 @@ import '../driver/driver_home_screen.dart';
 import '../driver/driver_onboarding_screen.dart';
 import '../driver/driver_otp_screen.dart';
 import '../home/home_screen.dart';
-import '../../core/config/market_config.dart';
 import 'local_pin_setup_screen.dart';
 import 'otp_screen.dart';
 import 'pin_session.dart';
@@ -70,9 +69,10 @@ class _AuthSessionGateState extends ConsumerState<AuthSessionGate> {
         final phone = (data['phone']?.toString() ?? '').trim();
         final email = (data['email']?.toString() ?? '').trim();
         final pinConfigured = data['pinConfigured'] == true;
-        final identity = MarketConfig.validatePhone(phone)
-            ? phone
-            : (email.contains('@') ? email : phone);
+        final identity = loginIdentityFromAuth(
+          accountPhone: phone,
+          accountEmail: email,
+        );
         if (identity.isNotEmpty) {
           await api.saveUserPhone(identity);
         }

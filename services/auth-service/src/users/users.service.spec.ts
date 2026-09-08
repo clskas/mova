@@ -12,6 +12,7 @@ describe('UsersService owner lock', () => {
     },
     otpCode: {
       deleteMany: jest.fn(),
+      findMany: jest.fn().mockResolvedValue([]),
     },
     $queryRaw: jest.fn(),
   };
@@ -150,6 +151,64 @@ describe('UsersService owner lock', () => {
     const result = await service.listUsers(0, 50, undefined, true);
     expect(prisma.$queryRaw).not.toHaveBeenCalled();
     expect(result.data[0].playPrelaunch).toBe(true);
+  });
+
+  it('backfills a Google driver e-mail from the OTP row (Kise Ndiki)', async () => {
+    const createdAt = new Date('2026-09-08T10:00:00.000Z');
+    prisma.$queryRaw.mockResolvedValue([]);
+    prisma.user.findMany.mockImplementation(async (args: { where?: { phone?: { startsWith?: string } } }) => {
+      if (args?.where?.phone?.startsWith === '+2439000000') return [];
+      return [
+        {
+          id: 'kise-1',
+          googleId: 'gid-kise',
+          email: null,
+          firstName: 'Kise',
+          lastName: 'Ndiki',
+          role: UserRole.DRIVER,
+          phone: null,
+          createdAt,
+        },
+      ];
+    });
+    prisma.otpCode.findMany.mockResolvedValue([{ phone: 'kise.ndiki@gmail.com' }]);
+    prisma.user.update.mockResolvedValue({});
+    prisma.user.count.mockResolvedValue(1);
+    const result = await service.listUsers(0, 50);
+    expect(prisma.user.update).toHaveBeenCalledWith({
+      where: { id: 'kise-1' },
+      data: { email: 'kise.ndiki@gmail.com' },
+    });
+    expect(result.data[0].email).toBe('kise.ndiki@gmail.com');
+    expect(result.data[0].firstName).toBe('Kise');
+  });
+
+  it('does not wipe a Google e-mail when the profile PATCH sends email null', async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'drv-1',
+      googleId: 'gid-kise',
+      email: 'kise.ndiki@gmail.com',
+      firstName: 'Kise',
+      lastName: 'Ndiki',
+      role: UserRole.DRIVER,
+      phone: null,
+      status: UserStatus.PENDING_KYC,
+    });
+    prisma.user.update.mockResolvedValue({
+      id: 'drv-1',
+      googleId: 'gid-kise',
+      email: 'kise.ndiki@gmail.com',
+      firstName: 'Kise',
+      lastName: 'Ndiki',
+      role: UserRole.DRIVER,
+      phone: null,
+      status: UserStatus.PENDING_KYC,
+    });
+    await service.updateProfile('drv-1', { firstName: 'Kise', lastName: 'Ndiki', email: null });
+    expect(prisma.user.update).toHaveBeenCalledWith({
+      where: { id: 'drv-1' },
+      data: { firstName: 'Kise', lastName: 'Ndiki' },
+    });
   });
 
   it('refuses to purge a Play bot that does not match the safe pattern', async () => {

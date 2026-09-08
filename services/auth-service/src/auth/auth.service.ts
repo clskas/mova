@@ -513,9 +513,12 @@ export class AuthService {
       ? await this.prisma.user.findUnique({ where: { id: challenge.userId } })
       : null;
 
+    const destinationEmail = challenge.destination.includes('@')
+      ? challenge.destination.trim().toLowerCase()
+      : null;
     const identity: GoogleIdentity = {
       googleId: challenge.googleId,
-      email: challenge.email,
+      email: challenge.email?.trim().toLowerCase() || destinationEmail,
       emailVerified: true,
       givenName: challenge.givenName,
       familyName: challenge.familyName,
@@ -1061,11 +1064,44 @@ export class AuthService {
       where: { id: user.id },
       data: {
         googleId: identity.googleId,
-        email: user.email ?? identity.email,
-        firstName: user.firstName ?? identity.givenName,
-        lastName: user.lastName ?? identity.familyName,
-        avatarUrl: user.avatarUrl ?? identity.picture,
+        email: user.email?.trim() || identity.email,
+        firstName: user.firstName?.trim() || identity.givenName,
+        lastName: user.lastName?.trim() || identity.familyName,
+        avatarUrl: user.avatarUrl?.trim() || identity.picture,
       },
+    });
+  }
+
+  /** Rebind a Google-only account whose e-mail was wiped (onboarding PATCH null). */
+  private async restoreGoogleUserEmail(email: string): Promise<User | null> {
+    const normalized = email.trim().toLowerCase();
+    if (!normalized.includes('@')) return null;
+    const missing = await this.prisma.user.findMany({
+      where: {
+        googleId: { not: null },
+        OR: [{ email: null }, { email: '' }],
+      },
+    });
+    if (!missing.length) return null;
+    const otps = await this.prisma.otpCode.findMany({
+      where: { phone: { equals: normalized, mode: 'insensitive' } },
+      orderBy: { createdAt: 'desc' },
+      take: 8,
+    });
+    const pick = (candidates: User[]): User | null => {
+      if (!candidates.length) return null;
+      if (candidates.length === 1) return candidates[0];
+      if (!otps.length) return null;
+      const otpAt = otps[0].createdAt.getTime();
+      return candidates
+        .slice()
+        .sort((a, b) => Math.abs(a.createdAt.getTime() - otpAt) - Math.abs(b.createdAt.getTime() - otpAt))[0];
+    };
+    const matched = pick(missing);
+    if (!matched) return null;
+    return this.prisma.user.update({
+      where: { id: matched.id },
+      data: { email: normalized },
     });
   }
 
@@ -1111,9 +1147,12 @@ export class AuthService {
       };
     }
     if (parsed.kind === 'email') {
-      const user = await this.prisma.user.findFirst({
+      let user = await this.prisma.user.findFirst({
         where: { email: { equals: parsed.value, mode: 'insensitive' } },
       });
+      if (!user) {
+        user = await this.restoreGoogleUserEmail(parsed.value);
+      }
       return { user, normalized: parsed.value, lockKey: user?.phone ?? parsed.value };
     }
     const user = await this.prisma.user.findUnique({ where: { phone: parsed.value } });
@@ -1147,10 +1186,10 @@ export class AuthService {
         : UserRole.PASSENGER;
     return {
       googleId: identity.googleId,
-      email: identity.email,
-      firstName: identity.givenName,
-      lastName: identity.familyName,
-      avatarUrl: identity.picture,
+      email: identity.email?.trim().toLowerCase() || null,
+      firstName: identity.givenName?.trim() || null,
+      lastName: identity.familyName?.trim() || null,
+      avatarUrl: identity.picture?.trim() || null,
       role: createdRole,
       status: isDriverApplicant ? UserStatus.PENDING_KYC : UserStatus.ACTIVE,
     };

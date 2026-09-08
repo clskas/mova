@@ -41,6 +41,14 @@ function activeDriverVehicle(driver?: AdminDriver | AdminDriverDetail | null) {
   return driver.vehicles.find((v) => v.isActive !== false) ?? driver.vehicles[0];
 }
 
+function allJustificatifsApproved(
+  items?: Array<{ required?: boolean; uploaded?: boolean; status?: string | null }>,
+): boolean {
+  const list = items ?? [];
+  const relevant = list.filter((item) => item.required || item.uploaded);
+  return relevant.length > 0 && relevant.every((item) => String(item.status ?? "").toUpperCase() === "APPROVED");
+}
+
 function vehicleTypeApprovalLabel(status?: string | null): string {
   switch (status) {
     case "APPROVED":
@@ -825,7 +833,13 @@ export default function ChauffeursPage() {
             </Link>
             {canReviewKyc && selected.kycStatus !== "APPROVED" && (
               <div className="flex flex-wrap gap-2 pt-2 border-t">
-                <BtnSuccess onClick={() => reviewKyc(true)} disabled={saving}>
+                <BtnSuccess
+                  onClick={() => reviewKyc(true)}
+                  disabled={
+                    saving ||
+                    !(selected.kycAllJustificatifsApproved || allJustificatifsApproved(selected.kyc?.checklist))
+                  }
+                >
                   Approuver KYC
                 </BtnSuccess>
                 {selected.kycStatus !== "REJECTED" && (

@@ -67,10 +67,16 @@ export class UsersService {
     data: { firstName?: string | null; lastName?: string | null; email?: string | null },
   ) {
     const normalize = (value?: string | null) => (value == null ? null : value.trim() || null);
+    const current = await this.prisma.user.findUnique({ where: { id } });
+    if (!current) throw new MovaHttpException(MovaErrorCode.USER_NOT_FOUND, HttpStatus.NOT_FOUND);
     const patch: { firstName?: string | null; lastName?: string | null; email?: string | null } = {};
     if (data.firstName !== undefined) patch.firstName = normalize(data.firstName);
     if (data.lastName !== undefined) patch.lastName = normalize(data.lastName);
-    if (data.email !== undefined) patch.email = normalize(data.email);
+    if (data.email !== undefined) {
+      const next = normalize(data.email);
+      if (next) patch.email = next.toLowerCase();
+      else if (!current.googleId) patch.email = null;
+    }
     const user = await this.prisma.user.update({ where: { id }, data: patch });
     return this.enrichUser(user);
   }
@@ -137,19 +143,82 @@ export class UsersService {
       this.prisma.user.findMany({ where, skip, take, orderBy: { createdAt: 'desc' } }),
       this.prisma.user.count({ where }),
     ]);
-    return {
-      data: data.map((u) => {
-        const { googleId: _g, localPinHash, ...safe } = u;
+    const repaired = await Promise.all(
+      data.map(async (u) => {
+        let email = u.email;
+        if (u.googleId && !String(email ?? '').trim()) {
+          const recovered = await this.inferGoogleEmailFromOtp(u.createdAt);
+          if (recovered) {
+            try {
+              await this.prisma.user.update({ where: { id: u.id }, data: { email: recovered } });
+              email = recovered;
+            } catch {
+              /* unique collision — next Google login still fills it */
+            }
+          }
+        }
+        const { googleId: _g, localPinHash, ...safe } = { ...u, email };
         return {
           ...safe,
-          playPrelaunch: isPlayPrelaunchAccount(u),
+          playPrelaunch: isPlayPrelaunchAccount({ ...u, email }),
           pinConfigured: Boolean(localPinHash),
         };
       }),
+    );
+    return {
+      data: repaired,
       total,
       skip,
       take,
     };
+  }
+
+  /**
+   * Google Driver / partner whose e-mail was wiped (onboarding PATCH null).
+   * Recovers the address from the Google OTP row (`otp_codes.phone` = e-mail).
+   */
+  async backfillMissingGoogleEmails() {
+    const missing = await this.prisma.user.findMany({
+      where: {
+        googleId: { not: null },
+        OR: [{ email: null }, { email: '' }],
+      },
+      select: { id: true, createdAt: true, firstName: true, lastName: true },
+    });
+    if (!missing.length) return { updated: 0 };
+    let updated = 0;
+    for (const user of missing) {
+      const email = await this.inferGoogleEmailFromOtp(user.createdAt);
+      if (!email) continue;
+      try {
+        await this.prisma.user.update({ where: { id: user.id }, data: { email } });
+        updated += 1;
+      } catch {
+        /* unique email collision — leave for next login */
+      }
+    }
+    return { updated };
+  }
+
+  private async inferGoogleEmailFromOtp(createdAt?: Date | null): Promise<string | null> {
+    if (!createdAt || Number.isNaN(createdAt.getTime())) return null;
+    const start = new Date(createdAt.getTime() - 30 * 60 * 1000);
+    const end = new Date(createdAt.getTime() + 30 * 60 * 1000);
+    const otps = await this.prisma.otpCode.findMany({
+      where: {
+        phone: { contains: '@' },
+        createdAt: { gte: start, lte: end },
+      },
+      select: { phone: true },
+    });
+    const emails = [
+      ...new Set(
+        otps
+          .map((row) => String(row.phone ?? '').trim().toLowerCase())
+          .filter((value) => value.includes('@')),
+      ),
+    ];
+    return emails.length === 1 ? emails[0] : null;
   }
 
   private roleFromSearch(q?: string): UserRole | undefined {

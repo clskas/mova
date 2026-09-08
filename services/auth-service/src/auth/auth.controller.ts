@@ -56,11 +56,11 @@ export class AuthController {
   @ApiOperation({ summary: 'Connexion Google — OTP e-mail (resto/location 1re fois) puis JWT' })
   async loginGoogle(@Body() dto: GoogleLoginDto, @Res({ passthrough: true }) res: Response) {
     const result = await this.authService.loginWithGoogle(dto.idToken, dto.role, dto.portal, dto.intendedRole);
-    if ('otpRequired' in result && result.otpRequired) {
-      res.status(HttpStatus.OK);
+    if ('accessToken' in result) {
+      res.status(result.isNew ? HttpStatus.CREATED : HttpStatus.OK);
       return result;
     }
-    res.status(result.isNew ? HttpStatus.CREATED : HttpStatus.OK);
+    res.status(HttpStatus.OK);
     return result;
   }
 

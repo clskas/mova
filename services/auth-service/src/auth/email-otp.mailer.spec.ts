@@ -80,21 +80,38 @@ describe('site4now TLS hostname mismatch', () => {
 
 describe('sengaAccessMailCopy', () => {
   it('never puts OTP or code PIN in the subject (MessageAI)', () => {
-    const pin = sengaAccessMailCopy('482917', { partnerPortals: true });
     const restaurant = sengaAccessMailCopy('482917', { portal: 'restaurant' });
     const rental = sengaAccessMailCopy('482917', { portal: 'rental' });
     const otp = sengaAccessMailCopy('482917');
-    for (const copy of [pin, restaurant, rental, otp]) {
+    for (const copy of [restaurant, rental, otp]) {
       expect(copy.subject).not.toMatch(/otp|code PIN/i);
       expect(copy.text).not.toMatch(/otp|code PIN/i);
       expect(copy.html).not.toMatch(/otp|code PIN/i);
       expect(copy.text).toContain('482917');
     }
-    expect(pin.subject).toBe(SENGA_RESTAURANT_ACCESS_MAIL_SUBJECT);
     expect(restaurant.subject).toBe(SENGA_RESTAURANT_ACCESS_MAIL_SUBJECT);
     expect(rental.subject).toBe(SENGA_RENTAL_ACCESS_MAIL_SUBJECT);
     expect(otp.subject).toBe(SENGA_ACCESS_MAIL_SUBJECT);
-    expect(pin.text).toContain('restaurant.afri-soft.com');
+  });
+
+  it('restaurant mail lists only the restaurant portal', () => {
+    const copy = sengaAccessMailCopy('319027', { portal: 'restaurant' });
+    expect(copy.text).toContain('votre compte SENGA restaurant');
+    expect(copy.text).toContain('restaurant.afri-soft.com');
+    expect(copy.html).toContain('restaurant.afri-soft.com');
+    expect(copy.text).not.toContain('rental.afri-soft.com');
+    expect(copy.html).not.toContain('rental.afri-soft.com');
+    expect(copy.text).not.toMatch(/Location/i);
+    expect(copy.html).not.toMatch(/Location/i);
+  });
+
+  it('rental mail lists only the rental portal', () => {
+    const copy = sengaAccessMailCopy('319027', { portal: 'rental' });
+    expect(copy.text).toContain('votre compte SENGA location');
+    expect(copy.text).toContain('rental.afri-soft.com');
+    expect(copy.html).toContain('rental.afri-soft.com');
+    expect(copy.text).not.toContain('restaurant.afri-soft.com');
+    expect(copy.html).not.toContain('restaurant.afri-soft.com');
   });
 });
 

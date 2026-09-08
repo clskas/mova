@@ -1365,7 +1365,9 @@ describe('AuthService', () => {
     expect(result.hasPhone).toBe(true);
     expect(result.loginPin).toMatch(/^\d{6}$/);
     expect(sms.sendSms).toHaveBeenCalledWith('+243811111111', expect.stringContaining(result.loginPin!), 'login_pin');
-    expect(mailer.sendLoginPin).toHaveBeenCalledWith('a@b.cd', result.loginPin);
+    expect(mailer.sendLoginPin).toHaveBeenCalledWith('a@b.cd', result.loginPin, {
+      portal: undefined,
+    });
     const logged = logSpy.mock.calls.flat().map(String).join(' ');
     expect(logged).not.toContain(result.loginPin);
     logSpy.mockRestore();
@@ -1379,7 +1381,9 @@ describe('AuthService', () => {
     expect(result.hasEmail).toBe(true);
     expect(result.emailSent).toBe(true);
     expect(sms.sendSms).not.toHaveBeenCalled();
-    expect(mailer.sendLoginPin).toHaveBeenCalledWith('only@ex.com', result.loginPin);
+    expect(mailer.sendLoginPin).toHaveBeenCalledWith('only@ex.com', result.loginPin, {
+      portal: undefined,
+    });
   });
 
   it('ne marque pas emailSent si SMTP refuse le PIN', async () => {
@@ -1390,6 +1394,30 @@ describe('AuthService', () => {
     expect(result.emailSent).toBe(false);
     expect(result.emailError).toMatch(/SMTP/);
     expect(result.loginPin).toMatch(/^\d{6}$/);
+  });
+
+  it('envoie le PIN restaurant avec le portail resto seulement', async () => {
+    prisma.user.findUnique.mockResolvedValue(
+      makeUser({ role: UserRole.RESTAURANT, phone: null, email: 'resto@ex.com' }),
+    );
+    prisma.user.update.mockResolvedValue(makeUser({ role: UserRole.RESTAURANT }));
+    const result = await service.issueLoginPin('user-1');
+    expect(result.emailSent).toBe(true);
+    expect(mailer.sendLoginPin).toHaveBeenCalledWith('resto@ex.com', result.loginPin, {
+      portal: 'restaurant',
+    });
+  });
+
+  it('envoie le PIN location avec le portail rental seulement', async () => {
+    prisma.user.findUnique.mockResolvedValue(
+      makeUser({ role: UserRole.RENTAL_PARTNER, phone: null, email: 'fleet@ex.com' }),
+    );
+    prisma.user.update.mockResolvedValue(makeUser({ role: UserRole.RENTAL_PARTNER }));
+    const result = await service.issueLoginPin('user-1');
+    expect(result.emailSent).toBe(true);
+    expect(mailer.sendLoginPin).toHaveBeenCalledWith('fleet@ex.com', result.loginPin, {
+      portal: 'rental',
+    });
   });
 
   it('enregistre un PIN fourni sans renvoyer SMS ni e-mail', async () => {

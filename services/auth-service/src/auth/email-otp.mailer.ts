@@ -15,37 +15,35 @@ export const SENGA_RENTAL_ACCESS_MAIL_SUBJECT = 'Votre accès SENGA location';
 
 export type SengaAccessMailPortal = 'restaurant' | 'rental';
 
-export function sengaAccessMailSubject(opts?: {
-  partnerPortals?: boolean;
-  portal?: SengaAccessMailPortal;
-}): string {
+const PORTAL_MAIL_LINKS: Record<
+  SengaAccessMailPortal,
+  { who: string; label: string; host: string; url: string }
+> = {
+  restaurant: {
+    who: 'votre compte SENGA restaurant',
+    label: 'Restaurant',
+    host: 'restaurant.afri-soft.com',
+    url: 'https://restaurant.afri-soft.com',
+  },
+  rental: {
+    who: 'votre compte SENGA location',
+    label: 'Location',
+    host: 'rental.afri-soft.com',
+    url: 'https://rental.afri-soft.com',
+  },
+};
+
+export function sengaAccessMailSubject(opts?: { portal?: SengaAccessMailPortal }): string {
   if (opts?.portal === 'rental') return SENGA_RENTAL_ACCESS_MAIL_SUBJECT;
-  if (opts?.portal === 'restaurant' || opts?.partnerPortals === true) {
-    return SENGA_RESTAURANT_ACCESS_MAIL_SUBJECT;
-  }
+  if (opts?.portal === 'restaurant') return SENGA_RESTAURANT_ACCESS_MAIL_SUBJECT;
   return SENGA_ACCESS_MAIL_SUBJECT;
 }
 
-export function sengaAccessMailCopy(
-  code: string,
-  opts?: { partnerPortals?: boolean; portal?: SengaAccessMailPortal },
-) {
-  const portals = opts?.partnerPortals === true || Boolean(opts?.portal);
-  const who =
-    opts?.portal === 'rental'
-      ? 'votre compte SENGA location'
-      : opts?.portal === 'restaurant'
-        ? 'votre compte SENGA restaurant'
-        : portals
-          ? 'votre compte partenaire SENGA'
-          : 'votre compte SENGA';
-  const portalText = portals
-    ? `Restaurant : https://restaurant.afri-soft.com\nLocation : https://rental.afri-soft.com\n\n`
-    : '';
-  const portalHtml = portals
-    ? `<p>Restaurant : <a href="https://restaurant.afri-soft.com">restaurant.afri-soft.com</a><br/>` +
-      `Location : <a href="https://rental.afri-soft.com">rental.afri-soft.com</a></p>`
-    : '';
+export function sengaAccessMailCopy(code: string, opts?: { portal?: SengaAccessMailPortal }) {
+  const link = opts?.portal ? PORTAL_MAIL_LINKS[opts.portal] : undefined;
+  const who = link?.who ?? 'votre compte SENGA';
+  const portalText = link ? `${link.label} : ${link.url}\n\n` : '';
+  const portalHtml = link ? `<p>${link.label} : <a href="${link.url}">${link.host}</a></p>` : '';
   return {
     subject: sengaAccessMailSubject(opts),
     text:
@@ -313,7 +311,7 @@ export class EmailOtpMailer {
     pin: string,
     opts?: { portal?: SengaAccessMailPortal },
   ): Promise<EmailOtpSendResult> {
-    const copy = sengaAccessMailCopy(pin, { partnerPortals: true, portal: opts?.portal });
+    const copy = sengaAccessMailCopy(pin, { portal: opts?.portal });
     return this.sendNotice(to, copy.subject, copy.text, copy.html);
   }
 
@@ -326,10 +324,7 @@ export class EmailOtpMailer {
     code: string,
     opts?: { portal?: SengaAccessMailPortal },
   ): Promise<EmailOtpSendResult> {
-    const copy = sengaAccessMailCopy(code, {
-      partnerPortals: Boolean(opts?.portal),
-      portal: opts?.portal,
-    });
+    const copy = sengaAccessMailCopy(code, { portal: opts?.portal });
     return this.sendNotice(to, copy.subject, copy.text, copy.html);
   }
 

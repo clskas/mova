@@ -1464,10 +1464,9 @@ export class AuthService {
     }
     if (shouldNotify && hasEmail) {
       try {
-        const portal = this.accessMailPortal(user.role);
-        const mailed = portal
-          ? await this.emailOtp.sendLoginPin(email, pin, { portal })
-          : await this.emailOtp.sendLoginPin(email, pin);
+        const mailed = await this.emailOtp.sendLoginPin(email, pin, {
+          portal: this.accessMailPortal(user.role),
+        });
         emailSent = mailed.success === true;
         if (!emailSent) emailError = mailed.message;
       } catch (e) {

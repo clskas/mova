@@ -216,7 +216,7 @@ export function rdcMobileMoneyOperatorMismatchFr(
     case 'ORANGE_MONEY':
       return (
         `Ce numéro n’est pas un numéro Orange Money (préfixes ${list}). ` +
-        'Saisissez le numéro de la SIM Orange — le push USSD arrive sur CE numéro, pas sur une autre SIM.'
+        'Saisissez le numéro de la SIM Orange (80, 84, 85, 89).'
       );
     case 'MPESA':
       return (
@@ -236,6 +236,41 @@ export function rdcMobileMoneyOperatorMismatchFr(
     default:
       return 'Opérateur Mobile Money et numéro ne correspondent pas.';
   }
+}
+
+/**
+ * C2B pending copy. Do not promise *144# unless the aggregator returned a USSD/URL
+ * (SerdiPay OM on AfriMomo often accepts the intent then never pushes or webhooks).
+ */
+export function rdcC2bPendingUserMessageFr(params: {
+  operator: string;
+  amountLabel: string;
+  phone: string;
+  gatewayMessage?: string;
+  paymentUrl?: string;
+  ussdCode?: string;
+}): string {
+  const op = mapRdcMmOperatorId(params.operator);
+  const hasPrompt = Boolean(params.paymentUrl?.trim() || params.ussdCode?.trim());
+  if (hasPrompt) {
+    return (
+      params.gatewayMessage?.trim() ||
+      `Confirmez la recharge de ${params.amountLabel} sur ${params.phone}.`
+    );
+  }
+  if (op === 'ORANGE_MONEY') {
+    return (
+      `SerdiPay a enregistré Orange Money de ${params.amountLabel} vers ${params.phone} (en attente). ` +
+      `Aucun code USSD ni lien n’a été renvoyé — si rien n’apparaît, le canal Orange n’a pas poussé. Réessayez M-Pesa ou Airtel Money.`
+    );
+  }
+  if (op === 'AIRTEL_MONEY') {
+    return `Confirmez le push Airtel Money de ${params.amountLabel} sur ${params.phone}.`;
+  }
+  return (
+    params.gatewayMessage?.trim() ||
+    `Confirmez la recharge de ${params.amountLabel} sur votre téléphone (${params.phone}).`
+  );
 }
 
 function mapRdcMmOperatorId(operator: string): RdcMobileMoneyOperatorId | null {

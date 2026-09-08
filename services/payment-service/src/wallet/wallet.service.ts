@@ -21,6 +21,7 @@ import {
   isTestOtpAllowedForPhone,
   mapSmsDeliveryFailureToUserMessage,
   normalizePhoneRdc,
+  rdcC2bPendingUserMessageFr,
   rdcMobileMoneyOperatorMismatchFr,
   SERDIPAY_MIN_AMOUNT_CDF,
   serdiPaySanitizeSmsText,
@@ -619,7 +620,14 @@ export class WalletService {
         success: true,
         simulated: false,
         pendingMobileMoney: true,
-        message: this.c2bPendingUserMessage(operator, amountCdf, normalizedPhone, mm.message),
+        message: rdcC2bPendingUserMessageFr({
+          operator,
+          amountLabel: formatCdf(amountCdf),
+          phone: normalizedPhone,
+          gatewayMessage: mm.message,
+          paymentUrl,
+          ussdCode: mm.ussdCode,
+        }),
         amountCdf,
         provider,
         balanceCdf: wallet.balanceCdf,
@@ -1169,26 +1177,6 @@ export class WalletService {
 
   private topUpLockKey(userId: string, amountCdf: number, providerKey: string) {
     return `${TOPUP_LOCK_PREFIX}${userId}:${providerKey}:${amountCdf}`;
-  }
-
-  /** Orange C2B: SENGA never opens the dialer — the USSD push must hit this MSISDN. */
-  private c2bPendingUserMessage(
-    operator: MobileMoneyOperator,
-    amountCdf: number,
-    phone: string,
-    gatewayMessage?: string,
-  ): string {
-    const amount = formatCdf(amountCdf);
-    if (operator === 'ORANGE_MONEY') {
-      return (
-        `Confirmez le push USSD Orange Money de ${amount} sur ${phone} (minimum 2 300 FC). ` +
-        `SENGA n’ouvre pas le composeur — le *144# arrive sur cette ligne Orange.`
-      );
-    }
-    if (operator === 'AIRTEL_MONEY') {
-      return `Confirmez le push USSD Airtel Money de ${amount} sur ${phone}.`;
-    }
-    return gatewayMessage?.trim() || `Confirmez la recharge de ${amount} sur votre téléphone (${phone}).`;
   }
 
   /** Short Redis lock so a double-tap cannot open two C2B / B2C. Fail-closed if Redis is down. */

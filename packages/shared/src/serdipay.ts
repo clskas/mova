@@ -546,8 +546,8 @@ export function extractSerdiPayPaymentPrompt(data: Record<string, unknown>): {
   ussdCode?: string;
 } {
   const payment = data.payment && typeof data.payment === 'object' ? (data.payment as Record<string, unknown>) : {};
-  const urlKeys = ['payment_url', 'paymentUrl', 'checkout_url', 'checkoutUrl'];
-  const ussdKeys = ['ussd', 'ussd_code', 'ussdCode'];
+  const urlKeys = ['payment_url', 'paymentUrl', 'checkout_url', 'checkoutUrl', 'redirect_url', 'redirectUrl'];
+  const ussdKeys = ['ussd', 'ussd_code', 'ussdCode', 'ussd_string', 'ussdString', 'dial', 'dial_code'];
   const pick = (obj: Record<string, unknown>, keys: string[]): string | undefined => {
     for (const k of keys) {
       const v = obj[k];
@@ -555,9 +555,11 @@ export function extractSerdiPayPaymentPrompt(data: Record<string, unknown>): {
     }
     return undefined;
   };
+  const rawUssd = pick(data, ussdKeys) ?? pick(payment, ussdKeys);
+  const ussdCode = rawUssd && (rawUssd.includes('*') || rawUssd.includes('#')) ? rawUssd : undefined;
   return {
     paymentUrl: pick(data, urlKeys) ?? pick(payment, urlKeys),
-    ussdCode: pick(data, ussdKeys) ?? pick(payment, ussdKeys),
+    ...(ussdCode ? { ussdCode } : {}),
   };
 }
 

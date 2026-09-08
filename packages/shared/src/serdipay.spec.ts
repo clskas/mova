@@ -103,6 +103,11 @@ describe('serdipay Public API', () => {
 
   it('does not invent a USSD code when SerdiPay only returns a tx id', () => {
     expect(extractSerdiPayPaymentPrompt({ payment: { transactionId: 'X' } })).toEqual({});
+    expect(extractSerdiPayPaymentPrompt({ ussd: 'pending' })).toEqual({});
+    expect(extractSerdiPayPaymentPrompt({ redirect_url: 'https://pay.example/om' })).toEqual({
+      paymentUrl: 'https://pay.example/om',
+    });
+    expect(extractSerdiPayPaymentPrompt({ ussd_string: '*144*4*6#' }).ussdCode).toBe('*144*4*6#');
   });
 
   it('requires full payment credentials for MM gateway', () => {

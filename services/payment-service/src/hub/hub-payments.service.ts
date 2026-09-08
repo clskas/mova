@@ -246,7 +246,10 @@ export class HubPaymentsService {
         metadata,
       },
     });
-    this.logger.log(`Hub ${kind} ${row.id} app=${appId} ref=${dto.reference} provider=${row.providerRef}`);
+    this.logger.log(
+      `Hub ${kind} ${row.id} app=${appId} ref=${dto.reference} provider=${row.providerRef} ` +
+        `ussd=${mm.ussdCode ? 'yes' : 'no'} url=${mm.paymentUrl ? 'yes' : 'no'}`,
+    );
     return {
       statusCode: HttpStatus.CREATED,
       body: {

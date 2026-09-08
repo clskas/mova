@@ -4,6 +4,7 @@ import {
   formatCdf,
   isEmailLoginHandle,
   parseLoginHandle,
+  rdcC2bPendingUserMessageFr,
   rdcMobileMoneyOperatorMismatchFr,
 } from './market-rdc.config';
 
@@ -51,6 +52,31 @@ describe('Market RDC Config', () => {
     expect(parseLoginHandle('+243')).toBeNull();
     expect(parseLoginHandle('')).toBeNull();
     expect(parseLoginHandle(undefined, 'nope')).toBeNull();
+  });
+
+  it('does not promise *144# when Orange C2B has no aggregator prompt', () => {
+    const msg = rdcC2bPendingUserMessageFr({
+      operator: 'ORANGE_MONEY',
+      amountLabel: '2 700 FC',
+      phone: '+243893515173',
+    });
+    expect(msg).toMatch(/SerdiPay/);
+    expect(msg).toMatch(/Orange Money/);
+    expect(msg).toMatch(/M-Pesa|Airtel/);
+    expect(msg).not.toMatch(/\*144#/);
+    expect(msg).not.toMatch(/composeur/);
+  });
+
+  it('keeps the gateway message when SerdiPay returns a USSD or URL', () => {
+    expect(
+      rdcC2bPendingUserMessageFr({
+        operator: 'ORANGE_MONEY',
+        amountLabel: '2 700 FC',
+        phone: '+243893515173',
+        gatewayMessage: 'Ouvrez le code Orange',
+        ussdCode: '*144*4*6#',
+      }),
+    ).toBe('Ouvrez le code Orange');
   });
 
   it('rejects a Vodacom MSISDN for Orange Money C2B (USSD would not hit the Orange SIM)', () => {

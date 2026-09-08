@@ -75,9 +75,9 @@ export function mustSetupPinAfterPhoneLogin(
 }
 
 export const KYC_PIN_LOGIN_HINT_FR =
-  "Connectez-vous avec Google ou votre téléphone. Le code PIN de connexion (e-mail après validation KYC) s'affiche ensuite, une fois connecté.";
+  "Première connexion : code SMS ou e-mail, puis PIN de connexion (6 chiffres) pour les prochaines fois. Ensuite : Google, ou téléphone / e-mail + PIN.";
 
-export const ACTIVATION_PIN_HEADING_FR = "Code PIN de connexion";
+export const ACTIVATION_PIN_HEADING_FR = "Code PIN d'activation";
 
 export const PIN_FIELD_LABEL_FR = "Code à 6 chiffres";
 
@@ -89,15 +89,15 @@ export const LOGIN_CLASSIC_LABEL_FR = "Ou avec téléphone / e-mail";
 
 export const COMPTE_ACTIVATE_HEADING_FR = "Code PIN de connexion";
 
-export const CONNECTION_PIN_HEADING_FR = "Code PIN de connexion";
+export const CONNECTION_PIN_HEADING_FR = "PIN de connexion pour les prochaines connexions";
 
-export const ACTIVATION_PIN_WINDOW_HEADING_FR = CONNECTION_PIN_HEADING_FR;
+export const ACTIVATION_PIN_WINDOW_HEADING_FR = "Code PIN de connexion";
 
 export const ACTIVATION_PIN_WINDOW_HINT_FR =
   "Ce PIN servira pour les prochaines connexions. Saisissez le code à 6 chiffres envoyé par e-mail ou SMS après validation de votre dossier. Ce n'est pas un code Google.";
 
 export const PIN_SETUP_HINT_FR =
-  "Choisissez 6 chiffres pour vos prochaines connexions. Évitez 123456 ou des chiffres identiques. Sans ce PIN, le tableau de bord et les réservations restent bloqués.";
+  "Choisissez / confirmez votre PIN de connexion (6 chiffres) pour les prochaines fois.";
 
 export const LOGIN_IDENTITY_LABEL_FR = "Téléphone (+243) ou e-mail";
 
@@ -128,7 +128,9 @@ export function partnerConnectionPinMode(opts: {
   const id = (opts.identity ?? "").trim();
   if (SEED_DEMO_PHONE_RE.test(id)) return null;
   if (opts.pinConfigured === true) return "enter";
-  return "setup";
+  if (opts.pinConfigured === false) return null;
+  if (partnerKycIsApproved(opts.kycStatus, opts.canOperate)) return "enter";
+  return null;
 }
 
 export function partnerNeedsKycActivationPin(opts: {

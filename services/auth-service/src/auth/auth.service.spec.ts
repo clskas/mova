@@ -561,6 +561,91 @@ describe('AuthService', () => {
     expect(sms.sendOtp).not.toHaveBeenCalled();
   });
 
+  it('sends restaurant email OTP on Continuer even if Google is already linked', async () => {
+    const resto = makeUser({
+      id: 'resto-js',
+      phone: null,
+      email: 'jscelestinkas@gmail.com',
+      googleId: 'gid-other',
+      role: UserRole.RESTAURANT,
+    });
+    prisma.user.findFirst.mockResolvedValue(resto);
+    await expect(
+      service.requestOtp('jscelestinkas@gmail.com', UserRole.RESTAURANT, 'restaurant'),
+    ).resolves.toMatchObject({
+      success: true,
+      phone: 'jscelestinkas@gmail.com',
+    });
+    expect(mailer.sendOtp).toHaveBeenCalledWith(
+      'jscelestinkas@gmail.com',
+      expect.any(String),
+      expect.objectContaining({ portal: 'restaurant' }),
+    );
+    expect(sms.sendOtp).not.toHaveBeenCalled();
+  });
+
+  it('sends rental email OTP with the location access-mail template', async () => {
+    prisma.user.findFirst.mockResolvedValue(
+      makeUser({
+        phone: null,
+        email: 'fleet@gmail.com',
+        googleId: 'gid-rental',
+        role: UserRole.RENTAL_PARTNER,
+      }),
+    );
+    await expect(
+      service.requestOtp('fleet@gmail.com', UserRole.RENTAL_PARTNER, 'rental'),
+    ).resolves.toMatchObject({ success: true });
+    expect(mailer.sendOtp).toHaveBeenCalledWith(
+      'fleet@gmail.com',
+      expect.any(String),
+      expect.objectContaining({ portal: 'rental' }),
+    );
+  });
+
+  it('surfaces the SMTP mailer error on restaurant email Continuer', async () => {
+    prisma.user.findFirst.mockResolvedValue(
+      makeUser({
+        phone: null,
+        email: 'jscelestinkas@gmail.com',
+        googleId: 'gid-other',
+        role: UserRole.RESTAURANT,
+      }),
+    );
+    mailer.sendOtp.mockResolvedValue({
+      success: false,
+      message: 'Authentification SMTP refusée. Vérifiez SMTP_USER et SMTP_PASS sur mova-auth.',
+    });
+    await expect(
+      service.requestOtp('jscelestinkas@gmail.com', UserRole.RESTAURANT, 'restaurant'),
+    ).rejects.toMatchObject({
+      response: { message: expect.stringMatching(/SMTP_USER et SMTP_PASS/) },
+    });
+  });
+
+  it('verifies restaurant email OTP then returns the existing Google-linked account', async () => {
+    const resto = makeUser({
+      id: 'resto-js',
+      phone: null,
+      email: 'jscelestinkas@gmail.com',
+      googleId: 'gid-other',
+      role: UserRole.RESTAURANT,
+    });
+    prisma.user.findUnique.mockResolvedValue(null);
+    prisma.user.findFirst.mockResolvedValue(resto);
+    await seedHashedOtp('jscelestinkas@gmail.com', '847291');
+    const result = await service.verifyOtp(
+      'jscelestinkas@gmail.com',
+      '847291',
+      UserRole.RESTAURANT,
+      'restaurant',
+    );
+    expect(result.user.id).toBe('resto-js');
+    expect(result.user.email).toBe('jscelestinkas@gmail.com');
+    expect(prisma.user.create).not.toHaveBeenCalled();
+    expect(result.needsPinSetup).toBe(true);
+  });
+
   it('sends Google email OTP on first restaurant portal login (no session JWT yet)', async () => {
     prisma.user.findUnique.mockResolvedValue(null);
     prisma.user.findFirst.mockResolvedValue(null);
@@ -933,9 +1018,9 @@ describe('AuthService', () => {
   it('refuses passenger Google login when the access e-mail cannot be sent', async () => {
     prisma.user.findUnique.mockResolvedValue(null);
     prisma.user.findFirst.mockResolvedValue(null);
-    mailer.sendOtp.mockResolvedValue({ success: false, message: 'SMTP missing' });
+    mailer.sendOtp.mockResolvedValue({ success: false, message: 'Authentification SMTP refusée. Vérifiez SMTP_USER et SMTP_PASS sur mova-auth.' });
     await expect(service.loginWithGoogle('id-token', UserRole.PASSENGER)).rejects.toMatchObject({
-      response: { message: expect.stringMatching(/e-mail/i) },
+      response: { message: expect.stringMatching(/SMTP_USER et SMTP_PASS/) },
     });
     expect(prisma.user.create).not.toHaveBeenCalled();
     expect(jwt.sign).not.toHaveBeenCalled();

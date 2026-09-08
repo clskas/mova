@@ -165,18 +165,8 @@ export default function LoginPage() {
     let lastStatus = 0;
     try {
       const msisdn = normalizeLoginPhone(phone);
-      if (isEmailIdentity(msisdn)) {
-        if (!opts?.forceSms && !pinMode && !forgotPin && isLoginPinConfirmed()) {
-          const enabled = await fetchPinEnabled(API_BASE, msisdn, INTENT);
-          if (enabled) {
-            setPinMode(true);
-            return;
-          }
-        }
-        setError("Utilisez Google, ou un numéro +243 pour recevoir un SMS.");
-        return;
-      }
-      if (!/^\+243\d{9}$/.test(msisdn) && !forgotPin) {
+      const emailLogin = isEmailIdentity(msisdn);
+      if (!emailLogin && !/^\+243\d{9}$/.test(msisdn) && !forgotPin) {
         setError("Numéro invalide. Format : +243XXXXXXXXX");
         return;
       }
@@ -427,8 +417,8 @@ export default function LoginPage() {
             {codeSent && (
               <label className="block text-sm">
                 <span className="text-gray-600">
-                  {googleChallenge?.channel === "email"
-                    ? `Code reçu par e-mail${googleChallenge.masked ? ` (${googleChallenge.masked})` : ""}`
+                  {googleChallenge?.channel === "email" || isEmailIdentity(phone)
+                    ? `Code reçu par e-mail${googleChallenge?.masked ? ` (${googleChallenge.masked})` : ""}`
                     : forgotPin
                       ? "Code SMS — vous définirez ensuite un nouveau PIN"
                       : "Code reçu par SMS"}
@@ -457,7 +447,9 @@ export default function LoginPage() {
                   : codeSent
                     ? "Valider le code"
                     : forgotPin
-                      ? "Recevoir un SMS"
+                      ? isEmailIdentity(phone)
+                        ? "Recevoir le code"
+                        : "Recevoir un SMS"
                       : "Continuer"}
               </button>
             {forgotPin && !codeSent && !googleChallenge && (
@@ -483,7 +475,7 @@ export default function LoginPage() {
                   setError(null);
                 }}
               >
-                {googleChallenge ? "Retour" : "Changer de numéro"}
+                {googleChallenge ? "Retour" : isEmailIdentity(phone) ? "Changer d'e-mail" : "Changer de numéro"}
               </button>
             )}
             <PartnerLoginHelp />

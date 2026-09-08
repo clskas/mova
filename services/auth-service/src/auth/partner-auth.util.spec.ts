@@ -82,6 +82,7 @@ describe('partner-auth.util', () => {
 
   it('explains that Admin must create staff first', () => {
     expect(missingInviteOnlyAccountMessage('+243811111111', 'ADMIN')).toMatch(/compte staff/);
+    expect(missingInviteOnlyAccountMessage('jscelestinkas@gmail.com', 'RESTAURANT')).toMatch(/cet e-mail/);
   });
 
   it('tells staff to use the admin portal instead of restaurant', async () => {

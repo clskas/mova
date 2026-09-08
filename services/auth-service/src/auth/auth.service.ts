@@ -32,7 +32,13 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '@mova/shared';
 import { SmsService } from './sms.providers';
-import { EMAIL_UNAVAILABLE_USER_MESSAGE, EmailOtpMailer, SengaAccessMailPortal } from './email-otp.mailer';
+import {
+  EMAIL_UNAVAILABLE_USER_MESSAGE,
+  EmailOtpMailer,
+  SengaAccessMailPortal,
+  emailOtpFailureMessage,
+  mapSmtpFailureToAdminMessage,
+} from './email-otp.mailer';
 import { generateSecureLocalPin, hashLocalPin, isValidLocalPin, verifyLocalPin } from './local-pin.util';
 import {
   defaultPartnerDisplayName,
@@ -119,10 +125,14 @@ export class AuthService {
         'Numéro de téléphone requis.',
       );
     }
-    const normalized = normalizePhoneRdc(phone);
-    if (!validatePhoneRdc(normalized)) {
+    const parsed = parseLoginHandle(phone);
+    if (!parsed || parsed.kind === 'userId') {
       throw new MovaHttpException(MovaErrorCode.AUTH_INVALID_PHONE, HttpStatus.BAD_REQUEST);
     }
+    if (parsed.kind === 'email') {
+      return this.requestEmailOtp(parsed.value, requestedRole);
+    }
+    const normalized = parsed.value;
     await this.assertInviteOnlyAccountExists(normalized, requestedRole);
     const useTestOtp = isTestOtpAllowedForPhone(normalized);
     const liveCode = useTestOtp ? TEST_OTP_CODE : crypto.randomInt(100000, 999999).toString();
@@ -320,6 +330,10 @@ export class AuthService {
 
   async verifyOtp(phone: string, code: string, role?: UserRole, portal?: string, intendedRole?: string) {
     const requestedRole = this.resolveRequestedAuthRole(role, portal, intendedRole);
+    const parsed = parseLoginHandle(phone);
+    if (parsed?.kind === 'email') {
+      return this.verifyEmailOtp(parsed.value, code, requestedRole);
+    }
     const normalized = await this.consumeValidOtp(phone, code);
 
     let user = await this.prisma.user.findUnique({ where: { phone: normalized } });
@@ -767,6 +781,84 @@ export class AuthService {
     }
   }
 
+  /**
+   * Restaurant / rental Continuer with e-mail: same access-mail template as the PIN
+   * that reached Gmail. A linked Google account must not block this path.
+   */
+  private async requestEmailOtp(email: string, requestedRole?: UserRole) {
+    const user = await this.prisma.user.findFirst({
+      where: { email: { equals: email, mode: 'insensitive' } },
+    });
+    if (!user) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.FORBIDDEN,
+        missingInviteOnlyAccountMessage(email, requestedRole),
+      );
+    }
+    this.assertRoleAccess(user, requestedRole);
+    if (user.status === UserStatus.SUSPENDED) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.FORBIDDEN,
+        'Compte suspendu. Contactez le support SENGA.',
+      );
+    }
+    await this.issueOtpToDestination(email, 'email', requestedRole);
+    return {
+      success: true,
+      message: 'Code envoyé par e-mail. Vérifiez votre boîte de réception.',
+      phone: email,
+    };
+  }
+
+  private async verifyEmailOtp(email: string, code: string, requestedRole?: UserRole) {
+    const normalized = await this.consumeValidOtp(email, code, { email: true });
+    let user = await this.prisma.user.findFirst({
+      where: { email: { equals: normalized, mode: 'insensitive' } },
+    });
+    let isNew = false;
+    if (!user) {
+      if (!isAllowedPartnerSelfRegisterRole(requestedRole)) {
+        throw new MovaHttpException(
+          MovaErrorCode.AUTH_FORBIDDEN,
+          HttpStatus.FORBIDDEN,
+          missingInviteOnlyAccountMessage(normalized, requestedRole),
+        );
+      }
+      const createdRole = requestedRole!;
+      user = await this.prisma.user.create({
+        data: {
+          email: normalized,
+          role: createdRole,
+          status: UserStatus.ACTIVE,
+        },
+      });
+      isNew = true;
+      await this.provisionUser(user.id, user.role);
+      try {
+        const payload: UserCreatedPayload = { userId: user.id, phone: user.phone ?? undefined, role: user.role };
+        await this.redis.publish(MOVA_EVENTS.USER_CREATED, payload);
+      } catch (e) {
+        this.logger.warn(`USER_CREATED publish failed: ${(e as Error).message}`);
+      }
+    }
+    this.assertRoleAccess(user, requestedRole);
+    if (user.status === UserStatus.SUSPENDED) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.FORBIDDEN,
+        'Compte suspendu. Contactez le support SENGA.',
+      );
+    }
+    try {
+      await this.clearPinFailures(normalized);
+    } catch (e) {
+      this.logger.warn(`clearPinFailures failed: ${(e as Error).message}`);
+    }
+    return this.buildAuthResponse(user, { isNew });
+  }
+
   private async issueOtpToDestination(
     destination: string,
     channel: GoogleOtpChannel,
@@ -833,7 +925,7 @@ export class AuthService {
       throw new MovaHttpException(
         MovaErrorCode.VALIDATION_ERROR,
         HttpStatus.SERVICE_UNAVAILABLE,
-        EMAIL_UNAVAILABLE_USER_MESSAGE,
+        mapSmtpFailureToAdminMessage((e as Error).message),
       );
     }
     if (!emailResult.success) {
@@ -841,7 +933,7 @@ export class AuthService {
       throw new MovaHttpException(
         MovaErrorCode.VALIDATION_ERROR,
         HttpStatus.SERVICE_UNAVAILABLE,
-        EMAIL_UNAVAILABLE_USER_MESSAGE,
+        emailOtpFailureMessage(emailResult.message),
       );
     }
     return { mock: false as const };

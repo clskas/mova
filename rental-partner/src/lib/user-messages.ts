@@ -98,6 +98,9 @@ export function sanitizeUserMessage(
   const msg = String(raw).trim();
   if (!msg) return fallback;
   if (isClassValidatorPinMessage(msg)) return PIN_SIX_DIGITS_FR;
+  if (/smtp_|resend a refusé|relais a rejeté|e-mail non configuré|impossible d'envoyer (le code par )?e-mail/i.test(msg)) {
+    return msg.length > 220 ? `${msg.slice(0, 217)}…` : msg;
+  }
   if (/payment failed|merchant is not allowed|failed to process the payment|channel0/i.test(msg)) {
     return PAYMENT_FAILED_FR;
   }

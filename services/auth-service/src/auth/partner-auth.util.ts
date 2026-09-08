@@ -97,16 +97,19 @@ export function defaultPartnerDisplayName(role?: string | null): string {
 }
 
 export function missingInviteOnlyAccountMessage(phone: string, role?: string | null): string {
+  const ident = (phone ?? '').includes('@') ? 'cet e-mail' : 'ce numéro';
   if (role === 'RENTAL_PARTNER' || phone === PARTNER_SEED_PHONES.rental) {
-    return "Aucun compte partenaire location pour ce numéro. Créez le partenaire dans l'admin SENGA (rôle Partenaire location) avant la première connexion.";
+    return `Aucun compte partenaire location pour ${ident}. Créez le partenaire dans l'admin SENGA (rôle Partenaire location) avant la première connexion.`;
   }
   if (role === 'RESTAURANT' || phone === PARTNER_SEED_PHONES.restaurant) {
-    return "Aucun compte partenaire restaurant pour ce numéro. Créez le partenaire dans l'admin SENGA (rôle Restaurant) avant la première connexion.";
+    return `Aucun compte partenaire restaurant pour ${ident}. Créez le partenaire dans l'admin SENGA (rôle Restaurant) avant la première connexion.`;
   }
   if (isStaffAuthRole(role) || phone === OWNER_SUPER_ADMIN_PHONE) {
-    return "Aucun compte staff pour ce numéro. Créez-le d'abord dans l'admin SENGA.";
+    return `Aucun compte staff pour ${ident}. Créez-le d'abord dans l'admin SENGA.`;
   }
-  return "Ce numéro n'a pas de compte. Créez-le d'abord dans l'admin SENGA.";
+  return ident === 'cet e-mail'
+    ? "Cet e-mail n'a pas de compte. Créez-le d'abord dans l'admin SENGA."
+    : "Ce numéro n'a pas de compte. Créez-le d'abord dans l'admin SENGA.";
 }
 
 /** Staff / owner Google on a partner portal — never a 5xx. No URL (UI sanitizers strip hosts). */

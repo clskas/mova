@@ -6,7 +6,7 @@ import * as tls from 'tls';
 import { isMockOtpAllowed, maskEmail } from '@mova/shared';
 
 export const EMAIL_UNAVAILABLE_USER_MESSAGE =
-  'Impossible d\'envoyer le code par e-mail. Réessayez plus tard, ou connectez-vous avec un numéro +243.';
+  "Impossible d'envoyer le code par e-mail. Réessayez plus tard.";
 
 /** Subject that reached Gmail for the restaurant PIN (no « OTP » / « code PIN »). */
 export const SENGA_ACCESS_MAIL_SUBJECT = 'Votre accès SENGA — AfriSoft';
@@ -246,7 +246,8 @@ export async function lookupSmtpCname(host: string): Promise<string | undefined>
 }
 
 export function mapSmtpFailureToAdminMessage(raw: string): string {
-  const lower = raw.toLowerCase();
+  const snippet = raw.replace(/\s+/g, ' ').trim().slice(0, 100);
+  const lower = snippet.toLowerCase();
   if (/535|534|535-5\.7|authentication|auth invalid|invalid login|incorrect password/.test(lower)) {
     return 'Authentification SMTP refusée. Vérifiez SMTP_USER et SMTP_PASS sur mova-auth.';
   }
@@ -256,7 +257,20 @@ export function mapSmtpFailureToAdminMessage(raw: string): string {
   if (/econnrefused|enotfound|getaddrinfo/.test(lower)) {
     return 'SMTP_HOST injoignable. Vérifiez SMTP_HOST sur mova-auth (ex. mail.votredomaine.com).';
   }
-  return EMAIL_UNAVAILABLE_USER_MESSAGE;
+  if (/550|messageai|marked as spam/.test(lower)) {
+    return snippet
+      ? `Le relais a rejeté l'e-mail (${snippet}). Réessayez plus tard.`
+      : "Le relais a rejeté l'e-mail (filtre anti-spam). Réessayez plus tard.";
+  }
+  return snippet
+    ? `Impossible d'envoyer l'e-mail (${snippet}). Réessayez plus tard.`
+    : EMAIL_UNAVAILABLE_USER_MESSAGE;
+}
+
+/** Prefer the mailer's French detail over the generic « utilisez +243 ». */
+export function emailOtpFailureMessage(detail?: string): string {
+  const msg = (detail ?? '').trim();
+  return msg || EMAIL_UNAVAILABLE_USER_MESSAGE;
 }
 
 @Injectable()
@@ -366,7 +380,10 @@ export class EmailOtpMailer {
     if (!res.ok) {
       const body = await res.text().catch(() => '');
       this.logger.error(`Resend HTTP ${res.status}: ${body.slice(0, 200)}`);
-      return { success: false, message: EMAIL_UNAVAILABLE_USER_MESSAGE };
+      return {
+        success: false,
+        message: `Resend a refusé l'envoi (statut ${res.status}). Réessayez plus tard.`,
+      };
     }
     return { success: true, message: EMAIL_RESEND_ADMIN_MESSAGE };
   }
@@ -438,9 +455,6 @@ export class EmailOtpMailer {
     this.logger.log(
       `SMTP accepted (250) for ${maskEmail(to)} from=${from} envelope=${envelopeFrom} ehlo=${ehloHostname} — not inbox proof. ${emailInboxHintFor(to)}`,
     );
-    if (isGmailAddress(to)) {
-      return { success: false, message: EMAIL_GMAIL_SMTP_UNTRUSTED_ADMIN_MESSAGE };
-    }
     return { success: true, message: EMAIL_SMTP_ACCEPTED_ADMIN_MESSAGE };
   }
 }

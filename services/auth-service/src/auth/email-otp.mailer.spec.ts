@@ -3,6 +3,7 @@ import {
   EMAIL_RESEND_ADMIN_MESSAGE,
   EMAIL_SMTP_ACCEPTED_ADMIN_MESSAGE,
   EMAIL_SMTP_ENV_HINT,
+  EMAIL_UNAVAILABLE_USER_MESSAGE,
   SENGA_ACCESS_MAIL_SUBJECT,
   SENGA_RENTAL_ACCESS_MAIL_SUBJECT,
   SENGA_RESTAURANT_ACCESS_MAIL_SUBJECT,
@@ -108,6 +109,7 @@ describe('emailInboxHintFor', () => {
     expect(EMAIL_RESEND_ADMIN_MESSAGE).toMatch(/Resend/);
     expect(EMAIL_GMAIL_SMTP_UNTRUSTED_ADMIN_MESSAGE).toMatch(/Copiez le PIN/);
     expect(EMAIL_GMAIL_SMTP_UNTRUSTED_ADMIN_MESSAGE).not.toMatch(/PIN envoyé/);
+    expect(EMAIL_UNAVAILABLE_USER_MESSAGE).not.toMatch(/\+243/);
   });
 });
 
@@ -128,5 +130,18 @@ describe('mapSmtpFailureToAdminMessage', () => {
   it('lists the exact env hint constant for ops copy', () => {
     expect(EMAIL_SMTP_ENV_HINT).toMatch(/SMTP_HOST/);
     expect(EMAIL_SMTP_ENV_HINT).toMatch(/RESEND_API_KEY/);
+  });
+
+  it('surfaces MessageAI 550 instead of hiding behind +243', () => {
+    expect(
+      mapSmtpFailureToAdminMessage(
+        'SMTP unexpected: 550 This message cannot be delivered as it was marked as spam',
+      ),
+    ).toMatch(/550|spam|relais/i);
+    expect(
+      mapSmtpFailureToAdminMessage(
+        'SMTP unexpected: 550 This message cannot be delivered as it was marked as spam',
+      ),
+    ).not.toMatch(/\+243/);
   });
 });

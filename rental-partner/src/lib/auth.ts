@@ -48,12 +48,30 @@ export function setToken(token: string, phone?: string) {
 export function clearToken() {
   storageRemove(TOKEN_KEY);
   storageRemove(PIN_PENDING_KEY);
+  storageRemove(PIN_CONFIRMED_KEY);
   clearPinSessionUnlocked();
+}
+
+export async function logoutPartnerSession(apiBase: string) {
+  const token = getToken();
+  if (token) {
+    try {
+      await fetch(`${apiBase}/api/auth/logout`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    } catch {
+      /* still drop the local session */
+    }
+  }
+  clearToken();
 }
 
 export function dropTokenKeepPhone(phone?: string): void {
   storageRemove(TOKEN_KEY);
   storageRemove(PIN_PENDING_KEY);
+  storageRemove(PIN_CONFIRMED_KEY);
+  clearPinSessionUnlocked();
   const keep = (phone || getLastPhone() || "").trim();
   if (keep) storageSet(LAST_PHONE_KEY, keep);
 }

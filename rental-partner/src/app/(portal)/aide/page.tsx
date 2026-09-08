@@ -8,8 +8,9 @@ const MANUAL = [
     title: "Code PIN de connexion",
     steps: [
       "Connectez-vous sur https://rental.afri-soft.com/login avec Google ou votre téléphone.",
-      "Première fois : code SMS (téléphone) ou code e-mail (après Google), puis fenêtre PIN de connexion (6 chiffres) pour les prochaines fois.",
-      "Ce n'est pas un OTP Google, et ce n'est pas le titre « Activer le compte » sur toute la page.",
+      "Première fois : code SMS (téléphone) ou code e-mail (après Google), puis PIN de connexion (6 chiffres) pour les prochaines fois.",
+      "Après Déconnexion : pavé Connexion — « Entrez le PIN pour +243 ••• XXX », 6 points, clavier. Google ne reconnecte pas tout seul.",
+      "Après validation du dossier : fenêtre « Code PIN d'activation » pour commencer à travailler.",
     ],
   },
   {

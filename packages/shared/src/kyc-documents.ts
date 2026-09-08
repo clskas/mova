@@ -274,3 +274,19 @@ export function isValidKycDocumentType(raw: string): boolean {
     return false;
   }
 }
+
+/** Every required or uploaded justificatif must be individually APPROVED. */
+export function allPartnerJustificatifsApproved(
+  checklist: Array<{ required?: boolean; uploaded?: boolean; status?: string | null }>,
+): boolean {
+  const relevant = checklist.filter((item) => item.required || item.uploaded);
+  if (!relevant.length) return false;
+  return relevant.every((item) => String(item.status ?? '').trim().toUpperCase() === 'APPROVED');
+}
+
+export function allDriverJustificatifsApproved(
+  docs: Array<{ status?: string | null }>,
+): boolean {
+  if (!docs.length) return false;
+  return docs.every((doc) => String(doc.status ?? '').trim().toUpperCase() === 'APPROVED');
+}

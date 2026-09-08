@@ -58,6 +58,12 @@ export class RentalPartnerPortalController {
     );
   }
 
+  @Post('kyc/activation-pin')
+  @ApiOperation({ summary: "Confirmer le PIN d'activation après validation du dossier" })
+  kycActivationPin(@Request() req: { user: { id: string } }, @Body() body: { pin?: string }) {
+    return this.partnerKyc.verifyActivationPin(req.user.id, 'RENTAL_PARTNER', body.pin ?? '');
+  }
+
   @Get('dashboard')
   @ApiOperation({ summary: 'Tableau de bord partenaire location' })
   dashboard(@Request() req: { user: { id: string } }) {

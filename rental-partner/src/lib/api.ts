@@ -201,6 +201,8 @@ export type RentalKycDossier = {
   phoneVerified?: boolean;
   canOperate?: boolean;
   pinConfigured?: boolean;
+  activationPinVerified?: boolean;
+  needsActivationPin?: boolean;
   requiredComplete?: boolean;
   checklist?: KycChecklistItem[];
 };

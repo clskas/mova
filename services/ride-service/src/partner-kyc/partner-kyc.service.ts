@@ -14,6 +14,7 @@ import {
   serviceUrl,
   kycRejectNotifyCopy,
   notifyAuthUser,
+  allPartnerJustificatifsApproved,
   type AuthUserNotifyResult,
   type KycPartnerKind,
   type PartnerKycSubject as PartnerSubject,
@@ -76,6 +77,9 @@ export class PartnerKycService {
       canOperate: restaurant.kycStatus === PartnerKycStatus.APPROVED,
       pinConfigured: user?.pinConfigured === true,
       pinPending: restaurant.kycStatus === PartnerKycStatus.APPROVED && user?.pinConfigured !== true,
+      activationPinVerified: !!restaurant.activationPinVerifiedAt,
+      needsActivationPin:
+        restaurant.kycStatus === PartnerKycStatus.APPROVED && !restaurant.activationPinVerifiedAt,
       checklist,
       requiredComplete: this.requiredComplete(checklist) && (phoneVerified || hasEmail),
       orphan: visibility.reason === 'orphan',
@@ -113,6 +117,8 @@ export class PartnerKycService {
       canOperate: profile.kycStatus === PartnerKycStatus.APPROVED,
       pinConfigured: user?.pinConfigured === true,
       pinPending: profile.kycStatus === PartnerKycStatus.APPROVED && user?.pinConfigured !== true,
+      activationPinVerified: !!profile.activationPinVerifiedAt,
+      needsActivationPin: profile.kycStatus === PartnerKycStatus.APPROVED && !profile.activationPinVerifiedAt,
       checklist,
       requiredComplete: this.requiredComplete(checklist) && (phoneVerified || hasEmail),
       orphan: visibility.reason === 'orphan',
@@ -252,16 +258,25 @@ export class PartnerKycService {
             'Dossier incomplet : justificatifs manquants, ou aucun +243 / e-mail pour envoyer le PIN.',
           );
         }
-        await this.prisma.partnerKycDocument.updateMany({
-          where: { userId, subject: PartnerKycSubject.RESTAURANT, status: PartnerKycStatus.PENDING },
-          data: { status: PartnerKycStatus.APPROVED, notes: null },
-        });
+        this.assertAllJustificatifsApproved(dossier.checklist);
         await this.prisma.restaurant.update({
           where: { id: restaurant.id },
-          data: { kycStatus: PartnerKycStatus.APPROVED, kycNotes: null, isActive: true },
+          data: {
+            kycStatus: PartnerKycStatus.APPROVED,
+            kycNotes: null,
+            isActive: true,
+            activationPinVerifiedAt: null,
+          },
         });
         const pin = await this.issueLoginPin(userId);
-        return { ...dossier, kycStatus: PartnerKycStatus.APPROVED, canOperate: true, ...pin };
+        return {
+          ...dossier,
+          kycStatus: PartnerKycStatus.APPROVED,
+          canOperate: true,
+          activationPinVerified: false,
+          needsActivationPin: true,
+          ...pin,
+        };
       }
       await this.prisma.restaurant.update({
         where: { id: restaurant.id },
@@ -287,16 +302,20 @@ export class PartnerKycService {
           'Dossier incomplet : justificatifs manquants, ou aucun +243 / e-mail pour envoyer le PIN.',
         );
       }
-      await this.prisma.partnerKycDocument.updateMany({
-        where: { userId, subject: PartnerKycSubject.RENTAL_PARTNER, status: PartnerKycStatus.PENDING },
-        data: { status: PartnerKycStatus.APPROVED, notes: null },
-      });
+      this.assertAllJustificatifsApproved(dossier.checklist);
       await this.prisma.rentalPartnerProfile.update({
         where: { userId },
-        data: { kycStatus: PartnerKycStatus.APPROVED, kycNotes: null },
+        data: { kycStatus: PartnerKycStatus.APPROVED, kycNotes: null, activationPinVerifiedAt: null },
       });
       const pin = await this.issueLoginPin(userId);
-      return { ...dossier, kycStatus: PartnerKycStatus.APPROVED, canOperate: true, ...pin };
+      return {
+        ...dossier,
+        kycStatus: PartnerKycStatus.APPROVED,
+        canOperate: true,
+        activationPinVerified: false,
+        needsActivationPin: true,
+        ...pin,
+      };
     }
     await this.prisma.rentalPartnerProfile.update({
       where: { id: profile.id },
@@ -420,6 +439,33 @@ export class PartnerKycService {
     };
   }
 
+  async verifyActivationPin(userId: string, subject: PartnerSubject, pin: string) {
+    const dossier = subject === 'RESTAURANT' ? await this.getRestaurantDossier(userId) : await this.getRentalDossier(userId);
+    if (dossier.kycStatus !== PartnerKycStatus.APPROVED) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        undefined,
+        'Le dossier n\'est pas encore validé.',
+      );
+    }
+    if (dossier.activationPinVerified) {
+      return { ...dossier, activationPinVerified: true, needsActivationPin: false };
+    }
+    await this.assertLoginPinMatches(userId, pin);
+    if (subject === 'RESTAURANT') {
+      await this.prisma.restaurant.updateMany({
+        where: { ownerUserId: userId },
+        data: { activationPinVerifiedAt: new Date() },
+      });
+      return this.getRestaurantDossier(userId);
+    }
+    await this.prisma.rentalPartnerProfile.update({
+      where: { userId },
+      data: { activationPinVerifiedAt: new Date() },
+    });
+    return this.getRentalDossier(userId);
+  }
+
   async issueLoginPin(userId: string): Promise<IssueLoginPinResult> {
     try {
       const res = await fetch(serviceUrl('auth', `/internal/users/${userId}/issue-login-pin`), {
@@ -470,6 +516,32 @@ export class PartnerKycService {
     } catch (e) {
       throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, (e as Error).message);
     }
+  }
+
+  private assertAllJustificatifsApproved(
+    checklist: Array<{ required: boolean; uploaded: boolean; status: string | null }>,
+  ) {
+    if (!allPartnerJustificatifsApproved(checklist)) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        undefined,
+        'Tous les justificatifs doivent être approuvés individuellement avant d\'approuver le dossier.',
+      );
+    }
+  }
+
+  private async assertLoginPinMatches(userId: string, pin: string) {
+    try {
+      const res = await fetch(serviceUrl('auth', `/internal/users/${userId}/verify-login-pin`), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-internal-api-key': INTERNAL_API_KEY },
+        body: JSON.stringify({ pin: String(pin ?? '').trim() }),
+      });
+      if (res.ok) return;
+    } catch (e) {
+      this.logger.warn(`Verify login PIN threw for ${userId}: ${(e as Error).message}`);
+    }
+    throw new MovaHttpException(MovaErrorCode.AUTH_INVALID_PIN, HttpStatus.UNAUTHORIZED, 'Code PIN incorrect.');
   }
 
   private requiredComplete(checklist: Array<{ required: boolean; uploaded: boolean; status: string | null }>) {

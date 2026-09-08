@@ -196,6 +196,18 @@ function partnerStageLabel(r: PartnerKycDossier) {
   return "Dossier en attente";
 }
 
+function allJustificatifsApproved(
+  items: Array<{ required?: boolean; uploaded?: boolean; status?: string | null }> | undefined,
+): boolean {
+  const list = items ?? [];
+  const relevant = list.filter((item) => item.required || item.uploaded);
+  return relevant.length > 0 && relevant.every((item) => String(item.status ?? "").toUpperCase() === "APPROVED");
+}
+
+function allDriverDocsApproved(docs: Array<{ status?: string | null }>): boolean {
+  return docs.length > 0 && docs.every((doc) => String(doc.status ?? "").toUpperCase() === "APPROVED");
+}
+
 function partnerAccountLabel(r: PartnerKycDossier) {
   if (r.orphan || r.hiddenReason === "orphan") return "Sans compte (fantôme)";
   if (r.hiddenReason === "play_prelaunch") return "Test Lab";
@@ -564,7 +576,12 @@ export default function KycPage() {
                     />
                     {canWrite("kyc") && statusFilter !== "APPROVED" && (
                       <div className="flex gap-2">
-                        <BtnSuccess onClick={() => reviewDriver(dossier.userId, true)}>Approuver le dossier</BtnSuccess>
+                        <BtnSuccess
+                          disabled={!allDriverDocsApproved(dossier.docs)}
+                          onClick={() => reviewDriver(dossier.userId, true)}
+                        >
+                          Approuver le dossier
+                        </BtnSuccess>
                         <BtnDanger onClick={() => reviewDriver(dossier.userId, false)}>Rejeter le dossier</BtnDanger>
                       </div>
                     )}
@@ -663,8 +680,13 @@ export default function KycPage() {
                       </div>
                       {canWrite("kyc") && r.userId && r.kycStatus !== "APPROVED" && (
                         <div className="flex gap-2">
-                          <BtnSuccess onClick={() => reviewPartner("RESTAURANT", r.userId!, true)}>Approuver</BtnSuccess>
-                          <BtnDanger onClick={() => reviewPartner("RESTAURANT", r.userId!, false)}>Rejeter</BtnDanger>
+                          <BtnSuccess
+                            disabled={!allJustificatifsApproved(restaurants.find((d) => d.userId === r.userId)?.checklist ?? r.checklist)}
+                            onClick={() => reviewPartner("RESTAURANT", r.userId!, true)}
+                          >
+                            Approuver le dossier
+                          </BtnSuccess>
+                          <BtnDanger onClick={() => reviewPartner("RESTAURANT", r.userId!, false)}>Rejeter le dossier</BtnDanger>
                         </div>
                       )}
                       {canWrite("kyc") && r.userId && r.kycStatus === "APPROVED" && (
@@ -734,8 +756,13 @@ export default function KycPage() {
                       </div>
                       {canWrite("kyc") && r.userId && r.kycStatus !== "APPROVED" && (
                         <div className="flex gap-2">
-                          <BtnSuccess onClick={() => reviewPartner("RENTAL_PARTNER", r.userId!, true)}>Approuver</BtnSuccess>
-                          <BtnDanger onClick={() => reviewPartner("RENTAL_PARTNER", r.userId!, false)}>Rejeter</BtnDanger>
+                          <BtnSuccess
+                            disabled={!allJustificatifsApproved(rentalPartners.find((d) => d.userId === r.userId)?.checklist ?? r.checklist)}
+                            onClick={() => reviewPartner("RENTAL_PARTNER", r.userId!, true)}
+                          >
+                            Approuver le dossier
+                          </BtnSuccess>
+                          <BtnDanger onClick={() => reviewPartner("RENTAL_PARTNER", r.userId!, false)}>Rejeter le dossier</BtnDanger>
                         </div>
                       )}
                       {canWrite("kyc") && r.userId && r.kycStatus === "APPROVED" && (

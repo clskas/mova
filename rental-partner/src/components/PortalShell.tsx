@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { clearToken } from "@/lib/auth";
+import { logoutPartnerSession } from "@/lib/auth";
+import { disableGoogleAutoSelect } from "@/components/GoogleContinueButton";
+import { PUBLIC_API_BASE } from "@/lib/public-api-base";
 import { usePartnerLiveConnected } from "@/components/PartnerLiveProvider";
 
 const NAV = [
@@ -33,8 +35,10 @@ export function PortalShell({
   const liveConnected = usePartnerLiveConnected();
 
   function logout() {
-    clearToken();
-    router.replace("/login");
+    disableGoogleAutoSelect();
+    void logoutPartnerSession(PUBLIC_API_BASE).finally(() => {
+      router.replace("/login");
+    });
   }
 
   return (

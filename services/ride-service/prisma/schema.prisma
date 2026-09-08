@@ -263,6 +263,7 @@ model Restaurant {
   courierMode       RestaurantCourierMode @default(PLATFORM)
   kycStatus         PartnerKycStatus @default(PENDING)
   kycNotes          String?
+  activationPinVerifiedAt DateTime?
   nif               String?
   rccm              String?
   payoutProvider    String?
@@ -719,6 +720,7 @@ model RentalPartnerProfile {
   partnerType RentalPartnerType @default(INDIVIDUAL)
   kycStatus   PartnerKycStatus  @default(PENDING)
   kycNotes    String?
+  activationPinVerifiedAt DateTime?
   nif         String?
   rccm        String?
   createdAt   DateTime          @default(now())

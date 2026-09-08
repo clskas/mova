@@ -13,13 +13,13 @@ import {
   normalizeLoginPhone,
   phoneFromToken,
   RESTAURANT_AUTH_INTENT,
-  isLoginPinConfirmed,
+  isPinSessionUnlocked,
   markLoginPinConfirmed,
   setPinPending,
   setLastPhone,
   setToken,
 } from "@/lib/auth";
-import { GoogleContinueButton, googleClientId } from "@/components/GoogleContinueButton";
+import { GoogleContinueButton, disableGoogleAutoSelect, googleClientId } from "@/components/GoogleContinueButton";
 import { PwaInstallBanner } from "@/components/PwaInstallBanner";
 import { PUBLIC_API_BASE } from "@/lib/public-api-base";
 import {
@@ -34,8 +34,11 @@ import {
   LOGIN_CLASSIC_LABEL_FR,
   LOGIN_IDENTITY_LABEL_FR,
   PartnerLoginHelp,
+  CONNECTION_LOGIN_TITLE_FR,
+  CONNECTION_PIN_FOOTER_FR,
   CONNECTION_PIN_HEADING_FR,
   PIN_SETUP_HINT_FR,
+  connectionPinPrompt,
   PinDigitPad,
   PinForgotLink,
   PinSetupForm,
@@ -91,7 +94,7 @@ export default function LoginPage() {
         setPinPending(true);
         return;
       }
-      if (token) {
+      if (token && isPinSessionUnlocked()) {
         try {
           const res = await fetch(`${API_BASE}/api/users/me`, {
             headers: { Authorization: `Bearer ${token}` },
@@ -105,9 +108,15 @@ export default function LoginPage() {
         } catch {
           dropTokenKeepPhone(phoneFromToken() || getLastPhone() || "");
         }
+      } else if (token) {
+        dropTokenKeepPhone(phoneFromToken() || getLastPhone() || "");
       }
+      disableGoogleAutoSelect();
       const last = getLastPhone();
-      if (last) setPhone(last);
+      if (last) {
+        setPhone(last);
+        setPinMode(true);
+      }
     })();
     return () => {
       cancelled = true;
@@ -147,7 +156,7 @@ export default function LoginPage() {
       setGoogleChallenge(null);
       return;
     }
-    if (source !== "pin" && data.pinConfigured === true && !isLoginPinConfirmed()) {
+    if (source !== "pin" && data.pinConfigured === true) {
       setPinMode(true);
       setCodeSent(false);
       setGoogleChallenge(null);
@@ -170,7 +179,7 @@ export default function LoginPage() {
         setError("Numéro invalide. Format : +243XXXXXXXXX");
         return;
       }
-      if (!opts?.forceSms && !pinMode && !forgotPin && isLoginPinConfirmed()) {
+      if (!opts?.forceSms && !pinMode && !forgotPin) {
         const enabled = await fetchPinEnabled(API_BASE, msisdn, INTENT);
         if (enabled) {
           setPinMode(true);
@@ -345,17 +354,19 @@ export default function LoginPage() {
             </div>
           </div>
         ) : pinOnly ? (
-          <div className="fixed inset-0 z-[10050] bg-gradient-to-br from-orange-50 to-violet-50 overflow-y-auto">
-            <div className="min-h-[100dvh] flex items-start justify-center p-6 pt-10">
-              <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-8 space-y-4">
-                <h2 className="text-lg font-semibold text-center text-[#1A1A2E]">{CONNECTION_PIN_HEADING_FR}</h2>
-                <p className="text-sm text-gray-600 text-center">{PIN_SETUP_HINT_FR}</p>
+          <div className="fixed inset-0 z-[10050] bg-[#F5F5F7] overflow-y-auto">
+            <div className="min-h-[100dvh] flex items-center justify-center p-6">
+              <div className="w-full max-w-sm space-y-5">
+                <div className="text-center">
+                  <h1 className="text-2xl font-bold text-[#1A1A2E]">{CONNECTION_LOGIN_TITLE_FR}</h1>
+                  <p className="text-sm text-gray-500 mt-1">{connectionPinPrompt(phone)}</p>
+                </div>
                 <PinDigitPad
                   value={pin}
                   onChange={setPin}
                   disabled={loading}
                   accentClass="bg-[#FF6B35]"
-                  fieldLabel="PIN de connexion"
+                  keypadOnly
                   autoFocus
                 />
                 <PinForgotLink
@@ -367,10 +378,11 @@ export default function LoginPage() {
                     setError(null);
                   }}
                 />
-                <button type="button" className="w-full text-sm text-gray-400 underline" onClick={useAnotherNumber}>
+                <button type="button" className="w-full text-sm text-[#6C63FF] underline" onClick={useAnotherNumber}>
                   Ce n&apos;est pas moi
                 </button>
                 {error && <p className="text-sm text-red-600 text-center">{error}</p>}
+                <p className="text-xs text-gray-400 text-center leading-relaxed">{CONNECTION_PIN_FOOTER_FR}</p>
               </div>
             </div>
           </div>

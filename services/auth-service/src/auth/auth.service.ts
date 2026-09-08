@@ -240,6 +240,18 @@ export class AuthService {
     return this.buildAuthResponse(user, { isNew: false });
   }
 
+  async verifyLoginPin(userId: string, pin: string) {
+    const trimmed = String(pin ?? '').trim();
+    if (!/^\d{6}$/.test(trimmed)) {
+      throw new MovaHttpException(MovaErrorCode.AUTH_INVALID_PIN, HttpStatus.UNAUTHORIZED);
+    }
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user?.localPinHash || !verifyLocalPin(trimmed, user.localPinHash)) {
+      throw new MovaHttpException(MovaErrorCode.AUTH_INVALID_PIN, HttpStatus.UNAUTHORIZED);
+    }
+    return { success: true };
+  }
+
   async setupLocalPin(userId: string, pin: string, confirmPin: string) {
     if (pin !== confirmPin) {
       throw new MovaHttpException(

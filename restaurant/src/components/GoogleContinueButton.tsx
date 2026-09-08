@@ -14,11 +14,15 @@ declare global {
           initialize: (config: {
             client_id: string;
             callback: (response: { credential: string }) => void;
+            auto_select?: boolean;
+            cancel_on_tap_outside?: boolean;
           }) => void;
           renderButton: (
             parent: HTMLElement,
             options: { theme?: string; size?: string; text?: string; width?: number; locale?: string },
           ) => void;
+          disableAutoSelect?: () => void;
+          cancel?: () => void;
         };
       };
     };
@@ -27,6 +31,15 @@ declare global {
 
 export function googleClientId(): string {
   return (process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? "").trim();
+}
+
+export function disableGoogleAutoSelect() {
+  try {
+    window.google?.accounts?.id?.disableAutoSelect?.();
+    window.google?.accounts?.id?.cancel?.();
+  } catch {
+    /* GIS not loaded */
+  }
 }
 
 type Props = {
@@ -54,10 +67,13 @@ export function GoogleContinueButton({ onCredential, disabled }: Props) {
       if (cancelled || !hostRef.current || !window.google?.accounts?.id) return;
       window.google.accounts.id.initialize({
         client_id: clientId,
+        auto_select: false,
+        cancel_on_tap_outside: true,
         callback: (response) => {
           if (response.credential) void onCredentialRef.current(response.credential);
         },
       });
+      window.google.accounts.id.disableAutoSelect?.();
       hostRef.current.innerHTML = "";
       window.google.accounts.id.renderButton(hostRef.current, {
         theme: "outline",

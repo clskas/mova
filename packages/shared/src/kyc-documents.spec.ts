@@ -1,5 +1,6 @@
 import {
   normalizeKycRejectNotes,
+  allPartnerJustificatifsApproved,
   restaurantKycTypes,
   rentalKycTypes,
   REQUIRED_RESTAURANT_KYC_TYPES,
@@ -43,6 +44,24 @@ describe('libellés KYC admin', () => {
     expect(kycPartnerKindLabel('RENTAL_INDIVIDUAL')).toBe('Location (particulier)');
     expect(rentalKycPartnerKind('COMPANY')).toBe('RENTAL_COMPANY');
     expect(rentalKycPartnerKind('INDIVIDUAL')).toBe('RENTAL_INDIVIDUAL');
+  });
+});
+
+describe('allPartnerJustificatifsApproved', () => {
+  it('exige chaque justificatif requis ou envoyé en APPROVED', () => {
+    expect(
+      allPartnerJustificatifsApproved([
+        { required: true, uploaded: true, status: 'APPROVED' },
+        { required: true, uploaded: true, status: 'PENDING' },
+      ]),
+    ).toBe(false);
+    expect(
+      allPartnerJustificatifsApproved([
+        { required: true, uploaded: true, status: 'APPROVED' },
+        { required: true, uploaded: true, status: 'APPROVED' },
+        { required: false, uploaded: false, status: null },
+      ]),
+    ).toBe(true);
   });
 });
 

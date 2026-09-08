@@ -75,6 +75,12 @@ export class RestaurantPortalController {
     );
   }
 
+  @Post('kyc/activation-pin')
+  @ApiOperation({ summary: "Confirmer le PIN d'activation après validation du dossier" })
+  kycActivationPin(@Request() req: { user: { id: string } }, @Body() body: { pin?: string }) {
+    return this.partnerKyc.verifyActivationPin(req.user.id, 'RESTAURANT', body.pin ?? '');
+  }
+
   @Get('dashboard')
   @ApiOperation({ summary: 'Tableau de bord partenaire restaurant' })
   dashboard(@Request() req: { user: { id: string } }) {

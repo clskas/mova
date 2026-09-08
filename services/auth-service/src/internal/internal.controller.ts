@@ -91,6 +91,11 @@ export class InternalController {
     return this.auth.issueLoginPin(id, { pin: dto?.pin, notify: dto?.notify });
   }
 
+  @Post('users/:id/verify-login-pin')
+  verifyLoginPin(@Param('id') id: string, @Body() dto: { pin?: string }) {
+    return this.auth.verifyLoginPin(id, dto?.pin ?? '');
+  }
+
   /** SMS hub + mailer from User.phone / User.email. */
   @Post('users/:id/notify')
   notifyUser(@Param('id') id: string, @Body() dto: NotifyUserDto) {

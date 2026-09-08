@@ -39,3 +39,18 @@ export function partnerNeedsKycActivationPin(opts: {
 }): boolean {
   return partnerConnectionPinMode(opts) === 'enter';
 }
+
+/**
+ * After admin KYC approval: blocking « Code PIN d'activation » (resto/location).
+ * Separate from login PIN, even when both are the same issueLoginPin value.
+ */
+export function partnerNeedsWorkActivationPin(opts: {
+  kycStatus?: string | null;
+  activationPinVerified?: boolean;
+  identity?: string;
+}): boolean {
+  const id = (opts.identity ?? '').trim();
+  if (SEED_DEMO_PHONE_RE.test(id)) return false;
+  if (opts.activationPinVerified === true) return false;
+  return String(opts.kycStatus ?? '').trim().toUpperCase() === 'APPROVED';
+}

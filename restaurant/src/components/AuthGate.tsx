@@ -1,16 +1,14 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
-  ACTIVATION_PIN_WINDOW_HEADING_FR,
-  ACTIVATION_PIN_WINDOW_HINT_FR,
+  WORK_ACTIVATION_PIN_HEADING_FR,
+  WORK_ACTIVATION_PIN_HINT_FR,
   ActivationPinCard,
   accountPhone,
   isPartnerPinExemptPath,
-  partnerNeedsKycActivationPin,
-  type AuthPayload,
+  partnerNeedsWorkActivationPin,
 } from "@/components/PinAuth";
 import { apiFetch, fetchKyc } from "@/lib/api";
 import { PUBLIC_API_BASE } from "@/lib/public-api-base";
@@ -19,18 +17,12 @@ import {
   dropTokenKeepPhone,
   getLastPhone,
   getToken,
-  isLoginPinConfirmed,
   isPinPending,
   isPinSessionUnlocked,
   isRestaurantRole,
-  markLoginPinConfirmed,
   normalizeLoginPhone,
   phoneFromToken,
   roleFromToken,
-  setLastPhone,
-  setPinPending,
-  setToken,
-  userIdFromToken,
 } from "@/lib/auth";
 
 type Me = {
@@ -54,7 +46,8 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
       router.replace("/login");
       return;
     }
-    if (isPinPending()) {
+    if (isPinPending() || !isPinSessionUnlocked()) {
+      dropTokenKeepPhone(phoneFromToken() || getLastPhone() || "");
       router.replace("/login");
       return;
     }
@@ -68,7 +61,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
         ]);
         if (cancelled) return;
         if (me.needsPinSetup && me.pinConfigured !== true) {
-          setPinPending(true);
+          dropTokenKeepPhone(phoneFromToken() || getLastPhone() || "");
           router.replace("/login");
           return;
         }
@@ -82,21 +75,13 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
           },
           phoneFromToken() || getLastPhone() || "",
         );
-        const pinConfigured = me.pinConfigured === true || kyc?.pinConfigured === true;
-        const needsPin = partnerNeedsKycActivationPin({
-          pinConfigured,
+        const needsPin = partnerNeedsWorkActivationPin({
           kycStatus: kyc?.kycStatus,
-          canOperate: kyc?.canOperate,
-          unlocked: isLoginPinConfirmed() || isPinSessionUnlocked(),
+          activationPinVerified: kyc?.activationPinVerified === true,
           identity: fallback,
         });
-        if (needsPin) {
-          setActivateIdentity(fallback);
-          setNeedsActivation(true);
-          setReady(true);
-          return;
-        }
-        setNeedsActivation(false);
+        setActivateIdentity(fallback);
+        setNeedsActivation(needsPin);
         setReady(true);
       } catch {
         dropTokenKeepPhone(phoneFromToken() || getLastPhone() || "");
@@ -106,7 +91,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
 
     void check();
     const poll = window.setInterval(() => {
-      if (!cancelled && !isLoginPinConfirmed() && !isPinSessionUnlocked()) void check();
+      if (!cancelled) void check();
     }, 8000);
     return () => {
       cancelled = true;
@@ -115,7 +100,6 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   }, [router, pathname]);
 
   if (needsActivation && !isPartnerPinExemptPath(pathname)) {
-    const uid = userIdFromToken();
     return (
       <div className="fixed inset-0 z-[10050] bg-gradient-to-br from-orange-50 to-violet-50 overflow-y-auto">
         <div className="min-h-[100dvh] flex items-start justify-center p-6 pt-10 pb-16">
@@ -123,26 +107,21 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
             <p className="text-center text-sm text-gray-500 mb-4">SENGA Restaurant</p>
             <ActivationPinCard
               apiBase={PUBLIC_API_BASE}
-              intent={{ ...RESTAURANT_AUTH_INTENT, ...(uid ? { userId: uid } : {}) }}
+              intent={RESTAURANT_AUTH_INTENT}
               accentClass="bg-[#FF6B35]"
               highlightClass="border-orange-400 bg-orange-50"
-              heading={ACTIVATION_PIN_WINDOW_HEADING_FR}
-              hint={ACTIVATION_PIN_WINDOW_HINT_FR}
+              heading={WORK_ACTIVATION_PIN_HEADING_FR}
+              hint={WORK_ACTIVATION_PIN_HINT_FR}
               lockIdentity
               defaultIdentity={activateIdentity}
               normalizeIdentity={normalizeLoginPhone}
-              onActivated={(data: AuthPayload) => {
-                const phone = accountPhone(data, activateIdentity);
-                if (data.accessToken) setToken(data.accessToken, phone || undefined);
-                if (phone) setLastPhone(phone);
-                markLoginPinConfirmed();
+              verifyPath="/api/restaurant/kyc/activation-pin"
+              authToken={getToken()}
+              onActivated={() => {
                 setNeedsActivation(false);
                 setReady(true);
               }}
             />
-            <Link href="/dossier" className="block text-center text-sm text-orange-800 underline mt-4">
-              Ouvrir mon dossier
-            </Link>
           </div>
         </div>
       </div>

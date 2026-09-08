@@ -96,10 +96,24 @@ export const ACTIVATION_PIN_WINDOW_HEADING_FR = "Code PIN de connexion";
 export const ACTIVATION_PIN_WINDOW_HINT_FR =
   "Ce PIN servira pour les prochaines connexions. Saisissez le code à 6 chiffres envoyé par e-mail ou SMS après validation de votre dossier (objet « Votre acces SENGA restaurant »). Ce n'est pas un code Google.";
 
+export const WORK_ACTIVATION_PIN_HEADING_FR = "Code PIN d'activation";
+
+export const WORK_ACTIVATION_PIN_HINT_FR =
+  "Dossier validé — saisissez le PIN reçu par e-mail pour commencer à travailler.";
+
 export const PIN_SETUP_HINT_FR =
   "Choisissez / confirmez votre PIN de connexion (6 chiffres) pour les prochaines fois.";
 
 export const LOGIN_IDENTITY_LABEL_FR = "Téléphone (+243) ou e-mail";
+
+export const CONNECTION_LOGIN_TITLE_FR = "Connexion";
+
+export const CONNECTION_PIN_FOOTER_FR =
+  "Téléphone : code par SMS. Google : connexion directe (identité déjà vérifiée par Google). Après la première connexion avec un téléphone, le PIN à 6 chiffres est obligatoire. PIN oublié : SMS ou Google, puis un nouveau code.";
+
+export function connectionPinPrompt(identity: string): string {
+  return `Entrez le PIN pour ${maskPhoneDisplay(identity)}`;
+}
 
 const PIN_HELP_PATHS = ["/aide", "/manuel"];
 
@@ -141,6 +155,17 @@ export function partnerNeedsKycActivationPin(opts: {
   pinConfigured?: boolean;
 }): boolean {
   return partnerConnectionPinMode(opts) === "enter";
+}
+
+export function partnerNeedsWorkActivationPin(opts: {
+  kycStatus?: string | null;
+  activationPinVerified?: boolean;
+  identity?: string;
+}): boolean {
+  const id = (opts.identity ?? "").trim();
+  if (SEED_DEMO_PHONE_RE.test(id)) return false;
+  if (opts.activationPinVerified === true) return false;
+  return partnerKycIsApproved(opts.kycStatus);
 }
 
 export function PartnerLoginHelp({
@@ -201,6 +226,7 @@ export function PinDigitPad({
   compact = true,
   autoFocus = false,
   fieldLabel,
+  keypadOnly = false,
 }: {
   value: string;
   onChange: (next: string) => void;
@@ -209,6 +235,7 @@ export function PinDigitPad({
   compact?: boolean;
   autoFocus?: boolean;
   fieldLabel?: string;
+  keypadOnly?: boolean;
 }) {
   const keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "⌫"] as const;
   function press(key: string) {
@@ -219,23 +246,39 @@ export function PinDigitPad({
     }
     if (value.length < 6) onChange(`${value}${key}`);
   }
+  const showKeypad = keypadOnly || !compact;
   return (
-    <div data-testid="pin-pad" className="space-y-3">
-      <label className="block text-sm">
-        {fieldLabel ? <span className="font-semibold text-gray-800">{fieldLabel}</span> : null}
+    <div data-testid="pin-pad" className="space-y-4">
+      {!keypadOnly && (
+        <label className="block text-sm">
+          {fieldLabel ? <span className="font-semibold text-gray-800">{fieldLabel}</span> : null}
+          <input
+            data-testid="login-pin"
+            className="mt-1 w-full rounded-xl border-2 border-gray-300 bg-white p-4 tracking-[0.45em] text-center text-2xl font-semibold"
+            value={value}
+            onChange={(e) => onChange(e.target.value.replace(/\D/g, "").slice(0, 6))}
+            inputMode="numeric"
+            autoComplete="off"
+            maxLength={6}
+            placeholder="6 chiffres"
+            disabled={disabled}
+            autoFocus={autoFocus}
+          />
+        </label>
+      )}
+      {keypadOnly && (
         <input
           data-testid="login-pin"
-          className="mt-1 w-full rounded-xl border-2 border-gray-300 bg-white p-4 tracking-[0.45em] text-center text-2xl font-semibold"
+          className="sr-only"
           value={value}
           onChange={(e) => onChange(e.target.value.replace(/\D/g, "").slice(0, 6))}
           inputMode="numeric"
           autoComplete="off"
           maxLength={6}
-          placeholder="6 chiffres"
           disabled={disabled}
           autoFocus={autoFocus}
         />
-      </label>
+      )}
       <div className="flex justify-center gap-2" aria-hidden>
         {Array.from({ length: 6 }).map((_, i) => (
           <span
@@ -244,7 +287,7 @@ export function PinDigitPad({
           />
         ))}
       </div>
-      {!compact && (
+      {showKeypad && (
         <div className="grid grid-cols-3 gap-2 max-w-[240px] mx-auto">
           {keys.map((key, i) => (
             <button
@@ -275,6 +318,8 @@ export function ActivationPinCard({
   lockIdentity = false,
   normalizeIdentity,
   submitLabel = PIN_SUBMIT_LABEL_FR,
+  verifyPath,
+  authToken,
 }: {
   apiBase: string;
   intent: Record<string, string>;
@@ -287,6 +332,8 @@ export function ActivationPinCard({
   lockIdentity?: boolean;
   normalizeIdentity?: (raw: string) => string;
   submitLabel?: string;
+  verifyPath?: string;
+  authToken?: string | null;
 }) {
   const [identity, setIdentity] = useState(defaultIdentity ?? "");
   const [pin, setPin] = useState("");
@@ -309,6 +356,22 @@ export function ActivationPinCard({
     setLoading(true);
     setError(null);
     try {
+      if (verifyPath) {
+        const res = await fetch(`${apiBase}${verifyPath}`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+          },
+          body: JSON.stringify({ pin }),
+        });
+        const data = (await res.json().catch(() => ({}))) as AuthPayload & { error?: { message?: string } };
+        if (!res.ok) {
+          throw new Error(data.error?.message ?? "PIN incorrect. Réessayez.");
+        }
+        onActivated(data);
+        return;
+      }
       const handle = identity.trim()
         ? normalizeIdentity
           ? normalizeIdentity(identity)

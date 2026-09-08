@@ -1,4 +1,8 @@
-import { partnerConnectionPinMode, partnerNeedsKycActivationPin } from './partner-connection-pin';
+import {
+  partnerConnectionPinMode,
+  partnerNeedsKycActivationPin,
+  partnerNeedsWorkActivationPin,
+} from './partner-connection-pin';
 
 describe('partnerConnectionPinMode', () => {
   it('shows the KYC login PIN after Google or phone when a PIN was issued', () => {
@@ -76,6 +80,29 @@ describe('partnerConnectionPinMode', () => {
       partnerNeedsKycActivationPin({
         pinConfigured: true,
         unlocked: true,
+      }),
+    ).toBe(false);
+  });
+
+  it('shows work activation once after KYC approval, even if login PIN is already known', () => {
+    expect(
+      partnerNeedsWorkActivationPin({
+        kycStatus: 'APPROVED',
+        activationPinVerified: false,
+        identity: 'resto@gmail.com',
+      }),
+    ).toBe(true);
+    expect(
+      partnerNeedsWorkActivationPin({
+        kycStatus: 'APPROVED',
+        activationPinVerified: true,
+        identity: 'resto@gmail.com',
+      }),
+    ).toBe(false);
+    expect(
+      partnerNeedsWorkActivationPin({
+        kycStatus: 'PENDING',
+        activationPinVerified: false,
       }),
     ).toBe(false);
   });

@@ -92,9 +92,9 @@ describe('PartnerKycService', () => {
       address: 'Gombe',
     });
     prisma.partnerKycDocument.findMany.mockResolvedValue([
-      { type: 'MANAGER_ID', status: 'PENDING', notes: null, url: '/a', id: 'd1' },
-      { type: 'RCCM', status: 'PENDING', notes: null, url: '/b', id: 'd2' },
-      { type: 'PREMISES_PHOTO', status: 'PENDING', notes: null, url: '/c', id: 'd3' },
+      { type: 'MANAGER_ID', status: 'APPROVED', notes: null, url: '/a', id: 'd1' },
+      { type: 'RCCM', status: 'APPROVED', notes: null, url: '/b', id: 'd2' },
+      { type: 'PREMISES_PHOTO', status: 'APPROVED', notes: null, url: '/c', id: 'd3' },
     ]);
     (global.fetch as jest.Mock)
       .mockResolvedValueOnce({
@@ -105,7 +105,6 @@ describe('PartnerKycService', () => {
         ok: true,
         json: async () => ({ loginPin: '847291', smsSent: true, hasPhone: true, emailSent: false }),
       });
-    prisma.partnerKycDocument.updateMany.mockResolvedValue({ count: 3 });
     prisma.restaurant.update.mockResolvedValue({});
 
     const result = await service.reviewSubject('u1', 'RESTAURANT', true);
@@ -130,9 +129,9 @@ describe('PartnerKycService', () => {
       address: 'Gombe',
     });
     prisma.partnerKycDocument.findMany.mockResolvedValue([
-      { type: 'MANAGER_ID', status: 'PENDING', notes: null, url: '/a', id: 'd1' },
-      { type: 'RCCM', status: 'PENDING', notes: null, url: '/b', id: 'd2' },
-      { type: 'PREMISES_PHOTO', status: 'PENDING', notes: null, url: '/c', id: 'd3' },
+      { type: 'MANAGER_ID', status: 'APPROVED', notes: null, url: '/a', id: 'd1' },
+      { type: 'RCCM', status: 'APPROVED', notes: null, url: '/b', id: 'd2' },
+      { type: 'PREMISES_PHOTO', status: 'APPROVED', notes: null, url: '/c', id: 'd3' },
     ]);
     (global.fetch as jest.Mock)
       .mockResolvedValueOnce({
@@ -143,13 +142,39 @@ describe('PartnerKycService', () => {
         ok: true,
         json: async () => ({ loginPin: '847291', smsSent: false, emailSent: true, hasPhone: false, hasEmail: true }),
       });
-    prisma.partnerKycDocument.updateMany.mockResolvedValue({ count: 3 });
     prisma.restaurant.update.mockResolvedValue({});
 
     const result = await service.reviewSubject('u1', 'RESTAURANT', true);
     expect(result.loginPin).toBe('847291');
     expect(result.emailSent).toBe(true);
     expect(result.smsSent).toBe(false);
+  });
+
+  it('refuse d\'approuver le dossier si un justificatif n\'est pas encore validé', async () => {
+    prisma.restaurant.findFirst.mockResolvedValue({
+      id: 'r1',
+      ownerUserId: 'u1',
+      kycStatus: 'PENDING',
+      kycNotes: null,
+      nif: 'NIF-1',
+      rccm: 'CD/KIN/RCCM/1',
+      payoutProvider: 'ORANGE_MONEY',
+      payoutPhone: '+243810000001',
+      address: 'Gombe',
+    });
+    prisma.partnerKycDocument.findMany.mockResolvedValue([
+      { type: 'MANAGER_ID', status: 'APPROVED', notes: null, url: '/a', id: 'd1' },
+      { type: 'RCCM', status: 'PENDING', notes: null, url: '/b', id: 'd2' },
+      { type: 'PREMISES_PHOTO', status: 'APPROVED', notes: null, url: '/c', id: 'd3' },
+    ]);
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({ phone: '+243810000001', name: 'Chez Flore' }),
+    });
+    await expect(service.reviewSubject('u1', 'RESTAURANT', true)).rejects.toMatchObject({
+      message: expect.stringMatching(/justificatifs doivent être approuvés/),
+    });
+    expect(prisma.restaurant.update).not.toHaveBeenCalled();
   });
 
   it('attribue chaque justificatif au partenaire (nom, téléphone, type français)', async () => {

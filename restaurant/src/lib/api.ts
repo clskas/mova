@@ -346,6 +346,8 @@ export type RestaurantKycDossier = {
   phoneVerified?: boolean;
   canOperate?: boolean;
   pinConfigured?: boolean;
+  activationPinVerified?: boolean;
+  needsActivationPin?: boolean;
   requiredComplete?: boolean;
   checklist?: KycChecklistItem[];
 };

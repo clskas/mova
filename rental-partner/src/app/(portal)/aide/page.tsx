@@ -7,9 +7,9 @@ const MANUAL = [
   {
     title: "Activer le compte (PIN après KYC)",
     steps: [
-      "Ouvrez https://rental.afri-soft.com/login — carte indigo « PIN d'activation (e-mail / SMS après validation KYC) ».",
-      "Champ e-mail ou +243, puis « Code PIN à 6 chiffres », bouton « Ouvrir la session avec le PIN ».",
-      "Google est plus bas (optionnel). Déjà connecté : « Activer avec le PIN reçu par e-mail ».",
+      "Ouvrez https://rental.afri-soft.com — section « Activer le compte ».",
+      "Saisissez l'e-mail ou le +243, puis le « PIN d'activation (6 chiffres, e-mail après validation KYC) ».",
+      "Cliquez « Activer / Se connecter avec le PIN ». Ne pas confondre avec un OTP Google.",
     ],
   },
   {

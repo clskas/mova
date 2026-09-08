@@ -1181,8 +1181,8 @@ export class WalletService {
     const amount = formatCdf(amountCdf);
     if (operator === 'ORANGE_MONEY') {
       return (
-        `Confirmez le push USSD Orange Money de ${amount} sur ${phone}. ` +
-        `SENGA n’ouvre pas le composeur — le message arrive sur cette ligne Orange.`
+        `Confirmez le push USSD Orange Money de ${amount} sur ${phone} (minimum 2 300 FC). ` +
+        `SENGA n’ouvre pas le composeur — le *144# arrive sur cette ligne Orange.`
       );
     }
     if (operator === 'AIRTEL_MONEY') {

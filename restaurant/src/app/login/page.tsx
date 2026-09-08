@@ -29,7 +29,6 @@ import {
   toUserErrorMessage,
 } from "@/lib/user-messages";
 import {
-  ACTIVATION_PIN_HEADING_FR,
   ActivationPinCard,
   AuthPayload,
   GOOGLE_OPTIONAL_LABEL_FR,
@@ -313,7 +312,6 @@ export default function LoginPage() {
               intent={{ ...INTENT }}
               accentClass="bg-[#FF6B35]"
               highlightClass="border-orange-400 bg-orange-50"
-              heading={ACTIVATION_PIN_HEADING_FR}
               defaultIdentity={phone}
               normalizeIdentity={normalizeLoginPhone}
               onActivated={(data) => finishRestaurantSession(data, "pin")}

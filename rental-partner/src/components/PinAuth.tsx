@@ -75,18 +75,19 @@ export function mustSetupPinAfterPhoneLogin(
 }
 
 export const KYC_PIN_LOGIN_HINT_FR =
-  "Après validation KYC, saisissez le PIN d'activation à 6 chiffres envoyé par e-mail (objet « Votre acces SENGA »).";
+  "Connectez-vous avec Google ou votre téléphone. Le PIN d'activation (e-mail après validation KYC) s'affiche ensuite, une fois connecté.";
 
-export const ACTIVATION_PIN_HEADING_FR =
-  "PIN d'activation (6 chiffres, e-mail après validation KYC)";
+export const ACTIVATION_PIN_HEADING_FR = "Code PIN d'activation";
 
-export const PIN_FIELD_LABEL_FR = "PIN d'activation (6 chiffres, e-mail après validation KYC)";
+export const PIN_FIELD_LABEL_FR = "Code à 6 chiffres";
 
-export const PIN_SUBMIT_LABEL_FR = "Activer / Se connecter avec le PIN";
+export const PIN_SUBMIT_LABEL_FR = "Activer";
 
-export const GOOGLE_OPTIONAL_LABEL_FR = "Ou continuer avec Google (compte déjà lié)";
+export const GOOGLE_OPTIONAL_LABEL_FR = "Continuer avec Google";
 
-export const COMPTE_ACTIVATE_HEADING_FR = "Activer le compte";
+export const LOGIN_CLASSIC_LABEL_FR = "Ou avec téléphone / e-mail";
+
+export const COMPTE_ACTIVATE_HEADING_FR = "Code PIN d'activation";
 
 export const ACTIVATION_PIN_WINDOW_HEADING_FR = "Code PIN d'activation";
 
@@ -171,6 +172,7 @@ export function PinDigitPad({
   accentClass = "bg-indigo-600",
   compact = true,
   autoFocus = false,
+  fieldLabel,
 }: {
   value: string;
   onChange: (next: string) => void;
@@ -178,6 +180,7 @@ export function PinDigitPad({
   accentClass?: string;
   compact?: boolean;
   autoFocus?: boolean;
+  fieldLabel?: string;
 }) {
   const keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "⌫"] as const;
   function press(key: string) {
@@ -191,7 +194,7 @@ export function PinDigitPad({
   return (
     <div data-testid="pin-pad" className="space-y-3">
       <label className="block text-sm">
-        <span className="font-semibold text-gray-800">{PIN_FIELD_LABEL_FR}</span>
+        {fieldLabel ? <span className="font-semibold text-gray-800">{fieldLabel}</span> : null}
         <input
           data-testid="login-pin"
           className="mt-1 w-full rounded-xl border-2 border-gray-300 bg-white p-4 tracking-[0.45em] text-center text-2xl font-semibold"
@@ -239,10 +242,11 @@ export function ActivationPinCard({
   highlightClass,
   defaultIdentity,
   onActivated,
-  heading = COMPTE_ACTIVATE_HEADING_FR,
-  hint,
+  heading = ACTIVATION_PIN_WINDOW_HEADING_FR,
+  hint = ACTIVATION_PIN_WINDOW_HINT_FR,
   lockIdentity = false,
   normalizeIdentity,
+  submitLabel = PIN_SUBMIT_LABEL_FR,
 }: {
   apiBase: string;
   intent: Record<string, string>;
@@ -254,6 +258,7 @@ export function ActivationPinCard({
   hint?: string;
   lockIdentity?: boolean;
   normalizeIdentity?: (raw: string) => string;
+  submitLabel?: string;
 }) {
   const [identity, setIdentity] = useState(defaultIdentity ?? "");
   const [pin, setPin] = useState("");
@@ -266,7 +271,7 @@ export function ActivationPinCard({
 
   async function submit() {
     if (!identity.trim()) {
-      setError("Saisissez votre e-mail ou numéro +243.");
+      setError(lockIdentity ? "Compte non identifié. Reconnectez-vous." : "Saisissez votre e-mail ou numéro +243.");
       return;
     }
     if (pin.length !== 6) {
@@ -294,16 +299,14 @@ export function ActivationPinCard({
     <section data-testid="activation-pin-card" className={`rounded-2xl border-2 p-5 space-y-4 ${highlightClass}`}>
       <div>
         <h2 className="text-lg font-bold text-[#1A1A2E]">{heading}</h2>
-        {hint ? (
-          <p className="text-sm text-gray-700 mt-1">{hint}</p>
-        ) : heading !== ACTIVATION_PIN_HEADING_FR ? (
-          <p className="text-sm text-gray-700 mt-1">{ACTIVATION_PIN_HEADING_FR}</p>
-        ) : null}
+        {hint ? <p className="text-sm text-gray-700 mt-1">{hint}</p> : null}
       </div>
-      {lockIdentity && identity.trim() ? (
-        <p className="text-sm text-gray-600">
-          Compte : <span className="font-medium text-gray-800">{maskPhoneDisplay(identity)}</span>
-        </p>
+      {lockIdentity ? (
+        identity.trim() ? (
+          <p className="text-sm text-gray-600">
+            Compte : <span className="font-medium text-gray-800">{maskPhoneDisplay(identity)}</span>
+          </p>
+        ) : null
       ) : (
         <label className="block text-sm">
           <span className="font-semibold text-gray-800">{LOGIN_IDENTITY_LABEL_FR}</span>
@@ -326,7 +329,7 @@ export function ActivationPinCard({
         disabled={loading}
         accentClass={accentClass}
         compact
-        autoFocus={Boolean(identity.trim())}
+        autoFocus={lockIdentity || Boolean(identity.trim())}
       />
       <button
         type="button"
@@ -335,7 +338,7 @@ export function ActivationPinCard({
         data-testid="activation-submit"
         className={`w-full py-3 rounded-xl text-white font-medium disabled:opacity-60 ${accentClass}`}
       >
-        {loading ? "Activation…" : PIN_SUBMIT_LABEL_FR}
+        {loading ? "Activation…" : submitLabel}
       </button>
       {error && <p className="text-sm text-red-600 text-center">{error}</p>}
     </section>

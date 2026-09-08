@@ -5,11 +5,11 @@ import { fetchCompanyContacts, type CompanyContact } from "@/lib/api";
 
 const MANUAL = [
   {
-    title: "Activer le compte (PIN après KYC)",
+    title: "PIN d'activation après KYC",
     steps: [
-      "Ouvrez https://rental.afri-soft.com — section « Activer le compte ».",
-      "Saisissez l'e-mail ou le +243, puis le « PIN d'activation (6 chiffres, e-mail après validation KYC) ».",
-      "Cliquez « Activer / Se connecter avec le PIN ». Ne pas confondre avec un OTP Google.",
+      "Connectez-vous sur https://rental.afri-soft.com/login avec Google ou votre téléphone — pas avec le PIN KYC.",
+      "Après validation du dossier, une fenêtre « Code PIN d'activation » (6 chiffres) s'affiche une fois connecté.",
+      "Ce code arrive par e-mail. Ce n'est pas un OTP Google. Tant que le dossier n'est pas validé, cette fenêtre n'apparaît pas.",
     ],
   },
   {

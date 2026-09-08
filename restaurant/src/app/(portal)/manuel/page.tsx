@@ -6,11 +6,11 @@ const CHAPTERS = [
   {
     title: "Première connexion et PIN",
     steps: [
-      "Ouvrez https://restaurant.afri-soft.com/login — section « Activer le compte ».",
-      "Saisissez l'e-mail ou le +243, puis le « PIN d'activation (6 chiffres, e-mail après validation KYC) » (e-mail « Votre acces SENGA restaurant », ex. 482917).",
-      "Cliquez « Activer / Se connecter avec le PIN ». Google est plus bas : « Ou continuer avec Google (compte déjà lié) » — ne cliquez pas Google à la place du PIN.",
-      "Après connexion (Google, SMS ou session), si le dossier est validé et que vous n'avez pas encore saisi le PIN KYC, une fenêtre « Code PIN d'activation » bloque le tableau de bord, les commandes et le menu.",
-      "Mon dossier reste accessible pour envoyer les justificatifs — les zones de saisie ne sont plus couvertes par le PIN.",
+      "Ouvrez https://restaurant.afri-soft.com/login — Google, ou téléphone / e-mail (SMS). Ce n'est pas l'écran d'activation.",
+      "Après connexion, si le dossier n'est pas encore validé, ouvrez Mon dossier pour envoyer les justificatifs. Le PIN d'activation n'apparaît pas avant la validation KYC.",
+      "Quand SENGA valide le dossier, un PIN à 6 chiffres arrive par e-mail (objet « Votre acces SENGA restaurant »).",
+      "Une fois connecté, si le dossier est validé et que vous n'avez pas encore saisi ce PIN, la fenêtre « Code PIN d'activation » (6 chiffres seulement) bloque le tableau de bord, les commandes et le menu.",
+      "Mon dossier, Compte et Aide restent accessibles. Ce n'est pas un code Google.",
       "Si le PIN n'arrive pas, l'équipe SENGA le renvoie depuis l'admin (KYC ou fiche Utilisateur) — vérifiez aussi le spam Gmail.",
     ],
   },

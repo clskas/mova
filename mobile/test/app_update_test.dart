@@ -209,25 +209,25 @@ void main() {
       expect(state.showBanner, isTrue);
     });
 
-    test('driver 1.0.5 / 50 is behind advertised Play 1.0.6+51 (name 1.0.5 / code 51)', () {
+    test('driver 1.0.5 / 51 is behind advertised Play 1.0.6+56 (name 1.0.5 / code 56)', () {
       final state = AppUpdateService.parseRemote(
         {
           'passenger': {
             'currentVersion': '1.0.5',
             'minVersion': '1.0.0',
-            'currentVersionCode': 51,
+            'currentVersionCode': 56,
             'storeUrl': 'https://play.google.com/store/apps/details?id=cd.mova.mova.passenger',
           },
           'driver': {
             'currentVersion': '1.0.5',
             'minVersion': '1.0.0',
-            'currentVersionCode': 51,
+            'currentVersionCode': 56,
             'storeUrl': 'https://play.google.com/store/apps/details?id=cd.mova.mova.driver',
           },
         },
         isDriver: true,
         localVersion: '1.0.5',
-        localBuild: 50,
+        localBuild: 51,
       );
       expect(state!.updateAvailable, isTrue);
       expect(state.forceUpdate, isFalse);
@@ -241,7 +241,7 @@ void main() {
           'passenger': {
             'currentVersion': '1.0.5',
             'minVersion': '1.0.0',
-            'currentVersionCode': 51,
+            'currentVersionCode': 56,
             'storeUrl': 'https://play.google.com/store/apps/details?id=cd.mova.mova.passenger',
           },
         },
@@ -259,7 +259,7 @@ void main() {
           'passenger': {
             'currentVersion': '1.0.5',
             'minVersion': '1.0.0',
-            'currentVersionCode': 51,
+            'currentVersionCode': 56,
             'storeUrl': 'https://play.google.com/store/apps/details?id=cd.mova.mova.passenger',
           },
         },

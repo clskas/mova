@@ -2,7 +2,7 @@
 /// Le versionCode Play est `pubspec` / CI (`--build-number` + `--dart-define=APP_BUILD`).
 class AppVersion {
   static const name = '1.0.5';
-  static const build = int.fromEnvironment('APP_BUILD', defaultValue: 51);
+  static const build = int.fromEnvironment('APP_BUILD', defaultValue: 56);
 
   static int compare(String a, String b) {
     List<int> parts(String raw) => raw

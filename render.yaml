@@ -426,11 +426,11 @@ envVarGroups:
         value: "1.0.5"
       - key: MOBILE_MIN_VERSION
         value: "1.0.0"
-      # Live Play production versionCode (1.0.6+51, promoted 2026-09-07). Name stays 1.0.5.
+      # Live Play production versionCode (1.0.6+56, promoted 2026-09-08). Name stays 1.0.5.
       - key: MOBILE_PASSENGER_VERSION_CODE
-        value: "51"
+        value: "56"
       - key: MOBILE_DRIVER_VERSION_CODE
-        value: "51"
+        value: "56"
       - key: MOBILE_MIN_VERSION_CODE
         value: "0"
       - key: PLAY_STORE_PASSENGER_URL

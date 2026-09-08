@@ -20,13 +20,13 @@ const DEFAULT_DRIVER_STORE =
 /**
  * Name floor stays `1.0.5`: Play 1.0.6 AABs still compile `AppVersion.name = '1.0.5'`.
  * Advertising `1.0.6` would show the banner on phones already on latest Play.
- * versionCode floor is last confirmed Play production (`1.0.6+51`,
- * Mobile Release 34132509908 — internal upload then promote to production).
+ * versionCode floor is last confirmed Play production (`1.0.6+56`,
+ * Mobile Release 34205232773 — internal upload then promote to production).
  * Do not advertise a higher code until that AAB is live — otherwise the banner
  * stays after the user installs the latest store build.
  */
 const CURRENT_VERSION_FLOOR = '1.0.5';
-const CURRENT_VERSION_CODE_FLOOR = 51;
+const CURRENT_VERSION_CODE_FLOOR = 56;
 
 function parseVersionCode(raw: string | undefined, fallback: number): number {
   const n = Number.parseInt(raw?.trim() || '', 10);

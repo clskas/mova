@@ -75,44 +75,70 @@ export function mustSetupPinAfterPhoneLogin(
 }
 
 export const KYC_PIN_LOGIN_HINT_FR =
-  "Connectez-vous avec Google ou votre téléphone. Le PIN d'activation (e-mail après validation KYC) s'affiche ensuite, une fois connecté.";
+  "Connectez-vous avec Google ou votre téléphone. Le code PIN de connexion (e-mail après validation KYC) s'affiche ensuite, une fois connecté.";
 
-export const ACTIVATION_PIN_HEADING_FR = "Code PIN d'activation";
+export const ACTIVATION_PIN_HEADING_FR = "Code PIN de connexion";
 
 export const PIN_FIELD_LABEL_FR = "Code à 6 chiffres";
 
-export const PIN_SUBMIT_LABEL_FR = "Activer";
+export const PIN_SUBMIT_LABEL_FR = "Valider";
 
 export const GOOGLE_OPTIONAL_LABEL_FR = "Continuer avec Google";
 
 export const LOGIN_CLASSIC_LABEL_FR = "Ou avec téléphone / e-mail";
 
-export const COMPTE_ACTIVATE_HEADING_FR = "Code PIN d'activation";
+export const COMPTE_ACTIVATE_HEADING_FR = "Code PIN de connexion";
 
-export const ACTIVATION_PIN_WINDOW_HEADING_FR = "Code PIN d'activation";
+export const CONNECTION_PIN_HEADING_FR = "Code PIN de connexion";
+
+export const ACTIVATION_PIN_WINDOW_HEADING_FR = CONNECTION_PIN_HEADING_FR;
 
 export const ACTIVATION_PIN_WINDOW_HINT_FR =
-  "Votre dossier est validé. Saisissez le code à 6 chiffres reçu par e-mail ou SMS pour commencer à travailler. Ce n'est pas un code Google.";
+  "Ce PIN servira pour les prochaines connexions. Saisissez le code à 6 chiffres envoyé par e-mail ou SMS après validation de votre dossier. Ce n'est pas un code Google.";
+
+export const PIN_SETUP_HINT_FR =
+  "Choisissez 6 chiffres pour vos prochaines connexions. Évitez 123456 ou des chiffres identiques. Sans ce PIN, le tableau de bord et les réservations restent bloqués.";
 
 export const LOGIN_IDENTITY_LABEL_FR = "Téléphone (+243) ou e-mail";
 
-const PIN_EXEMPT_PATHS = ["/dossier", "/aide", "/manuel", "/compte"];
+const PIN_HELP_PATHS = ["/aide", "/manuel"];
 
-/** Dossier / aide stay usable; dashboard and reservations stay blocked. */
+/** Aide / manuel stay readable. After a PIN is issued, work pages stay blocked. */
 export function isPartnerPinExemptPath(pathname: string | null | undefined): boolean {
   if (!pathname) return false;
-  return PIN_EXEMPT_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+  return PIN_HELP_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+}
+
+export type PartnerConnectionPinMode = "setup" | "enter" | null;
+
+export function partnerKycIsApproved(status?: string | null, canOperate?: boolean): boolean {
+  if (canOperate === true) return true;
+  return String(status ?? "").trim().toUpperCase() === "APPROVED";
+}
+
+/** Keep in sync with packages/shared/src/partner-connection-pin.ts */
+export function partnerConnectionPinMode(opts: {
+  pinConfigured?: boolean;
+  kycStatus?: string | null;
+  canOperate?: boolean;
+  unlocked: boolean;
+  identity?: string;
+}): PartnerConnectionPinMode {
+  if (opts.unlocked) return null;
+  const id = (opts.identity ?? "").trim();
+  if (SEED_DEMO_PHONE_RE.test(id)) return null;
+  if (opts.pinConfigured === true) return "enter";
+  return "setup";
 }
 
 export function partnerNeedsKycActivationPin(opts: {
   kycStatus?: string | null;
+  canOperate?: boolean;
   unlocked: boolean;
   identity?: string;
+  pinConfigured?: boolean;
 }): boolean {
-  if (opts.unlocked) return false;
-  const id = (opts.identity ?? "").trim();
-  if (SEED_DEMO_PHONE_RE.test(id)) return false;
-  return opts.kycStatus === "APPROVED";
+  return partnerConnectionPinMode(opts) === "enter";
 }
 
 export function PartnerLoginHelp({
@@ -270,7 +296,7 @@ export function ActivationPinCard({
   }, [defaultIdentity]);
 
   async function submit() {
-    if (!identity.trim()) {
+    if (!identity.trim() && !intent.userId) {
       setError(lockIdentity ? "Compte non identifié. Reconnectez-vous." : "Saisissez votre e-mail ou numéro +243.");
       return;
     }
@@ -281,7 +307,11 @@ export function ActivationPinCard({
     setLoading(true);
     setError(null);
     try {
-      const handle = normalizeIdentity ? normalizeIdentity(identity) : identity.trim();
+      const handle = identity.trim()
+        ? normalizeIdentity
+          ? normalizeIdentity(identity)
+          : identity.trim()
+        : "";
       const result = await loginWithPinRequest(apiBase, handle, pin, intent);
       if (!result.ok) {
         throw new Error(result.data.error?.message ?? "PIN incorrect. Réessayez.");
@@ -330,15 +360,16 @@ export function ActivationPinCard({
         accentClass={accentClass}
         compact
         autoFocus={lockIdentity || Boolean(identity.trim())}
+        fieldLabel={PIN_FIELD_LABEL_FR}
       />
       <button
         type="button"
-        disabled={loading || !identity.trim() || pin.length !== 6}
+        disabled={loading || (!identity.trim() && !intent.userId) || pin.length !== 6}
         onClick={() => void submit()}
         data-testid="activation-submit"
         className={`w-full py-3 rounded-xl text-white font-medium disabled:opacity-60 ${accentClass}`}
       >
-        {loading ? "Activation…" : submitLabel}
+        {loading ? "Validation…" : submitLabel}
       </button>
       {error && <p className="text-sm text-red-600 text-center">{error}</p>}
     </section>
@@ -422,12 +453,14 @@ export function PinSetupForm({ apiBase, token, onDone, accentClass, reset }: Pin
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" data-testid="connection-pin-setup">
       <h2 className="text-lg font-semibold text-center text-[#1A1A2E]">
-        {reset ? "Définir un nouveau code PIN" : "Créer votre code PIN"}
+        {reset ? "Définir un nouveau code PIN" : CONNECTION_PIN_HEADING_FR}
       </h2>
       <p className="text-sm text-gray-600 text-center">
-        Obligatoire pour les prochaines connexions. 6 chiffres — évitez 123456 ou des chiffres identiques. Pas d&apos;étape suivante sans enregistrement.
+        {reset
+          ? "Obligatoire pour les prochaines connexions. 6 chiffres — évitez 123456 ou des chiffres identiques."
+          : PIN_SETUP_HINT_FR}
       </p>
       <label className="block text-sm">
         <span className="text-gray-600">Nouveau PIN</span>

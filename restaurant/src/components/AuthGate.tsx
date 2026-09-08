@@ -7,9 +7,10 @@ import {
   ACTIVATION_PIN_WINDOW_HEADING_FR,
   ACTIVATION_PIN_WINDOW_HINT_FR,
   ActivationPinCard,
+  PinSetupForm,
   accountPhone,
   isPartnerPinExemptPath,
-  partnerNeedsKycActivationPin,
+  partnerConnectionPinMode,
   type AuthPayload,
 } from "@/components/PinAuth";
 import { apiFetch, fetchProfile } from "@/lib/api";
@@ -19,7 +20,6 @@ import {
   dropTokenKeepPhone,
   getLastPhone,
   getToken,
-  isPinPending,
   isPinSessionUnlocked,
   isRestaurantRole,
   markPinSessionUnlocked,
@@ -43,6 +43,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [ready, setReady] = useState(false);
+  const [setupToken, setSetupToken] = useState<string | null>(null);
   const [needsActivation, setNeedsActivation] = useState(false);
   const [activateIdentity, setActivateIdentity] = useState("");
 
@@ -52,9 +53,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
       router.replace("/login");
       return;
     }
-    if (isPinPending()) {
-      setPinPending(false);
-    }
+    const sessionToken = token;
     let cancelled = false;
 
     async function check() {
@@ -74,17 +73,30 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
           },
           phoneFromToken() || getLastPhone() || "",
         );
-        const needsPin = partnerNeedsKycActivationPin({
+        const mode = partnerConnectionPinMode({
+          pinConfigured: me.pinConfigured,
           kycStatus: profile?.kycStatus,
+          canOperate: profile?.canOperate,
           unlocked: isPinSessionUnlocked(),
           identity: fallback,
         });
-        if (needsPin) {
+        if (mode === "setup") {
+          setPinPending(true);
+          setSetupToken(sessionToken);
+          setNeedsActivation(false);
+          setReady(true);
+          return;
+        }
+        if (mode === "enter") {
+          setPinPending(false);
+          setSetupToken(null);
           setActivateIdentity(fallback);
           setNeedsActivation(true);
           setReady(true);
           return;
         }
+        setPinPending(false);
+        setSetupToken(null);
         setNeedsActivation(false);
         setReady(true);
       } catch {
@@ -103,7 +115,36 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     };
   }, [router, pathname]);
 
-  if (needsActivation && !isPartnerPinExemptPath(pathname)) {
+  const blockWork = !isPartnerPinExemptPath(pathname);
+
+  if (setupToken && blockWork) {
+    return (
+      <div className="fixed inset-0 z-[10050] bg-gradient-to-br from-orange-50 to-violet-50 overflow-y-auto">
+        <div className="min-h-[100dvh] flex items-start justify-center p-6 pt-10 pb-16">
+          <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-6 sm:p-8">
+            <p className="text-center text-sm text-gray-500 mb-4">SENGA Restaurant</p>
+            <PinSetupForm
+              apiBase={PUBLIC_API_BASE}
+              token={setupToken}
+              accentClass="bg-[#FF6B35]"
+              onDone={() => {
+                setPinPending(false);
+                setSetupToken(null);
+                markPinSessionUnlocked();
+                setNeedsActivation(false);
+                setReady(true);
+              }}
+            />
+            <Link href="/dossier" className="block text-center text-sm text-orange-800 underline mt-4">
+              Ouvrir mon dossier
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (needsActivation && blockWork) {
     return (
       <div className="fixed inset-0 z-[10050] bg-gradient-to-br from-orange-50 to-violet-50 overflow-y-auto">
         <div className="min-h-[100dvh] flex items-start justify-center p-6 pt-10 pb-16">

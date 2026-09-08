@@ -5,11 +5,12 @@ import { fetchCompanyContacts, type CompanyContact } from "@/lib/api";
 
 const MANUAL = [
   {
-    title: "PIN d'activation après KYC",
+    title: "Code PIN de connexion",
     steps: [
-      "Connectez-vous sur https://restaurant.afri-soft.com/login avec Google ou votre téléphone — pas avec le PIN KYC.",
-      "Après validation du dossier, une fenêtre « Code PIN d'activation » (6 chiffres) s'affiche une fois connecté.",
-      "Ce code arrive par e-mail. Ce n'est pas un OTP Google. Tant que le dossier n'est pas validé, cette fenêtre n'apparaît pas.",
+      "Connectez-vous sur https://restaurant.afri-soft.com/login avec Google ou votre téléphone — pas avec un PIN sur l'écran d'accueil.",
+      "Après la première connexion (Google ou téléphone), une fenêtre « Code PIN de connexion » (6 chiffres) s'affiche. Ce PIN servira pour les prochaines connexions.",
+      "Si le dossier n'est pas encore validé, ouvrez Mon dossier, envoyez les justificatifs, puis revenez : le PIN reçu par e-mail ou SMS après KYC s'affiche alors.",
+      "Ce n'est pas un code Google. Aide et Manuel restent accessibles.",
     ],
   },
   {

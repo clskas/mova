@@ -13,7 +13,8 @@ import {
   isRentalPartnerRole,
   normalizeLoginPhone,
   phoneFromToken,
-  markPinSessionUnlocked,
+  isLoginPinConfirmed,
+  markLoginPinConfirmed,
   setPinPending,
   setLastPhone,
   setToken,
@@ -33,14 +34,18 @@ import {
   LOGIN_CLASSIC_LABEL_FR,
   LOGIN_IDENTITY_LABEL_FR,
   PartnerLoginHelp,
+  PIN_SETUP_HINT_FR,
   PinDigitPad,
   PinForgotLink,
   PinSetupForm,
   accountPhone,
   fetchPinEnabled,
   isEmailIdentity,
+  jwtNeedsPinSetup,
   loginWithPinRequest,
   maskPhoneDisplay,
+  mustSetupPinAfterPhoneLogin,
+  shouldRequirePinSetup,
 } from "@/components/PinAuth";
 
 const API_BASE = PUBLIC_API_BASE;
@@ -81,8 +86,9 @@ export default function LoginPage() {
     let cancelled = false;
     void (async () => {
       const token = getToken();
-      if (token && (isPinPending() || setupToken)) {
+      if (token && (isPinPending() || setupToken || jwtNeedsPinSetup(token))) {
         if (!setupToken) setSetupToken(token);
+        setPinPending(true);
         return;
       }
       if (token) {
@@ -126,16 +132,30 @@ export default function LoginPage() {
     const typedPhone = source === "google" ? "" : normalizeLoginPhone(phone);
     const phoneOnAccount = accountPhone(data, typedPhone);
     setToken(data.accessToken, phoneOnAccount || undefined);
-    if (phoneOnAccount) setLastPhone(phoneOnAccount);
-    if (forgotPin) {
+    if (phoneOnAccount) {
+      setLastPhone(phoneOnAccount);
+      if (!phone.trim()) setPhone(phoneOnAccount);
+    }
+    const needsSetup =
+      forgotPin ||
+      mustSetupPinAfterPhoneLogin(data, typedPhone, source === "otp" && !googleChallenge) ||
+      shouldRequirePinSetup(data, phoneOnAccount, data.accessToken);
+    if (needsSetup) {
       setPinPending(true);
       setSetupToken(data.accessToken);
+      setCodeSent(false);
+      setGoogleChallenge(null);
+      return;
+    }
+    if (source !== "pin" && data.pinConfigured === true && !isLoginPinConfirmed()) {
+      setPinMode(true);
+      setCodeSent(false);
+      setGoogleChallenge(null);
+      setPin("");
       return;
     }
     setPinPending(false);
-    if (source === "pin") {
-      markPinSessionUnlocked();
-    }
+    markLoginPinConfirmed();
     router.replace("/");
   }
 
@@ -146,7 +166,7 @@ export default function LoginPage() {
     try {
       const msisdn = normalizeLoginPhone(phone);
       if (isEmailIdentity(msisdn)) {
-        if (!opts?.forceSms && !pinMode && !forgotPin) {
+        if (!opts?.forceSms && !pinMode && !forgotPin && isLoginPinConfirmed()) {
           const enabled = await fetchPinEnabled(API_BASE, msisdn, INTENT);
           if (enabled) {
             setPinMode(true);
@@ -160,7 +180,7 @@ export default function LoginPage() {
         setError("Numéro invalide. Format : +243XXXXXXXXX");
         return;
       }
-      if (!opts?.forceSms && !pinMode && !forgotPin) {
+      if (!opts?.forceSms && !pinMode && !forgotPin && isLoginPinConfirmed()) {
         const enabled = await fetchPinEnabled(API_BASE, msisdn, INTENT);
         if (enabled) {
           setPinMode(true);
@@ -305,15 +325,15 @@ export default function LoginPage() {
           <h1 className="text-2xl font-semibold text-[#1A1A2E]">SENGA Location</h1>
           <p className="text-sm text-gray-600 mt-1">
             {setupToken
-              ? "Créez votre code PIN"
+              ? PIN_SETUP_HINT_FR
               : pinOnly
-                ? `Entrez le code PIN pour ${maskPhoneDisplay(phone)}`
+                ? `Entrez le PIN de connexion pour ${maskPhoneDisplay(phone)}`
                 : forgotPin && codeSent
-                  ? "Code SMS envoyé. Vous définirez ensuite un nouveau PIN."
+                  ? "Code SMS envoyé. Vous définirez ensuite un nouveau PIN de connexion."
                   : forgotPin
                     ? "Récupérez l'accès par SMS (vous pouvez changer de numéro) ou avec Google, puis définissez un nouveau PIN."
                     : googleChallenge
-                      ? "Confirmez le code reçu."
+                      ? "Saisissez le code reçu par e-mail, puis votre PIN de connexion."
                       : "Connectez-vous avec Google ou votre téléphone."}
           </p>
         </div>
@@ -329,7 +349,7 @@ export default function LoginPage() {
                   onDone={() => {
                     setPinPending(false);
                     setForgotPin(false);
-                    markPinSessionUnlocked();
+                    markLoginPinConfirmed();
                     router.replace("/");
                   }}
                 />
@@ -386,7 +406,7 @@ export default function LoginPage() {
                 onChange={setPin}
                 disabled={loading}
                 accentClass="bg-indigo-600"
-                fieldLabel="Code PIN"
+                fieldLabel="PIN de connexion"
                 autoFocus
               />
             )}

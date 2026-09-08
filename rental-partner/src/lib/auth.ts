@@ -2,6 +2,7 @@ const TOKEN_KEY = "mova_rental_partner_token";
 const PIN_PENDING_KEY = "mova_rental_partner_pin_pending";
 const LAST_PHONE_KEY = "mova_rental_partner_last_phone";
 const PIN_UNLOCK_KEY = "mova_rental_partner_pin_login_unlocked";
+const PIN_CONFIRMED_KEY = "mova_rental_partner_login_pin_confirmed";
 
 function storageGet(key: string): string | null {
   if (typeof window === "undefined") return null;
@@ -71,6 +72,15 @@ export function isPinSessionUnlocked(): boolean {
   } catch {
     return false;
   }
+}
+
+export function markLoginPinConfirmed(): void {
+  storageSet(PIN_CONFIRMED_KEY, "1");
+  markPinSessionUnlocked();
+}
+
+export function isLoginPinConfirmed(): boolean {
+  return storageGet(PIN_CONFIRMED_KEY) === "1";
 }
 
 export function clearPinSessionUnlocked(): void {
@@ -160,4 +170,12 @@ export function phoneFromToken(): string | null {
   if (phone) return phone;
   const email = typeof payload?.email === "string" ? payload.email.trim() : "";
   return email || null;
+}
+
+export function userIdFromToken(): string | null {
+  const token = getToken();
+  if (!token) return null;
+  const payload = decodeJwtPayload(token);
+  const sub = payload?.sub;
+  return typeof sub === "string" && sub.trim() ? sub.trim() : null;
 }

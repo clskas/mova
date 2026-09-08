@@ -9,16 +9,18 @@ import {
   accountPhone,
   partnerNeedsKycActivationPin,
 } from "@/components/PinAuth";
-import { apiFetch, fetchProfile } from "@/lib/api";
+import { apiFetch, fetchKyc } from "@/lib/api";
 import { PUBLIC_API_BASE } from "@/lib/public-api-base";
 import {
   RESTAURANT_AUTH_INTENT,
   getLastPhone,
+  isLoginPinConfirmed,
   isPinSessionUnlocked,
-  markPinSessionUnlocked,
+  markLoginPinConfirmed,
   normalizeLoginPhone,
   setLastPhone,
   setToken,
+  userIdFromToken,
 } from "@/lib/auth";
 
 export default function ComptePage() {
@@ -31,15 +33,23 @@ export default function ComptePage() {
     setIdentity(last);
     void (async () => {
       try {
-        const [me, profile] = await Promise.all([
-          apiFetch<{ email?: string; phone?: string }>("/api/users/me"),
-          fetchProfile().catch(() => null),
+        const [me, kyc] = await Promise.all([
+          apiFetch<{ email?: string; phone?: string; pinConfigured?: boolean }>("/api/users/me"),
+          fetchKyc().catch(() => null),
         ]);
         if (!last) setIdentity(me.phone || me.email || "");
+        const pinConfigured =
+          me.pinConfigured === true || kyc?.pinConfigured === true
+            ? true
+            : me.pinConfigured === false && kyc?.pinConfigured !== true
+              ? false
+              : me.pinConfigured ?? kyc?.pinConfigured;
         setShowActivate(
           partnerNeedsKycActivationPin({
-            kycStatus: profile?.kycStatus,
-            unlocked: isPinSessionUnlocked(),
+            pinConfigured,
+            kycStatus: kyc?.kycStatus,
+            canOperate: kyc?.canOperate,
+            unlocked: isLoginPinConfirmed() || isPinSessionUnlocked(),
             identity: last || me.phone || me.email || "",
           }),
         );
@@ -49,13 +59,15 @@ export default function ComptePage() {
     })();
   }, []);
 
+  const uid = userIdFromToken();
+
   return (
     <div className="max-w-lg space-y-4">
       <h2 className="text-xl font-bold">Compte et connexion</h2>
       {showActivate && !activated && (
         <ActivationPinCard
           apiBase={PUBLIC_API_BASE}
-          intent={{ ...RESTAURANT_AUTH_INTENT }}
+          intent={{ ...RESTAURANT_AUTH_INTENT, ...(uid ? { userId: uid } : {}) }}
           accentClass="bg-[#FF6B35]"
           highlightClass="border-[#FF6B35] bg-orange-50"
           heading={ACTIVATION_PIN_WINDOW_HEADING_FR}
@@ -67,7 +79,7 @@ export default function ComptePage() {
             const remembered = accountPhone(data, identity);
             if (data.accessToken) setToken(data.accessToken, remembered || undefined);
             if (remembered) setLastPhone(remembered);
-            markPinSessionUnlocked();
+            markLoginPinConfirmed();
             setActivated(true);
             window.location.replace("/");
           }}

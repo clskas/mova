@@ -141,7 +141,8 @@ const kManualChapters = <ManualChapter>[
     icon: '👤',
     steps: [
       'Ouvrez SENGA. Entrez votre numéro +243, ou continuez avec Google.',
-      'Au premier accès, créez un code PIN à 6 chiffres.',
+      'Téléphone : un code SMS arrive, puis choisissez / confirmez votre PIN de connexion (6 chiffres).',
+      'Google : un code arrive par e-mail (objet « Votre accès SENGA », sans le mot OTP), puis la même fenêtre PIN.',
       'Les prochaines fois, ouvrez l\'app et saisissez ce PIN.',
       'Ne donnez jamais votre PIN de connexion à quelqu\'un.',
     ],
@@ -317,8 +318,9 @@ const kDriverManualChapters = <ManualChapter>[
     title: 'Connexion avec le PIN',
     icon: '🔐',
     steps: [
-      'Après validation, créez ou utilisez votre code PIN à 6 chiffres.',
-      'Ouvrez SENGA Driver et saisissez ce PIN.',
+      'À la première connexion (SMS ou Google), après le code, choisissez / confirmez un PIN de connexion à 6 chiffres.',
+      'Les prochaines fois, ouvrez SENGA Driver et saisissez ce PIN.',
+      'Le PIN d\'activation du dossier (après validation SENGA) est distinct du PIN de connexion.',
       'Ne donnez jamais votre PIN de connexion.',
     ],
   ),

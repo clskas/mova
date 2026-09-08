@@ -350,8 +350,9 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
             MaterialPageRoute(
               builder: (_) => LocalPinSetupScreen(
                 title: _forgotPinRecovery
-                    ? 'Définir un nouveau code PIN'
-                    : 'Créer votre code PIN',
+                    ? pinResetHeadingFr
+                    : connectionPinHeadingFr,
+                reset: _forgotPinRecovery,
                 onCompleted: () async {
                   Navigator.of(context).pop();
                   await widget.onAuthenticated(data);
@@ -490,7 +491,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
           if (_step == PhoneLoginStep.googleOtp) ...[
             Text(
               _googleOtpChannel == 'email'
-                  ? 'Un code a été envoyé par e-mail${_googleDestinationMasked != null && _googleDestinationMasked!.isNotEmpty ? ' ($_googleDestinationMasked)' : ''}. Vérifiez votre boîte de réception.'
+                  ? 'Un code a été envoyé par e-mail${_googleDestinationMasked != null && _googleDestinationMasked!.isNotEmpty ? ' ($_googleDestinationMasked)' : ''} (objet « Votre accès SENGA »). Vérifiez votre boîte de réception.'
                   : 'Un code SMS a été envoyé${_googleDestinationMasked != null && _googleDestinationMasked!.isNotEmpty ? ' ($_googleDestinationMasked)' : ''}.',
               textAlign: TextAlign.center,
               style: TextStyle(color: MovaColors.textSecondary.withValues(alpha: 0.9), fontSize: 13),
@@ -500,8 +501,8 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
           SixDigitPinField(
             controller: _codeController,
             label: _step == PhoneLoginStep.googleOtp && _googleOtpChannel == 'email'
-                ? 'Code OTP reçu par e-mail'
-                : 'Code OTP reçu par SMS',
+                ? 'Code reçu par e-mail'
+                : 'Code reçu par SMS',
             autofocus: true,
             enabled: !_loading,
           ),

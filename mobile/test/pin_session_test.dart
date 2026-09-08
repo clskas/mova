@@ -23,4 +23,10 @@ void main() {
     expect(sessionRequiresPinUnlock(pinConfigured: true, phone: 'marie@gmail.com'), isTrue);
     expect(sessionRequiresPinUnlock(pinConfigured: true, phone: '+243900000010'), isFalse);
   });
+
+  test('first-login PIN copy matches resto/location', () {
+    expect(connectionPinHeadingFr, contains('PIN de connexion'));
+    expect(pinSetupHintFr, contains('Choisissez / confirmez'));
+    expect(pinResetHeadingFr, contains('nouveau code PIN'));
+  });
 }

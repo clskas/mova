@@ -2,6 +2,12 @@
 bool isSeedDemoPhone(String phone) =>
     RegExp(r'^\+2439000000\d{2}$').hasMatch(phone.trim());
 
+/// Same copy as resto/location `CONNECTION_PIN_HEADING_FR` / `PIN_SETUP_HINT_FR`.
+const connectionPinHeadingFr = 'PIN de connexion pour les prochaines connexions';
+const pinSetupHintFr =
+    'Choisissez / confirmez votre PIN de connexion (6 chiffres) pour les prochaines fois.';
+const pinResetHeadingFr = 'Définir un nouveau code PIN';
+
 bool isEmailIdentity(String value) {
   final t = value.trim();
   final at = t.indexOf('@');

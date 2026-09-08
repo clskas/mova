@@ -235,6 +235,48 @@ void main() {
       expect(state.storeUrl, contains('cd.mova.mova.driver'));
     });
 
+    test('56 is behind advertised 57 (same 1.0.5 name)', () {
+      final state = AppUpdateService.parseRemote(
+        {
+          'passenger': {
+            'currentVersion': '1.0.5',
+            'minVersion': '1.0.0',
+            'currentVersionCode': 57,
+            'storeUrl': 'https://play.google.com/store/apps/details?id=cd.mova.mova.passenger',
+          },
+          'driver': {
+            'currentVersion': '1.0.5',
+            'minVersion': '1.0.0',
+            'currentVersionCode': 57,
+            'storeUrl': 'https://play.google.com/store/apps/details?id=cd.mova.mova.driver',
+          },
+        },
+        isDriver: false,
+        localVersion: '1.0.5',
+        localBuild: 56,
+      );
+      expect(state!.updateAvailable, isTrue);
+      expect(state.showBanner, isTrue);
+    });
+
+    test('57 matching advertised 57 hides the banner', () {
+      final state = AppUpdateService.parseRemote(
+        {
+          'passenger': {
+            'currentVersion': '1.0.5',
+            'minVersion': '1.0.0',
+            'currentVersionCode': 57,
+            'storeUrl': 'https://play.google.com/store/apps/details?id=cd.mova.mova.passenger',
+          },
+        },
+        isDriver: false,
+        localVersion: '1.0.5',
+        localBuild: 57,
+      );
+      expect(state!.updateAvailable, isFalse);
+      expect(state.showBanner, isFalse);
+    });
+
     test('driver still sees the banner if the API omits the driver block', () {
       final state = AppUpdateService.parseRemote(
         {

@@ -395,8 +395,9 @@ export class AuthService {
 
   /**
    * Step 1: verify Google ID token.
-   * Restaurant / rental: always email OTP (even if KYC already issued a login PIN),
-   * then the connection-PIN window. Driver, passenger, staff: session JWT, no extra OTP.
+   * Restaurant / rental / passenger / driver: always email OTP
+   * (objet « Votre accès SENGA… », jamais « OTP » / « code PIN »),
+   * then the connection-PIN window. Staff / SUPER_ADMIN: session JWT, no extra OTP.
    */
   async loginWithGoogle(
     idToken: string,
@@ -438,7 +439,7 @@ export class AuthService {
       );
     }
 
-    if (!this.requiresPartnerGoogleEmailOtp(requestedRole, user)) {
+    if (!this.requiresGoogleEmailOtp(requestedRole, user)) {
       return this.finalizeGoogleSession(identity, user, requestedRole);
     }
 
@@ -628,11 +629,18 @@ export class AuthService {
     return (fromIntended as UserRole | undefined) ?? role ?? (fromPortal as UserRole | undefined);
   }
 
-  /** Restaurant / rental Google: always email OTP, then PIN de connexion. Driver/passenger/staff unchanged. */
-  private requiresPartnerGoogleEmailOtp(requestedRole: UserRole | undefined, user: User | null): boolean {
-    if (!isPartnerPortalRole(requestedRole)) return false;
-    if (user && !isPartnerPortalRole(user.role)) return false;
-    return true;
+  /**
+   * Google email OTP then PIN de connexion — same path as resto/location.
+   * Staff keep a direct JWT (admin console / owner allowlist).
+   */
+  private requiresGoogleEmailOtp(requestedRole: UserRole | undefined, user: User | null): boolean {
+    if (user && isStaffAuthRole(user.role)) return false;
+    if (isStaffAuthRole(requestedRole)) return false;
+    if (isPartnerPortalRole(requestedRole)) {
+      if (user && !isPartnerPortalRole(user.role)) return false;
+      return true;
+    }
+    return requestedRole === UserRole.PASSENGER || requestedRole === UserRole.DRIVER;
   }
 
   private accessMailPortal(role?: UserRole | null): SengaAccessMailPortal | undefined {

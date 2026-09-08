@@ -53,7 +53,7 @@ export class AuthController {
   }
 
   @Post('google')
-  @ApiOperation({ summary: 'Connexion Google — OTP e-mail (resto/location 1re fois) puis JWT' })
+  @ApiOperation({ summary: 'Connexion Google — code e-mail (passager/chauffeur/resto/location) puis JWT + PIN' })
   async loginGoogle(@Body() dto: GoogleLoginDto, @Res({ passthrough: true }) res: Response) {
     const result = await this.authService.loginWithGoogle(dto.idToken, dto.role, dto.portal, dto.intendedRole);
     if ('accessToken' in result) {

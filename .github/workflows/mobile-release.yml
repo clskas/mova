@@ -116,11 +116,11 @@ jobs:
         id: playver
         run: |
           set -euo pipefail
-          # Play last published versionCode was 56. This rebuild must be > 56.
-          CODE="${{ github.run_number }}"
-          if [ "$CODE" -lt 57 ]; then CODE=57; fi
+          # Play production is 1.0.6+56 (run 34205232773). This AAB is 57 (PIN after OTP).
+          # Pin 57 so run_number cannot skip or reuse a lower code. Next ship = 58.
+          CODE=57
           echo "code=$CODE" >> "$GITHUB_OUTPUT"
-          echo "Play versionCode=$CODE (pubspec 1.0.6; run_number=${{ github.run_number }})"
+          echo "Play versionCode=$CODE (pubspec 1.0.6+57)"
 
       - name: Build passenger AAB
         working-directory: mobile

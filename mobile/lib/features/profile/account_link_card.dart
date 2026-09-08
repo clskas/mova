@@ -8,6 +8,7 @@ import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_widgets.dart';
 import '../auth/local_pin_setup_screen.dart';
+import '../auth/pin_session.dart';
 import '../auth/widgets/six_digit_pin_field.dart';
 
 const _linkedSnack = 'Compte lié. Vous pouvez vous connecter avec le téléphone ou Google.';
@@ -181,7 +182,7 @@ class _AccountLinkCardState extends ConsumerState<AccountLinkCard> {
           await Navigator.of(context).push(
             MaterialPageRoute(
               builder: (_) => LocalPinSetupScreen(
-                title: 'Créer un code PIN',
+                title: connectionPinHeadingFr,
                 onCompleted: () async {
                   Navigator.of(context).pop();
                 },

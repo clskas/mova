@@ -5,18 +5,21 @@ import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
+import 'pin_session.dart';
 import 'widgets/six_digit_pin_field.dart';
 
-/// Configuration du code PIN local après la première connexion SMS.
+/// PIN de connexion after the first SMS or Google email code — not the driver KYC activation PIN.
 class LocalPinSetupScreen extends ConsumerStatefulWidget {
   const LocalPinSetupScreen({
     super.key,
     required this.onCompleted,
-    this.title = 'Créer votre code PIN',
+    this.title = connectionPinHeadingFr,
+    this.reset = false,
   });
 
   final Future<void> Function() onCompleted;
   final String title;
+  final bool reset;
 
   @override
   ConsumerState<LocalPinSetupScreen> createState() => _LocalPinSetupScreenState();
@@ -99,21 +102,23 @@ class _LocalPinSetupScreenState extends ConsumerState<LocalPinSetupScreen> {
                 ),
           ),
           const SizedBox(height: 8),
-          const Text(
-            '6 chiffres — obligatoire. Évitez 123456 ou des chiffres identiques. Pas d\'étape suivante sans enregistrement.',
+          Text(
+            widget.reset
+                ? 'Obligatoire pour les prochaines connexions. 6 chiffres — évitez 123456 ou des chiffres identiques.'
+                : pinSetupHintFr,
             textAlign: TextAlign.center,
-            style: TextStyle(color: MovaColors.textSecondary),
+            style: const TextStyle(color: MovaColors.textSecondary),
           ),
           const SizedBox(height: 28),
           SixDigitPinField(
             controller: _pinController,
-            label: 'Nouveau code PIN',
+            label: 'Nouveau PIN',
             autofocus: true,
           ),
           const SizedBox(height: 16),
           SixDigitPinField(
             controller: _confirmController,
-            label: 'Confirmer le code PIN',
+            label: 'Confirmer le PIN',
           ),
           if (_error != null) ...[
             const SizedBox(height: 16),
@@ -121,7 +126,7 @@ class _LocalPinSetupScreenState extends ConsumerState<LocalPinSetupScreen> {
           ],
           const SizedBox(height: 24),
           MovaButton(
-            label: 'Enregistrer mon PIN',
+            label: 'Enregistrer le PIN',
             isLoading: _loading,
             onPressed: _pinController.text.trim().length == 6 &&
                     _confirmController.text.trim().length == 6

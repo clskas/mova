@@ -22,8 +22,8 @@ const DEFAULT_DRIVER_STORE =
  * Advertising `1.0.6` would show the banner on phones already on latest Play.
  * versionCode floor is last confirmed Play production (`1.0.6+56`,
  * Mobile Release 34205232773 — internal upload then promote to production).
- * Do not advertise a higher code until that AAB is live — otherwise the banner
- * stays after the user installs the latest store build.
+ * Play 57 (PIN after OTP) must not be advertised here until that AAB is live —
+ * otherwise the banner stays after the user installs the latest store build.
  */
 const CURRENT_VERSION_FLOOR = '1.0.5';
 const CURRENT_VERSION_CODE_FLOOR = 56;

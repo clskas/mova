@@ -7,8 +7,10 @@ import '../../core/api/api_client.dart';
 import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
+import 'driver_activation_pin_screen.dart';
 import 'driver_onboarding_screen.dart';
 import 'driver_home_screen.dart';
+import 'driver_post_login.dart';
 import '../auth/phone_login_panel.dart';
 
 class DriverOtpScreen extends ConsumerWidget {
@@ -19,17 +21,26 @@ class DriverOtpScreen extends ConsumerWidget {
     await ProfileCache.clear();
     if (!context.mounted) return;
     final onboarding = await api.get('/drivers/onboarding');
-    var onboardingDone = false;
+    var target = DriverPostLoginTarget.onboarding;
     if (onboarding case Success(:final data)) {
-      onboardingDone = data['profile']?['onboardingCompleted'] == true;
+      target = driverPostLoginTarget(data);
     }
     if (!context.mounted) return;
     FocusManager.instance.primaryFocus?.unfocus();
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
-        builder: (_) => onboardingDone
-            ? const DriverHomeScreen()
-            : const DriverOnboardingScreen(canSkipToHome: true),
+        builder: (_) => switch (target) {
+          DriverPostLoginTarget.onboarding =>
+            const DriverOnboardingScreen(canSkipToHome: true),
+          DriverPostLoginTarget.activationPin => DriverActivationPinScreen(
+              onActivated: (pinContext) async {
+                Navigator.of(pinContext).pushReplacement(
+                  MaterialPageRoute(builder: (_) => const DriverHomeScreen()),
+                );
+              },
+            ),
+          DriverPostLoginTarget.home => const DriverHomeScreen(),
+        },
       ),
     );
   }

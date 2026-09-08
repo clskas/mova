@@ -20,6 +20,7 @@ class MovaScreen extends StatelessWidget {
     this.scrollable = true,
     this.padding = const EdgeInsets.all(16),
     this.centerContent = false,
+    this.resizeToAvoidBottomInset = true,
   });
 
   final String? title;
@@ -32,6 +33,7 @@ class MovaScreen extends StatelessWidget {
   final EdgeInsets padding;
   /// Centre verticalement le contenu (écrans de connexion OTP).
   final bool centerContent;
+  final bool resizeToAvoidBottomInset;
 
   @override
   Widget build(BuildContext context) {
@@ -49,7 +51,7 @@ class MovaScreen extends StatelessWidget {
     }
 
     return Scaffold(
-      resizeToAvoidBottomInset: true,
+      resizeToAvoidBottomInset: resizeToAvoidBottomInset,
       appBar: (title != null || titleWidget != null)
           ? AppBar(
               title: titleWidget ??

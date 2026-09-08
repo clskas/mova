@@ -23,7 +23,9 @@ import '../profile/profile_screen.dart';
 import '../carpool/carpool_screen.dart';
 import 'active_delivery_screen.dart';
 import 'active_ride_screen.dart';
+import 'driver_activation_pin_screen.dart';
 import 'driver_onboarding_screen.dart';
+import 'driver_post_login.dart';
 import 'driver_earnings_screen.dart';
 import 'kyc_screen.dart';
 import 'driver_ride_history_screen.dart';
@@ -83,7 +85,6 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
   bool _missionAlertsSeeded = false;
   bool _offerAlertsSeeded = false;
   String? _offersError;
-  bool _activationPinDialogOpen = false;
 
   @override
   void initState() {
@@ -315,15 +316,12 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
         if (previousKyc != 'APPROVED' && kycStatus == 'APPROVED' && mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('KYC approuvé — saisissez votre code PIN d\'activation si demandé.'),
+              content: Text('KYC approuvé — saisissez votre PIN d\'activation pour commencer.'),
               backgroundColor: MovaColors.green,
             ),
           );
         }
-        if (_needsActivationPinPrompt(data)) {
-          _maybeShowActivationPin();
-        }
-        _syncProfilePoll(kycStatus);
+        _syncProfilePoll(data);
       case Failure(:final error):
         setState(() {
           _profileError = error.message;
@@ -332,103 +330,16 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
     }
   }
 
-  bool _isActivationPinVerified(Map<String, dynamic>? data) {
-    if (data == null) return false;
-    return data['activationPinVerified'] == true || data['activationPinVerifiedAt'] != null;
+  bool _needsActivationPinPrompt(Map<String, dynamic>? data) {
+    return driverNeedsActivationPin(data);
   }
 
-  bool _needsActivationPinPrompt(Map<String, dynamic> data) {
-    if (_isActivationPinVerified(data)) return false;
-    return data['needsActivationPin'] == true;
-  }
-
-  void _maybeShowActivationPin({bool force = false}) {
-    if (_isActivationPinVerified(_profile)) return;
-    if (_profile?['needsActivationPin'] != true && !force) return;
-    if (!mounted || _activationPinDialogOpen) return;
-    _activationPinDialogOpen = true;
-    final controller = TextEditingController();
-    var submitting = false;
-    showDialog<void>(
-      context: context,
-      barrierDismissible: !force,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          scrollable: true,
-          title: const Text('Code PIN d\'activation'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Text(
-                'Entrez le code à 6 chiffres communiqué par SENGA après validation de votre dossier.',
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: controller,
-                keyboardType: TextInputType.number,
-                maxLength: 6,
-                enabled: !submitting,
-                decoration: const InputDecoration(labelText: 'PIN'),
-              ),
-            ],
-          ),
-          actions: [
-            if (!force)
-              TextButton(
-                onPressed: submitting ? null : () => Navigator.of(ctx, rootNavigator: true).pop(),
-                child: const Text('Plus tard'),
-              ),
-            TextButton(
-              onPressed: submitting
-                  ? null
-                  : () async {
-                      setDialogState(() => submitting = true);
-                      final api = ref.read(apiClientProvider);
-                      final result = await api.post('/drivers/activation-pin', {'pin': controller.text.trim()});
-                      if (!ctx.mounted) return;
-                      switch (result) {
-                        case Success(:final data):
-                          if (mounted) {
-                            setState(() {
-                              _profile = {
-                                ...?_profile,
-                                ...data,
-                                'activationPinVerified': true,
-                                'needsActivationPin': false,
-                              };
-                              _profileError = null;
-                            });
-                          }
-                          Navigator.of(ctx, rootNavigator: true).pop();
-                          await _loadProfile(clearCache: true);
-                          await _connectDriverCashInbox();
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Compte activé — vous pouvez passer en ligne.')),
-                            );
-                          }
-                        case Failure(:final error):
-                          setDialogState(() => submitting = false);
-                          ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(error.message)));
-                      }
-                    },
-              child: submitting
-                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Text('Activer'),
-            ),
-          ],
-        ),
-      ),
-    ).whenComplete(() {
-      controller.dispose();
-      _activationPinDialogOpen = false;
-    });
-  }
-
-  void _syncProfilePoll(String? kycStatus) {
+  void _syncProfilePoll(Map<String, dynamic>? data) {
     _profilePollTimer?.cancel();
-    if (kycStatus != 'APPROVED') {
+    final kycStatus = data?['kycStatus']?.toString();
+    final waitingForKyc = kycStatus != 'APPROVED';
+    final waitingForPin = _needsActivationPinPrompt(data);
+    if (waitingForKyc || waitingForPin) {
       _profilePollTimer = Timer.periodic(const Duration(seconds: 5), (_) {
         if (mounted) _loadProfile(clearCache: true);
       });
@@ -1113,6 +1024,20 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
       return const MovaScreen(
         title: 'SENGA Driver',
         child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_needsActivationPinPrompt(_profile)) {
+      return DriverActivationPinScreen(
+        onActivated: (_) async {
+          await _loadProfile(clearCache: true);
+          await _connectDriverCashInbox();
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Compte activé — vous pouvez passer en ligne.')),
+            );
+          }
+        },
       );
     }
 

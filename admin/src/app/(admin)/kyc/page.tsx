@@ -754,8 +754,8 @@ export default function KycPage() {
       )}
 
       {preview?.url && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setPreview(null)}>
-          <div className="bg-white rounded-2xl p-4 max-w-2xl w-full max-h-[90vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/50 overflow-y-auto overscroll-contain" onClick={() => setPreview(null)}>
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl p-4 max-w-2xl w-full max-h-[min(92dvh,92vh)] min-h-0 overflow-y-auto overscroll-contain pb-[max(1.5rem,env(safe-area-inset-bottom))]" onClick={(e) => e.stopPropagation()}>
             <p className="font-medium mb-1">{kycDocLabel(preview.type, preview.typeLabel)}</p>
             <p className="text-sm text-gray-600 mb-3">
               {preview.partnerKindLabel || "Chauffeur"} {preview.displayName || preview.phone || preview.publicId}

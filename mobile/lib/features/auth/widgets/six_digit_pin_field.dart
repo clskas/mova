@@ -39,6 +39,7 @@ class SixDigitPinField extends StatelessWidget {
         color: MovaColors.midnight,
       ),
       textAlign: TextAlign.center,
+      scrollPadding: const EdgeInsets.fromLTRB(20, 24, 20, 140),
     );
   }
 }

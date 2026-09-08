@@ -52,4 +52,28 @@ void main() {
     expect(tester.widget<MovaButton>(find.widgetWithText(MovaButton, 'Continuer')).onPressed, isNotNull);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('identity fields stay reachable when the keyboard is open', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    tester.view.physicalSize = const Size(360, 640);
+    tester.view.devicePixelRatio = 1.0;
+    tester.view.viewInsets = const FakeViewPadding(bottom: 280);
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetViewInsets();
+    });
+
+    await tester.pumpWidget(_testApp(const DriverOnboardingScreen()));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(find.text('Prénom'), findsOneWidget);
+    expect(find.text('Nom'), findsOneWidget);
+    expect(find.text('Continuer'), findsNothing);
+
+    await tester.enterText(find.byType(TextField).first, 'Jean');
+    await tester.pump();
+    expect(find.text('Jean'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }

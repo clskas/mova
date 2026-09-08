@@ -5,9 +5,11 @@ import '../../core/api/api_client.dart';
 import '../../core/cache/profile_cache.dart';
 import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
+import '../driver/driver_activation_pin_screen.dart';
 import '../driver/driver_home_screen.dart';
 import '../driver/driver_onboarding_screen.dart';
 import '../driver/driver_otp_screen.dart';
+import '../driver/driver_post_login.dart';
 import '../home/home_screen.dart';
 import '../../core/config/market_config.dart';
 import 'local_pin_setup_screen.dart';
@@ -145,7 +147,7 @@ class _DriverHomeResolver extends ConsumerStatefulWidget {
 
 class _DriverHomeResolverState extends ConsumerState<_DriverHomeResolver> {
   bool _loading = true;
-  bool _onboardingDone = false;
+  DriverPostLoginTarget _target = DriverPostLoginTarget.onboarding;
 
   @override
   void initState() {
@@ -157,13 +159,13 @@ class _DriverHomeResolverState extends ConsumerState<_DriverHomeResolver> {
     final api = ref.read(apiClientProvider);
     final onboarding = await api.get('/drivers/onboarding');
     if (!mounted) return;
-    var done = false;
+    var target = DriverPostLoginTarget.onboarding;
     if (onboarding case Success(:final data)) {
-      done = data['profile']?['onboardingCompleted'] == true;
+      target = driverPostLoginTarget(data);
     }
     setState(() {
       _loading = false;
-      _onboardingDone = done;
+      _target = target;
     });
   }
 
@@ -176,8 +178,13 @@ class _DriverHomeResolverState extends ConsumerState<_DriverHomeResolver> {
         ),
       );
     }
-    return _onboardingDone
-        ? const DriverHomeScreen()
-        : const DriverOnboardingScreen(canSkipToHome: true);
+    switch (_target) {
+      case DriverPostLoginTarget.onboarding:
+        return const DriverOnboardingScreen(canSkipToHome: true);
+      case DriverPostLoginTarget.activationPin:
+        return DriverActivationPinScreen(onActivated: (_) => _load());
+      case DriverPostLoginTarget.home:
+        return const DriverHomeScreen();
+    }
   }
 }

@@ -27,7 +27,6 @@ class DriverOnboardingScreen extends ConsumerStatefulWidget {
 }
 
 class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen> {
-  final _pageController = PageController();
   final _picker = ImagePicker();
   int _step = 0;
   bool _loading = false;
@@ -59,6 +58,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
   static const _cguStorageKey = 'driver_onboarding_cgu_accepted';
   static const double _fieldGap = 12;
   static const double _docGap = 12;
+  static const EdgeInsets _fieldScrollPadding = EdgeInsets.fromLTRB(20, 24, 20, 160);
 
   static const _steps = [
     'Identité',
@@ -85,10 +85,6 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
     if (saved == null || saved < 0 || saved >= _steps.length) return;
     if (!mounted) return;
     setState(() => _step = saved);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !_pageController.hasClients) return;
-      _pageController.jumpToPage(saved);
-    });
   }
 
   Future<void> _persistOnboardingStep() async {
@@ -109,7 +105,6 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
 
   @override
   void dispose() {
-    _pageController.dispose();
     _firstName.dispose();
     _lastName.dispose();
     _email.dispose();
@@ -563,7 +558,6 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
           _loading = false;
         });
         await _persistOnboardingStep();
-        _pageController.nextPage(duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
       } else {
         await _finishOnboarding();
       }
@@ -581,15 +575,53 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
     if (_step == 0) return;
     setState(() => _step -= 1);
     _persistOnboardingStep();
-    _pageController.previousPage(duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
+  }
+
+  bool _keyboardOpen(BuildContext context) => MediaQuery.viewInsetsOf(context).bottom > 80;
+
+  Widget _stepScroll({required List<Widget> children}) {
+    final keyboard = MediaQuery.viewInsetsOf(context).bottom;
+    return ListView(
+      physics: kMovaScrollPhysics,
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+      padding: EdgeInsets.only(bottom: 48 + keyboard),
+      children: children,
+    );
+  }
+
+  Widget _kycTextField({
+    required TextEditingController controller,
+    required String label,
+    TextInputType? keyboardType,
+  }) {
+    return TextField(
+      controller: controller,
+      keyboardType: keyboardType,
+      scrollPadding: _fieldScrollPadding,
+      textInputAction: TextInputAction.next,
+      decoration: InputDecoration(labelText: label),
+    );
+  }
+
+  Widget _currentStep() {
+    return switch (_step) {
+      0 => _stepPersonal(),
+      1 => _stepLicense(),
+      2 => _stepVehicle(),
+      3 => _stepCompliance(),
+      4 => _stepPayout(),
+      _ => _stepActivation(),
+    };
   }
 
   @override
   Widget build(BuildContext context) {
     final publicId = _state?['publicId']?.toString();
+    final keyboardOpen = _keyboardOpen(context);
     return MovaScreen(
       title: widget.canSkipToHome ? 'Mon dossier chauffeur' : 'Enregistrement chauffeur',
       scrollable: false,
+      resizeToAvoidBottomInset: false,
       actions: [
         if (widget.canSkipToHome)
           TextButton(
@@ -610,36 +642,37 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
           : Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                if (publicId != null)
+                if (!keyboardOpen && publicId != null)
                   Text(
                     'Identifiant chauffeur : $publicId',
                     style: const TextStyle(fontWeight: FontWeight.bold, color: MovaColors.violet),
                   ),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.link, color: MovaColors.violet),
-                  title: const Text(
-                    'Compte et connexion',
-                    style: TextStyle(fontWeight: FontWeight.w600),
+                if (!keyboardOpen)
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.link, color: MovaColors.violet),
+                    title: const Text(
+                      'Compte et connexion',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    subtitle: const Text('Lier Google ou un numéro +243 — un seul compte chauffeur'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const ProfileScreen(title: 'Compte et connexion'),
+                        ),
+                      );
+                    },
                   ),
-                  subtitle: const Text('Lier Google ou un numéro +243 — un seul compte chauffeur'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const ProfileScreen(title: 'Compte et connexion'),
-                      ),
-                    );
-                  },
-                ),
-                if (_state?['kyc'] != null) ...[
+                if (!keyboardOpen && _state?['kyc'] != null) ...[
                   const SizedBox(height: 8),
                   Text(
                     'Documents : ${_state!['kyc']['checklist'] is List ? (_state!['kyc']['checklist'] as List).where((i) => i is Map && i['required'] == true && i['uploaded'] == true).length : 0}/6 obligatoires',
                     style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
                   ),
                 ],
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
                 LinearProgressIndicator(
                   value: (_step + 1) / _steps.length,
                   backgroundColor: MovaColors.cloud,
@@ -654,54 +687,42 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
                   const SizedBox(height: 12),
                   MovaErrorBanner(message: _error!),
                 ],
-                const SizedBox(height: 16),
-                Expanded(
-                  child: PageView(
-                    controller: _pageController,
-                    physics: const NeverScrollableScrollPhysics(),
+                const SizedBox(height: 12),
+                Expanded(child: _currentStep()),
+                if (!keyboardOpen) ...[
+                  const SizedBox(height: 16),
+                  Row(
                     children: [
-                      _stepPersonal(),
-                      _stepLicense(),
-                      _stepVehicle(),
-                      _stepCompliance(),
-                      _stepPayout(),
-                      _stepActivation(),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    if (_step > 0)
+                      if (_step > 0)
+                        Expanded(
+                          child: MovaButton(
+                            label: 'Retour',
+                            isSecondary: true,
+                            icon: Icons.arrow_back_rounded,
+                            onPressed: _loading ? null : _back,
+                          ),
+                        ),
+                      if (_step > 0) const SizedBox(width: 12),
                       Expanded(
                         child: MovaButton(
-                          label: 'Retour',
-                          isSecondary: true,
-                          icon: Icons.arrow_back_rounded,
-                          onPressed: _loading ? null : _back,
+                          label: _step == _steps.length - 1
+                              ? (_isEditingDossier ? 'Enregistrer' : 'Envoyer le dossier')
+                              : 'Continuer',
+                          icon: Icons.arrow_forward_rounded,
+                          isLoading: _loading,
+                          onPressed: _continueEnabled ? _next : null,
                         ),
                       ),
-                    if (_step > 0) const SizedBox(width: 12),
-                    Expanded(
-                      child: MovaButton(
-                        label: _step == _steps.length - 1
-                            ? (_isEditingDossier ? 'Enregistrer' : 'Envoyer le dossier')
-                            : 'Continuer',
-                        icon: Icons.arrow_forward_rounded,
-                        isLoading: _loading,
-                        onPressed: _continueEnabled ? _next : null,
-                      ),
-                    ),
-                  ],
-                ),
+                    ],
+                  ),
+                ],
               ],
             ),
     );
   }
 
   Widget _stepPersonal() {
-    return ListView(
-      padding: const EdgeInsets.only(bottom: 24),
+    return _stepScroll(
       children: [
         const Text('Informations personnelles', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
         const SizedBox(height: 10),
@@ -710,13 +731,13 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
           style: TextStyle(color: MovaColors.textSecondary, fontSize: 13),
         ),
         const SizedBox(height: 16),
-        TextField(controller: _firstName, decoration: const InputDecoration(labelText: 'Prénom')),
+        _kycTextField(controller: _firstName, label: 'Prénom'),
         const SizedBox(height: _fieldGap),
-        TextField(controller: _lastName, decoration: const InputDecoration(labelText: 'Nom')),
+        _kycTextField(controller: _lastName, label: 'Nom'),
         const SizedBox(height: _fieldGap),
-        TextField(controller: _email, decoration: const InputDecoration(labelText: 'Email')),
+        _kycTextField(controller: _email, label: 'Email', keyboardType: TextInputType.emailAddress),
         const SizedBox(height: _fieldGap),
-        TextField(controller: _idNumber, decoration: const InputDecoration(labelText: 'N° carte d\'identité / passeport')),
+        _kycTextField(controller: _idNumber, label: 'N° carte d\'identité / passeport'),
         const SizedBox(height: 20),
         _docButton('ID_PHOTO', 'Carte d\'identité / passeport'),
         _docButton('SELFIE', 'Photo récente (profil)'),
@@ -725,8 +746,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
   }
 
   Widget _stepLicense() {
-    return ListView(
-      padding: const EdgeInsets.only(bottom: 24),
+    return _stepScroll(
       children: [
         const Text('Permis de conduire', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
         if (_renewalPending) ...[
@@ -746,7 +766,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
           ),
         ],
         const SizedBox(height: 16),
-        TextField(controller: _licenseNumber, decoration: const InputDecoration(labelText: 'N° permis')),
+        _kycTextField(controller: _licenseNumber, label: 'N° permis'),
         const SizedBox(height: _fieldGap),
         _datePickerField(controller: _licenseExpiry, label: 'Date d\'expiration du permis'),
         const SizedBox(height: 12),
@@ -756,16 +776,15 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
   }
 
   Widget _stepVehicle() {
-    return ListView(
-      padding: const EdgeInsets.only(bottom: 24),
+    return _stepScroll(
       children: [
         const Text('Véhicule', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
         const SizedBox(height: 16),
-        TextField(controller: _plate, decoration: const InputDecoration(labelText: 'Plaque d\'immatriculation')),
+        _kycTextField(controller: _plate, label: 'Plaque d\'immatriculation'),
         const SizedBox(height: _fieldGap),
-        TextField(controller: _make, decoration: const InputDecoration(labelText: 'Marque')),
+        _kycTextField(controller: _make, label: 'Marque'),
         const SizedBox(height: _fieldGap),
-        TextField(controller: _model, decoration: const InputDecoration(labelText: 'Modèle')),
+        _kycTextField(controller: _model, label: 'Modèle'),
         const SizedBox(height: _fieldGap),
         DropdownButtonFormField<String>(
           value: _vehicleType,
@@ -843,8 +862,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
   }
 
   Widget _stepCompliance() {
-    return ListView(
-      padding: const EdgeInsets.only(bottom: 24),
+    return _stepScroll(
       children: [
         const Text('Sécurité & conformité', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
         const SizedBox(height: 16),
@@ -899,8 +917,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
   }
 
   Widget _stepPayout() {
-    return ListView(
-      padding: const EdgeInsets.only(bottom: 24),
+    return _stepScroll(
       children: [
         const Text('Informations financières', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
         const SizedBox(height: 16),
@@ -915,9 +932,9 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
           onChanged: (v) => setState(() => _payoutProvider = v ?? 'ORANGE_MONEY'),
         ),
         const SizedBox(height: _fieldGap),
-        TextField(
+        _kycTextField(
           controller: _payoutPhone,
-          decoration: const InputDecoration(labelText: 'Numéro de retrait (+243…)'),
+          label: 'Numéro de retrait (+243…)',
           keyboardType: TextInputType.phone,
         ),
       ],
@@ -926,8 +943,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
 
   Widget _stepActivation() {
     final kycStatus = _state?['profile']?['kycStatus']?.toString() ?? 'PENDING';
-    return ListView(
-      padding: const EdgeInsets.only(bottom: 24),
+    return _stepScroll(
       children: [
         const Text('Activation', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
         const SizedBox(height: 16),

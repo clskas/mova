@@ -13,6 +13,7 @@ import {
   normalizePhoneRdc,
   validatePhoneRdc,
   isDemoUserInsertForbidden,
+  isAdminHiddenPlayAccount,
   isPlayPrelaunchAccount,
   isSeedDemoPhone,
 } from '@mova/shared';
@@ -82,16 +83,19 @@ export class UsersService {
           AND email IS NOT NULL
           AND (
             LOWER(email) LIKE '%@cloudtestlabaccounts.com'
-            OR LOWER(email) ~ '^[a-z0-9]+([._][a-z0-9]+)*\\.[0-9]{5}@gmail\\.com$'
+            OR (
+              role NOT IN ('RESTAURANT', 'RENTAL_PARTNER')
+              AND LOWER(email) ~ '^[a-z0-9]+([._][a-z0-9]+)*\\.[0-9]{5}@gmail\\.com$'
+            )
           )
       `;
       return rows.map((r) => r.id);
     } catch {
       const candidates = await this.prisma.user.findMany({
         where: { phone: null, NOT: { email: null } },
-        select: { id: true, email: true, phone: true, firstName: true, lastName: true },
+        select: { id: true, email: true, phone: true, firstName: true, lastName: true, role: true },
       });
-      return candidates.filter(isPlayPrelaunchAccount).map((u) => u.id);
+      return candidates.filter(isAdminHiddenPlayAccount).map((u) => u.id);
     }
   }
 
@@ -100,10 +104,13 @@ export class UsersService {
       includePlayPrelaunch ? Promise.resolve([] as string[]) : this.playPrelaunchUserIds(),
       this.prisma.user.findMany({
         where: { phone: { startsWith: '+2439000000' } },
-        select: { id: true, phone: true },
+        select: { id: true, phone: true, role: true },
       }),
     ]);
-    const demoIds = demoRows.filter((u) => u.phone && isSeedDemoPhone(u.phone)).map((u) => u.id);
+    const demoIds = demoRows
+      .filter((u) => u.phone && isSeedDemoPhone(u.phone))
+      .filter((u) => u.role !== UserRole.RESTAURANT && u.role !== UserRole.RENTAL_PARTNER)
+      .map((u) => u.id);
     return [...new Set([...playIds, ...demoIds])];
   }
 
@@ -188,6 +195,10 @@ export class UsersService {
     const deleted: string[] = [];
     const skipped: { id: string; reason: string }[] = [];
     for (const user of data) {
+      if (user.role === UserRole.RESTAURANT || user.role === UserRole.RENTAL_PARTNER) {
+        skipped.push({ id: user.id, reason: 'partenaire restaurant / location' });
+        continue;
+      }
       if (!isPlayPrelaunchAccount(user)) {
         skipped.push({ id: user.id, reason: 'hors motif Test Lab' });
         continue;

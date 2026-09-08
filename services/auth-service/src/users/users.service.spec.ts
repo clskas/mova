@@ -107,6 +107,32 @@ describe('UsersService owner lock', () => {
     expect(result.data[0].playPrelaunch).toBe(false);
   });
 
+  it('lists restaurant and rental Google accounts that are not Test Lab', async () => {
+    prisma.$queryRaw.mockResolvedValue([]);
+    prisma.user.findMany.mockImplementation(async (args: { where?: { phone?: { startsWith?: string } } }) => {
+      if (args?.where?.phone?.startsWith === '+2439000000') {
+        return [{ id: 'seed-resto', phone: '+243900000030', role: UserRole.RESTAURANT }];
+      }
+      return [
+        {
+          id: 'resto-1',
+          email: 'chezflore.kin@gmail.com',
+          phone: null,
+          role: UserRole.RESTAURANT,
+          firstName: 'Flore',
+        },
+      ];
+    });
+    prisma.user.count.mockResolvedValue(1);
+    const result = await service.listUsers(0, 50);
+    expect(prisma.user.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: undefined,
+      }),
+    );
+    expect(result.data[0].id).toBe('resto-1');
+  });
+
   it('lists Play Test Lab rows when includePlayPrelaunch is true', async () => {
     prisma.user.findMany.mockImplementation(async (args: { where?: { phone?: { startsWith?: string } } }) => {
       if (args?.where?.phone?.startsWith === '+2439000000') return [];

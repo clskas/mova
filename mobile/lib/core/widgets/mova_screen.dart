@@ -37,7 +37,7 @@ class MovaScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final viewInsets = MediaQuery.viewInsetsOf(context);
+    final viewInsets = scrollable ? MediaQuery.viewInsetsOf(context) : EdgeInsets.zero;
 
     Widget bodyChild = Padding(padding: padding, child: child);
 

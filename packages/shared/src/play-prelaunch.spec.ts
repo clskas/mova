@@ -1,5 +1,7 @@
 import {
+  isAdminHiddenPlayAccount,
   isCloudTestLabEmail,
+  isOfficialPlayTestLabAccount,
   isPlayPrelaunchAccount,
   isPlayPrelaunchDisplayName,
   isPlayVirtualGmail,
@@ -58,5 +60,36 @@ describe('play-prelaunch accounts', () => {
     expect(
       isPlayPrelaunchAccount({ email: 'celestinkas@gmail.com', phone: null }),
     ).toBe(false);
+  });
+
+  it('keeps restaurant and rental Google accounts on Utilisateurs', () => {
+    expect(
+      isAdminHiddenPlayAccount({
+        email: 'chezflore.kin@gmail.com',
+        phone: null,
+        role: 'RESTAURANT',
+      }),
+    ).toBe(false);
+    expect(
+      isAdminHiddenPlayAccount({
+        email: 'flotte.goma.12345@gmail.com',
+        phone: null,
+        role: 'RENTAL_PARTNER',
+      }),
+    ).toBe(false);
+    expect(
+      isOfficialPlayTestLabAccount({
+        email: 'aqwza7hpyxgwc3pve4yeil-lvl-02@cloudtestlabaccounts.com',
+        phone: null,
+        role: 'RESTAURANT',
+      }),
+    ).toBe(true);
+    expect(
+      isAdminHiddenPlayAccount({
+        email: 'aqwza7hpyxgwc3pve4yeil-lvl-02@cloudtestlabaccounts.com',
+        phone: null,
+        role: 'RESTAURANT',
+      }),
+    ).toBe(true);
   });
 });

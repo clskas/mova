@@ -448,9 +448,10 @@ export class AdminService {
     return this.proxy('ride', `/internal/restaurants/${id}`, { method: 'DELETE' });
   }
 
-  listPartnerKycPending(status?: string) {
+  listPartnerKycPending(status?: string, includeHidden = false) {
     const params = new URLSearchParams();
     if (status) params.set('status', status);
+    if (includeHidden) params.set('includeHidden', 'true');
     const q = params.toString();
     return this.fetchJson('ride', `/internal/partner-kyc/pending${q ? `?${q}` : ''}`);
   }

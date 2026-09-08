@@ -22,6 +22,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { UploadsService } from '../uploads/uploads.service';
 import { fetchAuthUserBrief } from '../common/internal-lookup.util';
+import { classifyAdminPartner } from './partner-admin-visibility';
 
 const PHONE_OK = /^\+243\d{9}$/;
 
@@ -47,6 +48,7 @@ export class PartnerKycService {
   async getRestaurantDossier(ownerUserId: string) {
     const restaurant = await this.ensureRestaurant(ownerUserId);
     const user = await fetchAuthUserBrief(ownerUserId);
+    const visibility = classifyAdminPartner(user);
     const types = restaurantKycTypes();
     const checklist = await this.buildChecklist(ownerUserId, PartnerKycSubject.RESTAURANT, types);
     const phoneVerified = PHONE_OK.test(user?.phone?.trim() ?? '');
@@ -76,12 +78,16 @@ export class PartnerKycService {
       pinPending: restaurant.kycStatus === PartnerKycStatus.APPROVED && user?.pinConfigured !== true,
       checklist,
       requiredComplete: this.requiredComplete(checklist) && (phoneVerified || hasEmail),
+      orphan: visibility.reason === 'orphan',
+      hiddenReason: visibility.reason,
+      userRole: visibility.userRole ?? null,
     };
   }
 
   async getRentalDossier(ownerUserId: string) {
     const profile = await this.ensureRentalProfile(ownerUserId);
     const user = await fetchAuthUserBrief(ownerUserId);
+    const visibility = classifyAdminPartner(user);
     const kind = profile.partnerType as RentalPartnerKind;
     const types = rentalKycTypes(kind);
     const checklist = await this.buildChecklist(ownerUserId, PartnerKycSubject.RENTAL_PARTNER, types);
@@ -109,6 +115,9 @@ export class PartnerKycService {
       pinPending: profile.kycStatus === PartnerKycStatus.APPROVED && user?.pinConfigured !== true,
       checklist,
       requiredComplete: this.requiredComplete(checklist) && (phoneVerified || hasEmail),
+      orphan: visibility.reason === 'orphan',
+      hiddenReason: visibility.reason,
+      userRole: visibility.userRole ?? null,
     };
   }
 
@@ -299,7 +308,7 @@ export class PartnerKycService {
     return { ...(await this.getRentalDossier(userId)), kycStatus: PartnerKycStatus.REJECTED, ...notified };
   }
 
-  async listPendingAdmin(status?: string) {
+  async listPendingAdmin(status?: string, includeHidden = false) {
     const normalized = String(status ?? '').trim().toUpperCase();
     const all = normalized === 'ALL';
     const exact =
@@ -392,10 +401,22 @@ export class PartnerKycService {
         email: dossier?.email ?? null,
       };
     });
+    const visibleRestaurants = includeHidden
+      ? restaurantDossiers
+      : restaurantDossiers.filter((d) => !d.hiddenReason);
+    const visibleRentals = includeHidden
+      ? rentalDossiers
+      : rentalDossiers.filter((d) => !d.hiddenReason);
+    const visibleKeys = new Set<string>([
+      ...visibleRestaurants.map((d) => `${d.userId}:RESTAURANT`),
+      ...visibleRentals.map((d) => `${d.userId}:RENTAL_PARTNER`),
+    ]);
     return {
-      restaurants: restaurantDossiers,
-      rentalPartners: rentalDossiers,
-      documents: attributedDocuments,
+      restaurants: visibleRestaurants,
+      rentalPartners: visibleRentals,
+      documents: attributedDocuments.filter(
+        (doc) => !dossierByKey.has(`${doc.userId}:${doc.subject}`) || visibleKeys.has(`${doc.userId}:${doc.subject}`),
+      ),
     };
   }
 

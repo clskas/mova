@@ -618,6 +618,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
 
   Widget _stepScroll({required List<Widget> children}) {
     return ListView(
+      key: PageStorageKey<String>('driver-dossier-step-$_step'),
       physics: kMovaScrollPhysics,
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       padding: const EdgeInsets.only(bottom: 24),
@@ -634,6 +635,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
     TextInputType? keyboardType,
   }) {
     return TextField(
+      key: ValueKey<String>('driver-dossier-$label'),
       controller: controller,
       keyboardType: keyboardType,
       scrollPadding: _fieldScrollPadding,

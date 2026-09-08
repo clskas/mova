@@ -221,6 +221,47 @@ describe('PartnerKycService', () => {
     expect(result.restaurants[0].email).toBe('flore@example.com');
     expect(result.restaurants[0].pinConfigured).toBe(false);
     expect(result.restaurants[0].pinPending).toBe(false);
+    expect(result.restaurants[0].orphan).toBe(false);
+  });
+
+  it('masque un dossier restaurant sans compte auth, sauf fantômes', async () => {
+    prisma.restaurant.findMany.mockResolvedValue([
+      {
+        id: 'r-ghost',
+        name: 'Chez Fantôme',
+        ownerUserId: 'missing-user',
+        kycStatus: 'PENDING',
+        kycNotes: null,
+        address: 'Gombe',
+        nif: null,
+        rccm: null,
+        payoutProvider: null,
+        payoutPhone: null,
+      },
+    ]);
+    prisma.rentalPartnerProfile.findMany.mockResolvedValue([]);
+    prisma.partnerKycDocument.findMany.mockResolvedValue([]);
+    prisma.restaurant.findFirst.mockResolvedValue({
+      id: 'r-ghost',
+      name: 'Chez Fantôme',
+      ownerUserId: 'missing-user',
+      kycStatus: 'PENDING',
+      kycNotes: null,
+      nif: null,
+      rccm: null,
+      payoutProvider: null,
+      payoutPhone: null,
+      address: 'Gombe',
+    });
+    (global.fetch as jest.Mock).mockResolvedValue({ ok: false, json: async () => ({}) });
+
+    const hidden = await service.listPendingAdmin();
+    expect(hidden.restaurants).toHaveLength(0);
+
+    const shown = await service.listPendingAdmin(undefined, true);
+    expect(shown.restaurants).toHaveLength(1);
+    expect(shown.restaurants[0].orphan).toBe(true);
+    expect(shown.restaurants[0].hiddenReason).toBe('orphan');
   });
 
   it('filtre les dossiers partenaires par statut', async () => {

@@ -307,8 +307,14 @@ export class InternalController {
   }
 
   @Get('partner-kyc/pending')
-  partnerKycPending(@Query('status') status?: string) {
-    return this.partnerKyc.listPendingAdmin(status);
+  partnerKycPending(
+    @Query('status') status?: string,
+    @Query('includeHidden') includeHidden?: string,
+  ) {
+    return this.partnerKyc.listPendingAdmin(
+      status,
+      includeHidden === 'true' || includeHidden === '1',
+    );
   }
 
   @Post('partner-kyc/documents/:id/review')

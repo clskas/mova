@@ -244,7 +244,8 @@ export default function UtilisateursPage() {
       <p className="text-sm text-gray-600 mb-4">
         <strong>Utilisateurs</strong> = qui peut se connecter (rôle Passager, Chauffeur, Restaurant, Location, staff).
         <strong> Chauffeurs</strong> = profils véhicule / KYC. Un chauffeur réel a les deux : rôle Chauffeur ici, et une
-        ligne dans Chauffeurs. Les robots Google Play / Test Lab sont masqués des deux listes.
+        ligne dans Chauffeurs. Les partenaires restaurant / location apparaissent ici même sans +243 (connexion Google).
+        Les robots Google Play / Test Lab restent masqués.
       </p>
       {error && <div className="mb-4"><ErrorBanner message={error} onRetry={load} /></div>}
       <div className="space-y-4">

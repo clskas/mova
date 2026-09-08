@@ -2087,6 +2087,9 @@ export type PartnerKycDossier = {
   emailSent?: boolean;
   hasPhone?: boolean;
   hasEmail?: boolean;
+  orphan?: boolean;
+  hiddenReason?: "orphan" | "play_prelaunch" | null;
+  userRole?: string | null;
 };
 
 export async function regeneratePartnerLoginPin(
@@ -2107,9 +2110,10 @@ export async function fetchKycPending(status?: string): Promise<KycItem[]> {
   return Array.isArray(data) ? data : [];
 }
 
-export async function fetchPartnerKycPending(status?: string) {
+export async function fetchPartnerKycPending(status?: string, includeHidden = false) {
   const params = new URLSearchParams();
   if (status) params.set("status", status);
+  if (includeHidden) params.set("includeHidden", "true");
   const q = params.toString();
   return apiFetch<{
     restaurants?: PartnerKycDossier[];

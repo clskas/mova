@@ -196,8 +196,17 @@ function partnerStageLabel(r: PartnerKycDossier) {
   return "Dossier en attente";
 }
 
+function partnerAccountLabel(r: PartnerKycDossier) {
+  if (r.orphan || r.hiddenReason === "orphan") return "Sans compte (fantôme)";
+  if (r.hiddenReason === "play_prelaunch") return "Test Lab";
+  if (r.userRole && r.userRole !== "RESTAURANT" && r.userRole !== "RENTAL_PARTNER") {
+    return `Rôle compte : ${r.userRole}`;
+  }
+  return null;
+}
+
 export default function KycPage() {
-  const { canWrite } = useAdmin();
+  const { canWrite, role } = useAdmin();
   const [items, setItems] = useState<KycItem[]>([]);
   const [pendingDrivers, setPendingDrivers] = useState<AdminDriver[]>([]);
   const [allDrivers, setAllDrivers] = useState<AdminDriver[]>([]);
@@ -210,6 +219,7 @@ export default function KycPage() {
   const [kindFilter, setKindFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("PENDING");
   const [docTypeFilter, setDocTypeFilter] = useState("");
+  const [includeHidden, setIncludeHidden] = useState(false);
   const [pinBanner, setPinBanner] = useState<{ title: string; pin?: string; notice: string } | null>(null);
 
   const load = useCallback(async () => {
@@ -218,8 +228,8 @@ export default function KycPage() {
     try {
       const [data, drivers, partners] = await Promise.all([
         fetchKycPending(statusFilter),
-        fetchDrivers(),
-        fetchPartnerKycPending(statusFilter).catch(() => ({ restaurants: [], rentalPartners: [] })),
+        fetchDrivers(includeHidden),
+        fetchPartnerKycPending(statusFilter, includeHidden).catch(() => ({ restaurants: [], rentalPartners: [] })),
       ]);
       setItems(Array.isArray(data) ? data : []);
       setAllDrivers(drivers);
@@ -238,7 +248,7 @@ export default function KycPage() {
     } finally {
       setLoading(false);
     }
-  }, [statusFilter]);
+  }, [statusFilter, includeHidden]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -511,6 +521,16 @@ export default function KycPage() {
               <option key={o.value || "all-docs"} value={o.value}>{o.label}</option>
             ))}
           </select>
+          {role === "SUPER_ADMIN" && (
+            <label className="flex items-center gap-2 text-sm text-gray-600 px-1">
+              <input
+                type="checkbox"
+                checked={includeHidden}
+                onChange={(e) => setIncludeHidden(e.target.checked)}
+              />
+              Afficher les profils fantômes / Test Lab
+            </label>
+          )}
         </div>
       </div>
       {error && <div className="mb-4"><ErrorBanner message={error} onRetry={load} /></div>}
@@ -627,6 +647,9 @@ export default function KycPage() {
                         <IdentityHeader kind={kind} name={name} phone={r.phone} email={r.email} />
                         <div className="mt-1"><StatusBadge status={r.kycStatus} /></div>
                         <p className="text-xs text-gray-600 mt-1">{partnerStageLabel(r)}</p>
+                        {partnerAccountLabel(r) && (
+                          <p className="text-xs text-amber-800 mt-1">{partnerAccountLabel(r)}</p>
+                        )}
                         {!r.phoneVerified && !r.email?.trim() && (
                           <p className="text-xs text-red-700 mt-1">
                             Liez un +243 ou un e-mail avant d&apos;approuver / pour envoyer le PIN
@@ -695,6 +718,9 @@ export default function KycPage() {
                         <IdentityHeader kind={kind} name={name} phone={r.phone} email={r.email} />
                         <div className="mt-1"><StatusBadge status={r.kycStatus} /></div>
                         <p className="text-xs text-gray-600 mt-1">{partnerStageLabel(r)}</p>
+                        {partnerAccountLabel(r) && (
+                          <p className="text-xs text-amber-800 mt-1">{partnerAccountLabel(r)}</p>
+                        )}
                         {!r.phoneVerified && !r.email?.trim() && (
                           <p className="text-xs text-red-700 mt-1">
                             Liez un +243 ou un e-mail avant d&apos;approuver / pour envoyer le PIN

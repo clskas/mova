@@ -1,7 +1,10 @@
 import { INTERNAL_API_KEY, serviceUrl } from '@mova/shared';
 
 export type UserBrief = {
+  id: string;
   name?: string;
+  firstName?: string;
+  lastName?: string;
   phone?: string;
   email?: string;
   role?: string;
@@ -24,7 +27,10 @@ export async function fetchAuthUserBrief(userId: string): Promise<UserBrief | nu
     };
     const name = [user.firstName, user.lastName].filter(Boolean).join(' ').trim();
     return {
+      id: userId,
       name: name || undefined,
+      firstName: user.firstName,
+      lastName: user.lastName,
       phone: user.phone,
       email: user.email?.trim() || undefined,
       role: user.role,

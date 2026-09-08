@@ -434,8 +434,14 @@ export class AdminController {
   @Get('partner-kyc/pending')
   @RequirePermissions(AdminPermission.KYC_READ)
   @ApiOperation({ summary: 'Dossiers restaurant et location (filtre statut)' })
-  partnerKycPending(@Query('status') status?: string) {
-    return this.adminService.listPartnerKycPending(status);
+  partnerKycPending(
+    @Query('status') status?: string,
+    @Query('includeHidden') includeHidden?: string,
+  ) {
+    return this.adminService.listPartnerKycPending(
+      status,
+      includeHidden === 'true' || includeHidden === '1',
+    );
   }
 
   @Post('partner-kyc/documents/:id/review')

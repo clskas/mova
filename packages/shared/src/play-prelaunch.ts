@@ -33,18 +33,43 @@ export function isPlayPrelaunchDisplayName(firstName?: string | null, lastName?:
   return TEST_LAB_DISPLAY_NAME.test((firstName ?? '').trim()) || TEST_LAB_DISPLAY_NAME.test((lastName ?? '').trim());
 }
 
-/**
- * Safe to hide / list / purge only when there is no phone.
- * A real user who somehow reused a numbered Gmail but added +243 is kept.
- */
-export function isPlayPrelaunchAccount(user: {
+export type PlayPrelaunchUser = {
   email?: string | null;
   phone?: string | null;
   firstName?: string | null;
   lastName?: string | null;
-}): boolean {
+  role?: string | null;
+};
+
+/**
+ * Official Firebase / Play crawler mailbox or display name — never a real RDC partner.
+ * Does not include numbered Gmail (`prenom.nom.12345`) which can collide with a
+ * restaurant / loueur who signed in with Google and has no +243 yet.
+ */
+export function isOfficialPlayTestLabAccount(user: PlayPrelaunchUser): boolean {
   if ((user.phone ?? '').trim()) return false;
   if (isCloudTestLabEmail(user.email)) return true;
-  if (isPlayVirtualGmail(user.email)) return true;
   return isPlayPrelaunchDisplayName(user.firstName, user.lastName);
+}
+
+/**
+ * Safe to hide / list / purge only when there is no phone.
+ * A real user who somehow reused a numbered Gmail but added +243 is kept.
+ */
+export function isPlayPrelaunchAccount(user: PlayPrelaunchUser): boolean {
+  if ((user.phone ?? '').trim()) return false;
+  if (isOfficialPlayTestLabAccount(user)) return true;
+  if (isPlayVirtualGmail(user.email)) return true;
+  return false;
+}
+
+/**
+ * Utilisateurs / KYC default lists: hide Play crawlers, but keep restaurant and
+ * rental partners who signed in with Google (email, no +243).
+ */
+export function isAdminHiddenPlayAccount(user: PlayPrelaunchUser): boolean {
+  if (user.role === 'RESTAURANT' || user.role === 'RENTAL_PARTNER') {
+    return isOfficialPlayTestLabAccount(user);
+  }
+  return isPlayPrelaunchAccount(user);
 }

@@ -252,9 +252,40 @@ export const SERDIPAY_B2C_CHANNEL_DISABLED_FR =
 export const SERDIPAY_CHANNEL_DISABLED_FR =
   'Ce canal Mobile Money n’est pas activé pour le marchand. Contactez le support SENGA.';
 
+/**
+ * Laravel/SerdiPay payment-merchant 401 `{ "message": "Unauthenticated." }`.
+ * Not Nest JWT (`Unauthorized`), not hub HMAC (`Invalid HMAC signature`).
+ */
+export const SERDIPAY_MERCHANT_UNAUTHENTICATED_FR =
+  'Authentification marchand SerdiPay expirée. Réessayez la recharge — ce n’est pas votre session SENGA.';
+export const SERDIPAY_UNAUTHENTICATED_FR = SERDIPAY_MERCHANT_UNAUTHENTICATED_FR;
+
+export function isSerdiPayUnauthenticatedError(raw?: string): boolean {
+  const lower = (raw ?? '').trim().toLowerCase();
+  if (!lower) return false;
+  return /\bunauthenticated\b/.test(lower);
+}
+
+export function isAfriSoftHubHmacError(raw?: string): boolean {
+  const lower = (raw ?? '').trim().toLowerCase();
+  return /invalid hmac|missing afrisoft hub auth|invalid api key|hub_auth_/i.test(lower);
+}
+
+export const AFRISOFT_HUB_HMAC_FR =
+  'Le hub paiements AfriSoft a refusé l’authentification. Réessayez dans un instant.';
+
 /** SerdiPay payment-client (B2C) checks merchant float, not the user SENGA wallet. */
 export const SERDIPAY_B2C_MERCHANT_FLOAT_LOW_FR =
   'Le compte de versement n’a pas assez de fonds. Votre solde SENGA n’a pas été débité.';
+
+/** C2B collect does not debit the user SENGA wallet. */
+export const SERDIPAY_C2B_MERCHANT_FLOAT_LOW_FR =
+  'Le compte d’encaissement SerdiPay n’a pas assez de fonds (float). Aucun push USSD n’a été envoyé. Votre portefeuille SENGA n’a pas été crédité.';
+
+export const SERDIPAY_CHANNEL_DISABLED_GENERIC_FR =
+  'Ce canal Mobile Money n’est pas activé pour le marchand SerdiPay. Aucun push USSD n’a été envoyé. Contactez le support SENGA.';
+export const SERDIPAY_MERCHANT_FLOAT_LOW_GENERIC_FR =
+  'Le compte marchand SerdiPay n’a pas assez de fonds. L’opération Mobile Money n’a pas abouti.';
 
 export function isSerdiPayChannelDisabledError(raw?: string): boolean {
   const lower = (raw ?? '').toLowerCase();
@@ -290,6 +321,13 @@ export function mapSerdiPayPaymentFailure(
 ): string {
   const detail = (error ?? '').trim() || (description ?? '').trim() || (message ?? '').trim();
   const lower = detail.toLowerCase();
+  if (isAfriSoftHubHmacError(detail)) {
+    return AFRISOFT_HUB_HMAC_FR;
+  }
+  // Laravel « Unauthenticated. » only — never Nest JWT « Unauthorized » or hub HMAC.
+  if (isSerdiPayUnauthenticatedError(detail)) {
+    return SERDIPAY_MERCHANT_UNAUTHENTICATED_FR;
+  }
   const range = lower.match(/min\s*:\s*(\d+)\s*-\s*max\s*:\s*(\d+)/i);
   if (lower.includes('not within allowed range') || (status === 402 && range)) {
     const min = range?.[1] ? Number(range[1]) : SERDIPAY_MIN_AMOUNT_CDF;
@@ -297,10 +335,14 @@ export function mapSerdiPayPaymentFailure(
     return `Montant hors plage Mobile Money : minimum ${min.toLocaleString('fr-FR')} FC, maximum ${max.toLocaleString('fr-FR')} FC.`;
   }
   if (isSerdiPayChannelDisabledError(detail)) {
-    return kind === 'c2b' ? SERDIPAY_CHANNEL_DISABLED_FR : SERDIPAY_B2C_CHANNEL_DISABLED_FR;
+    if (kind === 'c2b') return SERDIPAY_CHANNEL_DISABLED_FR;
+    if (kind === 'b2c') return SERDIPAY_B2C_CHANNEL_DISABLED_FR;
+    return SERDIPAY_CHANNEL_DISABLED_GENERIC_FR;
   }
   if (isSerdiPayMerchantFloatLowError(detail)) {
-    return SERDIPAY_B2C_MERCHANT_FLOAT_LOW_FR;
+    if (kind === 'c2b') return SERDIPAY_C2B_MERCHANT_FLOAT_LOW_FR;
+    if (kind === 'b2c') return SERDIPAY_B2C_MERCHANT_FLOAT_LOW_FR;
+    return SERDIPAY_MERCHANT_FLOAT_LOW_GENERIC_FR;
   }
   if (lower.includes('failed to process the payment') && !error?.trim()) {
     return 'Le paiement Mobile Money a été refusé. Vérifiez le montant (≥ 2 300 FC) et réessayez.';
@@ -360,8 +402,11 @@ export async function serdiPayGetAccessToken(
         message: mapSerdiPayTokenFailure(res.status, data.message ?? data.error),
       };
     }
-    // Doc does not specify TTL; refresh proactively after 50 minutes.
-    const ttlSec = typeof data.expires_in === 'number' ? data.expires_in : 3000;
+    // Production (2026-09-08): payment-merchant returned Laravel « Unauthenticated. »
+    // 98s after a successful C2B — a 50-minute cache reused a dead Bearer.
+    // Cap even when expires_in is present; retry-on-401 is the safety net.
+    const rawTtl = typeof data.expires_in === 'number' && data.expires_in > 0 ? data.expires_in : 45;
+    const ttlSec = Math.min(rawTtl, 45);
     cachedToken = { accessToken: String(token), expiresAtMs: now + ttlSec * 1000 };
     return { ok: true, token: String(token) };
   } catch {
@@ -486,7 +531,32 @@ export type SerdiPayMmResult = {
   transactionId: string;
   providerRef: string;
   message?: string;
+  /** Hosted checkout (rare on SerdiPay C2B; CinetPay / some OM rails). */
+  paymentUrl?: string;
+  /** USSD string to dial if the aggregator returns one — never invent *144#. */
+  ussdCode?: string;
 };
+
+/** Copy payment_url / ussd from a SerdiPay JSON body only when present. Do not invent *144#. */
+export function extractSerdiPayPaymentPrompt(data: Record<string, unknown>): {
+  paymentUrl?: string;
+  ussdCode?: string;
+} {
+  const payment = data.payment && typeof data.payment === 'object' ? (data.payment as Record<string, unknown>) : {};
+  const urlKeys = ['payment_url', 'paymentUrl', 'checkout_url', 'checkoutUrl'];
+  const ussdKeys = ['ussd', 'ussd_code', 'ussdCode'];
+  const pick = (obj: Record<string, unknown>, keys: string[]): string | undefined => {
+    for (const k of keys) {
+      const v = obj[k];
+      if (typeof v === 'string' && v.trim()) return v.trim();
+    }
+    return undefined;
+  };
+  return {
+    paymentUrl: pick(data, urlKeys) ?? pick(payment, urlKeys),
+    ussdCode: pick(data, ussdKeys) ?? pick(payment, ussdKeys),
+  };
+}
 
 function paymentCredentials(get: EnvGetter):
   | { ok: true; apiId: string; apiPassword: string; merchantCode: string; merchantPin: string }
@@ -515,6 +585,7 @@ async function postMerchantPayment(
   defaultPath: string,
   params: { operator: MobileMoneyOperator; amountCdf: number; phone: string; reference: string },
   kind: 'c2b' | 'b2c',
+  retryAuth = true,
 ): Promise<SerdiPayMmResult> {
   const creds = paymentCredentials(get);
   if (creds.ok === false) {
@@ -551,7 +622,7 @@ async function postMerchantPayment(
       }),
     });
 
-    const data = (await res.json().catch(() => ({}))) as {
+    const data = (await res.json().catch(() => ({}))) as Record<string, unknown> & {
       success?: boolean;
       status?: string | number;
       message?: string;
@@ -563,6 +634,8 @@ async function postMerchantPayment(
         status?: string;
         sessionId?: string | number;
         transactionId?: string;
+        payment_url?: string;
+        ussd?: string;
       };
     };
 
@@ -580,6 +653,15 @@ async function postMerchantPayment(
       data.payment?.status === 'failed';
 
     if (!accepted || failedStatus) {
+      const payloadMsg = [data.message, data.error, data.description].filter(Boolean).join(' | ');
+      if (
+        retryAuth &&
+        (res.status === 401 || isSerdiPayUnauthenticatedError(payloadMsg))
+      ) {
+        cachedToken = null;
+        return postMerchantPayment(get, pathKey, defaultPath, params, kind, false);
+      }
+      cachedToken = null;
       return {
         success: false,
         transactionId: '',
@@ -594,6 +676,8 @@ async function postMerchantPayment(
       };
     }
 
+    const prompt = extractSerdiPayPaymentPrompt(data);
+    cachedToken = null;
     const txId =
       data.payment?.transactionId ??
       data.transactionId ??
@@ -607,6 +691,8 @@ async function postMerchantPayment(
       success: true,
       transactionId: String(txId),
       providerRef,
+      ...(prompt.paymentUrl ? { paymentUrl: prompt.paymentUrl } : {}),
+      ...(prompt.ussdCode ? { ussdCode: prompt.ussdCode } : {}),
       message:
         data.message ??
         data.description ??

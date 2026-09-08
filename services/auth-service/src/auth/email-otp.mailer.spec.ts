@@ -20,6 +20,7 @@ import {
   smtpTlsConnectOptions,
   smtpTlsServername,
 } from './email-otp.mailer';
+import { otpSmsText } from './sms.providers';
 
 describe('smtpReplyComplete', () => {
   it('waits for the last EHLO line (250 space, not 250-)', () => {
@@ -112,6 +113,13 @@ describe('sengaAccessMailCopy', () => {
     expect(copy.html).toContain('rental.afri-soft.com');
     expect(copy.text).not.toContain('restaurant.afri-soft.com');
     expect(copy.html).not.toContain('restaurant.afri-soft.com');
+  });
+
+  it('SMS OTP copy never lists restaurant or rental URLs', () => {
+    const sms = otpSmsText('SENGA', '319027');
+    expect(sms).not.toContain('rental.afri-soft.com');
+    expect(sms).not.toContain('restaurant.afri-soft.com');
+    expect(sms).not.toMatch(/Location/i);
   });
 });
 

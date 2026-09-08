@@ -20,6 +20,17 @@ export const MARKET_RDC = {
     { id: 'AIRTEL_MONEY', name: 'Airtel Money', color: '#ED1C24' },
   ] as const,
 
+  /**
+   * RDC MSISDN prefixes (2 digits after +243). Rails follow the SIM operator.
+   * Orange 80/84/85/89 · Vodacom 81/82/83 · Airtel 97/98/99 · Africell 90/91.
+   */
+  mmPrefixes: {
+    ORANGE_MONEY: ['80', '84', '85', '89'],
+    MPESA: ['81', '82', '83'],
+    AIRTEL_MONEY: ['97', '98', '99'],
+    AFRIMONEY: ['90', '91'],
+  } as const,
+
   vehicleTypes: [
     { id: 'MOTO_TAXI', label: 'Moto-taxi', mobileId: 'MOTO', priority: 1 },
     { id: 'STANDARD', label: 'Standard', mobileId: 'STANDARD', priority: 2 },
@@ -174,6 +185,66 @@ export function formatCdf(amount: number): string {
 
 export function validatePhoneRdc(phone: string): boolean {
   return MARKET_RDC.phoneRegex.test(phone);
+}
+
+export type RdcMobileMoneyOperatorId = keyof typeof MARKET_RDC.mmPrefixes;
+
+export function rdcMsisdnPrefix(phone: string): string | null {
+  const n = normalizePhoneRdc(phone);
+  if (!validatePhoneRdc(n)) return null;
+  return n.slice(4, 6);
+}
+
+export function rdcMobileMoneyOperatorMismatchFr(
+  operator: string,
+  phone: string,
+): string | null {
+  const key = mapRdcMmOperatorId(operator);
+  const prefix = rdcMsisdnPrefix(phone);
+  if (!prefix) {
+    return 'Numéro Mobile Money invalide. Format : +243XXXXXXXXX (pas un e-mail).';
+  }
+  if (!key) return null;
+  const prefixes = MARKET_RDC.mmPrefixes[key];
+  if ((prefixes as readonly string[]).includes(prefix)) return null;
+  const knownOther = (
+    Object.entries(MARKET_RDC.mmPrefixes) as Array<[RdcMobileMoneyOperatorId, readonly string[]]>
+  ).some(([op, ps]) => op !== key && ps.includes(prefix));
+  if (!knownOther) return null;
+  const list = prefixes.join(', ');
+  switch (key) {
+    case 'ORANGE_MONEY':
+      return (
+        `Ce numéro n’est pas un numéro Orange Money (préfixes ${list}). ` +
+        'Saisissez le numéro de la SIM Orange — le push USSD arrive sur CE numéro, pas sur une autre SIM.'
+      );
+    case 'MPESA':
+      return (
+        `Ce numéro n’est pas un numéro Vodacom M-Pesa (préfixes ${list}). ` +
+        'Saisissez le numéro de la SIM Vodacom — le push USSD arrive sur CE numéro.'
+      );
+    case 'AIRTEL_MONEY':
+      return (
+        `Ce numéro n’est pas un numéro Airtel Money (préfixes ${list}). ` +
+        'Saisissez le numéro de la SIM Airtel — le push USSD arrive sur CE numéro.'
+      );
+    case 'AFRIMONEY':
+      return (
+        `Ce numéro n’est pas un numéro AfriMoney (préfixes ${list}). ` +
+        'Saisissez le numéro de la SIM Africell.'
+      );
+    default:
+      return 'Opérateur Mobile Money et numéro ne correspondent pas.';
+  }
+}
+
+function mapRdcMmOperatorId(operator: string): RdcMobileMoneyOperatorId | null {
+  const p = operator.trim().toUpperCase();
+  if (p === 'ORANGE_MONEY' || p === 'ORANGE' || p === 'OM') return 'ORANGE_MONEY';
+  if (p === 'MPESA' || p === 'M-PESA' || p === 'MP') return 'MPESA';
+  if (p === 'AIRTEL_MONEY' || p === 'AIRTEL' || p === 'AM') return 'AIRTEL_MONEY';
+  if (p === 'AFRIMONEY' || p === 'AF') return 'AFRIMONEY';
+  return null;
 }
 
 /** Google-only PIN login: anything with `@` is an e-mail, even if dots were stripped. */

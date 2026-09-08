@@ -4,6 +4,7 @@ import {
   formatCdf,
   isEmailLoginHandle,
   parseLoginHandle,
+  rdcMobileMoneyOperatorMismatchFr,
 } from './market-rdc.config';
 
 describe('Market RDC Config', () => {
@@ -22,6 +23,12 @@ describe('Market RDC Config', () => {
     expect(normalizePhoneRdc('+243-900-000-031')).toBe('+243900000031');
     expect(normalizePhoneRdc(undefined as unknown as string)).toBe('');
     expect(normalizePhoneRdc(null as unknown as string)).toBe('');
+  });
+
+  it('rejects Orange Money on an Airtel MSISDN (USSD would not open on the Orange SIM)', () => {
+    expect(rdcMobileMoneyOperatorMismatchFr('ORANGE_MONEY', '+243970000001')).toMatch(/Orange Money/i);
+    expect(rdcMobileMoneyOperatorMismatchFr('ORANGE_MONEY', '+243840000001')).toBeNull();
+    expect(rdcMobileMoneyOperatorMismatchFr('AIRTEL_MONEY', '+243970000001')).toBeNull();
   });
 
   it('should format CDF amounts', () => {
@@ -44,5 +51,12 @@ describe('Market RDC Config', () => {
     expect(parseLoginHandle('+243')).toBeNull();
     expect(parseLoginHandle('')).toBeNull();
     expect(parseLoginHandle(undefined, 'nope')).toBeNull();
+  });
+
+  it('rejects a Vodacom MSISDN for Orange Money C2B (USSD would not hit the Orange SIM)', () => {
+    expect(rdcMobileMoneyOperatorMismatchFr('ORANGE_MONEY', '+243812345678')).toMatch(/Orange Money/);
+    expect(rdcMobileMoneyOperatorMismatchFr('ORANGE_MONEY', '+243890000001')).toBeNull();
+    expect(rdcMobileMoneyOperatorMismatchFr('ORANGE_MONEY', 'marie@gmail.com')).toMatch(/invalide|e-mail/i);
+    expect(rdcMobileMoneyOperatorMismatchFr('MPESA', '+243812345678')).toBeNull();
   });
 });

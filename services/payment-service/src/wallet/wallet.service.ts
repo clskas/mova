@@ -21,6 +21,7 @@ import {
   isTestOtpAllowedForPhone,
   mapSmsDeliveryFailureToUserMessage,
   normalizePhoneRdc,
+  rdcMobileMoneyOperatorMismatchFr,
   SERDIPAY_MIN_AMOUNT_CDF,
   serdiPaySanitizeSmsText,
   timingSafeEqualString,
@@ -541,7 +542,6 @@ export class WalletService {
         `Minimum SerdiPay : ${SERDIPAY_MIN_AMOUNT_CDF.toLocaleString('fr-FR')} FC.`,
       );
     }
-    await this.acquireTopUpLock(userId, amountCdf);
     const providerKey = (provider ?? '').trim().toUpperCase();
     if (!providerKey) {
       throw new MovaHttpException(
@@ -550,31 +550,8 @@ export class WalletService {
         'Opérateur Mobile Money requis (ORANGE_MONEY, MPESA, AIRTEL_MONEY ou AFRIMONEY).',
       );
     }
+    await this.acquireTopUpLock(userId, amountCdf, providerKey);
     const ref = afrisoftHubReference('senga', 'topup', randomUUID());
-
-    const walletForLock = await this.createWallet(userId);
-    const recentPending = await this.prisma.walletTransaction.findFirst({
-      where: {
-        walletId: walletForLock.id,
-        type: 'TOPUP_PENDING',
-        amountCdf,
-        createdAt: { gte: new Date(Date.now() - 2 * 60 * 1000) },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-    if (recentPending) {
-      return {
-        success: true,
-        simulated: false,
-        pendingMobileMoney: true,
-        message: 'Recharge déjà en cours — confirmez sur votre téléphone ou patientez 2 minutes.',
-        amountCdf,
-        provider: providerKey,
-        balanceCdf: walletForLock.balanceCdf,
-        formattedBalance: formatCdf(walletForLock.balanceCdf),
-        providerRef: recentPending.reference ?? ref,
-      };
-    }
 
     if (providerKey === 'MOCK') {
       this.assertMockAllowed();
@@ -596,8 +573,16 @@ export class WalletService {
     if (!phoneTrimmed) {
       throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Numéro Mobile Money requis.');
     }
+    const normalizedPhone = normalizePhoneRdc(phoneTrimmed);
+    if (!validatePhoneRdc(normalizedPhone)) {
+      throw new MovaHttpException(MovaErrorCode.AUTH_INVALID_PHONE, HttpStatus.BAD_REQUEST);
+    }
+    const mismatch = rdcMobileMoneyOperatorMismatchFr(operator, normalizedPhone);
+    if (mismatch) {
+      throw new MovaHttpException(MovaErrorCode.PAYMENT_INVALID_METHOD, undefined, mismatch);
+    }
 
-    const mm = await initiateViaGateway(this.config, operator, amountCdf, phoneTrimmed, ref, 'topup');
+    const mm = await initiateViaGateway(this.config, operator, amountCdf, normalizedPhone, ref, 'topup');
     if (!mm) {
       this.assertMockAllowed();
       const wallet = await this.credit(userId, amountCdf, `Recharge ${provider} (simulation)`, ref);
@@ -634,13 +619,14 @@ export class WalletService {
         success: true,
         simulated: false,
         pendingMobileMoney: true,
-        message: mm.message ?? `Confirmez la recharge de ${formatCdf(amountCdf)} sur votre téléphone.`,
+        message: this.c2bPendingUserMessage(operator, amountCdf, normalizedPhone, mm.message),
         amountCdf,
         provider,
         balanceCdf: wallet.balanceCdf,
         formattedBalance: formatCdf(wallet.balanceCdf),
         providerRef,
         ...(paymentUrl ? { paymentUrl } : {}),
+        ...(mm.ussdCode ? { ussdCode: mm.ussdCode } : {}),
       };
     }
 
@@ -815,6 +801,10 @@ export class WalletService {
     const normalizedPhone = normalizePhoneRdc(rawPhone);
     if (!validatePhoneRdc(normalizedPhone)) {
       throw new MovaHttpException(MovaErrorCode.AUTH_INVALID_PHONE, HttpStatus.BAD_REQUEST);
+    }
+    const mismatch = rdcMobileMoneyOperatorMismatchFr(normalizedProvider, normalizedPhone);
+    if (mismatch) {
+      throw new MovaHttpException(MovaErrorCode.PAYMENT_INVALID_METHOD, undefined, mismatch);
     }
     if (amountCdf < SERDIPAY_MIN_AMOUNT_CDF) {
       throw new MovaHttpException(
@@ -1177,8 +1167,28 @@ export class WalletService {
     return { found: true, status: 'COMPLETED', balanceCdf: wallet.balanceCdf };
   }
 
-  private topUpLockKey(userId: string, amountCdf: number) {
-    return `${TOPUP_LOCK_PREFIX}${userId}:${amountCdf}`;
+  private topUpLockKey(userId: string, amountCdf: number, providerKey: string) {
+    return `${TOPUP_LOCK_PREFIX}${userId}:${providerKey}:${amountCdf}`;
+  }
+
+  /** Orange C2B: SENGA never opens the dialer — the USSD push must hit this MSISDN. */
+  private c2bPendingUserMessage(
+    operator: MobileMoneyOperator,
+    amountCdf: number,
+    phone: string,
+    gatewayMessage?: string,
+  ): string {
+    const amount = formatCdf(amountCdf);
+    if (operator === 'ORANGE_MONEY') {
+      return (
+        `Confirmez le push USSD Orange Money de ${amount} sur ${phone}. ` +
+        `SENGA n’ouvre pas le composeur — le message arrive sur cette ligne Orange.`
+      );
+    }
+    if (operator === 'AIRTEL_MONEY') {
+      return `Confirmez le push USSD Airtel Money de ${amount} sur ${phone}.`;
+    }
+    return gatewayMessage?.trim() || `Confirmez la recharge de ${amount} sur votre téléphone (${phone}).`;
   }
 
   /** Short Redis lock so a double-tap cannot open two C2B / B2C. Fail-closed if Redis is down. */
@@ -1215,9 +1225,9 @@ export class WalletService {
   }
 
   /** Short Redis lock (60s) so a double-tap cannot open two C2B. Fail-closed if Redis is down. */
-  private async acquireTopUpLock(userId: string, amountCdf: number) {
+  private async acquireTopUpLock(userId: string, amountCdf: number, providerKey: string) {
     await this.acquireMoneyLock(
-      this.topUpLockKey(userId, amountCdf),
+      this.topUpLockKey(userId, amountCdf, providerKey),
       TOPUP_LOCK_TTL_SEC,
       'Recharge déjà en cours — patientez une minute.',
     );

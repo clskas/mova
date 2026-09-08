@@ -1,9 +1,14 @@
 import {
+  extractSerdiPayPaymentPrompt,
   mapSerdiPayPaymentFailure,
   mapSerdiPayTokenFailure,
   SERDIPAY_B2C_CHANNEL_DISABLED_FR,
   SERDIPAY_B2C_MERCHANT_FLOAT_LOW_FR,
+  SERDIPAY_C2B_MERCHANT_FLOAT_LOW_FR,
   SERDIPAY_CHANNEL_DISABLED_FR,
+  AFRISOFT_HUB_HMAC_FR,
+  SERDIPAY_CHANNEL_DISABLED_GENERIC_FR,
+  SERDIPAY_MERCHANT_UNAUTHENTICATED_FR,
   SERDIPAY_MIN_AMOUNT_CDF,
   __resetSerdiPayTokenCache,
   isSerdiPayAuthConfigured,
@@ -11,6 +16,7 @@ import {
   isSerdiPayMerchantFloatLowError,
   isSerdiPayPaymentConfigured,
   isSerdiPaySmsConfigured,
+  isSerdiPayUnauthenticatedError,
   serdiPayDisburseMobileMoney,
   serdiPayGetAccessToken,
   serdiPayInitiateMobileMoney,
@@ -49,6 +55,54 @@ describe('serdipay Public API', () => {
     expect(serdiPayTelecomCode('AFRIMONEY')).toBe('AF');
     expect(serdiPayTelecomCode('MP')).toBe('MP');
     expect(serdiPayTelecomCode('OM')).toBe('OM');
+  });
+
+  it('forwards a SerdiPay C2B payment_url / ussd when the JSON actually has one', async () => {
+    env.SERDIPAY_EMAIL = 'm@example.com';
+    env.SERDIPAY_PASSWORD = 'secret';
+    env.SERDIPAY_API_ID = 'APIX';
+    env.SERDIPAY_API_PASSWORD = 'apipw';
+    env.SERDIPAY_MERCHANT_CODE = '466551';
+    env.SERDIPAY_MERCHANT_PIN = '1234';
+
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ access_token: 'tok-abc' }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 102,
+        json: async () => ({
+          message: 'ok',
+          payment: {
+            status: 'pending',
+            transactionId: 'OM1',
+            payment_url: 'https://pay.example/om',
+            ussd: '*144*4*6#',
+          },
+        }),
+      });
+    (global as unknown as { fetch: typeof fetch }).fetch = fetchMock as unknown as typeof fetch;
+
+    const result = await serdiPayInitiateMobileMoney(get, {
+      operator: 'ORANGE_MONEY',
+      amountCdf: 2300,
+      phone: '+243890000001',
+      reference: 'senga_topup_om',
+    });
+    expect(result.success).toBe(true);
+    expect(result.paymentUrl).toBe('https://pay.example/om');
+    expect(result.ussdCode).toBe('*144*4*6#');
+    const payBody = JSON.parse(fetchMock.mock.calls[1][1].body as string);
+    expect(payBody.telecom).toBe('OM');
+    expect(payBody.clientPhone).toBe('243890000001');
+  });
+
+  it('does not invent a USSD code when SerdiPay only returns a tx id', () => {
+    expect(extractSerdiPayPaymentPrompt({ payment: { transactionId: 'X' } })).toEqual({});
   });
 
   it('requires full payment credentials for MM gateway', () => {
@@ -254,6 +308,11 @@ describe('serdipay Public API', () => {
     );
     expect(SERDIPAY_B2C_MERCHANT_FLOAT_LOW_FR).toMatch(/compte de versement/i);
     expect(SERDIPAY_B2C_MERCHANT_FLOAT_LOW_FR).toMatch(/n’a pas été débité|n'a pas été débité/);
+    expect(mapSerdiPayPaymentFailure(400, 'Your Balance is low', 'Your Balance is low', undefined, 'c2b')).toBe(
+      SERDIPAY_C2B_MERCHANT_FLOAT_LOW_FR,
+    );
+    expect(SERDIPAY_C2B_MERCHANT_FLOAT_LOW_FR).toMatch(/encaissement/i);
+    expect(SERDIPAY_C2B_MERCHANT_FLOAT_LOW_FR).toMatch(/Aucun push USSD/i);
     expect(SERDIPAY_B2C_MERCHANT_FLOAT_LOW_FR).not.toMatch(/Your Balance is low/i);
   });
 
@@ -319,6 +378,67 @@ describe('serdipay Public API', () => {
     expect(mapSerdiPayTokenFailure(400, 'Failed to get the token')).toMatch(/Authentification marchand/);
   });
 
+  it('maps Laravel Unauthenticated to French merchant-auth (not SENGA session)', () => {
+    expect(isSerdiPayUnauthenticatedError('Unauthenticated.')).toBe(true);
+    expect(mapSerdiPayPaymentFailure(401, 'Unauthenticated.', 'Unauthenticated.', undefined, 'c2b')).toBe(
+      SERDIPAY_MERCHANT_UNAUTHENTICATED_FR,
+    );
+    expect(SERDIPAY_MERCHANT_UNAUTHENTICATED_FR).not.toMatch(/Veuillez vous connecter/i);
+    expect(SERDIPAY_MERCHANT_UNAUTHENTICATED_FR).not.toMatch(/Unauthenticated/i);
+  });
+
+  it('retries C2B once after payment-merchant 401 Unauthenticated', async () => {
+    env.SERDIPAY_EMAIL = 'm@example.com';
+    env.SERDIPAY_PASSWORD = 'portal-pw';
+    env.SERDIPAY_API_ID = 'APIX';
+    env.SERDIPAY_MERCHANT_CODE = '466551';
+    env.SERDIPAY_MERCHANT_PIN = '1234';
+
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ access_token: 'tok-stale' }),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        json: async () => ({ message: 'Unauthenticated.' }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ access_token: 'tok-fresh' }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 102,
+        json: async () => ({ message: 'ok', payment: { transactionId: 'SDRETRY' } }),
+      });
+    (global as unknown as { fetch: typeof fetch }).fetch = fetchMock as unknown as typeof fetch;
+
+    const result = await serdiPayInitiateMobileMoney(get, {
+      operator: 'ORANGE_MONEY',
+      amountCdf: 2300,
+      phone: '+243840000001',
+      reference: 'senga_topup_retry',
+    });
+    expect(result.success).toBe(true);
+    expect(result.providerRef).toBe('sp_SDRETRY');
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(String(fetchMock.mock.calls[0][0])).toMatch(/get-token/);
+    expect(String(fetchMock.mock.calls[1][0])).toMatch(/payment-merchant/);
+    expect(String(fetchMock.mock.calls[2][0])).toMatch(/get-token/);
+    expect(String(fetchMock.mock.calls[3][0])).toMatch(/payment-merchant/);
+    const retryBody = JSON.parse(fetchMock.mock.calls[3][1].body as string);
+    expect(retryBody.telecom).toBe('OM');
+    expect(retryBody.clientPhone).toBe('243840000001');
+    expect((fetchMock.mock.calls[3][1].headers as { Authorization: string }).Authorization).toBe(
+      'Bearer tok-fresh',
+    );
+  });
+
   it('maps AfriMomo channel0 merchant-not-allowed to French (B2C vs C2B)', () => {
     const raw = 'Payment Failed, Merchant is not allowed to use this channel0';
     expect(isSerdiPayChannelDisabledError(raw)).toBe(true);
@@ -328,7 +448,7 @@ describe('serdipay Public API', () => {
     expect(mapSerdiPayPaymentFailure(400, raw, raw, undefined, 'c2b')).toBe(
       SERDIPAY_CHANNEL_DISABLED_FR,
     );
-    expect(mapSerdiPayPaymentFailure(400, raw)).toBe(SERDIPAY_B2C_CHANNEL_DISABLED_FR);
+    expect(mapSerdiPayPaymentFailure(400, raw)).toBe(SERDIPAY_CHANNEL_DISABLED_GENERIC_FR);
     expect(mapSerdiPayPaymentFailure(400, raw)).not.toMatch(/channel0/i);
     expect(mapSerdiPayPaymentFailure(400, raw)).not.toMatch(/Payment Failed/i);
   });

@@ -98,11 +98,34 @@ describe('WalletService', () => {
     });
   });
 
+  it('refuse Orange Money sur un numéro Airtel (pas de USSD sur la SIM Orange)', async () => {
+    prisma.wallet.upsert.mockResolvedValue({ id: 'w1', userId: 'u1', balanceCdf: 0 });
+    await expect(service.topUp('u1', 2300, 'ORANGE_MONEY', '+243970000001')).rejects.toMatchObject({
+      response: { message: expect.stringMatching(/Orange Money/i) },
+    });
+  });
+
   it('rejette un opérateur inconnu (pas de fallback Airtel/Orange)', async () => {
     prisma.wallet.upsert.mockResolvedValue({ id: 'w1', userId: 'u1', balanceCdf: 0 });
     prisma.walletTransaction.findFirst.mockResolvedValue(null);
     await expect(service.topUp('u1', 5000, 'UNKNOWN_TELCO', '+243970000001')).rejects.toMatchObject({
       response: { code: 'MOVA_PAY_003' },
+    });
+  });
+
+  it('refuse Orange Money vers un préfixe Vodacom (pas de C2B sur la mauvaise SIM)', async () => {
+    prisma.wallet.upsert.mockResolvedValue({ id: 'w1', userId: 'u1', balanceCdf: 0 });
+    prisma.walletTransaction.findFirst.mockResolvedValue(null);
+    await expect(service.topUp('u1', 5000, 'ORANGE_MONEY', '+243812345678')).rejects.toMatchObject({
+      response: { message: expect.stringMatching(/Orange Money/i) },
+    });
+  });
+
+  it('refuse une recharge Orange Money si le « numéro » est un e-mail', async () => {
+    prisma.wallet.upsert.mockResolvedValue({ id: 'w1', userId: 'u1', balanceCdf: 0 });
+    prisma.walletTransaction.findFirst.mockResolvedValue(null);
+    await expect(service.topUp('u1', 5000, 'ORANGE_MONEY', 'marie@gmail.com')).rejects.toMatchObject({
+      response: { message: expect.stringMatching(/invalide|e-mail/i) },
     });
   });
 
@@ -135,7 +158,7 @@ describe('WalletService', () => {
     };
     const locked = new WalletService(prisma as never, config, redis as never);
     prisma.wallet.upsert.mockResolvedValue({ id: 'w1', userId: 'u1', balanceCdf: 0 });
-    await expect(locked.topUp('u1', 5000, 'ORANGE_MONEY', '+243970000001')).rejects.toMatchObject({
+    await expect(locked.topUp('u1', 5000, 'ORANGE_MONEY', '+243890000001')).rejects.toMatchObject({
       response: { message: expect.stringMatching(/déjà en cours/i) },
     });
   });
@@ -147,7 +170,7 @@ describe('WalletService', () => {
       },
     };
     const locked = new WalletService(prisma as never, config, redis as never);
-    await expect(locked.topUp('u1', 5000, 'ORANGE_MONEY', '+243970000001')).rejects.toMatchObject({
+    await expect(locked.topUp('u1', 5000, 'ORANGE_MONEY', '+243890000001')).rejects.toMatchObject({
       response: { code: 'MOVA_INT_001' },
     });
   });
@@ -228,7 +251,7 @@ describe('WalletService', () => {
     };
     const locked = new WalletService(prisma as never, config, redis as never);
     await expect(
-      locked.withdrawToMobileMoney('u1', 5000, 'ORANGE_MONEY', '+243970000001', { skipOtp: true }),
+      locked.withdrawToMobileMoney('u1', 5000, 'ORANGE_MONEY', '+243890000001', { skipOtp: true }),
     ).rejects.toMatchObject({
       response: { message: expect.stringMatching(/déjà en cours/i) },
     });
@@ -300,10 +323,10 @@ describe('WalletService', () => {
   it('autorise le retrait simulé après OTP envoyé au numéro de versement', async () => {
     tx.$queryRaw.mockResolvedValue([{ id: 'w1', balanceCdf: 5000, heldBalanceCdf: 0 }]);
     tx.wallet.update.mockResolvedValue({ id: 'w1', userId: 'u1', balanceCdf: 2700 });
-    const otp = await service.requestWithdrawOtp('u1', 2300, 'ORANGE_MONEY', '+243970000001');
-    expect(otp.phone).toBe('+243970000001');
-    expect(otp.message).toMatch(/243970000001/);
-    const result = await service.withdrawToMobileMoney('u1', 2300, 'ORANGE_MONEY', '+243970000001', {
+    const otp = await service.requestWithdrawOtp('u1', 2300, 'ORANGE_MONEY', '+243890000001');
+    expect(otp.phone).toBe('+243890000001');
+    expect(otp.message).toMatch(/243890000001/);
+    const result = await service.withdrawToMobileMoney('u1', 2300, 'ORANGE_MONEY', '+243890000001', {
       otp: TEST_OTP_CODE,
     });
     expect(result.success).toBe(true);
@@ -336,7 +359,7 @@ describe('WalletService', () => {
 
   it('refuse un retrait B2C sans OTP', async () => {
     await expect(
-      service.withdrawToMobileMoney('u1', 2300, 'ORANGE_MONEY', '+243970000001'),
+      service.withdrawToMobileMoney('u1', 2300, 'ORANGE_MONEY', '+243890000001'),
     ).rejects.toMatchObject({
       response: {
         code: 'MOVA_AUTH_001',
@@ -347,9 +370,9 @@ describe('WalletService', () => {
   });
 
   it('refuse un retrait si l’OTP a été envoyé vers un autre numéro', async () => {
-    await service.requestWithdrawOtp('u1', 2300, 'ORANGE_MONEY', '+243970000001');
+    await service.requestWithdrawOtp('u1', 2300, 'ORANGE_MONEY', '+243890000001');
     await expect(
-      service.withdrawToMobileMoney('u1', 2300, 'ORANGE_MONEY', '+243810000002', {
+      service.withdrawToMobileMoney('u1', 2300, 'ORANGE_MONEY', '+243840000002', {
         otp: TEST_OTP_CODE,
       }),
     ).rejects.toMatchObject({
@@ -381,7 +404,7 @@ describe('WalletService', () => {
     (global as unknown as { fetch: typeof fetch }).fetch = fetchMock as unknown as typeof fetch;
 
     await expect(
-      service.withdrawToMobileMoney('u1', 2300, 'ORANGE_MONEY', '+243970000001', { skipOtp: true }),
+      service.withdrawToMobileMoney('u1', 2300, 'ORANGE_MONEY', '+243890000001', { skipOtp: true }),
     ).rejects.toMatchObject({
       response: { message: SERDIPAY_B2C_MERCHANT_FLOAT_LOW_FR },
     });
@@ -416,7 +439,7 @@ describe('WalletService', () => {
     (global as unknown as { fetch: typeof fetch }).fetch = fetchMock as unknown as typeof fetch;
     try {
       await expect(
-        service.requestWithdrawOtp('u1', 2300, 'ORANGE_MONEY', '+243970000001'),
+        service.requestWithdrawOtp('u1', 2300, 'ORANGE_MONEY', '+243890000001'),
       ).rejects.toMatchObject({
         response: { message: expect.stringMatching(/Trop de codes|une minute/i) },
       });

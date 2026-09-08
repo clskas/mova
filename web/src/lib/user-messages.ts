@@ -66,6 +66,12 @@ const TECHNICAL_PATTERNS = [
 export const PIN_SIX_DIGITS_FR = "Le code PIN doit contenir 6 chiffres.";
 export const PAYMENT_FAILED_FR =
   "Le paiement Mobile Money a échoué. Réessayez ou contactez le support SENGA.";
+export const CHANNEL_DISABLED_FR =
+  "Ce canal Mobile Money n’est pas activé pour le marchand SerdiPay. Aucun push USSD n’a été envoyé. Contactez le support SENGA.";
+export const MERCHANT_FLOAT_LOW_FR =
+  "Le compte marchand SerdiPay n’a pas assez de fonds. L’opération Mobile Money n’a pas abouti.";
+export const MERCHANT_UNAUTHENTICATED_FR =
+  "Authentification marchand SerdiPay expirée. Réessayez la recharge — ce n’est pas votre session SENGA.";
 export const VALIDATION_FAILED_FR = "Données invalides. Vérifiez les champs.";
 
 function isClassValidatorPinMessage(msg: string): boolean {
@@ -102,7 +108,12 @@ export function sanitizeUserMessage(
   const msg = String(raw).trim();
   if (!msg) return fallback;
   if (isClassValidatorPinMessage(msg)) return PIN_SIX_DIGITS_FR;
+  if (/\bunauthenticated\b/i.test(msg)) return MERCHANT_UNAUTHENTICATED_FR;
+  if (/your balance is low|balance is low|insufficient (funds|balance|float)|not enough funds/i.test(msg)) {
+    return MERCHANT_FLOAT_LOW_FR;
+  }
   if (/payment failed|merchant is not allowed|failed to process the payment|channel0/i.test(msg)) {
+    if (/channel|merchant is not allowed/i.test(msg)) return CHANNEL_DISABLED_FR;
     return PAYMENT_FAILED_FR;
   }
   if (

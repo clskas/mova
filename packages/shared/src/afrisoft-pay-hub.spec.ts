@@ -104,6 +104,34 @@ describe('afrisoft-pay-hub', () => {
     expect(body.amount_cdf).toBe(500);
   });
 
+  it('forwards hub ussdCode / paymentUrl from C2B PENDING', async () => {
+    const env: Record<string, string> = {
+      PAY_HUB_URL: 'https://pay.afri-soft.com',
+      AFRISOFT_HUB_APP_ID: 'senga',
+      AFRISOFT_HUB_API_KEY: 'test-key',
+    };
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 201,
+      json: async () => ({
+        payment_id: 'pay_om',
+        status: 'PENDING',
+        paymentUrl: 'https://pay.example/om',
+        ussdCode: '*144*4*6#',
+      }),
+    }) as unknown as typeof fetch;
+
+    const result = await afrisoftPayHubInitiate((k) => env[k], {
+      amountCdf: 2300,
+      phone: '+243890000001',
+      operator: 'ORANGE_MONEY',
+      purpose: 'topup',
+    });
+    expect(result.success).toBe(true);
+    expect(result.paymentUrl).toBe('https://pay.example/om');
+    expect(result.ussdCode).toBe('*144*4*6#');
+  });
+
   it('reads nested Nest error.message when hub returns 502', async () => {
     const env: Record<string, string> = {
       PAY_HUB_URL: 'https://pay.afri-soft.com',

@@ -6,6 +6,8 @@ export interface PaymentInitResult {
   providerRef?: string;
   /** CinetPay hosted checkout URL (open in WebView / browser). */
   paymentUrl?: string;
+  /** Aggregator-supplied USSD to dial — never invent *144#. */
+  ussdCode?: string;
   message?: string;
 }
 export interface PaymentProvider {

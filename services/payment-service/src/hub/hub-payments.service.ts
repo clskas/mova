@@ -12,6 +12,7 @@ import {
   serdiPayDisburseMobileMoney,
   serdiPayInitiateMobileMoney,
   serdiPayNormalizePhone,
+  rdcMobileMoneyOperatorMismatchFr,
 } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { isPrismaUniqueViolation } from '../prisma/prisma-errors';
@@ -58,6 +59,7 @@ export class HubPaymentsService {
   }) {
     const meta = row.metadata && typeof row.metadata === 'object' ? (row.metadata as Record<string, unknown>) : {};
     const paymentUrl = typeof meta.paymentUrl === 'string' ? meta.paymentUrl : undefined;
+    const ussdCode = typeof meta.ussdCode === 'string' ? meta.ussdCode : undefined;
     return {
       payment_id: row.id,
       status: row.status,
@@ -68,6 +70,7 @@ export class HubPaymentsService {
       completed_at: row.completedAt?.toISOString() ?? null,
       message: row.failureReason ?? undefined,
       ...(paymentUrl ? { paymentUrl } : {}),
+      ...(ussdCode ? { ussdCode } : {}),
     };
   }
 
@@ -112,6 +115,10 @@ export class HubPaymentsService {
       );
     }
     const phone = serdiPayNormalizePhone(dto.phone);
+    const msisdnMismatch = rdcMobileMoneyOperatorMismatchFr(operator, phone);
+    if (msisdnMismatch) {
+      throw new HttpException({ message: msisdnMismatch, code: 'HUB_TELECOM_MSISDN' }, HttpStatus.BAD_REQUEST);
+    }
     const purpose = dto.purpose?.trim() || (kind === 'PAYOUT' ? 'withdraw' : 'pay');
 
     // Reserve the unique (appId, reference) row BEFORE the aggregator call so a
@@ -156,6 +163,7 @@ export class HubPaymentsService {
       success: boolean;
       providerRef?: string;
       paymentUrl?: string;
+      ussdCode?: string;
       message?: string;
     };
 
@@ -229,6 +237,7 @@ export class HubPaymentsService {
     const metadata = {
       ...(dto.metadata ?? {}),
       ...(mm.paymentUrl ? { paymentUrl: mm.paymentUrl } : {}),
+      ...(mm.ussdCode ? { ussdCode: mm.ussdCode } : {}),
     };
     const row = await this.prisma.hubPayment.update({
       where: { id: reserved.id },

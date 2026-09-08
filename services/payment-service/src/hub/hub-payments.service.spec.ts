@@ -141,7 +141,7 @@ describe('HubPaymentsService.create — réserve avant agrégateur', () => {
     app_id: 'senga',
     amount_cdf: 2300,
     currency: 'CDF',
-    phone: '+243970000001',
+    phone: '+243812345678',
     telecom: 'MP',
     reference: 'senga_topup_unique_1',
     purpose: 'topup',

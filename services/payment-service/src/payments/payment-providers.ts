@@ -83,6 +83,7 @@ export async function initiateViaGateway(
       transactionId: result.transactionId,
       providerRef: result.providerRef,
       paymentUrl: result.paymentUrl,
+      ussdCode: result.ussdCode,
       message: result.message,
     };
   }

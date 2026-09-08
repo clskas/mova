@@ -28,6 +28,10 @@ export interface SmsProvider {
   isConfigured(): boolean;
 }
 
+export function otpSmsText(brand: string, code: string): string {
+  return `Votre code ${brand} ${code} Valide 10 minutes`;
+}
+
 @Injectable()
 export class MockSmsProvider implements SmsProvider {
   readonly name = 'MOCK';
@@ -68,7 +72,7 @@ export class AfriSoftSmsHubProvider implements SmsProvider {
     const brand = this.config.get<string>('APP_BRAND_NAME')?.trim() || 'SENGA';
     const result = await afrisoftSmsHubSendSms(this.get, {
       phone,
-      text: `Votre code ${brand} ${code} Valide 10 minutes`,
+      text: otpSmsText(brand, code),
       purpose: 'login',
     });
     if (!result.success) this.logger.warn(`SMS hub: ${result.message}`);

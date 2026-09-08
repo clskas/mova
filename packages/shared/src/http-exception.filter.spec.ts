@@ -1,7 +1,12 @@
 import { HttpStatus } from '@nestjs/common';
 import { PIN_SIX_DIGITS_FR, toPublicHttpMessage, WITHDRAW_AMOUNT_INVALID_FR, WITHDRAW_OTP_REQUIRED_FR, WITHDRAW_PHONE_INVALID_FR } from './http-exception.filter';
 import { MOVA_ERROR_MESSAGES, MovaErrorCode } from './mova-error-codes';
-import { SERDIPAY_B2C_CHANNEL_DISABLED_FR, SERDIPAY_B2C_MERCHANT_FLOAT_LOW_FR } from './serdipay';
+import {
+  AFRISOFT_HUB_HMAC_FR,
+  SERDIPAY_CHANNEL_DISABLED_GENERIC_FR,
+  SERDIPAY_MERCHANT_FLOAT_LOW_GENERIC_FR,
+  SERDIPAY_MERCHANT_UNAUTHENTICATED_FR,
+} from './serdipay';
 
 describe('toPublicHttpMessage', () => {
   it('maps class-validator PIN regex/length English to French', () => {
@@ -50,7 +55,7 @@ describe('toPublicHttpMessage', () => {
         'Payment Failed, Merchant is not allowed to use this channel0',
         HttpStatus.BAD_REQUEST,
       ),
-    ).toBe(SERDIPAY_B2C_CHANNEL_DISABLED_FR);
+    ).toBe(SERDIPAY_CHANNEL_DISABLED_GENERIC_FR);
     expect(
       toPublicHttpMessage(
         'Payment Failed, Merchant is not allowed to use this channel0',
@@ -61,10 +66,28 @@ describe('toPublicHttpMessage', () => {
 
   it('maps SerdiPay merchant-float English to French (never leaks Balance is low)', () => {
     expect(toPublicHttpMessage('Your Balance is low', HttpStatus.BAD_REQUEST)).toBe(
-      SERDIPAY_B2C_MERCHANT_FLOAT_LOW_FR,
+      SERDIPAY_MERCHANT_FLOAT_LOW_GENERIC_FR,
     );
     expect(toPublicHttpMessage('Your Balance is low', HttpStatus.BAD_REQUEST)).not.toMatch(
       /Your Balance is low|Balance is low/i,
+    );
+  });
+
+  it('maps Laravel/SerdiPay Unauthenticated to merchant French, not SENGA login', () => {
+    expect(toPublicHttpMessage('Unauthenticated.', HttpStatus.BAD_REQUEST)).toBe(
+      SERDIPAY_MERCHANT_UNAUTHENTICATED_FR,
+    );
+    expect(toPublicHttpMessage('Unauthenticated.', HttpStatus.BAD_REQUEST)).not.toMatch(
+      /Veuillez vous connecter/,
+    );
+    expect(toPublicHttpMessage('Invalid HMAC signature', HttpStatus.UNAUTHORIZED)).toBe(
+      AFRISOFT_HUB_HMAC_FR,
+    );
+    expect(toPublicHttpMessage('Unauthorized', HttpStatus.UNAUTHORIZED)).toBe(
+      MOVA_ERROR_MESSAGES[MovaErrorCode.AUTH_UNAUTHORIZED],
+    );
+    expect(toPublicHttpMessage('Unauthorized', HttpStatus.UNAUTHORIZED)).not.toBe(
+      SERDIPAY_MERCHANT_UNAUTHENTICATED_FR,
     );
   });
 

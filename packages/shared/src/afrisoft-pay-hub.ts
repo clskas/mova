@@ -190,6 +190,7 @@ export interface AfriSoftHubPaymentResult {
   transactionId?: string;
   providerRef?: string;
   paymentUrl?: string;
+  ussdCode?: string;
   status?: AfriSoftHubPaymentStatus;
   reference?: string;
   amountCdf?: number;
@@ -304,6 +305,7 @@ function mapHubJson(
     transactionId: paymentId ?? providerRef,
     providerRef,
     paymentUrl: pickStr(json, ['payment_url', 'paymentUrl']),
+    ussdCode: pickStr(json, ['ussd_code', 'ussdCode', 'ussd']),
     status: status ?? 'PENDING',
     reference: pickStr(json, ['reference']),
     amountCdf: typeof amount === 'number' ? amount : undefined,

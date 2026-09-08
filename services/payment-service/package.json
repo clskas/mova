@@ -63,6 +63,9 @@
     "transform": {
       "^.+\\.(t|j)s$": ["ts-jest", { "tsconfig": { "ignoreDeprecations": "5.0" } }]
     },
+    "moduleNameMapper": {
+      "^@mova/shared$": "<rootDir>/../../../packages/shared/src"
+    },
     "testEnvironment": "node"
   }
 }

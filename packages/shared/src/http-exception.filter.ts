@@ -10,8 +10,10 @@ import { Response } from 'express';
 import { REQUEST_ID_HEADER, RequestWithId } from './request-id.middleware';
 import { MovaErrorCode, MOVA_ERROR_MESSAGES } from './mova-error-codes';
 import {
+  isAfriSoftHubHmacError,
   isSerdiPayChannelDisabledError,
   isSerdiPayMerchantFloatLowError,
+  isSerdiPayUnauthenticatedError,
   mapSerdiPayPaymentFailure,
 } from './serdipay';
 
@@ -130,6 +132,8 @@ export function toPublicHttpMessage(raw: string, status: number): string {
   if (
     isSerdiPayChannelDisabledError(msg) ||
     isSerdiPayMerchantFloatLowError(msg) ||
+    isSerdiPayUnauthenticatedError(msg) ||
+    isAfriSoftHubHmacError(msg) ||
     /payment failed|failed to process the payment/i.test(msg)
   ) {
     return mapSerdiPayPaymentFailure(status, msg, msg);

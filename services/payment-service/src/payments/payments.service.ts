@@ -10,6 +10,7 @@ import {
   INTERNAL_API_KEY,
   fromMobileRideStatus,
   normalizePhoneRdc,
+  rdcMobileMoneyOperatorMismatchFr,
   serviceUrl,
   validatePhoneRdc,
 } from '@mova/shared';
@@ -201,6 +202,10 @@ export class PaymentsService {
     const normalized = phone?.trim() ? normalizePhoneRdc(phone.trim()) : '';
     if (!normalized) throw new MovaHttpException(MovaErrorCode.PAYMENT_PHONE_REQUIRED);
     if (!validatePhoneRdc(normalized)) throw new MovaHttpException(MovaErrorCode.AUTH_INVALID_PHONE);
+    const mismatch = rdcMobileMoneyOperatorMismatchFr(method, normalized);
+    if (mismatch) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, mismatch);
+    }
     return normalized;
   }
 
@@ -436,6 +441,8 @@ export class PaymentsService {
         payment,
         providerRef: result.providerRef,
         message: result.message ?? 'Confirmez le paiement sur votre téléphone Mobile Money.',
+        ...(result.paymentUrl ? { paymentUrl: result.paymentUrl } : {}),
+        ...(result.ussdCode ? { ussdCode: result.ussdCode } : {}),
       };
     }
 
@@ -830,6 +837,8 @@ export class PaymentsService {
         message: result.message ?? 'Confirmez le paiement sur votre téléphone Mobile Money.',
         amountCdf,
         currency: 'CDF',
+        ...(result.paymentUrl ? { paymentUrl: result.paymentUrl } : {}),
+        ...(result.ussdCode ? { ussdCode: result.ussdCode } : {}),
       };
     }
 

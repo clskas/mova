@@ -577,15 +577,54 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
     _persistOnboardingStep();
   }
 
-  bool _keyboardOpen(BuildContext context) => MediaQuery.viewInsetsOf(context).bottom > 80;
+  /// Sticky chrome that used to sit above the form. Kept inside the ListView so
+  /// opening the keyboard never inserts/removes Column siblings (that rematches
+  /// [Expanded] / [TextField] slots and immediately unfocuses).
+  List<Widget> _dossierChrome() {
+    final publicId = _state?['publicId']?.toString();
+    return [
+      if (publicId != null)
+        Text(
+          'Identifiant chauffeur : $publicId',
+          style: const TextStyle(fontWeight: FontWeight.bold, color: MovaColors.violet),
+        ),
+      ListTile(
+        contentPadding: EdgeInsets.zero,
+        leading: const Icon(Icons.link, color: MovaColors.violet),
+        title: const Text(
+          'Compte et connexion',
+          style: TextStyle(fontWeight: FontWeight.w600),
+        ),
+        subtitle: const Text('Lier Google ou un numéro +243 — un seul compte chauffeur'),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => const ProfileScreen(title: 'Compte et connexion'),
+            ),
+          );
+        },
+      ),
+      if (_state?['kyc'] != null) ...[
+        const SizedBox(height: 8),
+        Text(
+          'Documents : ${_state!['kyc']['checklist'] is List ? (_state!['kyc']['checklist'] as List).where((i) => i is Map && i['required'] == true && i['uploaded'] == true).length : 0}/6 obligatoires',
+          style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
+        ),
+      ],
+      const SizedBox(height: 8),
+    ];
+  }
 
   Widget _stepScroll({required List<Widget> children}) {
-    final keyboard = MediaQuery.viewInsetsOf(context).bottom;
     return ListView(
       physics: kMovaScrollPhysics,
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-      padding: EdgeInsets.only(bottom: 48 + keyboard),
-      children: children,
+      padding: const EdgeInsets.only(bottom: 24),
+      children: [
+        ..._dossierChrome(),
+        ...children,
+      ],
     );
   }
 
@@ -616,12 +655,10 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
 
   @override
   Widget build(BuildContext context) {
-    final publicId = _state?['publicId']?.toString();
-    final keyboardOpen = _keyboardOpen(context);
     return MovaScreen(
       title: widget.canSkipToHome ? 'Mon dossier chauffeur' : 'Enregistrement chauffeur',
       scrollable: false,
-      resizeToAvoidBottomInset: false,
+      resizeToAvoidBottomInset: true,
       actions: [
         if (widget.canSkipToHome)
           TextButton(
@@ -642,37 +679,6 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
           : Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                if (!keyboardOpen && publicId != null)
-                  Text(
-                    'Identifiant chauffeur : $publicId',
-                    style: const TextStyle(fontWeight: FontWeight.bold, color: MovaColors.violet),
-                  ),
-                if (!keyboardOpen)
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.link, color: MovaColors.violet),
-                    title: const Text(
-                      'Compte et connexion',
-                      style: TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    subtitle: const Text('Lier Google ou un numéro +243 — un seul compte chauffeur'),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const ProfileScreen(title: 'Compte et connexion'),
-                        ),
-                      );
-                    },
-                  ),
-                if (!keyboardOpen && _state?['kyc'] != null) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    'Documents : ${_state!['kyc']['checklist'] is List ? (_state!['kyc']['checklist'] as List).where((i) => i is Map && i['required'] == true && i['uploaded'] == true).length : 0}/6 obligatoires',
-                    style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
-                  ),
-                ],
-                const SizedBox(height: 8),
                 LinearProgressIndicator(
                   value: (_step + 1) / _steps.length,
                   backgroundColor: MovaColors.cloud,
@@ -689,33 +695,31 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
                 ],
                 const SizedBox(height: 12),
                 Expanded(child: _currentStep()),
-                if (!keyboardOpen) ...[
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      if (_step > 0)
-                        Expanded(
-                          child: MovaButton(
-                            label: 'Retour',
-                            isSecondary: true,
-                            icon: Icons.arrow_back_rounded,
-                            onPressed: _loading ? null : _back,
-                          ),
-                        ),
-                      if (_step > 0) const SizedBox(width: 12),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    if (_step > 0)
                       Expanded(
                         child: MovaButton(
-                          label: _step == _steps.length - 1
-                              ? (_isEditingDossier ? 'Enregistrer' : 'Envoyer le dossier')
-                              : 'Continuer',
-                          icon: Icons.arrow_forward_rounded,
-                          isLoading: _loading,
-                          onPressed: _continueEnabled ? _next : null,
+                          label: 'Retour',
+                          isSecondary: true,
+                          icon: Icons.arrow_back_rounded,
+                          onPressed: _loading ? null : _back,
                         ),
                       ),
-                    ],
-                  ),
-                ],
+                    if (_step > 0) const SizedBox(width: 12),
+                    Expanded(
+                      child: MovaButton(
+                        label: _step == _steps.length - 1
+                            ? (_isEditingDossier ? 'Enregistrer' : 'Envoyer le dossier')
+                            : 'Continuer',
+                        icon: Icons.arrow_forward_rounded,
+                        isLoading: _loading,
+                        onPressed: _continueEnabled ? _next : null,
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
     );

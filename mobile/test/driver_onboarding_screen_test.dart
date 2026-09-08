@@ -53,11 +53,10 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('identity fields stay reachable when the keyboard is open', (tester) async {
+  testWidgets('identity fields keep focus when the keyboard opens', (tester) async {
     SharedPreferences.setMockInitialValues({});
     tester.view.physicalSize = const Size(360, 640);
     tester.view.devicePixelRatio = 1.0;
-    tester.view.viewInsets = const FakeViewPadding(bottom: 280);
     addTearDown(() {
       tester.view.resetPhysicalSize();
       tester.view.resetViewInsets();
@@ -69,11 +68,27 @@ void main() {
 
     expect(find.text('Prénom'), findsOneWidget);
     expect(find.text('Nom'), findsOneWidget);
-    expect(find.text('Continuer'), findsNothing);
+    expect(find.text('Continuer'), findsOneWidget);
 
-    await tester.enterText(find.byType(TextField).first, 'Jean');
+    final firstField = find.byType(TextField).first;
+    await tester.ensureVisible(firstField);
+    await tester.tap(firstField);
+    await tester.pump();
+
+    final editable = find.descendant(of: firstField, matching: find.byType(EditableText));
+    expect(tester.state<EditableTextState>(editable).widget.focusNode.hasFocus, isTrue);
+
+    tester.view.viewInsets = const FakeViewPadding(bottom: 280);
+    await tester.pump();
+
+    expect(find.text('Continuer'), findsOneWidget);
+    expect(find.text('Prénom'), findsOneWidget);
+    expect(tester.state<EditableTextState>(editable).widget.focusNode.hasFocus, isTrue);
+
+    await tester.enterText(firstField, 'Jean');
     await tester.pump();
     expect(find.text('Jean'), findsOneWidget);
+    expect(tester.state<EditableTextState>(editable).widget.focusNode.hasFocus, isTrue);
     expect(tester.takeException(), isNull);
   });
 }

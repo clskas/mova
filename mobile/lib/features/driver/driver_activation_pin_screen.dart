@@ -74,14 +74,15 @@ class _DriverActivationPinScreenState extends ConsumerState<DriverActivationPinS
     return PopScope(
       canPop: false,
       child: MovaScreen(
-        title: 'Code PIN d\'activation',
+        title: 'PIN d\'activation',
+        centerContent: true,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const Icon(Icons.lock_outline, size: 56, color: MovaColors.violet),
             const SizedBox(height: 16),
             Text(
-              'Code PIN d\'activation',
+              'PIN d\'activation',
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.bold,
@@ -97,7 +98,7 @@ class _DriverActivationPinScreenState extends ConsumerState<DriverActivationPinS
             const SizedBox(height: 28),
             SixDigitPinField(
               controller: _pinController,
-              label: 'Code PIN d\'activation (6 chiffres)',
+              label: 'PIN d\'activation (6 chiffres)',
               autofocus: true,
             ),
             if (_error != null) ...[

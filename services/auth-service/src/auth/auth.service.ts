@@ -25,14 +25,13 @@ import {
   mapSmsDeliveryFailureToUserMessage,
   denyJwtJti,
   isMockOtpAllowed,
-  isProductionRuntime,
   isDemoUserInsertForbidden,
   isPlayPrelaunchAccount,
 } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '@mova/shared';
 import { SmsService } from './sms.providers';
-import { EMAIL_UNAVAILABLE_USER_MESSAGE, EmailOtpMailer } from './email-otp.mailer';
+import { EmailOtpMailer } from './email-otp.mailer';
 import { generateSecureLocalPin, hashLocalPin, isValidLocalPin, verifyLocalPin } from './local-pin.util';
 import {
   defaultPartnerDisplayName,
@@ -60,19 +59,8 @@ const OTP_FAIL_MAX = 5;
 const OTP_FAIL_TTL_SEC = 15 * 60;
 
 const GOOGLE_CHALLENGE_PREFIX = 'auth:google:ch:';
-const GOOGLE_CHALLENGE_TTL_SEC = 10 * 60;
 
 type GoogleOtpChannel = 'sms' | 'email';
-
-type GoogleOtpChallengeResult = {
-  success: true;
-  otpRequired: true;
-  challengeId: string;
-  otpChannel: GoogleOtpChannel;
-  destinationMasked: string;
-  message: string;
-  mockCode?: string;
-};
 
 type GoogleChallenge = {
   googleId: string;
@@ -394,10 +382,12 @@ export class AuthService {
   }
 
   /**
-   * Step 1: verify Google ID token, issue email OTP to the Google mailbox.
-   * A linked phone does not change the channel — SMS OTP is only for POST /auth/otp/request.
-   * Does not return a session JWT. Driver app (`role=DRIVER`) may create a pending KYC
-   * chauffeur on verify — never staff, never a silent promote of PASSENGER / SUPER_ADMIN.
+   * Verify Google ID token and issue the session JWT.
+   * Google already proved the mailbox — do not block on a second email code.
+   * The restaurant PIN template now reaches Gmail; leftover OTP mail uses that
+   * envelope (no « OTP » / « code PIN »). SMS stays on POST /auth/otp/request.
+   * Driver app (`role=DRIVER`) may create a pending KYC chauffeur — never staff,
+   * never a silent promote of PASSENGER / SUPER_ADMIN.
    * Partner roles only from restaurant / rental portals (explicit role or portal).
    */
   async loginWithGoogle(
@@ -405,7 +395,7 @@ export class AuthService {
     role?: UserRole,
     portal?: string,
     intendedRole?: string,
-  ): Promise<GoogleOtpChallengeResult | ReturnType<AuthService['buildAuthResponse']>> {
+  ) {
     const requestedRole = this.resolveRequestedAuthRole(role, portal, intendedRole);
     const identity = await this.googleTokens.verify(idToken);
     let user = await this.resolveGoogleLoginUser(identity, requestedRole);
@@ -423,7 +413,6 @@ export class AuthService {
       }
     }
 
-    const channel: GoogleOtpChannel = 'email';
     const destination = (identity.email ?? user?.email ?? '').trim().toLowerCase();
     if (!destination.includes('@')) {
       throw new MovaHttpException(
@@ -440,50 +429,7 @@ export class AuthService {
       );
     }
 
-    let issued: { mock: boolean };
-    try {
-      issued = await this.issueOtpToDestination(destination, channel);
-    } catch (e) {
-      if (this.canCompleteVerifiedGoogleWithoutOtp(identity, user, requestedRole, channel, e)) {
-        this.logger.warn(
-          `email OTP unavailable — completing verified Google login for ${maskEmail(destination)}`,
-        );
-        return this.finalizeGoogleSession(identity, user, requestedRole);
-      }
-      throw e;
-    }
-    let challengeId: string;
-    try {
-      challengeId = await this.storeGoogleChallenge({
-        googleId: identity.googleId,
-        email: identity.email,
-        givenName: identity.givenName,
-        familyName: identity.familyName,
-        picture: identity.picture,
-        userId: user?.id ?? null,
-        isNew: !user,
-        role: requestedRole,
-        destination,
-        channel,
-      });
-    } catch (e) {
-      if (this.canCompleteVerifiedGoogleWithoutOtp(identity, user, requestedRole, channel, e)) {
-        this.logger.warn('Google challenge store failed — completing verified Google login');
-        return this.finalizeGoogleSession(identity, user, requestedRole);
-      }
-      throw e;
-    }
-    const destinationMasked = maskEmail(destination);
-    const message = 'Code envoyé par e-mail. Vérifiez votre boîte de réception.';
-    return {
-      success: true,
-      otpRequired: true,
-      challengeId,
-      otpChannel: channel,
-      destinationMasked,
-      message,
-      ...(issued.mock && !isProductionRuntime() ? { mockCode: TEST_OTP_CODE } : {}),
-    };
+    return this.finalizeGoogleSession(identity, user, requestedRole);
   }
 
   /**
@@ -688,24 +634,6 @@ export class AuthService {
     return null;
   }
 
-  private canCompleteVerifiedGoogleWithoutOtp(
-    identity: GoogleIdentity,
-    user: User | null,
-    requestedRole: UserRole | undefined,
-    channel: GoogleOtpChannel,
-    error: unknown,
-  ): boolean {
-    if (!(error instanceof MovaHttpException) || error.getStatus() !== HttpStatus.SERVICE_UNAVAILABLE) {
-      return false;
-    }
-    if (identity.emailVerified === false) return false;
-    if (channel === 'email') return true;
-    return (
-      isOwnerSuperAdminEmail(identity.email) ||
-      Boolean(user && isStaffAuthRole(user.role) && isStaffAuthRole(requestedRole))
-    );
-  }
-
   private async finalizeGoogleSession(
     identity: GoogleIdentity,
     existing: User | null,
@@ -782,100 +710,6 @@ export class AuthService {
         missingInviteOnlyAccountMessage('', role),
       );
     }
-  }
-
-  private async issueOtpToDestination(destination: string, channel: GoogleOtpChannel) {
-    const useTestOtp = channel === 'sms' ? isTestOtpAllowedForPhone(destination) : isMockOtpAllowed();
-    const liveCode = useTestOtp ? TEST_OTP_CODE : crypto.randomInt(100000, 999999).toString();
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
-    try {
-      await this.prisma.otpCode.updateMany({
-        where: { phone: destination, used: false },
-        data: { used: true },
-      });
-      for (const code of otpCodesToIssue(destination, liveCode)) {
-        await this.prisma.otpCode.create({
-          data: { phone: destination, code: hashOtpCode(code), expiresAt },
-        });
-      }
-    } catch (e) {
-      this.logger.error(`Google OTP persist failed: ${(e as Error).message}`);
-      throw new MovaHttpException(
-        MovaErrorCode.VALIDATION_ERROR,
-        HttpStatus.SERVICE_UNAVAILABLE,
-        channel === 'sms' ? SMS_UNAVAILABLE_USER_MESSAGE : EMAIL_UNAVAILABLE_USER_MESSAGE,
-      );
-    }
-
-    if (useTestOtp) {
-      const label = channel === 'sms' ? maskPhoneRdc(destination) : maskEmail(destination);
-      this.logger.warn(`TEST OTP ${TEST_OTP_CODE} for Google ${channel} ${label}`);
-      return { mock: true as const };
-    }
-
-    if (channel === 'sms') {
-      let smsResult: { success: boolean; message?: string };
-      try {
-        smsResult = await this.sms.sendOtp(destination, liveCode);
-      } catch (e) {
-        this.logger.error(`OTP SMS threw for ${maskPhoneRdc(destination)}: ${(e as Error).message}`);
-        throw new MovaHttpException(
-          MovaErrorCode.VALIDATION_ERROR,
-          HttpStatus.SERVICE_UNAVAILABLE,
-          mapSmsDeliveryFailureToUserMessage((e as Error).message),
-        );
-      }
-      if (!smsResult.success) {
-        this.logger.error(`OTP SMS failed for ${maskPhoneRdc(destination)}: ${smsResult.message}`);
-        throw new MovaHttpException(
-          MovaErrorCode.VALIDATION_ERROR,
-          HttpStatus.SERVICE_UNAVAILABLE,
-          mapSmsDeliveryFailureToUserMessage(smsResult.message),
-        );
-      }
-      return { mock: false as const };
-    }
-
-    let emailResult: { success: boolean; message: string };
-    try {
-      emailResult = await this.emailOtp.sendOtp(destination, liveCode);
-    } catch (e) {
-      this.logger.error(`OTP email threw for ${maskEmail(destination)}: ${(e as Error).message}`);
-      throw new MovaHttpException(
-        MovaErrorCode.VALIDATION_ERROR,
-        HttpStatus.SERVICE_UNAVAILABLE,
-        EMAIL_UNAVAILABLE_USER_MESSAGE,
-      );
-    }
-    if (!emailResult.success) {
-      this.logger.error(`OTP email failed for ${maskEmail(destination)}: ${emailResult.message}`);
-      throw new MovaHttpException(
-        MovaErrorCode.VALIDATION_ERROR,
-        HttpStatus.SERVICE_UNAVAILABLE,
-        EMAIL_UNAVAILABLE_USER_MESSAGE,
-      );
-    }
-    return { mock: false as const };
-  }
-
-  private async storeGoogleChallenge(challenge: GoogleChallenge): Promise<string> {
-    const challengeId = crypto.randomUUID();
-    try {
-      await this.redis.client.set(
-        `${GOOGLE_CHALLENGE_PREFIX}${challengeId}`,
-        JSON.stringify(challenge),
-        'EX',
-        GOOGLE_CHALLENGE_TTL_SEC,
-      );
-    } catch (e) {
-      this.logger.error(`Google challenge store failed: ${(e as Error).message}`);
-      throw new MovaHttpException(
-        MovaErrorCode.INTERNAL_ERROR,
-        HttpStatus.SERVICE_UNAVAILABLE,
-        'Connexion Google temporairement indisponible. Réessayez.',
-      );
-    }
-    return challengeId;
   }
 
   private async loadGoogleChallenge(challengeId: string): Promise<GoogleChallenge> {

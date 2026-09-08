@@ -584,7 +584,7 @@ export default function LoginPage() {
           )}
 
           <p className="text-xs text-gray-400 text-center leading-relaxed">
-            Téléphone : code par SMS. Google : code par e-mail (boîte Google), même si un numéro est lié.
+            Téléphone : code par SMS. Google : connexion directe (identité déjà vérifiée par Google).
             Après la première connexion avec un téléphone, le PIN à 6 chiffres est obligatoire. PIN oublié : SMS
             ou Google, puis un nouveau code.
           </p>

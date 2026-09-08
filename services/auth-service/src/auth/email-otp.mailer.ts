@@ -8,6 +8,38 @@ import { isMockOtpAllowed, maskEmail } from '@mova/shared';
 export const EMAIL_UNAVAILABLE_USER_MESSAGE =
   'Impossible d\'envoyer le code par e-mail. Réessayez plus tard, ou connectez-vous avec un numéro +243.';
 
+/** Subject that reached Gmail for the restaurant PIN (no « OTP » / « code PIN »). */
+export const SENGA_ACCESS_MAIL_SUBJECT = 'Votre accès SENGA — AfriSoft';
+
+export function sengaAccessMailCopy(code: string, opts?: { partnerPortals?: boolean }) {
+  const portals = opts?.partnerPortals === true;
+  const who = portals ? 'votre compte partenaire SENGA' : 'votre compte SENGA';
+  const portalText = portals
+    ? `Restaurant : https://restaurant.afri-soft.com\nLocation : https://rental.afri-soft.com\n\n`
+    : '';
+  const portalHtml = portals
+    ? `<p>Restaurant : <a href="https://restaurant.afri-soft.com">restaurant.afri-soft.com</a><br/>` +
+      `Location : <a href="https://rental.afri-soft.com">rental.afri-soft.com</a></p>`
+    : '';
+  return {
+    subject: SENGA_ACCESS_MAIL_SUBJECT,
+    text:
+      `Bonjour,\n\n` +
+      `AfriSoft a généré un code d'accès pour ${who}.\n\n` +
+      portalText +
+      `Code d'accès (6 chiffres) : ${code}\n\n` +
+      `Saisissez-le sur l'écran de connexion. Si vous n'êtes pas à l'origine de cette demande, ignorez ce message.\n\n` +
+      `— L'équipe SENGA / AfriSoft\nhttps://afri-soft.com`,
+    html:
+      `<p>Bonjour,</p>` +
+      `<p>AfriSoft a généré un code d'accès pour ${who}.</p>` +
+      portalHtml +
+      `<p>Code d'accès (6 chiffres) : <strong>${code}</strong></p>` +
+      `<p>Saisissez-le sur l'écran de connexion. Si vous n'êtes pas à l'origine de cette demande, ignorez ce message.</p>` +
+      `<p>— L'équipe SENGA / AfriSoft<br/><a href="https://afri-soft.com">afri-soft.com</a></p>`,
+  };
+}
+
 /**
  * SMTP 250 = site4now accepted DATA. Not inbox proof.
  * Production bounces: 550 MessageAI outbound spam, then Gmail never sees the mail.
@@ -238,65 +270,17 @@ export class EmailOtpMailer {
   }
 
   async sendLoginPin(to: string, pin: string): Promise<EmailOtpSendResult> {
-    const subject = 'Votre accès SENGA — AfriSoft';
-    const text =
-      `Bonjour,\n\n` +
-      `AfriSoft a généré un code d'accès pour votre compte partenaire SENGA.\n\n` +
-      `Restaurant : https://restaurant.afri-soft.com\n` +
-      `Location : https://rental.afri-soft.com\n\n` +
-      `Code d'accès (6 chiffres) : ${pin}\n\n` +
-      `Saisissez-le sur l'écran de connexion. Si vous n'êtes pas à l'origine de cette demande, ignorez ce message.\n\n` +
-      `— L'équipe SENGA / AfriSoft\nhttps://afri-soft.com`;
-    const html =
-      `<p>Bonjour,</p>` +
-      `<p>AfriSoft a généré un code d'accès pour votre compte partenaire SENGA.</p>` +
-      `<p>Restaurant : <a href="https://restaurant.afri-soft.com">restaurant.afri-soft.com</a><br/>` +
-      `Location : <a href="https://rental.afri-soft.com">rental.afri-soft.com</a></p>` +
-      `<p>Code d'accès (6 chiffres) : <strong>${pin}</strong></p>` +
-      `<p>Saisissez-le sur l'écran de connexion. Si vous n'êtes pas à l'origine de cette demande, ignorez ce message.</p>` +
-      `<p>— L'équipe SENGA / AfriSoft<br/><a href="https://afri-soft.com">afri-soft.com</a></p>`;
-    return this.sendNotice(to, subject, text, html);
+    const copy = sengaAccessMailCopy(pin, { partnerPortals: true });
+    return this.sendNotice(to, copy.subject, copy.text, copy.html);
   }
 
+  /**
+   * Same envelope as the restaurant PIN that reached Gmail (2026-09-08).
+   * Never put « OTP » or « code PIN » in the subject — MessageAI 550s those.
+   */
   async sendOtp(to: string, code: string): Promise<EmailOtpSendResult> {
-    const dest = to.trim().toLowerCase();
-    if (isMockOtpAllowed()) {
-      this.logger.log(`[MOCK EMAIL OTP] → ${maskEmail(dest)}`);
-      return { success: true, message: 'Code OTP e-mail simulé (MOCK_OTP)' };
-    }
-
-    if (!this.isConfigured()) {
-      this.logger.error(
-        `EMAIL OTP not sent to ${maskEmail(dest)} — ${EMAIL_SMTP_ENV_HINT} OTP was still issued; do not skip verification.`,
-      );
-      return { success: false, message: EMAIL_SMTP_ENV_HINT };
-    }
-
-    const subject = 'Votre accès SENGA — AfriSoft';
-    const text =
-      `Bonjour,\n\n` +
-      `Voici le code de connexion temporaire pour votre compte SENGA (AfriSoft).\n\n` +
-      `Code (6 chiffres, 10 minutes) : ${code}\n\n` +
-      `Si vous n'êtes pas à l'origine de cette demande, ignorez ce message.\n\n` +
-      `— L'équipe SENGA / AfriSoft\nhttps://afri-soft.com`;
-    const html =
-      `<p>Bonjour,</p>` +
-      `<p>Voici le code de connexion temporaire pour votre compte SENGA (AfriSoft).</p>` +
-      `<p>Code (6 chiffres, 10 minutes) : <strong>${code}</strong></p>` +
-      `<p>Si vous n'êtes pas à l'origine de cette demande, ignorez ce message.</p>` +
-      `<p>— L'équipe SENGA / AfriSoft<br/><a href="https://afri-soft.com">afri-soft.com</a></p>`;
-    const from = this.fromAddress();
-
-    try {
-      if (this.resendKey()) {
-        return await this.sendResend(dest, from, subject, text, html);
-      }
-      return await this.sendSmtp(dest, from, subject, text, html);
-    } catch (e) {
-      const detail = (e as Error).message;
-      this.logger.error(`EMAIL OTP send failed for ${maskEmail(dest)}: ${detail}`);
-      return { success: false, message: mapSmtpFailureToAdminMessage(detail) };
-    }
+    const copy = sengaAccessMailCopy(code);
+    return this.sendNotice(to, copy.subject, copy.text, copy.html);
   }
 
   private resendKey(): string {

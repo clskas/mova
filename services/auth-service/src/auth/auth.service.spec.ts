@@ -1,4 +1,4 @@
-import { isMockOtpAllowed, MovaErrorCode, TEST_OTP_CODE, UserRole, UserStatus } from '@mova/shared';
+import { MovaErrorCode, TEST_OTP_CODE, UserRole, UserStatus } from '@mova/shared';
 import { AuthService } from './auth.service';
 import { hashOtpCode } from './otp-code.util';
 import { hashLocalPin } from './local-pin.util';
@@ -6,16 +6,9 @@ import { OWNER_SUPER_ADMIN_PHONE } from './partner-auth.util';
 
 type GoogleStart = Awaited<ReturnType<AuthService['loginWithGoogle']>>;
 
-function googleOtpChallenge(result: GoogleStart) {
-  if (!('otpRequired' in result)) {
-    throw new Error('expected Google OTP challenge, got a session JWT');
-  }
-  return result;
-}
-
 function googleSession(result: GoogleStart) {
   if (!('accessToken' in result)) {
-    throw new Error('expected Google session JWT, got an OTP challenge');
+    throw new Error('expected Google session JWT');
   }
   return result;
 }
@@ -466,14 +459,25 @@ describe('AuthService', () => {
     expect(sms.sendOtp).toHaveBeenCalledWith('+243812345678', expect.any(String));
   });
 
-  it('allows first Google login on driver app (OTP challenge, no user yet)', async () => {
+  it('allows first Google login on driver app (session JWT, no email OTP)', async () => {
     prisma.user.findUnique.mockResolvedValue(null);
     prisma.user.findFirst.mockResolvedValue(null);
-    const start = googleOtpChallenge(await service.loginWithGoogle('id-token', UserRole.DRIVER));
-    expect(start.otpRequired).toBe(true);
-    expect(start.challengeId).toEqual(expect.any(String));
-    expect(prisma.user.create).not.toHaveBeenCalled();
-    expect(jwt.sign).not.toHaveBeenCalled();
+    const created = makeUser({
+      id: 'g-driver',
+      phone: null,
+      googleId: 'gid-new',
+      email: 'new.user@gmail.com',
+      role: UserRole.DRIVER,
+      status: UserStatus.PENDING_KYC,
+    });
+    prisma.user.create.mockResolvedValue(created);
+    const result = googleSession(await service.loginWithGoogle('id-token', UserRole.DRIVER));
+    expect(result.isNew).toBe(true);
+    expect(result.accessToken).toBe('jwt-token');
+    expect(result.user.role).toBe(UserRole.DRIVER);
+    expect(prisma.user.create).toHaveBeenCalled();
+    expect(mailer.sendOtp).not.toHaveBeenCalled();
+    expect(sms.sendOtp).not.toHaveBeenCalled();
   });
 
   it('creates a pending DRIVER after Google email OTP from the driver app', async () => {
@@ -542,36 +546,35 @@ describe('AuthService', () => {
       email: 'new.user@gmail.com',
     });
     prisma.user.findUnique.mockResolvedValue(driver);
-    const start = googleOtpChallenge(await service.loginWithGoogle('id-token', UserRole.DRIVER));
-    expect(start.otpRequired).toBe(true);
-    expect(prisma.user.create).not.toHaveBeenCalled();
-
-    seedGoogleChallenge({
-      userId: driver.id,
-      isNew: false,
-      role: UserRole.DRIVER,
-      destination: 'new.user@gmail.com',
-      channel: 'email',
-      email: 'new.user@gmail.com',
-    });
-    await seedHashedOtp('new.user@gmail.com', '847291');
-    prisma.user.findUnique.mockResolvedValue(driver);
     prisma.user.update.mockResolvedValue(driver);
-    const done = await service.verifyGoogleOtp('challenge-1', '847291', UserRole.DRIVER);
+    const done = googleSession(await service.loginWithGoogle('id-token', UserRole.DRIVER));
     expect(done.user.role).toBe(UserRole.DRIVER);
     expect(done.isNew).toBe(false);
+    expect(done.accessToken).toBe('jwt-token');
     expect(prisma.user.create).not.toHaveBeenCalled();
     expect(jwt.sign).toHaveBeenCalled();
+    expect(mailer.sendOtp).not.toHaveBeenCalled();
+    expect(sms.sendOtp).not.toHaveBeenCalled();
   });
 
-  it('allows first Google login on restaurant portal (OTP challenge, no JWT yet)', async () => {
+  it('allows first Google login on restaurant portal (session JWT, no email OTP)', async () => {
     prisma.user.findUnique.mockResolvedValue(null);
     prisma.user.findFirst.mockResolvedValue(null);
-    const start = googleOtpChallenge(await service.loginWithGoogle('id-token', UserRole.RESTAURANT, 'restaurant'));
-    expect(start.otpRequired).toBe(true);
-    expect(start.challengeId).toEqual(expect.any(String));
-    expect(prisma.user.create).not.toHaveBeenCalled();
-    expect(jwt.sign).not.toHaveBeenCalled();
+    const created = makeUser({
+      id: 'g-resto',
+      phone: null,
+      googleId: 'gid-new',
+      email: 'new.user@gmail.com',
+      role: UserRole.RESTAURANT,
+    });
+    prisma.user.create.mockResolvedValue(created);
+    const result = googleSession(await service.loginWithGoogle('id-token', UserRole.RESTAURANT, 'restaurant'));
+    expect(result.isNew).toBe(true);
+    expect(result.accessToken).toBe('jwt-token');
+    expect(result.user.role).toBe(UserRole.RESTAURANT);
+    expect(prisma.user.create).toHaveBeenCalled();
+    expect(mailer.sendOtp).not.toHaveBeenCalled();
+    expect(sms.sendOtp).not.toHaveBeenCalled();
   });
 
   it('creates RESTAURANT after Google email OTP from restaurant portal', async () => {
@@ -677,23 +680,25 @@ describe('AuthService', () => {
     return challenge;
   }
 
-  it('Google-only login sends email OTP and does not issue JWT yet', async () => {
+  it('Google-only login issues JWT without email OTP', async () => {
     prisma.user.findUnique.mockResolvedValue(null);
     prisma.user.findFirst.mockResolvedValue(null);
-    const result = googleOtpChallenge(await service.loginWithGoogle('id-token', UserRole.PASSENGER));
-    expect(result.otpRequired).toBe(true);
-    expect(result.otpChannel).toBe('email');
-    expect(result.challengeId).toEqual(expect.any(String));
-    expect(result).not.toHaveProperty('accessToken');
-    expect(prisma.user.create).not.toHaveBeenCalled();
-    expect(jwt.sign).not.toHaveBeenCalled();
-    expect(prisma.otpCode.create).toHaveBeenCalled();
+    const created = makeUser({
+      id: 'g-user',
+      phone: null,
+      googleId: 'gid-new',
+      email: 'new.user@gmail.com',
+      firstName: 'Marie',
+    });
+    prisma.user.create.mockResolvedValue(created);
+    const result = googleSession(await service.loginWithGoogle('id-token', UserRole.PASSENGER));
+    expect(result.accessToken).toBe('jwt-token');
+    expect(result.isNew).toBe(true);
+    expect(result).not.toHaveProperty('otpRequired');
+    expect(prisma.user.create).toHaveBeenCalled();
+    expect(prisma.otpCode.create).not.toHaveBeenCalled();
+    expect(mailer.sendOtp).not.toHaveBeenCalled();
     expect(sms.sendOtp).not.toHaveBeenCalled();
-    if (isMockOtpAllowed()) {
-      expect(mailer.sendOtp).not.toHaveBeenCalled();
-    } else {
-      expect(mailer.sendOtp).toHaveBeenCalledWith('new.user@gmail.com', expect.any(String));
-    }
   });
 
   it('completes Google-only login after email OTP — creates PASSENGER and JWT', async () => {
@@ -820,7 +825,7 @@ describe('AuthService', () => {
     );
   });
 
-  it('Google login of a phone user sends email OTP (not SMS) and keeps the same userId after verify', async () => {
+  it('Google login of a phone user issues JWT without email or SMS OTP and keeps the same userId', async () => {
     const existing = makeUser({
       id: 'phone-user',
       phone: '+243811111111',
@@ -828,36 +833,22 @@ describe('AuthService', () => {
       email: 'marie@gmail.com',
     });
     prisma.user.findUnique.mockResolvedValue(existing);
-    const start = googleOtpChallenge(await service.loginWithGoogle('id-token', UserRole.PASSENGER));
-    expect(start.otpRequired).toBe(true);
-    expect(start.otpChannel).toBe('email');
-    expect(start).not.toHaveProperty('accessToken');
-    expect(sms.sendOtp).not.toHaveBeenCalled();
-    expect(prisma.user.create).not.toHaveBeenCalled();
-    if (!isMockOtpAllowed()) {
-      expect(mailer.sendOtp).toHaveBeenCalledWith('new.user@gmail.com', expect.any(String));
-    }
-
-    seedGoogleChallenge({
-      userId: existing.id,
-      isNew: false,
-      destination: 'new.user@gmail.com',
-      channel: 'email',
-      email: 'new.user@gmail.com',
-    });
-    await seedHashedOtp('new.user@gmail.com', '847291');
-    prisma.user.findUnique.mockResolvedValue(existing);
     prisma.user.update.mockResolvedValue(existing);
-    const done = await service.verifyGoogleOtp('challenge-1', '847291', UserRole.PASSENGER);
+    const done = googleSession(await service.loginWithGoogle('id-token', UserRole.PASSENGER));
     expect(done.user.id).toBe('phone-user');
     expect(done.isNew).toBe(false);
+    expect(done.accessToken).toBe('jwt-token');
+    expect(done).not.toHaveProperty('otpRequired');
+    expect(sms.sendOtp).not.toHaveBeenCalled();
+    expect(mailer.sendOtp).not.toHaveBeenCalled();
     expect(prisma.user.create).not.toHaveBeenCalled();
   });
 
-  it('attaches Google to an existing phone user after OTP when emails match — same userId', async () => {
+  it('attaches Google to an existing phone user when emails match — same userId, no OTP', async () => {
     const existing = makeUser({ id: 'email-match', email: 'marie@gmail.com', googleId: null });
     prisma.user.findUnique.mockResolvedValue(null);
     prisma.user.findFirst.mockResolvedValue(existing);
+    prisma.user.update.mockResolvedValue({ ...existing, googleId: 'gid-new' });
     googleTokens.verify.mockResolvedValue({
       googleId: 'gid-new',
       email: 'marie@gmail.com',
@@ -867,43 +858,23 @@ describe('AuthService', () => {
       picture: null,
       audience: 'web',
     });
-    const start = googleOtpChallenge(await service.loginWithGoogle('id-token', UserRole.PASSENGER));
-    expect(start.otpChannel).toBe('email');
-    expect(sms.sendOtp).not.toHaveBeenCalled();
-    expect(prisma.user.create).not.toHaveBeenCalled();
-    expect(prisma.user.update).not.toHaveBeenCalled();
-
-    seedGoogleChallenge({
-      userId: existing.id,
-      isNew: false,
-      destination: 'marie@gmail.com',
-      channel: 'email',
-      email: 'marie@gmail.com',
-    });
-    await seedHashedOtp('marie@gmail.com', '847291');
-    prisma.user.findUnique.mockResolvedValue(existing);
-    prisma.user.update.mockResolvedValue({ ...existing, googleId: 'gid-new' });
-    const done = await service.verifyGoogleOtp('challenge-1', '847291', UserRole.PASSENGER);
+    const done = googleSession(await service.loginWithGoogle('id-token', UserRole.PASSENGER));
     expect(done.user.id).toBe('email-match');
+    expect(sms.sendOtp).not.toHaveBeenCalled();
+    expect(mailer.sendOtp).not.toHaveBeenCalled();
+    expect(prisma.user.create).not.toHaveBeenCalled();
     expect(prisma.user.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: existing.id },
         data: expect.objectContaining({ googleId: 'gid-new' }),
       }),
     );
-    expect(prisma.user.create).not.toHaveBeenCalled();
   });
 
-  it('completes Google login when email OTP cannot be sent (verified Google email)', async () => {
+  it('completes Google login without sending email OTP even if the mailer is down', async () => {
     prisma.user.findUnique.mockResolvedValue(null);
     prisma.user.findFirst.mockResolvedValue(null);
     mailer.sendOtp.mockResolvedValue({ success: false, message: 'SMTP missing' });
-    if (isMockOtpAllowed()) {
-      const result = googleOtpChallenge(await service.loginWithGoogle('id-token', UserRole.PASSENGER));
-      expect(result.otpRequired).toBe(true);
-      expect(jwt.sign).not.toHaveBeenCalled();
-      return;
-    }
     const created = makeUser({
       id: 'g-user',
       phone: null,
@@ -914,6 +885,7 @@ describe('AuthService', () => {
     const result = googleSession(await service.loginWithGoogle('id-token', UserRole.PASSENGER));
     expect(result.accessToken).toBe('jwt-token');
     expect(result).not.toHaveProperty('otpRequired');
+    expect(mailer.sendOtp).not.toHaveBeenCalled();
     expect(prisma.user.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ googleId: 'gid-new', role: UserRole.PASSENGER }),
@@ -942,54 +914,36 @@ describe('AuthService', () => {
       if (where.phone === OWNER_SUPER_ADMIN_PHONE) return Promise.resolve(owner);
       return Promise.resolve(null);
     });
-    const start = googleOtpChallenge(await service.loginWithGoogle('id-token', UserRole.ADMIN));
-    expect(start.otpRequired).toBe(true);
-    expect(start.otpChannel).toBe('email');
-    expect(sms.sendOtp).not.toHaveBeenCalled();
-    if (!isMockOtpAllowed()) {
-      expect(mailer.sendOtp).toHaveBeenCalledWith('celestinkas@gmail.com', expect.any(String));
-    }
-    expect(prisma.user.create).not.toHaveBeenCalled();
-  });
-
-  it('issues SUPER_ADMIN JWT when owner Google email OTP cannot be sent', async () => {
-    const owner = makeUser({
-      id: 'owner-1',
-      phone: OWNER_SUPER_ADMIN_PHONE,
-      role: UserRole.SUPER_ADMIN,
-      email: null,
-      googleId: null,
-    });
-    googleTokens.verify.mockResolvedValue({
-      googleId: 'gid-owner',
-      email: 'celestinkas@gmail.com',
-      emailVerified: true,
-      givenName: 'Celestin',
-      familyName: 'Kas',
-      picture: null,
-      audience: 'web',
-    });
-    prisma.user.findUnique.mockImplementation(({ where }: { where: { googleId?: string; phone?: string; id?: string } }) => {
-      if (where.phone === OWNER_SUPER_ADMIN_PHONE) return Promise.resolve(owner);
-      if (where.id === owner.id) return Promise.resolve(owner);
-      return Promise.resolve(null);
-    });
     prisma.user.update.mockResolvedValue({ ...owner, googleId: 'gid-owner', email: 'celestinkas@gmail.com' });
-    mailer.sendOtp.mockResolvedValue({ success: false, message: 'SMTP missing' });
-    if (isMockOtpAllowed()) {
-      const result = googleOtpChallenge(await service.loginWithGoogle('id-token', UserRole.ADMIN));
-      expect(result.otpRequired).toBe(true);
-      expect(result.otpChannel).toBe('email');
-      expect(prisma.user.create).not.toHaveBeenCalled();
-      return;
-    }
     const result = googleSession(await service.loginWithGoogle('id-token', UserRole.ADMIN));
     expect(result.accessToken).toBe('jwt-token');
     expect(result.user.role).toBe(UserRole.SUPER_ADMIN);
+    expect(result).not.toHaveProperty('otpRequired');
+    expect(sms.sendOtp).not.toHaveBeenCalled();
+    expect(mailer.sendOtp).not.toHaveBeenCalled();
     expect(prisma.user.create).not.toHaveBeenCalled();
   });
 
-  it('allows owner SUPER_ADMIN Google on the restaurant portal (email OTP, same account)', async () => {
+  it('refuses Google login when the Google email is not verified', async () => {
+    googleTokens.verify.mockResolvedValue({
+      googleId: 'gid-new',
+      email: 'new.user@gmail.com',
+      emailVerified: false,
+      givenName: 'Marie',
+      familyName: 'Kabila',
+      picture: null,
+      audience: 'web',
+    });
+    prisma.user.findUnique.mockResolvedValue(null);
+    prisma.user.findFirst.mockResolvedValue(null);
+    await expect(service.loginWithGoogle('id-token', UserRole.PASSENGER)).rejects.toMatchObject({
+      response: { code: MovaErrorCode.AUTH_INVALID_GOOGLE },
+    });
+    expect(prisma.user.create).not.toHaveBeenCalled();
+    expect(mailer.sendOtp).not.toHaveBeenCalled();
+  });
+
+  it('allows owner SUPER_ADMIN Google on the restaurant portal (same account, no email OTP)', async () => {
     const owner = makeUser({
       id: 'owner-1',
       phone: OWNER_SUPER_ADMIN_PHONE,
@@ -1011,13 +965,13 @@ describe('AuthService', () => {
       return Promise.resolve(null);
     });
     prisma.user.findFirst.mockResolvedValue(owner);
-    const start = googleOtpChallenge(await service.loginWithGoogle('id-token', UserRole.RESTAURANT, 'restaurant'));
-    expect(start.otpRequired).toBe(true);
-    expect(start.otpChannel).toBe('email');
+    prisma.user.update.mockResolvedValue({ ...owner, googleId: 'gid-owner' });
+    const result = googleSession(await service.loginWithGoogle('id-token', UserRole.RESTAURANT, 'restaurant'));
+    expect(result.accessToken).toBe('jwt-token');
+    expect(result.user.role).toBe(UserRole.SUPER_ADMIN);
+    expect(result).not.toHaveProperty('otpRequired');
     expect(sms.sendOtp).not.toHaveBeenCalled();
-    if (!isMockOtpAllowed()) {
-      expect(mailer.sendOtp).toHaveBeenCalledWith('celestinkas@gmail.com', expect.any(String));
-    }
+    expect(mailer.sendOtp).not.toHaveBeenCalled();
     expect(prisma.user.create).not.toHaveBeenCalled();
   });
 

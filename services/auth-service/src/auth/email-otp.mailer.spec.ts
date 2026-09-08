@@ -3,10 +3,12 @@ import {
   EMAIL_RESEND_ADMIN_MESSAGE,
   EMAIL_SMTP_ACCEPTED_ADMIN_MESSAGE,
   EMAIL_SMTP_ENV_HINT,
+  SENGA_ACCESS_MAIL_SUBJECT,
   allowsSharedMailCertFallback,
   emailInboxHintFor,
   inferSmtpHost,
   isGmailAddress,
+  sengaAccessMailCopy,
   mapSmtpFailureToAdminMessage,
   smtpEhloHostname,
   smtpConnectHost,
@@ -70,6 +72,21 @@ describe('site4now TLS hostname mismatch', () => {
     expect(opts.servername).toBe('mail5013.site4now.net');
     expect(opts.rejectUnauthorized).not.toBe(false);
     expect(typeof opts.checkServerIdentity).toBe('function');
+  });
+});
+
+describe('sengaAccessMailCopy', () => {
+  it('never puts OTP or code PIN in the subject (MessageAI)', () => {
+    const pin = sengaAccessMailCopy('482917', { partnerPortals: true });
+    const otp = sengaAccessMailCopy('482917');
+    for (const copy of [pin, otp]) {
+      expect(copy.subject).toBe(SENGA_ACCESS_MAIL_SUBJECT);
+      expect(copy.subject).not.toMatch(/otp|code PIN/i);
+      expect(copy.text).not.toMatch(/otp|code PIN/i);
+      expect(copy.html).not.toMatch(/otp|code PIN/i);
+      expect(copy.text).toContain('482917');
+    }
+    expect(pin.text).toContain('restaurant.afri-soft.com');
   });
 });
 

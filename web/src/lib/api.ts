@@ -236,12 +236,11 @@ function mockFor<T>(path: string, init?: RequestInit): T {
   if (path.includes('/auth/google') && !path.includes('/auth/google/verify') && !path.includes('/auth/link-')) {
     return {
       success: true,
-      otpRequired: true,
-      challengeId: 'mock-google-challenge',
-      otpChannel: 'email',
-      destinationMasked: 'ma***@gmail.com',
-      message: 'Code envoyé par e-mail. Vérifiez votre boîte de réception.',
-      mockCode: '123456',
+      accessToken: 'mock-web-token',
+      isNew: false,
+      pinConfigured: false,
+      needsPinSetup: true,
+      user: { id: 'mock-user', phone: '', hasPhone: false, email: 'ma***@gmail.com', role: 'PASSENGER' },
     } as T;
   }
   if (path.includes('/auth/otp/verify') || path.includes('/auth/google/verify') || path.includes('/auth/link-')) {

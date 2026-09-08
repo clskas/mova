@@ -34,7 +34,7 @@ const kFaqItems = <FaqItem>[
   FaqItem(
     question: 'Comment recharger mon portefeuille SENGA ?',
     answer:
-        'Ouvrez Wallet SENGA, appuyez sur Recharger, choisissez votre opérateur mobile money et suivez les instructions USSD ou l\'écran de confirmation.',
+        'Portefeuille SENGA → Recharger avec → Orange Money. Saisissez le numéro de la SIM Orange (80, 84, 85, 89) et au moins 2 300 FC. SENGA n’ouvre pas le composeur : attendez le push USSD Orange (*144#) sur CE numéro, puis saisissez votre PIN.',
   ),
   FaqItem(
     question: 'Le prix affiché est-il définitif ?',
@@ -188,9 +188,10 @@ const kManualChapters = <ManualChapter>[
     icon: '💳',
     steps: [
       'Ouvrez Wallet SENGA.',
-      'Appuyez sur Recharger.',
-      'Choisissez Orange Money, M-Pesa ou Airtel Money.',
-      'Validez le paiement sur votre téléphone. Le solde apparaît en CDF.',
+      'Appuyez sur Recharger avec → Orange Money (ou M-Pesa / Airtel).',
+      'Saisissez le numéro de CETTE SIM et au moins 2 300 FC.',
+      'SENGA n’ouvre pas le composeur. Attendez le push USSD (*144# sur Orange) et validez le PIN.',
+      'Le solde apparaît en CDF après confirmation opérateur.',
     ],
   ),
   ManualChapter(

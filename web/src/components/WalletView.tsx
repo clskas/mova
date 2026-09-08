@@ -28,6 +28,7 @@ export function WalletView({ onBack, mock }: Props) {
   const [withdrawOtp, setWithdrawOtp] = useState("");
   const [withdrawOtpSent, setWithdrawOtpSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
   const [historyRefresh, setHistoryRefresh] = useState(0);
   const topUpInFlight = useRef(false);
   const withdrawInFlight = useRef(false);
@@ -47,7 +48,7 @@ export function WalletView({ onBack, mock }: Props) {
 
   useEffect(() => {
     const stored = getStoredPhone()?.trim();
-    if (stored) {
+    if (stored && !stored.includes("@")) {
       setTopUpPhone((p) => p || stored);
       setWithdrawPhone((p) => p || stored);
     }
@@ -68,11 +69,37 @@ export function WalletView({ onBack, mock }: Props) {
       setError("Indiquez le numéro Mobile Money à débiter.");
       return;
     }
+    if (!mock) {
+      const digits = topUpPhone.replace(/\D/g, "");
+      const nsn = digits.startsWith("243") ? digits.slice(3) : digits.startsWith("0") ? digits.slice(1) : digits;
+      const prefix = nsn.slice(0, 2);
+      const prefixes: Record<string, string[]> = {
+        ORANGE_MONEY: ["80", "84", "85", "89"],
+        MPESA: ["81", "82", "83"],
+        AIRTEL_MONEY: ["97", "98", "99"],
+      };
+      const allowed = prefixes[topUpProvider];
+      if (allowed && !allowed.includes(prefix)) {
+        setError(
+          topUpProvider === "ORANGE_MONEY"
+            ? "Ce numéro n’est pas un numéro Orange Money (préfixes 80, 84, 85, 89). Saisissez le numéro de la SIM Orange — le push USSD arrive sur CE numéro. SENGA n’ouvre pas le composeur."
+            : "Ce numéro ne correspond pas à l’opérateur choisi. Le push USSD arrive sur le numéro saisi.",
+        );
+        return;
+      }
+    }
     topUpInFlight.current = true;
     setTopUpLoading(true);
     setError(null);
+    setInfo(null);
     try {
-      const res = await apiFetch<{ balanceCdf?: number; message?: string }>("/api/wallet/top-up", {
+      const res = await apiFetch<{
+        balanceCdf?: number;
+        message?: string;
+        paymentUrl?: string;
+        ussdCode?: string;
+        pendingMobileMoney?: boolean;
+      }>("/api/wallet/top-up", {
         method: "POST",
         body: JSON.stringify({
           provider: mock ? "MOCK" : topUpProvider,
@@ -80,11 +107,22 @@ export function WalletView({ onBack, mock }: Props) {
           phone: topUpPhone.trim() || undefined,
         }),
       }, { useMock: mock });
+      if (res.paymentUrl) {
+        window.open(res.paymentUrl, "_blank", "noopener,noreferrer");
+      }
       if (res.balanceCdf != null) {
         setWallet((w) => ({ ...w, balanceCdf: res.balanceCdf }));
       }
       await load();
       setHistoryRefresh((n) => n + 1);
+      if (res.pendingMobileMoney) {
+        setInfo(
+          res.message ??
+            (topUpProvider === "ORANGE_MONEY"
+              ? "Push Orange Money demandé. SENGA n’ouvre pas le composeur : attendez *144# sur le numéro saisi (min. 2 300 FC)."
+              : "Confirmez le push USSD / PIN sur le numéro saisi."),
+        );
+      }
     } catch (e) {
       setError(toUserErrorMessage(e, "Échec de la recharge"));
     } finally {
@@ -180,6 +218,7 @@ export function WalletView({ onBack, mock }: Props) {
         <p className="text-xs text-[#FF6B35] bg-orange-50 rounded-lg py-2 px-3">Mode démo — passerelle indisponible</p>
       )}
       {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg p-3">{error}</p>}
+      {info && <p className="text-sm text-emerald-800 bg-emerald-50 rounded-lg p-3">{info}</p>}
 
       <div className="bg-white rounded-xl p-6 shadow-sm text-center">
         <p className="text-sm text-gray-500">Solde disponible</p>
@@ -190,6 +229,9 @@ export function WalletView({ onBack, mock }: Props) {
 
       <div className="bg-white rounded-xl p-4 shadow-sm space-y-3">
         <p className="font-medium text-sm">Recharger</p>
+        <p className="text-xs text-gray-500">
+          Orange Money : push USSD (*144#) sur le numéro de la SIM Orange — SENGA n’ouvre pas le composeur. Minimum 2 300 FC.
+        </p>
         <input
           className="w-full rounded-xl border-0 bg-gray-50 p-3"
           type="number"

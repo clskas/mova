@@ -2,11 +2,15 @@
 const pinSixDigitsFr = 'Le code PIN doit contenir 6 chiffres.';
 const paymentFailedFr =
     'Le paiement Mobile Money a échoué. Réessayez ou contactez le support SENGA.';
+const channelDisabledFr =
+    'Ce canal Mobile Money n’est pas activé pour le marchand SerdiPay. Aucun push USSD n’a été envoyé. Contactez le support SENGA.';
 const validationFailedFr = 'Données invalides. Vérifiez les champs.';
 const withdrawOtpPromptFr =
     'Saisissez le code SMS à 6 chiffres envoyé au numéro Mobile Money.';
 const merchantFloatLowFr =
-    'Le compte de versement n’a pas assez de fonds. Votre solde SENGA n’a pas été débité.';
+    'Le compte marchand SerdiPay n’a pas assez de fonds. L’opération Mobile Money n’a pas abouti.';
+const merchantUnauthenticatedFr =
+    'Authentification marchand SerdiPay expirée. Réessayez la recharge — ce n’est pas votre session SENGA.';
 
 /// Backend « OTP requis / invalide / expiré » is a withdraw *step*, not a wallet crash.
 bool isWithdrawOtpChallengeMessage(String? raw) {
@@ -87,8 +91,16 @@ String sanitizeUserMessage(
   if (raw == null || raw.trim().isEmpty) return fallback;
   final msg = raw.trim();
   if (_isClassValidatorPinMessage(msg)) return pinSixDigitsFr;
+  if (RegExp(r'\bunauthenticated\b', caseSensitive: false).hasMatch(msg)) {
+    return merchantUnauthenticatedFr;
+  }
   if (_isMerchantFloatEnglish(msg)) return merchantFloatLowFr;
-  if (_isPaymentGatewayEnglish(msg)) return paymentFailedFr;
+  if (_isPaymentGatewayEnglish(msg)) {
+    if (msg.toLowerCase().contains('channel') || msg.toLowerCase().contains('merchant is not allowed')) {
+      return channelDisabledFr;
+    }
+    return paymentFailedFr;
+  }
   final withdrawField = _withdrawFieldMessage(msg);
   if (withdrawField != null) return withdrawField;
   if (_isClassValidatorEnglish(msg)) return validationFailedFr;

@@ -175,6 +175,12 @@ class MarketConfig {
     MobileMoneyProvider(id: 'AIRTEL_MONEY', name: 'Airtel Money', color: 0xFFED1C24),
   ];
 
+  static const mmPrefixes = {
+    'ORANGE_MONEY': ['80', '84', '85', '89'],
+    'MPESA': ['81', '82', '83'],
+    'AIRTEL_MONEY': ['97', '98', '99'],
+  };
+
   static const vehicleTypes = [
     VehicleTypeOption(id: 'MOTO_TAXI', label: 'Moto-taxi', icon: '🏍️'),
     VehicleTypeOption(id: 'STANDARD', label: 'Standard', icon: '🚗'),
@@ -280,6 +286,29 @@ class MarketConfig {
   static bool validatePhone(String phone) {
     final cleaned = phone.replaceAll(' ', '');
     return RegExp(r'^\+243[0-9]{9}$').hasMatch(cleaned);
+  }
+
+  static String? mmPrefixMismatchFr(String providerId, String phone) {
+    final normalized = normalizePhone(phone);
+    if (!validatePhone(normalized)) {
+      return 'Numéro Mobile Money invalide. Format : +243XXXXXXXXX (pas un e-mail).';
+    }
+    final prefixes = mmPrefixes[providerId];
+    if (prefixes == null) return null;
+    final prefix = normalized.substring(4, 6);
+    if (prefixes.contains(prefix)) return null;
+    final list = prefixes.join(', ');
+    if (providerId == 'ORANGE_MONEY') {
+      return 'Ce numéro n’est pas un numéro Orange Money (préfixes $list). '
+          'Saisissez le numéro de la SIM Orange — le push USSD (*144#) arrive sur CE numéro. '
+          'SENGA n’ouvre pas le composeur.';
+    }
+    if (providerId == 'MPESA') {
+      return 'Ce numéro n’est pas un numéro Vodacom M-Pesa (préfixes $list). '
+          'Saisissez le numéro de la SIM Vodacom.';
+    }
+    return 'Ce numéro n’est pas un numéro Airtel Money (préfixes $list). '
+        'Saisissez le numéro de la SIM Airtel.';
   }
 
   static String normalizePhone(String phone) {

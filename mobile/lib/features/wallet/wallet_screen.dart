@@ -12,6 +12,7 @@ import '../../core/error/result.dart';
 import '../../core/error/user_friendly_error.dart';
 import '../../core/widgets/offline_shell.dart';
 import '../../core/wallet/wallet_movements.dart';
+import '../../core/wallet/mobile_money_prompt.dart';
 
 int _readCdf(dynamic value) {
   if (value is int) return value;
@@ -187,8 +188,11 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
   }
 
   Future<void> _showTopUpSheet(MobileMoneyProvider provider) async {
+    final stored = await ref.read(apiClientProvider).loadUserPhone();
     final initialPhone =
-        await ref.read(apiClientProvider).loadUserPhone() ?? '+243812345678';
+        (stored != null && MarketConfig.validatePhone(MarketConfig.normalizePhone(stored)))
+            ? MarketConfig.normalizePhone(stored)
+            : '';
     if (!mounted) return;
 
     setState(() => _topUpSheetOpen = true);
@@ -318,12 +322,16 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
             });
             return;
           }
+          await openMobileMoneyPrompt(
+            paymentUrl: data['paymentUrl']?.toString(),
+            ussdCode: data['ussdCode']?.toString(),
+          );
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(
                   data['message']?.toString() ??
-                      'Confirmez la recharge sur votre téléphone Mobile Money.',
+                      'Confirmez la recharge sur votre téléphone Mobile Money. SENGA n’ouvre pas le composeur.',
                 ),
               ),
             );
@@ -965,9 +973,15 @@ class _WalletTopUpSheetState extends State<_WalletTopUpSheet> {
       );
       return;
     }
+    final phone = _phoneController.text.trim();
+    final mismatch = MarketConfig.mmPrefixMismatchFr(widget.provider.id, phone);
+    if (mismatch != null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(mismatch)));
+      return;
+    }
     Navigator.pop(
       context,
-      (amount: amount, phone: _phoneController.text.trim()),
+      (amount: amount, phone: phone),
     );
   }
 
@@ -988,6 +1002,13 @@ class _WalletTopUpSheetState extends State<_WalletTopUpSheet> {
             Text(
               'Recharger via ${widget.provider.name}',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              widget.provider.id == 'ORANGE_MONEY'
+                  ? 'SENGA n’ouvre pas le composeur. Orange Money envoie un push USSD (*144#) sur le numéro ci-dessous (SIM Orange, préfixes 80 / 84 / 85 / 89). Minimum 2 300 FC.'
+                  : 'SENGA n’ouvre pas le composeur. Confirmez le push USSD / PIN sur le numéro Mobile Money ci-dessous. Minimum 2 300 FC.',
+              style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
             ),
             const SizedBox(height: 16),
             TextField(

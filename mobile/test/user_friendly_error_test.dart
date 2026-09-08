@@ -21,7 +21,7 @@ void main() {
   test('maps payment gateway English to French', () {
     expect(
       sanitizeUserMessage('Payment Failed, Merchant is not allowed to use this channel0'),
-      'Le paiement Mobile Money a échoué. Réessayez ou contactez le support SENGA.',
+      channelDisabledFr,
     );
   });
 
@@ -68,10 +68,18 @@ void main() {
     expect(isWithdrawOtpChallengeMessage('Recharge Mobile Money refusée.'), isFalse);
   });
 
+  test('maps Laravel Unauthenticated to merchant French, not SENGA login', () {
+    expect(
+      sanitizeUserMessage('Unauthenticated.'),
+      'Authentification marchand SerdiPay expirée. Réessayez la recharge — ce n’est pas votre session SENGA.',
+    );
+    expect(sanitizeUserMessage('Unauthenticated.'), isNot(contains('Veuillez vous connecter')));
+  });
+
   test('maps SerdiPay merchant-float English to French (not the user SENGA wallet)', () {
     expect(
       sanitizeUserMessage('Your Balance is low'),
-      'Le compte de versement n’a pas assez de fonds. Votre solde SENGA n’a pas été débité.',
+      merchantFloatLowFr,
     );
     expect(sanitizeUserMessage('Your Balance is low'), isNot(contains('2301')));
   });

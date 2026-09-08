@@ -11,6 +11,7 @@ import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import '../billing/receipt_screen.dart';
+import '../../core/wallet/mobile_money_prompt.dart';
 import 'widgets/cash_pin_confirm_dialog.dart';
 
 const _paymentMethods = [
@@ -368,11 +369,15 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
           return;
         }
         if (data['pendingMobileMoney'] == true) {
+          await openMobileMoneyPrompt(
+            paymentUrl: data['paymentUrl']?.toString(),
+            ussdCode: data['ussdCode']?.toString(),
+          );
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
                 data['message']?.toString() ??
-                    'Confirmez le paiement sur votre téléphone Mobile Money.',
+                    'Confirmez le paiement sur votre téléphone Mobile Money. SENGA n’ouvre pas le composeur.',
               ),
             ),
           );

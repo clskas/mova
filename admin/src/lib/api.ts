@@ -2035,7 +2035,7 @@ export function activationPinSmsCopy(result: KycNotifyResult): string {
   else parts.push("SMS non envoyé.");
   if (result.emailSent) {
     parts.push(
-      "Le serveur SMTP a accepté l'e-mail — ce n'est pas une preuve d'arrivée en boîte. Si Gmail : ouvrez Spam / Courrier indésirable. Expéditeur : SENGA <noreply@afri-soft.com>.",
+      "Le serveur a accepté mais Gmail peut rejeter (DKIM/DMARC). Vérifiez spam et DNS.",
     );
   } else if (result.hasEmail === false) parts.push("Aucun e-mail lié.");
   else if (result.emailError) parts.push(`E-mail non envoyé : ${result.emailError}.`);

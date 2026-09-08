@@ -5,6 +5,7 @@ import {
   emailInboxHintFor,
   inferSmtpHost,
   mapSmtpFailureToAdminMessage,
+  smtpEhloHostname,
   smtpConnectHost,
   smtpPeerMatchesSharedMailCert,
   smtpReplyComplete,
@@ -70,10 +71,18 @@ describe('site4now TLS hostname mismatch', () => {
 });
 
 describe('emailInboxHintFor', () => {
-  it('warns Gmail about spam and DMARC reject', () => {
-    expect(emailInboxHintFor('jscelestinkas@gmail.com')).toMatch(/Spam/);
-    expect(emailInboxHintFor('jscelestinkas@gmail.com')).toMatch(/DMARC/);
-    expect(EMAIL_SMTP_ACCEPTED_ADMIN_MESSAGE).toMatch(/pas une preuve d'arrivée/);
+  it('warns Gmail about site4now spam bounce and DMARC reject', () => {
+    expect(emailInboxHintFor('jscelestinkas@gmail.com')).toMatch(/MessageAI/);
+    expect(emailInboxHintFor('jscelestinkas@gmail.com')).toMatch(/DKIM/);
+    expect(EMAIL_SMTP_ACCEPTED_ADMIN_MESSAGE).toMatch(/Gmail peut rejeter \(DKIM\/DMARC\)/);
+    expect(EMAIL_SMTP_ACCEPTED_ADMIN_MESSAGE).not.toMatch(/envoyé/);
+  });
+});
+
+describe('smtpEhloHostname', () => {
+  it('uses a FQDN derived from the From domain, not a bare HELO', () => {
+    expect(smtpEhloHostname('noreply@afri-soft.com')).toBe('senga.afri-soft.com');
+    expect(smtpEhloHostname('noreply@afri-soft.com')).not.toBe('senga');
   });
 });
 

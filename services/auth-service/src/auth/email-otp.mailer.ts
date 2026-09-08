@@ -8,20 +8,23 @@ import { isMockOtpAllowed, maskEmail } from '@mova/shared';
 export const EMAIL_UNAVAILABLE_USER_MESSAGE =
   'Impossible d\'envoyer le code par e-mail. Réessayez plus tard, ou connectez-vous avec un numéro +243.';
 
-/** SMTP 250 = accepted by the relay, not "in the inbox". */
+/**
+ * SMTP 250 = site4now accepted DATA. Not inbox proof.
+ * Production bounces: 550 MessageAI outbound spam, then Gmail never sees the mail.
+ * DNS: DMARC p=reject and no DKIM on afri-soft.com — Gmail can also drop silently.
+ */
 export const EMAIL_SMTP_ACCEPTED_ADMIN_MESSAGE =
-  "Le serveur SMTP a accepté le message. Ce n'est pas une preuve d'arrivée en boîte. Si Gmail : ouvrez Spam / Courrier indésirable.";
+  'Le serveur a accepté mais Gmail peut rejeter (DKIM/DMARC). Vérifiez spam et DNS.';
 
 export function emailInboxHintFor(to: string): string {
   const dest = to.trim().toLowerCase();
   if (dest.endsWith('@gmail.com') || dest.endsWith('@googlemail.com')) {
     return (
-      'Destinataire Gmail : vérifiez Spam. ' +
-      'From SENGA (noreply@afri-soft.com via site4now). ' +
-      'DMARC p=reject sur afri-soft.com — sans alignement SPF/DKIM, Gmail jette le message (pas même en spam).'
+      'Gmail : rien en spam = souvent rejet site4now MessageAI (550) avant Gmail, ' +
+      'ou DMARC p=reject sans DKIM. From SENGA <noreply@afri-soft.com> via mail5013.site4now.net.'
     );
   }
-  return 'Vérifiez la boîte et le dossier spam.';
+  return 'Vérifiez la boîte, le spam, et les bounces de noreply@afri-soft.com.';
 }
 
 /** Exact Render keys for mova-auth — listed when transport is incomplete. */
@@ -151,6 +154,13 @@ export function smtpTlsConnectOptions(
   };
 }
 
+/** EHLO must be a FQDN. Bare "senga" looks like a botnet to MessageAI. */
+export function smtpEhloHostname(fromAddress: string): string {
+  const domain = (fromAddress.split('@')[1] ?? '').trim().toLowerCase().replace(/[>]/g, '');
+  if (domain.includes('.')) return `senga.${domain}`;
+  return 'senga.afri-soft.com';
+}
+
 export async function lookupSmtpCname(host: string): Promise<string | undefined> {
   try {
     const records = await dns.promises.resolveCname(normalizeSmtpHost(host));
@@ -202,7 +212,7 @@ export class EmailOtpMailer {
       if (this.resendKey()) {
         return await this.sendResend(dest, from, subject, text, safeHtml);
       }
-      return await this.sendSmtp(dest, from, subject, text);
+      return await this.sendSmtp(dest, from, subject, text, safeHtml);
     } catch (e) {
       const detail = (e as Error).message;
       this.logger.error(`EMAIL send failed for ${maskEmail(dest)}: ${detail}`);
@@ -211,11 +221,23 @@ export class EmailOtpMailer {
   }
 
   async sendLoginPin(to: string, pin: string): Promise<EmailOtpSendResult> {
-    const subject = 'Votre code PIN SENGA';
+    const subject = 'Votre accès SENGA — AfriSoft';
     const text =
-      `Votre code PIN de connexion SENGA est prêt. Saisissez-le pour ouvrir l'application.\n\n` +
-      `Code : ${pin}\n\nSi vous n'êtes pas à l'origine de cette demande, ignorez cet e-mail.`;
-    const html = `<p>Votre code PIN de connexion SENGA est <strong>${pin}</strong>.</p><p>Saisissez-le pour ouvrir l'application.</p>`;
+      `Bonjour,\n\n` +
+      `AfriSoft a généré un code d'accès pour votre compte partenaire SENGA.\n\n` +
+      `Restaurant : https://restaurant.afri-soft.com\n` +
+      `Location : https://rental.afri-soft.com\n\n` +
+      `Code d'accès (6 chiffres) : ${pin}\n\n` +
+      `Saisissez-le sur l'écran de connexion. Si vous n'êtes pas à l'origine de cette demande, ignorez ce message.\n\n` +
+      `— L'équipe SENGA / AfriSoft\nhttps://afri-soft.com`;
+    const html =
+      `<p>Bonjour,</p>` +
+      `<p>AfriSoft a généré un code d'accès pour votre compte partenaire SENGA.</p>` +
+      `<p>Restaurant : <a href="https://restaurant.afri-soft.com">restaurant.afri-soft.com</a><br/>` +
+      `Location : <a href="https://rental.afri-soft.com">rental.afri-soft.com</a></p>` +
+      `<p>Code d'accès (6 chiffres) : <strong>${pin}</strong></p>` +
+      `<p>Saisissez-le sur l'écran de connexion. Si vous n'êtes pas à l'origine de cette demande, ignorez ce message.</p>` +
+      `<p>— L'équipe SENGA / AfriSoft<br/><a href="https://afri-soft.com">afri-soft.com</a></p>`;
     return this.sendNotice(to, subject, text, html);
   }
 
@@ -233,18 +255,26 @@ export class EmailOtpMailer {
       return { success: false, message: EMAIL_SMTP_ENV_HINT };
     }
 
-    const subject = 'Votre code SENGA';
+    const subject = 'Votre accès SENGA — AfriSoft';
     const text =
-      `Votre code de connexion SENGA est ${code}. Il expire dans 10 minutes.\n\n` +
-      `Si vous n'êtes pas à l'origine de cette demande, ignorez cet e-mail.`;
-    const html = `<p>Votre code de connexion SENGA est <strong>${code}</strong>.</p><p>Il expire dans 10 minutes.</p>`;
+      `Bonjour,\n\n` +
+      `Voici le code de connexion temporaire pour votre compte SENGA (AfriSoft).\n\n` +
+      `Code (6 chiffres, 10 minutes) : ${code}\n\n` +
+      `Si vous n'êtes pas à l'origine de cette demande, ignorez ce message.\n\n` +
+      `— L'équipe SENGA / AfriSoft\nhttps://afri-soft.com`;
+    const html =
+      `<p>Bonjour,</p>` +
+      `<p>Voici le code de connexion temporaire pour votre compte SENGA (AfriSoft).</p>` +
+      `<p>Code (6 chiffres, 10 minutes) : <strong>${code}</strong></p>` +
+      `<p>Si vous n'êtes pas à l'origine de cette demande, ignorez ce message.</p>` +
+      `<p>— L'équipe SENGA / AfriSoft<br/><a href="https://afri-soft.com">afri-soft.com</a></p>`;
     const from = this.fromAddress();
 
     try {
       if (this.resendKey()) {
         return await this.sendResend(dest, from, subject, text, html);
       }
-      return await this.sendSmtp(dest, from, subject, text);
+      return await this.sendSmtp(dest, from, subject, text, html);
     } catch (e) {
       const detail = (e as Error).message;
       this.logger.error(`EMAIL OTP send failed for ${maskEmail(dest)}: ${detail}`);
@@ -289,7 +319,7 @@ export class EmailOtpMailer {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: `SENGA <${from}>`,
+        from: `SENGA AfriSoft <${from}>`,
         to: [to],
         subject,
         text,
@@ -304,7 +334,13 @@ export class EmailOtpMailer {
     return { success: true, message: EMAIL_SMTP_ACCEPTED_ADMIN_MESSAGE };
   }
 
-  private async sendSmtp(to: string, from: string, subject: string, text: string): Promise<EmailOtpSendResult> {
+  private async sendSmtp(
+    to: string,
+    from: string,
+    subject: string,
+    text: string,
+    html?: string,
+  ): Promise<EmailOtpSendResult> {
     const user = this.smtpUser();
     const configuredHost = inferSmtpHost(user, this.config.get<string>('SMTP_HOST'))!;
     const explicitHost = (this.config.get<string>('SMTP_HOST') ?? '').trim();
@@ -322,22 +358,48 @@ export class EmailOtpMailer {
     const pass = this.config.get<string>('SMTP_PASS') ?? '';
     const envelopeFrom = user.includes('@') ? user : from;
     const messageId = `<${Date.now()}.${Math.random().toString(36).slice(2)}@${(from.split('@')[1] || 'afri-soft.com').replace(/[>]/g, '')}>`;
+    const boundary = `senga-alt-${Date.now().toString(36)}`;
+    const safeHtml = html ?? `<p>${escapeHtml(text).replace(/\n/g, '<br/>')}</p>`;
     const message = [
-      `From: SENGA <${from}>`,
+      `From: SENGA AfriSoft <${from}>`,
       `To: ${to}`,
+      `Reply-To: ${from}`,
       `Subject: ${encodeRfc2047(subject)}`,
       `Date: ${new Date().toUTCString()}`,
       `Message-ID: ${messageId}`,
       'MIME-Version: 1.0',
+      `List-Unsubscribe: <mailto:${from}>`,
+      'Auto-Submitted: auto-generated',
+      `Content-Type: multipart/alternative; boundary="${boundary}"`,
+      '',
+      `--${boundary}`,
       'Content-Type: text/plain; charset=utf-8',
       'Content-Transfer-Encoding: 8bit',
       '',
       text,
+      `--${boundary}`,
+      'Content-Type: text/html; charset=utf-8',
+      'Content-Transfer-Encoding: 8bit',
+      '',
+      safeHtml,
+      `--${boundary}--`,
     ].join('\r\n');
 
-    await smtpSend({ host, tlsServername, configuredHost, port, user, pass, from: envelopeFrom, to, message });
+    const ehloHostname = smtpEhloHostname(from);
+    await smtpSend({
+      host,
+      tlsServername,
+      configuredHost,
+      port,
+      user,
+      pass,
+      from: envelopeFrom,
+      to,
+      message,
+      ehloHostname,
+    });
     this.logger.log(
-      `SMTP accepted (250) for ${maskEmail(to)} from=${from} envelope=${envelopeFrom} — not inbox proof. ${emailInboxHintFor(to)}`,
+      `SMTP accepted (250) for ${maskEmail(to)} from=${from} envelope=${envelopeFrom} ehlo=${ehloHostname} — not inbox proof. ${emailInboxHintFor(to)}`,
     );
     return { success: true, message: EMAIL_SMTP_ACCEPTED_ADMIN_MESSAGE };
   }
@@ -353,6 +415,7 @@ type SmtpOpts = {
   from: string;
   to: string;
   message: string;
+  ehloHostname?: string;
 };
 
 function b64(value: string) {
@@ -491,8 +554,9 @@ async function smtpSend(opts: SmtpOpts): Promise<void> {
   };
 
   try {
+    const ehloName = opts.ehloHostname || smtpEhloHostname(opts.from);
     await expect(['220']);
-    write('EHLO senga');
+    write(`EHLO ${ehloName}`);
     let ehlo = await expect(['250']);
     if (!implicitTls && (opts.port === 587 || opts.port === 25 || opts.port === 2525)) {
       write('STARTTLS');
@@ -516,7 +580,7 @@ async function smtpSend(opts: SmtpOpts): Promise<void> {
       state.socket = upgraded;
       buf = '';
       attach(state.socket);
-      write('EHLO senga');
+      write(`EHLO ${ehloName}`);
       ehlo = await expect(['250']);
     }
     const auth = ehloAuthMethods(ehlo);

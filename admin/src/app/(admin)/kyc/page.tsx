@@ -193,7 +193,48 @@ function partnerStageLabel(r: PartnerKycDossier) {
     return r.pinPending || !r.pinConfigured ? "KYC OK — PIN à transmettre" : "Actif (PIN configuré)";
   }
   if (r.kycStatus === "REJECTED") return "Dossier refusé";
+  if (allJustificatifsApproved(r.checklist)) return "Documents OK — Approuver le dossier";
   return "Dossier en attente";
+}
+
+function driverStageLabel(
+  docs: Array<{ type?: string; status?: string | null }>,
+  driver?: AdminDriver | null,
+) {
+  if (driver?.kycStatus === "APPROVED") {
+    return driver.activationPinVerified ? "Actif (PIN configuré)" : "KYC OK — PIN à transmettre";
+  }
+  if (driver?.kycStatus === "REJECTED") return "Dossier refusé";
+  if (allDriverDocsApproved(docs, driver)) return "Documents OK — Approuver le dossier";
+  return "Dossier en attente";
+}
+
+function isOpenDocStatus(status?: string | null) {
+  const s = String(status ?? "").toUpperCase();
+  return s === "PENDING" || s === "REJECTED";
+}
+
+function dossierNeedsAdminAction(
+  docs: Array<{ status?: string | null }>,
+  driver?: AdminDriver | null,
+  statusFilter?: string,
+) {
+  const filter = String(statusFilter ?? "PENDING").toUpperCase();
+  const profileStatus = String(driver?.kycStatus ?? "").toUpperCase();
+  const hasOpenDocs = docs.some((d) => isOpenDocStatus(d.status));
+  if (filter === "ALL") return true;
+  if (filter === "APPROVED") {
+    return profileStatus === "APPROVED" || docs.some((d) => String(d.status ?? "").toUpperCase() === "APPROVED");
+  }
+  if (filter === "REJECTED") {
+    return profileStatus === "REJECTED" || docs.some((d) => String(d.status ?? "").toUpperCase() === "REJECTED");
+  }
+  // PENDING: keep dossiers still awaiting dossier approval even when every doc is APPROVED
+  if (profileStatus === "APPROVED" && !hasOpenDocs) return false;
+  if (profileStatus === "PENDING" || profileStatus === "REJECTED" || driver?.readyForReview) return true;
+  // Unknown profile: only keep if justificatifs still need review (avoid resurfacing approved dossiers)
+  if (!driver) return hasOpenDocs;
+  return hasOpenDocs;
 }
 
 function allJustificatifsApproved(
@@ -252,9 +293,14 @@ export default function KycPage() {
     setLoading(true);
     setError(null);
     try {
+      // PENDING filter must still show dossiers whose documents are all APPROVED
+      // but profile KYC is still PENDING (awaiting « Approuver le dossier » / PIN).
+      const driverDocStatus = statusFilter === "PENDING" ? "ALL" : statusFilter;
       const [data, drivers, partners] = await Promise.all([
-        fetchKycPending(statusFilter),
-        fetchDrivers(includeHidden),
+        fetchKycPending(driverDocStatus),
+        // Large take so PENDING dossiers with all docs APPROVED are not dropped
+        // from the driversWithoutDocs / profile enrichment fallback (default API take=50).
+        fetchDrivers(includeHidden, { take: 500 }),
         fetchPartnerKycPending(statusFilter, includeHidden).catch(() => ({ restaurants: [], rentalPartners: [] })),
       ]);
       setItems(Array.isArray(data) ? data : []);
@@ -296,9 +342,8 @@ export default function KycPage() {
         }
         notes = motif.trim();
       }
+      // Document-level review only — PIN is issued solely via « Approuver le dossier ».
       const result = await apiFetch<{
-        activationPin?: string;
-        loginPin?: string;
         smsSent?: boolean;
         hasPhone?: boolean;
         smsError?: string;
@@ -309,9 +354,7 @@ export default function KycPage() {
         method: "POST",
         body: JSON.stringify({ approved, notes }),
       });
-      if (approved && (result.activationPin || result.loginPin)) {
-        window.alert(kycApprovedPinAlert(result));
-      } else if (!approved) {
+      if (!approved) {
         window.alert(`Refus enregistré.\n\n${activationPinSmsCopy(result)}`);
       }
       load();
@@ -422,6 +465,8 @@ export default function KycPage() {
 
   const q = search.trim().toLowerCase();
 
+  const driversByUserId = useMemo(() => new Map(allDrivers.map((d) => [d.userId, d])), [allDrivers]);
+
   const driverDossiers = useMemo(() => {
     const grouped = groupDriverDocs(items, allDrivers);
     return grouped
@@ -431,10 +476,14 @@ export default function KycPage() {
       }))
       .filter((dossier) => {
         if (kindFilter && kindFilter !== "DRIVER") return false;
-        if (!dossier.docs.length) return false;
+        const driver = driversByUserId.get(dossier.userId);
+        if (docTypeFilter && !dossier.docs.length) return false;
+        if (!dossierNeedsAdminAction(dossier.docs, driver, statusFilter)) return false;
+        // Keep PENDING dossiers with zero open docs (all APPROVED) so « Approuver le dossier » stays reachable
+        if (!dossier.docs.length && !(driver?.kycStatus === "PENDING" || driver?.readyForReview)) return false;
         return matchesSearch(q, dossier.displayName, dossier.phone, dossier.email, dossier.publicId);
       });
-  }, [items, allDrivers, kindFilter, docTypeFilter, q]);
+  }, [items, allDrivers, driversByUserId, kindFilter, docTypeFilter, q, statusFilter]);
 
   const driverDocUserIds = useMemo(() => new Set(driverDossiers.map((d) => d.userId)), [driverDossiers]);
   const showDriversWithoutDocs =
@@ -501,15 +550,15 @@ export default function KycPage() {
     <div className="max-w-4xl mx-auto">
       <PageHeader title="KYC" subtitle="Validation des dossiers chauffeurs, restaurants et loueurs" />
       <div className="mb-4 rounded-xl border border-violet-200 bg-violet-50 p-4 text-sm text-violet-950 space-y-1">
-        <p className="font-semibold">PIN après validation</p>
+        <p className="font-semibold">Validation en deux étapes</p>
         <p>
-          En approuvant un restaurant ou un loueur, SENGA génère un PIN à 6 chiffres s&apos;il n&apos;existe pas encore,
-          puis l&apos;envoie par SMS au +243 lié et/ou par e-mail. Le PIN s&apos;affiche ici (et dans l&apos;alerte)
-          pour que vous puissiez le transmettre à la voix si le message n&apos;arrive pas.
+          1) Approuvez chaque justificatif individuellement. 2) Quand tous sont validés, le dossier reste visible
+          (« Documents OK — Approuver le dossier ») — cliquez alors le bouton vert pour générer et envoyer le PIN.
+          Le PIN n&apos;est jamais créé à la validation d&apos;un seul document.
         </p>
         <p>
-          Sans +243 ni e-mail, l&apos;approbation est bloquée — message : « Liez un +243 ou un e-mail avant
-          d&apos;approuver / pour envoyer le PIN ». Sur un dossier déjà validé, utilisez « Renvoyer le PIN ».
+          Sans +243 ni e-mail, l&apos;approbation du dossier est bloquée pour restaurants / loueurs. Sur un dossier
+          déjà validé, utilisez « Renvoyer le PIN ».
         </p>
       </div>
       <div className="mb-4 space-y-3">
@@ -578,20 +627,31 @@ export default function KycPage() {
           {driverDossiers.length > 0 && (
             <div className="space-y-3">
               <h2 className="text-sm font-semibold text-gray-700">Chauffeurs</h2>
-              {driverDossiers.map((dossier) => (
+              {driverDossiers.map((dossier) => {
+                const driver = driversByUserId.get(dossier.userId);
+                const docsApproved = allDriverDocsApproved(dossier.docs, driver);
+                return (
                 <Card key={dossier.userId} className="p-4 space-y-3">
                   <div className="flex flex-wrap justify-between gap-2">
-                    <IdentityHeader
-                      kind={dossier.partnerKindLabel}
-                      name={dossier.displayName}
-                      phone={dossier.phone}
-                      email={dossier.email}
-                      extra={dossier.publicId}
-                    />
-                    {canWrite("kyc") && statusFilter !== "APPROVED" && (
+                    <div>
+                      <IdentityHeader
+                        kind={dossier.partnerKindLabel}
+                        name={dossier.displayName}
+                        phone={dossier.phone}
+                        email={dossier.email}
+                        extra={dossier.publicId}
+                      />
+                      <p className="text-xs text-gray-600 mt-1">{driverStageLabel(dossier.docs, driver)}</p>
+                      {docsApproved && driver?.kycStatus !== "APPROVED" && (
+                        <p className="text-xs text-green-700 mt-1 font-medium">
+                          Tous les justificatifs sont validés — vous pouvez approuver le dossier (PIN).
+                        </p>
+                      )}
+                    </div>
+                    {canWrite("kyc") && statusFilter !== "APPROVED" && driver?.kycStatus !== "APPROVED" && (
                       <div className="flex gap-2">
                         <BtnSuccess
-                          disabled={!allDriverDocsApproved(dossier.docs, allDrivers.find((d) => d.userId === dossier.userId))}
+                          disabled={!docsApproved}
                           onClick={() => reviewDriver(dossier.userId, true)}
                         >
                           Approuver le dossier
@@ -622,7 +682,8 @@ export default function KycPage() {
                     ))}
                   </ul>
                 </Card>
-              ))}
+                );
+              })}
             </div>
           )}
           {driversWithoutDocs.length > 0 && (
@@ -637,20 +698,28 @@ export default function KycPage() {
               </h2>
               {driversWithoutDocs.map((d) => (
                 <Card key={d.id} className="p-4 flex flex-wrap justify-between items-center gap-4">
-                  <IdentityHeader
-                    kind="Chauffeur"
-                    name={driverNameFromProfile(d) || "Chauffeur"}
-                    phone={d.phone}
-                    email={d.email}
-                    extra={d.publicId}
-                  />
+                  <div>
+                    <IdentityHeader
+                      kind="Chauffeur"
+                      name={driverNameFromProfile(d) || "Chauffeur"}
+                      phone={d.phone}
+                      email={d.email}
+                      extra={d.publicId}
+                    />
+                    <p className="text-xs text-gray-600 mt-1">{driverStageLabel([], d)}</p>
+                  </div>
                   <div>
                     <StatusBadge status={d.kycStatus} />
                     {!d.onboardingCompleted && (
                       <p className="text-xs text-amber-600 mt-1">Enregistrement en cours</p>
                     )}
-                    {d.onboardingCompleted && d.kycStatus === "PENDING" && (
-                      <p className="text-xs text-green-700 mt-1 font-medium">Dossier complet — prêt à valider</p>
+                    {d.kycAllJustificatifsApproved && d.kycStatus === "PENDING" && (
+                      <p className="text-xs text-green-700 mt-1 font-medium">
+                        Documents OK — Approuver le dossier
+                      </p>
+                    )}
+                    {d.onboardingCompleted && d.kycStatus === "PENDING" && !d.kycAllJustificatifsApproved && (
+                      <p className="text-xs text-amber-700 mt-1 font-medium">Dossier incomplet — justificatifs manquants</p>
                     )}
                   </div>
                   {canWrite("kyc") && (

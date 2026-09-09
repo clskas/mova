@@ -1921,9 +1921,14 @@ export async function purgePlayPrelaunchUsers() {
   );
 }
 
-export async function fetchDrivers(includeHidden = false): Promise<AdminDriver[]> {
+export async function fetchDrivers(
+  includeHidden = false,
+  opts?: { take?: number; kycStatus?: string },
+): Promise<AdminDriver[]> {
   const params = new URLSearchParams();
   if (includeHidden) params.set("includeHidden", "true");
+  if (opts?.take != null) params.set("take", String(opts.take));
+  if (opts?.kycStatus) params.set("kycStatus", opts.kycStatus);
   const q = params.toString();
   const data = await apiFetch<AdminDriver[] | { data?: AdminDriver[] }>(
     `/api/admin/drivers${q ? `?${q}` : ""}`,

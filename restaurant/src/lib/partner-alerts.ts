@@ -167,11 +167,23 @@ export async function unlockPartnerAlerts() {
   unlockListeners.forEach((fn) => fn());
 }
 
-/** Précharge le WAV. Le déblocage réel se fait via le bouton (geste utilisateur). */
-export function initPartnerAudioUnlock() {
-  if (typeof window === "undefined") return;
+/** Précharge le WAV. Retourne un cleanup pour le listener de geste (Strict Mode / unmount). */
+export function initPartnerAudioUnlock(): () => void {
+  if (typeof window === "undefined") return () => undefined;
   getHtmlAudio();
   emitUi();
+
+  if (audioUnlocked) return () => undefined;
+
+  const unlockOnGesture = () => {
+    void unlockPartnerAlerts();
+  };
+  window.addEventListener("pointerdown", unlockOnGesture, { once: true, capture: true });
+  window.addEventListener("keydown", unlockOnGesture, { once: true, capture: true });
+  return () => {
+    window.removeEventListener("pointerdown", unlockOnGesture, true);
+    window.removeEventListener("keydown", unlockOnGesture, true);
+  };
 }
 
 /** Conservé pour compat : la permission n'est demandée que dans unlockPartnerAlerts. */

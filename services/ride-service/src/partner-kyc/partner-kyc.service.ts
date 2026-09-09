@@ -23,6 +23,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { UploadsService } from '../uploads/uploads.service';
 import { fetchAuthUserBrief } from '../common/internal-lookup.util';
+import { stubRestaurantCreateData } from '../restaurant/restaurant-profile.util';
 import { classifyAdminPartner } from './partner-admin-visibility';
 
 const PHONE_OK = /^\+243\d{9}$/;
@@ -604,7 +605,18 @@ export class PartnerKycService {
       orderBy: { createdAt: 'asc' },
     });
     if (existing) return existing;
-    throw new MovaHttpException(MovaErrorCode.RESTAURANT_NOT_FOUND, HttpStatus.NOT_FOUND);
+    try {
+      return await this.prisma.restaurant.create({
+        data: stubRestaurantCreateData(ownerUserId),
+      });
+    } catch {
+      const raced = await this.prisma.restaurant.findFirst({
+        where: { ownerUserId },
+        orderBy: { createdAt: 'asc' },
+      });
+      if (raced) return raced;
+      throw new MovaHttpException(MovaErrorCode.RESTAURANT_NOT_FOUND, HttpStatus.NOT_FOUND);
+    }
   }
 
   async ensureRentalProfile(userId: string) {

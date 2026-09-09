@@ -35,7 +35,7 @@ export function RestaurantLiveProvider({ children }: { children: React.ReactNode
   useEffect(() => {
     if (!getToken() || typeof window === "undefined") return;
 
-    initPartnerAudioUnlock();
+    const stopGestureUnlock = initPartnerAudioUnlock();
     if (typeof Notification !== "undefined" && Notification.permission === "granted") {
       void registerPartnerWebPush("restaurant");
     }
@@ -55,6 +55,7 @@ export function RestaurantLiveProvider({ children }: { children: React.ReactNode
     });
 
     return () => {
+      stopGestureUnlock();
       offUnlock();
       window.clearInterval(pollId);
       socket.disconnect();

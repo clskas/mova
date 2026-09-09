@@ -38,9 +38,22 @@ describe('DeliveriesService', () => {
   } as unknown as PricingService;
 
   const prisma = {
-    delivery: { create: jest.fn(), findUnique: jest.fn(), findMany: jest.fn(), update: jest.fn() },
+    delivery: {
+      create: jest.fn(),
+      findUnique: jest.fn(),
+      findMany: jest.fn(),
+      update: jest.fn(),
+      updateMany: jest.fn(),
+      count: jest.fn(),
+    },
     deliveryEvent: { create: jest.fn() },
-    restaurant: { findUnique: jest.fn(), findMany: jest.fn(), findFirst: jest.fn() },
+    restaurant: {
+      findUnique: jest.fn(),
+      findMany: jest.fn(),
+      findFirst: jest.fn(),
+      delete: jest.fn(),
+      update: jest.fn(),
+    },
     restaurantDriver: { findUnique: jest.fn() },
   };
 
@@ -537,5 +550,30 @@ describe('DeliveriesService', () => {
     await service.acceptDelivery('d1', 'fleet-drv');
     expect(creditRestaurantEscrow).toHaveBeenCalledWith('DELIVERY', 'd1');
     expect(releaseEscrowPayout).not.toHaveBeenCalled();
+  });
+
+  it('supprime définitivement un restaurant sans commandes actives', async () => {
+    prisma.restaurant.findUnique.mockResolvedValue({ id: 'r-fake', name: 'Chez Flore' });
+    prisma.delivery.count.mockResolvedValue(0);
+    prisma.delivery.updateMany.mockResolvedValue({ count: 2 });
+    prisma.restaurant.delete.mockResolvedValue({ id: 'r-fake', name: 'Chez Flore' });
+
+    const result = await service.deleteRestaurant('r-fake');
+    expect(result).toEqual({ id: 'r-fake', deleted: true, name: 'Chez Flore' });
+    expect(prisma.delivery.updateMany).toHaveBeenCalledWith({
+      where: { restaurantId: 'r-fake' },
+      data: { restaurantId: null },
+    });
+    expect(prisma.restaurant.delete).toHaveBeenCalledWith({ where: { id: 'r-fake' } });
+  });
+
+  it('refuse de supprimer un restaurant avec commandes en cours', async () => {
+    prisma.restaurant.findUnique.mockResolvedValue({ id: 'r1', name: 'Resto Beni' });
+    prisma.delivery.count.mockResolvedValue(3);
+
+    await expect(service.deleteRestaurant('r1')).rejects.toMatchObject({
+      code: MovaErrorCode.VALIDATION_ERROR,
+    });
+    expect(prisma.restaurant.delete).not.toHaveBeenCalled();
   });
 });

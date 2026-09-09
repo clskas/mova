@@ -426,7 +426,7 @@ export class AdminController {
 
   @Delete('restaurants/:id')
   @RequirePermissions(AdminPermission.RESTAURANTS_WRITE)
-  @ApiOperation({ summary: 'Supprimer restaurant (soft)' })
+  @ApiOperation({ summary: 'Supprimer définitivement un restaurant' })
   deleteRestaurant(@Param('id') id: string) {
     return this.adminService.deleteRestaurant(id);
   }

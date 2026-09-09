@@ -52,6 +52,7 @@ export type RestaurantProfile = {
   courierMode?: "PLATFORM" | "OWN" | "HYBRID";
   kycStatus?: string;
   canOperate?: boolean;
+  needsProfileSetup?: boolean;
 };
 
 export type CourierMode = "PLATFORM" | "OWN" | "HYBRID";
@@ -306,8 +307,27 @@ export function updateRestaurantLocation(data: {
   address?: string;
   lat?: number;
   lng?: number;
+  completeSetup?: boolean;
 }) {
-  return apiFetch("/api/restaurant/location", { method: "PATCH", body: JSON.stringify(data) });
+  return apiFetch<{
+    id: string;
+    name: string;
+    cuisine?: string;
+    address?: string;
+    lat?: number;
+    lng?: number;
+    needsProfileSetup?: boolean;
+  }>("/api/restaurant/location", { method: "PATCH", body: JSON.stringify(data) });
+}
+
+export function completeRestaurantProfile(data: {
+  name: string;
+  cuisine: string;
+  address: string;
+  lat: number;
+  lng: number;
+}) {
+  return updateRestaurantLocation({ ...data, completeSetup: true });
 }
 
 export async function uploadMenuPhoto(file: File): Promise<string> {

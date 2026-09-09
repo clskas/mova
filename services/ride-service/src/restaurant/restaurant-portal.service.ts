@@ -22,6 +22,10 @@ import { formatParcelDelivery } from '../deliveries/parcel.util';
 import { DeliveriesService } from '../deliveries/deliveries.service';
 import { UploadsService } from '../uploads/uploads.service';
 import { MenuItemDto, UpdateRestaurantLocationDto, UpdateRestaurantMenuDto } from './restaurant-portal.dto';
+import {
+  assertRestaurantProfileComplete,
+  restaurantNeedsProfileSetup,
+} from './restaurant-profile.util';
 import { fetchServicePaymentStatuses } from '../common/payment-status.util';
 import { refundEscrow } from '../common/escrow.util';
 import { PartnerBillingService } from '../billing/partner-billing.service';
@@ -109,6 +113,7 @@ export class RestaurantPortalService {
       courierMode: restaurant.courierMode ?? 'PLATFORM',
       kycStatus: restaurant.kycStatus,
       canOperate: restaurant.kycStatus === 'APPROVED',
+      needsProfileSetup: restaurantNeedsProfileSetup(restaurant),
     };
   }
 
@@ -492,21 +497,43 @@ export class RestaurantPortalService {
 
   async updateLocation(ownerUserId: string, dto: UpdateRestaurantLocationDto) {
     const restaurant = await this.getRestaurantForOwner(ownerUserId);
-    if (dto.lat != null && (dto.lat < -90 || dto.lat > 90)) {
-      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Latitude invalide.');
-    }
-    if (dto.lng != null && (dto.lng < -180 || dto.lng > 180)) {
-      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Longitude invalide.');
-    }
-    const updated = await this.prisma.restaurant.update({
-      where: { id: restaurant.id },
-      data: {
+    let payload: { name?: string; cuisine?: string; address?: string; lat?: number; lng?: number };
+
+    if (dto.completeSetup) {
+      try {
+        payload = assertRestaurantProfileComplete({
+          name: dto.name ?? restaurant.name,
+          cuisine: dto.cuisine ?? restaurant.cuisine,
+          address: dto.address ?? restaurant.address,
+          lat: dto.lat ?? restaurant.lat,
+          lng: dto.lng ?? restaurant.lng,
+        });
+      } catch (err) {
+        throw new MovaHttpException(
+          MovaErrorCode.VALIDATION_ERROR,
+          undefined,
+          err instanceof Error ? err.message : 'Informations restaurant incomplètes.',
+        );
+      }
+    } else {
+      if (dto.lat != null && (dto.lat < -90 || dto.lat > 90)) {
+        throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Latitude invalide.');
+      }
+      if (dto.lng != null && (dto.lng < -180 || dto.lng > 180)) {
+        throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Longitude invalide.');
+      }
+      payload = {
         ...(dto.name !== undefined ? { name: dto.name.trim() || restaurant.name } : {}),
         ...(dto.cuisine !== undefined ? { cuisine: dto.cuisine.trim() || restaurant.cuisine } : {}),
         ...(dto.address !== undefined ? { address: dto.address.trim() || restaurant.address } : {}),
         ...(dto.lat != null ? { lat: dto.lat } : {}),
         ...(dto.lng != null ? { lng: dto.lng } : {}),
-      },
+      };
+    }
+
+    const updated = await this.prisma.restaurant.update({
+      where: { id: restaurant.id },
+      data: payload,
     });
     return {
       id: updated.id,
@@ -515,6 +542,7 @@ export class RestaurantPortalService {
       address: updated.address,
       lat: updated.lat,
       lng: updated.lng,
+      needsProfileSetup: restaurantNeedsProfileSetup(updated),
     };
   }
 

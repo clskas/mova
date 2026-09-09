@@ -19,7 +19,7 @@ export function PartnerAlertHost() {
   return (
     <>
       {!ui.soundEnabled && (
-        <div className="fixed top-[max(0.5rem,env(safe-area-inset-top))] left-3 right-3 z-[60] mx-auto max-w-lg rounded-xl border border-orange-200 bg-orange-50 shadow-lg px-3 py-2.5 flex items-center justify-between gap-2">
+        <div className="fixed top-[max(0.5rem,env(safe-area-inset-top))] left-3 right-3 z-[10060] mx-auto max-w-lg rounded-xl border border-orange-200 bg-orange-50 shadow-lg px-3 py-2.5 flex items-center justify-between gap-2">
           <p className="text-sm text-orange-950 min-w-0">
             Activez le son pour entendre les <span className="font-semibold">nouvelles commandes</span>.
           </p>

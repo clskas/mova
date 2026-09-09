@@ -47,10 +47,23 @@ export class AdminService {
       async (r) => {
         const data = await r.json().catch(() => ({}));
         if (!r.ok) {
-          const payload = data as { message?: string | string[]; error?: { message?: string } };
+          const payload = data as {
+            message?: string | string[];
+            error?: { message?: string; code?: string };
+          };
           const raw = payload.error?.message ?? payload.message;
-          const message = Array.isArray(raw) ? raw.join(', ') : raw ?? `Admin proxy failed: ${service}${path} (${r.status})`;
-          throw new Error(message);
+          const message = Array.isArray(raw)
+            ? raw.join(', ')
+            : raw ?? `Admin proxy failed: ${service}${path} (${r.status})`;
+          const code =
+            payload.error?.code && payload.error.code.startsWith('MOVA_')
+              ? (payload.error.code as MovaErrorCode)
+              : r.status === HttpStatus.NOT_FOUND
+                ? MovaErrorCode.NOT_FOUND
+                : r.status === HttpStatus.CONFLICT || r.status === HttpStatus.BAD_REQUEST
+                  ? MovaErrorCode.VALIDATION_ERROR
+                  : MovaErrorCode.INTERNAL_ERROR;
+          throw new MovaHttpException(code, r.status >= 400 && r.status < 600 ? r.status : HttpStatus.BAD_GATEWAY, message);
         }
         return data;
       },

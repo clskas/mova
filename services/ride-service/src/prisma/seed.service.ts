@@ -30,6 +30,9 @@ const RESTAURANTS = [
   { name: 'Cafe Goma', cuisine: 'Café', address: 'Avenue du Lac, Goma', lat: -1.678, lng: 29.218, rating: 4.4, imageUrl: 'https://cdn.mova.cd/restaurants/cafe-goma.jpg', menuItems: [{ name: 'Petit-déjeuner', unitPriceCdf: 8000 }] },
 ];
 
+/** Known demo catalog names — never seed in production (SEED_DEMO_CATALOG must stay false on Render). */
+export const DEMO_RESTAURANT_SEED_NAMES = RESTAURANTS.map((r) => r.name);
+
 const RENTAL_VEHICLES = [
   {
     name: 'Toyota Corolla',

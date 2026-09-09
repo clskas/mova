@@ -18,6 +18,7 @@ import {
 } from './parcel.util';
 import { assertDriverCanReceiveJobs, assertDriverEligibleForParcel, driverCanReceiveJobs, fetchDriverProfileSnapshot } from '../common/driver-eligibility.util';
 import { fetchDriverDebtStatus } from '../common/driver-debt.util';
+import { stubRestaurantCreateData } from '../restaurant/restaurant-profile.util';
 import { TrackingService } from '../tracking/tracking.service';
 import { MatchingService } from '../matching/matching.service';
 import { CommissionService } from '../rides/commission.service';
@@ -1513,20 +1514,9 @@ export class DeliveriesService {
       orderBy: { createdAt: 'asc' },
     });
     if (existing) return existing;
-    const displayName = name?.trim() || 'Mon restaurant';
     try {
       return await this.prisma.restaurant.create({
-        data: {
-          name: displayName,
-          cuisine: 'À préciser',
-          address: 'Kinshasa — à compléter',
-          lat: -4.3105,
-          lng: 15.3032,
-          ownerUserId,
-          isActive: true,
-          isAcceptingOrders: false,
-          menuItems: [],
-        },
+        data: stubRestaurantCreateData(ownerUserId, name),
       });
     } catch {
       const raced = await this.prisma.restaurant.findFirst({
@@ -1813,7 +1803,31 @@ export class DeliveriesService {
   async deleteRestaurant(id: string) {
     const restaurant = await this.prisma.restaurant.findUnique({ where: { id } });
     if (!restaurant) throw new MovaHttpException(MovaErrorCode.RESTAURANT_NOT_FOUND, HttpStatus.NOT_FOUND);
-    return this.prisma.restaurant.update({ where: { id }, data: { isActive: false } });
+
+    const activeOrders = await this.prisma.delivery.count({
+      where: {
+        restaurantId: id,
+        status: {
+          notIn: [DeliveryStatus.DELIVERED, DeliveryStatus.CANCELLED],
+        },
+      },
+    });
+    if (activeOrders > 0) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        HttpStatus.CONFLICT,
+        `Impossible de supprimer « ${restaurant.name} » : ${activeOrders} commande(s) encore en cours. Terminez ou annulez-les d'abord.`,
+      );
+    }
+
+    // Preserve delivery history without blocking hard delete (FK has no onDelete).
+    await this.prisma.delivery.updateMany({
+      where: { restaurantId: id },
+      data: { restaurantId: null },
+    });
+
+    await this.prisma.restaurant.delete({ where: { id } });
+    return { id, deleted: true, name: restaurant.name };
   }
 
   async adminCancelDelivery(id: string, reason?: string) {

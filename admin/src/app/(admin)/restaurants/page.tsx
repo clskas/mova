@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { apiFetch, deleteRestaurant, fetchUsers, formatUserName, saveRestaurant, type AdminUser, type Restaurant } from "@/lib/api";
+import { apiFetch, deleteRestaurant, fetchUsers, formatUserName, saveRestaurant, toUserErrorMessage, type AdminUser, type Restaurant } from "@/lib/api";
 import { useAdmin } from "@/components/AdminProvider";
 import {
   BtnDanger,
@@ -164,12 +164,14 @@ export default function RestaurantsPage() {
   async function handleDelete() {
     if (!deleteTarget || readOnly) return;
     setSaving(true);
+    setError(null);
     try {
       await deleteRestaurant(deleteTarget.id);
       setDeleteTarget(null);
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Erreur suppression");
+      setError(toUserErrorMessage(err, "Impossible de supprimer ce restaurant."));
+      setDeleteTarget(null);
     } finally {
       setSaving(false);
     }
@@ -220,7 +222,7 @@ export default function RestaurantsPage() {
     <div className="max-w-4xl mx-auto space-y-6">
       <PageHeader
         title="Restaurants"
-        subtitle={readOnly ? "Consultation des restaurants partenaires" : "Créer, modifier et désactiver les restaurants"}
+        subtitle={readOnly ? "Consultation des restaurants partenaires" : "Créer, modifier et supprimer les restaurants"}
       />
       {readOnly && (
         <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2">
@@ -448,7 +450,7 @@ export default function RestaurantsPage() {
         onClose={() => setDeleteTarget(null)}
         onConfirm={handleDelete}
         title="Supprimer le restaurant"
-        message={`Désactiver « ${deleteTarget?.name ?? ""} » ? Les commandes en cours ne seront pas affectées.`}
+        message={`Supprimer définitivement « ${deleteTarget?.name ?? ""} » ? Le restaurant disparaîtra de la liste et du catalogue passager. Impossible s'il a des commandes encore en cours.`}
         confirmLabel="Supprimer"
         danger
         loading={saving}

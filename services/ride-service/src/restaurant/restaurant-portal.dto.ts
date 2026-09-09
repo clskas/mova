@@ -53,4 +53,8 @@ export class UpdateRestaurantLocationDto {
   @ApiPropertyOptional() @IsOptional() @IsString() address?: string;
   @ApiPropertyOptional() @IsOptional() @IsNumber() lat?: number;
   @ApiPropertyOptional() @IsOptional() @IsNumber() lng?: number;
+  @ApiPropertyOptional({ description: 'Valide et finalise la fiche restaurant (onboarding)' })
+  @IsOptional()
+  @IsBoolean()
+  completeSetup?: boolean;
 }

@@ -10,6 +10,7 @@ describe('DriversService KYC dossier', () => {
     },
     driverProfile: {
       findUnique: jest.fn(),
+      findMany: jest.fn(),
       upsert: jest.fn(),
       update: jest.fn(),
     },
@@ -43,4 +44,39 @@ describe('DriversService KYC dossier', () => {
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
+  it('PENDING inclut les docs APPROVED des dossiers encore en attente (Approuver le dossier)', async () => {
+    prisma.driverProfile.findMany.mockResolvedValue([{ userId: 'u-pending' }]);
+    const approvedDoc = {
+      id: 'doc-approved',
+      userId: 'u-pending',
+      type: 'ID_PHOTO',
+      status: 'APPROVED',
+      createdAt: new Date('2026-09-01T00:00:00.000Z'),
+    };
+    prisma.kycDocument.findMany.mockResolvedValue([approvedDoc]);
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({ id: 'u-pending', firstName: 'Ada', lastName: 'K', phone: '+243810000001' }),
+    });
+
+    const result = await service.pendingKyc('PENDING');
+    expect(prisma.driverProfile.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { kycStatus: { in: ['PENDING', 'REJECTED'] } },
+      }),
+    );
+    expect(prisma.kycDocument.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          OR: [
+            { status: { in: ['PENDING', 'REJECTED'] } },
+            { userId: { in: ['u-pending'] } },
+          ],
+        },
+      }),
+    );
+    expect(result).toHaveLength(1);
+    expect(result[0].status).toBe('APPROVED');
+    expect(result[0].userId).toBe('u-pending');
+  });
 });

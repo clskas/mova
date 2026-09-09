@@ -857,19 +857,48 @@ export class DriversService {
     };
   }
 
+  /**
+   * Admin KYC queue. For PENDING, include:
+   * - open justificatifs (PENDING / REJECTED), and
+   * - every document belonging to drivers whose dossier is still PENDING / REJECTED
+   *   (all docs APPROVED but « Approuver le dossier » not clicked yet).
+   * A plain `status=APPROVED` take:500 used to drop those dossiers once the last
+   * open doc was approved (they competed with historical APPROVED rows).
+   */
   async pendingKyc(status?: string) {
     const normalized = String(status ?? 'PENDING').trim().toUpperCase();
-    const where =
-      normalized === 'ALL'
-        ? {}
-        : normalized === 'APPROVED' || normalized === 'REJECTED' || normalized === 'PENDING'
-          ? { status: normalized as KycStatus }
-          : { status: KycStatus.PENDING };
-    const docs = await this.prisma.kycDocument.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      take: 500,
-    });
+    let docs: Awaited<ReturnType<typeof this.prisma.kycDocument.findMany>>;
+    if (normalized === 'PENDING') {
+      const openProfiles = await this.prisma.driverProfile.findMany({
+        where: { kycStatus: { in: [KycStatus.PENDING, KycStatus.REJECTED] } },
+        select: { userId: true },
+        orderBy: { updatedAt: 'desc' },
+        take: 1000,
+      });
+      const openUserIds = openProfiles.map((p) => p.userId);
+      docs = await this.prisma.kycDocument.findMany({
+        where: {
+          OR: [
+            { status: { in: [KycStatus.PENDING, KycStatus.REJECTED] } },
+            ...(openUserIds.length > 0 ? [{ userId: { in: openUserIds } }] : []),
+          ],
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 2000,
+      });
+    } else {
+      const where =
+        normalized === 'ALL'
+          ? {}
+          : normalized === 'APPROVED' || normalized === 'REJECTED'
+            ? { status: normalized as KycStatus }
+            : { status: KycStatus.PENDING };
+      docs = await this.prisma.kycDocument.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        take: 2000,
+      });
+    }
     const userIds = [...new Set(docs.map((d) => d.userId))];
     const users = await Promise.all(userIds.map((id) => this.fetchAuthUser(id)));
     const userById = new Map(users.filter(Boolean).map((u) => [u!.id, u!]));

@@ -222,6 +222,8 @@ function dossierNeedsAdminAction(
   const filter = String(statusFilter ?? "PENDING").toUpperCase();
   const profileStatus = String(driver?.kycStatus ?? "").toUpperCase();
   const hasOpenDocs = docs.some((d) => isOpenDocStatus(d.status));
+  const allDocsApproved =
+    docs.length > 0 && docs.every((d) => String(d.status ?? "").toUpperCase() === "APPROVED");
   if (filter === "ALL") return true;
   if (filter === "APPROVED") {
     return profileStatus === "APPROVED" || docs.some((d) => String(d.status ?? "").toUpperCase() === "APPROVED");
@@ -229,12 +231,13 @@ function dossierNeedsAdminAction(
   if (filter === "REJECTED") {
     return profileStatus === "REJECTED" || docs.some((d) => String(d.status ?? "").toUpperCase() === "REJECTED");
   }
-  // PENDING: keep dossiers still awaiting dossier approval even when every doc is APPROVED
+  // PENDING: keep dossiers awaiting « Approuver le dossier » even when every doc is APPROVED
   if (profileStatus === "APPROVED" && !hasOpenDocs) return false;
   if (profileStatus === "PENDING" || profileStatus === "REJECTED" || driver?.readyForReview) return true;
-  // Unknown profile: only keep if justificatifs still need review (avoid resurfacing approved dossiers)
-  if (!driver) return hasOpenDocs;
-  return hasOpenDocs;
+  // Profile missing from drivers list: still keep if docs need review OR all are APPROVED
+  // (awaiting dossier PIN — never drop after last justificatif approve).
+  if (!driver) return hasOpenDocs || allDocsApproved;
+  return hasOpenDocs || (allDocsApproved && profileStatus !== "APPROVED");
 }
 
 function allJustificatifsApproved(
@@ -288,21 +291,25 @@ export default function KycPage() {
   const [docTypeFilter, setDocTypeFilter] = useState("");
   const [includeHidden, setIncludeHidden] = useState(false);
   const [pinBanner, setPinBanner] = useState<{ title: string; pin?: string; notice: string } | null>(null);
+  const [focusedUserId, setFocusedUserId] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (opts?: { soft?: boolean }) => {
+    // Soft reload keeps cards visible after last-doc approve (no LoadingState flash).
+    if (!opts?.soft) setLoading(true);
     setError(null);
     try {
-      // PENDING filter must still show dossiers whose documents are all APPROVED
-      // but profile KYC is still PENDING (awaiting « Approuver le dossier » / PIN).
-      const driverDocStatus = statusFilter === "PENDING" ? "ALL" : statusFilter;
-      const [data, drivers, partners] = await Promise.all([
-        fetchKycPending(driverDocStatus),
-        // Large take so PENDING dossiers with all docs APPROVED are not dropped
-        // from the driversWithoutDocs / profile enrichment fallback (default API take=50).
-        fetchDrivers(includeHidden, { take: 500 }),
+      // Backend PENDING now returns docs for PENDING dossiers even when all justificatifs
+      // are APPROVED (awaiting « Approuver le dossier » / PIN). Do NOT switch to ALL —
+      // a global ALL take:500 used to drown those rows under historical APPROVED docs.
+      const [data, pendingOnly, rejectedOnly, partners] = await Promise.all([
+        fetchKycPending(statusFilter),
+        // Fetch PENDING/REJECTED profiles explicitly — unfiltered take:500 by createdAt
+        // mostly returns APPROVED drivers and drops the dossier awaiting PIN.
+        fetchDrivers(includeHidden, { take: 500, kycStatus: "PENDING" }),
+        fetchDrivers(includeHidden, { take: 200, kycStatus: "REJECTED" }),
         fetchPartnerKycPending(statusFilter, includeHidden).catch(() => ({ restaurants: [], rentalPartners: [] })),
       ]);
+      const drivers = [...pendingOnly, ...rejectedOnly];
       setItems(Array.isArray(data) ? data : []);
       setAllDrivers(drivers);
       setPendingDrivers(
@@ -322,16 +329,16 @@ export default function KycPage() {
     }
   }, [statusFilter, includeHidden]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { void load(); }, [load]);
 
   useEffect(() => {
     const timer = setInterval(() => {
-      if (!loading) load();
+      if (!loading) void load({ soft: true });
     }, 15000);
     return () => clearInterval(timer);
   }, [load, loading]);
 
-  async function review(id: string, approved: boolean) {
+  async function review(id: string, approved: boolean, userId?: string) {
     try {
       let notes: string | undefined;
       if (!approved) {
@@ -357,7 +364,16 @@ export default function KycPage() {
       if (!approved) {
         window.alert(`Refus enregistré.\n\n${activationPinSmsCopy(result)}`);
       }
-      load();
+      // Optimistic: keep dossier on screen with updated doc status before soft reload.
+      if (userId) setFocusedUserId(userId);
+      setItems((prev) =>
+        prev.map((item) =>
+          item.id === id
+            ? { ...item, status: approved ? "APPROVED" : "REJECTED", notes: notes ?? item.notes }
+            : item,
+        ),
+      );
+      await load({ soft: true });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Échec de la validation");
     }
@@ -380,13 +396,14 @@ export default function KycPage() {
       } else if (!approved) {
         window.alert(`Refus enregistré.\n\n${activationPinSmsCopy(result)}`);
       }
-      load();
+      setFocusedUserId(null);
+      await load({ soft: true });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Échec de la validation");
     }
   }
 
-  async function reviewPartnerDoc(id: string, approved: boolean) {
+  async function reviewPartnerDoc(id: string, approved: boolean, userId?: string) {
     try {
       let notes: string | undefined;
       if (!approved) {
@@ -401,7 +418,22 @@ export default function KycPage() {
       if (!approved) {
         window.alert(`Refus enregistré.\n\n${activationPinSmsCopy(result)}`);
       }
-      load();
+      if (userId) setFocusedUserId(userId);
+      const patchChecklist = (list: PartnerKycDossier[]) =>
+        list.map((dossier) => {
+          if (userId && dossier.userId !== userId) return dossier;
+          return {
+            ...dossier,
+            checklist: (dossier.checklist ?? []).map((item) =>
+              item.documentId === id
+                ? { ...item, status: approved ? "APPROVED" : "REJECTED", notes: notes ?? item.notes }
+                : item,
+            ),
+          };
+        });
+      setRestaurants(patchChecklist);
+      setRentalPartners(patchChecklist);
+      await load({ soft: true });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Échec de la validation");
     }
@@ -444,7 +476,8 @@ export default function KycPage() {
       } else {
         window.alert(`Refus enregistré.\n\n${activationPinSmsCopy(result)}`);
       }
-      load();
+      setFocusedUserId(null);
+      await load({ soft: true });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Échec de la validation");
     }
@@ -536,12 +569,16 @@ export default function KycPage() {
     filteredRestaurants.length === 0 &&
     filteredRentals.length === 0;
 
-  function partnerDocActions(item: PartnerKycChecklistItem) {
+  function partnerDocActions(item: PartnerKycChecklistItem, userId?: string | null) {
     if (!canWrite("kyc") || !item.documentId || item.status === "APPROVED") return null;
     return (
       <div className="flex gap-2 mt-2">
-        <BtnSuccess onClick={() => reviewPartnerDoc(item.documentId!, true)}>Valider ce justificatif</BtnSuccess>
-        <BtnDanger onClick={() => reviewPartnerDoc(item.documentId!, false)}>Refuser ce justificatif</BtnDanger>
+        <BtnSuccess onClick={() => reviewPartnerDoc(item.documentId!, true, userId ?? undefined)}>
+          Valider ce justificatif
+        </BtnSuccess>
+        <BtnDanger onClick={() => reviewPartnerDoc(item.documentId!, false, userId ?? undefined)}>
+          Refuser ce justificatif
+        </BtnDanger>
       </div>
     );
   }
@@ -608,7 +645,7 @@ export default function KycPage() {
           )}
         </div>
       </div>
-      {error && <div className="mb-4"><ErrorBanner message={error} onRetry={load} /></div>}
+      {error && <div className="mb-4"><ErrorBanner message={error} onRetry={() => void load()} /></div>}
       {pinBanner && (
         <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm">
           <p className="font-semibold text-amber-950">{pinBanner.title}</p>
@@ -630,8 +667,16 @@ export default function KycPage() {
               {driverDossiers.map((dossier) => {
                 const driver = driversByUserId.get(dossier.userId);
                 const docsApproved = allDriverDocsApproved(dossier.docs, driver);
+                const focused = focusedUserId === dossier.userId;
+                const showDossierActions =
+                  canWrite("kyc") &&
+                  statusFilter !== "APPROVED" &&
+                  (driver ? driver.kycStatus !== "APPROVED" : statusFilter === "PENDING");
                 return (
-                <Card key={dossier.userId} className="p-4 space-y-3">
+                <Card
+                  key={dossier.userId}
+                  className={`p-4 space-y-3${focused ? " ring-2 ring-green-500" : ""}`}
+                >
                   <div className="flex flex-wrap justify-between gap-2">
                     <div>
                       <IdentityHeader
@@ -642,19 +687,19 @@ export default function KycPage() {
                         extra={dossier.publicId}
                       />
                       <p className="text-xs text-gray-600 mt-1">{driverStageLabel(dossier.docs, driver)}</p>
-                      {docsApproved && driver?.kycStatus !== "APPROVED" && (
+                      {docsApproved && showDossierActions && (
                         <p className="text-xs text-green-700 mt-1 font-medium">
                           Tous les justificatifs sont validés — vous pouvez approuver le dossier (PIN).
                         </p>
                       )}
                     </div>
-                    {canWrite("kyc") && statusFilter !== "APPROVED" && driver?.kycStatus !== "APPROVED" && (
+                    {showDossierActions && (
                       <div className="flex gap-2">
                         <BtnSuccess
                           disabled={!docsApproved}
                           onClick={() => reviewDriver(dossier.userId, true)}
                         >
-                          Approuver le dossier
+                          {docsApproved ? "Documents OK — Approuver le dossier" : "Approuver le dossier"}
                         </BtnSuccess>
                         <BtnDanger onClick={() => reviewDriver(dossier.userId, false)}>Rejeter le dossier</BtnDanger>
                       </div>
@@ -673,8 +718,8 @@ export default function KycPage() {
                         actions={
                           canWrite("kyc") && k.status !== "APPROVED" ? (
                             <div className="flex gap-2 mt-2">
-                              <BtnSuccess onClick={() => review(k.id, true)}>Approuver</BtnSuccess>
-                              <BtnDanger onClick={() => review(k.id, false)}>Rejeter</BtnDanger>
+                              <BtnSuccess onClick={() => review(k.id, true, dossier.userId)}>Approuver</BtnSuccess>
+                              <BtnDanger onClick={() => review(k.id, false, dossier.userId)}>Rejeter</BtnDanger>
                             </div>
                           ) : null
                         }
@@ -728,7 +773,9 @@ export default function KycPage() {
                         disabled={!d.kycAllJustificatifsApproved}
                         onClick={() => reviewDriver(d.userId, true)}
                       >
-                        Approuver le dossier
+                        {d.kycAllJustificatifsApproved
+                          ? "Documents OK — Approuver le dossier"
+                          : "Approuver le dossier"}
                       </BtnSuccess>
                       {d.kycStatus !== "REJECTED" && (
                         <BtnDanger onClick={() => reviewDriver(d.userId, false)}>Rejeter</BtnDanger>
@@ -745,8 +792,15 @@ export default function KycPage() {
               {filteredRestaurants.map((r) => {
                 const name = dossierName(r);
                 const kind = dossierKind(r);
+                const docsOk = allJustificatifsApproved(
+                  restaurants.find((d) => d.userId === r.userId)?.checklist ?? r.checklist,
+                );
+                const focused = focusedUserId === r.userId;
                 return (
-                  <Card key={r.restaurantId ?? r.userId ?? name} className="p-4 space-y-3">
+                  <Card
+                    key={r.restaurantId ?? r.userId ?? name}
+                    className={`p-4 space-y-3${focused ? " ring-2 ring-green-500" : ""}`}
+                  >
                     <div className="flex flex-wrap justify-between gap-2">
                       <div>
                         <IdentityHeader kind={kind} name={name} phone={r.phone} email={r.email} />
@@ -769,10 +823,10 @@ export default function KycPage() {
                       {canWrite("kyc") && r.userId && r.kycStatus !== "APPROVED" && (
                         <div className="flex gap-2">
                           <BtnSuccess
-                            disabled={!allJustificatifsApproved(restaurants.find((d) => d.userId === r.userId)?.checklist ?? r.checklist)}
+                            disabled={!docsOk}
                             onClick={() => reviewPartner("RESTAURANT", r.userId!, true)}
                           >
-                            Approuver le dossier
+                            {docsOk ? "Documents OK — Approuver le dossier" : "Approuver le dossier"}
                           </BtnSuccess>
                           <BtnDanger onClick={() => reviewPartner("RESTAURANT", r.userId!, false)}>Rejeter le dossier</BtnDanger>
                         </div>
@@ -806,7 +860,7 @@ export default function KycPage() {
                             email: r.email,
                             partnerKindLabel: kind,
                           }) : undefined}
-                          actions={partnerDocActions(item)}
+                          actions={partnerDocActions(item, r.userId)}
                         />
                       ))}
                     </ul>
@@ -821,8 +875,15 @@ export default function KycPage() {
               {filteredRentals.map((r) => {
                 const name = dossierName(r);
                 const kind = dossierKind(r);
+                const docsOk = allJustificatifsApproved(
+                  rentalPartners.find((d) => d.userId === r.userId)?.checklist ?? r.checklist,
+                );
+                const focused = focusedUserId === r.userId;
                 return (
-                  <Card key={r.userId} className="p-4 space-y-3">
+                  <Card
+                    key={r.userId}
+                    className={`p-4 space-y-3${focused ? " ring-2 ring-green-500" : ""}`}
+                  >
                     <div className="flex flex-wrap justify-between gap-2">
                       <div>
                         <IdentityHeader kind={kind} name={name} phone={r.phone} email={r.email} />
@@ -845,10 +906,10 @@ export default function KycPage() {
                       {canWrite("kyc") && r.userId && r.kycStatus !== "APPROVED" && (
                         <div className="flex gap-2">
                           <BtnSuccess
-                            disabled={!allJustificatifsApproved(rentalPartners.find((d) => d.userId === r.userId)?.checklist ?? r.checklist)}
+                            disabled={!docsOk}
                             onClick={() => reviewPartner("RENTAL_PARTNER", r.userId!, true)}
                           >
-                            Approuver le dossier
+                            {docsOk ? "Documents OK — Approuver le dossier" : "Approuver le dossier"}
                           </BtnSuccess>
                           <BtnDanger onClick={() => reviewPartner("RENTAL_PARTNER", r.userId!, false)}>Rejeter le dossier</BtnDanger>
                         </div>
@@ -882,7 +943,7 @@ export default function KycPage() {
                             email: r.email,
                             partnerKindLabel: kind,
                           }) : undefined}
-                          actions={partnerDocActions(item)}
+                          actions={partnerDocActions(item, r.userId)}
                         />
                       ))}
                     </ul>

@@ -305,4 +305,63 @@ describe('PartnerKycService', () => {
       }),
     );
   });
+
+  it('garde un dossier PENDING même si tous les justificatifs sont APPROVED', async () => {
+    prisma.restaurant.findMany.mockResolvedValue([
+      {
+        id: 'r1',
+        name: 'Chez Flore',
+        ownerUserId: 'u1',
+        kycStatus: 'PENDING',
+        kycNotes: null,
+        address: 'Gombe',
+        nif: null,
+        rccm: null,
+        payoutProvider: null,
+        payoutPhone: null,
+      },
+    ]);
+    prisma.rentalPartnerProfile.findMany.mockResolvedValue([]);
+    prisma.restaurant.findFirst.mockResolvedValue({
+      id: 'r1',
+      name: 'Chez Flore',
+      ownerUserId: 'u1',
+      kycStatus: 'PENDING',
+      kycNotes: null,
+      nif: 'NIF-1',
+      rccm: 'CD/KIN/RCCM/1',
+      payoutProvider: 'ORANGE_MONEY',
+      payoutPhone: '+243810000001',
+      address: 'Gombe',
+    });
+    // 1st call = flat documents feed (0 PENDING rows); later = checklist (all APPROVED)
+    prisma.partnerKycDocument.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValue([
+        { type: 'MANAGER_ID', status: 'APPROVED', notes: null, url: '/a', id: 'd1' },
+        { type: 'RCCM', status: 'APPROVED', notes: null, url: '/b', id: 'd2' },
+        { type: 'PREMISES_PHOTO', status: 'APPROVED', notes: null, url: '/c', id: 'd3' },
+      ]);
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        firstName: 'Flore',
+        lastName: 'Kabila',
+        phone: '+243810000001',
+        email: 'flore@example.com',
+        pinConfigured: false,
+      }),
+    });
+
+    const result = await service.listPendingAdmin('PENDING');
+    expect(prisma.restaurant.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ kycStatus: 'PENDING' }),
+      }),
+    );
+    expect(result.restaurants).toHaveLength(1);
+    expect(result.restaurants[0].kycStatus).toBe('PENDING');
+    // Checklist may still list required slots; dossier must remain visible for « Approuver le dossier ».
+    expect(result.restaurants[0].userId).toBe('u1');
+  });
 });

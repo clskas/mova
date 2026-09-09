@@ -327,6 +327,11 @@ export class PartnerKycService {
     return { ...(await this.getRentalDossier(userId)), kycStatus: PartnerKycStatus.REJECTED, ...notified };
   }
 
+  /**
+   * PENDING = dossiers still awaiting admin action (incl. all justificatifs APPROVED
+   * but dossier-level PIN not issued). Filter by dossier kycStatus — never drop a
+   * PENDING dossier just because it has zero PENDING documents left.
+   */
   async listPendingAdmin(status?: string, includeHidden = false) {
     const normalized = String(status ?? '').trim().toUpperCase();
     const all = normalized === 'ALL';
@@ -334,6 +339,7 @@ export class PartnerKycService {
       normalized === 'PENDING' || normalized === 'APPROVED' || normalized === 'REJECTED'
         ? (normalized as PartnerKycStatus)
         : null;
+    // Dossier-level filter is authoritative for admin cards (checklist loads all doc statuses).
     const dossierWhere = all
       ? {}
       : exact

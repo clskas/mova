@@ -38,8 +38,27 @@ const LOCAL_HOSTS: Record<keyof typeof SERVICE_PORTS, string> = {
   admin: `http://localhost:${SERVICE_PORTS.admin}`,
 };
 
+/** Public Render hosts — used when AUTH_SERVICE_URL etc. were dropped by the 20-var UI limit. */
+const RENDER_PUBLIC_HOSTS: Record<keyof typeof SERVICE_PORTS, string> = {
+  gateway: 'https://mova-gateway.onrender.com',
+  auth: 'https://mova-auth.onrender.com',
+  ride: 'https://mova-ride.onrender.com',
+  payment: 'https://mova-payment.onrender.com',
+  driver: 'https://mova-driver.onrender.com',
+  notification: 'https://mova-notification.onrender.com',
+  admin: 'https://mova-admin.onrender.com',
+};
+
+function isRenderRuntime(): boolean {
+  if ((process.env.RENDER ?? '').trim()) return true;
+  if ((process.env.RENDER_SERVICE_ID ?? '').trim()) return true;
+  if ((process.env.RENDER_EXTERNAL_URL ?? '').trim()) return true;
+  return false;
+}
+
 function defaultHost(service: keyof typeof SERVICE_PORTS): string {
   if (process.env[ENV_KEYS[service]]) return process.env[ENV_KEYS[service]]!;
+  if (isRenderRuntime()) return RENDER_PUBLIC_HOSTS[service];
   if (process.env.DOCKER === 'true' || process.env.KUBERNETES_SERVICE_HOST) {
     return DOCKER_HOSTS[service];
   }

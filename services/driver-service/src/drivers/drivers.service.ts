@@ -19,6 +19,7 @@ import {
   formatMovaPublicId,
   maskPhoneRdc,
   evaluateDriverDocuments,
+  authNotifyUnreachableError,
   type DriverDocumentsStatus,
   type AuthUserNotifyResult,
 } from '@mova/shared';
@@ -256,23 +257,44 @@ export class DriversService {
     });
   }
 
-  private async fetchAuthUser(userId: string) {
+  private async lookupAuthUser(userId: string): Promise<{
+    user: {
+      id: string;
+      phone: string | null;
+      firstName?: string | null;
+      lastName?: string | null;
+      email?: string | null;
+      role: string;
+    } | null;
+    status: 'ok' | 'not_found' | 'unavailable';
+  }> {
     try {
       const res = await fetch(serviceUrl('auth', `/internal/users/${userId}`), {
         headers: { 'x-internal-api-key': INTERNAL_API_KEY },
       });
-      if (!res.ok) return null;
-      return res.json() as Promise<{
+      if (res.status === 404) return { user: null, status: 'not_found' };
+      if (!res.ok) {
+        this.logger.warn(`Auth user lookup ${userId} HTTP ${res.status}`);
+        return { user: null, status: 'unavailable' };
+      }
+      const user = (await res.json()) as {
         id: string;
         phone: string | null;
         firstName?: string | null;
         lastName?: string | null;
         email?: string | null;
         role: string;
-      }>;
-    } catch {
-      return null;
+      };
+      return { user, status: 'ok' };
+    } catch (e) {
+      this.logger.warn(`Auth user lookup ${userId} failed: ${(e as Error).message}`);
+      return { user: null, status: 'unavailable' };
     }
+  }
+
+  private async fetchAuthUser(userId: string) {
+    const { user } = await this.lookupAuthUser(userId);
+    return user;
   }
 
   private ocrFieldsFor(doc?: {
@@ -639,6 +661,7 @@ export class DriversService {
     hasEmail?: boolean;
     smsError?: string;
     emailError?: string;
+    emailMasked?: string;
   }> {
     try {
       const res = await fetch(serviceUrl('auth', `/internal/users/${userId}/issue-login-pin`), {
@@ -658,6 +681,7 @@ export class DriversService {
         hasEmail?: boolean;
         smsError?: string;
         emailError?: string;
+        emailMasked?: string;
         message?: string;
       };
       if (!res.ok) {
@@ -667,6 +691,7 @@ export class DriversService {
           hasPhone: false,
           hasEmail: false,
           emailError: json.message || `Auth issue-login-pin HTTP ${res.status}`,
+          emailMasked: json.emailMasked,
         };
       }
       return json;
@@ -677,7 +702,7 @@ export class DriversService {
         emailSent: false,
         hasPhone: false,
         hasEmail: false,
-        emailError: (e as Error).message,
+        emailError: authNotifyUnreachableError((e as Error).message),
       };
     }
   }
@@ -706,11 +731,16 @@ export class DriversService {
         hasEmail: issued.hasEmail === true,
         smsError: issued.smsError,
         emailError: issued.emailError,
+        emailMasked: issued.emailMasked,
       };
     }
     const fallback = await this.sendActivationPinNotify(userId, pin);
     if (fallback.hasEmail || fallback.hasPhone || fallback.emailSent || fallback.smsSent) {
-      return fallback;
+      return {
+        ...fallback,
+        emailMasked: fallback.emailMasked || issued.emailMasked,
+        emailError: fallback.emailError || issued.emailError,
+      };
     }
     return {
       smsSent: false,
@@ -719,6 +749,7 @@ export class DriversService {
       hasEmail: fallback.hasEmail,
       smsError: issued.smsError || fallback.smsError,
       emailError: issued.emailError || fallback.emailError,
+      emailMasked: issued.emailMasked || fallback.emailMasked,
     };
   }
 
@@ -1139,15 +1170,18 @@ export class DriversService {
             select: { userId: true, type: true, status: true },
           })
         : [];
-    const users = await Promise.all(userIds.map((id) => this.fetchAuthUser(id)));
-    const userById = new Map(users.filter(Boolean).map((u) => [u!.id, u!]));
+    const lookups = await Promise.all(userIds.map((id) => this.lookupAuthUser(id)));
+    const lookupById = new Map(userIds.map((id, i) => [id, lookups[i]!]));
     const mapped = rows.map((p) => {
       const kycSummary = this.kycUploadSummary(p.userId, allDocs);
       const documentsStatus = this.documentsStatusFor(p);
-      const user = userById.get(p.userId) ?? null;
+      const lookup = lookupById.get(p.userId);
+      const user = lookup?.user ?? null;
       const visibility = classifyAdminDriver(user, {
         onboardingCompleted: p.onboardingCompleted,
         kycDocumentsUploaded: kycSummary.kycDocumentsUploaded,
+        kycStatus: p.kycStatus,
+        authLookup: lookup?.status ?? 'unavailable',
       });
       return {
         ...p,
@@ -1175,19 +1209,22 @@ export class DriversService {
   }
 
   async getDriverAdminDetail(userId: string) {
-    const [profile, kyc, user] = await Promise.all([
+    const [profile, kyc, lookup] = await Promise.all([
       this.prisma.driverProfile.findUnique({ where: { userId }, include: { vehicles: true } }),
       this.getKycStatus(userId),
-      this.fetchAuthUser(userId),
+      this.lookupAuthUser(userId),
     ]);
     if (!profile) {
       throw new MovaHttpException(MovaErrorCode.DRIVER_KYC_PENDING, undefined, 'Profil chauffeur introuvable.');
     }
+    const user = lookup.user;
     const vehicle = profile.vehicles.find((v) => v.isActive) ?? profile.vehicles[0];
     const documentsStatus = this.documentsStatusFor(profile);
     const visibility = classifyAdminDriver(user, {
       onboardingCompleted: profile.onboardingCompleted,
       kycDocumentsUploaded: kyc.checklist.filter((c) => c.required && c.uploaded).length,
+      kycStatus: profile.kycStatus,
+      authLookup: lookup.status,
     });
     return {
       id: profile.id,

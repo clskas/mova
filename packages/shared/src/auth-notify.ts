@@ -8,6 +8,8 @@ export type AuthUserNotifyResult = {
   hasEmail: boolean;
   smsError?: string;
   emailError?: string;
+  /** Masked destination for admin alerts (ex. af***@gmail.com). Never the PIN. */
+  emailMasked?: string;
 };
 
 export type AuthUserNotifyPayload = {
@@ -24,6 +26,15 @@ const EMPTY_NOTIFY: AuthUserNotifyResult = {
   hasPhone: false,
   hasEmail: false,
 };
+
+/** French message when driver→auth HTTP fails (undici "fetch failed", timeout, bad URL). */
+export function authNotifyUnreachableError(raw?: string): string {
+  const detail = (raw ?? '').trim();
+  if (!detail || /fetch failed|ECONNREFUSED|ENOTFOUND|ETIMEDOUT|network|aborted/i.test(detail)) {
+    return "E-mail non envoyé : service d'authentification injoignable. Réessayez « Renvoyer le PIN ».";
+  }
+  return `E-mail non envoyé : ${detail}`;
+}
 
 /** SMS (AfriSoft hub, +243) and/or e-mail via auth User.phone / User.email. Never log PIN. */
 export async function notifyAuthUser(
@@ -44,6 +55,7 @@ export async function notifyAuthUser(
       return {
         ...EMPTY_NOTIFY,
         emailError: json.message || `Auth notify HTTP ${res.status}`,
+        emailMasked: typeof json.emailMasked === 'string' ? json.emailMasked : undefined,
       };
     }
     return {
@@ -53,11 +65,12 @@ export async function notifyAuthUser(
       hasEmail: json.hasEmail === true,
       smsError: json.smsError,
       emailError: json.emailError,
+      emailMasked: typeof json.emailMasked === 'string' ? json.emailMasked : undefined,
     };
   } catch (e) {
     return {
       ...EMPTY_NOTIFY,
-      emailError: (e as Error).message || 'Auth notify unreachable',
+      emailError: authNotifyUnreachableError((e as Error).message),
     };
   }
 }

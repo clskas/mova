@@ -1387,6 +1387,7 @@ describe('AuthService', () => {
     expect(result.hasPhone).toBe(false);
     expect(result.hasEmail).toBe(true);
     expect(result.emailSent).toBe(true);
+    expect(result.emailMasked).toBe('on***@ex.com');
     expect(sms.sendSms).not.toHaveBeenCalled();
     expect(mailer.sendLoginPin).toHaveBeenCalledWith('only@ex.com', result.loginPin, {
       portal: undefined,
@@ -1494,6 +1495,7 @@ describe('AuthService', () => {
     expect(users.ensureContactEmail).toHaveBeenCalledWith('user-1');
     expect(result.hasEmail).toBe(true);
     expect(result.emailSent).toBe(true);
+    expect(result.emailMasked).toBe('af***@gmail.com');
     expect(mailer.sendLoginPin).toHaveBeenCalledWith('afriri75@gmail.com', '939527', {
       portal: undefined,
     });

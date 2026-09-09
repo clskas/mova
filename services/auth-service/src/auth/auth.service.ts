@@ -1487,7 +1487,15 @@ export class AuthService {
         emailError = (e as Error).message;
       }
     }
-    return { smsSent, emailSent, hasPhone, hasEmail, smsError, emailError };
+    return {
+      smsSent,
+      emailSent,
+      hasPhone,
+      hasEmail,
+      smsError,
+      emailError,
+      emailMasked: email ? maskEmail(email) : undefined,
+    };
   }
 
   /**
@@ -1543,6 +1551,7 @@ export class AuthService {
       hasEmail,
       smsError,
       emailError,
+      emailMasked: email ? maskEmail(email) : undefined,
     };
   }
 }

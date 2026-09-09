@@ -1968,6 +1968,8 @@ export type KycNotifyResult = {
   emailSent?: boolean;
   hasEmail?: boolean;
   emailError?: string;
+  /** Masked destination (ex. af***@gmail.com) when auth resolved an e-mail. */
+  emailMasked?: string;
 };
 
 export async function reviewDriverKyc(userId: string, approved: boolean, notes?: string) {
@@ -2029,22 +2031,48 @@ export async function regenerateDriverActivationPin(userId: string) {
   });
 }
 
+function formatPinEmailLine(result: KycNotifyResult): string | null {
+  const masked = result.emailMasked?.trim();
+  if (result.emailSent) {
+    return masked ? `E-mail envoyé à ${masked}` : "E-mail envoyé.";
+  }
+  if (result.emailError) {
+    const err = result.emailError.trim();
+    if (/fetch failed|ECONNREFUSED|ENOTFOUND|ETIMEDOUT|injoignable|Auth notify unreachable/i.test(err)) {
+      return "E-mail non envoyé : service d'authentification injoignable. Réessayez « Renvoyer le PIN ».";
+    }
+    if (/Auth issue-login-pin HTTP|Auth notify HTTP/i.test(err)) {
+      return `E-mail non envoyé : ${err}`;
+    }
+    return masked ? `E-mail non envoyé à ${masked} : ${err}` : `E-mail non envoyé : ${err}`;
+  }
+  if (result.hasEmail === false) return "Aucun e-mail lié.";
+  if (result.hasEmail) return "E-mail non envoyé (le serveur SMTP n'a pas accepté le message).";
+  return null;
+}
+
 export function activationPinSmsCopy(result: KycNotifyResult): string {
   const parts: string[] = [];
-  if (result.smsSent) parts.push("Un SMS a été envoyé.");
-  else if (result.hasPhone === false) {
-    parts.push(
-      result.emailSent
-        ? "Aucun numéro +243 lié — envoi par e-mail."
-        : "Aucun numéro +243 lié — le SMS n'a pas été envoyé.",
-    );
-  } else if (result.smsError) parts.push(`SMS non envoyé : ${result.smsError}.`);
-  else parts.push("SMS non envoyé.");
-  if (result.emailSent) {
-    parts.push("Un e-mail a été envoyé (Resend).");
-  } else if (result.emailError) parts.push(result.emailError);
-  else if (result.hasEmail === false) parts.push("Aucun e-mail lié.");
-  else if (result.hasEmail) parts.push("E-mail non envoyé (le serveur SMTP n'a pas accepté le message).");
+  const emailLine = formatPinEmailLine(result);
+  if (emailLine) parts.push(emailLine);
+
+  if (result.smsSent) {
+    parts.push("Un SMS a été envoyé.");
+  } else if (result.hasPhone === false) {
+    // Ne jamais masquer un échec e-mail derrière « Aucun numéro +243 … fetch failed ».
+    if (!result.emailError) {
+      parts.push(
+        result.emailSent
+          ? "Aucun numéro +243 lié."
+          : "Aucun numéro +243 lié — le SMS n'a pas été envoyé.",
+      );
+    }
+  } else if (result.smsError) {
+    parts.push(`SMS non envoyé : ${result.smsError}.`);
+  } else if (result.hasPhone) {
+    parts.push("SMS non envoyé.");
+  }
+
   return parts.join(" ");
 }
 

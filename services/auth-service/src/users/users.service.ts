@@ -115,7 +115,7 @@ export class UsersService {
           AND (
             LOWER(email) LIKE '%@cloudtestlabaccounts.com'
             OR (
-              role NOT IN ('RESTAURANT', 'RENTAL_PARTNER')
+              role NOT IN ('RESTAURANT', 'RENTAL_PARTNER', 'DRIVER')
               AND LOWER(email) ~ '^[a-z0-9]+([._][a-z0-9]+)*\\.[0-9]{5}@gmail\\.com$'
             )
           )

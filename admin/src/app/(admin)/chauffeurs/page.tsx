@@ -174,7 +174,7 @@ export default function ChauffeursPage() {
     setLoading(true);
     setError(null);
     try {
-      const data = await fetchDrivers(includeHidden);
+      const data = await fetchDrivers(includeHidden, { take: 500 });
       setDrivers(Array.isArray(data) ? data : []);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur de chargement");
@@ -542,7 +542,7 @@ export default function ChauffeursPage() {
 
             {"canGenerateActivationPin" in selected && selected.canGenerateActivationPin && !activationPin && canReviewKyc && (
               <div className="rounded-xl bg-blue-50 border border-blue-200 p-4 text-sm">
-                <p className="text-blue-900">KYC approuvé mais aucun PIN actif. Envoyez un code SMS à ce chauffeur.</p>
+                <p className="text-blue-900">KYC approuvé mais aucun PIN actif. Envoyez un code à ce chauffeur (SMS ou e-mail).</p>
                 <button
                   type="button"
                   onClick={generatePin}
@@ -561,7 +561,7 @@ export default function ChauffeursPage() {
                 disabled={saving}
                 className="text-sm text-[#6C63FF] hover:underline"
               >
-                Renvoyer le PIN par SMS
+                Renvoyer le PIN
               </button>
             )}
 

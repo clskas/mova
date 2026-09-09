@@ -64,11 +64,12 @@ export function isPlayPrelaunchAccount(user: PlayPrelaunchUser): boolean {
 }
 
 /**
- * Utilisateurs / KYC default lists: hide Play crawlers, but keep restaurant and
- * rental partners who signed in with Google (email, no +243).
+ * Utilisateurs / KYC / Chauffeurs default lists: hide Play crawlers, but keep
+ * restaurant, rental, and DRIVER accounts who signed in with Google (email, no +243).
+ * Numbered Gmail without a real DRIVER/partner role still matches isPlayPrelaunchAccount.
  */
 export function isAdminHiddenPlayAccount(user: PlayPrelaunchUser): boolean {
-  if (user.role === 'RESTAURANT' || user.role === 'RENTAL_PARTNER') {
+  if (user.role === 'RESTAURANT' || user.role === 'RENTAL_PARTNER' || user.role === 'DRIVER') {
     return isOfficialPlayTestLabAccount(user);
   }
   return isPlayPrelaunchAccount(user);

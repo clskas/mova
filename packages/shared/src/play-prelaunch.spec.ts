@@ -92,4 +92,32 @@ describe('play-prelaunch accounts', () => {
       }),
     ).toBe(true);
   });
+
+  it('keeps Google DRIVER accounts (personal or numbered Gmail) on Chauffeurs / Utilisateurs', () => {
+    expect(
+      isAdminHiddenPlayAccount({
+        email: 'afriri75@gmail.com',
+        phone: null,
+        role: 'DRIVER',
+        firstName: 'Kike',
+        lastName: 'Sala',
+      }),
+    ).toBe(false);
+    expect(
+      isAdminHiddenPlayAccount({
+        email: 'martinpearson.39569@gmail.com',
+        phone: null,
+        role: 'DRIVER',
+      }),
+    ).toBe(false);
+    expect(
+      isAdminHiddenPlayAccount({
+        email: 'aqwza7hpyxgwc3pve4yeil-lvl-02@cloudtestlabaccounts.com',
+        phone: null,
+        role: 'DRIVER',
+        firstName: 'Nuage',
+        lastName: 'Laboratoire',
+      }),
+    ).toBe(true);
+  });
 });

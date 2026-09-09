@@ -715,8 +715,8 @@ export class DriversService {
     return {
       smsSent: false,
       emailSent: false,
-      hasPhone: issued.hasPhone === true || fallback.hasPhone,
-      hasEmail: issued.hasEmail === true || fallback.hasEmail,
+      hasPhone: fallback.hasPhone,
+      hasEmail: fallback.hasEmail,
       smsError: issued.smsError || fallback.smsError,
       emailError: issued.emailError || fallback.emailError,
     };

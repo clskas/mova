@@ -136,6 +136,8 @@ const STATUS_COLORS: Record<string, string> = {
   IN_TRANSIT: "bg-violet-100 text-violet-700",
   RESTAURANT_CONFIRMED: "bg-amber-100 text-amber-800",
   READY_FOR_PICKUP: "bg-blue-100 text-blue-700",
+  Manquant: "bg-amber-100 text-amber-800",
+  MISSING: "bg-amber-100 text-amber-800",
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -158,6 +160,8 @@ const STATUS_LABELS: Record<string, string> = {
   READY_FOR_PICKUP: "Prêt",
   ASSIGNED: "Assigné",
   SOS: "SOS",
+  Manquant: "Manquant",
+  MISSING: "Manquant",
 };
 
 export function StatusBadge({ status }: { status?: string }) {

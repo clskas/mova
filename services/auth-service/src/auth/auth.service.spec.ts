@@ -1473,4 +1473,29 @@ describe('AuthService', () => {
     expect(sms.sendSms).toHaveBeenCalledWith('+243810000001', expect.stringContaining(motif), 'kyc_reject');
     expect(mailer.sendNotice).not.toHaveBeenCalled();
   });
+
+  it('issueLoginPin recovers Google e-mail via UsersService when User.email is empty', async () => {
+    prisma.user.findUnique.mockResolvedValue(makeUser({ phone: null, email: null, googleId: 'gid-1' }));
+    prisma.user.update.mockResolvedValue(makeUser({ phone: null, email: 'afriri75@gmail.com', googleId: 'gid-1' }));
+    const users = {
+      ensureContactEmail: jest.fn().mockResolvedValue('afriri75@gmail.com'),
+    };
+    service = new AuthService(
+      prisma as never,
+      jwt as never,
+      { get: jest.fn() } as never,
+      redis as never,
+      sms as never,
+      googleTokens as never,
+      mailer as never,
+      users as never,
+    );
+    const result = await service.issueLoginPin('user-1', { pin: '939527' });
+    expect(users.ensureContactEmail).toHaveBeenCalledWith('user-1');
+    expect(result.hasEmail).toBe(true);
+    expect(result.emailSent).toBe(true);
+    expect(mailer.sendLoginPin).toHaveBeenCalledWith('afriri75@gmail.com', '939527', {
+      portal: undefined,
+    });
+  });
 });

@@ -127,8 +127,10 @@ describe('KYC notify copy', () => {
     const copy = driverActivationPinNotifyCopy('111657');
     expect(copy.smsText).toContain('111657');
     expect(copy.emailText).toContain('111657');
+    expect(copy.emailSubject).toBe('Votre accès SENGA — AfriSoft');
     expect(copy.emailSubject).not.toContain('111657');
     expect(copy.emailSubject).not.toMatch(/code PIN/i);
+    expect(copy.emailSubject).not.toMatch(/OTP/i);
     expect(copy.smsText).toMatch(/activation et connexion/);
   });
 });

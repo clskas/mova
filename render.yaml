@@ -199,6 +199,7 @@ services:
         value: "true"
       - key: RUN_SEED
         value: "false"
+      - fromGroup: mova-external-apis
 
   - type: web
     name: mova-notification

@@ -637,6 +637,8 @@ export class DriversService {
     emailSent?: boolean;
     hasPhone?: boolean;
     hasEmail?: boolean;
+    smsError?: string;
+    emailError?: string;
   }> {
     try {
       const res = await fetch(serviceUrl('auth', `/internal/users/${userId}/issue-login-pin`), {
@@ -654,12 +656,29 @@ export class DriversService {
         emailSent?: boolean;
         hasPhone?: boolean;
         hasEmail?: boolean;
+        smsError?: string;
+        emailError?: string;
+        message?: string;
       };
-      if (!res.ok) return { smsSent: false };
+      if (!res.ok) {
+        return {
+          smsSent: false,
+          emailSent: false,
+          hasPhone: false,
+          hasEmail: false,
+          emailError: json.message || `Auth issue-login-pin HTTP ${res.status}`,
+        };
+      }
       return json;
     } catch (e) {
       this.logger.warn(`Account login PIN issue failed for ${userId}: ${(e as Error).message}`);
-      return { smsSent: false };
+      return {
+        smsSent: false,
+        emailSent: false,
+        hasPhone: false,
+        hasEmail: false,
+        emailError: (e as Error).message,
+      };
     }
   }
 
@@ -671,6 +690,36 @@ export class DriversService {
     const pin = this.generateActivationPin();
     await this.issueAccountLoginPin(userId, { pin, notify: false });
     return pin;
+  }
+
+  /**
+   * Persist activation PIN locally, then notify via auth issueLoginPin (User.email / User.phone
+   * + MessageAI-safe « Votre accès SENGA » template). Falls back to notifyAuthUser copy.
+   */
+  private async deliverActivationPin(userId: string, pin: string): Promise<AuthUserNotifyResult> {
+    const issued = await this.issueAccountLoginPin(userId, { pin, notify: true });
+    if (issued.hasEmail === true || issued.hasPhone === true || issued.emailSent || issued.smsSent) {
+      return {
+        smsSent: issued.smsSent === true,
+        emailSent: issued.emailSent === true,
+        hasPhone: issued.hasPhone === true,
+        hasEmail: issued.hasEmail === true,
+        smsError: issued.smsError,
+        emailError: issued.emailError,
+      };
+    }
+    const fallback = await this.sendActivationPinNotify(userId, pin);
+    if (fallback.hasEmail || fallback.hasPhone || fallback.emailSent || fallback.smsSent) {
+      return fallback;
+    }
+    return {
+      smsSent: false,
+      emailSent: false,
+      hasPhone: issued.hasPhone === true || fallback.hasPhone,
+      hasEmail: issued.hasEmail === true || fallback.hasEmail,
+      smsError: issued.smsError || fallback.smsError,
+      emailError: issued.emailError || fallback.emailError,
+    };
   }
 
   private async applyKycApproval(userId: string) {
@@ -717,7 +766,7 @@ export class DriversService {
         data: { typeApprovalStatus: KycStatus.APPROVED, typeApprovedAt: now, typeApprovalNotes: null },
       });
     }
-    const notified = await this.sendActivationPinNotify(userId, pin);
+    const notified = await this.deliverActivationPin(userId, pin);
     return {
       pin,
       loginPin: pin,
@@ -1031,7 +1080,7 @@ export class DriversService {
         isAvailable: false,
       },
     });
-    const notified = await this.sendActivationPinNotify(userId, pin);
+    const notified = await this.deliverActivationPin(userId, pin);
     return {
       activationPin: pin,
       loginPin: pin,

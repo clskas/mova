@@ -220,4 +220,74 @@ describe('UsersService owner lock', () => {
     expect(result.deleted).toBe(0);
     expect(prisma.user.delete).not.toHaveBeenCalled();
   });
+
+  it('ensureContactEmail recovers Google mailbox for PIN notify', async () => {
+    const createdAt = new Date('2026-09-08T12:00:00.000Z');
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'drv-kike',
+      googleId: 'gid-kike',
+      email: null,
+      createdAt,
+      firstName: 'Kike',
+      lastName: 'Sala',
+      role: UserRole.DRIVER,
+      phone: null,
+    });
+    prisma.otpCode.findMany.mockResolvedValue([{ phone: 'afriri75@gmail.com' }]);
+    prisma.user.update.mockResolvedValue({});
+    const email = await service.ensureContactEmail('drv-kike');
+    expect(email).toBe('afriri75@gmail.com');
+    expect(prisma.user.update).toHaveBeenCalledWith({
+      where: { id: 'drv-kike' },
+      data: { email: 'afriri75@gmail.com' },
+    });
+  });
+
+  it('findById backfills missing Google e-mail so KYC cards show contact', async () => {
+    const createdAt = new Date('2026-09-08T12:00:00.000Z');
+    prisma.user.findUnique
+      .mockResolvedValueOnce({
+        id: 'drv-kike',
+        googleId: 'gid-kike',
+        email: null,
+        createdAt,
+        firstName: 'Kike',
+        lastName: 'Sala',
+        role: UserRole.DRIVER,
+        phone: null,
+        status: UserStatus.PENDING_KYC,
+        avatarUrl: null,
+        updatedAt: createdAt,
+      })
+      .mockResolvedValueOnce({
+        id: 'drv-kike',
+        googleId: 'gid-kike',
+        email: null,
+        createdAt,
+        firstName: 'Kike',
+        lastName: 'Sala',
+        role: UserRole.DRIVER,
+        phone: null,
+        status: UserStatus.PENDING_KYC,
+        avatarUrl: null,
+        updatedAt: createdAt,
+      })
+      .mockResolvedValueOnce({
+        id: 'drv-kike',
+        googleId: 'gid-kike',
+        email: 'afriri75@gmail.com',
+        createdAt,
+        firstName: 'Kike',
+        lastName: 'Sala',
+        role: UserRole.DRIVER,
+        phone: null,
+        status: UserStatus.PENDING_KYC,
+        avatarUrl: null,
+        updatedAt: createdAt,
+      });
+    prisma.otpCode.findMany.mockResolvedValue([{ phone: 'afriri75@gmail.com' }]);
+    prisma.user.update.mockResolvedValue({});
+    const user = await service.findById('drv-kike');
+    expect(user.email).toBe('afriri75@gmail.com');
+  });
 });

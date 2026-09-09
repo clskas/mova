@@ -1,4 +1,5 @@
-import { INTERNAL_API_KEY, serviceUrl } from './service-urls';
+import { serviceUrl } from './service-urls';
+import { resolveInternalApiKey } from './prod-security';
 
 export type AuthUserNotifyResult = {
   smsSent: boolean;
@@ -32,11 +33,19 @@ export async function notifyAuthUser(
   try {
     const res = await fetch(serviceUrl('auth', `/internal/users/${userId}/notify`), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-internal-api-key': INTERNAL_API_KEY },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-internal-api-key': resolveInternalApiKey(),
+      },
       body: JSON.stringify(payload),
     });
     const json = (await res.json().catch(() => ({}))) as AuthUserNotifyResult & { message?: string };
-    if (!res.ok) return EMPTY_NOTIFY;
+    if (!res.ok) {
+      return {
+        ...EMPTY_NOTIFY,
+        emailError: json.message || `Auth notify HTTP ${res.status}`,
+      };
+    }
     return {
       smsSent: json.smsSent === true,
       emailSent: json.emailSent === true,
@@ -45,7 +54,10 @@ export async function notifyAuthUser(
       smsError: json.smsError,
       emailError: json.emailError,
     };
-  } catch {
-    return EMPTY_NOTIFY;
+  } catch (e) {
+    return {
+      ...EMPTY_NOTIFY,
+      emailError: (e as Error).message || 'Auth notify unreachable',
+    };
   }
 }

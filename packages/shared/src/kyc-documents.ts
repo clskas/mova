@@ -204,7 +204,7 @@ export function driverActivationPinNotifyCopy(pin: string): {
     smsText:
       `SENGA — votre code PIN (activation et connexion) : ${pin}. ` +
       `Valable 72 h pour l'activation chauffeur. Ne le communiquez à personne.`,
-    emailSubject: 'Votre accès chauffeur SENGA — AfriSoft',
+    emailSubject: 'Votre accès SENGA — AfriSoft',
     emailText:
       `Bonjour,\n\nAfriSoft a activé votre accès chauffeur SENGA.\n\n` +
       `Numéro à 6 chiffres (activation 72 h et connexion) : ${pin}\n\n` +

@@ -59,7 +59,32 @@ export class UsersService {
   async findById(id: string) {
     const user = await this.prisma.user.findUnique({ where: { id } });
     if (!user) throw new MovaHttpException(MovaErrorCode.USER_NOT_FOUND, HttpStatus.NOT_FOUND);
+    if (user.googleId && !String(user.email ?? '').trim()) {
+      await this.ensureContactEmail(id);
+      const refreshed = await this.prisma.user.findUnique({ where: { id } });
+      if (refreshed) return this.enrichUser(refreshed);
+    }
     return this.enrichUser(user);
+  }
+
+  /**
+   * Auth User.email is the source of truth for PIN / KYC mail (not driver-service).
+   * Google drivers sometimes had email wiped by onboarding PATCH — recover from OTP row.
+   */
+  async ensureContactEmail(userId: string): Promise<string | null> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) return null;
+    const existing = user.email?.trim();
+    if (existing) return existing.toLowerCase();
+    if (!user.googleId) return null;
+    const recovered = await this.inferGoogleEmailFromOtp(user.createdAt);
+    if (!recovered) return null;
+    try {
+      await this.prisma.user.update({ where: { id: userId }, data: { email: recovered } });
+    } catch {
+      /* unique collision — still use recovered address for this send */
+    }
+    return recovered;
   }
 
   async updateProfile(

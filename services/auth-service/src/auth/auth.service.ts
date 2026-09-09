@@ -1,4 +1,4 @@
-import { HttpStatus, Injectable, Logger } from '@nestjs/common';
+import { HttpStatus, Injectable, Logger, Optional } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { User, UserRole, UserStatus } from '@prisma/client';
@@ -31,6 +31,7 @@ import {
 } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '@mova/shared';
+import { UsersService } from '../users/users.service';
 import { SmsService } from './sms.providers';
 import {
   EMAIL_UNAVAILABLE_USER_MESSAGE,
@@ -114,7 +115,16 @@ export class AuthService {
     private sms: SmsService,
     private googleTokens: GoogleTokenVerifier,
     private emailOtp: EmailOtpMailer,
+    @Optional() private users?: UsersService,
   ) {}
+
+  /** Prefer User.email; recover Google mailbox when wiped (same as Utilisateurs list). */
+  private async resolveContactEmail(userId: string, fallback?: string | null): Promise<string> {
+    const existing = fallback?.trim() || '';
+    if (existing) return existing.toLowerCase();
+    if (!this.users) return '';
+    return (await this.users.ensureContactEmail(userId))?.trim().toLowerCase() || '';
+  }
 
   async requestOtp(phone: string, role?: UserRole, portal?: string, intendedRole?: string) {
     const requestedRole = this.resolveRequestedAuthRole(role, portal, intendedRole);
@@ -1447,7 +1457,7 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new MovaHttpException(MovaErrorCode.USER_NOT_FOUND, HttpStatus.NOT_FOUND);
     const phone = normalizePhoneRdc(user.phone?.trim() ?? '');
-    const email = user.email?.trim() || '';
+    const email = await this.resolveContactEmail(userId, user.email);
     const hasPhone = validatePhoneRdc(phone);
     const hasEmail = Boolean(email);
     let smsSent = false;
@@ -1494,7 +1504,7 @@ export class AuthService {
       data: { localPinHash: hashLocalPin(pin), localPinSetAt: new Date() },
     });
     const phone = normalizePhoneRdc(user.phone?.trim() ?? '');
-    const email = user.email?.trim() || '';
+    const email = await this.resolveContactEmail(userId, user.email);
     const hasPhone = validatePhoneRdc(phone);
     const hasEmail = Boolean(email);
     const shouldNotify = opts?.notify !== false;

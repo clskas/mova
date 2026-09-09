@@ -376,8 +376,8 @@ export default function ChauffeursPage() {
       />
       <p className="text-sm text-gray-600 mb-4">
         <strong>Chauffeurs</strong> = dossier véhicule et KYC. <strong>Utilisateurs</strong> = comptes de connexion.
-        Un chauffeur réel apparaît ici <em>et</em> dans Utilisateurs avec le rôle Chauffeur. Les profils sans compte
-        (orphelins, Test Lab) sont masqués.
+        Un chauffeur réel (y compris Google sans +243) apparaît ici <em>et</em> dans Utilisateurs avec le rôle Chauffeur.
+        Seuls les vrais orphelins (sans compte) et Test Lab sont masqués.
       </p>
       {error && <div className="mb-4"><ErrorBanner message={error} onRetry={load} /></div>}
       <div className="space-y-4">
@@ -422,9 +422,10 @@ export default function ChauffeursPage() {
                       ) : (
                         <>
                           <span className="block font-medium text-gray-800">
-                            {[d.firstName, d.lastName].filter(Boolean).join(" ") || d.phone || "—"}
+                            {[d.firstName, d.lastName].filter(Boolean).join(" ") || d.email || d.phone || "—"}
                           </span>
                           {d.phone && <span className="block text-gray-500">{d.phone}</span>}
+                          {!d.phone && d.email && <span className="block text-gray-500">{d.email}</span>}
                           {d.userRole && d.userRole !== "DRIVER" && (
                             <span className="block text-amber-700">Rôle compte : {d.userRole}</span>
                           )}

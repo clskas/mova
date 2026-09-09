@@ -4,7 +4,7 @@ import * as crypto from 'crypto';
 import {
   MovaErrorCode,
   MovaHttpException,
-  INTERNAL_API_KEY,
+  resolveInternalApiKey,
   resolveCityFromCoords,
   serviceUrl,
   MARKET_RDC,
@@ -265,12 +265,13 @@ export class DriversService {
       lastName?: string | null;
       email?: string | null;
       role: string;
+      status?: string | null;
     } | null;
     status: 'ok' | 'not_found' | 'unavailable';
   }> {
     try {
       const res = await fetch(serviceUrl('auth', `/internal/users/${userId}`), {
-        headers: { 'x-internal-api-key': INTERNAL_API_KEY },
+        headers: { 'x-internal-api-key': resolveInternalApiKey() },
       });
       if (res.status === 404) return { user: null, status: 'not_found' };
       if (!res.ok) {
@@ -284,6 +285,7 @@ export class DriversService {
         lastName?: string | null;
         email?: string | null;
         role: string;
+        status?: string | null;
       };
       return { user, status: 'ok' };
     } catch (e) {
@@ -602,11 +604,7 @@ export class DriversService {
         activationPinExpiresAt: null,
       },
     });
-    await fetch(serviceUrl('auth', `/internal/users/${userId}`), {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', 'x-internal-api-key': INTERNAL_API_KEY },
-      body: JSON.stringify({ status: 'ACTIVE', role: 'DRIVER' }),
-    }).catch((e) => this.logger.warn(`Could not activate auth user ${userId}`, e));
+    await this.syncAuthDriverActive(userId);
     return this.getProfileWithUser(userId);
   }
 
@@ -643,6 +641,43 @@ export class DriversService {
     return notifyDriverActivationPin(userId, pin);
   }
 
+  /** Keep Utilisateurs badge in sync: APPROVED dossier ⇒ User.status ACTIVE (not PENDING_KYC). */
+  private async syncAuthDriverActive(userId: string): Promise<void> {
+    try {
+      const res = await fetch(serviceUrl('auth', `/internal/users/${userId}`), {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-internal-api-key': resolveInternalApiKey(),
+        },
+        body: JSON.stringify({ status: 'ACTIVE', role: 'DRIVER' }),
+      });
+      if (!res.ok) {
+        this.logger.warn(`Could not set auth user ACTIVE for ${userId}: HTTP ${res.status}`);
+      }
+    } catch (e) {
+      this.logger.warn(`Could not set auth user ACTIVE for ${userId}: ${(e as Error).message}`);
+    }
+  }
+
+  private async syncAuthDriverPendingKyc(userId: string): Promise<void> {
+    try {
+      const res = await fetch(serviceUrl('auth', `/internal/users/${userId}`), {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-internal-api-key': resolveInternalApiKey(),
+        },
+        body: JSON.stringify({ status: 'PENDING_KYC', role: 'DRIVER' }),
+      });
+      if (!res.ok) {
+        this.logger.warn(`Could not set auth user PENDING_KYC for ${userId}: HTTP ${res.status}`);
+      }
+    } catch (e) {
+      this.logger.warn(`Could not set auth user PENDING_KYC for ${userId}: ${(e as Error).message}`);
+    }
+  }
+
   private sendKycRejectNotify(
     userId: string,
     opts: { documentType?: string; reason: string },
@@ -666,7 +701,7 @@ export class DriversService {
     try {
       const res = await fetch(serviceUrl('auth', `/internal/users/${userId}/issue-login-pin`), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-internal-api-key': INTERNAL_API_KEY },
+        headers: { 'Content-Type': 'application/json', 'x-internal-api-key': resolveInternalApiKey() },
         body: JSON.stringify({
           purpose: 'driver_kyc',
           pin: opts?.pin,
@@ -784,11 +819,8 @@ export class DriversService {
         ...(existing?.technicalInspectionExpiry == null ? { technicalInspectionExpiry: defaultExpiry } : {}),
       },
     });
-    await fetch(serviceUrl('auth', `/internal/users/${userId}`), {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', 'x-internal-api-key': INTERNAL_API_KEY },
-      body: JSON.stringify({ role: 'DRIVER' }),
-    }).catch((e) => this.logger.warn(`Could not confirm DRIVER role for ${userId}`, e));
+    // Utilisateurs badge reads User.status — must leave PENDING_KYC once dossier is approved.
+    await this.syncAuthDriverActive(userId);
     const profile = await this.prisma.driverProfile.findUnique({ where: { userId } });
     if (profile) {
       await this.ensureDefaultVehicle(profile.id);
@@ -812,14 +844,14 @@ export class DriversService {
   async getEarnings(userId: string) {
     await fetch(serviceUrl('payment', `/internal/driver-payouts/sync/${userId}`), {
       method: 'POST',
-      headers: { 'x-internal-api-key': INTERNAL_API_KEY },
+      headers: { 'x-internal-api-key': resolveInternalApiKey() },
     }).catch(() => undefined);
 
     const profile = await this.getOrCreateProfile(userId);
 
     const fetchJson = async (url: string) => {
       try {
-        const res = await fetch(url, { headers: { 'x-internal-api-key': INTERNAL_API_KEY } });
+        const res = await fetch(url, { headers: { 'x-internal-api-key': resolveInternalApiKey() } });
         if (!res.ok) return null;
         return res.json();
       } catch {
@@ -871,7 +903,7 @@ export class DriversService {
 
     const url = serviceUrl('ride', `/internal/rides/driver/${userId}/payout-items?${params.toString()}`);
     try {
-      const res = await fetch(url, { headers: { 'x-internal-api-key': INTERNAL_API_KEY } });
+      const res = await fetch(url, { headers: { 'x-internal-api-key': resolveInternalApiKey() } });
       if (!res.ok) return { items: [], pagination: { total: 0, skip: 0, take: 50 }, summary: { netCdf: 0, count: 0 } };
       return res.json();
     } catch {
@@ -893,7 +925,7 @@ export class DriversService {
 
     await fetch(serviceUrl('payment', `/internal/driver-payouts/sync/${userId}`), {
       method: 'POST',
-      headers: { 'x-internal-api-key': INTERNAL_API_KEY },
+      headers: { 'x-internal-api-key': resolveInternalApiKey() },
     }).catch(() => undefined);
 
     let res: Response;
@@ -901,7 +933,7 @@ export class DriversService {
       res = await fetch(serviceUrl('payment', `/internal/wallets/${userId}/withdraw`), {
         method: 'POST',
         headers: {
-          'x-internal-api-key': INTERNAL_API_KEY,
+          'x-internal-api-key': resolveInternalApiKey(),
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ amountCdf, provider: payoutProvider, phone: payoutPhone }),
@@ -1066,6 +1098,7 @@ export class DriversService {
         create: { userId, kycStatus: status },
         update: { kycStatus: status, activationPin: null, activationPinVerifiedAt: null, activationPinExpiresAt: null },
       });
+      await this.syncAuthDriverPendingKyc(userId);
       notified = await this.sendKycRejectNotify(userId, { reason: reason ?? notes ?? '' });
     }
     const profile = await this.prisma.driverProfile.findUnique({ where: { userId }, include: { vehicles: true } });
@@ -1111,6 +1144,8 @@ export class DriversService {
         isAvailable: false,
       },
     });
+    // Heal Utilisateurs badge for dossiers already APPROVED before this sync shipped.
+    await this.syncAuthDriverActive(userId);
     const notified = await this.deliverActivationPin(userId, pin);
     return {
       activationPin: pin,
@@ -1172,6 +1207,18 @@ export class DriversService {
         : [];
     const lookups = await Promise.all(userIds.map((id) => this.lookupAuthUser(id)));
     const lookupById = new Map(userIds.map((id, i) => [id, lookups[i]!]));
+    // Heal Utilisateurs: APPROVED dossiers stuck on User.status PENDING_KYC.
+    await Promise.all(
+      rows
+        .filter((p) => p.kycStatus === KycStatus.APPROVED)
+        .map(async (p) => {
+          const user = lookupById.get(p.userId)?.user;
+          if (user && String(user.status ?? '').toUpperCase() === 'PENDING_KYC') {
+            await this.syncAuthDriverActive(p.userId);
+            user.status = 'ACTIVE';
+          }
+        }),
+    );
     const mapped = rows.map((p) => {
       const kycSummary = this.kycUploadSummary(p.userId, allDocs);
       const documentsStatus = this.documentsStatusFor(p);

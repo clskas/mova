@@ -56,8 +56,31 @@ function isRenderRuntime(): boolean {
   return false;
 }
 
+/**
+ * Render `fromService.property: hostport` injects `hostname:port` without a scheme.
+ * Undici `fetch()` requires an absolute URL — missing `http://` → « fetch failed ».
+ * http-proxy-middleware often still works, which hid the bug for the gateway.
+ */
+export function normalizeServiceBaseUrl(raw?: string | null): string {
+  const trimmed = (raw ?? '').trim().replace(/\/$/, '');
+  if (!trimmed) return '';
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed)) return trimmed;
+  return `http://${trimmed}`;
+}
+
+function isLoopbackServiceUrl(url: string): boolean {
+  return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/?$/i.test(url);
+}
+
 function defaultHost(service: keyof typeof SERVICE_PORTS): string {
-  if (process.env[ENV_KEYS[service]]) return process.env[ENV_KEYS[service]]!;
+  const fromEnv = normalizeServiceBaseUrl(process.env[ENV_KEYS[service]]);
+  if (fromEnv) {
+    // Stale localhost AUTH_SERVICE_URL on Render must not poison inter-service fetch.
+    if (isRenderRuntime() && isLoopbackServiceUrl(fromEnv)) {
+      return RENDER_PUBLIC_HOSTS[service];
+    }
+    return fromEnv;
+  }
   if (isRenderRuntime()) return RENDER_PUBLIC_HOSTS[service];
   if (process.env.DOCKER === 'true' || process.env.KUBERNETES_SERVICE_HOST) {
     return DOCKER_HOSTS[service];

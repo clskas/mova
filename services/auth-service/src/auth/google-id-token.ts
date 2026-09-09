@@ -89,12 +89,23 @@ export async function verifyGoogleIdToken(
     throw new Error('GOOGLE_AUDIENCE_MISMATCH');
   }
   const email = payload.email?.trim().toLowerCase() || null;
+  let givenName = payload.given_name?.trim() || null;
+  let familyName = payload.family_name?.trim() || null;
+  // Some Google accounts only expose `name` (no given_name / family_name).
+  if (!givenName && !familyName) {
+    const full = payload.name?.trim() || '';
+    if (full) {
+      const parts = full.split(/\s+/).filter(Boolean);
+      givenName = parts[0] ?? null;
+      familyName = parts.length > 1 ? parts.slice(1).join(' ') : null;
+    }
+  }
   return {
     googleId: payload.sub,
     email,
     emailVerified: payload.email_verified === true,
-    givenName: payload.given_name?.trim() || null,
-    familyName: payload.family_name?.trim() || null,
+    givenName,
+    familyName,
     picture: payload.picture?.trim() || null,
     audience: Array.isArray(payload.aud) ? payload.aud[0] ?? '' : payload.aud ?? '',
   };

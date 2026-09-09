@@ -136,11 +136,39 @@ export class AdminService {
     return this.fetchJson('ride', `/internal/rides/reports?days=${days}`);
   }
 
-  listUsers(skip = 0, take = 50, search?: string, includePlayPrelaunch = false) {
+  async listUsers(skip = 0, take = 50, search?: string, includePlayPrelaunch = false) {
     const params = new URLSearchParams({ skip: String(skip), take: String(take) });
     if (search) params.set('search', search);
     if (includePlayPrelaunch) params.set('includePlayPrelaunch', 'true');
-    return this.fetchJson('auth', `/internal/users?${params}`);
+    const result = await this.fetchJson<{
+      data?: Array<{ id: string; role?: string; status?: string; [key: string]: unknown }>;
+      total?: number;
+      skip?: number;
+      take?: number;
+    }>('auth', `/internal/users?${params}`);
+    const pendingDrivers = (result.data ?? []).filter(
+      (u) => u.role === 'DRIVER' && String(u.status ?? '').toUpperCase() === 'PENDING_KYC',
+    );
+    if (pendingDrivers.length === 0) return result;
+    await Promise.all(
+      pendingDrivers.map(async (u) => {
+        try {
+          const detail = await this.fetchJson<{ kycStatus?: string }>(
+            'driver',
+            `/internal/drivers/${u.id}/detail`,
+          );
+          if (String(detail.kycStatus ?? '').toUpperCase() !== 'APPROVED') return;
+          await this.proxy('auth', `/internal/users/${u.id}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ status: 'ACTIVE', role: 'DRIVER' }),
+          });
+          u.status = 'ACTIVE';
+        } catch {
+          /* driver profile missing or auth unreachable — leave badge as-is */
+        }
+      }),
+    );
+    return result;
   }
   listPlayPrelaunchUsers() {
     return this.fetchJson('auth', '/internal/users/play-prelaunch');

@@ -126,7 +126,9 @@ export class WalletController {
   }
 
   @Post('withdraw')
-  @ApiOperation({ summary: 'Retrait mobile money (OTP requis)' })
+  @ApiOperation({
+    summary: 'Retrait mobile money (OTP requis sauf si WITHDRAW_SKIP_OTP=true)',
+  })
   async withdraw(@Request() req: { user: { id: string } }, @Body() dto: WithdrawDto) {
     return this.walletService.withdrawToMobileMoney(req.user.id, dto.amountCdf, dto.provider, dto.phone, {
       otp: dto.otp,

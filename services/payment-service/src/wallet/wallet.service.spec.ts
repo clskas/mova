@@ -1,5 +1,9 @@
 import { ConfigService } from '@nestjs/config';
-import { WalletService, __resetWithdrawOtpMemoryForTests } from './wallet.service';
+import {
+  WalletService,
+  __resetWithdrawOtpMemoryForTests,
+  __resetWithdrawSkipOtpLogForTests,
+} from './wallet.service';
 import { SERDIPAY_B2C_MERCHANT_FLOAT_LOW_FR, TEST_OTP_CODE } from '@mova/shared';
 
 describe('WalletService', () => {
@@ -53,6 +57,7 @@ describe('WalletService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     __resetWithdrawOtpMemoryForTests();
+    __resetWithdrawSkipOtpLogForTests();
     configGet.mockImplementation((key: string) => {
       if (key === 'MOCK_PAYMENTS') return 'true';
       if (key === 'NODE_ENV') return 'test';
@@ -367,6 +372,22 @@ describe('WalletService', () => {
       },
     });
     expect(tx.wallet.update).not.toHaveBeenCalled();
+  });
+
+  it('WITHDRAW_SKIP_OTP=true autorise le retrait sans OTP ni SMS', async () => {
+    configGet.mockImplementation((key: string) => {
+      if (key === 'MOCK_PAYMENTS') return 'true';
+      if (key === 'NODE_ENV') return 'test';
+      if (key === 'WITHDRAW_SKIP_OTP') return 'true';
+      return undefined;
+    });
+    tx.$queryRaw.mockResolvedValue([{ id: 'w1', balanceCdf: 5000, heldBalanceCdf: 0 }]);
+    tx.wallet.update.mockResolvedValue({ id: 'w1', userId: 'u1', balanceCdf: 2700 });
+    const otpRes = await service.requestWithdrawOtp('u1', 2300, 'ORANGE_MONEY', '+243890000001');
+    expect(otpRes).toMatchObject({ skipOtp: true, otpRequired: false });
+    const result = await service.withdrawToMobileMoney('u1', 2300, 'ORANGE_MONEY', '+243890000001');
+    expect(result.success).toBe(true);
+    expect(tx.wallet.update).toHaveBeenCalledTimes(1);
   });
 
   it('refuse un retrait si l’OTP a été envoyé vers un autre numéro', async () => {

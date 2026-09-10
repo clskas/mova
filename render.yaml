@@ -156,6 +156,9 @@ services:
         fromService: { name: mova-auth, type: web, property: hostport }
       - key: MOCK_PAYMENTS
         value: "false"
+      # Temporary founder withdraw test — no SMS OTP. Re-enable: "false" or remove + restart.
+      - key: WITHDRAW_SKIP_OTP
+        value: "true"
       - key: NODE_ENV
         value: "production"
       - key: APP_ENV

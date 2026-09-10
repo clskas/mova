@@ -55,6 +55,22 @@ const WITHDRAW_OTP_COOLDOWN_SEC = 45;
 const WITHDRAW_OTP_HOUR_LIMIT = 5;
 const STALE_PAYOUT_MIN_AGE_MS = 15 * 60 * 1000;
 
+/**
+ * Temporary founder test mode: skip withdraw OTP (no SMS/email).
+ * Default OFF. Re-enable OTP: WITHDRAW_SKIP_OTP=false (or unset) + restart payment-service.
+ */
+function envTruthy(raw: string | undefined): boolean {
+  const v = (raw ?? '').trim().toLowerCase();
+  return v === 'true' || v === '1' || v === 'yes';
+}
+
+let withdrawSkipOtpLogged = false;
+
+/** @internal test helper */
+export function __resetWithdrawSkipOtpLogForTests(): void {
+  withdrawSkipOtpLogged = false;
+}
+
 type WithdrawOtpChallenge = {
   h: string;
   p: string;
@@ -87,6 +103,19 @@ export class WalletService {
 
   private isMockPayments() {
     return this.config.get('MOCK_PAYMENTS') === 'true';
+  }
+
+  /** Env WITHDRAW_SKIP_OTP=true — temporary production test; default false. */
+  isWithdrawOtpSkipped(): boolean {
+    const skip = envTruthy(this.config.get<string>('WITHDRAW_SKIP_OTP'));
+    if (skip && !withdrawSkipOtpLogged) {
+      withdrawSkipOtpLogged = true;
+      this.logger.warn(
+        'WITHDRAW_SKIP_OTP=true — retraits sans OTP (mode test temporaire). ' +
+          'Réactiver : WITHDRAW_SKIP_OTP=false ou unset, puis redémarrer payment-service.',
+      );
+    }
+    return skip;
   }
 
   /** NODE_ENV=production or a real AfriSoft / Render host — never simulate money. */
@@ -716,6 +745,21 @@ export class WalletService {
       provider,
       phone,
     );
+
+    if (this.isWithdrawOtpSkipped()) {
+      return {
+        success: true,
+        skipOtp: true,
+        otpRequired: false,
+        message: 'Mode test : retrait sans code.',
+        channel: 'none' as const,
+        phone: normalizedPhone,
+        amountCdf: amount,
+        provider: normalizedProvider,
+        expiresInSec: 0,
+      };
+    }
+
     await this.assertWithdrawOtpRateLimit(userId, normalizedPhone);
 
     const useTestOtp =
@@ -735,6 +779,8 @@ export class WalletService {
       this.logger.warn(`TEST OTP retrait pour ${normalizedPhone.slice(0, 6)}…`);
       return {
         success: true,
+        skipOtp: false,
+        otpRequired: true,
         message: `Code envoyé au ${normalizedPhone} pour confirmer le retrait.`,
         channel: 'sms' as const,
         phone: normalizedPhone,
@@ -761,6 +807,8 @@ export class WalletService {
       if (sms.success) {
         return {
           success: true,
+          skipOtp: false,
+          otpRequired: true,
           message: `Code envoyé au ${normalizedPhone} pour confirmer le retrait.`,
           channel: 'sms' as const,
           phone: normalizedPhone,
@@ -780,6 +828,8 @@ export class WalletService {
     if (emailFallback) {
       return {
         success: true,
+        skipOtp: false,
+        otpRequired: true,
         message: `SMS indisponible — code envoyé par e-mail à ${emailFallback.masked} pour confirmer le retrait.`,
         channel: 'email' as const,
         deliveryHint: emailFallback.masked,
@@ -809,7 +859,8 @@ export class WalletService {
       provider,
       phone,
     );
-    if (!opts.skipOtp) {
+    const skipOtp = Boolean(opts.skipOtp) || this.isWithdrawOtpSkipped();
+    if (!skipOtp) {
       await this.consumeWithdrawOtp(userId, amount, normalizedProvider, normalizedPhone, opts.otp);
     }
 

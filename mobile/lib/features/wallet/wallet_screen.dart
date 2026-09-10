@@ -250,12 +250,16 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
     setState(() => _withdrawLoading = true);
     final api = ref.read(apiClientProvider);
     await api.checkHealth();
-    final result = await api.post('/wallet/withdraw', {
+    final body = <String, dynamic>{
       'provider': provider,
       'amountCdf': amountCdf,
       'phone': MarketConfig.normalizePhone(phone),
-      'otp': otp,
-    });
+    };
+    final trimmedOtp = otp.trim();
+    if (trimmedOtp.isNotEmpty) {
+      body['otp'] = trimmedOtp;
+    }
+    final result = await api.post('/wallet/withdraw', body);
     if (!mounted) return;
     setState(() => _withdrawLoading = false);
     switch (result) {
@@ -766,7 +770,16 @@ class _WalletWithdrawSheetState extends ConsumerState<_WalletWithdrawSheet> {
     setState(() => _otpLoading = false);
     switch (result) {
       case Success(:final data):
-        final msg = data is Map ? data['message']?.toString() : null;
+        final map = data is Map ? Map<String, dynamic>.from(data as Map) : <String, dynamic>{};
+        final skipOtp = map['skipOtp'] == true || map['otpRequired'] == false;
+        if (skipOtp) {
+          Navigator.pop(
+            context,
+            (amount: parsed.amount, phone: parsed.phone, provider: _providerId, otp: ''),
+          );
+          return;
+        }
+        final msg = map['message']?.toString();
         setState(() {
           _otpSent = true;
           _otpPhone = parsed.phone;

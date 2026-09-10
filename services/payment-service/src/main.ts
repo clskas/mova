@@ -33,6 +33,15 @@ async function bootstrap() {
   const port = process.env.PORT ?? 3003;
   await app.listen(port);
   const hubMode = (process.env.AFRISOFT_PAY_HUB_MODE ?? '').trim().toLowerCase() === 'true';
+  const withdrawSkip =
+    (process.env.WITHDRAW_SKIP_OTP ?? '').trim().toLowerCase() === 'true' ||
+    (process.env.WITHDRAW_SKIP_OTP ?? '').trim() === '1';
   console.log(`SENGA payment-service on port ${port}${hubMode ? ' (AfriSoft pay hub /v1)' : ''}`);
+  if (withdrawSkip) {
+    console.warn(
+      '[payment-service] WITHDRAW_SKIP_OTP=true — retraits sans OTP (mode test). ' +
+        'Réactiver OTP : WITHDRAW_SKIP_OTP=false ou unset, puis redémarrer.',
+    );
+  }
 }
 bootstrap();

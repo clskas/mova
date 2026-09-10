@@ -308,6 +308,8 @@ export type WalletWithdrawResult = {
   message?: string;
   balanceCdf?: number;
   formattedBalance?: string;
+  skipOtp?: boolean;
+  otpRequired?: boolean;
 };
 
 export function requestWithdrawOtp(data: { amountCdf: number; provider: string; phone: string }) {
@@ -321,7 +323,7 @@ export function withdrawPartnerWallet(data: {
   amountCdf: number;
   provider: string;
   phone: string;
-  otp: string;
+  otp?: string;
 }) {
   return apiFetch<WalletWithdrawResult>("/api/wallet/withdraw", {
     method: "POST",

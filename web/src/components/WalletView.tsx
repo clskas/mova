@@ -152,7 +152,7 @@ export function WalletView({ onBack, mock }: Props) {
     setWithdrawLoading(true);
     setError(null);
     try {
-      await apiFetch<{ message?: string }>("/api/wallet/withdraw/otp", {
+      const otpRes = await apiFetch<{ message?: string; skipOtp?: boolean }>("/api/wallet/withdraw/otp", {
         method: "POST",
         body: JSON.stringify({
           provider: withdrawProvider,
@@ -160,6 +160,25 @@ export function WalletView({ onBack, mock }: Props) {
           phone: withdrawPhone.trim(),
         }),
       }, { useMock: mock });
+      if (otpRes.skipOtp) {
+        const res = await apiFetch<{ balanceCdf?: number; message?: string }>("/api/wallet/withdraw", {
+          method: "POST",
+          body: JSON.stringify({
+            provider: withdrawProvider,
+            amountCdf: value,
+            phone: withdrawPhone.trim(),
+          }),
+        }, { useMock: mock });
+        if (res.balanceCdf != null) {
+          setWallet((w) => ({ ...w, balanceCdf: res.balanceCdf }));
+        }
+        setWithdrawOtp("");
+        setWithdrawOtpSent(false);
+        setInfo(res.message ?? "Mode test : retrait sans code.");
+        await load();
+        setHistoryRefresh((n) => n + 1);
+        return;
+      }
       setWithdrawOtpSent(true);
     } catch (e) {
       setError(toUserErrorMessage(e, "Impossible d’envoyer le code"));

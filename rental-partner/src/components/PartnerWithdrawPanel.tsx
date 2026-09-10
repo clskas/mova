@@ -71,6 +71,20 @@ export function PartnerWithdrawPanel({ balanceCdf, walletAvailable = true, onWit
           provider,
           phone: phone.trim(),
         });
+        if (sent.skipOtp) {
+          const result = await withdrawPartnerWallet({
+            amountCdf,
+            provider,
+            phone: phone.trim(),
+          });
+          rememberPhone();
+          setSuccess(result.message ?? "Retrait initié avec succès.");
+          setAmount("");
+          setOtp("");
+          setOtpSent(false);
+          onWithdrawn?.();
+          return;
+        }
         setOtpSent(true);
         setSuccess(sent.message ?? "Code envoyé au numéro de versement.");
         return;

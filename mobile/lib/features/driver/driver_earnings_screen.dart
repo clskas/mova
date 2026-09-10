@@ -48,7 +48,7 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
     return int.tryParse(value?.toString() ?? '') ?? 0;
   }
 
-  int get _minWithdraw => _asInt(_data?['minWithdrawCdf']).clamp(500, 999999999);
+  int get _minWithdraw => _asInt(_data?['minWithdrawCdf']).clamp(2300, 999999999);
 
   bool get _payoutConfigured => _data?['payoutConfigured'] == true;
 

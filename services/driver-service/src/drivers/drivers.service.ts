@@ -885,7 +885,7 @@ export class DriversService {
       payoutPhone: profile?.payoutPhone ?? null,
       payoutPhoneMasked: profile?.payoutPhone ? maskPhoneRdc(profile.payoutPhone) : null,
       payoutConfigured: !!profile?.payoutPhone,
-      minWithdrawCdf: 500,
+      minWithdrawCdf: 2300,
     };
   }
 

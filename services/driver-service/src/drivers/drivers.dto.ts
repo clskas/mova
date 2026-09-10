@@ -41,9 +41,9 @@ export class ActivationPinDto {
 }
 
 export class DriverWithdrawDto {
-  @ApiProperty({ description: 'Montant en FC (minimum 500)' })
+  @ApiProperty({ description: 'Montant en FC (minimum SerdiPay 2300)' })
   @Type(() => Number)
   @IsInt()
-  @Min(500)
+  @Min(2300)
   amountCdf: number;
 }

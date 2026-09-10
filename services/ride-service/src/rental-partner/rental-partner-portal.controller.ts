@@ -5,7 +5,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PartnerPromoDto } from '../promo/partner-promo.dto';
 import { PartnerPromoService } from '../promo/partner-promo.service';
 import { PartnerBillingService } from '../billing/partner-billing.service';
-import { CreatePartnerVehicleDto, PartnerBookingActionDto, PartnerConfirmCashDto, PartnerLogisticsDto, UploadPartnerVehiclePhotoDto } from './rental-partner-portal.dto';
+import { CreatePartnerVehicleDto, PartnerBookingActionDto, PartnerConfirmCashDto, PartnerLogisticsDto, UploadPartnerVehiclePhotoDto, UpdateRentalBusinessDto } from './rental-partner-portal.dto';
 import { RentalPartnerPortalService } from './rental-partner-portal.service';
 import { RentalPartnerRoleGuard } from './rental-partner-role.guard';
 import { PartnerKycService } from '../partner-kyc/partner-kyc.service';
@@ -26,6 +26,18 @@ export class RentalPartnerPortalController {
   @ApiOperation({ summary: 'Profil partenaire location' })
   profile(@Request() req: { user: { id: string } }) {
     return this.portal.getProfile(req.user.id);
+  }
+
+  @Patch('profile')
+  @ApiOperation({ summary: 'Mettre à jour la fiche activité (nom, ville, adresse, GPS)' })
+  updateProfile(@Request() req: { user: { id: string } }, @Body() dto: UpdateRentalBusinessDto) {
+    return this.portal.updateBusiness(req.user.id, dto);
+  }
+
+  @Patch('location')
+  @ApiOperation({ summary: 'Alias — mettre à jour la fiche activité de location' })
+  updateLocation(@Request() req: { user: { id: string } }, @Body() dto: UpdateRentalBusinessDto) {
+    return this.portal.updateBusiness(req.user.id, dto);
   }
 
   @Get('kyc')

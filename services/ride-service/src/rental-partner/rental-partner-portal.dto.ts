@@ -1,5 +1,17 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsIn, IsInt, IsOptional, IsString, Min } from 'class-validator';
+import { IsBoolean, IsIn, IsInt, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+
+export class UpdateRentalBusinessDto {
+  @ApiPropertyOptional() @IsOptional() @IsString() businessName?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() city?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() address?: string;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() lat?: number;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() lng?: number;
+  @ApiPropertyOptional({ description: "Valide et finalise la fiche activité de location (onboarding)" })
+  @IsOptional()
+  @IsBoolean()
+  completeSetup?: boolean;
+}
 
 export class CreatePartnerVehicleDto {
   @ApiProperty()

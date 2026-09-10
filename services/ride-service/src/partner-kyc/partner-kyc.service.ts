@@ -24,6 +24,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { UploadsService } from '../uploads/uploads.service';
 import { fetchAuthUserBrief } from '../common/internal-lookup.util';
 import { stubRestaurantCreateData } from '../restaurant/restaurant-profile.util';
+import { stubRentalProfileCreateData } from '../rental-partner/rental-profile.util';
 import { classifyAdminPartner } from './partner-admin-visibility';
 
 const PHONE_OK = /^\+243\d{9}$/;
@@ -99,7 +100,9 @@ export class PartnerKycService {
     const phoneVerified = PHONE_OK.test(user?.phone?.trim() ?? '');
     const hasEmail = Boolean(user?.email?.trim());
     const partnerKind = rentalKycPartnerKind(kind);
-    const displayName = user?.name || null;
+    const displayName = profile.businessName?.trim() && profile.businessName !== 'Ma location'
+      ? profile.businessName
+      : user?.name || null;
     return {
       subject: 'RENTAL_PARTNER' as const,
       userId: ownerUserId,
@@ -107,6 +110,11 @@ export class PartnerKycService {
       partnerKind,
       partnerKindLabel: kycPartnerKindLabel(partnerKind),
       displayName,
+      businessName: profile.businessName,
+      city: profile.city,
+      address: profile.address,
+      lat: profile.lat,
+      lng: profile.lng,
       kycStatus: profile.kycStatus,
       kycNotes: profile.kycNotes,
       nif: profile.nif,
@@ -619,12 +627,12 @@ export class PartnerKycService {
     }
   }
 
-  async ensureRentalProfile(userId: string) {
+  async ensureRentalProfile(userId: string, businessName?: string) {
     const existing = await this.prisma.rentalPartnerProfile.findUnique({ where: { userId } });
     if (existing) return existing;
     try {
       return await this.prisma.rentalPartnerProfile.create({
-        data: { userId, partnerType: RentalPartnerType.INDIVIDUAL, kycStatus: PartnerKycStatus.PENDING },
+        data: stubRentalProfileCreateData(userId, businessName),
       });
     } catch {
       const raced = await this.prisma.rentalPartnerProfile.findUnique({ where: { userId } });

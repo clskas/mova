@@ -13,8 +13,12 @@ import { PartnerBillingService } from '../billing/partner-billing.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RentalService } from '../rental/rental.service';
 import { UploadsService } from '../uploads/uploads.service';
-import { CreatePartnerVehicleDto, PartnerLogisticsDto } from './rental-partner-portal.dto';
+import { CreatePartnerVehicleDto, PartnerLogisticsDto, UpdateRentalBusinessDto } from './rental-partner-portal.dto';
 import { PartnerKycService } from '../partner-kyc/partner-kyc.service';
+import {
+  assertRentalProfileComplete,
+  rentalNeedsProfileSetup,
+} from './rental-profile.util';
 
 @Injectable()
 export class RentalPartnerPortalService {
@@ -54,6 +58,7 @@ export class RentalPartnerPortalService {
     const recentBookings = await this.listBookings(ownerUserId, { take: 5 });
     return {
       ...profile,
+      partnerName: profile.name ?? 'Partenaire location',
       kpis: {
         balanceCdf: wallet.balanceCdf,
         formattedBalance: wallet.formattedBalance,
@@ -65,6 +70,8 @@ export class RentalPartnerPortalService {
         completedMonth,
         completedMonthCount: completedMonth,
         totalRentalSales: rentalCredits.length,
+        pendingBookings: profile.pendingBookings,
+        vehicleCounts: profile.vehicleCounts,
       },
       recentBookings: recentBookings.data,
     };
@@ -123,7 +130,7 @@ export class RentalPartnerPortalService {
 
   async getProfile(ownerUserId: string) {
     const user = await fetchAuthUserBrief(ownerUserId);
-    const partner = await this.partnerKyc.ensureRentalProfile(ownerUserId);
+    const partner = await this.partnerKyc.ensureRentalProfile(ownerUserId, user?.name ?? undefined);
     const counts = await this.prisma.rentalVehicle.groupBy({
       by: ['approvalStatus'],
       where: { ownerUserId },
@@ -136,19 +143,87 @@ export class RentalPartnerPortalService {
         vehicle: { ownerUserId },
       },
     });
+    const needsSetup = rentalNeedsProfileSetup(partner);
     return {
       userId: ownerUserId,
-      name: user?.name,
+      id: partner.id,
+      name: needsSetup ? user?.name : partner.businessName,
+      businessName: partner.businessName,
+      city: partner.city,
+      address: partner.address,
+      lat: partner.lat,
+      lng: partner.lng,
       phone: user?.phone,
       kycStatus: partner.kycStatus,
       partnerType: partner.partnerType,
       canOperate: partner.kycStatus === 'APPROVED',
+      needsProfileSetup: needsSetup,
       vehicleCounts: {
         pending: byStatus[RentalVehicleApprovalStatus.PENDING] ?? 0,
         approved: byStatus[RentalVehicleApprovalStatus.APPROVED] ?? 0,
         rejected: byStatus[RentalVehicleApprovalStatus.REJECTED] ?? 0,
       },
       pendingBookings,
+    };
+  }
+
+  async updateBusiness(ownerUserId: string, dto: UpdateRentalBusinessDto) {
+    const partner = await this.partnerKyc.ensureRentalProfile(ownerUserId);
+    let payload: {
+      businessName?: string;
+      city?: string;
+      address?: string;
+      lat?: number;
+      lng?: number;
+    };
+
+    if (dto.completeSetup) {
+      try {
+        payload = assertRentalProfileComplete({
+          businessName: dto.businessName ?? partner.businessName,
+          city: dto.city ?? partner.city,
+          address: dto.address ?? partner.address,
+          lat: dto.lat ?? partner.lat,
+          lng: dto.lng ?? partner.lng,
+        });
+      } catch (err) {
+        throw new MovaHttpException(
+          MovaErrorCode.VALIDATION_ERROR,
+          undefined,
+          err instanceof Error ? err.message : 'Informations de location incomplètes.',
+        );
+      }
+    } else {
+      if (dto.lat != null && (dto.lat < -90 || dto.lat > 90)) {
+        throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Latitude invalide.');
+      }
+      if (dto.lng != null && (dto.lng < -180 || dto.lng > 180)) {
+        throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Longitude invalide.');
+      }
+      payload = {
+        ...(dto.businessName !== undefined
+          ? { businessName: dto.businessName.trim() || partner.businessName }
+          : {}),
+        ...(dto.city !== undefined ? { city: dto.city.trim() || partner.city } : {}),
+        ...(dto.address !== undefined ? { address: dto.address.trim() || partner.address } : {}),
+        ...(dto.lat != null ? { lat: dto.lat } : {}),
+        ...(dto.lng != null ? { lng: dto.lng } : {}),
+      };
+    }
+
+    const updated = await this.prisma.rentalPartnerProfile.update({
+      where: { id: partner.id },
+      data: payload,
+    });
+    return {
+      id: updated.id,
+      businessName: updated.businessName,
+      name: updated.businessName,
+      city: updated.city,
+      address: updated.address,
+      lat: updated.lat,
+      lng: updated.lng,
+      needsProfileSetup: rentalNeedsProfileSetup(updated),
     };
   }
 

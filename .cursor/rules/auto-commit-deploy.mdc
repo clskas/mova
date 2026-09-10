@@ -1,0 +1,27 @@
+---
+description: Always commit and deploy when finishing implementation work
+alwaysApply: true
+---
+
+# Auto commit and deploy
+
+When a feature, fix, or meaningful implementation is **finished** in a session, commit the relevant files and deploy to production **without asking** whether to commit or deploy.
+
+## Do
+
+- Stage only files that belong to the completed work
+- Commit with a concise message focused on why
+- Push `main` to both remotes when this repo uses dual remotes (`origin` and `afri-soft`)
+- Rely on the existing GitHub Actions Deploy pipeline (CI → Build → Deploy); migrations run on service start via `scripts/migrate-with-backup.sh`
+- Monitor the pipeline and report failures (including Render minutes / quota)
+
+## Ask only about WHAT, not WHETHER
+
+Ask the user only if it is ambiguous **which files** belong in the commit, or if deploy target/scope is unclear. Do **not** ask for permission to commit or deploy after finishing the work.
+
+## Never
+
+- Commit secrets (`.env`, `pay.json`, `sms.json`, credentials, keys)
+- Force-push, `--no-verify`, or amend unless the user explicitly allows it and git safety rules are met
+- Update git config
+- Include scratch/artifacts (`store-listing` scratch, `__pycache__`, `docker/npmrc` drive-by edits, stray `=`)

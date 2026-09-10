@@ -15,6 +15,15 @@ const CHAPTERS = [
     ],
   },
   {
+    title: "Fiche activité (après inscription)",
+    steps: [
+      "Au premier accès, complétez le nom de votre agence, la ville, l'adresse et la position GPS.",
+      "Votre compte est automatiquement lié à cette activité de location.",
+      "Vous pourrez modifier ces infos plus tard dans Paramètres.",
+      "Ensuite, ouvrez Mon dossier pour le KYC (entreprise ou particulier).",
+    ],
+  },
+  {
     title: "Entreprise ou particulier",
     steps: [
       "Ouvrez Mon dossier et choisissez votre type.",

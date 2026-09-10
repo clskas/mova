@@ -718,6 +718,12 @@ model RentalPartnerProfile {
   id          String            @id @default(uuid())
   userId      String            @unique
   partnerType RentalPartnerType @default(INDIVIDUAL)
+  /// Display / agency name shown in the partner portal (stub until onboarding).
+  businessName String           @default("Ma location")
+  city        String            @default("À préciser")
+  address     String            @default("Kinshasa — à compléter")
+  lat         Float             @default(-4.3105)
+  lng         Float             @default(15.3032)
   kycStatus   PartnerKycStatus  @default(PENDING)
   kycNotes    String?
   activationPinVerifiedAt DateTime?

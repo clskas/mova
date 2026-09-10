@@ -10,7 +10,8 @@ import {
   isPartnerPinExemptPath,
   partnerNeedsWorkActivationPin,
 } from "@/components/PinAuth";
-import { apiFetch, fetchKyc } from "@/lib/api";
+import { RentalOnboardingCard } from "@/components/RentalOnboardingCard";
+import { apiFetch, fetchKyc, fetchProfile } from "@/lib/api";
 import { PUBLIC_API_BASE } from "@/lib/public-api-base";
 import {
   RENTAL_AUTH_INTENT,
@@ -37,6 +38,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [ready, setReady] = useState(false);
+  const [needsProfileSetup, setNeedsProfileSetup] = useState(false);
   const [needsActivation, setNeedsActivation] = useState(false);
   const [activateIdentity, setActivateIdentity] = useState("");
 
@@ -55,8 +57,9 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
 
     async function check() {
       try {
-        const [me, kyc] = await Promise.all([
+        const [me, profile, kyc] = await Promise.all([
           apiFetch<Me>("/api/users/me"),
+          fetchProfile().catch(() => null),
           fetchKyc().catch(() => null),
         ]);
         if (cancelled) return;
@@ -65,6 +68,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
           router.replace("/login");
           return;
         }
+        setNeedsProfileSetup(profile?.needsProfileSetup === true);
         const fallback = accountPhone(
           {
             pinConfigured: me.pinConfigured,
@@ -99,35 +103,6 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     };
   }, [router, pathname]);
 
-  if (needsActivation && !isPartnerPinExemptPath(pathname)) {
-    return (
-      <div className="fixed inset-0 z-[10050] bg-gradient-to-br from-indigo-50 to-violet-50 overflow-y-auto">
-        <div className="min-h-[100dvh] flex items-start justify-center p-6 pt-10 pb-16">
-          <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-6 sm:p-8">
-            <p className="text-center text-sm text-gray-500 mb-4">SENGA Location</p>
-            <ActivationPinCard
-              apiBase={PUBLIC_API_BASE}
-              intent={RENTAL_AUTH_INTENT}
-              accentClass="bg-indigo-600"
-              highlightClass="border-indigo-400 bg-indigo-50"
-              heading={WORK_ACTIVATION_PIN_HEADING_FR}
-              hint={WORK_ACTIVATION_PIN_HINT_FR}
-              lockIdentity
-              defaultIdentity={activateIdentity}
-              normalizeIdentity={normalizeLoginPhone}
-              verifyPath="/api/rental-partner/kyc/activation-pin"
-              authToken={getToken()}
-              onActivated={() => {
-                setNeedsActivation(false);
-                setReady(true);
-              }}
-            />
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   if (!ready) {
     return (
       <div className="min-h-screen flex items-center justify-center text-gray-500">
@@ -136,5 +111,54 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     );
   }
 
-  return <>{children}</>;
+  const showOnboarding = needsProfileSetup && !isPartnerPinExemptPath(pathname);
+  const showActivation = needsActivation && !needsProfileSetup && !isPartnerPinExemptPath(pathname);
+
+  return (
+    <>
+      {children}
+      {showOnboarding && (
+        <div className="fixed inset-0 z-[10040] bg-gradient-to-br from-indigo-50 to-violet-50 overflow-y-auto">
+          <div className="min-h-[100dvh] flex items-start justify-center p-6 pt-10 pb-16">
+            <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-6 sm:p-8">
+              <p className="text-center text-sm text-gray-500 mb-4">SENGA Location</p>
+              <RentalOnboardingCard
+                onComplete={() => {
+                  setNeedsProfileSetup(false);
+                  setReady(true);
+                  router.replace("/dossier");
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+      {showActivation && (
+        <div className="fixed inset-0 z-[10050] bg-gradient-to-br from-indigo-50 to-violet-50 overflow-y-auto">
+          <div className="min-h-[100dvh] flex items-start justify-center p-6 pt-10 pb-16">
+            <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-6 sm:p-8">
+              <p className="text-center text-sm text-gray-500 mb-4">SENGA Location</p>
+              <ActivationPinCard
+                apiBase={PUBLIC_API_BASE}
+                intent={RENTAL_AUTH_INTENT}
+                accentClass="bg-indigo-600"
+                highlightClass="border-indigo-400 bg-indigo-50"
+                heading={WORK_ACTIVATION_PIN_HEADING_FR}
+                hint={WORK_ACTIVATION_PIN_HINT_FR}
+                lockIdentity
+                defaultIdentity={activateIdentity}
+                normalizeIdentity={normalizeLoginPhone}
+                verifyPath="/api/rental-partner/kyc/activation-pin"
+                authToken={getToken()}
+                onActivated={() => {
+                  setNeedsActivation(false);
+                  setReady(true);
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
 }

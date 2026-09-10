@@ -14,6 +14,14 @@ const MANUAL = [
     ],
   },
   {
+    title: "Fiche activité",
+    steps: [
+      "Au premier accès, renseignez nom, ville, adresse et GPS — votre compte est lié à l'activité.",
+      "Modifiez ces infos dans Paramètres.",
+      "Puis complétez Mon dossier (KYC) avant de publier des véhicules.",
+    ],
+  },
+  {
     title: "Entreprise ou particulier",
     steps: [
       "Ouvrez Mon dossier et choisissez votre type.",

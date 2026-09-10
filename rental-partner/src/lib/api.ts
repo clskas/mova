@@ -10,13 +10,20 @@ export function getApiBase() {
 
 export type PartnerProfile = {
   userId: string;
+  id?: string;
   name?: string;
+  businessName?: string;
+  city?: string;
+  address?: string;
+  lat?: number;
+  lng?: number;
   phone?: string;
   vehicleCounts?: { pending?: number; approved?: number; rejected?: number };
   pendingBookings?: number;
   kycStatus?: string;
   partnerType?: "COMPANY" | "INDIVIDUAL";
   canOperate?: boolean;
+  needsProfileSetup?: boolean;
 };
 
 export type PartnerBooking = {
@@ -133,6 +140,36 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
 
 export function fetchProfile() {
   return apiFetch<PartnerProfile>("/api/rental-partner/profile");
+}
+
+export function updateRentalBusiness(data: {
+  businessName?: string;
+  city?: string;
+  address?: string;
+  lat?: number;
+  lng?: number;
+  completeSetup?: boolean;
+}) {
+  return apiFetch<{
+    id: string;
+    businessName: string;
+    name?: string;
+    city?: string;
+    address?: string;
+    lat?: number;
+    lng?: number;
+    needsProfileSetup?: boolean;
+  }>("/api/rental-partner/profile", { method: "PATCH", body: JSON.stringify(data) });
+}
+
+export function completeRentalProfile(data: {
+  businessName: string;
+  city: string;
+  address: string;
+  lat: number;
+  lng: number;
+}) {
+  return updateRentalBusiness({ ...data, completeSetup: true });
 }
 
 export function fetchVehicles(params?: { q?: string; status?: string; city?: string }) {

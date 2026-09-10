@@ -12,7 +12,15 @@ export function PartnerPortalFrame({ children }: { children: React.ReactNode }) 
     let cancelled = false;
     fetchProfile()
       .then((p) => {
-        if (!cancelled) setPartnerName(p.name);
+        if (!cancelled) {
+          const label =
+            p.businessName && p.businessName !== "Ma location"
+              ? p.businessName
+              : p.name && p.name !== "Ma location"
+                ? p.name
+                : undefined;
+          setPartnerName(label);
+        }
       })
       .catch(() => undefined);
     return () => {

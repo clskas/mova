@@ -803,7 +803,7 @@ export class AdminService {
   }
   topUpWalletStatus(userId: string, providerRef: string) {
     const q = new URLSearchParams({ providerRef });
-    return this.proxy('payment', `/internal/wallets/${userId}/top-up/status?${q}`);
+    return this.proxy('payment', `/internal/wallets/${userId}/top-up/status?${q}`, { method: 'GET' });
   }
   reverseVirtualTreasuryFloat() {
     return this.proxy('payment', `/internal/wallets/platform/reverse-virtual-float`, { method: 'POST', body: '{}' });

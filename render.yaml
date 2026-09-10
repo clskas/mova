@@ -427,13 +427,11 @@ envVarGroups:
         value: "1.0.5"
       - key: MOBILE_MIN_VERSION
         value: "1.0.0"
-      # Live Play production versionCode (1.0.6+63, promoted 2026-09-08, run 34255560335).
-      # Pubspec was 1.0.7+60; CI used run_number 63 (internal already had 62).
-      # Name stays 1.0.5 so phones already on 63 do not see a name-based banner.
+      # Live Play production versionCode (1.0.6+64). Name stays 1.0.5 (Dart AppVersion.name).
       - key: MOBILE_PASSENGER_VERSION_CODE
-        value: "63"
+        value: "64"
       - key: MOBILE_DRIVER_VERSION_CODE
-        value: "63"
+        value: "64"
       - key: MOBILE_MIN_VERSION_CODE
         value: "0"
       - key: PLAY_STORE_PASSENGER_URL

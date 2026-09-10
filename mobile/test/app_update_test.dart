@@ -370,13 +370,13 @@ void main() {
       expect(state.showBanner, isTrue);
     });
 
-    test('Play stale updateAvailable does not keep the banner after install', () {
+    test('Play reporting installed code does not clear an API ahead banner', () {
       final fromApi = AppUpdateService.parseRemote(
         {
           'passenger': {
             'currentVersion': '1.0.5',
             'minVersion': '1.0.0',
-            'currentVersionCode': 56,
+            'currentVersionCode': 64,
             'storeUrl': 'https://play.google.com/store/apps/details?id=cd.mova.mova.passenger',
           },
         },
@@ -385,10 +385,35 @@ void main() {
         localBuild: 50,
       )!;
       expect(fromApi.updateAvailable, isTrue);
+      // Play often echoes the installed versionCode when no update is probed —
+      // that must not wipe the API "store is ahead" decision.
       final afterPlay = AppUpdateService.reconcileWithPlay(
         fromApi,
         playCode: 50,
         localBuild: 50,
+      );
+      expect(afterPlay.updateAvailable, isTrue);
+      expect(afterPlay.showBanner, isTrue);
+    });
+
+    test('API caught up clears banner after install even if Play echoes local', () {
+      final fromApi = AppUpdateService.parseRemote(
+        {
+          'passenger': {
+            'currentVersion': '1.0.5',
+            'minVersion': '1.0.0',
+            'currentVersionCode': 64,
+          },
+        },
+        isDriver: false,
+        localVersion: '1.0.5',
+        localBuild: 64,
+      )!;
+      expect(fromApi.updateAvailable, isFalse);
+      final afterPlay = AppUpdateService.reconcileWithPlay(
+        fromApi,
+        playCode: 64,
+        localBuild: 64,
       );
       expect(afterPlay.updateAvailable, isFalse);
       expect(afterPlay.showBanner, isFalse);

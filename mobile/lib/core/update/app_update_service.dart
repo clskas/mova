@@ -220,9 +220,16 @@ class AppUpdateService extends Notifier<AppUpdateState> {
     await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
-  /// Play Core's `updateAvailable` stays true after a store install.
-  /// Compare versionCodes: hide an optional banner once the phone is on (or past)
-  /// the latest Play build, even if `/public/app-version` advertised a planned code.
+  /// Merge Play Core's available versionCode with the API decision.
+  ///
+  /// Only *adds* a soft update when Play offers a newer package than the
+  /// installed build. Never clears an API-driven banner when Play reports the
+  /// installed code (or no update) — that regression hid banners whenever
+  /// `availableVersionCode == localBuild` even though `/public/app-version`
+  /// correctly said the store was ahead.
+  ///
+  /// After the user installs, `parseRemote` already clears the banner when
+  /// `localBuild >= currentVersionCode`.
   static AppUpdateState reconcileWithPlay(
     AppUpdateState next, {
     required int playCode,
@@ -230,13 +237,7 @@ class AppUpdateService extends Notifier<AppUpdateState> {
     String? fallbackStoreUrl,
   }) {
     if (playCode <= 0 || localBuild <= 0) return next;
-    if (localBuild >= playCode) {
-      if (!next.forceUpdate && next.updateAvailable) {
-        return next.copyWith(updateAvailable: false);
-      }
-      return next;
-    }
-    if (!next.updateAvailable) {
+    if (playCode > localBuild) {
       return next.copyWith(
         updateAvailable: true,
         storeUrl: (next.storeUrl == null || next.storeUrl!.isEmpty)

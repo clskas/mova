@@ -283,11 +283,14 @@ class AppUpdateService extends Notifier<AppUpdateState> {
         currentCode > 0 && localBuild > 0 && localBuild < currentCode;
     final belowMin = AppVersion.compare(localVersion, min) < 0 ||
         (minCode > 0 && localBuild > 0 && localBuild < minCode);
+    // Include versionCode so "Plus tard" snooze clears when Play ships a new
+    // build under the same marketing name (AppVersion.name stays 1.0.5).
+    final remoteId = currentCode > 0 ? '$current+$currentCode' : current;
     return AppUpdateState(
       updateAvailable: belowMin || behindName || behindCode,
       forceUpdate: belowMin,
       storeUrl: storeUrl,
-      remoteVersion: current,
+      remoteVersion: remoteId,
     );
   }
 

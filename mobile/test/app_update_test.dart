@@ -376,7 +376,7 @@ void main() {
           'passenger': {
             'currentVersion': '1.0.5',
             'minVersion': '1.0.0',
-            'currentVersionCode': 64,
+            'currentVersionCode': 65,
             'storeUrl': 'https://play.google.com/store/apps/details?id=cd.mova.mova.passenger',
           },
         },
@@ -385,6 +385,7 @@ void main() {
         localBuild: 50,
       )!;
       expect(fromApi.updateAvailable, isTrue);
+      expect(fromApi.remoteVersion, '1.0.5+65');
       // Play often echoes the installed versionCode when no update is probed —
       // that must not wipe the API "store is ahead" decision.
       final afterPlay = AppUpdateService.reconcileWithPlay(
@@ -402,21 +403,51 @@ void main() {
           'passenger': {
             'currentVersion': '1.0.5',
             'minVersion': '1.0.0',
+            'currentVersionCode': 65,
+          },
+        },
+        isDriver: false,
+        localVersion: '1.0.5',
+        localBuild: 65,
+      )!;
+      expect(fromApi.updateAvailable, isFalse);
+      final afterPlay = AppUpdateService.reconcileWithPlay(
+        fromApi,
+        playCode: 65,
+        localBuild: 65,
+      );
+      expect(afterPlay.updateAvailable, isFalse);
+      expect(afterPlay.showBanner, isFalse);
+    });
+
+    test('snooze identity changes when only versionCode bumps', () {
+      final v64 = AppUpdateService.parseRemote(
+        {
+          'passenger': {
+            'currentVersion': '1.0.5',
+            'minVersion': '1.0.0',
             'currentVersionCode': 64,
           },
         },
         isDriver: false,
         localVersion: '1.0.5',
-        localBuild: 64,
+        localBuild: 50,
       )!;
-      expect(fromApi.updateAvailable, isFalse);
-      final afterPlay = AppUpdateService.reconcileWithPlay(
-        fromApi,
-        playCode: 64,
-        localBuild: 64,
-      );
-      expect(afterPlay.updateAvailable, isFalse);
-      expect(afterPlay.showBanner, isFalse);
+      final v65 = AppUpdateService.parseRemote(
+        {
+          'passenger': {
+            'currentVersion': '1.0.5',
+            'minVersion': '1.0.0',
+            'currentVersionCode': 65,
+          },
+        },
+        isDriver: false,
+        localVersion: '1.0.5',
+        localBuild: 50,
+      )!;
+      expect(v64.remoteVersion, '1.0.5+64');
+      expect(v65.remoteVersion, '1.0.5+65');
+      expect(v64.remoteVersion, isNot(v65.remoteVersion));
     });
 
     test('Play newer versionCode still shows an optional banner', () {

@@ -57,44 +57,34 @@ textarea {
   margin-right: auto !important;
 }
 
-[data-desktop-nav] {
-  display: none !important;
-}
-[data-mobile-nav] {
-  position: fixed !important;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  z-index: 40;
+/* Top navigation (phone + desktop): horizontal scroll on narrow screens. */
+[data-portal-nav],
+.senga-portal-nav {
   display: flex !important;
   flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-start;
   gap: 0.25rem;
-  padding: 0.4rem 0.5rem max(0.5rem, env(safe-area-inset-bottom));
   width: 100%;
   max-width: 100%;
   overflow-x: auto;
   overflow-y: hidden;
-  background: rgba(255, 255, 255, 0.96);
-  border-top: 1px solid #e0e7ff;
   -webkit-overflow-scrolling: touch;
+  padding-bottom: 0.15rem;
 }
-[data-mobile-nav] > * {
+[data-portal-nav] > *,
+.senga-portal-nav > * {
   flex: 0 0 auto;
   min-width: 4.4rem;
 }
-.senga-portal-main {
-  padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
+@media (min-width: 640px) {
+  [data-portal-nav] > *,
+  .senga-portal-nav > * {
+    min-width: 0;
+  }
 }
-@media (min-width: 1024px) {
-  [data-desktop-nav] {
-    display: flex !important;
-  }
-  [data-mobile-nav] {
-    display: none !important;
-  }
-  .senga-portal-main {
-    padding-bottom: max(1rem, env(safe-area-inset-bottom));
-  }
+.senga-portal-main {
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
 }
 
 .google-gis-wrap {

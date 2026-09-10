@@ -7,11 +7,11 @@ import { PartnerPortalFrame } from "@/components/PartnerPortalFrame";
 
 export default function PortalLayout({ children }: { children: React.ReactNode }) {
   return (
-    <AuthGate>
-      <PartnerLiveProvider>
-        <PartnerAlertHost />
+    <PartnerLiveProvider>
+      <PartnerAlertHost />
+      <AuthGate>
         <PartnerPortalFrame>{children}</PartnerPortalFrame>
-      </PartnerLiveProvider>
-    </AuthGate>
+      </AuthGate>
+    </PartnerLiveProvider>
   );
 }

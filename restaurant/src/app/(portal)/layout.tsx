@@ -33,11 +33,11 @@ function RestaurantPortalFrame({ children }: { children: React.ReactNode }) {
 
 export default function PortalLayout({ children }: { children: React.ReactNode }) {
   return (
-    <AuthGate>
-      <RestaurantLiveProvider>
-        <PartnerAlertHost />
+    <RestaurantLiveProvider>
+      <PartnerAlertHost />
+      <AuthGate>
         <RestaurantPortalFrame>{children}</RestaurantPortalFrame>
-      </RestaurantLiveProvider>
-    </AuthGate>
+      </AuthGate>
+    </RestaurantLiveProvider>
   );
 }

@@ -1,27 +1,41 @@
 "use client";
 
 import Link from "next/link";
+import { useCallback, useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { LOGIN_AFTER_LOGOUT_HREF, logoutPartnerSession } from "@/lib/auth";
 import { disableGoogleAutoSelect } from "@/components/GoogleContinueButton";
 import { PUBLIC_API_BASE } from "@/lib/public-api-base";
-import { usePartnerLiveConnected } from "@/components/PartnerLiveProvider";
+import { usePartnerLiveConnected, usePartnerLiveRegister } from "@/components/PartnerLiveProvider";
+import { fetchDashboard } from "@/lib/api";
 
 const NAV = [
-  { href: "/", label: "Tableau de bord", short: "Accueil", icon: "📊" },
-  { href: "/dossier", label: "Mon dossier", short: "Dossier", icon: "📁" },
-  { href: "/vehicules", label: "Véhicules", short: "Véhicules", icon: "🚗" },
-  { href: "/reservations", label: "Réservations", short: "Reservation", icon: "📅" },
-  { href: "/revenus", label: "Revenus", short: "Revenus", icon: "💰" },
-  { href: "/promos", label: "Codes promo", short: "Promos", icon: "🏷️" },
-  { href: "/parametres", label: "Paramètres", short: "Réglages", icon: "⚙️" },
-  { href: "/compte", label: "Compte et connexion", short: "Compte", icon: "👤" },
-  { href: "/aide", label: "Aide / Manuel", short: "Manuel", icon: "❓" },
-  { href: "/manuel", label: "Manuel utilisateur", short: "Manuel", icon: "📘" },
+  { href: "/", label: "Tableau de bord", short: "Accueil", icon: "📊", badgeKey: null as null | "pending" },
+  { href: "/dossier", label: "Mon dossier", short: "Dossier", icon: "📁", badgeKey: null },
+  { href: "/vehicules", label: "Véhicules", short: "Véhicules", icon: "🚗", badgeKey: null },
+  { href: "/reservations", label: "Réservations", short: "Réservations", icon: "📅", badgeKey: "pending" as const },
+  { href: "/revenus", label: "Revenus", short: "Revenus", icon: "💰", badgeKey: null },
+  { href: "/promos", label: "Codes promo", short: "Promos", icon: "🏷️", badgeKey: null },
+  { href: "/parametres", label: "Paramètres", short: "Réglages", icon: "⚙️", badgeKey: null },
+  { href: "/compte", label: "Compte et connexion", short: "Compte", icon: "👤", badgeKey: null },
+  { href: "/aide", label: "Aide / Manuel", short: "Manuel", icon: "❓", badgeKey: null },
+  { href: "/manuel", label: "Manuel utilisateur", short: "Manuel", icon: "📘", badgeKey: null },
 ];
 
 function navActive(pathname: string, href: string) {
   return pathname === href || (href !== "/" && pathname.startsWith(href));
+}
+
+function PendingBadge({ count }: { count: number }) {
+  if (count <= 0) return null;
+  return (
+    <span
+      className="absolute -top-1 -right-1 min-w-[1.15rem] h-[1.15rem] px-1 rounded-full bg-indigo-600 text-white text-[10px] font-bold leading-[1.15rem] text-center tabular-nums"
+      aria-label={`${count} réservation${count > 1 ? "s" : ""} en attente`}
+    >
+      {count > 99 ? "99+" : count}
+    </span>
+  );
 }
 
 export function PortalShell({
@@ -33,6 +47,22 @@ export function PortalShell({
 }) {
   const pathname = usePathname();
   const liveConnected = usePartnerLiveConnected();
+  const [pendingCount, setPendingCount] = useState(0);
+
+  const refreshPending = useCallback(async () => {
+    try {
+      const dash = await fetchDashboard();
+      setPendingCount(dash.kpis?.pendingBookings ?? 0);
+    } catch {
+      /* keep last known count */
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshPending();
+  }, [refreshPending]);
+
+  usePartnerLiveRegister(refreshPending);
 
   function logout() {
     disableGoogleAutoSelect();
@@ -54,22 +84,43 @@ export function PortalShell({
               </span>
             )}
           </div>
-          <nav data-desktop-nav className="senga-nav-desktop items-center gap-1 flex-wrap justify-center min-w-0">
-            {NAV.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`px-3 py-2 rounded-lg text-sm min-h-11 inline-flex items-center ${
-                  navActive(pathname, item.href)
-                    ? "bg-indigo-100 text-indigo-800 font-medium"
-                    : "text-gray-600 hover:bg-gray-100"
-                }`}
-              >
-                {item.label}
-              </Link>
-            ))}
-            <button type="button" onClick={logout} className="px-3 py-2 rounded-lg text-sm text-gray-500 hover:bg-gray-100 min-h-11">
-              Déconnexion
+          <nav data-portal-nav className="senga-portal-nav" aria-label="Navigation">
+            {NAV.map((item) => {
+              const active = navActive(pathname, item.href);
+              const showBadge = item.badgeKey === "pending" ? pendingCount : 0;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  aria-label={
+                    showBadge > 0 ? `${item.label} (${showBadge} en attente)` : item.label
+                  }
+                  className={`relative flex flex-col items-center justify-center gap-0.5 min-h-10 rounded-xl text-[11px] leading-tight text-center px-2 sm:px-3 sm:min-h-11 sm:text-sm sm:flex-row sm:gap-1.5 ${
+                    active
+                      ? "bg-indigo-100 text-indigo-800 font-semibold"
+                      : "text-gray-600 hover:bg-gray-100"
+                  }`}
+                >
+                  <span className="text-base leading-none sm:hidden" aria-hidden>
+                    {item.icon}
+                  </span>
+                  <span className="sm:hidden">{item.short}</span>
+                  <span className="hidden sm:inline">{item.label}</span>
+                  <PendingBadge count={showBadge} />
+                </Link>
+              );
+            })}
+            <button
+              type="button"
+              onClick={logout}
+              aria-label="Déconnexion"
+              className="flex flex-col items-center justify-center gap-0.5 min-h-10 rounded-xl text-[11px] leading-tight text-center px-2 text-gray-600 hover:bg-gray-100 sm:px-3 sm:min-h-11 sm:text-sm sm:flex-row sm:gap-1.5"
+            >
+              <span className="text-base leading-none sm:hidden" aria-hidden>
+                🚪
+              </span>
+              <span className="sm:hidden">Déconnexion</span>
+              <span className="hidden sm:inline">Déconnexion</span>
             </button>
           </nav>
         </div>
@@ -78,37 +129,6 @@ export function PortalShell({
       <main className="senga-portal-main flex-1 p-3 sm:p-4 lg:p-6 max-w-5xl mx-auto w-full min-w-0">
         {children}
       </main>
-
-      <nav data-mobile-nav className="senga-nav-phone" aria-label="Navigation">
-        {NAV.map((item) => (
-          <Link
-            key={item.href}
-            href={item.href}
-            aria-label={item.label}
-            className={`flex flex-col items-center justify-center gap-0.5 min-h-10 rounded-xl text-[11px] leading-tight text-center px-1 ${
-              navActive(pathname, item.href)
-                ? "bg-indigo-100 text-indigo-800 font-semibold"
-                : "text-gray-600"
-            }`}
-          >
-            <span className="text-base leading-none" aria-hidden>
-              {item.icon}
-            </span>
-            {item.short}
-          </Link>
-        ))}
-        <button
-          type="button"
-          onClick={logout}
-          aria-label="Déconnexion"
-          className="flex flex-col items-center justify-center gap-0.5 min-h-10 rounded-xl text-[11px] leading-tight text-center px-1 text-gray-600"
-        >
-          <span className="text-base leading-none" aria-hidden>
-            🚪
-          </span>
-          Déconnexion
-        </button>
-      </nav>
     </div>
   );
 }

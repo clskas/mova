@@ -103,20 +103,19 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     };
   }, [router, pathname]);
 
-  if (!ready) {
-    return (
-      <div className="min-h-screen flex items-center justify-center text-gray-500">
-        Chargement…
-      </div>
-    );
-  }
-
-  const showOnboarding = needsProfileSetup && !isPartnerPinExemptPath(pathname);
-  const showActivation = needsActivation && !needsProfileSetup && !isPartnerPinExemptPath(pathname);
+  const showOnboarding = ready && needsProfileSetup && !isPartnerPinExemptPath(pathname);
+  const showActivation =
+    ready && needsActivation && !needsProfileSetup && !isPartnerPinExemptPath(pathname);
 
   return (
     <>
+      {/* Keep portal children mounted so live WS + badge stay active under overlays. */}
       {children}
+      {!ready && (
+        <div className="fixed inset-0 z-[10030] flex items-center justify-center bg-[#f4f3ff] text-gray-500">
+          Chargement…
+        </div>
+      )}
       {showOnboarding && (
         <div className="fixed inset-0 z-[10040] bg-gradient-to-br from-indigo-50 to-violet-50 overflow-y-auto">
           <div className="min-h-[100dvh] flex items-start justify-center p-6 pt-10 pb-16">

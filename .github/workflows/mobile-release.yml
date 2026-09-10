@@ -128,9 +128,9 @@ jobs:
         id: playver
         run: |
           set -euo pipefail
-          # Play production floor is 1.0.6+65. Next rebuild must be > 64 (prefer run_number).
+          # Play production floor is 1.0.6+67. Next rebuild must be > 67 (prefer run_number).
           CODE="${{ github.run_number }}"
-          if [ "$CODE" -lt 65 ]; then CODE=65; fi
+          if [ "$CODE" -lt 68 ]; then CODE=68; fi
           echo "code=$CODE" >> "$GITHUB_OUTPUT"
           echo "Play versionCode=$CODE (pubspec 1.0.7+60; run_number=${{ github.run_number }})"
 

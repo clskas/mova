@@ -9,7 +9,7 @@ describe('buildMobileAppVersionResponse', () => {
     expect(payload.passenger.currentVersion).toBe('1.0.5');
     expect(payload.driver.currentVersion).toBe('1.0.5');
     expect(payload.passenger.minVersion).toBe('1.0.0');
-    expect(payload.passenger.currentVersionCode).toBe(67);
+    expect(payload.passenger.currentVersionCode).toBe(68);
     expect(payload.passenger.minVersionCode).toBe(0);
     expect(payload.passenger.storeUrl).toContain('cd.mova.mova.passenger');
     expect(payload.driver.storeUrl).toContain('cd.mova.mova.driver');
@@ -48,8 +48,8 @@ describe('buildMobileAppVersionResponse', () => {
       },
       now,
     );
-    expect(payload.passenger.currentVersionCode).toBe(67);
-    expect(payload.driver.currentVersionCode).toBe(67);
+    expect(payload.passenger.currentVersionCode).toBe(68);
+    expect(payload.driver.currentVersionCode).toBe(68);
   });
 
   it('raises stale Render env below the shipped floor so banners can show', () => {
@@ -64,12 +64,12 @@ describe('buildMobileAppVersionResponse', () => {
     );
     expect(payload.passenger.currentVersion).toBe('1.0.5');
     expect(payload.driver.currentVersion).toBe('1.0.5');
-    expect(payload.passenger.currentVersionCode).toBe(67);
-    expect(payload.driver.currentVersionCode).toBe(67);
+    expect(payload.passenger.currentVersionCode).toBe(68);
+    expect(payload.driver.currentVersionCode).toBe(68);
   });
 
-  it('raises a stale env of 51–66 to last confirmed Play 67', () => {
-    for (const code of ['51', '56', '57', '58', '59', '60', '63', '64', '65', '66']) {
+  it('raises a stale env of 51–67 to last confirmed Play 68', () => {
+    for (const code of ['51', '56', '57', '58', '59', '60', '63', '64', '65', '66', '67']) {
       const payload = buildMobileAppVersionResponse(
         {
           MOBILE_PASSENGER_VERSION_CODE: code,
@@ -77,8 +77,8 @@ describe('buildMobileAppVersionResponse', () => {
         },
         now,
       );
-      expect(payload.passenger.currentVersionCode).toBe(67);
-      expect(payload.driver.currentVersionCode).toBe(67);
+      expect(payload.passenger.currentVersionCode).toBe(68);
+      expect(payload.driver.currentVersionCode).toBe(68);
     }
   });
 });

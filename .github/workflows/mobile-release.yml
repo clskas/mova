@@ -128,7 +128,7 @@ jobs:
         id: playver
         run: |
           set -euo pipefail
-          # Play production floor is 1.0.6+67. Next rebuild must be > 67 (prefer run_number).
+          # Play production floor after AfriSoft icons: expect run_number >= 68.
           CODE="${{ github.run_number }}"
           if [ "$CODE" -lt 68 ]; then CODE=68; fi
           echo "code=$CODE" >> "$GITHUB_OUTPUT"

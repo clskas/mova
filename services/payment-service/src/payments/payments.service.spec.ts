@@ -52,6 +52,9 @@ describe('PaymentsService', () => {
     creditRestaurantSharesOnly: jest.fn().mockResolvedValue({ handled: true, restaurants: [{ credited: true }] }),
     creditFoodDeliverySettlement: jest.fn().mockResolvedValue({ handled: true, driver: { credited: true } }),
   };
+  const rentalPayouts = {
+    creditRentalSettlement: jest.fn().mockResolvedValue({ handled: false }),
+  };
   const debtLedger = {
     recordCashDebt: jest.fn().mockResolvedValue(undefined),
   };
@@ -71,6 +74,7 @@ describe('PaymentsService', () => {
     wallet as unknown as WalletService,
     driverPayouts as never,
     foodPayouts as never,
+    rentalPayouts as never,
     debtLedger as never,
     redis as unknown as RedisService,
     new MockPaymentProvider(config),

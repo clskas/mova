@@ -11,8 +11,22 @@ import { tripDistanceKm } from '../common/geo.util';
 import { fetchAuthUserBrief } from '../common/internal-lookup.util';
 import { fetchServicePaymentStatus } from '../common/payment-status.util';
 import {
+  assertEscrowAllowsDispatch,
+  assertPinMatches,
+  cancelPhase,
+  driverEligibleForFoodOffer,
+  isDeliveryPrepaidRequired,
+  isFoodAcceptTimeoutDue,
+  isFoodPaymentTimeoutDue,
+  isPinTimeoutDue,
+  resolveCourierSource,
+  settleGuaranteedCancel,
+  shouldReturnToSender,
+} from './delivery-guarantee.util';
+import {
   buildParcelTimeline,
   detectCommune,
+  foodClientStatusLabel,
   formatParcelDelivery,
   generateDeliveryPin,
 } from './parcel.util';
@@ -25,17 +39,6 @@ import { CommissionService } from '../rides/commission.service';
 import { deliveryDriverGross } from './delivery-driver-gross.util';
 import { parseFoodItemShares, parseOrderPlacedMetadata } from './food-delivery-settlement.util';
 import { applyPromoCode, formatPromoValidation } from '../common/promo-apply.util';
-import {
-  assertEscrowAllowsDispatch,
-  assertPinMatches,
-  cancelPhase,
-  driverEligibleForFoodOffer,
-  isDeliveryPrepaidRequired,
-  isPinTimeoutDue,
-  resolveCourierSource,
-  settleGuaranteedCancel,
-  shouldReturnToSender,
-} from './delivery-guarantee.util';
 import {
   creditRestaurantEscrow,
   freezeEscrow,
@@ -494,19 +497,23 @@ export class DeliveriesService {
         } as unknown as Prisma.InputJsonValue,
       },
     });
-    if (!flags.guaranteed) {
-      await this.redis.publish(MOVA_EVENTS.DELIVERY_CREATED, {
-        deliveryId: delivery.id,
-        userId,
-        type: delivery.type,
-        restaurantId: restaurant.id,
-        restaurantName: restaurant.name,
-        restaurantOwnerUserId: restaurant.ownerUserId ?? undefined,
-        estimatedPriceCdf: delivery.estimatedPriceCdf,
-      });
-    }
+    await this.redis.publish(MOVA_EVENTS.DELIVERY_CREATED, {
+      deliveryId: delivery.id,
+      userId,
+      type: delivery.type,
+      restaurantId: restaurant.id,
+      restaurantName: restaurant.name,
+      restaurantOwnerUserId: restaurant.ownerUserId ?? undefined,
+      estimatedPriceCdf: delivery.estimatedPriceCdf,
+    });
     const withEvents = { ...delivery, events: [{ id: '1', deliveryId: delivery.id, event: 'ORDER_PLACED', metadata: null, createdAt: new Date() }] };
-    return { delivery: formatParcelDelivery(withEvents), estimate: { ...estimate, estimatedPriceCdf: promoApplied.estimatedPriceCdf, discountCdf: promoApplied.discountCdf }, needsEscrow: flags.guaranteed };
+    return {
+      delivery: formatParcelDelivery(withEvents),
+      estimate: { ...estimate, estimatedPriceCdf: promoApplied.estimatedPriceCdf, discountCdf: promoApplied.discountCdf },
+      needsEscrow: flags.guaranteed,
+      /** Food: pay after restaurant accept (not at create). */
+      payAfterAccept: flags.guaranteed,
+    };
   }
 
   async estimateFoodMulti(dto: CreateFoodMultiDeliveryDto) {
@@ -619,18 +626,21 @@ export class DeliveriesService {
       },
     });
 
-    if (!flags.guaranteed) {
-      await this.redis.publish(MOVA_EVENTS.DELIVERY_CREATED, {
-        deliveryId: delivery.id,
-        userId,
-        type: delivery.type,
-        restaurantName: 'Multi-restaurants',
-        estimatedPriceCdf: delivery.estimatedPriceCdf,
-      });
-    }
+    await this.redis.publish(MOVA_EVENTS.DELIVERY_CREATED, {
+      deliveryId: delivery.id,
+      userId,
+      type: delivery.type,
+      restaurantName: 'Multi-restaurants',
+      estimatedPriceCdf: delivery.estimatedPriceCdf,
+    });
 
     const withEvents = { ...delivery, events: [{ id: '1', deliveryId: delivery.id, event: 'ORDER_PLACED', metadata: null, createdAt: new Date() }] };
-    return { delivery: formatParcelDelivery(withEvents), estimate: { ...estimate, estimatedPriceCdf: promoApplied.estimatedPriceCdf, discountCdf: promoApplied.discountCdf }, needsEscrow: flags.guaranteed };
+    return {
+      delivery: formatParcelDelivery(withEvents),
+      estimate: { ...estimate, estimatedPriceCdf: promoApplied.estimatedPriceCdf, discountCdf: promoApplied.discountCdf },
+      needsEscrow: flags.guaranteed,
+      payAfterAccept: flags.guaranteed,
+    };
   }
 
   async estimateExpress(dto: CreateParcelDeliveryDto, redeemPromo = false) {
@@ -1277,7 +1287,10 @@ export class DeliveriesService {
         paymentReady: formatted.paymentReady,
         isPaid: formatted.isPaid,
         paymentStatus: formatted.paymentStatus,
-        statusLabel: this.deliveryStatusLabel(delivery.type, delivery.status),
+        statusLabel: this.deliveryStatusLabel(delivery.type, delivery.status, {
+          guaranteed: Boolean(delivery.guaranteed),
+          escrowReady: Boolean(delivery.escrowReady),
+        }),
         alreadyDelivered: true,
       };
     }
@@ -1379,7 +1392,10 @@ export class DeliveriesService {
       await this.enrichDeliveryForViewer(updated, formatParcelDelivery(updated, courier), userId),
       id,
     );
-    const statusLabel = this.deliveryStatusLabel(updated.type, status);
+    const statusLabel = this.deliveryStatusLabel(updated.type, status, {
+      guaranteed: Boolean(updated.guaranteed),
+      escrowReady: Boolean(updated.escrowReady),
+    });
     await this.redis.publish(MOVA_EVENTS.DELIVERY_STATUS_UPDATED, {
       deliveryId: id,
       userId: delivery.userId,
@@ -1400,19 +1416,9 @@ export class DeliveriesService {
     };
   }
 
-  private deliveryStatusLabel(type: DeliveryType, status: DeliveryStatus): string {
+  private deliveryStatusLabel(type: DeliveryType, status: DeliveryStatus, opts?: { guaranteed?: boolean; escrowReady?: boolean }): string {
     if (type === DeliveryType.FOOD) {
-      return (
-        {
-          [DeliveryStatus.PENDING]: 'En attente du restaurant',
-          [DeliveryStatus.RESTAURANT_CONFIRMED]: 'En préparation',
-          [DeliveryStatus.READY_FOR_PICKUP]: 'Prête — livreur en route',
-          [DeliveryStatus.PICKED_UP]: 'Livreur assigné',
-          [DeliveryStatus.IN_TRANSIT]: 'Livreur en route',
-          [DeliveryStatus.DELIVERED]: 'Commande livrée',
-          [DeliveryStatus.CANCELLED]: 'Commande annulée',
-        }[status] ?? status
-      );
+      return foodClientStatusLabel(status, opts);
     }
     return status;
   }
@@ -1633,7 +1639,10 @@ export class DeliveriesService {
     });
     const courier = updated.driverId ? await this.fetchCourierProfile(updated.driverId) : null;
     const formatted = await this.enrichDeliveryPayment(formatParcelDelivery(updated, courier), id);
-    const statusLabel = this.deliveryStatusLabel(updated.type, status);
+    const statusLabel = this.deliveryStatusLabel(updated.type, status, {
+      guaranteed: Boolean(updated.guaranteed),
+      escrowReady: Boolean(updated.escrowReady),
+    });
     await this.redis.publish(MOVA_EVENTS.DELIVERY_STATUS_UPDATED, {
       deliveryId: id,
       userId: delivery.userId,
@@ -1686,14 +1695,14 @@ export class DeliveriesService {
       include: { restaurant: true },
     });
     if (updated.type === DeliveryType.FOOD) {
-      await this.redis.publish(MOVA_EVENTS.DELIVERY_CREATED, {
+      // Restaurant was already notified at create; payment unlocks prep (order-payment WS + status poll).
+      await this.redis.publish(MOVA_EVENTS.DELIVERY_STATUS_UPDATED, {
         deliveryId: updated.id,
         userId: updated.userId,
         type: updated.type,
-        restaurantId: updated.restaurantId ?? undefined,
+        status: updated.status,
         restaurantName: updated.restaurant?.name,
         restaurantOwnerUserId: updated.restaurant?.ownerUserId ?? undefined,
-        estimatedPriceCdf: updated.estimatedPriceCdf,
       });
     } else if (!updated.driverId) {
       await this.alertDeliveryOffer(updated);
@@ -1798,6 +1807,66 @@ export class DeliveriesService {
       frozen += 1;
     }
     return frozen;
+  }
+
+  /**
+   * Auto-cancel stale food orders:
+   * - PENDING unpaid > 30 min (restaurant never accepted)
+   * - RESTAURANT_CONFIRMED unpaid > 15 min (client never paid after accept)
+   * No charge when escrow was never collected.
+   */
+  async cancelStaleFoodOrders() {
+    const candidates = await this.prisma.delivery.findMany({
+      where: {
+        type: DeliveryType.FOOD,
+        guaranteed: true,
+        escrowReady: false,
+        status: { in: [DeliveryStatus.PENDING, DeliveryStatus.RESTAURANT_CONFIRMED] },
+      },
+      include: {
+        restaurant: true,
+        events: { where: { event: 'RESTAURANT_CONFIRMED' }, orderBy: { createdAt: 'desc' }, take: 1 },
+      },
+      take: 80,
+    });
+    let cancelled = 0;
+    for (const d of candidates) {
+      let reason: string | null = null;
+      if (d.status === DeliveryStatus.PENDING && isFoodAcceptTimeoutDue({ createdAt: d.createdAt })) {
+        reason =
+          'Délai dépassé : le restaurant n\'a pas accepté la commande sous 30 minutes. Aucun paiement n\'a été prélevé.';
+      } else if (d.status === DeliveryStatus.RESTAURANT_CONFIRMED) {
+        const acceptedAt = d.events[0]?.createdAt ?? d.updatedAt;
+        if (isFoodPaymentTimeoutDue({ acceptedAt })) {
+          reason =
+            'Délai dépassé : paiement non effectué sous 15 minutes après acceptation du restaurant. Commande annulée sans frais.';
+        }
+      }
+      if (!reason) continue;
+
+      const updated = await this.prisma.delivery.update({
+        where: { id: d.id },
+        data: { status: DeliveryStatus.CANCELLED, cancelledAt: new Date() },
+        include: { restaurant: true },
+      });
+      await this.prisma.deliveryEvent.create({
+        data: {
+          deliveryId: d.id,
+          event: 'CANCELLED',
+          metadata: { reason, auto: true } as Prisma.InputJsonValue,
+        },
+      });
+      await this.redis.publish(MOVA_EVENTS.DELIVERY_STATUS_UPDATED, {
+        deliveryId: updated.id,
+        userId: updated.userId,
+        type: updated.type,
+        status: DeliveryStatus.CANCELLED,
+        restaurantName: updated.restaurant?.name,
+        restaurantOwnerUserId: updated.restaurant?.ownerUserId ?? undefined,
+      });
+      cancelled += 1;
+    }
+    return cancelled;
   }
 
   async deleteRestaurant(id: string) {

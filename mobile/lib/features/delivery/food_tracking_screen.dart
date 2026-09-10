@@ -144,8 +144,8 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
     final raw = _delivery?['timeline'] as List? ?? _delivery?['tracking'] as List?;
     if (raw != null && raw.isNotEmpty) return raw.cast<Map<String, dynamic>>();
     return const [
-      {'label': 'Confirmé', 'done': true},
-      {'label': 'Préparation', 'done': false},
+      {'label': 'Envoyée au restaurant', 'done': true},
+      {'label': 'Acceptée', 'done': false},
       {'label': 'En route', 'done': false},
       {'label': 'Livré', 'done': false},
     ];
@@ -163,7 +163,10 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
         ? fromApi
         : switch (status) {
             'PENDING' => 'En attente du restaurant',
-            'RESTAURANT_CONFIRMED' => 'En préparation',
+            'RESTAURANT_CONFIRMED' =>
+              (_delivery?['escrowReady'] == true || deliveryIsPaid(_delivery))
+                  ? 'En préparation'
+                  : 'Acceptée — en attente de votre paiement',
             'READY_FOR_PICKUP' => 'Prête — livreur en route',
             'PICKED_UP' => 'Livreur assigné',
             'IN_TRANSIT' => 'En livraison',
@@ -358,7 +361,8 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
       builder: (ctx) => AlertDialog(
         title: const Text('Annuler la commande ?'),
         content: const Text(
-          'Annulation possible uniquement tant que le restaurant n\'a pas confirmé votre commande.',
+          'Vous pouvez annuler tant que le livreur n\'est pas en route. '
+          'Si vous avez déjà payé, le remboursement est automatique.',
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Non')),
@@ -455,10 +459,23 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
                           ),
                           const SizedBox(height: 12),
                         ],
+                        if (_delivery?['status']?.toString() == 'PENDING' &&
+                            !deliveryIsPaid(_delivery) &&
+                            !_paymentDue) ...[
+                          const MovaCard(
+                            child: Text(
+                              'Commande envoyée. Le restaurant doit d\'abord accepter. '
+                              'Vous paierez uniquement après son acceptation (délai 15 min).',
+                              style: TextStyle(fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                        ],
                         if (_paymentDue && !deliveryIsPaid(_delivery)) ...[
                           const MovaCard(
                             child: Text(
-                              'Payez maintenant pour séquestrer le montant. Le restaurant et le livreur ne sont contactés qu\'après paiement.',
+                              'Le restaurant a accepté votre commande. '
+                              'Payez maintenant pour lancer la préparation (délai 15 min, sinon annulation).',
                               style: TextStyle(fontWeight: FontWeight.w600),
                             ),
                           ),

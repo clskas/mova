@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { getToken } from "@/lib/auth";
-import { alertNewRestaurantOrder, initPartnerAudioUnlock, onPartnerAlertsUnlocked } from "@/lib/partner-alerts";
+import { alertNewRestaurantOrder, alertRestaurantOrderPaid, initPartnerAudioUnlock, onPartnerAlertsUnlocked } from "@/lib/partner-alerts";
 import { registerPartnerWebPush } from "@/lib/partner-web-push";
 import { connectRestaurantSocket } from "@/lib/restaurant-socket";
 
@@ -49,6 +49,9 @@ export function RestaurantLiveProvider({ children }: { children: React.ReactNode
       onOrderEvent: (payload) => {
         if (payload.type === "order" && payload.status === "PENDING") {
           alertNewRestaurantOrder(payload.deliveryId);
+        }
+        if (payload.type === "order-payment" && payload.isPaid) {
+          alertRestaurantOrderPaid(payload.deliveryId);
         }
         triggerRefresh();
       },

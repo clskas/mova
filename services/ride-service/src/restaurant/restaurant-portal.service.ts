@@ -176,9 +176,7 @@ export class RestaurantPortalService {
       include: { events: { orderBy: { createdAt: 'asc' } } },
     });
     let scoped = rows.filter(
-      (d) =>
-        (d.restaurantId === restaurant.id || this.deliveryIncludesRestaurant(d.items, restaurant.id)) &&
-        (!d.guaranteed || d.escrowReady),
+      (d) => d.restaurantId === restaurant.id || this.deliveryIncludesRestaurant(d.items, restaurant.id),
     );
     if (q) {
       scoped = scoped.filter((d) => {
@@ -202,8 +200,11 @@ export class RestaurantPortalService {
   private paymentStatusLabel(
     status: DeliveryStatus,
     payment?: { isPaid?: boolean; paymentStatus?: string | null; paymentMethod?: string | null },
+    opts?: { guaranteed?: boolean; escrowReady?: boolean },
   ): string | null {
-    if (payment?.isPaid) return 'Séquestrée — paiement garanti';
+    if (payment?.isPaid || opts?.escrowReady) return 'Séquestrée — paiement garanti';
+    if (status === DeliveryStatus.PENDING) return 'Non payée — acceptez pour demander le paiement';
+    if (status === DeliveryStatus.RESTAURANT_CONFIRMED) return 'En attente du paiement client';
     if (status !== DeliveryStatus.DELIVERED) return 'En attente de paiement client';
     if (payment?.paymentStatus === 'PENDING' && payment?.paymentMethod === 'CASH') return 'Espèces en attente';
     return 'En attente de paiement';
@@ -239,7 +240,7 @@ export class RestaurantPortalService {
     return {
       id: d.id,
       status: d.status,
-      statusLabel: this.statusLabel(d.status),
+      statusLabel: this.statusLabel(d.status, { guaranteed: Boolean(d.guaranteed), escrowReady: Boolean(d.escrowReady) }),
       items,
       deliveryAddress: d.deliveryAddress,
       estimatedPriceCdf: d.estimatedPriceCdf,
@@ -253,17 +254,23 @@ export class RestaurantPortalService {
       isPaid: payment?.isPaid ?? Boolean(d.escrowReady),
       paymentStatus: payment?.paymentStatus ?? null,
       paymentMethod: payment?.paymentMethod ?? null,
-      paymentStatusLabel: this.paymentStatusLabel(d.status, payment),
+      paymentStatusLabel: this.paymentStatusLabel(d.status, payment, {
+        guaranteed: Boolean(d.guaranteed),
+        escrowReady: Boolean(d.escrowReady),
+      }),
       guaranteed: Boolean(d.guaranteed),
       escrowReady: Boolean(d.escrowReady),
     };
   }
 
-  private statusLabel(status: DeliveryStatus): string {
+  private statusLabel(status: DeliveryStatus, opts?: { guaranteed?: boolean; escrowReady?: boolean }): string {
+    if (status === DeliveryStatus.PENDING) return 'Nouvelle commande';
+    if (status === DeliveryStatus.RESTAURANT_CONFIRMED) {
+      if (opts?.guaranteed && !opts.escrowReady) return 'Acceptée — en attente paiement';
+      return 'En préparation';
+    }
     return (
       {
-        [DeliveryStatus.PENDING]: 'Nouvelle commande',
-        [DeliveryStatus.RESTAURANT_CONFIRMED]: 'En préparation',
         [DeliveryStatus.READY_FOR_PICKUP]: 'Prête pour livreur',
         [DeliveryStatus.PICKED_UP]: 'Livreur assigné',
         [DeliveryStatus.IN_TRANSIT]: 'En livraison',
@@ -296,13 +303,6 @@ export class RestaurantPortalService {
     if (delivery.status !== DeliveryStatus.PENDING) {
       throw new MovaHttpException(MovaErrorCode.DELIVERY_INVALID_STATUS);
     }
-    if (delivery.guaranteed && !delivery.escrowReady) {
-      throw new MovaHttpException(
-        MovaErrorCode.DELIVERY_ESCROW_REQUIRED,
-        undefined,
-        'La commande n\'est visible pour préparation qu\'après séquestre du montant total.',
-      );
-    }
     return this.transition(delivery.id, DeliveryStatus.RESTAURANT_CONFIRMED, ownerUserId, 'RESTAURANT_CONFIRMED');
   }
 
@@ -311,6 +311,13 @@ export class RestaurantPortalService {
     this.assertRestaurantKycApproved(restaurant);
     if (delivery.status !== DeliveryStatus.RESTAURANT_CONFIRMED) {
       throw new MovaHttpException(MovaErrorCode.DELIVERY_INVALID_STATUS);
+    }
+    if (delivery.guaranteed && !delivery.escrowReady) {
+      throw new MovaHttpException(
+        MovaErrorCode.DELIVERY_ESCROW_REQUIRED,
+        HttpStatus.CONFLICT,
+        'Attendez le paiement du client avant de préparer et marquer la commande prête.',
+      );
     }
     return this.transition(delivery.id, DeliveryStatus.READY_FOR_PICKUP, ownerUserId, 'READY_FOR_PICKUP');
   }
@@ -332,7 +339,7 @@ export class RestaurantPortalService {
         metadata: { updatedBy: ownerUserId, reason: reason ?? 'Refus restaurant' } as Prisma.InputJsonValue,
       },
     });
-    if (delivery.guaranteed) {
+    if (delivery.guaranteed && delivery.escrowReady) {
       await refundEscrow('DELIVERY', deliveryId, 'Refus restaurant — remboursement intégral avant enlèvement.').catch(
         () => undefined,
       );
@@ -350,10 +357,7 @@ export class RestaurantPortalService {
         where: {
           type: DeliveryType.FOOD,
           status: DeliveryStatus.PENDING,
-          AND: [
-            { OR: [{ restaurantId: restaurant.id }, { restaurantId: null }] },
-            { OR: [{ guaranteed: false }, { escrowReady: true }] },
-          ],
+          AND: [{ OR: [{ restaurantId: restaurant.id }, { restaurantId: null }] }],
         },
       }),
       this.prisma.delivery.count({
@@ -367,10 +371,7 @@ export class RestaurantPortalService {
               DeliveryStatus.IN_TRANSIT,
             ],
           },
-          AND: [
-            { OR: [{ restaurantId: restaurant.id }, { restaurantId: null }] },
-            { OR: [{ guaranteed: false }, { escrowReady: true }] },
-          ],
+          AND: [{ OR: [{ restaurantId: restaurant.id }, { restaurantId: null }] }],
         },
       }),
       this.prisma.delivery.findMany({

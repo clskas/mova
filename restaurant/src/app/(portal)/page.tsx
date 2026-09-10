@@ -270,9 +270,17 @@ export default function OrdersPage() {
                     key={o.id}
                     order={o}
                     busy={busyId === o.id}
-                    onConfirm={o.status === "PENDING" && o.isPaid !== false ? () => act(o.id, "confirm") : undefined}
-                    onReject={o.status === "PENDING" ? () => act(o.id, "reject") : undefined}
-                    onReady={o.status === "RESTAURANT_CONFIRMED" ? () => act(o.id, "ready") : undefined}
+                    onConfirm={o.status === "PENDING" ? () => act(o.id, "confirm") : undefined}
+                    onReject={
+                      o.status === "PENDING" || (o.status === "RESTAURANT_CONFIRMED" && !o.isPaid)
+                        ? () => act(o.id, "reject")
+                        : undefined
+                    }
+                    onReady={
+                      o.status === "RESTAURANT_CONFIRMED" && o.isPaid !== false
+                        ? () => act(o.id, "ready")
+                        : undefined
+                    }
                     onChatClient={() => openChat(o.id, "Client")}
                     onChatDriver={o.driverAssigned ? () => openChat(o.id, "Livreur") : undefined}
                     fleetDrivers={canAssignOwn && !o.driverAssigned && o.status === "READY_FOR_PICKUP" ? fleetDrivers : []}
@@ -298,7 +306,7 @@ export default function OrdersPage() {
                       order={o}
                       busy={busyId === o.id}
                       fleetDrivers={fleetDrivers}
-                      onConfirm={o.isPaid !== false ? () => act(o.id, "confirm") : undefined}
+                      onConfirm={() => act(o.id, "confirm")}
                       onReject={() => act(o.id, "reject")}
                       onChatClient={() => openChat(o.id, "Client")}
                       onChatDriver={o.driverAssigned ? () => openChat(o.id, "Livreur") : undefined}
@@ -319,7 +327,16 @@ export default function OrdersPage() {
                       key={o.id}
                       order={o}
                       busy={busyId === o.id}
-                      onReady={o.status === "RESTAURANT_CONFIRMED" ? () => act(o.id, "ready") : undefined}
+                      onReady={
+                        o.status === "RESTAURANT_CONFIRMED" && o.isPaid !== false
+                          ? () => act(o.id, "ready")
+                          : undefined
+                      }
+                      onReject={
+                        o.status === "RESTAURANT_CONFIRMED" && !o.isPaid
+                          ? () => act(o.id, "reject")
+                          : undefined
+                      }
                       onChatClient={() => openChat(o.id, "Client")}
                       onChatDriver={o.driverAssigned ? () => openChat(o.id, "Livreur") : undefined}
                       fleetDrivers={canAssignOwn && !o.driverAssigned && o.status === "READY_FOR_PICKUP" ? fleetDrivers : []}
@@ -463,8 +480,22 @@ function OrderCard({
           </select>
         </div>
       )}
-      {order.status === "PENDING" && !order.isPaid && (
-        <p className="mt-3 text-xs text-amber-700">En attente du paiement du client. Préparez seulement après confirmation.</p>
+      {order.status === "PENDING" && (
+        <p className="mt-3 text-xs text-amber-700">
+          Nouvelle commande non payée. Acceptez pour confirmer la disponibilité — le client paiera ensuite. Ne
+          préparez pas avant le paiement.
+        </p>
+      )}
+      {order.status === "RESTAURANT_CONFIRMED" && !order.isPaid && (
+        <p className="mt-3 text-xs text-amber-700">
+          Commande acceptée. En attente du paiement client (délai 15 min). Ne préparez pas et ne marquez pas
+          « Prête » avant confirmation du paiement.
+        </p>
+      )}
+      {order.status === "RESTAURANT_CONFIRMED" && order.isPaid && (
+        <p className="mt-3 text-xs text-green-700">
+          Paiement reçu. Vous pouvez préparer la commande puis la marquer prête pour le livreur.
+        </p>
       )}
     </div>
   );

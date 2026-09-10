@@ -67,8 +67,8 @@ const PARCEL_TIMELINE: { status: DeliveryStatus; label: string }[] = [
 ];
 
 const FOOD_TIMELINE: { status: DeliveryStatus; label: string }[] = [
-  { status: DeliveryStatus.PENDING, label: 'Confirmé' },
-  { status: DeliveryStatus.RESTAURANT_CONFIRMED, label: 'Préparation' },
+  { status: DeliveryStatus.PENDING, label: 'Envoyée au restaurant' },
+  { status: DeliveryStatus.RESTAURANT_CONFIRMED, label: 'Acceptée' },
   { status: DeliveryStatus.PICKED_UP, label: 'En route' },
   { status: DeliveryStatus.DELIVERED, label: 'Livré' },
 ];
@@ -302,6 +302,26 @@ export function resolveCourierLocation(
   return mock ? { ...mock, source: 'estimated' as const } : null;
 }
 
+export function foodClientStatusLabel(
+  status: DeliveryStatus,
+  opts?: { guaranteed?: boolean; escrowReady?: boolean },
+): string {
+  if (status === DeliveryStatus.PENDING) return 'En attente du restaurant';
+  if (status === DeliveryStatus.RESTAURANT_CONFIRMED) {
+    if (opts?.guaranteed && !opts.escrowReady) return 'Acceptée — en attente de votre paiement';
+    return 'En préparation';
+  }
+  return (
+    {
+      [DeliveryStatus.READY_FOR_PICKUP]: 'Prête — livreur en route',
+      [DeliveryStatus.PICKED_UP]: 'Livreur assigné',
+      [DeliveryStatus.IN_TRANSIT]: 'En livraison',
+      [DeliveryStatus.DELIVERED]: 'Commande livrée',
+      [DeliveryStatus.CANCELLED]: 'Commande annulée',
+    } as Partial<Record<DeliveryStatus, string>>
+  )[status] ?? status;
+}
+
 export function formatParcelDelivery(
   delivery: Delivery & { events?: DeliveryEvent[]; restaurant?: { id: string; name: string; cuisine?: string | null } | null },
   courier?: CourierProfile | null,
@@ -311,7 +331,10 @@ export function formatParcelDelivery(
   const fundsFrozen = Boolean((delivery as Delivery & { fundsFrozenAt?: Date | null }).fundsFrozenAt);
   const escrowReady = Boolean((delivery as Delivery & { escrowReady?: boolean }).escrowReady);
   const paymentReady = guaranteed
-    ? delivery.status !== DeliveryStatus.CANCELLED && !fundsFrozen && !escrowReady
+    ? delivery.status !== DeliveryStatus.CANCELLED &&
+      !fundsFrozen &&
+      !escrowReady &&
+      (delivery.type !== DeliveryType.FOOD || delivery.status === DeliveryStatus.RESTAURANT_CONFIRMED)
     : delivery.status === DeliveryStatus.DELIVERED;
   const city = resolveCityFromCoords(delivery.pickupLat ?? 0, delivery.pickupLng ?? 0);
   const dropLat = delivery.dropoffLat ?? delivery.deliveryLat;
@@ -342,17 +365,7 @@ export function formatParcelDelivery(
     status: delivery.status,
     statusLabel:
       delivery.type === DeliveryType.FOOD
-        ? (
-            {
-              [DeliveryStatus.PENDING]: 'En attente du restaurant',
-              [DeliveryStatus.RESTAURANT_CONFIRMED]: 'En préparation',
-              [DeliveryStatus.READY_FOR_PICKUP]: 'Prête — livreur en route',
-              [DeliveryStatus.PICKED_UP]: 'Livreur assigné',
-              [DeliveryStatus.IN_TRANSIT]: 'En livraison',
-              [DeliveryStatus.DELIVERED]: 'Commande livrée',
-              [DeliveryStatus.CANCELLED]: 'Commande annulée',
-            } as Record<DeliveryStatus, string>
-          )[delivery.status] ?? delivery.status
+        ? foodClientStatusLabel(delivery.status, { guaranteed, escrowReady })
         : delivery.status,
     pickupLat: delivery.pickupLat,
     pickupLng: delivery.pickupLng,

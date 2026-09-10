@@ -501,9 +501,16 @@ SENGA orchestre **collect-then-dispatch** + **split échelonné**. Le hub AfriSo
 
 Trois verrous (repas) / deux verrous (colis-express) :
 
-1. **Personne ne cuisine / ne part** tant que `paymentStatus === COMPLETED` et que le séquestre couvre le **ticket total** (plats + frais + commission).
-2. **Le restaurant est payé à l’enlèvement** (`PICKED_UP` + séquestre déjà capturé) — pas bloqué par le last-mile. Si la livraison échoue, le plat est déjà sorti : le resto garde sa part ; le litige client/livreur est plateforme.
-3. **Le livreur n’est payé qu’après preuve de réception** (PIN 4 chiffres SMS + in-app, ou « J’ai reçu »). Un tap `DELIVERED` **seul** ne déclenche aucun split livreur.
+1. **Repas — accept-then-pay** : le restaurant est notifié à la création (`PENDING`, non payé). Il **accepte** (`RESTAURANT_CONFIRMED`) sans séquestre. Le client paie **ensuite**. Cuisine / « Prête pour livreur » / dispatch livreur restent bloqués tant que `escrowReady` (séquestre ticket total).
+2. **Colis / express** : collect-then-dispatch inchangé — pas d’offre livreur tant que le séquestre n’est pas capturé.
+3. **Le restaurant est payé à l’enlèvement** (`PICKED_UP` + séquestre déjà capturé) — pas bloqué par le last-mile.
+4. **Le livreur n’est payé qu’après preuve de réception** (PIN 4 chiffres SMS + in-app, ou « J’ai reçu »).
+
+Timeouts repas (scheduler 5 min) :
+
+- **Acceptation** : `PENDING` non accepté sous **30 min** → auto-annulation (aucun prélèvement).
+- **Paiement** : `RESTAURANT_CONFIRMED` non payé sous **15 min** → auto-annulation (aucun prélèvement).
+- Refus restaurant avant paiement → annulation, aucun frais.
 
 `DELIVERY_PREPAID_REQUIRED` (défaut `true`) : le COD n’est **pas** dispatchable. Les espèces sont refusées sur `payService` escrow (`PAYMENT_INVALID_METHOD`). Mettre `false` seulement pour un repli ops.
 
@@ -521,7 +528,7 @@ Le hub **n’a pas** : escrow, hold, pré-autorisation, preuve de livraison, com
 
 Code : `ride-service` (`guaranteed`, `escrowReady`, PIN) + `payment-service` (`escrowHeld`, `payoutReleased`, `settleEscrow`).
 
-#### A. Livraison colis / express / repas — flux **garanti** (défaut)
+#### A. Livraison colis / express — flux **garanti** (collect-then-dispatch)
 
 ```mermaid
 sequenceDiagram
@@ -531,19 +538,38 @@ sequenceDiagram
   participant L as Livreur
 
   C->>P: Commande (guaranteed=true, escrowReady=false)
-  Note over P: Pas d'offre livreur / resto tant que PENDING
+  Note over P: Pas d'offre livreur tant que unpaid
   C->>P: WALLET hold total ou MM C2B
   alt Wallet
     P->>P: debit wallet (séquestre plateforme) + ServicePayment COMPLETED escrowHeld
   else Mobile Money
-    P->>H: POST /v1/payments
+    C->>H: POST /v1/payments
     H-->>P: webhook SUCCESS
   end
   P->>L: Dispatch (ASSIGNED / PICKED_UP autorisés)
-  Note over P: Repas : CREDIT_RESTAURANT à PICKED_UP (part plats)
   L->>C: PIN SMS + in-app
   C->>P: PIN livreur ou « J'ai reçu »
-  P->>P: capture hold + split livreur / commission (resto déjà crédité)
+  P->>P: capture hold + split livreur / commission
+```
+
+#### A2. Repas — flux **garanti** (accept-then-pay)
+
+```mermaid
+sequenceDiagram
+  participant C as Client
+  participant P as Plateforme SENGA
+  participant R as Restaurant
+  participant H as Hub AfriSoft
+  participant L as Livreur
+
+  C->>P: Commande FOOD (PENDING, escrowReady=false)
+  P->>R: DELIVERY_CREATED (toast / son)
+  R->>P: Accepter (RESTAURANT_CONFIRMED)
+  Note over C: paymentReady=true
+  C->>P: WALLET / MM séquestre
+  P->>R: order-payment (peut préparer)
+  R->>P: Prête (READY_FOR_PICKUP) si escrowReady
+  P->>L: Dispatch livreur
 ```
 
 | Moyen | Encaissement | Dispatch | Payout livreur |
@@ -609,8 +635,9 @@ Pré-autorisation opérateur : **n’existe pas** chez SerdiPay/CinetPay. Un C2B
 
 ### 10.5 Garantie repas + flotte interne (implémenté)
 
-- **Prépayé obligatoire** (`DELIVERY_PREPAID_REQUIRED` ≠ `false`) : colis, express et repas. Dispatch / `ASSIGNED` / `PICKED_UP` interdits tant que `escrowReady` (wallet débité **ou** webhook MM `COMPLETED`).
-- **Même séquestre** pour le resto : la part plats est encaissée au moment de la commande, pas « on verra si le client paie après ».
+- **Prépayé obligatoire** (`DELIVERY_PREPAID_REQUIRED` ≠ `false`) : colis, express et repas. Dispatch / `ASSIGNED` / `PICKED_UP` / « Prête » repas interdits tant que `escrowReady` (wallet débité **ou** webhook MM `COMPLETED`).
+- **Repas** : notification resto à la création ; paiement client **après** acceptation (`RESTAURANT_CONFIRMED`). Cuisine bloquée jusqu’au séquestre.
+- **Colis / express** : séquestre dès la commande (collect-then-dispatch).
 - **Resto crédité à `PICKED_UP`** (le plat a quitté la cuisine — irrévocable). **Livreur SENGA crédité uniquement au PIN** / « J’ai reçu ».
 - **Livreur interne** (`courierSource=RESTAURANT`) : frais de course → restaurant (ou déjà dans son net), **pas** le pool livreurs SENGA. Commission plateforme inchangée.
 - Remboursements : crédit wallet interne / B2C au retrait. **Pas** d’API refund hub.

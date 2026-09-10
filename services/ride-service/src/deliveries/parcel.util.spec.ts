@@ -2,6 +2,7 @@ import { DeliveryStatus, DeliveryType } from '@prisma/client';
 import {
   buildParcelTimeline,
   computeDeliveryEtaMinutes,
+  foodClientStatusLabel,
   generateDeliveryPin,
   mockCourierLocation,
   resolveCourierLocation,
@@ -56,8 +57,8 @@ describe('parcel.util', () => {
       [],
     );
     expect(timeline.map((s) => s.label)).toEqual([
-      'Confirmé',
-      'Préparation',
+      'Envoyée au restaurant',
+      'Acceptée',
       'En route',
       'Livré',
     ]);
@@ -82,5 +83,15 @@ describe('parcel.util', () => {
     );
     expect(ready[1]?.done).toBe(true);
     expect(ready[2]?.done).toBe(false);
+  });
+
+  it('foodClientStatusLabel distingue acceptée unpaid vs préparation', () => {
+    expect(foodClientStatusLabel(DeliveryStatus.PENDING)).toBe('En attente du restaurant');
+    expect(
+      foodClientStatusLabel(DeliveryStatus.RESTAURANT_CONFIRMED, { guaranteed: true, escrowReady: false }),
+    ).toBe('Acceptée — en attente de votre paiement');
+    expect(
+      foodClientStatusLabel(DeliveryStatus.RESTAURANT_CONFIRMED, { guaranteed: true, escrowReady: true }),
+    ).toBe('En préparation');
   });
 });

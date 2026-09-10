@@ -2,6 +2,11 @@ import {
   assertEscrowAllowsDispatch,
   assertPinMatches,
   driverEligibleForFoodOffer,
+  FOOD_ACCEPT_TIMEOUT_MS,
+  FOOD_PAYMENT_TIMEOUT_MS,
+  isDeliveryEscrowCollectible,
+  isFoodAcceptTimeoutDue,
+  isFoodPaymentTimeoutDue,
   isPinTimeoutDue,
   PIN_TIMEOUT_MS,
   resolveCourierSource,
@@ -36,6 +41,55 @@ describe('delivery-guarantee.util', () => {
     expect(() =>
       assertEscrowAllowsDispatch({ guaranteed: false, escrowReady: false, estimatedPriceCdf: 8000 }),
     ).not.toThrow();
+  });
+
+  it('repas : séquestre collectible seulement après acceptation restaurant', () => {
+    expect(
+      isDeliveryEscrowCollectible({
+        type: 'FOOD',
+        status: 'PENDING',
+        guaranteed: true,
+        escrowReady: false,
+      }),
+    ).toBe(false);
+    expect(
+      isDeliveryEscrowCollectible({
+        type: 'FOOD',
+        status: 'RESTAURANT_CONFIRMED',
+        guaranteed: true,
+        escrowReady: false,
+      }),
+    ).toBe(true);
+    expect(
+      isDeliveryEscrowCollectible({
+        type: 'FOOD',
+        status: 'RESTAURANT_CONFIRMED',
+        guaranteed: true,
+        escrowReady: true,
+      }),
+    ).toBe(false);
+  });
+
+  it('colis : séquestre collectible dès la création', () => {
+    expect(
+      isDeliveryEscrowCollectible({
+        type: 'PARCEL',
+        status: 'PENDING',
+        guaranteed: true,
+        escrowReady: false,
+      }),
+    ).toBe(true);
+  });
+
+  it('timeouts repas acceptation 30 min / paiement 15 min', () => {
+    expect(FOOD_ACCEPT_TIMEOUT_MS).toBe(30 * 60 * 1000);
+    expect(FOOD_PAYMENT_TIMEOUT_MS).toBe(15 * 60 * 1000);
+    const created = new Date('2026-09-10T10:00:00Z');
+    expect(isFoodAcceptTimeoutDue({ createdAt: created, now: new Date('2026-09-10T10:29:00Z') })).toBe(false);
+    expect(isFoodAcceptTimeoutDue({ createdAt: created, now: new Date('2026-09-10T10:30:00Z') })).toBe(true);
+    const accepted = new Date('2026-09-10T10:00:00Z');
+    expect(isFoodPaymentTimeoutDue({ acceptedAt: accepted, now: new Date('2026-09-10T10:14:00Z') })).toBe(false);
+    expect(isFoodPaymentTimeoutDue({ acceptedAt: accepted, now: new Date('2026-09-10T10:15:00Z') })).toBe(true);
   });
 
   it('rembourse tout avant enlèvement', () => {

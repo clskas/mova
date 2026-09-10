@@ -910,7 +910,9 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
               _estimatedTotal ??
               _cartSubtotal + 3500;
           final needsEscrow = data['needsEscrow'] == true;
-          if (needsEscrow && deliveryId.isNotEmpty) {
+          final payAfterAccept = data['payAfterAccept'] == true;
+          // Food: pay after restaurant accept — go straight to tracking.
+          if (needsEscrow && deliveryId.isNotEmpty && !payAfterAccept) {
             await Navigator.push<bool>(
               context,
               MaterialPageRoute(

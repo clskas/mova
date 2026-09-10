@@ -16,7 +16,7 @@ export class DeliveryGuaranteeScheduler implements OnModuleInit, OnModuleDestroy
 
   onModuleInit() {
     this.timer = setInterval(() => void this.tick(), TICK_MS);
-    this.logger.log('Gel PIN / litige livraison actif (toutes les 5 min)');
+    this.logger.log('Gel PIN / timeouts repas (acceptation & paiement) actifs (toutes les 5 min)');
   }
 
   onModuleDestroy() {
@@ -25,12 +25,19 @@ export class DeliveryGuaranteeScheduler implements OnModuleInit, OnModuleDestroy
 
   private async tick() {
     try {
-      const [d, e] = await Promise.all([this.deliveries.freezeOverduePins(), this.errands.freezeOverduePins()]);
+      const [d, e, food] = await Promise.all([
+        this.deliveries.freezeOverduePins(),
+        this.errands.freezeOverduePins(),
+        this.deliveries.cancelStaleFoodOrders(),
+      ]);
       if (d + e > 0) {
         this.logger.warn(`${d + e} commande(s) gelée(s) — délai PIN dépassé, pas de versement automatique`);
       }
+      if (food > 0) {
+        this.logger.warn(`${food} commande(s) repas annulée(s) — délai acceptation / paiement dépassé`);
+      }
     } catch (err) {
-      this.logger.warn(`freezeOverduePins: ${(err as Error).message}`);
+      this.logger.warn(`delivery guarantee tick: ${(err as Error).message}`);
     }
   }
 }

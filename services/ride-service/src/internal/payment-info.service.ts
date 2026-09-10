@@ -9,6 +9,7 @@ import {
 import { MovaErrorCode, MovaHttpException, fromMobileRideStatus } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { RentalService } from '../rental/rental.service';
+import { isDeliveryEscrowCollectible } from '../deliveries/delivery-guarantee.util';
 
 export type ServiceReferenceType = 'RIDE' | 'DELIVERY' | 'ERRAND' | 'MOVING' | 'RENTAL' | 'CARPOOL' | 'SCHEDULED';
 
@@ -79,10 +80,16 @@ export class PaymentInfoService {
     const delivery = await this.prisma.delivery.findUnique({ where: { id: deliveryId } });
     if (!delivery) throw new MovaHttpException(MovaErrorCode.DELIVERY_NOT_FOUND, HttpStatus.NOT_FOUND);
     const amountCdf = delivery.escrowAmountCdf ?? delivery.finalPriceCdf ?? delivery.estimatedPriceCdf;
-    const cancelled = delivery.status === DeliveryStatus.CANCELLED;
     const frozen = Boolean(delivery.fundsFrozenAt);
     const guaranteed = delivery.guaranteed === true;
-    const escrowCollect = guaranteed && !cancelled && !frozen && !delivery.escrowReady && !delivery.payoutReleasedAt;
+    const escrowCollect = isDeliveryEscrowCollectible({
+      type: delivery.type,
+      status: delivery.status,
+      guaranteed,
+      escrowReady: delivery.escrowReady,
+      fundsFrozen: frozen,
+      payoutReleased: Boolean(delivery.payoutReleasedAt),
+    });
     return {
       referenceType: 'DELIVERY',
       referenceId: deliveryId,

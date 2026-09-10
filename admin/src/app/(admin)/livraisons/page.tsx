@@ -47,8 +47,8 @@ const TYPE_OPTIONS = [
 ];
 
 const DELIVERY_STATUSES = [
-  { value: "PENDING", label: "En attente restaurant" },
-  { value: "RESTAURANT_CONFIRMED", label: "En préparation" },
+  { value: "PENDING", label: "En attente acceptation resto" },
+  { value: "RESTAURANT_CONFIRMED", label: "Acceptée (paiement / prep)" },
   { value: "READY_FOR_PICKUP", label: "Prête livreur" },
   { value: "PICKED_UP", label: "Pris en charge" },
   { value: "IN_TRANSIT", label: "En transit" },

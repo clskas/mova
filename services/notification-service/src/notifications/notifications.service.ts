@@ -439,7 +439,7 @@ export class NotificationsService implements OnModuleInit {
     return (
       {
         PENDING: 'Commande envoyée au restaurant.',
-        RESTAURANT_CONFIRMED: 'Le restaurant prépare votre repas.',
+        RESTAURANT_CONFIRMED: 'Le restaurant a accepté votre commande. Payez maintenant pour lancer la préparation.',
         READY_FOR_PICKUP: 'Votre commande est prête — le livreur arrive.',
         PICKED_UP: 'Le livreur a récupéré votre commande.',
         IN_TRANSIT: 'Le livreur est en route vers vous.',

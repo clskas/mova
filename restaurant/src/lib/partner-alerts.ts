@@ -228,7 +228,16 @@ export function alertNewRestaurantOrder(deliveryId: string, body?: string) {
   notifyPartnerAlert({
     key: `order:${deliveryId}`,
     title: "Nouvelle commande SENGA",
-    body: body ?? `Commande #${deliveryId.slice(0, 8)} à confirmer`,
+    body: body ?? `Commande #${deliveryId.slice(0, 8)} à confirmer (paiement après acceptation)`,
     tag: "mova-new-order",
+  });
+}
+
+export function alertRestaurantOrderPaid(deliveryId: string) {
+  notifyPartnerAlert({
+    key: `paid:${deliveryId}`,
+    title: "Paiement reçu",
+    body: `Commande #${deliveryId.slice(0, 8)} payée — vous pouvez préparer`,
+    tag: "mova-order-paid",
   });
 }

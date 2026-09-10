@@ -8,6 +8,12 @@ export const PIN_TIMEOUT_MS = {
   ERRAND: 24 * 60 * 60 * 1000,
 } as const;
 
+/** Restaurant must accept a food order within this window (unpaid PENDING). */
+export const FOOD_ACCEPT_TIMEOUT_MS = 30 * 60 * 1000;
+
+/** Client must pay after restaurant accept within this window (RESTAURANT_CONFIRMED unpaid). */
+export const FOOD_PAYMENT_TIMEOUT_MS = 15 * 60 * 1000;
+
 export const UNREACHABLE_ATTEMPTS_BEFORE_RETURN = 3;
 export const UNREACHABLE_DELAY_MS = 30 * 60 * 1000;
 
@@ -34,6 +40,47 @@ export function cancelPhase(status: string): Exclude<GuaranteePhase, 'PIN_TIMEOU
 
 export function isDeliveryPrepaidRequired(): boolean {
   return process.env.DELIVERY_PREPAID_REQUIRED !== 'false';
+}
+
+/**
+ * Food: escrow only after restaurant accept (RESTAURANT_CONFIRMED).
+ * Parcel / express: escrow as soon as the order is placed (non-cancelled).
+ */
+export function isDeliveryEscrowCollectible(params: {
+  type: string;
+  status: string;
+  guaranteed?: boolean | null;
+  escrowReady?: boolean | null;
+  fundsFrozen?: boolean | null;
+  payoutReleased?: boolean | null;
+}): boolean {
+  if (!params.guaranteed) return false;
+  if (params.escrowReady || params.fundsFrozen || params.payoutReleased) return false;
+  if (params.status === 'CANCELLED' || params.status === 'DELIVERED') return false;
+  if (params.type === 'FOOD') {
+    return params.status === 'RESTAURANT_CONFIRMED';
+  }
+  return true;
+}
+
+export function isFoodAcceptTimeoutDue(params: {
+  createdAt: Date;
+  now?: Date;
+  timeoutMs?: number;
+}): boolean {
+  const now = params.now ?? new Date();
+  const timeout = params.timeoutMs ?? FOOD_ACCEPT_TIMEOUT_MS;
+  return now.getTime() - params.createdAt.getTime() >= timeout;
+}
+
+export function isFoodPaymentTimeoutDue(params: {
+  acceptedAt: Date;
+  now?: Date;
+  timeoutMs?: number;
+}): boolean {
+  const now = params.now ?? new Date();
+  const timeout = params.timeoutMs ?? FOOD_PAYMENT_TIMEOUT_MS;
+  return now.getTime() - params.acceptedAt.getTime() >= timeout;
 }
 
 export type CourierSource = 'PLATFORM' | 'RESTAURANT';

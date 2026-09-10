@@ -6,6 +6,7 @@ import {
   apiFetch,
   fetchCashDebts,
   fetchDebtPolicy,
+  fetchTopUpWalletStatus,
   fetchUser,
   fetchUsers,
   fetchUserWallet,
@@ -15,9 +16,12 @@ import {
   formatDate,
   formatUserName,
   normalizeMetrics,
+  reverseVirtualTreasuryFloat,
   sanitizeAdminError,
   settleCashDebt,
   confirmCashDebtByCode,
+  SERDIPAY_MIN_AMOUNT_CDF,
+  topUpWallet,
   updateDebtPolicy,
   withdrawWallet,
   type AdminMetrics,
@@ -47,9 +51,9 @@ import {
 } from "@/components/ui";
 
 const MOBILE_MONEY_PROVIDERS = [
-  { value: "ORANGE_MONEY", label: "Orange Money" },
   { value: "MPESA", label: "M-Pesa" },
   { value: "AIRTEL_MONEY", label: "Airtel Money" },
+  { value: "ORANGE_MONEY", label: "Orange Money" },
 ];
 
 const DEBT_CATEGORY_LABELS: Record<string, string> = {
@@ -97,12 +101,17 @@ export default function PortefeuillePage() {
   const [cashConfirmSuccess, setCashConfirmSuccess] = useState<string | null>(null);
   const [platformTreasury, setPlatformTreasury] = useState<UserWalletDetail | null>(null);
   const [platformRechargeAmount, setPlatformRechargeAmount] = useState("");
-  const [platformRechargeDesc, setPlatformRechargeDesc] = useState("");
+  const [platformRechargePhone, setPlatformRechargePhone] = useState("");
+  const [platformRechargeProvider, setPlatformRechargeProvider] = useState("MPESA");
+  const [platformPendingRef, setPlatformPendingRef] = useState<string | null>(null);
   const [platformWithdrawAmount, setPlatformWithdrawAmount] = useState("");
   const [platformWithdrawPhone, setPlatformWithdrawPhone] = useState("");
-  const [platformWithdrawProvider, setPlatformWithdrawProvider] = useState("ORANGE_MONEY");
+  const [platformWithdrawProvider, setPlatformWithdrawProvider] = useState("MPESA");
   const [platformSaving, setPlatformSaving] = useState(false);
   const [platformSuccess, setPlatformSuccess] = useState<string | null>(null);
+  const [showEmergencyVirtual, setShowEmergencyVirtual] = useState(false);
+  const [emergencyAmount, setEmergencyAmount] = useState("");
+  const [emergencyDesc, setEmergencyDesc] = useState("");
   const [txFilter, setTxFilter] = useState<"all" | "recharge" | "withdraw">("all");
   const [txLoadingMore, setTxLoadingMore] = useState(false);
   const withdrawInFlight = useRef(false);
@@ -233,22 +242,118 @@ export default function PortefeuillePage() {
   }
 
   async function submitPlatformRecharge() {
-    if (!platformRechargeAmount.trim()) return;
+    if (platformInFlight.current) return;
+    const amount = Number(platformRechargeAmount);
+    if (!Number.isFinite(amount) || amount < SERDIPAY_MIN_AMOUNT_CDF) {
+      setError(`Montant minimum SerdiPay : ${SERDIPAY_MIN_AMOUNT_CDF.toLocaleString("fr-FR")} FC`);
+      return;
+    }
+    if (!platformRechargePhone.trim()) {
+      setError("Indiquez le numéro Mobile Money à débiter (compte société).");
+      return;
+    }
+    platformInFlight.current = true;
+    setPlatformSaving(true);
+    setError(null);
+    setPlatformSuccess(null);
+    try {
+      const result = await topUpWallet(MOVA_PLATFORM_USER_ID, {
+        amountCdf: amount,
+        provider: platformRechargeProvider,
+        phone: platformRechargePhone.trim(),
+      });
+      if (result.paymentUrl) {
+        window.open(result.paymentUrl, "_blank", "noopener,noreferrer");
+      }
+      if (result.pendingMobileMoney && result.providerRef) {
+        setPlatformPendingRef(result.providerRef);
+        setPlatformSuccess(result.message ?? "Recharge Mobile Money en attente de confirmation.");
+      } else {
+        setPlatformPendingRef(null);
+        setPlatformSuccess(result.message ?? "Trésorerie créditée via Mobile Money.");
+        setPlatformRechargeAmount("");
+      }
+      await load();
+    } catch (e) {
+      setError(sanitizeAdminError(e instanceof Error ? e.message : "Échec recharge trésorerie"));
+    } finally {
+      platformInFlight.current = false;
+      setPlatformSaving(false);
+    }
+  }
+
+  async function pollPlatformTopUp() {
+    if (!platformPendingRef) return;
+    setPlatformSaving(true);
+    setError(null);
+    try {
+      const status = await fetchTopUpWalletStatus(MOVA_PLATFORM_USER_ID, platformPendingRef);
+      if (status.isPaid) {
+        setPlatformPendingRef(null);
+        setPlatformSuccess(
+          `Recharge confirmée${status.amountCdf != null ? ` — ${formatCdf(status.amountCdf)}` : ""}.`,
+        );
+        setPlatformRechargeAmount("");
+        await load();
+      } else if (status.status === "FAILED") {
+        setPlatformPendingRef(null);
+        setError("Recharge Mobile Money échouée ou annulée.");
+        await load();
+      } else {
+        setPlatformSuccess("Toujours en attente du push / confirmation Mobile Money…");
+      }
+    } catch (e) {
+      setError(sanitizeAdminError(e instanceof Error ? e.message : "Échec vérification recharge"));
+    } finally {
+      setPlatformSaving(false);
+    }
+  }
+
+  async function submitReverseVirtualFloat() {
+    if (!window.confirm("Annuler les apports virtuels admin sur la trésorerie ? (idempotent, ne touche pas aux commissions / recharges MM)")) {
+      return;
+    }
+    setPlatformSaving(true);
+    setError(null);
+    setPlatformSuccess(null);
+    try {
+      const result = await reverseVirtualTreasuryFloat();
+      setPlatformSuccess(result.message ?? "Apport virtuel annulé.");
+      await load();
+    } catch (e) {
+      setError(sanitizeAdminError(e instanceof Error ? e.message : "Échec annulation apport virtuel"));
+    } finally {
+      setPlatformSaving(false);
+    }
+  }
+
+  async function submitEmergencyVirtualCredit() {
+    const amount = Number(emergencyAmount);
+    if (!Number.isFinite(amount) || amount < 1) return;
+    if (
+      !window.confirm(
+        "Crédit d’urgence ledger-only (sans dépôt Mobile Money). Réserver aux corrections ops. Continuer ?",
+      )
+    ) {
+      return;
+    }
     setPlatformSaving(true);
     setError(null);
     setPlatformSuccess(null);
     try {
       const result = await adjustWallet(MOVA_PLATFORM_USER_ID, {
-        amountCdf: Number(platformRechargeAmount),
+        amountCdf: amount,
         type: "CREDIT",
-        description: platformRechargeDesc.trim() || "Apport trésorerie SENGA (admin)",
+        description:
+          emergencyDesc.trim() ||
+          "Ajustement urgence ops (ledger-only — pas un dépôt Mobile Money)",
       });
-      setPlatformSuccess(result.message ?? "Trésorerie créditée.");
-      setPlatformRechargeAmount("");
-      setPlatformRechargeDesc("");
+      setPlatformSuccess(result.message ?? "Crédit d’urgence appliqué.");
+      setEmergencyAmount("");
+      setEmergencyDesc("");
       await load();
     } catch (e) {
-      setError(sanitizeAdminError(e instanceof Error ? e.message : "Échec crédit trésorerie"));
+      setError(sanitizeAdminError(e instanceof Error ? e.message : "Échec crédit urgence"));
     } finally {
       setPlatformSaving(false);
     }
@@ -256,14 +361,19 @@ export default function PortefeuillePage() {
 
   async function submitPlatformWithdraw() {
     if (platformInFlight.current) return;
-    if (!platformWithdrawAmount.trim() || !platformWithdrawPhone.trim()) return;
+    const amount = Number(platformWithdrawAmount);
+    if (!Number.isFinite(amount) || amount < SERDIPAY_MIN_AMOUNT_CDF) {
+      setError(`Montant minimum SerdiPay : ${SERDIPAY_MIN_AMOUNT_CDF.toLocaleString("fr-FR")} FC`);
+      return;
+    }
+    if (!platformWithdrawPhone.trim()) return;
     platformInFlight.current = true;
     setPlatformSaving(true);
     setError(null);
     setPlatformSuccess(null);
     try {
       const result = await withdrawWallet(MOVA_PLATFORM_USER_ID, {
-        amountCdf: Number(platformWithdrawAmount),
+        amountCdf: amount,
         provider: platformWithdrawProvider,
         phone: platformWithdrawPhone.trim(),
       });
@@ -303,8 +413,8 @@ export default function PortefeuillePage() {
     if (withdrawInFlight.current) return;
     if (!activeUserId || !withdrawAmount.trim() || !withdrawPhone.trim()) return;
     const amount = Number(withdrawAmount);
-    if (!Number.isFinite(amount) || amount < 500) {
-      setError("Montant minimum de retrait : 500 FC");
+    if (!Number.isFinite(amount) || amount < SERDIPAY_MIN_AMOUNT_CDF) {
+      setError(`Montant minimum SerdiPay : ${SERDIPAY_MIN_AMOUNT_CDF.toLocaleString("fr-FR")} FC`);
       return;
     }
     withdrawInFlight.current = true;
@@ -428,8 +538,8 @@ export default function PortefeuillePage() {
             <div>
               <h2 className="font-semibold text-lg">{MOVA_PLATFORM_WALLET_LABEL}</h2>
               <p className="text-sm text-gray-600 mt-1">
-                Compte virtuel des commissions SENGA. Il se crédite automatiquement à chaque paiement (wallet ou espèces).
-                Les espèces collectées chez les chauffeurs se régularisent au guichet — voir section « Confirmer paiement espèces ».
+                Compte trésorerie SENGA : commissions automatiques + dépôts Mobile Money réels.
+                Les espèces collectées chez les chauffeurs se régularisent au guichet — voir « Confirmer paiement espèces ».
               </p>
             </div>
             <div className="grid sm:grid-cols-2 gap-4 text-sm">
@@ -453,9 +563,11 @@ export default function PortefeuillePage() {
             {!readOnly && (
               <div className="grid lg:grid-cols-2 gap-6 pt-2">
                 <div className="space-y-3">
-                  <h3 className="font-medium">Recharger la trésorerie (apport virtuel)</h3>
+                  <h3 className="font-medium">Recharger la trésorerie (Mobile Money)</h3>
                   <p className="text-xs text-gray-500">
-                    Injecte des fonds virtuels (float initial, correction comptable). En production, cela reflète un dépôt réel sur le compte SENGA.
+                    Dépôt réel via M-Pesa, Airtel Money ou Orange Money (minimum{" "}
+                    {SERDIPAY_MIN_AMOUNT_CDF.toLocaleString("fr-FR")} FC). Confirmez le push sur le téléphone du compte société.
+                    Orange Money peut rester en attente sans USSD chez SerdiPay — préférez M-Pesa ou Airtel si besoin.
                   </p>
                   <label>
                     <FieldLabel>Montant CDF</FieldLabel>
@@ -463,25 +575,48 @@ export default function PortefeuillePage() {
                       value={platformRechargeAmount}
                       onChange={setPlatformRechargeAmount}
                       type="number"
-                      placeholder="100000"
+                      placeholder={String(SERDIPAY_MIN_AMOUNT_CDF)}
                     />
                   </label>
                   <label>
-                    <FieldLabel>Motif</FieldLabel>
-                    <TextInput
-                      value={platformRechargeDesc}
-                      onChange={setPlatformRechargeDesc}
-                      placeholder="Apport capital / float Mobile Money"
+                    <FieldLabel>Opérateur</FieldLabel>
+                    <SelectInput
+                      value={platformRechargeProvider}
+                      onChange={setPlatformRechargeProvider}
+                      options={MOBILE_MONEY_PROVIDERS}
                     />
                   </label>
-                  <BtnPrimary onClick={submitPlatformRecharge} disabled={platformSaving || !platformRechargeAmount.trim()}>
-                    {platformSaving ? "En cours…" : "Créditer la trésorerie"}
-                  </BtnPrimary>
+                  <label>
+                    <FieldLabel>Numéro Mobile Money à débiter (+243…)</FieldLabel>
+                    <TextInput
+                      value={platformRechargePhone}
+                      onChange={setPlatformRechargePhone}
+                      placeholder="+24381…"
+                    />
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    <BtnPrimary
+                      onClick={submitPlatformRecharge}
+                      disabled={
+                        platformSaving ||
+                        !platformRechargeAmount.trim() ||
+                        !platformRechargePhone.trim()
+                      }
+                    >
+                      {platformSaving ? "En cours…" : "Payer via Mobile Money"}
+                    </BtnPrimary>
+                    {platformPendingRef && (
+                      <BtnGhost onClick={pollPlatformTopUp} disabled={platformSaving}>
+                        Vérifier le paiement
+                      </BtnGhost>
+                    )}
+                  </div>
                 </div>
                 <div className="space-y-3">
                   <h3 className="font-medium">Retirer vers Mobile Money (sortie réelle)</h3>
                   <p className="text-xs text-gray-500">
                     Transfère des fonds du compte trésorerie SENGA vers un numéro Orange / M-Pesa / Airtel (compte société).
+                    Minimum {SERDIPAY_MIN_AMOUNT_CDF.toLocaleString("fr-FR")} FC.
                   </p>
                   <label>
                     <FieldLabel>Montant CDF</FieldLabel>
@@ -515,6 +650,43 @@ export default function PortefeuillePage() {
                     {platformSaving ? "Retrait…" : "Retirer de la trésorerie"}
                   </BtnPrimary>
                 </div>
+              </div>
+            )}
+            {!readOnly && (
+              <div className="pt-2 border-t border-violet-100 space-y-2">
+                <div className="flex flex-wrap gap-2">
+                  <BtnGhost onClick={submitReverseVirtualFloat} disabled={platformSaving}>
+                    Annuler apport virtuel (si solde issu d’un crédit admin)
+                  </BtnGhost>
+                  <BtnGhost onClick={() => setShowEmergencyVirtual((v) => !v)} disabled={platformSaving}>
+                    {showEmergencyVirtual ? "Masquer urgence ops" : "Crédit urgence ops (ledger-only)"}
+                  </BtnGhost>
+                </div>
+                {showEmergencyVirtual && (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-4 space-y-3">
+                    <p className="text-xs text-amber-900">
+                      Urgence uniquement : crédite le ledger sans dépôt Mobile Money. Ne remplace pas une recharge réelle.
+                    </p>
+                    <label>
+                      <FieldLabel>Montant CDF</FieldLabel>
+                      <TextInput value={emergencyAmount} onChange={setEmergencyAmount} type="number" />
+                    </label>
+                    <label>
+                      <FieldLabel>Motif</FieldLabel>
+                      <TextInput
+                        value={emergencyDesc}
+                        onChange={setEmergencyDesc}
+                        placeholder="Correction comptable urgence"
+                      />
+                    </label>
+                    <BtnPrimary
+                      onClick={submitEmergencyVirtualCredit}
+                      disabled={platformSaving || !emergencyAmount.trim()}
+                    >
+                      Appliquer crédit urgence
+                    </BtnPrimary>
+                  </div>
+                )}
               </div>
             )}
           </Card>
@@ -599,7 +771,7 @@ export default function PortefeuillePage() {
                 <h2 className="font-semibold">Retrait Mobile Money</h2>
                 <p className="text-sm text-gray-500">
                   Envoie les fonds du portefeuille vers un numéro Orange Money, M-Pesa ou Airtel Money.
-                  Minimum 500 FC.
+                  Minimum {SERDIPAY_MIN_AMOUNT_CDF.toLocaleString("fr-FR")} FC (SerdiPay).
                 </p>
                 <div className="grid sm:grid-cols-2 gap-4">
                   <label>

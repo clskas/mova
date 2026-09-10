@@ -6,6 +6,8 @@ import {
   MovaErrorCode,
   MovaHttpException,
   RedisService,
+  ADMIN_CLEAR_VIRTUAL_APPORT_3000_REF,
+  REVERSE_VIRTUAL_TREASURY_FLOAT_REF,
   SMS_UNAVAILABLE_USER_MESSAGE,
   TEST_OTP_CODE,
   afrisoftHubReference,
@@ -605,6 +607,8 @@ export class WalletService {
     const providerRef = mm.providerRef ?? ref;
     const paymentUrl = mm.paymentUrl;
     const isAsync = isAfrisoftHubAsyncRef(providerRef) || Boolean(mm.pending);
+    const isTreasury = userId === MOVA_PLATFORM_USER_ID;
+    const rechargeLabel = isTreasury ? `Recharge trésorerie ${provider}` : `Recharge ${provider}`;
     if (isAsync) {
       const wallet = await this.createWallet(userId);
       await this.prisma.walletTransaction.create({
@@ -612,7 +616,7 @@ export class WalletService {
           walletId: wallet.id,
           amountCdf,
           type: 'TOPUP_PENDING',
-          description: `Recharge ${provider} en attente`,
+          description: `${rechargeLabel} en attente`,
           reference: providerRef,
         },
       });
@@ -638,11 +642,15 @@ export class WalletService {
       };
     }
 
-    const wallet = await this.credit(userId, amountCdf, `Recharge ${provider}`, providerRef);
+    const wallet = await this.credit(userId, amountCdf, rechargeLabel, providerRef);
     return {
       success: true,
       simulated: false,
-      message: mm.message ?? `Recharge de ${formatCdf(amountCdf)} effectuée`,
+      message:
+        mm.message ??
+        (isTreasury
+          ? `Trésorerie créditée de ${formatCdf(amountCdf)} via Mobile Money`
+          : `Recharge de ${formatCdf(amountCdf)} effectuée`),
       amountCdf,
       provider,
       balanceCdf: wallet.balanceCdf,
@@ -1082,6 +1090,88 @@ export class WalletService {
     }
     const wallet = await this.debit(userId, amountCdf, description, auditRef);
     return { wallet, message: `Débit manuel de ${formatCdf(amountCdf)} appliqué.` };
+  }
+
+  /**
+   * Idempotent: reverse ledger-only admin CREDITS on the SENGA treasury wallet
+   * (apport virtuel / float). Does not touch commission credits or MM top-ups.
+   * Safe if already reversed or if balance is already 0.
+   */
+  async reverseVirtualTreasuryFloat() {
+    const REVERSE_REF = REVERSE_VIRTUAL_TREASURY_FLOAT_REF;
+    const clearRefs = [REVERSE_REF, ADMIN_CLEAR_VIRTUAL_APPORT_3000_REF];
+    for (const ref of clearRefs) {
+      const already = await this.findExistingLedger(ref, 'DEBIT');
+      if (already) {
+        const wallet = await this.prisma.wallet.findUnique({ where: { userId: MOVA_PLATFORM_USER_ID } });
+        return {
+          alreadyApplied: true,
+          amountCdf: 0,
+          balanceCdf: wallet?.balanceCdf ?? 0,
+          message: 'Annulation de l’apport virtuel déjà appliquée.',
+        };
+      }
+    }
+
+    await this.ensurePlatformWallet();
+    const wallet = await this.prisma.wallet.findUnique({ where: { userId: MOVA_PLATFORM_USER_ID } });
+    if (!wallet || wallet.balanceCdf <= 0) {
+      return {
+        alreadyApplied: false,
+        amountCdf: 0,
+        balanceCdf: wallet?.balanceCdf ?? 0,
+        message: 'Trésorerie déjà à zéro — rien à annuler.',
+      };
+    }
+
+    const [virtualCredits, priorClears] = await Promise.all([
+      this.prisma.walletTransaction.findMany({
+        where: {
+          walletId: wallet.id,
+          type: 'CREDIT',
+          reference: { startsWith: 'admin_adjust_CREDIT' },
+        },
+        select: { amountCdf: true },
+      }),
+      this.prisma.walletTransaction.findMany({
+        where: {
+          walletId: wallet.id,
+          type: 'DEBIT',
+          OR: [
+            { reference: { in: clearRefs } },
+            { reference: { startsWith: 'admin_adjust_DEBIT' } },
+            { description: { contains: 'Annulation apport virtuel' } },
+          ],
+        },
+        select: { amountCdf: true },
+      }),
+    ]);
+    const virtualSum = virtualCredits.reduce((s, t) => s + Math.abs(t.amountCdf), 0);
+    const alreadyCleared = priorClears.reduce((s, t) => s + Math.abs(t.amountCdf), 0);
+    const outstandingVirtual = Math.max(0, virtualSum - alreadyCleared);
+    const amountCdf = Math.min(wallet.balanceCdf, outstandingVirtual);
+    if (amountCdf <= 0) {
+      return {
+        alreadyApplied: false,
+        amountCdf: 0,
+        balanceCdf: wallet.balanceCdf,
+        message:
+          'Aucun crédit admin (apport virtuel) trouvé sur la trésorerie — solde inchangé (commissions / recharges MM conservées).',
+      };
+    }
+
+    const updated = await this.debit(
+      MOVA_PLATFORM_USER_ID,
+      amountCdf,
+      'Annulation apport virtuel trésorerie (remplacé par recharge Mobile Money)',
+      REVERSE_REF,
+    );
+    return {
+      alreadyApplied: false,
+      amountCdf,
+      balanceCdf: updated?.balanceCdf ?? 0,
+      message: `Apport virtuel de ${formatCdf(amountCdf)} annulé. Solde trésorerie : ${formatCdf(updated?.balanceCdf ?? 0)}.`,
+    };
   }
 
   async completePendingTopUp(

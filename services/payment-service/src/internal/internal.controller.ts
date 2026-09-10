@@ -40,9 +40,16 @@ class AdminAdjustDto {
 }
 
 class InternalWithdrawDto {
-  @Type(() => Number) @IsInt() @Min(500) amountCdf: number;
+  /** SerdiPay Public API floor — see SERDIPAY_MIN_AMOUNT_CDF (2300). */
+  @Type(() => Number) @IsInt() @Min(2300) amountCdf: number;
   @IsString() provider: string;
   @IsString() phone: string;
+}
+
+class InternalTopUpDto {
+  @Type(() => Number) @IsInt() @Min(2300) amountCdf: number;
+  @IsString() provider: string;
+  @IsOptional() @IsString() phone?: string;
 }
 
 class ReconcileMobileMoneyDto {
@@ -97,6 +104,21 @@ export class InternalController {
   @Post('wallets/:userId/adjust')
   adjust(@Param('userId') userId: string, @Body() dto: AdminAdjustDto) {
     return this.wallet.adminAdjust(userId, dto.amountCdf, dto.type, dto.description);
+  }
+
+  @Post('wallets/:userId/top-up')
+  topUp(@Param('userId') userId: string, @Body() dto: InternalTopUpDto) {
+    return this.wallet.topUp(userId, dto.amountCdf, dto.provider, dto.phone);
+  }
+
+  @Get('wallets/:userId/top-up/status')
+  topUpStatus(@Param('userId') userId: string, @Query('providerRef') providerRef?: string) {
+    return this.wallet.getTopUpStatus(userId, providerRef?.trim() ?? '');
+  }
+
+  @Post('wallets/platform/reverse-virtual-float')
+  reverseVirtualTreasuryFloat() {
+    return this.wallet.reverseVirtualTreasuryFloat();
   }
 
   @Post('wallets/:userId/withdraw')

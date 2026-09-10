@@ -620,7 +620,7 @@ export type AdminSessionUser = {
 
 export type WalletOverview = {
   totalBalanceCdf?: number;
-  /** Solde du compte trésorerie SENGA (commissions virtuelles). */
+  /** Solde du compte trésorerie SENGA (commissions + recharges MM). */
   platformBalanceCdf?: number;
   /** Somme des soldes utilisateurs (passagers, chauffeurs, partenaires). */
   userLiabilitiesCdf?: number;
@@ -1821,6 +1821,56 @@ export async function adjustWallet(
     `/api/admin/wallet/${userId}/adjust`,
     { method: "POST", body: JSON.stringify(data) },
   );
+}
+
+/** SerdiPay Public API floor for C2B top-up and B2C withdraw. */
+export const SERDIPAY_MIN_AMOUNT_CDF = 2300;
+
+export type WalletTopUpResult = {
+  success?: boolean;
+  simulated?: boolean;
+  pendingMobileMoney?: boolean;
+  message?: string;
+  amountCdf?: number;
+  provider?: string;
+  balanceCdf?: number;
+  providerRef?: string;
+  paymentUrl?: string;
+  ussdCode?: string;
+};
+
+export type WalletTopUpStatus = {
+  providerRef?: string;
+  status?: string | null;
+  pendingMobileMoney?: boolean;
+  isPaid?: boolean;
+  amountCdf?: number;
+  balanceCdf?: number;
+  message?: string;
+};
+
+export async function topUpWallet(
+  userId: string,
+  data: { amountCdf: number; provider: string; phone: string },
+) {
+  return apiFetch<WalletTopUpResult>(`/api/admin/wallet/${userId}/top-up`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function fetchTopUpWalletStatus(userId: string, providerRef: string) {
+  const params = new URLSearchParams({ providerRef });
+  return apiFetch<WalletTopUpStatus>(`/api/admin/wallet/${userId}/top-up/status?${params}`);
+}
+
+export async function reverseVirtualTreasuryFloat() {
+  return apiFetch<{
+    alreadyApplied?: boolean;
+    amountCdf?: number;
+    balanceCdf?: number;
+    message?: string;
+  }>("/api/admin/wallet/treasury/reverse-virtual-float", { method: "POST", body: "{}" });
 }
 
 export async function withdrawWallet(

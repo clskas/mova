@@ -798,6 +798,16 @@ export class AdminService {
   adjustWallet(userId: string, body: { amountCdf: number; type: 'CREDIT' | 'DEBIT'; description: string }) {
     return this.proxy('payment', `/internal/wallets/${userId}/adjust`, { method: 'POST', body: JSON.stringify(body) });
   }
+  topUpWallet(userId: string, body: { amountCdf: number; provider: string; phone: string }) {
+    return this.proxy('payment', `/internal/wallets/${userId}/top-up`, { method: 'POST', body: JSON.stringify(body) });
+  }
+  topUpWalletStatus(userId: string, providerRef: string) {
+    const q = new URLSearchParams({ providerRef });
+    return this.proxy('payment', `/internal/wallets/${userId}/top-up/status?${q}`);
+  }
+  reverseVirtualTreasuryFloat() {
+    return this.proxy('payment', `/internal/wallets/platform/reverse-virtual-float`, { method: 'POST', body: '{}' });
+  }
   withdrawWallet(userId: string, body: { amountCdf: number; provider: string; phone: string }) {
     return this.proxy('payment', `/internal/wallets/${userId}/withdraw`, { method: 'POST', body: JSON.stringify(body) });
   }

@@ -960,6 +960,32 @@ export class AdminController {
     return this.adminService.updateDebtPolicy(body);
   }
 
+  @Post('wallet/treasury/reverse-virtual-float')
+  @RequirePermissions(AdminPermission.WALLETS_WRITE)
+  @ApiOperation({
+    summary: 'Annuler les apports virtuels admin sur la trésorerie SENGA (idempotent)',
+  })
+  reverseVirtualTreasuryFloat() {
+    return this.adminService.reverseVirtualTreasuryFloat();
+  }
+
+  @Post('wallet/:userId/top-up')
+  @RequirePermissions(AdminPermission.WALLETS_WRITE)
+  @ApiOperation({ summary: 'Recharge Mobile Money (C2B) — trésorerie ou utilisateur' })
+  topUpWallet(
+    @Param('userId') userId: string,
+    @Body() body: { amountCdf: number; provider: string; phone: string },
+  ) {
+    return this.adminService.topUpWallet(userId, body);
+  }
+
+  @Get('wallet/:userId/top-up/status')
+  @RequirePermissions(AdminPermission.WALLETS_READ)
+  @ApiOperation({ summary: 'Statut recharge Mobile Money (polling)' })
+  topUpWalletStatus(@Param('userId') userId: string, @Query('providerRef') providerRef?: string) {
+    return this.adminService.topUpWalletStatus(userId, providerRef?.trim() ?? '');
+  }
+
   @Get('wallet/:userId')
   @RequirePermissions(AdminPermission.WALLETS_READ)
   @ApiOperation({ summary: 'Portefeuille utilisateur' })
@@ -969,7 +995,7 @@ export class AdminController {
 
   @Post('wallet/:userId/adjust')
   @RequirePermissions(AdminPermission.WALLETS_WRITE)
-  @ApiOperation({ summary: 'Ajustement manuel portefeuille' })
+  @ApiOperation({ summary: 'Ajustement manuel portefeuille (ops / urgence)' })
   adjustWallet(
     @Param('userId') userId: string,
     @Body() body: { amountCdf: number; type: 'CREDIT' | 'DEBIT'; description: string },

@@ -140,6 +140,11 @@ export class InternalController {
     return this.rides.getFoodDeliverySettlement(referenceId);
   }
 
+  @Get('services/RENTAL/:referenceId/rental-settlement')
+  rentalSettlement(@Param('referenceId') referenceId: string) {
+    return this.rides.getRentalSettlement(referenceId);
+  }
+
   @Get('rides')
   listRides(
     @Query('status') status?: string,

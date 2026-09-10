@@ -19,6 +19,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { WalletService } from '../wallet/wallet.service';
 import { DriverPayoutService } from '../payouts/driver-payout.service';
 import { FoodDeliveryPayoutService } from '../payouts/food-delivery-payout.service';
+import { RentalPayoutService } from '../payouts/rental-payout.service';
 import { DriverDebtLedgerService } from '../ledger/driver-debt-ledger.service';
 import { HubPaymentsService } from '../hub/hub-payments.service';
 import { AirtelMoneyProvider, MockPaymentProvider, MpesaProvider, OrangeMoneyProvider, isAsyncMobileMoneyRef } from './payment-providers';
@@ -52,6 +53,7 @@ export class PaymentsService {
     private walletService: WalletService,
     private driverPayouts: DriverPayoutService,
     private foodPayouts: FoodDeliveryPayoutService,
+    private rentalPayouts: RentalPayoutService,
     private debtLedger: DriverDebtLedgerService,
     private redis: RedisService,
     mock: MockPaymentProvider,
@@ -336,6 +338,12 @@ export class PaymentsService {
       }
       if (type === 'RENTAL') {
         await this.syncRentalPaidStatus(referenceId);
+        const rentalPayment = await this.prisma.servicePayment.findUnique({
+          where: { referenceType_referenceId: { referenceType: type, referenceId } },
+        });
+        const rentalMethod = rentalPayment?.method ?? PaymentMethod.WALLET;
+        const rentalResult = await this.rentalPayouts.creditRentalSettlement(referenceId, rentalMethod);
+        if (rentalResult.handled) return;
       }
       if (type === 'DELIVERY') {
         const foodPayment = await this.prisma.servicePayment.findUnique({

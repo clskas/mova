@@ -23,6 +23,7 @@ import { RedisService } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { parseOrderPlacedMetadata, computeFoodSettlementPools, applyOwnCourierRouting } from '../deliveries/food-delivery-settlement.util';
 import { deliveryDriverGross } from '../deliveries/delivery-driver-gross.util';
+import { computeRentalPartnerDisplay } from '../billing/partner-display.util';
 import { PricingService } from './pricing.service';
 import { CommissionService } from './commission.service';
 import { MatchingService } from '../matching/matching.service';
@@ -1043,6 +1044,72 @@ export class RidesService {
     };
     // Flotte resto : frais de livraison → restaurant (pas le pool livreurs SENGA).
     return applyOwnCourierRouting(raw, d.courierSource);
+  }
+
+  /**
+   * Settlement location partenaire : part propriétaire (88 %) + commission SENGA (12 %)
+   * + éventuel frais logistique chauffeur MOVA_DRIVER (séparé, commission RENTAL sur surcharge).
+   */
+  async getRentalSettlement(referenceId: string) {
+    const r = await this.prisma.rentalInquiry.findUnique({
+      where: { id: referenceId },
+      include: { vehicle: true },
+    });
+    const empty = {
+      referenceType: 'RENTAL' as const,
+      referenceId,
+      ownerUserId: null as string | null,
+      partnerNetCdf: 0,
+      platformFeeCdf: 0,
+      subtotalGrossCdf: 0,
+      depositCdf: 0,
+      logistics: null as {
+        driverId: string;
+        grossCdf: number;
+        netCdf: number;
+        platformFeeCdf: number;
+      } | null,
+    };
+    if (!r) return empty;
+
+    const display = computeRentalPartnerDisplay({
+      totalCdf: r.totalCdf,
+      estimatedPriceCdf: r.estimatedPriceCdf,
+      discountCdf: r.discountCdf,
+      depositCdf: r.vehicle?.depositCdf ?? 0,
+      promoCode: r.promoCode,
+    });
+    const ownerUserId = r.vehicle?.ownerUserId ?? null;
+
+    let logistics: typeof empty.logistics = null;
+    if (
+      r.logisticsMode === 'MOVA_DRIVER' &&
+      r.driverId &&
+      (r.status === RentalInquiryStatus.RETURNED ||
+        r.status === RentalInquiryStatus.PAID ||
+        r.status === RentalInquiryStatus.CLOSED)
+    ) {
+      const rule = await this.commission.get(CommissionServiceType.RENTAL);
+      const gross = this.platformConfig.get().interCity.baseSurchargeCdf * 2;
+      const split = this.commission.splitGross(gross, rule.platformPercent);
+      logistics = {
+        driverId: r.driverId,
+        grossCdf: Math.round(gross),
+        netCdf: Math.round(split.driverNetCdf),
+        platformFeeCdf: split.platformFeeCdf,
+      };
+    }
+
+    return {
+      referenceType: 'RENTAL' as const,
+      referenceId,
+      ownerUserId,
+      partnerNetCdf: display.partnerNetCdf,
+      platformFeeCdf: display.platformFeeCdf,
+      subtotalGrossCdf: display.subtotalGrossCdf,
+      depositCdf: display.depositCdf,
+      logistics,
+    };
   }
 
   async getRidePayout(rideId: string) {

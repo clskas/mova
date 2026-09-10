@@ -447,4 +447,75 @@ describe('WalletService', () => {
       (global as unknown as { fetch: typeof fetch | undefined }).fetch = prevFetch;
     }
   });
+
+  it('reverseVirtualTreasuryFloat debits admin_adjust CREDITS only (idempotent)', async () => {
+    const {
+      MOVA_PLATFORM_USER_ID,
+      REVERSE_VIRTUAL_TREASURY_FLOAT_REF,
+      ADMIN_CLEAR_VIRTUAL_APPORT_3000_REF,
+    } = await import('@mova/shared');
+    // clearRefs loop: reverse_ref then admin_clear_3000
+    prisma.walletTransaction.findFirst.mockResolvedValueOnce(null).mockResolvedValueOnce(null);
+    prisma.wallet.upsert.mockResolvedValue({
+      id: 'pw1',
+      userId: MOVA_PLATFORM_USER_ID,
+      balanceCdf: 3000,
+      heldBalanceCdf: 0,
+    });
+    prisma.wallet.findUnique.mockResolvedValue({
+      id: 'pw1',
+      userId: MOVA_PLATFORM_USER_ID,
+      balanceCdf: 3000,
+      heldBalanceCdf: 0,
+    });
+    // Promise.all: virtual credits, then prior clears
+    prisma.walletTransaction.findMany
+      .mockResolvedValueOnce([{ amountCdf: 3000 }])
+      .mockResolvedValueOnce([]);
+    tx.$queryRaw.mockResolvedValue([{ id: 'pw1', balanceCdf: 3000, heldBalanceCdf: 0 }]);
+    tx.walletTransaction.findFirst.mockResolvedValue(null);
+    tx.wallet.update.mockResolvedValue({
+      id: 'pw1',
+      userId: MOVA_PLATFORM_USER_ID,
+      balanceCdf: 0,
+      heldBalanceCdf: 0,
+    });
+    tx.walletTransaction.create.mockResolvedValue({});
+
+    const first = await service.reverseVirtualTreasuryFloat();
+    expect(first.amountCdf).toBe(3000);
+    expect(first.alreadyApplied).toBe(false);
+    expect(tx.wallet.update).toHaveBeenCalledWith({
+      where: { id: 'pw1' },
+      data: { balanceCdf: { decrement: 3000 } },
+    });
+    expect(tx.walletTransaction.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          type: 'DEBIT',
+          amountCdf: -3000,
+          reference: REVERSE_VIRTUAL_TREASURY_FLOAT_REF,
+        }),
+      }),
+    );
+
+    jest.clearAllMocks();
+    // Prod one-shot clear ref must short-circuit even if commissions already accrued
+    prisma.walletTransaction.findFirst.mockResolvedValueOnce({
+      id: 'done',
+      reference: ADMIN_CLEAR_VIRTUAL_APPORT_3000_REF,
+      type: 'DEBIT',
+    });
+    prisma.wallet.findUnique.mockResolvedValue({
+      id: 'pw1',
+      userId: MOVA_PLATFORM_USER_ID,
+      balanceCdf: 12_000,
+      heldBalanceCdf: 0,
+    });
+    const second = await service.reverseVirtualTreasuryFloat();
+    expect(second.alreadyApplied).toBe(true);
+    expect(second.amountCdf).toBe(0);
+    expect(second.balanceCdf).toBe(12_000);
+    expect(tx.wallet.update).not.toHaveBeenCalled();
+  });
 });

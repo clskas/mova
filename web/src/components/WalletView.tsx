@@ -177,7 +177,7 @@ export function WalletView({ onBack, mock }: Props) {
     }
     const value = parseInt(withdrawAmount, 10);
     if (!/^\d{6}$/.test(withdrawOtp.trim())) {
-      setError("Entrez le code à 6 chiffres reçu sur le numéro de versement.");
+      setError("Entrez le code à 6 chiffres (SMS ou e-mail).");
       return;
     }
     withdrawInFlight.current = true;
@@ -301,7 +301,7 @@ export function WalletView({ onBack, mock }: Props) {
             onChange={(e) => setWithdrawOtp(e.target.value)}
             inputMode="numeric"
             maxLength={6}
-            placeholder="Code SMS (6 chiffres)"
+            placeholder="Code à 6 chiffres"
           />
         )}
         <button
@@ -310,7 +310,7 @@ export function WalletView({ onBack, mock }: Props) {
           disabled={withdrawLoading || (wallet?.balanceCdf ?? 0) < 2300}
           className="w-full border border-[#6C63FF] text-[#6C63FF] rounded-xl py-3 font-medium disabled:opacity-50"
         >
-          {withdrawLoading ? "Retrait…" : withdrawOtpSent ? "Confirmer le retrait" : "Envoyer le code SMS"}
+          {withdrawLoading ? "Retrait…" : withdrawOtpSent ? "Confirmer le retrait" : "Envoyer le code"}
         </button>
       </div>
 

@@ -7,6 +7,7 @@ import {
   MovaHttpException,
   RedisService,
   ADMIN_CLEAR_VIRTUAL_APPORT_3000_REF,
+  INTERNAL_API_KEY,
   REVERSE_VIRTUAL_TREASURY_FLOAT_REF,
   SMS_UNAVAILABLE_USER_MESSAGE,
   TEST_OTP_CODE,
@@ -22,11 +23,13 @@ import {
   isMockOtpAllowed,
   isTestOtpAllowedForPhone,
   mapSmsDeliveryFailureToUserMessage,
+  maskEmail,
   normalizePhoneRdc,
   rdcC2bPendingUserMessageFr,
   rdcMobileMoneyOperatorMismatchFr,
   SERDIPAY_MIN_AMOUNT_CDF,
   serdiPaySanitizeSmsText,
+  serviceUrl,
   timingSafeEqualString,
   validatePhoneRdc,
   type MobileMoneyOperator,
@@ -733,6 +736,7 @@ export class WalletService {
       return {
         success: true,
         message: `Code envoyé au ${normalizedPhone} pour confirmer le retrait.`,
+        channel: 'sms' as const,
         phone: normalizedPhone,
         amountCdf: amount,
         provider: normalizedProvider,
@@ -741,40 +745,56 @@ export class WalletService {
       };
     }
 
-    if (!isAfrisoftSmsHubClientConfigured(this.envGetter)) {
-      throw new MovaHttpException(
-        MovaErrorCode.VALIDATION_ERROR,
-        HttpStatus.SERVICE_UNAVAILABLE,
-        SMS_UNAVAILABLE_USER_MESSAGE,
+    const amountLabel = amount.toLocaleString('fr-FR');
+    let smsError: string | undefined;
+
+    if (isAfrisoftSmsHubClientConfigured(this.envGetter)) {
+      const text = serdiPaySanitizeSmsText(
+        `SENGA : code ${liveCode} pour confirmer le retrait de ${amountLabel} FC vers ce numero Valable 10 min`,
       );
+      const sms = await afrisoftSmsHubSendSms(this.envGetter, {
+        phone: normalizedPhone,
+        text,
+        purpose: 'withdraw-otp',
+        idempotencyKey: `senga:withdraw-otp:${userId}:${normalizedPhone}:${amount}`,
+      });
+      if (sms.success) {
+        return {
+          success: true,
+          message: `Code envoyé au ${normalizedPhone} pour confirmer le retrait.`,
+          channel: 'sms' as const,
+          phone: normalizedPhone,
+          amountCdf: amount,
+          provider: normalizedProvider,
+          expiresInSec: WITHDRAW_OTP_TTL_SEC,
+        };
+      }
+      smsError = sms.message;
+      this.logger.error(`Withdraw OTP SMS failed: ${sms.message}`);
+    } else {
+      smsError = SMS_UNAVAILABLE_USER_MESSAGE;
+      this.logger.warn('Withdraw OTP: hub SMS non configuré — tentative e-mail');
     }
 
-    const amountLabel = amount.toLocaleString('fr-FR');
-    const text = serdiPaySanitizeSmsText(
-      `SENGA : code ${liveCode} pour confirmer le retrait de ${amountLabel} FC vers ce numero Valable 10 min`,
-    );
-    const sms = await afrisoftSmsHubSendSms(this.envGetter, {
-      phone: normalizedPhone,
-      text,
-      purpose: 'withdraw-otp',
-      idempotencyKey: `senga:withdraw-otp:${userId}:${normalizedPhone}:${amount}`,
-    });
-    if (!sms.success) {
-      this.logger.error(`Withdraw OTP SMS failed: ${sms.message}`);
-      throw new MovaHttpException(
-        MovaErrorCode.VALIDATION_ERROR,
-        HttpStatus.SERVICE_UNAVAILABLE,
-        mapSmsDeliveryFailureToUserMessage(sms.message),
-      );
+    const emailFallback = await this.trySendWithdrawOtpByEmail(userId, liveCode, amountLabel);
+    if (emailFallback) {
+      return {
+        success: true,
+        message: `SMS indisponible — code envoyé par e-mail à ${emailFallback.masked} pour confirmer le retrait.`,
+        channel: 'email' as const,
+        deliveryHint: emailFallback.masked,
+        phone: normalizedPhone,
+        amountCdf: amount,
+        provider: normalizedProvider,
+        expiresInSec: WITHDRAW_OTP_TTL_SEC,
+      };
     }
-    return {
-      success: true,
-      message: `Code envoyé au ${normalizedPhone} pour confirmer le retrait.`,
-      phone: normalizedPhone,
-      amountCdf: amount,
-      provider: normalizedProvider,
-      expiresInSec: WITHDRAW_OTP_TTL_SEC,
-    };
+
+    throw new MovaHttpException(
+      MovaErrorCode.VALIDATION_ERROR,
+      HttpStatus.SERVICE_UNAVAILABLE,
+      this.withdrawOtpDeliveryFailureMessage(smsError),
+    );
   }
 
   async withdrawToMobileMoney(
@@ -844,7 +864,7 @@ export class WalletService {
       throw new MovaHttpException(
         MovaErrorCode.AUTH_INVALID_OTP,
         HttpStatus.BAD_REQUEST,
-        'Code OTP requis (6 chiffres envoyé au numéro Mobile Money).',
+        'Code OTP requis (6 chiffres — SMS ou e-mail).',
       );
     }
     const raw = await this.readAndDeleteWithdrawOtp(userId);
@@ -926,6 +946,77 @@ export class WalletService {
     return mem.value;
   }
 
+  private withdrawOtpDeliveryFailureMessage(smsError?: string): string {
+    const smsPart = mapSmsDeliveryFailureToUserMessage(smsError);
+    return `${smsPart} Ajoutez un e-mail au compte (profil) pour recevoir le code sans SMS, ou réessayez après recharge des crédits SMS.`;
+  }
+
+  private async fetchUserEmail(userId: string): Promise<string | undefined> {
+    try {
+      const res = await fetch(serviceUrl('auth', `/internal/users/${userId}`), {
+        headers: { 'x-internal-api-key': INTERNAL_API_KEY },
+        signal: AbortSignal.timeout(8_000),
+      });
+      if (!res.ok) return undefined;
+      const user = (await res.json()) as { email?: string | null };
+      const email = user.email?.trim();
+      return email && email.includes('@') ? email : undefined;
+    } catch (e) {
+      this.logger.warn(`fetchUserEmail failed: ${(e as Error).message}`);
+      return undefined;
+    }
+  }
+
+  /** When SerdiPay SMS credits are empty, deliver the same challenge by e-mail. */
+  private async trySendWithdrawOtpByEmail(
+    userId: string,
+    code: string,
+    amountLabel: string,
+  ): Promise<{ masked: string } | null> {
+    const email = await this.fetchUserEmail(userId);
+    if (!email) {
+      this.logger.warn(`Withdraw OTP e-mail fallback skipped: no email for user ${userId.slice(0, 8)}…`);
+      return null;
+    }
+    const masked = maskEmail(email);
+    const subject = 'SENGA — code de confirmation de retrait';
+    const text = [
+      'Bonjour,',
+      '',
+      `Votre code SENGA pour confirmer le retrait de ${amountLabel} FC : ${code}`,
+      '',
+      'Valable 10 minutes. Si vous n’êtes pas à l’origine de cette demande, ignorez ce message.',
+      '',
+      '— L’équipe SENGA',
+    ].join('\n');
+    try {
+      const res = await fetch(serviceUrl('notification', '/internal/email'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-internal-api-key': INTERNAL_API_KEY,
+        },
+        body: JSON.stringify({ to: email, subject, text }),
+        signal: AbortSignal.timeout(12_000),
+      });
+      if (!res.ok) {
+        const body = await res.text().catch(() => '');
+        this.logger.error(`Withdraw OTP e-mail failed (${res.status}): ${body.slice(0, 200)}`);
+        return null;
+      }
+      const json = (await res.json().catch(() => null)) as { success?: boolean; message?: string } | null;
+      if (json && json.success === false) {
+        this.logger.error(`Withdraw OTP e-mail rejected: ${json.message ?? 'unknown'}`);
+        return null;
+      }
+      this.logger.warn(`Withdraw OTP delivered by e-mail to ${masked} (SMS unavailable)`);
+      return { masked };
+    } catch (e) {
+      this.logger.error(`Withdraw OTP e-mail threw: ${(e as Error).message}`);
+      return null;
+    }
+  }
+
   private async assertWithdrawOtpRateLimit(userId: string, phone: string) {
     const client = this.redis?.client;
     if (!client) return;
@@ -941,7 +1032,7 @@ export class WalletService {
         throw new MovaHttpException(
           MovaErrorCode.VALIDATION_ERROR,
           HttpStatus.TOO_MANY_REQUESTS,
-          'Patientez avant de demander un nouveau code (un SMS toutes les 45 secondes).',
+          'Patientez avant de demander un nouveau code (toutes les 45 secondes).',
         );
       }
       const count = await client.incr(hourKey);

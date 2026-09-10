@@ -61,19 +61,19 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 
-    expect(find.text('Envoyer le code SMS'), findsOneWidget);
+    expect(find.text('Envoyer le code'), findsOneWidget);
     expect(find.text('Confirmer le retrait'), findsNothing);
-    expect(find.text('Code SMS (6 chiffres)'), findsOneWidget);
+    expect(find.text('Code à 6 chiffres'), findsOneWidget);
     expect(find.text('Réessayer'), findsNothing);
 
     await tester.enterText(find.byType(TextField).first, '2500');
     await tester.pump();
 
-    await tester.tap(find.text('Envoyer le code SMS'));
+    await tester.tap(find.text('Envoyer le code'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 
-    expect(find.text('Code SMS (6 chiffres)'), findsOneWidget);
+    expect(find.text('Code à 6 chiffres'), findsOneWidget);
     expect(find.text('Confirmer le retrait'), findsOneWidget);
     expect(find.text('Réessayer'), findsNothing);
     expect(tester.takeException(), isNull);
@@ -104,7 +104,7 @@ void main() {
 
     await tester.enterText(find.byType(TextField).first, '2000');
     await tester.pump();
-    await tester.tap(find.text('Envoyer le code SMS'));
+    await tester.tap(find.text('Envoyer le code'));
     await tester.pump();
 
     expect(

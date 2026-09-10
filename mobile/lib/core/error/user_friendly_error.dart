@@ -6,7 +6,7 @@ const channelDisabledFr =
     'Ce canal Mobile Money n’est pas activé pour le marchand SerdiPay. Aucun push USSD n’a été envoyé. Contactez le support SENGA.';
 const validationFailedFr = 'Données invalides. Vérifiez les champs.';
 const withdrawOtpPromptFr =
-    'Saisissez le code SMS à 6 chiffres envoyé au numéro Mobile Money.';
+    'Saisissez le code à 6 chiffres (SMS ou e-mail).';
 const merchantFloatLowFr =
     'Le compte marchand SerdiPay n’a pas assez de fonds. L’opération Mobile Money n’a pas abouti.';
 const merchantUnauthenticatedFr =

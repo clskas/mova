@@ -702,6 +702,7 @@ class _WalletWithdrawSheetState extends ConsumerState<_WalletWithdrawSheet> {
   bool _otpSent = false;
   bool _otpLoading = false;
   String? _otpPhone;
+  String? _otpDeliveryHint;
   String? _formError;
 
   @override
@@ -764,10 +765,12 @@ class _WalletWithdrawSheetState extends ConsumerState<_WalletWithdrawSheet> {
     if (!mounted) return;
     setState(() => _otpLoading = false);
     switch (result) {
-      case Success():
+      case Success(:final data):
+        final msg = data is Map ? data['message']?.toString() : null;
         setState(() {
           _otpSent = true;
           _otpPhone = parsed.phone;
+          _otpDeliveryHint = (msg != null && msg.isNotEmpty) ? msg : null;
           _formError = null;
         });
       case Failure(:final error):
@@ -824,7 +827,7 @@ class _WalletWithdrawSheetState extends ConsumerState<_WalletWithdrawSheet> {
             ),
             const SizedBox(height: 8),
             const Text(
-              'Un code SMS sera envoyé au numéro de versement pour confirmer que vous ne vous êtes pas trompé.',
+              'Un code de confirmation (SMS, ou e-mail si SMS indisponible) sera envoyé pour valider le numéro de versement.',
               style: TextStyle(color: MovaColors.textSecondary, fontSize: 13),
             ),
             const SizedBox(height: 16),
@@ -876,8 +879,9 @@ class _WalletWithdrawSheetState extends ConsumerState<_WalletWithdrawSheet> {
             const SizedBox(height: 12),
             Text(
               _otpSent
-                  ? 'Code envoyé au $_otpPhone. Saisissez les 6 chiffres pour confirmer le versement.'
-                  : 'Le code SMS à 6 chiffres s’affiche ici après envoi — ce n’est pas une erreur.',
+                  ? (_otpDeliveryHint ??
+                      'Code envoyé. Saisissez les 6 chiffres (SMS ou e-mail) pour confirmer le versement.')
+                  : 'Le code à 6 chiffres s’affiche ici après envoi — ce n’est pas une erreur.',
               style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
             ),
             const SizedBox(height: 8),
@@ -887,8 +891,8 @@ class _WalletWithdrawSheetState extends ConsumerState<_WalletWithdrawSheet> {
               keyboardType: TextInputType.number,
               maxLength: 6,
               decoration: const InputDecoration(
-                labelText: 'Code SMS (6 chiffres)',
-                prefixIcon: Icon(Icons.sms_outlined),
+                labelText: 'Code à 6 chiffres',
+                prefixIcon: Icon(Icons.pin_outlined),
                 counterText: '',
               ),
             ),
@@ -899,6 +903,7 @@ class _WalletWithdrawSheetState extends ConsumerState<_WalletWithdrawSheet> {
                     : () => setState(() {
                           _otpSent = false;
                           _otpPhone = null;
+                          _otpDeliveryHint = null;
                           _otpController.clear();
                           _formError = null;
                         }),
@@ -922,8 +927,8 @@ class _WalletWithdrawSheetState extends ConsumerState<_WalletWithdrawSheet> {
                   ? 'Envoi du code…'
                   : _otpSent
                       ? 'Confirmer le retrait'
-                      : 'Envoyer le code SMS',
-              icon: _otpSent ? Icons.check : Icons.sms_outlined,
+                      : 'Envoyer le code',
+              icon: _otpSent ? Icons.check : Icons.pin_outlined,
               isLoading: _otpLoading,
               onPressed: _otpLoading ? null : _confirm,
             ),

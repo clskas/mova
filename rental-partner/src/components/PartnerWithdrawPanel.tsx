@@ -76,7 +76,7 @@ export function PartnerWithdrawPanel({ balanceCdf, walletAvailable = true, onWit
         return;
       }
       if (!/^\d{6}$/.test(otp.trim())) {
-        setError("Entrez le code à 6 chiffres reçu sur ce numéro.");
+        setError("Entrez le code à 6 chiffres (SMS ou e-mail).");
         return;
       }
       const result = await withdrawPartnerWallet({
@@ -212,7 +212,7 @@ export function PartnerWithdrawPanel({ balanceCdf, walletAvailable = true, onWit
               className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
               inputMode="numeric"
               maxLength={6}
-              placeholder="Code SMS (6 chiffres)"
+              placeholder="Code à 6 chiffres"
               value={otp}
               onChange={(e) => setOtp(e.target.value)}
             />
@@ -227,7 +227,7 @@ export function PartnerWithdrawPanel({ balanceCdf, walletAvailable = true, onWit
               ? "Retrait en cours…"
               : otpSent
                 ? "Confirmer le retrait"
-                : "Envoyer le code SMS"}
+                : "Envoyer le code"}
           </button>
         </div>
       </div>

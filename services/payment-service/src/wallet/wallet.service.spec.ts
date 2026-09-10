@@ -435,14 +435,59 @@ describe('WalletService', () => {
       ok: false,
       status: 429,
       json: async () => ({ message: 'OTP cooldown active' }),
+      text: async () => 'OTP cooldown active',
     });
     (global as unknown as { fetch: typeof fetch }).fetch = fetchMock as unknown as typeof fetch;
     try {
       await expect(
         service.requestWithdrawOtp('u1', 2300, 'ORANGE_MONEY', '+243890000001'),
       ).rejects.toMatchObject({
-        response: { message: expect.stringMatching(/Trop de codes|une minute/i) },
+        response: { message: expect.stringMatching(/Trop de codes|une minute|e-mail/i) },
       });
+    } finally {
+      (global as unknown as { fetch: typeof fetch | undefined }).fetch = prevFetch;
+    }
+  });
+
+  it('falls back to e-mail OTP when SMS hub rejects (crédits SerdiPay)', async () => {
+    configGet.mockImplementation((key: string) => {
+      if (key === 'NODE_ENV') return 'test';
+      if (key === 'AFRISOFT_HUB_API_KEY') return 'test-key';
+      if (key === 'AFRISOFT_HUB_APP_ID') return 'senga';
+      if (key === 'AFRISOFT_SMS_HUB_URL') return 'https://sms.test.local';
+      return undefined;
+    });
+    const prevFetch = global.fetch;
+    const fetchMock = jest.fn(async (url: string | URL) => {
+      const href = String(url);
+      if (href.includes('/v1/sms/send')) {
+        return {
+          ok: false,
+          status: 403,
+          json: async () => ({ message: 'Crédit SMS SerdiPay insuffisant (403).' }),
+          text: async () => 'Crédit SMS SerdiPay insuffisant (403).',
+        };
+      }
+      if (href.includes('/internal/users/')) {
+        return {
+          ok: true,
+          json: async () => ({ id: 'u1', email: 'fondateur@example.com' }),
+        };
+      }
+      if (href.includes('/internal/email')) {
+        return {
+          ok: true,
+          json: async () => ({ success: true, message: 'E-mail envoyé' }),
+        };
+      }
+      return { ok: false, status: 500, json: async () => ({}), text: async () => '' };
+    });
+    (global as unknown as { fetch: typeof fetch }).fetch = fetchMock as unknown as typeof fetch;
+    try {
+      const otp = await service.requestWithdrawOtp('u1', 2300, 'ORANGE_MONEY', '+243890000001');
+      expect(otp.channel).toBe('email');
+      expect(otp.message).toMatch(/e-mail/i);
+      expect(otp.deliveryHint).toMatch(/fo\*\*\*@example\.com|fondateur|example/i);
     } finally {
       (global as unknown as { fetch: typeof fetch | undefined }).fetch = prevFetch;
     }

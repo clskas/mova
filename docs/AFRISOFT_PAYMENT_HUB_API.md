@@ -5,7 +5,8 @@
 **Statut :** contrat cible multi-apps + état réel SENGA documenté  
 **Langue :** français (en-têtes bilingues FR / EN)  
 **Companion SMS/OTP :** même pattern multi-apps (`app_id` + HMAC) — [AFRISOFT_SMS_OTP_HUB_API.md](./AFRISOFT_SMS_OTP_HUB_API.md).  
-**Pack apps sœurs (C2B / B2C + livraisons) :** [integrations/afrisoft-pay-hub.md](./integrations/afrisoft-pay-hub.md) · env [afrisoft-pay-hub.env.example](./integrations/afrisoft-pay-hub.env.example)
+**Handoff apps sœurs (comme « hub sms ») :** [integrations/afrisoft-pay-hub-mobilemoney.md](./integrations/afrisoft-pay-hub-mobilemoney.md)  
+**Pack détaillé (C2B / B2C + notes SENGA) :** [integrations/afrisoft-pay-hub.md](./integrations/afrisoft-pay-hub.md) · env [afrisoft-pay-hub.env.example](./integrations/afrisoft-pay-hub.env.example)
 
 ---
 

@@ -50,6 +50,7 @@ export type RestaurantProfile = {
   prepTimeMin?: number;
   menuItems?: MenuItem[];
   courierMode?: "PLATFORM" | "OWN" | "HYBRID";
+  commerceType?: "RESTAURANT" | "SUPERMARKET" | "PHARMACY" | "BOUTIQUE";
   kycStatus?: string;
   canOperate?: boolean;
   needsProfileSetup?: boolean;

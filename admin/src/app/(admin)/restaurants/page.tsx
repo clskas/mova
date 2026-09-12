@@ -21,6 +21,19 @@ import {
 } from "@/components/ui";
 import { GpsCoordButton } from "@/components/GpsCoordButton";
 
+type CommerceType = "RESTAURANT" | "SUPERMARKET" | "PHARMACY" | "BOUTIQUE";
+
+const COMMERCE_TYPE_OPTIONS: { value: CommerceType; label: string }[] = [
+  { value: "RESTAURANT", label: "Restaurant" },
+  { value: "SUPERMARKET", label: "Supermarché" },
+  { value: "PHARMACY", label: "Pharmacie" },
+  { value: "BOUTIQUE", label: "Boutique" },
+];
+
+function commerceTypeLabel(value?: string | null) {
+  return COMMERCE_TYPE_OPTIONS.find((o) => o.value === value)?.label ?? "Restaurant";
+}
+
 type MenuItem = {
   name: string;
   priceCdf: number;
@@ -60,6 +73,7 @@ export default function RestaurantsPage() {
     lat: "-4.3217",
     lng: "15.3125",
     ownerUserId: "",
+    commerceType: "RESTAURANT" as CommerceType,
   });
   const [editTarget, setEditTarget] = useState<Restaurant | null>(null);
   const [editLat, setEditLat] = useState("");
@@ -125,9 +139,10 @@ export default function RestaurantsPage() {
         lat: parseCoord(form.lat, -4.3217),
         lng: parseCoord(form.lng, 15.3125),
         rating: 4.0,
+        commerceType: form.commerceType,
         ...(form.ownerUserId ? { ownerUserId: form.ownerUserId } : {}),
       });
-      setForm({ name: "", cuisine: "Congolaise", address: "", lat: "-4.3217", lng: "15.3125", ownerUserId: "" });
+      setForm({ name: "", cuisine: "Congolaise", address: "", lat: "-4.3217", lng: "15.3125", ownerUserId: "", commerceType: "RESTAURANT" });
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur création");
@@ -149,6 +164,7 @@ export default function RestaurantsPage() {
           lng: parseCoord(editLng, editTarget.lng ?? 15.3125),
           isActive: editTarget.isActive !== false,
           ownerUserId: editTarget.ownerUserId || null,
+          commerceType: editTarget.commerceType ?? "RESTAURANT",
         },
         editTarget.id,
       );
@@ -239,6 +255,14 @@ export default function RestaurantsPage() {
             <TextInput value={form.cuisine} onChange={(v) => setForm((f) => ({ ...f, cuisine: v }))} placeholder="Cuisine" />
             <TextInput value={form.address} onChange={(v) => setForm((f) => ({ ...f, address: v }))} placeholder="Adresse" />
           </div>
+          <div className="rounded-xl border border-orange-100 bg-orange-50/40 p-3 space-y-2">
+            <FieldLabel>Type de commerce (SENGA Business)</FieldLabel>
+            <SelectInput
+              value={form.commerceType}
+              onChange={(v) => setForm((f) => ({ ...f, commerceType: v as CommerceType }))}
+              options={COMMERCE_TYPE_OPTIONS}
+            />
+          </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="text-sm">
               <FieldLabel>Latitude GPS</FieldLabel>
@@ -289,6 +313,7 @@ export default function RestaurantsPage() {
             <thead>
               <tr className="border-b text-left text-gray-500">
                 <th className="p-3">Nom</th>
+                <th className="p-3">Type</th>
                 <th className="p-3">Cuisine</th>
                 <th className="p-3">Adresse</th>
                 <th className="p-3">GPS</th>
@@ -303,6 +328,11 @@ export default function RestaurantsPage() {
               {restaurants.map((r) => (
                 <tr key={r.id} className="border-b">
                   <td className="p-3 font-medium">{r.name}</td>
+                  <td className="p-3 text-xs">
+                    <span className="px-2 py-0.5 rounded-full bg-orange-50 text-orange-800">
+                      {commerceTypeLabel(r.commerceType)}
+                    </span>
+                  </td>
                   <td className="p-3">{r.cuisine ?? "—"}</td>
                   <td className="p-3 text-gray-500">{r.address ?? "—"}</td>
                   <td className="p-3 text-gray-500 text-xs font-mono">
@@ -354,6 +384,14 @@ export default function RestaurantsPage() {
         {editTarget && (
           <div className="space-y-4">
             <label><FieldLabel>Nom</FieldLabel><TextInput value={editTarget.name} onChange={(v) => setEditTarget({ ...editTarget, name: v })} /></label>
+            <label>
+              <FieldLabel>Type de commerce</FieldLabel>
+              <SelectInput
+                value={editTarget.commerceType ?? "RESTAURANT"}
+                onChange={(v) => setEditTarget({ ...editTarget, commerceType: v as CommerceType })}
+                options={COMMERCE_TYPE_OPTIONS}
+              />
+            </label>
             <label><FieldLabel>Cuisine</FieldLabel><TextInput value={editTarget.cuisine ?? ""} onChange={(v) => setEditTarget({ ...editTarget, cuisine: v })} /></label>
             <label><FieldLabel>Adresse</FieldLabel><TextInput value={editTarget.address ?? ""} onChange={(v) => setEditTarget({ ...editTarget, address: v })} /></label>
             <div className="grid gap-3 sm:grid-cols-2">

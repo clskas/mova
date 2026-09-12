@@ -7,15 +7,19 @@ import { PwaInstallBanner } from "@/components/PwaInstallBanner";
 import { PartnerAlertHost } from "@/components/PartnerAlertHost";
 import { RestaurantLiveProvider } from "@/components/RestaurantLiveProvider";
 import { fetchProfile } from "@/lib/api";
+import { parseCommerceType, type CommerceType } from "@/lib/commerce-type";
 
 function RestaurantPortalFrame({ children }: { children: React.ReactNode }) {
   const [restaurantName, setRestaurantName] = useState<string>();
+  const [commerceType, setCommerceType] = useState<CommerceType>("RESTAURANT");
 
   useEffect(() => {
     let cancelled = false;
     fetchProfile()
       .then((p) => {
-        if (!cancelled) setRestaurantName(p.name);
+        if (cancelled) return;
+        setRestaurantName(p.name);
+        setCommerceType(parseCommerceType(p.commerceType));
       })
       .catch(() => undefined);
     return () => {
@@ -24,7 +28,7 @@ function RestaurantPortalFrame({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <PortalShell restaurantName={restaurantName}>
+    <PortalShell restaurantName={restaurantName} commerceType={commerceType}>
       {children}
       <PwaInstallBanner />
     </PortalShell>

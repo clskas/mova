@@ -349,6 +349,7 @@ export type Restaurant = {
   isAcceptingOrders?: boolean;
   prepTimeMin?: number;
   ownerUserId?: string | null;
+  commerceType?: "RESTAURANT" | "SUPERMARKET" | "PHARMACY" | "BOUTIQUE";
   kycStatus?: string;
   kycNotes?: string | null;
 };

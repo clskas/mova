@@ -56,6 +56,13 @@ enum RestaurantCourierMode {
   HYBRID
 }
 
+enum CommerceType {
+  RESTAURANT
+  SUPERMARKET
+  PHARMACY
+  BOUTIQUE
+}
+
 enum DeliveryCourierSource {
   PLATFORM
   RESTAURANT
@@ -260,6 +267,7 @@ model Restaurant {
   isAcceptingOrders Boolean  @default(true)
   prepTimeMin       Int      @default(25)
   ownerUserId       String?
+  commerceType      CommerceType @default(RESTAURANT)
   courierMode       RestaurantCourierMode @default(PLATFORM)
   kycStatus         PartnerKycStatus @default(PENDING)
   kycNotes          String?
@@ -276,6 +284,7 @@ model Restaurant {
   drivers          RestaurantDriver[]
 
   @@index([ownerUserId])
+  @@index([commerceType])
   @@map("restaurants")
 }
 

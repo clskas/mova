@@ -75,6 +75,7 @@ export class DeliveriesController {
     @Query('maxEtaMin') maxEtaMin?: string,
     @Query('maxPriceCdf') maxPriceCdf?: string,
     @Query('maxDistanceKm') maxDistanceKm?: string,
+    @Query('commerceType') commerceType?: string,
   ) {
     const lat = deliveryLat != null ? Number(deliveryLat) : undefined;
     const lng = deliveryLng != null ? Number(deliveryLng) : undefined;
@@ -89,6 +90,7 @@ export class DeliveriesController {
       price != null && !Number.isNaN(price) ? price : undefined,
       distance != null && !Number.isNaN(distance) ? distance : undefined,
       deliveryCity?.trim() || undefined,
+      commerceType?.trim() || undefined,
     );
   }
 

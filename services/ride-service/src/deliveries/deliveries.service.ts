@@ -32,7 +32,7 @@ import {
 } from './parcel.util';
 import { assertDriverCanReceiveJobs, assertDriverEligibleForParcel, driverCanReceiveJobs, fetchDriverProfileSnapshot } from '../common/driver-eligibility.util';
 import { fetchDriverDebtStatus } from '../common/driver-debt.util';
-import { stubRestaurantCreateData } from '../restaurant/restaurant-profile.util';
+import { isCommerceType, stubRestaurantCreateData } from '../restaurant/restaurant-profile.util';
 import { TrackingService } from '../tracking/tracking.service';
 import { MatchingService } from '../matching/matching.service';
 import { CommissionService } from '../rides/commission.service';
@@ -987,6 +987,7 @@ export class DeliveriesService {
     maxPriceCdf?: number,
     maxDistanceKm?: number,
     deliveryCity?: string,
+    commerceType?: string,
   ) {
     const rows = await this.prisma.restaurant.findMany({
       where: {
@@ -994,11 +995,13 @@ export class DeliveriesService {
         isAcceptingOrders: true,
         kycStatus: PartnerKycStatus.APPROVED,
         ...(cuisine?.trim() ? { cuisine: { contains: cuisine.trim(), mode: 'insensitive' } } : {}),
+        ...(isCommerceType(commerceType) ? { commerceType } : {}),
       },
       orderBy: { rating: 'desc' },
       select: {
         id: true, name: true, cuisine: true, address: true, lat: true, lng: true,
         rating: true, imageUrl: true, menuItems: true, promotionLabel: true,
+        commerceType: true,
       },
     });
 
@@ -1539,8 +1542,20 @@ export class DeliveriesService {
   }
 
   async upsertRestaurant(id: string | null, data: Record<string, unknown>) {
-    if (id) return this.prisma.restaurant.update({ where: { id }, data: data as never });
-    return this.prisma.restaurant.create({ data: data as never });
+    const payload = { ...data };
+    if ('commerceType' in payload) {
+      if (payload.commerceType == null || payload.commerceType === '') {
+        delete payload.commerceType;
+      } else if (!isCommerceType(payload.commerceType)) {
+        throw new MovaHttpException(
+          MovaErrorCode.VALIDATION_ERROR,
+          undefined,
+          'commerceType invalide. Valeurs: RESTAURANT, SUPERMARKET, PHARMACY, BOUTIQUE.',
+        );
+      }
+    }
+    if (id) return this.prisma.restaurant.update({ where: { id }, data: payload as never });
+    return this.prisma.restaurant.create({ data: payload as never });
   }
 
   async getDeliveryAdmin(id: string) {

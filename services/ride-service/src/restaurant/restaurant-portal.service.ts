@@ -111,6 +111,7 @@ export class RestaurantPortalService {
       promotionLabel: restaurant.promotionLabel,
       menuItems: restaurant.menuItems ?? [],
       courierMode: restaurant.courierMode ?? 'PLATFORM',
+      commerceType: restaurant.commerceType ?? 'RESTAURANT',
       kycStatus: restaurant.kycStatus,
       canOperate: restaurant.kycStatus === 'APPROVED',
       needsProfileSetup: restaurantNeedsProfileSetup(restaurant),
@@ -399,6 +400,7 @@ export class RestaurantPortalService {
         name: restaurant.name,
         isAcceptingOrders: restaurant.isAcceptingOrders,
         prepTimeMin: restaurant.prepTimeMin,
+        commerceType: restaurant.commerceType ?? 'RESTAURANT',
       },
       kpis: {
         pendingOrders,

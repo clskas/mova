@@ -5,6 +5,24 @@ export const RESTAURANT_STUB_ADDRESS = 'Kinshasa — à compléter';
 export const RESTAURANT_STUB_LAT = -4.3105;
 export const RESTAURANT_STUB_LNG = 15.3032;
 
+export const COMMERCE_TYPES = ['RESTAURANT', 'SUPERMARKET', 'PHARMACY', 'BOUTIQUE'] as const;
+export type CommerceTypeValue = (typeof COMMERCE_TYPES)[number];
+
+export const COMMERCE_TYPE_LABELS_FR: Record<CommerceTypeValue, string> = {
+  RESTAURANT: 'Restaurant',
+  SUPERMARKET: 'Supermarché',
+  PHARMACY: 'Pharmacie',
+  BOUTIQUE: 'Boutique',
+};
+
+export function isCommerceType(value: unknown): value is CommerceTypeValue {
+  return typeof value === 'string' && (COMMERCE_TYPES as readonly string[]).includes(value);
+}
+
+export function parseCommerceType(value: unknown, fallback: CommerceTypeValue = 'RESTAURANT'): CommerceTypeValue {
+  return isCommerceType(value) ? value : fallback;
+}
+
 export function restaurantNeedsProfileSetup(restaurant: {
   name: string;
   cuisine: string;

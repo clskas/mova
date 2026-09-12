@@ -1,25 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
 import { LOGIN_AFTER_LOGOUT_HREF, logoutPartnerSession } from "@/lib/auth";
 import { disableGoogleAutoSelect } from "@/components/GoogleContinueButton";
 import { PUBLIC_API_BASE } from "@/lib/public-api-base";
 import { useRestaurantLiveConnected, useRestaurantLiveRegister } from "@/components/RestaurantLiveProvider";
 import { fetchDashboard } from "@/lib/api";
-
-const NAV = [
-  { href: "/dashboard", label: "Tableau de bord", short: "Accueil", icon: "📊", badgeKey: null as null | "pending" },
-  { href: "/", label: "Commandes", short: "Commandes", icon: "🧾", badgeKey: "pending" as const },
-  { href: "/menu", label: "Menu", short: "Menu", icon: "🍽️", badgeKey: null },
-  { href: "/dossier", label: "Mon dossier", short: "Dossier", icon: "📁", badgeKey: null },
-  { href: "/promos", label: "Codes promo", short: "Promos", icon: "🏷️", badgeKey: null },
-  { href: "/earnings", label: "Revenus", short: "Revenus", icon: "💰", badgeKey: null },
-  { href: "/compte", label: "Compte et connexion", short: "Compte", icon: "👤", badgeKey: null },
-  { href: "/settings", label: "Paramètres", short: "Réglages", icon: "⚙️", badgeKey: null },
-  { href: "/aide", label: "Aide / Manuel", short: "Aide", icon: "❓", badgeKey: null },
-];
+import {
+  COMMERCE_TYPE_LABELS_FR,
+  type CommerceType,
+  navItemsForCommerceType,
+} from "@/lib/commerce-type";
 
 function navActive(pathname: string, href: string) {
   return pathname === href || (href !== "/" && pathname.startsWith(href));
@@ -37,10 +30,20 @@ function PendingBadge({ count }: { count: number }) {
   );
 }
 
-export function PortalShell({ children, restaurantName }: { children: React.ReactNode; restaurantName?: string }) {
+export function PortalShell({
+  children,
+  restaurantName,
+  commerceType = "RESTAURANT",
+}: {
+  children: React.ReactNode;
+  restaurantName?: string;
+  commerceType?: CommerceType;
+}) {
   const pathname = usePathname();
   const liveConnected = useRestaurantLiveConnected();
   const [pendingCount, setPendingCount] = useState(0);
+  const nav = useMemo(() => navItemsForCommerceType(commerceType), [commerceType]);
+  const typeLabel = COMMERCE_TYPE_LABELS_FR[commerceType] ?? COMMERCE_TYPE_LABELS_FR.RESTAURANT;
 
   const refreshPending = useCallback(async () => {
     try {
@@ -68,17 +71,22 @@ export function PortalShell({ children, restaurantName }: { children: React.Reac
     <div className="min-h-screen flex flex-col overflow-x-clip">
       <header className="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-orange-100 pt-[env(safe-area-inset-top)]">
         <div className="px-3 sm:px-4 py-2 flex flex-col items-center gap-2">
-          <div data-brand>
-            <p className="text-[10px] sm:text-xs text-orange-600 font-medium uppercase tracking-wide">SENGA Partenaire</p>
-            <h1 className="font-semibold text-base sm:text-lg text-[#1A1A2E] truncate">{restaurantName ?? "Restaurant"}</h1>
-            {liveConnected && (
-              <span className="text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
-                En direct
+          <div data-brand className="flex flex-col items-center gap-1">
+            <p className="text-[10px] sm:text-xs text-orange-600 font-medium uppercase tracking-wide">SENGA Business</p>
+            <h1 className="font-semibold text-base sm:text-lg text-[#1A1A2E] truncate">{restaurantName ?? "Partenaire"}</h1>
+            <div className="flex flex-wrap items-center justify-center gap-1.5">
+              <span className="text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full bg-orange-100 text-orange-800">
+                {typeLabel}
               </span>
-            )}
+              {liveConnected && (
+                <span className="text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                  En direct
+                </span>
+              )}
+            </div>
           </div>
           <nav data-portal-nav className="senga-portal-nav" aria-label="Navigation">
-            {NAV.map((item) => {
+            {nav.map((item) => {
               const active = navActive(pathname, item.href);
               const showBadge = item.badgeKey === "pending" ? pendingCount : 0;
               return (

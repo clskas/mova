@@ -3,6 +3,8 @@ import {
   RESTAURANT_STUB_CUISINE,
   RESTAURANT_STUB_NAME,
   assertRestaurantProfileComplete,
+  isCommerceType,
+  parseCommerceType,
   restaurantNeedsProfileSetup,
 } from './restaurant-profile.util';
 
@@ -55,5 +57,12 @@ describe('restaurant-profile.util', () => {
         lng: 15.3,
       }),
     ).toThrow(/Complétez toutes les informations/);
+  });
+
+  it('parses commerceType values', () => {
+    expect(isCommerceType('PHARMACY')).toBe(true);
+    expect(isCommerceType('cafe')).toBe(false);
+    expect(parseCommerceType('SUPERMARKET')).toBe('SUPERMARKET');
+    expect(parseCommerceType('unknown')).toBe('RESTAURANT');
   });
 });

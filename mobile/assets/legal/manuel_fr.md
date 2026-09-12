@@ -1,6 +1,6 @@
 ﻿<!-- Source: docs/user-manual/passager.md - run scripts/sync-user-manual.ps1 after edits -->
 
-# Manuel utilisateur â€” Senga
+# Senga
 
 **Version :** 1.1 — Juillet 2026  
 **Marché :** République Démocratique du Congo (Kinshasa)
@@ -61,13 +61,15 @@ Les services **Wallet SENGA** et **Historique** sont en bas de la grille. Vous y
 7. Un chauffeur est assigné automatiquement environ **2 heures** avant l'heure prévue (ou manuellement par l'équipe SENGA).
 8. **Annulation tardive** (moins de 24 h avant le départ, chauffeur déjà confirmé) : des frais de **50 %** du tarif estimé peuvent être retenus sur votre portefeuille.
 
-## 5. Livraison repas
+## 5. Livraison commerces (repas & magasins)
 
-1. Appuyez sur **Livraison repas**.
-2. Choisissez un restaurant parmi la liste.
-3. Ajoutez des plats au panier.
-4. Indiquez l'adresse de livraison et commandez.
-5. Suivez la livraison en temps réel (position + trace du trajet).
+1. Appuyez sur **Livraisons**, puis **Livraison commerces** (ou l’entrée repas depuis l’accueil).
+2. Filtrez par type : **Tous**, **Restaurants**, **Supermarchés**, **Pharmacies**, **Boutiques**.
+3. Choisissez un magasin dans la liste (badge de type affiché sur chaque fiche).
+4. Parcourez le **menu** (restaurant) ou le **catalogue** (autres types) et ajoutez des articles au panier.
+5. Selon le magasin : choisissez une **taille** / des **options** ; confirmez l’âge ou l’**ordonnance** si demandé ; le stock épuisé empêche l’ajout.
+6. Indiquez l’adresse de livraison et commandez.
+7. Suivez la livraison en temps réel (position + trace du trajet).
 
 ## 6. Courses & commissions
 
@@ -131,11 +133,7 @@ Pendant une **course**, **livraison colis**, **repas**, **express** ou **course 
 
 La trace se construit au fur et à mesure du déplacement. En cas de faible réseau, la position peut être retardée ; la trace se complète à la reconnexion.
 
-## 15. Dette espèces (chauffeurs / livreurs)
-
-Après des courses payées en **espèces**, SENGA enregistre la commission due. Réglez la dette depuis **Revenus → Dette espèces**. Si le total dépasse le seuil fixé par SENGA, vous ne recevez plus de nouvelles offres tant que la dette n'est pas soldée.
-
-## 16. Aide et support
+## 15. Aide et support
 
 - **WhatsApp :** +243 900 000 000
 - **E-mail :** support@mova.cd

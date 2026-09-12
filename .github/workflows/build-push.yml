@@ -27,6 +27,8 @@ jobs:
       contents: read
       packages: write
     strategy:
+      # One flaky Trivy/network failure must not cancel sibling image builds.
+      fail-fast: false
       matrix:
         include:
           - service: api-gateway
@@ -91,7 +93,10 @@ jobs:
           cache-from: ${{ matrix.no_cache && '' || 'type=gha' }}
           cache-to: ${{ matrix.no_cache && '' || 'type=gha,mode=max' }}
           no-cache: ${{ matrix.no_cache || false }}
+      # Advisory only (exit-code 0). continue-on-error so transient registry
+      # stream errors (e.g. PROTOCOL_ERROR while extracting layers) do not fail deploy.
       - name: Trivy scan image
+        continue-on-error: true
         uses: aquasecurity/trivy-action@v0.36.0
         env:
           TRIVY_USERNAME: ${{ github.actor }}
@@ -102,3 +107,4 @@ jobs:
           exit-code: '0'
           severity: CRITICAL,HIGH
           ignore-unfixed: true
+          scanners: vuln

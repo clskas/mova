@@ -986,22 +986,29 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
   Widget _commerceTypeBadge(String? commerceType) {
     final type = CommerceTypes.normalize(commerceType);
     final color = CommerceTypes.badgeColor(type);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(CommerceTypes.icon(type), size: 12, color: color),
-          const SizedBox(width: 4),
-          Text(
-            CommerceTypes.labelFr(type),
-            style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w700),
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: Alignment.centerLeft,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(8),
           ),
-        ],
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(CommerceTypes.icon(type), size: 12, color: color),
+              const SizedBox(width: 4),
+              Text(
+                CommerceTypes.labelFr(type),
+                style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w700),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -1255,20 +1262,29 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
         const SizedBox(height: 8),
         Row(
           children: [
-            Text(
-              'Filtres livraison',
-              style: Theme.of(context).textTheme.titleSmall,
-            ),
-            if (_refreshing)
-              const Padding(
-                padding: EdgeInsets.only(left: 8),
-                child: SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
+            Expanded(
+              child: Row(
+                children: [
+                  Flexible(
+                    child: Text(
+                      'Filtres livraison',
+                      style: Theme.of(context).textTheme.titleSmall,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (_refreshing)
+                    const Padding(
+                      padding: EdgeInsets.only(left: 8),
+                      child: SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    ),
+                ],
               ),
-            const Spacer(),
+            ),
             if (_hasActiveRestaurantFilters)
               TextButton(
                 onPressed: _refreshing ? null : _resetRestaurantFilters,
@@ -1400,26 +1416,28 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
                         const SizedBox(height: 4),
                         _commerceTypeBadge(commerceType),
                         const SizedBox(height: 4),
-                        Wrap(
-                          spacing: 4,
-                          runSpacing: 4,
-                          crossAxisAlignment: WrapCrossAlignment.center,
+                        Row(
                           children: [
                             const Icon(Icons.star, color: Colors.amber, size: 14),
+                            const SizedBox(width: 4),
                             Text(
                               '${r['rating']}',
                               style: const TextStyle(fontSize: 13),
                             ),
+                            const SizedBox(width: 8),
                             const Icon(Icons.schedule, size: 14, color: MovaColors.textSecondary),
-                            Text(
-                              'Livraison ~${_deliveryEtaMin(r)} min',
-                              style: const TextStyle(
-                                color: MovaColors.violet,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                'Livraison ~${_deliveryEtaMin(r)} min',
+                                style: const TextStyle(
+                                  color: MovaColors.violet,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
                             ),
                           ],
                         ),

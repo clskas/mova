@@ -59,7 +59,7 @@ class DeliveryHubScreen extends StatelessWidget {
                       icon: MovaServiceIcon.food(color: MovaColors.green),
                       iconColor: MovaColors.green,
                       title: 'Livraison commerces',
-                      subtitle: 'Restaurants, supermarchés, pharmacies…',
+                      subtitle: 'Restaurants, supermarchés…',
                       onTap: () => _open(context, const FoodDeliveryScreen()),
                     ),
                     ServiceCard(

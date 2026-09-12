@@ -7,14 +7,14 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export const metadata: Metadata = {
-  title: "SENGA Restaurant",
-  description: "Portail partenaire — commandes repas SENGA RDC",
-  applicationName: "SENGA Restaurant",
+  title: "SENGA Business",
+  description: "Portail partenaire — restaurants, supermarchés, pharmacies et boutiques SENGA RDC",
+  applicationName: "SENGA Business",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "SENGA Resto",
+    title: "SENGA Business",
   },
   formatDetection: { telephone: false },
   icons: {

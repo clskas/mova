@@ -3,9 +3,9 @@ import type { MetadataRoute } from "next";
 export default function manifest(): MetadataRoute.Manifest {
   return {
     id: "/",
-    name: "SENGA Restaurant",
-    short_name: "SENGA Resto",
-    description: "Portail partenaire restaurant — commandes, menu et revenus SENGA RDC",
+    name: "SENGA Business",
+    short_name: "SENGA Biz",
+    description: "Portail partenaire SENGA Business — commandes, catalogue et revenus (RDC)",
     start_url: "/?source=pwa",
     scope: "/",
     display: "standalone",

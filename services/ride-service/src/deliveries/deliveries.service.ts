@@ -33,6 +33,13 @@ import {
 import { assertDriverCanReceiveJobs, assertDriverEligibleForParcel, driverCanReceiveJobs, fetchDriverProfileSnapshot } from '../common/driver-eligibility.util';
 import { fetchDriverDebtStatus } from '../common/driver-debt.util';
 import { isCommerceType, stubRestaurantCreateData } from '../restaurant/restaurant-profile.util';
+import {
+  assertOrderCatalogConstraints,
+  decrementMenuStock,
+  flattenMenuItems,
+  publicCatalogItems,
+  type MenuCatalogItem,
+} from '../restaurant/menu-catalog.util';
 import { TrackingService } from '../tracking/tracking.service';
 import { MatchingService } from '../matching/matching.service';
 import { CommissionService } from '../rides/commission.service';
@@ -54,9 +61,7 @@ import { ParcelWeightBandService } from '../platform/parcel-weight-band.service'
 
 type MenuSize = { label?: string; name?: string; priceCdf?: number; unitPriceCdf?: number };
 type MenuOption = { label?: string; name?: string; priceCdf?: number; unitPriceCdf?: number };
-type MenuItem = {
-  name?: string;
-  unitPriceCdf?: number;
+type MenuItem = MenuCatalogItem & {
   priceCdf?: number;
   sizes?: MenuSize[];
   options?: MenuOption[];
@@ -374,18 +379,62 @@ export class DeliveriesService {
   }
 
   private resolveFoodItemsSubtotalCdf(restaurantMenu: unknown, items: CreateFoodDeliveryDto['items']) {
-    const menu = (Array.isArray(restaurantMenu) ? restaurantMenu : []) as MenuItem[];
+    const menu = flattenMenuItems(restaurantMenu) as MenuItem[];
     let subtotal = 0;
     const normalized = items.map((it) => {
       const menuItem = menu.find((m) => (m.name ?? '').toString() === it.name);
       if (!menuItem) {
         throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, `Plat introuvable: ${it.name}`);
       }
+      if (menuItem.isAvailable === false) {
+        throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, `Produit indisponible: ${it.name}`);
+      }
       const unitPriceCdf = this.computeFoodItemUnitPriceCdf(menuItem, it.size, it.options);
       subtotal += unitPriceCdf * it.quantity;
-      return { ...it, unitPriceCdf };
+      return {
+        ...it,
+        unitPriceCdf,
+        ...(menuItem.requiresPrescription ? { requiresPrescription: true } : {}),
+        ...(menuItem.ageRestricted ? { ageRestricted: true } : {}),
+      };
     });
     return { subtotalCdf: subtotal, normalizedItems: normalized };
+  }
+
+  private assertFoodCatalogConstraints(restaurantMenu: unknown, items: CreateFoodDeliveryDto['items']) {
+    try {
+      assertOrderCatalogConstraints(
+        restaurantMenu,
+        items.map((it) => ({
+          name: it.name,
+          quantity: it.quantity,
+          prescriptionAcknowledged: it.prescriptionAcknowledged === true,
+        })),
+      );
+    } catch (err) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        undefined,
+        err instanceof Error ? err.message : 'Catalogue invalide pour cette commande.',
+      );
+    }
+  }
+
+  private async persistMenuStockDecrement(
+    restaurantId: string,
+    restaurantMenu: unknown,
+    items: CreateFoodDeliveryDto['items'],
+  ) {
+    const next = decrementMenuStock(
+      restaurantMenu,
+      items.map((it) => ({ name: it.name, quantity: it.quantity })),
+    );
+    await this.prisma.restaurant
+      .update({
+        where: { id: restaurantId },
+        data: { menuItems: next as unknown as Prisma.InputJsonValue },
+      })
+      .catch(() => undefined);
   }
 
   /** Frais et distance livraison repas — distance routière (inter-villes autorisée). */
@@ -452,6 +501,7 @@ export class DeliveriesService {
     if (!restaurant || !restaurant.isActive) throw new MovaHttpException(MovaErrorCode.RESTAURANT_NOT_FOUND, HttpStatus.NOT_FOUND);
     this.assertRestaurantCanOperate(restaurant);
     if (!dto.items.length) throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR);
+    this.assertFoodCatalogConstraints(restaurant.menuItems, dto.items);
     const { subtotalCdf, normalizedItems } = this.resolveFoodItemsSubtotalCdf(restaurant.menuItems, dto.items);
     const estimate = await this.estimateFood({ ...dto, items: normalizedItems });
     const promoApplied = await this.applyFoodPromo(subtotalCdf, estimate.deliveryFeeCdf, dto.promoCode, true, dto.restaurantId);
@@ -481,6 +531,7 @@ export class DeliveriesService {
       },
       include: { restaurant: true, events: true },
     });
+    await this.persistMenuStockDecrement(restaurant.id, restaurant.menuItems, normalizedItems);
     await this.prisma.deliveryEvent.create({
       data: {
         deliveryId: delivery.id,
@@ -573,6 +624,7 @@ export class DeliveriesService {
     // Normalize items and compute subtotal
     const normalizedOrders = dto.orders.map((o) => {
       const r = restaurants.find((x) => x.id === o.restaurantId)!;
+      this.assertFoodCatalogConstraints(r.menuItems, o.items as CreateFoodDeliveryDto['items']);
       const { subtotalCdf, normalizedItems } = this.resolveFoodItemsSubtotalCdf(r.menuItems, o.items as CreateFoodDeliveryDto['items']);
       return { restaurant: r, items: normalizedItems, subtotalCdf };
     });
@@ -608,6 +660,10 @@ export class DeliveriesService {
       },
       include: { events: true },
     });
+
+    await Promise.all(
+      normalizedOrders.map((o) => this.persistMenuStockDecrement(o.restaurant.id, o.restaurant.menuItems, o.items)),
+    );
 
     await this.prisma.deliveryEvent.create({
       data: {
@@ -844,11 +900,7 @@ export class DeliveriesService {
   }
 
   private publicMenuItems(raw: unknown) {
-    if (!Array.isArray(raw)) return [];
-    return raw.filter((entry) => {
-      if (!entry || typeof entry !== 'object') return false;
-      return (entry as { isAvailable?: boolean }).isAvailable !== false;
-    });
+    return publicCatalogItems(raw);
   }
 
   async getDelivery(id: string, userId: string) {
@@ -1026,10 +1078,10 @@ export class DeliveriesService {
         let deliveryEtaMin: number | null = null;
         let distanceKm: number | null = null;
         let minMenuPriceCdf = 0;
-        const menu = (r.menuItems as { unitPriceCdf?: number; priceCdf?: number }[] | null) ?? [];
+        const menu = flattenMenuItems(r.menuItems);
         if (menu.length > 0) {
           minMenuPriceCdf = menu.reduce((min, item) => {
-            const p = item.unitPriceCdf ?? item.priceCdf ?? 0;
+            const p = item.unitPriceCdf ?? 0;
             return min === 0 ? p : Math.min(min, p);
           }, 0);
         }

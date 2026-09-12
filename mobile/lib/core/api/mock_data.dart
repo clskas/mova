@@ -756,11 +756,23 @@ abstract final class MockData {
         {
           'id': 'rest-1',
           'name': 'Chez Mamou',
+          'commerceType': 'RESTAURANT',
           'cuisine': 'Congolais',
           'rating': 4.6,
           'deliveryMinCdf': 3500,
           'items': [
-            {'id': 'item-1', 'name': 'Poulet moambe', 'priceCdf': 8500},
+            {
+              'id': 'item-1',
+              'name': 'Poulet moambe',
+              'priceCdf': 8500,
+              'sizes': [
+                {'label': 'Normal', 'priceCdf': 8500},
+                {'label': 'Grande', 'priceCdf': 11000},
+              ],
+              'options': [
+                {'label': 'Extra piment', 'priceCdf': 500},
+              ],
+            },
             {'id': 'item-2', 'name': 'Fumbwa', 'priceCdf': 6000},
             {'id': 'item-3', 'name': 'Liboke poisson', 'priceCdf': 9500},
           ],
@@ -768,6 +780,7 @@ abstract final class MockData {
         {
           'id': 'rest-2',
           'name': 'Le Jardin',
+          'commerceType': 'RESTAURANT',
           'cuisine': 'Grillades',
           'rating': 4.4,
           'deliveryMinCdf': 4000,
@@ -779,17 +792,25 @@ abstract final class MockData {
         {
           'id': 'rest-3',
           'name': 'Snack Express',
+          'commerceType': 'RESTAURANT',
           'cuisine': 'Fast-food',
           'rating': 4.2,
           'deliveryMinCdf': 2500,
           'items': [
             {'id': 'item-6', 'name': 'Burger SENGA', 'priceCdf': 5500},
-            {'id': 'item-7', 'name': 'Frites + soda', 'priceCdf': 4500},
+            {
+              'id': 'item-7',
+              'name': 'Bière locale',
+              'priceCdf': 2500,
+              'ageRestricted': true,
+              'stockQty': 12,
+            },
           ],
         },
         {
           'id': 'rest-4',
           'name': 'Chez Flore',
+          'commerceType': 'RESTAURANT',
           'cuisine': 'Congolais',
           'rating': 4.6,
           'deliveryMinCdf': 3500,
@@ -801,12 +822,72 @@ abstract final class MockData {
         {
           'id': 'rest-5',
           'name': 'Limoncello',
+          'commerceType': 'RESTAURANT',
           'cuisine': 'Italien',
           'rating': 4.5,
           'deliveryMinCdf': 4000,
           'items': [
             {'id': 'item-10', 'name': 'Pizza Margherita', 'priceCdf': 18000},
             {'id': 'item-11', 'name': 'Pasta carbonara', 'priceCdf': 16000},
+          ],
+        },
+        {
+          'id': 'shop-1',
+          'name': 'Shoprite Gombe',
+          'commerceType': 'SUPERMARKET',
+          'cuisine': 'Épicerie',
+          'rating': 4.3,
+          'deliveryMinCdf': 3000,
+          'items': [
+            {'id': 'item-s1', 'name': 'Riz 5 kg', 'priceCdf': 18000, 'stockQty': 8},
+            {'id': 'item-s2', 'name': 'Huile 1 L', 'priceCdf': 6500, 'stockQty': 20},
+            {
+              'id': 'item-s3',
+              'name': 'Vin rouge',
+              'priceCdf': 15000,
+              'stockQty': 4,
+              'ageRestricted': true,
+            },
+          ],
+        },
+        {
+          'id': 'pharm-1',
+          'name': 'Pharmacie du Centre',
+          'commerceType': 'PHARMACY',
+          'cuisine': 'Santé',
+          'rating': 4.7,
+          'deliveryMinCdf': 2500,
+          'items': [
+            {'id': 'item-p1', 'name': 'Paracétamol 500 mg', 'priceCdf': 3500, 'stockQty': 40},
+            {
+              'id': 'item-p2',
+              'name': 'Antibiotique (ordonnance)',
+              'priceCdf': 12000,
+              'stockQty': 6,
+              'requiresPrescription': true,
+            },
+          ],
+        },
+        {
+          'id': 'bout-1',
+          'name': 'Mode Kin',
+          'commerceType': 'BOUTIQUE',
+          'cuisine': 'Mode',
+          'rating': 4.1,
+          'deliveryMinCdf': 3500,
+          'items': [
+            {
+              'id': 'item-b1',
+              'name': 'T-shirt uni',
+              'priceCdf': 15000,
+              'stockQty': 5,
+              'sizes': [
+                {'label': 'M', 'priceCdf': 15000},
+                {'label': 'L', 'priceCdf': 15000},
+                {'label': 'XL', 'priceCdf': 16000},
+              ],
+            },
+            {'id': 'item-b2', 'name': 'Casquette', 'priceCdf': 8000, 'stockQty': 2},
           ],
         },
       ];

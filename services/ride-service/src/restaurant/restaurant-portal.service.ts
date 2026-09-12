@@ -21,7 +21,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { formatParcelDelivery } from '../deliveries/parcel.util';
 import { DeliveriesService } from '../deliveries/deliveries.service';
 import { UploadsService } from '../uploads/uploads.service';
-import { MenuItemDto, UpdateRestaurantLocationDto, UpdateRestaurantMenuDto } from './restaurant-portal.dto';
+import { UpdateRestaurantLocationDto, UpdateRestaurantMenuDto } from './restaurant-portal.dto';
 import {
   assertRestaurantProfileComplete,
   restaurantNeedsProfileSetup,
@@ -31,14 +31,7 @@ import { refundEscrow } from '../common/escrow.util';
 import { PartnerBillingService } from '../billing/partner-billing.service';
 import { computeRestaurantPartnerDisplay } from '../billing/partner-display.util';
 import { fetchAuthUserBrief } from '../common/internal-lookup.util';
-
-type StoredMenuItem = {
-  name: string;
-  unitPriceCdf: number;
-  imageUrl?: string;
-  description?: string;
-  isAvailable?: boolean;
-};
+import { normalizeMenuCatalogInput, parseMenuCatalog } from './menu-catalog.util';
 
 @Injectable()
 export class RestaurantPortalService {
@@ -444,58 +437,19 @@ export class RestaurantPortalService {
 
   async getMenu(ownerUserId: string) {
     const restaurant = await this.getRestaurantForOwner(ownerUserId);
-    const items = this.parseMenuItems(restaurant.menuItems);
-    return { restaurantId: restaurant.id, menuItems: items };
+    const catalog = parseMenuCatalog(restaurant.menuItems);
+    return {
+      restaurantId: restaurant.id,
+      categories: catalog.categories,
+      menuItems: catalog.items,
+      catalog,
+    };
   }
 
   async uploadMenuPhoto(ownerUserId: string, imageBase64: string, mimeType?: string) {
     const restaurant = await this.getRestaurantForOwner(ownerUserId);
     this.assertRestaurantKycApproved(restaurant);
     return this.uploads.uploadMenuPhoto(imageBase64, mimeType);
-  }
-
-  private parseMenuItems(raw: unknown): StoredMenuItem[] {
-    if (!Array.isArray(raw)) return [];
-    return raw
-      .map((entry) => {
-        if (!entry || typeof entry !== 'object') return null;
-        const row = entry as Record<string, unknown>;
-        const name = String(row.name ?? '').trim();
-        const price = Number(row.unitPriceCdf ?? row.priceCdf ?? 0);
-        if (!name || !Number.isFinite(price) || price <= 0) return null;
-        const item: StoredMenuItem = {
-          name,
-          unitPriceCdf: Math.round(price),
-          isAvailable: row.isAvailable !== false,
-        };
-        if (row.imageUrl) item.imageUrl = String(row.imageUrl);
-        if (row.description) item.description = String(row.description);
-        return item;
-      })
-      .filter((x): x is StoredMenuItem => x !== null);
-  }
-
-  private normalizeMenuItems(items: MenuItemDto[]): StoredMenuItem[] {
-    const seen = new Set<string>();
-    const normalized: StoredMenuItem[] = [];
-    for (const item of items) {
-      const name = item.name.trim();
-      if (!name) continue;
-      const key = name.toLowerCase();
-      if (seen.has(key)) continue;
-      seen.add(key);
-      normalized.push({
-        name,
-        unitPriceCdf: Math.round(item.unitPriceCdf),
-        ...(item.imageUrl?.trim() ? { imageUrl: item.imageUrl.trim() } : {}),
-        ...(item.description?.trim() ? { description: item.description.trim() } : {}),
-        isAvailable: item.isAvailable !== false,
-      });
-    }
-    if (!normalized.length) {
-      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Ajoutez au moins un plat au menu.');
-    }
-    return normalized;
   }
 
   async updateLocation(ownerUserId: string, dto: UpdateRestaurantLocationDto) {
@@ -553,26 +507,46 @@ export class RestaurantPortalService {
     const restaurant = await this.getRestaurantForOwner(ownerUserId);
     if (
       dto.menuItems != null ||
+      dto.categories != null ||
       dto.isAcceptingOrders === true ||
       dto.promotionLabel !== undefined ||
       dto.prepTimeMin !== undefined
     ) {
       this.assertRestaurantKycApproved(restaurant);
     }
-    const menuItems =
-      dto.menuItems != null ? this.normalizeMenuItems(dto.menuItems) : undefined;
+    let menuItems: Prisma.InputJsonValue | undefined;
+    let catalog = parseMenuCatalog(restaurant.menuItems);
+    if (dto.menuItems != null || dto.categories != null) {
+      try {
+        const normalized = normalizeMenuCatalogInput({
+          menuItems: dto.menuItems,
+          categories: dto.categories,
+        });
+        menuItems = normalized.stored as unknown as Prisma.InputJsonValue;
+        catalog = { categories: normalized.categories, items: normalized.items };
+      } catch (err) {
+        throw new MovaHttpException(
+          MovaErrorCode.VALIDATION_ERROR,
+          undefined,
+          err instanceof Error ? err.message : 'Catalogue invalide.',
+        );
+      }
+    }
     const updated = await this.prisma.restaurant.update({
       where: { id: restaurant.id },
       data: {
-        ...(menuItems != null ? { menuItems: menuItems as unknown as Prisma.InputJsonValue } : {}),
+        ...(menuItems != null ? { menuItems } : {}),
         ...(dto.promotionLabel !== undefined ? { promotionLabel: dto.promotionLabel } : {}),
         ...(dto.isAcceptingOrders !== undefined ? { isAcceptingOrders: dto.isAcceptingOrders } : {}),
         ...(dto.prepTimeMin !== undefined ? { prepTimeMin: dto.prepTimeMin } : {}),
       },
     });
+    const saved = menuItems != null ? catalog : parseMenuCatalog(updated.menuItems);
     return {
       id: updated.id,
-      menuItems: updated.menuItems ?? [],
+      categories: saved.categories,
+      menuItems: saved.items,
+      catalog: saved,
       promotionLabel: updated.promotionLabel,
       isAcceptingOrders: updated.isAcceptingOrders,
       prepTimeMin: updated.prepTimeMin,

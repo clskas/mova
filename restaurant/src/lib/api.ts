@@ -153,7 +153,13 @@ export function fetchOrders(params?: {
 }
 
 export type RestaurantDashboard = {
-  restaurant: { id: string; name: string; isAcceptingOrders?: boolean; prepTimeMin?: number };
+  restaurant: {
+    id: string;
+    name: string;
+    isAcceptingOrders?: boolean;
+    prepTimeMin?: number;
+    commerceType?: "RESTAURANT" | "SUPERMARKET" | "PHARMACY" | "BOUTIQUE";
+  };
   kpis: {
     pendingOrders: number;
     activeOrders: number;

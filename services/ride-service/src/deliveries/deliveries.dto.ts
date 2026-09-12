@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsArray, IsEnum, IsNumber, IsOptional, IsString, IsUUID, Max, Min, ValidateNested } from 'class-validator';
+import { IsArray, IsBoolean, IsEnum, IsNumber, IsOptional, IsString, IsUUID, Max, Min, ValidateNested } from 'class-validator';
 import { DeliveryStatus, WeightCategory } from '@prisma/client';
 
 export class CreateParcelDeliveryDto {
@@ -37,6 +37,11 @@ export class FoodOrderItemDto {
   @ApiProperty() @IsNumber() @Min(0) unitPriceCdf: number;
   @ApiProperty({ required: false }) @IsOptional() @IsString() size?: string;
   @ApiProperty({ required: false, type: [String] }) @IsOptional() @IsArray() @IsString({ each: true }) options?: string[];
+  /** Required true when the catalog item has requiresPrescription. */
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  prescriptionAcknowledged?: boolean;
 }
 
 export class FoodRestaurantOrderDto {

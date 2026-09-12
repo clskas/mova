@@ -7,11 +7,18 @@ describe('RestaurantPortalService', () => {
     id: 'resto-1',
     ownerUserId: 'owner-1',
     name: 'Chez Test',
+    cuisine: 'Congolaise',
+    address: 'Gombe',
+    lat: -4.31,
+    lng: 15.3,
+    rating: 4.5,
     kycStatus: PartnerKycStatus.PENDING,
     menuItems: [],
     isAcceptingOrders: false,
     promotionLabel: null,
     prepTimeMin: 20,
+    courierMode: 'PLATFORM',
+    commerceType: 'PHARMACY',
   };
 
   const prisma = {
@@ -72,11 +79,48 @@ describe('RestaurantPortalService', () => {
       menuItems: [{ name: 'Poulet', unitPriceCdf: 8000 }],
     });
     expect(prisma.restaurant.update).toHaveBeenCalled();
-    expect(result.menuItems).toEqual([{ name: 'Poulet', unitPriceCdf: 8000 }]);
+    expect(result.menuItems).toEqual(
+      expect.arrayContaining([expect.objectContaining({ name: 'Poulet', unitPriceCdf: 8000 })]),
+    );
+  });
+
+  it('conserve tailles, options et stock à la publication', async () => {
+    deliveries.ensureRestaurantForOwner.mockResolvedValue({
+      ...restaurant,
+      kycStatus: PartnerKycStatus.APPROVED,
+    });
+    prisma.restaurant.update.mockImplementation(async ({ data }: { data: { menuItems: unknown } }) => ({
+      ...restaurant,
+      kycStatus: PartnerKycStatus.APPROVED,
+      menuItems: data.menuItems,
+    }));
+    const result = await service.updateMenu('owner-1', {
+      menuItems: [
+        {
+          name: 'Burger',
+          unitPriceCdf: 10000,
+          stockQty: 4,
+          sizes: [{ label: 'XL', priceCdf: 12000 }],
+          options: [{ label: 'Bacon', priceCdf: 1500 }],
+          requiresPrescription: false,
+        },
+      ],
+    });
+    expect(result.menuItems[0]).toMatchObject({
+      name: 'Burger',
+      stockQty: 4,
+      sizes: [{ label: 'XL', priceCdf: 12000 }],
+      options: [{ label: 'Bacon', priceCdf: 1500 }],
+    });
   });
 
   it('refuse l\'upload photo menu sans KYC validé', async () => {
     await expect(service.uploadMenuPhoto('owner-1', 'base64')).rejects.toThrow(/validé avant de publier le menu/);
     expect(uploads.uploadMenuPhoto).not.toHaveBeenCalled();
+  });
+
+  it('expose commerceType sur le profil partenaire', async () => {
+    const profile = await service.getProfile('owner-1');
+    expect(profile.commerceType).toBe('PHARMACY');
   });
 });

@@ -1,4 +1,4 @@
-# Seed compte restaurant demo + lien Chez Flore
+# Seed compte restaurant demo + lien Chez Flore + magasins SENGA Business
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 $compose = "$root\docker-compose.yml"
@@ -17,7 +17,11 @@ SELECT id, name, "ownerUserId" FROM restaurants WHERE name = 'Chez Flore';
 "@
 $linkSql | docker compose -f $compose exec -T postgres psql -U mova -d mova_rides
 
+Write-Host "=== Magasins SENGA Business (SUPERMARKET / PHARMACY / BOUTIQUE) ===" -ForegroundColor Cyan
+Get-Content "$root\scripts\sql\seed-senga-business-stores.sql" | docker compose -f $compose exec -T postgres psql -U mova -d mova_rides
+
 Write-Host "=== Rebuild ride-service (API portail) ===" -ForegroundColor Cyan
 docker compose -f $compose up -d --build ride-service api-gateway notification-service
 
 Write-Host "Done. Portail: cd restaurant && npm install && npm run dev -> http://localhost:3007" -ForegroundColor Green
+Write-Host "Demo stores: Chez Flore (RESTAURANT), Supermarché Gombe, Pharmacie Victoire, Boutique Matonge" -ForegroundColor Green

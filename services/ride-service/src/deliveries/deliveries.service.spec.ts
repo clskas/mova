@@ -354,6 +354,72 @@ describe('DeliveriesService', () => {
     expect(byDistanceWide.data).toHaveLength(2);
   });
 
+  it('filtre restaurants par commerceType et renvoie le champ', async () => {
+    prisma.restaurant.findMany.mockImplementation(
+      ({ where }: { where?: { commerceType?: string } }) => {
+        const rows = [
+          {
+            id: 'r1',
+            name: 'Chez Flore',
+            cuisine: 'Congolais',
+            address: 'Gombe',
+            lat: -4.3105,
+            lng: 15.3032,
+            rating: 4.6,
+            imageUrl: null,
+            menuItems: [],
+            commerceType: 'RESTAURANT',
+          },
+          {
+            id: 'r2',
+            name: 'Pharma Plus',
+            cuisine: 'Santé',
+            address: 'Gombe',
+            lat: -4.312,
+            lng: 15.305,
+            rating: 4.4,
+            imageUrl: null,
+            menuItems: [],
+            commerceType: 'PHARMACY',
+          },
+        ];
+        const filtered = where?.commerceType
+          ? rows.filter((r) => r.commerceType === where.commerceType)
+          : rows;
+        return Promise.resolve(filtered);
+      },
+    );
+
+    const pharmacies = await service.listRestaurants(
+      -4.3217,
+      15.3125,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      'PHARMACY',
+    );
+    expect(pharmacies.data).toHaveLength(1);
+    expect(pharmacies.data[0]).toMatchObject({ name: 'Pharma Plus', commerceType: 'PHARMACY' });
+
+    await service.listRestaurants(
+      -4.3217,
+      15.3125,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      'not-a-type',
+    );
+    expect(prisma.restaurant.findMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        where: expect.not.objectContaining({ commerceType: expect.anything() }),
+      }),
+    );
+  });
+
   it('createParcel garanti : pas d\'alerte livreur avant séquestre', async () => {
     prisma.delivery.create.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({
       ...data,

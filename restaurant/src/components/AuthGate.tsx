@@ -120,7 +120,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
         <div className="fixed inset-0 z-[10040] bg-gradient-to-br from-orange-50 to-violet-50 overflow-y-auto">
           <div className="min-h-[100dvh] flex items-start justify-center p-6 pt-10 pb-16">
             <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-6 sm:p-8">
-              <p className="text-center text-sm text-gray-500 mb-4">SENGA Restaurant</p>
+              <p className="text-center text-sm text-gray-500 mb-4">SENGA Business</p>
               <RestaurantOnboardingCard
                 onComplete={() => {
                   setNeedsProfileSetup(false);
@@ -136,7 +136,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
         <div className="fixed inset-0 z-[10050] bg-gradient-to-br from-orange-50 to-violet-50 overflow-y-auto">
           <div className="min-h-[100dvh] flex items-start justify-center p-6 pt-10 pb-16">
             <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-6 sm:p-8">
-              <p className="text-center text-sm text-gray-500 mb-4">SENGA Restaurant</p>
+              <p className="text-center text-sm text-gray-500 mb-4">SENGA Business</p>
               <ActivationPinCard
                 apiBase={PUBLIC_API_BASE}
                 intent={RESTAURANT_AUTH_INTENT}

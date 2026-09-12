@@ -19,6 +19,7 @@ import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import '../../core/widgets/service_area_selector.dart';
 import '../booking/payment_screen.dart';
+import 'commerce_type.dart';
 import 'food_tracking_screen.dart';
 
 class FoodDeliveryScreen extends ConsumerStatefulWidget {
@@ -44,6 +45,8 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
   final _addressController = TextEditingController(text: 'Ma position');
   final _promoController = TextEditingController();
   String _filterCuisine = '';
+  /// `null` = Tous ; otherwise a [CommerceTypes] value.
+  String? _filterCommerceType;
   double _filterMaxEta = 0; // 0 = pas de filtre
   double _filterMaxPrice = 0;
   double _filterMaxDistance = 0;
@@ -386,11 +389,129 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
     _estimatedTotal = null;
   }
 
+  int? _itemStockQty(Map<String, dynamic> item) {
+    final raw = item['stockQty'];
+    if (raw == null) return null;
+    if (raw is num) return raw.toInt();
+    return int.tryParse(raw.toString());
+  }
+
+  bool _itemAgeRestricted(Map<String, dynamic> item) =>
+      item['ageRestricted'] == true || item['ageRestricted']?.toString() == 'true';
+
+  bool _itemRequiresPrescription(Map<String, dynamic> item) =>
+      item['requiresPrescription'] == true ||
+      item['requiresPrescription']?.toString() == 'true';
+
+  bool _canAddMoreToCart(Map<String, dynamic> item, String restaurantId) {
+    final stockQty = _itemStockQty(item);
+    if (stockQty == null) return true;
+    return _itemQtyInCart(restaurantId, _itemKey(item)) < stockQty;
+  }
+
+  void _showStockBlockedMessage(Map<String, dynamic> item) {
+    final stockQty = _itemStockQty(item) ?? 0;
+    final message = stockQty <= 0
+        ? 'Article en rupture de stock.'
+        : 'Stock insuffisant ($stockQty disponible${stockQty > 1 ? 's' : ''}).';
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<bool> _confirmAgeRestricted() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Produit réservé aux adultes'),
+        content: const Text(
+          'Ce produit est réservé aux personnes de 18 ans et plus. '
+          'Confirmez-vous avoir au moins 18 ans ?',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
+          ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Oui, j\'ai 18+')),
+        ],
+      ),
+    );
+    return ok == true;
+  }
+
+  Future<bool> _confirmPrescriptionRequired() async {
+    var acknowledged = false;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            return AlertDialog(
+              title: const Text('Ordonnance requise'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Ce produit nécessite une ordonnance valide. '
+                    'Vous devrez la présenter au magasin ou au livreur.',
+                  ),
+                  const SizedBox(height: 12),
+                  CheckboxListTile(
+                    contentPadding: EdgeInsets.zero,
+                    value: acknowledged,
+                    onChanged: (v) => setDialogState(() => acknowledged = v == true),
+                    title: const Text(
+                      'Je confirme disposer d\'une ordonnance valide',
+                      style: TextStyle(fontSize: 14),
+                    ),
+                    controlAffinity: ListTileControlAffinity.leading,
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
+                ElevatedButton(
+                  onPressed: acknowledged ? () => Navigator.pop(ctx, true) : null,
+                  child: const Text('Continuer'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+    return ok == true;
+  }
+
+  Future<bool> _ensureComplianceBeforeAdd(Map<String, dynamic> item) async {
+    if (_itemAgeRestricted(item)) {
+      final ageOk = await _confirmAgeRestricted();
+      if (!ageOk) return false;
+    }
+    if (_itemRequiresPrescription(item)) {
+      final rxOk = await _confirmPrescriptionRequired();
+      if (!rxOk) return false;
+    }
+    return true;
+  }
+
+  void _bumpCartKey(String key) {
+    _cart[key] = (_cart[key] ?? 0) + 1;
+    _estimatedTotal = null;
+    _estimatedDeliveryFee = null;
+    _estimatedDiscount = null;
+  }
+
   Future<void> _promptAndAddToCart(Map<String, dynamic> item, String restaurantId) async {
     final name = _itemKey(item);
+    if (!_canAddMoreToCart(item, restaurantId)) {
+      if (mounted) _showStockBlockedMessage(item);
+      return;
+    }
+    if (!await _ensureComplianceBeforeAdd(item)) return;
+    if (!mounted) return;
+
     final baseKey = _cartKey(restaurantId, name);
     final sizes = (item['sizes'] as List?)?.cast<Map<String, dynamic>>();
     final options = (item['options'] as List?)?.cast<Map<String, dynamic>>();
+    final stockQty = _itemStockQty(item);
 
     if ((sizes != null && sizes.isNotEmpty) || (options != null && options.isNotEmpty)) {
       String? selectedSize;
@@ -414,6 +535,16 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      if (stockQty != null) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          stockQty <= 0 ? 'Rupture de stock' : 'Stock : $stockQty',
+                          style: TextStyle(
+                            color: stockQty <= 0 ? Colors.red.shade700 : MovaColors.textSecondary,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 12),
                       if (sizes != null && sizes.isNotEmpty) ...[
                         const Text('Taille', style: TextStyle(fontWeight: FontWeight.w600)),
@@ -465,35 +596,38 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
         },
       );
       if (ok == true && mounted) {
+        if (!_canAddMoreToCart(item, restaurantId)) {
+          _showStockBlockedMessage(item);
+          return;
+        }
         setState(() {
           final key = _cartKey(restaurantId, name, size: selectedSize, options: selectedOptions.toList());
-          _cart[key] = (_cart[key] ?? 0) + 1;
-          _estimatedTotal = null;
-      _estimatedDeliveryFee = null;
-      _estimatedDiscount = null;
+          _bumpCartKey(key);
         });
       }
     } else {
-      setState(() {
-        _cart[baseKey] = (_cart[baseKey] ?? 0) + 1;
-        _estimatedTotal = null;
-      _estimatedDeliveryFee = null;
-      _estimatedDiscount = null;
-      });
+      setState(() => _bumpCartKey(baseKey));
     }
   }
 
   Future<void> _showMealDetailModal(
     Map<String, dynamic> item,
     String restaurantId,
-    String restaurantName,
-  ) async {
+    String restaurantName, {
+    String? commerceType,
+  }) async {
     final name = _itemKey(item);
     final imageUrl = _itemImageUrl(item);
     final price = _itemPrice(item);
     final description = item['description']?.toString().trim() ?? '';
     final sizes = (item['sizes'] as List?)?.cast<Map<String, dynamic>>();
     final options = (item['options'] as List?)?.cast<Map<String, dynamic>>();
+    final stockQty = _itemStockQty(item);
+    final ageRestricted = _itemAgeRestricted(item);
+    final requiresPrescription = _itemRequiresPrescription(item);
+    final showSizesOptions = CommerceTypes.normalize(commerceType) == CommerceTypes.restaurant ||
+        (sizes != null && sizes.isNotEmpty) ||
+        (options != null && options.isNotEmpty);
 
     await showModalBottomSheet<void>(
       context: context,
@@ -503,6 +637,7 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
         return StatefulBuilder(
           builder: (ctx, setModalState) {
             final qty = _itemQtyInCart(restaurantId, name);
+            final canAdd = _canAddMoreToCart(item, restaurantId);
             return DraggableScrollableSheet(
               initialChildSize: 0.72,
               minChildSize: 0.45,
@@ -539,12 +674,12 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
                                   fit: BoxFit.cover,
                                   errorBuilder: (_, __, ___) => SizedBox(
                                     height: 160,
-                                    child: _restaurantPlaceholder(),
+                                    child: _storePlaceholder(commerceType),
                                   ),
                                 ),
                               )
                             else
-                              SizedBox(height: 160, child: _restaurantPlaceholder()),
+                              SizedBox(height: 160, child: _storePlaceholder(commerceType)),
                             const SizedBox(height: 16),
                             Text(
                               name,
@@ -564,6 +699,34 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
+                            if (stockQty != null) ...[
+                              const SizedBox(height: 10),
+                              Text(
+                                stockQty <= 0 ? 'Rupture de stock' : 'En stock : $stockQty',
+                                style: TextStyle(
+                                  color: stockQty <= 0 ? Colors.red.shade700 : MovaColors.textSecondary,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
+                            if (ageRestricted || requiresPrescription) ...[
+                              const SizedBox(height: 12),
+                              if (ageRestricted)
+                                _productWarningTile(
+                                  icon: Icons.warning_amber_rounded,
+                                  color: MovaColors.orange,
+                                  text: 'Réservé aux personnes de 18 ans et plus',
+                                ),
+                              if (requiresPrescription) ...[
+                                if (ageRestricted) const SizedBox(height: 8),
+                                _productWarningTile(
+                                  icon: Icons.medication_outlined,
+                                  color: const Color(0xFF0D9488),
+                                  text: 'Ordonnance médicale requise',
+                                ),
+                              ],
+                            ],
                             if (description.isNotEmpty) ...[
                               const SizedBox(height: 16),
                               const Text(
@@ -580,7 +743,7 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
                                 ),
                               ),
                             ],
-                            if (sizes != null && sizes.isNotEmpty) ...[
+                            if (showSizesOptions && sizes != null && sizes.isNotEmpty) ...[
                               const SizedBox(height: 16),
                               const Text('Tailles disponibles', style: TextStyle(fontWeight: FontWeight.w600)),
                               const SizedBox(height: 8),
@@ -593,7 +756,7 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
                                 }).toList(),
                               ),
                             ],
-                            if (options != null && options.isNotEmpty) ...[
+                            if (showSizesOptions && options != null && options.isNotEmpty) ...[
                               const SizedBox(height: 16),
                               const Text('Options', style: TextStyle(fontWeight: FontWeight.w600)),
                               const SizedBox(height: 8),
@@ -643,10 +806,12 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
                                     ),
                                     IconButton(
                                       icon: const Icon(Icons.add),
-                                      onPressed: () async {
-                                        await _promptAndAddToCart(item, restaurantId);
-                                        if (ctx.mounted) setModalState(() {});
-                                      },
+                                      onPressed: canAdd
+                                          ? () async {
+                                              await _promptAndAddToCart(item, restaurantId);
+                                              if (ctx.mounted) setModalState(() {});
+                                            }
+                                          : null,
                                     ),
                                   ],
                                 ),
@@ -662,11 +827,17 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
                                       borderRadius: BorderRadius.circular(12),
                                     ),
                                   ),
-                                  onPressed: () async {
-                                    await _promptAndAddToCart(item, restaurantId);
-                                    if (ctx.mounted) Navigator.pop(ctx);
-                                  },
-                                  child: Text(qty > 0 ? 'Ajouter encore' : 'Ajouter au panier'),
+                                  onPressed: canAdd
+                                      ? () async {
+                                          await _promptAndAddToCart(item, restaurantId);
+                                          if (ctx.mounted) Navigator.pop(ctx);
+                                        }
+                                      : null,
+                                  child: Text(
+                                    !canAdd
+                                        ? 'Stock insuffisant'
+                                        : (qty > 0 ? 'Ajouter encore' : 'Ajouter au panier'),
+                                  ),
                                 ),
                               ),
                             ],
@@ -684,8 +855,37 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
     );
   }
 
+  Widget _productWarningTile({
+    required IconData icon,
+    required Color color,
+    required String text,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: color),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(color: color, fontWeight: FontWeight.w600, fontSize: 13),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   bool get _hasActiveRestaurantFilters =>
       _filterCuisine.trim().isNotEmpty ||
+      _filterCommerceType != null ||
       _filterMaxEta > 0 ||
       _filterMaxPrice > 0 ||
       _filterMaxDistance > 0;
@@ -693,6 +893,7 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
   Future<void> _resetRestaurantFilters() async {
     setState(() {
       _filterCuisine = '';
+      _filterCommerceType = null;
       _filterMaxEta = 0;
       _filterMaxPrice = 0;
       _filterMaxDistance = 0;
@@ -716,6 +917,7 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
       'deliveryLng': '$_deliveryLng',
       'deliveryCity': _deliveryCityName,
       if (_filterCuisine.trim().isNotEmpty) 'cuisine': _filterCuisine.trim(),
+      if (_filterCommerceType != null) 'commerceType': _filterCommerceType!,
       if (_filterMaxEta > 0) 'maxEtaMin': _filterMaxEta.round().toString(),
       if (_filterMaxPrice > 0) 'maxPriceCdf': _filterMaxPrice.round().toString(),
       if (_filterMaxDistance > 0) 'maxDistanceKm': _filterMaxDistance.toStringAsFixed(1),
@@ -728,7 +930,14 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
       _refreshing = false;
       switch (result) {
         case Success(:final data):
-          _restaurants = _parseRestaurants(data);
+          var parsed = _parseRestaurants(data);
+          // Client-side fallback until / if API filters by commerceType.
+          if (_filterCommerceType != null) {
+            parsed = parsed
+                .where((r) => CommerceTypes.normalize(r['commerceType']) == _filterCommerceType)
+                .toList();
+          }
+          _restaurants = parsed;
           _applyInitialReorder();
         case Failure(:final error):
           _error = error.message;
@@ -763,12 +972,37 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
     return GeoUtils.driverEtaMinutes(lat, lng, _deliveryLat, _deliveryLng) + 15;
   }
 
-  Widget _restaurantPlaceholder() {
+  Widget _storePlaceholder([String? commerceType]) {
+    final type = CommerceTypes.normalize(commerceType);
+    final color = CommerceTypes.badgeColor(type);
     return Container(
       width: 72,
       height: 72,
-      color: MovaColors.green.withValues(alpha: 0.12),
-      child: const Icon(Icons.restaurant, color: MovaColors.green),
+      color: color.withValues(alpha: 0.12),
+      child: Icon(CommerceTypes.icon(type), color: color),
+    );
+  }
+
+  Widget _commerceTypeBadge(String? commerceType) {
+    final type = CommerceTypes.normalize(commerceType);
+    final color = CommerceTypes.badgeColor(type);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(CommerceTypes.icon(type), size: 12, color: color),
+          const SizedBox(width: 4),
+          Text(
+            CommerceTypes.labelFr(type),
+            style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w700),
+          ),
+        ],
+      ),
     );
   }
 
@@ -842,7 +1076,7 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
 
   Future<void> _estimateOrder() async {
     if (_cart.isEmpty) {
-      setState(() => _validationError = 'Ajoutez au moins un plat au panier.');
+      setState(() => _validationError = 'Ajoutez au moins un article au panier.');
       return;
     }
     if (_addressController.text.trim().isEmpty) {
@@ -878,7 +1112,7 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
 
   Future<void> _order() async {
     if (_cart.isEmpty) {
-      setState(() => _validationError = 'Ajoutez au moins un plat au panier.');
+      setState(() => _validationError = 'Ajoutez au moins un article au panier.');
       return;
     }
     if (_addressController.text.trim().isEmpty) {
@@ -930,7 +1164,9 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
             MaterialPageRoute(
               builder: (_) => FoodTrackingScreen(
                 orderId: deliveryId,
-                restaurantName: isMulti ? 'Multi-restaurants' : (_selectedRestaurant!['name']?.toString() ?? ''),
+                restaurantName: isMulti
+                    ? 'Multi-magasins'
+                    : (_selectedRestaurant!['name']?.toString() ?? ''),
                 totalCdf: total,
                 deliveryAddress: _addressController.text.trim(),
               ),
@@ -944,13 +1180,21 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
 
   Widget _buildRestaurantList() {
     final query = _searchQuery.trim().toLowerCase();
-    final filtered = query.isEmpty
-        ? _restaurants
-        : _restaurants.where((r) {
-            final name = r['name']?.toString().toLowerCase() ?? '';
-            final cuisine = r['cuisine']?.toString().toLowerCase() ?? '';
-            return name.contains(query) || cuisine.contains(query);
-          }).toList();
+    final storesNoun = CommerceTypes.storesNoun(filterType: _filterCommerceType);
+    final filtered = _restaurants.where((r) {
+      if (_filterCommerceType != null &&
+          CommerceTypes.normalize(r['commerceType']) != _filterCommerceType) {
+        return false;
+      }
+      if (query.isEmpty) return true;
+      final name = r['name']?.toString().toLowerCase() ?? '';
+      final cuisine = r['cuisine']?.toString().toLowerCase() ?? '';
+      final typeLabel = CommerceTypes.labelFr(r['commerceType']).toLowerCase();
+      return name.contains(query) || cuisine.contains(query) || typeLabel.contains(query);
+    }).toList();
+
+    final showCuisineFilter = _filterCommerceType == null ||
+        _filterCommerceType == CommerceTypes.restaurant;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -961,7 +1205,7 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
         ),
         const SizedBox(height: 6),
         Text(
-          'Restaurants à $_deliveryCityName',
+          '${storesNoun[0].toUpperCase()}${storesNoun.substring(1)} à $_deliveryCityName',
           style: const TextStyle(
             color: MovaColors.textSecondary,
             fontSize: 13,
@@ -972,12 +1216,41 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
         _buildDeliveryAddressField(),
         const SizedBox(height: 12),
         TextField(
-          decoration: const InputDecoration(
-            labelText: 'Rechercher un restaurant',
-            prefixIcon: Icon(Icons.search),
+          decoration: InputDecoration(
+            labelText: 'Rechercher un ${CommerceTypes.storesNoun(filterType: _filterCommerceType, plural: false)}',
+            prefixIcon: const Icon(Icons.search),
             isDense: true,
           ),
           onChanged: (v) => setState(() => _searchQuery = v),
+        ),
+        const SizedBox(height: 10),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              for (final chip in CommerceTypes.filterChips) ...[
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: ChoiceChip(
+                    label: Text(chip.label),
+                    selected: _filterCommerceType == chip.value,
+                    onSelected: _refreshing
+                        ? null
+                        : (_) async {
+                            setState(() {
+                              _filterCommerceType = chip.value;
+                              if (chip.value != null &&
+                                  chip.value != CommerceTypes.restaurant) {
+                                _filterCuisine = '';
+                              }
+                            });
+                            await _loadRestaurants(background: true);
+                          },
+                  ),
+                ),
+              ],
+            ],
+          ),
         ),
         const SizedBox(height: 8),
         Row(
@@ -1004,29 +1277,30 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
           ],
         ),
         const SizedBox(height: 4),
-        DropdownButtonFormField<String?>(
-          value: _filterCuisine.isEmpty ? null : _filterCuisine,
-          decoration: const InputDecoration(
-            labelText: 'Cuisine',
-            isDense: true,
+        if (showCuisineFilter)
+          DropdownButtonFormField<String?>(
+            value: _filterCuisine.isEmpty ? null : _filterCuisine,
+            decoration: const InputDecoration(
+              labelText: 'Cuisine',
+              isDense: true,
+            ),
+            items: [
+              const DropdownMenuItem<String?>(value: null, child: Text('Toutes')),
+              ...{
+                if (_filterCuisine.trim().isNotEmpty) _filterCuisine.trim(),
+                ..._restaurants
+                    .where((r) =>
+                        CommerceTypes.normalize(r['commerceType']) == CommerceTypes.restaurant)
+                    .map((r) => r['cuisine']?.toString() ?? '')
+                    .where((c) => c.trim().isNotEmpty),
+              }.map((c) => DropdownMenuItem(value: c, child: Text(c))),
+            ],
+            onChanged: (v) async {
+              setState(() => _filterCuisine = v ?? '');
+              await _loadRestaurants(background: true);
+            },
           ),
-          items: [
-            const DropdownMenuItem<String?>(value: null, child: Text('Toutes')),
-            ...{
-              // La cuisine sélectionnée doit rester présente même si la liste filtrée
-              // ne la contient plus, sinon le Dropdown lève une assertion (valeur orpheline).
-              if (_filterCuisine.trim().isNotEmpty) _filterCuisine.trim(),
-              ..._restaurants
-                  .map((r) => r['cuisine']?.toString() ?? '')
-                  .where((c) => c.trim().isNotEmpty),
-            }.map((c) => DropdownMenuItem(value: c, child: Text(c))),
-          ],
-          onChanged: (v) async {
-            setState(() => _filterCuisine = v ?? '');
-            await _loadRestaurants(background: true);
-          },
-        ),
-        const SizedBox(height: 8),
+        if (showCuisineFilter) const SizedBox(height: 8),
         Text(
           'Délai max (ETA, min. 20 min): ${_filterMaxEta <= 0 ? 'aucun' : '${_filterMaxEta.round()} min'}',
           style: const TextStyle(fontSize: 12, color: MovaColors.textSecondary),
@@ -1038,12 +1312,12 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
           divisions: 18,
           label: _filterMaxEta <= 0 ? 'Aucun' : '${_filterMaxEta.round()} min',
           // Le backend applique un plancher de 20 min sur l'ETA livraison : toute valeur
-          // 1–19 min exclurait tous les restaurants. On la ramène donc à 20 min.
+          // 1–19 min exclurait tous les magasins. On la ramène donc à 20 min.
           onChanged: (v) => setState(() => _filterMaxEta = v <= 0 ? 0 : (v < 20 ? 20 : v)),
           onChangeEnd: (_) => _loadRestaurants(background: true),
         ),
         Text(
-          'Prix max (plat le moins cher): ${_filterMaxPrice <= 0 ? 'aucun' : MarketConfig.formatCdf(_filterMaxPrice.round())}',
+          'Prix max (article le moins cher): ${_filterMaxPrice <= 0 ? 'aucun' : MarketConfig.formatCdf(_filterMaxPrice.round())}',
           style: const TextStyle(fontSize: 12, color: MovaColors.textSecondary),
         ),
         Slider(
@@ -1070,7 +1344,7 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
         ),
         const SizedBox(height: 12),
         Text(
-          'Restaurants à proximité',
+          '${storesNoun[0].toUpperCase()}${storesNoun.substring(1)} à proximité',
           style: Theme.of(context).textTheme.titleSmall,
         ),
         if (filtered.isEmpty)
@@ -1079,23 +1353,24 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
             child: Text(
               _restaurants.isEmpty
                   ? (_hasActiveRestaurantFilters
-                      ? 'Aucun restaurant ne correspond aux filtres (cuisine, délai, prix ou distance). Ajustez ou réinitialisez les filtres ci-dessus.'
-                      : 'Aucun restaurant disponible à $_deliveryCityName pour le moment.')
-                  : 'Aucun restaurant ne correspond à votre recherche.',
+                      ? 'Aucun $storesNoun ne correspond aux filtres. Ajustez ou réinitialisez les filtres ci-dessus.'
+                      : 'Aucun $storesNoun disponible à $_deliveryCityName pour le moment.')
+                  : 'Aucun $storesNoun ne correspond à votre recherche.',
               style: const TextStyle(color: MovaColors.textSecondary),
               textAlign: TextAlign.center,
             ),
           ),
         const SizedBox(height: 12),
         ...filtered.map((r) {
+          final commerceType = r['commerceType']?.toString();
           return Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: MovaCard(
               onTap: () => setState(() {
                 _selectedRestaurant = r;
                 _estimatedTotal = null;
-      _estimatedDeliveryFee = null;
-      _estimatedDiscount = null;
+                _estimatedDeliveryFee = null;
+                _estimatedDiscount = null;
               }),
               child: Row(
                 children: [
@@ -1107,9 +1382,9 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
                             width: 72,
                             height: 72,
                             fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => _restaurantPlaceholder(),
+                            errorBuilder: (_, __, ___) => _storePlaceholder(commerceType),
                           )
-                        : _restaurantPlaceholder(),
+                        : _storePlaceholder(commerceType),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -1122,6 +1397,9 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
+                        const SizedBox(height: 4),
+                        _commerceTypeBadge(commerceType),
+                        const SizedBox(height: 4),
                         Wrap(
                           spacing: 4,
                           runSpacing: 4,
@@ -1145,15 +1423,16 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
                             ),
                           ],
                         ),
-                        Text(
-                          r['cuisine']?.toString() ?? '',
-                          style: const TextStyle(
-                            color: MovaColors.textSecondary,
-                            fontSize: 12,
+                        if ((r['cuisine']?.toString() ?? '').trim().isNotEmpty)
+                          Text(
+                            r['cuisine']?.toString() ?? '',
+                            style: const TextStyle(
+                              color: MovaColors.textSecondary,
+                              fontSize: 12,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
                         if ((r['promotionLabel']?.toString() ?? '').trim().isNotEmpty)
                           Padding(
                             padding: const EdgeInsets.only(top: 4),
@@ -1181,11 +1460,14 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
     final restaurant = _selectedRestaurant!;
     final items = _menuItems(restaurant);
     final restaurantId = restaurant['id']?.toString() ?? '';
+    final commerceType = restaurant['commerceType']?.toString();
+    final catalogNoun = CommerceTypes.catalogNoun(commerceType);
+    final storeNoun = CommerceTypes.storeNoun(commerceType);
 
     if (items.isEmpty) {
-      return const Text(
-        'Menu indisponible pour ce restaurant.',
-        style: TextStyle(color: MovaColors.textSecondary),
+      return Text(
+        '$catalogNoun indisponible pour ce $storeNoun.',
+        style: const TextStyle(color: MovaColors.textSecondary),
       );
     }
 
@@ -1200,16 +1482,23 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
                 _selectedRestaurant = null;
                 _cart.clear();
                 _estimatedTotal = null;
-      _estimatedDeliveryFee = null;
-      _estimatedDiscount = null;
+                _estimatedDeliveryFee = null;
+                _estimatedDiscount = null;
               }),
             ),
             Expanded(
-              child: Text(
-                restaurant['name']?.toString() ?? '',
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    restaurant['name']?.toString() ?? '',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  _commerceTypeBadge(commerceType),
+                ],
               ),
             ),
           ],
@@ -1218,6 +1507,8 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
         ...items.map((item) {
           final name = _itemKey(item);
           final qty = _itemQtyInCart(restaurantId, name);
+          final stockQty = _itemStockQty(item);
+          final canAdd = _canAddMoreToCart(item, restaurantId);
           return Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: MovaCard(
@@ -1229,6 +1520,7 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
                         item,
                         restaurantId,
                         restaurant['name']?.toString() ?? '',
+                        commerceType: commerceType,
                       ),
                       borderRadius: BorderRadius.circular(12),
                       child: Row(
@@ -1241,14 +1533,14 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
                                 width: 64,
                                 height: 64,
                                 fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => _restaurantPlaceholder(),
+                                errorBuilder: (_, __, ___) => _storePlaceholder(commerceType),
                               ),
                             )
                           else
                             SizedBox(
                               width: 64,
                               height: 64,
-                              child: _restaurantPlaceholder(),
+                              child: _storePlaceholder(commerceType),
                             ),
                           const SizedBox(width: 12),
                           Expanded(
@@ -1272,6 +1564,22 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
                                   MarketConfig.formatCdf(_itemPrice(item)),
                                   style: const TextStyle(color: MovaColors.violet),
                                 ),
+                                if (stockQty != null)
+                                  Text(
+                                    stockQty <= 0 ? 'Rupture de stock' : 'Stock : $stockQty',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: stockQty <= 0 ? Colors.red.shade700 : MovaColors.textSecondary,
+                                    ),
+                                  ),
+                                if (_itemAgeRestricted(item) || _itemRequiresPrescription(item))
+                                  Text(
+                                    [
+                                      if (_itemAgeRestricted(item)) '18+',
+                                      if (_itemRequiresPrescription(item)) 'Ordonnance',
+                                    ].join(' · '),
+                                    style: const TextStyle(fontSize: 11, color: MovaColors.orange),
+                                  ),
                                 const Text(
                                   'Voir le détail',
                                   style: TextStyle(fontSize: 11, color: MovaColors.violet),
@@ -1292,7 +1600,7 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
                   Text('$qty', style: const TextStyle(fontWeight: FontWeight.bold)),
                   IconButton(
                     icon: const Icon(Icons.add_circle_outline),
-                    onPressed: () => _promptAndAddToCart(item, restaurantId),
+                    onPressed: canAdd ? () => _promptAndAddToCart(item, restaurantId) : null,
                   ),
                 ],
               ),
@@ -1423,7 +1731,7 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
     });
 
     return MovaScreen(
-      title: 'Livraison repas',
+      title: 'Livraison commerces',
       child: _loading
           ? const Center(child: CircularProgressIndicator())
           : Column(

@@ -331,7 +331,7 @@ export function LoginClient({ forcePin = false }: { forcePin?: boolean }) {
       <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-6 sm:p-8 space-y-5">
         <div className="text-center">
           <div className="text-3xl mb-2">🍽️</div>
-          <h1 className="text-2xl font-semibold text-[#1A1A2E]">SENGA Restaurant</h1>
+          <h1 className="text-2xl font-semibold text-[#1A1A2E]">SENGA Business</h1>
           <p className="text-sm text-gray-600 mt-1">
             {setupToken || pinOnly
               ? PIN_SETUP_HINT_FR

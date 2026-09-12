@@ -47,6 +47,7 @@ void main() {
     expect(find.text('Programmez votre trajet à l\'avance'), findsOneWidget);
     expect(find.text('Livraison colis'), findsNothing);
     expect(find.text('Livraison repas'), findsNothing);
+    expect(find.text('Livraison commerces'), findsNothing);
     expect(find.text('Courses & commissions'), findsNothing);
     expect(find.text('Covoiturage'), findsOneWidget);
     expect(find.text('Livraison express'), findsNothing);
@@ -115,10 +116,10 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 
-    await tester.tap(find.text('Livraison repas').first);
+    await tester.tap(find.text('Livraison commerces').first);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 800));
-    final restaurants = find.text('Restaurants à proximité');
+    final restaurants = find.text('Magasins à proximité');
     if (restaurants.evaluate().isEmpty) {
       await tester.pump(const Duration(milliseconds: 800));
     }

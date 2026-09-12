@@ -1,6 +1,8 @@
-# SENGA Restaurant (portail partenaire)
+# SENGA Business (portail partenaire)
 
 Portail web : [restaurant.afri-soft.com](https://restaurant.afri-soft.com)
+
+Le portail sert les partenaires **restaurant**, **supermarché**, **pharmacie** et **boutique**. L'interface s'adapte au type de commerce (menu, catalogue, stock, restrictions).
 
 ## Connexion et PIN
 
@@ -16,9 +18,10 @@ Portail web : [restaurant.afri-soft.com](https://restaurant.afri-soft.com)
 
 ## Exploitation
 
-- **Menu** : plats et prix en CDF après validation du dossier.
+- **Menu / Catalogue** : articles et prix en CDF après validation du dossier (tailles et options selon le type).
+- **Stock / Restrictions** : disponibles pour supermarché, pharmacie et boutique.
 - **Commandes** : préparer, suivre, accepter.
 - **Paramètres** : livreurs SENGA, internes ou mixte ; localisation.
 - **Revenus** : encaissements en CDF.
 
-Vous êtes payé à l'enlèvement du plat. Un livreur SENGA est payé après le PIN client.
+Vous êtes payé à l'enlèvement. Un livreur SENGA est payé après le PIN client.

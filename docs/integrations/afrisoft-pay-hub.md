@@ -1,8 +1,9 @@
 # Pack d’intégration — Payment Hub AfriSoft (app sœur)
 
-**Handoff canonique :** ce document · env [afrisoft-pay-hub.env.example](./afrisoft-pay-hub.env.example)  
+**Handoff canonique apps sœurs (comme « hub sms ») :** [afrisoft-pay-hub-mobilemoney.md](./afrisoft-pay-hub-mobilemoney.md)  
+**Ce document :** pack détaillé (y compris notes SENGA livraisons) · env [afrisoft-pay-hub.env.example](./afrisoft-pay-hub.env.example)  
 **Contrat long / ops VPS :** [AFRISOFT_PAYMENT_HUB_API.md](../AFRISOFT_PAYMENT_HUB_API.md)  
-**Companion SMS :** [afrisoft-sms-otp/README.md](./afrisoft-sms-otp/README.md) · [afrisoft-sms-hub.env.example](./afrisoft-sms-hub.env.example)
+**Companion SMS :** [afrisoft-sms-hub-otp.md](./afrisoft-sms-hub-otp.md) · [afrisoft-sms-hub.env.example](./afrisoft-sms-hub.env.example)
 
 **Public :** équipe d’une **autre application AfriSoft** (ou future app) qui veut encaisser / reverser du Mobile Money RDC **sans** ouvrir un compte SerdiPay / CinetPay, **sans** IP whitelist, **sans** réutiliser le wallet SENGA.  
 **Langue :** français  

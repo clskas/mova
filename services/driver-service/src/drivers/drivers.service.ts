@@ -911,10 +911,15 @@ export class DriversService {
     }
   }
 
-  async withdraw(userId: string, amountCdf: number) {
+  async withdraw(
+    userId: string,
+    amountCdf: number,
+    opts?: { provider?: string; phone?: string },
+  ) {
     const profile = await this.getOrCreateProfile(userId);
-    const payoutPhone = profile?.payoutPhone?.trim();
-    const payoutProvider = profile?.payoutProvider?.trim() || 'ORANGE_MONEY';
+    const payoutPhone = (opts?.phone?.trim() || profile?.payoutPhone?.trim() || '').trim();
+    const payoutProvider =
+      (opts?.provider?.trim() || profile?.payoutProvider?.trim() || 'MPESA').trim();
     if (!payoutPhone) {
       throw new MovaHttpException(
         MovaErrorCode.VALIDATION_ERROR,

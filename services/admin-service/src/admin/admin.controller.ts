@@ -1055,6 +1055,20 @@ export class AdminController {
     return this.adminService.updatePlatformConfig(body);
   }
 
+  @Get('client-apps-config')
+  @RequirePermissions(AdminPermission.SYSTEM_READ)
+  @ApiOperation({ summary: 'Config apps (MM + maintenance) — SuperAdmin' })
+  clientAppsConfig() {
+    return this.adminService.getClientAppsConfig();
+  }
+
+  @Patch('client-apps-config')
+  @RequirePermissions(AdminPermission.SYSTEM_WRITE)
+  @ApiOperation({ summary: 'Modifier config apps (MM + maintenance) — SuperAdmin' })
+  updateClientAppsConfig(@Body() body: Record<string, unknown>) {
+    return this.adminService.updateClientAppsConfig(body);
+  }
+
   @Get('cancellation-policies')
   @RequirePermissions(AdminPermission.PRICING_READ)
   @ApiOperation({ summary: 'Politiques annulation courses par type véhicule' })

@@ -128,11 +128,11 @@ jobs:
         id: playver
         run: |
           set -euo pipefail
-          # Play production floor after AfriSoft icons: expect run_number >= 68.
+          # Play production floor: expect run_number >= 69 after this release.
           CODE="${{ github.run_number }}"
-          if [ "$CODE" -lt 68 ]; then CODE=68; fi
+          if [ "$CODE" -lt 69 ]; then CODE=69; fi
           echo "code=$CODE" >> "$GITHUB_OUTPUT"
-          echo "Play versionCode=$CODE (pubspec 1.0.7+60; run_number=${{ github.run_number }})"
+          echo "Play versionCode=$CODE (pubspec 1.0.7+69; run_number=${{ github.run_number }})"
 
       - name: Build passenger AAB
         working-directory: mobile

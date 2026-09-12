@@ -21,7 +21,8 @@ export type AdminSection =
   | "covoiturage"
   | "publicites"
   | "contacts"
-  | "cgu";
+  | "cgu"
+  | "systeme";
 
 export const ADMIN_ROLES: AdminRole[] = ["SUPER_ADMIN", "ADMIN", "SUPPORT", "FINANCE", "CONTENT"];
 
@@ -54,12 +55,13 @@ const ALL_SECTIONS: AdminSection[] = [
   "publicites",
   "contacts",
   "cgu",
+  "systeme",
 ];
 
 /** Sections visibles dans le menu par rôle. */
 const ROLE_SECTIONS: Record<AdminRole, AdminSection[]> = {
   SUPER_ADMIN: ALL_SECTIONS,
-  ADMIN: ALL_SECTIONS,
+  ADMIN: ALL_SECTIONS.filter((s) => s !== "systeme"),
   SUPPORT: ["utilisateurs", "chauffeurs", "kyc", "litiges", "fraude", "courses", "livraisons", "planifiees", "locations", "demenagements", "covoiturage"],
   FINANCE: ["dashboard", "portefeuille", "tarifs", "abonnements"],
   CONTENT: ["restaurants", "tarifs", "parametres", "locations", "publicites"],
@@ -68,7 +70,7 @@ const ROLE_SECTIONS: Record<AdminRole, AdminSection[]> = {
 /** Sections où l'utilisateur peut modifier des données. */
 const ROLE_WRITE: Record<AdminRole, AdminSection[]> = {
   SUPER_ADMIN: ALL_SECTIONS,
-  ADMIN: ALL_SECTIONS.filter((s) => s !== "portefeuille"),
+  ADMIN: ALL_SECTIONS.filter((s) => s !== "portefeuille" && s !== "systeme"),
   SUPPORT: ["kyc", "litiges", "courses", "livraisons", "planifiees", "locations", "demenagements", "covoiturage"],
   FINANCE: ["tarifs", "abonnements", "portefeuille"],
   CONTENT: ["restaurants", "locations", "publicites"],
@@ -88,6 +90,8 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/kyc", label: "KYC", short: "KYC", section: "kyc" },
   { href: "/contacts", label: "Contacts", short: "Contacts", section: "contacts" },
   { href: "/cgu", label: "CGU", short: "CGU", section: "cgu" },
+  { href: "/operateurs-mm", label: "Opérateurs Mobile Money", short: "MM", section: "systeme" },
+  { href: "/maintenance", label: "Mode maintenance", short: "Maint.", section: "systeme" },
   { href: "/courses", label: "Courses", short: "Courses", section: "courses" },
   { href: "/livraisons", label: "Livraisons", short: "Livr.", section: "livraisons" },
   { href: "/restaurants", label: "Restaurants", short: "Restos", section: "restaurants" },

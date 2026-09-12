@@ -8,6 +8,7 @@ import '../cache/profile_cache.dart';
 import '../cache/user_profile_cache.dart';
 import '../cache/unified_history_cache.dart';
 import '../cache/wallet_cache.dart';
+import '../config/app_version.dart';
 import '../config/market_config.dart';
 import '../error/mova_error_codes.dart';
 import '../error/result.dart';
@@ -80,6 +81,11 @@ class ApiClient {
     return _token;
   }
 
+  static const _sessionUnlockedAtKey = 'session_unlocked_at_ms';
+
+  /// Keep JWT across camera / OS process death for this long after PIN/OTP unlock.
+  static const sessionUnlockTtl = Duration(hours: 12);
+
   Future<void> loadToken() async {
     final prefs = await SharedPreferences.getInstance();
     _token = prefs.getString('auth_token');
@@ -91,10 +97,28 @@ class ApiClient {
     await prefs.setString('auth_token', token);
   }
 
+  /// Call after OTP / PIN / Google login so a camera process kill does not force re-login.
+  Future<void> markSessionUnlocked() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(
+      _sessionUnlockedAtKey,
+      DateTime.now().millisecondsSinceEpoch,
+    );
+  }
+
+  Future<bool> isSessionRecentlyUnlocked() async {
+    final prefs = await SharedPreferences.getInstance();
+    final at = prefs.getInt(_sessionUnlockedAtKey);
+    if (at == null) return false;
+    final unlockedAt = DateTime.fromMillisecondsSinceEpoch(at);
+    return DateTime.now().difference(unlockedAt) < sessionUnlockTtl;
+  }
+
   Future<void> clearToken({bool keepPhone = false}) async {
     _token = null;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('auth_token');
+    await prefs.remove(_sessionUnlockedAtKey);
     if (!keepPhone) {
       await prefs.remove('user_phone');
     }
@@ -124,6 +148,7 @@ class ApiClient {
 
   Map<String, String> get _headers => {
         'Content-Type': 'application/json',
+        'X-Senga-Client': AppFlavor.isDriver ? 'senga_driver' : 'senga',
         if (_token != null && _token!.isNotEmpty) 'Authorization': 'Bearer $_token',
       };
 

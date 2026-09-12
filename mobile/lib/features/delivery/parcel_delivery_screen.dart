@@ -9,6 +9,7 @@ import '../../core/api/api_client.dart';
 import '../../core/billing/service_price_display.dart';
 import '../../core/config/market_config.dart';
 import '../../core/error/result.dart';
+import '../../core/media/image_pick_util.dart';
 import '../../core/location/service_area_location.dart';
 import '../../core/location/service_area_prefs.dart';
 import '../../core/location/service_areas.dart';
@@ -373,24 +374,11 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
   }
 
   Future<void> _pickPhoto(ImageSource source) async {
-    try {
-      final picked = await _picker.pickImage(
-        source: source,
-        maxWidth: 1280,
-        imageQuality: 85,
-        preferredCameraDevice: CameraDevice.rear,
-      );
-      if (picked != null) {
-        setState(() => _photoFile = File(picked.path));
-      }
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Impossible d\'accéder à la caméra ou à la galerie.'),
-          ),
-        );
-      }
+    final picked = await pickMovaImage(_picker, source);
+    if (picked != null) {
+      setState(() => _photoFile = File(picked.path));
+    } else if (mounted) {
+      showImagePickError(context);
     }
   }
 

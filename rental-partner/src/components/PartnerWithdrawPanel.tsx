@@ -4,14 +4,15 @@ import { useEffect, useRef, useState } from "react";
 import { phoneFromToken } from "@/lib/auth";
 import { formatCdf, requestWithdrawOtp, topUpPartnerWallet, withdrawPartnerWallet } from "@/lib/api";
 import { toUserErrorMessage } from "@/lib/user-messages";
+import { PUBLIC_API_BASE } from "@/lib/public-api-base";
 
 const PAYOUT_PHONE_KEY = "mova_rental_partner_payout_phone";
 
-const PROVIDERS = [
+const ALL_PROVIDERS = [
   { value: "ORANGE_MONEY", label: "Orange Money" },
   { value: "MPESA", label: "M-Pesa" },
   { value: "AIRTEL_MONEY", label: "Airtel Money" },
-];
+] as const;
 
 type Props = {
   balanceCdf: number;
@@ -22,7 +23,10 @@ type Props = {
 export function PartnerWithdrawPanel({ balanceCdf, walletAvailable = true, onWithdrawn }: Props) {
   const [amount, setAmount] = useState("");
   const [topUpAmount, setTopUpAmount] = useState("");
-  const [provider, setProvider] = useState("ORANGE_MONEY");
+  const [providers, setProviders] = useState<{ value: string; label: string }[]>(
+    ALL_PROVIDERS.filter((p) => p.value !== "ORANGE_MONEY"),
+  );
+  const [provider, setProvider] = useState("MPESA");
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
@@ -39,6 +43,30 @@ export function PartnerWithdrawPanel({ balanceCdf, walletAvailable = true, onWit
     }
     const fromToken = phoneFromToken();
     if (fromToken) setPhone(fromToken);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch(`${PUBLIC_API_BASE}/api/public/client-config`);
+        if (!res.ok) return;
+        const data = (await res.json()) as {
+          mobileMoney?: Record<string, Record<string, boolean>>;
+        };
+        const row = data.mobileMoney?.location;
+        if (!row || cancelled) return;
+        const next = ALL_PROVIDERS.filter((p) => row[p.value] === true);
+        if (next.length === 0) return;
+        setProviders(next);
+        setProvider((prev) => (next.some((p) => p.value === prev) ? prev : next[0].value));
+      } catch {
+        /* keep defaults (OM hidden) */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   function rememberPhone() {
@@ -162,7 +190,7 @@ export function PartnerWithdrawPanel({ balanceCdf, walletAvailable = true, onWit
       <div>
         <h3 className="font-medium text-[#1A1A2E]">Portefeuille Mobile Money</h3>
         <p className="text-xs text-gray-500 mt-1">
-          Orange Money, M-Pesa ou Airtel Money. Minimum SerdiPay 2 300 FC. Solde :{" "}
+          Orange Money, M-Pesa ou Airtel Money (selon disponibilité). Minimum SerdiPay 2 300 FC. Solde :{" "}
           <strong>{formatCdf(balanceCdf)}</strong>
         </p>
       </div>
@@ -174,7 +202,7 @@ export function PartnerWithdrawPanel({ balanceCdf, walletAvailable = true, onWit
             value={provider}
             onChange={(e) => setProvider(e.target.value)}
           >
-            {PROVIDERS.map((p) => (
+            {providers.map((p) => (
               <option key={p.value} value={p.value}>
                 {p.label}
               </option>

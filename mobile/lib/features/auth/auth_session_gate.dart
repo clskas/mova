@@ -84,15 +84,35 @@ class _AuthSessionGateState extends ConsumerState<AuthSessionGate> {
           return;
         }
         if (sessionRequiresPinUnlock(pinConfigured: pinConfigured, phone: phone)) {
+          // Camera / OS may kill the process; keep JWT if the user unlocked recently.
+          if (await api.isSessionRecentlyUnlocked()) {
+            if (!mounted) return;
+            setState(() {
+              _checking = false;
+              _authenticated = true;
+            });
+            return;
+          }
           await api.clearToken(keepPhone: true);
           if (mounted) setState(() => _checking = false);
           return;
         }
+        await api.markSessionUnlocked();
+        if (!mounted) return;
         setState(() {
           _checking = false;
           _authenticated = true;
         });
-      case Failure():
+      case Failure(:final error):
+        // Transient /users/me after camera kill must not wipe a still-valid JWT.
+        if (error is! AuthFailure && await api.isSessionRecentlyUnlocked()) {
+          if (!mounted) return;
+          setState(() {
+            _checking = false;
+            _authenticated = true;
+          });
+          return;
+        }
         await _clearRejectedSession(api);
     }
   }
@@ -117,6 +137,7 @@ class _AuthSessionGateState extends ConsumerState<AuthSessionGate> {
     if (_needsPinSetup) {
       return LocalPinSetupScreen(
         onCompleted: () async {
+          await ref.read(apiClientProvider).markSessionUnlocked();
           if (!mounted) return;
           setState(() {
             _needsPinSetup = false;

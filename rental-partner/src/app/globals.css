@@ -57,30 +57,32 @@ textarea {
   margin-right: auto !important;
 }
 
-/* Top navigation (phone + desktop): horizontal scroll on narrow screens. */
+/* Top navigation: wrap so all items stay visible without horizontal scroll. */
 [data-portal-nav],
 .senga-portal-nav {
   display: flex !important;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   align-items: center;
-  justify-content: flex-start;
-  gap: 0.25rem;
+  justify-content: center;
+  gap: 0.2rem;
   width: 100%;
   max-width: 100%;
-  overflow-x: auto;
-  overflow-y: hidden;
-  -webkit-overflow-scrolling: touch;
+  overflow-x: visible;
+  overflow-y: visible;
   padding-bottom: 0.15rem;
 }
 [data-portal-nav] > *,
 .senga-portal-nav > * {
-  flex: 0 0 auto;
-  min-width: 4.4rem;
+  flex: 1 1 auto;
+  min-width: 3.1rem;
+  max-width: 6.5rem;
 }
 @media (min-width: 640px) {
   [data-portal-nav] > *,
   .senga-portal-nav > * {
+    flex: 0 1 auto;
     min-width: 0;
+    max-width: none;
   }
 }
 .senga-portal-main {

@@ -8,6 +8,7 @@ import { toMobileRideStatus } from '@mova/shared';
 import { TrackingService } from '../tracking/tracking.service';
 import { buildMobileAppVersionResponse } from './app-version';
 import { LegalDocumentsService } from '../legal-documents/legal-documents.service';
+import { ClientAppsConfigService } from '../platform/client-apps-config.service';
 
 @ApiTags('public')
 @Controller('public')
@@ -16,12 +17,21 @@ export class PublicController {
     private prisma: PrismaService,
     private tracking: TrackingService,
     private legalDocuments: LegalDocumentsService,
+    private clientAppsConfig: ClientAppsConfigService,
   ) {}
 
   @Get('app-version')
   @ApiOperation({ summary: 'Versions courantes / minimales (apps mobiles + web)' })
   getAppVersion() {
     return buildMobileAppVersionResponse();
+  }
+
+  @Get('client-config')
+  @ApiOperation({
+    summary: 'Config client (visibilité opérateurs MM + mode maintenance par app)',
+  })
+  getClientConfig() {
+    return this.clientAppsConfig.getPublic();
   }
 
   @Get('cgu')

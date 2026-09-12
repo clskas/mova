@@ -9,7 +9,7 @@ describe('buildMobileAppVersionResponse', () => {
     expect(payload.passenger.currentVersion).toBe('1.0.5');
     expect(payload.driver.currentVersion).toBe('1.0.5');
     expect(payload.passenger.minVersion).toBe('1.0.0');
-    expect(payload.passenger.currentVersionCode).toBe(68);
+    expect(payload.passenger.currentVersionCode).toBe(69);
     expect(payload.passenger.minVersionCode).toBe(0);
     expect(payload.passenger.storeUrl).toContain('cd.mova.mova.passenger');
     expect(payload.driver.storeUrl).toContain('cd.mova.mova.driver');
@@ -33,7 +33,7 @@ describe('buildMobileAppVersionResponse', () => {
     expect(payload.driver.currentVersion).toBe('1.0.6');
     expect(payload.passenger.minVersion).toBe('1.0.1');
     expect(payload.driver.minVersion).toBe('1.0.1');
-    expect(payload.passenger.currentVersionCode).toBe(68);
+    expect(payload.passenger.currentVersionCode).toBe(69);
     expect(payload.driver.currentVersionCode).toBe(69);
     expect(payload.passenger.minVersionCode).toBe(8);
     expect(payload.passenger.storeUrl).toBe('https://play.example/passenger');
@@ -48,8 +48,8 @@ describe('buildMobileAppVersionResponse', () => {
       },
       now,
     );
-    expect(payload.passenger.currentVersionCode).toBe(68);
-    expect(payload.driver.currentVersionCode).toBe(68);
+    expect(payload.passenger.currentVersionCode).toBe(69);
+    expect(payload.driver.currentVersionCode).toBe(69);
   });
 
   it('raises stale Render env below the shipped floor so banners can show', () => {
@@ -64,8 +64,8 @@ describe('buildMobileAppVersionResponse', () => {
     );
     expect(payload.passenger.currentVersion).toBe('1.0.5');
     expect(payload.driver.currentVersion).toBe('1.0.5');
-    expect(payload.passenger.currentVersionCode).toBe(68);
-    expect(payload.driver.currentVersionCode).toBe(68);
+    expect(payload.passenger.currentVersionCode).toBe(69);
+    expect(payload.driver.currentVersionCode).toBe(69);
   });
 
   it('raises a stale env of 51–67 to last confirmed Play 68', () => {
@@ -77,8 +77,8 @@ describe('buildMobileAppVersionResponse', () => {
         },
         now,
       );
-      expect(payload.passenger.currentVersionCode).toBe(68);
-      expect(payload.driver.currentVersionCode).toBe(68);
+      expect(payload.passenger.currentVersionCode).toBe(69);
+      expect(payload.driver.currentVersionCode).toBe(69);
     }
   });
 });

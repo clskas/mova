@@ -14,7 +14,7 @@ import '../billing/receipt_screen.dart';
 import '../../core/wallet/mobile_money_prompt.dart';
 import 'widgets/cash_pin_confirm_dialog.dart';
 
-const _paymentMethods = [
+const _allPaymentMethods = [
   ('WALLET', 'Portefeuille SENGA', Icons.account_balance_wallet, MovaColors.violet),
   ('ORANGE_MONEY', 'Orange Money', Icons.phone_android, MovaColors.orange),
   ('MPESA', 'M-Pesa', Icons.phone_android, Color(0xFFE60000)),
@@ -67,6 +67,11 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   bool _awaitingMobileMoney = false;
   Timer? _mmPollTimer;
   int _mmPollAttempts = 0;
+  Set<String> _enabledMm = {'MPESA', 'AIRTEL_MONEY'};
+
+  List<(String, String, IconData, Color)> get _paymentMethods => _allPaymentMethods
+      .where((m) => !_mobileMoneyMethods.contains(m.$1) || _enabledMm.contains(m.$1))
+      .toList();
 
   bool get _shouldPromptCashPin =>
       widget.promptCashPinOnSelect ?? widget.serviceType != null;
@@ -84,6 +89,31 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     _cashPin = widget.completionPin;
     _loadPhone();
     _loadPaymentDetails();
+    _loadMmVisibility();
+  }
+
+  Future<void> _loadMmVisibility() async {
+    final api = ref.read(apiClientProvider);
+    final result = await api.get('/public/client-config');
+    if (!mounted) return;
+    if (result case Success(:final data)) {
+      final mm = data['mobileMoney'];
+      final row = mm is Map ? mm['senga'] : null;
+      if (row is Map) {
+        final next = <String>{};
+        for (final id in _mobileMoneyMethods) {
+          if (row[id] == true) next.add(id);
+        }
+        if (next.isNotEmpty) {
+          setState(() {
+            _enabledMm = next;
+            if (_mobileMoneyMethods.contains(_method) && !_enabledMm.contains(_method)) {
+              _method = 'WALLET';
+            }
+          });
+        }
+      }
+    }
   }
 
   @override

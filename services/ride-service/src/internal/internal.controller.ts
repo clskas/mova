@@ -27,6 +27,7 @@ import { MovingService } from '../moving/moving.service';
 import { MovingVehiclePricingService } from '../moving/moving-vehicle-pricing.service';
 import { PlatformConfigService } from '../platform/platform-config.service';
 import { ParcelWeightBandService } from '../platform/parcel-weight-band.service';
+import { ClientAppsConfigService } from '../platform/client-apps-config.service';
 import { PaymentInfoService } from './payment-info.service';
 import { PricingAdminService } from '../rides/pricing-admin.service';
 import { PricingTimeWindowService } from '../rides/pricing-time-window.service';
@@ -39,6 +40,7 @@ import { PublicitesService } from '../publicites/publicites.service';
 import { PartnerKycService } from '../partner-kyc/partner-kyc.service';
 import { CompanyContactsService } from '../company-contacts/company-contacts.service';
 import { LegalDocumentsService } from '../legal-documents/legal-documents.service';
+import { ClientAppsConfig } from '@mova/shared';
 
 @ApiTags('internal')
 @Controller('internal')
@@ -60,6 +62,7 @@ export class InternalController {
     private movingVehiclePricing: MovingVehiclePricingService,
     private platformConfig: PlatformConfigService,
     private parcelWeightBands: ParcelWeightBandService,
+    private clientAppsConfig: ClientAppsConfigService,
     private rental: RentalService,
     private tracking: TrackingService,
     private fraud: FraudService,
@@ -479,6 +482,16 @@ export class InternalController {
   @Patch('platform-config')
   updatePlatformConfig(@Body() body: Record<string, unknown>) {
     return this.platformConfig.update(body as never);
+  }
+
+  @Get('client-apps-config')
+  getClientAppsConfig() {
+    return this.clientAppsConfig.getPublic();
+  }
+
+  @Patch('client-apps-config')
+  updateClientAppsConfig(@Body() body: Partial<ClientAppsConfig>) {
+    return this.clientAppsConfig.update(body);
   }
 
   @Get('cancellation-policies')

@@ -9,6 +9,7 @@ import '../../core/api/api_client.dart';
 import '../../core/billing/service_price_display.dart';
 import '../../core/config/market_config.dart';
 import '../../core/error/result.dart';
+import '../../core/media/image_pick_util.dart';
 import '../../core/location/destination_coords.dart';
 import '../../core/location/location_service.dart';
 import '../../core/location/service_area_location.dart';
@@ -350,8 +351,11 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
   }
 
   Future<void> _addPhoto() async {
-    final file = await _picker.pickImage(source: ImageSource.camera, imageQuality: 75);
-    if (file == null) return;
+    final file = await pickMovaImage(_picker, ImageSource.camera);
+    if (file == null) {
+      if (mounted) showImagePickError(context);
+      return;
+    }
     final localPath = file.path;
     setState(() {
       _uploadingPhoto = true;

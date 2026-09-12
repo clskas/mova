@@ -9,6 +9,7 @@ import '../../core/api/api_client.dart';
 import '../../core/api/ride_socket.dart';
 import '../../core/geo/maps_launcher.dart';
 import '../../core/error/result.dart';
+import '../../core/media/image_pick_util.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
@@ -285,8 +286,11 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
 
   Future<void> _uploadProofPhoto() async {
     final picker = ImagePicker();
-    final picked = await picker.pickImage(source: ImageSource.camera, imageQuality: 75);
-    if (picked == null || !mounted) return;
+    final picked = await pickMovaImage(picker, ImageSource.camera);
+    if (picked == null || !mounted) {
+      if (mounted) showImagePickError(context);
+      return;
+    }
     setState(() => _uploadingProof = true);
     final api = ref.read(apiClientProvider);
     final upload = await api.uploadParcelPhoto(File(picked.path));

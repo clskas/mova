@@ -2482,6 +2482,30 @@ export async function updatePlatformConfig(patch: Record<string, unknown>): Prom
   });
 }
 
+export type ClientAppId = "senga" | "senga_driver" | "resto" | "location";
+export type MmOperatorId = "ORANGE_MONEY" | "MPESA" | "AIRTEL_MONEY";
+
+export type ClientAppsConfig = {
+  mobileMoney: Record<ClientAppId, Record<MmOperatorId, boolean>>;
+  maintenance: {
+    messageFr: string;
+    apps: Record<ClientAppId, boolean>;
+  };
+};
+
+export async function fetchClientAppsConfig(): Promise<ClientAppsConfig> {
+  return apiFetch<ClientAppsConfig>("/api/admin/client-apps-config");
+}
+
+export async function updateClientAppsConfig(
+  patch: Partial<ClientAppsConfig>,
+): Promise<ClientAppsConfig> {
+  return apiFetch<ClientAppsConfig>("/api/admin/client-apps-config", {
+    method: "PATCH",
+    body: JSON.stringify(patch),
+  });
+}
+
 export async function fetchCancellationPolicies(): Promise<CancellationPolicy[]> {
   const raw = await apiFetch<CancellationPolicy[]>("/api/admin/cancellation-policies");
   return Array.isArray(raw) ? raw : [];

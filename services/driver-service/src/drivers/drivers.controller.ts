@@ -84,7 +84,10 @@ export class DriversController {
   @Post('withdraw')
   @ApiOperation({ summary: 'Retrait Mobile Money vers le numéro configuré dans le dossier' })
   withdraw(@Request() req: { user: { id: string } }, @Body() dto: DriverWithdrawDto) {
-    return this.driversService.withdraw(req.user.id, dto.amountCdf);
+    return this.driversService.withdraw(req.user.id, dto.amountCdf, {
+      provider: dto.provider,
+      phone: dto.phone,
+    });
   }
 
   @Get('profile')

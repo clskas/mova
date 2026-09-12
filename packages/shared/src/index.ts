@@ -4,6 +4,8 @@ export * from './mova-error-codes';
 export * from './http-exception.filter';
 export * from './enums';
 export * from './admin-rbac';
+export * from './client-apps-config';
+
 export * from './events';
 export * from './communes-seed';
 export * from './service-areas';

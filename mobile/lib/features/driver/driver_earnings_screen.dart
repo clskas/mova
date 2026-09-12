@@ -41,6 +41,8 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
   _ServiceFilter _serviceFilter = _ServiceFilter.all;
   DateTime? _customFrom;
   DateTime? _customTo;
+  late String _withdrawProviderId;
+  List<_MmChoice> _mmChoices = const [];
 
   int _asInt(dynamic value) {
     if (value is int) return value;
@@ -62,7 +64,45 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
   @override
   void initState() {
     super.initState();
+    _withdrawProviderId = MarketConfig.mobileMoneyProviders
+        .firstWhere((p) => p.id == 'MPESA', orElse: () => MarketConfig.mobileMoneyProviders.first)
+        .id;
+    _mmChoices = MarketConfig.mobileMoneyProviders
+        .where((p) => p.id != 'ORANGE_MONEY')
+        .map((p) => _MmChoice(p.id, p.name))
+        .toList();
     _load();
+    _loadMmProviders();
+  }
+
+  Future<void> _loadMmProviders() async {
+    final api = ref.read(apiClientProvider);
+    final result = await api.get('/public/client-config');
+    if (!mounted) return;
+    if (result case Success(:final data)) {
+      final mm = data['mobileMoney'];
+      final row = mm is Map ? mm['senga_driver'] : null;
+      if (row is Map) {
+        final choices = <_MmChoice>[];
+        for (final p in MarketConfig.mobileMoneyProviders) {
+          if (row[p.id] == true) choices.add(_MmChoice(p.id, p.name));
+        }
+        if (choices.isNotEmpty) {
+          setState(() {
+            _mmChoices = choices;
+            if (!_mmChoices.any((c) => c.id == _withdrawProviderId)) {
+              _withdrawProviderId = _mmChoices.first.id;
+            }
+          });
+        }
+      }
+    }
+    final profileProvider = _data?['payoutProvider']?.toString();
+    if (profileProvider != null &&
+        _mmChoices.any((c) => c.id == profileProvider) &&
+        mounted) {
+      setState(() => _withdrawProviderId = profileProvider);
+    }
   }
 
   @override
@@ -387,7 +427,10 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
       _error = null;
     });
     final api = ref.read(apiClientProvider);
-    final result = await api.post('/drivers/withdraw', {'amountCdf': amount});
+    final result = await api.post('/drivers/withdraw', {
+      'amountCdf': amount,
+      'provider': _withdrawProviderId,
+    });
     if (!mounted) return;
     setState(() => _withdrawing = false);
     switch (result) {
@@ -730,6 +773,26 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
                     style: TextStyle(color: MovaColors.error, fontSize: 13),
                   ),
                 const SizedBox(height: 12),
+                if (_payoutConfigured && _mmChoices.isNotEmpty) ...[
+                  DropdownButtonFormField<String>(
+                    value: _mmChoices.any((c) => c.id == _withdrawProviderId)
+                        ? _withdrawProviderId
+                        : _mmChoices.first.id,
+                    decoration: const InputDecoration(
+                      labelText: 'Opérateur Mobile Money',
+                      prefixIcon: Icon(Icons.phone_android),
+                    ),
+                    items: _mmChoices
+                        .map((c) => DropdownMenuItem(value: c.id, child: Text(c.label)))
+                        .toList(),
+                    onChanged: _withdrawing
+                        ? null
+                        : (v) {
+                            if (v != null) setState(() => _withdrawProviderId = v);
+                          },
+                  ),
+                  const SizedBox(height: 12),
+                ],
                 TextField(
                   controller: _amountController,
                   enabled: !_withdrawing && _payoutConfigured,
@@ -758,4 +821,10 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
             ),
     );
   }
+}
+
+class _MmChoice {
+  const _MmChoice(this.id, this.label);
+  final String id;
+  final String label;
 }

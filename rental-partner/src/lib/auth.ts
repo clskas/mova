@@ -176,7 +176,10 @@ export function clearLastPhone(): void {
 
 export function authHeaders(): Record<string, string> {
   const token = getToken();
-  return token ? { Authorization: `Bearer ${token}` } : {};
+  return {
+    "X-Senga-Client": "location",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
 }
 
 export function decodeJwtPayload(token: string): Record<string, unknown> | null {

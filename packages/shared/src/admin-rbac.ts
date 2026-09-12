@@ -36,6 +36,9 @@ export enum AdminPermission {
   CONTACTS_WRITE = 'contacts:write',
   CGU_READ = 'cgu:read',
   CGU_WRITE = 'cgu:write',
+  /** SuperAdmin-only: maintenance mode + MM operator visibility. */
+  SYSTEM_READ = 'system:read',
+  SYSTEM_WRITE = 'system:write',
 }
 
 export const ADMIN_PANEL_ROLES: UserRole[] = [

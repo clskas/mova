@@ -379,6 +379,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
           return;
         }
         await api.saveToken(token);
+        await api.markSessionUnlocked();
         final mustSetupPin = !seedDemo && (_forgotPinRecovery || !pinConfigured);
         if (mustSetupPin && mounted) {
           await Navigator.of(context).push(

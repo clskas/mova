@@ -6,6 +6,7 @@ import { RequestIdMiddleware } from '@mova/shared';
 import { AuthModule } from './auth/auth.module';
 import { HealthModule } from './health/health.module';
 import { ProxyMiddleware } from './proxy/proxy.middleware';
+import { MaintenanceMiddleware } from './proxy/maintenance.middleware';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { GatewayThrottlerGuard } from './auth/gateway-throttler.guard';
 
@@ -19,11 +20,13 @@ import { GatewayThrottlerGuard } from './auth/gateway-throttler.guard';
   providers: [
     { provide: APP_GUARD, useClass: GatewayThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
+    MaintenanceMiddleware,
   ],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
     consumer.apply(RequestIdMiddleware).forRoutes({ path: '*', method: RequestMethod.ALL });
+    consumer.apply(MaintenanceMiddleware).forRoutes({ path: 'api/*', method: RequestMethod.ALL });
     consumer.apply(ProxyMiddleware).forRoutes({ path: 'api/*', method: RequestMethod.ALL });
   }
 }

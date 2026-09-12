@@ -46,4 +46,17 @@ export class DriverWithdrawDto {
   @IsInt()
   @Min(2300)
   amountCdf: number;
+
+  @ApiPropertyOptional({
+    description: 'Opérateur Mobile Money (sinon profil chauffeur)',
+    enum: ['ORANGE_MONEY', 'MPESA', 'AIRTEL_MONEY', 'AFRIMONEY'],
+  })
+  @IsOptional()
+  @IsString()
+  provider?: string;
+
+  @ApiPropertyOptional({ description: 'Numéro MM (sinon profil chauffeur)' })
+  @IsOptional()
+  @IsString()
+  phone?: string;
 }

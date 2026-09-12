@@ -18,8 +18,7 @@ const NAV = [
   { href: "/earnings", label: "Revenus", short: "Revenus", icon: "💰", badgeKey: null },
   { href: "/compte", label: "Compte et connexion", short: "Compte", icon: "👤", badgeKey: null },
   { href: "/settings", label: "Paramètres", short: "Réglages", icon: "⚙️", badgeKey: null },
-  { href: "/aide", label: "Aide / Manuel", short: "Manuel", icon: "❓", badgeKey: null },
-  { href: "/manuel", label: "Manuel utilisateur", short: "Manuel", icon: "📘", badgeKey: null },
+  { href: "/aide", label: "Aide / Manuel", short: "Aide", icon: "❓", badgeKey: null },
 ];
 
 function navActive(pathname: string, href: string) {

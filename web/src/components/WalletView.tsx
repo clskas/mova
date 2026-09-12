@@ -21,15 +21,22 @@ export function WalletView({ onBack, mock }: Props) {
   const [withdrawLoading, setWithdrawLoading] = useState(false);
   const [amount, setAmount] = useState("10000");
   const [topUpPhone, setTopUpPhone] = useState("");
-  const [topUpProvider, setTopUpProvider] = useState("ORANGE_MONEY");
+  const [topUpProvider, setTopUpProvider] = useState("MPESA");
   const [withdrawAmount, setWithdrawAmount] = useState("5000");
   const [withdrawPhone, setWithdrawPhone] = useState("");
-  const [withdrawProvider, setWithdrawProvider] = useState("ORANGE_MONEY");
+  const [withdrawProvider, setWithdrawProvider] = useState("MPESA");
   const [withdrawOtp, setWithdrawOtp] = useState("");
   const [withdrawOtpSent, setWithdrawOtpSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [historyRefresh, setHistoryRefresh] = useState(0);
+  const [mmProviders, setMmProviders] = useState(
+    () =>
+      [
+        { value: "MPESA", label: "M-Pesa" },
+        { value: "AIRTEL_MONEY", label: "Airtel Money" },
+      ] as { value: string; label: string }[],
+  );
   const topUpInFlight = useRef(false);
   const withdrawInFlight = useRef(false);
 
@@ -52,6 +59,34 @@ export function WalletView({ onBack, mock }: Props) {
       setTopUpPhone((p) => p || stored);
       setWithdrawPhone((p) => p || stored);
     }
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const data = await apiFetch<{
+          mobileMoney?: Record<string, Record<string, boolean>>;
+        }>("/api/public/client-config", undefined, { useMock: false });
+        const row = data.mobileMoney?.senga;
+        if (!row || cancelled) return;
+        const all = [
+          { value: "ORANGE_MONEY", label: "Orange Money" },
+          { value: "MPESA", label: "M-Pesa" },
+          { value: "AIRTEL_MONEY", label: "Airtel Money" },
+        ];
+        const next = all.filter((p) => row[p.value] === true);
+        if (next.length === 0) return;
+        setMmProviders(next);
+        setTopUpProvider((prev) => (next.some((p) => p.value === prev) ? prev : next[0].value));
+        setWithdrawProvider((prev) => (next.some((p) => p.value === prev) ? prev : next[0].value));
+      } catch {
+        /* keep OM-hidden defaults */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -265,9 +300,11 @@ export function WalletView({ onBack, mock }: Props) {
           value={topUpProvider}
           onChange={(e) => setTopUpProvider(e.target.value)}
         >
-          <option value="ORANGE_MONEY">Orange Money</option>
-          <option value="MPESA">M-Pesa</option>
-          <option value="AIRTEL_MONEY">Airtel Money</option>
+          {mmProviders.map((p) => (
+            <option key={p.value} value={p.value}>
+              {p.label}
+            </option>
+          ))}
         </select>
         <input
           className="w-full rounded-xl border-0 bg-gray-50 p-3"
@@ -299,9 +336,11 @@ export function WalletView({ onBack, mock }: Props) {
           value={withdrawProvider}
           onChange={(e) => setWithdrawProvider(e.target.value)}
         >
-          <option value="ORANGE_MONEY">Orange Money</option>
-          <option value="MPESA">M-Pesa</option>
-          <option value="AIRTEL_MONEY">Airtel Money</option>
+          {mmProviders.map((p) => (
+            <option key={p.value} value={p.value}>
+              {p.label}
+            </option>
+          ))}
         </select>
         <input
           className="w-full rounded-xl border-0 bg-gray-50 p-3"

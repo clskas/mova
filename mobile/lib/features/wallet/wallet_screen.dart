@@ -708,6 +708,9 @@ class _WalletWithdrawSheetState extends ConsumerState<_WalletWithdrawSheet> {
   String? _otpPhone;
   String? _otpDeliveryHint;
   String? _formError;
+  List<MobileMoneyProvider> _providers = MarketConfig.mobileMoneyProviders
+      .where((p) => p.id != 'ORANGE_MONEY')
+      .toList();
 
   @override
   void initState() {
@@ -717,10 +720,36 @@ class _WalletWithdrawSheetState extends ConsumerState<_WalletWithdrawSheet> {
     );
     _phoneController = TextEditingController(text: widget.initialPhone);
     _otpController = TextEditingController();
-    _providerId = MarketConfig.mobileMoneyProviders.first.id;
+    _providerId = _providers.isNotEmpty
+        ? _providers.firstWhere((p) => p.id == 'MPESA', orElse: () => _providers.first).id
+        : MarketConfig.mobileMoneyProviders.first.id;
     if (widget.startOnOtpStep) {
       _otpSent = true;
       _otpPhone = MarketConfig.normalizePhone(widget.initialPhone);
+    }
+    _loadProviders();
+  }
+
+  Future<void> _loadProviders() async {
+    final api = ref.read(apiClientProvider);
+    final result = await api.get('/public/client-config');
+    if (!mounted) return;
+    if (result case Success(:final data)) {
+      final mm = data['mobileMoney'];
+      final row = mm is Map ? mm['senga'] : null;
+      if (row is Map) {
+        final next = MarketConfig.mobileMoneyProviders
+            .where((p) => row[p.id] == true)
+            .toList();
+        if (next.isNotEmpty) {
+          setState(() {
+            _providers = next;
+            if (!_providers.any((p) => p.id == _providerId)) {
+              _providerId = _providers.first.id;
+            }
+          });
+        }
+      }
     }
   }
 
@@ -845,12 +874,14 @@ class _WalletWithdrawSheetState extends ConsumerState<_WalletWithdrawSheet> {
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
-              value: _providerId,
+              value: _providers.any((p) => p.id == _providerId)
+                  ? _providerId
+                  : (_providers.isNotEmpty ? _providers.first.id : _providerId),
               decoration: const InputDecoration(
                 labelText: 'Opérateur',
                 prefixIcon: Icon(Icons.account_balance_wallet_outlined),
               ),
-              items: MarketConfig.mobileMoneyProviders
+              items: _providers
                   .map((p) => DropdownMenuItem(value: p.id, child: Text(p.name)))
                   .toList(),
               onChanged: _otpSent

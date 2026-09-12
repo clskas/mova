@@ -914,6 +914,17 @@ export class AdminService {
     return this.proxy('ride', '/internal/platform-config', { method: 'PATCH', body: JSON.stringify(body) });
   }
 
+  getClientAppsConfig() {
+    return this.fetchJson('ride', '/internal/client-apps-config');
+  }
+
+  updateClientAppsConfig(body: Record<string, unknown>) {
+    return this.proxy('ride', '/internal/client-apps-config', {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    });
+  }
+
   listCancellationPolicies() {
     return this.fetchJson('ride', '/internal/cancellation-policies');
   }

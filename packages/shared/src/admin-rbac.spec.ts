@@ -55,8 +55,11 @@ describe('admin-rbac', () => {
   it('CGU : SUPER_ADMIN et ADMIN seulement', () => {
     expect(hasAdminPermission(UserRole.SUPER_ADMIN, AdminPermission.CGU_READ)).toBe(true);
     expect(hasAdminPermission(UserRole.SUPER_ADMIN, AdminPermission.CGU_WRITE)).toBe(true);
+    expect(hasAdminPermission(UserRole.SUPER_ADMIN, AdminPermission.SYSTEM_READ)).toBe(true);
+    expect(hasAdminPermission(UserRole.SUPER_ADMIN, AdminPermission.SYSTEM_WRITE)).toBe(true);
     expect(hasAdminPermission(UserRole.ADMIN, AdminPermission.CGU_READ)).toBe(true);
     expect(hasAdminPermission(UserRole.ADMIN, AdminPermission.CGU_WRITE)).toBe(true);
+    expect(hasAdminPermission(UserRole.ADMIN, AdminPermission.SYSTEM_WRITE)).toBe(false);
     expect(hasAdminPermission(UserRole.SUPPORT, AdminPermission.CGU_READ)).toBe(false);
     expect(hasAdminPermission(UserRole.CONTENT, AdminPermission.CGU_WRITE)).toBe(false);
   });

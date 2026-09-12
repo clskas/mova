@@ -31,12 +31,55 @@ export function getApiBase() {
   return API_BASE;
 }
 
+export type MenuSize = {
+  label: string;
+  priceCdf?: number;
+  unitPriceCdf?: number;
+  name?: string;
+};
+
+export type MenuOption = {
+  label: string;
+  priceCdf?: number;
+  unitPriceCdf?: number;
+  name?: string;
+  group?: string;
+};
+
+export type MenuOptionGroup = {
+  id?: string;
+  name: string;
+  min?: number;
+  max?: number;
+  options: MenuOption[];
+};
+
+export type MenuCategory = {
+  id: string;
+  name: string;
+  sortOrder?: number;
+};
+
 export type MenuItem = {
+  id?: string;
   name: string;
   unitPriceCdf: number;
+  categoryId?: string;
   imageUrl?: string;
   description?: string;
   isAvailable?: boolean;
+  /** null = unlimited */
+  stockQty?: number | null;
+  sizes?: MenuSize[];
+  options?: MenuOption[];
+  optionGroups?: MenuOptionGroup[];
+  ageRestricted?: boolean;
+  requiresPrescription?: boolean;
+};
+
+export type MenuCatalog = {
+  categories: MenuCategory[];
+  items: MenuItem[];
 };
 
 export type RestaurantProfile = {
@@ -126,7 +169,12 @@ export function fetchProfile() {
 }
 
 export function fetchMenu() {
-  return apiFetch<{ restaurantId: string; menuItems: MenuItem[] }>("/api/restaurant/menu");
+  return apiFetch<{
+    restaurantId: string;
+    categories?: MenuCategory[];
+    menuItems: MenuItem[];
+    catalog?: MenuCatalog;
+  }>("/api/restaurant/menu");
 }
 
 export function fetchOrders(params?: {
@@ -295,10 +343,17 @@ export function assignOwnDriver(orderId: string, driverUserId: string) {
   });
 }
 
-export function saveMenu(menuItems: MenuItem[]) {
-  return apiFetch<{ menuItems: MenuItem[] }>("/api/restaurant/menu", {
+export function saveMenu(menuItems: MenuItem[], categories?: MenuCategory[]) {
+  return apiFetch<{
+    menuItems: MenuItem[];
+    categories?: MenuCategory[];
+    catalog?: MenuCatalog;
+  }>("/api/restaurant/menu", {
     method: "PATCH",
-    body: JSON.stringify({ menuItems }),
+    body: JSON.stringify({
+      menuItems,
+      ...(categories != null ? { categories } : {}),
+    }),
   });
 }
 

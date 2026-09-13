@@ -38,8 +38,11 @@ Pipeline : workflow GitHub **Mobile Release** (après Deploy + smoke), environne
 1. [Google Cloud Console](https://console.cloud.google.com/) → projet lié à Play (ou en créer un).
 2. **IAM & Admin** → **Comptes de service** → **Créer** (ex. `senga-play-ci`).
 3. **Clés** → **Ajouter une clé** → JSON → télécharger le fichier.
-4. Play Console → **Utilisateurs et autorisations** → **Inviter des utilisateurs** → coller l’e-mail du compte de service.
-5. Droits : **Administrateur de versions** (ou au minimum accès aux versions + track Internal) sur **Senga** et **SENGA Driver**.
+4. Play Console → **Utilisateurs et autorisations** → **Inviter des utilisateurs** → coller l’e-mail du compte de service (ex. `senga-play-ci@kongomarket.iam.gserviceaccount.com`).
+5. Droits : **Administrateur de versions** (ou au minimum accès aux versions + track Internal) sur **les deux apps** :
+   - **Senga** / `cd.mova.mova.passenger`
+   - **SENGA Driver** / `cd.mova.mova.driver`  
+   Si le SA n’est invité que sur le passager, l’upload chauffeur échoue avec `Google Api Error: Invalid request - The caller does not have permission` (l’API Play ne peut pas s’auto-accorder l’accès).
 6. Placer le JSON en local (gitignored) : `mobile/android/play-service-account.json`.
 7. Encoder + pousser le secret sur le repo CI **afri-soft-com/mova** (PowerShell) :
 

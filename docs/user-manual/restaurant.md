@@ -2,13 +2,13 @@
 
 Portail web : [restaurant.afri-soft.com](https://restaurant.afri-soft.com)
 
-Le portail **SENGA Business** sert les partenaires **restaurant**, **supermarché**, **pharmacie** et **boutique**. L’interface (menus, libellés, pages) s’adapte au type de commerce (`commerceType`) défini à la création du magasin dans l’admin.
+Le portail **SENGA Business** sert les partenaires **restaurant**, **supermarché**, **pharmacie** et **boutique**. L’interface (menus, libellés, pages) s’adapte au type de commerce (`commerceType`).
 
 ## Connexion et PIN
 
 1. Ouvrez [restaurant.afri-soft.com](https://restaurant.afri-soft.com).
 2. Saisissez votre **téléphone +243 ou e-mail**, puis le **Code PIN (reçu par e-mail / SMS)** — 6 chiffres.
-3. Première visite avant KYC : code SMS ou Continuer avec Google, puis **Mon dossier**.
+3. Première visite : après connexion, l’écran d’onboarding demande de **choisir le type de commerce**, puis le nom, l’adresse et le GPS. Ensuite → **Mon dossier** (KYC).
 4. Après **Approuver** dans l’admin KYC, le PIN part par SMS et/ou e-mail. Un compte déjà lié à Google peut aussi se connecter avec ce PIN.
 5. Si l’e-mail n’est pas dans la boîte, ouvrez **Spam**. L’admin n’a que la preuve SMTP (accepté), pas l’arrivée Gmail.
 
@@ -25,8 +25,11 @@ Le portail **SENGA Business** sert les partenaires **restaurant**, **supermarch�
 | **Pharmacie** | Catalogue, Stock, Restrictions (ordonnance) | Filtre Pharmacies ; mention ordonnance si requis |
 | **Boutique** | Catalogue, Stock, Restrictions (âge) | Filtre Boutiques |
 
-Le type est fixé par l’équipe SENGA à la création / édition du magasin (console admin → **Restaurants** → type de commerce). Contactez le support pour le changer.
+**Quand le type est choisi :**
+1. **Par le partenaire** à la première configuration (onboarding SENGA Business), ou plus tard dans **Paramètres → Type de commerce**.
+2. **Par l’admin** à la création / édition du magasin (console → **Restaurants**), si besoin de corriger.
 
+Après un changement de type, rechargez le portail : la navigation (Menu / Catalogue / Stock / Restrictions) se met à jour.
 ## Menu (restaurants)
 
 1. Ouvrez **Menu**.

@@ -3,7 +3,19 @@
 import { useEffect, useState } from "react";
 import { GpsCoordButton } from "@/components/GpsCoordButton";
 import { completeRestaurantProfile, fetchProfile } from "@/lib/api";
+import {
+  COMMERCE_TYPE_LABELS_FR,
+  parseCommerceType,
+  type CommerceType,
+} from "@/lib/commerce-type";
 import { toUserErrorMessage } from "@/lib/user-messages";
+
+const COMMERCE_OPTIONS: { value: CommerceType; hint: string }[] = [
+  { value: "RESTAURANT", hint: "Menus, plats, options et suppléments" },
+  { value: "SUPERMARKET", hint: "Catalogue, stock et catégories" },
+  { value: "PHARMACY", hint: "Produits de santé et restrictions" },
+  { value: "BOUTIQUE", hint: "Mode, accessoires, cadeaux, etc." },
+];
 
 type RestaurantOnboardingCardProps = {
   onComplete: () => void;
@@ -15,6 +27,7 @@ function parseCoord(value: string): number | null {
 }
 
 export function RestaurantOnboardingCard({ onComplete }: RestaurantOnboardingCardProps) {
+  const [commerceType, setCommerceType] = useState<CommerceType>("RESTAURANT");
   const [name, setName] = useState("");
   const [cuisine, setCuisine] = useState("Congolaise");
   const [address, setAddress] = useState("");
@@ -29,6 +42,7 @@ export function RestaurantOnboardingCard({ onComplete }: RestaurantOnboardingCar
     fetchProfile()
       .then((p) => {
         if (cancelled) return;
+        setCommerceType(parseCommerceType(p.commerceType));
         if (p.name && p.name !== "Mon restaurant") setName(p.name);
         if (p.cuisine && p.cuisine !== "À préciser") setCuisine(p.cuisine);
         if (p.address && p.address !== "Kinshasa — à compléter") setAddress(p.address);
@@ -36,7 +50,7 @@ export function RestaurantOnboardingCard({ onComplete }: RestaurantOnboardingCar
         if (p.lng != null) setLng(String(p.lng));
       })
       .catch((e) => {
-        if (!cancelled) setError(toUserErrorMessage(e, "Impossible de charger votre restaurant."));
+        if (!cancelled) setError(toUserErrorMessage(e, "Impossible de charger votre magasin."));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -62,9 +76,10 @@ export function RestaurantOnboardingCard({ onComplete }: RestaurantOnboardingCar
         address: address.trim(),
         lat: latNum,
         lng: lngNum,
+        commerceType,
       });
       if (result.needsProfileSetup) {
-        throw new Error("Complétez toutes les informations de votre restaurant.");
+        throw new Error("Complétez toutes les informations de votre établissement.");
       }
       onComplete();
     } catch (err) {
@@ -74,13 +89,24 @@ export function RestaurantOnboardingCard({ onComplete }: RestaurantOnboardingCar
     }
   }
 
+  const specialtyLabel = commerceType === "RESTAURANT" ? "Cuisine / spécialité" : "Spécialité / rayon";
+  const nameLabel =
+    commerceType === "RESTAURANT"
+      ? "Nom du restaurant"
+      : commerceType === "PHARMACY"
+        ? "Nom de la pharmacie"
+        : commerceType === "SUPERMARKET"
+          ? "Nom du supermarché"
+          : "Nom de la boutique";
+
   return (
     <form onSubmit={submit} className="space-y-5">
       <div>
-        <h2 className="text-xl font-bold text-gray-900">Complétez les informations de votre restaurant</h2>
+        <h2 className="text-xl font-bold text-gray-900">Bienvenue sur SENGA Business</h2>
         <p className="mt-2 text-sm text-gray-500">
-          Ces informations lient automatiquement votre compte à votre établissement. Ensuite, vous pourrez
-          compléter votre dossier KYC dans <span className="font-medium">Mon dossier</span>.
+          Choisissez d’abord votre type de commerce — le portail s’adapte (menu, catalogue, stock,
+          restrictions). Ensuite, complétez votre dossier KYC dans{" "}
+          <span className="font-medium">Mon dossier</span>.
         </p>
       </div>
 
@@ -88,8 +114,39 @@ export function RestaurantOnboardingCard({ onComplete }: RestaurantOnboardingCar
         <p className="text-sm text-gray-400">Chargement…</p>
       ) : (
         <div className="space-y-4">
+          <fieldset>
+            <legend className="text-sm font-medium text-gray-700">Type de commerce</legend>
+            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+              {COMMERCE_OPTIONS.map((opt) => {
+                const selected = commerceType === opt.value;
+                return (
+                  <label
+                    key={opt.value}
+                    className={`cursor-pointer rounded-xl border p-3 transition ${
+                      selected
+                        ? "border-orange-400 bg-orange-50 ring-1 ring-orange-300"
+                        : "border-gray-200 hover:border-orange-200"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="commerceType"
+                      className="sr-only"
+                      checked={selected}
+                      onChange={() => setCommerceType(opt.value)}
+                    />
+                    <span className="block text-sm font-semibold text-gray-900">
+                      {COMMERCE_TYPE_LABELS_FR[opt.value]}
+                    </span>
+                    <span className="mt-0.5 block text-xs text-gray-500">{opt.hint}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </fieldset>
+
           <label className="block text-sm">
-            <span className="text-gray-600">Nom du restaurant</span>
+            <span className="text-gray-600">{nameLabel}</span>
             <input
               required
               className="mt-1 w-full rounded-xl border p-3"
@@ -99,11 +156,11 @@ export function RestaurantOnboardingCard({ onComplete }: RestaurantOnboardingCar
             />
           </label>
           <label className="block text-sm">
-            <span className="text-gray-600">Cuisine</span>
+            <span className="text-gray-600">{specialtyLabel}</span>
             <input
               required
               className="mt-1 w-full rounded-xl border p-3"
-              placeholder="Ex. Congolaise"
+              placeholder={commerceType === "RESTAURANT" ? "Ex. Congolaise" : "Ex. Épicerie, Mode…"}
               value={cuisine}
               onChange={(e) => setCuisine(e.target.value)}
             />
@@ -149,7 +206,7 @@ export function RestaurantOnboardingCard({ onComplete }: RestaurantOnboardingCar
             onError={setError}
           />
           <p className="text-xs text-gray-400">
-            Les passagers voient les restaurants proches de leur adresse de livraison. Une position précise
+            Les clients voient les commerces proches de leur adresse de livraison. Une position précise
             améliore votre visibilité.
           </p>
         </div>

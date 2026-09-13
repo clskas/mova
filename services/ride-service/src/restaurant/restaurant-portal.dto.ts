@@ -3,6 +3,7 @@ import { Type } from 'class-transformer';
 import {
   IsArray,
   IsBoolean,
+  IsIn,
   IsInt,
   IsNumber,
   IsOptional,
@@ -10,6 +11,7 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
+import { COMMERCE_TYPES } from './restaurant-profile.util';
 
 export class MenuSizeDto {
   @ApiProperty() @IsString() label: string;
@@ -131,7 +133,14 @@ export class UpdateRestaurantLocationDto {
   @ApiPropertyOptional() @IsOptional() @IsString() address?: string;
   @ApiPropertyOptional() @IsOptional() @IsNumber() lat?: number;
   @ApiPropertyOptional() @IsOptional() @IsNumber() lng?: number;
-  @ApiPropertyOptional({ description: 'Valide et finalise la fiche restaurant (onboarding)' })
+  @ApiPropertyOptional({
+    enum: COMMERCE_TYPES,
+    description: 'Type de commerce (choisi à l’onboarding partenaire)',
+  })
+  @IsOptional()
+  @IsIn([...COMMERCE_TYPES])
+  commerceType?: (typeof COMMERCE_TYPES)[number];
+  @ApiPropertyOptional({ description: 'Valide et finalise la fiche magasin (onboarding)' })
   @IsOptional()
   @IsBoolean()
   completeSetup?: boolean;

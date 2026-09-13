@@ -24,6 +24,7 @@ import { UploadsService } from '../uploads/uploads.service';
 import { UpdateRestaurantLocationDto, UpdateRestaurantMenuDto } from './restaurant-portal.dto';
 import {
   assertRestaurantProfileComplete,
+  parseCommerceType,
   restaurantNeedsProfileSetup,
 } from './restaurant-profile.util';
 import { fetchServicePaymentStatuses } from '../common/payment-status.util';
@@ -454,7 +455,14 @@ export class RestaurantPortalService {
 
   async updateLocation(ownerUserId: string, dto: UpdateRestaurantLocationDto) {
     const restaurant = await this.getRestaurantForOwner(ownerUserId);
-    let payload: { name?: string; cuisine?: string; address?: string; lat?: number; lng?: number };
+    let payload: {
+      name?: string;
+      cuisine?: string;
+      address?: string;
+      lat?: number;
+      lng?: number;
+      commerceType?: ReturnType<typeof parseCommerceType>;
+    };
 
     if (dto.completeSetup) {
       try {
@@ -469,8 +477,13 @@ export class RestaurantPortalService {
         throw new MovaHttpException(
           MovaErrorCode.VALIDATION_ERROR,
           undefined,
-          err instanceof Error ? err.message : 'Informations restaurant incomplètes.',
+          err instanceof Error ? err.message : 'Informations magasin incomplètes.',
         );
+      }
+      if (dto.commerceType != null) {
+        payload.commerceType = parseCommerceType(dto.commerceType);
+      } else if (!restaurant.commerceType) {
+        payload.commerceType = 'RESTAURANT';
       }
     } else {
       if (dto.lat != null && (dto.lat < -90 || dto.lat > 90)) {
@@ -485,6 +498,7 @@ export class RestaurantPortalService {
         ...(dto.address !== undefined ? { address: dto.address.trim() || restaurant.address } : {}),
         ...(dto.lat != null ? { lat: dto.lat } : {}),
         ...(dto.lng != null ? { lng: dto.lng } : {}),
+        ...(dto.commerceType != null ? { commerceType: parseCommerceType(dto.commerceType) } : {}),
       };
     }
 
@@ -499,6 +513,7 @@ export class RestaurantPortalService {
       address: updated.address,
       lat: updated.lat,
       lng: updated.lng,
+      commerceType: updated.commerceType ?? 'RESTAURANT',
       needsProfileSetup: restaurantNeedsProfileSetup(updated),
     };
   }

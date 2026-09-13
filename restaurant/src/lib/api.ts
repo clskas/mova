@@ -371,6 +371,7 @@ export function updateRestaurantLocation(data: {
   address?: string;
   lat?: number;
   lng?: number;
+  commerceType?: "RESTAURANT" | "SUPERMARKET" | "PHARMACY" | "BOUTIQUE";
   completeSetup?: boolean;
 }) {
   return apiFetch<{
@@ -380,6 +381,7 @@ export function updateRestaurantLocation(data: {
     address?: string;
     lat?: number;
     lng?: number;
+    commerceType?: "RESTAURANT" | "SUPERMARKET" | "PHARMACY" | "BOUTIQUE";
     needsProfileSetup?: boolean;
   }>("/api/restaurant/location", { method: "PATCH", body: JSON.stringify(data) });
 }
@@ -390,6 +392,7 @@ export function completeRestaurantProfile(data: {
   address: string;
   lat: number;
   lng: number;
+  commerceType: "RESTAURANT" | "SUPERMARKET" | "PHARMACY" | "BOUTIQUE";
 }) {
   return updateRestaurantLocation({ ...data, completeSetup: true });
 }

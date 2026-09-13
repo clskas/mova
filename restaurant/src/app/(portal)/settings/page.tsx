@@ -14,6 +14,11 @@ import {
   type RestaurantFleetDriver,
 } from "@/lib/api";
 import { toUserErrorMessage } from "@/lib/user-messages";
+import {
+  COMMERCE_TYPE_LABELS_FR,
+  parseCommerceType,
+  type CommerceType,
+} from "@/lib/commerce-type";
 
 export default function SettingsPage() {
   const [accepting, setAccepting] = useState(true);
@@ -21,6 +26,7 @@ export default function SettingsPage() {
   const [promo, setPromo] = useState("");
   const [name, setName] = useState("");
   const [cuisine, setCuisine] = useState("");
+  const [commerceType, setCommerceType] = useState<CommerceType>("RESTAURANT");
   const [address, setAddress] = useState("");
   const [lat, setLat] = useState("");
   const [lng, setLng] = useState("");
@@ -43,6 +49,7 @@ export default function SettingsPage() {
       setPromo("");
       setName(p.name ?? "");
       setCuisine(p.cuisine ?? "");
+      setCommerceType(parseCommerceType(p.commerceType));
       setAddress(p.address ?? "");
       setLat(p.lat != null ? String(p.lat) : "");
       setLng(p.lng != null ? String(p.lng) : "");
@@ -123,10 +130,11 @@ export default function SettingsPage() {
         prepTimeMin: prepTime,
         promotionLabel: promo.trim() || undefined,
       });
-      if (address.trim() || name.trim() || cuisine.trim() || latNum != null) {
+      if (address.trim() || name.trim() || cuisine.trim() || latNum != null || commerceType) {
         await updateRestaurantLocation({
           ...(name.trim() ? { name: name.trim() } : {}),
           ...(cuisine.trim() ? { cuisine: cuisine.trim() } : {}),
+          commerceType,
           ...(address.trim() ? { address: address.trim() } : {}),
           ...(latNum != null && lngNum != null ? { lat: latNum, lng: lngNum } : {}),
         });
@@ -166,9 +174,26 @@ export default function SettingsPage() {
         ) : (
           <div className="bg-white rounded-2xl border p-6 space-y-5">
             <div className="space-y-3 pb-4 border-b">
-              <h3 className="font-semibold text-sm text-gray-700">Localisation du restaurant</h3>
+              <h3 className="font-semibold text-sm text-gray-700">Établissement</h3>
               <label className="block text-sm">
-                <span className="text-gray-600">Nom du restaurant</span>
+                <span className="text-gray-600">Type de commerce</span>
+                <select
+                  className="mt-1 w-full rounded-xl border p-3 bg-white"
+                  value={commerceType}
+                  onChange={(e) => setCommerceType(parseCommerceType(e.target.value))}
+                >
+                  {(Object.keys(COMMERCE_TYPE_LABELS_FR) as CommerceType[]).map((key) => (
+                    <option key={key} value={key}>
+                      {COMMERCE_TYPE_LABELS_FR[key]}
+                    </option>
+                  ))}
+                </select>
+                <span className="mt-1 block text-xs text-gray-400">
+                  Change le menu du portail (Menu, Catalogue, Stock, Restrictions).
+                </span>
+              </label>
+              <label className="block text-sm">
+                <span className="text-gray-600">Nom</span>
                 <input
                   className="mt-1 w-full rounded-xl border p-3"
                   placeholder="Ex. Chez Flore"
@@ -177,10 +202,12 @@ export default function SettingsPage() {
                 />
               </label>
               <label className="block text-sm">
-                <span className="text-gray-600">Cuisine</span>
+                <span className="text-gray-600">
+                  {commerceType === "RESTAURANT" ? "Cuisine" : "Spécialité / rayon"}
+                </span>
                 <input
                   className="mt-1 w-full rounded-xl border p-3"
-                  placeholder="Ex. Congolais"
+                  placeholder="Ex. Congolaise"
                   value={cuisine}
                   onChange={(e) => setCuisine(e.target.value)}
                 />

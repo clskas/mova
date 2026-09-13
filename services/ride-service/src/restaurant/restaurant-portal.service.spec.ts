@@ -123,4 +123,32 @@ describe('RestaurantPortalService', () => {
     const profile = await service.getProfile('owner-1');
     expect(profile.commerceType).toBe('PHARMACY');
   });
+
+  it('enregistre commerceType à l’onboarding (completeSetup)', async () => {
+    const prisma = (service as unknown as { prisma: { restaurant: { update: jest.Mock } } }).prisma;
+    prisma.restaurant.update.mockResolvedValueOnce({
+      ...restaurant,
+      name: 'Pharma Plus',
+      cuisine: 'Santé',
+      address: 'Victoire',
+      lat: -4.3,
+      lng: 15.3,
+      commerceType: 'PHARMACY',
+    });
+    const result = await service.updateLocation('owner-1', {
+      name: 'Pharma Plus',
+      cuisine: 'Santé',
+      address: 'Victoire',
+      lat: -4.3,
+      lng: 15.3,
+      commerceType: 'PHARMACY',
+      completeSetup: true,
+    });
+    expect(prisma.restaurant.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ commerceType: 'PHARMACY' }),
+      }),
+    );
+    expect(result.commerceType).toBe('PHARMACY');
+  });
 });

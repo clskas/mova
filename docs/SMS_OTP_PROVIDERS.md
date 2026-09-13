@@ -22,7 +22,7 @@ Mobile Money reste indépendant (`MOBILE_MONEY_GATEWAY=serdipay`).
 - **Auth** : `apiId` + `apiKey` dans le corps JSON (pas de Bearer / `get-token` paiement).
 - **Send** : `POST {SERDIPAY_SMS_BASE_URL}/api/sms-api/v1/send`  
   Body : `{ apiId, apiKey, phone, senderId?, text }` — téléphone en `+243…`.
-- **Prod** : `https://serdipay.com` — **Staging** : `https://api.serdipay.cloud`
+- **Prod** : `https://apis.serdipay.com` — **Staging** : `https://api.serdipay.cloud`
 - **HTTP** : `200` OK · `400` API ID · `403` crédit SMS insuffisant · `404` bad request · `406` Not Acceptable
 - Activation : admin SerdiPay active l’API SMS ; credentials envoyés par WhatsApp/mail.
 - Ces credentials sont **distincts** de `SERDIPAY_EMAIL` / `SERDIPAY_PASSWORD` (paiement).
@@ -32,7 +32,7 @@ Mobile Money reste indépendant (`MOBILE_MONEY_GATEWAY=serdipay`).
 | Variable | Exemple | Notes |
 |----------|---------|--------|
 | `SMS_PROVIDER` | `serdipay` | Switch explicite |
-| `SERDIPAY_SMS_BASE_URL` | `https://serdipay.com` | Staging : `https://api.serdipay.cloud` |
+| `SERDIPAY_SMS_BASE_URL` | `https://apis.serdipay.com` | Staging : `https://api.serdipay.cloud` |
 | `SERDIPAY_SMS_PATH` | `/api/sms-api/v1/send` | Défaut code si vide |
 | `SERDIPAY_SMS_API_ID` | *(secret)* | Fourni par SerdiPay |
 | `SERDIPAY_SMS_API_KEY` | *(secret)* | Fourni par SerdiPay |

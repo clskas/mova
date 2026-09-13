@@ -99,7 +99,7 @@ MOCK_PAYMENTS=false
 | `SERDIPAY_API_PASSWORD` | **VPS hub** — `api_password` du corps ; **optionnel**, défaut = `SERDIPAY_PASSWORD` |
 | `SERDIPAY_MERCHANT_CODE` / `SERDIPAY_MERCHANT_PIN` | **VPS hub** — code marchand + PIN |
 | `SERDIPAY_SMS_API_ID` / `SERDIPAY_SMS_API_KEY` | Credentials SMS API (doc `sms-api.pdf`) — distincts du paiement |
-| `SERDIPAY_SMS_BASE_URL` / `SERDIPAY_SMS_PATH` | Défauts `https://serdipay.com` + `/api/sms-api/v1/send` |
+| `SERDIPAY_SMS_BASE_URL` / `SERDIPAY_SMS_PATH` | Défauts `https://apis.serdipay.com` + `/api/sms-api/v1/send` |
 | `SERDIPAY_SMS_SENDER_ID` | Sender alphanumérique SerdiPay (ex. `SerdiPay`) |
 | `SMS_PROVIDER` | `africastalking` \| `serdipay` \| `twilio` — switch **explicite**, sans fallback (voir [SMS_OTP_PROVIDERS.md](./SMS_OTP_PROVIDERS.md)) |
 | `AFRICAS_TALKING_USERNAME` / `AFRICAS_TALKING_API_KEY` | App AT (ex. `mova`) + API key — voir [AFRICAS_TALKING_SMS.md](./AFRICAS_TALKING_SMS.md) |
@@ -135,7 +135,7 @@ Sans provider SMS avec `MOCK_OTP=false` et sans `ALLOW_TEST_OTP`, l'API renvoie 
 | `true` (dev) | Mobile money simulé, succès immédiat |
 | `false` (prod) | SerdiPay C2B (`payment-merchant`) / B2C (`payment-client`) ; telecom `OM` / `MP` / `AM` / `AF`. CinetPay = collect only (pas de payout). B2C doit être **activé** sur le dashboard SerdiPay/AfriMomo — sinon `channel0` / « merchant not allowed » ; SENGA refuse et recrédite le wallet. |
 
-`SERDIPAY_BASE_URL` : **prod** `https://serdipay.com` (PDF Public API + fiche Word « API Routes PRODUCTION »). Staging Word : `https://api.serdipay.cloud`. Recreate du conteneur `payment` après changement. Auth : `POST …/merchant/get-token` `{ email, password }`.
+`SERDIPAY_BASE_URL` : **prod** `https://apis.serdipay.com` (`serdipay.com` = marketing SPA — POST → 405). Staging Word : `https://api.serdipay.cloud`. Recreate du conteneur `payment` après changement. Auth : `POST …/merchant/get-token` `{ email, password }`.
 
 Le **portefeuille SENGA** (`POST /api/wallet/top-up`, `POST /api/payments/rides/:id`) persiste toujours en PostgreSQL, mock ou réel.
 

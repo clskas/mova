@@ -6,9 +6,11 @@
  *    Endpoints are placeholders (“Share the Endpoint”); not used for SENGA MM.
  *
  * Public API (this client) :
- * - Hosts from *SerdipayAPIKey* + PDF « API USSD » :
- *   prod https://serdipay.com ; staging https://api.serdipay.cloud.
- *   Do not use https://apis.serdipay.com (not in those files).
+ * - Hosts:
+ *   prod Public API https://apis.serdipay.com (POST allowed; IP whitelist).
+ *   staging https://api.serdipay.cloud.
+ *   https://serdipay.com is the marketing SPA (since ~2026-09-11): GET → HTML,
+ *   POST → nginx 405 — never use it as SERDIPAY_BASE_URL.
  * - Auth : POST /api/public-api/v1/merchant/get-token  { email, password }
  *   Word field is Username (email). A `username`-only body is rejected (400).
  * - Word routes : C2B → …/payment-merchant ; B2C → …/payment-client
@@ -21,7 +23,7 @@
  * SMS OTP — doc séparée « SerdiPay SMS API » (sms-api.pdf) :
  * - Auth dans le corps JSON : apiId + apiKey (pas de Bearer / get-token)
  * - POST /api/sms-api/v1/send  { apiId, apiKey, phone, senderId, text }
- * - Prod : https://serdipay.com  | Staging : https://api.serdipay.cloud
+ * - Prod : https://apis.serdipay.com  | Staging : https://api.serdipay.cloud
  * - Credentials SMS distincts des credentials paiement (email/password).
  */
 
@@ -64,7 +66,7 @@ export const SERDIPAY_ENV_KEYS = {
   smsApiKey: 'SERDIPAY_SMS_API_KEY',
   smsUsername: 'SERDIPAY_SMS_USERNAME',
   smsSenderId: 'SERDIPAY_SMS_SENDER_ID',
-  /** Default prod https://serdipay.com ; staging https://api.serdipay.cloud */
+  /** Default prod https://apis.serdipay.com ; staging https://api.serdipay.cloud */
   smsBaseUrl: 'SERDIPAY_SMS_BASE_URL',
   /** Default /api/sms-api/v1/send */
   smsPath: 'SERDIPAY_SMS_PATH',
@@ -148,7 +150,7 @@ function serdiPayApiPassword(get: EnvGetter): string | undefined {
 }
 
 function baseUrl(get: EnvGetter): string {
-  return (get(SERDIPAY_ENV_KEYS.baseUrl)?.trim() || 'https://serdipay.com').replace(/\/$/, '');
+  return (get(SERDIPAY_ENV_KEYS.baseUrl)?.trim() || 'https://apis.serdipay.com').replace(/\/$/, '');
 }
 
 function pathOr(get: EnvGetter, key: keyof typeof SERDIPAY_ENV_KEYS, fallback: string): string {
@@ -200,7 +202,7 @@ export function isSerdiPaySmsProcessingError(status: number, raw?: string): bool
 }
 
 function smsBaseUrl(get: EnvGetter): string {
-  return (get(SERDIPAY_ENV_KEYS.smsBaseUrl)?.trim() || 'https://serdipay.com').replace(/\/$/, '');
+  return (get(SERDIPAY_ENV_KEYS.smsBaseUrl)?.trim() || 'https://apis.serdipay.com').replace(/\/$/, '');
 }
 
 /** Telecom codes from SerdiPay Public API doc. */

@@ -39,8 +39,8 @@ Fill (no placeholders from the SerdiPay PDF):
 ```env
 MOCK_PAYMENTS=false
 MOBILE_MONEY_GATEWAY=serdipay
-# Prod Public API (PDF + Word). Staging: https://api.serdipay.cloud
-SERDIPAY_BASE_URL=https://serdipay.com
+# Prod Public API: https://apis.serdipay.com (serdipay.com = marketing SPA, POST→405). Staging: https://api.serdipay.cloud
+SERDIPAY_BASE_URL=https://apis.serdipay.com
 SERDIPAY_EMAIL=
 SERDIPAY_PASSWORD=
 SERDIPAY_API_ID=

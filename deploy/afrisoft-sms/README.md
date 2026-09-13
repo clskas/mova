@@ -32,7 +32,7 @@ SMS_PROVIDER=serdipay
 MOCK_OTP=false
 MOCK_RETURN_CODE=false
 MOCK_FIXED_OTP=false
-SERDIPAY_SMS_BASE_URL=https://serdipay.com
+SERDIPAY_SMS_BASE_URL=https://apis.serdipay.com
 SERDIPAY_SMS_SENDER_ID=SerdiPay
 ```
 

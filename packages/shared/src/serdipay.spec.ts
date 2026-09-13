@@ -176,7 +176,7 @@ describe('serdipay Public API', () => {
     const auth = await serdiPayGetAccessToken(get);
     expect(auth).toEqual({ ok: true, token: 'tok-abc' });
     expect(fetchMock).toHaveBeenCalledWith(
-      'https://serdipay.com/api/public-api/v1/merchant/get-token',
+      'https://apis.serdipay.com/api/public-api/v1/merchant/get-token',
       expect.objectContaining({
         method: 'POST',
         body: JSON.stringify({ email: 'm@example.com', password: 'secret' }),
@@ -215,7 +215,7 @@ describe('serdipay Public API', () => {
     expect(result.success).toBe(true);
     expect(result.providerRef).toBe('sp_SERDXYZ');
     const payCall = fetchMock.mock.calls[1];
-    expect(payCall[0]).toBe('https://serdipay.com/api/public-api/v1/merchant/payment-merchant');
+    expect(payCall[0]).toBe('https://apis.serdipay.com/api/public-api/v1/merchant/payment-merchant');
     expect(JSON.parse(payCall[1].body)).toEqual({
       api_id: 'APIX',
       api_password: 'apipw',
@@ -257,7 +257,7 @@ describe('serdipay Public API', () => {
       reference: 'payout_ref_1',
     });
     expect(fetchMock.mock.calls[1][0]).toBe(
-      'https://serdipay.com/api/public-api/v1/merchant/payment-client',
+      'https://apis.serdipay.com/api/public-api/v1/merchant/payment-client',
     );
     const b2cBody = JSON.parse(fetchMock.mock.calls[1][1].body as string);
     expect(b2cBody.telecom).toBe('MP');
@@ -536,7 +536,7 @@ describe('serdipay Public API', () => {
     env.SERDIPAY_SMS_API_ID = 'APISMSDEMO';
     env.SERDIPAY_SMS_API_KEY = 'test-sms-key';
     env.SERDIPAY_SMS_SENDER_ID = 'SerdiPay';
-    env.SERDIPAY_SMS_BASE_URL = 'https://serdipay.com';
+    env.SERDIPAY_SMS_BASE_URL = 'https://apis.serdipay.com';
     expect(isSerdiPaySmsConfigured(get)).toBe(true);
 
     const fetchMock = jest.fn().mockResolvedValue({
@@ -553,7 +553,7 @@ describe('serdipay Public API', () => {
     expect(result.success).toBe(true);
     expect(result.message).toMatch(/SMS sent successfully/);
     expect(fetchMock).toHaveBeenCalledWith(
-      'https://serdipay.com/api/sms-api/v1/send',
+      'https://apis.serdipay.com/api/sms-api/v1/send',
       expect.objectContaining({ method: 'POST' }),
     );
     const body = JSON.parse(fetchMock.mock.calls[0][1].body as string);

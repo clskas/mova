@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api/api_client.dart';
 import '../../core/cache/profile_cache.dart';
+import '../../core/cache/user_profile_cache.dart';
 import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
 import '../driver/driver_home_screen.dart';
@@ -84,8 +85,9 @@ class _AuthSessionGateState extends ConsumerState<AuthSessionGate> {
           return;
         }
         if (sessionRequiresPinUnlock(pinConfigured: pinConfigured, phone: phone)) {
-          // Camera / OS may kill the process; keep JWT if the user unlocked recently.
-          if (await api.isSessionRecentlyUnlocked()) {
+          // Camera / OS may kill the process; keep JWT across capture + unlock window.
+          if (await api.shouldKeepSessionAcrossProcessDeath()) {
+            await api.markSessionUnlocked();
             if (!mounted) return;
             setState(() {
               _checking = false;
@@ -93,7 +95,8 @@ class _AuthSessionGateState extends ConsumerState<AuthSessionGate> {
             });
             return;
           }
-          await api.clearToken(keepPhone: true);
+          // Cold start with PIN: show login, but do NOT wipe JWT — a later camera-kill
+          // recovery (or retry) can still validate the same token.
           if (mounted) setState(() => _checking = false);
           return;
         }
@@ -104,14 +107,29 @@ class _AuthSessionGateState extends ConsumerState<AuthSessionGate> {
           _authenticated = true;
         });
       case Failure(:final error):
-        // Transient /users/me after camera kill must not wipe a still-valid JWT.
-        if (error is! AuthFailure && await api.isSessionRecentlyUnlocked()) {
+        // After camera kill, gateway flaps / brief 401 must not force re-login.
+        if (await api.shouldKeepSessionAcrossProcessDeath()) {
+          await api.markSessionUnlocked();
           if (!mounted) return;
           setState(() {
             _checking = false;
             _authenticated = true;
           });
           return;
+        }
+        if (error is! AuthFailure) {
+          final cached = await UserProfileCache.load();
+          if (!cached.isEmpty && api.hasToken) {
+            final role = cached.profile?['role']?.toString();
+            if (jwtRoleMatchesAppFlavor(widget.role, role)) {
+              if (!mounted) return;
+              setState(() {
+                _checking = false;
+                _authenticated = true;
+              });
+              return;
+            }
+          }
         }
         await _clearRejectedSession(api);
     }

@@ -1,9 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import '../api/api_client.dart';
 
 /// Paramètres adaptés aux appareils à faible mémoire (évite le kill processus caméra).
 const int kMovaPickMaxSide = 1024;
 const int kMovaPickQuality = 65;
+
+/// Stamp session + camera guard before OS camera/gallery (Android often kills the process).
+Future<void> markExternalCaptureSessionGuard() async {
+  final prefs = await SharedPreferences.getInstance();
+  final now = DateTime.now().millisecondsSinceEpoch;
+  await prefs.setInt(ApiClient.sessionUnlockedAtKey, now);
+  await prefs.setInt(ApiClient.cameraCaptureGuardKey, now);
+}
 
 Future<XFile?> pickMovaImage(
   ImagePicker picker,
@@ -11,6 +22,7 @@ Future<XFile?> pickMovaImage(
   CameraDevice preferredCameraDevice = CameraDevice.rear,
 }) async {
   try {
+    await markExternalCaptureSessionGuard();
     return await picker.pickImage(
       source: source,
       maxWidth: kMovaPickMaxSide.toDouble(),

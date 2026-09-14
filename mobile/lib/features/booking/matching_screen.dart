@@ -344,6 +344,7 @@ class _MatchingScreenState extends ConsumerState<MatchingScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                const SizedBox(height: 8),
                 MovaButton(
                   label: 'Annuler la recherche',
                   isSecondary: true,
@@ -351,15 +352,14 @@ class _MatchingScreenState extends ConsumerState<MatchingScreen>
                   icon: Icons.close,
                   onPressed: _searching && !_cancelling ? _cancel : null,
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 6),
                 const Text(
-                  'Politique d\'annulation : gratuite avant acceptation du chauffeur.',
+                  'Annulation gratuite avant acceptation du chauffeur.',
                   textAlign: TextAlign.center,
-                  maxLines: 3,
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 12, color: MovaColors.textSecondary),
+                  style: TextStyle(fontSize: 11, color: MovaColors.textSecondary),
                 ),
-                SizedBox(height: MediaQuery.paddingOf(context).bottom + 8),
               ],
             ),
           ),

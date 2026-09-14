@@ -180,8 +180,8 @@ class MovaFlexScroll extends StatelessWidget {
   }
 }
 
-/// Pied d'actions sous un [Expanded] : se compacte et défile sur petits écrans
-/// au lieu de provoquer un « BOTTOM OVERFLOWED ».
+/// Pied d'actions sous un [Expanded] : hauteur intrinsèque (max ~32% écran),
+/// pour ne pas voler la moitié de l'écran au contenu (ex. chauffeurs disponibles).
 class MovaStickyActions extends StatelessWidget {
   const MovaStickyActions({super.key, required this.child});
 
@@ -189,8 +189,9 @@ class MovaStickyActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Flexible(
-      fit: FlexFit.loose,
+    final maxH = MediaQuery.sizeOf(context).height * 0.32;
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: maxH),
       child: SingleChildScrollView(
         physics: kMovaScrollPhysics,
         child: child,

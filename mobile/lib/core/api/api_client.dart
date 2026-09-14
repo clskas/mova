@@ -81,10 +81,15 @@ class ApiClient {
     return _token;
   }
 
-  static const _sessionUnlockedAtKey = 'session_unlocked_at_ms';
+  /// Shared with [markExternalCaptureSessionGuard] in image_pick_util.dart.
+  static const sessionUnlockedAtKey = 'session_unlocked_at_ms';
+  static const cameraCaptureGuardKey = 'camera_capture_guard_ms';
 
   /// Keep JWT across camera / OS process death for this long after PIN/OTP unlock.
   static const sessionUnlockTtl = Duration(hours: 12);
+
+  /// Fresh camera/gallery launch — survive process death even if unlock TTL expired.
+  static const cameraCaptureGuardTtl = Duration(minutes: 15);
 
   Future<void> loadToken() async {
     final prefs = await SharedPreferences.getInstance();
@@ -101,24 +106,40 @@ class ApiClient {
   Future<void> markSessionUnlocked() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(
-      _sessionUnlockedAtKey,
+      sessionUnlockedAtKey,
       DateTime.now().millisecondsSinceEpoch,
     );
   }
 
   Future<bool> isSessionRecentlyUnlocked() async {
     final prefs = await SharedPreferences.getInstance();
-    final at = prefs.getInt(_sessionUnlockedAtKey);
+    final at = prefs.getInt(sessionUnlockedAtKey);
     if (at == null) return false;
     final unlockedAt = DateTime.fromMillisecondsSinceEpoch(at);
     return DateTime.now().difference(unlockedAt) < sessionUnlockTtl;
+  }
+
+  /// True if a camera/gallery capture was started recently (process may have been killed).
+  Future<bool> consumeCameraCaptureGuard() async {
+    final prefs = await SharedPreferences.getInstance();
+    final at = prefs.getInt(cameraCaptureGuardKey);
+    if (at == null) return false;
+    await prefs.remove(cameraCaptureGuardKey);
+    final startedAt = DateTime.fromMillisecondsSinceEpoch(at);
+    return DateTime.now().difference(startedAt) < cameraCaptureGuardTtl;
+  }
+
+  Future<bool> shouldKeepSessionAcrossProcessDeath() async {
+    if (await isSessionRecentlyUnlocked()) return true;
+    return consumeCameraCaptureGuard();
   }
 
   Future<void> clearToken({bool keepPhone = false}) async {
     _token = null;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('auth_token');
-    await prefs.remove(_sessionUnlockedAtKey);
+    await prefs.remove(sessionUnlockedAtKey);
+    await prefs.remove(cameraCaptureGuardKey);
     if (!keepPhone) {
       await prefs.remove('user_phone');
     }

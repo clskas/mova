@@ -32,7 +32,8 @@ void main() {
     await tester.pumpWidget(_testApp(const WalletScreen()));
     await tester.pump();
 
-    await tester.tap(find.text('Orange Money'));
+    // Recharge defaults hide Orange Money until client-config enables it.
+    await tester.tap(find.text('M-Pesa (Vodacom)'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 

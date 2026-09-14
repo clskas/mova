@@ -14,7 +14,7 @@ export default function manifest(): MetadataRoute.Manifest {
     theme_color: "#FF6B35",
     lang: "fr",
     dir: "ltr",
-    categories: ["food", "business"],
+    categories: ["business", "shopping"],
     shortcuts: [
       { name: "Commandes", short_name: "Commandes", url: "/", icons: [{ src: "/icon-192.png", sizes: "192x192" }] },
       { name: "Revenus", short_name: "Revenus", url: "/earnings", icons: [{ src: "/icon-192.png", sizes: "192x192" }] },

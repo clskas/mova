@@ -451,14 +451,17 @@ async function postSerdiPaySms(
 }
 
 function mapSerdiPaySmsFailure(status: number, data: SerdiPaySmsJson): SerdiPaySmsResult {
-  if (status === 403) {
+  const combined = `${data.message ?? ''} ${data.error ?? ''}`.trim();
+  // SerdiPay often returns HTTP 400 + message "An error occor…" with the real
+  // cause in `error` (e.g. Insufficient SMS credits) — prefer that signal.
+  if (status === 403 || /insufficient sms credits|crédit.*sms|sms.*insuffisant|not enough sms/i.test(combined)) {
     return {
       success: false,
-      message: data.message ?? data.error ?? 'Crédit SMS SerdiPay insuffisant (403).',
+      message: data.error ?? data.message ?? 'Crédit SMS SerdiPay insuffisant.',
     };
   }
-  const detail = data.message ?? data.error ?? 'échec fournisseur';
-  if (isSerdiPaySmsProcessingError(status, detail)) {
+  const detail = data.error ?? data.message ?? 'échec fournisseur';
+  if (isSerdiPaySmsProcessingError(status, `${data.message ?? ''} ${detail}`)) {
     return { success: false, message: SERDIPAY_SMS_REJECTED_FR };
   }
   return {

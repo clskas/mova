@@ -24,9 +24,16 @@ test.describe("Admin — restaurants CRUD", () => {
     await expect(page.getByText("Type de commerce (SENGA Business)")).toBeVisible();
     await expect(page.getByRole("button", { name: "Créer" })).toBeVisible();
     await expect(page.getByText("Chargement…")).not.toBeVisible({ timeout: 15_000 });
+    // Liste vide → pas de tableau ; sinon colonnes Nom + Type (commerceType SENGA Business).
     await expect(
-      page.getByRole("columnheader", { name: "Nom" }).or(page.getByText("Aucun restaurant"))
+      page
+        .getByRole("columnheader", { name: "Nom" })
+        .or(page.getByText("Aucun restaurant")),
     ).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByRole("columnheader", { name: "Type" })).toBeVisible();
+    await expect(
+      page
+        .getByRole("columnheader", { name: "Type" })
+        .or(page.getByText("Aucun restaurant")),
+    ).toBeVisible();
   });
 });

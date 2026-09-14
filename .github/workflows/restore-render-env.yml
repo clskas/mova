@@ -23,6 +23,12 @@ jobs:
           AFRISOFT_SMS_HUB_URL: ${{ secrets.AFRISOFT_SMS_HUB_URL }}
           AFRISOFT_HUB_APP_ID: ${{ secrets.AFRISOFT_HUB_APP_ID }}
           AFRISOFT_HUB_API_KEY: ${{ secrets.AFRISOFT_HUB_API_KEY }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          SMTP_FROM: ${{ secrets.SMTP_FROM }}
+          SMTP_TLS_SERVERNAME: ${{ secrets.SMTP_TLS_SERVERNAME }}
         run: |
           set -euo pipefail
           if [ -z "${RENDER_API_KEY:-}" ]; then echo "::error::RENDER_API_KEY missing"; exit 1; fi
@@ -102,33 +108,40 @@ jobs:
           # OTP login uses AfriSoft SMS hub (sms.afri-soft.com). Do NOT force
           # africastalking alone — that left mova-auth without a working SMS path
           # after env wipe and showed « Service temporairement indisponible » on Continuer.
+          #
+          # Google / web / mobile non-staff login needs SMTP email OTP (not SMS credits).
+          # Render starter has a ~20 env-var cap — keep this list lean or SMTP_PASS drops again.
           AFRISOFT_SMS_HUB_URL="${AFRISOFT_SMS_HUB_URL:-https://sms.afri-soft.com}"
           AFRISOFT_HUB_APP_ID="${AFRISOFT_HUB_APP_ID:-senga}"
           if [ -z "${AFRISOFT_HUB_API_KEY:-}" ]; then
             echo "::warning::AFRISOFT_HUB_API_KEY secret missing — auth OTP SMS will fail until set"
           fi
+          SMTP_HOST="${SMTP_HOST:-mail.afri-soft.com}"
+          SMTP_PORT="${SMTP_PORT:-587}"
+          SMTP_USER="${SMTP_USER:-noreply@afri-soft.com}"
+          SMTP_FROM="${SMTP_FROM:-${SMTP_USER}}"
+          SMTP_TLS_SERVERNAME="${SMTP_TLS_SERVERNAME:-mail5013.site4now.net}"
+          if [ -z "${SMTP_PASS:-}" ]; then
+            echo "::warning::SMTP_PASS secret missing — Google/email OTP will fail until set"
+          fi
 
           upsert_many "$AUTH_ID" \
             DATABASE_URL "$DATABASE_URL_AUTH" \
             REDIS_URL "$REDIS_URL" \
-            MOCK_OTP "false" \
-            ALLOW_TEST_OTP "false" \
             NODE_ENV "production" \
             APP_ENV "production" \
-            RUN_SEED "false" \
-            SKIP_DEMO_SEED "true" \
-            SEED_DEMO_CATALOG "false" \
             SMS_PROVIDER "afrisoft" \
             AFRISOFT_SMS_HUB_URL "$AFRISOFT_SMS_HUB_URL" \
             AFRISOFT_HUB_APP_ID "$AFRISOFT_HUB_APP_ID" \
             AFRISOFT_HUB_API_KEY "${AFRISOFT_HUB_API_KEY:-}" \
-            MOBILE_MONEY_GATEWAY "serdipay" \
-            SERDIPAY_BASE_URL "https://apis.serdipay.com" \
-            SUPABASE_URL "https://furttqrltkwirdhiktdl.supabase.co" \
-            SUPABASE_UPLOADS_BUCKET "uploads" \
-            SUPABASE_KYC_BUCKET "kyc-docs" \
-            PAYMENT_SERVICE_URL "https://mova-payment.onrender.com" \
-            JWT_SECRET "${JWT_SECRET:-}"
+            SMTP_HOST "$SMTP_HOST" \
+            SMTP_PORT "$SMTP_PORT" \
+            SMTP_USER "$SMTP_USER" \
+            SMTP_FROM "$SMTP_FROM" \
+            SMTP_PASS "${SMTP_PASS:-}" \
+            SMTP_TLS_SERVERNAME "$SMTP_TLS_SERVERNAME" \
+            JWT_SECRET "${JWT_SECRET:-}" \
+            INTERNAL_API_KEY "${INTERNAL_API_KEY:-}"
 
           upsert_many "$RIDE_ID" \
             DATABASE_URL "$DATABASE_URL_RIDES" \

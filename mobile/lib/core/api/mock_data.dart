@@ -610,6 +610,7 @@ abstract final class MockData {
         'kycStatus': 'APPROVED',
         'needsActivationPin': false,
         'isAvailable': false,
+        'acceptsDeliveries': true,
         'ratingAvg': 4.8,
         'totalRides': 120,
         'vehicles': [

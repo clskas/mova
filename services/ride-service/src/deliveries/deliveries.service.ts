@@ -28,7 +28,7 @@ import {
   formatParcelDelivery,
   generateDeliveryPin,
 } from './parcel.util';
-import { assertDriverCanReceiveJobs, assertDriverEligibleForParcel, driverCanReceiveJobs, fetchDriverProfileSnapshot } from '../common/driver-eligibility.util';
+import { assertDriverCanReceiveJobs, assertDriverEligibleForParcel, driverAcceptsDeliveries, driverCanReceiveJobs, fetchDriverProfileSnapshot } from '../common/driver-eligibility.util';
 import { fetchDriverDebtStatus } from '../common/driver-debt.util';
 import { isCommerceType, stubRestaurantCreateData } from '../restaurant/restaurant-profile.util';
 import {
@@ -1120,6 +1120,9 @@ export class DeliveriesService {
     if (!profile?.isAvailable || !driverCanReceiveJobs(profile)) {
       return { offers: [] as Record<string, unknown>[], documentsBlocked: profile?.documentsStatus?.canOperate === false };
     }
+    if (!driverAcceptsDeliveries(profile)) {
+      return { offers: [] as Record<string, unknown>[], documentsBlocked: false, rideOnly: true };
+    }
 
     const hasGps = profile.currentLat != null && profile.currentLng != null;
     const operatingCity = (profile.operatingCity?.trim() || 'Kinshasa').toLowerCase();
@@ -1239,6 +1242,14 @@ export class DeliveriesService {
       await assertDriverEligibleForParcel(driverUserId, delivery.weightCategory);
     } else {
       await assertDriverCanReceiveJobs(driverUserId);
+    }
+    const profile = await fetchDriverProfileSnapshot(driverUserId);
+    if (!driverAcceptsDeliveries(profile)) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        HttpStatus.FORBIDDEN,
+        'Ce compte est configuré courses uniquement (pas de livraisons).',
+      );
     }
     const foodAcceptable =
       delivery.type === DeliveryType.FOOD && delivery.status === DeliveryStatus.READY_FOR_PICKUP;

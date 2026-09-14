@@ -47,6 +47,14 @@ class DriverStatusDto {
   @ApiProperty({ required: false }) @IsOptional() @IsBoolean() suspendUser?: boolean;
 }
 
+class DriverDeliveryModeDto {
+  @ApiProperty({
+    description: 'true = Livreur SENGA (courses + livraisons); false = courses uniquement',
+  })
+  @IsBoolean()
+  acceptsDeliveries: boolean;
+}
+
 @ApiTags('admin')
 @Controller('admin')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -167,6 +175,13 @@ export class AdminController {
   @ApiOperation({ summary: 'Activer/suspendre chauffeur' })
   driverStatus(@Param('userId') userId: string, @Body() dto: DriverStatusDto) {
     return this.adminService.setDriverStatus(userId, dto.active, dto.suspendUser ?? !dto.active);
+  }
+
+  @Patch('drivers/:userId/delivery-mode')
+  @RequirePermissions(AdminPermission.DRIVERS_WRITE)
+  @ApiOperation({ summary: 'Activer/désactiver livraisons (Livreur SENGA vs courses uniquement)' })
+  driverDeliveryMode(@Param('userId') userId: string, @Body() dto: DriverDeliveryModeDto) {
+    return this.adminService.setDriverAcceptsDeliveries(userId, dto.acceptsDeliveries);
   }
 
   @Get('kyc/pending')

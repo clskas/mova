@@ -1,4 +1,4 @@
-import { driverCanReceiveJobs, type DriverProfileSnapshot } from './driver-eligibility.util';
+import { driverAcceptsDeliveries, driverCanReceiveJobs, type DriverProfileSnapshot } from './driver-eligibility.util';
 
 describe('driverCanReceiveJobs', () => {
   const base: DriverProfileSnapshot = {
@@ -19,5 +19,17 @@ describe('driverCanReceiveJobs', () => {
 
   it('rejects pending KYC', () => {
     expect(driverCanReceiveJobs({ ...base, kycStatus: 'PENDING' })).toBe(false);
+  });
+});
+
+describe('driverAcceptsDeliveries', () => {
+  it('defaults to livreur SENGA when flag is missing', () => {
+    expect(driverAcceptsDeliveries({})).toBe(true);
+    expect(driverAcceptsDeliveries(null)).toBe(true);
+  });
+
+  it('respects ride-only admin flag', () => {
+    expect(driverAcceptsDeliveries({ acceptsDeliveries: false })).toBe(false);
+    expect(driverAcceptsDeliveries({ acceptsDeliveries: true })).toBe(true);
   });
 });

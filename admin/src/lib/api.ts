@@ -97,6 +97,8 @@ export type AdminDriver = {
   hiddenReason?: "orphan" | "play_prelaunch" | "seed_demo" | "leftover" | null;
   licenseNumber?: string | null;
   isAvailable?: boolean;
+  /** true (défaut) = Livreur SENGA (courses + livraisons); false = courses uniquement. */
+  acceptsDeliveries?: boolean;
   ratingAvg?: number;
   totalRides?: number;
   kycStatus?: string;
@@ -2009,6 +2011,13 @@ export async function setDriverStatus(userId: string, active: boolean, suspendUs
   return apiFetch(`/api/admin/drivers/${userId}/status`, {
     method: "PATCH",
     body: JSON.stringify({ active, suspendUser }),
+  });
+}
+
+export async function setDriverAcceptsDeliveries(userId: string, acceptsDeliveries: boolean) {
+  return apiFetch(`/api/admin/drivers/${userId}/delivery-mode`, {
+    method: "PATCH",
+    body: JSON.stringify({ acceptsDeliveries }),
   });
 }
 

@@ -14,6 +14,8 @@ import { fetchDriverDebtStatus } from './driver-debt.util';
 
 export type DriverProfileSnapshot = {
   isAvailable?: boolean;
+  /** false = ride-only; true/undefined = SENGA flotte courses + livraisons. */
+  acceptsDeliveries?: boolean;
   kycStatus?: string;
   activationPinVerified?: boolean;
   activationPinVerifiedAt?: string | Date | null;
@@ -27,6 +29,11 @@ export type DriverProfileSnapshot = {
   ratingAvg?: number;
   vehicles?: { id: string; type: string; isActive?: boolean }[];
 };
+
+/** Platform livreurs SENGA (default). Ride-only when admin sets acceptsDeliveries=false. */
+export function driverAcceptsDeliveries(profile: DriverProfileSnapshot | null | undefined): boolean {
+  return profile?.acceptsDeliveries !== false;
+}
 
 export async function fetchDriverProfileSnapshot(userId: string): Promise<DriverProfileSnapshot | null> {
   try {

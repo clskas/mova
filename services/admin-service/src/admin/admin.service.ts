@@ -339,6 +339,12 @@ export class AdminService {
         : Promise.resolve(null),
     ]).then(([driver]) => driver);
   }
+  setDriverAcceptsDeliveries(userId: string, acceptsDeliveries: boolean) {
+    return this.proxy('driver', `/internal/drivers/${userId}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ acceptsDeliveries }),
+    });
+  }
   pendingKyc(status?: string) {
     const params = new URLSearchParams();
     if (status) params.set('status', status);

@@ -60,6 +60,8 @@ model DriverProfile {
   activationPinExpiresAt    DateTime?
   operatingCity             String    @default("Kinshasa")
   isAvailable   Boolean   @default(false)
+  /// false = courses uniquement ; true (défaut) = flotte SENGA courses + livraisons.
+  acceptsDeliveries Boolean @default(true)
   currentLat    Float?
   currentLng    Float?
   ratingAvg     Float     @default(5.0)

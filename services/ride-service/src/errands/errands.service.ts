@@ -6,6 +6,7 @@ import { DEFAULT_PICKUP } from '../common/address.util';
 import { fetchServicePaymentStatus } from '../common/payment-status.util';
 import {
   assertDriverCanReceiveJobs,
+  driverAcceptsDeliveries,
   driverCanReceiveJobs,
   fetchDriverProfileSnapshot,
 } from '../common/driver-eligibility.util';
@@ -565,6 +566,9 @@ export class ErrandsService {
     if (!profile?.isAvailable || !driverCanReceiveJobs(profile)) {
       return { offers: [] as Record<string, unknown>[] };
     }
+    if (!driverAcceptsDeliveries(profile)) {
+      return { offers: [] as Record<string, unknown>[], rideOnly: true };
+    }
     const hasGps = profile.currentLat != null && profile.currentLng != null;
 
     const [pendingErrands, assignedErrands] = await Promise.all([
@@ -670,6 +674,14 @@ export class ErrandsService {
 
   async acceptErrand(errandId: string, driverUserId: string) {
     await assertDriverCanReceiveJobs(driverUserId);
+    const eligibility = await fetchDriverProfileSnapshot(driverUserId);
+    if (!driverAcceptsDeliveries(eligibility)) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        HttpStatus.FORBIDDEN,
+        'Ce compte est configuré courses uniquement (pas de livraisons).',
+      );
+    }
     const order = await this.prisma.errandOrder.findUnique({ where: { id: errandId } });
     if (!order) throw new MovaHttpException(MovaErrorCode.ERRAND_NOT_FOUND, HttpStatus.NOT_FOUND);
     if (order.status !== ErrandOrderStatus.PENDING || order.driverId) {

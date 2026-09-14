@@ -14,6 +14,7 @@ import {
   reviewVehicleTypeApproval,
   runKycOcr,
   setDriverStatus,
+  setDriverAcceptsDeliveries,
   type AdminDriver,
   type AdminDriverDetail,
 } from "@/lib/api";
@@ -133,6 +134,11 @@ function OcrBadge({ ocr }: { ocr?: KycOcrInfo | null }) {
   );
 }
 
+function driverServiceRoleLabel(d: AdminDriver | AdminDriverDetail): string {
+  if (d.acceptsDeliveries === false) return "Courses uniquement";
+  return "Livreur SENGA";
+}
+
 function driverStageLabel(d: AdminDriver | AdminDriverDetail): string {
   const vehicle = activeDriverVehicle(d);
   if (vehicle?.typeApprovalStatus === "REJECTED") return "Type engin refusé";
@@ -164,6 +170,7 @@ export default function ChauffeursPage() {
   const [detail, setDetail] = useState<AdminDriverDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [actionTarget, setActionTarget] = useState<{ driver: AdminDriver; activate: boolean } | null>(null);
+  const [roleFilter, setRoleFilter] = useState<"all" | "livreur" | "ride_only">("all");
   const [saving, setSaving] = useState(false);
   const [activationPin, setActivationPin] = useState<string | null>(null);
   const [smsNotice, setSmsNotice] = useState<string | null>(null);
@@ -216,17 +223,38 @@ export default function ChauffeursPage() {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return drivers;
-    return drivers.filter(
-      (d) =>
+    return drivers.filter((d) => {
+      if (roleFilter === "livreur" && d.acceptsDeliveries === false) return false;
+      if (roleFilter === "ride_only" && d.acceptsDeliveries !== false) return false;
+      if (!q) return true;
+      return (
         d.userId.toLowerCase().includes(q) ||
         d.publicId?.toLowerCase().includes(q) ||
         d.kycStatus?.toLowerCase().includes(q) ||
         d.phone?.toLowerCase().includes(q) ||
         `${d.firstName ?? ""} ${d.lastName ?? ""}`.toLowerCase().includes(q) ||
         d.vehicles?.some((v) => v.plateNumber.toLowerCase().includes(q))
-    );
-  }, [drivers, search]);
+      );
+    });
+  }, [drivers, search, roleFilter]);
+
+  async function toggleDeliveryMode(acceptsDeliveries: boolean) {
+    if (!selectedId) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await setDriverAcceptsDeliveries(selectedId, acceptsDeliveries);
+      const refreshed = await fetchDriverDetail(selectedId);
+      setDetail(refreshed);
+      setDrivers((prev) =>
+        prev.map((d) => (d.userId === selectedId ? { ...d, acceptsDeliveries } : d)),
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Impossible de changer le mode livraison");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   async function toggleStatus() {
     if (!actionTarget) return;
@@ -379,10 +407,28 @@ export default function ChauffeursPage() {
         Un chauffeur réel (y compris Google sans +243) apparaît ici <em>et</em> dans Utilisateurs avec le rôle Chauffeur.
         Seuls les vrais orphelins (sans compte) et Test Lab sont masqués.
       </p>
+      <p className="text-sm text-gray-600 mb-4 rounded-lg border border-violet-100 bg-violet-50/60 px-3 py-2">
+        <strong>Livreurs de l&apos;entreprise (SENGA)</strong> = chauffeurs avec badge « Livreur SENGA »
+        (courses + repas/colis/courses). Les restaurants n&apos;ont plus de flotte propre (mode PLATFORM) :
+        toutes les livraisons food/commerce passent par cette flotte. « Courses uniquement » = autres chauffeurs
+        (taxi/moto) exclus des offres de livraison.
+      </p>
       {error && <div className="mb-4"><ErrorBanner message={error} onRetry={load} /></div>}
       <div className="space-y-4">
         <div className="flex flex-wrap gap-3 items-end">
           <SearchInput value={search} onChange={setSearch} placeholder="Rechercher par ID SENGA, nom, téléphone, plaque ou statut KYC…" />
+          <label className="flex flex-col gap-1 text-xs text-gray-600 pb-1">
+            Rôle service
+            <select
+              className="rounded-md border border-gray-300 px-2 py-1.5 text-sm text-gray-800"
+              value={roleFilter}
+              onChange={(e) => setRoleFilter(e.target.value as typeof roleFilter)}
+            >
+              <option value="all">Tous</option>
+              <option value="livreur">Livreurs SENGA</option>
+              <option value="ride_only">Courses uniquement</option>
+            </select>
+          </label>
           {role === "SUPER_ADMIN" && (
             <label className="flex items-center gap-2 text-sm text-gray-600 pb-1">
               <input
@@ -406,6 +452,7 @@ export default function ChauffeursPage() {
                   <th className="p-3">Identifiant</th>
                   <th className="p-3">Compte</th>
                   <th className="p-3">Étape</th>
+                  <th className="p-3">Rôle</th>
                   <th className="p-3">Docs</th>
                   <th className="p-3">KYC</th>
                   <th className="p-3">Dispo</th>
@@ -433,6 +480,17 @@ export default function ChauffeursPage() {
                       )}
                     </td>
                     <td className="p-3 text-xs">{driverStageLabel(d)}</td>
+                    <td className="p-3 text-xs">
+                      <span
+                        className={`inline-flex rounded-full border px-2 py-0.5 text-[11px] font-medium ${
+                          d.acceptsDeliveries === false
+                            ? "border-gray-200 bg-gray-50 text-gray-700"
+                            : "border-violet-200 bg-violet-50 text-violet-800"
+                        }`}
+                      >
+                        {driverServiceRoleLabel(d)}
+                      </span>
+                    </td>
                     <td className="p-3 text-xs">
                       {d.kycDocumentsUploaded ?? 0}/{d.kycDocumentsRequired ?? 6}
                       {d.onboardingCompleted && <span className="block text-green-600">Dossier envoyé</span>}
@@ -471,6 +529,18 @@ export default function ChauffeursPage() {
               </p>
               <p><span className="text-gray-500">KYC:</span> <StatusBadge status={selected.kycStatus} /></p>
               <p><span className="text-gray-500">Étape:</span> {driverStageLabel(selected)}</p>
+              <p>
+                <span className="text-gray-500">Rôle service:</span>{" "}
+                <span
+                  className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${
+                    selected.acceptsDeliveries === false
+                      ? "border-gray-200 bg-gray-50 text-gray-700"
+                      : "border-violet-200 bg-violet-50 text-violet-800"
+                  }`}
+                >
+                  {driverServiceRoleLabel(selected)}
+                </span>
+              </p>
               <p><span className="text-gray-500">Dossier enregistrement:</span> {selected.onboardingCompleted ? "Soumis ✓" : "En cours"}</p>
               <p><span className="text-gray-500">Documents:</span> {selected.kycDocumentsUploaded ?? 0}/{selected.kycDocumentsRequired ?? 6} obligatoires</p>
               <p><span className="text-gray-500">PIN activé:</span> {selected.activationPinVerified ? "Oui" : "Non"}</p>
@@ -858,12 +928,34 @@ export default function ChauffeursPage() {
               </div>
             )}
             {!readOnly && (
-              <div className="flex gap-2 pt-2">
-                {selected.isAvailable ? (
-                  <BtnDanger onClick={() => setActionTarget({ driver: selected, activate: false })}>Suspendre</BtnDanger>
-                ) : (
-                  <BtnSuccess onClick={() => setActionTarget({ driver: selected, activate: true })}>Activer</BtnSuccess>
-                )}
+              <div className="space-y-2 pt-2 border-t">
+                <p className="text-xs text-gray-500">
+                  Mode service — défaut SENGA : livreur (courses + livraisons food/colis).
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {selected.acceptsDeliveries === false ? (
+                    <BtnSuccess
+                      onClick={() => toggleDeliveryMode(true)}
+                      disabled={saving}
+                    >
+                      Passer en Livreur SENGA
+                    </BtnSuccess>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={saving}
+                      onClick={() => toggleDeliveryMode(false)}
+                      className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      Limiter aux courses uniquement
+                    </button>
+                  )}
+                  {selected.isAvailable ? (
+                    <BtnDanger onClick={() => setActionTarget({ driver: selected, activate: false })}>Suspendre</BtnDanger>
+                  ) : (
+                    <BtnSuccess onClick={() => setActionTarget({ driver: selected, activate: true })}>Activer</BtnSuccess>
+                  )}
+                </div>
               </div>
             )}
           </div>

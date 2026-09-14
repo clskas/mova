@@ -1397,8 +1397,39 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
           ],
           if (_available) ...[
             const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: (_profile?['acceptsDeliveries'] == false)
+                    ? MovaColors.orange.withValues(alpha: 0.12)
+                    : MovaColors.violet.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: (_profile?['acceptsDeliveries'] == false)
+                      ? MovaColors.orange.withValues(alpha: 0.35)
+                      : MovaColors.violet.withValues(alpha: 0.35),
+                ),
+              ),
+              child: Text(
+                (_profile?['acceptsDeliveries'] == false)
+                    ? 'Chauffeur SENGA — courses uniquement'
+                    : 'Livreur SENGA — courses et livraisons',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: (_profile?['acceptsDeliveries'] == false)
+                      ? MovaColors.orange
+                      : MovaColors.violet,
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
             Text(
-              'En ligne — courses et livraisons près de votre position GPS.',
+              (_profile?['acceptsDeliveries'] == false)
+                  ? 'En ligne — courses près de votre position GPS.'
+                  : 'En ligne — courses et livraisons près de votre position GPS.',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 12, color: MovaColors.textSecondary.withValues(alpha: 0.9)),
             ),

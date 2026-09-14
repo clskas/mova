@@ -42,6 +42,8 @@ class ReviewKycDto {
 class UpdateDriverStatusDto {
   @IsOptional() @IsBoolean() isAvailable?: boolean;
   @IsOptional() @IsBoolean() active?: boolean;
+  /** false = courses only; true = SENGA chauffeur + livreur (default). */
+  @IsOptional() @IsBoolean() acceptsDeliveries?: boolean;
 }
 class CreateIncidentDto {
   @IsString() userId: string;

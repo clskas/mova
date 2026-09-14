@@ -1309,6 +1309,7 @@ export class DriversService {
       onboardingCompleted: profile?.onboardingCompleted ?? false,
       kycStatus: profile?.kycStatus,
       isAvailable: profile?.isAvailable,
+      acceptsDeliveries: profile?.acceptsDeliveries !== false,
       ratingAvg: profile?.ratingAvg,
       totalRides: profile?.totalRides,
       activationPinVerified: !!profile?.activationPinVerifiedAt,
@@ -1347,9 +1348,19 @@ export class DriversService {
     };
   }
 
-  async updateDriverAdmin(userId: string, data: { isAvailable?: boolean; active?: boolean }) {
+  async updateDriverAdmin(
+    userId: string,
+    data: { isAvailable?: boolean; active?: boolean; acceptsDeliveries?: boolean },
+  ) {
     const profile = await this.prisma.driverProfile.findUnique({ where: { userId } });
     if (!profile) throw new MovaHttpException(MovaErrorCode.DRIVER_KYC_PENDING);
+    if (data.acceptsDeliveries !== undefined) {
+      return this.prisma.driverProfile.update({
+        where: { userId },
+        data: { acceptsDeliveries: data.acceptsDeliveries },
+        include: { vehicles: true },
+      });
+    }
     if (data.active !== undefined) return this.setDriverActive(userId, data.active);
     if (data.isAvailable !== undefined) return this.setAvailability(userId, data.isAvailable);
     return profile;

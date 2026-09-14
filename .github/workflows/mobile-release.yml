@@ -30,6 +30,11 @@ on:
         required: false
         type: boolean
         default: false
+      promote_only:
+        description: "Promouvoir seulement internal→production (pas de rebuild AAB). À utiliser quand versionCode est déjà sur internal."
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -45,7 +50,7 @@ jobs:
   build-android:
     name: Build Android (AAB)
     if: >
-      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_dispatch' && inputs.promote_only != true) ||
       startsWith(github.ref, 'refs/tags/v') ||
       (github.event_name == 'workflow_run' &&
        github.event.workflow_run.conclusion == 'success')

@@ -1,5 +1,8 @@
 # One-shot / ops: restore critical Render env vars after accidental wipe.
 # Uses GitHub secrets (never echoed). Safe to re-run.
+#
+# IMPORTANT: upserts one key at a time. Never bulk PUT /env-vars — that wipes
+# every key not in the payload (and hid update banners / broke deploys).
 name: Restore Render Env
 
 on:
@@ -25,114 +28,103 @@ jobs:
           fi
           if [ -z "${REDIS_URL:-}" ]; then echo "::error::REDIS_URL secret required"; exit 1; fi
 
-          put_env() {
+          upsert_env() {
             local sid="$1"
-            local payload="$2"
-            echo "Updating service ${sid} (keys only, no values logged)"
+            local key="$2"
+            local value="$3"
+            if [ -z "$value" ]; then
+              echo "  skip ${key} (empty)"
+              return 0
+            fi
             code=$(curl -sS -o /tmp/render-env-out.json -w "%{http_code}" -X PUT \
-              "https://api.render.com/v1/services/${sid}/env-vars" \
+              "https://api.render.com/v1/services/${sid}/env-vars/$(python -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1], safe=''))" "$key")" \
               -H "Authorization: Bearer ${RENDER_API_KEY}" \
               -H "Accept: application/json" \
               -H "Content-Type: application/json" \
-              -d "${payload}")
+              -d "$(jq -n --arg v "$value" '{value:$v}')")
             if [ "$code" != "200" ] && [ "$code" != "201" ]; then
-              echo "::error::Render env update failed for ${sid} HTTP ${code}"
-              # never cat body (may contain secrets)
+              echo "::error::Render env upsert failed for ${sid} ${key} HTTP ${code}"
               exit 1
             fi
-            echo "OK ${sid} HTTP ${code}"
+            echo "  OK ${key}"
           }
 
-          # Optional JWT — omit key if secret unset (some deploys inject elsewhere)
-          jwt_json=""
-          if [ -n "${JWT_SECRET:-}" ]; then
-            jwt_json=$(jq -n --arg v "$JWT_SECRET" '{key:"JWT_SECRET",value:$v}')
-          fi
+          upsert_many() {
+            local sid="$1"
+            shift
+            echo "Updating service ${sid} (per-key upsert, no wipe)"
+            while [ "$#" -ge 2 ]; do
+              upsert_env "$sid" "$1" "$2"
+              shift 2
+            done
+          }
 
-          auth_payload=$(jq -n \
-            --arg db "$DATABASE_URL_AUTH" \
-            --arg redis "$REDIS_URL" \
-            --argjson jwt "${jwt_json:-null}" \
-            '
-            [
-              {key:"DATABASE_URL", value:$db},
-              {key:"REDIS_URL", value:$redis},
-              {key:"MOCK_OTP", value:"false"},
-              {key:"ALLOW_TEST_OTP", value:"false"},
-              {key:"NODE_ENV", value:"production"},
-              {key:"APP_ENV", value:"production"},
-              {key:"RUN_SEED", value:"false"},
-              {key:"SKIP_DEMO_SEED", value:"true"},
-              {key:"SEED_DEMO_CATALOG", value:"false"},
-              {key:"SMS_PROVIDER", value:"africastalking"},
-              {key:"AFRICAS_TALKING_ENV", value:"production"},
-              {key:"AFRICAS_TALKING_SMS_SENDER", value:"MOVA"},
-              {key:"MOBILE_MONEY_GATEWAY", value:"serdipay"},
-              {key:"SERDIPAY_BASE_URL", value:"https://apis.serdipay.com"},
-              {key:"SUPABASE_URL", value:"https://furttqrltkwirdhiktdl.supabase.co"},
-              {key:"SUPABASE_UPLOADS_BUCKET", value:"uploads"},
-              {key:"SUPABASE_KYC_BUCKET", value:"kyc-docs"}
-            ] + (if $jwt == null then [] else [$jwt] end)
-            ')
+          AUTH_ID="srv-d8slrk8js32c73dac310"
+          RIDE_ID="srv-d8slrlernols73b4bcq0"
+          PAY_ID="srv-d8slrm8g4nts73bq9pj0"
 
-          ride_payload=$(jq -n \
-            --arg db "$DATABASE_URL_RIDES" \
-            --arg redis "$REDIS_URL" \
-            --argjson jwt "${jwt_json:-null}" \
-            '
-            [
-              {key:"DATABASE_URL", value:$db},
-              {key:"REDIS_URL", value:$redis},
-              {key:"DRIVER_SERVICE_URL", value:"https://mova-driver.onrender.com"},
-              {key:"MOCK_PAYMENTS", value:"false"},
-              {key:"NODE_ENV", value:"production"},
-              {key:"APP_ENV", value:"production"},
-              {key:"RUN_SEED", value:"false"},
-              {key:"SKIP_DEMO_SEED", value:"true"},
-              {key:"SEED_DEMO_CATALOG", value:"false"},
-              {key:"SMS_PROVIDER", value:"africastalking"},
-              {key:"MOBILE_MONEY_GATEWAY", value:"serdipay"},
-              {key:"SERDIPAY_BASE_URL", value:"https://apis.serdipay.com"},
-              {key:"SUPABASE_URL", value:"https://furttqrltkwirdhiktdl.supabase.co"},
-              {key:"SUPABASE_UPLOADS_BUCKET", value:"uploads"},
-              {key:"SUPABASE_KYC_BUCKET", value:"kyc-docs"},
-              {key:"MOBILE_PASSENGER_VERSION", value:"1.0.5"},
-              {key:"MOBILE_DRIVER_VERSION", value:"1.0.5"},
-              {key:"MOBILE_MIN_VERSION", value:"1.0.0"},
-              {key:"MOBILE_PASSENGER_VERSION_CODE", value:"70"},
-              {key:"MOBILE_DRIVER_VERSION_CODE", value:"70"},
-              {key:"MOBILE_MIN_VERSION_CODE", value:"0"},
-              {key:"PLAY_STORE_PASSENGER_URL", value:"https://play.google.com/store/apps/details?id=cd.mova.mova.passenger"},
-              {key:"PLAY_STORE_DRIVER_URL", value:"https://play.google.com/store/apps/details?id=cd.mova.mova.driver"}
-            ] + (if $jwt == null then [] else [$jwt] end)
-            ')
+          upsert_many "$AUTH_ID" \
+            DATABASE_URL "$DATABASE_URL_AUTH" \
+            REDIS_URL "$REDIS_URL" \
+            MOCK_OTP "false" \
+            ALLOW_TEST_OTP "false" \
+            NODE_ENV "production" \
+            APP_ENV "production" \
+            RUN_SEED "false" \
+            SKIP_DEMO_SEED "true" \
+            SEED_DEMO_CATALOG "false" \
+            SMS_PROVIDER "africastalking" \
+            AFRICAS_TALKING_ENV "production" \
+            AFRICAS_TALKING_SMS_SENDER "MOVA" \
+            MOBILE_MONEY_GATEWAY "serdipay" \
+            SERDIPAY_BASE_URL "https://apis.serdipay.com" \
+            SUPABASE_URL "https://furttqrltkwirdhiktdl.supabase.co" \
+            SUPABASE_UPLOADS_BUCKET "uploads" \
+            SUPABASE_KYC_BUCKET "kyc-docs" \
+            JWT_SECRET "${JWT_SECRET:-}"
 
-          payment_payload=$(jq -n \
-            --arg db "$DATABASE_URL_PAYMENTS" \
-            --arg redis "$REDIS_URL" \
-            --argjson jwt "${jwt_json:-null}" \
-            '
-            [
-              {key:"DATABASE_URL", value:$db},
-              {key:"REDIS_URL", value:$redis},
-              {key:"RIDE_SERVICE_URL", value:"https://mova-ride.onrender.com"},
-              {key:"MOCK_PAYMENTS", value:"false"},
-              {key:"NODE_ENV", value:"production"},
-              {key:"APP_ENV", value:"production"},
-              {key:"RUN_SEED", value:"false"},
-              {key:"SKIP_DEMO_SEED", value:"true"},
-              {key:"SEED_DEMO_CATALOG", value:"false"},
-              {key:"SMS_PROVIDER", value:"africastalking"},
-              {key:"MOBILE_MONEY_GATEWAY", value:"serdipay"},
-              {key:"SERDIPAY_BASE_URL", value:"https://apis.serdipay.com"},
-              {key:"SUPABASE_URL", value:"https://furttqrltkwirdhiktdl.supabase.co"},
-              {key:"SUPABASE_UPLOADS_BUCKET", value:"uploads"},
-              {key:"SUPABASE_KYC_BUCKET", value:"kyc-docs"}
-            ] + (if $jwt == null then [] else [$jwt] end)
-            ')
+          upsert_many "$RIDE_ID" \
+            DATABASE_URL "$DATABASE_URL_RIDES" \
+            REDIS_URL "$REDIS_URL" \
+            DRIVER_SERVICE_URL "https://mova-driver.onrender.com" \
+            MOCK_PAYMENTS "false" \
+            NODE_ENV "production" \
+            APP_ENV "production" \
+            RUN_SEED "false" \
+            SKIP_DEMO_SEED "true" \
+            SEED_DEMO_CATALOG "false" \
+            SMS_PROVIDER "africastalking" \
+            MOBILE_MONEY_GATEWAY "serdipay" \
+            SERDIPAY_BASE_URL "https://apis.serdipay.com" \
+            SUPABASE_URL "https://furttqrltkwirdhiktdl.supabase.co" \
+            SUPABASE_UPLOADS_BUCKET "uploads" \
+            SUPABASE_KYC_BUCKET "kyc-docs" \
+            MOBILE_PASSENGER_VERSION "1.0.5" \
+            MOBILE_DRIVER_VERSION "1.0.5" \
+            MOBILE_MIN_VERSION "1.0.0" \
+            MOBILE_PASSENGER_VERSION_CODE "70" \
+            MOBILE_DRIVER_VERSION_CODE "70" \
+            MOBILE_MIN_VERSION_CODE "0" \
+            PLAY_STORE_PASSENGER_URL "https://play.google.com/store/apps/details?id=cd.mova.mova.passenger" \
+            PLAY_STORE_DRIVER_URL "https://play.google.com/store/apps/details?id=cd.mova.mova.driver" \
+            JWT_SECRET "${JWT_SECRET:-}"
 
-          put_env "srv-d8slrk8js32c73dac310" "$auth_payload"
-          put_env "srv-d8slrlernols73b4bcq0" "$ride_payload"
-          put_env "srv-d8slrm8g4nts73bq9pj0" "$payment_payload"
+          upsert_many "$PAY_ID" \
+            DATABASE_URL "$DATABASE_URL_PAYMENTS" \
+            REDIS_URL "$REDIS_URL" \
+            RIDE_SERVICE_URL "https://mova-ride.onrender.com" \
+            MOCK_PAYMENTS "false" \
+            NODE_ENV "production" \
+            APP_ENV "production" \
+            RUN_SEED "false" \
+            SKIP_DEMO_SEED "true" \
+            SEED_DEMO_CATALOG "false" \
+            SMS_PROVIDER "africastalking" \
+            MOBILE_MONEY_GATEWAY "serdipay" \
+            SERDIPAY_BASE_URL "https://apis.serdipay.com" \
+            SUPABASE_URL "https://furttqrltkwirdhiktdl.supabase.co" \
+            SUPABASE_UPLOADS_BUCKET "uploads" \
+            SUPABASE_KYC_BUCKET "kyc-docs" \
+            JWT_SECRET "${JWT_SECRET:-}"
 
-          echo "Restore complete. Verify keys (not values) in Render dashboard."
+          echo "Restore complete (per-key upsert). Redeploy ride/auth/payment so banners pick up versionCode 70."

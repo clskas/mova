@@ -313,6 +313,52 @@ jobs:
             bundle exec fastlane promote_internal_to_production
           fi
 
+  promote-android-production:
+    name: Promote Play internal → production
+    if: >
+      github.event_name == 'workflow_dispatch' &&
+      inputs.promote_only == true
+    runs-on: ubuntu-latest
+    environment: production-mobile
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.2'
+          bundler-cache: true
+          working-directory: mobile/android
+
+      - name: Promote internal track to production (Fastlane)
+        working-directory: mobile/android
+        env:
+          PLAY_STORE_JSON_KEY: ${{ secrets.PLAY_STORE_JSON_KEY }}
+          PLAY_STORE_JSON: ${{ secrets.PLAY_STORE_JSON }}
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          set -e
+          if [ -n "$PLAY_STORE_JSON_KEY" ]; then
+            echo "$PLAY_STORE_JSON_KEY" | base64 -d > /tmp/play-store-key.json
+          elif [ -n "$PLAY_SERVICE_ACCOUNT_JSON" ]; then
+            if printf '%s' "$PLAY_SERVICE_ACCOUNT_JSON" | head -c 1 | grep -q '{'; then
+              printf '%s' "$PLAY_SERVICE_ACCOUNT_JSON" > /tmp/play-store-key.json
+            else
+              echo "$PLAY_SERVICE_ACCOUNT_JSON" | base64 -d > /tmp/play-store-key.json
+            fi
+          elif [ -n "$PLAY_STORE_JSON" ]; then
+            printf '%s' "$PLAY_STORE_JSON" > /tmp/play-store-key.json
+          else
+            echo "::error::Secrets Play absents — promote impossible."
+            exit 1
+          fi
+          if ! head -c 1 /tmp/play-store-key.json | grep -q '{'; then
+            echo "::error::Clé Play Store invalide (JSON attendu après décodage)."
+            exit 1
+          fi
+          export PLAY_STORE_JSON_KEY_PATH=/tmp/play-store-key.json
+          echo "Promote Play internal → production (passenger + driver)"
+          bundle exec fastlane promote_internal_to_production
 
   build-ios:
     name: Build iOS (IPA)

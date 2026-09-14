@@ -1,5 +1,8 @@
 # One-shot / ops: restore critical Render env vars after accidental wipe.
-# Uses GitHub secrets (never echoed). Safe to re-run.
+# Prefers live Render Postgres connection strings (mova-db-auth) so we never
+# accidentally point prod at legacy Neon. GitHub DATABASE_URL_* secrets are NOT
+# used for prod DATABASE_URL (they previously pointed at Neon and emptied the
+# app's view of users).
 #
 # IMPORTANT: upserts one key at a time. Never bulk PUT /env-vars — that wipes
 # every key not in the payload (and hid update banners / broke deploys).
@@ -15,18 +18,48 @@ jobs:
       - name: Restore auth / ride / payment env vars
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
-          DATABASE_URL_AUTH: ${{ secrets.DATABASE_URL_AUTH }}
-          DATABASE_URL_RIDES: ${{ secrets.DATABASE_URL_RIDES }}
-          DATABASE_URL_PAYMENTS: ${{ secrets.DATABASE_URL_PAYMENTS }}
           REDIS_URL: ${{ secrets.REDIS_URL }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
         run: |
           set -euo pipefail
           if [ -z "${RENDER_API_KEY:-}" ]; then echo "::error::RENDER_API_KEY missing"; exit 1; fi
-          if [ -z "${DATABASE_URL_AUTH:-}" ] || [ -z "${DATABASE_URL_RIDES:-}" ] || [ -z "${DATABASE_URL_PAYMENTS:-}" ]; then
-            echo "::error::DATABASE_URL_AUTH/RIDES/PAYMENTS secrets required"; exit 1
-          fi
           if [ -z "${REDIS_URL:-}" ]; then echo "::error::REDIS_URL secret required"; exit 1; fi
+
+          # Canonical prod DB is Render Postgres mova-db-auth (multi-db).
+          MOVA_PG_ID="dpg-daa5u3on74is739uken0-a"
+          CONN_JSON=$(curl -sS -H "Authorization: Bearer ${RENDER_API_KEY}" \
+            -H "Accept: application/json" \
+            "https://api.render.com/v1/postgres/${MOVA_PG_ID}/connection-info")
+          BASE_DSN=$(echo "$CONN_JSON" | jq -r '.externalConnectionString // .connectionString // empty')
+          if [ -z "$BASE_DSN" ]; then
+            echo "::error::Could not read mova-db-auth externalConnectionString"; exit 1
+          fi
+          if [[ "$BASE_DSN" != *".render.com"* ]]; then
+            echo "::error::Unexpected non-Render DSN from mova-db-auth"; exit 1
+          fi
+
+          dsn_for() {
+            local db="$1"
+            python -c "import os,re,sys; b=os.environ['BASE_DSN']; db=sys.argv[1]; print(re.sub(r'/[^/?]+(\\?|$)', '/' + db + r'\\1', b))" "$db"
+          }
+          export BASE_DSN
+          DATABASE_URL_AUTH="$(dsn_for mova_auth)"
+          DATABASE_URL_RIDES="$(dsn_for mova_rides)"
+          DATABASE_URL_PAYMENTS="$(dsn_for mova_payments)"
+          echo "Using Render Postgres mova-db-auth for DATABASE_URL_* (not Neon)"
+
+          assert_render_dsn() {
+            local name="$1" url="$2"
+            if [[ "$url" == *"neon.tech"* ]]; then
+              echo "::error::${name} points at Neon — refuse (prod is Render Postgres)"; exit 1
+            fi
+            if [[ "$url" != *".render.com"* ]]; then
+              echo "::error::${name} must be a Render external URL"; exit 1
+            fi
+          }
+          assert_render_dsn DATABASE_URL_AUTH "$DATABASE_URL_AUTH"
+          assert_render_dsn DATABASE_URL_RIDES "$DATABASE_URL_RIDES"
+          assert_render_dsn DATABASE_URL_PAYMENTS "$DATABASE_URL_PAYMENTS"
 
           upsert_env() {
             local sid="$1"
@@ -81,12 +114,15 @@ jobs:
             SUPABASE_URL "https://furttqrltkwirdhiktdl.supabase.co" \
             SUPABASE_UPLOADS_BUCKET "uploads" \
             SUPABASE_KYC_BUCKET "kyc-docs" \
+            PAYMENT_SERVICE_URL "https://mova-payment.onrender.com" \
             JWT_SECRET "${JWT_SECRET:-}"
 
           upsert_many "$RIDE_ID" \
             DATABASE_URL "$DATABASE_URL_RIDES" \
             REDIS_URL "$REDIS_URL" \
+            AUTH_SERVICE_URL "https://mova-auth.onrender.com" \
             DRIVER_SERVICE_URL "https://mova-driver.onrender.com" \
+            PAYMENT_SERVICE_URL "https://mova-payment.onrender.com" \
             MOCK_PAYMENTS "false" \
             NODE_ENV "production" \
             APP_ENV "production" \
@@ -112,6 +148,7 @@ jobs:
           upsert_many "$PAY_ID" \
             DATABASE_URL "$DATABASE_URL_PAYMENTS" \
             REDIS_URL "$REDIS_URL" \
+            AUTH_SERVICE_URL "https://mova-auth.onrender.com" \
             RIDE_SERVICE_URL "https://mova-ride.onrender.com" \
             MOCK_PAYMENTS "false" \
             NODE_ENV "production" \

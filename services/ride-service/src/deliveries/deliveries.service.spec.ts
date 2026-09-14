@@ -10,7 +10,8 @@ jest.mock('../common/driver-eligibility.util', () => ({
   assertDriverEligibleForParcel: jest.fn().mockResolvedValue(undefined),
   assertDriverCanReceiveJobs: jest.fn().mockResolvedValue(undefined),
   driverCanReceiveJobs: jest.fn().mockReturnValue(true),
-  fetchDriverProfileSnapshot: jest.fn().mockResolvedValue(null),
+  driverAcceptsDeliveries: jest.fn().mockReturnValue(true),
+  fetchDriverProfileSnapshot: jest.fn().mockResolvedValue({ acceptsDeliveries: true }),
 }));
 jest.mock('../common/escrow.util', () => ({
   releaseEscrowPayout: jest.fn().mockResolvedValue({ success: true }),

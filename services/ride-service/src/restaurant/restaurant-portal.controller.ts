@@ -178,7 +178,7 @@ export class RestaurantPortalController {
   }
 
   @Post('orders/:id/assign-driver')
-  @ApiOperation({ summary: 'Assigner un livreur de la flotte restaurant' })
+  @ApiOperation({ summary: 'Assigner un livreur (désactivé — livreurs SENGA uniquement)' })
   assignDriver(
     @Request() req: { user: { id: string } },
     @Param('id') id: string,
@@ -188,25 +188,25 @@ export class RestaurantPortalController {
   }
 
   @Get('drivers')
-  @ApiOperation({ summary: 'Livreurs internes du restaurant' })
+  @ApiOperation({ summary: 'Livreurs internes (désactivé — liste vide, PLATFORM)' })
   drivers(@Request() req: { user: { id: string } }) {
     return this.portal.listDrivers(req.user.id);
   }
 
   @Post('drivers')
-  @ApiOperation({ summary: 'Ajouter un livreur à la flotte' })
+  @ApiOperation({ summary: 'Ajouter un livreur (désactivé)' })
   addDriver(@Request() req: { user: { id: string } }, @Body() dto: AddRestaurantDriverDto) {
     return this.portal.addDriver(req.user.id, dto);
   }
 
   @Post('drivers/:driverUserId/remove')
-  @ApiOperation({ summary: 'Retirer un livreur de la flotte' })
+  @ApiOperation({ summary: 'Retirer un livreur (désactivé)' })
   removeDriver(@Request() req: { user: { id: string } }, @Param('driverUserId') driverUserId: string) {
     return this.portal.removeDriver(req.user.id, driverUserId);
   }
 
   @Patch('courier-mode')
-  @ApiOperation({ summary: 'Mode livreurs : PLATFORM, OWN ou HYBRID' })
+  @ApiOperation({ summary: 'Mode livreurs verrouillé sur PLATFORM' })
   courierMode(@Request() req: { user: { id: string } }, @Body() dto: UpdateCourierModeDto) {
     return this.portal.updateCourierMode(req.user.id, dto.courierMode);
   }

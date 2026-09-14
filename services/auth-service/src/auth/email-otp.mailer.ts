@@ -10,7 +10,7 @@ export const EMAIL_UNAVAILABLE_USER_MESSAGE =
 
 /** Subject that reached Gmail for the restaurant PIN (no « OTP » / « code PIN »). */
 export const SENGA_ACCESS_MAIL_SUBJECT = 'Votre accès SENGA — AfriSoft';
-export const SENGA_RESTAURANT_ACCESS_MAIL_SUBJECT = 'Votre accès SENGA restaurant';
+export const SENGA_RESTAURANT_ACCESS_MAIL_SUBJECT = 'Votre accès SENGA Business';
 export const SENGA_RENTAL_ACCESS_MAIL_SUBJECT = 'Votre accès SENGA location';
 
 export type SengaAccessMailPortal = 'restaurant' | 'rental';
@@ -20,8 +20,8 @@ const PORTAL_MAIL_LINKS: Record<
   { who: string; label: string; host: string; url: string }
 > = {
   restaurant: {
-    who: 'votre compte SENGA restaurant',
-    label: 'Restaurant',
+    who: 'votre compte SENGA Business',
+    label: 'SENGA Business',
     host: 'restaurant.afri-soft.com',
     url: 'https://restaurant.afri-soft.com',
   },

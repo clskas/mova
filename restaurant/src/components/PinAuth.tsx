@@ -94,7 +94,7 @@ export const CONNECTION_PIN_HEADING_FR = "PIN de connexion pour les prochaines c
 export const ACTIVATION_PIN_WINDOW_HEADING_FR = "Code PIN de connexion";
 
 export const ACTIVATION_PIN_WINDOW_HINT_FR =
-  "Ce PIN servira pour les prochaines connexions. Saisissez le code à 6 chiffres envoyé par e-mail ou SMS après validation de votre dossier (objet « Votre acces SENGA restaurant »). Ce n'est pas un code Google.";
+  "Ce PIN servira pour les prochaines connexions. Saisissez le code à 6 chiffres envoyé par e-mail ou SMS après validation de votre dossier (objet « Votre accès SENGA Business »). Ce n'est pas un code Google.";
 
 export const WORK_ACTIVATION_PIN_HEADING_FR = "Code PIN d'activation";
 

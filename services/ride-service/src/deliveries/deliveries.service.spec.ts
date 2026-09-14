@@ -502,7 +502,7 @@ describe('DeliveriesService', () => {
     expect(prisma.delivery.update).not.toHaveBeenCalled();
   });
 
-  it('OWN : un livreur externe ne peut pas prendre la commande', async () => {
+  it('OWN historique : un livreur SENGA peut quand même prendre la commande (flotte partenaire désactivée)', async () => {
     prisma.delivery.findUnique.mockResolvedValue({
       id: 'd1',
       userId: 'u1',
@@ -514,11 +514,34 @@ describe('DeliveriesService', () => {
       escrowReady: true,
       escrowAmountCdf: 15000,
       estimatedPriceCdf: 15000,
+      deliveryPin: '1234',
+      pickupLat: -4.32,
+      pickupLng: 15.31,
     });
     prisma.restaurant.findUnique.mockResolvedValue({ courierMode: 'OWN' });
     prisma.restaurantDriver.findUnique.mockResolvedValue(null);
-    await expect(service.acceptDelivery('d1', 'external-drv')).rejects.toBeInstanceOf(MovaHttpException);
-    expect(prisma.delivery.update).not.toHaveBeenCalled();
+    prisma.delivery.update.mockResolvedValue({
+      id: 'd1',
+      userId: 'u1',
+      driverId: 'external-drv',
+      type: 'FOOD',
+      status: 'PICKED_UP',
+      restaurantId: 'r1',
+      restaurant: { name: 'Chez Mama', ownerUserId: 'own-1' },
+      events: [],
+      estimatedPriceCdf: 15000,
+      pickupLat: -4.32,
+      pickupLng: 15.31,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    prisma.deliveryEvent.create.mockResolvedValue({});
+    await service.acceptDelivery('d1', 'external-drv');
+    expect(prisma.delivery.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ courierSource: 'PLATFORM', driverId: 'external-drv' }),
+      }),
+    );
   });
 
   it('PIN déjà livré : idempotent, pas de second split', async () => {

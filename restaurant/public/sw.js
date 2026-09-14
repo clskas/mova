@@ -1,4 +1,4 @@
-const CACHE = "mova-resto-v13";
+const CACHE = "mova-business-v14";
 const SHELL = [
   "/manifest.webmanifest",
   "/icon-192.png",
@@ -64,7 +64,7 @@ self.addEventListener("fetch", (event) => {
 });
 
 self.addEventListener("push", (event) => {
-  let payload = { title: "SENGA Restaurant", body: "Nouvelle activité", url: "/", tag: "mova-partner" };
+  let payload = { title: "SENGA Business", body: "Nouvelle activité", url: "/", tag: "mova-partner" };
   try {
     payload = { ...payload, ...(event.data?.json() ?? {}) };
   } catch {

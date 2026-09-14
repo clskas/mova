@@ -23,12 +23,11 @@ const MANUAL = [
     ],
   },
   {
-    title: "Livreurs internes ou SENGA",
+    title: "Livraison par SENGA",
     steps: [
-      "Dans Paramètres, choisissez qui livre.",
-      "Livreurs SENGA : un livreur de la plateforme vient chercher la commande.",
-      "Livreurs internes : ce sont vos propres livreurs (ajoutez-les par numéro).",
-      "Mode mixte : vos livreurs d’abord, puis SENGA si besoin.",
+      "SENGA gère tous les livreurs : vous ne choisissez pas de flotte interne.",
+      "Quand la commande est prête, un livreur SENGA vient la chercher.",
+      "Vous êtes payé à l’enlèvement ; le livreur est payé après le PIN client.",
     ],
   },
   {

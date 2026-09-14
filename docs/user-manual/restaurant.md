@@ -67,7 +67,7 @@ Disponible pour supermarché, pharmacie et boutique.
 ## Exploitation quotidienne
 
 - **Commandes** : préparer, suivre, accepter.
-- **Paramètres** : livreurs SENGA, internes ou mixte ; localisation du magasin.
+- **Paramètres** : localisation du magasin, disponibilité. Les livraisons sont toujours assurées par les livreurs SENGA (pas de flotte partenaire).
 - **Revenus** : encaissements en CDF.
 
-Vous êtes payé à l’enlèvement. Un livreur SENGA est payé après le PIN client.
+Vous êtes payé à l’enlèvement. Le livreur SENGA est payé après le PIN client.

@@ -97,7 +97,7 @@ describe('sengaAccessMailCopy', () => {
 
   it('restaurant mail lists only the restaurant portal', () => {
     const copy = sengaAccessMailCopy('319027', { portal: 'restaurant' });
-    expect(copy.text).toContain('votre compte SENGA restaurant');
+    expect(copy.text).toContain('votre compte SENGA Business');
     expect(copy.text).toContain('restaurant.afri-soft.com');
     expect(copy.html).toContain('restaurant.afri-soft.com');
     expect(copy.text).not.toContain('rental.afri-soft.com');

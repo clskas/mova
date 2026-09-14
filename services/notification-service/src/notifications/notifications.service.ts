@@ -219,7 +219,7 @@ export class NotificationsService implements OnModuleInit {
         body,
         tag: `order-${payload.deliveryId}`,
         portalPath: '/',
-        smsBody: `SENGA Restaurant — Nouvelle commande${label}. Connectez-vous au portail pour confirmer.`,
+        smsBody: `SENGA Business — Nouvelle commande${label}. Connectez-vous au portail pour confirmer.`,
       });
       this.logger.log(`restaurant order notification for ${payload.deliveryId}`);
     }

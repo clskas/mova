@@ -4,10 +4,6 @@ import {
   MOVA_EVENTS,
   MovaErrorCode,
   MovaHttpException,
-  INTERNAL_API_KEY,
-  serviceUrl,
-  UserRole,
-  normalizePhoneRdc,
 } from '@mova/shared';
 import { RedisService } from '@mova/shared';
 import {
@@ -31,7 +27,6 @@ import { fetchServicePaymentStatuses } from '../common/payment-status.util';
 import { refundEscrow } from '../common/escrow.util';
 import { PartnerBillingService } from '../billing/partner-billing.service';
 import { computeRestaurantPartnerDisplay } from '../billing/partner-display.util';
-import { fetchAuthUserBrief } from '../common/internal-lookup.util';
 import { normalizeMenuCatalogInput, parseMenuCatalog } from './menu-catalog.util';
 
 @Injectable()
@@ -104,7 +99,7 @@ export class RestaurantPortalService {
       prepTimeMin: restaurant.prepTimeMin,
       promotionLabel: restaurant.promotionLabel,
       menuItems: restaurant.menuItems ?? [],
-      courierMode: restaurant.courierMode ?? 'PLATFORM',
+      courierMode: 'PLATFORM' as const,
       commerceType: restaurant.commerceType ?? 'RESTAURANT',
       kycStatus: restaurant.kycStatus,
       canOperate: restaurant.kycStatus === 'APPROVED',
@@ -586,154 +581,58 @@ export class RestaurantPortalService {
 
   async updateCourierMode(ownerUserId: string, courierMode: 'PLATFORM' | 'OWN' | 'HYBRID') {
     const restaurant = await this.getRestaurantForOwner(ownerUserId);
-    this.assertRestaurantKycApproved(restaurant);
-    const mode = courierMode.toUpperCase();
-    if (!['PLATFORM', 'OWN', 'HYBRID'].includes(mode)) {
-      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Mode livreurs invalide.');
+    const mode = (courierMode ?? '').toUpperCase();
+    if (mode !== 'PLATFORM') {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        undefined,
+        'Les livraisons sont assurées uniquement par les livreurs SENGA. Le mode flotte partenaire n\'est plus disponible.',
+      );
     }
     const updated = await this.prisma.restaurant.update({
       where: { id: restaurant.id },
-      data: { courierMode: mode as 'PLATFORM' | 'OWN' | 'HYBRID' },
+      data: { courierMode: 'PLATFORM' },
     });
     return { id: updated.id, courierMode: updated.courierMode };
   }
 
   async listDrivers(ownerUserId: string) {
     const restaurant = await this.getRestaurantForOwner(ownerUserId);
-    const rows = await this.prisma.restaurantDriver.findMany({
-      where: { restaurantId: restaurant.id },
-      orderBy: { createdAt: 'asc' },
-    });
-    const drivers = await Promise.all(
-      rows.map(async (r) => {
-        const brief = await fetchAuthUserBrief(r.driverUserId);
-        return {
-          id: r.id,
-          driverUserId: r.driverUserId,
-          isActive: r.isActive,
-          phone: brief?.phone,
-          name: brief?.name,
-        };
-      }),
-    );
     return {
       restaurantId: restaurant.id,
-      courierMode: restaurant.courierMode,
-      drivers,
+      courierMode: 'PLATFORM' as const,
+      drivers: [] as {
+        id: string;
+        driverUserId: string;
+        isActive: boolean;
+        phone?: string;
+        name?: string;
+      }[],
     };
   }
 
-  async addDriver(ownerUserId: string, dto: { driverUserId?: string; phone?: string }) {
-    const restaurant = await this.getRestaurantForOwner(ownerUserId);
-    this.assertRestaurantKycApproved(restaurant);
-    const driver = await this.resolveSengaDriverAccount(dto);
-    if (!driver) {
-      throw new MovaHttpException(
-        MovaErrorCode.VALIDATION_ERROR,
-        undefined,
-        'Aucun livreur SENGA pour ce numéro. La personne doit déjà avoir un compte livreur dans l\'application SENGA.',
-      );
-    }
-    const row = await this.prisma.restaurantDriver.upsert({
-      where: { restaurantId_driverUserId: { restaurantId: restaurant.id, driverUserId: driver.id } },
-      create: { restaurantId: restaurant.id, driverUserId: driver.id, isActive: true },
-      update: { isActive: true },
-    });
-    return {
-      id: row.id,
-      driverUserId: row.driverUserId,
-      isActive: row.isActive,
-      phone: driver.phone,
-      name: driver.name,
-    };
+  async addDriver(_ownerUserId: string, _dto: { driverUserId?: string; phone?: string }) {
+    throw new MovaHttpException(
+      MovaErrorCode.VALIDATION_ERROR,
+      undefined,
+      'Vous ne pouvez plus ajouter de livreurs internes. SENGA gère toutes les livraisons.',
+    );
   }
 
-  private async resolveSengaDriverAccount(dto: { driverUserId?: string; phone?: string }) {
-    const directId = dto.driverUserId?.trim();
-    if (directId) {
-      return this.loadSengaDriverAccount(directId);
-    }
-    const rawPhone = dto.phone?.trim();
-    if (!rawPhone) return null;
-    const normalized = normalizePhoneRdc(rawPhone);
-    try {
-      const res = await fetch(
-        serviceUrl('auth', `/internal/users?search=${encodeURIComponent(normalized || rawPhone)}&take=5`),
-        { headers: { 'x-internal-api-key': INTERNAL_API_KEY } },
-      );
-      const body = (await res.json()) as {
-        data?: { id: string; role?: string; phone?: string; firstName?: string; lastName?: string }[];
-      };
-      const rows = body.data ?? [];
-      const match =
-        rows.find((u) => normalizePhoneRdc(u.phone ?? '') === normalized) ??
-        rows.find((u) => u.role === UserRole.DRIVER) ??
-        rows[0];
-      if (!match?.id) return null;
-      return this.loadSengaDriverAccount(match.id, match);
-    } catch {
-      return null;
-    }
+  async removeDriver(_ownerUserId: string, _driverUserId: string) {
+    throw new MovaHttpException(
+      MovaErrorCode.VALIDATION_ERROR,
+      undefined,
+      'Vous ne pouvez plus retirer de livreurs internes. SENGA gère toutes les livraisons.',
+    );
   }
 
-  private async loadSengaDriverAccount(
-    userId: string,
-    hint?: { role?: string; phone?: string; firstName?: string; lastName?: string },
-  ) {
-    let role = hint?.role;
-    let phone = hint?.phone;
-    let firstName = hint?.firstName;
-    let lastName = hint?.lastName;
-    if (!role || !phone) {
-      try {
-        const res = await fetch(serviceUrl('auth', `/internal/users/${userId}`), {
-          headers: { 'x-internal-api-key': INTERNAL_API_KEY },
-        });
-        if (!res.ok) return null;
-        const user = (await res.json()) as {
-          role?: string;
-          phone?: string;
-          firstName?: string;
-          lastName?: string;
-        };
-        role = user.role ?? role;
-        phone = user.phone ?? phone;
-        firstName = user.firstName ?? firstName;
-        lastName = user.lastName ?? lastName;
-      } catch {
-        return null;
-      }
-    }
-    if (role !== UserRole.DRIVER) return null;
-    const name = [firstName, lastName].filter(Boolean).join(' ').trim();
-    return { id: userId, phone, name: name || undefined };
-  }
-
-  async removeDriver(ownerUserId: string, driverUserId: string) {
-    const restaurant = await this.getRestaurantForOwner(ownerUserId);
-    await this.prisma.restaurantDriver.deleteMany({
-      where: { restaurantId: restaurant.id, driverUserId },
-    });
-    return { removed: true };
-  }
-
-  async assignOwnDriver(deliveryId: string, ownerUserId: string, driverUserId: string) {
-    const { delivery, restaurant } = await this.assertOrderAccess(deliveryId, ownerUserId);
-    this.assertRestaurantKycApproved(restaurant);
-    if (delivery.guaranteed && !delivery.escrowReady) {
-      throw new MovaHttpException(MovaErrorCode.DELIVERY_ESCROW_REQUIRED);
-    }
-    const fleet = await this.prisma.restaurantDriver.findUnique({
-      where: { restaurantId_driverUserId: { restaurantId: restaurant.id, driverUserId } },
-    });
-    if (!fleet?.isActive) {
-      throw new MovaHttpException(
-        MovaErrorCode.VALIDATION_ERROR,
-        undefined,
-        'Ce livreur n\'est pas dans votre flotte. Ajoutez-le dans Paramètres.',
-      );
-    }
-    return this.deliveries.acceptDelivery(deliveryId, driverUserId);
+  async assignOwnDriver(_deliveryId: string, _ownerUserId: string, _driverUserId: string) {
+    throw new MovaHttpException(
+      MovaErrorCode.VALIDATION_ERROR,
+      undefined,
+      'Vous ne pouvez plus assigner un livreur interne. Un livreur SENGA prendra la commande.',
+    );
   }
 
   private async publishStatus(

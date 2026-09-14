@@ -5,17 +5,12 @@ import { useSearchParams } from "next/navigation";
 import { useRestaurantLiveRegister } from "@/components/RestaurantLiveProvider";
 import { ChatPanel } from "@/components/ChatPanel";
 import {
-  assignOwnDriver,
   confirmOrder,
   fetchOrders,
-  fetchProfile,
-  fetchRestaurantDrivers,
   formatCdf,
   markOrderReady,
   rejectOrder,
-  type RestaurantFleetDriver,
   type RestaurantOrder,
-  type RestaurantProfile,
 } from "@/lib/api";
 import { toUserErrorMessage } from "@/lib/user-messages";
 import { PartnerAmountLine } from "@/components/PartnerAmountLine";
@@ -41,7 +36,6 @@ import {
 
 export default function OrdersPage() {
   const searchParams = useSearchParams();
-  const [profile, setProfile] = useState<RestaurantProfile | null>(null);
   const [orders, setOrders] = useState<RestaurantOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -54,7 +48,6 @@ export default function OrdersPage() {
   const [filterQ, setFilterQ] = useState("");
   const [filtersActive, setFiltersActive] = useState(false);
   const [paginationTotal, setPaginationTotal] = useState<number | null>(null);
-  const [fleetDrivers, setFleetDrivers] = useState<RestaurantFleetDriver[]>([]);
   const seenPendingIds = useRef<Set<string> | null>(null);
 
   useEffect(() => {
@@ -102,23 +95,17 @@ export default function OrdersPage() {
   const load = useCallback(async () => {
     setError(null);
     try {
-      const [p, o, fleet] = await Promise.all([
-        fetchProfile(),
-        fetchOrders(
-          filtersActive
-            ? {
-                status: filterStatus || undefined,
-                from: filterFrom || undefined,
-                to: filterTo || undefined,
-                q: filterQ.trim() || undefined,
-                take: 50,
-              }
-            : undefined,
-        ),
-        fetchRestaurantDrivers().catch(() => ({ drivers: [] as RestaurantFleetDriver[] })),
-      ]);
-      setProfile(p);
-      setFleetDrivers(fleet?.drivers ?? []);
+      const o = await fetchOrders(
+        filtersActive
+          ? {
+              status: filterStatus || undefined,
+              from: filterFrom || undefined,
+              to: filterTo || undefined,
+              q: filterQ.trim() || undefined,
+              take: 50,
+            }
+          : undefined,
+      );
       const list = o.orders ?? [];
       setOrders(list);
       setPaginationTotal(o.pagination?.total ?? null);
@@ -164,21 +151,6 @@ export default function OrdersPage() {
       setBusyId(null);
     }
   }
-
-  async function assignDriver(orderId: string, driverUserId: string) {
-    setBusyId(orderId);
-    setError(null);
-    try {
-      await assignOwnDriver(orderId, driverUserId);
-      await load();
-    } catch (e) {
-      setError(toUserErrorMessage(e, "Assignation impossible"));
-    } finally {
-      setBusyId(null);
-    }
-  }
-
-  const canAssignOwn = profile?.courierMode === "OWN" || profile?.courierMode === "HYBRID";
 
   const pending = orders.filter((o) => o.status === "PENDING");
   const active = orders.filter((o) => !["DELIVERED", "CANCELLED", "PENDING"].includes(o.status));
@@ -283,8 +255,6 @@ export default function OrdersPage() {
                     }
                     onChatClient={() => openChat(o.id, "Client")}
                     onChatDriver={o.driverAssigned ? () => openChat(o.id, "Livreur") : undefined}
-                    fleetDrivers={canAssignOwn && !o.driverAssigned && o.status === "READY_FOR_PICKUP" ? fleetDrivers : []}
-                    onAssignDriver={canAssignOwn && !o.driverAssigned && o.status === "READY_FOR_PICKUP" ? (driverId) => assignDriver(o.id, driverId) : undefined}
                   />
                 ))}
               </div>
@@ -305,7 +275,6 @@ export default function OrdersPage() {
                       key={o.id}
                       order={o}
                       busy={busyId === o.id}
-                      fleetDrivers={fleetDrivers}
                       onConfirm={() => act(o.id, "confirm")}
                       onReject={() => act(o.id, "reject")}
                       onChatClient={() => openChat(o.id, "Client")}
@@ -339,8 +308,6 @@ export default function OrdersPage() {
                       }
                       onChatClient={() => openChat(o.id, "Client")}
                       onChatDriver={o.driverAssigned ? () => openChat(o.id, "Livreur") : undefined}
-                      fleetDrivers={canAssignOwn && !o.driverAssigned && o.status === "READY_FOR_PICKUP" ? fleetDrivers : []}
-                      onAssignDriver={canAssignOwn && !o.driverAssigned && o.status === "READY_FOR_PICKUP" ? (driverId) => assignDriver(o.id, driverId) : undefined}
                     />
                   ))}
                 </div>
@@ -355,21 +322,17 @@ export default function OrdersPage() {
 function OrderCard({
   order,
   busy,
-  fleetDrivers = [],
   onConfirm,
   onReject,
   onReady,
-  onAssignDriver,
   onChatClient,
   onChatDriver,
 }: {
   order: RestaurantOrder;
   busy: boolean;
-  fleetDrivers?: RestaurantFleetDriver[];
   onConfirm?: () => void;
   onReject?: () => void;
   onReady?: () => void;
-  onAssignDriver?: (driverUserId: string) => void;
   onChatClient?: () => void;
   onChatDriver?: () => void;
 }) {
@@ -458,28 +421,6 @@ function OrderCard({
           <span className="text-xs text-green-700 self-center">Livreur assigné</span>
         )}
       </div>
-      {onAssignDriver && (
-        <div className="mt-3 flex flex-wrap gap-2 items-center">
-          <select
-            className="rounded-xl border p-2 text-sm flex-1 min-w-[160px]"
-            defaultValue=""
-            disabled={busy || fleetDrivers.length === 0}
-            onChange={(e) => {
-              const id = e.target.value;
-              if (id) onAssignDriver(id);
-            }}
-          >
-            <option value="">
-              {fleetDrivers.length === 0 ? "Ajoutez un livreur dans Paramètres" : "Assigner un livreur interne…"}
-            </option>
-            {fleetDrivers.filter((d) => d.isActive).map((d) => (
-              <option key={d.id} value={d.driverUserId}>
-                {d.phone || d.name || "Livreur SENGA"}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
       {order.status === "PENDING" && (
         <p className="mt-3 text-xs text-amber-700">
           Nouvelle commande non payée. Acceptez pour confirmer la disponibilité — le client paiera ensuite. Ne

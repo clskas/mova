@@ -122,6 +122,28 @@ describe('RestaurantPortalService', () => {
   it('expose commerceType sur le profil partenaire', async () => {
     const profile = await service.getProfile('owner-1');
     expect(profile.commerceType).toBe('PHARMACY');
+    expect(profile.courierMode).toBe('PLATFORM');
+  });
+
+  it('refuse OWN/HYBRID et l’ajout de livreurs internes', async () => {
+    await expect(service.updateCourierMode('owner-1', 'OWN')).rejects.toMatchObject({
+      code: MovaErrorCode.VALIDATION_ERROR,
+    });
+    await expect(service.updateCourierMode('owner-1', 'HYBRID')).rejects.toMatchObject({
+      code: MovaErrorCode.VALIDATION_ERROR,
+    });
+    await expect(service.addDriver('owner-1', { phone: '+243970000000' })).rejects.toMatchObject({
+      code: MovaErrorCode.VALIDATION_ERROR,
+    });
+    await expect(service.removeDriver('owner-1', 'drv-1')).rejects.toMatchObject({
+      code: MovaErrorCode.VALIDATION_ERROR,
+    });
+    await expect(service.assignOwnDriver('del-1', 'owner-1', 'drv-1')).rejects.toMatchObject({
+      code: MovaErrorCode.VALIDATION_ERROR,
+    });
+    const fleet = await service.listDrivers('owner-1');
+    expect(fleet.courierMode).toBe('PLATFORM');
+    expect(fleet.drivers).toEqual([]);
   });
 
   it('enregistre commerceType à l’onboarding (completeSetup)', async () => {

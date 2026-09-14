@@ -1,4 +1,4 @@
-const CACHE = "mova-business-v14";
+const CACHE = "mova-business-v15";
 const SHELL = [
   "/manifest.webmanifest",
   "/icon-192.png",

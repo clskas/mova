@@ -164,8 +164,8 @@ jobs:
             MOBILE_PASSENGER_VERSION "1.0.5" \
             MOBILE_DRIVER_VERSION "1.0.5" \
             MOBILE_MIN_VERSION "1.0.0" \
-            MOBILE_PASSENGER_VERSION_CODE "70" \
-            MOBILE_DRIVER_VERSION_CODE "70" \
+            MOBILE_PASSENGER_VERSION_CODE "71" \
+            MOBILE_DRIVER_VERSION_CODE "71" \
             MOBILE_MIN_VERSION_CODE "0" \
             PLAY_STORE_PASSENGER_URL "https://play.google.com/store/apps/details?id=cd.mova.mova.passenger" \
             PLAY_STORE_DRIVER_URL "https://play.google.com/store/apps/details?id=cd.mova.mova.driver" \

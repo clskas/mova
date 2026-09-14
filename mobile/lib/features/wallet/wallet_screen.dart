@@ -55,11 +55,34 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
   DateTime? _lastSync;
   bool _fromCache = false;
   Timer? _topUpPollTimer;
+  /// Recharge cards — filtered by admin « Opérateurs Mobile Money » (`senga`).
+  List<MobileMoneyProvider> _topUpProviders = MarketConfig.mobileMoneyProviders
+      .where((p) => p.id != 'ORANGE_MONEY')
+      .toList();
 
   @override
   void initState() {
     super.initState();
     _loadWallet();
+    _loadTopUpProviders();
+  }
+
+  Future<void> _loadTopUpProviders() async {
+    final api = ref.read(apiClientProvider);
+    final result = await api.get('/public/client-config');
+    if (!mounted) return;
+    if (result case Success(:final data)) {
+      final mm = data['mobileMoney'];
+      final row = mm is Map ? mm['senga'] : null;
+      if (row is Map) {
+        final next = MarketConfig.mobileMoneyProviders
+            .where((p) => row[p.id] == true)
+            .toList();
+        if (next.isNotEmpty) {
+          setState(() => _topUpProviders = next);
+        }
+      }
+    }
   }
 
   @override
@@ -525,32 +548,41 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                 ],
               ),
             ),
-          ...MarketConfig.mobileMoneyProviders.map((p) => MovaCard(
-                margin: const EdgeInsets.only(bottom: 8),
-                onTap: _topUpLoading ? null : () => _showTopUpSheet(p),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: Color(p.color),
-                        borderRadius: BorderRadius.circular(8),
+          if (_topUpProviders.isEmpty)
+            const Padding(
+              padding: EdgeInsets.only(bottom: 8),
+              child: Text(
+                'Aucun opérateur Mobile Money disponible pour la recharge.',
+                style: TextStyle(color: MovaColors.textSecondary, fontSize: 13),
+              ),
+            )
+          else
+            ..._topUpProviders.map((p) => MovaCard(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  onTap: _topUpLoading ? null : () => _showTopUpSheet(p),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: Color(p.color),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        p.name,
-                        style: const TextStyle(fontWeight: FontWeight.w600),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          p.name,
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                    ),
-                    const Icon(Icons.add_circle_outline, color: MovaColors.violet),
-                  ],
-                ),
-              )),
+                      const Icon(Icons.add_circle_outline, color: MovaColors.violet),
+                    ],
+                  ),
+                )),
           const SizedBox(height: 24),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -779,6 +811,11 @@ class _WalletWithdrawSheetState extends ConsumerState<_WalletWithdrawSheet> {
     final phone = MarketConfig.normalizePhone(_phoneController.text.trim());
     if (!MarketConfig.validatePhone(phone)) {
       setState(() => _formError = 'Numéro Mobile Money invalide. Format : +243XXXXXXXXX');
+      return null;
+    }
+    final mismatch = MarketConfig.mmPrefixMismatchFr(_providerId, phone);
+    if (mismatch != null) {
+      setState(() => _formError = mismatch);
       return null;
     }
     setState(() => _formError = null);

@@ -176,18 +176,13 @@ jobs:
             REDIS_URL "$REDIS_URL" \
             AUTH_SERVICE_URL "https://mova-auth.onrender.com" \
             RIDE_SERVICE_URL "https://mova-ride.onrender.com" \
+            PAY_HUB_URL "https://pay.afri-soft.com" \
+            AFRISOFT_HUB_APP_ID "${AFRISOFT_HUB_APP_ID:-senga}" \
+            AFRISOFT_HUB_API_KEY "${AFRISOFT_HUB_API_KEY:-}" \
             MOCK_PAYMENTS "false" \
             NODE_ENV "production" \
             APP_ENV "production" \
-            RUN_SEED "false" \
-            SKIP_DEMO_SEED "true" \
-            SEED_DEMO_CATALOG "false" \
-            SMS_PROVIDER "africastalking" \
-            MOBILE_MONEY_GATEWAY "serdipay" \
-            SERDIPAY_BASE_URL "https://apis.serdipay.com" \
-            SUPABASE_URL "https://furttqrltkwirdhiktdl.supabase.co" \
-            SUPABASE_UPLOADS_BUCKET "uploads" \
-            SUPABASE_KYC_BUCKET "kyc-docs" \
-            JWT_SECRET "${JWT_SECRET:-}"
+            JWT_SECRET "${JWT_SECRET:-}" \
+            INTERNAL_API_KEY "${INTERNAL_API_KEY:-}"
 
-          echo "Restore complete (per-key upsert). Redeploy ride/auth/payment so banners pick up versionCode 70."
+          echo "Restore complete (per-key upsert). Redeploy ride/auth/payment after env changes."

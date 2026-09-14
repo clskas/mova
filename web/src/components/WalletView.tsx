@@ -118,7 +118,9 @@ export function WalletView({ onBack, mock }: Props) {
         setError(
           topUpProvider === "ORANGE_MONEY"
             ? "Ce numéro n’est pas un numéro Orange Money (préfixes 80, 84, 85, 89). Saisissez le numéro de la SIM Orange."
-            : "Ce numéro ne correspond pas à l’opérateur choisi.",
+            : topUpProvider === "MPESA"
+              ? "Ce numéro n’est pas un numéro Vodacom M-Pesa (préfixes 81, 82, 83). Saisissez le numéro de la SIM Vodacom."
+              : "Ce numéro n’est pas un numéro Airtel Money (préfixes 97, 98, 99). Saisissez le numéro de la SIM Airtel.",
         );
         return;
       }
@@ -181,6 +183,29 @@ export function WalletView({ onBack, mock }: Props) {
     }
     if (!withdrawPhone.trim()) {
       setError("Numéro Mobile Money requis.");
+      return;
+    }
+    const digits = withdrawPhone.replace(/\D/g, "");
+    const nsn = digits.startsWith("243")
+      ? digits.slice(3)
+      : digits.startsWith("0")
+        ? digits.slice(1)
+        : digits;
+    const prefix = nsn.slice(0, 2);
+    const prefixes: Record<string, string[]> = {
+      ORANGE_MONEY: ["80", "84", "85", "89"],
+      MPESA: ["81", "82", "83"],
+      AIRTEL_MONEY: ["97", "98", "99"],
+    };
+    const allowed = prefixes[withdrawProvider];
+    if (allowed && !allowed.includes(prefix)) {
+      setError(
+        withdrawProvider === "ORANGE_MONEY"
+          ? "Ce numéro n’est pas un numéro Orange Money (préfixes 80, 84, 85, 89)."
+          : withdrawProvider === "MPESA"
+            ? "Ce numéro n’est pas un numéro Vodacom M-Pesa (préfixes 81, 82, 83)."
+            : "Ce numéro n’est pas un numéro Airtel Money (préfixes 97, 98, 99).",
+      );
       return;
     }
     withdrawInFlight.current = true;

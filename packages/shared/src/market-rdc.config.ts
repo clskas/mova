@@ -207,10 +207,7 @@ export function rdcMobileMoneyOperatorMismatchFr(
   if (!key) return null;
   const prefixes = MARKET_RDC.mmPrefixes[key];
   if ((prefixes as readonly string[]).includes(prefix)) return null;
-  const knownOther = (
-    Object.entries(MARKET_RDC.mmPrefixes) as Array<[RdcMobileMoneyOperatorId, readonly string[]]>
-  ).some(([op, ps]) => op !== key && ps.includes(prefix));
-  if (!knownOther) return null;
+  // Strict: the MSISDN must match the chosen operator (no « unknown prefix » bypass).
   const list = prefixes.join(', ');
   switch (key) {
     case 'ORANGE_MONEY':

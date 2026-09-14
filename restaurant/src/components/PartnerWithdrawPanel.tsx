@@ -73,6 +73,34 @@ export function PartnerWithdrawPanel({ balanceCdf, walletAvailable = true, onWit
     if (phone.trim()) localStorage.setItem(PAYOUT_PHONE_KEY, phone.trim());
   }
 
+  function operatorPhoneMismatch(): string | null {
+    const digits = phone.replace(/\D/g, "");
+    const nsn = digits.startsWith("243")
+      ? digits.slice(3)
+      : digits.startsWith("0")
+        ? digits.slice(1)
+        : digits;
+    if (nsn.length < 9) {
+      return "Numéro Mobile Money invalide. Format : +243XXXXXXXXX";
+    }
+    const prefix = nsn.slice(0, 2);
+    const prefixes: Record<string, string[]> = {
+      ORANGE_MONEY: ["80", "84", "85", "89"],
+      MPESA: ["81", "82", "83"],
+      AIRTEL_MONEY: ["97", "98", "99"],
+    };
+    const allowed = prefixes[provider];
+    if (!allowed) return null;
+    if (allowed.includes(prefix)) return null;
+    if (provider === "ORANGE_MONEY") {
+      return "Ce numéro n’est pas un numéro Orange Money (préfixes 80, 84, 85, 89).";
+    }
+    if (provider === "MPESA") {
+      return "Ce numéro n’est pas un numéro Vodacom M-Pesa (préfixes 81, 82, 83).";
+    }
+    return "Ce numéro n’est pas un numéro Airtel Money (préfixes 97, 98, 99).";
+  }
+
   async function submitWithdraw() {
     if (inFlight.current) return;
     const amountCdf = Number(amount);
@@ -86,6 +114,11 @@ export function PartnerWithdrawPanel({ balanceCdf, walletAvailable = true, onWit
     }
     if (!phone.trim()) {
       setError("Numéro Mobile Money requis.");
+      return;
+    }
+    const mismatch = operatorPhoneMismatch();
+    if (mismatch) {
+      setError(mismatch);
       return;
     }
     inFlight.current = true;
@@ -150,6 +183,11 @@ export function PartnerWithdrawPanel({ balanceCdf, walletAvailable = true, onWit
     }
     if (!phone.trim()) {
       setError("Numéro Mobile Money requis.");
+      return;
+    }
+    const mismatch = operatorPhoneMismatch();
+    if (mismatch) {
+      setError(mismatch);
       return;
     }
     inFlight.current = true;

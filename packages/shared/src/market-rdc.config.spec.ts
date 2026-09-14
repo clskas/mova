@@ -32,6 +32,11 @@ describe('Market RDC Config', () => {
     expect(rdcMobileMoneyOperatorMismatchFr('AIRTEL_MONEY', '+243970000001')).toBeNull();
   });
 
+  it('rejects unknown RDC prefixes for a chosen operator (strict MSISDN match)', () => {
+    expect(rdcMobileMoneyOperatorMismatchFr('MPESA', '+243900000001')).toMatch(/M-Pesa/i);
+    expect(rdcMobileMoneyOperatorMismatchFr('AIRTEL_MONEY', '+243900000001')).toMatch(/Airtel/i);
+  });
+
   it('should format CDF amounts', () => {
     const formatted = formatCdf(12500);
     expect(formatted).toContain('FC');

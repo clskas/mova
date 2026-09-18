@@ -408,10 +408,9 @@ export default function ChauffeursPage() {
         Seuls les vrais orphelins (sans compte) et Test Lab sont masqués.
       </p>
       <p className="text-sm text-gray-600 mb-4 rounded-lg border border-violet-100 bg-violet-50/60 px-3 py-2">
-        <strong>Livreurs de l&apos;entreprise (SENGA)</strong> = chauffeurs avec badge « Livreur SENGA »
-        (courses + repas/colis/courses). Les restaurants n&apos;ont plus de flotte propre (mode PLATFORM) :
-        toutes les livraisons food/commerce passent par cette flotte. « Courses uniquement » = autres chauffeurs
-        (taxi/moto) exclus des offres de livraison.
+        <strong>Livreurs SENGA</strong> = seuls à recevoir les <em>notifications / offres de livraison</em>
+        (repas, colis, express, courses). <strong>Courses uniquement</strong> = taxi/moto : offres de courses
+        seulement, jamais de push livraison. Basculez le mode dans la fiche chauffeur ci-dessous.
       </p>
       {error && <div className="mb-4"><ErrorBanner message={error} onRetry={load} /></div>}
       <div className="space-y-4">

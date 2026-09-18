@@ -33,3 +33,26 @@ describe('driverAcceptsDeliveries', () => {
     expect(driverAcceptsDeliveries({ acceptsDeliveries: true })).toBe(true);
   });
 });
+
+describe('filterDriversAcceptingDeliveries', () => {
+  const originalFetch = global.fetch;
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+    jest.resetModules();
+  });
+
+  it('keeps livreurs and drops ride-only chauffeurs', async () => {
+    global.fetch = jest.fn(async (url: RequestInfo | URL) => {
+      const id = String(url).split('/').pop() ?? '';
+      return {
+        ok: true,
+        json: async () => ({ acceptsDeliveries: id !== 'ride-only-user' }),
+      } as Response;
+    }) as unknown as typeof fetch;
+
+    const { filterDriversAcceptingDeliveries } = await import('./driver-eligibility.util');
+    const kept = await filterDriversAcceptingDeliveries(['livreur-user', 'ride-only-user']);
+    expect(kept).toEqual(['livreur-user']);
+  });
+});

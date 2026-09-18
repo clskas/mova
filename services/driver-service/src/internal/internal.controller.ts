@@ -22,6 +22,11 @@ class NearbyQuery {
   @IsString() vehicleType: VehicleType;
   @IsOptional() @Type(() => Number) @IsNumber() searchAttempt?: number;
   @IsOptional() @IsString() city?: string;
+  /** true = uniquement Livreur SENGA (acceptsDeliveries), pour offres livraison/courses. */
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true' || value === '1')
+  @IsBoolean()
+  forDelivery?: boolean;
 }
 class RatingDto { @IsNumber() ratingAvg: number; }
 class ReviewKycDto {
@@ -61,7 +66,14 @@ export class InternalController {
   constructor(private drivers: DriversService, private incidents: IncidentsService) {}
   @Post('profiles') createProfile(@Body() dto: CreateProfileDto) { return this.drivers.createProfile(dto.userId); }
   @Get('drivers/nearby') nearby(@Query() q: NearbyQuery) {
-    return this.drivers.findNearby(q.lat, q.lng, q.vehicleType as VehicleType, q.searchAttempt ?? 0, q.city);
+    return this.drivers.findNearby(
+      q.lat,
+      q.lng,
+      q.vehicleType as VehicleType,
+      q.searchAttempt ?? 0,
+      q.city,
+      { forDelivery: q.forDelivery === true },
+    );
   }
   @Get('drivers/count') count() { return this.drivers.countDrivers().then((count) => ({ count })); }
   @Get('drivers/stats') driverStats() { return this.drivers.getAdminStats(); }

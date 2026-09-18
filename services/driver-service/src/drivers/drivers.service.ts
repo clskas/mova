@@ -140,7 +140,14 @@ export class DriversService {
     return profile;
   }
 
-  async findNearby(lat: number, lng: number, vehicleType: VehicleType, searchAttempt = 0, city?: string): Promise<DriverCandidate[]> {
+  async findNearby(
+    lat: number,
+    lng: number,
+    vehicleType: VehicleType,
+    searchAttempt = 0,
+    city?: string,
+    opts?: { forDelivery?: boolean },
+  ): Promise<DriverCandidate[]> {
     const matching = this.matchingConfig.get();
     const effectiveRadius = Math.min(
       matching.initialRadiusKm + searchAttempt * matching.radiusIncrementKm,
@@ -156,6 +163,8 @@ export class DriversService {
         activationPinVerifiedAt: { not: null },
         currentLat: { not: null },
         currentLng: { not: null },
+        // Livraisons / courses : uniquement Livreur SENGA (pas les chauffeurs « courses uniquement »).
+        ...(opts?.forDelivery ? { acceptsDeliveries: true } : {}),
         vehicles: { some: { type: { in: compatibleTypes }, isActive: true, typeApprovalStatus: KycStatus.APPROVED } },
       },
       include: { vehicles: { where: { type: { in: compatibleTypes }, isActive: true, typeApprovalStatus: KycStatus.APPROVED } } },

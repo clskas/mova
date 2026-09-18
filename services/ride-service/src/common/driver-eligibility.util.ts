@@ -35,6 +35,17 @@ export function driverAcceptsDeliveries(profile: DriverProfileSnapshot | null | 
   return profile?.acceptsDeliveries !== false;
 }
 
+/** Exclude ride-only chauffeurs from delivery/errand push pools. */
+export async function filterDriversAcceptingDeliveries(driverUserIds: string[]): Promise<string[]> {
+  if (driverUserIds.length === 0) return [];
+  try {
+    const profiles = await Promise.all(driverUserIds.map((id) => fetchDriverProfileSnapshot(id)));
+    return driverUserIds.filter((_, i) => driverAcceptsDeliveries(profiles[i]));
+  } catch {
+    return driverUserIds;
+  }
+}
+
 export async function fetchDriverProfileSnapshot(userId: string): Promise<DriverProfileSnapshot | null> {
   try {
     const res = await fetch(serviceUrl('driver', `/internal/drivers/${userId}`), {

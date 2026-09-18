@@ -1,8 +1,13 @@
-import { VehicleType } from '@prisma/client';
-import { DriverJobAlertPayload, DriverJobKind, MOVA_EVENTS } from '@mova/shared';
-import { RedisService } from '@mova/shared';
+import {
+  DriverJobAlertPayload,
+  DriverJobKind,
+  MOVA_EVENTS,
+  RedisService,
+  VehicleType,
+} from '@mova/shared';
 import { MatchingService } from '../matching/matching.service';
 import { filterDriversNotDebtBlocked } from './driver-debt.util';
+import { filterDriversAcceptingDeliveries } from './driver-eligibility.util';
 
 /** Types d'engins à notifier pour colis, express, courses/commissions, etc. */
 export const DELIVERY_ALERT_VEHICLE_TYPES: VehicleType[] = [
@@ -22,6 +27,10 @@ export async function publishDriverJobAlert(
   await redis.publish(MOVA_EVENTS.DRIVER_JOB_ALERT, payload);
 }
 
+/**
+ * Notifie les livreurs SENGA à proximité (pas les chauffeurs « courses uniquement »).
+ * Utilisé pour DELIVERY_OFFER (colis, repas, express, courses/errands).
+ */
 export async function notifyNearbyDrivers(
   redis: RedisService,
   matching: MatchingService,
@@ -39,11 +48,17 @@ export async function notifyNearbyDrivers(
 ): Promise<void> {
   const types = opts.vehicleTypes ?? [VehicleType.MOTO_TAXI, VehicleType.STANDARD];
   const seen = new Set<string>();
+  const forDelivery = opts.jobKind === 'DELIVERY_OFFER';
   for (const vehicleType of types) {
-    const drivers = await matching.findDrivers(opts.pickupLat, opts.pickupLng, vehicleType, 0);
+    const drivers = await matching.findDrivers(opts.pickupLat, opts.pickupLng, vehicleType, 0, {
+      forDelivery,
+    });
     for (const d of drivers) seen.add(d.userId);
   }
-  const driverUserIds = await filterDriversNotDebtBlocked([...seen]);
+  let driverUserIds = await filterDriversNotDebtBlocked([...seen]);
+  if (forDelivery) {
+    driverUserIds = await filterDriversAcceptingDeliveries(driverUserIds);
+  }
   if (driverUserIds.length === 0) return;
   await publishDriverJobAlert(redis, {
     jobKind: opts.jobKind,

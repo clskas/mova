@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../api/api_client.dart';
+import '../config/app_version.dart';
 import '../config/market_config.dart';
 import '../offline/connectivity_service.dart';
 import '../theme/mova_colors.dart';
@@ -72,8 +73,12 @@ class _MovaOfflineShellState extends ConsumerState<MovaOfflineShell>
                         Expanded(
                           child: Text(
                             update.flexibleDownloaded
-                                ? 'La mise à jour de SENGA est prête. Redémarrez pour l\'installer.'
-                                : 'Une nouvelle version de SENGA est disponible.',
+                                ? (AppFlavor.isDriver
+                                    ? 'La mise à jour de SENGA Driver est prête. Redémarrez pour l\'installer.'
+                                    : 'La mise à jour de SENGA est prête. Redémarrez pour l\'installer.')
+                                : (AppFlavor.isDriver
+                                    ? 'Une nouvelle version de SENGA Driver est disponible.'
+                                    : 'Une nouvelle version de SENGA est disponible.'),
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 13,

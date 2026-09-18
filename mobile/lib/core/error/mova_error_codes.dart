@@ -66,6 +66,13 @@ const movaErrorMessages = <String, String>{
 
 MovaFailure failureFromApiResponse(int statusCode, Map<String, dynamic> body) {
   final error = body['error'];
+  final topMessage = body['message']?.toString();
+  if (body['maintenance'] == true || (error is Map && error['code'] == 'MAINTENANCE')) {
+    final msg = (error is Map ? error['message']?.toString() : null) ??
+        topMessage ??
+        'SENGA est actuellement en maintenance. Merci pour votre patience.';
+    return ServerFailure(sanitizeUserMessage(msg, fallback: msg));
+  }
   if (error is Map<String, dynamic>) {
     final code = error['code'] as String?;
     final rawMessage = error['message'];

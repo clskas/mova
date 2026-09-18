@@ -73,12 +73,14 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
     ('ID_PHOTO', 'Carte d\'identité / passeport'),
     ('SELFIE', 'Photo récente (profil)'),
     ('DRIVERS_LICENSE', 'Permis de conduire'),
-    ('VEHICLE_REGISTRATION', 'Carte grise'),
+    ('VEHICLE_REGISTRATION', 'Carte grise (optionnel)'),
     ('VEHICLE_INSURANCE', 'Assurance véhicule'),
     ('TECHNICAL_INSPECTION', 'Visite technique'),
     ('CRIMINAL_RECORD', 'Casier judiciaire (optionnel)'),
   ];
 
+  static const _optionalDocTypes = {'VEHICLE_REGISTRATION', 'CRIMINAL_RECORD'};
+  static const _requiredDocCount = 5;
   Future<void> _restoreOnboardingStep() async {
     final prefs = await SharedPreferences.getInstance();
     final saved = prefs.getInt(_stepStorageKey);
@@ -521,7 +523,12 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
       }
     }
     if (!found) {
-      checklist.add({'type': type, 'uploaded': true, 'url': url, 'required': true});
+      checklist.add({
+        'type': type,
+        'uploaded': true,
+        'url': url,
+        'required': !_optionalDocTypes.contains(type),
+      });
     }
     kyc['checklist'] = checklist;
     final required = checklist.where((i) => i['required'] == true);
@@ -608,7 +615,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
       if (_state?['kyc'] != null) ...[
         const SizedBox(height: 8),
         Text(
-          'Documents : ${_state!['kyc']['checklist'] is List ? (_state!['kyc']['checklist'] as List).where((i) => i is Map && i['required'] == true && i['uploaded'] == true).length : 0}/6 obligatoires',
+          'Documents : ${_state!['kyc']['checklist'] is List ? (_state!['kyc']['checklist'] as List).where((i) => i is Map && i['required'] == true && i['uploaded'] == true).length : 0}/$_requiredDocCount obligatoires',
           style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
         ),
       ],
@@ -860,7 +867,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
           label: Text(_vehicleImageUrl != null && _vehicleImageUrl!.isNotEmpty ? 'Changer la photo' : 'Prendre une photo'),
         ),
         const SizedBox(height: 20),
-        _docButton('VEHICLE_REGISTRATION', 'Carte grise'),
+        _docButton('VEHICLE_REGISTRATION', 'Carte grise (optionnel)'),
         _docButton('VEHICLE_INSURANCE', 'Assurance'),
         _docButton('TECHNICAL_INSPECTION', 'Visite technique'),
       ],

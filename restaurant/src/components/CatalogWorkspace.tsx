@@ -252,7 +252,7 @@ export function CatalogWorkspace({ mode }: { mode: CatalogMode }) {
       )}
 
       {(mode === "catalogue" || mode === "stock") && (
-        <div className="bg-white rounded-2xl border p-5 space-y-3">
+        <div className="bg-white rounded-2xl border p-4 sm:p-5 space-y-3 min-w-0 overflow-hidden">
           <h3 className="font-semibold">Catégories</h3>
           <div className="flex flex-wrap gap-2">
             {categories.length === 0 && <p className="text-sm text-gray-400">Aucune catégorie</p>}
@@ -271,14 +271,19 @@ export function CatalogWorkspace({ mode }: { mode: CatalogMode }) {
             ))}
           </div>
           {mode === "catalogue" && (
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2 min-w-0">
               <input
-                className="flex-1 rounded-xl border p-3 text-sm"
+                className="w-full min-w-0 flex-1 rounded-xl border p-3 text-sm"
                 placeholder="Nouvelle catégorie (ex. Boissons)"
                 value={newCatName}
                 onChange={(e) => setNewCatName(e.target.value)}
               />
-              <button type="button" disabled={!canOperate} onClick={addCategory} className="px-4 py-2 rounded-xl border text-sm disabled:opacity-60">
+              <button
+                type="button"
+                disabled={!canOperate}
+                onClick={addCategory}
+                className="shrink-0 w-full sm:w-auto px-4 py-2.5 min-h-11 rounded-xl border text-sm disabled:opacity-60"
+              >
                 Ajouter
               </button>
             </div>

@@ -82,9 +82,9 @@ describe('allDriverJustificatifsApproved', () => {
         { type: 'ID_PHOTO', required: true, uploaded: true, status: 'APPROVED' },
         { type: 'SELFIE', required: true, uploaded: true, status: 'APPROVED' },
         { type: 'DRIVERS_LICENSE', required: true, uploaded: true, status: 'APPROVED' },
-        { type: 'VEHICLE_REGISTRATION', required: true, uploaded: true, status: 'APPROVED' },
         { type: 'VEHICLE_INSURANCE', required: true, uploaded: true, status: 'APPROVED' },
         { type: 'TECHNICAL_INSPECTION', required: true, uploaded: true, status: 'APPROVED' },
+        { type: 'VEHICLE_REGISTRATION', required: false, uploaded: false, status: null },
         { type: 'CRIMINAL_RECORD', required: false, uploaded: false, status: null },
       ]),
     ).toBe(true);

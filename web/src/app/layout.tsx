@@ -3,6 +3,7 @@ import "./globals.css";
 import { PwaRegister } from "@/components/PwaRegister";
 import { PwaInstallBanner } from "@/components/PwaInstallBanner";
 import { UpdateBanner } from "@/components/UpdateBanner";
+import { MaintenanceGate } from "@/components/MaintenanceGate";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -35,7 +36,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="min-h-[100dvh] antialiased overflow-x-hidden">
         <PwaRegister />
         <UpdateBanner />
-        {children}
+        <MaintenanceGate
+          appId="senga"
+          apiBase={(process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000").trim()}
+        >
+          {children}
+        </MaintenanceGate>
         <PwaInstallBanner />
       </body>
     </html>

@@ -240,12 +240,11 @@ function dossierNeedsAdminAction(
   return hasOpenDocs || (allDocsApproved && profileStatus !== "APPROVED");
 }
 
-/** Aligné sur packages/shared REQUIRED_DRIVER_KYC_TYPES (6 justificatifs). */
+/** Aligné sur packages/shared REQUIRED_DRIVER_KYC_TYPES (carte grise optionnelle). */
 const REQUIRED_DRIVER_KYC_TYPES = [
   "ID_PHOTO",
   "SELFIE",
   "DRIVERS_LICENSE",
-  "VEHICLE_REGISTRATION",
   "VEHICLE_INSURANCE",
   "TECHNICAL_INSPECTION",
 ] as const;

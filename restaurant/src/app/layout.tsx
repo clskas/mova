@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { PwaRegister } from "@/components/PwaRegister";
 import { UpdateBanner } from "@/components/UpdateBanner";
+import { MaintenanceGate } from "@/components/MaintenanceGate";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -42,10 +43,10 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="fr">
-      <body className="min-h-screen antialiased">
+      <body className="min-h-screen antialiased overflow-x-hidden">
         <PwaRegister />
         <UpdateBanner />
-        {children}
+        <MaintenanceGate appId="resto">{children}</MaintenanceGate>
       </body>
     </html>
   );

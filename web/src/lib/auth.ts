@@ -135,5 +135,8 @@ export function isSeedDemoPhone(phone: string): boolean {
 
 export function authHeaders(): Record<string, string> {
   const token = getToken();
-  return token ? { Authorization: `Bearer ${token}` } : {};
+  return {
+    "X-Senga-Client": "senga",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
 }

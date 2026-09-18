@@ -8,6 +8,7 @@ import 'core/offline/sync_queue.dart';
 import 'core/theme/mova_theme.dart';
 import 'core/update/app_update_service.dart';
 import 'core/widgets/offline_shell.dart';
+import 'core/widgets/maintenance_gate.dart';
 import 'features/auth/auth_session_gate.dart';
 import 'features/chat/chat_alert_service.dart';
 import 'features/chat/chat_poll_service.dart';
@@ -86,7 +87,9 @@ class _MovaPassengerAppState extends ConsumerState<MovaPassengerApp>
           nextScreen: const AuthSessionGate(role: AuthSessionRole.passenger),
         ),
         debugShowCheckedModeBanner: false,
-        builder: (context, child) => MovaOfflineShell(child: child),
+        builder: (context, child) => MaintenanceGate(
+          child: MovaOfflineShell(child: child),
+        ),
       ),
     );
   }
@@ -136,7 +139,9 @@ class _MovaDriverAppState extends ConsumerState<MovaDriverApp>
           nextScreen: const AuthSessionGate(role: AuthSessionRole.driver),
         ),
         debugShowCheckedModeBanner: false,
-        builder: (context, child) => MovaOfflineShell(child: child),
+        builder: (context, child) => MaintenanceGate(
+          child: MovaOfflineShell(child: child),
+        ),
       ),
     );
   }

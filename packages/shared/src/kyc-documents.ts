@@ -15,7 +15,7 @@ export const KYC_DOCUMENT_LABELS: Record<KycDocumentType, string> = {
   ID_PHOTO: 'Carte d\'identité / passeport',
   SELFIE: 'Photo récente (profil)',
   DRIVERS_LICENSE: 'Permis de conduire',
-  VEHICLE_REGISTRATION: 'Carte grise',
+  VEHICLE_REGISTRATION: 'Carte grise (optionnel)',
   VEHICLE_INSURANCE: 'Assurance véhicule',
   TECHNICAL_INSPECTION: 'Visite technique',
   CRIMINAL_RECORD: 'Extrait casier judiciaire',
@@ -26,12 +26,14 @@ export const REQUIRED_DRIVER_KYC_TYPES: KycDocumentType[] = [
   KYC_DOCUMENT_TYPES.ID_PHOTO,
   KYC_DOCUMENT_TYPES.SELFIE,
   KYC_DOCUMENT_TYPES.DRIVERS_LICENSE,
-  KYC_DOCUMENT_TYPES.VEHICLE_REGISTRATION,
   KYC_DOCUMENT_TYPES.VEHICLE_INSURANCE,
   KYC_DOCUMENT_TYPES.TECHNICAL_INSPECTION,
 ];
 
-export const OPTIONAL_DRIVER_KYC_TYPES: KycDocumentType[] = [KYC_DOCUMENT_TYPES.CRIMINAL_RECORD];
+export const OPTIONAL_DRIVER_KYC_TYPES: KycDocumentType[] = [
+  KYC_DOCUMENT_TYPES.VEHICLE_REGISTRATION,
+  KYC_DOCUMENT_TYPES.CRIMINAL_RECORD,
+];
 
 /**
  * Dossier restaurant (RDC) — l'admin vérifie avant mise en ligne :

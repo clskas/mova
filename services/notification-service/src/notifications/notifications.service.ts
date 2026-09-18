@@ -21,7 +21,7 @@ import { SmsService } from '../sms/sms.service';
 import { FcmPushService } from '../push/fcm-push.service';
 import { PushTokensService } from '../push/push-tokens.service';
 import { WebPushService } from '../push/web-push.service';
-import { fetchAuthUserBrief } from '../common/user-lookup.util';
+import { fetchAuthUserBrief, fetchOpsStaffForAlerts } from '../common/user-lookup.util';
 
 @Injectable()
 export class NotificationsService implements OnModuleInit {
@@ -184,9 +184,50 @@ export class NotificationsService implements OnModuleInit {
   }
 
   async onIncidentCreated(payload: IncidentCreatedPayload) {
-    const title = payload.isEmergency || payload.type === 'SOS' ? '🚨 Alerte SOS' : 'Nouvel incident';
-    await this.create(payload.userId, title, 'Votre signalement a été transmis à l\'équipe SENGA.', 'INCIDENT_CREATED', payload);
-    this.logger.warn(`incident.created ${payload.incidentId} type=${payload.type} emergency=${payload.isEmergency}`);
+    const isSos = payload.isEmergency || payload.type === 'SOS';
+    const title = isSos ? 'Alerte SOS' : 'Nouvel incident';
+    await this.create(
+      payload.userId,
+      title,
+      'Votre signalement a été transmis à l\'équipe SENGA.',
+      'INCIDENT_CREATED',
+      payload,
+    );
+
+    // Ops: SUPER_ADMIN / ADMIN / SUPPORT / CITY_ADMIN — notif in-app + push + SMS (SOS).
+    const staff = await fetchOpsStaffForAlerts();
+    const recipients = staff.filter((s) => s.id !== payload.userId);
+    const maps =
+      payload.lat != null && payload.lng != null
+        ? ` https://maps.google.com/?q=${payload.lat},${payload.lng}`
+        : '';
+    const staffBody = isSos
+      ? `SOS urgent — ouvrez Litiges dans l'admin.${maps}`
+      : `Nouvel incident ${payload.type} — Litiges admin.`;
+    const staffIds: string[] = [];
+    for (const s of recipients) {
+      await this.create(s.id, title, staffBody, 'INCIDENT_CREATED', {
+        ...payload,
+        forOps: true,
+      });
+      staffIds.push(s.id);
+      if (isSos && s.phone) {
+        await this.sms.sendMessage(
+          s.phone,
+          `SENGA SOS — ${payload.type}${payload.rideId ? ` course ${payload.rideId.slice(0, 8)}` : ''}.${maps}`.slice(0, 160),
+        );
+      }
+    }
+    if (staffIds.length > 0) {
+      await this.pushToDrivers(staffIds, title, staffBody, {
+        type: 'INCIDENT_CREATED',
+        incidentId: payload.incidentId,
+        emergency: isSos ? '1' : '0',
+      });
+    }
+    this.logger.warn(
+      `incident.created ${payload.incidentId} type=${payload.type} emergency=${isSos} staff=${staffIds.length}`,
+    );
   }
 
   async onRideStatusSms(payload: RideStatusSmsPayload) {

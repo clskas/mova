@@ -52,6 +52,12 @@ export class InternalController {
     const { total } = await this.users.listUsers(0, 1);
     return { count: total };
   }
+
+  @Get('users/ops-staff')
+  listOpsStaff() {
+    return this.users.listOpsStaffForAlerts();
+  }
+
   @Get('users')
   list(
     @Query('skip') skip?: string,

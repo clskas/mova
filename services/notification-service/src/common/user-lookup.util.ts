@@ -15,3 +15,24 @@ export async function fetchAuthUserBrief(userId: string): Promise<UserBrief | nu
     return null;
   }
 }
+
+export type OpsStaffBrief = {
+  id: string;
+  phone?: string | null;
+  role: string;
+  managedCity?: string | null;
+  name?: string;
+};
+
+export async function fetchOpsStaffForAlerts(): Promise<OpsStaffBrief[]> {
+  try {
+    const res = await fetch(serviceUrl('auth', '/internal/users/ops-staff'), {
+      headers: { 'x-internal-api-key': INTERNAL_API_KEY },
+    });
+    if (!res.ok) return [];
+    const data = (await res.json()) as OpsStaffBrief[];
+    return Array.isArray(data) ? data : [];
+  } catch {
+    return [];
+  }
+}

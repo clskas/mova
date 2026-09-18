@@ -19,6 +19,7 @@ import {
 import { useAdmin } from "@/components/AdminProvider";
 import {
   BtnDanger,
+  BtnGhost,
   BtnPrimary,
   Card,
   ConfirmDialog,
@@ -261,7 +262,20 @@ export default function UtilisateursPage() {
         }
         action={
           !readOnly ? (
-            <BtnPrimary onClick={() => setCreateOpen(true)}>Créer un partenaire</BtnPrimary>
+            <div className="flex flex-wrap gap-2">
+              <BtnPrimary onClick={() => setCreateOpen(true)}>Nouveau compte</BtnPrimary>
+              {canPurge && (
+                <BtnGhost
+                  onClick={() => {
+                    setCreateRole("CITY_ADMIN");
+                    setCreateManagedCity("");
+                    setCreateOpen(true);
+                  }}
+                >
+                  + Admin ville
+                </BtnGhost>
+              )}
+            </div>
           ) : undefined
         }
       />
@@ -370,16 +384,23 @@ export default function UtilisateursPage() {
         )}
       </div>
 
-      <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Créer un partenaire">
+      <Modal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        title={createRole === "CITY_ADMIN" ? "Créer un admin ville" : "Créer un compte"}
+      >
         <div className="space-y-4">
-          <p className="text-sm text-gray-600">
-            Le portail restaurant / location crée le compte à la première connexion OTP. Vous pouvez aussi
-            créer ou lier un partenaire ici (rôle Restaurant ou Partenaire location), puis relier le
-            restaurant (menu Restaurants) ou les véhicules (Catalogue location).
-            {canPurge
-              ? " Les comptes Admin ville (CITY_ADMIN) sont créés uniquement par un SUPER_ADMIN, avec une ville gérée obligatoire."
-              : ""}
-          </p>
+          {createRole === "CITY_ADMIN" ? (
+            <p className="text-sm text-gray-600">
+              L’admin ville ne voit que les données de sa ville (courses, livraisons, restos…).
+              Il ne peut pas modifier les tarifs ni la trésorerie. Réservé au SUPER_ADMIN.
+            </p>
+          ) : (
+            <p className="text-sm text-gray-600">
+              Créez un partenaire (Restaurant / Location) ou, en SUPER_ADMIN, un staff
+              (Admin ville, Support…). Le partenaire peut aussi s’inscrire seul via OTP.
+            </p>
+          )}
           <label>
             <FieldLabel>Téléphone *</FieldLabel>
             <TextInput value={createPhone} onChange={setCreatePhone} placeholder="+243900000030" />

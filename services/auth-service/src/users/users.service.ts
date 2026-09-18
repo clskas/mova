@@ -199,6 +199,35 @@ export class UsersService {
     };
   }
 
+  /** Staff ops alertés en cas de SOS (SUPER_ADMIN, ADMIN, SUPPORT + CITY_ADMIN). */
+  async listOpsStaffForAlerts() {
+    const roles: UserRole[] = [
+      UserRole.SUPER_ADMIN,
+      UserRole.ADMIN,
+      UserRole.SUPPORT,
+      UserRole.CITY_ADMIN,
+    ];
+    const users = await this.prisma.user.findMany({
+      where: { role: { in: roles }, status: UserStatus.ACTIVE },
+      select: {
+        id: true,
+        phone: true,
+        role: true,
+        managedCity: true,
+        firstName: true,
+        lastName: true,
+      },
+      take: 200,
+    });
+    return users.map((u) => ({
+      id: u.id,
+      phone: u.phone,
+      role: u.role,
+      managedCity: u.managedCity,
+      name: [u.firstName, u.lastName].filter(Boolean).join(' ').trim() || undefined,
+    }));
+  }
+
   /**
    * Google Driver / partner whose e-mail was wiped (onboarding PATCH null).
    * Recovers the address from the Google OTP row (`otp_codes.phone` = e-mail).

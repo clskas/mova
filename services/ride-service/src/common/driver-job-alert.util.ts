@@ -7,7 +7,7 @@ import {
 } from '@mova/shared';
 import { MatchingService } from '../matching/matching.service';
 import { filterDriversNotDebtBlocked } from './driver-debt.util';
-import { filterDriversAcceptingDeliveries } from './driver-eligibility.util';
+import { filterDriversAcceptingDeliveries, filterDriversAcceptingRides } from './driver-eligibility.util';
 
 /** Types d'engins à notifier pour colis, express, courses/commissions, etc. */
 export const DELIVERY_ALERT_VEHICLE_TYPES: VehicleType[] = [
@@ -58,6 +58,8 @@ export async function notifyNearbyDrivers(
   let driverUserIds = await filterDriversNotDebtBlocked([...seen]);
   if (forDelivery) {
     driverUserIds = await filterDriversAcceptingDeliveries(driverUserIds);
+  } else if (opts.jobKind === 'RIDE_OFFER') {
+    driverUserIds = await filterDriversAcceptingRides(driverUserIds);
   }
   if (driverUserIds.length === 0) return;
   await publishDriverJobAlert(redis, {

@@ -411,11 +411,36 @@ export class AdminService {
         : Promise.resolve(null),
     ]).then(([driver]) => driver);
   }
-  async setDriverAcceptsDeliveries(userId: string, acceptsDeliveries: boolean, managedCity?: string | null) {
+  async setDriverAcceptsDeliveries(
+    userId: string,
+    opts: {
+      serviceMode?: 'BOTH' | 'RIDES_ONLY' | 'DELIVERIES_ONLY';
+      acceptsDeliveries?: boolean;
+    },
+    managedCity?: string | null,
+  ) {
     await this.getDriver(userId, managedCity);
+    let acceptsRides = true;
+    let acceptsDeliveries = true;
+    if (opts.serviceMode === 'RIDES_ONLY') {
+      acceptsRides = true;
+      acceptsDeliveries = false;
+    } else if (opts.serviceMode === 'DELIVERIES_ONLY') {
+      acceptsRides = false;
+      acceptsDeliveries = true;
+    } else if (opts.serviceMode === 'BOTH') {
+      acceptsRides = true;
+      acceptsDeliveries = true;
+    } else if (opts.acceptsDeliveries === false) {
+      acceptsRides = true;
+      acceptsDeliveries = false;
+    } else if (opts.acceptsDeliveries === true) {
+      acceptsRides = true;
+      acceptsDeliveries = true;
+    }
     return this.proxy('driver', `/internal/drivers/${userId}/status`, {
       method: 'PATCH',
-      body: JSON.stringify({ acceptsDeliveries }),
+      body: JSON.stringify({ acceptsRides, acceptsDeliveries }),
     });
   }
   pendingKyc(status?: string, managedCity?: string | null) {

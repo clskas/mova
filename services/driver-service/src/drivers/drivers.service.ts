@@ -163,8 +163,8 @@ export class DriversService {
         activationPinVerifiedAt: { not: null },
         currentLat: { not: null },
         currentLng: { not: null },
-        // Livraisons / courses : uniquement Livreur SENGA (pas les chauffeurs « courses uniquement »).
-        ...(opts?.forDelivery ? { acceptsDeliveries: true } : {}),
+        // Livraisons : livreurs (BOTH / DELIVERIES_ONLY). Courses : chauffeurs (BOTH / RIDES_ONLY).
+        ...(opts?.forDelivery ? { acceptsDeliveries: true } : { acceptsRides: true }),
         vehicles: { some: { type: { in: compatibleTypes }, isActive: true, typeApprovalStatus: KycStatus.APPROVED } },
       },
       include: { vehicles: { where: { type: { in: compatibleTypes }, isActive: true, typeApprovalStatus: KycStatus.APPROVED } } },
@@ -1340,7 +1340,14 @@ export class DriversService {
       onboardingCompleted: profile?.onboardingCompleted ?? false,
       kycStatus: profile?.kycStatus,
       isAvailable: profile?.isAvailable,
+      acceptsRides: profile?.acceptsRides !== false,
       acceptsDeliveries: profile?.acceptsDeliveries !== false,
+      serviceMode:
+        profile?.acceptsRides === false
+          ? 'DELIVERIES_ONLY'
+          : profile?.acceptsDeliveries === false
+            ? 'RIDES_ONLY'
+            : 'BOTH',
       ratingAvg: profile?.ratingAvg,
       totalRides: profile?.totalRides,
       activationPinVerified: !!profile?.activationPinVerifiedAt,
@@ -1381,14 +1388,20 @@ export class DriversService {
 
   async updateDriverAdmin(
     userId: string,
-    data: { isAvailable?: boolean; active?: boolean; acceptsDeliveries?: boolean },
+    data: { isAvailable?: boolean; active?: boolean; acceptsDeliveries?: boolean; acceptsRides?: boolean },
   ) {
     const profile = await this.prisma.driverProfile.findUnique({ where: { userId } });
     if (!profile) throw new MovaHttpException(MovaErrorCode.DRIVER_KYC_PENDING);
-    if (data.acceptsDeliveries !== undefined) {
+    if (data.acceptsDeliveries !== undefined || data.acceptsRides !== undefined) {
+      let acceptsDeliveries =
+        data.acceptsDeliveries !== undefined ? data.acceptsDeliveries : profile.acceptsDeliveries;
+      let acceptsRides = data.acceptsRides !== undefined ? data.acceptsRides : profile.acceptsRides;
+      if (!acceptsDeliveries && !acceptsRides) {
+        acceptsRides = true;
+      }
       return this.prisma.driverProfile.update({
         where: { userId },
-        data: { acceptsDeliveries: data.acceptsDeliveries },
+        data: { acceptsDeliveries, acceptsRides },
         include: { vehicles: true },
       });
     }

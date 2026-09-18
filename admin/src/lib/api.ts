@@ -111,8 +111,12 @@ export type AdminDriver = {
   hiddenReason?: "orphan" | "play_prelaunch" | "seed_demo" | "leftover" | null;
   licenseNumber?: string | null;
   isAvailable?: boolean;
-  /** true (défaut) = Livreur SENGA (courses + livraisons); false = courses uniquement. */
+  /** true (défaut) = accepte les courses. */
+  acceptsRides?: boolean;
+  /** true (défaut) = accepte les livraisons food/colis. */
   acceptsDeliveries?: boolean;
+  /** BOTH | RIDES_ONLY | DELIVERIES_ONLY */
+  serviceMode?: "BOTH" | "RIDES_ONLY" | "DELIVERIES_ONLY";
   ratingAvg?: number;
   totalRides?: number;
   kycStatus?: string;
@@ -2050,11 +2054,18 @@ export async function setDriverStatus(userId: string, active: boolean, suspendUs
   });
 }
 
-export async function setDriverAcceptsDeliveries(userId: string, acceptsDeliveries: boolean) {
+export type DriverServiceMode = "BOTH" | "RIDES_ONLY" | "DELIVERIES_ONLY";
+
+export async function setDriverServiceMode(userId: string, serviceMode: DriverServiceMode) {
   return apiFetch(`/api/admin/drivers/${userId}/delivery-mode`, {
     method: "PATCH",
-    body: JSON.stringify({ acceptsDeliveries }),
+    body: JSON.stringify({ serviceMode }),
   });
+}
+
+/** @deprecated Prefer setDriverServiceMode */
+export async function setDriverAcceptsDeliveries(userId: string, acceptsDeliveries: boolean) {
+  return setDriverServiceMode(userId, acceptsDeliveries ? "BOTH" : "RIDES_ONLY");
 }
 
 export type KycNotifyResult = {

@@ -14,9 +14,10 @@ import {
   reviewVehicleTypeApproval,
   runKycOcr,
   setDriverStatus,
-  setDriverAcceptsDeliveries,
+  setDriverServiceMode,
   type AdminDriver,
   type AdminDriverDetail,
+  type DriverServiceMode,
 } from "@/lib/api";
 import { useAdmin } from "@/components/AdminProvider";
 import { AuthenticatedMedia, resolveMediaUrl } from "@/components/AuthenticatedMedia";
@@ -134,9 +135,26 @@ function OcrBadge({ ocr }: { ocr?: KycOcrInfo | null }) {
   );
 }
 
+function resolveServiceMode(d: AdminDriver | AdminDriverDetail): DriverServiceMode {
+  if (d.serviceMode === "BOTH" || d.serviceMode === "RIDES_ONLY" || d.serviceMode === "DELIVERIES_ONLY") {
+    return d.serviceMode;
+  }
+  if (d.acceptsRides === false) return "DELIVERIES_ONLY";
+  if (d.acceptsDeliveries === false) return "RIDES_ONLY";
+  return "BOTH";
+}
+
 function driverServiceRoleLabel(d: AdminDriver | AdminDriverDetail): string {
-  if (d.acceptsDeliveries === false) return "Courses uniquement";
-  return "Livreur SENGA";
+  const mode = resolveServiceMode(d);
+  if (mode === "RIDES_ONLY") return "Courses uniquement";
+  if (mode === "DELIVERIES_ONLY") return "Livraisons uniquement";
+  return "Courses + livraisons";
+}
+
+function serviceModeBadgeClass(mode: DriverServiceMode): string {
+  if (mode === "RIDES_ONLY") return "border-gray-200 bg-gray-50 text-gray-700";
+  if (mode === "DELIVERIES_ONLY") return "border-amber-200 bg-amber-50 text-amber-900";
+  return "border-violet-200 bg-violet-50 text-violet-800";
 }
 
 function driverStageLabel(d: AdminDriver | AdminDriverDetail): string {
@@ -170,7 +188,7 @@ export default function ChauffeursPage() {
   const [detail, setDetail] = useState<AdminDriverDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [actionTarget, setActionTarget] = useState<{ driver: AdminDriver; activate: boolean } | null>(null);
-  const [roleFilter, setRoleFilter] = useState<"all" | "livreur" | "ride_only">("all");
+  const [roleFilter, setRoleFilter] = useState<"all" | "both" | "ride_only" | "delivery_only">("all");
   const [saving, setSaving] = useState(false);
   const [activationPin, setActivationPin] = useState<string | null>(null);
   const [smsNotice, setSmsNotice] = useState<string | null>(null);
@@ -224,8 +242,10 @@ export default function ChauffeursPage() {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return drivers.filter((d) => {
-      if (roleFilter === "livreur" && d.acceptsDeliveries === false) return false;
-      if (roleFilter === "ride_only" && d.acceptsDeliveries !== false) return false;
+      const mode = resolveServiceMode(d);
+      if (roleFilter === "both" && mode !== "BOTH") return false;
+      if (roleFilter === "ride_only" && mode !== "RIDES_ONLY") return false;
+      if (roleFilter === "delivery_only" && mode !== "DELIVERIES_ONLY") return false;
       if (!q) return true;
       return (
         d.userId.toLowerCase().includes(q) ||
@@ -238,19 +258,28 @@ export default function ChauffeursPage() {
     });
   }, [drivers, search, roleFilter]);
 
-  async function toggleDeliveryMode(acceptsDeliveries: boolean) {
+  async function setServiceMode(serviceMode: DriverServiceMode) {
     if (!selectedId) return;
     setSaving(true);
     setError(null);
     try {
-      await setDriverAcceptsDeliveries(selectedId, acceptsDeliveries);
+      await setDriverServiceMode(selectedId, serviceMode);
       const refreshed = await fetchDriverDetail(selectedId);
       setDetail(refreshed);
       setDrivers((prev) =>
-        prev.map((d) => (d.userId === selectedId ? { ...d, acceptsDeliveries } : d)),
+        prev.map((d) =>
+          d.userId === selectedId
+            ? {
+                ...d,
+                serviceMode: refreshed.serviceMode ?? serviceMode,
+                acceptsRides: refreshed.acceptsRides,
+                acceptsDeliveries: refreshed.acceptsDeliveries,
+              }
+            : d,
+        ),
       );
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Impossible de changer le mode livraison");
+      setError(e instanceof Error ? e.message : "Impossible de changer le mode service");
     } finally {
       setSaving(false);
     }
@@ -408,9 +437,9 @@ export default function ChauffeursPage() {
         Seuls les vrais orphelins (sans compte) et Test Lab sont masqués.
       </p>
       <p className="text-sm text-gray-600 mb-4 rounded-lg border border-violet-100 bg-violet-50/60 px-3 py-2">
-        <strong>Livreurs SENGA</strong> = seuls à recevoir les <em>notifications / offres de livraison</em>
-        (repas, colis, express, courses). <strong>Courses uniquement</strong> = taxi/moto : offres de courses
-        seulement, jamais de push livraison. Basculez le mode dans la fiche chauffeur ci-dessous.
+        Trois modes service : <strong>courses uniquement</strong> (taxi/moto),{" "}
+        <strong>livraisons uniquement</strong> (food/colis), ou <strong>les deux</strong> (défaut SENGA).
+        Choisissez le mode dans la fiche chauffeur.
       </p>
       {error && <div className="mb-4"><ErrorBanner message={error} onRetry={load} /></div>}
       <div className="space-y-4">
@@ -424,8 +453,9 @@ export default function ChauffeursPage() {
               onChange={(e) => setRoleFilter(e.target.value as typeof roleFilter)}
             >
               <option value="all">Tous</option>
-              <option value="livreur">Livreurs SENGA</option>
+              <option value="both">Courses + livraisons</option>
               <option value="ride_only">Courses uniquement</option>
+              <option value="delivery_only">Livraisons uniquement</option>
             </select>
           </label>
           {role === "SUPER_ADMIN" && (
@@ -481,11 +511,7 @@ export default function ChauffeursPage() {
                     <td className="p-3 text-xs">{driverStageLabel(d)}</td>
                     <td className="p-3 text-xs">
                       <span
-                        className={`inline-flex rounded-full border px-2 py-0.5 text-[11px] font-medium ${
-                          d.acceptsDeliveries === false
-                            ? "border-gray-200 bg-gray-50 text-gray-700"
-                            : "border-violet-200 bg-violet-50 text-violet-800"
-                        }`}
+                        className={`inline-flex rounded-full border px-2 py-0.5 text-[11px] font-medium ${serviceModeBadgeClass(resolveServiceMode(d))}`}
                       >
                         {driverServiceRoleLabel(d)}
                       </span>
@@ -531,11 +557,7 @@ export default function ChauffeursPage() {
               <p>
                 <span className="text-gray-500">Rôle service:</span>{" "}
                 <span
-                  className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${
-                    selected.acceptsDeliveries === false
-                      ? "border-gray-200 bg-gray-50 text-gray-700"
-                      : "border-violet-200 bg-violet-50 text-violet-800"
-                  }`}
+                  className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${serviceModeBadgeClass(resolveServiceMode(selected))}`}
                 >
                   {driverServiceRoleLabel(selected)}
                 </span>
@@ -929,26 +951,33 @@ export default function ChauffeursPage() {
             {!readOnly && (
               <div className="space-y-2 pt-2 border-t">
                 <p className="text-xs text-gray-500">
-                  Mode service — défaut SENGA : livreur (courses + livraisons food/colis).
+                  Mode service — choisir ce que ce profil reçoit comme offres.
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  {selected.acceptsDeliveries === false ? (
-                    <BtnSuccess
-                      onClick={() => toggleDeliveryMode(true)}
-                      disabled={saving}
-                    >
-                      Passer en Livreur SENGA
-                    </BtnSuccess>
-                  ) : (
-                    <button
-                      type="button"
-                      disabled={saving}
-                      onClick={() => toggleDeliveryMode(false)}
-                      className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-                    >
-                      Limiter aux courses uniquement
-                    </button>
-                  )}
+                  {(["RIDES_ONLY", "DELIVERIES_ONLY", "BOTH"] as const).map((mode) => {
+                    const active = resolveServiceMode(selected) === mode;
+                    const label =
+                      mode === "RIDES_ONLY"
+                        ? "Limiter aux courses uniquement"
+                        : mode === "DELIVERIES_ONLY"
+                          ? "Limiter aux livraisons uniquement"
+                          : "Courses et livraisons";
+                    return (
+                      <button
+                        key={mode}
+                        type="button"
+                        disabled={saving || active}
+                        onClick={() => setServiceMode(mode)}
+                        className={`rounded-md border px-3 py-1.5 text-sm disabled:opacity-50 ${
+                          active
+                            ? "border-[#6C63FF] bg-[#6C63FF]/10 text-[#4F46E5] font-medium"
+                            : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
                   {selected.isAvailable ? (
                     <BtnDanger onClick={() => setActionTarget({ driver: selected, activate: false })}>Suspendre</BtnDanger>
                   ) : (

@@ -58,10 +58,19 @@ class DriverStatusDto {
 
 class DriverDeliveryModeDto {
   @ApiProperty({
-    description: 'true = Livreur SENGA (courses + livraisons); false = courses uniquement',
+    description: 'BOTH | RIDES_ONLY | DELIVERIES_ONLY',
+    enum: ['BOTH', 'RIDES_ONLY', 'DELIVERIES_ONLY'],
+    required: false,
   })
+  @IsOptional()
+  @IsString()
+  serviceMode?: 'BOTH' | 'RIDES_ONLY' | 'DELIVERIES_ONLY';
+
+  /** @deprecated Prefer serviceMode. Kept for backward compatibility. */
+  @ApiProperty({ required: false })
+  @IsOptional()
   @IsBoolean()
-  acceptsDeliveries: boolean;
+  acceptsDeliveries?: boolean;
 }
 
 @ApiTags('admin')
@@ -203,7 +212,7 @@ export class AdminController {
 
   @Patch('drivers/:userId/delivery-mode')
   @RequirePermissions(AdminPermission.DRIVERS_WRITE)
-  @ApiOperation({ summary: 'Activer/désactiver livraisons (Livreur SENGA vs courses uniquement)' })
+  @ApiOperation({ summary: 'Mode service : BOTH | RIDES_ONLY | DELIVERIES_ONLY' })
   driverDeliveryMode(
     @Request() req: { user: AdminJwtUser },
     @Param('userId') userId: string,
@@ -211,7 +220,7 @@ export class AdminController {
   ) {
     return this.adminService.setDriverAcceptsDeliveries(
       userId,
-      dto.acceptsDeliveries,
+      { serviceMode: dto.serviceMode, acceptsDeliveries: dto.acceptsDeliveries },
       resolveManagedCityScope(req.user),
     );
   }

@@ -16,6 +16,8 @@ export type DriverProfileSnapshot = {
   isAvailable?: boolean;
   /** false = ride-only; true/undefined = SENGA flotte courses + livraisons. */
   acceptsDeliveries?: boolean;
+  /** false = delivery-only (no taxi/moto rides). */
+  acceptsRides?: boolean;
   kycStatus?: string;
   activationPinVerified?: boolean;
   activationPinVerifiedAt?: string | Date | null;
@@ -35,12 +37,28 @@ export function driverAcceptsDeliveries(profile: DriverProfileSnapshot | null | 
   return profile?.acceptsDeliveries !== false;
 }
 
+/** Courses taxi/moto. Delivery-only when admin sets acceptsRides=false. */
+export function driverAcceptsRides(profile: DriverProfileSnapshot | null | undefined): boolean {
+  return profile?.acceptsRides !== false;
+}
+
 /** Exclude ride-only chauffeurs from delivery/errand push pools. */
 export async function filterDriversAcceptingDeliveries(driverUserIds: string[]): Promise<string[]> {
   if (driverUserIds.length === 0) return [];
   try {
     const profiles = await Promise.all(driverUserIds.map((id) => fetchDriverProfileSnapshot(id)));
     return driverUserIds.filter((_, i) => driverAcceptsDeliveries(profiles[i]));
+  } catch {
+    return driverUserIds;
+  }
+}
+
+/** Exclude delivery-only livreurs from ride push pools. */
+export async function filterDriversAcceptingRides(driverUserIds: string[]): Promise<string[]> {
+  if (driverUserIds.length === 0) return [];
+  try {
+    const profiles = await Promise.all(driverUserIds.map((id) => fetchDriverProfileSnapshot(id)));
+    return driverUserIds.filter((_, i) => driverAcceptsRides(profiles[i]));
   } catch {
     return driverUserIds;
   }
@@ -130,6 +148,13 @@ export async function assertDriverEligibleForRide(
   rideVehicleType: string,
 ): Promise<DriverProfileSnapshot> {
   const profile = await assertDriverCanReceiveJobs(userId);
+  if (!driverAcceptsRides(profile)) {
+    throw new MovaHttpException(
+      MovaErrorCode.VALIDATION_ERROR,
+      HttpStatus.FORBIDDEN,
+      'Ce compte est limité aux livraisons — courses taxi/moto non autorisées.',
+    );
+  }
   const types = (profile.vehicles ?? [])
     .filter((v) => v.isActive !== false)
     .map((v) => {

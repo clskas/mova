@@ -54,7 +54,10 @@ bool _isPaymentGatewayEnglish(String msg) {
   return lower.contains('payment failed') ||
       lower.contains('merchant is not allowed') ||
       lower.contains('failed to process the payment') ||
-      lower.contains('channel0');
+      lower.contains('channel0') ||
+      lower.contains('b2c detail') ||
+      lower.contains('c2b detail') ||
+      lower.contains('detail error notification');
 }
 
 bool _isClassValidatorEnglish(String msg) {

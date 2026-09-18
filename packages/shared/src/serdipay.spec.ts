@@ -459,6 +459,14 @@ describe('serdipay Public API', () => {
     expect(mapSerdiPayPaymentFailure(400, raw)).not.toMatch(/Payment Failed/i);
   });
 
+  it('maps SerdiPay « B2C Detail error notification » to French (never leak English)', () => {
+    const raw = 'B2C Detail error notification';
+    expect(mapSerdiPayPaymentFailure(400, raw, raw, undefined, 'c2b')).toMatch(/opérateur/i);
+    expect(mapSerdiPayPaymentFailure(400, raw, raw, undefined, 'c2b')).not.toMatch(/B2C Detail/i);
+    expect(mapSerdiPayPaymentFailure(400, raw, raw, undefined, 'b2c')).toMatch(/versement/i);
+    expect(mapSerdiPayPaymentFailure(400, raw, raw, undefined, 'b2c')).not.toMatch(/B2C Detail/i);
+  });
+
   it('surfaces SerdiPay B2C channel0 as French and never sends channel:0', async () => {
     env.SERDIPAY_EMAIL = 'm@example.com';
     env.SERDIPAY_PASSWORD = 'portal-pw';

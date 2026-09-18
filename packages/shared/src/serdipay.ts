@@ -352,6 +352,22 @@ export function mapSerdiPayPaymentFailure(
   if (lower.includes('failed to process the payment') && !error?.trim()) {
     return 'Le paiement Mobile Money a été refusé. Vérifiez le montant (≥ 2 300 FC) et réessayez.';
   }
+  // AfriMomo/SerdiPay sometimes returns this English shell for C2B or B2C detail failures.
+  if (
+    lower.includes('b2c detail') ||
+    lower.includes('c2b detail') ||
+    /detail error notification/i.test(detail)
+  ) {
+    if (kind === 'b2c') {
+      return (
+        'Le versement Mobile Money a échoué chez l’opérateur. Votre solde SENGA n’a pas été perdu — réessayez ou contactez le support.'
+      );
+    }
+    return (
+      'Le paiement Mobile Money a échoué chez l’opérateur (aucun débit SENGA). ' +
+      'Vérifiez le numéro M-Pesa/Airtel, le solde SIM, puis réessayez.'
+    );
+  }
   if (detail && detail.length <= 180 && !/^https?:\/\//i.test(detail)) {
     // Keep French as-is; translate common English shells.
     if (/^failed to process the payment$/i.test(detail)) {

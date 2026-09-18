@@ -51,6 +51,9 @@ const TECHNICAL_PATTERNS = [
   /Payment Failed/i,
   /Merchant is not allowed/i,
   /Failed to process the payment/i,
+  /B2C Detail/i,
+  /C2B Detail/i,
+  /Detail error notification/i,
   /\bmapbox\b/i,
   /Invalid Token/i,
   /CinetPay non configuré/i,
@@ -144,7 +147,7 @@ export function sanitizeUserMessage(
   if (/your balance is low|balance is low|insufficient (funds|balance|float)|not enough funds/i.test(msg)) {
     return MERCHANT_FLOAT_LOW_FR;
   }
-  if (/payment failed|merchant is not allowed|failed to process the payment|channel0/i.test(msg)) {
+  if (/payment failed|merchant is not allowed|failed to process the payment|channel0|b2c detail|c2b detail|detail error notification/i.test(msg)) {
     if (/channel|merchant is not allowed/i.test(msg)) return CHANNEL_DISABLED_FR;
     return PAYMENT_FAILED_FR;
   }

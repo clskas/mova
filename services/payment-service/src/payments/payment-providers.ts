@@ -67,6 +67,9 @@ export async function initiateViaGateway(
   const hubClient = isAfrisoftPayHubClientConfigured(get);
 
   if (!hubProcess && hubClient) {
+    // Unique hub invoice per attempt (like wallet top-up). Never key idempotency on
+    // DELIVERY:/ride ids alone — after REFUNDED/FAILED that blocks a fresh C2B and
+    // can surface stale aggregator errors (e.g. SerdiPay « B2C Detail… »).
     const merchantRef = reference.startsWith('senga_') ? reference : afrisoftHubReference('senga', purpose);
     const result = await afrisoftPayHubInitiatePayment(get, {
       operator,
@@ -75,7 +78,7 @@ export async function initiateViaGateway(
       reference: merchantRef,
       purpose,
       metadata: { original_reference: reference },
-      idempotencyKey: `senga:${purpose}:${reference}`,
+      idempotencyKey: `senga:${purpose}:${merchantRef}`,
     });
     return {
       success: result.success,

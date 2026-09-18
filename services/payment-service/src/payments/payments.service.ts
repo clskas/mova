@@ -393,6 +393,8 @@ export class PaymentsService {
 
   private isAsyncMobileMoney(provider: PaymentProvider, result: { providerRef?: string; pending?: boolean }): boolean {
     if (provider.name === 'MOCK') return false;
+    // Hub may return an already-settled pay_* (idempotent replay). Do not force PENDING.
+    if (result.pending === false) return false;
     return Boolean(result.pending) || isAsyncMobileMoneyRef(result.providerRef);
   }
 

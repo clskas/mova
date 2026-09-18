@@ -25,6 +25,13 @@ void main() {
     );
   });
 
+  test('maps SerdiPay B2C Detail English shell to French', () {
+    expect(
+      sanitizeUserMessage('B2C Detail error notification'),
+      paymentFailedFr,
+    );
+  });
+
   test('maps class-validator English and Prisma codes without leaking internals', () {
     expect(
       sanitizeUserMessage('phone must be a string'),

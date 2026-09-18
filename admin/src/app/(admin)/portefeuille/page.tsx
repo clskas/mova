@@ -17,6 +17,7 @@ import {
   formatUserName,
   normalizeMetrics,
   reverseVirtualTreasuryFloat,
+  clawbackOpenCashFeeAccruals,
   sanitizeAdminError,
   settleCashDebt,
   confirmCashDebtByCode,
@@ -327,6 +328,28 @@ export default function PortefeuillePage() {
     }
   }
 
+  async function submitClawbackOpenCashFees() {
+    if (
+      !window.confirm(
+        "Retirer de la trésorerie les commissions espèces encore ouvertes (non encaissées au guichet) ? Opération idempotente.",
+      )
+    ) {
+      return;
+    }
+    setPlatformSaving(true);
+    setError(null);
+    setPlatformSuccess(null);
+    try {
+      const result = await clawbackOpenCashFeeAccruals();
+      setPlatformSuccess(result.message ?? "Trésorerie corrigée.");
+      await load();
+    } catch (e) {
+      setError(sanitizeAdminError(e instanceof Error ? e.message : "Échec clawback commissions espèces"));
+    } finally {
+      setPlatformSaving(false);
+    }
+  }
+
   async function submitEmergencyVirtualCredit() {
     const amount = Number(emergencyAmount);
     if (!Number.isFinite(amount) || amount < 1) return;
@@ -484,11 +507,11 @@ export default function PortefeuillePage() {
   const m = normalizeMetrics(metrics);
 
   const cards = [
-    { label: "Trésorerie SENGA", value: `${(wallet.platformBalanceCdf ?? platformTreasury?.balanceCdf ?? 0).toLocaleString("fr-CD")} FC` },
+    { label: "Trésorerie SENGA (encaissée)", value: `${(wallet.platformBalanceCdf ?? platformTreasury?.balanceCdf ?? 0).toLocaleString("fr-CD")} FC` },
     { label: "Dettes utilisateurs (wallets)", value: `${(wallet.userLiabilitiesCdf ?? 0).toLocaleString("fr-CD")} FC` },
-    { label: "Revenus du jour", value: `${m.revenueTodayCdf.toLocaleString("fr-CD")} FC` },
+    { label: "Revenus courses du jour (GMV)", value: `${m.revenueTodayCdf.toLocaleString("fr-CD")} FC` },
     { label: "Solde agrégé (tous wallets)", value: `${(wallet.totalBalanceCdf ?? 0).toLocaleString("fr-CD")} FC` },
-    { label: "Dettes espèces chauffeurs", value: `${(cashDebts?.totalOpenCdf ?? 0).toLocaleString("fr-CD")} FC` },
+    { label: "Commissions espèces à encaisser", value: `${(cashDebts?.platformFeeCdf ?? cashDebts?.totalOpenCdf ?? 0).toLocaleString("fr-CD")} FC` },
     { label: "Transactions aujourd'hui", value: wallet.transactionsToday ?? 0 },
   ];
 
@@ -538,7 +561,9 @@ export default function PortefeuillePage() {
             <div>
               <h2 className="font-semibold text-lg">{MOVA_PLATFORM_WALLET_LABEL}</h2>
               <p className="text-sm text-gray-600 mt-1">
-                Compte trésorerie SENGA : commissions automatiques + dépôts Mobile Money réels.
+                Compte trésorerie SENGA : commissions réellement encaissées (wallet/MM ou espèces au guichet)
+                + dépôts Mobile Money. Les commissions espèces ouvertes restent dans « à encaisser » jusqu’au
+                règlement guichet.
                 Les espèces collectées chez les chauffeurs se régularisent au guichet — voir « Confirmer paiement espèces ».
               </p>
             </div>
@@ -657,6 +682,9 @@ export default function PortefeuillePage() {
                 <div className="flex flex-wrap gap-2">
                   <BtnGhost onClick={submitReverseVirtualFloat} disabled={platformSaving}>
                     Annuler apport virtuel (si solde issu d’un crédit admin)
+                  </BtnGhost>
+                  <BtnGhost onClick={submitClawbackOpenCashFees} disabled={platformSaving}>
+                    Retirer commissions espèces non encaissées
                   </BtnGhost>
                   <BtnGhost onClick={() => setShowEmergencyVirtual((v) => !v)} disabled={platformSaving}>
                     {showEmergencyVirtual ? "Masquer urgence ops" : "Crédit urgence ops (ledger-only)"}

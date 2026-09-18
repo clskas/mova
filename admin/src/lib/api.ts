@@ -39,11 +39,13 @@ export type AdminMetrics = {
   revenueTodayCdf?: number;
   todayRides?: number;
   todayCompleted?: number;
+  todayRevenueCdf?: number;
 };
 
 export type AdminReports = {
   periodDays: number;
   generatedAt: string;
+  city?: string | null;
   daily: { date: string; rides: number; completed: number; revenueCdf: number; cancelled: number; deliveries: number }[];
   vehicleBreakdown: Record<string, number>;
   serviceBreakdown: {
@@ -67,7 +69,17 @@ export type AdminReports = {
     deliveryRevenueCdf: number;
     avgTicketCdf: number;
     totalDeliveries: number;
+    totalPlatformCommissionCdf?: number;
   };
+  commissionsByCity?: {
+    city: string;
+    ridesCdf: number;
+    deliveriesCdf: number;
+    foodCdf: number;
+    totalCdf: number;
+    rides: number;
+    deliveries: number;
+  }[];
 };
 
 export type AdminUser = {
@@ -1353,7 +1365,7 @@ export function normalizeMetrics(raw: AdminMetrics) {
     approvedDrivers: raw.approvedDrivers ?? 0,
     ridesToday: raw.ridesToday ?? raw.todayRides ?? 0,
     todayCompleted: raw.todayCompleted ?? 0,
-    revenueTodayCdf: raw.revenueTodayCdf ?? raw.revenueCdf ?? 0,
+    revenueTodayCdf: raw.todayRevenueCdf ?? raw.revenueTodayCdf ?? 0,
     totalRides: raw.rides ?? 0,
     completedRides: raw.completedRides ?? 0,
     totalRevenueCdf: raw.revenueCdf ?? 0,
@@ -1373,8 +1385,10 @@ export function normalizeMetrics(raw: AdminMetrics) {
   };
 }
 
-export async function fetchAdminReports(days = 30): Promise<AdminReports> {
-  return apiFetch<AdminReports>(`/api/admin/reports?days=${days}`);
+export async function fetchAdminReports(days = 30, city?: string | null): Promise<AdminReports> {
+  const params = new URLSearchParams({ days: String(days) });
+  if (city?.trim()) params.set("city", city.trim());
+  return apiFetch<AdminReports>(`/api/admin/reports?${params}`);
 }
 
 export function exportReportsCsv(reports: AdminReports, metrics: ReturnType<typeof normalizeMetrics>) {
@@ -1390,7 +1404,16 @@ export function exportReportsCsv(reports: AdminReports, metrics: ReturnType<type
     `Taux complétion;${(reports.kpis.completionRate * 100).toFixed(1)}%`,
     `Taux annulation;${(reports.kpis.cancelRate * 100).toFixed(1)}%`,
     `Revenus courses;${reports.kpis.totalRevenueCdf}`,
+    `Revenus livraisons;${reports.kpis.deliveryRevenueCdf}`,
+    `Commissions SENGA;${reports.kpis.totalPlatformCommissionCdf ?? 0}`,
     `Panier moyen;${reports.kpis.avgTicketCdf}`,
+    `Ville filtre;${reports.city ?? "toutes"}`,
+    "",
+    "Ville;Comm. courses;Comm. livraisons;Comm. repas;Total;Volume",
+    ...(reports.commissionsByCity ?? []).map(
+      (c) =>
+        `${c.city};${c.ridesCdf};${c.deliveriesCdf};${c.foodCdf};${c.totalCdf};${c.rides + c.deliveries}`,
+    ),
     "",
     "Date;Courses;Complétées;Revenus FC;Annulées;Livraisons",
     ...reports.daily.map(
@@ -1877,6 +1900,15 @@ export async function reverseVirtualTreasuryFloat() {
     balanceCdf?: number;
     message?: string;
   }>("/api/admin/wallet/treasury/reverse-virtual-float", { method: "POST", body: "{}" });
+}
+
+export async function clawbackOpenCashFeeAccruals() {
+  return apiFetch<{
+    alreadyApplied?: boolean;
+    amountCdf?: number;
+    balanceCdf?: number;
+    message?: string;
+  }>("/api/admin/wallet/treasury/clawback-open-cash-fees", { method: "POST", body: "{}" });
 }
 
 export async function withdrawWallet(

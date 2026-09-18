@@ -99,8 +99,8 @@ export class InternalController {
   }
 
   @Get('rides/reports')
-  reports(@Query('days') days?: string) {
-    return this.rides.getReportAnalytics(Number(days ?? 30));
+  reports(@Query('days') days?: string, @Query('city') city?: string) {
+    return this.rides.getReportAnalytics(Number(days ?? 30), city);
   }
 
   @Get('rides/driver/:userId/earnings')

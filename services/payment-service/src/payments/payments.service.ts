@@ -284,16 +284,8 @@ export class PaymentsService {
         driverNetCdf,
       });
     }
-    if (platformFee > 0) {
-      await this.walletService.creditPlatformFee(
-        platformFee,
-        paymentMethod === PaymentMethod.CASH
-          ? `Commission espèces ${referenceType} ${referenceId}`
-          : `Commission SENGA ${referenceType} ${referenceId}`,
-        `PLATFORM_FEE:${referenceType}:${referenceId}`,
-      );
-    }
     if (paymentMethod === PaymentMethod.CASH && platformFee > 0) {
+      // Espèces : dette seulement — la trésorerie est créditée au règlement guichet.
       await this.debtLedger.recordDebt({
         driverUserId: driverId,
         referenceType,
@@ -302,6 +294,12 @@ export class PaymentsService {
         amountCdf: platformFee,
         description: `Commission espèces à reverser — ${referenceType} ${referenceId.slice(0, 8)}`,
       });
+    } else if (platformFee > 0) {
+      await this.walletService.creditPlatformFee(
+        platformFee,
+        `Commission SENGA ${referenceType} ${referenceId}`,
+        `PLATFORM_FEE:${referenceType}:${referenceId}`,
+      );
     }
   }
 

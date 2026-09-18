@@ -7,6 +7,7 @@ import {
   exportReportsCsv,
   fetchAdminReports,
   formatCdf,
+  MOVA_CITIES,
   normalizeMetrics,
   type AdminMetrics,
   type AdminReports,
@@ -17,28 +18,31 @@ import { DonutChart } from "@/components/dashboard/DonutChart";
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { ReportsPanel } from "@/components/dashboard/ReportsPanel";
 import { ConnectionCard } from "@/components/ConnectionCard";
-import { Card, ErrorBanner, LoadingState, PageHeader, StatusBadge } from "@/components/ui";
+import { Card, ErrorBanner, LoadingState, PageHeader, SelectInput, StatusBadge } from "@/components/ui";
 
 type Period = 7 | 30 | 90;
 type ChartMode = "rides" | "revenue" | "deliveries";
 
 export default function DashboardPage() {
-  const { canAccess } = useAdmin();
+  const { canAccess, role, user } = useAdmin();
   const [metrics, setMetrics] = useState<AdminMetrics>({});
   const [reports, setReports] = useState<AdminReports | null>(null);
   const [period, setPeriod] = useState<Period>(30);
+  const [cityFilter, setCityFilter] = useState("");
   const [chartMode, setChartMode] = useState<ChartMode>("rides");
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
 
+  const scopedCity = role === "CITY_ADMIN" ? (user?.managedCity?.trim() || "") : cityFilter;
+
   const load = useCallback(async () => {
     setError(null);
     try {
       const [m, r] = await Promise.all([
         apiFetch<AdminMetrics>("/api/admin/metrics"),
-        fetchAdminReports(period),
+        fetchAdminReports(period, scopedCity || null),
       ]);
       setMetrics(m);
       setReports(r);
@@ -48,7 +52,7 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, [period]);
+  }, [period, scopedCity]);
 
   useEffect(() => {
     setLoading(true);
@@ -112,9 +116,21 @@ export default function DashboardPage() {
     <div className="max-w-7xl mx-auto space-y-6">
       <PageHeader
         title="Tableau de bord"
-        subtitle={`${m.city} · couverture nationale · ${lastUpdate ? `MAJ ${lastUpdate.toLocaleTimeString("fr-CD")}` : ""}`}
+        subtitle={`${scopedCity || m.city} · ${scopedCity ? `filtre ${scopedCity}` : "couverture nationale"} · ${lastUpdate ? `MAJ ${lastUpdate.toLocaleTimeString("fr-CD")}` : ""}`}
         action={
           <div className="flex flex-wrap items-center gap-2">
+            {role !== "CITY_ADMIN" && (
+              <div className="min-w-[9rem]">
+                <SelectInput
+                  value={cityFilter}
+                  onChange={setCityFilter}
+                  options={[
+                    { value: "", label: "Toutes les villes" },
+                    ...MOVA_CITIES.map((c) => ({ value: c, label: c })),
+                  ]}
+                />
+              </div>
+            )}
             {([7, 30, 90] as Period[]).map((d) => (
               <button
                 key={d}

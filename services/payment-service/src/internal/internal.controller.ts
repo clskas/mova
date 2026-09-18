@@ -121,6 +121,11 @@ export class InternalController {
     return this.wallet.reverseVirtualTreasuryFloat();
   }
 
+  @Post('wallets/platform/clawback-open-cash-fees')
+  clawbackOpenCashFeeAccruals() {
+    return this.wallet.clawbackOpenCashFeeAccruals();
+  }
+
   @Post('wallets/:userId/withdraw')
   withdraw(@Param('userId') userId: string, @Body() dto: InternalWithdrawDto) {
     return this.wallet.withdrawToMobileMoney(userId, dto.amountCdf, dto.provider, dto.phone, {

@@ -11,6 +11,7 @@ import {
   RideCreatedPayload,
   MARKET_RDC,
   estimateTripDurationMin,
+  resolveCityFromCoords,
   serviceUrl,
   rideTypesDriverCanServe,
   toMobileRideStatus,
@@ -1468,53 +1469,96 @@ export class RidesService {
   async getStats() {
     const now = new Date();
     const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const [rides, completed, revenue, todayRides, todayCompleted, activeRides, cancelled, todayRevenue] = await Promise.all([
-      this.prisma.ride.count(),
-      this.prisma.ride.count({ where: { status: RideStatus.COMPLETED } }),
-      this.prisma.ride.aggregate({ where: { status: RideStatus.COMPLETED }, _sum: { finalFareCdf: true, estimatedFareCdf: true } }),
-      this.prisma.ride.count({ where: { createdAt: { gte: startOfDay } } }),
-      this.prisma.ride.count({ where: { status: RideStatus.COMPLETED, completedAt: { gte: startOfDay } } }),
-      this.prisma.ride.count({ where: { status: { in: ACTIVE_STATUSES } } }),
-      this.prisma.ride.count({ where: { status: RideStatus.CANCELLED } }),
-      this.prisma.ride.aggregate({ where: { status: RideStatus.COMPLETED, completedAt: { gte: startOfDay } }, _sum: { finalFareCdf: true, estimatedFareCdf: true } }),
-    ]);
-    const revenueCdf = (revenue._sum.finalFareCdf ?? 0) + (revenue._sum.estimatedFareCdf ?? 0);
-    const todayRevenueCdf = (todayRevenue._sum.finalFareCdf ?? 0) + (todayRevenue._sum.estimatedFareCdf ?? 0);
+    const [rides, completed, allCompleted, todayRides, todayCompleted, activeRides, cancelled, todayCompletedRows] =
+      await Promise.all([
+        this.prisma.ride.count(),
+        this.prisma.ride.count({ where: { status: RideStatus.COMPLETED } }),
+        this.prisma.ride.findMany({
+          where: { status: RideStatus.COMPLETED },
+          select: { finalFareCdf: true, estimatedFareCdf: true },
+        }),
+        this.prisma.ride.count({ where: { createdAt: { gte: startOfDay } } }),
+        this.prisma.ride.count({ where: { status: RideStatus.COMPLETED, completedAt: { gte: startOfDay } } }),
+        this.prisma.ride.count({ where: { status: { in: ACTIVE_STATUSES } } }),
+        this.prisma.ride.count({ where: { status: RideStatus.CANCELLED } }),
+        this.prisma.ride.findMany({
+          where: { status: RideStatus.COMPLETED, completedAt: { gte: startOfDay } },
+          select: { finalFareCdf: true, estimatedFareCdf: true },
+        }),
+      ]);
+    const fareOf = (r: { finalFareCdf: number | null; estimatedFareCdf: number | null }) =>
+      r.finalFareCdf ?? r.estimatedFareCdf ?? 0;
+    const revenueCdf = allCompleted.reduce((s, r) => s + fareOf(r), 0);
+    const todayRevenueCdf = todayCompletedRows.reduce((s, r) => s + fareOf(r), 0);
     return { rides, completed, revenueCdf, todayRides, todayCompleted, todayRevenueCdf, activeRides, cancelled };
   }
 
   /** Séries temporelles et KPIs pour rapports admin (7–90 jours). */
-  async getReportAnalytics(days = 30) {
+  async getReportAnalytics(days = 30, cityFilter?: string | null) {
     const periodDays = Math.min(Math.max(Number(days) || 30, 7), 90);
     const since = new Date();
     since.setDate(since.getDate() - periodDays + 1);
     since.setHours(0, 0, 0, 0);
+    const cityKey = cityFilter?.trim().toLowerCase() || null;
 
-    const [rides, deliveries, errands, moving, scheduled, carpool] = await Promise.all([
-      this.prisma.ride.findMany({
-        where: { createdAt: { gte: since } },
-        select: {
-          createdAt: true,
-          status: true,
-          vehicleType: true,
-          finalFareCdf: true,
-          estimatedFareCdf: true,
-        },
-      }),
-      this.prisma.delivery.findMany({
-        where: { createdAt: { gte: since } },
-        select: { createdAt: true, status: true, type: true, finalPriceCdf: true, estimatedPriceCdf: true },
-      }),
-      this.prisma.errandOrder.findMany({
-        where: { createdAt: { gte: since } },
-        select: { createdAt: true, status: true, finalPriceCdf: true },
-      }),
-      this.prisma.movingRequest.count({ where: { createdAt: { gte: since } } }),
-      this.prisma.scheduledRide.count({ where: { createdAt: { gte: since } } }),
-      this.prisma.carpoolTrip.count({ where: { createdAt: { gte: since } } }),
-    ]);
+    const [rides, deliveries, errands, moving, scheduled, carpool, rideRule, deliveryRule, foodRule] =
+      await Promise.all([
+        this.prisma.ride.findMany({
+          where: { createdAt: { gte: since } },
+          select: {
+            createdAt: true,
+            status: true,
+            vehicleType: true,
+            finalFareCdf: true,
+            estimatedFareCdf: true,
+            pickupLat: true,
+            pickupLng: true,
+          },
+        }),
+        this.prisma.delivery.findMany({
+          where: { createdAt: { gte: since } },
+          select: {
+            createdAt: true,
+            status: true,
+            type: true,
+            finalPriceCdf: true,
+            estimatedPriceCdf: true,
+            pickupLat: true,
+            pickupLng: true,
+          },
+        }),
+        this.prisma.errandOrder.findMany({
+          where: { createdAt: { gte: since } },
+          select: { createdAt: true, status: true, finalPriceCdf: true, pickupLat: true, pickupLng: true },
+        }),
+        this.prisma.movingRequest.count({ where: { createdAt: { gte: since } } }),
+        this.prisma.scheduledRide.count({ where: { createdAt: { gte: since } } }),
+        this.prisma.carpoolTrip.count({ where: { createdAt: { gte: since } } }),
+        this.commission.get(CommissionServiceType.RIDE),
+        this.commission.get(CommissionServiceType.DELIVERY),
+        this.commission.get(CommissionServiceType.FOOD),
+      ]);
 
-    const dailyMap = new Map<string, { date: string; rides: number; completed: number; revenueCdf: number; cancelled: number; deliveries: number }>();
+    const cityOf = (lat?: number | null, lng?: number | null) => {
+      if (lat == null || lng == null || !Number.isFinite(Number(lat)) || !Number.isFinite(Number(lng))) {
+        return 'Inconnue';
+      }
+      return resolveCityFromCoords(Number(lat), Number(lng));
+    };
+
+    const inCity = (lat?: number | null, lng?: number | null) => {
+      if (!cityKey) return true;
+      return cityOf(lat, lng).toLowerCase() === cityKey;
+    };
+
+    const filteredRides = rides.filter((r) => inCity(r.pickupLat, r.pickupLng));
+    const filteredDeliveries = deliveries.filter((d) => inCity(d.pickupLat, d.pickupLng));
+    const filteredErrands = errands.filter((e) => inCity(e.pickupLat, e.pickupLng));
+
+    const dailyMap = new Map<
+      string,
+      { date: string; rides: number; completed: number; revenueCdf: number; cancelled: number; deliveries: number }
+    >();
     for (let i = 0; i < periodDays; i++) {
       const d = new Date(since);
       d.setDate(d.getDate() + i);
@@ -1527,7 +1571,41 @@ export class RidesService {
     let cancelledCount = 0;
     let totalRevenue = 0;
 
-    for (const ride of rides) {
+    const commissionByCity = new Map<
+      string,
+      { city: string; ridesCdf: number; deliveriesCdf: number; foodCdf: number; totalCdf: number; rides: number; deliveries: number }
+    >();
+    const bumpCommission = (
+      city: string,
+      kind: 'rides' | 'deliveries' | 'food',
+      feeCdf: number,
+    ) => {
+      const row = commissionByCity.get(city) ?? {
+        city,
+        ridesCdf: 0,
+        deliveriesCdf: 0,
+        foodCdf: 0,
+        totalCdf: 0,
+        rides: 0,
+        deliveries: 0,
+      };
+      if (kind === 'rides') {
+        row.ridesCdf += feeCdf;
+        row.rides += 1;
+      } else if (kind === 'food') {
+        row.foodCdf += feeCdf;
+        row.deliveries += 1;
+      } else {
+        row.deliveriesCdf += feeCdf;
+        row.deliveries += 1;
+      }
+      row.totalCdf += feeCdf;
+      commissionByCity.set(city, row);
+    };
+
+    const platformFee = (gross: number, percent: number) => Math.ceil((gross * percent) / 100);
+
+    for (const ride of filteredRides) {
       const key = ride.createdAt.toISOString().slice(0, 10);
       const bucket = dailyMap.get(key);
       if (bucket) {
@@ -1538,6 +1616,7 @@ export class RidesService {
           bucket.revenueCdf += fare;
           totalRevenue += fare;
           completedCount++;
+          bumpCommission(cityOf(ride.pickupLat, ride.pickupLng), 'rides', platformFee(fare, rideRule.platformPercent));
         }
         if (ride.status === RideStatus.CANCELLED) {
           bucket.cancelled++;
@@ -1547,48 +1626,64 @@ export class RidesService {
       vehicleBreakdown[ride.vehicleType] = (vehicleBreakdown[ride.vehicleType] ?? 0) + 1;
     }
 
-    for (const delivery of deliveries) {
+    for (const delivery of filteredDeliveries) {
       const key = delivery.createdAt.toISOString().slice(0, 10);
       if (dailyMap.has(key)) dailyMap.get(key)!.deliveries += 1;
+      const completed = delivery.status === DeliveryStatus.DELIVERED;
+      if (completed) {
+        const price = delivery.finalPriceCdf ?? delivery.estimatedPriceCdf ?? 0;
+        const city = cityOf(delivery.pickupLat, delivery.pickupLng);
+        if (delivery.type === DeliveryType.FOOD) {
+          bumpCommission(city, 'food', platformFee(price, foodRule.platformPercent));
+        } else {
+          bumpCommission(city, 'deliveries', platformFee(price, deliveryRule.platformPercent));
+        }
+      }
     }
-    for (const errand of errands) {
+    for (const errand of filteredErrands) {
       const key = errand.createdAt.toISOString().slice(0, 10);
       if (dailyMap.has(key)) dailyMap.get(key)!.deliveries += 1;
     }
 
-    const deliveryRevenue = deliveries.reduce(
+    const deliveryRevenue = filteredDeliveries.reduce(
       (sum, d) => sum + (d.finalPriceCdf ?? d.estimatedPriceCdf ?? 0),
       0,
     );
-    const errandRevenue = errands.reduce((sum, e) => sum + (e.finalPriceCdf ?? 0), 0);
+    const errandRevenue = filteredErrands.reduce((sum, e) => sum + (e.finalPriceCdf ?? 0), 0);
+
+    const commissionsByCity = Array.from(commissionByCity.values()).sort((a, b) => b.totalCdf - a.totalCdf);
+    const totalPlatformCommissionCdf = commissionsByCity.reduce((s, c) => s + c.totalCdf, 0);
 
     return {
       periodDays,
       generatedAt: new Date().toISOString(),
+      city: cityFilter?.trim() || null,
       daily: Array.from(dailyMap.values()),
       vehicleBreakdown,
       serviceBreakdown: {
-        rides: rides.length,
-        deliveries: deliveries.length,
-        errands: errands.length,
-        food: deliveries.filter((d) => d.type === DeliveryType.FOOD).length,
-        parcel: deliveries.filter((d) => d.type === DeliveryType.PARCEL).length,
-        express: deliveries.filter((d) => d.type === DeliveryType.EXPRESS).length,
-        moving,
-        scheduled,
-        carpool,
+        rides: filteredRides.length,
+        deliveries: filteredDeliveries.length,
+        errands: filteredErrands.length,
+        food: filteredDeliveries.filter((d) => d.type === DeliveryType.FOOD).length,
+        parcel: filteredDeliveries.filter((d) => d.type === DeliveryType.PARCEL).length,
+        express: filteredDeliveries.filter((d) => d.type === DeliveryType.EXPRESS).length,
+        moving: cityKey ? 0 : moving,
+        scheduled: cityKey ? 0 : scheduled,
+        carpool: cityKey ? 0 : carpool,
       },
       kpis: {
-        totalRides: rides.length,
+        totalRides: filteredRides.length,
         completedRides: completedCount,
         cancelledRides: cancelledCount,
-        completionRate: rides.length ? completedCount / rides.length : 0,
-        cancelRate: rides.length ? cancelledCount / rides.length : 0,
+        completionRate: filteredRides.length ? completedCount / filteredRides.length : 0,
+        cancelRate: filteredRides.length ? cancelledCount / filteredRides.length : 0,
         totalRevenueCdf: totalRevenue,
         deliveryRevenueCdf: deliveryRevenue + errandRevenue,
         avgTicketCdf: completedCount ? Math.round(totalRevenue / completedCount) : 0,
-        totalDeliveries: deliveries.length + errands.length,
+        totalDeliveries: filteredDeliveries.length + filteredErrands.length,
+        totalPlatformCommissionCdf,
       },
+      commissionsByCity,
     };
   }
 

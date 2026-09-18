@@ -11,3 +11,9 @@ export const REVERSE_VIRTUAL_TREASURY_FLOAT_REF = 'reverse_virtual_treasury_floa
  * Treated as already-applied alongside {@link REVERSE_VIRTUAL_TREASURY_FLOAT_REF}.
  */
 export const ADMIN_CLEAR_VIRTUAL_APPORT_3000_REF = 'admin_clear_virtual_apport_3000_v1';
+
+/**
+ * One-shot: remove premature PLATFORM_FEE CREDITS for OPEN cash debts
+ * (treasury must only hold money actually received — MM or cash settled at counter).
+ */
+export const CLAWBACK_OPEN_CASH_FEE_ACCRUAL_REF = 'clawback_open_cash_fee_accrual_v1';

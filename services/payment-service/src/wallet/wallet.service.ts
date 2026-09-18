@@ -7,6 +7,7 @@ import {
   MovaHttpException,
   RedisService,
   ADMIN_CLEAR_VIRTUAL_APPORT_3000_REF,
+  CLAWBACK_OPEN_CASH_FEE_ACCRUAL_REF,
   INTERNAL_API_KEY,
   REVERSE_VIRTUAL_TREASURY_FLOAT_REF,
   SMS_UNAVAILABLE_USER_MESSAGE,
@@ -1313,6 +1314,64 @@ export class WalletService {
       amountCdf,
       balanceCdf: updated?.balanceCdf ?? 0,
       message: `Apport virtuel de ${formatCdf(amountCdf)} annulé. Solde trésorerie : ${formatCdf(updated?.balanceCdf ?? 0)}.`,
+    };
+  }
+
+  /**
+   * Idempotent: debit treasury for PLATFORM_FEE amounts that were credited early
+   * while the matching cash debt is still OPEN (money not yet at SENGA).
+   */
+  async clawbackOpenCashFeeAccruals() {
+    const REF = CLAWBACK_OPEN_CASH_FEE_ACCRUAL_REF;
+    const already = await this.findExistingLedger(REF, 'DEBIT');
+    if (already) {
+      const wallet = await this.prisma.wallet.findUnique({ where: { userId: MOVA_PLATFORM_USER_ID } });
+      return {
+        alreadyApplied: true,
+        amountCdf: 0,
+        balanceCdf: wallet?.balanceCdf ?? 0,
+        message: 'Clawback commissions espèces déjà appliqué.',
+      };
+    }
+
+    const openFees = await this.prisma.driverCashDebt.aggregate({
+      where: { status: 'OPEN', category: 'PLATFORM_FEE' },
+      _sum: { amountCdf: true },
+    });
+    const amountCdf = Math.max(0, openFees._sum.amountCdf ?? 0);
+    if (amountCdf <= 0) {
+      const wallet = await this.prisma.wallet.findUnique({ where: { userId: MOVA_PLATFORM_USER_ID } });
+      return {
+        alreadyApplied: false,
+        amountCdf: 0,
+        balanceCdf: wallet?.balanceCdf ?? 0,
+        message: 'Aucune commission espèces ouverte à retirer de la trésorerie.',
+      };
+    }
+
+    await this.ensurePlatformWallet();
+    const wallet = await this.prisma.wallet.findUnique({ where: { userId: MOVA_PLATFORM_USER_ID } });
+    const debitAmount = Math.min(wallet?.balanceCdf ?? 0, amountCdf);
+    if (debitAmount <= 0) {
+      return {
+        alreadyApplied: false,
+        amountCdf: 0,
+        balanceCdf: wallet?.balanceCdf ?? 0,
+        message: 'Trésorerie insuffisante pour le clawback.',
+      };
+    }
+
+    const updated = await this.debit(
+      MOVA_PLATFORM_USER_ID,
+      debitAmount,
+      `Correction: commissions espèces non encaissées retirées de la trésorerie (${debitAmount} FC)`,
+      REF,
+    );
+    return {
+      alreadyApplied: false,
+      amountCdf: debitAmount,
+      balanceCdf: updated?.balanceCdf ?? 0,
+      message: `Trésorerie corrigée −${formatCdf(debitAmount)}. Solde : ${formatCdf(updated?.balanceCdf ?? 0)}.`,
     };
   }
 

@@ -80,9 +80,9 @@ export class AdminController {
 
   @Get('reports')
   @RequirePermissions(AdminPermission.METRICS_READ)
-  @ApiOperation({ summary: 'Rapports analytiques (séries temporelles, KPIs)' })
-  reports(@Query('days') days?: string) {
-    return this.adminService.getReports(Number(days ?? 30));
+  @ApiOperation({ summary: 'Rapports analytiques (séries temporelles, KPIs, commissions par ville)' })
+  reports(@Query('days') days?: string, @Query('city') city?: string) {
+    return this.adminService.getReports(Number(days ?? 30), city);
   }
 
   @Get('users')
@@ -1002,6 +1002,15 @@ export class AdminController {
   })
   reverseVirtualTreasuryFloat() {
     return this.adminService.reverseVirtualTreasuryFloat();
+  }
+
+  @Post('wallet/treasury/clawback-open-cash-fees')
+  @RequirePermissions(AdminPermission.WALLETS_WRITE)
+  @ApiOperation({
+    summary: 'Retirer de la trésorerie les commissions espèces encore ouvertes (idempotent)',
+  })
+  clawbackOpenCashFeeAccruals() {
+    return this.adminService.clawbackOpenCashFeeAccruals();
   }
 
   @Post('wallet/:userId/top-up')

@@ -33,6 +33,22 @@ export class DriverDebtLedgerService {
     return `CASH_DEBT:${category}:${referenceType.toUpperCase()}:${referenceId}${suffix}`;
   }
 
+  /** Crédit trésorerie quand une commission espèces est encaissée au guichet. */
+  private async creditPlatformOnCashFeeCollect(debt: {
+    category: CashDebtCategory;
+    referenceType: string;
+    referenceId: string;
+    amountCdf: number;
+  }) {
+    if (debt.category !== CashDebtCategory.PLATFORM_FEE || debt.amountCdf <= 0) return;
+    const collectRef = `PLATFORM_FEE_CASH_COLLECT:${debt.referenceType}:${debt.referenceId}`;
+    await this.wallet.creditPlatformFee(
+      debt.amountCdf,
+      `Encaissement commission espèces ${debt.referenceType} ${debt.referenceId.slice(0, 8)}`,
+      collectRef,
+    );
+  }
+
   async recordDebt(input: RecordDebtInput) {
     const amount = Math.round(input.amountCdf);
     if (amount <= 0) return { recorded: false as const, reason: 'zero_amount' as const };
@@ -104,6 +120,10 @@ export class DriverDebtLedgerService {
       return { settled: false as const, message: 'Aucune dette espèces ouverte' };
     }
 
+    const openDebts = await this.prisma.driverCashDebt.findMany({
+      where: { driverUserId, status: CashDebtStatus.OPEN },
+    });
+
     const settlementRef = `CASH_DEBT_SETTLE:${driverUserId}:${Date.now()}`;
     await this.wallet.debit(
       driverUserId,
@@ -120,6 +140,10 @@ export class DriverDebtLedgerService {
         settlementRef,
       },
     });
+
+    for (const debt of openDebts) {
+      await this.creditPlatformOnCashFeeCollect(debt);
+    }
 
     return {
       settled: true as const,
@@ -141,6 +165,7 @@ export class DriverDebtLedgerService {
       where: { id: debtId },
       data: { status: CashDebtStatus.SETTLED, settledAt: new Date(), settlementRef: ref },
     });
+    await this.creditPlatformOnCashFeeCollect(updated);
     return { settled: true as const, debt: updated };
   }
 

@@ -86,10 +86,11 @@ describe('RentalPayoutService', () => {
     expect(debtLedger.recordDebt).not.toHaveBeenCalled();
   });
 
-  it('espèces : pas de crédit wallet propriétaire, dette commission', async () => {
+  it('espèces : pas de crédit wallet propriétaire ni trésorerie, dette commission', async () => {
     const result = await service.creditRentalSettlement('book-1', PaymentMethod.CASH);
     expect(result.handled).toBe(true);
     expect(wallet.credit).not.toHaveBeenCalled();
+    expect(wallet.creditPlatformFee).not.toHaveBeenCalled();
     expect(driverPayouts.creditPayout).not.toHaveBeenCalled();
     expect(debtLedger.recordDebt).toHaveBeenCalledWith(
       expect.objectContaining({

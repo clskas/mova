@@ -98,16 +98,8 @@ export class RentalPayoutService {
 
     const rentalPlatformFee = Math.round(settlement.platformFeeCdf ?? 0);
     const platformFeeRef = `PLATFORM_FEE:RENTAL:${bookingId}`;
-    if (rentalPlatformFee > 0 && !(await this.alreadyCredited(platformFeeRef))) {
-      await this.wallet.creditPlatformFee(
-        rentalPlatformFee,
-        isCash
-          ? `Commission location espèces ${bookingId.slice(0, 8)}`
-          : `Commission location ${bookingId.slice(0, 8)}`,
-        platformFeeRef,
-      );
-    }
     if (isCash && settlement.ownerUserId && rentalPlatformFee > 0) {
+      // Espèces : dette seulement — crédit trésorerie au règlement guichet.
       await this.debtLedger.recordDebt({
         driverUserId: settlement.ownerUserId,
         referenceType: 'RENTAL',
@@ -116,6 +108,12 @@ export class RentalPayoutService {
         amountCdf: rentalPlatformFee,
         description: `Commission SENGA à reverser — location ${bookingId.slice(0, 8)}`,
       });
+    } else if (rentalPlatformFee > 0 && !(await this.alreadyCredited(platformFeeRef))) {
+      await this.wallet.creditPlatformFee(
+        rentalPlatformFee,
+        `Commission location ${bookingId.slice(0, 8)}`,
+        platformFeeRef,
+      );
     }
     results.platformFeeCdf = rentalPlatformFee;
 
@@ -130,15 +128,6 @@ export class RentalPayoutService {
       }
       const logisticsPlatformFee = Math.max(0, Math.round(logistics.grossCdf - logistics.netCdf));
       const logisticsFeeRef = `PLATFORM_FEE:RENTAL_LOGISTICS:${bookingId}`;
-      if (logisticsPlatformFee > 0 && !(await this.alreadyCredited(logisticsFeeRef))) {
-        await this.wallet.creditPlatformFee(
-          logisticsPlatformFee,
-          isCash
-            ? `Commission logistique location espèces ${bookingId.slice(0, 8)}`
-            : `Commission logistique location ${bookingId.slice(0, 8)}`,
-          logisticsFeeRef,
-        );
-      }
       if (isCash && logisticsPlatformFee > 0) {
         await this.debtLedger.recordDebt({
           driverUserId: logistics.driverId,
@@ -148,6 +137,12 @@ export class RentalPayoutService {
           amountCdf: logisticsPlatformFee,
           description: `Commission logistique à reverser — location ${bookingId.slice(0, 8)}`,
         });
+      } else if (logisticsPlatformFee > 0 && !(await this.alreadyCredited(logisticsFeeRef))) {
+        await this.wallet.creditPlatformFee(
+          logisticsPlatformFee,
+          `Commission logistique location ${bookingId.slice(0, 8)}`,
+          logisticsFeeRef,
+        );
       }
       if (isCash) {
         results.logistics = { credited: false, reason: 'cash', netCdf: logistics.netCdf };

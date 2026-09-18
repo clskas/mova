@@ -132,18 +132,9 @@ export class FoodDeliveryPayoutService {
     }
     results.restaurants = restaurantResults;
 
-    // Commission plateforme : créditer le compte unique SENGA (idempotent).
+    // Commission plateforme : wallet/MM → trésorerie ; espèces → dette puis crédit au guichet.
     const platformFee = Math.round(settlement.platformFeeCdf ?? 0);
     const platformFeeRef = `PLATFORM_FEE:DELIVERY:${deliveryId}`;
-    if (platformFee > 0 && !(await this.alreadyCredited(platformFeeRef))) {
-      await this.wallet.creditPlatformFee(
-        platformFee,
-        isCash
-          ? `Commission livraison repas espèces ${deliveryId.slice(0, 8)}`
-          : `Commission livraison repas ${deliveryId.slice(0, 8)}`,
-        platformFeeRef,
-      );
-    }
     if (isCash && driverUserId && platformFee > 0) {
       await this.debtLedger.recordDebt({
         driverUserId,
@@ -153,6 +144,12 @@ export class FoodDeliveryPayoutService {
         amountCdf: platformFee,
         description: `Commission SENGA à reverser — livraison ${deliveryId.slice(0, 8)}`,
       });
+    } else if (platformFee > 0 && !(await this.alreadyCredited(platformFeeRef))) {
+      await this.wallet.creditPlatformFee(
+        platformFee,
+        `Commission livraison repas ${deliveryId.slice(0, 8)}`,
+        platformFeeRef,
+      );
     }
     results.platformFeeCdf = platformFee;
     results.totalPaidCdf = settlement.totalPaidCdf;

@@ -155,8 +155,10 @@ export class AdminService {
     };
   }
 
-  getReports(days = 30) {
-    return this.fetchJson('ride', `/internal/rides/reports?days=${days}`);
+  getReports(days = 30, city?: string | null) {
+    const params = new URLSearchParams({ days: String(days) });
+    if (city?.trim()) params.set('city', city.trim());
+    return this.fetchJson('ride', `/internal/rides/reports?${params}`);
   }
 
   async listUsers(skip = 0, take = 50, search?: string, includePlayPrelaunch = false) {
@@ -842,6 +844,9 @@ export class AdminService {
   }
   reverseVirtualTreasuryFloat() {
     return this.proxy('payment', `/internal/wallets/platform/reverse-virtual-float`, { method: 'POST', body: '{}' });
+  }
+  clawbackOpenCashFeeAccruals() {
+    return this.proxy('payment', `/internal/wallets/platform/clawback-open-cash-fees`, { method: 'POST', body: '{}' });
   }
   withdrawWallet(userId: string, body: { amountCdf: number; provider: string; phone: string }) {
     return this.proxy('payment', `/internal/wallets/${userId}/withdraw`, { method: 'POST', body: JSON.stringify(body) });

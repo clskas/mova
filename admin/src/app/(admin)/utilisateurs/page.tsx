@@ -376,6 +376,9 @@ export default function UtilisateursPage() {
             Le portail restaurant / location crée le compte à la première connexion OTP. Vous pouvez aussi
             créer ou lier un partenaire ici (rôle Restaurant ou Partenaire location), puis relier le
             restaurant (menu Restaurants) ou les véhicules (Catalogue location).
+            {canPurge
+              ? " Les comptes Admin ville (CITY_ADMIN) sont créés uniquement par un SUPER_ADMIN, avec une ville gérée obligatoire."
+              : ""}
           </p>
           <label>
             <FieldLabel>Téléphone *</FieldLabel>

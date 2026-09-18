@@ -55,7 +55,7 @@ void main() {
 
   testWidgets('identity fields keep focus when the keyboard opens', (tester) async {
     SharedPreferences.setMockInitialValues({});
-    tester.view.physicalSize = const Size(360, 640);
+    tester.view.physicalSize = const Size(400, 1100);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(() {
       tester.view.resetPhysicalSize();

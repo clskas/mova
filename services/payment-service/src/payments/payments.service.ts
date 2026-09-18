@@ -1644,8 +1644,6 @@ export class PaymentsService {
             `Escrow PARTIAL ${type}/${referenceId}: MM not confirmed COMPLETED — no wallet credit`,
           );
         }
-      } else if (refundCdf > 0 && existing.method === PaymentMethod.WALLET) {
-        // unreachable — wallet handled above
       }
       // CASH partial: no passenger wallet credit
       if (courierFeeCdf > 0) {

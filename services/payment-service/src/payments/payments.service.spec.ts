@@ -344,23 +344,67 @@ describe('PaymentsService', () => {
     expect(wallet.credit).not.toHaveBeenCalled();
   });
 
-  it('refuse CASH sur un flux garanti (séquestre)', async () => {
-    (global.fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
-      status: 200,
-      json: async () => ({
-        userId: 'user-1',
-        amountCdf: 12000,
-        paymentReady: true,
-        escrowCollect: true,
-        guaranteed: true,
-        referenceType: 'DELIVERY',
-        referenceId: 'del-1',
-      }),
-    });
+  it('refuse CASH si bascule hors séquestre impossible', async () => {
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          userId: 'user-1',
+          amountCdf: 12000,
+          paymentReady: true,
+          escrowCollect: true,
+          guaranteed: true,
+          referenceType: 'DELIVERY',
+          referenceId: 'del-1',
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        json: async () => ({ message: 'déjà encaissé' }),
+      });
     await expect(service.payService('DELIVERY', 'del-1', 'user-1', PaymentMethod.CASH)).rejects.toMatchObject({
       code: MovaErrorCode.PAYMENT_INVALID_METHOD,
     });
+  });
+
+  it('accepte CASH après bascule hors séquestre', async () => {
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          userId: 'user-1',
+          amountCdf: 12000,
+          paymentReady: true,
+          escrowCollect: true,
+          guaranteed: true,
+          referenceType: 'DELIVERY',
+          referenceId: 'del-1',
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ success: true, guaranteed: false }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          userId: 'user-1',
+          amountCdf: 12000,
+          paymentReady: true,
+          escrowCollect: false,
+          guaranteed: false,
+          cashPin: '445566',
+          referenceType: 'DELIVERY',
+          referenceId: 'del-1',
+        }),
+      });
+    const result = await service.payService('DELIVERY', 'del-1', 'user-1', PaymentMethod.CASH);
+    expect(result).toMatchObject({ success: true, pendingCash: true });
   });
 
   it('CREDIT_RESTAURANT à l\'enlèvement : resto payé, livreur pas encore', async () => {

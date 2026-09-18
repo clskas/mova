@@ -58,14 +58,19 @@ export class DriversService {
     vehicles?: { typeApprovalStatus?: KycStatus; typeApprovalNotes?: string | null; isActive?: boolean }[];
   }): DriverDocumentsStatus {
     const activeVehicle = profile.vehicles?.find((v) => v.isActive !== false) ?? profile.vehicles?.[0];
-    return evaluateDriverDocuments({
-      licenseExpiry: profile.licenseExpiry,
-      insuranceExpiry: profile.insuranceExpiry,
-      technicalInspectionExpiry: profile.technicalInspectionExpiry,
-      documentsRenewalPending: profile.documentsRenewalPending,
-      vehicleTypeApprovalStatus: activeVehicle?.typeApprovalStatus,
-      vehicleTypeApprovalNotes: activeVehicle?.typeApprovalNotes,
-    });
+    return evaluateDriverDocuments(
+      {
+        licenseExpiry: profile.licenseExpiry,
+        insuranceExpiry: profile.insuranceExpiry,
+        technicalInspectionExpiry: profile.technicalInspectionExpiry,
+        documentsRenewalPending: profile.documentsRenewalPending,
+        vehicleTypeApprovalStatus: activeVehicle?.typeApprovalStatus,
+        vehicleTypeApprovalNotes: activeVehicle?.typeApprovalNotes,
+      },
+      new Date(),
+      30,
+      { requireDocumentsForJobs: this.matchingConfig.documentsRequiredForJobs() },
+    );
   }
 
   private sameCalendarDay(a?: Date | null, b?: string | Date | null): boolean {

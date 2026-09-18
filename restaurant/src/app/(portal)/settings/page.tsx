@@ -10,6 +10,7 @@ import {
 import { toUserErrorMessage } from "@/lib/user-messages";
 import {
   COMMERCE_TYPE_LABELS_FR,
+  commerceCopy,
   parseCommerceType,
   type CommerceType,
 } from "@/lib/commerce-type";
@@ -30,6 +31,7 @@ export default function SettingsPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [canOperate, setCanOperate] = useState(true);
+  const copy = commerceCopy(commerceType);
 
   const load = useCallback(async () => {
     try {
@@ -170,12 +172,10 @@ export default function SettingsPage() {
                     </option>
                   ))}
                 </select>
-                <span className="mt-1 block text-xs text-gray-400">
-                  Change le menu du portail (Menu, Catalogue, Stock, Restrictions).
-                </span>
+                <span className="mt-1 block text-xs text-gray-400">{copy.portalNavHint}</span>
               </label>
               <label className="block text-sm">
-                <span className="text-gray-600">Nom</span>
+                <span className="text-gray-600">{copy.nameLabel}</span>
                 <input
                   className="mt-1 w-full rounded-xl border p-3"
                   placeholder="Ex. Chez Flore"
@@ -184,12 +184,10 @@ export default function SettingsPage() {
                 />
               </label>
               <label className="block text-sm">
-                <span className="text-gray-600">
-                  {commerceType === "RESTAURANT" ? "Cuisine" : "Spécialité / rayon"}
-                </span>
+                <span className="text-gray-600">{copy.specialtyLabel}</span>
                 <input
                   className="mt-1 w-full rounded-xl border p-3"
-                  placeholder="Ex. Congolaise"
+                  placeholder={copy.specialtyPlaceholder}
                   value={cuisine}
                   onChange={(e) => setCuisine(e.target.value)}
                 />
@@ -231,9 +229,7 @@ export default function SettingsPage() {
               >
                 {locating ? "Localisation…" : "Utiliser ma position GPS"}
               </button>
-              <p className="text-xs text-gray-400">
-                Les passagers voient les restaurants proches de leur adresse de livraison. Une position précise améliore votre visibilité.
-              </p>
+              <p className="text-xs text-gray-400">{copy.visibilityGps}</p>
             </div>
             <label className="flex items-center justify-between gap-4">
               <span className="text-sm">Accepter les commandes</span>
@@ -270,7 +266,11 @@ export default function SettingsPage() {
             {message && <p className="text-sm text-green-700">{message}</p>}
             {error && <p className="text-sm text-red-600">{error}</p>}
             <p className="text-xs text-gray-400">
-              Gérez les plats et photos dans l&apos;onglet <a href="/menu" className="text-orange-600 underline">Menu</a>.
+              Gérez les {copy.itemNounPlural} et photos dans l&apos;onglet{" "}
+              <a href={copy.catalogHref} className="text-orange-600 underline">
+                {copy.settingsCatalogLinkLabel}
+              </a>
+              .
             </p>
           </div>
         )}

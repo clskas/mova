@@ -240,14 +240,8 @@ function dossierNeedsAdminAction(
   return hasOpenDocs || (allDocsApproved && profileStatus !== "APPROVED");
 }
 
-/** Aligné sur packages/shared REQUIRED_DRIVER_KYC_TYPES (carte grise optionnelle). */
-const REQUIRED_DRIVER_KYC_TYPES = [
-  "ID_PHOTO",
-  "SELFIE",
-  "DRIVERS_LICENSE",
-  "VEHICLE_INSURANCE",
-  "TECHNICAL_INSPECTION",
-] as const;
+/** Aligné sur packages/shared : aucun justificatif chauffeur obligatoire par défaut. */
+const REQUIRED_DRIVER_KYC_TYPES: string[] = [];
 
 function allJustificatifsApproved(
   items: Array<{ required?: boolean; uploaded?: boolean; status?: string | null }> | undefined,

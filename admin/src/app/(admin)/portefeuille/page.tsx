@@ -904,6 +904,27 @@ export default function PortefeuillePage() {
                   />
                   Politique active
                 </label>
+                <label className="flex items-center gap-2 text-sm sm:col-span-3">
+                  <input
+                    type="checkbox"
+                    checked={debtPolicy?.requirePositiveWalletBalance ?? false}
+                    disabled={readOnly || debtPolicySaving}
+                    onChange={(e) =>
+                      setDebtPolicy((p) =>
+                        p
+                          ? { ...p, requirePositiveWalletBalance: e.target.checked }
+                          : {
+                              id: "default",
+                              maxOpenDebtCdf: 50000,
+                              blockOffers: true,
+                              isActive: true,
+                              requirePositiveWalletBalance: e.target.checked,
+                            },
+                      )
+                    }
+                  />
+                  Exiger un solde portefeuille (virtuel) &gt; 0 pour recevoir les notifications de courses
+                </label>
               </div>
               {!readOnly && (
                 <BtnPrimary
@@ -916,6 +937,7 @@ export default function PortefeuillePage() {
                         maxOpenDebtCdf,
                         blockOffers: debtPolicy?.blockOffers ?? true,
                         isActive: debtPolicy?.isActive ?? true,
+                        requirePositiveWalletBalance: debtPolicy?.requirePositiveWalletBalance ?? false,
                       });
                       setDebtPolicy(updated);
                       setDebtThresholdInput(String(updated.maxOpenDebtCdf));

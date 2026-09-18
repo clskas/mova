@@ -102,7 +102,7 @@ export class PaymentInfoService {
       title: delivery.dropoffAddress ?? delivery.deliveryAddress ?? 'Livraison',
       guaranteed,
       escrowCollect,
-      cashAllowed: !guaranteed,
+      cashAllowed: !delivery.escrowReady && !frozen,
     };
   }
 
@@ -129,7 +129,7 @@ export class PaymentInfoService {
       title: order.description,
       guaranteed,
       escrowCollect,
-      cashAllowed: !guaranteed,
+      cashAllowed: !order.escrowReady && !frozen && !cancelled,
     };
   }
 

@@ -62,11 +62,18 @@ function daysRemaining(expiry: Date, now: Date): number {
   return Math.round((exp.getTime() - today.getTime()) / MS_PER_DAY);
 }
 
+export type EvaluateDriverDocumentsOptions = {
+  /** When true, missing/expired dates block job offers. Default false (docs optional). */
+  requireDocumentsForJobs?: boolean;
+};
+
 export function evaluateDriverDocuments(
   profile: DriverDocumentExpiryInput,
   now = new Date(),
   warnDays = 30,
+  opts?: EvaluateDriverDocumentsOptions,
 ): DriverDocumentsStatus {
+  const requireForJobs = opts?.requireDocumentsForJobs === true;
   const missing: DriverDocumentField[] = [];
   const expired: DriverDocumentField[] = [];
   const expiringSoon: DriverDocumentField[] = [];
@@ -95,10 +102,10 @@ export function evaluateDriverDocuments(
   }
 
   const valid = missing.length === 0 && expired.length === 0;
-  let canOperate = valid && !profile.documentsRenewalPending;
+  let canOperate = requireForJobs ? valid && !profile.documentsRenewalPending : true;
 
   let blockReason: string | undefined;
-  if (!canOperate) {
+  if (requireForJobs && !canOperate) {
     if (profile.documentsRenewalPending) {
       blockReason =
         'Renouvellement de documents en attente de validation SENGA. Téléversez les nouveaux justificatifs si ce n\'est pas déjà fait.';
@@ -107,7 +114,7 @@ export function evaluateDriverDocuments(
       blockReason = `Document(s) expiré(s) : ${labels.join(', ')}. Mettez à jour vos dates dans l'enregistrement.`;
     } else if (missing.length > 0) {
       const labels = items.filter((i) => i.status === 'missing').map((i) => i.label);
-      blockReason = `Date(s) d'expiration manquante(s) : ${labels.join(', ')}.`;
+      blockReason = `Date(s) d'expiration manquante(s) : ${labels.join(', ')}. Documents requis pour recevoir des courses.`;
     }
   }
 

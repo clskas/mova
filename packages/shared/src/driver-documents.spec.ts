@@ -11,10 +11,18 @@ describe('evaluateDriverDocuments', () => {
         technicalInspectionExpiry: '2027-01-01',
       },
       now,
+      30,
+      { requireDocumentsForJobs: true },
     );
     expect(status.canOperate).toBe(true);
     expect(status.expired).toHaveLength(0);
     expect(status.missing).toHaveLength(0);
+  });
+
+  it('allows missing/expired docs when requireDocumentsForJobs is off (default)', () => {
+    const status = evaluateDriverDocuments({ licenseExpiry: '2026-06-15' }, now);
+    expect(status.canOperate).toBe(true);
+    expect(status.expired).toContain('license');
   });
 
   it('blocks when a document is expired', () => {
@@ -25,6 +33,8 @@ describe('evaluateDriverDocuments', () => {
         technicalInspectionExpiry: '2027-01-01',
       },
       now,
+      30,
+      { requireDocumentsForJobs: true },
     );
     expect(status.canOperate).toBe(false);
     expect(status.expired).toContain('license');
@@ -39,12 +49,19 @@ describe('evaluateDriverDocuments', () => {
         technicalInspectionExpiry: '2026-06-16',
       },
       now,
+      30,
+      { requireDocumentsForJobs: true },
     );
     expect(status.canOperate).toBe(true);
   });
 
   it('blocks when expiry dates are missing', () => {
-    const status = evaluateDriverDocuments({ licenseExpiry: '2027-01-01' }, now);
+    const status = evaluateDriverDocuments(
+      { licenseExpiry: '2027-01-01' },
+      now,
+      30,
+      { requireDocumentsForJobs: true },
+    );
     expect(status.canOperate).toBe(false);
     expect(status.missing).toContain('insurance');
     expect(status.missing).toContain('technicalInspection');
@@ -59,6 +76,8 @@ describe('evaluateDriverDocuments', () => {
         documentsRenewalPending: true,
       },
       now,
+      30,
+      { requireDocumentsForJobs: true },
     );
     expect(status.canOperate).toBe(false);
     expect(status.blockReason).toMatch(/Renouvellement/);

@@ -35,7 +35,7 @@ import { assertServiceAreaPair, assertServiceAreaCoords } from '../common/addres
 import { tripDistanceKm } from '../common/geo.util';
 import { RoutingService } from '../geo/routing.service';
 import { assertDriverCanReceiveJobs, assertDriverEligibleForRide, driverCanReceiveJobs, fetchDriverProfileSnapshot } from '../common/driver-eligibility.util';
-import { fetchDriverDebtStatus } from '../common/driver-debt.util';
+import { fetchDriverDebtStatus, filterDriversNotDebtBlocked } from '../common/driver-debt.util';
 import { fetchAuthUserBrief } from '../common/internal-lookup.util';
 import { TripShareService } from '../share/trip-share.service';
 import { publishDriverJobAlert } from '../common/driver-job-alert.util';
@@ -296,7 +296,10 @@ export class RidesService {
     if (drivers.length > 0) {
       const pickup = ride.pickupAddress?.trim() || 'près de vous';
       const fare = ride.estimatedFareCdf != null ? ` · ${ride.estimatedFareCdf} FC` : '';
-      const driverUserIds = drivers.map((d) => d.userId);
+      let driverUserIds = await filterDriversNotDebtBlocked(drivers.map((d) => d.userId));
+      if (driverUserIds.length === 0) {
+        // no eligible drivers this attempt
+      } else {
       const alert: DriverJobAlertPayload = {
         jobKind: 'RIDE_OFFER',
         referenceId: ride.id,
@@ -315,6 +318,7 @@ export class RidesService {
         pickupLat: ride.pickupLat,
         pickupLng: ride.pickupLng,
       });
+      }
     }
     const meta = this.matching.getMatchingMeta(attempts);
 
@@ -418,13 +422,15 @@ export class RidesService {
   async getDriverOffers(driverUserId: string) {
     const profile = await fetchDriverProfileSnapshot(driverUserId);
     const debtStatus = await fetchDriverDebtStatus(driverUserId);
-    if (debtStatus.debtBlocked) {
+    if (debtStatus.debtBlocked || debtStatus.walletBlocked || debtStatus.offersBlocked) {
       return {
         offers: [] as Record<string, unknown>[],
         documentsBlocked: false,
-        debtBlocked: true,
+        debtBlocked: debtStatus.debtBlocked === true,
+        walletBlocked: debtStatus.walletBlocked === true,
         openDebtCdf: debtStatus.openDebtCdf,
         debtThresholdCdf: debtStatus.debtThresholdCdf,
+        walletBalanceCdf: debtStatus.walletBalanceCdf,
       };
     }
     if (!profile?.isAvailable || !driverCanReceiveJobs(profile)) {

@@ -555,12 +555,14 @@ export class ErrandsService {
   async getDriverOffers(driverUserId: string) {
     const profile = await fetchDriverProfileSnapshot(driverUserId);
     const debtStatus = await fetchDriverDebtStatus(driverUserId);
-    if (debtStatus.debtBlocked) {
+    if (debtStatus.debtBlocked || debtStatus.walletBlocked || debtStatus.offersBlocked) {
       return {
         offers: [] as Record<string, unknown>[],
-        debtBlocked: true,
+        debtBlocked: debtStatus.debtBlocked === true,
+        walletBlocked: debtStatus.walletBlocked === true,
         openDebtCdf: debtStatus.openDebtCdf,
         debtThresholdCdf: debtStatus.debtThresholdCdf,
+        walletBalanceCdf: debtStatus.walletBalanceCdf,
       };
     }
     if (!profile?.isAvailable || !driverCanReceiveJobs(profile)) {
@@ -882,6 +884,30 @@ export class ErrandsService {
         };
       }),
     );
+  }
+
+  /** Client choisit espèces : retire la garantie séquestre si pas encore encaissée. */
+  async switchToCashCod(id: string, userId?: string) {
+    const order = await this.prisma.errandOrder.findUnique({ where: { id } });
+    if (!order) throw new MovaHttpException(MovaErrorCode.ERRAND_NOT_FOUND, HttpStatus.NOT_FOUND);
+    if (userId && order.userId !== userId) {
+      throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
+    }
+    if (order.escrowReady || order.fundsFrozenAt || order.payoutReleasedAt) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        undefined,
+        'Le paiement séquestre est déjà en cours — les espèces ne sont plus disponibles.',
+      );
+    }
+    if (!order.guaranteed) {
+      return { success: true, guaranteed: false, errandId: id };
+    }
+    await this.prisma.errandOrder.update({
+      where: { id },
+      data: { guaranteed: false, escrowReady: false },
+    });
+    return { success: true, guaranteed: false, errandId: id };
   }
 
   async getAdmin(id: string) {

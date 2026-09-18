@@ -1084,6 +1084,9 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
   }
 
   String? _offerBlockMessage(Map<String, dynamic> ridePayload, Map<String, dynamic> deliveryPayload) {
+    if (ridePayload['walletBlocked'] == true || deliveryPayload['walletBlocked'] == true) {
+      return 'Solde portefeuille (virtuel) insuffisant. Rechargez dans Revenus pour recevoir des courses.';
+    }
     if (ridePayload['debtBlocked'] == true || deliveryPayload['debtBlocked'] == true) {
       final debt = ridePayload['openDebtCdf'] ?? deliveryPayload['openDebtCdf'];
       final threshold = ridePayload['debtThresholdCdf'] ?? deliveryPayload['debtThresholdCdf'];

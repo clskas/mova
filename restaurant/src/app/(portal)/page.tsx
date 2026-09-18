@@ -14,6 +14,7 @@ import {
 } from "@/lib/api";
 import { toUserErrorMessage } from "@/lib/user-messages";
 import { PartnerAmountLine } from "@/components/PartnerAmountLine";
+import { useCommerceCopy } from "@/components/CommerceTypeContext";
 
 function formatItems(items: unknown): string {
   if (!Array.isArray(items)) return "—";
@@ -35,6 +36,7 @@ import {
 } from "@/lib/partner-alerts";
 
 export default function OrdersPage() {
+  const copy = useCommerceCopy();
   const searchParams = useSearchParams();
   const [orders, setOrders] = useState<RestaurantOrder[]>([]);
   const [loading, setLoading] = useState(true);
@@ -223,7 +225,7 @@ export default function OrdersPage() {
             referenceId={chatOrderId}
             kind="delivery"
             peerLabel={chatPeerLabel}
-            subtitle="Messages visibles par client, livreur et restaurant"
+            subtitle={copy.chatSubtitle}
             onClose={closeChat}
           />
         )}
@@ -288,7 +290,7 @@ export default function OrdersPage() {
             <section>
               <h3 className="font-semibold text-violet-700 mb-3">En cours ({active.length})</h3>
               {active.length === 0 ? (
-                <p className="text-gray-400 text-sm bg-white rounded-xl p-6 border">Rien en cuisine pour le moment</p>
+                <p className="text-gray-400 text-sm bg-white rounded-xl p-6 border">{copy.emptyOrders}</p>
               ) : (
                 <div className="space-y-3">
                   {active.map((o) => (

@@ -88,6 +88,27 @@ export class InternalController {
     return this.paymentInfo.getPaymentInfo(referenceType, referenceId);
   }
 
+  /** Passager choisit espèces : désactive le séquestre tant qu'il n'est pas encaissé. */
+  @Post('services/:referenceType/:referenceId/switch-to-cash')
+  async switchServiceToCash(
+    @Param('referenceType') referenceType: string,
+    @Param('referenceId') referenceId: string,
+    @Body('userId') userId?: string,
+  ) {
+    const type = referenceType.toUpperCase();
+    if (type === 'DELIVERY') {
+      return this.deliveries.switchToCashCod(referenceId, userId);
+    }
+    if (type === 'ERRAND') {
+      return this.errands.switchToCashCod(referenceId, userId);
+    }
+    throw new MovaHttpException(
+      MovaErrorCode.VALIDATION_ERROR,
+      undefined,
+      'Basculer en espèces non supporté pour ce type de service.',
+    );
+  }
+
   @Get('rides/stats')
   stats() {
     return this.rides.getStats();

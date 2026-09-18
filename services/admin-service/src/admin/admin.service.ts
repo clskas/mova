@@ -1130,7 +1130,12 @@ export class AdminService {
     return this.proxy('payment', '/internal/debt-policy', { method: 'GET' });
   }
 
-  updateDebtPolicy(body: { maxOpenDebtCdf?: number; blockOffers?: boolean; isActive?: boolean }) {
+  updateDebtPolicy(body: {
+    maxOpenDebtCdf?: number;
+    blockOffers?: boolean;
+    isActive?: boolean;
+    requirePositiveWalletBalance?: boolean;
+  }) {
     return this.proxy('payment', '/internal/debt-policy', {
       method: 'PATCH',
       body: JSON.stringify(body),

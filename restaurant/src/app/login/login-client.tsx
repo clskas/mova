@@ -25,6 +25,7 @@ import {
 import { GoogleContinueButton, disableGoogleAutoSelect, googleClientId } from "@/components/GoogleContinueButton";
 import { PwaInstallBanner } from "@/components/PwaInstallBanner";
 import { PUBLIC_API_BASE } from "@/lib/public-api-base";
+import { commerceCopy } from "@/lib/commerce-type";
 import {
   LOGIN_GENERIC,
   LOGIN_GOOGLE_UNAVAILABLE,
@@ -154,7 +155,7 @@ export function LoginClient({ forcePin = false }: { forcePin?: boolean }) {
     }
     const role = data.user?.role ?? decodeJwtPayload(data.accessToken)?.role;
     if (!isRestaurantRole(typeof role === "string" ? role : null)) {
-      throw new Error("Ce compte n'est pas un partenaire restaurant.");
+      throw new Error(commerceCopy("RESTAURANT").loginWrongRole);
     }
     const typedPhone = source === "google" ? "" : normalizeLoginPhone(phone);
     const phoneOnAccount = accountPhone(data, typedPhone);

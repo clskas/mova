@@ -15,23 +15,28 @@ export const KYC_DOCUMENT_LABELS: Record<KycDocumentType, string> = {
   ID_PHOTO: 'Carte d\'identité / passeport',
   SELFIE: 'Photo récente (profil)',
   DRIVERS_LICENSE: 'Permis de conduire',
-  VEHICLE_REGISTRATION: 'Carte grise (optionnel)',
+  VEHICLE_REGISTRATION: 'Carte grise',
   VEHICLE_INSURANCE: 'Assurance véhicule',
   TECHNICAL_INSPECTION: 'Visite technique',
   CRIMINAL_RECORD: 'Extrait casier judiciaire',
 };
 
-/** Documents obligatoires avant validation admin. */
-export const REQUIRED_DRIVER_KYC_TYPES: KycDocumentType[] = [
+/**
+ * Documents obligatoires pour le dossier chauffeur.
+ * Vide par défaut : tous les justificatifs sont optionnels.
+ * Quand l'admin active « documents requis pour les courses », l'ops gate
+ * (dates d'expiration / canOperate) s'applique via PlatformConfig — pas cette liste.
+ */
+export const REQUIRED_DRIVER_KYC_TYPES: KycDocumentType[] = [];
+
+/** Tous les justificatifs chauffeur sont déposables librement (aucun obligatoire). */
+export const OPTIONAL_DRIVER_KYC_TYPES: KycDocumentType[] = [
   KYC_DOCUMENT_TYPES.ID_PHOTO,
   KYC_DOCUMENT_TYPES.SELFIE,
   KYC_DOCUMENT_TYPES.DRIVERS_LICENSE,
+  KYC_DOCUMENT_TYPES.VEHICLE_REGISTRATION,
   KYC_DOCUMENT_TYPES.VEHICLE_INSURANCE,
   KYC_DOCUMENT_TYPES.TECHNICAL_INSPECTION,
-];
-
-export const OPTIONAL_DRIVER_KYC_TYPES: KycDocumentType[] = [
-  KYC_DOCUMENT_TYPES.VEHICLE_REGISTRATION,
   KYC_DOCUMENT_TYPES.CRIMINAL_RECORD,
 ];
 
@@ -282,7 +287,8 @@ export function allPartnerJustificatifsApproved(
   checklist: Array<{ required?: boolean; uploaded?: boolean; status?: string | null }>,
 ): boolean {
   const relevant = checklist.filter((item) => item.required || item.uploaded);
-  if (!relevant.length) return false;
+  // Aucun justificatif requis ni déposé : dossier approuvable (chauffeur docs optionnels).
+  if (!relevant.length) return true;
   return relevant.every((item) => String(item.status ?? '').trim().toUpperCase() === 'APPROVED');
 }
 
@@ -312,6 +318,6 @@ export function allDriverJustificatifsApproved(
       .map((item) => ({ required: false, uploaded: true, status: item.status ?? null }));
     return allPartnerJustificatifsApproved([...requiredRows, ...extraUploaded]);
   }
-  if (!items.length) return false;
+  if (!items.length) return true;
   return items.every((doc) => String(doc.status ?? '').trim().toUpperCase() === 'APPROVED');
 }

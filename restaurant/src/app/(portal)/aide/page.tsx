@@ -1,53 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useCommerceCopy, useCommerceType } from "@/components/CommerceTypeContext";
 import { fetchCompanyContacts, type CompanyContact } from "@/lib/api";
-
-const MANUAL = [
-  {
-    title: "Code PIN de connexion",
-    steps: [
-      "Connectez-vous sur https://restaurant.afri-soft.com/login avec Google ou votre téléphone.",
-      "Première fois : code SMS (téléphone) ou code e-mail (après Google), puis PIN de connexion (6 chiffres) pour les prochaines fois.",
-      "Après Déconnexion : pavé Connexion — « Entrez le PIN pour +243 ••• XXX », 6 points, clavier. Google ne reconnecte pas tout seul.",
-      "Après validation du dossier : fenêtre « Code PIN d'activation » pour commencer à travailler.",
-    ],
-  },
-  {
-    title: "Dossier avant menus et commandes",
-    steps: [
-      "Ouvrez Mon dossier en premier.",
-      "Envoyez vos justificatifs (activité, identité, local).",
-      "Attendez la validation SENGA.",
-      "Tant que le dossier n’est pas validé, vous ne pouvez pas vendre ni afficher le menu.",
-    ],
-  },
-  {
-    title: "Livraison par SENGA",
-    steps: [
-      "SENGA gère tous les livreurs : vous ne choisissez pas de flotte interne.",
-      "Quand la commande est prête, un livreur SENGA vient la chercher.",
-      "Vous êtes payé à l’enlèvement ; le livreur est payé après le PIN client.",
-    ],
-  },
-  {
-    title: "Paiement à l’enlèvement",
-    steps: [
-      "Le client paie d’abord (portefeuille ou Mobile Money).",
-      "L’argent est bloqué jusqu’au départ du plat.",
-      "Vous êtes payé quand la commande est prise au restaurant.",
-      "Un livreur SENGA est payé après le code PIN du client.",
-    ],
-  },
-  {
-    title: "Menus et commandes",
-    steps: [
-      "Une fois le dossier validé, ajoutez vos plats dans Menu.",
-      "Ouvrez Commandes pour préparer et suivre.",
-      "Dans Paramètres, indiquez si vous acceptez les commandes.",
-    ],
-  },
-];
+import { commerceHelpChapters } from "@/lib/commerce-type";
 
 function telHref(phone: string) {
   return `tel:${phone.replace(/\s/g, "")}`;
@@ -59,6 +15,9 @@ function waHref(phone: string) {
 }
 
 export default function RestaurantAidePage() {
+  const commerceType = useCommerceType();
+  const copy = useCommerceCopy();
+  const chapters = useMemo(() => commerceHelpChapters(commerceType), [commerceType]);
   const [contacts, setContacts] = useState<CompanyContact[]>([]);
   const [loaded, setLoaded] = useState(false);
 
@@ -80,13 +39,14 @@ export default function RestaurantAidePage() {
     <div className="max-w-lg space-y-6">
       <div>
         <h2 className="text-xl font-bold">Aide</h2>
-        <p className="text-sm text-gray-500 mt-1">Manuel restaurant et contacts AfriSoft.</p>
+        <p className="text-sm text-gray-500 mt-1">{copy.aideIntro}</p>
       </div>
 
       <section className="bg-white border rounded-xl p-4">
         <h3 className="font-semibold text-[#1A1A2E]">Manuel utilisateur</h3>
         <p className="text-sm text-gray-600 mt-1">
-          Connexion, PIN d&apos;activation après validation KYC, dossier, menu et commandes.
+          Connexion, PIN d&apos;activation après validation KYC, dossier, {copy.catalogNoun.toLowerCase()} et
+          commandes.
         </p>
         <a href="/manuel" className="inline-block mt-2 text-orange-700 underline font-medium text-sm">
           Ouvrir le manuel utilisateur
@@ -95,7 +55,7 @@ export default function RestaurantAidePage() {
 
       <section className="space-y-2">
         <h3 className="font-semibold text-[#1A1A2E]">Aide rapide</h3>
-        {MANUAL.map((chapter) => (
+        {chapters.map((chapter) => (
           <details key={chapter.title} className="bg-white border rounded-xl p-3">
             <summary className="font-medium text-sm cursor-pointer">{chapter.title}</summary>
             <ol className="mt-2 list-decimal pl-5 space-y-1 text-sm text-gray-600">

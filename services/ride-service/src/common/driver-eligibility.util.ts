@@ -115,6 +115,13 @@ export async function assertDriverCanReceiveJobs(userId: string): Promise<Driver
       `Dette espèces (${debtStatus.openDebtCdf} FC) au-dessus du seuil (${debtStatus.debtThresholdCdf} FC). Réglez votre dette pour recevoir des courses.`,
     );
   }
+  if (debtStatus.walletBlocked) {
+    throw new MovaHttpException(
+      MovaErrorCode.VALIDATION_ERROR,
+      HttpStatus.FORBIDDEN,
+      'Solde portefeuille insuffisant (virtuel requis). Rechargez votre portefeuille pour recevoir des courses.',
+    );
+  }
   return profile;
 }
 

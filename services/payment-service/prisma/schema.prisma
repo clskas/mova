@@ -198,11 +198,13 @@ model DriverCashDebt {
 }
 
 model DriverDebtPolicy {
-  id             String   @id @default("default")
-  maxOpenDebtCdf Int      @default(50000) @map("max_open_debt_cdf")
-  blockOffers    Boolean  @default(true) @map("block_offers")
-  isActive       Boolean  @default(true) @map("is_active")
-  updatedAt      DateTime @updatedAt @map("updated_at")
+  id                           String   @id @default("default")
+  maxOpenDebtCdf               Int      @default(50000) @map("max_open_debt_cdf")
+  blockOffers                  Boolean  @default(true) @map("block_offers")
+  isActive                     Boolean  @default(true) @map("is_active")
+  /// When true, drivers with wallet balance ≤ 0 cannot receive job offers/notifications.
+  requirePositiveWalletBalance Boolean  @default(false) @map("require_positive_wallet_balance")
+  updatedAt                    DateTime @updatedAt @map("updated_at")
 
   @@map("driver_debt_policies")
 }

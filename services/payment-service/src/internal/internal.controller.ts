@@ -308,7 +308,12 @@ export class InternalController {
   }
 
   @Patch('debt-policy')
-  updateDebtPolicy(@Body() body: { maxOpenDebtCdf?: number; blockOffers?: boolean; isActive?: boolean }) {
+  updateDebtPolicy(@Body() body: {
+    maxOpenDebtCdf?: number;
+    blockOffers?: boolean;
+    isActive?: boolean;
+    requirePositiveWalletBalance?: boolean;
+  }) {
     return this.debtLedger.updatePolicy(body);
   }
 

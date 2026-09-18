@@ -616,8 +616,32 @@ export class PaymentsService {
       title: info.title ?? null,
       guaranteed: Boolean(info.guaranteed),
       escrowCollect: Boolean(info.escrowCollect),
-      cashAllowed: info.cashAllowed !== false && !info.escrowCollect,
+      cashAllowed: info.cashAllowed !== false,
     };
+  }
+
+  private async switchServiceToCashCod(referenceType: string, referenceId: string, userId: string) {
+    try {
+      const res = await fetch(
+        serviceUrl('ride', `/internal/services/${referenceType}/${referenceId}/switch-to-cash`),
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-internal-api-key': INTERNAL_API_KEY,
+          },
+          body: JSON.stringify({ userId }),
+        },
+      );
+      if (!res.ok) {
+        this.logger.warn(`switch-to-cash ${referenceType}/${referenceId} failed: HTTP ${res.status}`);
+        return false;
+      }
+      return true;
+    } catch (e) {
+      this.logger.warn(`switch-to-cash ${referenceType}/${referenceId} unreachable`, e);
+      return false;
+    }
   }
 
   async payService(
@@ -631,7 +655,7 @@ export class PaymentsService {
     const type = referenceType.toUpperCase();
     if (type === 'RIDE') return this.payRide(referenceId, userId, method, phone);
 
-    const info = await this.fetchServicePaymentInfo(type, referenceId);
+    let info = await this.fetchServicePaymentInfo(type, referenceId);
     if (info.userId !== userId) throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
     if (!info.paymentReady) {
       throw new MovaHttpException(
@@ -642,13 +666,25 @@ export class PaymentsService {
     }
     const amountCdf = info.amountCdf;
     if (amountCdf <= 0) throw new MovaHttpException(MovaErrorCode.PAYMENT_FAILED);
-    const escrowCollect = Boolean(info.escrowCollect);
+    let escrowCollect = Boolean(info.escrowCollect);
     if (method === PaymentMethod.CASH && escrowCollect) {
-      throw new MovaHttpException(
-        MovaErrorCode.PAYMENT_INVALID_METHOD,
-        undefined,
-        'Livraison garantie : payez par portefeuille ou Mobile Money. Les espèces ne sont pas couvertes par le séquestre.',
-      );
+      const switched = await this.switchServiceToCashCod(type, referenceId, userId);
+      if (!switched) {
+        throw new MovaHttpException(
+          MovaErrorCode.PAYMENT_INVALID_METHOD,
+          undefined,
+          'Impossible de basculer en espèces pour cette livraison.',
+        );
+      }
+      info = await this.fetchServicePaymentInfo(type, referenceId);
+      escrowCollect = Boolean(info.escrowCollect);
+      if (escrowCollect) {
+        throw new MovaHttpException(
+          MovaErrorCode.PAYMENT_INVALID_METHOD,
+          undefined,
+          'Livraison garantie : payez par portefeuille ou Mobile Money. Les espèces ne sont pas couvertes par le séquestre.',
+        );
+      }
     }
     const paymentPhone = this.resolvePaymentPhone(method, phone);
     const refKey = `${type}:${referenceId}`;

@@ -9,6 +9,7 @@ import {
 } from "@/lib/api";
 import { toUserErrorMessage } from "@/lib/user-messages";
 import { ImageSourcePicker } from "@/components/ImageSourcePicker";
+import { useCommerceCopy } from "@/components/CommerceTypeContext";
 
 const STATUS_LABEL: Record<string, string> = {
   PENDING: "En attente de validation",
@@ -17,6 +18,7 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 export default function RestaurantDossierPage() {
+  const copy = useCommerceCopy();
   const [dossier, setDossier] = useState<RestaurantKycDossier | null>(null);
   const [nif, setNif] = useState("");
   const [rccm, setRccm] = useState("");
@@ -83,10 +85,7 @@ export default function RestaurantDossierPage() {
     <div className="space-y-6 max-w-2xl pb-8">
       <div>
         <h1 className="text-xl font-semibold text-[#1A1A2E]">Mon dossier</h1>
-        <p className="text-sm text-gray-600 mt-1">
-          SENGA vérifie votre identité, votre activité et votre local avant d&apos;afficher le restaurant et
-          d&apos;accepter des commandes.
-        </p>
+        <p className="text-sm text-gray-600 mt-1">{copy.dossierVisibility}</p>
       </div>
       {error && <p className="text-sm text-red-700 bg-red-50 rounded-xl px-3 py-2">{error}</p>}
       {message && <p className="text-sm text-emerald-800 bg-emerald-50 rounded-xl px-3 py-2">{message}</p>}

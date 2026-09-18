@@ -9,11 +9,7 @@ import {
   type PartnerPromo,
 } from "@/lib/api";
 import { toUserErrorMessage } from "@/lib/user-messages";
-
-const SCOPE_LABELS: Record<string, string> = {
-  FOOD_MENU_ONLY: "Plats uniquement",
-  FOOD_ORDER: "Commande complète (plats + livraison)",
-};
+import { useCommerceCopy } from "@/components/CommerceTypeContext";
 
 const emptyForm = () => ({
   code: "",
@@ -24,6 +20,11 @@ const emptyForm = () => ({
 });
 
 export default function PromosPage() {
+  const copy = useCommerceCopy();
+  const scopeLabels: Record<string, string> = {
+    FOOD_MENU_ONLY: copy.scopeMenuOnly,
+    FOOD_ORDER: copy.scopeFullOrder,
+  };
   const [promos, setPromos] = useState<PartnerPromo[]>([]);
   const [form, setForm] = useState(emptyForm);
   const [loading, setLoading] = useState(true);
@@ -83,9 +84,7 @@ export default function PromosPage() {
     <div className="space-y-6">
         <div>
           <h2 className="text-xl font-semibold text-[#1A1A2E]">Codes promo</h2>
-          <p className="text-sm text-gray-600 mt-1">
-            Créez des codes valables uniquement pour votre restaurant. La remise est toujours déduite de votre part — SENGA et le livreur ne la financent pas.
-          </p>
+          <p className="text-sm text-gray-600 mt-1">{copy.promosBlurb}</p>
         </div>
 
         {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
@@ -141,8 +140,8 @@ export default function PromosPage() {
                 onChange={(e) => setForm((f) => ({ ...f, scope: e.target.value as typeof f.scope }))}
                 className="mt-1 w-full border rounded-lg px-3 py-2"
               >
-                <option value="FOOD_MENU_ONLY">Plats uniquement</option>
-                <option value="FOOD_ORDER">Commande complète</option>
+                <option value="FOOD_MENU_ONLY">{copy.scopeMenuOnly}</option>
+                <option value="FOOD_ORDER">{copy.scopeFullOrder}</option>
               </select>
             </label>
           </div>
@@ -173,7 +172,7 @@ export default function PromosPage() {
                     <p className="text-sm text-gray-600">
                       {p.discountPercent != null ? `−${p.discountPercent} %` : p.discountCdf != null ? `−${formatCdf(p.discountCdf)}` : "—"}
                       {" · "}
-                      {SCOPE_LABELS[p.scope ?? ""] ?? p.scope}
+                      {scopeLabels[p.scope ?? ""] ?? p.scope}
                       {" · À votre charge"}
                       {p.maxUses != null && ` · ${p.usedCount ?? 0}/${p.maxUses} utilisations`}
                     </p>

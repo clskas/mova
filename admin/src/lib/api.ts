@@ -535,6 +535,7 @@ export type PlatformConfigData = {
     combinedPeakNightMultiplier: number;
   };
   carpool: { matchRadiusKm: number; relaxedRadiusMultiplier: number };
+  driverOps?: { requireDocumentsForJobs: boolean };
 };
 
 export type PlatformConfigResponse = {
@@ -1954,6 +1955,7 @@ export type DriverDebtPolicy = {
   maxOpenDebtCdf: number;
   blockOffers: boolean;
   isActive: boolean;
+  requirePositiveWalletBalance?: boolean;
   updatedAt?: string;
 };
 
@@ -1965,6 +1967,7 @@ export async function updateDebtPolicy(data: {
   maxOpenDebtCdf?: number;
   blockOffers?: boolean;
   isActive?: boolean;
+  requirePositiveWalletBalance?: boolean;
 }) {
   return apiFetch<DriverDebtPolicy>("/api/admin/wallet/debt-policy", {
     method: "PATCH",

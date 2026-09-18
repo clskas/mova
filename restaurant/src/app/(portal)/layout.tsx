@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AuthGate } from "@/components/AuthGate";
+import { CommerceTypeProvider } from "@/components/CommerceTypeContext";
 import { PortalShell } from "@/components/PortalShell";
 import { PwaInstallBanner } from "@/components/PwaInstallBanner";
 import { PartnerAlertHost } from "@/components/PartnerAlertHost";
@@ -28,10 +29,12 @@ function RestaurantPortalFrame({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <PortalShell restaurantName={restaurantName} commerceType={commerceType}>
-      {children}
-      <PwaInstallBanner />
-    </PortalShell>
+    <CommerceTypeProvider commerceType={commerceType}>
+      <PortalShell restaurantName={restaurantName} commerceType={commerceType}>
+        {children}
+        <PwaInstallBanner />
+      </PortalShell>
+    </CommerceTypeProvider>
   );
 }
 

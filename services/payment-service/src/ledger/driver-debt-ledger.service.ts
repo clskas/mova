@@ -244,13 +244,24 @@ export class DriverDebtLedgerService {
     let policy = await this.prisma.driverDebtPolicy.findUnique({ where: { id: 'default' } });
     if (!policy) {
       policy = await this.prisma.driverDebtPolicy.create({
-        data: { id: 'default', maxOpenDebtCdf: 50_000, blockOffers: true, isActive: true },
+        data: {
+          id: 'default',
+          maxOpenDebtCdf: 50_000,
+          blockOffers: true,
+          isActive: true,
+          requirePositiveWalletBalance: false,
+        },
       });
     }
     return policy;
   }
 
-  async updatePolicy(data: { maxOpenDebtCdf?: number; blockOffers?: boolean; isActive?: boolean }) {
+  async updatePolicy(data: {
+    maxOpenDebtCdf?: number;
+    blockOffers?: boolean;
+    isActive?: boolean;
+    requirePositiveWalletBalance?: boolean;
+  }) {
     await this.getPolicy();
     return this.prisma.driverDebtPolicy.update({
       where: { id: 'default' },
@@ -258,36 +269,61 @@ export class DriverDebtLedgerService {
         ...(data.maxOpenDebtCdf != null ? { maxOpenDebtCdf: Math.max(0, Math.round(data.maxOpenDebtCdf)) } : {}),
         ...(data.blockOffers != null ? { blockOffers: data.blockOffers } : {}),
         ...(data.isActive != null ? { isActive: data.isActive } : {}),
+        ...(data.requirePositiveWalletBalance != null
+          ? { requirePositiveWalletBalance: data.requirePositiveWalletBalance }
+          : {}),
       },
     });
   }
 
   async getDebtStatus(driverUserId: string) {
-    const [summary, policy] = await Promise.all([this.getSummary(driverUserId), this.getPolicy()]);
+    const [summary, policy, wallet] = await Promise.all([
+      this.getSummary(driverUserId),
+      this.getPolicy(),
+      this.wallet.createWallet(driverUserId),
+    ]);
+    const availableCdf = Math.max(0, (wallet.balanceCdf ?? 0) - (wallet.heldBalanceCdf ?? 0));
     const debtBlocked =
       policy.isActive &&
       policy.blockOffers &&
       policy.maxOpenDebtCdf > 0 &&
       summary.totalOpenCdf > policy.maxOpenDebtCdf;
+    const walletBlocked =
+      policy.requirePositiveWalletBalance === true && availableCdf <= 0;
     return {
       debtBlocked,
+      walletBlocked,
+      offersBlocked: debtBlocked || walletBlocked,
       openDebtCdf: summary.totalOpenCdf,
       debtThresholdCdf: policy.maxOpenDebtCdf,
+      walletBalanceCdf: availableCdf,
       policyActive: policy.isActive,
       blockOffers: policy.blockOffers,
+      requirePositiveWalletBalance: policy.requirePositiveWalletBalance === true,
     };
   }
 
   async filterDriversNotDebtBlocked(driverUserIds: string[]): Promise<string[]> {
     if (driverUserIds.length === 0) return [];
     const policy = await this.getPolicy();
-    if (!policy.isActive || !policy.blockOffers || policy.maxOpenDebtCdf <= 0) {
+    const debtGate =
+      policy.isActive && policy.blockOffers && policy.maxOpenDebtCdf > 0;
+    const walletGate = policy.requirePositiveWalletBalance === true;
+    if (!debtGate && !walletGate) {
       return driverUserIds;
     }
     const allowed: string[] = [];
     for (const id of driverUserIds) {
-      const summary = await this.getSummary(id);
-      if (summary.totalOpenCdf <= policy.maxOpenDebtCdf) allowed.push(id);
+      if (debtGate) {
+        const summary = await this.getSummary(id);
+        if (summary.totalOpenCdf > policy.maxOpenDebtCdf) continue;
+      }
+      if (walletGate) {
+        const wallet = await this.wallet.createWallet(id);
+        const available = Math.max(0, (wallet.balanceCdf ?? 0) - (wallet.heldBalanceCdf ?? 0));
+        if (available <= 0) continue;
+      }
+      allowed.push(id);
     }
     return allowed;
   }

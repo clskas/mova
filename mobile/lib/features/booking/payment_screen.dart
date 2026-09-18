@@ -145,8 +145,8 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
             if (pin != null && pin.isNotEmpty) _cashPin = pin;
             _paymentReady = ready;
             _escrowCollect = data['escrowCollect'] == true;
-            _cashAllowed = data['cashAllowed'] != false && data['escrowCollect'] != true;
-            if (_escrowCollect && _method == 'CASH') _method = 'WALLET';
+            _cashAllowed = data['cashAllowed'] != false;
+            // Espèces restent sélectionnables même si le flux était initialement « garanti ».
             if (!ready && widget.serviceType == 'RENTAL') {
               _error =
                   'Le paiement sera disponible après le retour du véhicule. Le partenaire doit cliquer « Véhicule rendu ».';

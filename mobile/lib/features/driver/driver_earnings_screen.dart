@@ -11,6 +11,7 @@ import '../../core/widgets/mova_widgets.dart';
 import 'cash_debt_cash_payment_screen.dart';
 import 'driver_onboarding_screen.dart';
 import '../../core/wallet/wallet_movements.dart';
+import '../wallet/wallet_screen.dart';
 
 enum _EarningsPeriod { today, week, month, custom }
 
@@ -520,6 +521,17 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
                 ],
               ),
             ],
+          ),
+          const SizedBox(height: 14),
+          MovaButton(
+            label: 'Recharger le portefeuille',
+            icon: Icons.add_card_outlined,
+            onPressed: () async {
+              await Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const WalletScreen()),
+              );
+              if (mounted) await _load();
+            },
           ),
         ],
       ),

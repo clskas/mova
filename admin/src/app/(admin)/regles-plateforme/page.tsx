@@ -87,6 +87,7 @@ export default function ReglesPlateformePage() {
   const [nightDefault, setNightDefault] = useState("");
   const [combinedPeakNight, setCombinedPeakNight] = useState("");
   const [carpoolRadius, setCarpoolRadius] = useState("");
+  const [requireDocsForJobs, setRequireDocsForJobs] = useState(false);
 
   function applyConfig(c: PlatformConfigData) {
     setConfig(c);
@@ -116,6 +117,7 @@ export default function ReglesPlateformePage() {
     setNightDefault(String(c.pricing.defaultNightMultiplier));
     setCombinedPeakNight(String(c.pricing.combinedPeakNightMultiplier));
     setCarpoolRadius(String(c.carpool.matchRadiusKm));
+    setRequireDocsForJobs(c.driverOps?.requireDocumentsForJobs === true);
   }
 
   const load = useCallback(async () => {
@@ -254,6 +256,41 @@ export default function ReglesPlateformePage() {
                     {savingSection === "matching" ? "…" : "Enregistrer dispatch"}
                   </BtnPrimary>
                 </div>
+              )}
+            </Card>
+          </section>
+
+          <section>
+            <h2 className="font-semibold text-[#1A1A2E] mb-3">Documents chauffeurs &amp; notifications</h2>
+            <Card className="p-4 space-y-3 max-w-2xl">
+              <p className="text-sm text-gray-600">
+                Par défaut, tous les justificatifs du dossier chauffeur sont optionnels. Activez l&apos;option
+                ci-dessous pour exiger des documents valides (dates d&apos;expiration) afin de continuer à
+                recevoir les notifications de courses.
+              </p>
+              <label className="flex items-start gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  className="mt-1"
+                  checked={requireDocsForJobs}
+                  disabled={readOnly}
+                  onChange={(e) => setRequireDocsForJobs(e.target.checked)}
+                />
+                <span>
+                  Exiger des documents valides pour recevoir les notifications de courses / livraisons
+                </span>
+              </label>
+              {!readOnly && (
+                <BtnPrimary
+                  disabled={savingSection === "driverOps"}
+                  onClick={() =>
+                    savePlatform("driverOps", {
+                      driverOps: { requireDocumentsForJobs: requireDocsForJobs },
+                    })
+                  }
+                >
+                  {savingSection === "driverOps" ? "…" : "Enregistrer règle documents"}
+                </BtnPrimary>
               )}
             </Card>
           </section>

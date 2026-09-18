@@ -1091,7 +1091,12 @@ export class AdminController {
   @Patch('wallet/debt-policy')
   @RequirePermissions(AdminPermission.WALLETS_WRITE)
   @ApiOperation({ summary: 'Configurer le seuil de dette espèces chauffeurs' })
-  updateDebtPolicy(@Body() body: { maxOpenDebtCdf?: number; blockOffers?: boolean; isActive?: boolean }) {
+  updateDebtPolicy(@Body() body: {
+    maxOpenDebtCdf?: number;
+    blockOffers?: boolean;
+    isActive?: boolean;
+    requirePositiveWalletBalance?: boolean;
+  }) {
     return this.adminService.updateDebtPolicy(body);
   }
 

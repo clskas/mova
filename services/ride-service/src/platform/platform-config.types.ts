@@ -13,6 +13,10 @@ export type PlatformConfigOverrides = {
   };
   pricing?: Partial<typeof MARKET_RDC.pricing>;
   carpool?: { matchRadiusKm?: number; relaxedRadiusMultiplier?: number };
+  driverOps?: {
+    /** When true, missing/expired driver docs block ride/delivery offers. Default false. */
+    requireDocumentsForJobs?: boolean;
+  };
 };
 
 export type MergedPlatformConfig = {
@@ -53,6 +57,7 @@ export type MergedPlatformConfig = {
     combinedPeakNightMultiplier: number;
   };
   carpool: { matchRadiusKm: number; relaxedRadiusMultiplier: number };
+  driverOps: { requireDocumentsForJobs: boolean };
 };
 
 export const PLATFORM_CONFIG_DEFAULTS: MergedPlatformConfig = {
@@ -69,4 +74,5 @@ export const PLATFORM_CONFIG_DEFAULTS: MergedPlatformConfig = {
   },
   pricing: { ...MARKET_RDC.pricing },
   carpool: { matchRadiusKm: 5, relaxedRadiusMultiplier: 3 },
+  driverOps: { requireDocumentsForJobs: false },
 };

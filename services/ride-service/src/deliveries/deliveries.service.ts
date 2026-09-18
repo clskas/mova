@@ -137,7 +137,12 @@ export class DeliveriesService {
     return this.parcelWeightBands.getMultiplier(category);
   }
 
-  private guaranteeFlags(_paymentMethod?: string) {
+  private guaranteeFlags(paymentMethod?: string) {
+    const method = String(paymentMethod ?? '').trim().toUpperCase();
+    // Cash / COD : pas de séquestre — le client paie à la livraison.
+    if (method === 'CASH' || method === 'COD' || method === 'ESPECES' || method === 'ESPÈCES') {
+      return { guaranteed: false, escrowReady: false };
+    }
     const guaranteed = isDeliveryPrepaidRequired();
     return { guaranteed, escrowReady: false };
   }
@@ -1108,13 +1113,15 @@ export class DeliveriesService {
   async getDriverOffers(driverUserId: string) {
     const profile = await fetchDriverProfileSnapshot(driverUserId);
     const debtStatus = await fetchDriverDebtStatus(driverUserId);
-    if (debtStatus.debtBlocked) {
+    if (debtStatus.debtBlocked || debtStatus.walletBlocked || debtStatus.offersBlocked) {
       return {
         offers: [] as Record<string, unknown>[],
         documentsBlocked: false,
-        debtBlocked: true,
+        debtBlocked: debtStatus.debtBlocked === true,
+        walletBlocked: debtStatus.walletBlocked === true,
         openDebtCdf: debtStatus.openDebtCdf,
         debtThresholdCdf: debtStatus.debtThresholdCdf,
+        walletBalanceCdf: debtStatus.walletBalanceCdf,
       };
     }
     if (!profile?.isAvailable || !driverCanReceiveJobs(profile)) {
@@ -1285,6 +1292,30 @@ export class DeliveriesService {
       deliveryId,
     );
     return { delivery: formatted, success: true };
+  }
+
+  /** Client choisit espèces : retire la garantie séquestre si pas encore encaissée. */
+  async switchToCashCod(id: string, userId?: string) {
+    const delivery = await this.prisma.delivery.findUnique({ where: { id } });
+    if (!delivery) throw new MovaHttpException(MovaErrorCode.DELIVERY_NOT_FOUND, HttpStatus.NOT_FOUND);
+    if (userId && delivery.userId !== userId) {
+      throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
+    }
+    if (delivery.escrowReady || delivery.fundsFrozenAt || delivery.payoutReleasedAt) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        undefined,
+        'Le paiement séquestre est déjà en cours — les espèces ne sont plus disponibles.',
+      );
+    }
+    if (!delivery.guaranteed) {
+      return { success: true, guaranteed: false, deliveryId: id };
+    }
+    await this.prisma.delivery.update({
+      where: { id },
+      data: { guaranteed: false, escrowReady: false },
+    });
+    return { success: true, guaranteed: false, deliveryId: id };
   }
 
   async updateStatus(id: string, status: DeliveryStatus, userId: string, deliveryPin?: string) {

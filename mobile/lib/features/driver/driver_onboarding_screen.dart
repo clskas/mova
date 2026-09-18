@@ -79,8 +79,16 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
     ('CRIMINAL_RECORD', 'Casier judiciaire (optionnel)'),
   ];
 
-  static const _optionalDocTypes = {'VEHICLE_REGISTRATION', 'CRIMINAL_RECORD'};
-  static const _requiredDocCount = 5;
+  static const _optionalDocTypes = {
+    'ID_PHOTO',
+    'SELFIE',
+    'DRIVERS_LICENSE',
+    'VEHICLE_REGISTRATION',
+    'VEHICLE_INSURANCE',
+    'TECHNICAL_INSPECTION',
+    'CRIMINAL_RECORD',
+  };
+  static const _requiredDocCount = 0;
   Future<void> _restoreOnboardingStep() async {
     final prefs = await SharedPreferences.getInstance();
     final saved = prefs.getInt(_stepStorageKey);
@@ -615,7 +623,9 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
       if (_state?['kyc'] != null) ...[
         const SizedBox(height: 8),
         Text(
-          'Documents : ${_state!['kyc']['checklist'] is List ? (_state!['kyc']['checklist'] as List).where((i) => i is Map && i['required'] == true && i['uploaded'] == true).length : 0}/$_requiredDocCount obligatoires',
+          _requiredDocCount > 0
+              ? 'Documents : ${_state!['kyc']['checklist'] is List ? (_state!['kyc']['checklist'] as List).where((i) => i is Map && i['required'] == true && i['uploaded'] == true).length : 0}/$_requiredDocCount obligatoires'
+              : 'Documents : tous optionnels pour le moment — SENGA peut les rendre obligatoires plus tard pour continuer à recevoir des courses.',
           style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
         ),
       ],

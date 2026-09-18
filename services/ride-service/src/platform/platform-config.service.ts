@@ -25,6 +25,7 @@ function mergeConfig(overrides: PlatformConfigOverrides): MergedPlatformConfig {
     },
     pricing: { ...d.pricing, ...o.pricing },
     carpool: { ...d.carpool, ...o.carpool },
+    driverOps: { ...d.driverOps, ...o.driverOps },
   };
 }
 
@@ -101,6 +102,9 @@ export class PlatformConfigService implements OnModuleInit {
         : this.overrides.trip,
       pricing: patch.pricing ? { ...this.overrides.pricing, ...patch.pricing } : this.overrides.pricing,
       carpool: patch.carpool ? { ...this.overrides.carpool, ...patch.carpool } : this.overrides.carpool,
+      driverOps: patch.driverOps
+        ? { ...this.overrides.driverOps, ...patch.driverOps }
+        : this.overrides.driverOps,
     };
     this.validate(next);
     const row = await this.prisma.platformConfig.update({

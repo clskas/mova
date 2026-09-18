@@ -5,6 +5,7 @@ import { GpsCoordButton } from "@/components/GpsCoordButton";
 import { completeRestaurantProfile, fetchProfile } from "@/lib/api";
 import {
   COMMERCE_TYPE_LABELS_FR,
+  commerceCopy,
   parseCommerceType,
   type CommerceType,
 } from "@/lib/commerce-type";
@@ -89,15 +90,9 @@ export function RestaurantOnboardingCard({ onComplete }: RestaurantOnboardingCar
     }
   }
 
-  const specialtyLabel = commerceType === "RESTAURANT" ? "Cuisine / spécialité" : "Spécialité / rayon";
-  const nameLabel =
-    commerceType === "RESTAURANT"
-      ? "Nom du restaurant"
-      : commerceType === "PHARMACY"
-        ? "Nom de la pharmacie"
-        : commerceType === "SUPERMARKET"
-          ? "Nom du supermarché"
-          : "Nom de la boutique";
+  const copy = commerceCopy(commerceType);
+  const specialtyLabel = copy.specialtyLabel;
+  const nameLabel = copy.nameLabel;
 
   return (
     <form onSubmit={submit} className="space-y-5">
@@ -160,7 +155,7 @@ export function RestaurantOnboardingCard({ onComplete }: RestaurantOnboardingCar
             <input
               required
               className="mt-1 w-full rounded-xl border p-3"
-              placeholder={commerceType === "RESTAURANT" ? "Ex. Congolaise" : "Ex. Épicerie, Mode…"}
+              placeholder={copy.specialtyPlaceholder}
               value={cuisine}
               onChange={(e) => setCuisine(e.target.value)}
             />
@@ -205,10 +200,7 @@ export function RestaurantOnboardingCard({ onComplete }: RestaurantOnboardingCar
             }}
             onError={setError}
           />
-          <p className="text-xs text-gray-400">
-            Les clients voient les commerces proches de leur adresse de livraison. Une position précise
-            améliore votre visibilité.
-          </p>
+          <p className="text-xs text-gray-400">{copy.visibilityGps}</p>
         </div>
       )}
 

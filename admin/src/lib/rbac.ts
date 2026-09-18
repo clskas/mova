@@ -68,7 +68,6 @@ const ROLE_SECTIONS: Record<AdminRole, AdminSection[]> = {
   CONTENT: ["restaurants", "tarifs", "parametres", "locations", "publicites"],
   CITY_ADMIN: [
     "dashboard",
-    "utilisateurs",
     "chauffeurs",
     "kyc",
     "courses",
@@ -88,7 +87,7 @@ const ROLE_WRITE: Record<AdminRole, AdminSection[]> = {
   SUPPORT: ["kyc", "litiges", "courses", "livraisons", "planifiees", "locations", "demenagements", "covoiturage"],
   FINANCE: ["tarifs", "abonnements", "portefeuille"],
   CONTENT: ["restaurants", "locations", "publicites"],
-  CITY_ADMIN: ["courses", "livraisons", "restaurants", "litiges"],
+  CITY_ADMIN: ["dashboard", "chauffeurs", "kyc", "courses", "livraisons", "restaurants", "litiges", "tarifs", "parametres"],
 };
 
 export type NavItem = {
@@ -145,7 +144,12 @@ export function canWriteSection(role: AdminRole, section: AdminSection): boolean
 }
 
 export function navForRole(role: AdminRole): NavItem[] {
-  return NAV_ITEMS.filter((item) => canAccessSection(role, item.section));
+  return NAV_ITEMS.filter((item) => {
+    if (!canAccessSection(role, item.section)) return false;
+    // Règles plateforme nationales : réservées au staff central (pas admin ville).
+    if (role === "CITY_ADMIN" && item.href === "/regles-plateforme") return false;
+    return true;
+  });
 }
 
 export function sectionFromPath(pathname: string): AdminSection | null {

@@ -74,15 +74,20 @@ export class AdminController {
   @Get('metrics')
   @RequirePermissions(AdminPermission.METRICS_READ)
   @ApiOperation({ summary: 'Tableau de bord métriques' })
-  metrics() {
-    return this.adminService.getMetrics();
+  metrics(@Request() req: { user: AdminJwtUser }) {
+    return this.adminService.getMetrics(resolveManagedCityScope(req.user));
   }
 
   @Get('reports')
   @RequirePermissions(AdminPermission.METRICS_READ)
   @ApiOperation({ summary: 'Rapports analytiques (séries temporelles, KPIs, commissions par ville)' })
-  reports(@Query('days') days?: string, @Query('city') city?: string) {
-    return this.adminService.getReports(Number(days ?? 30), city);
+  reports(
+    @Request() req: { user: AdminJwtUser },
+    @Query('days') days?: string,
+    @Query('city') city?: string,
+  ) {
+    const scoped = resolveManagedCityScope(req.user) ?? city;
+    return this.adminService.getReports(Number(days ?? 30), scoped);
   }
 
   @Get('users')
@@ -159,6 +164,7 @@ export class AdminController {
   @RequirePermissions(AdminPermission.DRIVERS_READ)
   @ApiOperation({ summary: 'Liste chauffeurs' })
   drivers(
+    @Request() req: { user: AdminJwtUser },
     @Query('skip') skip?: string,
     @Query('take') take?: string,
     @Query('kycStatus') kycStatus?: string,
@@ -169,56 +175,90 @@ export class AdminController {
       kycStatus,
       isAvailable,
       includeHidden: includeHidden === 'true' || includeHidden === '1',
-    });
+    }, resolveManagedCityScope(req.user));
   }
 
   @Get('drivers/:userId')
   @RequirePermissions(AdminPermission.DRIVERS_READ)
   @ApiOperation({ summary: 'Détail chauffeur' })
-  driver(@Param('userId') userId: string) {
-    return this.adminService.getDriver(userId);
+  driver(@Request() req: { user: AdminJwtUser }, @Param('userId') userId: string) {
+    return this.adminService.getDriver(userId, resolveManagedCityScope(req.user));
   }
 
   @Patch('drivers/:userId/status')
   @RequirePermissions(AdminPermission.DRIVERS_WRITE)
   @ApiOperation({ summary: 'Activer/suspendre chauffeur' })
-  driverStatus(@Param('userId') userId: string, @Body() dto: DriverStatusDto) {
-    return this.adminService.setDriverStatus(userId, dto.active, dto.suspendUser ?? !dto.active);
+  driverStatus(
+    @Request() req: { user: AdminJwtUser },
+    @Param('userId') userId: string,
+    @Body() dto: DriverStatusDto,
+  ) {
+    return this.adminService.setDriverStatus(
+      userId,
+      dto.active,
+      dto.suspendUser ?? !dto.active,
+      resolveManagedCityScope(req.user),
+    );
   }
 
   @Patch('drivers/:userId/delivery-mode')
   @RequirePermissions(AdminPermission.DRIVERS_WRITE)
   @ApiOperation({ summary: 'Activer/désactiver livraisons (Livreur SENGA vs courses uniquement)' })
-  driverDeliveryMode(@Param('userId') userId: string, @Body() dto: DriverDeliveryModeDto) {
-    return this.adminService.setDriverAcceptsDeliveries(userId, dto.acceptsDeliveries);
+  driverDeliveryMode(
+    @Request() req: { user: AdminJwtUser },
+    @Param('userId') userId: string,
+    @Body() dto: DriverDeliveryModeDto,
+  ) {
+    return this.adminService.setDriverAcceptsDeliveries(
+      userId,
+      dto.acceptsDeliveries,
+      resolveManagedCityScope(req.user),
+    );
   }
 
   @Get('kyc/pending')
   @RequirePermissions(AdminPermission.KYC_READ)
   @ApiOperation({ summary: 'Justificatifs KYC (filtre statut : PENDING, APPROVED, REJECTED, ALL)' })
-  pendingKyc(@Query('status') status?: string) {
-    return this.adminService.pendingKyc(status);
+  pendingKyc(@Request() req: { user: AdminJwtUser }, @Query('status') status?: string) {
+    return this.adminService.pendingKyc(status, resolveManagedCityScope(req.user));
   }
 
   @Post('kyc/:id/review')
   @RequirePermissions(AdminPermission.KYC_WRITE)
   @ApiOperation({ summary: 'Valider/rejeter KYC' })
-  reviewKyc(@Param('id') id: string, @Body() dto: ApproveKycDto) {
-    return this.adminService.approveKyc(id, dto.approved, dto.notes);
+  reviewKyc(
+    @Request() req: { user: AdminJwtUser },
+    @Param('id') id: string,
+    @Body() dto: ApproveKycDto,
+  ) {
+    return this.adminService.approveKyc(id, dto.approved, dto.notes, resolveManagedCityScope(req.user));
   }
 
   @Patch('drivers/:userId/kyc')
   @RequirePermissions(AdminPermission.KYC_WRITE)
   @ApiOperation({ summary: 'Valider/rejeter KYC chauffeur (profil)' })
-  reviewDriverKyc(@Param('userId') userId: string, @Body() dto: ApproveKycDto) {
-    return this.adminService.reviewDriverKyc(userId, dto.approved, dto.notes);
+  reviewDriverKyc(
+    @Request() req: { user: AdminJwtUser },
+    @Param('userId') userId: string,
+    @Body() dto: ApproveKycDto,
+  ) {
+    return this.adminService.reviewDriverKyc(userId, dto.approved, dto.notes, resolveManagedCityScope(req.user));
   }
 
   @Patch('drivers/:userId/documents-renewal')
   @RequirePermissions(AdminPermission.KYC_WRITE)
   @ApiOperation({ summary: 'Valider/rejeter renouvellement documents chauffeur' })
-  reviewDriverDocumentsRenewal(@Param('userId') userId: string, @Body() dto: ApproveKycDto) {
-    return this.adminService.reviewDriverDocumentsRenewal(userId, dto.approved, dto.notes);
+  reviewDriverDocumentsRenewal(
+    @Request() req: { user: AdminJwtUser },
+    @Param('userId') userId: string,
+    @Body() dto: ApproveKycDto,
+  ) {
+    return this.adminService.reviewDriverDocumentsRenewal(
+      userId,
+      dto.approved,
+      dto.notes,
+      resolveManagedCityScope(req.user),
+    );
   }
 
   @Patch('drivers/:userId/vehicle-type')
@@ -469,31 +509,49 @@ export class AdminController {
   @RequirePermissions(AdminPermission.KYC_READ)
   @ApiOperation({ summary: 'Dossiers restaurant et location (filtre statut)' })
   partnerKycPending(
+    @Request() req: { user: AdminJwtUser },
     @Query('status') status?: string,
     @Query('includeHidden') includeHidden?: string,
   ) {
     return this.adminService.listPartnerKycPending(
       status,
       includeHidden === 'true' || includeHidden === '1',
+      resolveManagedCityScope(req.user),
     );
   }
 
   @Post('partner-kyc/documents/:id/review')
   @RequirePermissions(AdminPermission.KYC_WRITE)
   @ApiOperation({ summary: 'Valider ou refuser un justificatif partenaire' })
-  reviewPartnerKycDocument(@Param('id') id: string, @Body() dto: ApproveKycDto) {
-    return this.adminService.reviewPartnerKycDocument(id, dto.approved, dto.notes);
+  reviewPartnerKycDocument(
+    @Request() req: { user: AdminJwtUser },
+    @Param('id') id: string,
+    @Body() dto: ApproveKycDto,
+  ) {
+    return this.adminService.reviewPartnerKycDocument(
+      id,
+      dto.approved,
+      dto.notes,
+      resolveManagedCityScope(req.user),
+    );
   }
 
   @Patch('partner-kyc/:subject/:userId')
   @RequirePermissions(AdminPermission.KYC_WRITE)
   @ApiOperation({ summary: 'Valider ou refuser un dossier restaurant / loueur' })
   reviewPartnerKycSubject(
+    @Request() req: { user: AdminJwtUser },
     @Param('subject') subject: string,
     @Param('userId') userId: string,
     @Body() dto: ApproveKycDto,
   ) {
-    return this.adminService.reviewPartnerKycSubject(subject, userId, dto.approved, dto.notes);
+    return this.adminService.reviewPartnerKycSubject(
+      subject,
+      userId,
+      dto.approved,
+      dto.notes,
+      resolveManagedCityScope(req.user),
+    );
   }
 
   @Post('partner-kyc/:subject/:userId/login-pin')
@@ -612,22 +670,34 @@ export class AdminController {
   @Post('pricing-rules/:vehicleType')
   @RequirePermissions(AdminPermission.PRICING_WRITE)
   @ApiOperation({ summary: 'Créer/mettre à jour tarif véhicule' })
-  createPricingPost(@Param('vehicleType') vehicleType: string, @Body() body: Record<string, unknown>) {
-    return this.adminService.createPricingRule(vehicleType, body);
+  createPricingPost(
+    @Request() req: { user: AdminJwtUser },
+    @Param('vehicleType') vehicleType: string,
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.adminService.createPricingRule(vehicleType, body, resolveManagedCityScope(req.user));
   }
 
   @Patch('pricing-rules/:vehicleType')
   @RequirePermissions(AdminPermission.PRICING_WRITE)
   @ApiOperation({ summary: 'Modifier tarif véhicule' })
-  updatePricing(@Param('vehicleType') vehicleType: string, @Body() body: Record<string, unknown>) {
-    return this.adminService.updatePricingRule(vehicleType, body);
+  updatePricing(
+    @Request() req: { user: AdminJwtUser },
+    @Param('vehicleType') vehicleType: string,
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.adminService.updatePricingRule(vehicleType, body, resolveManagedCityScope(req.user));
   }
 
   @Delete('pricing-rules/:vehicleType')
   @RequirePermissions(AdminPermission.PRICING_WRITE)
   @ApiOperation({ summary: 'Désactiver règle tarifaire' })
-  deletePricing(@Param('vehicleType') vehicleType: string, @Query('city') city: string) {
-    return this.adminService.deletePricingRule(vehicleType, city);
+  deletePricing(
+    @Request() req: { user: AdminJwtUser },
+    @Param('vehicleType') vehicleType: string,
+    @Query('city') city: string,
+  ) {
+    return this.adminService.deletePricingRule(vehicleType, city, resolveManagedCityScope(req.user));
   }
 
   @Get('delivery-pricing-rules')
@@ -640,8 +710,12 @@ export class AdminController {
   @Patch('delivery-pricing-rules/:category')
   @RequirePermissions(AdminPermission.PRICING_WRITE)
   @ApiOperation({ summary: 'Modifier majoration livraison' })
-  updateDeliveryPricing(@Param('category') category: string, @Body() body: Record<string, unknown>) {
-    return this.adminService.updateDeliveryPricingRule(category, body);
+  updateDeliveryPricing(
+    @Request() req: { user: { role: string } },
+    @Param('category') category: string,
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.adminService.updateDeliveryPricingRule(category, body, req.user.role);
   }
 
   @Get('errand-category-estimates')
@@ -654,22 +728,32 @@ export class AdminController {
   @Post('errand-category-estimates')
   @RequirePermissions(AdminPermission.PRICING_WRITE)
   @ApiOperation({ summary: 'Créer catégorie estimation achats course' })
-  createErrandCategoryEstimate(@Body() body: Record<string, unknown>) {
-    return this.adminService.createErrandCategoryEstimate(body);
+  createErrandCategoryEstimate(
+    @Request() req: { user: { role: string } },
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.adminService.createErrandCategoryEstimate(body, req.user.role);
   }
 
   @Patch('errand-category-estimates/:category')
   @RequirePermissions(AdminPermission.PRICING_WRITE)
   @ApiOperation({ summary: 'Modifier catégorie estimation achats course' })
-  updateErrandCategoryEstimate(@Param('category') category: string, @Body() body: Record<string, unknown>) {
-    return this.adminService.updateErrandCategoryEstimate(category, body);
+  updateErrandCategoryEstimate(
+    @Request() req: { user: { role: string } },
+    @Param('category') category: string,
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.adminService.updateErrandCategoryEstimate(category, body, req.user.role);
   }
 
   @Delete('errand-category-estimates/:category')
   @RequirePermissions(AdminPermission.PRICING_WRITE)
   @ApiOperation({ summary: 'Désactiver catégorie estimation achats course' })
-  deleteErrandCategoryEstimate(@Param('category') category: string) {
-    return this.adminService.deleteErrandCategoryEstimate(category);
+  deleteErrandCategoryEstimate(
+    @Request() req: { user: { role: string } },
+    @Param('category') category: string,
+  ) {
+    return this.adminService.deleteErrandCategoryEstimate(category, req.user.role);
   }
 
   @Get('pricing-time-windows')
@@ -682,15 +766,22 @@ export class AdminController {
   @Post('pricing-time-windows')
   @RequirePermissions(AdminPermission.PRICING_WRITE)
   @ApiOperation({ summary: 'Créer une plage horaire pointe / nuit' })
-  createPricingTimeWindow(@Body() body: Record<string, unknown>) {
-    return this.adminService.createPricingTimeWindow(body);
+  createPricingTimeWindow(
+    @Request() req: { user: AdminJwtUser },
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.adminService.createPricingTimeWindow(body, resolveManagedCityScope(req.user));
   }
 
   @Patch('pricing-time-windows/:id')
   @RequirePermissions(AdminPermission.PRICING_WRITE)
   @ApiOperation({ summary: 'Modifier une plage horaire pointe / nuit' })
-  updatePricingTimeWindow(@Param('id') id: string, @Body() body: Record<string, unknown>) {
-    return this.adminService.updatePricingTimeWindow(id, body);
+  updatePricingTimeWindow(
+    @Request() req: { user: AdminJwtUser },
+    @Param('id') id: string,
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.adminService.updatePricingTimeWindow(id, body, resolveManagedCityScope(req.user));
   }
 
   @Delete('pricing-time-windows/:id')

@@ -133,12 +133,14 @@ export const ADMIN_ROLE_PERMISSIONS: Record<UserRole, AdminPermission[]> = {
     AdminPermission.PUBLICITES_READ,
     AdminPermission.PUBLICITES_WRITE,
   ],
-  /** City-scoped ops: like SUPPORT + restaurants, no system / pricing write / wallets. */
+  /** City-scoped ops: tarifs ville, chauffeurs/KYC/partenaires, dashboard — pas system/wallets. */
   [UserRole.CITY_ADMIN]: [
     AdminPermission.METRICS_READ,
     AdminPermission.USERS_READ,
     AdminPermission.DRIVERS_READ,
+    AdminPermission.DRIVERS_WRITE,
     AdminPermission.KYC_READ,
+    AdminPermission.KYC_WRITE,
     AdminPermission.RIDES_READ,
     AdminPermission.RIDES_WRITE,
     AdminPermission.INCIDENTS_READ,
@@ -149,6 +151,7 @@ export const ADMIN_ROLE_PERMISSIONS: Record<UserRole, AdminPermission[]> = {
     AdminPermission.RESTAURANTS_WRITE,
     AdminPermission.SCHEDULED_READ,
     AdminPermission.PRICING_READ,
+    AdminPermission.PRICING_WRITE,
   ],
 };
 

@@ -54,3 +54,42 @@ export function filterRowsByManagedCity<T>(
     return resolveCityFromCoords(Number(c.lat), Number(c.lng)).toLowerCase() === key;
   });
 }
+
+/** Match driver/partner `operatingCity` / `city` string against managedCity (case-insensitive). */
+export function filterRowsByCityName<T>(
+  rows: T[],
+  managedCity: string | null,
+  getCity: (row: T) => string | null | undefined,
+): T[] {
+  if (!managedCity) return rows;
+  const key = managedCity.toLowerCase();
+  return rows.filter((row) => (getCity(row)?.trim().toLowerCase() ?? '') === key);
+}
+
+export function assertCityMatch(
+  managedCity: string | null,
+  actualCity: string | null | undefined,
+  message = 'Ressource hors de votre ville gérée.',
+): void {
+  if (!managedCity) return;
+  if ((actualCity?.trim().toLowerCase() ?? '') !== managedCity.toLowerCase()) {
+    throw new MovaHttpException(MovaErrorCode.AUTH_FORBIDDEN, HttpStatus.FORBIDDEN, message);
+  }
+}
+
+export function forceCityOnBody(
+  managedCity: string | null,
+  body: Record<string, unknown>,
+  field = 'city',
+): Record<string, unknown> {
+  if (!managedCity) return body;
+  const existing = typeof body[field] === 'string' ? String(body[field]).trim() : '';
+  if (existing && existing.toLowerCase() !== managedCity.toLowerCase()) {
+    throw new MovaHttpException(
+      MovaErrorCode.AUTH_FORBIDDEN,
+      HttpStatus.FORBIDDEN,
+      `Vous ne pouvez modifier que les tarifs de ${managedCity}.`,
+    );
+  }
+  return { ...body, [field]: managedCity };
+}

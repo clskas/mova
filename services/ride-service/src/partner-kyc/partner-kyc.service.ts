@@ -72,6 +72,8 @@ export class PartnerKycService {
       payoutProvider: restaurant.payoutProvider,
       payoutPhone: restaurant.payoutPhone,
       address: restaurant.address,
+      lat: restaurant.lat,
+      lng: restaurant.lng,
       phone: user?.phone ?? null,
       email: user?.email ?? null,
       phoneVerified,

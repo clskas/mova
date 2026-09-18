@@ -539,9 +539,10 @@ function TimeWindowRow({
 }
 
 export default function TarifsPage() {
-  const { canWrite } = useAdmin();
+  const { canWrite, role, user } = useAdmin();
   const readOnly = !canWrite("tarifs");
-  const [city, setCity] = useState<string>(MOVA_CITIES[0]);
+  const lockedCity = role === "CITY_ADMIN" ? (user?.managedCity?.trim() || MOVA_CITIES[0]) : null;
+  const [city, setCity] = useState<string>(lockedCity ?? MOVA_CITIES[0]);
   const [vehicleRules, setVehicleRules] = useState<PricingRule[]>([]);
   const [deliveryRules, setDeliveryRules] = useState<DeliveryPricingRule[]>([]);
   const [otherSurcharges, setOtherSurcharges] = useState<ServiceSurcharge[]>([]);
@@ -789,12 +790,18 @@ export default function TarifsPage() {
           id="city-select"
           value={city}
           onChange={(e) => setCity(e.target.value)}
-          className="rounded-lg border border-gray-200 px-3 py-2 text-sm bg-white"
+          disabled={!!lockedCity}
+          className="rounded-lg border border-gray-200 px-3 py-2 text-sm bg-white disabled:bg-gray-50 disabled:text-gray-600"
         >
-          {MOVA_CITIES.map((c) => (
+          {(lockedCity ? [lockedCity] : MOVA_CITIES).map((c) => (
             <option key={c} value={c}>{c}</option>
           ))}
         </select>
+        {lockedCity && (
+          <span className="text-xs text-teal-800 bg-teal-50 border border-teal-100 rounded-lg px-2 py-1">
+            Périmètre admin ville
+          </span>
+        )}
         {!readOnly && missingTypes.length > 0 && (
           <BtnPrimary onClick={() => { setNewVehicleType(missingTypes[0]); setCreateOpen(true); }}>
             Ajouter un type

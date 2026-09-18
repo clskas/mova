@@ -4,9 +4,10 @@ import {
   MovaErrorCode,
   MovaHttpException,
   UserRole,
+  resolveCityFromCoords,
   serviceUrl,
 } from '@mova/shared';
-import { filterRowsByManagedCity } from '../common/city-scope.util';
+import { filterRowsByManagedCity, filterRowsByCityName, assertCityMatch, forceCityOnBody } from '../common/city-scope.util';
 
 type MovaService = 'auth' | 'ride' | 'driver' | 'payment' | 'notification';
 
@@ -80,7 +81,71 @@ export class AdminService {
     );
   }
 
-  async getMetrics() {
+  async getMetrics(managedCity?: string | null) {
+    if (!managedCity) {
+      return this.getMetricsNational();
+    }
+    const city = managedCity.trim();
+    const [driversRes, rides, deliveries, incidents, reports] = await Promise.all([
+      this.listDrivers(0, 500, { includeHidden: false }, city).catch(() => ({ data: [] as Array<Record<string, unknown>> })),
+      this.listRides({ skip: 0, take: 200 }, city).catch(() => [] as Array<Record<string, unknown>>),
+      this.listDeliveries({ skip: 0, take: 200 }, city).catch(() => [] as Array<Record<string, unknown>>),
+      this.fetchJson<{ status?: string; type?: string; lat?: number; lng?: number }[]>('driver', '/internal/incidents').catch(() => []),
+      this.getReports(30, city).catch(() => null),
+    ]);
+    const drivers = Array.isArray(driversRes) ? driversRes : (driversRes as { data?: Array<Record<string, unknown>> }).data ?? [];
+    const availableDrivers = drivers.filter((d) => d.isAvailable === true).length;
+    const pendingKyc = drivers.filter((d) => String(d.kycStatus ?? '').toUpperCase() === 'PENDING').length;
+    const approvedDrivers = drivers.filter((d) => String(d.kycStatus ?? '').toUpperCase() === 'APPROVED').length;
+    const rideRows = Array.isArray(rides) ? rides : [];
+    const deliveryRows = Array.isArray(deliveries) ? deliveries : [];
+    const activeRides = rideRows.filter((r) =>
+      ['REQUESTED', 'SEARCHING', 'ACCEPTED', 'DRIVER_ARRIVED', 'IN_PROGRESS'].includes(String(r.status ?? '')),
+    ).length;
+    const activeDeliveries = deliveryRows.filter((d) => {
+      if (d.type === 'ERRAND') return !['COMPLETED', 'CANCELLED'].includes(String(d.status ?? ''));
+      return !['DELIVERED', 'CANCELLED'].includes(String(d.status ?? ''));
+    }).length;
+    const cityKey = city.toLowerCase();
+    const cityIncidents = (Array.isArray(incidents) ? incidents : []).filter((i) => {
+      if (i.lat == null || i.lng == null) return true;
+      return resolveCityFromCoords(Number(i.lat), Number(i.lng)).toLowerCase() === cityKey;
+    });
+    const openIncidents = cityIncidents.filter((i) => i.status === 'OPEN').length;
+    const sosIncidents = cityIncidents.filter((i) => i.status === 'OPEN' && i.type === 'SOS').length;
+    const kpis =
+      reports && typeof reports === 'object' && reports !== null && 'kpis' in reports
+        ? (reports as { kpis: Record<string, number> }).kpis
+        : undefined;
+    return {
+      users: drivers.length,
+      drivers: drivers.length,
+      availableDrivers,
+      pendingKyc,
+      approvedDrivers,
+      rides: kpis?.totalRides ?? rideRows.length,
+      completedRides: kpis?.completedRides ?? 0,
+      revenueCdf: kpis?.totalRevenueCdf ?? 0,
+      todayRides: 0,
+      todayCompleted: 0,
+      todayRevenueCdf: 0,
+      activeRides,
+      cancelledRides: kpis?.cancelledRides ?? 0,
+      openIncidents,
+      sosIncidents,
+      activeDeliveries,
+      scheduledRides: 0,
+      carpoolTrips: 0,
+      movingRequests: 0,
+      rentalInquiries: 0,
+      walletBalanceCdf: 0,
+      walletCount: 0,
+      walletTransactionsToday: 0,
+      city,
+    };
+  }
+
+  private async getMetricsNational() {
     const [users, driverStats, rideStats, incidents, deliveries, scheduled, carpool, moving, rental, wallet] = await Promise.all([
       this.fetchJson<{ count: number }>('auth', '/internal/users/count').catch(() => ({ count: 0 })),
       this.fetchJson<{ total?: number; available?: number; pendingKyc?: number; approved?: number }>(
@@ -319,17 +384,26 @@ export class AdminService {
     }
   }
 
-  listDrivers(skip = 0, take = 50, filters?: { kycStatus?: string; isAvailable?: string; includeHidden?: boolean }) {
+  listDrivers(
+    skip = 0,
+    take = 50,
+    filters?: { kycStatus?: string; isAvailable?: string; includeHidden?: boolean },
+    managedCity?: string | null,
+  ) {
     const params = new URLSearchParams({ skip: String(skip), take: String(take) });
     if (filters?.kycStatus) params.set('kycStatus', filters.kycStatus);
     if (filters?.isAvailable) params.set('isAvailable', filters.isAvailable);
     if (filters?.includeHidden) params.set('includeHidden', 'true');
+    if (managedCity?.trim()) params.set('city', managedCity.trim());
     return this.fetchJson('driver', `/internal/drivers?${params}`);
   }
-  getDriver(userId: string) {
-    return this.fetchJson('driver', `/internal/drivers/${userId}/detail`);
+  async getDriver(userId: string, managedCity?: string | null) {
+    const detail = await this.fetchJson<{ operatingCity?: string | null }>('driver', `/internal/drivers/${userId}/detail`);
+    assertCityMatch(managedCity ?? null, detail?.operatingCity, 'Chauffeur hors de votre ville gérée.');
+    return detail;
   }
-  setDriverStatus(userId: string, active: boolean, suspendUser = false) {
+  async setDriverStatus(userId: string, active: boolean, suspendUser = false, managedCity?: string | null) {
+    await this.getDriver(userId, managedCity);
     return Promise.all([
       this.proxy('driver', `/internal/drivers/${userId}/status`, { method: 'PATCH', body: JSON.stringify({ active }) }),
       suspendUser
@@ -337,25 +411,39 @@ export class AdminService {
         : Promise.resolve(null),
     ]).then(([driver]) => driver);
   }
-  setDriverAcceptsDeliveries(userId: string, acceptsDeliveries: boolean) {
+  async setDriverAcceptsDeliveries(userId: string, acceptsDeliveries: boolean, managedCity?: string | null) {
+    await this.getDriver(userId, managedCity);
     return this.proxy('driver', `/internal/drivers/${userId}/status`, {
       method: 'PATCH',
       body: JSON.stringify({ acceptsDeliveries }),
     });
   }
-  pendingKyc(status?: string) {
+  pendingKyc(status?: string, managedCity?: string | null) {
     const params = new URLSearchParams();
     if (status) params.set('status', status);
+    if (managedCity?.trim()) params.set('city', managedCity.trim());
     const q = params.toString();
     return this.fetchJson('driver', `/internal/kyc/pending${q ? `?${q}` : ''}`);
   }
-  approveKyc(id: string, approved: boolean, notes?: string) {
+  async approveKyc(id: string, approved: boolean, notes?: string, managedCity?: string | null) {
+    if (managedCity) {
+      const pending = (await this.pendingKyc('ALL', managedCity)) as Array<{ id?: string }>;
+      if (!Array.isArray(pending) || !pending.some((d) => d.id === id)) {
+        throw new MovaHttpException(
+          MovaErrorCode.AUTH_FORBIDDEN,
+          HttpStatus.FORBIDDEN,
+          'Document KYC hors de votre ville gérée.',
+        );
+      }
+    }
     return this.proxy('driver', `/internal/kyc/${id}/review`, { method: 'POST', body: JSON.stringify({ approved, notes }) });
   }
-  reviewDriverKyc(userId: string, approved: boolean, notes?: string) {
+  async reviewDriverKyc(userId: string, approved: boolean, notes?: string, managedCity?: string | null) {
+    await this.getDriver(userId, managedCity);
     return this.proxy('driver', `/internal/drivers/${userId}/kyc`, { method: 'PATCH', body: JSON.stringify({ approved, notes }) });
   }
-  reviewDriverDocumentsRenewal(userId: string, approved: boolean, notes?: string) {
+  async reviewDriverDocumentsRenewal(userId: string, approved: boolean, notes?: string, managedCity?: string | null) {
+    await this.getDriver(userId, managedCity);
     return this.proxy('driver', `/internal/drivers/${userId}/documents-renewal`, {
       method: 'PATCH',
       body: JSON.stringify({ approved, notes }),
@@ -526,20 +614,75 @@ export class AdminService {
     return this.proxy('ride', `/internal/restaurants/${id}`, { method: 'DELETE' });
   }
 
-  listPartnerKycPending(status?: string, includeHidden = false) {
+  async listPartnerKycPending(status?: string, includeHidden = false, managedCity?: string | null) {
     const params = new URLSearchParams();
     if (status) params.set('status', status);
     if (includeHidden) params.set('includeHidden', 'true');
     const q = params.toString();
-    return this.fetchJson('ride', `/internal/partner-kyc/pending${q ? `?${q}` : ''}`);
+    const raw = await this.fetchJson<{
+      restaurants?: Array<{ lat?: number | null; lng?: number | null; city?: string | null; userId?: string; [k: string]: unknown }>;
+      rentalPartners?: Array<{ lat?: number | null; lng?: number | null; city?: string | null; userId?: string; [k: string]: unknown }>;
+      documents?: Array<{ id?: string; userId?: string; subject?: string; [k: string]: unknown }>;
+    }>('ride', `/internal/partner-kyc/pending${q ? `?${q}` : ''}`);
+    if (!managedCity) return raw;
+    const restaurants = filterRowsByManagedCity(raw.restaurants ?? [], managedCity, (r) => ({
+      lat: r.lat,
+      lng: r.lng,
+    }));
+    const rentalsGps = filterRowsByManagedCity(raw.rentalPartners ?? [], managedCity, (r) => ({
+      lat: r.lat,
+      lng: r.lng,
+    }));
+    const rentalsNamed = filterRowsByCityName(raw.rentalPartners ?? [], managedCity, (r) => r.city);
+    const rentalMerged = [...new Map([...rentalsGps, ...rentalsNamed].map((r) => [r.userId, r])).values()];
+    const allowed = new Set([
+      ...restaurants.map((r) => `${r.userId}:RESTAURANT`),
+      ...rentalMerged.map((r) => `${r.userId}:RENTAL_PARTNER`),
+    ]);
+    return {
+      restaurants,
+      rentalPartners: rentalMerged,
+      documents: (raw.documents ?? []).filter((d) => allowed.has(`${d.userId}:${d.subject}`)),
+    };
   }
-  reviewPartnerKycDocument(id: string, approved: boolean, notes?: string) {
+  async reviewPartnerKycDocument(id: string, approved: boolean, notes?: string, managedCity?: string | null) {
+    if (managedCity) {
+      const pending = await this.listPartnerKycPending('ALL', true, managedCity);
+      const docs = pending.documents ?? [];
+      if (!docs.some((d) => d.id === id)) {
+        throw new MovaHttpException(
+          MovaErrorCode.AUTH_FORBIDDEN,
+          HttpStatus.FORBIDDEN,
+          'Dossier partenaire hors de votre ville gérée.',
+        );
+      }
+    }
     return this.proxy('ride', `/internal/partner-kyc/documents/${id}/review`, {
       method: 'POST',
       body: JSON.stringify({ approved, notes }),
     });
   }
-  reviewPartnerKycSubject(subject: string, userId: string, approved: boolean, notes?: string) {
+  async reviewPartnerKycSubject(
+    subject: string,
+    userId: string,
+    approved: boolean,
+    notes?: string,
+    managedCity?: string | null,
+  ) {
+    if (managedCity) {
+      const pending = await this.listPartnerKycPending('ALL', true, managedCity);
+      const key = `${userId}:${subject}`;
+      const inScope =
+        (pending.restaurants ?? []).some((r) => `${r.userId}:RESTAURANT` === key) ||
+        (pending.rentalPartners ?? []).some((r) => `${r.userId}:RENTAL_PARTNER` === key);
+      if (!inScope) {
+        throw new MovaHttpException(
+          MovaErrorCode.AUTH_FORBIDDEN,
+          HttpStatus.FORBIDDEN,
+          'Partenaire hors de votre ville gérée.',
+        );
+      }
+    }
     return this.proxy('ride', `/internal/partner-kyc/${subject}/${userId}`, {
       method: 'PATCH',
       body: JSON.stringify({ approved, notes }),
@@ -596,13 +739,20 @@ export class AdminService {
     const q = city ? `?city=${encodeURIComponent(city)}` : '';
     return this.fetchJson('ride', `/internal/pricing-rules${q}`);
   }
-  createPricingRule(vehicleType: string, body: Record<string, unknown>) {
-    return this.proxy('ride', `/internal/pricing-rules/${vehicleType}`, { method: 'POST', body: JSON.stringify(body) });
+  createPricingRule(vehicleType: string, body: Record<string, unknown>, managedCity?: string | null) {
+    return this.proxy('ride', `/internal/pricing-rules/${vehicleType}`, {
+      method: 'POST',
+      body: JSON.stringify(forceCityOnBody(managedCity ?? null, body)),
+    });
   }
-  updatePricingRule(vehicleType: string, body: Record<string, unknown>) {
-    return this.proxy('ride', `/internal/pricing-rules/${vehicleType}`, { method: 'PATCH', body: JSON.stringify(body) });
+  updatePricingRule(vehicleType: string, body: Record<string, unknown>, managedCity?: string | null) {
+    return this.proxy('ride', `/internal/pricing-rules/${vehicleType}`, {
+      method: 'PATCH',
+      body: JSON.stringify(forceCityOnBody(managedCity ?? null, body)),
+    });
   }
-  deletePricingRule(vehicleType: string, city: string) {
+  deletePricingRule(vehicleType: string, city: string, managedCity?: string | null) {
+    assertCityMatch(managedCity ?? null, city, `Vous ne pouvez supprimer que les tarifs de ${managedCity}.`);
     const q = city ? `?city=${encodeURIComponent(city)}` : '';
     return this.proxy('ride', `/internal/pricing-rules/${vehicleType}${q}`, { method: 'DELETE' });
   }
@@ -610,20 +760,48 @@ export class AdminService {
   listDeliveryPricingRules() {
     return this.fetchJson('ride', '/internal/delivery-pricing-rules');
   }
-  updateDeliveryPricingRule(category: string, body: Record<string, unknown>) {
+  updateDeliveryPricingRule(category: string, body: Record<string, unknown>, actorRole?: string) {
+    if (actorRole === UserRole.CITY_ADMIN) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.FORBIDDEN,
+        'Les majorations livraison nationales sont réservées au staff central.',
+      );
+    }
     return this.proxy('ride', `/internal/delivery-pricing-rules/${category}`, { method: 'PATCH', body: JSON.stringify(body) });
   }
 
   listErrandCategoryEstimates() {
     return this.fetchJson('ride', '/internal/errand-category-estimates');
   }
-  createErrandCategoryEstimate(body: Record<string, unknown>) {
+  createErrandCategoryEstimate(body: Record<string, unknown>, actorRole?: string) {
+    if (actorRole === UserRole.CITY_ADMIN) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.FORBIDDEN,
+        'Les estimations courses nationales sont réservées au staff central.',
+      );
+    }
     return this.proxy('ride', '/internal/errand-category-estimates', { method: 'POST', body: JSON.stringify(body) });
   }
-  updateErrandCategoryEstimate(category: string, body: Record<string, unknown>) {
+  updateErrandCategoryEstimate(category: string, body: Record<string, unknown>, actorRole?: string) {
+    if (actorRole === UserRole.CITY_ADMIN) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.FORBIDDEN,
+        'Les estimations courses nationales sont réservées au staff central.',
+      );
+    }
     return this.proxy('ride', `/internal/errand-category-estimates/${category}`, { method: 'PATCH', body: JSON.stringify(body) });
   }
-  deleteErrandCategoryEstimate(category: string) {
+  deleteErrandCategoryEstimate(category: string, actorRole?: string) {
+    if (actorRole === UserRole.CITY_ADMIN) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.FORBIDDEN,
+        'Les estimations courses nationales sont réservées au staff central.',
+      );
+    }
     return this.proxy('ride', `/internal/errand-category-estimates/${category}`, { method: 'DELETE' });
   }
 
@@ -631,11 +809,17 @@ export class AdminService {
     const q = city ? `?city=${encodeURIComponent(city)}` : '';
     return this.fetchJson('ride', `/internal/pricing-time-windows${q}`);
   }
-  createPricingTimeWindow(body: Record<string, unknown>) {
-    return this.proxy('ride', '/internal/pricing-time-windows', { method: 'POST', body: JSON.stringify(body) });
+  createPricingTimeWindow(body: Record<string, unknown>, managedCity?: string | null) {
+    return this.proxy('ride', '/internal/pricing-time-windows', {
+      method: 'POST',
+      body: JSON.stringify(forceCityOnBody(managedCity ?? null, body)),
+    });
   }
-  updatePricingTimeWindow(id: string, body: Record<string, unknown>) {
-    return this.proxy('ride', `/internal/pricing-time-windows/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
+  updatePricingTimeWindow(id: string, body: Record<string, unknown>, managedCity?: string | null) {
+    return this.proxy('ride', `/internal/pricing-time-windows/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(forceCityOnBody(managedCity ?? null, body)),
+    });
   }
   deletePricingTimeWindow(id: string) {
     return this.proxy('ride', `/internal/pricing-time-windows/${id}`, { method: 'DELETE' });

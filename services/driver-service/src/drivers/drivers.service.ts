@@ -991,12 +991,17 @@ export class DriversService {
    * A plain `status=APPROVED` take:500 used to drop those dossiers once the last
    * open doc was approved (they competed with historical APPROVED rows).
    */
-  async pendingKyc(status?: string) {
+  async pendingKyc(status?: string, city?: string) {
     const normalized = String(status ?? 'PENDING').trim().toUpperCase();
     let docs: Awaited<ReturnType<typeof this.prisma.kycDocument.findMany>>;
     if (normalized === 'PENDING') {
       const openProfiles = await this.prisma.driverProfile.findMany({
-        where: { kycStatus: { in: [KycStatus.PENDING, KycStatus.REJECTED] } },
+        where: {
+          kycStatus: { in: [KycStatus.PENDING, KycStatus.REJECTED] },
+          ...(city?.trim()
+            ? { operatingCity: { equals: city.trim(), mode: 'insensitive' as const } }
+            : {}),
+        },
         select: { userId: true },
         orderBy: { updatedAt: 'desc' },
         take: 1000,
@@ -1026,23 +1031,37 @@ export class DriversService {
       });
     }
     const userIds = [...new Set(docs.map((d) => d.userId))];
-    const users = await Promise.all(userIds.map((id) => this.fetchAuthUser(id)));
+    const [users, profiles] = await Promise.all([
+      Promise.all(userIds.map((id) => this.fetchAuthUser(id))),
+      userIds.length
+        ? this.prisma.driverProfile.findMany({
+            where: { userId: { in: userIds } },
+            select: { userId: true, operatingCity: true },
+          })
+        : Promise.resolve([] as { userId: string; operatingCity: string | null }[]),
+    ]);
     const userById = new Map(users.filter(Boolean).map((u) => [u!.id, u!]));
-    return docs.map((doc) => {
-      const user = userById.get(doc.userId);
-      const displayName = [user?.firstName, user?.lastName].filter(Boolean).join(' ').trim();
-      const publicId = formatMovaPublicId(doc.userId, 'DRIVER');
-      return {
-        ...doc,
-        typeLabel: KYC_DOCUMENT_LABELS[doc.type as keyof typeof KYC_DOCUMENT_LABELS] ?? kycDocumentLabel(doc.type),
-        partnerKind: 'DRIVER' as const,
-        partnerKindLabel: 'Chauffeur',
-        displayName: displayName || publicId,
-        publicId,
-        phone: user?.phone ?? null,
-        email: user?.email ?? null,
-      };
-    });
+    const cityByUser = new Map(profiles.map((p) => [p.userId, p.operatingCity]));
+    const cityKey = city?.trim().toLowerCase();
+    return docs
+      .map((doc) => {
+        const user = userById.get(doc.userId);
+        const displayName = [user?.firstName, user?.lastName].filter(Boolean).join(' ').trim();
+        const publicId = formatMovaPublicId(doc.userId, 'DRIVER');
+        const operatingCity = cityByUser.get(doc.userId) ?? null;
+        return {
+          ...doc,
+          typeLabel: KYC_DOCUMENT_LABELS[doc.type as keyof typeof KYC_DOCUMENT_LABELS] ?? kycDocumentLabel(doc.type),
+          partnerKind: 'DRIVER' as const,
+          partnerKindLabel: 'Chauffeur',
+          displayName: displayName || publicId,
+          publicId,
+          phone: user?.phone ?? null,
+          email: user?.email ?? null,
+          operatingCity,
+        };
+      })
+      .filter((doc) => !cityKey || (doc.operatingCity?.trim().toLowerCase() ?? '') === cityKey);
   }
 
   async approveKyc(documentId: string, approved: boolean, notes?: string) {
@@ -1199,11 +1218,14 @@ export class DriversService {
   async listDriversAdmin(
     skip = 0,
     take = 50,
-    filters?: { kycStatus?: KycStatus; isAvailable?: boolean; includeHidden?: boolean },
+    filters?: { kycStatus?: KycStatus; isAvailable?: boolean; includeHidden?: boolean; operatingCity?: string },
   ) {
     const where = {
       ...(filters?.kycStatus ? { kycStatus: filters.kycStatus } : {}),
       ...(filters?.isAvailable !== undefined ? { isAvailable: filters.isAvailable } : {}),
+      ...(filters?.operatingCity?.trim()
+        ? { operatingCity: { equals: filters.operatingCity.trim(), mode: 'insensitive' as const } }
+        : {}),
     };
     const rows = await this.prisma.driverProfile.findMany({
       where,

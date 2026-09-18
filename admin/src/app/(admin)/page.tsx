@@ -103,7 +103,14 @@ export default function DashboardPage() {
     { label: "Planifiées", value: m.scheduledRides, href: "/planifiees", section: "planifiees" as const, accent: "violet" as const },
     { label: "Déménagements", value: m.movingRequests, href: "/demenagements", section: "demenagements" as const, accent: "orange" as const },
     { label: "Covoiturage", value: m.carpoolTrips, href: "/covoiturage", section: "covoiturage" as const, accent: "green" as const },
-  ].filter((c) => canAccess(c.section));
+  ].filter((c) => {
+    if (!canAccess(c.section)) return false;
+    // Admin ville : pas de KPIs portefeuille / démén / covoit nationaux.
+    if (role === "CITY_ADMIN" && (c.section === "portefeuille" || c.section === "demenagements" || c.section === "covoiturage")) {
+      return false;
+    }
+    return true;
+  });
 
   const quickLinks = [
     { label: "Courses en cours", href: "/courses", count: m.activeRides, show: canAccess("courses") },

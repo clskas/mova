@@ -41,15 +41,17 @@ describe('admin-rbac', () => {
     expect(hasAdminPermission(UserRole.SUPPORT, AdminPermission.PRICING_WRITE)).toBe(false);
   });
 
-  it('CITY_ADMIN : ops lecture/écriture limitée, pas system/pricing write/wallets', () => {
+  it('CITY_ADMIN : ops ville (tarifs/chauffeurs/KYC), pas system/wallets', () => {
     expect(hasAdminPermission(UserRole.CITY_ADMIN, AdminPermission.METRICS_READ)).toBe(true);
     expect(hasAdminPermission(UserRole.CITY_ADMIN, AdminPermission.USERS_READ)).toBe(true);
     expect(hasAdminPermission(UserRole.CITY_ADMIN, AdminPermission.RIDES_WRITE)).toBe(true);
     expect(hasAdminPermission(UserRole.CITY_ADMIN, AdminPermission.RESTAURANTS_READ)).toBe(true);
     expect(hasAdminPermission(UserRole.CITY_ADMIN, AdminPermission.SCHEDULED_READ)).toBe(true);
     expect(hasAdminPermission(UserRole.CITY_ADMIN, AdminPermission.KYC_READ)).toBe(true);
+    expect(hasAdminPermission(UserRole.CITY_ADMIN, AdminPermission.KYC_WRITE)).toBe(true);
+    expect(hasAdminPermission(UserRole.CITY_ADMIN, AdminPermission.DRIVERS_WRITE)).toBe(true);
     expect(hasAdminPermission(UserRole.CITY_ADMIN, AdminPermission.PRICING_READ)).toBe(true);
-    expect(hasAdminPermission(UserRole.CITY_ADMIN, AdminPermission.PRICING_WRITE)).toBe(false);
+    expect(hasAdminPermission(UserRole.CITY_ADMIN, AdminPermission.PRICING_WRITE)).toBe(true);
     expect(hasAdminPermission(UserRole.CITY_ADMIN, AdminPermission.WALLETS_WRITE)).toBe(false);
     expect(hasAdminPermission(UserRole.CITY_ADMIN, AdminPermission.SYSTEM_WRITE)).toBe(false);
     expect(hasAdminPermission(UserRole.CITY_ADMIN, AdminPermission.USERS_WRITE)).toBe(false);

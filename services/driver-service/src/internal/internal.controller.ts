@@ -83,15 +83,17 @@ export class InternalController {
     @Query('kycStatus') kycStatus?: KycStatus,
     @Query('isAvailable') isAvailable?: string,
     @Query('includeHidden') includeHidden?: string,
+    @Query('city') city?: string,
   ) {
     return this.drivers.listDriversAdmin(Number(skip ?? 0), Number(take ?? 50), {
       kycStatus,
       isAvailable: isAvailable === undefined ? undefined : isAvailable === 'true',
       includeHidden: includeHidden === 'true' || includeHidden === '1',
+      operatingCity: city?.trim() || undefined,
     });
   }
-  @Get('kyc/pending') pendingKyc(@Query('status') status?: string) {
-    return this.drivers.pendingKyc(status);
+  @Get('kyc/pending') pendingKyc(@Query('status') status?: string, @Query('city') city?: string) {
+    return this.drivers.pendingKyc(status, city);
   }
   @Post('kyc/:id/review') reviewKyc(@Param('id') id: string, @Body() dto: ReviewKycDto) { return this.drivers.approveKyc(id, dto.approved, dto.notes); }
   @Post('kyc/:id/ocr') runKycOcr(@Param('id') id: string) { return this.drivers.runKycOcr(id); }

@@ -8,6 +8,7 @@ import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import '../history/history_detail_dialog.dart';
+import '../../core/safety/sos_helper.dart';
 import 'widgets/driver_cash_pin_dialog.dart';
 
 class DriverMovingMissionScreen extends ConsumerStatefulWidget {
@@ -159,6 +160,17 @@ class _DriverMovingMissionScreenState extends ConsumerState<DriverMovingMissionS
     return MovaScreen(
       title: 'Mission déménagement',
       scrollable: false,
+      actions: [
+        sosAppBarButton(
+          onPressed: () => triggerSosAlert(
+            ref,
+            context,
+            description: 'SOS chauffeur — déménagement ${widget.movingId}',
+            referenceType: 'MOVING',
+            referenceId: widget.movingId,
+          ),
+        ),
+      ],
       child: MovaFlexScroll(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,

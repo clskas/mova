@@ -17,6 +17,7 @@ import '../chat/chat_alert_service.dart';
 import '../chat/delivery_chat_screen.dart';
 import '../chat/errand_chat_screen.dart';
 import '../../core/billing/service_price_display.dart';
+import '../../core/safety/sos_helper.dart';
 import '../delivery/delivery_payment_state.dart';
 import 'widgets/driver_cash_pin_dialog.dart';
 
@@ -508,6 +509,23 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
       title: 'Livraison active',
       scrollable: false,
       actions: [
+        sosAppBarButton(
+          onPressed: _deliveryId.isEmpty
+              ? () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Livraison introuvable — réessayez')),
+                  );
+                }
+              : () => triggerSosAlert(
+                    ref,
+                    context,
+                    description: _isErrand
+                        ? 'SOS chauffeur — courses $_deliveryId'
+                        : 'SOS chauffeur — livraison $_deliveryId',
+                    referenceType: _isErrand ? 'ERRAND' : 'DELIVERY',
+                    referenceId: _deliveryId,
+                  ),
+        ),
         IconButton(
           icon: const Icon(Icons.chat_bubble_outline),
           tooltip: 'Chat client',

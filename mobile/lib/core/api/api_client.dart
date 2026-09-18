@@ -1876,17 +1876,21 @@ class ApiClient {
   Future<Result<Map<String, dynamic>>> reportSos({
     required String description,
     String? rideId,
+    String? referenceType,
+    String? referenceId,
     double? lat,
     double? lng,
   }) async {
+    final refType = referenceType ?? (rideId != null ? 'RIDE' : null);
+    final refId = referenceId ?? rideId;
     return post('/incidents', {
       'type': 'SOS',
       'description': description,
       if (rideId != null) 'rideId': rideId,
       if (lat != null) 'lat': lat,
       if (lng != null) 'lng': lng,
-      'referenceType': rideId != null ? 'RIDE' : null,
-      'referenceId': rideId,
+      if (refType != null) 'referenceType': refType,
+      if (refId != null) 'referenceId': refId,
     });
   }
 

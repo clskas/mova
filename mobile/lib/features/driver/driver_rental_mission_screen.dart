@@ -9,6 +9,7 @@ import '../../core/geo/maps_launcher.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
+import '../../core/safety/sos_helper.dart';
 
 List<Map<String, dynamic>> rentalTimelineSteps(String? status) {
   const steps = [
@@ -161,6 +162,17 @@ class _DriverRentalMissionScreenState extends ConsumerState<DriverRentalMissionS
     return MovaScreen(
       title: 'Mission location',
       scrollable: false,
+      actions: [
+        sosAppBarButton(
+          onPressed: () => triggerSosAlert(
+            ref,
+            context,
+            description: 'SOS chauffeur — location ${widget.inquiryId}',
+            referenceType: 'RENTAL',
+            referenceId: widget.inquiryId,
+          ),
+        ),
+      ],
       child: MovaFlexScroll(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,

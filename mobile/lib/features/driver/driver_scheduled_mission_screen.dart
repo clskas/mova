@@ -8,6 +8,7 @@ import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import '../history/history_detail_dialog.dart';
+import '../../core/safety/sos_helper.dart';
 import 'widgets/driver_cash_pin_dialog.dart';
 
 class DriverScheduledMissionScreen extends ConsumerStatefulWidget {
@@ -179,6 +180,18 @@ class _DriverScheduledMissionScreenState extends ConsumerState<DriverScheduledMi
     return MovaScreen(
       title: 'Mission planifiée',
       scrollable: false,
+      actions: [
+        sosAppBarButton(
+          onPressed: () => triggerSosAlert(
+            ref,
+            context,
+            description: 'SOS chauffeur — course planifiée ${widget.rideId}',
+            rideId: widget.rideId,
+            referenceType: 'SCHEDULED',
+            referenceId: widget.rideId,
+          ),
+        ),
+      ],
       child: MovaFlexScroll(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,

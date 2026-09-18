@@ -15,6 +15,7 @@ import '../../core/widgets/mova_widgets.dart';
 import '../chat/chat_alert_service.dart';
 import '../chat/ride_chat_screen.dart';
 import '../geo/suggest_place_screen.dart';
+import '../../core/safety/sos_helper.dart';
 import 'widgets/driver_cash_pin_dialog.dart';
 
 class ActiveRideScreen extends ConsumerStatefulWidget {
@@ -256,6 +257,18 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
       title: _status == 'COMPLETED' ? 'Course terminée' : 'Course en cours',
       scrollable: false,
       actions: [
+        sosAppBarButton(
+          onPressed: () => triggerSosAlert(
+            ref,
+            context,
+            description: 'SOS chauffeur — course $_rideId',
+            rideId: _rideId,
+            referenceType: 'RIDE',
+            referenceId: _rideId,
+            fallbackLat: _currentLat,
+            fallbackLng: _currentLng,
+          ),
+        ),
         IconButton(
           icon: const Icon(Icons.chat_bubble_outline),
           tooltip: 'Chat passager',

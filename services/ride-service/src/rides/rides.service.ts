@@ -34,7 +34,7 @@ import { TrackingService } from '../tracking/tracking.service';
 import { assertServiceAreaPair, assertServiceAreaCoords } from '../common/address.util';
 import { tripDistanceKm } from '../common/geo.util';
 import { RoutingService } from '../geo/routing.service';
-import { assertDriverCanReceiveJobs, assertDriverEligibleForRide, driverCanReceiveJobs, fetchDriverProfileSnapshot } from '../common/driver-eligibility.util';
+import { assertDriverCanReceiveJobs, assertDriverEligibleForRide, driverCanReceiveJobs, fetchDriverProfileSnapshot, filterDriversAcceptingRides } from '../common/driver-eligibility.util';
 import { fetchDriverDebtStatus, filterDriversNotDebtBlocked } from '../common/driver-debt.util';
 import { fetchAuthUserBrief } from '../common/internal-lookup.util';
 import { TripShareService } from '../share/trip-share.service';
@@ -297,6 +297,7 @@ export class RidesService {
       const pickup = ride.pickupAddress?.trim() || 'près de vous';
       const fare = ride.estimatedFareCdf != null ? ` · ${ride.estimatedFareCdf} FC` : '';
       let driverUserIds = await filterDriversNotDebtBlocked(drivers.map((d) => d.userId));
+      driverUserIds = await filterDriversAcceptingRides(driverUserIds);
       if (driverUserIds.length === 0) {
         // no eligible drivers this attempt
       } else {

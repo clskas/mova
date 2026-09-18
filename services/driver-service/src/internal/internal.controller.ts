@@ -48,9 +48,23 @@ class UpdateDriverStatusDto {
   @IsOptional() @IsBoolean() isAvailable?: boolean;
   @IsOptional() @IsBoolean() active?: boolean;
   /** false = pas de livraisons. */
-  @IsOptional() @IsBoolean() acceptsDeliveries?: boolean;
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === false || value === 'false' || value === 0 || value === '0') return false;
+    if (value === true || value === 'true' || value === 1 || value === '1') return true;
+    return value;
+  })
+  @IsBoolean()
+  acceptsDeliveries?: boolean;
   /** false = pas de courses taxi/moto. */
-  @IsOptional() @IsBoolean() acceptsRides?: boolean;
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === false || value === 'false' || value === 0 || value === '0') return false;
+    if (value === true || value === 'true' || value === 1 || value === '1') return true;
+    return value;
+  })
+  @IsBoolean()
+  acceptsRides?: boolean;
 }
 class CreateIncidentDto {
   @IsString() userId: string;

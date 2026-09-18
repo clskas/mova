@@ -631,8 +631,15 @@ export class DriversService {
     }
     const user = await this.fetchAuthUser(userId);
     const pinVerified = !!profile?.activationPinVerifiedAt;
+    const acceptsRides = profile?.acceptsRides !== false;
+    const acceptsDeliveries = profile?.acceptsDeliveries !== false;
+    const serviceMode =
+      !acceptsRides ? 'DELIVERIES_ONLY' : !acceptsDeliveries ? 'RIDES_ONLY' : 'BOTH';
     return {
       ...profile,
+      acceptsRides,
+      acceptsDeliveries,
+      serviceMode,
       publicId: formatMovaPublicId(userId, 'DRIVER'),
       user,
       activationPinVerified: pinVerified,

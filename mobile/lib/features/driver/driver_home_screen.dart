@@ -1101,6 +1101,30 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
 
   String? get _kycStatus => _profile?['kycStatus']?.toString();
 
+  _DriverServiceMode _serviceModeLabel() {
+    final mode = _profile?['serviceMode']?.toString().toUpperCase();
+    if (mode == 'RIDES_ONLY') return _DriverServiceMode.ridesOnly;
+    if (mode == 'DELIVERIES_ONLY') return _DriverServiceMode.deliveriesOnly;
+    if (mode == 'BOTH') return _DriverServiceMode.both;
+    if (_profile?['acceptsRides'] == false) return _DriverServiceMode.deliveriesOnly;
+    if (_profile?['acceptsDeliveries'] == false) return _DriverServiceMode.ridesOnly;
+    return _DriverServiceMode.both;
+  }
+
+  String _waitingOffersHint() {
+    final mode = _serviceModeLabel();
+    if (mode == _DriverServiceMode.ridesOnly) {
+      return 'En attente de courses à proximité…\n'
+          'Vérifiez : En ligne, GPS activé, KYC approuvé.';
+    }
+    if (mode == _DriverServiceMode.deliveriesOnly) {
+      return 'En attente de livraisons à proximité…\n'
+          'Vérifiez : En ligne, GPS activé, KYC approuvé.';
+    }
+    return 'En attente de courses ou livraisons à proximité…\n'
+        'Vérifiez : En ligne, GPS activé, KYC approuvé.';
+  }
+
   Map<String, dynamic>? get _documentsStatus =>
       _profile?['documentsStatus'] as Map<String, dynamic>?;
 
@@ -1400,41 +1424,58 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
           ],
           if (_available) ...[
             const SizedBox(height: 12),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: (_profile?['acceptsDeliveries'] == false)
-                    ? MovaColors.orange.withValues(alpha: 0.12)
-                    : MovaColors.violet.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: (_profile?['acceptsDeliveries'] == false)
-                      ? MovaColors.orange.withValues(alpha: 0.35)
-                      : MovaColors.violet.withValues(alpha: 0.35),
-                ),
-              ),
-              child: Text(
-                (_profile?['acceptsDeliveries'] == false)
+            Builder(
+              builder: (context) {
+                final mode = _serviceModeLabel();
+                final isRidesOnly = mode == _DriverServiceMode.ridesOnly;
+                final isDeliveriesOnly = mode == _DriverServiceMode.deliveriesOnly;
+                final accent = isRidesOnly
+                    ? MovaColors.orange
+                    : isDeliveriesOnly
+                        ? MovaColors.midnight
+                        : MovaColors.violet;
+                final title = isRidesOnly
                     ? 'Chauffeur SENGA — courses uniquement'
-                    : 'Livreur SENGA — courses et livraisons',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: (_profile?['acceptsDeliveries'] == false)
-                      ? MovaColors.orange
-                      : MovaColors.violet,
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              (_profile?['acceptsDeliveries'] == false)
-                  ? 'En ligne — courses près de votre position GPS.'
-                  : 'En ligne — courses et livraisons près de votre position GPS.',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 12, color: MovaColors.textSecondary.withValues(alpha: 0.9)),
+                    : isDeliveriesOnly
+                        ? 'Livreur SENGA — livraisons uniquement'
+                        : 'Livreur SENGA — courses et livraisons';
+                final subtitle = isRidesOnly
+                    ? 'En ligne — courses près de votre position GPS.'
+                    : isDeliveriesOnly
+                        ? 'En ligne — livraisons près de votre position GPS.'
+                        : 'En ligne — courses et livraisons près de votre position GPS.';
+                return Column(
+                  children: [
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: accent.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: accent.withValues(alpha: 0.35)),
+                      ),
+                      child: Text(
+                        title,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: accent,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      subtitle,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: MovaColors.textSecondary.withValues(alpha: 0.9),
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
           ],
           if (_scheduledOffers.isNotEmpty) ...[
@@ -1840,13 +1881,12 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
               ),
               const SizedBox(height: _sectionGap),
             ] else if (_rideOffers.isEmpty && _deliveryOffers.isEmpty)
-              const Padding(
-                padding: EdgeInsets.only(bottom: 12),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
                 child: Text(
-                  'En attente de courses ou livraisons à proximité…\n'
-                  'Vérifiez : En ligne, GPS activé, KYC approuvé.',
+                  _waitingOffersHint(),
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: MovaColors.textSecondary),
+                  style: const TextStyle(color: MovaColors.textSecondary),
                 ),
               ),
             if (_deliveryOffers.isNotEmpty) ...[
@@ -1977,3 +2017,5 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
     );
   }
 }
+
+enum _DriverServiceMode { both, ridesOnly, deliveriesOnly }

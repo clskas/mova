@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Request, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiProperty, ApiTags } from '@nestjs/swagger';
 import { AdminPermission, VehicleType, normalizeVehicleType } from '@mova/shared';
-import { IsBoolean, IsEnum, IsOptional, IsString } from 'class-validator';
+import { IsBoolean, IsEnum, IsIn, IsOptional, IsString } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RequirePermissions } from '../auth/permissions.decorator';
@@ -63,7 +63,7 @@ class DriverDeliveryModeDto {
     required: false,
   })
   @IsOptional()
-  @IsString()
+  @IsIn(['BOTH', 'RIDES_ONLY', 'DELIVERIES_ONLY'])
   serviceMode?: 'BOTH' | 'RIDES_ONLY' | 'DELIVERIES_ONLY';
 
   /** @deprecated Prefer serviceMode. Kept for backward compatibility. */

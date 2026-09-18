@@ -420,12 +420,12 @@ export default function MenuPage() {
             Disponible
           </label>
         </div>
-        <div className="flex gap-2">
-          <button type="button" disabled={!canOperate} onClick={applyDraft} className="px-4 py-2 rounded-xl bg-[#6C63FF] text-white text-sm disabled:opacity-60">
+        <div className="flex flex-col sm:flex-row gap-2 min-w-0">
+          <button type="button" disabled={!canOperate} onClick={applyDraft} className="px-4 py-2.5 min-h-11 rounded-xl bg-[#6C63FF] text-white text-sm disabled:opacity-60 w-full sm:w-auto shrink-0">
             {editIndex != null ? "Mettre à jour" : "Ajouter au menu"}
           </button>
           {editIndex != null && (
-            <button type="button" onClick={cancelEdit} className="px-4 py-2 rounded-xl border text-sm">
+            <button type="button" onClick={cancelEdit} className="px-4 py-2.5 min-h-11 rounded-xl border text-sm w-full sm:w-auto shrink-0">
               Annuler
             </button>
           )}

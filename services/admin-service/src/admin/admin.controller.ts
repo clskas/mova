@@ -6,6 +6,7 @@ import { Transform } from 'class-transformer';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RequirePermissions } from '../auth/permissions.decorator';
 import { RolesGuard } from '../auth/roles.guard';
+import { resolveManagedCityScope, type AdminJwtUser } from '../common/city-scope.util';
 import { AdminService } from './admin.service';
 import { FraudService } from './fraud.service';
 
@@ -32,6 +33,10 @@ class UpdateUserDto {
   @ApiProperty({ required: false }) @IsOptional() @IsString() status?: string;
   @ApiProperty({ required: false }) @IsOptional() @IsString() firstName?: string;
   @ApiProperty({ required: false }) @IsOptional() @IsString() lastName?: string;
+  @ApiProperty({ required: false, description: 'CITY_ADMIN only: service-area city name' })
+  @IsOptional()
+  @IsString()
+  managedCity?: string;
 }
 
 class CreateUserDto {
@@ -40,6 +45,10 @@ class CreateUserDto {
   @ApiProperty({ required: false }) @IsOptional() @IsString() firstName?: string;
   @ApiProperty({ required: false }) @IsOptional() @IsString() lastName?: string;
   @ApiProperty({ required: false }) @IsOptional() @IsString() status?: string;
+  @ApiProperty({ required: false, description: 'CITY_ADMIN only: service-area city name' })
+  @IsOptional()
+  @IsString()
+  managedCity?: string;
 }
 
 class DriverStatusDto {
@@ -254,13 +263,18 @@ export class AdminController {
   @RequirePermissions(AdminPermission.RIDES_READ)
   @ApiOperation({ summary: 'Liste courses taxi' })
   rides(
+    @Request() req: { user: AdminJwtUser },
     @Query('status') status?: string,
     @Query('from') from?: string,
     @Query('to') to?: string,
     @Query('skip') skip?: string,
     @Query('take') take?: string,
   ) {
-    return this.adminService.listRides({ status, from, to, skip: Number(skip ?? 0), take: Number(take ?? 50) });
+    const managedCity = resolveManagedCityScope(req.user);
+    return this.adminService.listRides(
+      { status, from, to, skip: Number(skip ?? 0), take: Number(take ?? 50) },
+      managedCity,
+    );
   }
 
   @Get('rides/:id')
@@ -336,6 +350,7 @@ export class AdminController {
   @RequirePermissions(AdminPermission.DELIVERIES_READ)
   @ApiOperation({ summary: 'Vue livraisons' })
   deliveries(
+    @Request() req: { user: AdminJwtUser },
     @Query('status') status?: string,
     @Query('type') type?: string,
     @Query('from') from?: string,
@@ -344,15 +359,19 @@ export class AdminController {
     @Query('skip') skip?: string,
     @Query('take') take?: string,
   ) {
-    return this.adminService.listDeliveries({
-      status,
-      type,
-      from,
-      to,
-      search,
-      skip: Number(skip ?? 0),
-      take: Number(take ?? 50),
-    });
+    const managedCity = resolveManagedCityScope(req.user);
+    return this.adminService.listDeliveries(
+      {
+        status,
+        type,
+        from,
+        to,
+        search,
+        skip: Number(skip ?? 0),
+        take: Number(take ?? 50),
+      },
+      managedCity,
+    );
   }
 
   @Get('deliveries/:id')
@@ -414,8 +433,8 @@ export class AdminController {
   @Get('restaurants')
   @RequirePermissions(AdminPermission.RESTAURANTS_READ)
   @ApiOperation({ summary: 'Liste restaurants' })
-  restaurants() {
-    return this.adminService.listRestaurants();
+  restaurants(@Request() req: { user: AdminJwtUser }) {
+    return this.adminService.listRestaurants(resolveManagedCityScope(req.user));
   }
 
   @Post('restaurants')
@@ -585,8 +604,9 @@ export class AdminController {
   @Get('pricing-rules')
   @RequirePermissions(AdminPermission.PRICING_READ)
   @ApiOperation({ summary: 'Règles tarifaires véhicules' })
-  pricingRules(@Query('city') city?: string) {
-    return this.adminService.listPricingRules(city);
+  pricingRules(@Request() req: { user: AdminJwtUser }, @Query('city') city?: string) {
+    // CITY_ADMIN: force managedCity; SUPER_ADMIN keeps optional city query.
+    return this.adminService.listPricingRules(resolveManagedCityScope(req.user) ?? city);
   }
 
   @Post('pricing-rules/:vehicleType')
@@ -655,8 +675,8 @@ export class AdminController {
   @Get('pricing-time-windows')
   @RequirePermissions(AdminPermission.PRICING_READ)
   @ApiOperation({ summary: 'Plages horaires pointe / nuit par ville' })
-  pricingTimeWindows(@Query('city') city?: string) {
-    return this.adminService.listPricingTimeWindows(city);
+  pricingTimeWindows(@Request() req: { user: AdminJwtUser }, @Query('city') city?: string) {
+    return this.adminService.listPricingTimeWindows(resolveManagedCityScope(req.user) ?? city);
   }
 
   @Post('pricing-time-windows')
@@ -683,8 +703,8 @@ export class AdminController {
   @Get('communes')
   @RequirePermissions(AdminPermission.PRICING_READ)
   @ApiOperation({ summary: 'Quartiers/communes par ville' })
-  communes(@Query('city') city?: string) {
-    return this.adminService.listCommunes(city);
+  communes(@Request() req: { user: AdminJwtUser }, @Query('city') city?: string) {
+    return this.adminService.listCommunes(resolveManagedCityScope(req.user) ?? city);
   }
 
   @Patch('communes/:id')

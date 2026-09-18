@@ -18,6 +18,7 @@ enum UserRole {
   SUPPORT
   FINANCE
   CONTENT
+  CITY_ADMIN
 }
 
 enum UserStatus {
@@ -38,6 +39,8 @@ model User {
   avatarUrl String?
   localPinHash String?
   localPinSetAt DateTime?
+  /// CITY_ADMIN: service-area city name matching DRC_SERVICE_AREAS (e.g. "Kinshasa", "Beni").
+  managedCity String?
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
 

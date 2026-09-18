@@ -29,6 +29,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     if (!isAdminPanelRole(payload.role)) {
       throw new UnauthorizedException('Accès réservé au panneau admin SENGA');
     }
-    return { id: payload.sub, role: payload.role, status: payload.status };
+    return { id: payload.sub, role: payload.role, status: payload.status, managedCity: payload.managedCity };
   }
 }

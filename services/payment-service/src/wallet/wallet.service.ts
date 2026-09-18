@@ -1358,7 +1358,7 @@ export class WalletService {
         },
       });
       if (failed.count !== 1) {
-        return { found: true, alreadyFinal: true, status: 'COMPLETED', balanceCdf: pending.wallet.balanceCdf };
+        return { found: true, alreadyFinal: true, status: 'FAILED', balanceCdf: pending.wallet.balanceCdf };
       }
       return { found: true, status: 'FAILED', balanceCdf: pending.wallet.balanceCdf };
     }
@@ -1377,7 +1377,7 @@ export class WalletService {
         },
       });
       if (failed.count !== 1) {
-        return { found: true, alreadyFinal: true, status: 'COMPLETED', balanceCdf: pending.wallet.balanceCdf };
+        return { found: true, alreadyFinal: true, status: 'FAILED', balanceCdf: pending.wallet.balanceCdf };
       }
       return { found: true, status: 'FAILED', balanceCdf: pending.wallet.balanceCdf };
     }

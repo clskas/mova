@@ -1,5 +1,5 @@
 /** Rôles staff autorisés sur la console admin SENGA. */
-export type AdminRole = "SUPER_ADMIN" | "ADMIN" | "SUPPORT" | "FINANCE" | "CONTENT";
+export type AdminRole = "SUPER_ADMIN" | "ADMIN" | "SUPPORT" | "FINANCE" | "CONTENT" | "CITY_ADMIN";
 
 export type AdminSection =
   | "dashboard"
@@ -24,7 +24,7 @@ export type AdminSection =
   | "cgu"
   | "systeme";
 
-export const ADMIN_ROLES: AdminRole[] = ["SUPER_ADMIN", "ADMIN", "SUPPORT", "FINANCE", "CONTENT"];
+export const ADMIN_ROLES: AdminRole[] = ["SUPER_ADMIN", "ADMIN", "SUPPORT", "FINANCE", "CONTENT", "CITY_ADMIN"];
 
 export const ROLE_LABELS: Record<AdminRole, string> = {
   SUPER_ADMIN: "Super admin",
@@ -32,6 +32,7 @@ export const ROLE_LABELS: Record<AdminRole, string> = {
   SUPPORT: "Support",
   FINANCE: "Finance",
   CONTENT: "Contenu",
+  CITY_ADMIN: "Admin ville",
 };
 
 const ALL_SECTIONS: AdminSection[] = [
@@ -65,6 +66,19 @@ const ROLE_SECTIONS: Record<AdminRole, AdminSection[]> = {
   SUPPORT: ["utilisateurs", "chauffeurs", "kyc", "litiges", "fraude", "courses", "livraisons", "planifiees", "locations", "demenagements", "covoiturage"],
   FINANCE: ["dashboard", "portefeuille", "tarifs", "abonnements"],
   CONTENT: ["restaurants", "tarifs", "parametres", "locations", "publicites"],
+  CITY_ADMIN: [
+    "dashboard",
+    "utilisateurs",
+    "chauffeurs",
+    "kyc",
+    "courses",
+    "livraisons",
+    "restaurants",
+    "litiges",
+    "planifiees",
+    "tarifs",
+    "parametres",
+  ],
 };
 
 /** Sections où l'utilisateur peut modifier des données. */
@@ -74,6 +88,7 @@ const ROLE_WRITE: Record<AdminRole, AdminSection[]> = {
   SUPPORT: ["kyc", "litiges", "courses", "livraisons", "planifiees", "locations", "demenagements", "covoiturage"],
   FINANCE: ["tarifs", "abonnements", "portefeuille"],
   CONTENT: ["restaurants", "locations", "publicites"],
+  CITY_ADMIN: ["courses", "livraisons", "restaurants", "litiges"],
 };
 
 export type NavItem = {
@@ -151,6 +166,7 @@ export function roleBadgeClass(role: AdminRole): string {
     SUPPORT: "bg-sky-600 text-white",
     FINANCE: "bg-emerald-600 text-white",
     CONTENT: "bg-amber-600 text-white",
+    CITY_ADMIN: "bg-teal-700 text-white",
   };
   return map[role];
 }

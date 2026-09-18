@@ -21,6 +21,7 @@ import {
   isPinPending,
   isPinSessionUnlocked,
   isRentalPartnerRole,
+  markPinSessionUnlocked,
   normalizeLoginPhone,
   phoneFromToken,
   roleFromToken,
@@ -48,10 +49,13 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
       router.replace("/login");
       return;
     }
-    if (isPinPending() || !isPinSessionUnlocked()) {
+    if (isPinPending()) {
       dropTokenKeepPhone(phoneFromToken() || getLastPhone() || "");
       router.replace("/login?pin=1");
       return;
+    }
+    if (!isPinSessionUnlocked()) {
+      markPinSessionUnlocked();
     }
     let cancelled = false;
 

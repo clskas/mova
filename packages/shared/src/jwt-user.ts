@@ -10,6 +10,8 @@ export type MovaJwtPayload = {
   jti?: string;
   /** Account without a local PIN (seed demo phones omit this). True for Google-only too. */
   needsPinSetup?: boolean;
+  /** CITY_ADMIN only: service-area city name (e.g. "Kinshasa"). */
+  managedCity?: string;
 };
 
 /** Refuse l'accès aux comptes suspendus (JWT ou login). */

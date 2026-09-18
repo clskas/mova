@@ -65,7 +65,9 @@ bool sessionNeedsPinSetup({required bool pinConfigured, required String phone}) 
   return !isSeedDemoPhone(phone);
 }
 
-/// Cold start with an existing PIN: drop JWT and show the PIN pad (not stay logged in).
+/// Cold start with an existing PIN: keep the JWT until the user logs out explicitly.
+/// PIN pad is only for first-time setup (or after logout), not every app open.
 bool sessionRequiresPinUnlock({required bool pinConfigured, required String phone}) {
-  return pinConfigured && !isSeedDemoPhone(phone);
+  // Signature kept for call sites; unlock-on-cold-start disabled by product request.
+  return false && pinConfigured && !isSeedDemoPhone(phone);
 }

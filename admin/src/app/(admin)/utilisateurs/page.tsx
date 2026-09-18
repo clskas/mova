@@ -5,6 +5,7 @@ import {
   activationPinSmsCopy,
   createUser,
   deactivateUser as deactivateUserApi,
+  fetchCities,
   fetchDrivers,
   fetchUsers,
   formatUserName,
@@ -12,6 +13,7 @@ import {
   purgeUser as purgeUserApi,
   regeneratePartnerLoginPin,
   updateUser,
+  type AdminCity,
   type AdminUser,
 } from "@/lib/api";
 import { useAdmin } from "@/components/AdminProvider";
@@ -58,6 +60,9 @@ export default function UtilisateursPage() {
   const [createLast, setCreateLast] = useState("");
   const [loginPin, setLoginPin] = useState<string | null>(null);
   const [pinNotice, setPinNotice] = useState<string | null>(null);
+  const [editManagedCity, setEditManagedCity] = useState("");
+  const [createManagedCity, setCreateManagedCity] = useState("");
+  const [cityOptions, setCityOptions] = useState<AdminCity[]>([]);
 
   const [page, setPage] = useState(0);
   const pageSize = 50;
@@ -90,6 +95,13 @@ export default function UtilisateursPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  useEffect(() => {
+    if (!canPurge) return;
+    fetchCities()
+      .then((cities) => setCityOptions(cities.filter((c) => c.isActive !== false)))
+      .catch(() => setCityOptions([]));
+  }, [canPurge]);
+
   function applySearch() {
     setPage(0);
     setSearchQuery(search.trim());
@@ -104,6 +116,7 @@ export default function UtilisateursPage() {
     setEditStatus(u.status ?? "ACTIVE");
     setEditFirst(u.firstName ?? "");
     setEditLast(u.lastName ?? "");
+    setEditManagedCity(u.managedCity ?? "");
     setLoginPin(null);
     setPinNotice(null);
   }
@@ -111,6 +124,10 @@ export default function UtilisateursPage() {
   async function saveNewUser() {
     if (!createPhone.trim()) {
       setError("Le téléphone est obligatoire.");
+      return;
+    }
+    if (createRole === "CITY_ADMIN" && !createManagedCity.trim()) {
+      setError("Choisissez la ville gérée pour un Admin ville.");
       return;
     }
     setSaving(true);
@@ -121,12 +138,14 @@ export default function UtilisateursPage() {
         role: createRole,
         firstName: createFirst.trim() || undefined,
         lastName: createLast.trim() || undefined,
+        ...(createRole === "CITY_ADMIN" ? { managedCity: createManagedCity.trim() } : {}),
       });
       setCreateOpen(false);
       setCreatePhone("");
       setCreateFirst("");
       setCreateLast("");
       setCreateRole("RESTAURANT");
+      setCreateManagedCity("");
       load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Échec de la création");
@@ -137,6 +156,10 @@ export default function UtilisateursPage() {
 
   async function saveUser() {
     if (!selected) return;
+    if (editRole === "CITY_ADMIN" && !editManagedCity.trim()) {
+      setError("Choisissez la ville gérée pour un Admin ville.");
+      return;
+    }
     setSaving(true);
     try {
       await updateUser(selected.id, {
@@ -145,6 +168,7 @@ export default function UtilisateursPage() {
         status: editStatus,
         firstName: editFirst,
         lastName: editLast,
+        managedCity: editRole === "CITY_ADMIN" ? editManagedCity.trim() : null,
       });
       setSelected(null);
       load();
@@ -367,9 +391,32 @@ export default function UtilisateursPage() {
                 { value: "RENTAL_PARTNER", label: "Partenaire location" },
                 { value: "PASSENGER", label: "Passager" },
                 { value: "DRIVER", label: "Chauffeur" },
+                ...(canPurge
+                  ? [
+                      { value: "ADMIN", label: "Administrateur" },
+                      { value: "SUPPORT", label: "Support" },
+                      { value: "FINANCE", label: "Finance" },
+                      { value: "CONTENT", label: "Contenu" },
+                      { value: "CITY_ADMIN", label: "Admin ville" },
+                      { value: "SUPER_ADMIN", label: "Super admin" },
+                    ]
+                  : []),
               ]}
             />
           </label>
+          {canPurge && createRole === "CITY_ADMIN" && (
+            <label>
+              <FieldLabel>Ville gérée *</FieldLabel>
+              <SelectInput
+                value={createManagedCity}
+                onChange={setCreateManagedCity}
+                options={[
+                  { value: "", label: "Choisir une ville…" },
+                  ...cityOptions.map((c) => ({ value: c.name, label: c.name })),
+                ]}
+              />
+            </label>
+          )}
           <div className="grid sm:grid-cols-2 gap-4">
             <label>
               <FieldLabel>Prénom</FieldLabel>
@@ -410,8 +457,26 @@ export default function UtilisateursPage() {
                   { value: "SUPPORT", label: "Support" },
                   { value: "FINANCE", label: "Finance" },
                   { value: "CONTENT", label: "Contenu" },
+                  { value: "CITY_ADMIN", label: "Admin ville" },
                 ]} />
               </label>
+              {editRole === "CITY_ADMIN" && (
+                <label>
+                  <FieldLabel>Ville gérée *</FieldLabel>
+                  <SelectInput
+                    value={editManagedCity}
+                    onChange={setEditManagedCity}
+                    disabled={readOnly || !canPurge}
+                    options={[
+                      { value: "", label: "Choisir une ville…" },
+                      ...cityOptions.map((c) => ({ value: c.name, label: c.name })),
+                      ...(editManagedCity && !cityOptions.some((c) => c.name === editManagedCity)
+                        ? [{ value: editManagedCity, label: editManagedCity }]
+                        : []),
+                    ]}
+                  />
+                </label>
+              )}
               <label>
                 <FieldLabel>Statut</FieldLabel>
                 <SelectInput value={editStatus} onChange={setEditStatus} disabled={readOnly} options={[

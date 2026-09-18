@@ -57,7 +57,8 @@ export function dropTokenKeepPhone(phone?: string): void {
 export function markPinSessionUnlocked(): void {
   if (typeof window === "undefined") return;
   try {
-    sessionStorage.setItem(PIN_UNLOCK_KEY, "1");
+    // Persist across tab close until explicit logout (localStorage, not sessionStorage).
+    localStorage.setItem(PIN_UNLOCK_KEY, "1");
   } catch {
     /* ignore */
   }
@@ -66,7 +67,7 @@ export function markPinSessionUnlocked(): void {
 export function isPinSessionUnlocked(): boolean {
   if (typeof window === "undefined") return false;
   try {
-    return sessionStorage.getItem(PIN_UNLOCK_KEY) === "1";
+    return localStorage.getItem(PIN_UNLOCK_KEY) === "1" || sessionStorage.getItem(PIN_UNLOCK_KEY) === "1";
   } catch {
     return false;
   }
@@ -75,6 +76,7 @@ export function isPinSessionUnlocked(): boolean {
 export function clearPinSessionUnlocked(): void {
   if (typeof window === "undefined") return;
   try {
+    localStorage.removeItem(PIN_UNLOCK_KEY);
     sessionStorage.removeItem(PIN_UNLOCK_KEY);
   } catch {
     /* ignore */

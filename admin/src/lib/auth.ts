@@ -150,3 +150,11 @@ export function roleFromToken(token?: string | null): string | null {
   const role = payload?.role;
   return typeof role === "string" ? role : null;
 }
+
+export function managedCityFromToken(token?: string | null): string | null {
+  const t = token ?? getToken();
+  if (!t) return null;
+  const payload = decodeJwtPayload(t);
+  const city = payload?.managedCity;
+  return typeof city === "string" && city.trim() ? city.trim() : null;
+}

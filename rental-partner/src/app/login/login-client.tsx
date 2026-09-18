@@ -15,6 +15,7 @@ import {
   phoneFromToken,
   isPinSessionUnlocked,
   markLoginPinConfirmed,
+  markPinSessionUnlocked,
   setPinPending,
   setLastPhone,
   setToken,
@@ -110,6 +111,18 @@ export function LoginClient({ forcePin = false }: { forcePin?: boolean }) {
           dropTokenKeepPhone(phoneFromToken() || getLastPhone() || "");
         }
       } else if (token) {
+        try {
+          const res = await fetch(`${API_BASE}/api/users/me`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (res.ok) {
+            markPinSessionUnlocked();
+            if (!cancelled) router.replace("/");
+            return;
+          }
+        } catch {
+          /* fall through */
+        }
         dropTokenKeepPhone(phoneFromToken() || getLastPhone() || "");
       }
       disableGoogleAutoSelect();

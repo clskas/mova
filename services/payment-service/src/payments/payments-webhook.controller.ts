@@ -185,10 +185,14 @@ export class PaymentsWebhookController {
     }
     const payload = asRecord(body);
     const providerRef = extractAggregatorProviderRef(payload);
-    const outcome = extractAggregatorOutcome(payload) ?? 'COMPLETED';
+    const outcome = extractAggregatorOutcome(payload);
     if (!providerRef) {
       this.logger.warn(`AT callback sans référence: ${JSON.stringify(body).slice(0, 300)}`);
       return { success: false, message: 'Référence manquante' };
+    }
+    if (!outcome) {
+      this.logger.warn(`AT callback ignored (ambiguous status) ref=${providerRef}`);
+      return { success: false, pending: true, message: 'Statut AT ambigu — pas de mouvement wallet' };
     }
     this.logger.log(`Africa's Talking callback ${outcome} ref=${providerRef}`);
     return this.payments.completeMobileMoneyFromWebhook(
@@ -317,12 +321,33 @@ export class PaymentsWebhookController {
     }
     const payload = asRecord(body);
     const statusRaw = pickString(payload, ['status'])?.toUpperCase();
-    const outcome =
-      statusRaw === 'COMPLETED' || statusRaw === 'FAILED'
-        ? statusRaw
-        : payload.event === 'payment.failed'
-          ? 'FAILED'
-          : 'COMPLETED';
+    const eventRaw = pickString(payload, ['event'])?.toLowerCase() ?? '';
+    // Fail-closed: never default unknown/missing status to COMPLETED (that minted
+    // wallet credits on cancel after SerdiPay « Failed » collects).
+    let outcome: 'COMPLETED' | 'FAILED' | null = null;
+    if (statusRaw === 'COMPLETED' || statusRaw === 'FAILED') {
+      outcome = statusRaw;
+    } else if (eventRaw === 'payment.failed' || eventRaw.endsWith('.failed')) {
+      outcome = 'FAILED';
+    } else if (eventRaw === 'payment.completed' || eventRaw.endsWith('.completed')) {
+      outcome = 'COMPLETED';
+    }
+    if (!outcome) {
+      this.logger.warn(
+        `AfriSoft hub webhook ignored (ambiguous status=${statusRaw ?? '?'} event=${eventRaw || '?'})`,
+      );
+      return { success: false, pending: true, message: 'Statut hub ambigu — pas de mouvement wallet' };
+    }
+    // Require COMPLETED status + completed event when both are present.
+    if (
+      outcome === 'COMPLETED' &&
+      eventRaw &&
+      eventRaw !== 'payment.completed' &&
+      !eventRaw.endsWith('.completed')
+    ) {
+      this.logger.warn(`AfriSoft hub webhook rejected COMPLETED with event=${eventRaw}`);
+      return { success: false, pending: true, message: 'Événement hub incohérent — pas de crédit wallet' };
+    }
     const paymentId = pickString(payload, ['payment_id', 'paymentId']);
     const providerRef = pickString(payload, ['provider_ref', 'providerRef']) ?? paymentId;
     const reference = pickString(payload, ['reference']);

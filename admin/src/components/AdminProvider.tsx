@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { fetchCurrentUser, type AdminSessionUser } from "@/lib/api";
-import { getToken, roleFromToken } from "@/lib/auth";
+import { getToken, roleFromToken, managedCityFromToken } from "@/lib/auth";
 import {
   canAccessSection,
   canWriteSection,
@@ -46,6 +46,7 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
     }
 
     const jwtRole = normalizeAdminRole(roleFromToken(token));
+    const jwtCity = managedCityFromToken(token);
     try {
       const me = await fetchCurrentUser();
       const role = resolveStaffRole(me.role, token);
@@ -53,7 +54,11 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
         setUser(null);
         return;
       }
-      setUser({ ...me, role });
+      setUser({
+        ...me,
+        role,
+        managedCity: me.managedCity ?? jwtCity,
+      });
     } catch {
       if (jwtRole) {
         setUser({
@@ -61,6 +66,7 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
           role: jwtRole,
           firstName: "Admin",
           lastName: jwtRole,
+          managedCity: jwtCity,
         });
       } else {
         setUser(null);

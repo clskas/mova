@@ -8,7 +8,9 @@ import {
   PaymentCompletedPayload,
   RideCashPendingPayload,
   INTERNAL_API_KEY,
+  afrisoftPayHubGetPayment,
   fromMobileRideStatus,
+  isAfrisoftPayHubClientConfigured,
   normalizePhoneRdc,
   rdcMobileMoneyOperatorMismatchFr,
   serviceUrl,
@@ -1583,13 +1585,28 @@ export class PaymentsService {
             `ESCROW_REFUND:${type}:${referenceId}`,
           );
         }
-      } else {
-        await this.walletService.credit(
-          existing.userId,
-          existing.amountCdf,
-          body.reason ?? `Remboursement ${type} ${referenceId}`,
-          `ESCROW_REFUND:${type}:${referenceId}`,
+      } else if (MOBILE_MONEY_METHODS.has(existing.method)) {
+        // Only credit SENGA wallet when the hub/aggregator actually collected funds.
+        // SerdiPay « Failed » + local COMPLETED previously minted free wallet balance on cancel.
+        const mmCollected = await this.assertMobileMoneyCollectSucceeded(
+          existing.providerRef,
+          existing.status,
         );
+        if (mmCollected) {
+          await this.walletService.credit(
+            existing.userId,
+            existing.amountCdf,
+            body.reason ?? `Remboursement ${type} ${referenceId}`,
+            `ESCROW_REFUND:${type}:${referenceId}`,
+          );
+        } else {
+          this.logger.warn(
+            `Escrow REFUND ${type}/${referenceId}: MM not confirmed COMPLETED on hub — no wallet credit ` +
+              `(providerRef=${existing.providerRef ?? 'n/a'} localStatus=${existing.status})`,
+          );
+        }
+      } else {
+        // CASH / other: no wallet movement on cancel before pickup.
       }
       const payment = await this.prisma.servicePayment.update({
         where: { id: existing.id },
@@ -1610,14 +1627,27 @@ export class PaymentsService {
         } else {
           await this.walletService.releaseHold(type, referenceId);
         }
-      } else if (refundCdf > 0) {
-        await this.walletService.credit(
-          existing.userId,
-          refundCdf,
-          body.reason ?? `Remboursement partiel ${type} ${referenceId}`,
-          `ESCROW_REFUND:${type}:${referenceId}`,
+      } else if (refundCdf > 0 && MOBILE_MONEY_METHODS.has(existing.method)) {
+        const mmCollected = await this.assertMobileMoneyCollectSucceeded(
+          existing.providerRef,
+          existing.status,
         );
+        if (mmCollected) {
+          await this.walletService.credit(
+            existing.userId,
+            refundCdf,
+            body.reason ?? `Remboursement partiel ${type} ${referenceId}`,
+            `ESCROW_REFUND:${type}:${referenceId}`,
+          );
+        } else {
+          this.logger.warn(
+            `Escrow PARTIAL ${type}/${referenceId}: MM not confirmed COMPLETED — no wallet credit`,
+          );
+        }
+      } else if (refundCdf > 0 && existing.method === PaymentMethod.WALLET) {
+        // unreachable — wallet handled above
       }
+      // CASH partial: no passenger wallet credit
       if (courierFeeCdf > 0) {
         const info = await this.fetchServicePaymentInfo(type, referenceId).catch(() => null);
         if (info?.driverId) {
@@ -1639,5 +1669,38 @@ export class PaymentsService {
     }
 
     throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Action séquestre inconnue.');
+  }
+
+  /**
+   * MM escrow refund may credit the SENGA wallet only if funds were actually collected.
+   * Prefer live hub status; fall back to local COMPLETED only when hub is unreachable
+   * is not allowed — fail closed (no credit) unless hub confirms COMPLETED.
+   */
+  private async assertMobileMoneyCollectSucceeded(
+    providerRef: string | null | undefined,
+    localStatus: PaymentStatus,
+  ): Promise<boolean> {
+    const ref = providerRef?.trim();
+    if (!ref || ref.startsWith('cash_') || ref.startsWith('wallet_')) return false;
+    const get = (key: string) => this.config.get<string>(key);
+    if (!isAfrisoftPayHubClientConfigured(get)) {
+      this.logger.warn('MM escrow refund: hub client not configured — refusing wallet credit');
+      return false;
+    }
+    try {
+      const remote = await afrisoftPayHubGetPayment(get, ref);
+      if (remote.status === 'COMPLETED') return true;
+      this.logger.warn(
+        `MM escrow refund: hub status=${remote.status ?? '?'} success=${remote.success} for ${ref}`,
+      );
+      return false;
+    } catch (e) {
+      this.logger.warn(
+        `MM escrow refund: hub lookup failed for ${ref} — refusing wallet credit (${(e as Error).message})`,
+      );
+      // Even if local said COMPLETED, do not mint wallet without hub confirmation.
+      void localStatus;
+      return false;
+    }
   }
 }

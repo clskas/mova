@@ -30,7 +30,7 @@ import {
 } from "@/components/AdminIcons";
 import { DemoBadge } from "@/components/ui";
 import { checkGatewayHealth } from "@/lib/api";
-import { clearToken, getToken } from "@/lib/auth";
+import { clearToken, getToken, managedCityFromToken } from "@/lib/auth";
 import { navForRole, ROLE_LABELS, roleBadgeClass, canWriteSection, type NavItem } from "@/lib/rbac";
 
 const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -66,6 +66,7 @@ function ShellInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [demo, setDemo] = useState(false);
   const { role, loading, user } = useAdmin();
+  const managedCity = user?.managedCity?.trim() || managedCityFromToken() || null;
 
   useEffect(() => {
     checkGatewayHealth().then((ok) => setDemo(!ok && !getToken()));
@@ -130,6 +131,11 @@ function ShellInner({ children }: { children: React.ReactNode }) {
 
       <div className="flex-1 flex flex-col min-w-0">
         <header className="bg-white border-b overflow-x-hidden pt-[env(safe-area-inset-top)]">
+          {role === "CITY_ADMIN" && managedCity && (
+            <div className="px-3 lg:px-6 py-2 bg-teal-50 border-b border-teal-100 text-sm text-teal-900 text-center lg:text-left">
+              Périmètre : {managedCity}
+            </div>
+          )}
           <div className="px-3 lg:px-6 py-2 lg:py-3 flex flex-col items-center lg:items-stretch gap-2">
             <div className="flex flex-col items-center text-center mx-auto min-w-0 w-full lg:hidden">
               {/* eslint-disable-next-line @next/next/no-img-element */}

@@ -6,8 +6,18 @@ import {
   UserRole,
   serviceUrl,
 } from '@mova/shared';
+import { filterRowsByManagedCity } from '../common/city-scope.util';
 
 type MovaService = 'auth' | 'ride' | 'driver' | 'payment' | 'notification';
+
+const STAFF_ROLES = new Set<string>([
+  UserRole.SUPER_ADMIN,
+  UserRole.ADMIN,
+  UserRole.SUPPORT,
+  UserRole.FINANCE,
+  UserRole.CONTENT,
+  UserRole.CITY_ADMIN,
+]);
 
 @Injectable()
 export class AdminService {
@@ -218,18 +228,11 @@ export class AdminService {
   }
   async createUser(body: Record<string, unknown>, actorRole: string) {
     const nextRole = typeof body.role === 'string' ? body.role : undefined;
-    const staffRoles = new Set<string>([
-      UserRole.SUPER_ADMIN,
-      UserRole.ADMIN,
-      UserRole.SUPPORT,
-      UserRole.FINANCE,
-      UserRole.CONTENT,
-    ]);
-    if (nextRole && staffRoles.has(nextRole) && actorRole !== UserRole.SUPER_ADMIN) {
+    if (nextRole && STAFF_ROLES.has(nextRole) && actorRole !== UserRole.SUPER_ADMIN) {
       throw new MovaHttpException(
         MovaErrorCode.AUTH_FORBIDDEN,
         HttpStatus.FORBIDDEN,
-        'Seul un SUPER_ADMIN peut attribuer un rôle staff (ADMIN, SUPPORT, FINANCE, CONTENT, SUPER_ADMIN).',
+        'Seul un SUPER_ADMIN peut attribuer un rôle staff (ADMIN, SUPPORT, FINANCE, CONTENT, CITY_ADMIN, SUPER_ADMIN).',
       );
     }
     if (!nextRole) {
@@ -243,23 +246,16 @@ export class AdminService {
   }
   async updateUser(id: string, body: Record<string, unknown>, actorRole: string) {
     const nextRole = typeof body.role === 'string' ? body.role : undefined;
-    const staffRoles = new Set<string>([
-      UserRole.SUPER_ADMIN,
-      UserRole.ADMIN,
-      UserRole.SUPPORT,
-      UserRole.FINANCE,
-      UserRole.CONTENT,
-    ]);
     // Only SUPER_ADMIN may grant staff/admin-panel roles (blocks ADMIN→FINANCE escalation).
-    if (nextRole && staffRoles.has(nextRole) && actorRole !== UserRole.SUPER_ADMIN) {
+    if (nextRole && STAFF_ROLES.has(nextRole) && actorRole !== UserRole.SUPER_ADMIN) {
       throw new MovaHttpException(
         MovaErrorCode.AUTH_FORBIDDEN,
         HttpStatus.FORBIDDEN,
-        'Seul un SUPER_ADMIN peut attribuer un rôle staff (ADMIN, SUPPORT, FINANCE, CONTENT, SUPER_ADMIN).',
+        'Seul un SUPER_ADMIN peut attribuer un rôle staff (ADMIN, SUPPORT, FINANCE, CONTENT, CITY_ADMIN, SUPER_ADMIN).',
       );
     }
     const target = await this.getUser(id).catch(() => null) as { role?: string } | null;
-    if (target?.role && staffRoles.has(target.role) && actorRole !== UserRole.SUPER_ADMIN) {
+    if (target?.role && STAFF_ROLES.has(target.role) && actorRole !== UserRole.SUPER_ADMIN) {
       throw new MovaHttpException(
         MovaErrorCode.AUTH_FORBIDDEN,
         HttpStatus.FORBIDDEN,
@@ -411,7 +407,10 @@ export class AdminService {
     return this.proxy('driver', `/internal/incidents/${id}/resolve`, { method: 'POST', body: JSON.stringify({ status }) });
   }
 
-  listRides(query: { status?: string; from?: string; to?: string; skip?: number; take?: number }) {
+  listRides(
+    query: { status?: string; from?: string; to?: string; skip?: number; take?: number },
+    managedCity?: string | null,
+  ) {
     const params = new URLSearchParams();
     if (query.status) params.set('status', query.status);
     if (query.from) params.set('from', query.from);
@@ -420,9 +419,16 @@ export class AdminService {
     const take = Number.isFinite(query.take) && Number(query.take) > 0 ? Number(query.take) : 50;
     params.set('skip', String(Math.max(0, skip)));
     params.set('take', String(Math.min(200, take)));
-    return this.fetchJson<unknown[]>('ride', `/internal/rides?${params}`).then((data) =>
-      Array.isArray(data) ? data : [],
-    );
+    return this.fetchJson<
+      { pickupLat?: number; pickupLng?: number; [key: string]: unknown }[]
+    >('ride', `/internal/rides?${params}`).then((data) => {
+      const rows = Array.isArray(data) ? data : [];
+      // CITY_ADMIN: filter page in-memory via pickup GPS → resolveCityFromCoords (see city-scope.util).
+      return filterRowsByManagedCity(rows, managedCity ?? null, (r) => ({
+        lat: r.pickupLat,
+        lng: r.pickupLng,
+      }));
+    });
   }
   getRide(id: string) {
     return this.fetchJson('ride', `/internal/rides/${id}`);
@@ -437,15 +443,18 @@ export class AdminService {
     return this.proxy('ride', `/internal/rides/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status, reason }) });
   }
 
-  listDeliveries(query: {
-    status?: string;
-    type?: string;
-    from?: string;
-    to?: string;
-    search?: string;
-    skip?: number;
-    take?: number;
-  } = {}) {
+  async listDeliveries(
+    query: {
+      status?: string;
+      type?: string;
+      from?: string;
+      to?: string;
+      search?: string;
+      skip?: number;
+      take?: number;
+    } = {},
+    managedCity?: string | null,
+  ) {
     const params = new URLSearchParams();
     if (query.status) params.set('status', query.status);
     if (query.type) params.set('type', query.type);
@@ -454,7 +463,21 @@ export class AdminService {
     if (query.search?.trim()) params.set('search', query.search.trim());
     params.set('skip', String(query.skip ?? 0));
     params.set('take', String(query.take ?? 50));
-    return this.fetchJson('ride', `/internal/deliveries?${params}`);
+    const data = await this.fetchJson<
+      {
+        pickupLat?: number | null;
+        pickupLng?: number | null;
+        deliveryLat?: number | null;
+        deliveryLng?: number | null;
+        [key: string]: unknown;
+      }[]
+    >('ride', `/internal/deliveries?${params}`);
+    const rows = Array.isArray(data) ? data : [];
+    // CITY_ADMIN: in-memory filter by pickup (fallback delivery) GPS — see city-scope.util.
+    return filterRowsByManagedCity(rows, managedCity ?? null, (r) => ({
+      lat: r.pickupLat ?? r.deliveryLat,
+      lng: r.pickupLng ?? r.deliveryLng,
+    }));
   }
   getDelivery(id: string) {
     return this.fetchJson('ride', `/internal/deliveries/${id}`);
@@ -482,8 +505,14 @@ export class AdminService {
     return this.proxy('ride', `/internal/scheduled-rides/${id}/assign`, { method: 'PATCH', body: JSON.stringify({ driverId }) });
   }
 
-  listRestaurants() {
-    return this.fetchJson('ride', '/internal/restaurants');
+  async listRestaurants(managedCity?: string | null) {
+    const data = await this.fetchJson<{ lat?: number; lng?: number; [key: string]: unknown }[]>(
+      'ride',
+      '/internal/restaurants',
+    );
+    const rows = Array.isArray(data) ? data : [];
+    // CITY_ADMIN: full restaurant list filtered in-memory by restaurant lat/lng.
+    return filterRowsByManagedCity(rows, managedCity ?? null, (r) => ({ lat: r.lat, lng: r.lng }));
   }
   createRestaurant(body: Record<string, unknown>) {
     return this.proxy('ride', '/internal/restaurants', { method: 'POST', body: JSON.stringify(body) });

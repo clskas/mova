@@ -37,6 +37,7 @@ export class UsersService {
     email?: string | null;
     status: UserStatus;
     avatarUrl?: string | null;
+    managedCity?: string | null;
     createdAt: Date;
     updatedAt: Date;
   }) {
@@ -323,10 +324,29 @@ export class UsersService {
       UserRole.SUPPORT,
       UserRole.FINANCE,
       UserRole.CONTENT,
+      UserRole.CITY_ADMIN,
     ];
     if (role && !allowed.includes(role)) {
       throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, HttpStatus.BAD_REQUEST, 'Rôle utilisateur invalide.');
     }
+  }
+
+  /** CITY_ADMIN must have a managedCity; other roles clear it. */
+  private resolveManagedCityForRole(
+    role: UserRole,
+    managedCity: string | null | undefined,
+    existingCity?: string | null,
+  ): string | null {
+    if (role !== UserRole.CITY_ADMIN) return null;
+    const city = (managedCity !== undefined ? managedCity : existingCity)?.trim() || null;
+    if (!city) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        HttpStatus.BAD_REQUEST,
+        'CITY_ADMIN exige une ville gérée (managedCity), ex. Kinshasa ou Beni.',
+      );
+    }
+    return city;
   }
 
   async createAdmin(data: {
@@ -335,6 +355,7 @@ export class UsersService {
     firstName?: string;
     lastName?: string;
     status?: UserStatus;
+    managedCity?: string;
   }) {
     const phone = normalizePhoneRdc(data.phone);
     if (!validatePhoneRdc(phone)) {
@@ -348,6 +369,7 @@ export class UsersService {
       );
     }
     this.assertAssignableRole(data.role);
+    const managedCity = this.resolveManagedCityForRole(data.role, data.managedCity);
     const existing = await this.prisma.user.findUnique({ where: { phone } });
     if (existing) {
       const promotePassengerToPartner =
@@ -359,6 +381,7 @@ export class UsersService {
             where: { id: existing.id },
             data: {
               status: data.status ?? existing.status,
+              managedCity,
               ...(data.firstName !== undefined ? { firstName: data.firstName } : {}),
               ...(data.lastName !== undefined ? { lastName: data.lastName } : {}),
             },
@@ -372,6 +395,7 @@ export class UsersService {
             data: {
               role: data.role,
               status: data.status ?? UserStatus.ACTIVE,
+              managedCity: null,
               ...(data.firstName !== undefined ? { firstName: data.firstName } : {}),
               ...(data.lastName !== undefined ? { lastName: data.lastName } : {}),
             },
@@ -391,6 +415,7 @@ export class UsersService {
         status: data.status ?? (data.role === UserRole.DRIVER ? UserStatus.PENDING_KYC : UserStatus.ACTIVE),
         firstName: data.firstName,
         lastName: data.lastName,
+        managedCity,
       },
     });
     return this.enrichUser(user);
@@ -398,14 +423,31 @@ export class UsersService {
 
   async updateAdmin(
     id: string,
-    data: { role?: UserRole; phone?: string; status?: UserStatus; firstName?: string; lastName?: string },
+    data: {
+      role?: UserRole;
+      phone?: string;
+      status?: UserStatus;
+      firstName?: string;
+      lastName?: string;
+      managedCity?: string;
+    },
   ) {
     const existing = await this.findById(id);
     this.assertAssignableRole(data.role);
     if (data.status === UserStatus.SUSPENDED) {
       this.assertNotOwnerSuspend(existing.phone);
     }
-    const updated = await this.prisma.user.update({ where: { id }, data });
+    const nextRole = data.role ?? existing.role;
+    const managedCity = this.resolveManagedCityForRole(
+      nextRole,
+      data.managedCity,
+      existing.managedCity,
+    );
+    const { managedCity: _mc, ...rest } = data;
+    const updated = await this.prisma.user.update({
+      where: { id },
+      data: { ...rest, managedCity },
+    });
     if (data.status === UserStatus.SUSPENDED) {
       await this.denySuspendedUser(updated.id);
     }

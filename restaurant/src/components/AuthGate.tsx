@@ -21,6 +21,7 @@ import {
   isPinPending,
   isPinSessionUnlocked,
   isRestaurantRole,
+  markPinSessionUnlocked,
   normalizeLoginPhone,
   phoneFromToken,
   roleFromToken,
@@ -48,10 +49,14 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
       router.replace("/login");
       return;
     }
-    if (isPinPending() || !isPinSessionUnlocked()) {
+    if (isPinPending()) {
       dropTokenKeepPhone(phoneFromToken() || getLastPhone() || "");
       router.replace("/login?pin=1");
       return;
+    }
+    if (!isPinSessionUnlocked()) {
+      // Valid JWT survives browser restart until explicit logout.
+      markPinSessionUnlocked();
     }
     let cancelled = false;
 

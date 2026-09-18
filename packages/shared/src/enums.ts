@@ -8,6 +8,8 @@ export enum UserRole {
   SUPPORT = 'SUPPORT',
   FINANCE = 'FINANCE',
   CONTENT = 'CONTENT',
+  /** Admin panel role scoped to one service-area city (e.g. Kinshasa, Beni). */
+  CITY_ADMIN = 'CITY_ADMIN',
 }
 
 export enum UserStatus {

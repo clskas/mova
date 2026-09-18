@@ -12,6 +12,7 @@ class CreateUserAdminDto {
   @IsOptional() @IsEnum(UserStatus) status?: UserStatus;
   @IsOptional() @IsString() firstName?: string;
   @IsOptional() @IsString() lastName?: string;
+  @IsOptional() @IsString() managedCity?: string;
 }
 
 class UpdateUserAdminDto {
@@ -20,6 +21,7 @@ class UpdateUserAdminDto {
   @IsOptional() @IsString() firstName?: string;
   @IsOptional() @IsString() lastName?: string;
   @IsOptional() @IsString() phone?: string;
+  @IsOptional() @IsString() managedCity?: string;
 }
 
 class PurgeUserDto {

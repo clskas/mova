@@ -20,8 +20,9 @@ void main() {
 
   test('existing PIN skips setup and requires unlock on cold start', () {
     expect(sessionNeedsPinSetup(pinConfigured: true, phone: ''), isFalse);
-    expect(sessionRequiresPinUnlock(pinConfigured: true, phone: 'marie@gmail.com'), isTrue);
+    expect(sessionRequiresPinUnlock(pinConfigured: true, phone: 'marie@gmail.com'), isFalse);
     expect(sessionRequiresPinUnlock(pinConfigured: true, phone: '+243900000010'), isFalse);
+    expect(sessionRequiresPinUnlock(pinConfigured: true, phone: '+243893515173'), isFalse);
   });
 
   test('first-login PIN copy matches resto/location', () {

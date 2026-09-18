@@ -79,9 +79,9 @@ export function OtpGate({ children }: Props) {
           return;
         }
         if (me.pinConfigured && fallback && !isSeedDemoPhone(fallback) && !isPinSessionUnlocked()) {
-          dropTokenKeepPhone(fallback);
-          setPhone(fallback);
-          setPinMode(true);
+          // Valid JWT: stay authenticated across browser restarts until logout.
+          markPinSessionUnlocked();
+          setAuthenticated(true);
           setReady(true);
           return;
         }

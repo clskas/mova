@@ -1625,6 +1625,8 @@ export class RidesService {
       vehicleType: r.vehicleType,
       pickupAddress: r.pickupAddress,
       dropoffAddress: r.dropoffAddress,
+      pickupLat: r.pickupLat,
+      pickupLng: r.pickupLng,
       priceCdf: r.finalFareCdf ?? r.estimatedFareCdf ?? 0,
       createdAt: r.createdAt.toISOString(),
     }));

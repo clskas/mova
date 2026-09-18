@@ -47,6 +47,7 @@ export const ADMIN_PANEL_ROLES: UserRole[] = [
   UserRole.SUPPORT,
   UserRole.FINANCE,
   UserRole.CONTENT,
+  UserRole.CITY_ADMIN,
 ];
 
 export function isAdminPanelRole(role: string): role is UserRole {
@@ -131,6 +132,23 @@ export const ADMIN_ROLE_PERMISSIONS: Record<UserRole, AdminPermission[]> = {
     AdminPermission.SCHEDULED_WRITE,
     AdminPermission.PUBLICITES_READ,
     AdminPermission.PUBLICITES_WRITE,
+  ],
+  /** City-scoped ops: like SUPPORT + restaurants, no system / pricing write / wallets. */
+  [UserRole.CITY_ADMIN]: [
+    AdminPermission.METRICS_READ,
+    AdminPermission.USERS_READ,
+    AdminPermission.DRIVERS_READ,
+    AdminPermission.KYC_READ,
+    AdminPermission.RIDES_READ,
+    AdminPermission.RIDES_WRITE,
+    AdminPermission.INCIDENTS_READ,
+    AdminPermission.INCIDENTS_WRITE,
+    AdminPermission.DELIVERIES_READ,
+    AdminPermission.DELIVERIES_WRITE,
+    AdminPermission.RESTAURANTS_READ,
+    AdminPermission.RESTAURANTS_WRITE,
+    AdminPermission.SCHEDULED_READ,
+    AdminPermission.PRICING_READ,
   ],
 };
 

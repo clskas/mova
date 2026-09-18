@@ -1311,6 +1311,10 @@ export class AuthService {
 
   private buildAuthResponse(user: User, options: { isNew: boolean }) {
     const needsPinSetup = userNeedsPinSetup(user.phone, user.localPinHash);
+    const managedCity =
+      user.role === UserRole.CITY_ADMIN && user.managedCity?.trim()
+        ? user.managedCity.trim()
+        : undefined;
     const token = this.jwt.sign(
       {
         sub: user.id,
@@ -1319,6 +1323,7 @@ export class AuthService {
         role: user.role,
         status: user.status,
         needsPinSetup,
+        ...(managedCity ? { managedCity } : {}),
       },
       { jwtid: crypto.randomUUID() },
     );
@@ -1344,6 +1349,7 @@ export class AuthService {
         status: user.status,
         firstName: user.firstName,
         lastName: user.lastName,
+        ...(managedCity ? { managedCity } : {}),
       },
     };
   }

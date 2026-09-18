@@ -82,6 +82,8 @@ export type AdminUser = {
   createdAt?: string;
   playPrelaunch?: boolean;
   pinConfigured?: boolean;
+  /** CITY_ADMIN: service-area city name. */
+  managedCity?: string | null;
 };
 
 export type AdminDriver = {
@@ -619,6 +621,7 @@ export type AdminSessionUser = {
   canUnlinkPhone?: boolean;
   pinConfigured?: boolean;
   needsPinSetup?: boolean;
+  managedCity?: string | null;
 };
 
 export type WalletOverview = {
@@ -1939,6 +1942,7 @@ export async function createUser(data: {
   firstName?: string;
   lastName?: string;
   status?: string;
+  managedCity?: string;
 }) {
   return apiFetch<AdminUser>("/api/admin/users", { method: "POST", body: JSON.stringify(data) });
 }

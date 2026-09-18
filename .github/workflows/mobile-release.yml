@@ -133,11 +133,11 @@ jobs:
         id: playver
         run: |
           set -euo pipefail
-          # Play production floor: production is already at 70; next AAB must be ≥71.
+          # Play production floor: 71 already uploaded; next AAB must be ≥72.
           CODE="${{ github.run_number }}"
-          if [ "$CODE" -lt 71 ]; then CODE=71; fi
+          if [ "$CODE" -lt 72 ]; then CODE=72; fi
           echo "code=$CODE" >> "$GITHUB_OUTPUT"
-          echo "Play versionCode=$CODE (pubspec 1.0.7+71; run_number=${{ github.run_number }})"
+          echo "Play versionCode=$CODE (pubspec 1.0.7+72; run_number=${{ github.run_number }})"
 
       - name: Build passenger AAB
         working-directory: mobile

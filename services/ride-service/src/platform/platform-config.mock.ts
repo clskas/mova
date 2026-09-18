@@ -20,6 +20,7 @@ export function mockPlatformConfig(
     },
     pricing: { ...MARKET_RDC.pricing },
     carpool: { matchRadiusKm: 5, relaxedRadiusMultiplier: 3 },
+    driverOps: { requireDocumentsForJobs: false },
   };
   return {
     get: () => ({ ...base, ...overrides }),

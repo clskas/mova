@@ -1400,22 +1400,48 @@ export class DriversService {
 
   async updateDriverAdmin(
     userId: string,
-    data: { isAvailable?: boolean; active?: boolean; acceptsDeliveries?: boolean; acceptsRides?: boolean },
+    data: {
+      isAvailable?: boolean;
+      active?: boolean;
+      serviceMode?: 'BOTH' | 'RIDES_ONLY' | 'DELIVERIES_ONLY';
+      acceptsDeliveries?: boolean;
+      acceptsRides?: boolean;
+    },
   ) {
     const profile = await this.prisma.driverProfile.findUnique({ where: { userId } });
     if (!profile) throw new MovaHttpException(MovaErrorCode.DRIVER_KYC_PENDING);
-    if (data.acceptsDeliveries !== undefined || data.acceptsRides !== undefined) {
-      let acceptsDeliveries =
-        data.acceptsDeliveries !== undefined ? data.acceptsDeliveries : profile.acceptsDeliveries;
-      let acceptsRides = data.acceptsRides !== undefined ? data.acceptsRides : profile.acceptsRides;
+
+    if (
+      data.serviceMode !== undefined ||
+      data.acceptsDeliveries !== undefined ||
+      data.acceptsRides !== undefined
+    ) {
+      let acceptsRides = profile.acceptsRides !== false;
+      let acceptsDeliveries = profile.acceptsDeliveries !== false;
+      if (data.serviceMode === 'RIDES_ONLY') {
+        acceptsRides = true;
+        acceptsDeliveries = false;
+      } else if (data.serviceMode === 'DELIVERIES_ONLY') {
+        acceptsRides = false;
+        acceptsDeliveries = true;
+      } else if (data.serviceMode === 'BOTH') {
+        acceptsRides = true;
+        acceptsDeliveries = true;
+      } else {
+        if (data.acceptsDeliveries !== undefined) acceptsDeliveries = data.acceptsDeliveries === true;
+        if (data.acceptsRides !== undefined) acceptsRides = data.acceptsRides === true;
+      }
       if (!acceptsDeliveries && !acceptsRides) {
         acceptsRides = true;
       }
-      return this.prisma.driverProfile.update({
+      await this.prisma.driverProfile.update({
         where: { userId },
-        data: { acceptsDeliveries, acceptsRides },
-        include: { vehicles: true },
+        data: {
+          acceptsDeliveries,
+          acceptsRides,
+        },
       });
+      return this.getDriverAdminDetail(userId);
     }
     if (data.active !== undefined) return this.setDriverActive(userId, data.active);
     if (data.isAvailable !== undefined) return this.setAvailability(userId, data.isAvailable);

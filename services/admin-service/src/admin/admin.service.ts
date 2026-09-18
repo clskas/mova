@@ -420,27 +420,16 @@ export class AdminService {
     managedCity?: string | null,
   ) {
     await this.getDriver(userId, managedCity);
-    let acceptsRides = true;
-    let acceptsDeliveries = true;
-    if (opts.serviceMode === 'RIDES_ONLY') {
-      acceptsRides = true;
-      acceptsDeliveries = false;
-    } else if (opts.serviceMode === 'DELIVERIES_ONLY') {
-      acceptsRides = false;
-      acceptsDeliveries = true;
-    } else if (opts.serviceMode === 'BOTH') {
-      acceptsRides = true;
-      acceptsDeliveries = true;
-    } else if (opts.acceptsDeliveries === false) {
-      acceptsRides = true;
-      acceptsDeliveries = false;
-    } else if (opts.acceptsDeliveries === true) {
-      acceptsRides = true;
-      acceptsDeliveries = true;
+    let serviceMode = opts.serviceMode;
+    if (!serviceMode) {
+      if (opts.acceptsDeliveries === false) serviceMode = 'RIDES_ONLY';
+      else if (opts.acceptsDeliveries === true) serviceMode = 'BOTH';
+      else serviceMode = 'BOTH';
     }
+    // Pass serviceMode string (not booleans) so Nest never drops acceptsRides=false.
     return this.proxy('driver', `/internal/drivers/${userId}/status`, {
       method: 'PATCH',
-      body: JSON.stringify({ acceptsRides, acceptsDeliveries }),
+      body: JSON.stringify({ serviceMode }),
     });
   }
   pendingKyc(status?: string, managedCity?: string | null) {

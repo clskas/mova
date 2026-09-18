@@ -262,9 +262,23 @@ export default function ChauffeursPage() {
     if (!selectedId) return;
     setSaving(true);
     setError(null);
+    // Optimistic UI so the chosen mode is visible immediately.
+    const optimistic =
+      serviceMode === "RIDES_ONLY"
+        ? { serviceMode, acceptsRides: true, acceptsDeliveries: false }
+        : serviceMode === "DELIVERIES_ONLY"
+          ? { serviceMode, acceptsRides: false, acceptsDeliveries: true }
+          : { serviceMode: "BOTH" as const, acceptsRides: true, acceptsDeliveries: true };
+    setDetail((prev) => (prev ? { ...prev, ...optimistic } : prev));
+    setDrivers((prev) =>
+      prev.map((d) => (d.userId === selectedId ? { ...d, ...optimistic } : d)),
+    );
     try {
-      await setDriverServiceMode(selectedId, serviceMode);
-      const refreshed = await fetchDriverDetail(selectedId);
+      const updated = await setDriverServiceMode(selectedId, serviceMode);
+      const refreshed =
+        updated && typeof updated === "object" && "serviceMode" in updated
+          ? (updated as AdminDriverDetail)
+          : await fetchDriverDetail(selectedId);
       setDetail(refreshed);
       setDrivers((prev) =>
         prev.map((d) =>
@@ -280,6 +294,12 @@ export default function ChauffeursPage() {
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Impossible de changer le mode service");
+      try {
+        const rolled = await fetchDriverDetail(selectedId);
+        setDetail(rolled);
+      } catch {
+        /* keep optimistic until reload */
+      }
     } finally {
       setSaving(false);
     }

@@ -954,15 +954,20 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
       Success(:final data) => data,
       Failure() => <Map<String, dynamic>>[],
     };
-    final keys = _collectOfferKeys(rides, deliveries);
+    final mode = _serviceModeLabel();
+    final filteredRides =
+        mode == _DriverServiceMode.deliveriesOnly ? <Map<String, dynamic>>[] : rides;
+    final filteredDeliveries =
+        mode == _DriverServiceMode.ridesOnly ? <Map<String, dynamic>>[] : deliveries;
+    final keys = _collectOfferKeys(filteredRides, filteredDeliveries);
     final newOffers = <Map<String, dynamic>>[];
-    for (final o in rides) {
+    for (final o in filteredRides) {
       final id = o['id']?.toString();
       if (id == null || id.isEmpty) continue;
       final key = DriverJobAlertService.offerKey('ride', id);
       if (!_knownOfferKeys.contains(key) && !_dismissedOffers.contains('ride:$id')) newOffers.add(o);
     }
-    for (final o in deliveries) {
+    for (final o in filteredDeliveries) {
       final id = o['id']?.toString();
       if (id == null || id.isEmpty) continue;
       final key = DriverJobAlertService.offerKey('delivery', id);
@@ -970,8 +975,8 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
     }
     await _syncKnownOfferKeys(keys, newOffers: newOffers);
     setState(() {
-      _rideOffers = rides;
-      _deliveryOffers = deliveries;
+      _rideOffers = filteredRides;
+      _deliveryOffers = filteredDeliveries;
       _offersError = null;
     });
   }
@@ -1000,16 +1005,21 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
       Failure() => <String, dynamic>{'offers': <Map<String, dynamic>>[]},
     };
     final deliveries = List<Map<String, dynamic>>.from(deliveryPayload['offers'] as List? ?? []);
+    final mode = _serviceModeLabel();
+    final filteredRides =
+        mode == _DriverServiceMode.deliveriesOnly ? <Map<String, dynamic>>[] : rides;
+    final filteredDeliveries =
+        mode == _DriverServiceMode.ridesOnly ? <Map<String, dynamic>>[] : deliveries;
     final blockMessage = _offerBlockMessage(ridePayload, deliveryPayload);
-    final keys = _collectOfferKeys(rides, deliveries);
+    final keys = _collectOfferKeys(filteredRides, filteredDeliveries);
     final newOffers = <Map<String, dynamic>>[];
-    for (final o in rides) {
+    for (final o in filteredRides) {
       final id = o['id']?.toString();
       if (id == null || id.isEmpty) continue;
       final key = DriverJobAlertService.offerKey('ride', id);
       if (!_knownOfferKeys.contains(key) && !_dismissedOffers.contains('ride:$id')) newOffers.add(o);
     }
-    for (final o in deliveries) {
+    for (final o in filteredDeliveries) {
       final id = o['id']?.toString();
       if (id == null || id.isEmpty) continue;
       final key = DriverJobAlertService.offerKey('delivery', id);
@@ -1018,19 +1028,19 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
     await _syncKnownOfferKeys(keys, newOffers: newOffers);
 
     setState(() {
-      _rideOffers = rides;
-      _deliveryOffers = deliveries;
+      _rideOffers = filteredRides;
+      _deliveryOffers = filteredDeliveries;
       _offersError = blockMessage;
     });
 
-    for (final offer in rides) {
+    for (final offer in filteredRides) {
       final id = offer['id']?.toString() ?? '';
       if (id.isEmpty || _isOfferHidden('ride:$id')) continue;
       await _openRideOffer(offer);
       return;
     }
 
-    for (final offer in deliveries) {
+    for (final offer in filteredDeliveries) {
       final id = offer['id']?.toString() ?? '';
       if (id.isEmpty || _isOfferHidden('delivery:$id')) continue;
       if (offer['alreadyAssigned'] == true) {

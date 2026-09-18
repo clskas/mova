@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { IsBoolean, IsEnum, IsNumber, IsOptional, IsString } from 'class-validator';
+import { IsBoolean, IsEnum, IsIn, IsNumber, IsOptional, IsString } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 import { IncidentType, KycStatus, VehicleType } from '@prisma/client';
 import { normalizeVehicleType } from '@mova/shared';
@@ -47,7 +47,11 @@ class ReviewKycDto {
 class UpdateDriverStatusDto {
   @IsOptional() @IsBoolean() isAvailable?: boolean;
   @IsOptional() @IsBoolean() active?: boolean;
-  /** false = pas de livraisons. */
+  /** BOTH | RIDES_ONLY | DELIVERIES_ONLY — preferred over boolean flags (avoids false→dropped). */
+  @IsOptional()
+  @IsIn(['BOTH', 'RIDES_ONLY', 'DELIVERIES_ONLY'])
+  serviceMode?: 'BOTH' | 'RIDES_ONLY' | 'DELIVERIES_ONLY';
+  /** @deprecated Prefer serviceMode. */
   @IsOptional()
   @Transform(({ value }) => {
     if (value === false || value === 'false' || value === 0 || value === '0') return false;
@@ -56,7 +60,7 @@ class UpdateDriverStatusDto {
   })
   @IsBoolean()
   acceptsDeliveries?: boolean;
-  /** false = pas de courses taxi/moto. */
+  /** @deprecated Prefer serviceMode. */
   @IsOptional()
   @Transform(({ value }) => {
     if (value === false || value === 'false' || value === 0 || value === '0') return false;

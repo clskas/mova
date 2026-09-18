@@ -34,7 +34,7 @@ import { TrackingService } from '../tracking/tracking.service';
 import { assertServiceAreaPair, assertServiceAreaCoords } from '../common/address.util';
 import { tripDistanceKm } from '../common/geo.util';
 import { RoutingService } from '../geo/routing.service';
-import { assertDriverCanReceiveJobs, assertDriverEligibleForRide, driverCanReceiveJobs, fetchDriverProfileSnapshot, filterDriversAcceptingRides } from '../common/driver-eligibility.util';
+import { assertDriverCanReceiveJobs, assertDriverEligibleForRide, driverAcceptsRides, driverCanReceiveJobs, fetchDriverProfileSnapshot, filterDriversAcceptingRides } from '../common/driver-eligibility.util';
 import { fetchDriverDebtStatus, filterDriversNotDebtBlocked } from '../common/driver-debt.util';
 import { fetchAuthUserBrief } from '../common/internal-lookup.util';
 import { TripShareService } from '../share/trip-share.service';
@@ -436,6 +436,9 @@ export class RidesService {
     }
     if (!profile?.isAvailable || !driverCanReceiveJobs(profile)) {
       return { offers: [] as Record<string, unknown>[], documentsBlocked: profile?.documentsStatus?.canOperate === false };
+    }
+    if (!driverAcceptsRides(profile)) {
+      return { offers: [] as Record<string, unknown>[] };
     }
     if (profile.currentLat == null || profile.currentLng == null) {
       return { offers: [] as Record<string, unknown>[] };

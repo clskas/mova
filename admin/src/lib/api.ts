@@ -2060,7 +2060,7 @@ export async function setDriverStatus(userId: string, active: boolean, suspendUs
 export type DriverServiceMode = "BOTH" | "RIDES_ONLY" | "DELIVERIES_ONLY";
 
 export async function setDriverServiceMode(userId: string, serviceMode: DriverServiceMode) {
-  return apiFetch(`/api/admin/drivers/${userId}/delivery-mode`, {
+  return apiFetch<AdminDriverDetail>(`/api/admin/drivers/${userId}/delivery-mode`, {
     method: "PATCH",
     body: JSON.stringify({ serviceMode }),
   });

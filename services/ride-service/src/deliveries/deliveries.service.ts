@@ -842,13 +842,13 @@ export class DeliveriesService {
 
   /** Bloque une nouvelle commande si une livraison terminée n'est pas encore payée (comme les courses). */
   private async assertNoUnpaidCompletedDelivery(userId: string) {
-    const delivered = await this.prisma.delivery.findMany({
+    const delivered = (await this.prisma.delivery.findMany({
       where: { userId, status: DeliveryStatus.DELIVERED },
       orderBy: { deliveredAt: 'desc' },
       take: 5,
       select: { id: true },
-    });
-    for (const row of delivered) {
+    })) as Array<{ id: string }> | null;
+    for (const row of delivered ?? []) {
       const payment = await fetchServicePaymentStatus('DELIVERY', row.id);
       if (!payment.isPaid) {
         throw new MovaHttpException(MovaErrorCode.DELIVERY_UNPAID_PENDING, HttpStatus.CONFLICT);

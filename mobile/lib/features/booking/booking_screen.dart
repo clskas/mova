@@ -785,7 +785,6 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                       style: TextStyle(fontSize: 12, color: MovaColors.textSecondary),
                     ),
                     value: _roundTrip,
-                    activeThumbColor: MovaColors.violet,
                     onChanged: (v) {
                       setState(() => _roundTrip = v);
                       if (_dropoff != null || _destinationController.text.trim().isNotEmpty) {

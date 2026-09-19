@@ -153,7 +153,7 @@ export default async function CguPage() {
           <h3 className="text-lg font-medium">3.2 Vérification</h3>
           <p>
             L&apos;inscription requiert la validation OTP par SMS. Les chauffeurs doivent
-            compléter une vérification KYC (permis, carte grise, pièce d&apos;identité).
+            compléter une vérification KYC (permis, carte rose, pièce d&apos;identité).
           </p>
           <h3 className="text-lg font-medium">3.3 Sécurité du compte</h3>
           <p>

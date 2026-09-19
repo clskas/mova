@@ -12,7 +12,7 @@ La **ville SENGA** sur l'accueil est détectée via GPS à l'ouverture (modifiab
 
 ## Mise en route
 
-1. Complétez votre **KYC** (permis, carte grise, photo). L'admin peut voir des informations extraites par OCR après upload.
+1. Complétez votre **KYC** (permis, carte rose, photo). L'admin peut voir des informations extraites par OCR après upload.
 2. Attendez l'**approbation KYC** par l'équipe SENGA.
 3. Si votre véhicule est **VIP** ou **Confort**, l'admin doit aussi **valider le type d'engin** avant que vous puissiez travailler.
 4. Activez **En ligne** depuis l'écran principal.

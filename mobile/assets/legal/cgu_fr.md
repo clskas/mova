@@ -33,7 +33,7 @@ SENGA agit exclusivement en qualité d'intermédiaire technologique. Les prestat
 Vous devez être majeur (18 ans) et disposer d'un numéro de téléphone mobile valide au format **+243** suivi de 9 chiffres.
 
 ### 3.2 Vérification
-L'inscription requiert la validation OTP par SMS. Les chauffeurs doivent compléter une vérification KYC (permis, carte grise, pièce d'identité).
+L'inscription requiert la validation OTP par SMS. Les chauffeurs doivent compléter une vérification KYC (permis, carte rose, pièce d'identité).
 
 ### 3.3 Sécurité du compte
 Vous êtes responsable de la confidentialité de votre code OTP et de votre appareil. Signalez immédiatement toute utilisation non autorisée à support@mova.cd.

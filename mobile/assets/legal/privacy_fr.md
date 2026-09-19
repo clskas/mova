@@ -28,7 +28,7 @@ Cette politique explique quelles données nous collectons, pourquoi, comment lon
 
 ### 2.4 Données chauffeur (KYC)
 - Permis de conduire
-- Carte grise du véhicule
+- Carte rose du véhicule
 - Photo d'identité
 - Statut de disponibilité et revenus
 

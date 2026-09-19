@@ -16,7 +16,8 @@ if (keystorePropertiesFile.exists()) {
 
 android {
     namespace = "cd.mova.mova"
-    compileSdk = flutter.compileSdkVersion
+    // Play requires target API 36+ for updates as of 2026-08-31.
+    compileSdk = maxOf(36, flutter.compileSdkVersion)
     ndkVersion = "27.0.12077973"
 
     compileOptions {
@@ -51,7 +52,7 @@ android {
     defaultConfig {
         applicationId = "cd.mova.mova"
         minSdk = maxOf(23, flutter.minSdkVersion)
-        targetSdk = flutter.targetSdkVersion
+        targetSdk = maxOf(36, flutter.targetSdkVersion)
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         // Fallback if Dart `serverClientId` is unset — must be the Web OAuth client.

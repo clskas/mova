@@ -15,7 +15,7 @@ export const KYC_DOCUMENT_LABELS: Record<KycDocumentType, string> = {
   ID_PHOTO: 'Carte d\'identité / passeport',
   SELFIE: 'Photo récente (profil)',
   DRIVERS_LICENSE: 'Permis de conduire',
-  VEHICLE_REGISTRATION: 'Carte grise',
+  VEHICLE_REGISTRATION: 'Carte rose',
   VEHICLE_INSURANCE: 'Assurance véhicule',
   TECHNICAL_INSPECTION: 'Visite technique',
   CRIMINAL_RECORD: 'Extrait casier judiciaire',
@@ -260,6 +260,7 @@ function escapeNotifyHtml(value: string) {
 const LEGACY_TYPE_MAP: Record<string, KycDocumentType> = {
   permis_de_conduire: KYC_DOCUMENT_TYPES.DRIVERS_LICENSE,
   carte_grise: KYC_DOCUMENT_TYPES.VEHICLE_REGISTRATION,
+  carte_rose: KYC_DOCUMENT_TYPES.VEHICLE_REGISTRATION,
   photo_identite: KYC_DOCUMENT_TYPES.ID_PHOTO,
   DRIVERS_LICENSE: KYC_DOCUMENT_TYPES.DRIVERS_LICENSE,
 };

@@ -80,7 +80,7 @@ export default function PrivacyPage() {
           <h3 className="text-lg font-medium">2.4 Données chauffeur (KYC)</h3>
           <ul className="list-disc space-y-1 pl-5">
             <li>Permis de conduire</li>
-            <li>Carte grise du véhicule</li>
+            <li>Carte rose du véhicule</li>
             <li>Photo d&apos;identité</li>
             <li>Statut de disponibilité et revenus</li>
           </ul>

@@ -381,7 +381,7 @@ cd c:\Users\Administrator\Senga
 | 5c | ERRAND | Accepter course & commissions → **Photo preuve** puis terminer | Complétion refusée sans photo ; montant achats saisi à la fin |
 | 5d | Planifiée | Mission SCHEDULED → **Me porter volontaire** ou attendre auto-assign | Démarrage crée une Ride liée (`linkedRideId`) pour GPS live |
 | 6 | Gains | Consulter gains | Montants affichés |
-| 7 | KYC / documents | Upload permis, carte grise | Badges OCR si service configuré ; ne pas repasser en PENDING si déjà APPROVED |
+| 7 | KYC / documents | Upload permis, carte rose | Badges OCR si service configuré ; ne pas repasser en PENDING si déjà APPROVED |
 | 8 | Type d’engin | Si véhicule VIP/Confort en attente | Blocage **canOperate** tant que admin n’a pas validé le type |
 | 9 | Aide | Ouvrir | **Déconnexion** visible |
 | 10 | Déconnexion | Se déconnecter | Retour login |

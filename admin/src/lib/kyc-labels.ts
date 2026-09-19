@@ -2,7 +2,7 @@ export const KYC_DOC_LABELS: Record<string, string> = {
   ID_PHOTO: "Carte d'identité / passeport",
   SELFIE: "Photo récente (profil)",
   DRIVERS_LICENSE: "Permis de conduire",
-  VEHICLE_REGISTRATION: "Carte grise (optionnel)",
+  VEHICLE_REGISTRATION: "Carte rose (optionnel)",
   VEHICLE_INSURANCE: "Assurance véhicule",
   TECHNICAL_INSPECTION: "Visite technique",
   CRIMINAL_RECORD: "Extrait casier judiciaire",

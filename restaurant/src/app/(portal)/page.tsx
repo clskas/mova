@@ -32,7 +32,7 @@ function normalizeOptionLabels(raw: unknown): string[] {
 }
 
 /** Lignes articles avec taille + options/compléments pour resto et autres commerces. */
-export function formatOrderItemLines(items: unknown): string[] {
+function formatOrderItemLines(items: unknown): string[] {
   if (!Array.isArray(items)) return [];
   const lines: string[] = [];
   for (const it of items) {

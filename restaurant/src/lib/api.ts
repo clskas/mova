@@ -96,6 +96,12 @@ export type RestaurantProfile = {
   commerceType?: "RESTAURANT" | "SUPERMARKET" | "PHARMACY" | "BOUTIQUE";
   kycStatus?: string;
   canOperate?: boolean;
+  documentsReminder?: {
+    active?: boolean;
+    blocked?: boolean;
+    message?: string;
+    daysRemaining?: number | null;
+  };
   needsProfileSetup?: boolean;
 };
 

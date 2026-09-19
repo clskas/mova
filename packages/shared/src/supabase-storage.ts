@@ -30,6 +30,14 @@ export type SupabaseUploadResult = {
   message?: string;
 };
 
+function encodeObjectPath(objectPath: string): string {
+  return objectPath
+    .replace(/^\/+/, '')
+    .split('/')
+    .map(encodeURIComponent)
+    .join('/');
+}
+
 /**
  * Upload binaire via Storage REST (Authorization: service_role).
  * Buckets privés : retourne une signed URL (1h) si possible.
@@ -54,10 +62,7 @@ export async function supabaseUploadObject(
   }
 
   const objectPath = params.objectPath.replace(/^\/+/, '');
-  const uploadUrl = `${url}/storage/v1/object/${encodeURIComponent(params.bucket)}/${objectPath
-    .split('/')
-    .map(encodeURIComponent)
-    .join('/')}`;
+  const uploadUrl = `${url}/storage/v1/object/${encodeURIComponent(params.bucket)}/${encodeObjectPath(objectPath)}`;
 
   try {
     const res = await fetch(uploadUrl, {
@@ -78,35 +83,99 @@ export async function supabaseUploadObject(
       };
     }
 
-    const expiresIn = params.signedUrlExpiresIn ?? 3600;
-    const signRes = await fetch(`${url}/storage/v1/object/sign/${encodeURIComponent(params.bucket)}/${objectPath
-      .split('/')
-      .map(encodeURIComponent)
-      .join('/')}`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${key}`,
-        apikey: key,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ expiresIn }),
+    const signedUrl = await supabaseCreateSignedUrl(get, {
+      bucket: params.bucket,
+      objectPath,
+      expiresIn: params.signedUrlExpiresIn ?? 3600,
     });
-    const signData = (await signRes.json().catch(() => ({}))) as { signedURL?: string; signedUrl?: string };
-    const signedPath = signData.signedURL ?? signData.signedUrl;
-    const signedUrl = signedPath
-      ? signedPath.startsWith('http')
-        ? signedPath
-        : `${url}/storage/v1${signedPath.startsWith('/') ? '' : '/'}${signedPath}`
-      : undefined;
 
     return {
       success: true,
       bucket: params.bucket,
       path: objectPath,
-      signedUrl,
+      signedUrl: signedUrl ?? undefined,
       publicUrl: `${url}/storage/v1/object/authenticated/${params.bucket}/${objectPath}`,
     };
   } catch {
     return { success: false, message: 'Supabase Storage temporairement indisponible.' };
+  }
+}
+
+/** Signed URL courte pour affichage direct (admin / navigateur). */
+export async function supabaseCreateSignedUrl(
+  get: EnvGetter,
+  params: { bucket: string; objectPath: string; expiresIn?: number },
+): Promise<string | null> {
+  const url = get(SUPABASE_ENV_KEYS.url)?.trim()?.replace(/\/$/, '');
+  const key = get(SUPABASE_ENV_KEYS.serviceRoleKey)?.trim();
+  if (!url || !key) return null;
+  const objectPath = params.objectPath.replace(/^\/+/, '');
+  try {
+    const signRes = await fetch(
+      `${url}/storage/v1/object/sign/${encodeURIComponent(params.bucket)}/${encodeObjectPath(objectPath)}`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${key}`,
+          apikey: key,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ expiresIn: params.expiresIn ?? 3600 }),
+      },
+    );
+    const signData = (await signRes.json().catch(() => ({}))) as { signedURL?: string; signedUrl?: string };
+    const signedPath = signData.signedURL ?? signData.signedUrl;
+    if (!signedPath) return null;
+    return signedPath.startsWith('http')
+      ? signedPath
+      : `${url}/storage/v1${signedPath.startsWith('/') ? '' : '/'}${signedPath}`;
+  } catch {
+    return null;
+  }
+}
+
+export type SupabaseDownloadResult = {
+  success: boolean;
+  body?: Buffer;
+  contentType?: string;
+  message?: string;
+};
+
+/** Télécharge un objet privé (service_role) — utile pour servir `/api/uploads/*` après redeploy. */
+export async function supabaseDownloadObject(
+  get: EnvGetter,
+  params: { bucket: string; objectPath: string },
+): Promise<SupabaseDownloadResult> {
+  const url = get(SUPABASE_ENV_KEYS.url)?.trim()?.replace(/\/$/, '');
+  const key = get(SUPABASE_ENV_KEYS.serviceRoleKey)?.trim();
+  if (!url || !key) {
+    return { success: false, message: 'Supabase Storage non configuré.' };
+  }
+  const objectPath = params.objectPath.replace(/^\/+/, '');
+  try {
+    const res = await fetch(
+      `${url}/storage/v1/object/authenticated/${encodeURIComponent(params.bucket)}/${encodeObjectPath(objectPath)}`,
+      {
+        headers: {
+          Authorization: `Bearer ${key}`,
+          apikey: key,
+        },
+      },
+    );
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      return {
+        success: false,
+        message: `Objet introuvable (${res.status}): ${text.slice(0, 120)}`,
+      };
+    }
+    const ab = await res.arrayBuffer();
+    return {
+      success: true,
+      body: Buffer.from(ab),
+      contentType: res.headers.get('content-type') ?? undefined,
+    };
+  } catch {
+    return { success: false, message: 'Téléchargement Supabase indisponible.' };
   }
 }

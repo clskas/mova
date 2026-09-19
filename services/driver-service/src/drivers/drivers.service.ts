@@ -20,8 +20,13 @@ import {
   maskPhoneRdc,
   evaluateDriverDocuments,
   authNotifyUnreachableError,
+  resolveJobsGateTypes,
+  missingJobsGateTypes,
+  buildDocumentsReminder,
+  documentsGraceElapsed,
   type DriverDocumentsStatus,
   type AuthUserNotifyResult,
+  type DocumentsReminder,
 } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateOnboardingDto } from './drivers.dto';
@@ -55,10 +60,17 @@ export class DriversService {
     insuranceExpiry?: Date | null;
     technicalInspectionExpiry?: Date | null;
     documentsRenewalPending?: boolean;
+    createdAt?: Date | null;
     vehicles?: { typeApprovalStatus?: KycStatus; typeApprovalNotes?: string | null; isActive?: boolean }[];
-  }): DriverDocumentsStatus {
+  }, checklist?: Array<{ type?: string; uploaded?: boolean; status?: string | null }>): DriverDocumentsStatus & {
+    documentsReminder?: DocumentsReminder;
+  } {
+    const ops = this.matchingConfig.getDriverOps();
+    const requireForJobs = ops.requireDocumentsForJobs === true;
+    const graceElapsed = documentsGraceElapsed(profile.createdAt, ops.documentsGracePeriodDays);
+    const enforceExpiry = requireForJobs && graceElapsed;
     const activeVehicle = profile.vehicles?.find((v) => v.isActive !== false) ?? profile.vehicles?.[0];
-    return evaluateDriverDocuments(
+    const base = evaluateDriverDocuments(
       {
         licenseExpiry: profile.licenseExpiry,
         insuranceExpiry: profile.insuranceExpiry,
@@ -69,8 +81,43 @@ export class DriversService {
       },
       new Date(),
       30,
-      { requireDocumentsForJobs: this.matchingConfig.documentsRequiredForJobs() },
+      { requireDocumentsForJobs: enforceExpiry },
     );
+
+    const gateTypes = resolveJobsGateTypes('DRIVER', ops);
+    const missingKyc = checklist ? missingJobsGateTypes(checklist, gateTypes) : gateTypes;
+    const reminder = buildDocumentsReminder({
+      requireDocumentsForJobs: requireForJobs,
+      gracePeriodDays: ops.documentsGracePeriodDays,
+      createdAt: profile.createdAt,
+      missingTypes: missingKyc,
+    });
+
+    let canOperate = base.canOperate;
+    let blockReason = base.blockReason;
+    if (reminder.blocked) {
+      canOperate = false;
+      blockReason = reminder.message || blockReason;
+    } else if (!graceElapsed && requireForJobs && !base.canOperate) {
+      // Pendant le délai de grâce : laisser opérer mais garder le rappel.
+      canOperate = activeVehicle?.typeApprovalStatus
+        ? activeVehicle.typeApprovalStatus === 'APPROVED'
+        : true;
+      if (activeVehicle?.typeApprovalStatus && activeVehicle.typeApprovalStatus !== 'APPROVED') {
+        canOperate = false;
+        blockReason = base.blockReason;
+      } else {
+        canOperate = true;
+        blockReason = undefined;
+      }
+    }
+
+    return {
+      ...base,
+      canOperate,
+      blockReason,
+      documentsReminder: reminder.active || reminder.blocked ? reminder : undefined,
+    };
   }
 
   private sameCalendarDay(a?: Date | null, b?: string | Date | null): boolean {
@@ -213,12 +260,13 @@ export class DriversService {
         'Activez votre compte avec le code PIN reçu après validation SENGA.',
       );
     }
-    const documentsStatus = this.documentsStatusFor(profile);
+    const kyc = await this.getKycStatus(userId);
+    const documentsStatus = this.documentsStatusFor(profile, kyc.checklist);
     if (isAvailable && !documentsStatus.canOperate) {
       throw new MovaHttpException(
         MovaErrorCode.DRIVER_DOCUMENTS_EXPIRED,
         undefined,
-        documentsStatus.blockReason,
+        documentsStatus.blockReason ?? documentsStatus.documentsReminder?.message,
       );
     }
     return this.prisma.driverProfile.update({ where: { userId }, data: { isAvailable } });
@@ -412,7 +460,7 @@ export class DriversService {
         onboardingCompleted: profile?.onboardingCompleted ?? false,
         documentsRenewalPending: profile?.documentsRenewalPending ?? false,
         documentsRenewalRequestedAt: profile?.documentsRenewalRequestedAt,
-        documentsStatus: this.documentsStatusFor(profile ?? {}),
+        documentsStatus: this.documentsStatusFor(profile ?? {}, kyc.checklist),
         kycStatus: profile?.kycStatus,
         activationPinVerified: !!profile?.activationPinVerifiedAt,
         needsActivationPin: profile?.kycStatus === KycStatus.APPROVED && !profile?.activationPinVerifiedAt,
@@ -624,7 +672,8 @@ export class DriversService {
 
   async getProfileWithUser(userId: string) {
     const profile = await this.getOrCreateProfile(userId);
-    const documentsStatus = this.documentsStatusFor(profile);
+    const kyc = await this.getKycStatus(userId);
+    const documentsStatus = this.documentsStatusFor(profile, kyc.checklist);
     if (!documentsStatus.canOperate && profile.isAvailable) {
       await this.prisma.driverProfile.update({ where: { userId }, data: { isAvailable: false } });
       profile.isAvailable = false;
@@ -640,13 +689,15 @@ export class DriversService {
       acceptsRides,
       acceptsDeliveries,
       serviceMode,
+      documentsStatus,
+      documentsReminder: documentsStatus.documentsReminder,
+      kycChecklist: kyc.checklist,
       publicId: formatMovaPublicId(userId, 'DRIVER'),
       user,
       activationPinVerified: pinVerified,
       needsActivationPin: profile?.kycStatus === KycStatus.APPROVED && !pinVerified,
       documentsRenewalPending: profile?.documentsRenewalPending ?? false,
       documentsRenewalRequestedAt: profile?.documentsRenewalRequestedAt,
-      documentsStatus,
     };
   }
 

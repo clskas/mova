@@ -13,6 +13,9 @@ import {
   rentalKycPartnerKind,
   kycRejectNotifyCopy,
   driverActivationPinNotifyCopy,
+  resolveJobsGateTypes,
+  buildDocumentsReminder,
+  documentsGraceElapsed,
 } from './kyc-documents';
 
 describe('partner KYC checklists', () => {
@@ -54,6 +57,26 @@ describe('partner KYC checklists', () => {
       ),
     ).toBe(false);
     expect(JOBS_GATE_RENTAL_COMPANY_KYC_TYPES).toContain(PARTNER_KYC_DOCUMENT_TYPES.RCCM);
+  });
+
+  it('utilise la liste admin personnalisée pour le gate jobs et le délai de grâce', () => {
+    expect(
+      resolveJobsGateTypes('DRIVER', {
+        requireDocumentsForJobs: true,
+        requiredDriverDocuments: ['SELFIE', 'ID_PHOTO'],
+      }),
+    ).toEqual(['SELFIE', 'ID_PHOTO']);
+    expect(documentsGraceElapsed(new Date(), 7)).toBe(false);
+    expect(documentsGraceElapsed(new Date(Date.now() - 10 * 86400000), 7)).toBe(true);
+    const reminder = buildDocumentsReminder({
+      requireDocumentsForJobs: true,
+      gracePeriodDays: 3,
+      createdAt: new Date(),
+      missingTypes: ['SELFIE'],
+    });
+    expect(reminder.active).toBe(true);
+    expect(reminder.blocked).toBe(false);
+    expect(reminder.message).toContain('Photo récente');
   });
 });
 

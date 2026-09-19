@@ -48,11 +48,13 @@ export function AuthenticatedMedia({
 }) {
   const [src, setSrc] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
+  const [isPdf, setIsPdf] = useState(false);
 
   useEffect(() => {
     const full = resolveMediaUrl(url);
     setSrc(null);
     setFailed(!full);
+    setIsPdf(false);
     if (!full) return;
     if (full.startsWith("data:") || full.startsWith("blob:")) {
       setSrc(full);
@@ -61,14 +63,24 @@ export function AuthenticatedMedia({
     let objectUrl: string | null = null;
     let cancelled = false;
     fetch(full, { headers: authHeaders() })
-      .then((res) => (res.ok ? res.blob() : Promise.reject(new Error(String(res.status)))))
-      .then((blob) => {
+      .then(async (res) => {
+        if (!res.ok) throw new Error(String(res.status));
+        const ct = res.headers.get("content-type") ?? "";
+        const blob = await res.blob();
+        return { blob, ct };
+      })
+      .then(({ blob, ct }) => {
         if (cancelled) return;
+        const pdf =
+          ct.includes("pdf") ||
+          blob.type.includes("pdf") ||
+          (url ?? "").toLowerCase().endsWith(".pdf");
         objectUrl = URL.createObjectURL(blob);
+        setIsPdf(pdf);
         setSrc(objectUrl);
       })
       .catch(() => {
-        if (!cancelled) setSrc(full);
+        if (!cancelled) setFailed(true);
       });
     return () => {
       cancelled = true;
@@ -86,6 +98,17 @@ export function AuthenticatedMedia({
 
   if (!src) {
     return <div className={`${className ?? ""} bg-gray-100 animate-pulse rounded-lg border`} aria-hidden />;
+  }
+
+  if (isPdf) {
+    return (
+      <div className="space-y-2">
+        <iframe title={alt} src={src} className={`${className ?? ""} min-h-[420px] w-full rounded-lg border`} />
+        <a href={src} target="_blank" rel="noreferrer" className="text-sm text-[#6C63FF] underline">
+          Ouvrir le PDF
+        </a>
+      </div>
+    );
   }
 
   return (

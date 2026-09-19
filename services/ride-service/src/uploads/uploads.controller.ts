@@ -2,8 +2,6 @@ import { Body, Controller, Get, NotFoundException, Param, Post, Res, UseGuards }
 import { ApiBearerAuth, ApiOperation, ApiProperty, ApiTags } from '@nestjs/swagger';
 import { IsOptional, IsString } from 'class-validator';
 import type { Response } from 'express';
-import { existsSync } from 'fs';
-import { join } from 'path';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { UploadsService } from './uploads.service';
 
@@ -56,42 +54,32 @@ export class UploadsController {
   }
 
   @Get('parcels/:filename')
-  @ApiOperation({ summary: 'Télécharger une photo colis stockée localement' })
+  @ApiOperation({ summary: 'Télécharger une photo colis' })
   serveParcelPhoto(@Param('filename') filename: string, @Res() res: Response) {
-    return this.serveUploadedFile('parcels', filename, res);
+    return this.uploadsService.serveUploadedFile('parcels', filename, res);
   }
 
   @Get('menu/:filename')
-  @ApiOperation({ summary: 'Télécharger une photo plat stockée localement' })
+  @ApiOperation({ summary: 'Télécharger une photo plat' })
   serveMenuPhoto(@Param('filename') filename: string, @Res() res: Response) {
-    return this.serveUploadedFile('menu', filename, res);
+    return this.uploadsService.serveUploadedFile('menu', filename, res);
   }
 
   @Get('vehicles/:filename')
-  @ApiOperation({ summary: 'Télécharger une photo véhicule stockée localement' })
+  @ApiOperation({ summary: 'Télécharger une photo véhicule' })
   serveVehiclePhoto(@Param('filename') filename: string, @Res() res: Response) {
-    return this.serveUploadedFile('vehicles', filename, res);
+    return this.uploadsService.serveUploadedFile('vehicles', filename, res);
   }
 
   @Get('moving/:filename')
-  @ApiOperation({ summary: 'Télécharger une photo déménagement stockée localement' })
+  @ApiOperation({ summary: 'Télécharger une photo déménagement' })
   serveMovingPhoto(@Param('filename') filename: string, @Res() res: Response) {
-    return this.serveUploadedFile('moving', filename, res);
+    return this.uploadsService.serveUploadedFile('moving', filename, res);
   }
 
   @Get('kyc/:filename')
-  @ApiOperation({ summary: 'Télécharger un justificatif KYC stocké localement' })
+  @ApiOperation({ summary: 'Télécharger un justificatif KYC (local ou Supabase)' })
   serveKycPhoto(@Param('filename') filename: string, @Res() res: Response) {
-    return this.serveUploadedFile('kyc', filename, res);
-  }
-
-  private serveUploadedFile(category: 'parcels' | 'menu' | 'vehicles' | 'moving' | 'kyc', filename: string, res: Response) {
-    const safe = filename.replace(/[^a-zA-Z0-9._-]/g, '');
-    const filePath = join(process.cwd(), 'uploads', category, safe);
-    if (!existsSync(filePath)) throw new NotFoundException('Fichier introuvable');
-    const ext = safe.split('.').pop()?.toLowerCase();
-    const mime = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
-    res.setHeader('Content-Type', mime);
-    res.sendFile(filePath);
+    return this.uploadsService.serveUploadedFile('kyc', filename, res);
   }
 }

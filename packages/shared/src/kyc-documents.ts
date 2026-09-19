@@ -101,7 +101,8 @@ export const OPTIONAL_RENTAL_INDIVIDUAL_KYC_TYPES: PartnerKycDocumentType[] = [
   PARTNER_KYC_DOCUMENT_TYPES.ADDRESS_PROOF,
 ];
 
-/** Types exigés si PlatformConfig.driverOps.requireDocumentsForJobs = true. */
+/** Types exigés si PlatformConfig.driverOps.requireDocumentsForJobs = true
+ *  et qu'aucune liste admin personnalisée n'est définie. */
 export const JOBS_GATE_RESTAURANT_KYC_TYPES: PartnerKycDocumentType[] = [
   PARTNER_KYC_DOCUMENT_TYPES.MANAGER_ID,
   PARTNER_KYC_DOCUMENT_TYPES.RCCM,
@@ -119,6 +120,184 @@ export const JOBS_GATE_RENTAL_INDIVIDUAL_KYC_TYPES: Array<KycDocumentType | Part
   KYC_DOCUMENT_TYPES.ID_PHOTO,
 ];
 
+/** Catalogue admin : groupes de justificatifs (case à cocher « obligatoire »). */
+export type AdminDocumentCatalogGroup = {
+  id: KycPartnerKind;
+  label: string;
+  documents: Array<{ type: string; label: string }>;
+};
+
+export function adminDocumentCatalog(): AdminDocumentCatalogGroup[] {
+  return [
+    {
+      id: 'DRIVER',
+      label: 'Chauffeurs',
+      documents: OPTIONAL_DRIVER_KYC_TYPES.map((type) => ({
+        type,
+        label: KYC_DOCUMENT_LABELS[type],
+      })),
+    },
+    {
+      id: 'RESTAURANT',
+      label: 'Restaurants / boutiques',
+      documents: OPTIONAL_RESTAURANT_KYC_TYPES.map((type) => ({
+        type,
+        label: PARTNER_KYC_DOCUMENT_LABELS[type],
+      })),
+    },
+    {
+      id: 'RENTAL_COMPANY',
+      label: 'Location (entreprise)',
+      documents: OPTIONAL_RENTAL_COMPANY_KYC_TYPES.map((type) => ({
+        type,
+        label: PARTNER_KYC_DOCUMENT_LABELS[type],
+      })),
+    },
+    {
+      id: 'RENTAL_INDIVIDUAL',
+      label: 'Location (particulier)',
+      documents: [
+        {
+          type: KYC_DOCUMENT_TYPES.ID_PHOTO,
+          label: KYC_DOCUMENT_LABELS[KYC_DOCUMENT_TYPES.ID_PHOTO],
+        },
+        ...OPTIONAL_RENTAL_INDIVIDUAL_KYC_TYPES.map((type) => ({
+          type,
+          label: PARTNER_KYC_DOCUMENT_LABELS[type],
+        })),
+      ],
+    },
+  ];
+}
+
+export type DocumentsOpsConfig = {
+  requireDocumentsForJobs?: boolean;
+  /** Jours après création du compte avant blocage des notifs (0 = immédiat). */
+  documentsGracePeriodDays?: number;
+  requiredDriverDocuments?: string[];
+  requiredRestaurantDocuments?: string[];
+  requiredRentalCompanyDocuments?: string[];
+  requiredRentalIndividualDocuments?: string[];
+};
+
+const MS_PER_DAY = 86_400_000;
+
+export function normalizeDocumentTypeList(raw?: string[] | null): string[] {
+  if (!Array.isArray(raw)) return [];
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const item of raw) {
+    const type = String(item ?? '')
+      .trim()
+      .toUpperCase();
+    if (!type || seen.has(type)) continue;
+    seen.add(type);
+    out.push(type);
+  }
+  return out;
+}
+
+/** True si le délai de grâce est écoulé (blocage autorisé). */
+export function documentsGraceElapsed(
+  createdAt: Date | string | null | undefined,
+  graceDays: number,
+  now = new Date(),
+): boolean {
+  const days = Number.isFinite(graceDays) ? Math.max(0, Math.floor(graceDays)) : 0;
+  if (days <= 0) return true;
+  if (createdAt == null || createdAt === '') return true;
+  const start = createdAt instanceof Date ? createdAt : new Date(createdAt);
+  if (Number.isNaN(start.getTime())) return true;
+  return now.getTime() >= start.getTime() + days * MS_PER_DAY;
+}
+
+export function documentsGraceEndsAt(
+  createdAt: Date | string | null | undefined,
+  graceDays: number,
+): string | null {
+  const days = Number.isFinite(graceDays) ? Math.max(0, Math.floor(graceDays)) : 0;
+  if (days <= 0 || createdAt == null || createdAt === '') return null;
+  const start = createdAt instanceof Date ? createdAt : new Date(createdAt);
+  if (Number.isNaN(start.getTime())) return null;
+  return new Date(start.getTime() + days * MS_PER_DAY).toISOString();
+}
+
+export function resolveJobsGateTypes(
+  kind: KycPartnerKind,
+  ops?: DocumentsOpsConfig | null,
+): string[] {
+  const custom =
+    kind === 'DRIVER'
+      ? normalizeDocumentTypeList(ops?.requiredDriverDocuments)
+      : kind === 'RESTAURANT'
+        ? normalizeDocumentTypeList(ops?.requiredRestaurantDocuments)
+        : kind === 'RENTAL_COMPANY'
+          ? normalizeDocumentTypeList(ops?.requiredRentalCompanyDocuments)
+          : normalizeDocumentTypeList(ops?.requiredRentalIndividualDocuments);
+  if (custom.length > 0) return custom;
+  if (ops?.requireDocumentsForJobs !== true) return [];
+  if (kind === 'DRIVER') return [];
+  if (kind === 'RESTAURANT') return [...JOBS_GATE_RESTAURANT_KYC_TYPES];
+  if (kind === 'RENTAL_COMPANY') return [...JOBS_GATE_RENTAL_COMPANY_KYC_TYPES];
+  return [...JOBS_GATE_RENTAL_INDIVIDUAL_KYC_TYPES];
+}
+
+export type DocumentsReminder = {
+  active: boolean;
+  blocked: boolean;
+  gracePeriodDays: number;
+  graceEndsAt: string | null;
+  daysRemaining: number | null;
+  missingTypes: string[];
+  missingLabels: string[];
+  message: string;
+};
+
+export function buildDocumentsReminder(params: {
+  requireDocumentsForJobs: boolean;
+  gracePeriodDays: number;
+  createdAt?: Date | string | null;
+  missingTypes: string[];
+  now?: Date;
+}): DocumentsReminder {
+  const now = params.now ?? new Date();
+  const gracePeriodDays = Math.max(0, Math.floor(params.gracePeriodDays || 0));
+  const missingTypes = normalizeDocumentTypeList(params.missingTypes);
+  const missingLabels = missingTypes.map((t) => kycDocumentLabel(t));
+  const active = params.requireDocumentsForJobs && missingTypes.length > 0;
+  const graceEndsAt = documentsGraceEndsAt(params.createdAt, gracePeriodDays);
+  let daysRemaining: number | null = null;
+  if (graceEndsAt) {
+    daysRemaining = Math.max(
+      0,
+      Math.ceil((new Date(graceEndsAt).getTime() - now.getTime()) / MS_PER_DAY),
+    );
+  }
+  const blocked =
+    active && documentsGraceElapsed(params.createdAt, gracePeriodDays, now);
+  let message = '';
+  if (active) {
+    const list = missingLabels.join(', ');
+    if (blocked) {
+      message = `Documents obligatoires manquants ou non validés : ${list}. Déposez-les pour recevoir à nouveau les notifications.`;
+    } else if (daysRemaining != null) {
+      message = `Documents obligatoires à déposer (${list}). Il vous reste ${daysRemaining} jour${daysRemaining > 1 ? 's' : ''} avant suspension des notifications.`;
+    } else {
+      message = `Documents obligatoires à déposer : ${list}.`;
+    }
+  }
+  return {
+    active,
+    blocked,
+    gracePeriodDays,
+    graceEndsAt,
+    daysRemaining,
+    missingTypes,
+    missingLabels,
+    message,
+  };
+}
+
 /** True si tous les types du gate jobs sont déposés et APPROVED. */
 export function checklistSatisfiesJobsGate(
   checklist: Array<{ type?: string; uploaded?: boolean; status?: string | null }>,
@@ -135,6 +314,24 @@ export function checklistSatisfiesJobsGate(
     if (!row) return false;
     const uploaded = Boolean(row.uploaded ?? row.status);
     return uploaded && String(row.status ?? '').trim().toUpperCase() === 'APPROVED';
+  });
+}
+
+export function missingJobsGateTypes(
+  checklist: Array<{ type?: string; uploaded?: boolean; status?: string | null }>,
+  gateTypes: readonly string[],
+): string[] {
+  if (!gateTypes.length) return [];
+  const byType = new Map<string, { uploaded?: boolean; status?: string | null }>();
+  for (const item of checklist) {
+    const type = String(item.type ?? '').trim().toUpperCase();
+    if (type && !byType.has(type)) byType.set(type, item);
+  }
+  return gateTypes.filter((type) => {
+    const row = byType.get(String(type).toUpperCase());
+    if (!row) return true;
+    const uploaded = Boolean(row.uploaded ?? row.status);
+    return !(uploaded && String(row.status ?? '').trim().toUpperCase() === 'APPROVED');
   });
 }
 

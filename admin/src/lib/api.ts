@@ -539,7 +539,14 @@ export type PlatformConfigData = {
     combinedPeakNightMultiplier: number;
   };
   carpool: { matchRadiusKm: number; relaxedRadiusMultiplier: number };
-  driverOps?: { requireDocumentsForJobs: boolean };
+  driverOps?: {
+    requireDocumentsForJobs: boolean;
+    documentsGracePeriodDays?: number;
+    requiredDriverDocuments?: string[];
+    requiredRestaurantDocuments?: string[];
+    requiredRentalCompanyDocuments?: string[];
+    requiredRentalIndividualDocuments?: string[];
+  };
 };
 
 export type PlatformConfigResponse = {

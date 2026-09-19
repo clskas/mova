@@ -23,6 +23,66 @@ import {
   TextInput,
 } from "@/components/ui";
 
+/** Miroir de packages/shared adminDocumentCatalog — évite d'importer @mova/shared côté Next admin. */
+const DOCUMENT_CATALOG: Array<{
+  id: "DRIVER" | "RESTAURANT" | "RENTAL_COMPANY" | "RENTAL_INDIVIDUAL";
+  label: string;
+  field:
+    | "requiredDriverDocuments"
+    | "requiredRestaurantDocuments"
+    | "requiredRentalCompanyDocuments"
+    | "requiredRentalIndividualDocuments";
+  documents: Array<{ type: string; label: string }>;
+}> = [
+  {
+    id: "DRIVER",
+    label: "Chauffeurs",
+    field: "requiredDriverDocuments",
+    documents: [
+      { type: "ID_PHOTO", label: "Carte d'identité / passeport" },
+      { type: "SELFIE", label: "Photo récente (profil)" },
+      { type: "DRIVERS_LICENSE", label: "Permis de conduire" },
+      { type: "VEHICLE_REGISTRATION", label: "Carte rose" },
+      { type: "VEHICLE_INSURANCE", label: "Assurance véhicule" },
+      { type: "TECHNICAL_INSPECTION", label: "Visite technique" },
+      { type: "CRIMINAL_RECORD", label: "Extrait casier judiciaire" },
+    ],
+  },
+  {
+    id: "RESTAURANT",
+    label: "Restaurants / boutiques",
+    field: "requiredRestaurantDocuments",
+    documents: [
+      { type: "MANAGER_ID", label: "Identité du gérant (carte d'électeur / passeport)" },
+      { type: "RCCM", label: "RCCM ou preuve d'activité" },
+      { type: "PREMISES_PHOTO", label: "Adresse / photos du local" },
+      { type: "NIF", label: "NIF (si disponible)" },
+      { type: "PAYOUT_PROOF", label: "Preuve des coordonnées de paiement" },
+    ],
+  },
+  {
+    id: "RENTAL_COMPANY",
+    label: "Location (entreprise)",
+    field: "requiredRentalCompanyDocuments",
+    documents: [
+      { type: "RCCM", label: "RCCM ou preuve d'activité" },
+      { type: "COMPANY_STATUTES", label: "Statuts ou agrément" },
+      { type: "MANAGER_ID", label: "Identité du gérant (carte d'électeur / passeport)" },
+      { type: "HEADQUARTERS_PROOF", label: "Preuve de siège" },
+      { type: "NIF", label: "NIF (si disponible)" },
+    ],
+  },
+  {
+    id: "RENTAL_INDIVIDUAL",
+    label: "Location (particulier)",
+    field: "requiredRentalIndividualDocuments",
+    documents: [
+      { type: "ID_PHOTO", label: "Carte d'identité / passeport" },
+      { type: "ADDRESS_PROOF", label: "Preuve d'adresse" },
+    ],
+  },
+];
+
 const VEHICLE_LABELS: Record<string, string> = {
   MOTO_TAXI: "Moto-taxi",
   STANDARD: "Standard",
@@ -90,6 +150,13 @@ export default function ReglesPlateformePage() {
   const [combinedPeakNight, setCombinedPeakNight] = useState("");
   const [carpoolRadius, setCarpoolRadius] = useState("");
   const [requireDocsForJobs, setRequireDocsForJobs] = useState(false);
+  const [docsGraceDays, setDocsGraceDays] = useState("7");
+  const [requiredDocs, setRequiredDocs] = useState<Record<(typeof DOCUMENT_CATALOG)[number]["field"], string[]>>({
+    requiredDriverDocuments: [],
+    requiredRestaurantDocuments: [],
+    requiredRentalCompanyDocuments: [],
+    requiredRentalIndividualDocuments: [],
+  });
 
   function applyConfig(c: PlatformConfigData) {
     setConfig(c);
@@ -120,6 +187,13 @@ export default function ReglesPlateformePage() {
     setCombinedPeakNight(String(c.pricing.combinedPeakNightMultiplier));
     setCarpoolRadius(String(c.carpool.matchRadiusKm));
     setRequireDocsForJobs(c.driverOps?.requireDocumentsForJobs === true);
+    setDocsGraceDays(String(c.driverOps?.documentsGracePeriodDays ?? 7));
+    setRequiredDocs({
+      requiredDriverDocuments: c.driverOps?.requiredDriverDocuments ?? [],
+      requiredRestaurantDocuments: c.driverOps?.requiredRestaurantDocuments ?? [],
+      requiredRentalCompanyDocuments: c.driverOps?.requiredRentalCompanyDocuments ?? [],
+      requiredRentalIndividualDocuments: c.driverOps?.requiredRentalIndividualDocuments ?? [],
+    });
   }
 
   const load = useCallback(async () => {
@@ -272,12 +346,12 @@ export default function ReglesPlateformePage() {
 
           <section>
             <h2 className="font-semibold text-[#1A1A2E] mb-3">Documents chauffeurs / partenaires &amp; notifications</h2>
-            <Card className="p-4 space-y-3 max-w-2xl">
+            <Card className="p-4 space-y-4 max-w-3xl">
               <p className="text-sm text-gray-600">
-                Par défaut, tous les justificatifs (chauffeurs et partenaires) sont optionnels : l&apos;activation
-                reste possible même si certains documents manquent. Activez l&apos;option ci-dessous pour
-                exiger les documents clés — sinon plus de notifications de courses / commandes tant qu&apos;ils
-                ne sont pas déposés et validés.
+                Cochez les justificatifs obligatoires par catégorie. Tant qu&apos;ils ne sont pas déposés et
+                validés, les concernés reçoivent un rappel dans leur application. Après le délai ci-dessous,
+                les chauffeurs ne reçoivent plus d&apos;offres et les partenaires ne restent plus
+                visibles / commandables.
                 {cityAdminDocsOnly
                   ? " Cette règle s'applique au niveau plateforme (tous les comptes)."
                   : null}
@@ -291,16 +365,61 @@ export default function ReglesPlateformePage() {
                   onChange={(e) => setRequireDocsForJobs(e.target.checked)}
                 />
                 <span>
-                  Exiger des documents valides pour recevoir les notifications (chauffeurs) et rester
-                  visibles / commandables (restaurants, boutiques, loueurs)
+                  Activer l&apos;exigence documentaire (notifications courses / commandes)
                 </span>
               </label>
+              <div className="max-w-xs">
+                <NumField
+                  label="Délai avant blocage (jours, 0 = immédiat)"
+                  value={docsGraceDays}
+                  onChange={setDocsGraceDays}
+                  disabled={readOnly}
+                />
+              </div>
+              <div className="space-y-4">
+                {DOCUMENT_CATALOG.map((group) => (
+                  <div key={group.id} className="rounded-xl border border-gray-200 p-3 space-y-2">
+                    <p className="font-medium text-sm text-[#1A1A2E]">{group.label}</p>
+                    <div className="grid sm:grid-cols-2 gap-2">
+                      {group.documents.map((doc) => {
+                        const checked = requiredDocs[group.field].includes(doc.type);
+                        return (
+                          <label key={doc.type} className="flex items-start gap-2 text-sm">
+                            <input
+                              type="checkbox"
+                              className="mt-1"
+                              checked={checked}
+                              disabled={readOnly || !requireDocsForJobs}
+                              onChange={(e) => {
+                                setRequiredDocs((prev) => {
+                                  const cur = new Set(prev[group.field]);
+                                  if (e.target.checked) cur.add(doc.type);
+                                  else cur.delete(doc.type);
+                                  return { ...prev, [group.field]: Array.from(cur) };
+                                });
+                              }}
+                            />
+                            <span>{doc.label}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
               {!readOnly && (
                 <BtnPrimary
                   disabled={savingSection === "driverOps"}
                   onClick={() =>
                     savePlatform("driverOps", {
-                      driverOps: { requireDocumentsForJobs: requireDocsForJobs },
+                      driverOps: {
+                        requireDocumentsForJobs: requireDocsForJobs,
+                        documentsGracePeriodDays: Number(docsGraceDays) || 0,
+                        requiredDriverDocuments: requiredDocs.requiredDriverDocuments,
+                        requiredRestaurantDocuments: requiredDocs.requiredRestaurantDocuments,
+                        requiredRentalCompanyDocuments: requiredDocs.requiredRentalCompanyDocuments,
+                        requiredRentalIndividualDocuments: requiredDocs.requiredRentalIndividualDocuments,
+                      },
                     })
                   }
                 >

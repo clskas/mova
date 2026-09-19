@@ -1,4 +1,15 @@
-import { MARKET_RDC } from '@mova/shared';
+import { MARKET_RDC, normalizeDocumentTypeList } from '@mova/shared';
+
+export type DriverOpsConfig = {
+  /** When true, missing required docs block ride/delivery offers after grace period. */
+  requireDocumentsForJobs: boolean;
+  /** Days after account creation before blocking (0 = immediate). */
+  documentsGracePeriodDays: number;
+  requiredDriverDocuments: string[];
+  requiredRestaurantDocuments: string[];
+  requiredRentalCompanyDocuments: string[];
+  requiredRentalIndividualDocuments: string[];
+};
 
 export type PlatformConfigOverrides = {
   interCity?: Partial<typeof MARKET_RDC.interCity>;
@@ -13,10 +24,7 @@ export type PlatformConfigOverrides = {
   };
   pricing?: Partial<typeof MARKET_RDC.pricing>;
   carpool?: { matchRadiusKm?: number; relaxedRadiusMultiplier?: number };
-  driverOps?: {
-    /** When true, missing/expired driver docs block ride/delivery offers. Default false. */
-    requireDocumentsForJobs?: boolean;
-  };
+  driverOps?: Partial<DriverOpsConfig>;
 };
 
 export type MergedPlatformConfig = {
@@ -57,7 +65,7 @@ export type MergedPlatformConfig = {
     combinedPeakNightMultiplier: number;
   };
   carpool: { matchRadiusKm: number; relaxedRadiusMultiplier: number };
-  driverOps: { requireDocumentsForJobs: boolean };
+  driverOps: DriverOpsConfig;
 };
 
 export const PLATFORM_CONFIG_DEFAULTS: MergedPlatformConfig = {
@@ -74,5 +82,45 @@ export const PLATFORM_CONFIG_DEFAULTS: MergedPlatformConfig = {
   },
   pricing: { ...MARKET_RDC.pricing },
   carpool: { matchRadiusKm: 5, relaxedRadiusMultiplier: 3 },
-  driverOps: { requireDocumentsForJobs: false },
+  driverOps: {
+    requireDocumentsForJobs: false,
+    documentsGracePeriodDays: 7,
+    requiredDriverDocuments: [],
+    requiredRestaurantDocuments: [],
+    requiredRentalCompanyDocuments: [],
+    requiredRentalIndividualDocuments: [],
+  },
 };
+
+export function mergeDriverOps(
+  base: DriverOpsConfig,
+  patch?: Partial<DriverOpsConfig>,
+): DriverOpsConfig {
+  if (!patch) return base;
+  return {
+    requireDocumentsForJobs:
+      patch.requireDocumentsForJobs !== undefined
+        ? patch.requireDocumentsForJobs === true
+        : base.requireDocumentsForJobs,
+    documentsGracePeriodDays:
+      patch.documentsGracePeriodDays !== undefined
+        ? Math.max(0, Math.floor(Number(patch.documentsGracePeriodDays) || 0))
+        : base.documentsGracePeriodDays,
+    requiredDriverDocuments:
+      patch.requiredDriverDocuments !== undefined
+        ? normalizeDocumentTypeList(patch.requiredDriverDocuments)
+        : base.requiredDriverDocuments,
+    requiredRestaurantDocuments:
+      patch.requiredRestaurantDocuments !== undefined
+        ? normalizeDocumentTypeList(patch.requiredRestaurantDocuments)
+        : base.requiredRestaurantDocuments,
+    requiredRentalCompanyDocuments:
+      patch.requiredRentalCompanyDocuments !== undefined
+        ? normalizeDocumentTypeList(patch.requiredRentalCompanyDocuments)
+        : base.requiredRentalCompanyDocuments,
+    requiredRentalIndividualDocuments:
+      patch.requiredRentalIndividualDocuments !== undefined
+        ? normalizeDocumentTypeList(patch.requiredRentalIndividualDocuments)
+        : base.requiredRentalIndividualDocuments,
+  };
+}

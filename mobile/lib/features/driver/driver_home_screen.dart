@@ -1182,6 +1182,20 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
 
   String? get _documentsBlockReason => _documentsStatus?['blockReason']?.toString();
 
+  Map<String, dynamic>? get _documentsReminder {
+    final fromStatus = _documentsStatus?['documentsReminder'];
+    if (fromStatus is Map<String, dynamic>) return fromStatus;
+    final top = _profile?['documentsReminder'];
+    if (top is Map<String, dynamic>) return top;
+    return null;
+  }
+
+  String? get _documentsReminderMessage {
+    final r = _documentsReminder;
+    if (r == null || r['active'] != true) return null;
+    return r['message']?.toString();
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_bootstrapping) {
@@ -1394,6 +1408,27 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                               'Permis, assurance ou visite technique expiré(s) ou incomplet(s). '
                                   'Mettez à jour vos dates dans Enregistrement avant de recevoir des missions.'),
                       maxLines: 4,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: _sectionGap),
+          ],
+          if (_kycStatus == 'APPROVED' &&
+              _documentsCanOperate &&
+              _documentsReminderMessage != null) ...[
+            MovaCard(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.notification_important_outlined, color: MovaColors.violet),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      _documentsReminderMessage!,
+                      maxLines: 5,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),

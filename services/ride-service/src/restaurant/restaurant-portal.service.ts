@@ -108,6 +108,7 @@ export class RestaurantPortalService {
       canOperate: dossier.canOperate,
       documentsRequiredForJobs: dossier.documentsRequiredForJobs,
       documentsJobsGateOk: dossier.documentsJobsGateOk,
+      documentsReminder: dossier.documentsReminder,
       needsProfileSetup: restaurantNeedsProfileSetup(restaurant),
     };
   }

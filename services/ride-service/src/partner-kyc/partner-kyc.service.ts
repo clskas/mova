@@ -16,11 +16,12 @@ import {
   notifyAuthUser,
   allPartnerJustificatifsApproved,
   checklistSatisfiesJobsGate,
+  missingJobsGateTypes,
+  resolveJobsGateTypes,
+  buildDocumentsReminder,
+  documentsGraceElapsed,
   commerceTypeLabel,
   parseCommerceType,
-  JOBS_GATE_RESTAURANT_KYC_TYPES,
-  JOBS_GATE_RENTAL_COMPANY_KYC_TYPES,
-  JOBS_GATE_RENTAL_INDIVIDUAL_KYC_TYPES,
   type AuthUserNotifyResult,
   type KycPartnerKind,
   type PartnerKycSubject as PartnerSubject,
@@ -60,25 +61,62 @@ export class PartnerKycService {
     return this.platformConfig.get().driverOps.requireDocumentsForJobs === true;
   }
 
+  private driverOps() {
+    return this.platformConfig.get().driverOps;
+  }
+
+  private restaurantGateTypes(): string[] {
+    return resolveJobsGateTypes('RESTAURANT', this.driverOps());
+  }
+
+  private rentalGateTypes(partnerType: string | null | undefined): string[] {
+    return resolveJobsGateTypes(
+      partnerType === 'COMPANY' ? 'RENTAL_COMPANY' : 'RENTAL_INDIVIDUAL',
+      this.driverOps(),
+    );
+  }
+
   private restaurantCanOperate(
     kycStatus: string,
     checklist: Array<{ type?: string; uploaded?: boolean; status?: string | null }>,
+    createdAt?: Date | string | null,
   ): boolean {
     if (kycStatus !== PartnerKycStatus.APPROVED) return false;
     if (!this.requireDocumentsForJobs()) return true;
-    return checklistSatisfiesJobsGate(checklist, JOBS_GATE_RESTAURANT_KYC_TYPES);
+    const gate = this.restaurantGateTypes();
+    if (!gate.length) return true;
+    if (!documentsGraceElapsed(createdAt, this.driverOps().documentsGracePeriodDays)) return true;
+    return checklistSatisfiesJobsGate(checklist, gate);
   }
 
   private rentalCanOperate(
     kycStatus: string,
     partnerType: string | null | undefined,
     checklist: Array<{ type?: string; uploaded?: boolean; status?: string | null }>,
+    createdAt?: Date | string | null,
   ): boolean {
     if (kycStatus !== PartnerKycStatus.APPROVED) return false;
     if (!this.requireDocumentsForJobs()) return true;
-    const gate =
-      partnerType === 'COMPANY' ? JOBS_GATE_RENTAL_COMPANY_KYC_TYPES : JOBS_GATE_RENTAL_INDIVIDUAL_KYC_TYPES;
+    const gate = this.rentalGateTypes(partnerType);
+    if (!gate.length) return true;
+    if (!documentsGraceElapsed(createdAt, this.driverOps().documentsGracePeriodDays)) return true;
     return checklistSatisfiesJobsGate(checklist, gate);
+  }
+
+  private partnerDocumentsReminder(
+    kind: KycPartnerKind,
+    checklist: Array<{ type?: string; uploaded?: boolean; status?: string | null }>,
+    createdAt?: Date | string | null,
+  ) {
+    const ops = this.driverOps();
+    const gate = resolveJobsGateTypes(kind, ops);
+    const missing = missingJobsGateTypes(checklist, gate);
+    return buildDocumentsReminder({
+      requireDocumentsForJobs: this.requireDocumentsForJobs(),
+      gracePeriodDays: ops.documentsGracePeriodDays,
+      createdAt,
+      missingTypes: missing,
+    });
   }
 
   async getRestaurantDossier(ownerUserId: string) {
@@ -113,9 +151,10 @@ export class PartnerKycService {
       email: user?.email ?? null,
       phoneVerified,
       hasEmail,
-      canOperate: this.restaurantCanOperate(restaurant.kycStatus, checklist),
+      canOperate: this.restaurantCanOperate(restaurant.kycStatus, checklist, restaurant.createdAt),
       documentsRequiredForJobs: this.requireDocumentsForJobs(),
-      documentsJobsGateOk: checklistSatisfiesJobsGate(checklist, JOBS_GATE_RESTAURANT_KYC_TYPES),
+      documentsJobsGateOk: checklistSatisfiesJobsGate(checklist, this.restaurantGateTypes()),
+      documentsReminder: this.partnerDocumentsReminder('RESTAURANT', checklist, restaurant.createdAt),
       pinConfigured: user?.pinConfigured === true,
       pinPending: restaurant.kycStatus === PartnerKycStatus.APPROVED && user?.pinConfigured !== true,
       activationPinVerified: !!restaurant.activationPinVerifiedAt,
@@ -162,13 +201,13 @@ export class PartnerKycService {
       email: user?.email ?? null,
       phoneVerified,
       hasEmail,
-      canOperate: this.rentalCanOperate(profile.kycStatus, profile.partnerType, checklist),
+      canOperate: this.rentalCanOperate(profile.kycStatus, profile.partnerType, checklist, profile.createdAt),
       documentsRequiredForJobs: this.requireDocumentsForJobs(),
-      documentsJobsGateOk: checklistSatisfiesJobsGate(
+      documentsJobsGateOk: checklistSatisfiesJobsGate(checklist, this.rentalGateTypes(profile.partnerType)),
+      documentsReminder: this.partnerDocumentsReminder(
+        rentalKycPartnerKind(kind),
         checklist,
-        profile.partnerType === 'COMPANY'
-          ? JOBS_GATE_RENTAL_COMPANY_KYC_TYPES
-          : JOBS_GATE_RENTAL_INDIVIDUAL_KYC_TYPES,
+        profile.createdAt,
       ),
       pinConfigured: user?.pinConfigured === true,
       pinPending: profile.kycStatus === PartnerKycStatus.APPROVED && user?.pinConfigured !== true,
@@ -327,9 +366,18 @@ export class PartnerKycService {
         return {
           ...dossier,
           kycStatus: PartnerKycStatus.APPROVED,
-          canOperate: this.restaurantCanOperate(PartnerKycStatus.APPROVED, dossier.checklist),
+          canOperate: this.restaurantCanOperate(
+            PartnerKycStatus.APPROVED,
+            dossier.checklist,
+            restaurant.createdAt,
+          ),
           documentsRequiredForJobs: this.requireDocumentsForJobs(),
-          documentsJobsGateOk: checklistSatisfiesJobsGate(dossier.checklist, JOBS_GATE_RESTAURANT_KYC_TYPES),
+          documentsJobsGateOk: checklistSatisfiesJobsGate(dossier.checklist, this.restaurantGateTypes()),
+          documentsReminder: this.partnerDocumentsReminder(
+            'RESTAURANT',
+            dossier.checklist,
+            restaurant.createdAt,
+          ),
           activationPinVerified: false,
           needsActivationPin: true,
           ...pin,
@@ -368,13 +416,21 @@ export class PartnerKycService {
       return {
         ...dossier,
         kycStatus: PartnerKycStatus.APPROVED,
-        canOperate: this.rentalCanOperate(PartnerKycStatus.APPROVED, dossier.partnerType, dossier.checklist),
+        canOperate: this.rentalCanOperate(
+          PartnerKycStatus.APPROVED,
+          dossier.partnerType,
+          dossier.checklist,
+          profile.createdAt,
+        ),
         documentsRequiredForJobs: this.requireDocumentsForJobs(),
         documentsJobsGateOk: checklistSatisfiesJobsGate(
           dossier.checklist,
-          dossier.partnerType === 'COMPANY'
-            ? JOBS_GATE_RENTAL_COMPANY_KYC_TYPES
-            : JOBS_GATE_RENTAL_INDIVIDUAL_KYC_TYPES,
+          this.rentalGateTypes(dossier.partnerType),
+        ),
+        documentsReminder: this.partnerDocumentsReminder(
+          rentalKycPartnerKind(dossier.partnerType as RentalPartnerKind),
+          dossier.checklist,
+          profile.createdAt,
         ),
         activationPinVerified: false,
         needsActivationPin: true,

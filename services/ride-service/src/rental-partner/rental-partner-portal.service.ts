@@ -160,6 +160,7 @@ export class RentalPartnerPortalService {
       canOperate: dossier.canOperate,
       documentsRequiredForJobs: dossier.documentsRequiredForJobs,
       documentsJobsGateOk: dossier.documentsJobsGateOk,
+      documentsReminder: dossier.documentsReminder,
       needsProfileSetup: needsSetup,
       vehicleCounts: {
         pending: byStatus[RentalVehicleApprovalStatus.PENDING] ?? 0,

@@ -31,6 +31,7 @@ export default function SettingsPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [canOperate, setCanOperate] = useState(true);
+  const [docsReminder, setDocsReminder] = useState<string | null>(null);
   const copy = commerceCopy(commerceType);
 
   const load = useCallback(async () => {
@@ -46,6 +47,11 @@ export default function SettingsPage() {
       setLat(p.lat != null ? String(p.lat) : "");
       setLng(p.lng != null ? String(p.lng) : "");
       setCanOperate(p.canOperate !== false && p.kycStatus !== "PENDING" && p.kycStatus !== "REJECTED");
+      setDocsReminder(
+        p.documentsReminder?.active && p.documentsReminder.message
+          ? p.documentsReminder.message
+          : null,
+      );
     } catch (e) {
       setError(toUserErrorMessage(e, "Erreur"));
     } finally {
@@ -150,6 +156,14 @@ export default function SettingsPage() {
           <p className="text-sm text-amber-900 bg-amber-50 rounded-xl px-3 py-2">
             Votre dossier n&apos;est pas encore validé. Vous ne pouvez pas accepter de commandes — ouvrez{" "}
             <a href="/dossier" className="underline font-medium">Mon dossier</a>.
+          </p>
+        )}
+        {docsReminder && (
+          <p className="text-sm text-violet-900 bg-violet-50 rounded-xl px-3 py-2">
+            {docsReminder}{" "}
+            <a href="/dossier" className="underline font-medium">
+              Déposer les documents
+            </a>
           </p>
         )}
         <ConnectionCard />

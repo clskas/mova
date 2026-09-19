@@ -1,14 +1,17 @@
-import { HttpStatus, Injectable, Logger } from '@nestjs/common';
+import { HttpStatus, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   MovaErrorCode,
   MovaHttpException,
   isSupabaseStorageConfigured,
+  supabaseDownloadObject,
   supabaseKycBucket,
   supabaseUploadObject,
   supabaseUploadsBucket,
 } from '@mova/shared';
 import { randomUUID } from 'crypto';
+import type { Response } from 'express';
+import { existsSync } from 'fs';
 import { mkdir, writeFile } from 'fs/promises';
 import { join } from 'path';
 
@@ -41,6 +44,56 @@ export class UploadsService {
 
   async uploadKycDocument(base64: string, mimeType = 'image/jpeg') {
     return this.uploadImage('kyc', base64, mimeType);
+  }
+
+  private mimeForFilename(filename: string, fallback?: string): string {
+    const ext = filename.split('.').pop()?.toLowerCase();
+    if (ext === 'png') return 'image/png';
+    if (ext === 'webp') return 'image/webp';
+    if (ext === 'pdf') return 'application/pdf';
+    if (ext === 'jpg' || ext === 'jpeg') return 'image/jpeg';
+    return fallback ?? 'application/octet-stream';
+  }
+
+  /**
+   * Sert un fichier uploadé : disque local d'abord, sinon Supabase (après redeploy Render).
+   */
+  async serveUploadedFile(category: UploadCategory, filename: string, res: Response) {
+    const safe = filename.replace(/[^a-zA-Z0-9._-]/g, '');
+    if (!safe) throw new NotFoundException('Fichier introuvable');
+    const filePath = join(process.cwd(), 'uploads', category, safe);
+    if (existsSync(filePath)) {
+      res.setHeader('Content-Type', this.mimeForFilename(safe));
+      res.setHeader('Cache-Control', 'private, max-age=300');
+      return res.sendFile(filePath);
+    }
+
+    if (!isSupabaseStorageConfigured(this.get)) {
+      throw new NotFoundException('Fichier introuvable');
+    }
+
+    const bucket = category === 'kyc' ? supabaseKycBucket(this.get) : supabaseUploadsBucket(this.get);
+    const objectPath = `${category}/${safe}`;
+    const downloaded = await supabaseDownloadObject(this.get, { bucket, objectPath });
+    if (!downloaded.success || !downloaded.body) {
+      this.logger.warn(`Upload miss local+supabase ${objectPath}: ${downloaded.message}`);
+      throw new NotFoundException('Fichier introuvable');
+    }
+
+    // Recache localement pour les prochaines lectures sur cette instance.
+    try {
+      const dir = join(process.cwd(), 'uploads', category);
+      await mkdir(dir, { recursive: true });
+      await writeFile(filePath, downloaded.body);
+    } catch (err) {
+      this.logger.debug(
+        `Local recache skipped for ${objectPath}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+
+    res.setHeader('Content-Type', this.mimeForFilename(safe, downloaded.contentType));
+    res.setHeader('Cache-Control', 'private, max-age=300');
+    return res.send(downloaded.body);
   }
 
   private async uploadImage(category: UploadCategory, base64: string, mimeType = 'image/jpeg') {

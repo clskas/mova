@@ -5,6 +5,7 @@ import {
   MergedPlatformConfig,
   PLATFORM_CONFIG_DEFAULTS,
   PlatformConfigOverrides,
+  mergeDriverOps,
 } from './platform-config.types';
 
 function mergeConfig(overrides: PlatformConfigOverrides): MergedPlatformConfig {
@@ -25,7 +26,7 @@ function mergeConfig(overrides: PlatformConfigOverrides): MergedPlatformConfig {
     },
     pricing: { ...d.pricing, ...o.pricing },
     carpool: { ...d.carpool, ...o.carpool },
-    driverOps: { ...d.driverOps, ...o.driverOps },
+    driverOps: mergeDriverOps(d.driverOps, o.driverOps),
   };
 }
 
@@ -103,7 +104,18 @@ export class PlatformConfigService implements OnModuleInit {
       pricing: patch.pricing ? { ...this.overrides.pricing, ...patch.pricing } : this.overrides.pricing,
       carpool: patch.carpool ? { ...this.overrides.carpool, ...patch.carpool } : this.overrides.carpool,
       driverOps: patch.driverOps
-        ? { ...this.overrides.driverOps, ...patch.driverOps }
+        ? mergeDriverOps(
+            {
+              requireDocumentsForJobs: this.overrides.driverOps?.requireDocumentsForJobs === true,
+              documentsGracePeriodDays: this.overrides.driverOps?.documentsGracePeriodDays ?? 7,
+              requiredDriverDocuments: this.overrides.driverOps?.requiredDriverDocuments ?? [],
+              requiredRestaurantDocuments: this.overrides.driverOps?.requiredRestaurantDocuments ?? [],
+              requiredRentalCompanyDocuments: this.overrides.driverOps?.requiredRentalCompanyDocuments ?? [],
+              requiredRentalIndividualDocuments:
+                this.overrides.driverOps?.requiredRentalIndividualDocuments ?? [],
+            },
+            patch.driverOps,
+          )
         : this.overrides.driverOps,
     };
     this.validate(next);

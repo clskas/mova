@@ -170,10 +170,13 @@ abstract final class MockData {
     };
     final multiplier = _isPeakHour() ? 1.3 : 1.0;
     final subtotal = ((base + distanceFare + durationFare) * multiplier).ceil();
-    final total = vehicleType == 'MOTO_TAXI' ? subtotal.clamp(2000, 999999) : subtotal;
+    var total = vehicleType == 'MOTO_TAXI' ? subtotal.clamp(2000, 999999) : subtotal;
+    final roundTrip = body?['roundTrip'] == true;
+    final oneWay = total;
+    if (roundTrip) total = total * 2;
     return {
-      'distanceKm': distanceKm,
-      'durationMin': durationMin,
+      'distanceKm': roundTrip ? distanceKm * 2 : distanceKm,
+      'durationMin': roundTrip ? durationMin * 2 : durationMin,
       'vehicleType': vehicleType,
       'baseFareCdf': base,
       'distanceFareCdf': distanceFare,
@@ -185,6 +188,8 @@ abstract final class MockData {
       'currency': 'CDF',
       'peakHourLabel': multiplier > 1.0 ? 'Heure de pointe' : null,
       'formatted': '${total.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]} ')} FC',
+      if (roundTrip) 'roundTrip': true,
+      if (roundTrip) 'oneWayFareCdf': oneWay,
     };
   }
 
@@ -345,8 +350,10 @@ abstract final class MockData {
         ...body,
         'estimatedFareCdf': estimate(body)['estimatedFareCdf'],
         'priceCdf': estimate(body)['estimatedFareCdf'],
-        'distanceKm': 3.2,
-        'durationMin': 12,
+        'distanceKm': body['roundTrip'] == true ? 6.4 : 3.2,
+        'durationMin': body['roundTrip'] == true ? 24 : 12,
+        if (body['roundTrip'] == true) 'roundTripLeg': 'OUTBOUND',
+        if (body['roundTrip'] == true) 'roundTripLabel': 'Aller-retour · Aller',
       };
 
   static Map<String, dynamic> searchDrivers(String rideId) => {

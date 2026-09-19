@@ -27,6 +27,11 @@ enum RideStatus {
   CANCELLED
 }
 
+enum RoundTripLeg {
+  OUTBOUND
+  RETURN
+}
+
 enum DeliveryType {
   PARCEL
   FOOD
@@ -212,6 +217,8 @@ model Ride {
   cancelReason     String?
   cancelledBy      String?
   completionPin    String?
+  roundTrip        Boolean       @default(false)
+  roundTripLeg     RoundTripLeg?
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
 

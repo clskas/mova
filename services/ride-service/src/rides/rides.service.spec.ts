@@ -1,7 +1,11 @@
-import { RideStatus, VehicleType } from '@prisma/client';
+import { RideStatus, RoundTripLeg, VehicleType } from '@prisma/client';
 import { MOVA_EVENTS } from '@mova/shared';
 import { RidesService } from './rides.service';
 import { mockPlatformConfig } from '../platform/platform-config.mock';
+
+jest.mock('../common/internal-lookup.util', () => ({
+  fetchAuthUserBrief: jest.fn().mockResolvedValue({ phone: '+243810000000' }),
+}));
 
 describe('RidesService', () => {
   const prisma = {
@@ -379,5 +383,185 @@ describe('RidesService', () => {
     await expect(service.cancelRide('ride-1', 'stranger', 'nope')).rejects.toMatchObject({
       response: { code: 'MOVA_AUTH_003' },
     });
+  });
+
+  it('doubles estimate fare for roundTrip', async () => {
+    const oneWay = await service.estimate(-4.32, 15.31, -4.34, 15.33, VehicleType.MOTO_TAXI);
+    const roundTrip = await service.estimate(
+      -4.32,
+      15.31,
+      -4.34,
+      15.33,
+      VehicleType.MOTO_TAXI,
+      undefined,
+      false,
+      true,
+    );
+    expect(oneWay.roundTrip).toBe(false);
+    expect(roundTrip.roundTrip).toBe(true);
+    expect(roundTrip.estimatedFareCdf).toBe(oneWay.estimatedFareCdf * 2);
+    expect(roundTrip.distanceKm).toBeCloseTo(oneWay.distanceKm * 2, 5);
+    expect(roundTrip.etaMinutes).toBe(oneWay.etaMinutes * 2);
+    expect(roundTrip.oneWayFareCdf).toBe(oneWay.estimatedFareCdf);
+  });
+
+  it('creates roundTrip ride with OUTBOUND leg', async () => {
+    prisma.ride.findFirst.mockResolvedValue(null);
+    prisma.ride.findMany.mockResolvedValue([]);
+    prisma.ride.create.mockResolvedValue({
+      id: 'ride-ar-1',
+      passengerId: 'p1',
+      driverId: null,
+      vehicleId: null,
+      status: RideStatus.REQUESTED,
+      vehicleType: VehicleType.MOTO_TAXI,
+      pickupLat: -4.32,
+      pickupLng: 15.31,
+      pickupAddress: 'Gombe',
+      dropoffLat: -4.34,
+      dropoffLng: 15.33,
+      dropoffAddress: 'Limete',
+      estimatedFareCdf: 12400,
+      finalFareCdf: null,
+      distanceKm: 9,
+      durationMin: 22,
+      roundTrip: true,
+      roundTripLeg: RoundTripLeg.OUTBOUND,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const result = await service.createRide('p1', {
+      pickupLat: -4.32,
+      pickupLng: 15.31,
+      dropoffLat: -4.34,
+      dropoffLng: 15.33,
+      vehicleType: VehicleType.MOTO_TAXI,
+      pickupAddress: 'Gombe',
+      dropoffAddress: 'Limete',
+      roundTrip: true,
+    });
+
+    expect(prisma.ride.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          roundTrip: true,
+          roundTripLeg: RoundTripLeg.OUTBOUND,
+          estimatedFareCdf: 12400,
+        }),
+      }),
+    );
+    expect(result.roundTrip).toBe(true);
+    expect(result.roundTripLeg).toBe(RoundTripLeg.OUTBOUND);
+    expect(result.roundTripPhase).toBe('OUTBOUND');
+  });
+
+  it('switches outbound COMPLETED to RETURN without closing the ride', async () => {
+    const baseRide = {
+      id: 'ride-ar-1',
+      passengerId: 'p1',
+      driverId: 'd1',
+      vehicleId: 'v1',
+      status: RideStatus.IN_PROGRESS,
+      vehicleType: VehicleType.MOTO_TAXI,
+      pickupLat: -4.32,
+      pickupLng: 15.31,
+      pickupAddress: 'Gombe',
+      dropoffLat: -4.34,
+      dropoffLng: 15.33,
+      dropoffAddress: 'Limete',
+      estimatedFareCdf: 12400,
+      finalFareCdf: null,
+      distanceKm: 9,
+      durationMin: 22,
+      roundTrip: true,
+      roundTripLeg: RoundTripLeg.OUTBOUND,
+      acceptedAt: new Date(),
+      startedAt: new Date(),
+      completedAt: null,
+      cancelledAt: null,
+      cancelReason: null,
+      completionPin: '4321',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    prisma.ride.findUnique.mockResolvedValue(baseRide);
+    prisma.ride.update.mockResolvedValue({
+      ...baseRide,
+      roundTripLeg: RoundTripLeg.RETURN,
+    });
+
+    const result = await service.updateStatus('ride-ar-1', 'COMPLETED', 'd1');
+
+    expect(prisma.ride.update).toHaveBeenCalledWith({
+      where: { id: 'ride-ar-1' },
+      data: { roundTripLeg: RoundTripLeg.RETURN },
+    });
+    expect(prisma.rideEvent.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ event: 'ROUND_TRIP_RETURN' }),
+      }),
+    );
+    expect(result).toMatchObject({
+      roundTripReturnStarted: true,
+      paymentReady: false,
+      roundTripLeg: RoundTripLeg.RETURN,
+      roundTripPhase: 'RETURN',
+      activeDestinationLat: -4.32,
+      status: 'IN_PROGRESS',
+    });
+    expect(redis.publish).not.toHaveBeenCalledWith(MOVA_EVENTS.RIDE_COMPLETED, expect.anything());
+  });
+
+  it('completes roundTrip on second COMPLETED while on RETURN leg', async () => {
+    const baseRide = {
+      id: 'ride-ar-1',
+      passengerId: 'p1',
+      driverId: 'd1',
+      vehicleId: 'v1',
+      status: RideStatus.IN_PROGRESS,
+      vehicleType: VehicleType.MOTO_TAXI,
+      pickupLat: -4.32,
+      pickupLng: 15.31,
+      pickupAddress: 'Gombe',
+      dropoffLat: -4.34,
+      dropoffLng: 15.33,
+      dropoffAddress: 'Limete',
+      estimatedFareCdf: 12400,
+      finalFareCdf: null,
+      distanceKm: 9,
+      durationMin: 22,
+      roundTrip: true,
+      roundTripLeg: RoundTripLeg.RETURN,
+      acceptedAt: new Date(),
+      startedAt: new Date(),
+      completedAt: null,
+      cancelledAt: null,
+      cancelReason: null,
+      completionPin: '4321',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    prisma.ride.findUnique.mockResolvedValue(baseRide);
+    prisma.ride.update.mockResolvedValue({
+      ...baseRide,
+      status: RideStatus.COMPLETED,
+      completedAt: new Date(),
+      finalFareCdf: 12400,
+    });
+
+    const result = await service.updateStatus('ride-ar-1', 'COMPLETED', 'd1');
+
+    expect(prisma.ride.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: RideStatus.COMPLETED, finalFareCdf: 12400 }),
+      }),
+    );
+    expect(result.status).toBe('COMPLETED');
+    expect(result.paymentReady).toBe(true);
+    expect(redis.publish).toHaveBeenCalledWith(
+      MOVA_EVENTS.RIDE_COMPLETED,
+      expect.objectContaining({ rideId: 'ride-ar-1' }),
+    );
   });
 });

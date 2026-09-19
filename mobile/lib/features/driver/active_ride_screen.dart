@@ -172,8 +172,21 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
   }
 
   Future<void> _openNavigation({required bool toPickup}) async {
-    final lat = (toPickup ? _ride['pickupLat'] : _ride['dropoffLat']) as num?;
-    final lng = (toPickup ? _ride['pickupLng'] : _ride['dropoffLng']) as num?;
+    final onReturn = _ride['roundTrip'] == true &&
+        (_ride['roundTripLeg']?.toString() == 'RETURN' ||
+            _ride['roundTripPhase']?.toString() == 'RETURN');
+    num? lat;
+    num? lng;
+    if (toPickup) {
+      lat = _ride['pickupLat'] as num?;
+      lng = _ride['pickupLng'] as num?;
+    } else if (onReturn) {
+      lat = (_ride['activeDestinationLat'] ?? _ride['pickupLat']) as num?;
+      lng = (_ride['activeDestinationLng'] ?? _ride['pickupLng']) as num?;
+    } else {
+      lat = _ride['dropoffLat'] as num?;
+      lng = _ride['dropoffLng'] as num?;
+    }
     if (lat == null || lng == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -211,7 +224,17 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
     switch (result) {
       case Success(:final data):
         setState(() => _ride = data);
-        if (nextStatus == 'COMPLETED') {
+        if (data['roundTripReturnStarted'] == true) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Aller terminé — démarrez le retour vers le point de départ.'),
+              ),
+            );
+          }
+          return;
+        }
+        if (nextStatus == 'COMPLETED' && data['status']?.toString() == 'COMPLETED') {
           _locationTimer?.cancel();
           _syncPaymentPolling();
           if (mounted) {
@@ -232,10 +255,19 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
     }
   }
 
+  bool get _isRoundTripReturn =>
+      _ride['roundTrip'] == true &&
+      (_ride['roundTripLeg']?.toString() == 'RETURN' ||
+          _ride['roundTripPhase']?.toString() == 'RETURN');
+
+  bool get _isRoundTrip => _ride['roundTrip'] == true;
+
   String? _nextActionLabel() => switch (_status) {
         'DRIVER_ASSIGNED' => 'Je suis arrivé',
         'ARRIVING' => 'Démarrer la course',
-        'IN_PROGRESS' => 'Terminer la course',
+        'IN_PROGRESS' => _isRoundTripReturn
+            ? 'Terminer le retour'
+            : (_isRoundTrip ? 'Arrivé à destination (aller)' : 'Terminer la course'),
         _ => null,
       };
 
@@ -337,9 +369,30 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                if (_isRoundTrip) ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: MovaColors.violet.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      _ride['roundTripLabel']?.toString() ??
+                          (_isRoundTripReturn ? 'Aller-retour · Retour' : 'Aller-retour · Aller'),
+                      style: const TextStyle(
+                        color: MovaColors.violet,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
                 if (!headingToPickup)
                   Text(
-                    _ride['pickupAddress']?.toString() ?? 'Départ',
+                    _isRoundTripReturn
+                        ? (_ride['dropoffAddress']?.toString() ?? 'Destination aller')
+                        : (_ride['pickupAddress']?.toString() ?? 'Départ'),
                     style: const TextStyle(fontWeight: FontWeight.bold),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
@@ -347,7 +400,9 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
                 Text(
                   headingToPickup
                       ? 'Destination : ${_ride['dropoffAddress']?.toString() ?? 'Arrivée'}'
-                      : '→ ${_ride['dropoffAddress']?.toString() ?? 'Arrivée'}',
+                      : _isRoundTripReturn
+                          ? '→ ${_ride['activeDestinationAddress']?.toString() ?? _ride['pickupAddress']?.toString() ?? 'Retour au départ'}'
+                          : '→ ${_ride['dropoffAddress']?.toString() ?? 'Arrivée'}',
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -385,7 +440,9 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
           const SizedBox(height: 16),
           if (!headingToPickup)
             MovaButton(
-              label: 'Navigation destination',
+              label: _isRoundTripReturn
+                  ? 'Navigation retour (départ)'
+                  : 'Navigation destination',
               isSecondary: true,
               icon: Icons.navigation_outlined,
               onPressed: _openDropoff,

@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
-import { IsEnum, IsNumber, IsOptional, IsString } from 'class-validator';
+import { IsBoolean, IsEnum, IsNumber, IsOptional, IsString } from 'class-validator';
 import { RideStatus, VehicleType } from '@prisma/client';
 import { normalizeVehicleType } from '@mova/shared';
 
@@ -19,6 +19,10 @@ export class EstimateRideDto {
   @IsEnum(VehicleType)
   vehicleType: VehicleType;
   @ApiProperty({ required: false }) @IsOptional() @IsString() promoCode?: string;
+  @ApiProperty({ required: false, description: 'Aller-retour immédiat (même chauffeur, tarif ≈ 2×)' })
+  @IsOptional()
+  @IsBoolean()
+  roundTrip?: boolean;
 }
 
 export class CreateRideDto extends EstimateRideDto {

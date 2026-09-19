@@ -237,6 +237,25 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
                       ),
                       style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 13),
                     ),
+                    if (widget.offer['roundTrip'] == true) ...[
+                      const SizedBox(height: 10),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: MovaColors.violet.withValues(alpha: 0.25),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: MovaColors.violet.withValues(alpha: 0.5)),
+                        ),
+                        child: const Text(
+                          'Aller-retour',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ],
                     if (distance != null) ...[
                       const SizedBox(height: 4),
                       Wrap(

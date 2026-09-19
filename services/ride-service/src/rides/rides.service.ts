@@ -1,5 +1,5 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { CommissionServiceType, CarpoolStatus, DeliveryStatus, DeliveryType, ErrandOrderStatus, MovingRequestStatus, RentalInquiryStatus, RideStatus, ScheduledRideStatus, TrackingReferenceType, VehicleType } from '@prisma/client';
+import { CommissionServiceType, CarpoolStatus, DeliveryStatus, DeliveryType, ErrandOrderStatus, MovingRequestStatus, RentalInquiryStatus, RideStatus, RoundTripLeg, ScheduledRideStatus, TrackingReferenceType, VehicleType } from '@prisma/client';
 import {
   formatCdf,
   fromMobileRideStatus,
@@ -90,14 +90,30 @@ export class RidesService {
     vehicleType: VehicleType,
     promoCode?: string,
     redeemPromo = false,
+    roundTrip = false,
   ) {
     const { pickupArea, isInterCity } = assertServiceAreaPair(pickupLat, pickupLng, dropoffLat, dropoffLng);
     const route = await this.routing.resolveRoadDistance(pickupLat, pickupLng, dropoffLat, dropoffLng);
-    const distanceKm = route.distanceKm;
-    const etaMinutes =
+    let distanceKm = route.distanceKm;
+    let etaMinutes =
       route.durationMin ?? estimateTripDurationMin(distanceKm, this.platformConfig.get().trip.averageSpeedKmh.ride);
     const fare = await this.pricing.estimateFare(vehicleType, distanceKm, etaMinutes, pickupArea.name);
-    const base = this.pricing.withInterCitySurcharge(fare, isInterCity, distanceKm);
+    let base = this.pricing.withInterCitySurcharge(fare, isInterCity, distanceKm);
+    // Aller-retour immédiat : tarif ≈ 2× A→B (même distance/temps × 2), avant promo.
+    if (roundTrip) {
+      distanceKm = Math.round(distanceKm * 2 * 100) / 100;
+      etaMinutes = Math.round(etaMinutes * 2);
+      const doubled = Math.round(base.totalCdf * 2);
+      base = {
+        ...base,
+        distanceKm,
+        etaMinutes,
+        totalCdf: doubled,
+        estimatedFareCdf: doubled,
+        estimatedPriceCdf: doubled,
+        totalFormatted: formatCdf(doubled),
+      };
+    }
     const promoApplied = await applyPromoCode(this.promo, base.totalCdf, promoCode, redeemPromo, {
       context: { serviceType: 'RIDE' },
     });
@@ -112,6 +128,8 @@ export class RidesService {
       isInterCity,
       pickupCity: pickupArea.name,
       distanceSource: route.source,
+      roundTrip,
+      oneWayFareCdf: roundTrip ? Math.round(promoApplied.estimatedPriceCdf / 2) : promoApplied.estimatedPriceCdf,
     };
   }
 
@@ -186,6 +204,7 @@ export class RidesService {
       pickupAddress?: string;
       dropoffAddress?: string;
       promoCode?: string;
+      roundTrip?: boolean;
     },
   ) {
     const active = await this.prisma.ride.findFirst({
@@ -197,6 +216,7 @@ export class RidesService {
 
     assertServiceAreaPair(data.pickupLat, data.pickupLng, data.dropoffLat, data.dropoffLng);
 
+    const roundTrip = data.roundTrip === true;
     const estimate = await this.estimate(
       data.pickupLat,
       data.pickupLng,
@@ -205,6 +225,7 @@ export class RidesService {
       data.vehicleType,
       data.promoCode,
       true,
+      roundTrip,
     );
     const distanceKm = estimate.distanceKm;
     const ride = await this.prisma.ride.create({
@@ -223,6 +244,8 @@ export class RidesService {
         discountCdf: estimate.discountCdf ?? undefined,
         distanceKm,
         durationMin: estimate.etaMinutes,
+        roundTrip,
+        roundTripLeg: roundTrip ? RoundTripLeg.OUTBOUND : null,
       },
     });
     await this.prisma.rideEvent.create({ data: { rideId: ride.id, event: 'CREATED' } });
@@ -314,6 +337,7 @@ export class RidesService {
     pickupAddress?: string | null;
     vehicleType: VehicleType;
     estimatedFareCdf?: number | null;
+    roundTrip?: boolean | null;
   }) {
     if (ride.status === RideStatus.REQUESTED) {
       await this.prisma.ride.update({ where: { id: ride.id }, data: { status: RideStatus.SEARCHING } });
@@ -337,6 +361,7 @@ export class RidesService {
     if (drivers.length > 0) {
       const pickup = ride.pickupAddress?.trim() || 'près de vous';
       const fare = ride.estimatedFareCdf != null ? ` · ${ride.estimatedFareCdf} FC` : '';
+      const ar = ride.roundTrip ? ' · Aller-retour' : '';
       let driverUserIds = await filterDriversNotDebtBlocked(drivers.map((d) => d.userId));
       driverUserIds = await filterDriversAcceptingRides(driverUserIds);
       if (driverUserIds.length === 0) {
@@ -347,7 +372,7 @@ export class RidesService {
         referenceId: ride.id,
         driverUserIds,
         title: 'Nouvelle course SENGA',
-        body: `Course disponible · ${pickup}${fare}`,
+        body: `Course disponible${ar} · ${pickup}${fare}`,
         pickupAddress: ride.pickupAddress ?? undefined,
         pickupLat: ride.pickupLat,
         pickupLng: ride.pickupLng,
@@ -359,6 +384,7 @@ export class RidesService {
         pickupAddress: ride.pickupAddress,
         pickupLat: ride.pickupLat,
         pickupLng: ride.pickupLng,
+        roundTrip: ride.roundTrip === true,
       });
       }
     }
@@ -572,6 +598,30 @@ export class RidesService {
 
     const allowed = ALLOWED_TRANSITIONS[ride.status] ?? [];
     if (!allowed.includes(status)) throw new MovaHttpException(MovaErrorCode.RIDE_INVALID_TRANSITION);
+
+    // Aller-retour : premier « COMPLETED » = fin de l'aller → jambe retour (même chauffeur).
+    if (
+      status === RideStatus.COMPLETED &&
+      ride.roundTrip &&
+      ride.roundTripLeg === RoundTripLeg.OUTBOUND &&
+      ride.status === RideStatus.IN_PROGRESS
+    ) {
+      const updated = await this.prisma.ride.update({
+        where: { id: rideId },
+        data: { roundTripLeg: RoundTripLeg.RETURN },
+      });
+      await this.prisma.rideEvent.create({
+        data: { rideId, event: 'ROUND_TRIP_RETURN', metadata: { from: 'OUTBOUND', to: 'RETURN' } },
+      });
+      this.emitStatusChange(rideId, RideStatus.IN_PROGRESS);
+      await this.notifyRideStatusSms(
+        rideId,
+        ride.passengerId,
+        RideStatus.IN_PROGRESS,
+      );
+      const detail = this.formatRideDetail(updated);
+      return { ...detail, paymentReady: false, roundTripReturnStarted: true };
+    }
 
     const updates: Record<string, unknown> = { status };
     if (status === RideStatus.IN_PROGRESS) updates.startedAt = new Date();
@@ -934,6 +984,8 @@ export class RidesService {
     cancelledAt?: Date | null;
     cancelReason?: string | null;
     completionPin?: string | null;
+    roundTrip?: boolean;
+    roundTripLeg?: RoundTripLeg | null;
     createdAt: Date;
     updatedAt: Date;
   }) {
@@ -947,6 +999,15 @@ export class RidesService {
       ride.dropoffLng,
       ride.distanceKm,
     );
+    const roundTrip = ride.roundTrip === true;
+    const roundTripLeg = ride.roundTripLeg ?? null;
+    const onReturn = roundTrip && roundTripLeg === RoundTripLeg.RETURN;
+    // Navigation active : aller → dropoff ; retour → pickup d'origine.
+    const activeDestLat = onReturn ? ride.pickupLat : ride.dropoffLat;
+    const activeDestLng = onReturn ? ride.pickupLng : ride.dropoffLng;
+    const activeDestAddress = onReturn
+      ? ride.pickupAddress ?? 'Point de départ'
+      : ride.dropoffAddress;
     return {
       id: ride.id,
       passengerId: ride.passengerId,
@@ -981,6 +1042,17 @@ export class RidesService {
       completionPin: ride.completionPin ?? undefined,
       createdAt: ride.createdAt,
       updatedAt: ride.updatedAt,
+      roundTrip,
+      roundTripLeg,
+      roundTripPhase: onReturn ? 'RETURN' : roundTrip ? 'OUTBOUND' : null,
+      roundTripLabel: roundTrip
+        ? onReturn
+          ? 'Aller-retour · Retour'
+          : 'Aller-retour · Aller'
+        : null,
+      activeDestinationLat: activeDestLat,
+      activeDestinationLng: activeDestLng,
+      activeDestinationAddress: activeDestAddress,
       ...canCancelRide({ status: mobileStatus }),
     };
   }

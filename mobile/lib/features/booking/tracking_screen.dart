@@ -115,9 +115,26 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
     return s == 'COMPLETED' || s == 'CANCELLED';
   }
 
+  bool get _isRoundTripReturn =>
+      _ride?['roundTrip'] == true &&
+      (_ride?['roundTripLeg']?.toString() == 'RETURN' ||
+          _ride?['roundTripPhase']?.toString() == 'RETURN');
+
+  bool get _isRoundTrip => _ride?['roundTrip'] == true;
+
+  LatLng? get _activeDestination {
+    final lat = (_ride?['activeDestinationLat'] as num?)?.toDouble();
+    final lng = (_ride?['activeDestinationLng'] as num?)?.toDouble();
+    if (lat != null && lng != null) return LatLng(lat, lng);
+    if (_isRoundTripReturn) return _pickup;
+    return _dropoff;
+  }
+
   LatLng? get _approachTarget {
     if (_driverPos == null) return null;
-    if (_status.toUpperCase() == 'IN_PROGRESS') return _dropoff ?? _pickup;
+    if (_status.toUpperCase() == 'IN_PROGRESS') {
+      return _activeDestination ?? _dropoff ?? _pickup;
+    }
     return _pickup;
   }
 
@@ -137,7 +154,11 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
     final km = _driverDistanceKm;
     final dist = (km != null && km > 0) ? ' · ${km.toStringAsFixed(1)} km' : '';
     return switch (_status.toUpperCase()) {
-      'IN_PROGRESS' => 'Arrivée à destination : ~$_etaMinutes min$dist',
+      'IN_PROGRESS' => _isRoundTripReturn
+          ? 'Retour au départ : ~$_etaMinutes min$dist'
+          : (_isRoundTrip
+              ? 'Arrivée (aller) : ~$_etaMinutes min$dist'
+              : 'Arrivée à destination : ~$_etaMinutes min$dist'),
       'DRIVER_ARRIVED' => 'Votre chauffeur est arrivé',
       _ => 'Chauffeur à ~$_etaMinutes min$dist',
     };
@@ -176,8 +197,20 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
     if (driverLat != null && driverLng != null) {
       final status = data['status']?.toString() ?? '';
       final inProgress = status == 'IN_PROGRESS';
-      final targetLat = (inProgress ? data['dropoffLat'] : data['pickupLat']) as num?;
-      final targetLng = (inProgress ? data['dropoffLng'] : data['pickupLng']) as num?;
+      final onReturn = data['roundTrip'] == true &&
+          (data['roundTripLeg']?.toString() == 'RETURN' ||
+              data['roundTripPhase']?.toString() == 'RETURN');
+      num? targetLat;
+      num? targetLng;
+      if (inProgress) {
+        targetLat = (data['activeDestinationLat'] as num?) ??
+            (onReturn ? data['pickupLat'] : data['dropoffLat']) as num?;
+        targetLng = (data['activeDestinationLng'] as num?) ??
+            (onReturn ? data['pickupLng'] : data['dropoffLng']) as num?;
+      } else {
+        targetLat = data['pickupLat'] as num?;
+        targetLng = data['pickupLng'] as num?;
+      }
       if (targetLat != null && targetLng != null) {
         _driverDistanceKm = GeoUtils.haversineKm(
           driverLat,
@@ -196,8 +229,18 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
     if (_ride == null) return;
     final status = _status;
     final inProgress = status == 'IN_PROGRESS';
-    final targetLat = (inProgress ? _ride!['dropoffLat'] : _ride!['pickupLat']) as num?;
-    final targetLng = (inProgress ? _ride!['dropoffLng'] : _ride!['pickupLng']) as num?;
+    num? targetLat;
+    num? targetLng;
+    if (inProgress) {
+      final onReturn = _isRoundTripReturn;
+      targetLat = (_ride!['activeDestinationLat'] as num?) ??
+          (onReturn ? _ride!['pickupLat'] : _ride!['dropoffLat']) as num?;
+      targetLng = (_ride!['activeDestinationLng'] as num?) ??
+          (onReturn ? _ride!['pickupLng'] : _ride!['dropoffLng']) as num?;
+    } else {
+      targetLat = _ride!['pickupLat'] as num?;
+      targetLng = _ride!['pickupLng'] as num?;
+    }
     if (targetLat == null || targetLng == null) return;
     _driverDistanceKm = GeoUtils.haversineKm(
       driverPos.latitude,
@@ -834,6 +877,31 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
                               ),
                             ),
                             const SizedBox(height: 12),
+                            if (_isRoundTrip) ...[
+                              MovaCard(
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Icon(Icons.swap_horiz, color: MovaColors.violet),
+                                    const SizedBox(width: 8),
+                                    Flexible(
+                                      child: Text(
+                                        _ride?['roundTripLabel']?.toString() ??
+                                            (_isRoundTripReturn
+                                                ? 'Aller-retour · Retour'
+                                                : 'Aller-retour · Aller'),
+                                        textAlign: TextAlign.center,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                            ],
                             MovaCard(
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.center,

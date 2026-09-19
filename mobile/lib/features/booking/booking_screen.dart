@@ -66,6 +66,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   String? _validationError;
   bool _pickupFromGps = true;
   bool _pickupFromSuggestion = false;
+  bool _roundTrip = false;
   List<Map<String, dynamic>> _poiPlaces = [];
   String? _poiCategoryFilter;
   int _poiLoadGeneration = 0;
@@ -466,6 +467,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
       'dropoffLng': dropoff.longitude,
       'vehicleType': MarketConfig.apiVehicleType(vehicleType),
       if (_promoController.text.trim().isNotEmpty) 'promoCode': _promoController.text.trim(),
+      if (_roundTrip) 'roundTrip': true,
     };
   }
 
@@ -771,7 +773,27 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                     initialLng: _dropoff?.longitude,
                     onApply: _setDropoffFromCoords,
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text(
+                      'Aller-retour',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    subtitle: const Text(
+                      'Même chauffeur : aller puis retour immédiat (tarif ≈ 2×)',
+                      style: TextStyle(fontSize: 12, color: MovaColors.textSecondary),
+                    ),
+                    value: _roundTrip,
+                    activeThumbColor: MovaColors.violet,
+                    onChanged: (v) {
+                      setState(() => _roundTrip = v);
+                      if (_dropoff != null || _destinationController.text.trim().isNotEmpty) {
+                        unawaited(_fetchAllEstimates());
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 8),
                   Text('Taxi ou moto', style: theme.textTheme.titleSmall),
                   const SizedBox(height: 8),
                   VehicleCategoryChips(
@@ -809,7 +831,9 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                             children: [
                               Expanded(
                                 child: Text(
-                                  'Estimation · ${_selectedVehicleLabel()}',
+                                  _roundTrip
+                                      ? 'Estimation aller-retour · ${_selectedVehicleLabel()}'
+                                      : 'Estimation · ${_selectedVehicleLabel()}',
                                   style: const TextStyle(fontSize: 16),
                                 ),
                               ),
@@ -828,6 +852,13 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                               ),
                             ],
                           ),
+                          if (_roundTrip) ...[
+                            const SizedBox(height: 4),
+                            const Text(
+                              'Aller + retour (même chauffeur)',
+                              style: TextStyle(fontSize: 12, color: MovaColors.textSecondary),
+                            ),
+                          ],
                           const SizedBox(height: 8),
                           _breakdownRow(
                             'Base',

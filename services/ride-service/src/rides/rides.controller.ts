@@ -31,6 +31,8 @@ export class RidesController {
       dto.dropoffLng,
       dto.vehicleType,
       dto.promoCode,
+      false,
+      dto.roundTrip === true,
     );
   }
 

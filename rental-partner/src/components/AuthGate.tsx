@@ -91,9 +91,15 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
         setActivateIdentity(fallback);
         setNeedsActivation(needsPin);
         setReady(true);
-      } catch {
-        dropTokenKeepPhone(phoneFromToken() || getLastPhone() || "");
-        router.replace("/login?pin=1");
+      } catch (e) {
+        const status =
+          typeof e === "object" && e && "status" in e ? Number((e as { status?: number }).status) : 0;
+        if (status === 401 || status === 403) {
+          dropTokenKeepPhone(phoneFromToken() || getLastPhone() || "");
+          router.replace("/login?pin=1");
+          return;
+        }
+        if (!cancelled) setReady(true);
       }
     }
 

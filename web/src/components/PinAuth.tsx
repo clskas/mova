@@ -118,10 +118,10 @@ export function PinDigitPad({
   disabled?: boolean;
   accentClass?: string;
 }) {
-  const keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "⌫"] as const;
+  const keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "back"] as const;
   function press(key: string) {
     if (disabled || !key) return;
-    if (key === "⌫") {
+    if (key === "back") {
       onChange(value.slice(0, -1));
       return;
     }
@@ -137,16 +137,29 @@ export function PinDigitPad({
           />
         ))}
       </div>
-      <div className="grid grid-cols-3 gap-2 max-w-[240px] mx-auto">
+      <div className="grid grid-cols-3 gap-2 max-w-[280px] mx-auto">
         {keys.map((key, i) => (
           <button
             key={`${key}-${i}`}
             type="button"
             disabled={disabled || key === ""}
             onClick={() => press(key)}
-            className="h-14 rounded-xl bg-white shadow-sm text-xl font-semibold text-[#1A1A2E] disabled:opacity-0"
+            aria-label={key === "back" ? "Effacer" : undefined}
+            className="h-14 rounded-xl bg-white shadow-sm text-xl font-semibold text-[#1A1A2E] disabled:opacity-0 flex items-center justify-center overflow-visible"
           >
-            {key}
+            {key === "back" ? (
+              <svg width="26" height="20" viewBox="0 0 24 18" fill="none" aria-hidden className="shrink-0">
+                <path
+                  d="M8.5 1H21a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H8.5L2 9l6.5-8Z"
+                  stroke="currentColor"
+                  strokeWidth="1.75"
+                  strokeLinejoin="round"
+                />
+                <path d="M11 6.5 16.5 12M16.5 6.5 11 12" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
+              </svg>
+            ) : (
+              key
+            )}
           </button>
         ))}
       </div>

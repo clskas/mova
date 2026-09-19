@@ -12,6 +12,7 @@ import {
 } from "@/components/PinAuth";
 import { RestaurantOnboardingCard } from "@/components/RestaurantOnboardingCard";
 import { apiFetch, fetchKyc, fetchProfile } from "@/lib/api";
+import { ApiError } from "@/lib/api";
 import { PUBLIC_API_BASE } from "@/lib/public-api-base";
 import {
   RESTAURANT_AUTH_INTENT,
@@ -92,9 +93,15 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
         setActivateIdentity(fallback);
         setNeedsActivation(needsPin);
         setReady(true);
-      } catch {
-        dropTokenKeepPhone(phoneFromToken() || getLastPhone() || "");
-        router.replace("/login?pin=1");
+      } catch (e) {
+        // Keep JWT across network blips — only force re-login on hard auth loss.
+        const status = e instanceof ApiError ? e.status : 0;
+        if (status === 401 || status === 403) {
+          dropTokenKeepPhone(phoneFromToken() || getLastPhone() || "");
+          router.replace("/login?pin=1");
+          return;
+        }
+        if (!cancelled) setReady(true);
       }
     }
 

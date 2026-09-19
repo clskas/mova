@@ -78,6 +78,7 @@ export function CatalogWorkspace({ mode }: { mode: CatalogMode }) {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [canOperate, setCanOperate] = useState(true);
+  const persistTimer = useMemo(() => ({ id: null as ReturnType<typeof setTimeout> | null }), []);
 
   const copy = COPY[mode];
 
@@ -137,7 +138,7 @@ export function CatalogWorkspace({ mode }: { mode: CatalogMode }) {
 
   function applyDraft() {
     if (!canOperate) {
-      setError("Votre compte doit être validé avant de publier.");
+      setError("Votre compte doit être validé avant d'enregistrer des produits.");
       return;
     }
     const name = draft.name.trim();
@@ -160,23 +161,34 @@ export function CatalogWorkspace({ mode }: { mode: CatalogMode }) {
       ageRestricted: draft.ageRestricted === true,
       requiresPrescription: draft.requiresPrescription === true,
     };
-    if (editIndex != null) {
-      setItems((prev) => prev.map((item, i) => (i === editIndex ? next : item)));
-    } else {
-      setItems((prev) => [...prev, next]);
-    }
+    const nextItems =
+      editIndex != null
+        ? items.map((item, i) => (i === editIndex ? next : item))
+        : [...items, next];
+    setItems(nextItems);
     setEditIndex(null);
     setDraft(emptyItem());
     setError(null);
+    void persistItems(nextItems, categories, "Produit enregistré (disponible si coché « Disponible »).");
   }
 
   function removeItem(index: number) {
-    setItems((prev) => prev.filter((_, i) => i !== index));
+    const nextItems = items.filter((_, i) => i !== index);
+    setItems(nextItems);
     if (editIndex === index) cancelEdit();
+    if (canOperate) {
+      void persistItems(nextItems, categories, "Produit retiré du catalogue.");
+    }
   }
 
   function patchItem(index: number, patch: Partial<MenuItem>) {
-    setItems((prev) => prev.map((item, i) => (i === index ? { ...item, ...patch } : item)));
+    const nextItems = items.map((item, i) => (i === index ? { ...item, ...patch } : item));
+    setItems(nextItems);
+    if (!canOperate) return;
+    if (persistTimer.id) clearTimeout(persistTimer.id);
+    persistTimer.id = setTimeout(() => {
+      void persistItems(nextItems, categories, "Modifications enregistrées.");
+    }, 600);
   }
 
   async function handlePhoto(file: File) {
@@ -193,6 +205,28 @@ export function CatalogWorkspace({ mode }: { mode: CatalogMode }) {
     }
   }
 
+  async function persistItems(
+    nextItems: MenuItem[],
+    nextCategories: MenuCategory[],
+    okMessage: string,
+  ) {
+    if (!canOperate) return;
+    setSaving(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const result = await saveMenu(nextItems, nextCategories);
+      setItems(result.menuItems ?? nextItems);
+      setCategories(result.categories ?? nextCategories);
+      setMessage(okMessage);
+    } catch (e) {
+      setError(toUserErrorMessage(e, "Échec enregistrement"));
+      await load();
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function persist() {
     if (!canOperate) {
       setError("Votre compte doit être validé avant de publier.");
@@ -202,19 +236,7 @@ export function CatalogWorkspace({ mode }: { mode: CatalogMode }) {
       setError("Ajoutez au moins un produit");
       return;
     }
-    setSaving(true);
-    setError(null);
-    setMessage(null);
-    try {
-      const result = await saveMenu(items, categories);
-      setItems(result.menuItems ?? items);
-      setCategories(result.categories ?? categories);
-      setMessage("Catalogue enregistré — visible dans l'app passager");
-    } catch (e) {
-      setError(toUserErrorMessage(e, "Échec enregistrement"));
-    } finally {
-      setSaving(false);
-    }
+    await persistItems(items, categories, "Catalogue enregistré — visible dans l'app passager (produits disponibles).");
   }
 
   const showFullForm = mode === "catalogue";

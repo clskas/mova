@@ -419,12 +419,16 @@ export class DeliveriesService {
       restaurantMenu,
       items.map((it) => ({ name: it.name, quantity: it.quantity })),
     );
-    await this.prisma.restaurant
-      .update({
+    try {
+      await this.prisma.restaurant.update({
         where: { id: restaurantId },
         data: { menuItems: next as unknown as Prisma.InputJsonValue },
-      })
-      .catch(() => undefined);
+      });
+    } catch (err) {
+      // Stock must not block order placement, but failures must be visible in logs.
+      // eslint-disable-next-line no-console
+      console.warn(`menu stock decrement failed for restaurant ${restaurantId}`, err);
+    }
   }
 
   /** Frais et distance livraison repas — distance routière (inter-villes autorisée). */

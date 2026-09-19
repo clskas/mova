@@ -333,6 +333,42 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
   int _itemPrice(Map<String, dynamic> item) =>
       item['unitPriceCdf'] as int? ?? item['priceCdf'] as int? ?? 0;
 
+  /// Options plates (+ optionGroups) pour affichage / pricing passager.
+  List<Map<String, dynamic>> _itemOptions(Map<String, dynamic> item) {
+    final direct = (item['options'] as List?)?.cast<Map<String, dynamic>>() ?? const [];
+    if (direct.isNotEmpty) return direct;
+    final groups = (item['optionGroups'] as List?)?.cast<Map<String, dynamic>>() ?? const [];
+    if (groups.isEmpty) return const [];
+    final flat = <Map<String, dynamic>>[];
+    for (final g in groups) {
+      final gName = (g['name'] ?? '').toString();
+      final opts = (g['options'] as List?)?.cast<Map<String, dynamic>>() ?? const [];
+      for (final o in opts) {
+        flat.add({
+          ...o,
+          if (gName.isNotEmpty) 'group': o['group'] ?? gName,
+        });
+      }
+    }
+    return flat;
+  }
+
+  String _priceLabel(int amountCdf) => MarketConfig.formatCdf(amountCdf);
+
+  String _sizeChipLabel(Map<String, dynamic> s) {
+    final label = (s['label'] ?? s['name'])?.toString() ?? '';
+    final price = (s['priceCdf'] ?? s['unitPriceCdf']) as int?;
+    if (price != null && price > 0) return '$label · ${_priceLabel(price)}';
+    return label;
+  }
+
+  String _optionChipLabel(Map<String, dynamic> o) {
+    final label = (o['label'] ?? o['name'])?.toString() ?? '';
+    final price = (o['priceCdf'] ?? o['unitPriceCdf']) as int? ?? 0;
+    if (price > 0) return '$label (+${_priceLabel(price)})';
+    return label;
+  }
+
   /// Prix unitaire effectif d'un plat, suppléments compris — reproduit exactement
   /// la logique serveur (`computeFoodItemUnitPriceCdf`) : une taille sélectionnée
   /// remplace le prix de base, chaque option ajoute son supplément.
@@ -356,7 +392,7 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
     }
 
     if (options.isNotEmpty) {
-      final opts = (item['options'] as List?)?.cast<Map<String, dynamic>>() ?? const [];
+      final opts = _itemOptions(item);
       for (final selected in options) {
         for (final o in opts) {
           final label = (o['label'] ?? o['name'])?.toString();
@@ -510,10 +546,10 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
 
     final baseKey = _cartKey(restaurantId, name);
     final sizes = (item['sizes'] as List?)?.cast<Map<String, dynamic>>();
-    final options = (item['options'] as List?)?.cast<Map<String, dynamic>>();
+    final options = _itemOptions(item);
     final stockQty = _itemStockQty(item);
 
-    if ((sizes != null && sizes.isNotEmpty) || (options != null && options.isNotEmpty)) {
+    if ((sizes != null && sizes.isNotEmpty) || options.isNotEmpty) {
       String? selectedSize;
       final selectedOptions = <String>{};
       final ok = await showModalBottomSheet<bool>(
@@ -554,7 +590,7 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
                           children: sizes.map((s) {
                             final label = (s['label'] ?? s['name'])?.toString() ?? '';
                             return ChoiceChip(
-                              label: Text(label),
+                              label: Text(_sizeChipLabel(s)),
                               selected: selectedSize == label,
                               onSelected: (_) => setStateSheet(() => selectedSize = label),
                             );
@@ -562,8 +598,8 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
                         ),
                         const SizedBox(height: 12),
                       ],
-                      if (options != null && options.isNotEmpty) ...[
-                        const Text('Options', style: TextStyle(fontWeight: FontWeight.w600)),
+                      if (options.isNotEmpty) ...[
+                        const Text('Options / suppléments', style: TextStyle(fontWeight: FontWeight.w600)),
                         const SizedBox(height: 6),
                         ...options.map((o) {
                           final label = (o['label'] ?? o['name'])?.toString() ?? '';
@@ -578,7 +614,7 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
                                 selectedOptions.remove(label);
                               }
                             }),
-                            title: Text(label),
+                            title: Text(_optionChipLabel(o)),
                           );
                         }),
                         const SizedBox(height: 12),
@@ -621,13 +657,13 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
     final price = _itemPrice(item);
     final description = item['description']?.toString().trim() ?? '';
     final sizes = (item['sizes'] as List?)?.cast<Map<String, dynamic>>();
-    final options = (item['options'] as List?)?.cast<Map<String, dynamic>>();
+    final options = _itemOptions(item);
     final stockQty = _itemStockQty(item);
     final ageRestricted = _itemAgeRestricted(item);
     final requiresPrescription = _itemRequiresPrescription(item);
     final showSizesOptions = CommerceTypes.normalize(commerceType) == CommerceTypes.restaurant ||
         (sizes != null && sizes.isNotEmpty) ||
-        (options != null && options.isNotEmpty);
+        options.isNotEmpty;
 
     await showModalBottomSheet<void>(
       context: context,
@@ -751,24 +787,22 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
                                 spacing: 8,
                                 runSpacing: 8,
                                 children: sizes.map((s) {
-                                  final label = (s['label'] ?? s['name'])?.toString() ?? '';
-                                  return Chip(label: Text(label));
+                                  return Chip(label: Text(_sizeChipLabel(s)));
                                 }).toList(),
                               ),
                             ],
-                            if (showSizesOptions && options != null && options.isNotEmpty) ...[
+                            if (showSizesOptions && options.isNotEmpty) ...[
                               const SizedBox(height: 16),
-                              const Text('Options', style: TextStyle(fontWeight: FontWeight.w600)),
+                              const Text('Options / suppléments', style: TextStyle(fontWeight: FontWeight.w600)),
                               const SizedBox(height: 8),
                               ...options.map((o) {
-                                final label = (o['label'] ?? o['name'])?.toString() ?? '';
                                 return Padding(
                                   padding: const EdgeInsets.only(bottom: 4),
                                   child: Row(
                                     children: [
                                       const Icon(Icons.check_circle_outline, size: 18, color: MovaColors.green),
                                       const SizedBox(width: 8),
-                                      Expanded(child: Text(label)),
+                                      Expanded(child: Text(_optionChipLabel(o))),
                                     ],
                                   ),
                                 );

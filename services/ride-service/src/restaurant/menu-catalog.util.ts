@@ -430,7 +430,10 @@ export function decrementMenuStock(
   }
 
   const items = catalog.items.map((item) => {
-    const qty = qtyByName.get(item.name);
+    const qty =
+      qtyByName.get(item.name) ??
+      qtyByName.get(item.name.trim()) ??
+      [...qtyByName.entries()].find(([n]) => n.toLowerCase() === item.name.toLowerCase())?.[1];
     if (qty == null || typeof item.stockQty !== 'number') return item;
     return { ...item, stockQty: Math.max(0, item.stockQty - qty) };
   });

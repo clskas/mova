@@ -107,7 +107,7 @@ class _AuthSessionGateState extends ConsumerState<AuthSessionGate> {
           _authenticated = true;
         });
       case Failure(:final error):
-        // After camera kill, gateway flaps / brief 401 must not force re-login.
+        // After camera kill, gateway flaps must not force re-login.
         if (await api.shouldKeepSessionAcrossProcessDeath()) {
           await api.markSessionUnlocked();
           if (!mounted) return;
@@ -117,19 +117,19 @@ class _AuthSessionGateState extends ConsumerState<AuthSessionGate> {
           });
           return;
         }
-        if (error is! AuthFailure) {
-          final cached = await UserProfileCache.load();
-          if (!cached.isEmpty && api.hasToken) {
-            final role = cached.profile?['role']?.toString();
-            if (jwtRoleMatchesAppFlavor(widget.role, role)) {
-              if (!mounted) return;
-              setState(() {
-                _checking = false;
-                _authenticated = true;
-              });
-              return;
-            }
-          }
+        // Hard auth rejection → login. Soft/network errors keep JWT (no PIN on reopen).
+        if (error is AuthFailure) {
+          await _clearRejectedSession(api);
+          return;
+        }
+        if (api.hasToken) {
+          await api.markSessionUnlocked();
+          if (!mounted) return;
+          setState(() {
+            _checking = false;
+            _authenticated = true;
+          });
+          return;
         }
         await _clearRejectedSession(api);
     }

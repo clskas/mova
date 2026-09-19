@@ -111,7 +111,7 @@ export default function MenuPage() {
 
   function applyDraft() {
     if (!canOperate) {
-      setError("Votre compte doit être validé avant de publier le menu.");
+      setError("Votre compte doit être validé avant d'enregistrer le menu.");
       return;
     }
     const name = draft.name.trim();
@@ -151,19 +151,39 @@ export default function MenuPage() {
         ? optionGroups.flatMap((g) => g.options.map((o) => ({ ...o, group: g.name })))
         : undefined,
     };
-    if (editIndex != null) {
-      setItems((prev) => prev.map((item, i) => (i === editIndex ? next : item)));
-    } else {
-      setItems((prev) => [...prev, next]);
-    }
+    const nextItems =
+      editIndex != null
+        ? items.map((item, i) => (i === editIndex ? next : item))
+        : [...items, next];
+    setItems(nextItems);
     setEditIndex(null);
     setDraft(emptyDraft());
     setError(null);
+    void persistItems(nextItems, "Plat enregistré (visible si « Disponible »).");
   }
 
   function removeItem(index: number) {
-    setItems((prev) => prev.filter((_, i) => i !== index));
+    const nextItems = items.filter((_, i) => i !== index);
+    setItems(nextItems);
     if (editIndex === index) cancelEdit();
+    if (canOperate) void persistItems(nextItems, "Plat retiré du menu.");
+  }
+
+  async function persistItems(nextItems: MenuItem[], okMessage: string) {
+    if (!canOperate) return;
+    setSaving(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const result = await saveMenu(nextItems);
+      setItems(result.menuItems ?? nextItems);
+      setMessage(okMessage);
+    } catch (e) {
+      setError(toUserErrorMessage(e, "Échec enregistrement"));
+      await load();
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function persist() {
@@ -175,18 +195,7 @@ export default function MenuPage() {
       setError("Ajoutez au moins un plat");
       return;
     }
-    setSaving(true);
-    setError(null);
-    setMessage(null);
-    try {
-      const result = await saveMenu(items);
-      setItems(result.menuItems ?? items);
-      setMessage("Menu enregistré — visible dans l'app passager");
-    } catch (e) {
-      setError(toUserErrorMessage(e, "Échec enregistrement"));
-    } finally {
-      setSaving(false);
-    }
+    await persistItems(items, "Menu enregistré — visible dans l'app passager");
   }
 
   const sizes = draft.sizes ?? [];

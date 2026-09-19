@@ -20,6 +20,7 @@ import {
 import { useAdmin } from "@/components/AdminProvider";
 import { AuthenticatedMedia } from "@/components/AuthenticatedMedia";
 import { KYC_DOC_LABELS, kycDocLabel, personDisplayName } from "@/lib/kyc-labels";
+import { commerceTypeLabel } from "@mova/shared";
 import {
   BtnDanger,
   BtnSuccess,
@@ -51,8 +52,10 @@ function dossierName(r: PartnerKycDossier) {
 }
 
 function dossierKind(r: PartnerKycDossier) {
+  if (r.subject === "RESTAURANT") {
+    return r.partnerKindLabel || commerceTypeLabel(r.commerceType);
+  }
   if (r.partnerKindLabel) return r.partnerKindLabel;
-  if (r.subject === "RESTAURANT") return "Restaurant";
   if (r.partnerType === "COMPANY") return "Location (entreprise)";
   if (r.partnerType === "INDIVIDUAL") return "Location (particulier)";
   return "Location";
@@ -172,7 +175,7 @@ function DocumentRow({
 const KIND_OPTIONS = [
   { value: "", label: "Tous les types" },
   { value: "DRIVER", label: "Chauffeur" },
-  { value: "RESTAURANT", label: "Restaurant" },
+  { value: "RESTAURANT", label: "Commerce (resto / boutique / …)" },
   { value: "RENTAL", label: "Location" },
 ];
 
@@ -861,7 +864,7 @@ export default function KycPage() {
           )}
           {filteredRestaurants.length > 0 && (
             <div className="space-y-3">
-              <h2 className="text-sm font-semibold text-gray-700">Restaurants</h2>
+              <h2 className="text-sm font-semibold text-gray-700">Partenaires commerce</h2>
               {filteredRestaurants.map((r) => {
                 const name = dossierName(r);
                 const kind = dossierKind(r);

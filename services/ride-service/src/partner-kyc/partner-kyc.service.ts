@@ -16,6 +16,8 @@ import {
   notifyAuthUser,
   allPartnerJustificatifsApproved,
   checklistSatisfiesJobsGate,
+  commerceTypeLabel,
+  parseCommerceType,
   JOBS_GATE_RESTAURANT_KYC_TYPES,
   JOBS_GATE_RENTAL_COMPANY_KYC_TYPES,
   JOBS_GATE_RENTAL_INDIVIDUAL_KYC_TYPES,
@@ -88,6 +90,7 @@ export class PartnerKycService {
     const phoneVerified = PHONE_OK.test(user?.phone?.trim() ?? '');
     const hasEmail = Boolean(user?.email?.trim());
     const partnerKind: KycPartnerKind = 'RESTAURANT';
+    const commerceType = parseCommerceType(restaurant.commerceType);
     return {
       subject: 'RESTAURANT' as const,
       userId: ownerUserId,
@@ -95,7 +98,8 @@ export class PartnerKycService {
       name: restaurant.name,
       displayName: restaurant.name,
       partnerKind,
-      partnerKindLabel: kycPartnerKindLabel(partnerKind),
+      partnerKindLabel: commerceTypeLabel(commerceType),
+      commerceType,
       kycStatus: restaurant.kycStatus,
       kycNotes: restaurant.kycNotes,
       nif: restaurant.nif,

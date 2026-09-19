@@ -16,6 +16,7 @@ import {
   type AdminCity,
   type AdminUser,
 } from "@/lib/api";
+import { userRoleDisplayLabel } from "@mova/shared";
 import { useAdmin } from "@/components/AdminProvider";
 import {
   BtnDanger,
@@ -280,7 +281,8 @@ export default function UtilisateursPage() {
         }
       />
       <p className="text-sm text-gray-600 mb-4">
-        <strong>Utilisateurs</strong> = qui peut se connecter (rôle Passager, Chauffeur, Restaurant, Location, staff).
+        <strong>Utilisateurs</strong> = qui peut se connecter (rôle Passager, Chauffeur, partenaire commerce
+        — resto / boutique / pharmacie / supermarché —, Location, staff).
         <strong> Chauffeurs</strong> = profils véhicule / KYC. Un chauffeur réel a les deux : rôle Chauffeur ici, et une
         ligne dans Chauffeurs. Les partenaires restaurant / location apparaissent ici même sans +243 (connexion Google).
         Les robots Google Play / Test Lab restent masqués.
@@ -357,7 +359,12 @@ export default function UtilisateursPage() {
                     </td>
                     <td className="p-3">{u.phone ?? "—"}</td>
                     <td className="p-3">{u.email?.trim() ? u.email : "—"}</td>
-                    <td className="p-3"><StatusBadge status={u.role} /></td>
+                    <td className="p-3">
+                      <StatusBadge
+                        status={u.role === "RESTAURANT" ? (u.commerceType ?? "RESTAURANT") : u.role}
+                        label={userRoleDisplayLabel(u.role, u.commerceType)}
+                      />
+                    </td>
                     <td className="p-3"><StatusBadge status={u.status ?? "ACTIVE"} /></td>
                     <td className="p-3">
                       <button type="button" onClick={() => openDetail(u)} className="text-[#6C63FF] text-sm hover:underline">
@@ -411,7 +418,7 @@ export default function UtilisateursPage() {
               value={createRole}
               onChange={setCreateRole}
               options={[
-                { value: "RESTAURANT", label: "Restaurant partenaire" },
+                { value: "RESTAURANT", label: "Partenaire commerce" },
                 { value: "RENTAL_PARTNER", label: "Partenaire location" },
                 { value: "PASSENGER", label: "Passager" },
                 { value: "DRIVER", label: "Chauffeur" },
@@ -471,19 +478,38 @@ export default function UtilisateursPage() {
               </label>
               <label>
                 <FieldLabel>Rôle</FieldLabel>
-                <SelectInput value={editRole} onChange={setEditRole} disabled={readOnly} options={[
-                  { value: "PASSENGER", label: "Passager" },
-                  { value: "DRIVER", label: "Chauffeur" },
-                  { value: "RESTAURANT", label: "Restaurant partenaire" },
-                  { value: "RENTAL_PARTNER", label: "Partenaire location" },
-                  { value: "ADMIN", label: "Administrateur" },
-                  { value: "SUPER_ADMIN", label: "Super admin" },
-                  { value: "SUPPORT", label: "Support" },
-                  { value: "FINANCE", label: "Finance" },
-                  { value: "CONTENT", label: "Contenu" },
-                  { value: "CITY_ADMIN", label: "Admin ville" },
-                ]} />
+                {selected.role === "RESTAURANT" ? (
+                  <div className="mt-1">
+                    <StatusBadge
+                      status={selected.commerceType ?? "RESTAURANT"}
+                      label={userRoleDisplayLabel(selected.role, selected.commerceType)}
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Type de commerce du partenaire (restaurant, boutique, pharmacie ou supermarché).
+                      Modifiable dans la page Restaurants.
+                    </p>
+                  </div>
+                ) : (
+                  <SelectInput value={editRole} onChange={setEditRole} disabled={readOnly} options={[
+                    { value: "PASSENGER", label: "Passager" },
+                    { value: "DRIVER", label: "Chauffeur" },
+                    { value: "RESTAURANT", label: "Partenaire commerce (resto / boutique / …)" },
+                    { value: "RENTAL_PARTNER", label: "Partenaire location" },
+                    { value: "ADMIN", label: "Administrateur" },
+                    { value: "SUPER_ADMIN", label: "Super admin" },
+                    { value: "SUPPORT", label: "Support" },
+                    { value: "FINANCE", label: "Finance" },
+                    { value: "CONTENT", label: "Contenu" },
+                    { value: "CITY_ADMIN", label: "Admin ville" },
+                  ]} />
+                )}
               </label>
+              {selected.role !== "RESTAURANT" && editRole === "RESTAURANT" && !readOnly && (
+                <p className="text-xs text-amber-800 sm:col-span-2">
+                  Après passage en partenaire commerce, le type (resto / boutique / pharmacie / supermarché)
+                  se règle dans Restaurants.
+                </p>
+              )}
               {editRole === "CITY_ADMIN" && (
                 <label>
                   <FieldLabel>Ville gérée *</FieldLabel>

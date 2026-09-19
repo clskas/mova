@@ -96,6 +96,8 @@ export type AdminUser = {
   pinConfigured?: boolean;
   /** CITY_ADMIN: service-area city name. */
   managedCity?: string | null;
+  /** When role=RESTAURANT: RESTAURANT | SUPERMARKET | PHARMACY | BOUTIQUE */
+  commerceType?: "RESTAURANT" | "SUPERMARKET" | "PHARMACY" | "BOUTIQUE" | string;
 };
 
 export type AdminDriver = {
@@ -2218,6 +2220,7 @@ export type PartnerKycDossier = {
   displayName?: string | null;
   partnerKind?: string;
   partnerKindLabel?: string;
+  commerceType?: string;
   kycStatus?: string;
   kycNotes?: string | null;
   partnerType?: string;

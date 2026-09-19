@@ -162,13 +162,27 @@ const STATUS_LABELS: Record<string, string> = {
   SOS: "SOS",
   Manquant: "Manquant",
   MISSING: "Manquant",
+  PASSENGER: "Passager",
+  DRIVER: "Chauffeur",
+  RESTAURANT: "Restaurant",
+  SUPERMARKET: "Supermarché",
+  PHARMACY: "Pharmacie",
+  BOUTIQUE: "Boutique",
+  RENTAL_PARTNER: "Partenaire location",
+  ADMIN: "Administrateur",
+  SUPER_ADMIN: "Super admin",
+  SUPPORT: "Support",
+  FINANCE: "Finance",
+  CONTENT: "Contenu",
+  CITY_ADMIN: "Admin ville",
 };
 
-export function StatusBadge({ status }: { status?: string }) {
-  if (!status) return <span className="text-gray-400">—</span>;
-  const cls = STATUS_COLORS[status] ?? "bg-gray-100 text-gray-600";
-  const label = STATUS_LABELS[status] ?? status.replace(/_/g, " ").toLowerCase();
-  return <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${cls}`}>{label}</span>;
+export function StatusBadge({ status, label }: { status?: string; label?: string }) {
+  if (!status && !label) return <span className="text-gray-400">—</span>;
+  const key = status ?? "";
+  const cls = STATUS_COLORS[key] ?? "bg-gray-100 text-gray-600";
+  const text = label ?? STATUS_LABELS[key] ?? key.replace(/_/g, " ").toLowerCase();
+  return <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${cls}`}>{text}</span>;
 }
 
 export function PageHeader({ title, subtitle, action }: { title: string; subtitle?: string; action?: React.ReactNode }) {

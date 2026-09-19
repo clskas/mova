@@ -231,7 +231,7 @@ export class AdminService {
     if (search) params.set('search', search);
     if (includePlayPrelaunch) params.set('includePlayPrelaunch', 'true');
     const result = await this.fetchJson<{
-      data?: Array<{ id: string; role?: string; status?: string; [key: string]: unknown }>;
+      data?: Array<{ id: string; role?: string; status?: string; commerceType?: string; [key: string]: unknown }>;
       total?: number;
       skip?: number;
       take?: number;
@@ -239,25 +239,47 @@ export class AdminService {
     const pendingDrivers = (result.data ?? []).filter(
       (u) => u.role === 'DRIVER' && String(u.status ?? '').toUpperCase() === 'PENDING_KYC',
     );
-    if (pendingDrivers.length === 0) return result;
-    await Promise.all(
-      pendingDrivers.map(async (u) => {
-        try {
-          const detail = await this.fetchJson<{ kycStatus?: string }>(
-            'driver',
-            `/internal/drivers/${u.id}/detail`,
-          );
-          if (String(detail.kycStatus ?? '').toUpperCase() !== 'APPROVED') return;
-          await this.proxy('auth', `/internal/users/${u.id}`, {
-            method: 'PATCH',
-            body: JSON.stringify({ status: 'ACTIVE', role: 'DRIVER' }),
-          });
-          u.status = 'ACTIVE';
-        } catch {
-          /* driver profile missing or auth unreachable — leave badge as-is */
+    if (pendingDrivers.length > 0) {
+      await Promise.all(
+        pendingDrivers.map(async (u) => {
+          try {
+            const detail = await this.fetchJson<{ kycStatus?: string }>(
+              'driver',
+              `/internal/drivers/${u.id}/detail`,
+            );
+            if (String(detail.kycStatus ?? '').toUpperCase() !== 'APPROVED') return;
+            await this.proxy('auth', `/internal/users/${u.id}`, {
+              method: 'PATCH',
+              body: JSON.stringify({ status: 'ACTIVE', role: 'DRIVER' }),
+            });
+            u.status = 'ACTIVE';
+          } catch {
+            /* driver profile missing or auth unreachable — leave badge as-is */
+          }
+        }),
+      );
+    }
+    const restaurantUsers = (result.data ?? []).filter((u) => u.role === 'RESTAURANT');
+    if (restaurantUsers.length > 0) {
+      try {
+        const restaurants = await this.fetchJson<
+          Array<{ ownerUserId?: string | null; commerceType?: string | null }>
+        >('ride', '/internal/restaurants');
+        const byOwner = new Map<string, string>();
+        for (const r of restaurants ?? []) {
+          if (r.ownerUserId && !byOwner.has(r.ownerUserId)) {
+            byOwner.set(r.ownerUserId, r.commerceType ?? 'RESTAURANT');
+          }
         }
-      }),
-    );
+        for (const u of restaurantUsers) {
+          u.commerceType = byOwner.get(u.id) ?? 'RESTAURANT';
+        }
+      } catch {
+        for (const u of restaurantUsers) {
+          u.commerceType = u.commerceType ?? 'RESTAURANT';
+        }
+      }
+    }
     return result;
   }
   listPlayPrelaunchUsers() {

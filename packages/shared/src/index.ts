@@ -24,6 +24,7 @@ export * from './request-id.middleware';
 export * from './kyc-documents';
 export * from './kyc-ocr';
 export * from './driver-documents';
+export * from './commerce-type';
 export * from './public-id';
 export * from './africas-talking';
 export * from './serdipay';

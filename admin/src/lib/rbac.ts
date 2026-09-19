@@ -105,6 +105,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/contacts", label: "Contacts", short: "Contacts", section: "contacts" },
   { href: "/cgu", label: "CGU", short: "CGU", section: "cgu" },
   { href: "/operateurs-mm", label: "Opérateurs Mobile Money", short: "MM", section: "systeme" },
+  { href: "/services-senga", label: "Services SENGA", short: "Serv.", section: "systeme" },
   { href: "/maintenance", label: "Mode maintenance", short: "Maint.", section: "systeme" },
   { href: "/courses", label: "Courses", short: "Courses", section: "courses" },
   { href: "/livraisons", label: "Livraisons", short: "Livr.", section: "livraisons" },
@@ -146,8 +147,6 @@ export function canWriteSection(role: AdminRole, section: AdminSection): boolean
 export function navForRole(role: AdminRole): NavItem[] {
   return NAV_ITEMS.filter((item) => {
     if (!canAccessSection(role, item.section)) return false;
-    // Règles plateforme nationales : réservées au staff central (pas admin ville).
-    if (role === "CITY_ADMIN" && item.href === "/regles-plateforme") return false;
     return true;
   });
 }

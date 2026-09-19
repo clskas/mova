@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../core/api/api_client.dart';
 import '../../core/billing/driver_earnings_display.dart';
+import '../../core/config/client_apps_config.dart';
 import '../../core/config/market_config.dart';
 import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
@@ -86,7 +87,9 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
       if (row is Map) {
         final choices = <_MmChoice>[];
         for (final p in MarketConfig.mobileMoneyProviders) {
-          if (row[p.id] == true) choices.add(_MmChoice(p.id, p.name));
+          if (mmOperatorEnabledFor(row, p.id, 'withdraw')) {
+            choices.add(_MmChoice(p.id, p.name));
+          }
         }
         if (choices.isNotEmpty) {
           setState(() {

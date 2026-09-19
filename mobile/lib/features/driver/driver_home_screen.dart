@@ -73,6 +73,8 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
   static const double _listItemGap = 14;
   String? _profileError;
   bool _showingOffer = false;
+  String? _openOfferKind;
+  String? _openOfferId;
   List<Map<String, dynamic>> _rideOffers = [];
   List<Map<String, dynamic>> _deliveryOffers = [];
   List<Map<String, dynamic>> _assignedMissions = [];
@@ -527,6 +529,27 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
           _rideOffers = _rideOffers.where((o) => o['id']?.toString() != id).toList();
         });
       },
+      onOfferTaken: (payload) {
+        if (!mounted) return;
+        final kind = payload['kind']?.toString();
+        final rideId = payload['rideId']?.toString();
+        final deliveryId = payload['deliveryId']?.toString();
+        final id = kind == 'ride' ? rideId : deliveryId;
+        if (id == null || id.isEmpty) return;
+        setState(() {
+          if (kind == 'ride') {
+            _rideOffers = _rideOffers.where((o) => o['id']?.toString() != id).toList();
+          } else {
+            _deliveryOffers = _deliveryOffers.where((o) => o['id']?.toString() != id).toList();
+          }
+        });
+        if (_showingOffer &&
+            _openOfferId == id &&
+            ((kind == 'ride' && _openOfferKind == 'ride') ||
+                (kind == 'delivery' && _openOfferKind == 'delivery'))) {
+          Navigator.of(context).pop('taken');
+        }
+      },
       onCashPending: (payload) {
         final deliveryId = payload['deliveryId']?.toString();
         if (deliveryId == null || deliveryId.isEmpty) return;
@@ -799,12 +822,21 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
     final id = offer['id']?.toString() ?? '';
     if (id.isEmpty) return;
     _showingOffer = true;
+    _openOfferKind = 'delivery';
+    _openOfferId = id;
     final result = await Navigator.push<dynamic>(
       context,
       MaterialPageRoute(builder: (_) => DeliveryOfferScreen(offer: offer)),
     );
     _showingOffer = false;
+    _openOfferKind = null;
+    _openOfferId = null;
     if (!mounted) return;
+    if (result == 'taken') {
+      _dismissedOffers.add('delivery:$id');
+      await _refreshRideOffers();
+      return;
+    }
     if (result == 'timeout' || result == null) {
       _snoozedOffers['delivery:$id'] = DateTime.now();
     } else if (result == 'rejected') {
@@ -867,6 +899,8 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
     final id = offer['id']?.toString() ?? '';
     if (id.isEmpty) return;
     _showingOffer = true;
+    _openOfferKind = 'ride';
+    _openOfferId = id;
     final result = await Navigator.push<String?>(
       context,
       MaterialPageRoute(
@@ -876,14 +910,18 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
         ),
       ),
     );
-    if (result == 'timeout') {
+    _showingOffer = false;
+    _openOfferKind = null;
+    _openOfferId = null;
+    if (result == 'taken') {
+      _dismissedOffers.add('ride:$id');
+    } else if (result == 'timeout') {
       // Pas de réponse : ne pas masquer définitivement, re-proposer plus tard.
       _snoozedOffers['ride:$id'] = DateTime.now();
     } else {
       // Refus explicite ou acceptation : masquer définitivement pour cette session.
       _dismissedOffers.add('ride:$id');
     }
-    _showingOffer = false;
     await _loadActiveRide();
     await _refreshRideOffers();
   }

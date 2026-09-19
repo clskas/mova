@@ -74,11 +74,24 @@ La carte se rafraîchit automatiquement toutes les 10 secondes tant que la missi
 ### Validation KYC
 
 1. **KYC** ou **Chauffeurs → Détail** → **Approuver KYC**.
-2. Un PIN d'activation s'affiche (et part en SMS / e-mail). Le chauffeur le saisit dans l'app.
+2. Un **PIN d’activation à 6 chiffres** s’affiche (et part en SMS / e-mail). Le chauffeur le saisit à la **première connexion** app. Ce PIN n’est **pas** lié au dépôt des pièces (les docs restent optionnels tant que la règle ci-dessous est inactive).
 3. Pour un **restaurant** ou **loueur**, le même écran affiche le PIN de connexion et permet de le renvoyer si le SMS échoue.
-4. Le chauffeur peut alors passer **En ligne** (sous réserve du type d'engin).
+4. Le chauffeur peut alors passer **En ligne** (sous réserve du type d’engin).
 
-Des champs OCR (nom, numéro permis…) peuvent apparaître si le service d'analyse de documents est activé.
+Des champs OCR (nom, numéro permis…) peuvent apparaître si le service d’analyse de documents est activé.
+
+### Exiger des documents pour les jobs
+
+Dans **Règles plateforme** (SUPER_ADMIN, ADMIN, **CITY_ADMIN** — section documents uniquement pour l’admin ville) :
+
+- Option **« Exiger des documents valides pour recevoir les notifications »** (`requireDocumentsForJobs`).
+- Inactive par défaut : le PIN est émis à l’approbation KYC même sans pièces.
+- Active : le chauffeur doit avoir des justificatifs non expirés pour recevoir des offres (éligibilité jobs).
+
+### Wallet chauffeur et cash
+
+- Commission sur course **espèces** → **dette** plateforme (le wallet peut rester à 0).
+- Dette au-delà du seuil / règle solde positif → offres bloquées jusqu’à recharge ou règlement guichet.
 
 ### Validation du type d'engin
 

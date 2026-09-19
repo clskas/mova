@@ -164,7 +164,9 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
         : switch (status) {
             'PENDING' => 'En attente du restaurant',
             'RESTAURANT_CONFIRMED' =>
-              (_delivery?['escrowReady'] == true || deliveryIsPaid(_delivery))
+              deliveryIsCod(_delivery) ||
+                      _delivery?['escrowReady'] == true ||
+                      deliveryIsPaid(_delivery)
                   ? 'En préparation'
                   : 'Acceptée — en attente de votre paiement',
             'READY_FOR_PICKUP' => 'Prête — livreur en route',
@@ -176,7 +178,7 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
           };
     if (deliveryIsPaid(_delivery)) return '$base · Payée';
     if (deliveryCashPaymentPending(_delivery)) return '$base · Paiement espèces en attente';
-    if (_paymentDue) return '$base · Paiement en attente';
+    if (deliveryPaymentDue(_delivery)) return '$base · Paiement en attente';
     return base;
   }
 
@@ -311,12 +313,11 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
     return rated == true;
   }
 
-  bool get _paymentDue {
-    if (deliveryIsPaid(_delivery)) return false;
-    if (_cashPaymentPending) return false;
-    final status = _delivery?['status']?.toString();
-    return _delivery?['paymentReady'] == true || status == 'DELIVERED';
-  }
+  bool get _paymentDue => deliveryPaymentDue(_delivery);
+
+  bool get _escrowPaymentDue => deliveryEscrowPaymentDue(_delivery);
+
+  bool get _cashSettlementDue => deliveryCashSettlementDue(_delivery);
 
   bool get _cashPaymentPending => deliveryCashPaymentPending(_delivery);
 
@@ -350,7 +351,8 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
       }
     }
 
-    if (_paymentNavigated || !mounted || !_paymentDue) return;
+    // Auto-nav only for prepaid escrow — COD uses CTA after DELIVERED.
+    if (_paymentNavigated || !mounted || !_escrowPaymentDue || _cashPaymentPending) return;
     _paymentNavigated = true;
     _openPayment();
   }
@@ -461,7 +463,8 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
                         ],
                         if (_delivery?['status']?.toString() == 'PENDING' &&
                             !deliveryIsPaid(_delivery) &&
-                            !_paymentDue) ...[
+                            !_escrowPaymentDue &&
+                            !deliveryIsCod(_delivery)) ...[
                           const MovaCard(
                             child: Text(
                               'Commande envoyée. Le restaurant doit d\'abord accepter. '
@@ -471,11 +474,31 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
                           ),
                           const SizedBox(height: 12),
                         ],
-                        if (_paymentDue && !deliveryIsPaid(_delivery)) ...[
+                        if (deliveryIsCod(_delivery) &&
+                            !_cashSettlementDue &&
+                            !deliveryIsPaid(_delivery)) ...[
+                          const MovaCard(
+                            child: Text(
+                              'Commande non garantie (espèces). Paiement à la livraison — SENGA ne séquestre pas les fonds.',
+                              style: TextStyle(fontSize: 13),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                        ],
+                        if (_escrowPaymentDue && !deliveryIsPaid(_delivery)) ...[
                           const MovaCard(
                             child: Text(
                               'Le restaurant a accepté votre commande. '
                               'Payez maintenant pour lancer la préparation (délai 15 min, sinon annulation).',
+                              style: TextStyle(fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                        ],
+                        if (_cashSettlementDue && !deliveryIsPaid(_delivery)) ...[
+                          const MovaCard(
+                            child: Text(
+                              'Commande livrée. Payez le livreur en espèces (ou via l\'app) et communiquez-lui le PIN affiché.',
                               style: TextStyle(fontWeight: FontWeight.w600),
                             ),
                           ),
@@ -653,7 +676,7 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
                       if (_canCancel) const SizedBox(height: 8),
                       if (_paymentDue) ...[
                         MovaButton(
-                          label: 'Payer la commande',
+                          label: _cashSettlementDue ? 'Payer en espèces' : 'Payer la commande',
                           icon: Icons.payment_outlined,
                           onPressed: _openPayment,
                         ),

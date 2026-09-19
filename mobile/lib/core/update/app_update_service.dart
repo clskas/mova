@@ -145,7 +145,7 @@ class AppUpdateService extends Notifier<AppUpdateState> {
             if (snoozed != null &&
                 snoozed == parsed.remoteVersion &&
                 !parsed.forceUpdate) {
-              dismissed = DateTime.now().add(softDismissDuration);
+              dismissed = DateTime.now().add(const Duration(days: 365));
             } else if (snoozed != null && snoozed != parsed.remoteVersion) {
               await prefs.remove(_snoozePrefKey);
               dismissed = null;
@@ -169,6 +169,19 @@ class AppUpdateService extends Notifier<AppUpdateState> {
       if (next.storeUrl == null || next.storeUrl!.isEmpty) {
         next = next.copyWith(storeUrl: defaultStoreUrl);
       }
+      // After install: hide banner completely (no leftover flexible "Redémarrer").
+      if (!next.updateAvailable) {
+        next = next.copyWith(
+          flexibleDownloaded: false,
+          dismissedUntil: null,
+        );
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.remove(_snoozePrefKey);
+        } catch (_) {
+          /* ignore */
+        }
+      }
       if (next != state) state = next;
       // Do not auto-download / auto-reload: the chauffeur must see
       // « Une nouvelle version de SENGA est disponible » until they tap Mettre à jour.
@@ -181,8 +194,9 @@ class AppUpdateService extends Notifier<AppUpdateState> {
     if (!state.updateAvailable || state.forceUpdate) return;
     _softDismissTimer?.cancel();
     final remote = state.remoteVersion;
+    // Persist "Plus tard" until this store build is installed (or a newer one ships).
     state = state.copyWith(
-      dismissedUntil: DateTime.now().add(softDismissDuration),
+      dismissedUntil: DateTime.now().add(const Duration(days: 365)),
     );
     if (remote != null && remote.isNotEmpty) {
       unawaited(
@@ -191,11 +205,6 @@ class AppUpdateService extends Notifier<AppUpdateState> {
         }),
       );
     }
-    _softDismissTimer = Timer(softDismissDuration, () {
-      if (!state.forceUpdate) {
-        state = state.copyWith(dismissedUntil: null);
-      }
-    });
   }
 
   Future<void> openStore() async {

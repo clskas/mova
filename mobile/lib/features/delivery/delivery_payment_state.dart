@@ -27,10 +27,37 @@ bool deliveryIsPaid(Map<String, dynamic>? delivery) {
   return delivery?['paymentStatus']?.toString().toUpperCase() == 'COMPLETED';
 }
 
+/// Livraison / course COD (espèces à la remise) — pas de séquestre.
+bool deliveryIsCod(Map<String, dynamic>? delivery) =>
+    delivery?['guaranteed'] == false;
+
 bool deliveryCashPaymentPending(Map<String, dynamic>? delivery) =>
     !deliveryIsPaid(delivery) &&
     delivery?['paymentStatus']?.toString().toUpperCase() == 'PENDING' &&
     delivery?['paymentMethod']?.toString().toUpperCase() == 'CASH';
+
+bool _terminalDelivered(Map<String, dynamic>? delivery) {
+  final status = delivery?['status']?.toString();
+  return status == 'DELIVERED' || status == 'COMPLETED';
+}
+
+/// Prépayé / séquestre : payer avant dispatch (paymentReady côté API).
+bool deliveryEscrowPaymentDue(Map<String, dynamic>? delivery) {
+  if (deliveryIsPaid(delivery) || deliveryCashPaymentPending(delivery)) return false;
+  if (deliveryIsCod(delivery)) return false;
+  return delivery?['paymentReady'] == true;
+}
+
+/// COD : encaissement uniquement après livraison / course terminée.
+bool deliveryCashSettlementDue(Map<String, dynamic>? delivery) {
+  if (deliveryIsPaid(delivery) || deliveryCashPaymentPending(delivery)) return false;
+  if (!deliveryIsCod(delivery)) return false;
+  if (delivery?['paymentReady'] == true) return true;
+  return _terminalDelivered(delivery);
+}
+
+bool deliveryPaymentDue(Map<String, dynamic>? delivery) =>
+    deliveryEscrowPaymentDue(delivery) || deliveryCashSettlementDue(delivery);
 
 String paymentConfirmedMessage({String? method, bool isDelivery = true}) {
   final actor = isDelivery ? 'livreur' : 'chauffeur';

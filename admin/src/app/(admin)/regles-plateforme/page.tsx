@@ -52,8 +52,10 @@ function NumField({
 }
 
 export default function ReglesPlateformePage() {
-  const { canWrite } = useAdmin();
+  const { canWrite, role } = useAdmin();
   const readOnly = !canWrite("tarifs");
+  /** Admin ville : uniquement la règle documents (jobs), pas les paramètres nationaux. */
+  const cityAdminDocsOnly = role === "CITY_ADMIN";
   const [config, setConfig] = useState<PlatformConfigData | null>(null);
   const [cancellationPolicies, setCancellationPolicies] = useState<CancellationPolicy[]>([]);
   const [weightBands, setWeightBands] = useState<ParcelWeightBand[]>([]);
@@ -160,13 +162,18 @@ export default function ReglesPlateformePage() {
     <div className="space-y-8 pb-12">
       <PageHeader
         title="Règles plateforme"
-        subtitle="Paramètres globaux (dispatch, inter-ville, livraison repas, annulations, colis) — modifiables sans redéploiement."
+        subtitle={
+          cityAdminDocsOnly
+            ? "Exigence de documents pour les chauffeurs de votre ville (recevoir les offres)."
+            : "Paramètres globaux (dispatch, inter-ville, livraison repas, annulations, colis) — modifiables sans redéploiement."
+        }
       />
       {error && <ErrorBanner message={error} />}
       {loading || !config ? (
         <LoadingState label="Chargement des règles…" />
       ) : (
         <div className="space-y-8">
+          {!cityAdminDocsOnly && (
           <section>
             <h2 className="font-semibold text-[#1A1A2E] mb-3">Majoration inter-ville</h2>
             <Card className="p-4 grid sm:grid-cols-2 gap-4 max-w-xl">
@@ -259,6 +266,7 @@ export default function ReglesPlateformePage() {
               )}
             </Card>
           </section>
+          )}
 
           <section>
             <h2 className="font-semibold text-[#1A1A2E] mb-3">Documents chauffeurs &amp; notifications</h2>
@@ -267,6 +275,9 @@ export default function ReglesPlateformePage() {
                 Par défaut, tous les justificatifs du dossier chauffeur sont optionnels. Activez l&apos;option
                 ci-dessous pour exiger des documents valides (dates d&apos;expiration) afin de continuer à
                 recevoir les notifications de courses.
+                {cityAdminDocsOnly
+                  ? " Cette règle s'applique au niveau plateforme (tous les chauffeurs)."
+                  : null}
               </p>
               <label className="flex items-start gap-2 text-sm">
                 <input
@@ -295,6 +306,7 @@ export default function ReglesPlateformePage() {
             </Card>
           </section>
 
+          {!cityAdminDocsOnly && (
           <section>
             <h2 className="font-semibold text-[#1A1A2E] mb-3">Courses planifiées</h2>
             <Card className="p-4 grid sm:grid-cols-2 gap-4 max-w-xl">
@@ -418,6 +430,7 @@ export default function ReglesPlateformePage() {
               </table>
             </Card>
           </section>
+          )}
         </div>
       )}
     </div>

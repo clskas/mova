@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../../core/api/api_client.dart';
+import '../../core/config/client_apps_config.dart';
 import '../../core/config/market_config.dart';
 import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
@@ -102,7 +103,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       if (row is Map) {
         final next = <String>{};
         for (final id in _mobileMoneyMethods) {
-          if (row[id] == true) next.add(id);
+          if (mmOperatorEnabledFor(row, id, 'topup')) next.add(id);
         }
         if (next.isNotEmpty) {
           setState(() {
@@ -146,10 +147,16 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
             _paymentReady = ready;
             _escrowCollect = data['escrowCollect'] == true;
             _cashAllowed = data['cashAllowed'] != false;
-            // Espèces restent sélectionnables même si le flux était initialement « garanti ».
-            if (!ready && widget.serviceType == 'RENTAL') {
-              _error =
-                  'Le paiement sera disponible après le retour du véhicule. Le partenaire doit cliquer « Véhicule rendu ».';
+            if (!ready) {
+              _error = switch (widget.serviceType) {
+                'RENTAL' =>
+                  'Le paiement sera disponible après le retour du véhicule. Le partenaire doit cliquer « Véhicule rendu ».',
+                'DELIVERY' =>
+                  'Le paiement espèces sera disponible après la livraison.',
+                'ERRAND' =>
+                  'Le paiement espèces sera disponible après la fin des courses.',
+                _ => null,
+              };
             }
           });
         }
@@ -347,8 +354,16 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       return;
     }
     if (!_paymentReady) {
-      setState(() => _error =
-          'Le paiement sera disponible après le retour du véhicule. Le partenaire doit cliquer « Véhicule rendu ».');
+      final msg = switch (widget.serviceType) {
+        'DELIVERY' =>
+          'Le paiement espèces sera disponible après la livraison du colis.',
+        'ERRAND' =>
+          'Le paiement espèces sera disponible après la fin des courses.',
+        'RENTAL' =>
+          'Le paiement sera disponible après le retour du véhicule. Le partenaire doit cliquer « Véhicule rendu ».',
+        _ => 'Le paiement n\'est pas encore disponible pour cette course.',
+      };
+      setState(() => _error = msg);
       return;
     }
     if (_method == 'CASH' && (_cashPin == null || _cashPin!.isEmpty)) {

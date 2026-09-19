@@ -504,7 +504,7 @@ export default function ChauffeursPage() {
                   <th className="p-3">Rôle</th>
                   <th className="p-3">Docs</th>
                   <th className="p-3">KYC</th>
-                  <th className="p-3">Dispo</th>
+                  <th className="p-3">État</th>
                   <th className="p-3"></th>
                 </tr>
               </thead>
@@ -541,7 +541,13 @@ export default function ChauffeursPage() {
                       {d.onboardingCompleted && <span className="block text-green-600">Dossier envoyé</span>}
                     </td>
                     <td className="p-3"><StatusBadge status={d.kycStatus} /></td>
-                    <td className="p-3">{d.isAvailable ? "✓ Oui" : "Non"}</td>
+                    <td className="p-3 text-xs">
+                      {d.dutyStatus === "ON_TRIP"
+                        ? "En course"
+                        : d.dutyStatus === "AVAILABLE" || d.isAvailable
+                          ? "Disponible"
+                          : "Hors ligne"}
+                    </td>
                     <td className="p-3">
                       <button type="button" onClick={() => setSelectedId(d.userId)} className="text-[#6C63FF] text-sm hover:underline">
                         Détail
@@ -619,7 +625,13 @@ export default function ChauffeursPage() {
                 </p>
               )}
               <p><span className="text-gray-500">N° identité:</span> {detail?.idDocumentNumber ?? "—"}</p>
-              <p><span className="text-gray-500">Disponible:</span> {selected.isAvailable ? "Oui" : "Non"}</p>
+              <p><span className="text-gray-500">État:</span>{" "}
+                {selected.dutyStatus === "ON_TRIP"
+                  ? "En course"
+                  : selected.dutyStatus === "AVAILABLE" || selected.isAvailable
+                    ? "Disponible"
+                    : "Hors ligne"}
+              </p>
               {"payoutProvider" in selected && selected.payoutProvider && (
                 <p><span className="text-gray-500">Retrait:</span> {selected.payoutProvider} · {selected.payoutPhone ?? "—"}</p>
               )}
@@ -770,6 +782,23 @@ export default function ChauffeursPage() {
                           {item.uploaded ? `✓ ${item.status ?? "uploadé"}` : item.required ? "Manquant" : "Optionnel"}
                         </span>
                       </div>
+                      {item.url && (
+                        <div className="mt-2 space-y-2">
+                          <AuthenticatedMedia
+                            url={item.url}
+                            alt={item.label ?? item.type}
+                            className="max-h-48 w-full object-contain rounded-lg border bg-white"
+                          />
+                          <a
+                            href={resolveMediaUrl(item.url) ?? "#"}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-[#6C63FF] hover:underline text-xs"
+                          >
+                            Ouvrir le justificatif
+                          </a>
+                        </div>
+                      )}
                       {item.notes && item.status === "REJECTED" && (
                         <p className="text-xs text-red-700">Motif : {item.notes}</p>
                       )}

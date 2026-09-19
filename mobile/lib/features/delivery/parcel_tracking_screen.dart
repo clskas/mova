@@ -140,7 +140,7 @@ class _ParcelTrackingScreenState extends ConsumerState<ParcelTrackingScreen> {
     };
     if (deliveryIsPaid(_delivery)) return '$base · Payée';
     if (deliveryCashPaymentPending(_delivery)) return '$base · Paiement espèces en attente';
-    if (_paymentDue) return '$base · Paiement en attente';
+    if (deliveryPaymentDue(_delivery)) return '$base · Paiement en attente';
     return base;
   }
 
@@ -188,12 +188,11 @@ class _ParcelTrackingScreenState extends ConsumerState<ParcelTrackingScreen> {
     }
   }
 
-  bool get _paymentDue {
-    if (deliveryIsPaid(_delivery)) return false;
-    if (_cashPaymentPending) return false;
-    final status = _delivery?['status']?.toString();
-    return _delivery?['paymentReady'] == true || status == 'DELIVERED';
-  }
+  bool get _paymentDue => deliveryPaymentDue(_delivery);
+
+  bool get _escrowPaymentDue => deliveryEscrowPaymentDue(_delivery);
+
+  bool get _cashSettlementDue => deliveryCashSettlementDue(_delivery);
 
   bool get _cashPaymentPending => deliveryCashPaymentPending(_delivery);
 
@@ -232,7 +231,8 @@ class _ParcelTrackingScreenState extends ConsumerState<ParcelTrackingScreen> {
   }
 
   void _maybeGoToPayment() {
-    if (_paymentNavigated || !mounted || !_paymentDue || _cashPaymentPending) return;
+    // Auto-nav only for prepaid escrow — COD waits for explicit CTA after DELIVERED.
+    if (_paymentNavigated || !mounted || !_escrowPaymentDue || _cashPaymentPending) return;
     _paymentNavigated = true;
     _openPayment();
   }
@@ -350,10 +350,19 @@ class _ParcelTrackingScreenState extends ConsumerState<ParcelTrackingScreen> {
                               ),
                               const SizedBox(height: 12),
                             ],
-                            if (_paymentDue && !deliveryIsPaid(_delivery)) ...[
+                            if (_escrowPaymentDue && !deliveryIsPaid(_delivery)) ...[
                               const MovaCard(
                                 child: Text(
                                   'Payez maintenant pour séquestrer le montant. Aucun livreur n\'est contacté avant paiement.',
+                                  style: TextStyle(fontWeight: FontWeight.w600),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                            ],
+                            if (_cashSettlementDue && !deliveryIsPaid(_delivery)) ...[
+                              const MovaCard(
+                                child: Text(
+                                  'Colis livré. Payez le livreur en espèces (ou via l\'app) et communiquez-lui le PIN affiché.',
                                   style: TextStyle(fontWeight: FontWeight.w600),
                                 ),
                               ),
@@ -381,10 +390,10 @@ class _ParcelTrackingScreenState extends ConsumerState<ParcelTrackingScreen> {
                               ),
                               const SizedBox(height: 12),
                             ],
-                            if (_delivery?['guaranteed'] == false) ...[
+                            if (deliveryIsCod(_delivery) && !_cashSettlementDue && !deliveryIsPaid(_delivery)) ...[
                               const MovaCard(
                                 child: Text(
-                                  'Livraison non garantie (espèces). SENGA ne séquestre pas les fonds.',
+                                  'Livraison non garantie (espèces). SENGA ne séquestre pas les fonds — paiement à la remise.',
                                   style: TextStyle(fontSize: 13),
                                 ),
                               ),
@@ -520,7 +529,7 @@ class _ParcelTrackingScreenState extends ConsumerState<ParcelTrackingScreen> {
                           if (_canCancel) const SizedBox(height: 8),
                           if (_paymentDue) ...[
                             MovaButton(
-                              label: 'Payer la livraison',
+                              label: _cashSettlementDue ? 'Payer en espèces' : 'Payer la livraison',
                               icon: Icons.payment_outlined,
                               onPressed: _openPayment,
                             ),

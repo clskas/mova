@@ -1,12 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, Fragment } from "react";
 import {
   fetchClientAppsConfig,
   updateClientAppsConfig,
   type ClientAppsConfig,
   type ClientAppId,
   type MmOperatorId,
+  type MmOperatorChannels,
 } from "@/lib/api";
 import { useAdmin } from "@/components/AdminProvider";
 import { BtnPrimary, ErrorBanner, LoadingState, PageHeader } from "@/components/ui";
@@ -23,6 +24,14 @@ const OPERATORS: { id: MmOperatorId; label: string }[] = [
   { id: "MPESA", label: "M-Pesa" },
   { id: "ORANGE_MONEY", label: "Orange Money" },
 ];
+
+function channels(raw: MmOperatorChannels | boolean | undefined): MmOperatorChannels {
+  if (typeof raw === "boolean") return { topup: raw, withdraw: raw };
+  if (raw && typeof raw === "object") {
+    return { topup: !!raw.topup, withdraw: !!raw.withdraw };
+  }
+  return { topup: false, withdraw: false };
+}
 
 export default function OperateursMmPage() {
   const { role, canWrite } = useAdmin();
@@ -48,15 +57,16 @@ export default function OperateursMmPage() {
     void load();
   }, [load]);
 
-  function toggle(app: ClientAppId, op: MmOperatorId) {
+  function toggle(app: ClientAppId, op: MmOperatorId, channel: "topup" | "withdraw") {
     if (!config || readOnly) return;
+    const cur = channels(config.mobileMoney[app][op]);
     setConfig({
       ...config,
       mobileMoney: {
         ...config.mobileMoney,
         [app]: {
           ...config.mobileMoney[app],
-          [op]: !config.mobileMoney[app][op],
+          [op]: { ...cur, [channel]: !cur[channel] },
         },
       },
     });
@@ -90,10 +100,10 @@ export default function OperateursMmPage() {
   }
 
   return (
-    <div className="p-4 space-y-6 max-w-4xl">
+    <div className="p-4 space-y-6 max-w-5xl">
       <PageHeader
         title="Opérateurs Mobile Money"
-        subtitle="Afficher ou masquer Airtel Money, M-Pesa et Orange Money par application. Orange Money est masqué par défaut jusqu’à correction SerdiPay."
+        subtitle="Afficher ou masquer Airtel Money, M-Pesa et Orange Money par application, séparément pour recharge et retrait."
       />
       {error && <ErrorBanner message={error} />}
       {ok && <p className="text-sm text-emerald-700">{ok}</p>}
@@ -107,9 +117,18 @@ export default function OperateursMmPage() {
             <tr>
               <th className="p-3 font-medium">Application</th>
               {OPERATORS.map((op) => (
-                <th key={op.id} className="p-3 font-medium">
+                <th key={op.id} className="p-3 font-medium" colSpan={2}>
                   {op.label}
                 </th>
+              ))}
+            </tr>
+            <tr className="bg-slate-50/80 text-xs text-slate-500">
+              <th className="p-2" />
+              {OPERATORS.map((op) => (
+                <Fragment key={op.id}>
+                  <th className="p-2 font-normal">Recharge</th>
+                  <th className="p-2 font-normal">Retrait</th>
+                </Fragment>
               ))}
             </tr>
           </thead>
@@ -117,21 +136,33 @@ export default function OperateursMmPage() {
             {APPS.map((app) => (
               <tr key={app.id} className="border-t border-slate-100">
                 <td className="p-3 font-medium text-slate-800">{app.label}</td>
-                {OPERATORS.map((op) => (
-                  <td key={op.id} className="p-3">
-                    <label className="inline-flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={config.mobileMoney[app.id][op.id]}
-                        disabled={readOnly || saving}
-                        onChange={() => toggle(app.id, op.id)}
-                      />
-                      <span className="text-slate-600">
-                        {config.mobileMoney[app.id][op.id] ? "Visible" : "Masqué"}
-                      </span>
-                    </label>
-                  </td>
-                ))}
+                {OPERATORS.map((op) => {
+                  const ch = channels(config.mobileMoney[app.id][op.id]);
+                  return (
+                    <Fragment key={op.id}>
+                      <td className="p-3">
+                        <label className="inline-flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={ch.topup}
+                            disabled={readOnly || saving}
+                            onChange={() => toggle(app.id, op.id, "topup")}
+                          />
+                        </label>
+                      </td>
+                      <td className="p-3">
+                        <label className="inline-flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={ch.withdraw}
+                            disabled={readOnly || saving}
+                            onChange={() => toggle(app.id, op.id, "withdraw")}
+                          />
+                        </label>
+                      </td>
+                    </Fragment>
+                  );
+                })}
               </tr>
             ))}
           </tbody>

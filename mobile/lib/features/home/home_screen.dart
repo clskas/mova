@@ -49,6 +49,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
   Map<String, dynamic>? _activeDelivery;
   Map<String, dynamic>? _activeErrand;
   List<Map<String, dynamic>> _publicites = const [];
+  Map<String, bool> _serviceFlags = const {};
 
   @override
   void initState() {
@@ -61,7 +62,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     _loadActiveRide();
     _loadActiveDelivery();
     _loadPublicites();
+    _loadServiceFlags();
   }
+
+  Future<void> _loadServiceFlags() async {
+    final result = await ref.read(apiClientProvider).get('/public/client-config');
+    if (!mounted) return;
+    if (result case Success(:final data)) {
+      final raw = data['passengerServices'];
+      if (raw is Map) {
+        setState(() {
+          _serviceFlags = {
+            for (final e in raw.entries) e.key.toString(): e.value != false,
+          };
+        });
+      }
+    }
+  }
+
+  bool _svc(String id) => _serviceFlags[id] != false;
 
   @override
   void dispose() {
@@ -647,87 +666,98 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
 
               return Column(
                 children: [
-                  gridRow([
-                    ServiceCard(
-                      icon: PassengerServiceIcon.taxi(size: compactCards ? 52 : 58),
-                      brandedIcon: true,
-                      iconColor: MovaColors.violet,
-                      title: 'Taxi / Moto-taxi',
-                      subtitle: 'Course immédiate partout en RDC',
-                      onTap: () => _open(context, const BookingScreen()),
-                      compact: compactCards,
-                    ),
-                    ServiceCard(
-                      icon: PassengerServiceIcon.delivery(size: compactCards ? 52 : 58),
-                      brandedIcon: true,
-                      iconColor: MovaColors.green,
-                      title: 'Livraisons',
-                      subtitle: 'Repas, colis, express et plus',
-                      onTap: () => _open(context, const DeliveryHubScreen()),
-                      compact: compactCards,
-                    ),
-                  ]),
-                  const SizedBox(height: spacing),
-                  gridRow([
-                    ServiceCard(
-                      icon: PassengerServiceIcon.scheduled(size: compactCards ? 52 : 58),
-                      brandedIcon: true,
-                      iconColor: MovaColors.violet,
-                      title: 'Réservation planifiée',
-                      subtitle: 'Programmez votre trajet à l\'avance',
-                      onTap: () => _open(context, const ScheduledRideScreen()),
-                      compact: compactCards,
-                    ),
-                    ServiceCard(
-                      icon: PassengerServiceIcon.carpool(size: compactCards ? 52 : 58),
-                      brandedIcon: true,
-                      iconColor: MovaColors.midnight,
-                      title: 'Covoiturage',
-                      subtitle: 'Partagez un trajet, économisez',
-                      onTap: () => _open(context, const CarpoolScreen()),
-                      compact: compactCards,
-                    ),
-                  ]),
-                  const SizedBox(height: spacing),
-                  gridRow([
-                    ServiceCard(
-                      icon: PassengerServiceIcon.rental(size: compactCards ? 52 : 58),
-                      brandedIcon: true,
-                      iconColor: MovaColors.violet,
-                      title: 'Location véhicule',
-                      subtitle: 'Voiture, SUV ou minibus',
-                      onTap: () => _open(context, const RentalScreen()),
-                      compact: compactCards,
-                    ),
-                    ServiceCard(
-                      icon: PassengerServiceIcon.moving(size: compactCards ? 52 : 58),
-                      brandedIcon: true,
-                      iconColor: MovaColors.midnight,
-                      title: 'Déménagement',
-                      subtitle: 'Camion et manutention',
-                      onTap: () => _open(context, const MovingScreen()),
-                      compact: compactCards,
-                    ),
-                  ]),
-                  const SizedBox(height: spacing),
-                  gridRow([
-                    ServiceCard(
-                      icon: MovaServiceIcon.wallet(color: MovaColors.midnight),
-                      iconColor: MovaColors.midnight,
-                      title: 'Wallet SENGA',
-                      subtitle: 'Solde, recharge et paiements',
-                      onTap: () => _open(context, const WalletScreen()),
-                      compact: compactCards,
-                    ),
-                    ServiceCard(
-                      icon: MovaServiceIcon.history(color: MovaColors.orange),
-                      iconColor: MovaColors.orange,
-                      title: 'Historique',
-                      subtitle: 'Vos courses et transactions',
-                      onTap: () => _open(context, const HistoryScreen()),
-                      compact: compactCards,
-                    ),
-                  ]),
+                  ...() {
+                    final bool showDelivery = _svc('parcel') ||
+                        _svc('food') ||
+                        _svc('express') ||
+                        _svc('errand');
+                    final cards = <Widget>[
+                      if (_svc('taxi'))
+                        ServiceCard(
+                          icon: PassengerServiceIcon.taxi(size: compactCards ? 52 : 58),
+                          brandedIcon: true,
+                          iconColor: MovaColors.violet,
+                          title: 'Taxi / Moto-taxi',
+                          subtitle: 'Course immédiate partout en RDC',
+                          onTap: () => _open(context, const BookingScreen()),
+                          compact: compactCards,
+                        ),
+                      if (showDelivery)
+                        ServiceCard(
+                          icon: PassengerServiceIcon.delivery(size: compactCards ? 52 : 58),
+                          brandedIcon: true,
+                          iconColor: MovaColors.green,
+                          title: 'Livraisons',
+                          subtitle: 'Repas, colis, express et plus',
+                          onTap: () => _open(context, const DeliveryHubScreen()),
+                          compact: compactCards,
+                        ),
+                      if (_svc('scheduled'))
+                        ServiceCard(
+                          icon: PassengerServiceIcon.scheduled(size: compactCards ? 52 : 58),
+                          brandedIcon: true,
+                          iconColor: MovaColors.violet,
+                          title: 'Réservation planifiée',
+                          subtitle: 'Programmez votre trajet à l\'avance',
+                          onTap: () => _open(context, const ScheduledRideScreen()),
+                          compact: compactCards,
+                        ),
+                      if (_svc('carpool'))
+                        ServiceCard(
+                          icon: PassengerServiceIcon.carpool(size: compactCards ? 52 : 58),
+                          brandedIcon: true,
+                          iconColor: MovaColors.midnight,
+                          title: 'Covoiturage',
+                          subtitle: 'Partagez un trajet, économisez',
+                          onTap: () => _open(context, const CarpoolScreen()),
+                          compact: compactCards,
+                        ),
+                      if (_svc('rental'))
+                        ServiceCard(
+                          icon: PassengerServiceIcon.rental(size: compactCards ? 52 : 58),
+                          brandedIcon: true,
+                          iconColor: MovaColors.violet,
+                          title: 'Location véhicule',
+                          subtitle: 'Voiture, SUV ou minibus',
+                          onTap: () => _open(context, const RentalScreen()),
+                          compact: compactCards,
+                        ),
+                      if (_svc('moving'))
+                        ServiceCard(
+                          icon: PassengerServiceIcon.moving(size: compactCards ? 52 : 58),
+                          brandedIcon: true,
+                          iconColor: MovaColors.midnight,
+                          title: 'Déménagement',
+                          subtitle: 'Camion et manutention',
+                          onTap: () => _open(context, const MovingScreen()),
+                          compact: compactCards,
+                        ),
+                      if (_svc('wallet'))
+                        ServiceCard(
+                          icon: MovaServiceIcon.wallet(color: MovaColors.midnight),
+                          iconColor: MovaColors.midnight,
+                          title: 'Wallet SENGA',
+                          subtitle: 'Solde, recharge et paiements',
+                          onTap: () => _open(context, const WalletScreen()),
+                          compact: compactCards,
+                        ),
+                      ServiceCard(
+                        icon: MovaServiceIcon.history(color: MovaColors.orange),
+                        iconColor: MovaColors.orange,
+                        title: 'Historique',
+                        subtitle: 'Vos courses et transactions',
+                        onTap: () => _open(context, const HistoryScreen()),
+                        compact: compactCards,
+                      ),
+                    ];
+                    final rows = <Widget>[];
+                    for (var i = 0; i < cards.length; i += 2) {
+                      if (i > 0) rows.add(SizedBox(height: spacing));
+                      final pair = cards.sublist(i, i + 2 > cards.length ? cards.length : i + 2);
+                      rows.add(gridRow(pair));
+                    }
+                    return rows;
+                  }(),
                 ],
               );
             },

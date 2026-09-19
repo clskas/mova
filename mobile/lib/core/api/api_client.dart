@@ -1980,6 +1980,28 @@ class ApiClient {
     };
   }
 
+  /// Upload justificatif KYC — retourne l'URL `/api/uploads/kyc/...`.
+  Future<Result<String>> uploadKycPhoto(File file) async {
+    await ensureReady();
+    final bytes = await _readUploadBytes(file);
+    if (bytes.length > 3 * 1024 * 1024) {
+      return const Failure(ServerFailure('Photo trop volumineuse (max 3 Mo).'));
+    }
+    final result = await post('/uploads/kyc-photo', {
+      'imageBase64': base64Encode(bytes),
+      'mimeType': 'image/jpeg',
+    });
+    return switch (result) {
+      Success(:final data) => Success(
+          data['photoUrl']?.toString() ??
+              data['cloudinaryMockUrl']?.toString() ??
+              data['url']?.toString() ??
+              '',
+        ),
+      Failure(:final error) => Failure(error),
+    };
+  }
+
   /// Upload photo colis (base64) — retourne l'URL à passer à `photoUrl`.
   Future<Result<String>> uploadParcelPhoto(File file) async {
     await ensureReady();

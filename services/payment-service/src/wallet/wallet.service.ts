@@ -586,6 +586,7 @@ export class WalletService {
         'Opérateur Mobile Money requis (ORANGE_MONEY, MPESA, AIRTEL_MONEY ou AFRIMONEY).',
       );
     }
+    await this.assertMmOperatorAllowed(userId, providerKey, 'topup');
     await this.acquireTopUpLock(userId, amountCdf, providerKey);
     const ref = afrisoftHubReference('senga', 'topup', randomUUID());
 
@@ -860,6 +861,7 @@ export class WalletService {
       provider,
       phone,
     );
+    await this.assertMmOperatorAllowed(userId, normalizedProvider, 'withdraw');
     const skipOtp = Boolean(opts.skipOtp) || this.isWithdrawOtpSkipped();
     if (!skipOtp) {
       await this.consumeWithdrawOtp(userId, amount, normalizedProvider, normalizedPhone, opts.otp);
@@ -1468,6 +1470,49 @@ export class WalletService {
 
   private topUpLockKey(userId: string, amountCdf: number, providerKey: string) {
     return `${TOPUP_LOCK_PREFIX}${userId}:${providerKey}:${amountCdf}`;
+  }
+
+  /** Enforce SUPER_ADMIN MM visibility (topup vs withdraw) from ride-service client-apps config. */
+  private async assertMmOperatorAllowed(
+    userId: string,
+    providerKey: string,
+    channel: 'topup' | 'withdraw',
+  ) {
+    if (providerKey === 'MOCK' || providerKey === 'AFRIMONEY') return;
+    try {
+      const res = await fetch(serviceUrl('ride', '/internal/client-apps-config'), {
+        headers: { 'x-internal-api-key': INTERNAL_API_KEY },
+      });
+      if (!res.ok) return;
+      const cfg = (await res.json()) as {
+        mobileMoney?: Record<string, Record<string, boolean | { topup?: boolean; withdraw?: boolean }>>;
+      };
+      const roleRes = await fetch(serviceUrl('auth', `/internal/users/${userId}`), {
+        headers: { 'x-internal-api-key': INTERNAL_API_KEY },
+      });
+      let app = 'senga';
+      if (roleRes.ok) {
+        const user = (await roleRes.json()) as { role?: string };
+        const role = (user.role ?? '').toUpperCase();
+        if (role === 'DRIVER' || role === 'PENDING_KYC') app = 'senga_driver';
+        else if (role === 'RESTAURANT') app = 'resto';
+        else if (role === 'RENTAL_PARTNER') app = 'location';
+      }
+      const raw = cfg.mobileMoney?.[app]?.[providerKey];
+      let ok = false;
+      if (typeof raw === 'boolean') ok = raw;
+      else if (raw && typeof raw === 'object') ok = raw[channel] === true;
+      if (!ok) {
+        throw new MovaHttpException(
+          MovaErrorCode.PAYMENT_INVALID_METHOD,
+          HttpStatus.BAD_REQUEST,
+          `Opérateur ${providerKey} indisponible pour ${channel === 'topup' ? 'la recharge' : 'le retrait'}.`,
+        );
+      }
+    } catch (e) {
+      if (e instanceof MovaHttpException) throw e;
+      // Fail open if config unreachable — mobile already filters.
+    }
   }
 
   /** Short Redis lock so a double-tap cannot open two C2B / B2C. Fail-closed if Redis is down. */

@@ -115,6 +115,47 @@ export class RidesService {
     };
   }
 
+  /**
+   * Drivers currently on an active ride, delivery, or errand (for admin dutyStatus).
+   */
+  async listOnDutyDriverIds(): Promise<{ driverIds: string[] }> {
+    const [rides, deliveries, errands] = await Promise.all([
+      this.prisma.ride.findMany({
+        where: {
+          driverId: { not: null },
+          status: { in: [RideStatus.ACCEPTED, RideStatus.DRIVER_ARRIVED, RideStatus.IN_PROGRESS] },
+        },
+        select: { driverId: true },
+      }),
+      this.prisma.delivery.findMany({
+        where: {
+          driverId: { not: null },
+          status: {
+            in: [
+              DeliveryStatus.PICKED_UP,
+              DeliveryStatus.IN_TRANSIT,
+              DeliveryStatus.READY_FOR_PICKUP,
+              DeliveryStatus.RESTAURANT_CONFIRMED,
+            ],
+          },
+        },
+        select: { driverId: true },
+      }),
+      this.prisma.errandOrder.findMany({
+        where: {
+          driverId: { not: null },
+          status: { in: [ErrandOrderStatus.ASSIGNED, ErrandOrderStatus.IN_PROGRESS] },
+        },
+        select: { driverId: true },
+      }),
+    ]);
+    const ids = new Set<string>();
+    for (const r of rides) if (r.driverId) ids.add(r.driverId);
+    for (const d of deliveries) if (d.driverId) ids.add(d.driverId);
+    for (const e of errands) if (e.driverId) ids.add(e.driverId);
+    return { driverIds: [...ids] };
+  }
+
   /** Pins carte passager — lat/lng + type uniquement (pas d'identité chauffeur). */
   async listNearbyVehicles(lat: number, lng: number, vehicleType: VehicleType) {
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
@@ -404,6 +445,7 @@ export class RidesService {
     });
     await this.prisma.rideEvent.create({ data: { rideId, event: RideStatus.ACCEPTED } });
     this.emitStatusChange(rideId, RideStatus.ACCEPTED);
+    this.trackingGateway.broadcastOfferTaken('ride:taken', { rideId, driverId: driverUserId });
     await this.notifyRideStatusSms(rideId, ride.passengerId, RideStatus.ACCEPTED);
     return this.formatRideDetail(updated);
   }

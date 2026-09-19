@@ -49,6 +49,12 @@ export class UploadsController {
     return this.uploadsService.uploadMovingPhoto(dto.imageBase64, dto.mimeType);
   }
 
+  @Post('kyc-photo')
+  @ApiOperation({ summary: 'Téléverser justificatif KYC chauffeur / partenaire' })
+  uploadKycPhoto(@Body() dto: UploadParcelPhotoDto) {
+    return this.uploadsService.uploadKycDocument(dto.imageBase64, dto.mimeType);
+  }
+
   @Get('parcels/:filename')
   @ApiOperation({ summary: 'Télécharger une photo colis stockée localement' })
   serveParcelPhoto(@Param('filename') filename: string, @Res() res: Response) {

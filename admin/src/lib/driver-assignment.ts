@@ -49,6 +49,17 @@ export function filterDriversForParcel(
   return drivers.filter((d) => driverHasCargoVehicle(d));
 }
 
+/** Ordre assignation : dispo → en course → hors ligne. */
+export function sortDriversByDuty(drivers: AdminDriver[]): AdminDriver[] {
+  const rank = (d: AdminDriver) => {
+    if (d.dutyStatus === "AVAILABLE" || (d.isAvailable && d.dutyStatus !== "ON_TRIP" && d.dutyStatus !== "OFFLINE"))
+      return 0;
+    if (d.dutyStatus === "ON_TRIP") return 1;
+    return 2;
+  };
+  return [...drivers].sort((a, b) => rank(a) - rank(b));
+}
+
 /** Filtre selon le type de course planifiée (MOTO_TAXI, STANDARD, COMFORT, VIP). */
 export function filterDriversForRideVehicle(
   drivers: AdminDriver[],

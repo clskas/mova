@@ -12,13 +12,20 @@ La **ville SENGA** sur l'accueil est détectée via GPS à l'ouverture (modifiab
 
 ## Mise en route
 
-1. Complétez votre **KYC** (permis, carte rose, photo). L'admin peut voir des informations extraites par OCR après upload.
-2. Attendez l'**approbation KYC** par l'équipe SENGA.
-3. Si votre véhicule est **VIP** ou **Confort**, l'admin doit aussi **valider le type d'engin** avant que vous puissiez travailler.
-4. Activez **En ligne** depuis l'écran principal.
-5. Acceptez ou refusez courses, livraisons colis/repas et réservations planifiées.
-6. Utilisez la **navigation** vers le passager ou le point de livraison.
-7. Consultez **Revenus** et demandez un retrait (minimum 500 FC).
+1. Complétez votre **KYC** (permis, carte rose, photo). Les pièces sont **optionnelles** tant que l’admin n’a pas activé « exiger des documents pour les jobs ».
+2. Attendez l’**approbation KYC** par l’équipe SENGA.
+3. Vous recevez un **PIN d’activation à 6 chiffres** (SMS / e-mail). À la première connexion app, saisissez ce PIN — il n’est **pas** lié au dépôt des pièces.
+4. Si votre véhicule est **VIP** ou **Confort**, l’admin doit aussi **valider le type d’engin** avant que vous puissiez travailler.
+5. Activez **En ligne** depuis l’écran principal.
+6. Acceptez ou refusez courses, livraisons colis/repas et réservations planifiées.
+7. Utilisez la **navigation** vers le passager ou le point de livraison.
+8. Consultez **Revenus** et demandez un retrait (minimum 500 FC).
+
+## Wallet virtuel et paiements espèces
+
+- Le solde wallet peut rester à **0** : les commissions sur courses **espèces** créent une **dette** plateforme (pas un débit forcé du wallet).
+- Si la dette dépasse le seuil, ou si un solde positif est exigé, les **offres sont bloquées** jusqu’à recharge ou règlement au guichet.
+- Après une **livraison COD**, le client paie en espèces à la remise ; vous confirmez avec le **PIN** affiché côté passager.
 
 ## Position GPS pendant les missions
 
@@ -50,7 +57,7 @@ Gardez le **GPS activé** et l'application au premier plan pendant la mission.
 | KYC en attente | Dossier non approuvé | Compléter documents ; contacter support |
 | Type d'engin en attente | Véhicule VIP/Confort non validé | Attendre validation admin |
 | Compte suspendu | Statut utilisateur | Admin → Utilisateurs → ACTIVE |
-| Pas d'offres | Hors ligne ou indisponible | Activer **En ligne** |
+| Pas d'offres | Hors ligne, indisponible, **dette cash** / wallet bloqué, ou documents exigés manquants | En ligne ; régler dette ; compléter docs si règle activée |
 
 ## Courses & commissions (ERRAND)
 

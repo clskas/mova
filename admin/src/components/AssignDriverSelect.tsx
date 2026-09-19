@@ -21,9 +21,17 @@ export function driverOptionLabel(d: AdminDriver) {
   const name = driverDisplayName(d);
   const plate = d.vehicles?.[0]?.plateNumber;
   const id = d.publicId ?? d.userId.slice(0, 8);
-  if (name && plate) return `${name} · ${plate}`;
-  if (name) return `${name} · ${id}`;
-  return plate ? `${id} · ${plate}` : id;
+  const duty =
+    d.dutyStatus === "ON_TRIP"
+      ? " · En course"
+      : d.dutyStatus === "AVAILABLE"
+        ? " · Dispo"
+        : d.dutyStatus === "OFFLINE" || d.isAvailable === false
+          ? " · Hors ligne"
+          : "";
+  if (name && plate) return `${name} · ${plate}${duty}`;
+  if (name) return `${name} · ${id}${duty}`;
+  return plate ? `${id} · ${plate}${duty}` : `${id}${duty}`;
 }
 
 export function AssignDriverSelect({ drivers, value, onChange, disabled }: AssignDriverSelectProps) {

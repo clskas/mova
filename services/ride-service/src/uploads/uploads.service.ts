@@ -73,8 +73,19 @@ export class UploadsService {
         signedUrlExpiresIn: 7 * 24 * 3600,
       });
       if (result.success) {
-        const photoUrl = result.signedUrl ?? result.publicUrl ?? `supabase://${bucket}/${objectPath}`;
-        return { photoUrl, cloudinaryMockUrl: photoUrl, storage: 'supabase', bucket, path: objectPath };
+        // Always keep a durable API path for admin JWT fetch (signed URLs expire).
+        const dir = join(process.cwd(), 'uploads', category);
+        await mkdir(dir, { recursive: true });
+        const filename = `${id}.${ext}`;
+        await writeFile(join(dir, filename), buffer);
+        const photoUrl = `/api/uploads/${category}/${filename}`;
+        return {
+          photoUrl,
+          cloudinaryMockUrl: result.signedUrl ?? result.publicUrl ?? photoUrl,
+          storage: 'supabase+local',
+          bucket,
+          path: objectPath,
+        };
       }
       if (category === 'kyc') {
         this.logger.error(`Supabase KYC upload failed: ${result.message}`);

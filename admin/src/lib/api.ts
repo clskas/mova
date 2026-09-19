@@ -111,6 +111,8 @@ export type AdminDriver = {
   hiddenReason?: "orphan" | "play_prelaunch" | "seed_demo" | "leftover" | null;
   licenseNumber?: string | null;
   isAvailable?: boolean;
+  /** OFFLINE | AVAILABLE | ON_TRIP — dérivé isAvailable + missions actives */
+  dutyStatus?: "OFFLINE" | "AVAILABLE" | "ON_TRIP";
   /** true (défaut) = accepte les courses. */
   acceptsRides?: boolean;
   /** true (défaut) = accepte les livraisons food/colis. */
@@ -2544,13 +2546,26 @@ export async function updatePlatformConfig(patch: Record<string, unknown>): Prom
 
 export type ClientAppId = "senga" | "senga_driver" | "resto" | "location";
 export type MmOperatorId = "ORANGE_MONEY" | "MPESA" | "AIRTEL_MONEY";
+export type MmOperatorChannels = { topup: boolean; withdraw: boolean };
+export type PassengerServiceId =
+  | "taxi"
+  | "parcel"
+  | "food"
+  | "express"
+  | "errand"
+  | "scheduled"
+  | "carpool"
+  | "rental"
+  | "moving"
+  | "wallet";
 
 export type ClientAppsConfig = {
-  mobileMoney: Record<ClientAppId, Record<MmOperatorId, boolean>>;
+  mobileMoney: Record<ClientAppId, Record<MmOperatorId, MmOperatorChannels>>;
   maintenance: {
     messageFr: string;
     apps: Record<ClientAppId, boolean>;
   };
+  passengerServices: Record<PassengerServiceId, boolean>;
 };
 
 export async function fetchClientAppsConfig(): Promise<ClientAppsConfig> {

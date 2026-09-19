@@ -3,6 +3,7 @@ import {
   buildParcelTimeline,
   computeDeliveryEtaMinutes,
   foodClientStatusLabel,
+  formatParcelDelivery,
   generateDeliveryPin,
   mockCourierLocation,
   resolveCourierLocation,
@@ -93,5 +94,57 @@ describe('parcel.util', () => {
     expect(
       foodClientStatusLabel(DeliveryStatus.RESTAURANT_CONFIRMED, { guaranteed: true, escrowReady: true }),
     ).toBe('En préparation');
+    expect(
+      foodClientStatusLabel(DeliveryStatus.RESTAURANT_CONFIRMED, { guaranteed: false, escrowReady: false }),
+    ).toBe('En préparation');
+  });
+
+  it('formatParcelDelivery paymentReady : COD uniquement après DELIVERED', () => {
+    const base = {
+      id: 'd1',
+      userId: 'u1',
+      type: DeliveryType.PARCEL,
+      status: DeliveryStatus.IN_TRANSIT,
+      pickupLat: -4.32,
+      pickupLng: 15.31,
+      dropoffLat: -4.33,
+      dropoffLng: 15.32,
+      pickupAddress: 'A',
+      dropoffAddress: 'B',
+      deliveryLat: -4.33,
+      deliveryLng: 15.32,
+      deliveryAddress: 'B',
+      estimatedPriceCdf: 5000,
+      finalPriceCdf: null,
+      distanceKm: 2,
+      durationMin: 10,
+      photoUrl: null,
+      weightCategory: null,
+      restaurantId: null,
+      restaurant: null,
+      deliveryPin: '1234',
+      driverId: 'drv',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      events: [],
+      guaranteed: false,
+      escrowReady: false,
+      escrowAmountCdf: null,
+      fundsFrozenAt: null,
+      payoutReleasedAt: null,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any;
+
+    expect(formatParcelDelivery({ ...base, status: DeliveryStatus.IN_TRANSIT }).paymentReady).toBe(false);
+    expect(formatParcelDelivery({ ...base, status: DeliveryStatus.DELIVERED }).paymentReady).toBe(true);
+    expect(
+      formatParcelDelivery({ ...base, type: DeliveryType.EXPRESS, status: DeliveryStatus.DELIVERED }).paymentReady,
+    ).toBe(true);
+    expect(
+      formatParcelDelivery({ ...base, type: DeliveryType.FOOD, status: DeliveryStatus.IN_TRANSIT }).paymentReady,
+    ).toBe(false);
+    expect(
+      formatParcelDelivery({ ...base, type: DeliveryType.FOOD, status: DeliveryStatus.DELIVERED }).paymentReady,
+    ).toBe(true);
   });
 });

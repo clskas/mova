@@ -56,6 +56,7 @@ import { deliveryPinSms, sendPlatformSms } from '../common/sms-notify.util';
 import { RoutingService } from '../geo/routing.service';
 import { PlatformConfigService } from '../platform/platform-config.service';
 import { ParcelWeightBandService } from '../platform/parcel-weight-band.service';
+import { TrackingGateway } from '../websocket/tracking.gateway';
 
 type MenuSize = { label?: string; name?: string; priceCdf?: number; unitPriceCdf?: number };
 type MenuOption = { label?: string; name?: string; priceCdf?: number; unitPriceCdf?: number };
@@ -79,6 +80,7 @@ export class DeliveriesService {
     private routing: RoutingService,
     private platformConfig: PlatformConfigService,
     private parcelWeightBands: ParcelWeightBandService,
+    private trackingGateway: TrackingGateway,
   ) {}
 
   private deliveryCfg() {
@@ -1286,6 +1288,28 @@ export class DeliveriesService {
     await this.creditRestaurantAtPickup(deliveryId, delivery.type, delivery.guaranteed);
     const kind = delivery.type === DeliveryType.FOOD ? 'repas' : delivery.type === DeliveryType.EXPRESS ? 'express' : 'colis';
     await this.sendDeliveryPinToRequester(delivery.userId, delivery.deliveryPin, kind);
+    this.trackingGateway.broadcastOfferTaken('delivery:taken', {
+      deliveryId,
+      driverId: driverUserId,
+      type: delivery.type,
+    });
+    await this.redis.publish(MOVA_EVENTS.SERVICE_ASSIGNED, {
+      serviceType: 'DELIVERY',
+      referenceId: deliveryId,
+      driverId: driverUserId,
+      passengerId: delivery.userId,
+      summary: `Livraison ${delivery.type} acceptée`,
+      pickupAddress: delivery.pickupAddress ?? undefined,
+      dropoffAddress: delivery.dropoffAddress ?? delivery.deliveryAddress ?? undefined,
+    });
+    await this.redis.publish(MOVA_EVENTS.DELIVERY_STATUS_UPDATED, {
+      deliveryId,
+      userId: delivery.userId,
+      type: delivery.type,
+      status: updated.status,
+      restaurantName: updated.restaurant?.name,
+      restaurantOwnerUserId: updated.restaurant?.ownerUserId ?? undefined,
+    });
     const courier = await this.fetchCourierProfile(driverUserId);
     const formatted = await this.enrichDeliveryPayment(
       await this.enrichDeliveryForViewer(delivery, formatParcelDelivery(updated, courier), driverUserId),
@@ -1677,6 +1701,15 @@ export class DeliveriesService {
       status: updated.status,
       restaurantName: updated.restaurant?.name,
       restaurantOwnerUserId: updated.restaurant?.ownerUserId ?? undefined,
+    });
+    await this.redis.publish(MOVA_EVENTS.SERVICE_ASSIGNED, {
+      serviceType: 'DELIVERY',
+      referenceId: id,
+      driverId: driverId.trim(),
+      passengerId: delivery.userId,
+      summary: `Livraison ${delivery.type} assignée`,
+      pickupAddress: delivery.pickupAddress ?? undefined,
+      dropoffAddress: delivery.dropoffAddress ?? undefined,
     });
     return { delivery: formatted, driverId: updated.driverId, status: updated.status };
   }

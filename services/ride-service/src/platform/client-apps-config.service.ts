@@ -8,6 +8,7 @@ import {
   MmOperatorId,
   MovaErrorCode,
   MovaHttpException,
+  isMmOperatorEnabled,
   mergeClientAppsConfig,
 } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
@@ -51,6 +52,7 @@ export class ClientAppsConfigService implements OnModuleInit {
     return {
       mobileMoney: this.config.mobileMoney,
       maintenance: this.config.maintenance,
+      passengerServices: this.config.passengerServices,
     };
   }
 
@@ -66,6 +68,9 @@ export class ClientAppsConfigService implements OnModuleInit {
             apps: { ...this.config.maintenance.apps, ...patch.maintenance.apps },
           }
         : this.config.maintenance,
+      passengerServices: patch.passengerServices
+        ? { ...this.config.passengerServices, ...patch.passengerServices }
+        : this.config.passengerServices,
     });
 
     this.validate(next);
@@ -95,7 +100,7 @@ export class ClientAppsConfigService implements OnModuleInit {
       );
     }
     for (const app of Object.keys(cfg.mobileMoney) as ClientAppId[]) {
-      const enabled = MM_OPERATOR_IDS.filter((op) => cfg.mobileMoney[app][op]);
+      const enabled = MM_OPERATOR_IDS.filter((op) => isMmOperatorEnabled(cfg, app, op, 'any'));
       if (enabled.length === 0) {
         throw new MovaHttpException(
           MovaErrorCode.VALIDATION_ERROR,
@@ -106,9 +111,12 @@ export class ClientAppsConfigService implements OnModuleInit {
     }
   }
 
-  isOperatorEnabled(app: ClientAppId, operator: string): boolean {
-    const op = operator as MmOperatorId;
-    return MM_OPERATOR_IDS.includes(op) && this.config.mobileMoney[app]?.[op] === true;
+  isOperatorEnabled(
+    app: ClientAppId,
+    operator: string,
+    channel: 'topup' | 'withdraw' | 'any' = 'any',
+  ): boolean {
+    return isMmOperatorEnabled(this.config, app, operator, channel);
   }
 }
 

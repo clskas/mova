@@ -219,13 +219,18 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
   /** Push a job offer / cancel to online drivers subscribed to `driver:{userId}`. */
   broadcastDriverJob(
     driverUserIds: string[],
-    event: 'ride:new' | 'ride:cancelled',
+    event: 'ride:new' | 'ride:cancelled' | 'ride:taken' | 'delivery:taken',
     payload: Record<string, unknown>,
   ) {
     for (const userId of driverUserIds) {
       if (!userId) continue;
       this.server.to(`driver:${userId}`).emit(event, { ...payload, ts: Date.now() });
     }
+  }
+
+  /** Notify all connected drivers that an offer was accepted (close competing modals). */
+  broadcastOfferTaken(event: 'ride:taken' | 'delivery:taken', payload: Record<string, unknown>) {
+    this.server.emit(event, { ...payload, ts: Date.now() });
   }
 
   /** Notifie la room de la course qu'un paiement espèces est en attente de confirmation PIN. */

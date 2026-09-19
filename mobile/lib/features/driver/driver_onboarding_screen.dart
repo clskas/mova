@@ -471,7 +471,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
       _error = null;
     });
     final api = ref.read(apiClientProvider);
-    final upload = await api.uploadParcelPhoto(File(file.path));
+    final upload = await api.uploadKycPhoto(File(file.path));
     if (!mounted) return;
     switch (upload) {
       case Success(:final data):

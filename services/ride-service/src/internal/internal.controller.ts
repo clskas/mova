@@ -114,6 +114,11 @@ export class InternalController {
     return this.rides.getStats();
   }
 
+  @Get('drivers/on-duty')
+  listOnDutyDrivers() {
+    return this.rides.listOnDutyDriverIds();
+  }
+
   @Delete('users/:userId/data')
   purgeUserData(@Param('userId') userId: string) {
     return this.rides.purgeUserData(userId);

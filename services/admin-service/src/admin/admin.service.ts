@@ -384,7 +384,7 @@ export class AdminService {
     }
   }
 
-  listDrivers(
+  async listDrivers(
     skip = 0,
     take = 50,
     filters?: { kycStatus?: string; isAvailable?: string; includeHidden?: boolean },
@@ -395,7 +395,23 @@ export class AdminService {
     if (filters?.isAvailable) params.set('isAvailable', filters.isAvailable);
     if (filters?.includeHidden) params.set('includeHidden', 'true');
     if (managedCity?.trim()) params.set('city', managedCity.trim());
-    return this.fetchJson('driver', `/internal/drivers?${params}`);
+    const [result, onDuty] = await Promise.all([
+      this.fetchJson<{ data?: Array<Record<string, unknown>>; total?: number; skip?: number; take?: number }>(
+        'driver',
+        `/internal/drivers?${params}`,
+      ),
+      this.fetchJson<{ driverIds?: string[] }>('ride', '/internal/drivers/on-duty').catch(() => ({
+        driverIds: [] as string[],
+      })),
+    ]);
+    const onDutySet = new Set(onDuty.driverIds ?? []);
+    const data = (result.data ?? []).map((d) => {
+      const isAvailable = d.isAvailable === true;
+      const userId = String(d.userId ?? '');
+      const dutyStatus = !isAvailable ? 'OFFLINE' : onDutySet.has(userId) ? 'ON_TRIP' : 'AVAILABLE';
+      return { ...d, dutyStatus };
+    });
+    return { ...result, data };
   }
   async getDriver(userId: string, managedCity?: string | null) {
     const detail = await this.fetchJson<{ operatingCity?: string | null }>('driver', `/internal/drivers/${userId}/detail`);

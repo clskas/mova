@@ -17,7 +17,7 @@ import {
 } from "@/lib/api";
 import { useAdmin } from "@/components/AdminProvider";
 import { AssignDriverPanel } from "@/components/AssignDriverPanel";
-import { filterDriversForParcel } from "@/lib/driver-assignment";
+import { filterDriversForParcel, sortDriversByDuty } from "@/lib/driver-assignment";
 import { ContactBlock } from "@/components/ContactActions";
 import { GpsTraceMap } from "@/components/GpsTraceMap";
 import { useLiveGpsTrace } from "@/hooks/useLiveGpsTrace";
@@ -92,6 +92,7 @@ export default function LivraisonsPage() {
   const [newStatus, setNewStatus] = useState("");
   const [assignDriverId, setAssignDriverId] = useState("");
   const [assigningId, setAssigningId] = useState<string | null>(null);
+  const [rowAssign, setRowAssign] = useState<Record<string, string>>({});
   const [cancelTarget, setCancelTarget] = useState<DeliveryOverview | null>(null);
   const [saving, setSaving] = useState(false);
   const [deliveryDetail, setDeliveryDetail] = useState<DeliveryOverview | null>(null);
@@ -239,9 +240,9 @@ export default function LivraisonsPage() {
     return !["DELIVERED", "CANCELLED"].includes(d.status ?? "");
   };
 
-  const assignableDrivers = selected
-    ? filterDriversForParcel(drivers, selected.weightCategory)
-    : drivers;
+  const assignableDrivers = sortDriversByDuty(
+    selected ? filterDriversForParcel(drivers, selected.weightCategory) : drivers,
+  );
 
   async function saveAssignment() {
     if (!selected || !assignDriverId) return;
@@ -299,6 +300,7 @@ export default function LivraisonsPage() {
                 <th className="p-3">Trajet / Restaurant</th>
                 <th className="p-3">Statut</th>
                 <th className="p-3">Coursier</th>
+                <th className="p-3">Assigner</th>
                 <th className="p-3">Prix</th>
                 <th className="p-3">Date</th>
                 <th className="p-3"></th>
@@ -317,6 +319,22 @@ export default function LivraisonsPage() {
                   </td>
                   <td className="p-3"><StatusBadge status={d.status} /></td>
                   <td className="p-3">{d.driverName ?? (d.driverId ? "Assigné" : "—")}</td>
+                  <td className="p-3">
+                    {canAssignRecord(d) ? (
+                      <AssignDriverPanel
+                        compact
+                        drivers={sortDriversByDuty(filterDriversForParcel(drivers, d.weightCategory))}
+                        value={rowAssign[d.id] ?? d.driverId ?? ""}
+                        onChange={(id) => setRowAssign((prev) => ({ ...prev, [d.id]: id }))}
+                        onAssign={() => assignDriver(d.id, rowAssign[d.id] ?? "")}
+                        currentDriverId={d.driverId}
+                        saving={assigningId === d.id}
+                        disabled={readOnly}
+                      />
+                    ) : (
+                      "—"
+                    )}
+                  </td>
                   <td className="p-3 text-[#6C63FF]">{formatCdf(d.priceCdf)}</td>
                   <td className="p-3 text-gray-500">{d.createdAt ? formatDate(d.createdAt) : "—"}</td>
                   <td className="p-3">

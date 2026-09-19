@@ -27,6 +27,7 @@ class RideSocket {
   void Function(Map<String, dynamic> payload)? _onPaymentCompleted;
   void Function(Map<String, dynamic> payload)? _onRideNew;
   void Function(Map<String, dynamic> payload)? _onRideCancelled;
+  void Function(Map<String, dynamic> payload)? _onOfferTaken;
   void Function()? _onConnected;
   void Function()? _onDisconnected;
   final List<Completer<bool>> _connectWaiters = [];
@@ -48,6 +49,7 @@ class RideSocket {
     _onPaymentCompleted = null;
     _onRideNew = null;
     _onRideCancelled = null;
+    _onOfferTaken = null;
     _onConnected = null;
     _onDisconnected = null;
   }
@@ -217,6 +219,22 @@ class RideSocket {
             _onRideCancelled?.call(Map<String, dynamic>.from(data));
           }
         })
+        ..on('ride:taken', (data) {
+          if (data is Map) {
+            _onOfferTaken?.call({
+              ...Map<String, dynamic>.from(data),
+              'kind': 'ride',
+            });
+          }
+        })
+        ..on('delivery:taken', (data) {
+          if (data is Map) {
+            _onOfferTaken?.call({
+              ...Map<String, dynamic>.from(data),
+              'kind': 'delivery',
+            });
+          }
+        })
         ..onConnectError((_) {
           isConnected = false;
           _scheduleReconnect();
@@ -286,6 +304,7 @@ class RideSocket {
     void Function(Map<String, dynamic> payload)? onCashPending,
     void Function(Map<String, dynamic> payload)? onRideNew,
     void Function(Map<String, dynamic> payload)? onRideCancelled,
+    void Function(Map<String, dynamic> payload)? onOfferTaken,
     void Function()? onConnected,
     void Function()? onDisconnected,
   }) {
@@ -295,6 +314,7 @@ class RideSocket {
     if (onCashPending != null) _onCashPending = onCashPending;
     if (onRideNew != null) _onRideNew = onRideNew;
     if (onRideCancelled != null) _onRideCancelled = onRideCancelled;
+    if (onOfferTaken != null) _onOfferTaken = onOfferTaken;
     if (onConnected != null) _onConnected = onConnected;
     if (onDisconnected != null) _onDisconnected = onDisconnected;
 

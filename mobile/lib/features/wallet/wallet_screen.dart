@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/config/client_apps_config.dart';
 import '../../core/config/market_config.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
@@ -76,7 +77,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
       final row = mm is Map ? mm['senga'] : null;
       if (row is Map) {
         final next = MarketConfig.mobileMoneyProviders
-            .where((p) => row[p.id] == true)
+            .where((p) => mmOperatorEnabledFor(row, p.id, 'topup'))
             .toList();
         if (next.isNotEmpty) {
           setState(() => _topUpProviders = next);
@@ -771,7 +772,7 @@ class _WalletWithdrawSheetState extends ConsumerState<_WalletWithdrawSheet> {
       final row = mm is Map ? mm['senga'] : null;
       if (row is Map) {
         final next = MarketConfig.mobileMoneyProviders
-            .where((p) => row[p.id] == true)
+            .where((p) => mmOperatorEnabledFor(row, p.id, 'withdraw'))
             .toList();
         if (next.isNotEmpty) {
           setState(() {

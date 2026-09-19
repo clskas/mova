@@ -32,6 +32,7 @@ import { PromoService } from '../rides/surcharge.service';
 import { GeoService } from '../geo/geo.service';
 import { RoutingService } from '../geo/routing.service';
 import { PlatformConfigService } from '../platform/platform-config.service';
+import { TrackingGateway } from '../websocket/tracking.gateway';
 
 export type ErrandItemRow = { label: string; qty?: number; estimatedCdf?: number };
 
@@ -50,6 +51,7 @@ export class ErrandsService {
     private geo: GeoService,
     private errandCategories: ErrandCategoryEstimateService,
     private platformConfig: PlatformConfigService,
+    private trackingGateway: TrackingGateway,
   ) {}
 
   private async errandFees() {
@@ -712,6 +714,11 @@ export class ErrandsService {
       referenceId: updated.id,
       userId: updated.userId,
       status: updated.status,
+    });
+    this.trackingGateway.broadcastOfferTaken('delivery:taken', {
+      deliveryId: errandId,
+      driverId: driverUserId,
+      type: 'ERRAND',
     });
     return { errand: formatted, delivery: formatted, success: true };
   }

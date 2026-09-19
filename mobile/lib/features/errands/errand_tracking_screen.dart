@@ -269,11 +269,11 @@ class _ErrandTrackingScreenState extends ConsumerState<ErrandTrackingScreen> {
   int get _totalPriceCdf =>
       _order?['totalPriceCdf'] as int? ?? (_serviceFeeCdf + _purchaseCdf);
 
-  bool get _paymentDue {
-    if (deliveryIsPaid(_order)) return false;
-    final status = _order?['status']?.toString();
-    return _order?['paymentReady'] == true || status == 'COMPLETED';
-  }
+  bool get _paymentDue => deliveryPaymentDue(_order);
+
+  bool get _escrowPaymentDue => deliveryEscrowPaymentDue(_order);
+
+  bool get _cashSettlementDue => deliveryCashSettlementDue(_order);
 
   bool get _cashPaymentPending => deliveryCashPaymentPending(_order);
 
@@ -387,10 +387,11 @@ class _ErrandTrackingScreenState extends ConsumerState<ErrandTrackingScreen> {
   }
 
   Future<void> _maybeGoToPayment() async {
-    if (_paymentNavigated || !mounted || !_paymentDue) return;
+    if (!mounted) return;
 
     final alreadyRated = _order?['rated'] == true;
-    if (!_ratingInProgress && !alreadyRated) {
+    final completed = _order?['status']?.toString() == 'COMPLETED';
+    if (completed && !_ratingInProgress && !alreadyRated) {
       _ratingInProgress = true;
       final rated = await _showErrandRatingPrompt();
       _ratingInProgress = false;
@@ -399,7 +400,8 @@ class _ErrandTrackingScreenState extends ConsumerState<ErrandTrackingScreen> {
       }
     }
 
-    if (_paymentNavigated || !mounted || !_paymentDue) return;
+    // Auto-nav only for prepaid escrow — COD uses CTA after COMPLETED.
+    if (_paymentNavigated || !mounted || !_escrowPaymentDue || _cashPaymentPending) return;
     _paymentNavigated = true;
     _openPayment();
   }
@@ -445,7 +447,7 @@ class _ErrandTrackingScreenState extends ConsumerState<ErrandTrackingScreen> {
     };
     if (deliveryIsPaid(_order)) return '$base · Payée';
     if (_cashPaymentPending) return '$base · Paiement espèces en attente';
-    if (_paymentDue) return '$base · Paiement en attente';
+    if (deliveryPaymentDue(_order)) return '$base · Paiement en attente';
     return base;
   }
 
@@ -533,6 +535,35 @@ class _ErrandTrackingScreenState extends ConsumerState<ErrandTrackingScreen> {
                                       ),
                                     ),
                                   ],
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                            ],
+                            if (_escrowPaymentDue && !deliveryIsPaid(_order)) ...[
+                              const MovaCard(
+                                child: Text(
+                                  'Payez maintenant pour séquestrer le budget et les frais. Aucun livreur n\'est contacté avant paiement.',
+                                  style: TextStyle(fontWeight: FontWeight.w600),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                            ],
+                            if (_cashSettlementDue && !deliveryIsPaid(_order)) ...[
+                              const MovaCard(
+                                child: Text(
+                                  'Courses terminées. Payez le livreur en espèces (ou via l\'app) et communiquez-lui le PIN affiché.',
+                                  style: TextStyle(fontWeight: FontWeight.w600),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                            ],
+                            if (deliveryIsCod(_order) &&
+                                !_cashSettlementDue &&
+                                !deliveryIsPaid(_order)) ...[
+                              const MovaCard(
+                                child: Text(
+                                  'Course non garantie (espèces). Paiement à la remise — SENGA ne séquestre pas les fonds.',
+                                  style: TextStyle(fontSize: 13),
                                 ),
                               ),
                               const SizedBox(height: 12),
@@ -703,7 +734,7 @@ class _ErrandTrackingScreenState extends ConsumerState<ErrandTrackingScreen> {
                           if (_canCancel) const SizedBox(height: 8),
                           if (_paymentDue) ...[
                             MovaButton(
-                              label: 'Payer la course',
+                              label: _cashSettlementDue ? 'Payer en espèces' : 'Payer la course',
                               icon: Icons.payment_outlined,
                               onPressed: _openPayment,
                             ),

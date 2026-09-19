@@ -84,6 +84,7 @@ describe('ErrandsService', () => {
     geo as never,
     errandCategories as never,
     mockPlatformConfig(),
+    { broadcastOfferTaken: jest.fn() } as never,
   );
 
   const dto = {

@@ -104,6 +104,7 @@ describe('DeliveriesService', () => {
     routing as never,
     mockPlatformConfig(),
     parcelWeightBands as never,
+    { broadcastOfferTaken: jest.fn() } as never,
   );
 
   beforeEach(() => {

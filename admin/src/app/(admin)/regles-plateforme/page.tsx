@@ -174,6 +174,7 @@ export default function ReglesPlateformePage() {
       ) : (
         <div className="space-y-8">
           {!cityAdminDocsOnly && (
+          <>
           <section>
             <h2 className="font-semibold text-[#1A1A2E] mb-3">Majoration inter-ville</h2>
             <Card className="p-4 grid sm:grid-cols-2 gap-4 max-w-xl">
@@ -266,6 +267,7 @@ export default function ReglesPlateformePage() {
               )}
             </Card>
           </section>
+          </>
           )}
 
           <section>
@@ -307,6 +309,7 @@ export default function ReglesPlateformePage() {
           </section>
 
           {!cityAdminDocsOnly && (
+          <>
           <section>
             <h2 className="font-semibold text-[#1A1A2E] mb-3">Courses planifiées</h2>
             <Card className="p-4 grid sm:grid-cols-2 gap-4 max-w-xl">
@@ -430,6 +433,7 @@ export default function ReglesPlateformePage() {
               </table>
             </Card>
           </section>
+          </>
           )}
         </div>
       )}

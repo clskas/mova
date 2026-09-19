@@ -197,11 +197,29 @@ export class RestaurantPortalService {
     payment?: { isPaid?: boolean; paymentStatus?: string | null; paymentMethod?: string | null },
     opts?: { guaranteed?: boolean; escrowReady?: boolean },
   ): string | null {
-    if (payment?.isPaid || opts?.escrowReady) return 'Séquestrée — paiement garanti';
+    const method = String(payment?.paymentMethod ?? '').trim().toUpperCase();
+    const isCash =
+      opts?.guaranteed === false ||
+      method === 'CASH' ||
+      method === 'COD' ||
+      method === 'ESPECES' ||
+      method === 'ESPÈCES';
+
+    if (payment?.isPaid || opts?.escrowReady) {
+      return isCash ? 'Espèces confirmées' : 'Séquestrée — paiement garanti';
+    }
+
+    // COD / cash : paiement à la remise — le resto peut préparer tout de suite.
+    if (isCash) {
+      if (status === DeliveryStatus.DELIVERED) {
+        return payment?.paymentStatus === 'PENDING' ? 'Espèces en attente (à la remise)' : 'Espèces à régulariser';
+      }
+      return 'Espèces à la livraison';
+    }
+
     if (status === DeliveryStatus.PENDING) return 'Non payée — acceptez pour demander le paiement';
     if (status === DeliveryStatus.RESTAURANT_CONFIRMED) return 'En attente du paiement client';
     if (status !== DeliveryStatus.DELIVERED) return 'En attente de paiement client';
-    if (payment?.paymentStatus === 'PENDING' && payment?.paymentMethod === 'CASH') return 'Espèces en attente';
     return 'En attente de paiement';
   }
 
@@ -232,10 +250,14 @@ export class RestaurantPortalService {
       deliveryDiscountCdf: d.discountCdf,
       deliveryPromoCode: d.promoCode,
     });
+    const guaranteed = Boolean(d.guaranteed);
+    const escrowReady = Boolean(d.escrowReady);
+    const isPaid = payment?.isPaid ?? escrowReady;
+    const canPrepare = !guaranteed || isPaid || escrowReady;
     return {
       id: d.id,
       status: d.status,
-      statusLabel: this.statusLabel(d.status, { guaranteed: Boolean(d.guaranteed), escrowReady: Boolean(d.escrowReady) }),
+      statusLabel: this.statusLabel(d.status, { guaranteed, escrowReady }),
       items,
       deliveryAddress: d.deliveryAddress,
       estimatedPriceCdf: d.estimatedPriceCdf,
@@ -246,15 +268,16 @@ export class RestaurantPortalService {
       createdAt: d.createdAt.toISOString(),
       driverAssigned: Boolean(d.driverId),
       multiRestaurant: Boolean(restaurantId && !d.restaurantId && this.deliveryIncludesRestaurant(d.items, restaurantId)),
-      isPaid: payment?.isPaid ?? Boolean(d.escrowReady),
+      isPaid,
       paymentStatus: payment?.paymentStatus ?? null,
       paymentMethod: payment?.paymentMethod ?? null,
       paymentStatusLabel: this.paymentStatusLabel(d.status, payment, {
-        guaranteed: Boolean(d.guaranteed),
-        escrowReady: Boolean(d.escrowReady),
+        guaranteed,
+        escrowReady,
       }),
-      guaranteed: Boolean(d.guaranteed),
-      escrowReady: Boolean(d.escrowReady),
+      guaranteed,
+      escrowReady,
+      canPrepare,
     };
   }
 

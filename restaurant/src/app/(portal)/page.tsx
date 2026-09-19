@@ -30,6 +30,19 @@ function formatItems(items: unknown): string {
     .join(", ");
 }
 
+/** COD / espèces : préparer sans attendre le paiement (encaissement à la remise). */
+function orderIsCashCod(order: RestaurantOrder): boolean {
+  if (order.guaranteed === false) return true;
+  const method = String(order.paymentMethod ?? "").toUpperCase();
+  return method === "CASH" || method === "COD" || method === "ESPECES" || method === "ESPÈCES";
+}
+
+function orderCanPrepare(order: RestaurantOrder): boolean {
+  if (order.canPrepare === true) return true;
+  if (orderIsCashCod(order)) return true;
+  return order.isPaid === true || order.escrowReady === true;
+}
+
 import {
   alertNewRestaurantOrder,
   notifyPartnerAlert,
@@ -246,12 +259,12 @@ export default function OrdersPage() {
                     busy={busyId === o.id}
                     onConfirm={o.status === "PENDING" ? () => act(o.id, "confirm") : undefined}
                     onReject={
-                      o.status === "PENDING" || (o.status === "RESTAURANT_CONFIRMED" && !o.isPaid)
+                      o.status === "PENDING" || (o.status === "RESTAURANT_CONFIRMED" && !orderCanPrepare(o))
                         ? () => act(o.id, "reject")
                         : undefined
                     }
                     onReady={
-                      o.status === "RESTAURANT_CONFIRMED" && o.isPaid !== false
+                      o.status === "RESTAURANT_CONFIRMED" && orderCanPrepare(o)
                         ? () => act(o.id, "ready")
                         : undefined
                     }
@@ -299,12 +312,12 @@ export default function OrdersPage() {
                       order={o}
                       busy={busyId === o.id}
                       onReady={
-                        o.status === "RESTAURANT_CONFIRMED" && o.isPaid !== false
+                        o.status === "RESTAURANT_CONFIRMED" && orderCanPrepare(o)
                           ? () => act(o.id, "ready")
                           : undefined
                       }
                       onReject={
-                        o.status === "RESTAURANT_CONFIRMED" && !o.isPaid
+                        o.status === "RESTAURANT_CONFIRMED" && !orderCanPrepare(o)
                           ? () => act(o.id, "reject")
                           : undefined
                       }
@@ -351,7 +364,9 @@ function OrderCard({
         {order.paymentStatusLabel && (
           <span
             className={`text-xs px-2 py-1 rounded-full font-medium ${
-              order.isPaid ? "bg-green-50 text-green-700" : "bg-amber-50 text-amber-800"
+              order.isPaid || (orderIsCashCod(order) && order.status !== "DELIVERED")
+                ? "bg-green-50 text-green-700"
+                : "bg-amber-50 text-amber-800"
             }`}
           >
             {order.paymentStatusLabel}
@@ -425,19 +440,22 @@ function OrderCard({
       </div>
       {order.status === "PENDING" && (
         <p className="mt-3 text-xs text-amber-700">
-          Nouvelle commande non payée. Acceptez pour confirmer la disponibilité — le client paiera ensuite. Ne
-          préparez pas avant le paiement.
+          {orderIsCashCod(order)
+            ? "Nouvelle commande (espèces à la livraison). Acceptez pour commencer la préparation — le client paiera à la remise."
+            : "Nouvelle commande non payée. Acceptez pour confirmer la disponibilité — le client paiera ensuite. Ne préparez pas avant le paiement."}
         </p>
       )}
-      {order.status === "RESTAURANT_CONFIRMED" && !order.isPaid && (
+      {order.status === "RESTAURANT_CONFIRMED" && !orderCanPrepare(order) && (
         <p className="mt-3 text-xs text-amber-700">
           Commande acceptée. En attente du paiement client (délai 15 min). Ne préparez pas et ne marquez pas
           « Prête » avant confirmation du paiement.
         </p>
       )}
-      {order.status === "RESTAURANT_CONFIRMED" && order.isPaid && (
+      {order.status === "RESTAURANT_CONFIRMED" && orderCanPrepare(order) && (
         <p className="mt-3 text-xs text-green-700">
-          Paiement reçu. Vous pouvez préparer la commande puis la marquer prête pour le livreur.
+          {orderIsCashCod(order)
+            ? "Paiement en espèces à la livraison. Vous pouvez préparer la commande puis la marquer prête pour le livreur."
+            : "Paiement reçu. Vous pouvez préparer la commande puis la marquer prête pour le livreur."}
         </p>
       )}
     </div>

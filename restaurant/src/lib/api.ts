@@ -118,6 +118,8 @@ export type RestaurantOrder = {
   paymentStatusLabel?: string | null;
   guaranteed?: boolean;
   escrowReady?: boolean;
+  /** false seulement si commande prépayée encore sans séquestre */
+  canPrepare?: boolean;
 };
 
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {

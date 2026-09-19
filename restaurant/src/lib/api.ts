@@ -101,6 +101,7 @@ export type RestaurantProfile = {
     blocked?: boolean;
     message?: string;
     daysRemaining?: number | null;
+    hoursRemaining?: number | null;
   };
   needsProfileSetup?: boolean;
 };

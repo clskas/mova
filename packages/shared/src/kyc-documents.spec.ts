@@ -77,6 +77,22 @@ describe('partner KYC checklists', () => {
     expect(reminder.active).toBe(true);
     expect(reminder.blocked).toBe(false);
     expect(reminder.message).toContain('Photo récente');
+    expect(reminder.message).toMatch(/jour/);
+  });
+
+  it('affiche les heures restantes quand le délai est sous 24 h', () => {
+    const createdAt = new Date(Date.now() - 6.5 * 86400000);
+    const reminder = buildDocumentsReminder({
+      requireDocumentsForJobs: true,
+      gracePeriodDays: 7,
+      createdAt,
+      missingTypes: ['ID_PHOTO'],
+    });
+    expect(reminder.active).toBe(true);
+    expect(reminder.blocked).toBe(false);
+    expect(reminder.hoursRemaining).toBeGreaterThan(0);
+    expect(reminder.hoursRemaining!).toBeLessThan(24);
+    expect(reminder.message).toMatch(/heure/);
   });
 });
 

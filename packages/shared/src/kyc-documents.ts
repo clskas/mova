@@ -248,6 +248,7 @@ export type DocumentsReminder = {
   gracePeriodDays: number;
   graceEndsAt: string | null;
   daysRemaining: number | null;
+  hoursRemaining: number | null;
   missingTypes: string[];
   missingLabels: string[];
   message: string;
@@ -267,11 +268,16 @@ export function buildDocumentsReminder(params: {
   const active = params.requireDocumentsForJobs && missingTypes.length > 0;
   const graceEndsAt = documentsGraceEndsAt(params.createdAt, gracePeriodDays);
   let daysRemaining: number | null = null;
+  let hoursRemaining: number | null = null;
   if (graceEndsAt) {
-    daysRemaining = Math.max(
-      0,
-      Math.ceil((new Date(graceEndsAt).getTime() - now.getTime()) / MS_PER_DAY),
-    );
+    const msLeft = new Date(graceEndsAt).getTime() - now.getTime();
+    if (msLeft > 0) {
+      daysRemaining = Math.max(0, Math.ceil(msLeft / MS_PER_DAY));
+      hoursRemaining = Math.max(1, Math.ceil(msLeft / (60 * 60 * 1000)));
+    } else {
+      daysRemaining = 0;
+      hoursRemaining = 0;
+    }
   }
   const blocked =
     active && documentsGraceElapsed(params.createdAt, gracePeriodDays, now);
@@ -280,7 +286,9 @@ export function buildDocumentsReminder(params: {
     const list = missingLabels.join(', ');
     if (blocked) {
       message = `Documents obligatoires manquants ou non validés : ${list}. Déposez-les pour recevoir à nouveau les notifications.`;
-    } else if (daysRemaining != null) {
+    } else if (graceEndsAt && hoursRemaining != null && hoursRemaining > 0 && hoursRemaining < 24) {
+      message = `Documents obligatoires à déposer (${list}). Il vous reste ${hoursRemaining} heure${hoursRemaining > 1 ? 's' : ''} avant suspension des notifications.`;
+    } else if (daysRemaining != null && daysRemaining > 0) {
       message = `Documents obligatoires à déposer (${list}). Il vous reste ${daysRemaining} jour${daysRemaining > 1 ? 's' : ''} avant suspension des notifications.`;
     } else {
       message = `Documents obligatoires à déposer : ${list}.`;
@@ -292,6 +300,7 @@ export function buildDocumentsReminder(params: {
     gracePeriodDays,
     graceEndsAt,
     daysRemaining,
+    hoursRemaining,
     missingTypes,
     missingLabels,
     message,

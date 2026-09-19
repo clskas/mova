@@ -228,6 +228,23 @@ void main() {
       expect(state.showBanner, isFalse);
     });
 
+    test('lagging AppVersion.name still hides when versionCode is current', () {
+      final state = AppUpdateService.parseRemote(
+        {
+          'passenger': {
+            'currentVersion': '1.0.8',
+            'minVersion': '1.0.0',
+            'currentVersionCode': 80,
+          },
+        },
+        isDriver: false,
+        localVersion: '1.0.5',
+        localBuild: 80,
+      );
+      expect(state!.updateAvailable, isFalse);
+      expect(state.showBanner, isFalse);
+    });
+
     test('1.0.4 / 39 is behind advertised 1.0.5 / 42', () {
       final state = AppUpdateService.parseRemote(
         {

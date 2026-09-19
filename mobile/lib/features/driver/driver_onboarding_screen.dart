@@ -44,6 +44,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
   final _plate = TextEditingController();
   final _make = TextEditingController();
   final _model = TextEditingController();
+  final _color = TextEditingController();
   final _insuranceExpiry = TextEditingController();
   final _inspectionExpiry = TextEditingController();
   final _payoutPhone = TextEditingController();
@@ -124,6 +125,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
     _plate.dispose();
     _make.dispose();
     _model.dispose();
+    _color.dispose();
     _insuranceExpiry.dispose();
     _inspectionExpiry.dispose();
     _payoutPhone.dispose();
@@ -222,6 +224,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
     _plate.text = vehicle?['plateNumber']?.toString() ?? '';
     _make.text = vehicle?['make']?.toString() ?? '';
     _model.text = vehicle?['model']?.toString() ?? '';
+    _color.text = vehicle?['color']?.toString() ?? '';
     _vehicleType = vehicle?['type']?.toString() ?? 'STANDARD';
     _vehicleImageUrl = vehicle?['imageUrl']?.toString();
     _charterAccepted = profile?['charterAcceptedAt'] != null;
@@ -334,6 +337,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
       'vehicleMake': _make.text.trim(),
       'vehicleModel': _model.text.trim(),
       'vehicleType': _vehicleType,
+      'vehicleColor': _color.text.trim(),
       if (_vehicleImageUrl != null && _vehicleImageUrl!.isNotEmpty) 'vehicleImageUrl': _vehicleImageUrl,
       if (_insuranceExpiry.text.trim().isNotEmpty) 'insuranceExpiry': _insuranceExpiry.text.trim(),
       if (_inspectionExpiry.text.trim().isNotEmpty) 'technicalInspectionExpiry': _inspectionExpiry.text.trim(),
@@ -803,12 +807,6 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
       children: [
         const Text('Véhicule', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
         const SizedBox(height: 16),
-        _kycTextField(controller: _plate, label: 'Plaque d\'immatriculation'),
-        const SizedBox(height: _fieldGap),
-        _kycTextField(controller: _make, label: 'Marque'),
-        const SizedBox(height: _fieldGap),
-        _kycTextField(controller: _model, label: 'Modèle'),
-        const SizedBox(height: _fieldGap),
         DropdownButtonFormField<String>(
           value: _vehicleType,
           decoration: const InputDecoration(labelText: 'Type'),
@@ -822,6 +820,14 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
           ],
           onChanged: (v) => setState(() => _vehicleType = v ?? 'STANDARD'),
         ),
+        const SizedBox(height: _fieldGap),
+        _kycTextField(controller: _plate, label: 'Plaque d\'immatriculation'),
+        const SizedBox(height: _fieldGap),
+        _kycTextField(controller: _make, label: 'Marque'),
+        const SizedBox(height: _fieldGap),
+        _kycTextField(controller: _model, label: 'Modèle'),
+        const SizedBox(height: _fieldGap),
+        _kycTextField(controller: _color, label: 'Couleur (optionnel)'),
         const SizedBox(height: _fieldGap),
         _datePickerField(controller: _insuranceExpiry, label: 'Assurance expire le'),
         _datePickerField(controller: _inspectionExpiry, label: 'Visite technique expire le'),

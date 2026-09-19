@@ -16,18 +16,50 @@ import { toUserErrorMessage } from "@/lib/user-messages";
 import { PartnerAmountLine } from "@/components/PartnerAmountLine";
 import { useCommerceCopy } from "@/components/CommerceTypeContext";
 
-function formatItems(items: unknown): string {
-  if (!Array.isArray(items)) return "—";
-  return items
-    .map((it) => {
-      if (typeof it !== "object" || !it) return "";
-      const row = it as Record<string, unknown>;
-      const qty = row.quantity ?? row.qty ?? 1;
-      const name = row.name ?? row.itemName ?? "Article";
-      return `${qty}× ${name}`;
+function normalizeOptionLabels(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((entry) => {
+      if (typeof entry === "string") return entry.trim();
+      if (!entry || typeof entry !== "object") return "";
+      const row = entry as Record<string, unknown>;
+      const label = String(row.label ?? row.name ?? row.option ?? "").trim();
+      const group = String(row.group ?? row.groupName ?? "").trim();
+      if (!label) return "";
+      return group ? `${group}: ${label}` : label;
     })
-    .filter(Boolean)
-    .join(", ");
+    .filter(Boolean);
+}
+
+/** Lignes articles avec taille + options/compléments pour resto et autres commerces. */
+export function formatOrderItemLines(items: unknown): string[] {
+  if (!Array.isArray(items)) return [];
+  const lines: string[] = [];
+  for (const it of items) {
+    if (!it || typeof it !== "object") continue;
+    const row = it as Record<string, unknown>;
+    // Bloc multi-commerce : { restaurantId, items: [...] }
+    if (Array.isArray(row.items) && (row.restaurantId != null || row.partnerId != null)) {
+      lines.push(...formatOrderItemLines(row.items));
+      continue;
+    }
+    const qty = Number(row.quantity ?? row.qty ?? 1) || 1;
+    const name = String(row.name ?? row.itemName ?? row.title ?? "Article").trim() || "Article";
+    const size = String(
+      row.size ?? row.sizeLabel ?? row.selectedSize ?? row.taille ?? "",
+    ).trim();
+    const opts = normalizeOptionLabels(
+      row.options ?? row.selectedOptions ?? row.complements ?? row.extras,
+    );
+    const extras = [size ? `Taille: ${size}` : "", ...opts].filter(Boolean);
+    lines.push(extras.length ? `${qty}× ${name} — ${extras.join(" · ")}` : `${qty}× ${name}`);
+  }
+  return lines;
+}
+
+function formatItems(items: unknown): string {
+  const lines = formatOrderItemLines(items);
+  return lines.length ? lines.join(", ") : "—";
 }
 
 /** COD / espèces : préparer sans attendre le paiement (encaissement à la remise). */
@@ -94,7 +126,7 @@ export default function OrdersPage() {
     const body =
       newOrders.length > 1
         ? `${newOrders.length} nouvelles commandes à confirmer`
-        : `Commande #${first.id.slice(0, 8)} · Votre part ${formatCdf(first.partnerNetCdf ?? first.itemsSubtotalCdf)}`;
+        : `Commande #${first.id.slice(0, 8)} · ${formatItems(first.items)} · Votre part ${formatCdf(first.partnerNetCdf ?? first.itemsSubtotalCdf)}`;
     if (newOrders.length === 1) {
       alertNewRestaurantOrder(first.id, body);
     } else {
@@ -373,7 +405,23 @@ function OrderCard({
           </span>
         )}
       </div>
-      <p className="text-sm text-gray-800 mb-1">{formatItems(order.items)}</p>
+      <div className="mb-1">
+        {(() => {
+          const lines = formatOrderItemLines(order.items);
+          if (lines.length === 0) {
+            return <p className="text-sm text-gray-800">—</p>;
+          }
+          return (
+            <ul className="text-sm text-gray-800 space-y-1.5 list-none pl-0">
+              {lines.map((line, i) => (
+                <li key={`${order.id}-item-${i}`} className="leading-snug">
+                  {line}
+                </li>
+              ))}
+            </ul>
+          );
+        })()}
+      </div>
       <p className="text-sm text-gray-500 mb-1">Livraison : {order.deliveryAddress ?? "—"}</p>
       <div className="mb-4">
         <PartnerAmountLine

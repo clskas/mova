@@ -137,6 +137,7 @@ class AppUpdateService extends Notifier<AppUpdateState> {
             skipCache: true,
           );
       var next = state;
+      var advertisedCode = 0;
       if (result is Success) {
         final parsed = parseRemote(
           result.data,
@@ -145,6 +146,7 @@ class AppUpdateService extends Notifier<AppUpdateState> {
           localBuild: AppVersion.build,
         );
         if (parsed != null) {
+          advertisedCode = _codeFromRemoteId(parsed.remoteVersion);
           var dismissed = state.dismissedUntil;
           try {
             final prefs = await SharedPreferences.getInstance();
@@ -183,6 +185,7 @@ class AppUpdateService extends Notifier<AppUpdateState> {
         playCode: play.availableVersionCode,
         localBuild: AppVersion.build,
         fallbackStoreUrl: defaultStoreUrl,
+        advertisedCode: advertisedCode,
       );
       if (next.storeUrl == null || next.storeUrl!.isEmpty) {
         next = next.copyWith(storeUrl: defaultStoreUrl);
@@ -256,19 +259,21 @@ class AppUpdateService extends Notifier<AppUpdateState> {
   /// Merge Play Core's available versionCode with the API decision.
   ///
   /// Only *adds* a soft update when Play offers a newer package than the
-  /// installed build. Never clears an API-driven banner when Play reports the
-  /// installed code (or no update) — that regression hid banners whenever
-  /// `availableVersionCode == localBuild` even though `/public/app-version`
-  /// correctly said the store was ahead.
+  /// installed build. Never clears an API-driven banner when Play reports no
+  /// update while `/public/app-version` still says the store is ahead.
   ///
-  /// After the user installs, `parseRemote` already clears the banner when
-  /// `localBuild >= currentVersionCode`.
+  /// When [advertisedCode] is known and `localBuild >= advertisedCode`, force
+  /// hide — versionCode wins over a lagging AppVersion.name after install.
   static AppUpdateState reconcileWithPlay(
     AppUpdateState next, {
     required int playCode,
     required int localBuild,
     String? fallbackStoreUrl,
+    int advertisedCode = 0,
   }) {
+    if (advertisedCode > 0 && localBuild > 0 && localBuild >= advertisedCode) {
+      return next.copyWith(updateAvailable: false, flexibleDownloaded: false);
+    }
     if (playCode <= 0 || localBuild <= 0) return next;
     if (playCode > localBuild) {
       return next.copyWith(
@@ -316,15 +321,28 @@ class AppUpdateService extends Notifier<AppUpdateState> {
         currentCode > 0 && localBuild > 0 && localBuild < currentCode;
     final belowMin = AppVersion.compare(localVersion, min) < 0 ||
         (minCode > 0 && localBuild > 0 && localBuild < minCode);
+    // versionCode is authoritative once known: a phone on/above the store
+    // code must hide the banner even if AppVersion.name lagged (e.g. 1.0.5
+    // binary vs API advertising 1.0.8).
+    final codeCurrent =
+        currentCode > 0 && localBuild > 0 && localBuild >= currentCode;
     // Include versionCode so "Plus tard" snooze clears when Play ships a new
-    // build under the same marketing name (AppVersion.name stays 1.0.5).
+    // build under the same marketing name.
     final remoteId = currentCode > 0 ? '$current+$currentCode' : current;
     return AppUpdateState(
-      updateAvailable: belowMin || behindName || behindCode,
+      updateAvailable:
+          belowMin || (!codeCurrent && (behindName || behindCode)),
       forceUpdate: belowMin,
       storeUrl: storeUrl,
       remoteVersion: remoteId,
     );
+  }
+
+  static int _codeFromRemoteId(String? remoteId) {
+    if (remoteId == null || remoteId.isEmpty) return 0;
+    final i = remoteId.lastIndexOf('+');
+    if (i < 0) return 0;
+    return int.tryParse(remoteId.substring(i + 1).trim()) ?? 0;
   }
 
   static int _asInt(Object? value) {

@@ -16,7 +16,7 @@ import {
   type AdminCity,
   type AdminUser,
 } from "@/lib/api";
-import { userRoleDisplayLabel } from "@mova/shared";
+import { userRoleDisplayLabel } from "@/lib/commerce-type";
 import { useAdmin } from "@/components/AdminProvider";
 import {
   BtnDanger,

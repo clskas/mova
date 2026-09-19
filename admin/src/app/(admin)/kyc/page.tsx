@@ -20,7 +20,7 @@ import {
 import { useAdmin } from "@/components/AdminProvider";
 import { AuthenticatedMedia } from "@/components/AuthenticatedMedia";
 import { KYC_DOC_LABELS, kycDocLabel, personDisplayName } from "@/lib/kyc-labels";
-import { commerceTypeLabel } from "@mova/shared";
+import { commerceTypeLabel } from "@/lib/commerce-type";
 import {
   BtnDanger,
   BtnSuccess,

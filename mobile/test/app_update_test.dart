@@ -190,6 +190,44 @@ void main() {
       expect(state.showBanner, isFalse);
     });
 
+    test('passenger 1.0.5 binary sees banner when API advertises 1.0.8', () {
+      final state = AppUpdateService.parseRemote(
+        {
+          'passenger': {
+            'currentVersion': '1.0.8',
+            'minVersion': '1.0.0',
+            'currentVersionCode': 80,
+            'storeUrl': 'https://play.google.com/store/apps/details?id=cd.mova.mova.passenger',
+          },
+        },
+        isDriver: false,
+        localVersion: '1.0.5',
+        localBuild: 79,
+      );
+      expect(state!.updateAvailable, isTrue);
+      expect(state.forceUpdate, isFalse);
+      expect(state.showBanner, isTrue);
+      expect(state.remoteVersion, '1.0.8+80');
+    });
+
+    test('passenger 1.0.8+80 matching store hides the banner', () {
+      final state = AppUpdateService.parseRemote(
+        {
+          'passenger': {
+            'currentVersion': '1.0.8',
+            'minVersion': '1.0.0',
+            'currentVersionCode': 80,
+            'storeUrl': 'https://play.google.com/store/apps/details?id=cd.mova.mova.passenger',
+          },
+        },
+        isDriver: false,
+        localVersion: '1.0.8',
+        localBuild: 80,
+      );
+      expect(state!.updateAvailable, isFalse);
+      expect(state.showBanner, isFalse);
+    });
+
     test('1.0.4 / 39 is behind advertised 1.0.5 / 42', () {
       final state = AppUpdateService.parseRemote(
         {

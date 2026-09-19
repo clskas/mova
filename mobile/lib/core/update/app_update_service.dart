@@ -82,7 +82,11 @@ final appUpdateServiceProvider =
 
 class AppUpdateService extends Notifier<AppUpdateState> {
   static const softDismissDuration = Duration(minutes: 15);
-  static const _snoozePrefKey = 'senga_update_snoozed_version';
+  /// v3: short soft-dismiss (not 365d) + flavor-scoped keys so a stuck
+  /// passenger « Plus tard » cannot hide the banner forever.
+  static String get _snoozePrefKey => AppFlavor.isDriver
+      ? 'senga_driver_update_snooze_v3'
+      : 'senga_passenger_update_snooze_v3';
 
   Timer? _timer;
   Timer? _retryTimer;
@@ -107,7 +111,10 @@ class AppUpdateService extends Notifier<AppUpdateState> {
     if (_started) return;
     _started = true;
     unawaited(check());
-    _retryTimer = Timer(const Duration(seconds: 8), () => unawaited(check()));
+    // Passenger cold-start often races splash/bootstrap; retry a few times.
+    _retryTimer = Timer(const Duration(seconds: 4), () => unawaited(check()));
+    Timer(const Duration(seconds: 12), () => unawaited(check()));
+    Timer(const Duration(seconds: 25), () => unawaited(check()));
     _timer = Timer.periodic(const Duration(minutes: 5), (_) => unawaited(check()));
   }
 
@@ -141,14 +148,25 @@ class AppUpdateService extends Notifier<AppUpdateState> {
           var dismissed = state.dismissedUntil;
           try {
             final prefs = await SharedPreferences.getInstance();
+            // Drop legacy forever-snooze keys from earlier builds.
+            await prefs.remove('senga_update_snoozed_version');
+            await prefs.remove('senga_passenger_update_snooze_v2');
+            await prefs.remove('senga_driver_update_snooze_v2');
             final snoozed = prefs.getString(_snoozePrefKey);
-            if (snoozed != null &&
-                snoozed == parsed.remoteVersion &&
-                !parsed.forceUpdate) {
-              dismissed = DateTime.now().add(const Duration(days: 365));
-            } else if (snoozed != null && snoozed != parsed.remoteVersion) {
-              await prefs.remove(_snoozePrefKey);
-              dismissed = null;
+            if (snoozed != null && !parsed.forceUpdate) {
+              final parts = snoozed.split('|');
+              final remoteId = parts.first;
+              final until = parts.length > 1
+                  ? DateTime.tryParse(parts[1])
+                  : null;
+              if (remoteId == parsed.remoteVersion &&
+                  until != null &&
+                  until.isAfter(DateTime.now())) {
+                dismissed = until;
+              } else {
+                await prefs.remove(_snoozePrefKey);
+                dismissed = null;
+              }
             }
           } catch (_) {
             /* ignore storage */
@@ -194,14 +212,20 @@ class AppUpdateService extends Notifier<AppUpdateState> {
     if (!state.updateAvailable || state.forceUpdate) return;
     _softDismissTimer?.cancel();
     final remote = state.remoteVersion;
-    // Persist "Plus tard" until this store build is installed (or a newer one ships).
-    state = state.copyWith(
-      dismissedUntil: DateTime.now().add(const Duration(days: 365)),
-    );
+    final until = DateTime.now().add(softDismissDuration);
+    // Soft dismiss only — banner returns after 15 min if still behind.
+    state = state.copyWith(dismissedUntil: until);
+    _softDismissTimer = Timer(softDismissDuration, () {
+      if (!_alive) return;
+      state = state.copyWith(dismissedUntil: null);
+    });
     if (remote != null && remote.isNotEmpty) {
       unawaited(
         SharedPreferences.getInstance().then((prefs) {
-          return prefs.setString(_snoozePrefKey, remote);
+          return prefs.setString(
+            _snoozePrefKey,
+            '$remote|${until.toIso8601String()}',
+          );
         }),
       );
     }

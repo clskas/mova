@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../api/api_client.dart';
 import '../error/result.dart';
+import '../update/app_update_service.dart';
 import 'connectivity_service.dart';
 import 'sync_queue.dart';
 
@@ -16,6 +17,8 @@ Future<void> bootstrapMovaApp(WidgetRef ref) async {
 
   connectivity.onBackOnline = () async {
     await api.checkHealth();
+    // Passenger cold-start often misses the first app-version probe while offline.
+    ref.read(appUpdateServiceProvider.notifier).onAppResumed();
     if (api.canSync) {
       final flushResult = await queue.flush((method, path, body) async {
         return switch (method) {
@@ -40,6 +43,7 @@ Future<void> bootstrapMovaApp(WidgetRef ref) async {
   connectivity.onNetworkRestored = () async {
     connectivity.prepareReconnect();
     await api.checkHealth(resetFailures: true);
+    ref.read(appUpdateServiceProvider.notifier).onAppResumed();
   };
 
   connectivity.prepareReconnect();
@@ -52,4 +56,5 @@ Future<void> bootstrapMovaApp(WidgetRef ref) async {
   }
 
   connectivity.startGatewayHealthRetry(() => api.checkHealth());
+  ref.read(appUpdateServiceProvider.notifier).onAppResumed();
 }

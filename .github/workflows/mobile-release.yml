@@ -133,11 +133,11 @@ jobs:
         id: playver
         run: |
           set -euo pipefail
-          # Play production floor: 78 already uploaded; next AAB must be ≥79.
+          # Play production floor: 79 already uploaded; next AAB must be ≥80.
           CODE="${{ github.run_number }}"
-          if [ "$CODE" -lt 79 ]; then CODE=79; fi
+          if [ "$CODE" -lt 80 ]; then CODE=80; fi
           echo "code=$CODE" >> "$GITHUB_OUTPUT"
-          echo "Play versionCode=$CODE (pubspec 1.0.8+79; run_number=${{ github.run_number }})"
+          echo "Play versionCode=$CODE (pubspec 1.0.8+80; run_number=${{ github.run_number }})"
 
       - name: Build passenger AAB
         working-directory: mobile
@@ -199,8 +199,11 @@ jobs:
           flutter build apk --release \
             --flavor passenger \
             -t lib/main_passenger.dart \
+            --build-name=1.0.8 \
+            --build-number=${{ steps.playver.outputs.code }} \
             --dart-define=API_URL=${{ steps.urls.outputs.api }} \
             --dart-define=WS_URL=${{ steps.urls.outputs.ws }} \
+            --dart-define=APP_BUILD=${{ steps.playver.outputs.code }} \
             --dart-define=GOOGLE_SERVER_CLIENT_ID=$WEB_CLIENT
 
       - name: Build driver APK (install direct)
@@ -212,8 +215,11 @@ jobs:
           flutter build apk --release \
             --flavor driver \
             -t lib/main_driver.dart \
+            --build-name=1.0.8 \
+            --build-number=${{ steps.playver.outputs.code }} \
             --dart-define=API_URL=${{ steps.urls.outputs.api }} \
             --dart-define=WS_URL=${{ steps.urls.outputs.ws }} \
+            --dart-define=APP_BUILD=${{ steps.playver.outputs.code }} \
             --dart-define=GOOGLE_SERVER_CLIENT_ID=$WEB_CLIENT
 
       - name: Upload passenger APK artifact

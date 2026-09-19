@@ -1,9 +1,10 @@
 /// Version client — doit suivre `pubspec.yaml` / Play (`--build-name`).
 /// Le versionCode Play est `pubspec` / CI (`--build-number` + `--dart-define=APP_BUILD`).
-/// 57 = PIN after OTP (Play production 34213561877).
+/// defaultValue must match pubspec `+N` so a missing dart-define cannot leave
+/// the in-app update banner stuck after a Play install.
 class AppVersion {
   static const name = '1.0.8';
-  static const build = int.fromEnvironment('APP_BUILD', defaultValue: 57);
+  static const build = int.fromEnvironment('APP_BUILD', defaultValue: 84);
 
   static int compare(String a, String b) {
     List<int> parts(String raw) => raw

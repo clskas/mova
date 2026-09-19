@@ -294,6 +294,7 @@ export class DeliveriesService {
   }
 
   async createParcel(userId: string, dto: CreateParcelDeliveryDto) {
+    await this.assertNoUnpaidCompletedDelivery(userId);
     const estimate = await this.estimateParcel(dto, true);
     const weightCategory = await this.resolveWeightCategory(dto);
     const flags = this.guaranteeFlags(dto.paymentMethod);
@@ -491,6 +492,7 @@ export class DeliveriesService {
   }
 
   async createFood(userId: string, dto: CreateFoodDeliveryDto) {
+    await this.assertNoUnpaidCompletedDelivery(userId);
     const restaurant = await this.prisma.restaurant.findUnique({ where: { id: dto.restaurantId } });
     if (!restaurant || !restaurant.isActive) throw new MovaHttpException(MovaErrorCode.RESTAURANT_NOT_FOUND, HttpStatus.NOT_FOUND);
     this.assertRestaurantCanOperate(restaurant);
@@ -605,6 +607,7 @@ export class DeliveriesService {
   }
 
   async createFoodMulti(userId: string, dto: CreateFoodMultiDeliveryDto) {
+    await this.assertNoUnpaidCompletedDelivery(userId);
     if (!dto.orders?.length) throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Ajoutez au moins un restaurant.');
 
     const restaurants = await this.prisma.restaurant.findMany({
@@ -716,6 +719,7 @@ export class DeliveriesService {
   }
 
   async createExpress(userId: string, dto: CreateParcelDeliveryDto) {
+    await this.assertNoUnpaidCompletedDelivery(userId);
     const estimate = await this.estimateExpress(dto, true);
     const weightCategory = await this.resolveWeightCategory(dto);
     const flags = this.guaranteeFlags(dto.paymentMethod);
@@ -835,6 +839,22 @@ export class DeliveriesService {
     DeliveryStatus.PICKED_UP,
     DeliveryStatus.IN_TRANSIT,
   ];
+
+  /** Bloque une nouvelle commande si une livraison terminée n'est pas encore payée (comme les courses). */
+  private async assertNoUnpaidCompletedDelivery(userId: string) {
+    const delivered = await this.prisma.delivery.findMany({
+      where: { userId, status: DeliveryStatus.DELIVERED },
+      orderBy: { deliveredAt: 'desc' },
+      take: 5,
+      select: { id: true },
+    });
+    for (const row of delivered) {
+      const payment = await fetchServicePaymentStatus('DELIVERY', row.id);
+      if (!payment.isPaid) {
+        throw new MovaHttpException(MovaErrorCode.DELIVERY_UNPAID_PENDING, HttpStatus.CONFLICT);
+      }
+    }
+  }
 
   /** Livraison active du passager pour reprise après fermeture de l'app. */
   async getActiveDelivery(passengerId: string) {

@@ -21,13 +21,13 @@ const DEFAULT_DRIVER_STORE =
  * Marketing name floor must match `AppVersion.name` / pubspec (`1.0.8`).
  * Phones still on older binaries (`AppVersion.name = '1.0.5'`) see behindName
  * and get the in-app banner until they install the matching Play build.
- * versionCode floor tracks Play production (currently 83).
+ * versionCode floor tracks Play production (currently 84).
  * Raise the code floor when a newer AAB is uploaded — otherwise older phones
  * never see the banner when names already match (banner also fires when
  * store code > APP_BUILD).
  */
 const CURRENT_VERSION_FLOOR = '1.0.8';
-const CURRENT_VERSION_CODE_FLOOR = 83;
+const CURRENT_VERSION_CODE_FLOOR = 84;
 
 function parseVersionCode(raw: string | undefined, fallback: number): number {
   const n = Number.parseInt(raw?.trim() || '', 10);

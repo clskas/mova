@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -127,10 +128,23 @@ class AppUpdateService extends Notifier<AppUpdateState> {
       ? 'https://play.google.com/store/apps/details?id=cd.mova.mova.driver'
       : 'https://play.google.com/store/apps/details?id=cd.mova.mova.passenger';
 
+  /// Installed Play versionCode (PackageInfo), falling back to compile-time APP_BUILD.
+  static Future<int> resolveLocalBuild() async {
+    try {
+      final info = await PackageInfo.fromPlatform();
+      final fromPkg = int.tryParse(info.buildNumber.trim()) ?? 0;
+      if (fromPkg > 0) return fromPkg;
+    } catch (_) {
+      /* ignore */
+    }
+    return AppVersion.build;
+  }
+
   Future<void> check() async {
     if (_checking) return;
     _checking = true;
     try {
+      final localBuild = await resolveLocalBuild();
       final result = await ref.read(apiClientProvider).get(
             '/public/app-version',
             retries: 1,
@@ -143,7 +157,7 @@ class AppUpdateService extends Notifier<AppUpdateState> {
           result.data,
           isDriver: AppFlavor.isDriver,
           localVersion: AppVersion.name,
-          localBuild: AppVersion.build,
+          localBuild: localBuild,
         );
         if (parsed != null) {
           advertisedCode = _codeFromRemoteId(parsed.remoteVersion);
@@ -183,7 +197,7 @@ class AppUpdateService extends Notifier<AppUpdateState> {
       next = reconcileWithPlay(
         next,
         playCode: play.availableVersionCode,
-        localBuild: AppVersion.build,
+        localBuild: localBuild,
         fallbackStoreUrl: defaultStoreUrl,
         advertisedCode: advertisedCode,
       );

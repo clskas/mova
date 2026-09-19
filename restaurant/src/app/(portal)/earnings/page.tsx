@@ -93,7 +93,8 @@ export default function EarningsPage() {
       <div>
         <h2 className="text-xl font-semibold text-[#1A1A2E]">Revenus repas</h2>
         <p className="text-sm text-gray-600 mt-1">
-          Votre part des ventes est créditée après paiement du client (commission SENGA déduite).
+          Votre part est créditée après paiement portefeuille / Mobile Money (commission SENGA déduite).
+          En espèces, le crédit arrive après règlement du livreur au guichet SENGA.
         </p>
       </div>
 

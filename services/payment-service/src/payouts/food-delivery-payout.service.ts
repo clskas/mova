@@ -115,20 +115,31 @@ export class FoodDeliveryPayoutService {
     const driverUserId = settlement.driver?.userId;
     for (const restaurant of settlement.restaurants) {
       if (!restaurant.ownerUserId || restaurant.netCdf <= 0) continue;
+      // Espèces : le livreur détient le cash (part resto incluse). On n'avance PAS
+      // le wallet restaurant — dette RESTAURANT_SHARE, crédit au règlement guichet.
+      if (isCash) {
+        if (driverUserId) {
+          await this.debtLedger.recordDebt({
+            driverUserId,
+            referenceType: 'DELIVERY',
+            referenceId: deliveryId,
+            category: CashDebtCategory.RESTAURANT_SHARE,
+            amountCdf: restaurant.netCdf,
+            beneficiaryUserId: restaurant.ownerUserId,
+            description: `Part restaurant à reverser — commande ${deliveryId.slice(0, 8)}`,
+          });
+        }
+        restaurantResults.push({
+          credited: false,
+          reason: 'cash_in_hand',
+          amountCdf: Math.round(restaurant.netCdf),
+          restaurantId: restaurant.restaurantId,
+        });
+        continue;
+      }
       restaurantResults.push(
         await this.creditRestaurant(restaurant.ownerUserId, deliveryId, restaurant.restaurantId, restaurant.netCdf),
       );
-      if (isCash && driverUserId) {
-        await this.debtLedger.recordDebt({
-          driverUserId,
-          referenceType: 'DELIVERY',
-          referenceId: deliveryId,
-          category: CashDebtCategory.RESTAURANT_SHARE,
-          amountCdf: restaurant.netCdf,
-          beneficiaryUserId: restaurant.ownerUserId,
-          description: `Part restaurant à reverser — commande ${deliveryId.slice(0, 8)}`,
-        });
-      }
     }
     results.restaurants = restaurantResults;
 

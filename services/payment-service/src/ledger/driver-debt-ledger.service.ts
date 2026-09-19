@@ -49,6 +49,52 @@ export class DriverDebtLedgerService {
     );
   }
 
+  /**
+   * Après règlement guichet / wallet : verse la part restaurant (ou partenaire)
+   * qui était physiquement chez le livreur en espèces.
+   */
+  private async creditBeneficiaryOnShareCollect(debt: {
+    category: CashDebtCategory;
+    referenceType: string;
+    referenceId: string;
+    amountCdf: number;
+    beneficiaryUserId?: string | null;
+  }) {
+    const isShare =
+      debt.category === CashDebtCategory.RESTAURANT_SHARE ||
+      debt.category === CashDebtCategory.PARTNER_SHARE;
+    if (!isShare || !debt.beneficiaryUserId || debt.amountCdf <= 0) return;
+
+    const kind = debt.category === CashDebtCategory.RESTAURANT_SHARE ? 'restaurant' : 'partenaire';
+    const collectRef = `CASH_SHARE_COLLECT:${debt.category}:${debt.referenceType}:${debt.referenceId}:${debt.beneficiaryUserId}`;
+    const existing = await this.prisma.walletTransaction.findFirst({
+      where: { reference: collectRef, type: 'CREDIT' },
+    });
+    if (existing) return;
+
+    await this.wallet.credit(
+      debt.beneficiaryUserId,
+      debt.amountCdf,
+      `Part ${kind} encaissée (espèces) ${debt.referenceType} ${debt.referenceId.slice(0, 8)}`,
+      collectRef,
+    );
+  }
+
+  private async applyCashDebtSettlementCredits(
+    debts: Array<{
+      category: CashDebtCategory;
+      referenceType: string;
+      referenceId: string;
+      amountCdf: number;
+      beneficiaryUserId?: string | null;
+    }>,
+  ) {
+    for (const debt of debts) {
+      await this.creditPlatformOnCashFeeCollect(debt);
+      await this.creditBeneficiaryOnShareCollect(debt);
+    }
+  }
+
   async recordDebt(input: RecordDebtInput) {
     const amount = Math.round(input.amountCdf);
     if (amount <= 0) return { recorded: false as const, reason: 'zero_amount' as const };
@@ -141,9 +187,7 @@ export class DriverDebtLedgerService {
       },
     });
 
-    for (const debt of openDebts) {
-      await this.creditPlatformOnCashFeeCollect(debt);
-    }
+    await this.applyCashDebtSettlementCredits(openDebts);
 
     return {
       settled: true as const,
@@ -165,7 +209,7 @@ export class DriverDebtLedgerService {
       where: { id: debtId },
       data: { status: CashDebtStatus.SETTLED, settledAt: new Date(), settlementRef: ref },
     });
-    await this.creditPlatformOnCashFeeCollect(updated);
+    await this.applyCashDebtSettlementCredits([updated]);
     return { settled: true as const, debt: updated };
   }
 
@@ -455,6 +499,9 @@ export class DriverDebtLedgerService {
       return { confirmed: false as const, message: 'Aucune dette ouverte pour ce chauffeur' };
     }
 
+    const openDebts = await this.prisma.driverCashDebt.findMany({
+      where: { driverUserId: request.driverUserId, status: CashDebtStatus.OPEN },
+    });
     const settlementRef = `CASH_DEBT_CASH:${request.id}:${Date.now()}`;
     const updated = await this.prisma.driverCashDebt.updateMany({
       where: { driverUserId: request.driverUserId, status: CashDebtStatus.OPEN },
@@ -471,6 +518,8 @@ export class DriverDebtLedgerService {
         amountCdf: summary.totalOpenCdf,
       },
     });
+
+    await this.applyCashDebtSettlementCredits(openDebts);
 
     this.logger.log(
       `Cash debt payment confirmed for driver ${request.driverUserId}: ${summary.totalOpenCdf} CDF (${updated.count} ligne(s))`,

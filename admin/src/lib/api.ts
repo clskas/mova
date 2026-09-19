@@ -149,6 +149,7 @@ export type AdminDriver = {
     plateNumber: string;
     make?: string;
     model?: string;
+    color?: string | null;
     imageUrl?: string | null;
     isActive?: boolean;
     typeApprovalStatus?: string;
@@ -197,6 +198,7 @@ export type AdminDriverDetail = AdminDriver & {
     plateNumber?: string;
     make?: string;
     model?: string;
+    color?: string | null;
   } | null;
   kyc?: {
     checklist?: {

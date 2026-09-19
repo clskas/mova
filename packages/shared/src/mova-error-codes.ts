@@ -28,6 +28,7 @@ export enum MovaErrorCode {
   RESTAURANT_NOT_FOUND = 'MOVA_DEL_003',
   DELIVERY_ESCROW_REQUIRED = 'MOVA_DEL_004',
   DELIVERY_FUNDS_FROZEN = 'MOVA_DEL_005',
+  DELIVERY_UNPAID_PENDING = 'MOVA_DEL_006',
 
   CARPOOL_NOT_FOUND = 'MOVA_CAR_001',
   CARPOOL_NO_SEATS = 'MOVA_CAR_002',
@@ -98,6 +99,8 @@ export const MOVA_ERROR_MESSAGES: Record<MovaErrorCode, string> = {
     'Le client doit d\'abord payer (portefeuille ou Mobile Money). Ensuite seulement le restaurant prépare et le livreur part.',
   [MovaErrorCode.DELIVERY_FUNDS_FROZEN]:
     'Les fonds sont bloqués (litige ou délai dépassé). Le support SENGA interviendra — aucun versement automatique.',
+  [MovaErrorCode.DELIVERY_UNPAID_PENDING]:
+    'Vous avez une livraison terminée non payée. Réglez le paiement avant d\'en commander une nouvelle.',
 
   [MovaErrorCode.CARPOOL_NOT_FOUND]: 'Trajet covoiturage introuvable.',
   [MovaErrorCode.CARPOOL_NO_SEATS]: 'Plus de places disponibles sur ce trajet.',

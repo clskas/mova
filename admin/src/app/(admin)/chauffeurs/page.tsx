@@ -625,6 +625,23 @@ export default function ChauffeursPage() {
                 </p>
               )}
               <p><span className="text-gray-500">N° identité:</span> {detail?.idDocumentNumber ?? "—"}</p>
+              {(() => {
+                const v = activeDriverVehicle(selected) ?? detail?.vehicle ?? null;
+                if (!v) return null;
+                return (
+                  <>
+                    <p>
+                      <span className="text-gray-500">Véhicule:</span>{" "}
+                      {[v.make, v.model].filter(Boolean).join(" ") || (VEHICLE_TYPE_LABELS[v.type ?? ""] ?? v.type) || "—"}
+                      {v.plateNumber ? ` · ${v.plateNumber}` : ""}
+                    </p>
+                    <p>
+                      <span className="text-gray-500">Couleur:</span>{" "}
+                      {("color" in v && v.color) ? v.color : "—"}
+                    </p>
+                  </>
+                );
+              })()}
               <p><span className="text-gray-500">État:</span>{" "}
                 {selected.dutyStatus === "ON_TRIP"
                   ? "En course"
@@ -955,7 +972,9 @@ export default function ChauffeursPage() {
                             />
                           ) : null}
                           <div>
-                            {VEHICLE_TYPE_LABELS[v.type] ?? v.type} · {v.plateNumber} {v.make && `· ${v.make} ${v.model ?? ""}`}
+                            {VEHICLE_TYPE_LABELS[v.type] ?? v.type} · {v.plateNumber}
+                            {v.make && ` · ${v.make} ${v.model ?? ""}`}
+                            {v.color ? ` · ${v.color}` : ""}
                             {v.typeApprovalStatus && (
                               <span className="block text-xs text-gray-500 mt-0.5">
                                 Validation type : {vehicleTypeApprovalLabel(v.typeApprovalStatus)}

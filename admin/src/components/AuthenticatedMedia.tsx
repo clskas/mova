@@ -3,7 +3,14 @@
 import { useEffect, useState } from "react";
 import { authHeaders } from "@/lib/auth";
 
-const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000").replace(/\/$/, "");
+/**
+ * Gateway origin only — strip accidental trailing `/api` (same as admin/src/lib/api.ts).
+ * Clients append `/api/uploads/...`; a base ending in `/api` produced `/api/api/...` 404s.
+ */
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000")
+  .trim()
+  .replace(/\/+$/, "")
+  .replace(/\/api$/i, "");
 
 /** Rewrites relative and internal `/api/uploads/...` URLs to the public gateway. */
 export function resolveMediaUrl(url?: string | null): string | null {
@@ -14,6 +21,8 @@ export function resolveMediaUrl(url?: string | null): string | null {
 
   const toGateway = (pathname: string, search = "") => {
     let path = pathname.startsWith("/") ? pathname : `/${pathname}`;
+    // Collapse accidental `/api/api/...` from stored absolute URLs.
+    path = path.replace(/^\/api\/api\//i, "/api/");
     if (path.startsWith("/uploads/")) path = `/api${path}`;
     if (!path.startsWith("/api/") && !path.includes("/")) {
       path = `/api/uploads/vehicles/${path.replace(/^\//, "")}`;
@@ -24,13 +33,17 @@ export function resolveMediaUrl(url?: string | null): string | null {
   if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
     try {
       const parsed = new URL(trimmed);
-      if (parsed.pathname.startsWith("/api/uploads") || parsed.pathname.startsWith("/uploads/")) {
+      if (
+        parsed.pathname.startsWith("/api/uploads") ||
+        parsed.pathname.startsWith("/api/api/uploads") ||
+        parsed.pathname.startsWith("/uploads/")
+      ) {
         return toGateway(parsed.pathname, parsed.search);
       }
-      return trimmed;
     } catch {
       return trimmed;
     }
+    return trimmed;
   }
   return toGateway(trimmed);
 }

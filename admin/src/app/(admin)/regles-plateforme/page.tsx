@@ -271,14 +271,15 @@ export default function ReglesPlateformePage() {
           )}
 
           <section>
-            <h2 className="font-semibold text-[#1A1A2E] mb-3">Documents chauffeurs &amp; notifications</h2>
+            <h2 className="font-semibold text-[#1A1A2E] mb-3">Documents chauffeurs / partenaires &amp; notifications</h2>
             <Card className="p-4 space-y-3 max-w-2xl">
               <p className="text-sm text-gray-600">
-                Par défaut, tous les justificatifs du dossier chauffeur sont optionnels. Activez l&apos;option
-                ci-dessous pour exiger des documents valides (dates d&apos;expiration) afin de continuer à
-                recevoir les notifications de courses.
+                Par défaut, tous les justificatifs (chauffeurs et partenaires) sont optionnels : l&apos;activation
+                reste possible même si certains documents manquent. Activez l&apos;option ci-dessous pour
+                exiger les documents clés — sinon plus de notifications de courses / commandes tant qu&apos;ils
+                ne sont pas déposés et validés.
                 {cityAdminDocsOnly
-                  ? " Cette règle s'applique au niveau plateforme (tous les chauffeurs)."
+                  ? " Cette règle s'applique au niveau plateforme (tous les comptes)."
                   : null}
               </p>
               <label className="flex items-start gap-2 text-sm">
@@ -290,7 +291,8 @@ export default function ReglesPlateformePage() {
                   onChange={(e) => setRequireDocsForJobs(e.target.checked)}
                 />
                 <span>
-                  Exiger des documents valides pour recevoir les notifications de courses / livraisons
+                  Exiger des documents valides pour recevoir les notifications (chauffeurs) et rester
+                  visibles / commandables (restaurants, boutiques, loueurs)
                 </span>
               </label>
               {!readOnly && (

@@ -17,6 +17,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { formatParcelDelivery } from '../deliveries/parcel.util';
 import { DeliveriesService } from '../deliveries/deliveries.service';
 import { UploadsService } from '../uploads/uploads.service';
+import { PartnerKycService } from '../partner-kyc/partner-kyc.service';
 import { UpdateRestaurantLocationDto, UpdateRestaurantMenuDto } from './restaurant-portal.dto';
 import {
   assertRestaurantProfileComplete,
@@ -37,6 +38,7 @@ export class RestaurantPortalService {
     private uploads: UploadsService,
     private partnerBilling: PartnerBillingService,
     private deliveries: DeliveriesService,
+    private partnerKyc: PartnerKycService,
   ) {}
 
   async getEarningsReport(
@@ -87,6 +89,7 @@ export class RestaurantPortalService {
 
   async getProfile(ownerUserId: string) {
     const restaurant = await this.getRestaurantForOwner(ownerUserId);
+    const dossier = await this.partnerKyc.getRestaurantDossier(ownerUserId);
     return {
       id: restaurant.id,
       name: restaurant.name,
@@ -95,14 +98,16 @@ export class RestaurantPortalService {
       lat: restaurant.lat,
       lng: restaurant.lng,
       rating: restaurant.rating,
-      isAcceptingOrders: restaurant.isAcceptingOrders,
+      isAcceptingOrders: restaurant.isAcceptingOrders && dossier.canOperate,
       prepTimeMin: restaurant.prepTimeMin,
       promotionLabel: restaurant.promotionLabel,
       menuItems: restaurant.menuItems ?? [],
       courierMode: 'PLATFORM' as const,
       commerceType: restaurant.commerceType ?? 'RESTAURANT',
       kycStatus: restaurant.kycStatus,
-      canOperate: restaurant.kycStatus === 'APPROVED',
+      canOperate: dossier.canOperate,
+      documentsRequiredForJobs: dossier.documentsRequiredForJobs,
+      documentsJobsGateOk: dossier.documentsJobsGateOk,
       needsProfileSetup: restaurantNeedsProfileSetup(restaurant),
     };
   }
@@ -523,6 +528,16 @@ export class RestaurantPortalService {
       dto.prepTimeMin !== undefined
     ) {
       this.assertRestaurantKycApproved(restaurant);
+    }
+    if (dto.isAcceptingOrders === true) {
+      const dossier = await this.partnerKyc.getRestaurantDossier(ownerUserId);
+      if (!dossier.canOperate) {
+        throw new MovaHttpException(
+          MovaErrorCode.VALIDATION_ERROR,
+          undefined,
+          'Documents requis par SENGA : déposez et faites valider les justificatifs pour accepter des commandes.',
+        );
+      }
     }
     let menuItems: Prisma.InputJsonValue | undefined;
     let catalog = parseMenuCatalog(restaurant.menuItems);

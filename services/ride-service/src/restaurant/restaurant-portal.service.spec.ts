@@ -34,12 +34,21 @@ describe('RestaurantPortalService', () => {
     ensureRestaurantForOwner: jest.fn(),
   };
 
+  const partnerKyc = {
+    getRestaurantDossier: jest.fn().mockResolvedValue({
+      canOperate: true,
+      documentsRequiredForJobs: false,
+      documentsJobsGateOk: true,
+    }),
+  };
+
   const service = new RestaurantPortalService(
     prisma as never,
     redis as never,
     uploads as never,
     partnerBilling as never,
     deliveries as never,
+    partnerKyc as never,
   );
 
   beforeEach(() => {

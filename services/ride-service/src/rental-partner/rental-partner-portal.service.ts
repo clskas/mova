@@ -144,6 +144,7 @@ export class RentalPartnerPortalService {
       },
     });
     const needsSetup = rentalNeedsProfileSetup(partner);
+    const dossier = await this.partnerKyc.getRentalDossier(ownerUserId);
     return {
       userId: ownerUserId,
       id: partner.id,
@@ -156,7 +157,9 @@ export class RentalPartnerPortalService {
       phone: user?.phone,
       kycStatus: partner.kycStatus,
       partnerType: partner.partnerType,
-      canOperate: partner.kycStatus === 'APPROVED',
+      canOperate: dossier.canOperate,
+      documentsRequiredForJobs: dossier.documentsRequiredForJobs,
+      documentsJobsGateOk: dossier.documentsJobsGateOk,
       needsProfileSetup: needsSetup,
       vehicleCounts: {
         pending: byStatus[RentalVehicleApprovalStatus.PENDING] ?? 0,

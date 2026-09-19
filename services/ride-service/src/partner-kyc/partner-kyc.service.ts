@@ -15,6 +15,10 @@ import {
   kycRejectNotifyCopy,
   notifyAuthUser,
   allPartnerJustificatifsApproved,
+  checklistSatisfiesJobsGate,
+  JOBS_GATE_RESTAURANT_KYC_TYPES,
+  JOBS_GATE_RENTAL_COMPANY_KYC_TYPES,
+  JOBS_GATE_RENTAL_INDIVIDUAL_KYC_TYPES,
   type AuthUserNotifyResult,
   type KycPartnerKind,
   type PartnerKycSubject as PartnerSubject,
@@ -22,6 +26,7 @@ import {
 } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { UploadsService } from '../uploads/uploads.service';
+import { PlatformConfigService } from '../platform/platform-config.service';
 import { fetchAuthUserBrief } from '../common/internal-lookup.util';
 import { stubRestaurantCreateData } from '../restaurant/restaurant-profile.util';
 import { stubRentalProfileCreateData } from '../rental-partner/rental-profile.util';
@@ -46,7 +51,33 @@ export class PartnerKycService {
   constructor(
     private prisma: PrismaService,
     private uploads: UploadsService,
+    private platformConfig: PlatformConfigService,
   ) {}
+
+  private requireDocumentsForJobs(): boolean {
+    return this.platformConfig.get().driverOps.requireDocumentsForJobs === true;
+  }
+
+  private restaurantCanOperate(
+    kycStatus: string,
+    checklist: Array<{ type?: string; uploaded?: boolean; status?: string | null }>,
+  ): boolean {
+    if (kycStatus !== PartnerKycStatus.APPROVED) return false;
+    if (!this.requireDocumentsForJobs()) return true;
+    return checklistSatisfiesJobsGate(checklist, JOBS_GATE_RESTAURANT_KYC_TYPES);
+  }
+
+  private rentalCanOperate(
+    kycStatus: string,
+    partnerType: string | null | undefined,
+    checklist: Array<{ type?: string; uploaded?: boolean; status?: string | null }>,
+  ): boolean {
+    if (kycStatus !== PartnerKycStatus.APPROVED) return false;
+    if (!this.requireDocumentsForJobs()) return true;
+    const gate =
+      partnerType === 'COMPANY' ? JOBS_GATE_RENTAL_COMPANY_KYC_TYPES : JOBS_GATE_RENTAL_INDIVIDUAL_KYC_TYPES;
+    return checklistSatisfiesJobsGate(checklist, gate);
+  }
 
   async getRestaurantDossier(ownerUserId: string) {
     const restaurant = await this.ensureRestaurant(ownerUserId);
@@ -78,14 +109,16 @@ export class PartnerKycService {
       email: user?.email ?? null,
       phoneVerified,
       hasEmail,
-      canOperate: restaurant.kycStatus === PartnerKycStatus.APPROVED,
+      canOperate: this.restaurantCanOperate(restaurant.kycStatus, checklist),
+      documentsRequiredForJobs: this.requireDocumentsForJobs(),
+      documentsJobsGateOk: checklistSatisfiesJobsGate(checklist, JOBS_GATE_RESTAURANT_KYC_TYPES),
       pinConfigured: user?.pinConfigured === true,
       pinPending: restaurant.kycStatus === PartnerKycStatus.APPROVED && user?.pinConfigured !== true,
       activationPinVerified: !!restaurant.activationPinVerifiedAt,
       needsActivationPin:
         restaurant.kycStatus === PartnerKycStatus.APPROVED && !restaurant.activationPinVerifiedAt,
       checklist,
-      requiredComplete: this.requiredComplete(checklist) && (phoneVerified || hasEmail),
+      requiredComplete: phoneVerified || hasEmail,
       orphan: visibility.reason === 'orphan',
       hiddenReason: visibility.reason,
       userRole: visibility.userRole ?? null,
@@ -125,13 +158,20 @@ export class PartnerKycService {
       email: user?.email ?? null,
       phoneVerified,
       hasEmail,
-      canOperate: profile.kycStatus === PartnerKycStatus.APPROVED,
+      canOperate: this.rentalCanOperate(profile.kycStatus, profile.partnerType, checklist),
+      documentsRequiredForJobs: this.requireDocumentsForJobs(),
+      documentsJobsGateOk: checklistSatisfiesJobsGate(
+        checklist,
+        profile.partnerType === 'COMPANY'
+          ? JOBS_GATE_RENTAL_COMPANY_KYC_TYPES
+          : JOBS_GATE_RENTAL_INDIVIDUAL_KYC_TYPES,
+      ),
       pinConfigured: user?.pinConfigured === true,
       pinPending: profile.kycStatus === PartnerKycStatus.APPROVED && user?.pinConfigured !== true,
       activationPinVerified: !!profile.activationPinVerifiedAt,
       needsActivationPin: profile.kycStatus === PartnerKycStatus.APPROVED && !profile.activationPinVerifiedAt,
       checklist,
-      requiredComplete: this.requiredComplete(checklist) && (phoneVerified || hasEmail),
+      requiredComplete: phoneVerified || hasEmail,
       orphan: visibility.reason === 'orphan',
       hiddenReason: visibility.reason,
       userRole: visibility.userRole ?? null,
@@ -262,11 +302,11 @@ export class PartnerKycService {
       }
       if (approved) {
         const dossier = await this.getRestaurantDossier(userId);
-        if (!dossier.requiredComplete) {
+        if (!(dossier.phoneVerified || dossier.hasEmail)) {
           throw new MovaHttpException(
             MovaErrorCode.VALIDATION_ERROR,
             undefined,
-            'Dossier incomplet : justificatifs manquants, ou aucun +243 / e-mail pour envoyer le PIN.',
+            'Aucun +243 / e-mail pour envoyer le PIN d\'activation.',
           );
         }
         this.assertAllJustificatifsApproved(dossier.checklist);
@@ -283,7 +323,9 @@ export class PartnerKycService {
         return {
           ...dossier,
           kycStatus: PartnerKycStatus.APPROVED,
-          canOperate: true,
+          canOperate: this.restaurantCanOperate(PartnerKycStatus.APPROVED, dossier.checklist),
+          documentsRequiredForJobs: this.requireDocumentsForJobs(),
+          documentsJobsGateOk: checklistSatisfiesJobsGate(dossier.checklist, JOBS_GATE_RESTAURANT_KYC_TYPES),
           activationPinVerified: false,
           needsActivationPin: true,
           ...pin,
@@ -306,11 +348,11 @@ export class PartnerKycService {
     const profile = await this.ensureRentalProfile(userId);
     if (approved) {
       const dossier = await this.getRentalDossier(userId);
-      if (!dossier.requiredComplete) {
+      if (!(dossier.phoneVerified || dossier.hasEmail)) {
         throw new MovaHttpException(
           MovaErrorCode.VALIDATION_ERROR,
           undefined,
-          'Dossier incomplet : justificatifs manquants, ou aucun +243 / e-mail pour envoyer le PIN.',
+          'Aucun +243 / e-mail pour envoyer le PIN d\'activation.',
         );
       }
       this.assertAllJustificatifsApproved(dossier.checklist);
@@ -322,7 +364,14 @@ export class PartnerKycService {
       return {
         ...dossier,
         kycStatus: PartnerKycStatus.APPROVED,
-        canOperate: true,
+        canOperate: this.rentalCanOperate(PartnerKycStatus.APPROVED, dossier.partnerType, dossier.checklist),
+        documentsRequiredForJobs: this.requireDocumentsForJobs(),
+        documentsJobsGateOk: checklistSatisfiesJobsGate(
+          dossier.checklist,
+          dossier.partnerType === 'COMPANY'
+            ? JOBS_GATE_RENTAL_COMPANY_KYC_TYPES
+            : JOBS_GATE_RENTAL_INDIVIDUAL_KYC_TYPES,
+        ),
         activationPinVerified: false,
         needsActivationPin: true,
         ...pin,

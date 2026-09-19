@@ -25,7 +25,10 @@ describe('PartnerKycService', () => {
     },
   };
   const uploads = { uploadKycDocument: jest.fn() };
-  const service = new PartnerKycService(prisma as never, uploads as never);
+  const platformConfig = {
+    get: () => ({ driverOps: { requireDocumentsForJobs: false } }),
+  };
+  const service = new PartnerKycService(prisma as never, uploads as never, platformConfig as never);
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -175,6 +178,41 @@ describe('PartnerKycService', () => {
       message: expect.stringMatching(/justificatifs doivent être approuvés/),
     });
     expect(prisma.restaurant.update).not.toHaveBeenCalled();
+  });
+
+  it('approuve un dossier restaurant sans aucun justificatif (docs optionnels)', async () => {
+    prisma.restaurant.findFirst.mockResolvedValue({
+      id: 'r1',
+      ownerUserId: 'u1',
+      name: 'Chez Flore',
+      kycStatus: 'PENDING',
+      kycNotes: null,
+      nif: null,
+      rccm: null,
+      payoutProvider: null,
+      payoutPhone: null,
+      address: 'Gombe',
+      activationPinVerifiedAt: null,
+    });
+    prisma.partnerKycDocument.findMany.mockResolvedValue([]);
+    prisma.restaurant.update.mockResolvedValue({});
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ phone: '+243810000001', name: 'Chez Flore', pinConfigured: false }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ loginPin: '111657', smsSent: true, hasPhone: true, emailSent: false }),
+      });
+
+    const result = await service.reviewSubject('u1', 'RESTAURANT', true);
+    expect(result.loginPin).toBe('111657');
+    expect(prisma.restaurant.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ kycStatus: 'APPROVED', isActive: true }),
+      }),
+    );
   });
 
   it('attribue chaque justificatif au partenaire (nom, téléphone, type français)', async () => {

@@ -70,33 +70,73 @@ export const PARTNER_KYC_DOCUMENT_LABELS: Record<PartnerKycDocumentType, string>
   ADDRESS_PROOF: 'Preuve d\'adresse',
 };
 
-export const REQUIRED_RESTAURANT_KYC_TYPES: PartnerKycDocumentType[] = [
+/**
+ * Documents obligatoires à l'activation partenaire — vide par défaut
+ * (activation possible sans justificatif). Quand l'admin active
+ * « documents requis pour les courses », voir JOBS_GATE_* ci-dessous.
+ */
+export const REQUIRED_RESTAURANT_KYC_TYPES: PartnerKycDocumentType[] = [];
+
+export const OPTIONAL_RESTAURANT_KYC_TYPES: PartnerKycDocumentType[] = [
+  PARTNER_KYC_DOCUMENT_TYPES.MANAGER_ID,
+  PARTNER_KYC_DOCUMENT_TYPES.RCCM,
+  PARTNER_KYC_DOCUMENT_TYPES.PREMISES_PHOTO,
+  PARTNER_KYC_DOCUMENT_TYPES.NIF,
+  PARTNER_KYC_DOCUMENT_TYPES.PAYOUT_PROOF,
+];
+
+export const REQUIRED_RENTAL_COMPANY_KYC_TYPES: PartnerKycDocumentType[] = [];
+
+export const OPTIONAL_RENTAL_COMPANY_KYC_TYPES: PartnerKycDocumentType[] = [
+  PARTNER_KYC_DOCUMENT_TYPES.RCCM,
+  PARTNER_KYC_DOCUMENT_TYPES.COMPANY_STATUTES,
+  PARTNER_KYC_DOCUMENT_TYPES.MANAGER_ID,
+  PARTNER_KYC_DOCUMENT_TYPES.HEADQUARTERS_PROOF,
+  PARTNER_KYC_DOCUMENT_TYPES.NIF,
+];
+
+export const REQUIRED_RENTAL_INDIVIDUAL_KYC_TYPES: KycDocumentType[] = [];
+
+export const OPTIONAL_RENTAL_INDIVIDUAL_KYC_TYPES: PartnerKycDocumentType[] = [
+  PARTNER_KYC_DOCUMENT_TYPES.ADDRESS_PROOF,
+];
+
+/** Types exigés si PlatformConfig.driverOps.requireDocumentsForJobs = true. */
+export const JOBS_GATE_RESTAURANT_KYC_TYPES: PartnerKycDocumentType[] = [
   PARTNER_KYC_DOCUMENT_TYPES.MANAGER_ID,
   PARTNER_KYC_DOCUMENT_TYPES.RCCM,
   PARTNER_KYC_DOCUMENT_TYPES.PREMISES_PHOTO,
 ];
 
-export const OPTIONAL_RESTAURANT_KYC_TYPES: PartnerKycDocumentType[] = [
-  PARTNER_KYC_DOCUMENT_TYPES.NIF,
-  PARTNER_KYC_DOCUMENT_TYPES.PAYOUT_PROOF,
-];
-
-export const REQUIRED_RENTAL_COMPANY_KYC_TYPES: PartnerKycDocumentType[] = [
+export const JOBS_GATE_RENTAL_COMPANY_KYC_TYPES: PartnerKycDocumentType[] = [
   PARTNER_KYC_DOCUMENT_TYPES.RCCM,
   PARTNER_KYC_DOCUMENT_TYPES.COMPANY_STATUTES,
   PARTNER_KYC_DOCUMENT_TYPES.MANAGER_ID,
   PARTNER_KYC_DOCUMENT_TYPES.HEADQUARTERS_PROOF,
 ];
 
-export const OPTIONAL_RENTAL_COMPANY_KYC_TYPES: PartnerKycDocumentType[] = [
-  PARTNER_KYC_DOCUMENT_TYPES.NIF,
+export const JOBS_GATE_RENTAL_INDIVIDUAL_KYC_TYPES: Array<KycDocumentType | PartnerKycDocumentType> = [
+  KYC_DOCUMENT_TYPES.ID_PHOTO,
 ];
 
-export const REQUIRED_RENTAL_INDIVIDUAL_KYC_TYPES: KycDocumentType[] = [KYC_DOCUMENT_TYPES.ID_PHOTO];
-
-export const OPTIONAL_RENTAL_INDIVIDUAL_KYC_TYPES: PartnerKycDocumentType[] = [
-  PARTNER_KYC_DOCUMENT_TYPES.ADDRESS_PROOF,
-];
+/** True si tous les types du gate jobs sont déposés et APPROVED. */
+export function checklistSatisfiesJobsGate(
+  checklist: Array<{ type?: string; uploaded?: boolean; status?: string | null }>,
+  gateTypes: readonly string[],
+): boolean {
+  if (!gateTypes.length) return true;
+  const byType = new Map<string, { uploaded?: boolean; status?: string | null }>();
+  for (const item of checklist) {
+    const type = String(item.type ?? '').trim().toUpperCase();
+    if (type && !byType.has(type)) byType.set(type, item);
+  }
+  return gateTypes.every((type) => {
+    const row = byType.get(String(type).toUpperCase());
+    if (!row) return false;
+    const uploaded = Boolean(row.uploaded ?? row.status);
+    return uploaded && String(row.status ?? '').trim().toUpperCase() === 'APPROVED';
+  });
+}
 
 export type PartnerKycSubject = 'RESTAURANT' | 'RENTAL_PARTNER';
 export type RentalPartnerKind = 'COMPANY' | 'INDIVIDUAL';
@@ -155,8 +195,13 @@ export function rentalKycTypes(kind: RentalPartnerKind): Array<{
       ...REQUIRED_RENTAL_INDIVIDUAL_KYC_TYPES.map((type) => ({
         type,
         required: true,
-        label: KYC_DOCUMENT_LABELS[type],
+        label: KYC_DOCUMENT_LABELS[type as KycDocumentType],
       })),
+      {
+        type: KYC_DOCUMENT_TYPES.ID_PHOTO,
+        required: false,
+        label: KYC_DOCUMENT_LABELS[KYC_DOCUMENT_TYPES.ID_PHOTO],
+      },
       ...OPTIONAL_RENTAL_INDIVIDUAL_KYC_TYPES.map((type) => ({
         type,
         required: false,

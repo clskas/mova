@@ -90,8 +90,8 @@ jobs:
           build-args: |
             NEXT_PUBLIC_API_URL=https://mova-gateway.onrender.com
             NEXT_PUBLIC_BUILD_ID=${{ github.event.workflow_run.head_sha || github.sha }}
-          cache-from: ${{ matrix.no_cache && '' || 'type=gha' }}
-          cache-to: ${{ matrix.no_cache && '' || 'type=gha,mode=max' }}
+          cache-from: ${{ matrix.no_cache && '' || format('type=gha,scope={0}', matrix.image) }}
+          cache-to: ${{ matrix.no_cache && '' || format('type=gha,mode=max,scope={0}', matrix.image) }}
           no-cache: ${{ matrix.no_cache || false }}
       # Advisory only (exit-code 0). continue-on-error so transient registry
       # stream errors (e.g. PROTOCOL_ERROR while extracting layers) do not fail deploy.

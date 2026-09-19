@@ -4,7 +4,9 @@ import {
   allDriverJustificatifsApproved,
   restaurantKycTypes,
   rentalKycTypes,
-  REQUIRED_RESTAURANT_KYC_TYPES,
+  checklistSatisfiesJobsGate,
+  JOBS_GATE_RESTAURANT_KYC_TYPES,
+  JOBS_GATE_RENTAL_COMPANY_KYC_TYPES,
   PARTNER_KYC_DOCUMENT_TYPES,
   kycDocumentLabel,
   kycPartnerKindLabel,
@@ -14,20 +16,44 @@ import {
 } from './kyc-documents';
 
 describe('partner KYC checklists', () => {
-  it('exige identité, RCCM et photos du local pour un restaurant', () => {
+  it('laisse tous les justificatifs restaurant optionnels à l\'activation', () => {
     const required = restaurantKycTypes().filter((t) => t.required).map((t) => t.type);
-    expect(required).toEqual(REQUIRED_RESTAURANT_KYC_TYPES);
-    expect(required).toContain(PARTNER_KYC_DOCUMENT_TYPES.MANAGER_ID);
-    expect(required).toContain(PARTNER_KYC_DOCUMENT_TYPES.RCCM);
-    expect(required).toContain(PARTNER_KYC_DOCUMENT_TYPES.PREMISES_PHOTO);
+    const optional = restaurantKycTypes().filter((t) => !t.required).map((t) => t.type);
+    expect(required).toEqual([]);
+    expect(optional).toContain(PARTNER_KYC_DOCUMENT_TYPES.MANAGER_ID);
+    expect(optional).toContain(PARTNER_KYC_DOCUMENT_TYPES.RCCM);
+    expect(optional).toContain(PARTNER_KYC_DOCUMENT_TYPES.PREMISES_PHOTO);
   });
 
-  it('distingue loueur entreprise et individuel', () => {
-    const company = rentalKycTypes('COMPANY').filter((t) => t.required).map((t) => t.type);
-    const individual = rentalKycTypes('INDIVIDUAL').filter((t) => t.required).map((t) => t.type);
-    expect(company).toContain(PARTNER_KYC_DOCUMENT_TYPES.RCCM);
-    expect(company).toContain(PARTNER_KYC_DOCUMENT_TYPES.COMPANY_STATUTES);
-    expect(individual).toEqual(['ID_PHOTO']);
+  it('distingue loueur entreprise et individuel (tous optionnels)', () => {
+    const companyRequired = rentalKycTypes('COMPANY').filter((t) => t.required).map((t) => t.type);
+    const individualRequired = rentalKycTypes('INDIVIDUAL').filter((t) => t.required).map((t) => t.type);
+    const companyOptional = rentalKycTypes('COMPANY').filter((t) => !t.required).map((t) => t.type);
+    expect(companyRequired).toEqual([]);
+    expect(individualRequired).toEqual([]);
+    expect(companyOptional).toContain(PARTNER_KYC_DOCUMENT_TYPES.RCCM);
+    expect(companyOptional).toContain(PARTNER_KYC_DOCUMENT_TYPES.COMPANY_STATUTES);
+    expect(rentalKycTypes('INDIVIDUAL').map((t) => t.type)).toContain('ID_PHOTO');
+  });
+
+  it('exige les types jobs-gate quand l\'admin active la règle documents', () => {
+    expect(
+      checklistSatisfiesJobsGate(
+        [
+          { type: 'MANAGER_ID', uploaded: true, status: 'APPROVED' },
+          { type: 'RCCM', uploaded: true, status: 'APPROVED' },
+          { type: 'PREMISES_PHOTO', uploaded: true, status: 'APPROVED' },
+        ],
+        JOBS_GATE_RESTAURANT_KYC_TYPES,
+      ),
+    ).toBe(true);
+    expect(
+      checklistSatisfiesJobsGate(
+        [{ type: 'MANAGER_ID', uploaded: true, status: 'APPROVED' }],
+        JOBS_GATE_RESTAURANT_KYC_TYPES,
+      ),
+    ).toBe(false);
+    expect(JOBS_GATE_RENTAL_COMPANY_KYC_TYPES).toContain(PARTNER_KYC_DOCUMENT_TYPES.RCCM);
   });
 });
 

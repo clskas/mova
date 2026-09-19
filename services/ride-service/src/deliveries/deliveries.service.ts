@@ -1,6 +1,6 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { DeliveryStatus, DeliveryType, PartnerKycStatus, Prisma, SurchargeType, TrackingReferenceType, VehicleType, WeightCategory, CommissionServiceType } from '@prisma/client';
-import { driverEligibleForParcelWeight, INTERNAL_API_KEY, MOVA_EVENTS, MovaErrorCode, MovaHttpException, canCancelDelivery, estimateTripDurationMin, formatCdf, normalizeVehicleType, resolveCityFromCoords, serviceUrl, VehicleTypeValue } from '@mova/shared';
+import { DeliveryStatus, DeliveryType, PartnerKycStatus, PartnerKycSubject, Prisma, SurchargeType, TrackingReferenceType, VehicleType, WeightCategory, CommissionServiceType } from '@prisma/client';
+import { driverEligibleForParcelWeight, INTERNAL_API_KEY, MOVA_EVENTS, MovaErrorCode, MovaHttpException, canCancelDelivery, estimateTripDurationMin, formatCdf, normalizeVehicleType, resolveCityFromCoords, serviceUrl, VehicleTypeValue, checklistSatisfiesJobsGate, JOBS_GATE_RESTAURANT_KYC_TYPES } from '@mova/shared';
 import { RedisService } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { PricingService } from '../rides/pricing.service';
@@ -1047,20 +1047,43 @@ export class DeliveriesService {
       select: {
         id: true, name: true, cuisine: true, address: true, lat: true, lng: true,
         rating: true, imageUrl: true, menuItems: true, promotionLabel: true,
-        commerceType: true,
+        commerceType: true, ownerUserId: true,
       },
     });
+
+    let eligible = rows;
+    if (this.platformConfig.get().driverOps.requireDocumentsForJobs) {
+      const ownerIds = [...new Set(rows.map((r) => r.ownerUserId).filter(Boolean))];
+      const docs = ownerIds.length
+        ? await this.prisma.partnerKycDocument.findMany({
+            where: { userId: { in: ownerIds }, subject: PartnerKycSubject.RESTAURANT },
+            orderBy: { createdAt: 'desc' },
+            select: { userId: true, type: true, status: true },
+          })
+        : [];
+      const byOwner = new Map<string, Array<{ type: string; uploaded: boolean; status: string }>>();
+      for (const doc of docs) {
+        const list = byOwner.get(doc.userId) ?? [];
+        if (!list.some((x) => x.type === doc.type)) {
+          list.push({ type: doc.type, uploaded: true, status: doc.status });
+        }
+        byOwner.set(doc.userId, list);
+      }
+      eligible = rows.filter((r) =>
+        checklistSatisfiesJobsGate(byOwner.get(r.ownerUserId) ?? [], JOBS_GATE_RESTAURANT_KYC_TYPES),
+      );
+    }
 
     /** Rayon livraison repas autour du point de livraison (km). */
     const DELIVERY_RADIUS_KM = this.deliveryCfg().restaurantListRadiusKm;
 
     const cityKey = deliveryCity?.trim().toLowerCase();
-    let scoped = rows;
+    let scoped = eligible;
     if (cityKey) {
-      scoped = rows.filter((r) => resolveCityFromCoords(r.lat, r.lng).toLowerCase() === cityKey);
+      scoped = eligible.filter((r) => resolveCityFromCoords(r.lat, r.lng).toLowerCase() === cityKey);
     } else if (deliveryLat != null && deliveryLng != null) {
       const resolvedDeliveryCity = resolveCityFromCoords(deliveryLat, deliveryLng).toLowerCase();
-      scoped = rows.filter((r) => {
+      scoped = eligible.filter((r) => {
         const restaurantCity = resolveCityFromCoords(r.lat, r.lng).toLowerCase();
         if (restaurantCity === resolvedDeliveryCity) return true;
         return this.pricing.haversineKm(r.lat, r.lng, deliveryLat, deliveryLng) <= DELIVERY_RADIUS_KM;

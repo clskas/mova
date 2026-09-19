@@ -1,10 +1,11 @@
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '../prisma/prisma.module';
 import { UploadsModule } from '../uploads/uploads.module';
+import { PlatformConfigModule } from '../platform/platform-config.module';
 import { PartnerKycService } from './partner-kyc.service';
 
 @Module({
-  imports: [PrismaModule, UploadsModule],
+  imports: [PrismaModule, UploadsModule, PlatformConfigModule],
   providers: [PartnerKycService],
   exports: [PartnerKycService],
 })

@@ -68,10 +68,17 @@ describe('partner KYC checklists', () => {
     ).toEqual(['SELFIE', 'ID_PHOTO']);
     expect(documentsGraceElapsed(new Date(), 7)).toBe(false);
     expect(documentsGraceElapsed(new Date(Date.now() - 10 * 86400000), 7)).toBe(true);
+    // Ancre récente : même compte ancien → pas encore bloqué
+    expect(
+      documentsGraceElapsed(new Date(Date.now() - 10 * 86400000), 3, new Date(), new Date()),
+    ).toBe(false);
+    // Sans date de départ : ne pas bloquer
+    expect(documentsGraceElapsed(null, 3)).toBe(false);
     const reminder = buildDocumentsReminder({
       requireDocumentsForJobs: true,
       gracePeriodDays: 3,
-      createdAt: new Date(),
+      createdAt: new Date(Date.now() - 30 * 86400000),
+      policyAnchorAt: new Date(),
       missingTypes: ['SELFIE'],
     });
     expect(reminder.active).toBe(true);

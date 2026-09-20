@@ -12,6 +12,7 @@ type MatchingConfig = typeof MARKET_RDC.matching;
 const DEFAULT_DRIVER_OPS: Required<DocumentsOpsConfig> = {
   requireDocumentsForJobs: false,
   documentsGracePeriodDays: 7,
+  documentsGraceAnchorAt: null,
   requiredDriverDocuments: [],
   requiredRestaurantDocuments: [],
   requiredRentalCompanyDocuments: [],
@@ -79,6 +80,10 @@ export class MatchingConfigService implements OnModuleInit {
           0,
           Math.floor(Number(ops.documentsGracePeriodDays ?? DEFAULT_DRIVER_OPS.documentsGracePeriodDays) || 0),
         ),
+        documentsGraceAnchorAt:
+          typeof ops.documentsGraceAnchorAt === 'string' && ops.documentsGraceAnchorAt.trim()
+            ? ops.documentsGraceAnchorAt.trim()
+            : null,
         requiredDriverDocuments: normalizeDocumentTypeList(ops.requiredDriverDocuments),
         requiredRestaurantDocuments: normalizeDocumentTypeList(ops.requiredRestaurantDocuments),
         requiredRentalCompanyDocuments: normalizeDocumentTypeList(ops.requiredRentalCompanyDocuments),

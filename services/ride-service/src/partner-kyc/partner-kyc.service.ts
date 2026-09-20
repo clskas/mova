@@ -85,7 +85,16 @@ export class PartnerKycService {
     if (!this.requireDocumentsForJobs()) return true;
     const gate = this.restaurantGateTypes();
     if (!gate.length) return true;
-    if (!documentsGraceElapsed(createdAt, this.driverOps().documentsGracePeriodDays)) return true;
+    if (
+      !documentsGraceElapsed(
+        createdAt,
+        this.driverOps().documentsGracePeriodDays,
+        new Date(),
+        this.driverOps().documentsGraceAnchorAt,
+      )
+    ) {
+      return true;
+    }
     return checklistSatisfiesJobsGate(checklist, gate);
   }
 
@@ -99,7 +108,16 @@ export class PartnerKycService {
     if (!this.requireDocumentsForJobs()) return true;
     const gate = this.rentalGateTypes(partnerType);
     if (!gate.length) return true;
-    if (!documentsGraceElapsed(createdAt, this.driverOps().documentsGracePeriodDays)) return true;
+    if (
+      !documentsGraceElapsed(
+        createdAt,
+        this.driverOps().documentsGracePeriodDays,
+        new Date(),
+        this.driverOps().documentsGraceAnchorAt,
+      )
+    ) {
+      return true;
+    }
     return checklistSatisfiesJobsGate(checklist, gate);
   }
 
@@ -115,6 +133,7 @@ export class PartnerKycService {
       requireDocumentsForJobs: this.requireDocumentsForJobs(),
       gracePeriodDays: ops.documentsGracePeriodDays,
       createdAt,
+      policyAnchorAt: ops.documentsGraceAnchorAt,
       missingTypes: missing,
     });
   }

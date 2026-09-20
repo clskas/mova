@@ -545,6 +545,7 @@ export type PlatformConfigData = {
   driverOps?: {
     requireDocumentsForJobs: boolean;
     documentsGracePeriodDays?: number;
+    documentsGraceAnchorAt?: string | null;
     requiredDriverDocuments?: string[];
     requiredRestaurantDocuments?: string[];
     requiredRentalCompanyDocuments?: string[];

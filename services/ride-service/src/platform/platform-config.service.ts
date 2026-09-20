@@ -108,6 +108,7 @@ export class PlatformConfigService implements OnModuleInit {
             {
               requireDocumentsForJobs: this.overrides.driverOps?.requireDocumentsForJobs === true,
               documentsGracePeriodDays: this.overrides.driverOps?.documentsGracePeriodDays ?? 7,
+              documentsGraceAnchorAt: this.overrides.driverOps?.documentsGraceAnchorAt ?? null,
               requiredDriverDocuments: this.overrides.driverOps?.requiredDriverDocuments ?? [],
               requiredRestaurantDocuments: this.overrides.driverOps?.requiredRestaurantDocuments ?? [],
               requiredRentalCompanyDocuments: this.overrides.driverOps?.requiredRentalCompanyDocuments ?? [],

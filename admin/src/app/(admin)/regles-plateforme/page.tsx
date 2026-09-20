@@ -350,9 +350,10 @@ export default function ReglesPlateformePage() {
             <Card className="p-4 space-y-4 max-w-3xl">
               <p className="text-sm text-gray-600">
                 Cochez les justificatifs obligatoires par catégorie. Tant qu&apos;ils ne sont pas déposés et
-                validés, les concernés reçoivent un rappel dans leur application. Après le délai ci-dessous,
-                les chauffeurs ne reçoivent plus d&apos;offres et les partenaires ne restent plus
-                visibles / commandables.
+                validés, les concernés reçoivent un rappel dans leur application. Après le délai ci-dessous
+                (à partir de l&apos;enregistrement de cette règle, pas de la création du compte), les
+                chauffeurs ne reçoivent plus d&apos;offres et les partenaires ne restent plus visibles /
+                commandables. Réenregistrer la règle après un changement d&apos;exigences relance le délai.
                 {cityAdminDocsOnly
                   ? " Cette règle s'applique au niveau plateforme (tous les comptes)."
                   : null}

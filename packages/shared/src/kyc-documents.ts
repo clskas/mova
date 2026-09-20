@@ -175,8 +175,16 @@ export function adminDocumentCatalog(): AdminDocumentCatalogGroup[] {
 
 export type DocumentsOpsConfig = {
   requireDocumentsForJobs?: boolean;
-  /** Jours après création du compte avant blocage des notifs (0 = immédiat). */
+  /**
+   * Jours avant blocage des notifs après le début de la grâce.
+   * 0 = immédiat. La grâce part de max(création compte, documentsGraceAnchorAt).
+   */
   documentsGracePeriodDays?: number;
+  /**
+   * Ancre plateforme : date d’activation / changement de l’exigence documentaire.
+   * Évite de bloquer immédiatement les comptes créés avant l’activation de la règle.
+   */
+  documentsGraceAnchorAt?: string | null;
   requiredDriverDocuments?: string[];
   requiredRestaurantDocuments?: string[];
   requiredRentalCompanyDocuments?: string[];
@@ -200,28 +208,47 @@ export function normalizeDocumentTypeList(raw?: string[] | null): string[] {
   return out;
 }
 
+function parseGraceDate(value: Date | string | null | undefined): Date | null {
+  if (value == null || value === '') return null;
+  const d = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/** Début de la période de grâce : le plus récent entre création du compte et ancre politique. */
+export function resolveDocumentsGraceStart(
+  accountCreatedAt: Date | string | null | undefined,
+  policyAnchorAt?: Date | string | null,
+): Date | null {
+  const account = parseGraceDate(accountCreatedAt);
+  const anchor = parseGraceDate(policyAnchorAt);
+  if (account && anchor) return account.getTime() >= anchor.getTime() ? account : anchor;
+  return account ?? anchor;
+}
+
 /** True si le délai de grâce est écoulé (blocage autorisé). */
 export function documentsGraceElapsed(
   createdAt: Date | string | null | undefined,
   graceDays: number,
   now = new Date(),
+  policyAnchorAt?: Date | string | null,
 ): boolean {
   const days = Number.isFinite(graceDays) ? Math.max(0, Math.floor(graceDays)) : 0;
   if (days <= 0) return true;
-  if (createdAt == null || createdAt === '') return true;
-  const start = createdAt instanceof Date ? createdAt : new Date(createdAt);
-  if (Number.isNaN(start.getTime())) return true;
+  const start = resolveDocumentsGraceStart(createdAt, policyAnchorAt);
+  // Sans date de départ fiable : ne pas bloquer (le délai affiché en admin doit s'appliquer).
+  if (!start) return false;
   return now.getTime() >= start.getTime() + days * MS_PER_DAY;
 }
 
 export function documentsGraceEndsAt(
   createdAt: Date | string | null | undefined,
   graceDays: number,
+  policyAnchorAt?: Date | string | null,
 ): string | null {
   const days = Number.isFinite(graceDays) ? Math.max(0, Math.floor(graceDays)) : 0;
-  if (days <= 0 || createdAt == null || createdAt === '') return null;
-  const start = createdAt instanceof Date ? createdAt : new Date(createdAt);
-  if (Number.isNaN(start.getTime())) return null;
+  if (days <= 0) return null;
+  const start = resolveDocumentsGraceStart(createdAt, policyAnchorAt);
+  if (!start) return null;
   return new Date(start.getTime() + days * MS_PER_DAY).toISOString();
 }
 
@@ -261,6 +288,8 @@ export function buildDocumentsReminder(params: {
   requireDocumentsForJobs: boolean;
   gracePeriodDays: number;
   createdAt?: Date | string | null;
+  /** Ancre plateforme (activation / changement d’exigence). */
+  policyAnchorAt?: Date | string | null;
   missingTypes: string[];
   now?: Date;
 }): DocumentsReminder {
@@ -269,7 +298,7 @@ export function buildDocumentsReminder(params: {
   const missingTypes = normalizeDocumentTypeList(params.missingTypes);
   const missingLabels = missingTypes.map((t) => kycDocumentLabel(t));
   const active = params.requireDocumentsForJobs && missingTypes.length > 0;
-  const graceEndsAt = documentsGraceEndsAt(params.createdAt, gracePeriodDays);
+  const graceEndsAt = documentsGraceEndsAt(params.createdAt, gracePeriodDays, params.policyAnchorAt);
   let daysRemaining: number | null = null;
   let hoursRemaining: number | null = null;
   if (graceEndsAt) {
@@ -283,7 +312,7 @@ export function buildDocumentsReminder(params: {
     }
   }
   const blocked =
-    active && documentsGraceElapsed(params.createdAt, gracePeriodDays, now);
+    active && documentsGraceElapsed(params.createdAt, gracePeriodDays, now, params.policyAnchorAt);
   let message = '';
   if (active) {
     const list = missingLabels.join(', ');

@@ -68,7 +68,12 @@ export class DriversService {
   } {
     const ops = this.matchingConfig.getDriverOps();
     const requireForJobs = ops.requireDocumentsForJobs === true;
-    const graceElapsed = documentsGraceElapsed(profile.createdAt, ops.documentsGracePeriodDays);
+    const graceElapsed = documentsGraceElapsed(
+      profile.createdAt,
+      ops.documentsGracePeriodDays,
+      new Date(),
+      ops.documentsGraceAnchorAt,
+    );
     const enforceExpiry = requireForJobs && graceElapsed;
     const activeVehicle = profile.vehicles?.find((v) => v.isActive !== false) ?? profile.vehicles?.[0];
     const base = evaluateDriverDocuments(
@@ -92,6 +97,7 @@ export class DriversService {
       requireDocumentsForJobs: requireForJobs,
       gracePeriodDays: ops.documentsGracePeriodDays,
       createdAt: profile.createdAt,
+      policyAnchorAt: ops.documentsGraceAnchorAt,
       missingTypes: missingKyc,
     });
 

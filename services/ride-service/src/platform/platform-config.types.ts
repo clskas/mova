@@ -3,8 +3,10 @@ import { MARKET_RDC, normalizeDocumentTypeList } from '@mova/shared';
 export type DriverOpsConfig = {
   /** When true, missing required docs block ride/delivery offers after grace period. */
   requireDocumentsForJobs: boolean;
-  /** Days after account creation before blocking (0 = immediate). */
+  /** Days before blocking after grace start (0 = immediate). */
   documentsGracePeriodDays: number;
+  /** ISO timestamp when document requirements were last activated/changed. */
+  documentsGraceAnchorAt: string | null;
   requiredDriverDocuments: string[];
   requiredRestaurantDocuments: string[];
   requiredRentalCompanyDocuments: string[];
@@ -85,6 +87,7 @@ export const PLATFORM_CONFIG_DEFAULTS: MergedPlatformConfig = {
   driverOps: {
     requireDocumentsForJobs: false,
     documentsGracePeriodDays: 7,
+    documentsGraceAnchorAt: null,
     requiredDriverDocuments: [],
     requiredRestaurantDocuments: [],
     requiredRentalCompanyDocuments: [],
@@ -92,12 +95,16 @@ export const PLATFORM_CONFIG_DEFAULTS: MergedPlatformConfig = {
   },
 };
 
+function sortedDocKey(list: string[]): string {
+  return [...list].map((s) => s.toUpperCase()).sort().join('|');
+}
+
 export function mergeDriverOps(
   base: DriverOpsConfig,
   patch?: Partial<DriverOpsConfig>,
 ): DriverOpsConfig {
   if (!patch) return base;
-  return {
+  const next: DriverOpsConfig = {
     requireDocumentsForJobs:
       patch.requireDocumentsForJobs !== undefined
         ? patch.requireDocumentsForJobs === true
@@ -106,6 +113,10 @@ export function mergeDriverOps(
       patch.documentsGracePeriodDays !== undefined
         ? Math.max(0, Math.floor(Number(patch.documentsGracePeriodDays) || 0))
         : base.documentsGracePeriodDays,
+    documentsGraceAnchorAt:
+      patch.documentsGraceAnchorAt !== undefined
+        ? patch.documentsGraceAnchorAt
+        : (base.documentsGraceAnchorAt ?? null),
     requiredDriverDocuments:
       patch.requiredDriverDocuments !== undefined
         ? normalizeDocumentTypeList(patch.requiredDriverDocuments)
@@ -123,4 +134,25 @@ export function mergeDriverOps(
         ? normalizeDocumentTypeList(patch.requiredRentalIndividualDocuments)
         : base.requiredRentalIndividualDocuments,
   };
+
+  const requirementsChanged =
+    next.requireDocumentsForJobs !== base.requireDocumentsForJobs ||
+    sortedDocKey(next.requiredDriverDocuments) !== sortedDocKey(base.requiredDriverDocuments) ||
+    sortedDocKey(next.requiredRestaurantDocuments) !==
+      sortedDocKey(base.requiredRestaurantDocuments) ||
+    sortedDocKey(next.requiredRentalCompanyDocuments) !==
+      sortedDocKey(base.requiredRentalCompanyDocuments) ||
+    sortedDocKey(next.requiredRentalIndividualDocuments) !==
+      sortedDocKey(base.requiredRentalIndividualDocuments);
+
+  if (!next.requireDocumentsForJobs) {
+    next.documentsGraceAnchorAt = null;
+  } else if (patch.documentsGraceAnchorAt === undefined) {
+    if (requirementsChanged || !next.documentsGraceAnchorAt) {
+      // Nouvelle exigence (ou ancre absente) : le délai admin repart maintenant.
+      next.documentsGraceAnchorAt = new Date().toISOString();
+    }
+  }
+
+  return next;
 }

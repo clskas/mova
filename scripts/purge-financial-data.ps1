@@ -12,8 +12,8 @@ if (-not (Test-Path $sql)) {
 }
 
 Write-Host "=== Purge données financières (comptes utilisateurs conservés) ===" -ForegroundColor Yellow
-Write-Host "Supprime: portefeuilles, transactions, paiements, dettes, courses/livraisons/reservations" -ForegroundColor DarkGray
-Write-Host "Conservé: utilisateurs, tarifs, commissions (%), plans d'abonnement" -ForegroundColor DarkGray
+Write-Host "Supprime: portefeuilles, transactions, paiements, hub_payments, dettes, courses/livraisons, SOS/incidents, notifs" -ForegroundColor DarkGray
+Write-Host "Conservé: utilisateurs, restaurants, profils chauffeurs, tarifs, commissions (%), plans d'abonnement" -ForegroundColor DarkGray
 
 $walletCount = docker compose -f $compose exec -T postgres psql -U mova -d mova_payments -t -A -c "SELECT count(*) FROM wallets;"
 Write-Host "Portefeuilles avant purge: $($walletCount.Trim())" -ForegroundColor Cyan

@@ -35,5 +35,20 @@ TRUNCATE TABLE
   user_subscriptions,
   service_payments,
   payments,
+  hub_payments,
   wallets
 RESTART IDENTITY CASCADE;
+
+\c mova_drivers
+TRUNCATE TABLE
+  incidents
+RESTART IDENTITY CASCADE;
+
+\c mova_notifications
+TRUNCATE TABLE
+  notifications,
+  push_devices
+RESTART IDENTITY CASCADE;
+
+\c mova_auth
+TRUNCATE TABLE otp_codes;

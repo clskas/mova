@@ -98,6 +98,11 @@ export type AdminUser = {
   managedCity?: string | null;
   /** When role=RESTAURANT: RESTAURANT | SUPERMARKET | PHARMACY | BOUTIQUE */
   commerceType?: "RESTAURANT" | "SUPERMARKET" | "PHARMACY" | "BOUTIQUE" | string;
+  /** Stored permission overrides (empty = role defaults). */
+  adminPermissions?: string[];
+  effectivePermissions?: string[];
+  accessLevelIds?: string[];
+  permissionsCustomized?: boolean;
 };
 
 export type AdminDriver = {
@@ -654,6 +659,10 @@ export type AdminSessionUser = {
   pinConfigured?: boolean;
   needsPinSetup?: boolean;
   managedCity?: string | null;
+  adminPermissions?: string[];
+  effectivePermissions?: string[];
+  accessLevelIds?: string[];
+  permissionsCustomized?: boolean;
 };
 
 export type WalletOverview = {

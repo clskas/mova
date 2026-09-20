@@ -35,6 +35,31 @@ export const ROLE_LABELS: Record<AdminRole, string> = {
   CITY_ADMIN: "Admin ville",
 };
 
+/** Niveaux d’accès éditables (alignés @mova/shared ADMIN_ACCESS_LEVELS). */
+export const ACCESS_LEVEL_OPTIONS: { id: string; label: string; sections: AdminSection[] }[] = [
+  { id: "dashboard", label: "Tableau de bord", sections: ["dashboard"] },
+  { id: "utilisateurs", label: "Utilisateurs", sections: ["utilisateurs"] },
+  { id: "chauffeurs", label: "Chauffeurs", sections: ["chauffeurs"] },
+  { id: "kyc", label: "KYC", sections: ["kyc"] },
+  { id: "courses", label: "Courses", sections: ["courses"] },
+  { id: "livraisons", label: "Livraisons", sections: ["livraisons"] },
+  { id: "restaurants", label: "Restaurants / partenaires", sections: ["restaurants"] },
+  { id: "tarifs", label: "Tarifs & règles / zones", sections: ["tarifs", "parametres"] },
+  { id: "litiges", label: "Litiges / SOS", sections: ["litiges"] },
+  { id: "fraude", label: "Fraude", sections: ["fraude"] },
+  {
+    id: "planifiees",
+    label: "Planifiées / locations / covoiturage",
+    sections: ["planifiees", "locations", "demenagements", "covoiturage"],
+  },
+  { id: "abonnements", label: "Abonnements & promos", sections: ["abonnements"] },
+  { id: "portefeuille", label: "Portefeuille", sections: ["portefeuille"] },
+  { id: "publicites", label: "Publicités", sections: ["publicites"] },
+  { id: "contacts", label: "Contacts", sections: ["contacts"] },
+  { id: "cgu", label: "CGU", sections: ["cgu"] },
+  { id: "systeme", label: "Système (maintenance, MM, SOS ops)", sections: ["systeme"] },
+];
+
 const ALL_SECTIONS: AdminSection[] = [
   "dashboard",
   "utilisateurs",
@@ -137,19 +162,47 @@ export function isAdminRole(role?: string | null): boolean {
   return normalizeAdminRole(role) !== null;
 }
 
-export function canAccessSection(role: AdminRole, section: AdminSection): boolean {
+export function defaultAccessLevelIdsForRole(role: AdminRole): string[] {
+  const sections = new Set(ROLE_SECTIONS[role]);
+  return ACCESS_LEVEL_OPTIONS.filter((lvl) => lvl.sections.some((s) => sections.has(s))).map((lvl) => lvl.id);
+}
+
+export function sectionsFromAccessLevelIds(levelIds: string[]): AdminSection[] {
+  const wanted = new Set(levelIds);
+  const out = new Set<AdminSection>();
+  for (const lvl of ACCESS_LEVEL_OPTIONS) {
+    if (!wanted.has(lvl.id)) continue;
+    for (const s of lvl.sections) out.add(s);
+  }
+  return [...out];
+}
+
+export function canAccessSection(
+  role: AdminRole,
+  section: AdminSection,
+  accessLevelIds?: string[] | null,
+): boolean {
+  if (accessLevelIds && accessLevelIds.length > 0) {
+    return sectionsFromAccessLevelIds(accessLevelIds).includes(section);
+  }
   return ROLE_SECTIONS[role].includes(section);
 }
 
-export function canWriteSection(role: AdminRole, section: AdminSection): boolean {
+export function canWriteSection(
+  role: AdminRole,
+  section: AdminSection,
+  accessLevelIds?: string[] | null,
+): boolean {
+  if (!canAccessSection(role, section, accessLevelIds)) return false;
+  if (accessLevelIds && accessLevelIds.length > 0) {
+    if (role === "SUPER_ADMIN") return true;
+    return ROLE_WRITE[role].includes(section) || role === "ADMIN";
+  }
   return ROLE_WRITE[role].includes(section);
 }
 
-export function navForRole(role: AdminRole): NavItem[] {
-  return NAV_ITEMS.filter((item) => {
-    if (!canAccessSection(role, item.section)) return false;
-    return true;
-  });
+export function navForRole(role: AdminRole, accessLevelIds?: string[] | null): NavItem[] {
+  return NAV_ITEMS.filter((item) => canAccessSection(role, item.section, accessLevelIds));
 }
 
 export function sectionFromPath(pathname: string): AdminSection | null {
@@ -158,8 +211,8 @@ export function sectionFromPath(pathname: string): AdminSection | null {
   return item?.section ?? null;
 }
 
-export function defaultPathForRole(role: AdminRole): string {
-  const items = navForRole(role);
+export function defaultPathForRole(role: AdminRole, accessLevelIds?: string[] | null): string {
+  const items = navForRole(role, accessLevelIds);
   return items[0]?.href ?? "/";
 }
 

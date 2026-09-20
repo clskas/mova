@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { UserRole, UserStatus } from '@prisma/client';
-import { IsBoolean, IsEnum, IsOptional, IsString } from 'class-validator';
+import { IsArray, IsBoolean, IsEnum, IsOptional, IsString } from 'class-validator';
 import { UsersService } from '../users/users.service';
 import { AuthService } from '../auth/auth.service';
 import { InternalApiGuard } from '../common/internal-api.guard';
@@ -22,6 +22,8 @@ class UpdateUserAdminDto {
   @IsOptional() @IsString() lastName?: string;
   @IsOptional() @IsString() phone?: string;
   @IsOptional() @IsString() managedCity?: string;
+  @IsOptional() @IsArray() @IsString({ each: true }) adminPermissions?: string[];
+  @IsOptional() @IsArray() @IsString({ each: true }) accessLevelIds?: string[];
 }
 
 class PurgeUserDto {

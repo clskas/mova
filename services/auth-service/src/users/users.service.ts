@@ -16,6 +16,12 @@ import {
   isAdminHiddenPlayAccount,
   isPlayPrelaunchAccount,
   isSeedDemoPhone,
+  sanitizeAdminPermissions,
+  resolveAdminPermissions,
+  isAdminPanelRole,
+  accessLevelIdsFromPermissions,
+  permissionsFromAccessLevelIds,
+  permissionsMatchRoleDefaults,
 } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -38,12 +44,21 @@ export class UsersService {
     status: UserStatus;
     avatarUrl?: string | null;
     managedCity?: string | null;
+    adminPermissions?: string[] | null;
     createdAt: Date;
     updatedAt: Date;
   }) {
-    const { googleId, localPinHash: _pin, ...safe } = user;
+    const { googleId, localPinHash: _pin, adminPermissions: rawPerms, ...safe } = user;
+    const stored = sanitizeAdminPermissions(rawPerms);
+    const effectivePermissions = isAdminPanelRole(user.role)
+      ? resolveAdminPermissions(user.role, stored)
+      : [];
     return {
       ...safe,
+      adminPermissions: stored,
+      effectivePermissions,
+      accessLevelIds: accessLevelIdsFromPermissions(effectivePermissions),
+      permissionsCustomized: stored.length > 0,
       publicId: formatMovaPublicId(user.id, user.role),
       phoneMasked: maskPhoneRdc(user.phone),
       emailMasked: maskEmail(user.email),
@@ -459,6 +474,8 @@ export class UsersService {
       firstName?: string;
       lastName?: string;
       managedCity?: string;
+      adminPermissions?: string[];
+      accessLevelIds?: string[];
     },
   ) {
     const existing = await this.findById(id);
@@ -472,15 +489,33 @@ export class UsersService {
       data.managedCity,
       existing.managedCity,
     );
-    const { managedCity: _mc, ...rest } = data;
+    const { managedCity: _mc, adminPermissions: rawPerms, accessLevelIds, ...rest } = data;
+    let adminPermissions: string[] | undefined;
+    if (accessLevelIds !== undefined || rawPerms !== undefined) {
+      if (!isAdminPanelRole(nextRole)) {
+        adminPermissions = [];
+      } else if (accessLevelIds !== undefined) {
+        const fromLevels = permissionsFromAccessLevelIds(accessLevelIds);
+        adminPermissions = permissionsMatchRoleDefaults(nextRole, fromLevels) ? [] : fromLevels;
+      } else {
+        adminPermissions = sanitizeAdminPermissions(rawPerms);
+        if (permissionsMatchRoleDefaults(nextRole, adminPermissions)) {
+          adminPermissions = [];
+        }
+      }
+    }
     const updated = await this.prisma.user.update({
       where: { id },
-      data: { ...rest, managedCity },
+      data: {
+        ...rest,
+        managedCity,
+        ...(adminPermissions !== undefined ? { adminPermissions } : {}),
+      },
     });
     if (data.status === UserStatus.SUSPENDED) {
       await this.denySuspendedUser(updated.id);
     }
-    return updated;
+    return this.enrichUser(updated);
   }
 
   async deactivateUser(id: string) {

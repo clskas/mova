@@ -19,6 +19,11 @@ import {
 import { userRoleDisplayLabel } from "@/lib/commerce-type";
 import { useAdmin } from "@/components/AdminProvider";
 import {
+  ACCESS_LEVEL_OPTIONS,
+  defaultAccessLevelIdsForRole,
+  normalizeAdminRole,
+} from "@/lib/rbac";
+import {
   BtnDanger,
   BtnGhost,
   BtnPrimary,
@@ -36,6 +41,15 @@ import {
   TextInput,
 } from "@/components/ui";
 
+const STAFF_EDIT_ROLES = new Set([
+  "SUPER_ADMIN",
+  "ADMIN",
+  "SUPPORT",
+  "FINANCE",
+  "CONTENT",
+  "CITY_ADMIN",
+]);
+
 export default function UtilisateursPage() {
   const { canWrite, role, user } = useAdmin();
   const readOnly = !canWrite("utilisateurs");
@@ -52,6 +66,7 @@ export default function UtilisateursPage() {
   const [editStatus, setEditStatus] = useState("ACTIVE");
   const [editFirst, setEditFirst] = useState("");
   const [editLast, setEditLast] = useState("");
+  const [editAccessLevels, setEditAccessLevels] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [deactivateTarget, setDeactivateTarget] = useState<AdminUser | null>(null);
   const [purgeTarget, setPurgeTarget] = useState<AdminUser | null>(null);
@@ -113,14 +128,37 @@ export default function UtilisateursPage() {
 
   function openDetail(u: AdminUser) {
     setSelected(u);
-    setEditRole(u.role ?? "PASSENGER");
+    const nextRole = u.role ?? "PASSENGER";
+    setEditRole(nextRole);
     setEditPhone(u.phone ?? "");
     setEditStatus(u.status ?? "ACTIVE");
     setEditFirst(u.firstName ?? "");
     setEditLast(u.lastName ?? "");
     setEditManagedCity(u.managedCity ?? "");
+    const staffRole = normalizeAdminRole(nextRole);
+    if (staffRole) {
+      setEditAccessLevels(
+        u.permissionsCustomized && u.accessLevelIds?.length
+          ? u.accessLevelIds
+          : defaultAccessLevelIdsForRole(staffRole),
+      );
+    } else {
+      setEditAccessLevels([]);
+    }
     setLoginPin(null);
     setPinNotice(null);
+  }
+
+  function onEditRoleChange(next: string) {
+    setEditRole(next);
+    const staffRole = normalizeAdminRole(next);
+    setEditAccessLevels(staffRole ? defaultAccessLevelIdsForRole(staffRole) : []);
+  }
+
+  function toggleAccessLevel(id: string) {
+    setEditAccessLevels((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
   }
 
   async function saveNewUser() {
@@ -164,14 +202,19 @@ export default function UtilisateursPage() {
     }
     setSaving(true);
     try {
-      await updateUser(selected.id, {
+      const staffRole = normalizeAdminRole(editRole);
+      const payload: Partial<AdminUser> & { accessLevelIds?: string[] } = {
         role: editRole,
         phone: editPhone,
         status: editStatus,
         firstName: editFirst,
         lastName: editLast,
         managedCity: editRole === "CITY_ADMIN" ? editManagedCity.trim() : null,
-      });
+      };
+      if (canPurge && staffRole) {
+        payload.accessLevelIds = editAccessLevels;
+      }
+      await updateUser(selected.id, payload);
       setSelected(null);
       load();
     } catch (e) {
@@ -490,7 +533,7 @@ export default function UtilisateursPage() {
                     </p>
                   </div>
                 ) : (
-                  <SelectInput value={editRole} onChange={setEditRole} disabled={readOnly} options={[
+                  <SelectInput value={editRole} onChange={onEditRoleChange} disabled={readOnly} options={[
                     { value: "PASSENGER", label: "Passager" },
                     { value: "DRIVER", label: "Chauffeur" },
                     { value: "RESTAURANT", label: "Partenaire commerce (resto / boutique / …)" },
@@ -504,6 +547,39 @@ export default function UtilisateursPage() {
                   ]} />
                 )}
               </label>
+              {canPurge && STAFF_EDIT_ROLES.has(editRole) && (
+                <div className="sm:col-span-2 rounded-xl border border-violet-200 bg-violet-50/60 p-4 space-y-2">
+                  <p className="text-sm font-semibold text-violet-950">Niveaux d&apos;accès</p>
+                  <p className="text-xs text-violet-900">
+                    Par défaut : droits du rôle. Cochez / décochez pour personnaliser (le collaborateur devra se reconnecter).
+                  </p>
+                  <div className="grid sm:grid-cols-2 gap-2 pt-1">
+                    {ACCESS_LEVEL_OPTIONS.map((lvl) => (
+                      <label key={lvl.id} className="flex items-start gap-2 text-sm text-violet-950">
+                        <input
+                          type="checkbox"
+                          className="mt-0.5"
+                          checked={editAccessLevels.includes(lvl.id)}
+                          disabled={readOnly}
+                          onChange={() => toggleAccessLevel(lvl.id)}
+                        />
+                        <span>{lvl.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    className="text-xs text-[#6C63FF] hover:underline"
+                    disabled={readOnly}
+                    onClick={() => {
+                      const r = normalizeAdminRole(editRole);
+                      if (r) setEditAccessLevels(defaultAccessLevelIdsForRole(r));
+                    }}
+                  >
+                    Réinitialiser aux défauts du rôle
+                  </button>
+                </div>
+              )}
               {selected.role !== "RESTAURANT" && editRole === "RESTAURANT" && !readOnly && (
                 <p className="text-xs text-amber-800 sm:col-span-2">
                   Après passage en partenaire commerce, le type (resto / boutique / pharmacie / supermarché)

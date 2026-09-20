@@ -79,4 +79,13 @@ describe('admin-rbac', () => {
     expect(hasAdminPermission(UserRole.SUPPORT, AdminPermission.CGU_READ)).toBe(false);
     expect(hasAdminPermission(UserRole.CONTENT, AdminPermission.CGU_WRITE)).toBe(false);
   });
+
+  it('applique un override de permissions custom', () => {
+    expect(
+      hasAdminPermission(UserRole.SUPPORT, AdminPermission.WALLETS_READ, [
+        AdminPermission.WALLETS_READ,
+      ]),
+    ).toBe(true);
+    expect(hasAdminPermission(UserRole.SUPPORT, AdminPermission.WALLETS_READ)).toBe(false);
+  });
 });

@@ -18,7 +18,9 @@ export class RolesGuard implements CanActivate {
       context.getHandler(),
       context.getClass(),
     ]);
-    const { user } = context.switchToHttp().getRequest<{ user?: { role?: string } }>();
+    const { user } = context.switchToHttp().getRequest<{
+      user?: { role?: string; permissions?: string[] };
+    }>();
     const role = user?.role ?? '';
 
     // Deny-by-default: admin routes must declare @RequirePermissions(...).
@@ -29,7 +31,7 @@ export class RolesGuard implements CanActivate {
       throw new MovaHttpException(MovaErrorCode.AUTH_FORBIDDEN, HttpStatus.FORBIDDEN);
     }
 
-    const allowed = required.some((p) => hasAdminPermission(role, p));
+    const allowed = required.some((p) => hasAdminPermission(role, p, user?.permissions));
     if (!allowed) {
       throw new MovaHttpException(MovaErrorCode.AUTH_FORBIDDEN, HttpStatus.FORBIDDEN);
     }

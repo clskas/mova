@@ -28,6 +28,9 @@ import {
   isDemoUserInsertForbidden,
   isPlayPrelaunchAccount,
   isProductionRuntime,
+  sanitizeAdminPermissions,
+  resolveAdminPermissions,
+  isAdminPanelRole,
 } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '@mova/shared';
@@ -1315,6 +1318,13 @@ export class AuthService {
       user.role === UserRole.CITY_ADMIN && user.managedCity?.trim()
         ? user.managedCity.trim()
         : undefined;
+    const storedPerms = sanitizeAdminPermissions(
+      (user as User & { adminPermissions?: string[] }).adminPermissions,
+    );
+    const permissions =
+      isAdminPanelRole(user.role) && storedPerms.length > 0
+        ? resolveAdminPermissions(user.role, storedPerms)
+        : undefined;
     const token = this.jwt.sign(
       {
         sub: user.id,
@@ -1324,6 +1334,7 @@ export class AuthService {
         status: user.status,
         needsPinSetup,
         ...(managedCity ? { managedCity } : {}),
+        ...(permissions?.length ? { permissions } : {}),
       },
       { jwtid: crypto.randomUUID() },
     );
@@ -1343,13 +1354,22 @@ export class AuthService {
         googleLinked: Boolean(user.googleId),
         hasPhone: Boolean(user.phone),
         canUnlinkGoogle: Boolean(user.googleId && user.phone),
-        canUnlinkPhone: Boolean(user.phone && user.googleId && user.phone !== OWNER_SUPER_ADMIN_PHONE),
+        canUnlinkPhone: Boolean(user.googleId && user.phone && user.phone !== OWNER_SUPER_ADMIN_PHONE),
         publicId: formatMovaPublicId(user.id, user.role),
         role: user.role,
         status: user.status,
         firstName: user.firstName,
         lastName: user.lastName,
         ...(managedCity ? { managedCity } : {}),
+        ...(permissions?.length
+          ? { adminPermissions: storedPerms, effectivePermissions: permissions, permissionsCustomized: true }
+          : {
+              adminPermissions: [] as string[],
+              effectivePermissions: isAdminPanelRole(user.role)
+                ? resolveAdminPermissions(user.role, null)
+                : [],
+              permissionsCustomized: false,
+            }),
       },
     };
   }

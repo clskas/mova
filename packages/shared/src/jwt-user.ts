@@ -12,6 +12,8 @@ export type MovaJwtPayload = {
   needsPinSetup?: boolean;
   /** CITY_ADMIN only: service-area city name (e.g. "Kinshasa"). */
   managedCity?: string;
+  /** Optional AdminPermission overrides (empty/omit = role defaults). */
+  permissions?: string[];
 };
 
 /** Refuse l'accès aux comptes suspendus (JWT ou login). */

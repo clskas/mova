@@ -351,6 +351,16 @@ export class AdminService {
         'Seul un SUPER_ADMIN peut modifier un compte staff.',
       );
     }
+    if (
+      (body.adminPermissions !== undefined || body.accessLevelIds !== undefined) &&
+      actorRole !== UserRole.SUPER_ADMIN
+    ) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.FORBIDDEN,
+        'Seul un SUPER_ADMIN peut personnaliser les niveaux d\'accès.',
+      );
+    }
     return this.proxy('auth', `/internal/users/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
   }
   async deactivateUser(id: string, actorRole: string) {

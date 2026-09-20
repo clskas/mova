@@ -155,7 +155,157 @@ export const ADMIN_ROLE_PERMISSIONS: Record<UserRole, AdminPermission[]> = {
   ],
 };
 
-export function hasAdminPermission(role: string, permission: AdminPermission): boolean {
-  if (!isAdminPanelRole(role)) return false;
-  return ADMIN_ROLE_PERMISSIONS[role as UserRole].includes(permission);
+/** Niveaux d’accès UI (cases à cocher super-admin) → permissions API. */
+export type AdminAccessLevel = {
+  id: string;
+  label: string;
+  permissions: AdminPermission[];
+};
+
+export const ADMIN_ACCESS_LEVELS: AdminAccessLevel[] = [
+  { id: 'dashboard', label: 'Tableau de bord', permissions: [AdminPermission.METRICS_READ] },
+  {
+    id: 'utilisateurs',
+    label: 'Utilisateurs',
+    permissions: [AdminPermission.USERS_READ, AdminPermission.USERS_WRITE, AdminPermission.USERS_DELETE],
+  },
+  {
+    id: 'chauffeurs',
+    label: 'Chauffeurs',
+    permissions: [AdminPermission.DRIVERS_READ, AdminPermission.DRIVERS_WRITE],
+  },
+  { id: 'kyc', label: 'KYC', permissions: [AdminPermission.KYC_READ, AdminPermission.KYC_WRITE] },
+  { id: 'courses', label: 'Courses', permissions: [AdminPermission.RIDES_READ, AdminPermission.RIDES_WRITE] },
+  {
+    id: 'livraisons',
+    label: 'Livraisons',
+    permissions: [AdminPermission.DELIVERIES_READ, AdminPermission.DELIVERIES_WRITE],
+  },
+  {
+    id: 'restaurants',
+    label: 'Restaurants / partenaires',
+    permissions: [AdminPermission.RESTAURANTS_READ, AdminPermission.RESTAURANTS_WRITE],
+  },
+  {
+    id: 'tarifs',
+    label: 'Tarifs & règles',
+    permissions: [AdminPermission.PRICING_READ, AdminPermission.PRICING_WRITE],
+  },
+  {
+    id: 'litiges',
+    label: 'Litiges / SOS',
+    permissions: [AdminPermission.INCIDENTS_READ, AdminPermission.INCIDENTS_WRITE],
+  },
+  { id: 'fraude', label: 'Fraude', permissions: [AdminPermission.FRAUD_READ, AdminPermission.FRAUD_WRITE] },
+  {
+    id: 'planifiees',
+    label: 'Planifiées / locations / covoiturage',
+    permissions: [AdminPermission.SCHEDULED_READ, AdminPermission.SCHEDULED_WRITE],
+  },
+  {
+    id: 'abonnements',
+    label: 'Abonnements & promos',
+    permissions: [
+      AdminPermission.SUBSCRIPTIONS_READ,
+      AdminPermission.SUBSCRIPTIONS_WRITE,
+      AdminPermission.PROMO_READ,
+      AdminPermission.PROMO_WRITE,
+    ],
+  },
+  {
+    id: 'portefeuille',
+    label: 'Portefeuille',
+    permissions: [AdminPermission.WALLETS_READ, AdminPermission.WALLETS_WRITE],
+  },
+  {
+    id: 'publicites',
+    label: 'Publicités',
+    permissions: [AdminPermission.PUBLICITES_READ, AdminPermission.PUBLICITES_WRITE],
+  },
+  {
+    id: 'contacts',
+    label: 'Contacts',
+    permissions: [AdminPermission.CONTACTS_READ, AdminPermission.CONTACTS_WRITE],
+  },
+  { id: 'cgu', label: 'CGU', permissions: [AdminPermission.CGU_READ, AdminPermission.CGU_WRITE] },
+  {
+    id: 'systeme',
+    label: 'Système (maintenance, MM, SOS ops)',
+    permissions: [AdminPermission.SYSTEM_READ, AdminPermission.SYSTEM_WRITE],
+  },
+];
+
+const ALL_PERMISSION_VALUES = new Set<string>(Object.values(AdminPermission));
+
+export function sanitizeAdminPermissions(raw?: string[] | null): AdminPermission[] {
+  if (!raw?.length) return [];
+  const out: AdminPermission[] = [];
+  const seen = new Set<string>();
+  for (const p of raw) {
+    const key = String(p ?? '').trim();
+    if (!ALL_PERMISSION_VALUES.has(key) || seen.has(key)) continue;
+    seen.add(key);
+    out.push(key as AdminPermission);
+  }
+  return out;
+}
+
+/** Permissions effectives : override explicite, sinon matrice du rôle. */
+export function resolveAdminPermissions(
+  role: string,
+  overrides?: string[] | null,
+): AdminPermission[] {
+  if (!isAdminPanelRole(role)) return [];
+  const custom = sanitizeAdminPermissions(overrides);
+  if (custom.length > 0) return custom;
+  return [...(ADMIN_ROLE_PERMISSIONS[role as UserRole] ?? [])];
+}
+
+export function hasAdminPermission(
+  role: string,
+  permission: AdminPermission,
+  overrides?: string[] | null,
+): boolean {
+  return resolveAdminPermissions(role, overrides).includes(permission);
+}
+
+/** Cases cochées par défaut pour un rôle (niveaux dont au moins 1 permission est accordée). */
+export function defaultAccessLevelIdsForRole(role: string): string[] {
+  const perms = new Set(resolveAdminPermissions(role, null));
+  return ADMIN_ACCESS_LEVELS.filter((level) => level.permissions.some((p) => perms.has(p))).map(
+    (level) => level.id,
+  );
+}
+
+/** Convertit les niveaux cochés en liste de permissions à persister. */
+export function permissionsFromAccessLevelIds(levelIds: string[]): AdminPermission[] {
+  const wanted = new Set(levelIds);
+  const out: AdminPermission[] = [];
+  const seen = new Set<string>();
+  for (const level of ADMIN_ACCESS_LEVELS) {
+    if (!wanted.has(level.id)) continue;
+    for (const p of level.permissions) {
+      if (seen.has(p)) continue;
+      seen.add(p);
+      out.push(p);
+    }
+  }
+  return out;
+}
+
+/** true si la liste custom est identique aux défauts du rôle (→ stocker []). */
+export function permissionsMatchRoleDefaults(role: string, permissions: string[]): boolean {
+  const a = new Set(resolveAdminPermissions(role, null));
+  const b = new Set(sanitizeAdminPermissions(permissions));
+  if (a.size !== b.size) return false;
+  for (const p of a) if (!b.has(p)) return false;
+  return true;
+}
+
+/** Sections menu admin dérivées des permissions effectives. */
+export function accessLevelIdsFromPermissions(permissions: string[]): string[] {
+  const perms = new Set(sanitizeAdminPermissions(permissions));
+  return ADMIN_ACCESS_LEVELS.filter((level) => level.permissions.some((p) => perms.has(p))).map(
+    (level) => level.id,
+  );
 }

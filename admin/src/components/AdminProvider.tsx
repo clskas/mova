@@ -23,6 +23,7 @@ function resolveStaffRole(meRole?: string | null, token?: string | null): AdminR
 type AdminContextValue = {
   user: AdminSessionUser | null;
   role: AdminRole | null;
+  accessLevelIds: string[] | null;
   loading: boolean;
   canAccess: (section: AdminSection) => boolean;
   canWrite: (section: AdminSection) => boolean;
@@ -81,20 +82,24 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
   }, [refresh]);
 
   const role = user?.role ? normalizeAdminRole(user.role) : null;
+  const accessLevelIds =
+    user?.permissionsCustomized && user.accessLevelIds?.length ? user.accessLevelIds : null;
 
   useEffect(() => {
     if (loading || !role || pathname.startsWith("/login")) return;
     const section = sectionFromPath(pathname);
-    if (section && !canAccessSection(role, section)) {
-      router.replace(defaultPathForRole(role));
+    if (section && !canAccessSection(role, section, accessLevelIds)) {
+      router.replace(defaultPathForRole(role, accessLevelIds));
     }
-  }, [loading, role, pathname, router]);
+  }, [loading, role, accessLevelIds, pathname, router]);
 
   const value = useMemo<AdminContextValue>(() => {
-    const canAccess = (section: AdminSection) => (role ? canAccessSection(role, section) : false);
-    const canWrite = (section: AdminSection) => (role ? canWriteSection(role, section) : false);
-    return { user, role, loading, canAccess, canWrite, refresh };
-  }, [user, role, loading, refresh]);
+    const canAccess = (section: AdminSection) =>
+      role ? canAccessSection(role, section, accessLevelIds) : false;
+    const canWrite = (section: AdminSection) =>
+      role ? canWriteSection(role, section, accessLevelIds) : false;
+    return { user, role, accessLevelIds, loading, canAccess, canWrite, refresh };
+  }, [user, role, accessLevelIds, loading, refresh]);
 
   return <AdminContext.Provider value={value}>{children}</AdminContext.Provider>;
 }

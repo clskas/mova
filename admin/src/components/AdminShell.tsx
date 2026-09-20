@@ -67,15 +67,17 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
 function ShellInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [demo, setDemo] = useState(false);
-  const { role, loading, user } = useAdmin();
+  const { role, loading, user, accessLevelIds } = useAdmin();
   const managedCity = user?.managedCity?.trim() || managedCityFromToken() || null;
 
   useEffect(() => {
     checkGatewayHealth().then((ok) => setDemo(!ok && !getToken()));
   }, []);
 
-  const nav: NavItem[] = role ? navForRole(role) : [];
-  const hasWriteAccess = role ? nav.some((item) => canWriteSection(role, item.section)) : false;
+  const nav: NavItem[] = role ? navForRole(role, accessLevelIds) : [];
+  const hasWriteAccess = role
+    ? nav.some((item) => canWriteSection(role, item.section, accessLevelIds))
+    : false;
 
   return (
     <div className="min-h-screen flex overflow-x-hidden">

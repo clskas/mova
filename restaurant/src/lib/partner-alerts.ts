@@ -16,7 +16,39 @@ export type PartnerAlertUi = {
 const uiListeners = new Set<(ui: PartnerAlertUi) => void>();
 const unlockListeners = new Set<() => void>();
 
+function readSoundPref(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    if (localStorage.getItem(SOUND_PREF_KEY) === "1") return true;
+    // Migration depuis l’ancien stockage session-only.
+    if (sessionStorage.getItem(SOUND_PREF_KEY) === "1") {
+      localStorage.setItem(SOUND_PREF_KEY, "1");
+      sessionStorage.removeItem(SOUND_PREF_KEY);
+      return true;
+    }
+  } catch {
+    /* private mode */
+  }
+  return false;
+}
+
+function writeSoundPref() {
+  try {
+    localStorage.setItem(SOUND_PREF_KEY, "1");
+    sessionStorage.removeItem(SOUND_PREF_KEY);
+  } catch {
+    /* private mode */
+  }
+}
+
+function restoreSoundPref() {
+  if (!audioUnlocked && readSoundPref()) {
+    audioUnlocked = true;
+  }
+}
+
 export function getPartnerAlertUi(): PartnerAlertUi {
+  if (typeof window !== "undefined") restoreSoundPref();
   return { soundEnabled: audioUnlocked, toast };
 }
 
@@ -99,9 +131,10 @@ function beginHtmlChime(): Promise<boolean> {
     }
     audio.muted = false;
     audio.volume = 1;
+    // play() resolved = gesture accepted. Don't require !paused (some PWAs pause briefly).
     return audio
       .play()
-      .then(() => !audio.paused)
+      .then(() => true)
       .catch(() => false);
   } catch {
     return Promise.resolve(false);
@@ -159,14 +192,18 @@ export function dismissPartnerToast() {
 /**
  * À appeler depuis un clic (bouton « Activer le son »).
  * Débloque l'autoplay, joue un bip de test, demande la permission de notification.
- * Ne masque la bannière que si le bip a réellement joué.
+ * `fromBanner: true` = geste explicite : on masque la bannière dès que le contexte audio reprend,
+ * même si la détection du bip est floue sur certains navigateurs PWA.
  */
-export async function unlockPartnerAlerts() {
+export async function unlockPartnerAlerts(opts?: { fromBanner?: boolean }) {
   if (typeof window === "undefined") return;
   if (unlockInFlight) {
     await unlockInFlight;
-    return;
+    // Le clic bannière peut arriver après un unlockInFlight déjà terminé sans succès.
+    if (audioUnlocked || opts?.fromBanner !== true) return;
   }
+
+  const fromBanner = opts?.fromBanner === true;
 
   unlockInFlight = (async () => {
     // Kick HTML play before awaiting AudioContext.resume — keeps the gesture chain.
@@ -180,17 +217,14 @@ export async function unlockPartnerAlerts() {
     if (!played) {
       played = await playWebAudioChime();
     }
-    if (!played) {
+    const ctxReady = ctx?.state === "running";
+    if (!played && !ctxReady && !fromBanner) {
       emitUi();
       return;
     }
 
     audioUnlocked = true;
-    try {
-      sessionStorage.setItem(SOUND_PREF_KEY, "1");
-    } catch {
-      /* private mode */
-    }
+    writeSoundPref();
 
     if (typeof Notification !== "undefined" && Notification.permission === "default") {
       await Notification.requestPermission().catch(() => undefined);
@@ -217,25 +251,30 @@ export async function unlockPartnerAlerts() {
 /** Précharge le WAV. Retourne un cleanup pour le listener de geste (Strict Mode / unmount). */
 export function initPartnerAudioUnlock(): () => void {
   if (typeof window === "undefined") return () => undefined;
+  restoreSoundPref();
   getHtmlAudio();
   emitUi();
 
-  if (audioUnlocked) return () => undefined;
-
   let armed = true;
-  const unlockOnGesture = () => {
-    if (!armed || audioUnlocked) return;
-    void unlockPartnerAlerts();
+  let needsResume = true;
+  // Ne pas auto-unlock sur chaque geste : ça volait le clic « Activer le son »
+  // (capture) et pouvait échouer sans fromBanner. Reprise AudioContext seulement.
+  const resumeOnGesture = () => {
+    if (!armed || !audioUnlocked || !needsResume) return;
+    needsResume = false;
+    const ctx = getAudioContext();
+    if (ctx?.state === "suspended") {
+      void ctx.resume().catch(() => undefined);
+    }
   };
 
-  // Any user gesture can unlock autoplay; banner stays until play actually succeeds.
-  window.addEventListener("pointerdown", unlockOnGesture, { capture: true });
-  window.addEventListener("keydown", unlockOnGesture, { capture: true });
+  window.addEventListener("pointerdown", resumeOnGesture, { capture: true });
+  window.addEventListener("keydown", resumeOnGesture, { capture: true });
 
   return () => {
     armed = false;
-    window.removeEventListener("pointerdown", unlockOnGesture, true);
-    window.removeEventListener("keydown", unlockOnGesture, true);
+    window.removeEventListener("pointerdown", resumeOnGesture, true);
+    window.removeEventListener("keydown", resumeOnGesture, true);
   };
 }
 

@@ -27,7 +27,7 @@ export function PartnerAlertHost() {
             type="button"
             onClick={(e) => {
               e.stopPropagation();
-              void unlockPartnerAlerts();
+              void unlockPartnerAlerts({ fromBanner: true });
             }}
             className="shrink-0 px-3 py-2 min-h-11 rounded-lg bg-indigo-600 text-white text-sm font-medium"
           >

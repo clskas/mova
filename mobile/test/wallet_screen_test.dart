@@ -65,6 +65,7 @@ void main() {
     expect(find.text('Envoyer le code'), findsOneWidget);
     expect(find.text('Confirmer le retrait'), findsNothing);
     expect(find.text('Code à 6 chiffres'), findsOneWidget);
+    expect(find.text('000000'), findsOneWidget);
     expect(find.text('Réessayer'), findsNothing);
 
     await tester.enterText(find.byType(TextField).first, '2500');
@@ -79,12 +80,12 @@ void main() {
     expect(find.text('Réessayer'), findsNothing);
     expect(tester.takeException(), isNull);
 
+    // Standing code is prefilled; clear it to assert empty OTP still prompts.
+    await tester.enterText(find.byType(TextField).last, '');
+    await tester.pump();
     await tester.tap(find.text('Confirmer le retrait'));
     await tester.pump();
-    expect(
-      find.text(withdrawOtpPromptFr),
-      findsOneWidget,
-    );
+    expect(find.text(withdrawOtpPromptFr), findsOneWidget);
     expect(find.text('Réessayer'), findsNothing);
   });
 

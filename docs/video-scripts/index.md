@@ -13,7 +13,7 @@ Ces fichiers ne sont **pas** les démos Play Console `FOREGROUND_SERVICE_DATA_SY
 | Mobile passager (Senga) | ~50 s | Accueil → **Taxi / Moto-taxi** → destination → commander → **Suivi de course** | [passager-mobile.md](passager-mobile.md) |
 | Mobile chauffeur (SENGA Driver) | ~60 s | **En ligne** → **Accepter la course** → naviguer → **Terminer la course** | [chauffeur-mobile.md](chauffeur-mobile.md) |
 | Web / PWA passager | ~45 s | [senga.afri-soft.com](https://senga.afri-soft.com) → choisir un service → commander | [passager-web.md](passager-web.md) |
-| Portail Restaurant | ~50 s | [restaurant.afri-soft.com](https://restaurant.afri-soft.com) → **Commandes** → **Accepter** → **Menu** | [restaurant.md](restaurant.md) |
+| Portail Restaurant | ~50 s | [sengapartner.afri-soft.com](https://sengapartner.afri-soft.com) → **Commandes** → **Accepter** → **Menu** | [restaurant.md](restaurant.md) |
 | Portail Location | ~50 s | [rental.afri-soft.com](https://rental.afri-soft.com) → **Véhicules** → **Réservations** | [location.md](location.md) |
 | Admin | ~45 s | [admin.afri-soft.com](https://admin.afri-soft.com) → **Tableau de bord** → **KYC** → **Approuver** | [admin.md](admin.md) |
 

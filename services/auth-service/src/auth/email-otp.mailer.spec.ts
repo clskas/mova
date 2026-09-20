@@ -98,8 +98,8 @@ describe('sengaAccessMailCopy', () => {
   it('restaurant mail lists only the restaurant portal', () => {
     const copy = sengaAccessMailCopy('319027', { portal: 'restaurant' });
     expect(copy.text).toContain('votre compte SENGA Business');
-    expect(copy.text).toContain('restaurant.afri-soft.com');
-    expect(copy.html).toContain('restaurant.afri-soft.com');
+    expect(copy.text).toContain('sengapartner.afri-soft.com');
+    expect(copy.html).toContain('sengapartner.afri-soft.com');
     expect(copy.text).not.toContain('rental.afri-soft.com');
     expect(copy.html).not.toContain('rental.afri-soft.com');
     expect(copy.text).not.toMatch(/Location/i);
@@ -111,14 +111,14 @@ describe('sengaAccessMailCopy', () => {
     expect(copy.text).toContain('votre compte SENGA location');
     expect(copy.text).toContain('rental.afri-soft.com');
     expect(copy.html).toContain('rental.afri-soft.com');
-    expect(copy.text).not.toContain('restaurant.afri-soft.com');
-    expect(copy.html).not.toContain('restaurant.afri-soft.com');
+    expect(copy.text).not.toContain('sengapartner.afri-soft.com');
+    expect(copy.html).not.toContain('sengapartner.afri-soft.com');
   });
 
   it('SMS OTP copy never lists restaurant or rental URLs', () => {
     const sms = otpSmsText('SENGA', '319027');
     expect(sms).not.toContain('rental.afri-soft.com');
-    expect(sms).not.toContain('restaurant.afri-soft.com');
+    expect(sms).not.toContain('sengapartner.afri-soft.com');
     expect(sms).not.toMatch(/Location/i);
   });
 });

@@ -1,12 +1,14 @@
 # SENGA Business (portail partenaire)
 
-Portail web : [restaurant.afri-soft.com](https://restaurant.afri-soft.com)
+Portail web : [sengapartner.afri-soft.com](https://sengapartner.afri-soft.com)
+
+> Ancien URL `restaurant.afri-soft.com` : redirection 301 vers le domaine ci-dessus.
 
 Le portail **SENGA Business** sert les partenaires **restaurant**, **supermarché**, **pharmacie** et **boutique**. L’interface (menus, libellés, pages) s’adapte au type de commerce (`commerceType`).
 
 ## Connexion et PIN
 
-1. Ouvrez [restaurant.afri-soft.com](https://restaurant.afri-soft.com).
+1. Ouvrez [sengapartner.afri-soft.com](https://sengapartner.afri-soft.com).
 2. Saisissez votre **téléphone +243 ou e-mail**, puis le **Code PIN (reçu par e-mail / SMS)** — 6 chiffres.
 3. Première visite : après connexion, l’écran d’onboarding demande de **choisir le type de commerce**, puis le nom, l’adresse et le GPS. Ensuite → **Mon dossier** (KYC).
 4. Après **Approuver** dans l’admin KYC, le PIN part par SMS et/ou e-mail. Un compte déjà lié à Google peut aussi se connecter avec ce PIN.

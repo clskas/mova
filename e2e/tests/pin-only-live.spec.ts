@@ -3,7 +3,7 @@ import { dismissUpdateBanner, requireReachable } from "./helpers";
 
 const LIVE = {
   web: process.env.WEB_BASE_URL ?? "https://senga.afri-soft.com",
-  restaurant: process.env.RESTAURANT_BASE_URL ?? "https://restaurant.afri-soft.com",
+  restaurant: process.env.RESTAURANT_BASE_URL ?? "https://sengapartner.afri-soft.com",
   rental: process.env.RENTAL_BASE_URL ?? "https://rental.afri-soft.com",
 };
 

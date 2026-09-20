@@ -12,7 +12,7 @@ Type recommandé : **HTTPS Keyword** (mot-clé dans le corps) + code HTTP **200*
 |-----|-----|---------|--------|
 | SENGA web | `https://senga.afri-soft.com` | `SENGA` (ou laisser Keyword vide et utiliser HTTP 200) | Page marketing / app web |
 | SENGA admin | `https://admin.afri-soft.com` | `SENGA` | Portail admin |
-| Restaurant | `https://restaurant.afri-soft.com` | `SENGA` | Portail restaurant |
+| Restaurant / partenaires commerce | `https://sengapartner.afri-soft.com` | `SENGA` | Portail commerce (legacy `restaurant.afri-soft.com` → 301) |
 | Location | `https://rental.afri-soft.com` | `SENGA` | Portail location |
 | API gateway | `https://api.afri-soft.com/health` | `"status":"ok"` | Liveness+dépendances. Si trop d’alertes « degraded », utiliser `https://api.afri-soft.com/health/live` |
 | Hub paiements | `https://pay.afri-soft.com/health` | `"status":"ok"` | VPS `afrisoft-pay` |

@@ -152,7 +152,7 @@ export function commerceHelpChapters(type: CommerceType) {
     {
       title: "Code PIN de connexion",
       steps: [
-        "Connectez-vous sur https://restaurant.afri-soft.com/login avec Google ou votre téléphone.",
+        "Connectez-vous sur https://sengapartner.afri-soft.com/login avec Google ou votre téléphone.",
         "Première fois : code SMS (téléphone) ou code e-mail (après Google), puis PIN de connexion (6 chiffres) pour les prochaines fois.",
         "Après Déconnexion : pavé Connexion — « Entrez le PIN pour +243 ••• XXX », 6 points, clavier. Google ne reconnecte pas tout seul.",
         "Après validation du dossier : fenêtre « Code PIN d'activation » pour commencer à travailler.",
@@ -202,7 +202,7 @@ export function commerceManuelChapters(type: CommerceType) {
     {
       title: "Première connexion et PIN",
       steps: [
-        "Ouvrez https://restaurant.afri-soft.com/login — Google, ou téléphone / e-mail. Ce n'est pas l'écran « Activer le compte ».",
+        "Ouvrez https://sengapartner.afri-soft.com/login — Google, ou téléphone / e-mail. Ce n'est pas l'écran « Activer le compte ».",
         "Téléphone : un code SMS arrive, puis la fenêtre PIN de connexion (6 chiffres) : « Choisissez / confirmez votre PIN de connexion pour les prochaines fois ».",
         "Google : après Google, un code arrive par e-mail (objet « Votre accès SENGA Business », sans le mot OTP). Saisissez-le, puis la même fenêtre PIN de connexion.",
         "Après Déconnexion, le pavé Connexion s'affiche : « Entrez le PIN pour +243 ••• XXX », 6 points, clavier. Google ne reconnecte pas tout seul.",

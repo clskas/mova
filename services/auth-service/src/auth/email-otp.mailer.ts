@@ -22,8 +22,8 @@ const PORTAL_MAIL_LINKS: Record<
   restaurant: {
     who: 'votre compte SENGA Business',
     label: 'SENGA Business',
-    host: 'restaurant.afri-soft.com',
-    url: 'https://restaurant.afri-soft.com',
+    host: 'sengapartner.afri-soft.com',
+    url: 'https://sengapartner.afri-soft.com',
   },
   rental: {
     who: 'votre compte SENGA location',

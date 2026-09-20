@@ -15,6 +15,7 @@ Guide opérationnel pour mettre en production SENGA sur **l’ensemble des 32 zo
 | Cache / événements | Redis | Render Redis |
 | Frontend web | Next.js | Render (`mova-web`) |
 | Console admin | Next.js | Render ou Vercel |
+| Portail partenaires commerce | Next.js | Render (`mova-restaurant`) — domaine **sengapartner.afri-soft.com** (voir [SENGA_PARTNER_DOMAIN.md](./SENGA_PARTNER_DOMAIN.md)) |
 | App mobile passager / chauffeur | Flutter | App Store + Play Store |
 
 Architecture détaillée : [architecture.md](./architecture.md).

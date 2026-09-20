@@ -533,7 +533,7 @@ def web_taxi(dest="", estimate=False, confirmed=False) -> Image.Image:
 def resto_shell(active: str) -> tuple[Image.Image, ImageDraw.ImageDraw]:
     im = Image.new("RGB", DESKTOP, (255, 247, 237))
     d = ImageDraw.Draw(im)
-    browser_chrome(d, 1920, "https://restaurant.afri-soft.com", ORANGE_RESTO)
+    browser_chrome(d, 1920, "https://sengapartner.afri-soft.com", ORANGE_RESTO)
     items = [
         ("Tableau de bord", active == "dash"),
         ("Commandes", active == "orders"),
@@ -989,7 +989,7 @@ def build_all() -> list[dict]:
                 Shot("ready", 8, "Prête pour livreur", "Quand c’est prêt, indiquez Prête pour livreur.", resto_orders("accepted")),
                 Shot("menu", 12, "Menu & photos", "Dans Menu, vous publiez les plats vus par les clients.", resto_menu()),
                 Shot("dash", 6, "Tableau de bord", "Le tableau de bord montre vos ventes du jour.", resto_dash()),
-                Shot("end", 6, "restaurant.afri-soft.com", "Portail Restaurant SENGA.", end_card(DESKTOP, ic_b, "SENGA Restaurant", "restaurant.afri-soft.com", "Accepter les commandes, publier le menu", ORANGE_RESTO)),
+                Shot("end", 6, "sengapartner.afri-soft.com", "Portail Restaurant SENGA.", end_card(DESKTOP, ic_b, "SENGA Restaurant", "sengapartner.afri-soft.com", "Accepter les commandes, publier le menu", ORANGE_RESTO)),
             ],
             ORANGE_RESTO,
         )

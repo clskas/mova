@@ -63,7 +63,7 @@ Inventaire aligné sur `render.yaml` + domaines Cloudflare `*.afri-soft.com`.
 | **SMS / OTP hub AfriSoft** | VPS-pay | **VPS-pay** (inchangé) | `sms.afri-soft.com` |
 | `mova-web` (PWA / site passager) | Render Starter | **VPS-web** | `senga.afri-soft.com` |
 | `mova-admin-web` | Render Starter | **VPS-web** | `admin.afri-soft.com` |
-| `mova-restaurant` | Render Starter | **VPS-web** | `restaurant.afri-soft.com` |
+| `mova-restaurant` | Render Starter | **VPS-web** | `sengapartner.afri-soft.com` (legacy `restaurant.afri-soft.com` → 301) |
 | `mova-rental-partner` | Render Starter | **VPS-web** | `rental.afri-soft.com` |
 | `mova-gateway` | Render Starter | **VPS-api** | `api.afri-soft.com` |
 | `mova-auth` | Render Starter | **VPS-api** | (interne Docker) |

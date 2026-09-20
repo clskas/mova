@@ -280,8 +280,8 @@ export function PartnerWithdrawPanel({ balanceCdf, walletAvailable = true, onWit
           />
         </label>
         <p className="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
-          SMS temporairement indisponibles : laissez <strong>000000</strong> pour confirmer le
-          retrait (même règle que les apps mobiles).
+          SMS temporairement indisponibles : tous les clients confirment avec{' '}
+          <strong>000000</strong> en attendant l&apos;achat des crédits SMS.
         </p>
         <button
           type="button"

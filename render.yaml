@@ -156,9 +156,12 @@ services:
         fromService: { name: mova-auth, type: web, property: hostport }
       - key: MOCK_PAYMENTS
         value: "false"
-      # Temporary founder withdraw test — no SMS OTP. Re-enable: "false" or remove + restart.
+      # Temporary: no SMS OTP for ALL clients until SerdiPay SMS credits. Standing code 000000.
+      # Re-enable real OTP: value "false" or remove + restart mova-payment.
       - key: WITHDRAW_SKIP_OTP
         value: "true"
+      - key: WITHDRAW_STANDING_OTP
+        value: "000000"
       - key: NODE_ENV
         value: "production"
       - key: APP_ENV

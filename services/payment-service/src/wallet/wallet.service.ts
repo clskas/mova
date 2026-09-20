@@ -57,8 +57,10 @@ const WITHDRAW_OTP_HOUR_LIMIT = 5;
 const STALE_PAYOUT_MIN_AGE_MS = 15 * 60 * 1000;
 
 /**
- * Temporary founder test mode: skip withdraw OTP (no SMS/email).
+ * Temporary founder mode while SMS credits are unavailable:
+ * skip real SMS OTP for ALL accounts (passengers, drivers, partners).
  * Default OFF. Re-enable OTP: WITHDRAW_SKIP_OTP=false (or unset) + restart payment-service.
+ * Optional WITHDRAW_STANDING_OTP (default 000000) — code clients may type when the UI asks for OTP.
  */
 function envTruthy(raw: string | undefined): boolean {
   const v = (raw ?? '').trim().toLowerCase();
@@ -106,17 +108,24 @@ export class WalletService {
     return this.config.get('MOCK_PAYMENTS') === 'true';
   }
 
-  /** Env WITHDRAW_SKIP_OTP=true — temporary production test; default false. */
+  /** Env WITHDRAW_SKIP_OTP=true — temporary production bypass for every account (until SMS credits). */
   isWithdrawOtpSkipped(): boolean {
     const skip = envTruthy(this.config.get<string>('WITHDRAW_SKIP_OTP'));
     if (skip && !withdrawSkipOtpLogged) {
       withdrawSkipOtpLogged = true;
       this.logger.warn(
-        'WITHDRAW_SKIP_OTP=true — retraits sans OTP (mode test temporaire). ' +
-          'Réactiver : WITHDRAW_SKIP_OTP=false ou unset, puis redémarrer payment-service.',
+        'WITHDRAW_SKIP_OTP=true — retraits sans SMS pour TOUS les clients (code de secours 000000). ' +
+          'Réactiver l’OTP SMS : WITHDRAW_SKIP_OTP=false ou unset, puis redémarrer payment-service.',
       );
     }
     return skip;
+  }
+
+  /** Standing 6-digit code while SMS is down (only when WITHDRAW_SKIP_OTP is on). */
+  getWithdrawStandingOtp(): string | null {
+    if (!this.isWithdrawOtpSkipped()) return null;
+    const raw = (this.config.get<string>('WITHDRAW_STANDING_OTP') ?? '000000').trim();
+    return /^\d{6}$/.test(raw) ? raw : '000000';
   }
 
   /** NODE_ENV=production or a real AfriSoft / Render host — never simulate money. */
@@ -749,16 +758,25 @@ export class WalletService {
     );
 
     if (this.isWithdrawOtpSkipped()) {
+      const standing = this.getWithdrawStandingOtp() ?? '000000';
+      const challenge: WithdrawOtpChallenge = {
+        h: hashWithdrawOtp(standing),
+        p: normalizedPhone,
+        a: amount,
+        v: normalizedProvider,
+      };
+      await this.storeWithdrawOtp(userId, challenge);
       return {
         success: true,
         skipOtp: true,
         otpRequired: false,
-        message: 'Mode test : retrait sans code.',
+        standingOtp: standing,
+        message: `SMS temporairement indisponibles. Tous les clients : confirmez avec ${standing} (ou validez directement).`,
         channel: 'none' as const,
         phone: normalizedPhone,
         amountCdf: amount,
         provider: normalizedProvider,
-        expiresInSec: 0,
+        expiresInSec: WITHDRAW_OTP_TTL_SEC,
       };
     }
 
@@ -862,9 +880,17 @@ export class WalletService {
       phone,
     );
     await this.assertMmOperatorAllowed(userId, normalizedProvider, 'withdraw');
-    const skipOtp = Boolean(opts.skipOtp) || this.isWithdrawOtpSkipped();
+    const standing = this.getWithdrawStandingOtp();
+    const otpDigits = String(opts.otp ?? '').replace(/\s/g, '');
+    const skipOtp =
+      Boolean(opts.skipOtp) ||
+      this.isWithdrawOtpSkipped() ||
+      (standing != null && otpDigits === standing);
     if (!skipOtp) {
       await this.consumeWithdrawOtp(userId, amount, normalizedProvider, normalizedPhone, opts.otp);
+    } else if (standing && otpDigits === standing) {
+      // Clear any stored challenge so a later real-OTP deploy cannot reuse it.
+      await this.readAndDeleteWithdrawOtp(userId);
     }
 
     const lockKey = `${WITHDRAW_LOCK_PREFIX}${userId}`;

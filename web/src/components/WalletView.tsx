@@ -234,7 +234,7 @@ export function WalletView({ onBack, mock }: Props) {
         }
         setWithdrawOtp("");
         setWithdrawOtpSent(false);
-        setInfo(res.message ?? "Mode test : retrait sans code.");
+        setInfo(res.message ?? "SMS indisponibles — confirmez avec 000000.");
         await load();
         setHistoryRefresh((n) => n + 1);
         return;

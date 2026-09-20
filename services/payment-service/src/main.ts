@@ -39,8 +39,8 @@ async function bootstrap() {
   console.log(`SENGA payment-service on port ${port}${hubMode ? ' (AfriSoft pay hub /v1)' : ''}`);
   if (withdrawSkip) {
     console.warn(
-      '[payment-service] WITHDRAW_SKIP_OTP=true — retraits sans OTP (mode test). ' +
-        'Réactiver OTP : WITHDRAW_SKIP_OTP=false ou unset, puis redémarrer.',
+      '[payment-service] WITHDRAW_SKIP_OTP=true — retraits sans SMS pour TOUS les clients (secours 000000). ' +
+        'Réactiver OTP SMS : WITHDRAW_SKIP_OTP=false ou unset, puis redémarrer.',
     );
   }
 }

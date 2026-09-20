@@ -752,7 +752,7 @@ class _WalletWithdrawSheetState extends ConsumerState<_WalletWithdrawSheet> {
       text: widget.maxAmount >= 5000 ? '5000' : '${widget.maxAmount}',
     );
     _phoneController = TextEditingController(text: widget.initialPhone);
-    _otpController = TextEditingController();
+    _otpController = TextEditingController(text: '000000');
     _providerId = _providers.isNotEmpty
         ? _providers.firstWhere((p) => p.id == 'MPESA', orElse: () => _providers.first).id
         : MarketConfig.mobileMoneyProviders.first.id;
@@ -907,7 +907,7 @@ class _WalletWithdrawSheetState extends ConsumerState<_WalletWithdrawSheet> {
             ),
             const SizedBox(height: 8),
             const Text(
-              'Un code de confirmation (SMS, ou e-mail si SMS indisponible) sera envoyé pour valider le numéro de versement.',
+              'SMS temporairement indisponibles : tous les clients confirment avec le code 000000 (en attendant les crédits SMS).',
               style: TextStyle(color: MovaColors.textSecondary, fontSize: 13),
             ),
             const SizedBox(height: 16),

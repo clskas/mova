@@ -384,10 +384,20 @@ describe('WalletService', () => {
     tx.$queryRaw.mockResolvedValue([{ id: 'w1', balanceCdf: 5000, heldBalanceCdf: 0 }]);
     tx.wallet.update.mockResolvedValue({ id: 'w1', userId: 'u1', balanceCdf: 2700 });
     const otpRes = await service.requestWithdrawOtp('u1', 2300, 'ORANGE_MONEY', '+243890000001');
-    expect(otpRes).toMatchObject({ skipOtp: true, otpRequired: false });
+    expect(otpRes).toMatchObject({
+      skipOtp: true,
+      otpRequired: false,
+      standingOtp: '000000',
+    });
+    expect(String(otpRes.message)).toMatch(/Tous les clients/i);
     const result = await service.withdrawToMobileMoney('u1', 2300, 'ORANGE_MONEY', '+243890000001');
     expect(result.success).toBe(true);
     expect(tx.wallet.update).toHaveBeenCalledTimes(1);
+    tx.wallet.update.mockClear();
+    const withStanding = await service.withdrawToMobileMoney('u1', 2300, 'ORANGE_MONEY', '+243890000001', {
+      otp: '000000',
+    });
+    expect(withStanding.success).toBe(true);
   });
 
   it('refuse un retrait si l’OTP a été envoyé vers un autre numéro', async () => {

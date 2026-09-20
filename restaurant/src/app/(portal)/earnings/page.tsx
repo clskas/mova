@@ -118,6 +118,12 @@ export default function EarningsPage() {
               <p className="text-xs opacity-80 mt-2">
                 Vos ventes déjà créditées — retirez vers Mobile Money ci-dessous.
               </p>
+              <a
+                href="#retrait"
+                className="mt-4 inline-flex items-center justify-center min-h-11 px-4 rounded-xl bg-white text-orange-700 text-sm font-semibold shadow-sm"
+              >
+                Retirer maintenant
+              </a>
             </div>
             <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 sm:p-6">
               <p className="text-sm text-amber-900">Gains espèces (non retirables)</p>
@@ -129,15 +135,17 @@ export default function EarningsPage() {
               </p>
             </div>
           </div>
-          <PartnerWithdrawPanel
-            balanceCdf={earnings.withdrawableCdf ?? earnings.balanceCdf}
-            walletAvailable={earnings.walletAvailable !== false}
-            onWithdrawn={() => {
-              setLoading(true);
-              setWalletHistoryRefresh((n) => n + 1);
-              load();
-            }}
-          />
+          <div id="retrait">
+            <PartnerWithdrawPanel
+              balanceCdf={earnings.withdrawableCdf ?? earnings.balanceCdf}
+              walletAvailable={earnings.walletAvailable !== false}
+              onWithdrawn={() => {
+                setLoading(true);
+                setWalletHistoryRefresh((n) => n + 1);
+                load();
+              }}
+            />
+          </div>
           <WalletMovementHistory refreshKey={walletHistoryRefresh} />
         </>
       )}

@@ -282,7 +282,7 @@ export function PartnerWithdrawPanel({ balanceCdf, walletAvailable = true, onWit
           type="button"
           disabled={loading !== null || balanceCdf < 2300}
           onClick={submitWithdraw}
-          className="px-4 py-2.5 min-h-11 rounded-xl bg-orange-600 text-white text-sm font-medium disabled:opacity-50 w-full sm:w-auto sm:min-w-[12rem]"
+          className="px-4 py-2.5 min-h-11 rounded-xl bg-orange-600 text-white text-sm font-semibold disabled:opacity-50 w-full"
         >
           {loading === "withdraw"
             ? "Retrait en cours…"
@@ -290,6 +290,12 @@ export function PartnerWithdrawPanel({ balanceCdf, walletAvailable = true, onWit
               ? "Confirmer le retrait"
               : "Retirer"}
         </button>
+        {balanceCdf < 2300 && (
+          <p className="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+            Solde insuffisant pour un retrait (minimum 2&nbsp;300&nbsp;FC). Solde actuel :{" "}
+            {formatCdf(balanceCdf)}.
+          </p>
+        )}
       </div>
       <details className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2">
         <summary className="text-sm font-medium text-gray-700 cursor-pointer">

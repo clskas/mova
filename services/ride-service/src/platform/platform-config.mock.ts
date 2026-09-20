@@ -23,6 +23,7 @@ export function mockPlatformConfig(
     driverOps: {
       requireDocumentsForJobs: false,
       documentsGracePeriodDays: 7,
+      documentsGraceAnchorAt: null,
       requiredDriverDocuments: [],
       requiredRestaurantDocuments: [],
       requiredRentalCompanyDocuments: [],

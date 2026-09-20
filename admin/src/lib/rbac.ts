@@ -175,7 +175,7 @@ export function sectionsFromAccessLevelIds(levelIds: string[]): AdminSection[] {
     if (!wanted.has(lvl.id)) continue;
     for (const s of lvl.sections) out.add(s);
   }
-  return [...out];
+  return Array.from(out);
 }
 
 export function canAccessSection(

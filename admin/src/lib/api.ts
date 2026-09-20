@@ -2610,6 +2610,59 @@ export async function updateClientAppsConfig(
   });
 }
 
+export type PlatformVendor = {
+  id: string;
+  name: string;
+  provider: string;
+  category: string;
+  amountUsd?: number | null;
+  billingCycle?: string | null;
+  nextPaymentAt?: string | null;
+  expiresAt?: string | null;
+  alertDaysBefore: number;
+  notifyEnabled: boolean;
+  notes?: string | null;
+  url?: string | null;
+  lastAlertedAt?: string | null;
+  daysUntilPayment?: number | null;
+  daysUntilExpiry?: number | null;
+  daysUntilSoonest?: number | null;
+  urgent?: boolean;
+  overdue?: boolean;
+};
+
+export async function fetchPlatformVendors(): Promise<PlatformVendor[]> {
+  const raw = await apiFetch<PlatformVendor[]>("/api/admin/platform-vendors");
+  return Array.isArray(raw) ? raw : [];
+}
+
+export async function createPlatformVendor(data: Partial<PlatformVendor>) {
+  return apiFetch<PlatformVendor>("/api/admin/platform-vendors", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updatePlatformVendor(id: string, data: Partial<PlatformVendor>) {
+  return apiFetch<PlatformVendor>(`/api/admin/platform-vendors/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deletePlatformVendor(id: string) {
+  return apiFetch<{ deleted: boolean }>(`/api/admin/platform-vendors/${id}`, {
+    method: "DELETE",
+  });
+}
+
+export async function runPlatformVendorAlerts() {
+  return apiFetch<{ alerted: number }>("/api/admin/platform-vendors/run-alerts", {
+    method: "POST",
+    body: "{}",
+  });
+}
+
 export async function fetchCancellationPolicies(): Promise<CancellationPolicy[]> {
   const raw = await apiFetch<CancellationPolicy[]>("/api/admin/cancellation-policies");
   return Array.isArray(raw) ? raw : [];

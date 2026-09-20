@@ -1216,6 +1216,35 @@ export class AdminService {
     });
   }
 
+  listPlatformVendors() {
+    return this.fetchJson('ride', '/internal/platform-vendors');
+  }
+
+  createPlatformVendor(body: Record<string, unknown>) {
+    return this.proxy('ride', '/internal/platform-vendors', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+  }
+
+  updatePlatformVendor(id: string, body: Record<string, unknown>) {
+    return this.proxy('ride', `/internal/platform-vendors/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    });
+  }
+
+  deletePlatformVendor(id: string) {
+    return this.proxy('ride', `/internal/platform-vendors/${id}`, { method: 'DELETE' });
+  }
+
+  runPlatformVendorAlerts() {
+    return this.proxy('ride', '/internal/platform-vendors/run-alerts', {
+      method: 'POST',
+      body: '{}',
+    });
+  }
+
   listCancellationPolicies() {
     return this.fetchJson('ride', '/internal/cancellation-policies');
   }

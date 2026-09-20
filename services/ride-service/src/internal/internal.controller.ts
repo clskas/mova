@@ -28,6 +28,7 @@ import { MovingVehiclePricingService } from '../moving/moving-vehicle-pricing.se
 import { PlatformConfigService } from '../platform/platform-config.service';
 import { ParcelWeightBandService } from '../platform/parcel-weight-band.service';
 import { ClientAppsConfigService } from '../platform/client-apps-config.service';
+import { PlatformVendorsService } from '../platform/platform-vendors.service';
 import { PaymentInfoService } from './payment-info.service';
 import { PricingAdminService } from '../rides/pricing-admin.service';
 import { PricingTimeWindowService } from '../rides/pricing-time-window.service';
@@ -63,6 +64,7 @@ export class InternalController {
     private platformConfig: PlatformConfigService,
     private parcelWeightBands: ParcelWeightBandService,
     private clientAppsConfig: ClientAppsConfigService,
+    private platformVendors: PlatformVendorsService,
     private rental: RentalService,
     private tracking: TrackingService,
     private fraud: FraudService,
@@ -518,6 +520,31 @@ export class InternalController {
   @Patch('client-apps-config')
   updateClientAppsConfig(@Body() body: Partial<ClientAppsConfig>) {
     return this.clientAppsConfig.update(body);
+  }
+
+  @Get('platform-vendors')
+  listPlatformVendors() {
+    return this.platformVendors.list();
+  }
+
+  @Post('platform-vendors')
+  createPlatformVendor(@Body() body: Record<string, unknown>) {
+    return this.platformVendors.create(body as never);
+  }
+
+  @Patch('platform-vendors/:id')
+  updatePlatformVendor(@Param('id') id: string, @Body() body: Record<string, unknown>) {
+    return this.platformVendors.update(id, body as never);
+  }
+
+  @Delete('platform-vendors/:id')
+  deletePlatformVendor(@Param('id') id: string) {
+    return this.platformVendors.remove(id);
+  }
+
+  @Post('platform-vendors/run-alerts')
+  runPlatformVendorAlerts() {
+    return this.platformVendors.runExpiryAlerts();
   }
 
   @Get('cancellation-policies')

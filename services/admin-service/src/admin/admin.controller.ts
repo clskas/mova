@@ -1218,6 +1218,41 @@ export class AdminController {
     return this.adminService.updateClientAppsConfig(body);
   }
 
+  @Get('platform-vendors')
+  @RequirePermissions(AdminPermission.SYSTEM_READ)
+  @ApiOperation({ summary: 'Abonnements / hébergements externes — SuperAdmin' })
+  listPlatformVendors() {
+    return this.adminService.listPlatformVendors();
+  }
+
+  @Post('platform-vendors')
+  @RequirePermissions(AdminPermission.SYSTEM_WRITE)
+  @ApiOperation({ summary: 'Créer abonnement plateforme externe' })
+  createPlatformVendor(@Body() body: Record<string, unknown>) {
+    return this.adminService.createPlatformVendor(body);
+  }
+
+  @Patch('platform-vendors/:id')
+  @RequirePermissions(AdminPermission.SYSTEM_WRITE)
+  @ApiOperation({ summary: 'Modifier abonnement plateforme externe' })
+  updatePlatformVendor(@Param('id') id: string, @Body() body: Record<string, unknown>) {
+    return this.adminService.updatePlatformVendor(id, body);
+  }
+
+  @Delete('platform-vendors/:id')
+  @RequirePermissions(AdminPermission.SYSTEM_WRITE)
+  @ApiOperation({ summary: 'Supprimer abonnement plateforme externe' })
+  deletePlatformVendor(@Param('id') id: string) {
+    return this.adminService.deletePlatformVendor(id);
+  }
+
+  @Post('platform-vendors/run-alerts')
+  @RequirePermissions(AdminPermission.SYSTEM_WRITE)
+  @ApiOperation({ summary: 'Déclencher alertes échéances plateformes' })
+  runPlatformVendorAlerts() {
+    return this.adminService.runPlatformVendorAlerts();
+  }
+
   @Get('cancellation-policies')
   @RequirePermissions(AdminPermission.PRICING_READ)
   @ApiOperation({ summary: 'Politiques annulation courses par type véhicule' })

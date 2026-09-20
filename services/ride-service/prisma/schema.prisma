@@ -1098,3 +1098,26 @@ model LegalDocument {
   @@index([slug, isPublished, publishedAt])
   @@map("legal_documents")
 }
+
+/// Abonnements / hébergements externes (Render, Play, SMS, domaine…) — suivi Super Admin.
+model PlatformVendor {
+  id              String    @id @default(uuid())
+  name            String
+  provider        String
+  category        String    @default("other")
+  amountUsd       Float?
+  billingCycle    String?
+  nextPaymentAt   DateTime?
+  expiresAt       DateTime?
+  alertDaysBefore Int       @default(14)
+  notifyEnabled   Boolean   @default(true)
+  notes           String?
+  url             String?
+  lastAlertedAt   DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([expiresAt])
+  @@index([nextPaymentAt])
+  @@map("platform_vendors")
+}

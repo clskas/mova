@@ -72,7 +72,8 @@ export function dropTokenKeepPhone(phone?: string): void {
 
 export function markPinSessionUnlocked(): void {
   try {
-    sessionStorage.setItem(PIN_UNLOCK_KEY, "1");
+    localStorage.setItem(PIN_UNLOCK_KEY, "1");
+    sessionStorage.removeItem(PIN_UNLOCK_KEY);
   } catch {
     /* ignore */
   }
@@ -80,7 +81,7 @@ export function markPinSessionUnlocked(): void {
 
 export function isPinSessionUnlocked(): boolean {
   try {
-    return sessionStorage.getItem(PIN_UNLOCK_KEY) === "1";
+    return localStorage.getItem(PIN_UNLOCK_KEY) === "1" || sessionStorage.getItem(PIN_UNLOCK_KEY) === "1";
   } catch {
     return false;
   }
@@ -88,6 +89,7 @@ export function isPinSessionUnlocked(): boolean {
 
 export function clearPinSessionUnlocked(): void {
   try {
+    localStorage.removeItem(PIN_UNLOCK_KEY);
     sessionStorage.removeItem(PIN_UNLOCK_KEY);
   } catch {
     /* ignore */

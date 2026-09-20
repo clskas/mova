@@ -10,7 +10,6 @@ import {
   getToken,
   isPinPending,
   isPinSessionUnlocked,
-  isSeedDemoPhone,
   markPinSessionUnlocked,
   phoneFromToken,
   setPinPending,
@@ -36,6 +35,10 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
       setSetupToken(token);
       return;
     }
+    // JWT valide : conserver la session PWA après fermeture (comme restaurant / location).
+    if (!isPinSessionUnlocked()) {
+      markPinSessionUnlocked();
+    }
     let cancelled = false;
     void (async () => {
       try {
@@ -54,11 +57,6 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
         ) {
           setPinPending(true);
           setSetupToken(token);
-          return;
-        }
-        if (me.pinConfigured && fallback && !isSeedDemoPhone(fallback) && !isPinSessionUnlocked()) {
-          dropTokenKeepPhone(fallback);
-          router.replace("/login");
           return;
         }
       } catch {

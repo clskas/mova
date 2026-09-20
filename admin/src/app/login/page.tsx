@@ -103,10 +103,13 @@ export default function LoginPage() {
             { pinConfigured: me.pinConfigured, phone: me.phone, hasPhone: me.hasPhone, user: me, email: me.email },
             phoneFromToken(token) || getLastPhone() || "",
           );
-          if (me.pinConfigured && remembered && !isSeedDemoPhone(remembered) && !isPinSessionUnlocked()) {
-            dropTokenKeepPhone(remembered);
-            setPhone(remembered);
-            setPinMode(true);
+          // Ne plus jeter le JWT à chaque réouverture PWA (sessionStorage disparaissait).
+          if (!isPinSessionUnlocked()) markPinSessionUnlocked();
+          if (remembered) setPhone(remembered);
+          const role = normalizeAdminRole(me.role ?? roleFromToken(token));
+          if (role) {
+            router.replace(defaultPathForRole(role));
+            return;
           }
         })
         .catch(() => {

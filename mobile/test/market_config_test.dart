@@ -26,10 +26,12 @@ void main() {
       expect(MarketConfig.vehicleTypesForCategory('TAXI').map((v) => v.id), ['STANDARD', 'COMFORT', 'VIP']);
     });
 
-    test('matching chauffeur : moto exclusive, taxi compatible par gamme', () {
+    test('matching chauffeur : catégorie exacte uniquement', () {
       expect(MarketConfig.driverVehicleTypesForRide('MOTO'), ['MOTO_TAXI']);
-      expect(MarketConfig.driverVehicleTypesForRide('TAXI'), ['STANDARD', 'COMFORT', 'VIP']);
-      expect(MarketConfig.driverVehicleTypesForRide('CONFORT'), ['COMFORT', 'VIP']);
+      expect(MarketConfig.driverVehicleTypesForRide('TAXI'), ['STANDARD']);
+      expect(MarketConfig.driverVehicleTypesForRide('STANDARD'), ['STANDARD']);
+      expect(MarketConfig.driverVehicleTypesForRide('CONFORT'), ['COMFORT']);
+      expect(MarketConfig.driverVehicleTypesForRide('VIP'), ['VIP']);
     });
   });
 }

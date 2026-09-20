@@ -73,25 +73,16 @@ export function toMobileVehicleType(type: VehicleTypeValue): MobileVehicleType {
   }
 }
 
-/** Types de courses qu'un chauffeur peut accepter selon ses véhicules actifs. */
+/** Types de courses qu'un chauffeur peut accepter selon ses véhicules actifs (strict : 1 type = 1 catégorie). */
 export function rideTypesDriverCanServe(driverVehicleTypes: VehicleTypeValue[]): VehicleTypeValue[] {
   const types = new Set<VehicleTypeValue>();
   for (const vt of driverVehicleTypes) {
     switch (vt) {
       case 'MOTO_TAXI':
-        types.add('MOTO_TAXI');
-        break;
       case 'STANDARD':
-        types.add('STANDARD');
-        break;
       case 'COMFORT':
-        types.add('STANDARD');
-        types.add('COMFORT');
-        break;
       case 'VIP':
-        types.add('STANDARD');
-        types.add('COMFORT');
-        types.add('VIP');
+        types.add(vt);
         break;
       case 'UTILITAIRE':
       case 'CAMION':
@@ -101,7 +92,7 @@ export function rideTypesDriverCanServe(driverVehicleTypes: VehicleTypeValue[]):
   return [...types];
 }
 
-/** Véhicules chauffeur éligibles pour une course d'un type donné (matching inverse). */
+/** Véhicules chauffeur éligibles pour une course (strict : même catégorie que demandée). */
 export function driverVehicleTypesForRide(rideType: VehicleTypeValue | string): VehicleTypeValue[] {
   let normalized: VehicleTypeValue;
   try {
@@ -111,13 +102,10 @@ export function driverVehicleTypesForRide(rideType: VehicleTypeValue | string): 
   }
   switch (normalized) {
     case 'MOTO_TAXI':
-      return ['MOTO_TAXI'];
     case 'STANDARD':
-      return ['STANDARD', 'COMFORT', 'VIP'];
     case 'COMFORT':
-      return ['COMFORT', 'VIP'];
     case 'VIP':
-      return ['VIP'];
+      return [normalized];
     default:
       return [];
   }

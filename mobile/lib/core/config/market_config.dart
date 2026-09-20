@@ -232,15 +232,15 @@ class MarketConfig {
     return vehicleTypes.where((v) => v.id != 'MOTO_TAXI').toList();
   }
 
-  /// Véhicules chauffeur compatibles avec une course (même règle que le backend).
+  /// Véhicules chauffeur compatibles avec une course (même règle stricte que le backend).
   static List<String> driverVehicleTypesForRide(String rideType) {
     switch (normalizeVehicleType(rideType)) {
       case 'MOTO_TAXI':
         return const ['MOTO_TAXI'];
       case 'STANDARD':
-        return const ['STANDARD', 'COMFORT', 'VIP'];
+        return const ['STANDARD'];
       case 'COMFORT':
-        return const ['COMFORT', 'VIP'];
+        return const ['COMFORT'];
       case 'VIP':
         return const ['VIP'];
       default:

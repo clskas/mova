@@ -36,14 +36,16 @@ describe('ride-contract', () => {
     expect(toMobileVehicleType('VIP')).toBe('VIP');
   });
 
-  it('matches driver tiers to ride types', () => {
+  it('matches driver tiers to ride types (exact category only)', () => {
     expect(rideTypesDriverCanServe(['STANDARD'])).toEqual(['STANDARD']);
-    expect(rideTypesDriverCanServe(['COMFORT']).sort()).toEqual(['COMFORT', 'STANDARD'].sort());
-    expect(rideTypesDriverCanServe(['VIP']).sort()).toEqual(['COMFORT', 'STANDARD', 'VIP'].sort());
-    expect(driverVehicleTypesForRide('COMFORT').sort()).toEqual(['COMFORT', 'VIP'].sort());
-    expect(driverVehicleTypesForRide('STANDARD').sort()).toEqual(['COMFORT', 'STANDARD', 'VIP'].sort());
+    expect(rideTypesDriverCanServe(['COMFORT'])).toEqual(['COMFORT']);
+    expect(rideTypesDriverCanServe(['VIP'])).toEqual(['VIP']);
+    expect(rideTypesDriverCanServe(['COMFORT', 'VIP']).sort()).toEqual(['COMFORT', 'VIP'].sort());
+    expect(driverVehicleTypesForRide('COMFORT')).toEqual(['COMFORT']);
+    expect(driverVehicleTypesForRide('STANDARD')).toEqual(['STANDARD']);
+    expect(driverVehicleTypesForRide('VIP')).toEqual(['VIP']);
     expect(driverVehicleTypesForRide('MOTO')).toEqual(['MOTO_TAXI']);
-    expect(driverVehicleTypesForRide('TAXI').sort()).toEqual(['COMFORT', 'STANDARD', 'VIP'].sort());
+    expect(driverVehicleTypesForRide('TAXI')).toEqual(['STANDARD']);
     expect(driverVehicleTypesForRide('UNKNOWN')).toEqual([]);
   });
 

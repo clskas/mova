@@ -120,6 +120,13 @@ class MovaErrorBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     final friendly = sanitizeUserMessage(message);
     final narrow = MediaQuery.sizeOf(context).width < 360;
+    // Fond clair + texte sombre : lisible sur écrans clairs et sur fonds midnight (offre chauffeur).
+    const messageStyle = TextStyle(
+      fontSize: 13,
+      height: 1.35,
+      color: Color(0xFF9A3412),
+      fontWeight: FontWeight.w600,
+    );
 
     final messageRow = Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -129,7 +136,7 @@ class MovaErrorBanner extends StatelessWidget {
         Expanded(
           child: Text(
             friendly,
-            style: const TextStyle(fontSize: 13, height: 1.35),
+            style: messageStyle,
             maxLines: 5,
             overflow: TextOverflow.ellipsis,
           ),
@@ -141,9 +148,9 @@ class MovaErrorBanner extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: MovaColors.orange.withValues(alpha: 0.1),
+        color: const Color(0xFFFFF7ED),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: MovaColors.orange.withValues(alpha: 0.4)),
+        border: Border.all(color: MovaColors.orange.withValues(alpha: 0.55)),
       ),
       child: narrow && onRetry != null
           ? Column(
@@ -164,7 +171,7 @@ class MovaErrorBanner extends StatelessWidget {
                 Expanded(
                   child: Text(
                     friendly,
-                    style: const TextStyle(fontSize: 13, height: 1.35),
+                    style: messageStyle,
                     maxLines: 5,
                     overflow: TextOverflow.ellipsis,
                   ),

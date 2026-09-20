@@ -32,8 +32,10 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
   bool _loading = false;
   String? _error;
   Timer? _timer;
+  Timer? _statusPollTimer;
   double? _pickupDistanceKm;
   int? _pickupEtaMin;
+  bool _closingForCancel = false;
 
   String get _rideId => widget.offer['id']?.toString() ?? '';
 
@@ -50,6 +52,38 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
       }
       setState(() => _countdown--);
     });
+    _statusPollTimer = Timer.periodic(const Duration(seconds: 2), (_) => _pollRideStillOpen());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _pollRideStillOpen());
+  }
+
+  /// Si le passager annule pendant l'affichage de l'offre, fermer immédiatement.
+  Future<void> _pollRideStillOpen() async {
+    if (_closingForCancel || _loading || !mounted || _rideId.isEmpty) return;
+    final api = ref.read(apiClientProvider);
+    final result = await api.getRide(_rideId);
+    if (!mounted || _closingForCancel) return;
+    if (result case Success(:final data)) {
+      final status = (data['status']?.toString() ?? '').toUpperCase();
+      if (status == 'CANCELLED' || status == 'CANCELED') {
+        _closeAsCancelled();
+      } else if (status.isNotEmpty &&
+          status != 'SEARCHING' &&
+          status != 'MATCHING' &&
+          status != 'REQUESTED') {
+        // Déjà prise / autre état — fermer sans message d'erreur générique.
+        _timer?.cancel();
+        _statusPollTimer?.cancel();
+        if (mounted) Navigator.pop(context, 'taken');
+      }
+    }
+  }
+
+  void _closeAsCancelled() {
+    if (_closingForCancel || !mounted) return;
+    _closingForCancel = true;
+    _timer?.cancel();
+    _statusPollTimer?.cancel();
+    Navigator.pop(context, 'cancelled');
   }
 
   /// Le compte à rebours a expiré sans réponse du chauffeur.
@@ -104,6 +138,7 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
   @override
   void dispose() {
     _timer?.cancel();
+    _statusPollTimer?.cancel();
     super.dispose();
   }
 
@@ -119,12 +154,28 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
     switch (result) {
       case Success(:final data):
         _timer?.cancel();
+        _statusPollTimer?.cancel();
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => ActiveRideScreen(ride: data)),
         );
       case Failure(:final error):
-        setState(() => _error = error.message);
+        final msg = error.message;
+        final looksInvalidStatus = msg.contains('Statut de course invalide');
+        if (looksInvalidStatus) {
+          final rideResult = await api.getRide(_rideId);
+          if (!mounted) return;
+          if (rideResult case Success(:final data)) {
+            final status = (data['status']?.toString() ?? '').toUpperCase();
+            if (status == 'CANCELLED' || status == 'CANCELED') {
+              _closeAsCancelled();
+              return;
+            }
+          }
+          setState(() => _error = 'Course annulée ou déjà prise.');
+          return;
+        }
+        setState(() => _error = msg);
     }
   }
 
@@ -140,9 +191,15 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
     switch (result) {
       case Success():
         _timer?.cancel();
+        _statusPollTimer?.cancel();
         Navigator.pop(context, 'rejected');
       case Failure(:final error):
-        setState(() => _error = error.message);
+        final msg = error.message;
+        if (msg.contains('Statut de course invalide')) {
+          _closeAsCancelled();
+          return;
+        }
+        setState(() => _error = msg);
     }
   }
 

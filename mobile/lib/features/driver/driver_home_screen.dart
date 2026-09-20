@@ -529,6 +529,9 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
         setState(() {
           _rideOffers = _rideOffers.where((o) => o['id']?.toString() != id).toList();
         });
+        if (_showingOffer && _openOfferId == id && _openOfferKind == 'ride') {
+          Navigator.of(context).pop('cancelled');
+        }
       },
       onOfferTaken: (payload) {
         if (!mounted) return;
@@ -916,6 +919,16 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
     _openOfferId = null;
     if (result == 'taken') {
       _dismissedOffers.add('ride:$id');
+    } else if (result == 'cancelled') {
+      _dismissedOffers.add('ride:$id');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Course annulée par le passager'),
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
     } else if (result == 'timeout') {
       // Pas de réponse : ne pas masquer définitivement, re-proposer plus tard.
       _snoozedOffers['ride:$id'] = DateTime.now();

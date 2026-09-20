@@ -364,9 +364,19 @@ export class RidesService {
       const ar = ride.roundTrip ? ' · Aller-retour' : '';
       let driverUserIds = await filterDriversNotDebtBlocked(drivers.map((d) => d.userId));
       driverUserIds = await filterDriversAcceptingRides(driverUserIds);
-      if (driverUserIds.length === 0) {
-        // no eligible drivers this attempt
-      } else {
+      const eligibleDrivers = drivers.filter((d) => driverUserIds.includes(d.userId));
+      if (eligibleDrivers.length === 0) {
+        const meta = this.matching.getMatchingMeta(attempts);
+        return {
+          rideId: ride.id,
+          status: toMobileRideStatus(RideStatus.SEARCHING),
+          attempt: attempts + 1,
+          driversFound: 0,
+          ...meta,
+          drivers: [],
+          matchingWeights: this.platformConfig.get().matching.scoreWeights,
+        };
+      }
       const alert: DriverJobAlertPayload = {
         jobKind: 'RIDE_OFFER',
         referenceId: ride.id,
@@ -386,7 +396,25 @@ export class RidesService {
         pickupLng: ride.pickupLng,
         roundTrip: ride.roundTrip === true,
       });
-      }
+      const meta = this.matching.getMatchingMeta(attempts);
+      return {
+        rideId: ride.id,
+        status: toMobileRideStatus(RideStatus.SEARCHING),
+        attempt: attempts + 1,
+        driversFound: eligibleDrivers.length,
+        ...meta,
+        drivers: eligibleDrivers.map((d) => ({
+          driverId: d.driverId,
+          userId: d.userId,
+          lat: d.lat,
+          lng: d.lng,
+          rating: d.rating,
+          distanceKm: Math.round(d.distanceKm * 100) / 100,
+          score: Math.round(d.score * 1000) / 1000,
+          vehicleId: d.vehicleId,
+        })),
+        matchingWeights: this.platformConfig.get().matching.scoreWeights,
+      };
     }
     const meta = this.matching.getMatchingMeta(attempts);
 
@@ -394,18 +422,9 @@ export class RidesService {
       rideId: ride.id,
       status: toMobileRideStatus(RideStatus.SEARCHING),
       attempt: attempts + 1,
-      driversFound: drivers.length,
+      driversFound: 0,
       ...meta,
-      drivers: drivers.map((d) => ({
-        driverId: d.driverId,
-        userId: d.userId,
-        lat: d.lat,
-        lng: d.lng,
-        rating: d.rating,
-        distanceKm: Math.round(d.distanceKm * 100) / 100,
-        score: Math.round(d.score * 1000) / 1000,
-        vehicleId: d.vehicleId,
-      })),
+      drivers: [],
       matchingWeights: this.platformConfig.get().matching.scoreWeights,
     };
   }

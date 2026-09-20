@@ -2,6 +2,9 @@
 
 Console web pour les **partenaires commerce** (restaurant, supermarché, pharmacie, boutique) : recevoir, confirmer et préparer les commandes passées via l'app SENGA.
 
+**Production :** [https://sengapartner.afri-soft.com](https://sengapartner.afri-soft.com)  
+(Ancien hôte `restaurant.afri-soft.com` → redirection 301. Checklist DNS/Render : [docs/SENGA_PARTNER_DOMAIN.md](../docs/SENGA_PARTNER_DOMAIN.md).)
+
 ## Démarrage (dev)
 
 ```powershell

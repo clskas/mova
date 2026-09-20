@@ -28,7 +28,7 @@ export function PartnerWithdrawPanel({ balanceCdf, walletAvailable = true, onWit
   );
   const [provider, setProvider] = useState("MPESA");
   const [phone, setPhone] = useState("");
-  const [otp, setOtp] = useState("");
+  const [otp, setOtp] = useState("000000");
   const [otpSent, setOtpSent] = useState(false);
   const [loading, setLoading] = useState<"withdraw" | "topup" | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -36,13 +36,14 @@ export function PartnerWithdrawPanel({ balanceCdf, walletAvailable = true, onWit
   const inFlight = useRef(false);
 
   useEffect(() => {
+    const looksLikePhone = (v: string) => /^\+?\d[\d\s-]{7,}$/.test(v.trim());
     const saved = localStorage.getItem(PAYOUT_PHONE_KEY);
-    if (saved) {
+    if (saved && looksLikePhone(saved)) {
       setPhone(saved);
       return;
     }
     const fromToken = phoneFromToken();
-    if (fromToken) setPhone(fromToken);
+    if (fromToken && looksLikePhone(fromToken)) setPhone(fromToken);
   }, []);
 
   useEffect(() => {
@@ -141,7 +142,7 @@ export function PartnerWithdrawPanel({ balanceCdf, walletAvailable = true, onWit
           rememberPhone();
           setSuccess(result.message ?? "Retrait initié avec succès.");
           setAmount("");
-          setOtp("");
+          setOtp("000000");
           setOtpSent(false);
           onWithdrawn?.();
           return;
@@ -163,7 +164,7 @@ export function PartnerWithdrawPanel({ balanceCdf, walletAvailable = true, onWit
       rememberPhone();
       setSuccess(result.message ?? "Retrait initié avec succès.");
       setAmount("");
-      setOtp("");
+      setOtp("000000");
       setOtpSent(false);
       onWithdrawn?.();
     } catch (e) {
@@ -229,8 +230,7 @@ export function PartnerWithdrawPanel({ balanceCdf, walletAvailable = true, onWit
         <h3 className="font-medium text-[#1A1A2E]">Retirer vers Mobile Money</h3>
         <p className="text-sm text-gray-600 mt-1 leading-relaxed">
           Solde disponible : <strong>{formatCdf(balanceCdf)}</strong>. Choisissez l&apos;opérateur,
-          le numéro qui recevra l&apos;argent, puis le montant (min. 2&nbsp;300&nbsp;FC). Un code
-          SMS confirme le versement.
+          le numéro qui recevra l&apos;argent, puis le montant (min. 2&nbsp;300&nbsp;FC).
         </p>
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
@@ -268,16 +268,21 @@ export function PartnerWithdrawPanel({ balanceCdf, walletAvailable = true, onWit
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
         />
-        {otpSent && (
+        <label className="block text-xs text-gray-500">
+          Code à 6 chiffres
           <input
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+            className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
             inputMode="numeric"
             maxLength={6}
-            placeholder="Code à 6 chiffres reçu par SMS"
+            placeholder="000000"
             value={otp}
-            onChange={(e) => setOtp(e.target.value)}
+            onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
           />
-        )}
+        </label>
+        <p className="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+          SMS temporairement indisponibles : laissez <strong>000000</strong> pour confirmer le
+          retrait (même règle que les apps mobiles).
+        </p>
         <button
           type="button"
           disabled={loading !== null || balanceCdf < 2300}

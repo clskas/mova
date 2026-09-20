@@ -226,10 +226,11 @@ export function PartnerWithdrawPanel({ balanceCdf, walletAvailable = true, onWit
   return (
     <section className="rounded-xl border border-gray-100 bg-white p-4 space-y-5">
       <div>
-        <h3 className="font-medium text-[#1A1A2E]">Portefeuille Mobile Money</h3>
-        <p className="text-xs text-gray-500 mt-1">
-          Orange Money, M-Pesa ou Airtel Money (selon disponibilité). Minimum SerdiPay 2 300 FC. Solde :{" "}
-          <strong>{formatCdf(balanceCdf)}</strong>
+        <h3 className="font-medium text-[#1A1A2E]">Retirer vers Mobile Money</h3>
+        <p className="text-sm text-gray-600 mt-1 leading-relaxed">
+          Solde disponible : <strong>{formatCdf(balanceCdf)}</strong>. Choisissez l&apos;opérateur,
+          le numéro qui recevra l&apos;argent, puis le montant (min. 2&nbsp;300&nbsp;FC). Un code
+          SMS confirme le versement.
         </p>
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
@@ -257,18 +258,52 @@ export function PartnerWithdrawPanel({ balanceCdf, walletAvailable = true, onWit
           />
         </label>
       </div>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-2">
-          <p className="text-sm font-medium text-[#1A1A2E]">Recharger</p>
+      <div className="space-y-2">
+        <p className="text-sm font-medium text-[#1A1A2E]">Montant à retirer</p>
+        <input
+          type="number"
+          min={2300}
+          className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+          placeholder="5000"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+        />
+        {otpSent && (
+          <input
+            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+            inputMode="numeric"
+            maxLength={6}
+            placeholder="Code à 6 chiffres reçu par SMS"
+            value={otp}
+            onChange={(e) => setOtp(e.target.value)}
+          />
+        )}
+        <button
+          type="button"
+          disabled={loading !== null || balanceCdf < 2300}
+          onClick={submitWithdraw}
+          className="px-4 py-2.5 min-h-11 rounded-xl bg-orange-600 text-white text-sm font-medium disabled:opacity-50 w-full sm:w-auto sm:min-w-[12rem]"
+        >
+          {loading === "withdraw"
+            ? "Retrait en cours…"
+            : otpSent
+              ? "Confirmer le retrait"
+              : "Retirer"}
+        </button>
+      </div>
+      <details className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2">
+        <summary className="text-sm font-medium text-gray-700 cursor-pointer">
+          Recharger le solde (optionnel)
+        </summary>
+        <div className="mt-2 space-y-2">
           <p className="text-xs text-gray-500 leading-relaxed">
-            La recharge ne sert pas à encaisser le cash COD. Elle permet de régler des frais
-            plateforme ou dettes, et de disposer d&apos;un solde virtuel pour opérations futures
-            (même portefeuille que les retraits Mobile Money).
+            Utile uniquement pour régler des frais plateforme ou des dettes — pas pour encaisser
+            vos ventes (déjà sur le solde retirable).
           </p>
           <input
             type="number"
             min={2300}
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm bg-white"
             placeholder="2300"
             value={topUpAmount}
             onChange={(e) => setTopUpAmount(e.target.value)}
@@ -277,45 +312,12 @@ export function PartnerWithdrawPanel({ balanceCdf, walletAvailable = true, onWit
             type="button"
             disabled={loading !== null}
             onClick={submitTopUp}
-            className="px-4 py-2.5 min-h-11 rounded-xl bg-emerald-600 text-white text-sm font-medium disabled:opacity-50 w-full"
+            className="px-4 py-2.5 min-h-11 rounded-xl bg-emerald-600 text-white text-sm font-medium disabled:opacity-50 w-full sm:w-auto"
           >
             {loading === "topup" ? "Recharge…" : "Recharger (min. 2 300 FC)"}
           </button>
         </div>
-        <div className="space-y-2">
-          <p className="text-sm font-medium text-[#1A1A2E]">Retirer</p>
-          <input
-            type="number"
-            min={2300}
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-            placeholder="5000"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-          />
-          {otpSent && (
-            <input
-              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-              inputMode="numeric"
-              maxLength={6}
-              placeholder="Code à 6 chiffres"
-              value={otp}
-              onChange={(e) => setOtp(e.target.value)}
-            />
-          )}
-          <button
-            type="button"
-            disabled={loading !== null || balanceCdf < 2300}
-            onClick={submitWithdraw}
-            className="px-4 py-2.5 min-h-11 rounded-xl bg-orange-600 text-white text-sm font-medium disabled:opacity-50 w-full"
-          >
-            {loading === "withdraw"
-              ? "Retrait en cours…"
-              : otpSent
-                ? "Confirmer le retrait"
-                : "Envoyer le code"}
-          </button>
-        </div>
-      </div>
+      </details>
       {success && <p className="text-sm text-green-700">{success}</p>}
       {error && <p className="text-sm text-red-600">{error}</p>}
     </section>

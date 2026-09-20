@@ -91,10 +91,10 @@ export default function EarningsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-semibold text-[#1A1A2E]">Revenus repas</h2>
+        <h2 className="text-xl font-semibold text-[#1A1A2E]">Revenus</h2>
         <p className="text-sm text-gray-600 mt-1">
-          Votre part est créditée après paiement portefeuille / Mobile Money (commission SENGA déduite).
-          En espèces, le crédit arrive après règlement du livreur au guichet SENGA.
+          Chaque vente (hors commission SENGA) alimente votre solde. Pour encaisser : indiquez le
+          montant et votre numéro Mobile Money ci-dessous — un code SMS confirme le transfert.
         </p>
       </div>
 
@@ -116,7 +116,7 @@ export default function EarningsPage() {
                 {formatCdf(earnings.withdrawableCdf ?? earnings.balanceCdf)}
               </p>
               <p className="text-xs opacity-80 mt-2">
-                Prépayements wallet / Mobile Money — retirable vers votre Mobile Money.
+                Vos ventes déjà créditées — retirez vers Mobile Money ci-dessous.
               </p>
             </div>
             <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 sm:p-6">
@@ -129,27 +129,8 @@ export default function EarningsPage() {
               </p>
             </div>
           </div>
-          {(earnings.salesNetCdf != null || earnings.deliveryFeeCdf != null) && (
-            <div className="grid gap-3 sm:grid-cols-2 text-sm">
-              <div className="rounded-xl border border-gray-100 bg-white p-4">
-                <p className="text-gray-500">Part ventes (net)</p>
-                <p className="text-lg font-semibold text-[#1A1A2E] mt-1">
-                  {formatCdf(earnings.salesNetCdf ?? 0)}
-                </p>
-              </div>
-              <div className="rounded-xl border border-gray-100 bg-white p-4">
-                <p className="text-gray-500">Frais de livraison (livreur)</p>
-                <p className="text-lg font-semibold text-[#1A1A2E] mt-1">
-                  {formatCdf(earnings.deliveryFeeCdf ?? 0)}
-                </p>
-                <p className="text-xs text-gray-500 mt-1">
-                  Versés au livreur — ne font pas partie de votre solde.
-                </p>
-              </div>
-            </div>
-          )}
           <PartnerWithdrawPanel
-            balanceCdf={earnings.balanceCdf}
+            balanceCdf={earnings.withdrawableCdf ?? earnings.balanceCdf}
             walletAvailable={earnings.walletAvailable !== false}
             onWithdrawn={() => {
               setLoading(true);

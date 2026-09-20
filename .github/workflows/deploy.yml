@@ -158,21 +158,36 @@ jobs:
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
           GATEWAY_RENDER_SERVICE_ID: ${{ steps.render.outputs.gateway }}
+          EXPECTED_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
         run: |
           if [ -z "$RENDER_API_KEY" ] || [ -z "$GATEWAY_RENDER_SERVICE_ID" ]; then
             echo "RENDER_API_KEY or GATEWAY_RENDER_SERVICE_ID not set — skip wait"
             sleep 30
             exit 0
           fi
+          # A second API trigger for the same commit can finish as build_failed in ~2s
+          # while an earlier deploy of that commit is already live. Poll several
+          # recent deploys and succeed if the expected SHA is live.
           for i in $(seq 1 45); do
-            status=$(curl -sf -H "Authorization: Bearer $RENDER_API_KEY" \
-              "https://api.render.com/v1/services/${GATEWAY_RENDER_SERVICE_ID}/deploys?limit=1" \
-              | jq -r '.[0].status // .[0].deploy.status // "unknown"')
-            echo "Gateway deploy status: $status (attempt $i)"
-            if [ "$status" = "live" ]; then exit 0; fi
-            if [ "$status" = "build_failed" ] || [ "$status" = "update_failed" ]; then
-              echo "Deploy failed on Render"
-              exit 1
+            json=$(curl -sf -H "Authorization: Bearer $RENDER_API_KEY" \
+              "https://api.render.com/v1/services/${GATEWAY_RENDER_SERVICE_ID}/deploys?limit=5")
+            latest=$(echo "$json" | jq -r '.[0].status // .[0].deploy.status // "unknown"')
+            live_for_sha=$(echo "$json" | jq -r --arg sha "$EXPECTED_SHA" '
+              [.[] | (.deploy // .) | select(.status == "live" and .commit.id == $sha)] | length
+            ')
+            failed_for_sha=$(echo "$json" | jq -r --arg sha "$EXPECTED_SHA" '
+              [.[] | (.deploy // .) | select((.status == "build_failed" or .status == "update_failed") and .commit.id == $sha)] | length
+            ')
+            echo "Gateway latest=$latest live_for_sha=$live_for_sha failed_for_sha=$failed_for_sha (attempt $i)"
+            if [ "$live_for_sha" != "0" ]; then
+              echo "Gateway deploy live for $EXPECTED_SHA"
+              exit 0
+            fi
+            if [ "$latest" = "build_failed" ] || [ "$latest" = "update_failed" ]; then
+              if [ "$failed_for_sha" != "0" ] && [ "$live_for_sha" = "0" ]; then
+                echo "Deploy failed on Render for $EXPECTED_SHA"
+                exit 1
+              fi
             fi
             sleep 20
           done

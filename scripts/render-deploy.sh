@@ -65,6 +65,33 @@ fi
 failed=0
 for id in $IDS; do
   echo "Deploying Render service $id (commit: ${COMMIT_SHA:-latest})"
+
+  # Skip re-trigger when this commit is already live (avoids a race where a
+  # second deploy returns build_failed in seconds while prod is fine).
+  if [ -n "$COMMIT_SHA" ]; then
+    recent=$(curl -sf -H "Authorization: Bearer ${RENDER_API_KEY}" \
+      "https://api.render.com/v1/services/${id}/deploys?limit=3" || true)
+    if [ -n "$recent" ]; then
+      already_live=$(echo "$recent" | jq -r --arg sha "$COMMIT_SHA" '
+        [.[] | (.deploy // .) | select(.status == "live" and .commit.id == $sha)] | length
+      ')
+      in_flight=$(echo "$recent" | jq -r --arg sha "$COMMIT_SHA" '
+        [.[] | (.deploy // .) | select(
+          (.status == "build_in_progress" or .status == "update_in_progress" or .status == "created" or .status == "queued")
+          and .commit.id == $sha
+        )] | length
+      ')
+      if [ "$already_live" != "0" ]; then
+        echo "  Skipped — commit $COMMIT_SHA already live"
+        continue
+      fi
+      if [ "$in_flight" != "0" ]; then
+        echo "  Skipped — deploy already in progress for $COMMIT_SHA"
+        continue
+      fi
+    fi
+  fi
+
   response=$(mktemp)
   http_code=$(curl -sS -w "%{http_code}" -o "$response" -X POST \
     "https://api.render.com/v1/services/${id}/deploys" \

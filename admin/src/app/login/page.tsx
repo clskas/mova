@@ -10,7 +10,6 @@ import {
   getToken,
   isPinPending,
   isPinSessionUnlocked,
-  isSeedDemoPhone,
   markPinSessionUnlocked,
   normalizeLoginPhone,
   phoneFromToken,

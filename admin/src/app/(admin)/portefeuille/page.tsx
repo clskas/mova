@@ -508,6 +508,14 @@ export default function PortefeuillePage() {
 
   const cards = [
     { label: "Trésorerie SENGA (encaissée)", value: `${(wallet.platformBalanceCdf ?? platformTreasury?.balanceCdf ?? 0).toLocaleString("fr-CD")} FC` },
+    {
+      label: "Encaissements guichet (non retirable)",
+      value: `${(wallet.deskCashCollectedCdf ?? 0).toLocaleString("fr-CD")} FC`,
+    },
+    {
+      label: "Commissions prépayées (trésorerie)",
+      value: `${(wallet.prepaidCommissionCdf ?? 0).toLocaleString("fr-CD")} FC`,
+    },
     { label: "Dettes utilisateurs (wallets)", value: `${(wallet.userLiabilitiesCdf ?? 0).toLocaleString("fr-CD")} FC` },
     { label: "Revenus courses du jour (GMV)", value: `${m.revenueTodayCdf.toLocaleString("fr-CD")} FC` },
     { label: "Solde agrégé (tous wallets)", value: `${(wallet.totalBalanceCdf ?? 0).toLocaleString("fr-CD")} FC` },

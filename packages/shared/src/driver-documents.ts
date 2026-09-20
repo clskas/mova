@@ -1,4 +1,4 @@
-export type DriverDocumentField = 'license' | 'insurance' | 'technicalInspection';
+export type DriverDocumentField = 'license' | 'insurance' | 'technicalInspection' | 'fiscalSticker';
 
 export type VehicleTypeApprovalStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 
@@ -6,6 +6,7 @@ export interface DriverDocumentExpiryInput {
   licenseExpiry?: Date | string | null;
   insuranceExpiry?: Date | string | null;
   technicalInspectionExpiry?: Date | string | null;
+  fiscalStickerExpiry?: Date | string | null;
   documentsRenewalPending?: boolean;
   vehicleTypeApprovalStatus?: VehicleTypeApprovalStatus | null;
   vehicleTypeApprovalNotes?: string | null;
@@ -37,11 +38,12 @@ const MS_PER_DAY = 86_400_000;
 const DOCUMENT_FIELDS: {
   field: DriverDocumentField;
   label: string;
-  key: 'licenseExpiry' | 'insuranceExpiry' | 'technicalInspectionExpiry';
+  key: 'licenseExpiry' | 'insuranceExpiry' | 'technicalInspectionExpiry' | 'fiscalStickerExpiry';
 }[] = [
   { field: 'license', label: 'Permis de conduire', key: 'licenseExpiry' },
   { field: 'insurance', label: 'Assurance véhicule', key: 'insuranceExpiry' },
   { field: 'technicalInspection', label: 'Visite technique', key: 'technicalInspectionExpiry' },
+  { field: 'fiscalSticker', label: 'Vignette fiscale', key: 'fiscalStickerExpiry' },
 ];
 
 function startOfDay(date: Date): Date {

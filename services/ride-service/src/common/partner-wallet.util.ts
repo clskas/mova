@@ -240,6 +240,31 @@ export function sumTransactionAmounts(rows: PartnerWalletTransaction[]) {
   return rows.reduce((sum, tx) => sum + (tx.amountCdf ?? 0), 0);
 }
 
+export type PartnerCashVirtual = {
+  withdrawableCdf: number;
+  cashEarningsCdf: number;
+  lifetimeCashShareCdf: number;
+  currency: string;
+};
+
+export async function fetchPartnerCashVirtual(ownerUserId: string): Promise<PartnerCashVirtual> {
+  try {
+    const res = await paymentFetch(`/internal/earnings/partner/${ownerUserId}/cash-virtual`);
+    if (!res.ok) {
+      return { withdrawableCdf: 0, cashEarningsCdf: 0, lifetimeCashShareCdf: 0, currency: 'CDF' };
+    }
+    const body = (await res.json()) as PartnerCashVirtual;
+    return {
+      withdrawableCdf: body.withdrawableCdf ?? 0,
+      cashEarningsCdf: body.cashEarningsCdf ?? 0,
+      lifetimeCashShareCdf: body.lifetimeCashShareCdf ?? 0,
+      currency: body.currency ?? 'CDF',
+    };
+  } catch {
+    return { withdrawableCdf: 0, cashEarningsCdf: 0, lifetimeCashShareCdf: 0, currency: 'CDF' };
+  }
+}
+
 export function startOfDay(d = new Date()) {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }

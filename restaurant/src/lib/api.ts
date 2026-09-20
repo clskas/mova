@@ -233,6 +233,10 @@ export type RestaurantEarnings = {
   formattedBalance: string;
   walletAvailable?: boolean;
   walletMessage?: string;
+  withdrawableCdf?: number;
+  cashEarningsCdf?: number;
+  salesNetCdf?: number;
+  deliveryFeeCdf?: number;
   recentFoodSales: {
     id: string;
     amountCdf: number;

@@ -303,6 +303,8 @@ export type PartnerEarnings = {
   formattedBalance: string;
   walletAvailable?: boolean;
   walletMessage?: string;
+  withdrawableCdf?: number;
+  cashEarningsCdf?: number;
   recentCredits: { id: string; amountCdf: number; description?: string; reference?: string; createdAt: string }[];
 };
 

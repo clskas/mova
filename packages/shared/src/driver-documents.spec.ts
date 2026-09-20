@@ -9,6 +9,7 @@ describe('evaluateDriverDocuments', () => {
         licenseExpiry: '2027-01-01',
         insuranceExpiry: '2027-01-01',
         technicalInspectionExpiry: '2027-01-01',
+        fiscalStickerExpiry: '2027-01-01',
       },
       now,
       30,
@@ -31,6 +32,7 @@ describe('evaluateDriverDocuments', () => {
         licenseExpiry: '2026-06-15',
         insuranceExpiry: '2027-01-01',
         technicalInspectionExpiry: '2027-01-01',
+        fiscalStickerExpiry: '2027-01-01',
       },
       now,
       30,
@@ -47,6 +49,7 @@ describe('evaluateDriverDocuments', () => {
         licenseExpiry: '2026-06-16',
         insuranceExpiry: '2026-06-16',
         technicalInspectionExpiry: '2026-06-16',
+        fiscalStickerExpiry: '2026-06-16',
       },
       now,
       30,
@@ -65,6 +68,7 @@ describe('evaluateDriverDocuments', () => {
     expect(status.canOperate).toBe(false);
     expect(status.missing).toContain('insurance');
     expect(status.missing).toContain('technicalInspection');
+    expect(status.missing).toContain('fiscalSticker');
   });
 
   it('blocks operation when renewal is pending admin review', () => {
@@ -73,6 +77,7 @@ describe('evaluateDriverDocuments', () => {
         licenseExpiry: '2027-01-01',
         insuranceExpiry: '2027-01-01',
         technicalInspectionExpiry: '2027-01-01',
+        fiscalStickerExpiry: '2027-01-01',
         documentsRenewalPending: true,
       },
       now,
@@ -89,6 +94,7 @@ describe('evaluateDriverDocuments', () => {
         licenseExpiry: '2027-01-01',
         insuranceExpiry: '2027-01-01',
         technicalInspectionExpiry: '2027-01-01',
+        fiscalStickerExpiry: '2027-01-01',
         vehicleTypeApprovalStatus: 'PENDING',
       },
       now,
@@ -103,6 +109,7 @@ describe('evaluateDriverDocuments', () => {
         licenseExpiry: '2027-01-01',
         insuranceExpiry: '2027-01-01',
         technicalInspectionExpiry: '2027-01-01',
+        fiscalStickerExpiry: '2027-01-01',
         vehicleTypeApprovalStatus: 'REJECTED',
         vehicleTypeApprovalNotes: 'Photo moto, VIP déclaré',
       },
@@ -118,6 +125,7 @@ describe('evaluateDriverDocuments', () => {
         licenseExpiry: '2027-01-01',
         insuranceExpiry: '2027-01-01',
         technicalInspectionExpiry: '2027-01-01',
+        fiscalStickerExpiry: '2027-01-01',
         vehicleTypeApprovalStatus: 'APPROVED',
       },
       now,

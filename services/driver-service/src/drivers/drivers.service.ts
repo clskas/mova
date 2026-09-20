@@ -59,6 +59,7 @@ export class DriversService {
     licenseExpiry?: Date | null;
     insuranceExpiry?: Date | null;
     technicalInspectionExpiry?: Date | null;
+    fiscalStickerExpiry?: Date | null;
     documentsRenewalPending?: boolean;
     createdAt?: Date | null;
     vehicles?: { typeApprovalStatus?: KycStatus; typeApprovalNotes?: string | null; isActive?: boolean }[];
@@ -75,6 +76,7 @@ export class DriversService {
         licenseExpiry: profile.licenseExpiry,
         insuranceExpiry: profile.insuranceExpiry,
         technicalInspectionExpiry: profile.technicalInspectionExpiry,
+        fiscalStickerExpiry: profile.fiscalStickerExpiry,
         documentsRenewalPending: profile.documentsRenewalPending,
         vehicleTypeApprovalStatus: activeVehicle?.typeApprovalStatus,
         vehicleTypeApprovalNotes: activeVehicle?.typeApprovalNotes,
@@ -139,6 +141,7 @@ export class DriversService {
       licenseExpiry?: Date | null;
       insuranceExpiry?: Date | null;
       technicalInspectionExpiry?: Date | null;
+      fiscalStickerExpiry?: Date | null;
     },
     dto: UpdateOnboardingDto,
     profileData: Record<string, unknown>,
@@ -148,7 +151,9 @@ export class DriversService {
       (dto.licenseExpiry !== undefined && !this.sameCalendarDay(profile.licenseExpiry, dto.licenseExpiry)) ||
       (dto.insuranceExpiry !== undefined && !this.sameCalendarDay(profile.insuranceExpiry, dto.insuranceExpiry)) ||
       (dto.technicalInspectionExpiry !== undefined &&
-        !this.sameCalendarDay(profile.technicalInspectionExpiry, dto.technicalInspectionExpiry));
+        !this.sameCalendarDay(profile.technicalInspectionExpiry, dto.technicalInspectionExpiry)) ||
+      (dto.fiscalStickerExpiry !== undefined &&
+        !this.sameCalendarDay(profile.fiscalStickerExpiry, dto.fiscalStickerExpiry));
     if (expiryChanged) {
       profileData.documentsRenewalPending = true;
       profileData.documentsRenewalRequestedAt = new Date();
@@ -453,6 +458,7 @@ export class DriversService {
         licenseExpiry: profile?.licenseExpiry,
         insuranceExpiry: profile?.insuranceExpiry,
         technicalInspectionExpiry: profile?.technicalInspectionExpiry,
+        fiscalStickerExpiry: profile?.fiscalStickerExpiry,
         payoutProvider: profile?.payoutProvider,
         payoutPhone: profile?.payoutPhone,
         charterAcceptedAt: profile?.charterAcceptedAt,
@@ -495,6 +501,9 @@ export class DriversService {
     if (dto.insuranceExpiry !== undefined) profileData.insuranceExpiry = new Date(dto.insuranceExpiry);
     if (dto.technicalInspectionExpiry !== undefined) {
       profileData.technicalInspectionExpiry = new Date(dto.technicalInspectionExpiry);
+    }
+    if (dto.fiscalStickerExpiry !== undefined) {
+      profileData.fiscalStickerExpiry = new Date(dto.fiscalStickerExpiry);
     }
     if (dto.payoutProvider !== undefined) profileData.payoutProvider = dto.payoutProvider;
     if (dto.payoutPhone !== undefined) profileData.payoutPhone = dto.payoutPhone;
@@ -931,9 +940,10 @@ export class DriversService {
       }
     };
 
-    const [earnings, wallet] = await Promise.all([
+    const [earnings, wallet, cashVirtual] = await Promise.all([
       fetchJson(serviceUrl('ride', `/internal/rides/driver/${userId}/earnings`)),
       fetchJson(serviceUrl('payment', `/internal/wallets/${userId}`)),
+      fetchJson(serviceUrl('payment', `/internal/earnings/driver/${userId}/cash-virtual`)),
     ]);
 
     const earningsData = earnings ?? {
@@ -947,11 +957,14 @@ export class DriversService {
       deliveryEarningsCdf: 0,
     };
     const walletData = wallet ?? { balanceCdf: 0 };
+    const balance = walletData.balanceCdf ?? 0;
 
     return {
       ...earningsData,
-      walletBalanceCdf: walletData.balanceCdf ?? 0,
-      withdrawableCdf: walletData.balanceCdf ?? 0,
+      walletBalanceCdf: balance,
+      withdrawableCdf: cashVirtual?.withdrawableCdf ?? balance,
+      cashEarningsCdf: cashVirtual?.cashEarningsCdf ?? 0,
+      prepaidEarningsCdf: cashVirtual?.prepaidEarningsCdf ?? 0,
       currency: 'CDF',
       payoutProvider: profile?.payoutProvider ?? null,
       payoutPhone: profile?.payoutPhone ?? null,
@@ -1394,6 +1407,7 @@ export class DriversService {
       licenseExpiry: profile?.licenseExpiry,
       insuranceExpiry: profile?.insuranceExpiry,
       technicalInspectionExpiry: profile?.technicalInspectionExpiry,
+      fiscalStickerExpiry: profile?.fiscalStickerExpiry,
       documentsRenewalPending: profile?.documentsRenewalPending ?? false,
       documentsRenewalRequestedAt: profile?.documentsRenewalRequestedAt,
       payoutProvider: profile?.payoutProvider,

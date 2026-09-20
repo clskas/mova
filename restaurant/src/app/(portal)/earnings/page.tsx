@@ -109,13 +109,45 @@ export default function EarningsPage() {
                 "Portefeuille temporairement indisponible. En attente de configuration du hub de paiement — votre solde s'affichera ici dès que le service sera prêt."}
             </div>
           )}
-          <div className="rounded-2xl bg-gradient-to-br from-orange-500 to-orange-600 text-white p-5 sm:p-6 shadow-md">
-            <p className="text-sm opacity-90">Solde disponible</p>
-            <p className="text-2xl sm:text-3xl font-bold mt-1 break-words">{earnings.formattedBalance}</p>
-            <p className="text-xs opacity-80 mt-2">
-              Les frais de livraison et la commission plateforme sont versés au livreur et à SENGA.
-            </p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="rounded-2xl bg-gradient-to-br from-orange-500 to-orange-600 text-white p-5 sm:p-6 shadow-md">
+              <p className="text-sm opacity-90">Solde retirable</p>
+              <p className="text-2xl sm:text-3xl font-bold mt-1 break-words">
+                {formatCdf(earnings.withdrawableCdf ?? earnings.balanceCdf)}
+              </p>
+              <p className="text-xs opacity-80 mt-2">
+                Prépayements wallet / Mobile Money — retirable vers votre Mobile Money.
+              </p>
+            </div>
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 sm:p-6">
+              <p className="text-sm text-amber-900">Gains espèces (non retirables)</p>
+              <p className="text-2xl sm:text-3xl font-bold mt-1 break-words text-amber-950">
+                {formatCdf(earnings.cashEarningsCdf ?? 0)}
+              </p>
+              <p className="text-xs text-amber-800 mt-2">
+                Parts COD encore chez le livreur — créditées après règlement au guichet SENGA.
+              </p>
+            </div>
           </div>
+          {(earnings.salesNetCdf != null || earnings.deliveryFeeCdf != null) && (
+            <div className="grid gap-3 sm:grid-cols-2 text-sm">
+              <div className="rounded-xl border border-gray-100 bg-white p-4">
+                <p className="text-gray-500">Part ventes (net)</p>
+                <p className="text-lg font-semibold text-[#1A1A2E] mt-1">
+                  {formatCdf(earnings.salesNetCdf ?? 0)}
+                </p>
+              </div>
+              <div className="rounded-xl border border-gray-100 bg-white p-4">
+                <p className="text-gray-500">Frais de livraison (livreur)</p>
+                <p className="text-lg font-semibold text-[#1A1A2E] mt-1">
+                  {formatCdf(earnings.deliveryFeeCdf ?? 0)}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Versés au livreur — ne font pas partie de votre solde.
+                </p>
+              </div>
+            </div>
+          )}
           <PartnerWithdrawPanel
             balanceCdf={earnings.balanceCdf}
             walletAvailable={earnings.walletAvailable !== false}

@@ -47,6 +47,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
   final _color = TextEditingController();
   final _insuranceExpiry = TextEditingController();
   final _inspectionExpiry = TextEditingController();
+  final _fiscalStickerExpiry = TextEditingController();
   final _payoutPhone = TextEditingController();
   String _vehicleType = 'STANDARD';
   String _payoutProvider = 'ORANGE_MONEY';
@@ -77,6 +78,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
     ('VEHICLE_REGISTRATION', 'Carte rose (optionnel)'),
     ('VEHICLE_INSURANCE', 'Assurance véhicule'),
     ('TECHNICAL_INSPECTION', 'Visite technique'),
+    ('FISCAL_STICKER', 'Vignette fiscale'),
     ('CRIMINAL_RECORD', 'Casier judiciaire (optionnel)'),
   ];
 
@@ -87,6 +89,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
     'VEHICLE_REGISTRATION',
     'VEHICLE_INSURANCE',
     'TECHNICAL_INSPECTION',
+    'FISCAL_STICKER',
     'CRIMINAL_RECORD',
   };
   static const _requiredDocCount = 0;
@@ -128,6 +131,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
     _color.dispose();
     _insuranceExpiry.dispose();
     _inspectionExpiry.dispose();
+    _fiscalStickerExpiry.dispose();
     _payoutPhone.dispose();
     super.dispose();
   }
@@ -219,6 +223,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
     _licenseExpiry.text = _dateOnly(profile?['licenseExpiry']);
     _insuranceExpiry.text = _dateOnly(profile?['insuranceExpiry']);
     _inspectionExpiry.text = _dateOnly(profile?['technicalInspectionExpiry']);
+    _fiscalStickerExpiry.text = _dateOnly(profile?['fiscalStickerExpiry']);
     _payoutProvider = profile?['payoutProvider']?.toString() ?? 'ORANGE_MONEY';
     _payoutPhone.text = profile?['payoutPhone']?.toString() ?? user?['phone']?.toString() ?? '';
     _plate.text = vehicle?['plateNumber']?.toString() ?? '';
@@ -341,6 +346,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
       if (_vehicleImageUrl != null && _vehicleImageUrl!.isNotEmpty) 'vehicleImageUrl': _vehicleImageUrl,
       if (_insuranceExpiry.text.trim().isNotEmpty) 'insuranceExpiry': _insuranceExpiry.text.trim(),
       if (_inspectionExpiry.text.trim().isNotEmpty) 'technicalInspectionExpiry': _inspectionExpiry.text.trim(),
+      if (_fiscalStickerExpiry.text.trim().isNotEmpty) 'fiscalStickerExpiry': _fiscalStickerExpiry.text.trim(),
     }));
   }
 
@@ -831,10 +837,11 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
         const SizedBox(height: _fieldGap),
         _datePickerField(controller: _insuranceExpiry, label: 'Assurance expire le'),
         _datePickerField(controller: _inspectionExpiry, label: 'Visite technique expire le'),
+        _datePickerField(controller: _fiscalStickerExpiry, label: 'Vignette fiscale expire le'),
         if (_isEditingDossier) ...[
           const SizedBox(height: 8),
           const Text(
-            'En cas de changement, renvoyez les photos assurance et visite technique.',
+            'En cas de changement, renvoyez les photos assurance, visite technique et vignette fiscale.',
             style: TextStyle(color: MovaColors.textSecondary, fontSize: 12),
           ),
         ],
@@ -886,6 +893,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
         _docButton('VEHICLE_REGISTRATION', 'Carte rose (optionnel)'),
         _docButton('VEHICLE_INSURANCE', 'Assurance'),
         _docButton('TECHNICAL_INSPECTION', 'Visite technique'),
+        _docButton('FISCAL_STICKER', 'Vignette fiscale'),
       ],
     );
   }

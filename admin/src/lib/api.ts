@@ -172,6 +172,7 @@ export type AdminDriverDetail = AdminDriver & {
   licenseExpiry?: string | null;
   insuranceExpiry?: string | null;
   technicalInspectionExpiry?: string | null;
+  fiscalStickerExpiry?: string | null;
   documentsRenewalPending?: boolean;
   documentsRenewalRequestedAt?: string | null;
   payoutProvider?: string | null;
@@ -658,6 +659,10 @@ export type WalletOverview = {
   totalBalanceCdf?: number;
   /** Solde du compte trésorerie SENGA (commissions + recharges MM). */
   platformBalanceCdf?: number;
+  /** Commissions encaissées au guichet (espèces) — cumul info. */
+  deskCashCollectedCdf?: number;
+  /** Commissions prépayées (wallet/MM) créditées en trésorerie. */
+  prepaidCommissionCdf?: number;
   /** Somme des soldes utilisateurs (passagers, chauffeurs, partenaires). */
   userLiabilitiesCdf?: number;
   pendingPayoutsCdf?: number;
@@ -2578,6 +2583,8 @@ export type ClientAppsConfig = {
     apps: Record<ClientAppId, boolean>;
   };
   passengerServices: Record<PassengerServiceId, boolean>;
+  features?: { sengaPlusVisible?: boolean };
+  sosAlertUserIds?: string[];
 };
 
 export async function fetchClientAppsConfig(): Promise<ClientAppsConfig> {

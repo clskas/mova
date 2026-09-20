@@ -50,6 +50,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
   Map<String, dynamic>? _activeErrand;
   List<Map<String, dynamic>> _publicites = const [];
   Map<String, bool> _serviceFlags = const {};
+  bool _sengaPlusVisible = true;
 
   @override
   void initState() {
@@ -70,13 +71,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     if (!mounted) return;
     if (result case Success(:final data)) {
       final raw = data['passengerServices'];
-      if (raw is Map) {
-        setState(() {
+      final features = data['features'];
+      setState(() {
+        if (raw is Map) {
           _serviceFlags = {
             for (final e in raw.entries) e.key.toString(): e.value != false,
           };
-        });
-      }
+        }
+        if (features is Map && features['sengaPlusVisible'] == false) {
+          _sengaPlusVisible = false;
+        } else {
+          _sengaPlusVisible = true;
+        }
+      });
     }
   }
 
@@ -344,8 +351,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                 }
             }
           },
-          itemBuilder: (context) => const [
-            PopupMenuItem(
+          itemBuilder: (context) => [
+            const PopupMenuItem(
               value: _HomeMenuAction.wallet,
               child: ListTile(
                 leading: Icon(Icons.account_balance_wallet_outlined),
@@ -354,16 +361,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                 visualDensity: VisualDensity.compact,
               ),
             ),
-            PopupMenuItem(
-              value: _HomeMenuAction.subscriptions,
-              child: ListTile(
-                leading: Icon(Icons.card_membership_outlined),
-                title: Text('SENGA Plus'),
-                contentPadding: EdgeInsets.zero,
-                visualDensity: VisualDensity.compact,
+            if (_sengaPlusVisible)
+              const PopupMenuItem(
+                value: _HomeMenuAction.subscriptions,
+                child: ListTile(
+                  leading: Icon(Icons.card_membership_outlined),
+                  title: Text('SENGA Plus'),
+                  contentPadding: EdgeInsets.zero,
+                  visualDensity: VisualDensity.compact,
+                ),
               ),
-            ),
-            PopupMenuItem(
+            const PopupMenuItem(
               value: _HomeMenuAction.history,
               child: ListTile(
                 leading: Icon(Icons.history),
@@ -372,7 +380,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                 visualDensity: VisualDensity.compact,
               ),
             ),
-            PopupMenuItem(
+            const PopupMenuItem(
               value: _HomeMenuAction.help,
               child: ListTile(
                 leading: Icon(Icons.help_outline),
@@ -381,8 +389,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                 visualDensity: VisualDensity.compact,
               ),
             ),
-            PopupMenuDivider(),
-            PopupMenuItem(
+            const PopupMenuItem(
               value: _HomeMenuAction.logout,
               child: ListTile(
                 leading: Icon(Icons.logout),

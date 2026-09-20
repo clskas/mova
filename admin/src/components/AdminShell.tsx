@@ -42,6 +42,7 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   "/cgu": CguIcon,
   "/operateurs-mm": WalletIcon,
   "/services-senga": SettingsIcon,
+  "/alertes-sos": IncidentsIcon,
   "/maintenance": SettingsIcon,
   "/courses": RidesIcon,
   "/livraisons": DeliveriesIcon,

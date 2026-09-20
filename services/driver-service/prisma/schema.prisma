@@ -48,6 +48,7 @@ model DriverProfile {
   licenseExpiry             DateTime?
   insuranceExpiry           DateTime?
   technicalInspectionExpiry DateTime?
+  fiscalStickerExpiry       DateTime?
   documentsRenewalPending   Boolean   @default(false)
   documentsRenewalRequestedAt DateTime?
   payoutProvider            String?

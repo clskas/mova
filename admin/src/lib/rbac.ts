@@ -106,6 +106,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/cgu", label: "CGU", short: "CGU", section: "cgu" },
   { href: "/operateurs-mm", label: "Opérateurs Mobile Money", short: "MM", section: "systeme" },
   { href: "/services-senga", label: "Services SENGA", short: "Serv.", section: "systeme" },
+  { href: "/alertes-sos", label: "Alertes SOS", short: "SOS", section: "systeme" },
   { href: "/maintenance", label: "Mode maintenance", short: "Maint.", section: "systeme" },
   { href: "/courses", label: "Courses", short: "Courses", section: "courses" },
   { href: "/livraisons", label: "Livraisons", short: "Livr.", section: "livraisons" },

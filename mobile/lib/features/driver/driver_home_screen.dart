@@ -18,6 +18,7 @@ import '../../core/location/gps_enable_prompt.dart';
 import '../../core/location/service_area_gps.dart';
 import '../../core/error/result.dart';
 import '../../core/geo/geo_utils.dart';
+import '../../core/safety/sos_helper.dart';
 import '../help/driver_help_screen.dart';
 import '../profile/profile_screen.dart';
 import '../carpool/carpool_screen.dart';
@@ -1209,6 +1210,15 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
       title: 'SENGA Driver',
       scrollable: false,
       actions: [
+        IconButton(
+          icon: const Icon(Icons.sos, color: MovaColors.red),
+          tooltip: 'Alerte SOS',
+          onPressed: () => triggerSosAlert(
+            ref,
+            context,
+            description: 'SOS chauffeur — accueil',
+          ),
+        ),
         IconButton(
           icon: const Icon(Icons.account_balance_wallet_outlined),
           tooltip: 'Revenus',

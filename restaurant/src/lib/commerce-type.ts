@@ -276,6 +276,7 @@ function typeSpecificNav(commerceType: CommerceType): NavItem[] {
       return [
         { href: "/catalogue", label: "Catalogue", short: "Catalogue", icon: "📦", badgeKey: null },
         { href: "/stock", label: "Stock", short: "Stock", icon: "🗃️", badgeKey: null },
+        { href: "/restrictions", label: "Restrictions", short: "Règles", icon: "🛡️", badgeKey: null },
       ];
     case "PHARMACY":
       return [
@@ -284,7 +285,10 @@ function typeSpecificNav(commerceType: CommerceType): NavItem[] {
       ];
     case "RESTAURANT":
     default:
-      return [{ href: "/menu", label: "Menu", short: "Menu", icon: "🍽️", badgeKey: null }];
+      return [
+        { href: "/menu", label: "Menu", short: "Menu", icon: "🍽️", badgeKey: null },
+        { href: "/restrictions", label: "Restrictions", short: "Règles", icon: "🛡️", badgeKey: null },
+      ];
   }
 }
 

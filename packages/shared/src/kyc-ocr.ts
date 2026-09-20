@@ -5,6 +5,7 @@ export const KYC_OCR_ELIGIBLE_TYPES: KycDocumentType[] = [
   KYC_DOCUMENT_TYPES.DRIVERS_LICENSE,
   KYC_DOCUMENT_TYPES.VEHICLE_INSURANCE,
   KYC_DOCUMENT_TYPES.TECHNICAL_INSPECTION,
+  KYC_DOCUMENT_TYPES.FISCAL_STICKER,
 ];
 
 export type KycOcrStatus =
@@ -15,7 +16,11 @@ export type KycOcrStatus =
   | 'UNREADABLE'
   | 'SKIPPED';
 
-export type ProfileExpiryField = 'licenseExpiry' | 'insuranceExpiry' | 'technicalInspectionExpiry';
+export type ProfileExpiryField =
+  | 'licenseExpiry'
+  | 'insuranceExpiry'
+  | 'technicalInspectionExpiry'
+  | 'fiscalStickerExpiry';
 
 export function isKycOcrEligible(type: string): boolean {
   return (KYC_OCR_ELIGIBLE_TYPES as string[]).includes(type);
@@ -29,6 +34,8 @@ export function profileExpiryFieldForKycType(type: string): ProfileExpiryField |
       return 'insuranceExpiry';
     case KYC_DOCUMENT_TYPES.TECHNICAL_INSPECTION:
       return 'technicalInspectionExpiry';
+    case KYC_DOCUMENT_TYPES.FISCAL_STICKER:
+      return 'fiscalStickerExpiry';
     default:
       return null;
   }

@@ -30,11 +30,22 @@ export type MaintenanceConfig = {
   apps: Record<ClientAppId, boolean>;
 };
 
+export type ClientAppsFeatures = {
+  /** When false, SENGA Plus subscription entry is hidden in the passenger app. */
+  sengaPlusVisible: boolean;
+};
+
 export type ClientAppsConfig = {
   mobileMoney: MmVisibilityByApp;
   maintenance: MaintenanceConfig;
   /** When false, tile is hidden on SENGA passenger home. Default all true. */
   passengerServices: Record<PassengerServiceId, boolean>;
+  features: ClientAppsFeatures;
+  /**
+   * SuperAdmin-selected staff user IDs that receive SOS alerts.
+   * Empty = all ops roles (SUPER_ADMIN, ADMIN, SUPPORT, CITY_ADMIN).
+   */
+  sosAlertUserIds: string[];
 };
 
 export const DEFAULT_MAINTENANCE_MESSAGE_FR =
@@ -81,6 +92,8 @@ export const DEFAULT_CLIENT_APPS_CONFIG: ClientAppsConfig = {
     },
   },
   passengerServices: defaultPassengerServices(),
+  features: { sengaPlusVisible: true },
+  sosAlertUserIds: [],
 };
 
 export const CLIENT_APP_LABELS_FR: Record<ClientAppId, string> = {
@@ -173,6 +186,21 @@ export function mergeClientAppsConfig(raw: unknown): ClientAppsConfig {
         base.passengerServices[id] = src.passengerServices[id];
       }
     }
+  }
+
+  const featuresSrc = (src as { features?: Partial<ClientAppsFeatures> }).features;
+  if (featuresSrc && typeof featuresSrc === 'object') {
+    if (typeof featuresSrc.sengaPlusVisible === 'boolean') {
+      base.features.sengaPlusVisible = featuresSrc.sengaPlusVisible;
+    }
+  }
+
+  const sosIds = (src as { sosAlertUserIds?: unknown }).sosAlertUserIds;
+  if (Array.isArray(sosIds)) {
+    base.sosAlertUserIds = sosIds
+      .filter((id): id is string => typeof id === 'string' && id.trim().length > 0)
+      .map((id) => id.trim())
+      .slice(0, 200);
   }
 
   return base;
@@ -273,4 +301,19 @@ export function isPassengerServiceEnabled(
 ): boolean {
   if (!isPassengerServiceId(serviceId)) return true;
   return config.passengerServices[serviceId] !== false;
+}
+
+export function isSengaPlusVisible(config: ClientAppsConfig): boolean {
+  return config.features?.sengaPlusVisible !== false;
+}
+
+/** Empty list means “all ops staff”; otherwise only listed user IDs. */
+export function resolveSosAlertUserIds(
+  config: ClientAppsConfig,
+  allOpsStaffIds: string[],
+): string[] {
+  const selected = config.sosAlertUserIds ?? [];
+  if (selected.length === 0) return allOpsStaffIds;
+  const allow = new Set(selected);
+  return allOpsStaffIds.filter((id) => allow.has(id));
 }

@@ -53,6 +53,15 @@ export class ClientAppsConfigService implements OnModuleInit {
       mobileMoney: this.config.mobileMoney,
       maintenance: this.config.maintenance,
       passengerServices: this.config.passengerServices,
+      features: this.config.features,
+    };
+  }
+
+  /** Full config for admin (includes SOS recipient IDs). */
+  getAdmin() {
+    return {
+      ...this.getPublic(),
+      sosAlertUserIds: this.config.sosAlertUserIds,
     };
   }
 
@@ -71,6 +80,11 @@ export class ClientAppsConfigService implements OnModuleInit {
       passengerServices: patch.passengerServices
         ? { ...this.config.passengerServices, ...patch.passengerServices }
         : this.config.passengerServices,
+      features: patch.features
+        ? { ...this.config.features, ...patch.features }
+        : this.config.features,
+      sosAlertUserIds:
+        patch.sosAlertUserIds !== undefined ? patch.sosAlertUserIds : this.config.sosAlertUserIds,
     });
 
     this.validate(next);
@@ -80,7 +94,7 @@ export class ClientAppsConfigService implements OnModuleInit {
       data: { config: next as object },
     });
     this.config = mergeClientAppsConfig(row.config);
-    return this.getPublic();
+    return this.getAdmin();
   }
 
   private validate(cfg: ClientAppsConfig) {

@@ -45,6 +45,7 @@ const DOCUMENT_CATALOG: Array<{
       { type: "VEHICLE_REGISTRATION", label: "Carte rose" },
       { type: "VEHICLE_INSURANCE", label: "Assurance véhicule" },
       { type: "TECHNICAL_INSPECTION", label: "Visite technique" },
+      { type: "FISCAL_STICKER", label: "Vignette fiscale" },
       { type: "CRIMINAL_RECORD", label: "Extrait casier judiciaire" },
     ],
   },

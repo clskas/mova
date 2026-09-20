@@ -9,6 +9,7 @@ import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { DriverPayoutService } from '../payouts/driver-payout.service';
 import { PaymentsService } from '../payments/payments.service';
 import { DriverDebtLedgerService } from '../ledger/driver-debt-ledger.service';
+import { CashVirtualEarningsService } from '../ledger/cash-virtual-earnings.service';
 
 class CreateWalletDto {
   @IsString() userId: string;
@@ -70,7 +71,23 @@ export class InternalController {
     private driverPayouts: DriverPayoutService,
     private payments: PaymentsService,
     private debtLedger: DriverDebtLedgerService,
+    private cashVirtual: CashVirtualEarningsService,
   ) {}
+
+  @Get('earnings/driver/:userId/cash-virtual')
+  driverCashVirtual(@Param('userId') userId: string) {
+    return this.cashVirtual.getDriverCashVirtual(userId);
+  }
+
+  @Get('earnings/partner/:userId/cash-virtual')
+  partnerCashVirtual(@Param('userId') userId: string) {
+    return this.cashVirtual.getPartnerCashVirtual(userId);
+  }
+
+  @Get('earnings/platform/cash-virtual')
+  platformCashVirtual() {
+    return this.cashVirtual.getPlatformCashVirtual();
+  }
 
   @Post('wallets')
   create(@Body() dto: CreateWalletDto) {

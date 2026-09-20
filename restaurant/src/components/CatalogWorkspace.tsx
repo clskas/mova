@@ -159,7 +159,7 @@ export function CatalogWorkspace({ mode }: { mode: CatalogMode }) {
           ? null
           : Math.max(0, Math.round(Number(draft.stockQty))),
       ageRestricted: draft.ageRestricted === true,
-      requiresPrescription: draft.requiresPrescription === true,
+      requiresPrescription: commerceType === "PHARMACY" ? draft.requiresPrescription === true : false,
     };
     const nextItems =
       editIndex != null
@@ -240,7 +240,10 @@ export function CatalogWorkspace({ mode }: { mode: CatalogMode }) {
   }
 
   const showFullForm = mode === "catalogue";
-  const showRxFields = mode === "catalogue" || mode === "restrictions";
+  const showAgeRestriction = true;
+  const showPrescription = commerceType === "PHARMACY";
+  const showRestrictionFields =
+    (mode === "catalogue" || mode === "restrictions") && (showAgeRestriction || showPrescription);
 
   return (
     <div className="space-y-6">
@@ -375,24 +378,28 @@ export function CatalogWorkspace({ mode }: { mode: CatalogMode }) {
               onChange={(e) => setDraft({ ...draft, description: e.target.value })}
             />
           </label>
-          {(commerceType === "PHARMACY" || showRxFields) && (
+          {showRestrictionFields && (
             <div className="flex flex-wrap gap-4 text-sm">
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={draft.ageRestricted === true}
-                  onChange={(e) => setDraft({ ...draft, ageRestricted: e.target.checked })}
-                />
-                Restriction d&apos;âge
-              </label>
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={draft.requiresPrescription === true}
-                  onChange={(e) => setDraft({ ...draft, requiresPrescription: e.target.checked })}
-                />
-                Ordonnance requise
-              </label>
+              {showAgeRestriction && (
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={draft.ageRestricted === true}
+                    onChange={(e) => setDraft({ ...draft, ageRestricted: e.target.checked })}
+                  />
+                  Restriction d&apos;âge
+                </label>
+              )}
+              {showPrescription && (
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={draft.requiresPrescription === true}
+                    onChange={(e) => setDraft({ ...draft, requiresPrescription: e.target.checked })}
+                  />
+                  Ordonnance requise
+                </label>
+              )}
             </div>
           )}
           <div className="flex flex-wrap items-center gap-4">
@@ -480,13 +487,16 @@ export function CatalogWorkspace({ mode }: { mode: CatalogMode }) {
           </table>
         </div>
       ) : mode === "restrictions" ? (
+        !showRestrictionFields ? (
+          <p className="text-sm text-gray-500">Aucune restriction applicable pour ce type de commerce.</p>
+        ) : (
         <div className="bg-white rounded-2xl border overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-orange-50 text-left">
               <tr>
                 <th className="p-3 font-medium">Produit</th>
-                <th className="p-3 font-medium">Âge</th>
-                <th className="p-3 font-medium">Ordonnance</th>
+                {showAgeRestriction && <th className="p-3 font-medium">Âge</th>}
+                {showPrescription && <th className="p-3 font-medium">Ordonnance</th>}
               </tr>
             </thead>
             <tbody>
@@ -496,37 +506,46 @@ export function CatalogWorkspace({ mode }: { mode: CatalogMode }) {
                     <p className="font-medium">{item.name}</p>
                     <p className="text-xs text-gray-500">{formatCdf(item.unitPriceCdf)}</p>
                   </td>
-                  <td className="p-3">
-                    <label className="inline-flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        disabled={!canOperate}
-                        checked={item.ageRestricted === true}
-                        onChange={(e) => patchItem(index, { ageRestricted: e.target.checked })}
-                      />
-                      Restriction d&apos;âge
-                    </label>
-                  </td>
-                  <td className="p-3">
-                    <label className="inline-flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        disabled={!canOperate}
-                        checked={item.requiresPrescription === true}
-                        onChange={(e) => patchItem(index, { requiresPrescription: e.target.checked })}
-                      />
-                      Ordonnance
-                    </label>
-                  </td>
+                  {showAgeRestriction && (
+                    <td className="p-3">
+                      <label className="inline-flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          disabled={!canOperate}
+                          checked={item.ageRestricted === true}
+                          onChange={(e) => patchItem(index, { ageRestricted: e.target.checked })}
+                        />
+                        Restriction d&apos;âge
+                      </label>
+                    </td>
+                  )}
+                  {showPrescription && (
+                    <td className="p-3">
+                      <label className="inline-flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          disabled={!canOperate}
+                          checked={item.requiresPrescription === true}
+                          onChange={(e) =>
+                            patchItem(index, { requiresPrescription: e.target.checked })
+                          }
+                        />
+                        Ordonnance
+                      </label>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
           </table>
-          <p className="p-3 text-xs text-gray-500 border-t">
-            Les produits sous ordonnance exigent une confirmation du client à la commande. SENGA ne vérifie pas
-            l&apos;ordonnance médicale automatiquement.
-          </p>
+          {showPrescription && (
+            <p className="p-3 text-xs text-gray-500 border-t">
+              Les produits sous ordonnance exigent une confirmation du client à la commande. SENGA ne vérifie pas
+              l&apos;ordonnance médicale automatiquement.
+            </p>
+          )}
         </div>
+        )
       ) : (
         <div className="grid sm:grid-cols-2 gap-4">
           {items.map((item, index) => (

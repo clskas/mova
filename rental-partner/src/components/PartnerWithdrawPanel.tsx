@@ -260,6 +260,11 @@ export function PartnerWithdrawPanel({ balanceCdf, walletAvailable = true, onWit
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <p className="text-sm font-medium text-[#1A1A2E]">Recharger</p>
+          <p className="text-xs text-gray-500 leading-relaxed">
+            La recharge ne sert pas à encaisser le cash COD. Elle permet de régler des frais
+            plateforme ou dettes, et de disposer d&apos;un solde virtuel pour opérations futures
+            (même portefeuille que les retraits Mobile Money).
+          </p>
           <input
             type="number"
             min={2300}

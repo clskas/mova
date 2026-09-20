@@ -484,16 +484,52 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
 
   Widget _summaryHero() {
     final balance = _asInt(_data?['withdrawableCdf'] ?? _data?['walletBalanceCdf']);
+    final cashEarnings = _asInt(_data?['cashEarningsCdf']);
     return MovaCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text('Solde disponible', style: TextStyle(color: MovaColors.textSecondary, fontSize: 13)),
+          const Text('Solde retirable', style: TextStyle(color: MovaColors.textSecondary, fontSize: 13)),
           const SizedBox(height: 6),
           Text(
             MarketConfig.formatCdf(balance),
             style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: MovaColors.green),
           ),
+          const SizedBox(height: 4),
+          Text(
+            'Portefeuille (prépaiements wallet / Mobile Money)',
+            style: TextStyle(fontSize: 11, color: MovaColors.textSecondary.withValues(alpha: 0.9)),
+          ),
+          if (cashEarnings > 0) ...[
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: MovaColors.orange.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: MovaColors.orange.withValues(alpha: 0.25)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Gains espèces (non retirables)',
+                    style: TextStyle(fontSize: 12, color: MovaColors.textSecondary),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    MarketConfig.formatCdf(cashEarnings),
+                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 18, color: MovaColors.orange),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Argent encaissé en cash chez le client. Les commissions SENGA se règlent au guichet.',
+                    style: TextStyle(fontSize: 11, color: MovaColors.textSecondary),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 12),
           Row(
             children: [

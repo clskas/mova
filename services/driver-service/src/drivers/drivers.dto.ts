@@ -19,6 +19,7 @@ export class UpdateOnboardingDto {
   @ApiPropertyOptional() @IsOptional() @IsDateString() licenseExpiry?: string;
   @ApiPropertyOptional() @IsOptional() @IsDateString() insuranceExpiry?: string;
   @ApiPropertyOptional() @IsOptional() @IsDateString() technicalInspectionExpiry?: string;
+  @ApiPropertyOptional() @IsOptional() @IsDateString() fiscalStickerExpiry?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() payoutProvider?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() payoutPhone?: string;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() charterAccepted?: boolean;

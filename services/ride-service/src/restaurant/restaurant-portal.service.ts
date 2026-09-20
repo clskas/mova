@@ -8,6 +8,7 @@ import {
 import { RedisService } from '@mova/shared';
 import {
   fetchPartnerWallet,
+  fetchPartnerCashVirtual,
   filterPartnerTransactions,
   startOfDay,
   startOfMonth,
@@ -28,6 +29,7 @@ import { fetchServicePaymentStatuses } from '../common/payment-status.util';
 import { refundEscrow } from '../common/escrow.util';
 import { PartnerBillingService } from '../billing/partner-billing.service';
 import { computeRestaurantPartnerDisplay } from '../billing/partner-display.util';
+import { parseOrderPlacedMetadata } from '../deliveries/food-delivery-settlement.util';
 import { normalizeMenuCatalogInput, parseMenuCatalog } from './menu-catalog.util';
 
 @Injectable()
@@ -442,14 +444,47 @@ export class RestaurantPortalService {
 
   async getEarnings(ownerUserId: string) {
     const restaurant = await this.getRestaurantForOwner(ownerUserId);
-    const wallet = await fetchPartnerWallet(ownerUserId);
+    const [wallet, cashVirtual, delivered] = await Promise.all([
+      fetchPartnerWallet(ownerUserId),
+      fetchPartnerCashVirtual(ownerUserId),
+      this.prisma.delivery.findMany({
+        where: {
+          type: DeliveryType.FOOD,
+          status: DeliveryStatus.DELIVERED,
+          restaurantId: restaurant.id,
+        },
+        include: { events: { orderBy: { createdAt: 'asc' } } },
+        take: 500,
+        orderBy: { deliveredAt: 'desc' },
+      }),
+    ]);
     const foodCredits = filterPartnerTransactions(wallet.transactions, 'Vente repas');
+
+    let salesNetCdf = 0;
+    let deliveryFeeCdf = 0;
+    for (const d of delivered) {
+      const amounts = computeRestaurantPartnerDisplay({
+        items: d.items,
+        restaurantId: restaurant.id,
+        events: d.events,
+        deliveryDiscountCdf: d.discountCdf,
+        deliveryPromoCode: d.promoCode,
+      });
+      salesNetCdf += amounts.partnerNetCdf;
+      const meta = parseOrderPlacedMetadata(d.events);
+      deliveryFeeCdf += Math.round(meta?.deliveryFeeCdf ?? 0);
+    }
+
     return {
       restaurant: { id: restaurant.id, name: restaurant.name },
       balanceCdf: wallet.balanceCdf,
       formattedBalance: wallet.formattedBalance,
       walletAvailable: wallet.available,
       walletMessage: wallet.unavailableReason,
+      withdrawableCdf: cashVirtual.withdrawableCdf || wallet.balanceCdf,
+      cashEarningsCdf: cashVirtual.cashEarningsCdf,
+      salesNetCdf,
+      deliveryFeeCdf,
       recentFoodSales: foodCredits.slice(0, 20).map((tx) => ({
         id: tx.id,
         amountCdf: tx.amountCdf,

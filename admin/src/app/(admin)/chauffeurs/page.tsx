@@ -612,6 +612,12 @@ export default function ChauffeursPage() {
                   {new Date(detail.technicalInspectionExpiry).toLocaleDateString("fr-FR")}
                 </p>
               )}
+              {detail?.fiscalStickerExpiry != null && (
+                <p>
+                  <span className="text-gray-500">Vignette fiscale:</span>{" "}
+                  {new Date(detail.fiscalStickerExpiry).toLocaleDateString("fr-FR")}
+                </p>
+              )}
               {detail?.documentsStatus && (
                 <p>
                   <span className="text-gray-500">Documents opérationnels:</span>{" "}

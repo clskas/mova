@@ -4,6 +4,7 @@ import { MovaErrorCode, MovaHttpException, INTERNAL_API_KEY, serviceUrl } from '
 import { fetchAuthUserBrief } from '../common/internal-lookup.util';
 import {
   fetchPartnerWallet,
+  fetchPartnerCashVirtual,
   filterPartnerTransactions,
   startOfDay,
   startOfMonth,
@@ -79,7 +80,10 @@ export class RentalPartnerPortalService {
 
   async getEarnings(ownerUserId: string) {
     const user = await fetchAuthUserBrief(ownerUserId);
-    const wallet = await fetchPartnerWallet(ownerUserId);
+    const [wallet, cashVirtual] = await Promise.all([
+      fetchPartnerWallet(ownerUserId),
+      fetchPartnerCashVirtual(ownerUserId),
+    ]);
     const rentalCredits = filterPartnerTransactions(wallet.transactions, 'Revenu location');
     return {
       partnerName: user?.name ?? 'Partenaire',
@@ -87,6 +91,8 @@ export class RentalPartnerPortalService {
       formattedBalance: wallet.formattedBalance,
       walletAvailable: wallet.available,
       walletMessage: wallet.unavailableReason,
+      withdrawableCdf: cashVirtual.withdrawableCdf || wallet.balanceCdf,
+      cashEarningsCdf: cashVirtual.cashEarningsCdf,
       recentRentalSales: rentalCredits.slice(0, 20).map((tx) => ({
         id: tx.id,
         amountCdf: tx.amountCdf,

@@ -1215,9 +1215,39 @@ export class WalletService {
     ]);
     const totalBalance = balanceAgg._sum.balanceCdf ?? 0;
     const platformBalanceCdf = platformWallet?.balanceCdf ?? 0;
+
+    let deskCashCollectedCdf = 0;
+    let prepaidCommissionCdf = 0;
+    if (platformWallet) {
+      const [deskAgg, prepaidAgg] = await Promise.all([
+        this.prisma.walletTransaction.aggregate({
+          where: {
+            walletId: platformWallet.id,
+            type: 'CREDIT',
+            reference: { startsWith: 'PLATFORM_FEE_CASH_COLLECT:' },
+          },
+          _sum: { amountCdf: true },
+        }),
+        this.prisma.walletTransaction.aggregate({
+          where: {
+            walletId: platformWallet.id,
+            type: 'CREDIT',
+            reference: { startsWith: 'PLATFORM_FEE:' },
+          },
+          _sum: { amountCdf: true },
+        }),
+      ]);
+      deskCashCollectedCdf = deskAgg._sum.amountCdf ?? 0;
+      prepaidCommissionCdf = prepaidAgg._sum.amountCdf ?? 0;
+    }
+
     return {
       totalBalanceCdf: totalBalance,
       platformBalanceCdf,
+      /** Commissions encaissées au guichet (espèces) — info, déjà dans la trésorerie. */
+      deskCashCollectedCdf,
+      /** Commissions prépayées (wallet/MM) créditées en trésorerie. */
+      prepaidCommissionCdf,
       userLiabilitiesCdf: Math.max(0, totalBalance - platformBalanceCdf),
       pendingPayoutsCdf: Math.abs(withdrawToday._sum.amountCdf ?? 0),
       transactionsToday,

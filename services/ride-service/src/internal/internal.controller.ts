@@ -512,7 +512,7 @@ export class InternalController {
 
   @Get('client-apps-config')
   getClientAppsConfig() {
-    return this.clientAppsConfig.getPublic();
+    return this.clientAppsConfig.getAdmin();
   }
 
   @Patch('client-apps-config')

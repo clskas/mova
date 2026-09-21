@@ -96,8 +96,15 @@ class _DriverMovingMissionScreenState extends ConsumerState<DriverMovingMissionS
 
   Future<void> _confirmCash() async {
     final api = ref.read(apiClientProvider);
+    final total = (_moving?['finalPriceCdf'] ??
+            _moving?['estimatedPriceCdf'] ??
+            _moving?['passengerTotalCdf'] ??
+            _moving?['amountCdf']) as num?;
+    final net = (_moving?['driverNetCdf'] ?? _moving?['driverEarningsCdf']) as num?;
     final pin = await DriverCashPinDialog.show(
       context,
+      passengerTotalCdf: total?.round(),
+      driverNetCdf: net?.round(),
       validate: (enteredPin) async {
         final result = await api.confirmCashService('MOVING', widget.movingId, enteredPin);
         return switch (result) {

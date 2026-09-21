@@ -153,7 +153,7 @@ describe('PartnerKycService', () => {
     expect(result.smsSent).toBe(false);
   });
 
-  it('refuse d\'approuver le dossier si un justificatif n\'est pas encore validé', async () => {
+  it('autorise d\'approuver le dossier même si un justificatif n\'est pas encore validé', async () => {
     prisma.restaurant.findFirst.mockResolvedValue({
       id: 'r1',
       ownerUserId: 'u1',
@@ -164,20 +164,27 @@ describe('PartnerKycService', () => {
       payoutProvider: 'ORANGE_MONEY',
       payoutPhone: '+243810000001',
       address: 'Gombe',
+      createdAt: new Date(),
     });
     prisma.partnerKycDocument.findMany.mockResolvedValue([
       { type: 'MANAGER_ID', status: 'APPROVED', notes: null, url: '/a', id: 'd1' },
       { type: 'RCCM', status: 'PENDING', notes: null, url: '/b', id: 'd2' },
       { type: 'PREMISES_PHOTO', status: 'APPROVED', notes: null, url: '/c', id: 'd3' },
     ]);
-    (global.fetch as jest.Mock).mockResolvedValue({
-      ok: true,
-      json: async () => ({ phone: '+243810000001', name: 'Chez Flore' }),
-    });
-    await expect(service.reviewSubject('u1', 'RESTAURANT', true)).rejects.toMatchObject({
-      message: expect.stringMatching(/justificatifs doivent être approuvés/),
-    });
-    expect(prisma.restaurant.update).not.toHaveBeenCalled();
+    prisma.restaurant.update.mockResolvedValue({});
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ phone: '+243810000001', name: 'Chez Flore' }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ loginPin: '123456', smsSent: true }),
+      });
+    const result = await service.reviewSubject('u1', 'RESTAURANT', true);
+    expect(prisma.restaurant.update).toHaveBeenCalled();
+    expect(result.kycStatus).toBe('APPROVED');
+    expect(result.needsActivationPin).toBe(true);
   });
 
   it('approuve un dossier restaurant sans aucun justificatif (docs optionnels)', async () => {

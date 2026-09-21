@@ -1679,8 +1679,8 @@ export class PaymentsService {
           );
         }
       }
-      // CASH partial: no passenger wallet credit
-      if (courierFeeCdf > 0) {
+      // CASH : le livreur a déjà l'argent en main — pas de crédit wallet retirable.
+      if (courierFeeCdf > 0 && existing.method !== PaymentMethod.CASH) {
         const info = await this.fetchServicePaymentInfo(type, referenceId).catch(() => null);
         if (info?.driverId) {
           await this.driverPayouts.creditPayout(info.driverId, {

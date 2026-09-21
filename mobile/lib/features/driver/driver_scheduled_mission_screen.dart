@@ -112,8 +112,12 @@ class _DriverScheduledMissionScreenState extends ConsumerState<DriverScheduledMi
 
   Future<void> _confirmCash() async {
     final api = ref.read(apiClientProvider);
+    final total = (_ride?['finalFareCdf'] ?? _ride?['estimatedFareCdf'] ?? _ride?['amountCdf']) as num?;
+    final net = (_ride?['driverNetCdf'] ?? _ride?['driverEarningsCdf']) as num?;
     final pin = await DriverCashPinDialog.show(
       context,
+      passengerTotalCdf: total?.round(),
+      driverNetCdf: net?.round(),
       validate: (enteredPin) async {
         final result = await api.confirmCashService('SCHEDULED', widget.rideId, enteredPin);
         return switch (result) {

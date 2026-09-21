@@ -57,6 +57,60 @@ export class DriverPayoutService {
     return { credited: true, amountCdf: amount, reference, balanceCdf: wallet.balanceCdf };
   }
 
+  private async paymentMethodFor(
+    referenceType: string,
+    referenceId: string,
+  ): Promise<string | null> {
+    const type = referenceType.toUpperCase();
+    if (type === 'RIDE' || type === 'SCHEDULED') {
+      if (type === 'RIDE') {
+        const pay = await this.prisma.payment.findUnique({ where: { rideId: referenceId } });
+        if (pay?.status === 'COMPLETED') return pay.method;
+      }
+      const sp = await this.prisma.servicePayment.findUnique({
+        where: { referenceType_referenceId: { referenceType: type, referenceId } },
+      });
+      if (sp?.status === 'COMPLETED') return sp.method;
+      return null;
+    }
+    const sp = await this.prisma.servicePayment.findUnique({
+      where: { referenceType_referenceId: { referenceType: type, referenceId } },
+    });
+    if (sp?.status === 'COMPLETED') return sp.method;
+    return null;
+  }
+
+  /** Annule un crédit wallet erroné pour un job payé en espèces. */
+  private async clawbackCashPayoutIfNeeded(
+    driverUserId: string,
+    item: PayoutItem,
+  ): Promise<{ clawedBack: boolean; amountCdf?: number }> {
+    const reference = this.payoutReference(item.referenceType, item.referenceId);
+    if (!(await this.alreadyCredited(reference))) {
+      return { clawedBack: false };
+    }
+    const clawbackRef = `CLAWBACK_CASH:${reference}`;
+    const alreadyClawed = await this.prisma.walletTransaction.findFirst({
+      where: { reference: clawbackRef, type: 'DEBIT' },
+    });
+    if (alreadyClawed) return { clawedBack: false };
+
+    const amount = Math.round(item.driverNetCdf);
+    if (amount <= 0) return { clawedBack: false };
+    try {
+      await this.wallet.debit(
+        driverUserId,
+        amount,
+        `Correction — gain espèces (non retirable) ${item.referenceId}`,
+        clawbackRef,
+      );
+      return { clawedBack: true, amountCdf: amount };
+    } catch (e) {
+      this.logger.warn(`clawbackCashPayout ${reference} failed`, e);
+      return { clawedBack: false };
+    }
+  }
+
   private async fetchPayoutItems(driverUserId: string): Promise<PayoutItem[]> {
     try {
       const res = await fetch(serviceUrl('ride', `/internal/rides/driver/${driverUserId}/payout-items`), {
@@ -78,7 +132,21 @@ export class DriverPayoutService {
     const items = await this.fetchPayoutItems(driverUserId);
     let creditedCdf = 0;
     let creditedCount = 0;
+    let clawedBackCdf = 0;
+    let clawedBackCount = 0;
     for (const item of items) {
+      const method = await this.paymentMethodFor(item.referenceType, item.referenceId);
+      // Espèces : le chauffeur a déjà l'argent en main — jamais au portefeuille retirable.
+      if (method === 'CASH') {
+        const claw = await this.clawbackCashPayoutIfNeeded(driverUserId, item);
+        if (claw.clawedBack) {
+          clawedBackCdf += claw.amountCdf ?? 0;
+          clawedBackCount += 1;
+        }
+        continue;
+      }
+      // Paiement inconnu / non complété : ne pas créditer (évite double paiement).
+      if (method == null) continue;
       const result = await this.creditPayout(driverUserId, item);
       if (result.credited) {
         creditedCdf += result.amountCdf ?? 0;
@@ -90,6 +158,8 @@ export class DriverPayoutService {
       synced: true,
       creditedCount,
       creditedCdf,
+      clawedBackCount,
+      clawedBackCdf,
       walletBalanceCdf: wallet.balanceCdf,
       itemCount: items.length,
     };

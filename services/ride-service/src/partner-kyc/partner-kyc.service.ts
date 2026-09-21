@@ -14,7 +14,6 @@ import {
   serviceUrl,
   kycRejectNotifyCopy,
   notifyAuthUser,
-  allPartnerJustificatifsApproved,
   checklistSatisfiesJobsGate,
   missingJobsGateTypes,
   resolveJobsGateTypes,
@@ -371,7 +370,8 @@ export class PartnerKycService {
             'Aucun +243 / e-mail pour envoyer le PIN d\'activation.',
           );
         }
-        this.assertAllJustificatifsApproved(dossier.checklist);
+        // Comme les chauffeurs : dossier activable sans tous les justificatifs.
+        // Les docs restent exigibles plus tard via canOperate / notifications (grâce plateforme).
         await this.prisma.restaurant.update({
           where: { id: restaurant.id },
           data: {
@@ -426,7 +426,7 @@ export class PartnerKycService {
           'Aucun +243 / e-mail pour envoyer le PIN d\'activation.',
         );
       }
-      this.assertAllJustificatifsApproved(dossier.checklist);
+      // Comme les chauffeurs : activation possible sans dossier documentaire complet.
       await this.prisma.rentalPartnerProfile.update({
         where: { userId },
         data: { kycStatus: PartnerKycStatus.APPROVED, kycNotes: null, activationPinVerifiedAt: null },
@@ -660,18 +660,6 @@ export class PartnerKycService {
       return normalizeKycRejectNotes(approved, notes);
     } catch (e) {
       throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, (e as Error).message);
-    }
-  }
-
-  private assertAllJustificatifsApproved(
-    checklist: Array<{ required: boolean; uploaded: boolean; status: string | null }>,
-  ) {
-    if (!allPartnerJustificatifsApproved(checklist)) {
-      throw new MovaHttpException(
-        MovaErrorCode.VALIDATION_ERROR,
-        undefined,
-        'Tous les justificatifs doivent être approuvés individuellement avant d\'approuver le dossier.',
-      );
     }
   }
 

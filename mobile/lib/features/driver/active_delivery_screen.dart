@@ -388,10 +388,18 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
     _cashDialogOpen = true;
     final api = ref.read(apiClientProvider);
     final refType = _isErrand ? 'ERRAND' : 'DELIVERY';
+    final total = (_delivery['passengerTotalCdf'] ??
+            _delivery['finalPriceCdf'] ??
+            _delivery['estimatedPriceCdf'] ??
+            _delivery['amountCdf'] ??
+            _delivery['totalCdf']) as num?;
+    final net = (_delivery['driverNetCdf'] ?? _delivery['driverEarningsCdf'] ?? _delivery['courierFeeCdf']) as num?;
     final pin = await DriverCashPinDialog.show(
       context,
       title: 'Confirmer paiement espèces',
       label: 'Code PIN du client',
+      passengerTotalCdf: total?.round(),
+      driverNetCdf: net?.round(),
       validate: (enteredPin) async {
         final result = await api.confirmCashService(refType, _deliveryId, enteredPin);
         return switch (result) {

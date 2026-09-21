@@ -624,16 +624,16 @@ export default function KycPage() {
     <div className="max-w-4xl mx-auto">
       <PageHeader title="KYC" subtitle="Validation des dossiers chauffeurs, restaurants et loueurs" />
       <div className="mb-4 rounded-xl border border-violet-200 bg-violet-50 p-4 text-sm text-violet-950 space-y-1">
-        <p className="font-semibold">Validation en deux étapes</p>
+        <p className="font-semibold">Activation et justificatifs</p>
         <p>
-          1) Approuvez chaque justificatif individuellement. 2) Quand tous les types obligatoires sont validés
-          (chauffeur : 6, dont assurance véhicule), le dossier reste visible (« Documents OK — Approuver le dossier »)
-          — cliquez alors le bouton vert pour générer et afficher le PIN. Le PIN n&apos;est jamais créé à la
-          validation d&apos;un seul document.
+          Vous pouvez « Approuver le dossier » (PIN d&apos;activation) même si tous les justificatifs ne sont
+          pas encore validés — chauffeurs et partenaires. Les documents restent exigibles ensuite : la
+          plateforme peut couper les notifications de courses / commandes tant que le dossier documentaire
+          n&apos;est pas complet.
         </p>
         <p>
-          Sans +243 ni e-mail, le PIN s&apos;affiche quand même à l&apos;écran (SMS/e-mail optionnels). Sur un
-          dossier déjà validé, utilisez « Renvoyer le PIN ».
+          Approuver un justificatif seul ne crée jamais le PIN. Sans +243 ni e-mail, le PIN s&apos;affiche
+          quand même à l&apos;écran. Sur un dossier déjà validé, utilisez « Renvoyer le PIN ».
         </p>
       </div>
       <div className="mb-4 space-y-3">
@@ -735,6 +735,12 @@ export default function KycPage() {
                           Tous les justificatifs sont validés — vous pouvez approuver le dossier (PIN).
                         </p>
                       )}
+                      {!docsApproved && showDossierActions && missingMsg && (
+                        <p className="text-xs text-amber-800 mt-1">
+                          {missingMsg} — activation possible quand même ; les docs pourront être exigés
+                          pour continuer à recevoir des courses.
+                        </p>
+                      )}
                       {noContact && showDossierActions && (
                         <p className="text-xs text-amber-700 mt-1">
                           Pas de +243 / e-mail — le PIN s&apos;affichera à l&apos;écran (SMS non envoyé).
@@ -744,17 +750,11 @@ export default function KycPage() {
                     {showDossierActions && (
                       <div className="flex flex-col items-end gap-1">
                         <div className="flex gap-2">
-                          <BtnSuccess
-                            disabled={!docsApproved}
-                            onClick={() => reviewDriver(dossier.userId, true)}
-                          >
+                          <BtnSuccess onClick={() => reviewDriver(dossier.userId, true)}>
                             {docsApproved ? "Documents OK — Approuver le dossier" : "Approuver le dossier"}
                           </BtnSuccess>
                           <BtnDanger onClick={() => reviewDriver(dossier.userId, false)}>Rejeter le dossier</BtnDanger>
                         </div>
-                        {!docsApproved && missingMsg && (
-                          <p className="text-xs text-amber-800 max-w-sm text-right">{missingMsg}</p>
-                        )}
                       </div>
                     )}
                   </div>
@@ -827,7 +827,8 @@ export default function KycPage() {
                     )}
                     {d.onboardingCompleted && d.kycStatus === "PENDING" && !d.kycAllJustificatifsApproved && (
                       <p className="text-xs text-amber-800 mt-1 font-medium">
-                        Il manque encore des justificatifs obligatoires (6 requis, dont assurance véhicule).
+                        Justificatifs incomplets — activation possible ; les docs pourront être exigés pour
+                        continuer à recevoir des courses.
                       </p>
                     )}
                     {!d.phone?.trim() && !d.email?.trim() && d.kycStatus === "PENDING" && (
@@ -839,10 +840,7 @@ export default function KycPage() {
                   {canWrite("kyc") && (
                     <div className="flex flex-col items-end gap-1">
                       <div className="flex gap-2">
-                        <BtnSuccess
-                          disabled={!d.kycAllJustificatifsApproved}
-                          onClick={() => reviewDriver(d.userId, true)}
-                        >
+                        <BtnSuccess onClick={() => reviewDriver(d.userId, true)}>
                           {d.kycAllJustificatifsApproved
                             ? "Documents OK — Approuver le dossier"
                             : "Approuver le dossier"}
@@ -851,11 +849,6 @@ export default function KycPage() {
                           <BtnDanger onClick={() => reviewDriver(d.userId, false)}>Rejeter</BtnDanger>
                         )}
                       </div>
-                      {!d.kycAllJustificatifsApproved && d.kycStatus === "PENDING" && (
-                        <p className="text-xs text-amber-800 max-w-sm text-right">
-                          Il manque encore des justificatifs obligatoires (6 requis, dont assurance véhicule).
-                        </p>
-                      )}
                     </div>
                   )}
                 </Card>
@@ -886,7 +879,10 @@ export default function KycPage() {
                           <p className="text-xs text-amber-800 mt-1">{partnerAccountLabel(r)}</p>
                         )}
                         {!docsOk && partnerMissingMsg && (
-                          <p className="text-xs text-amber-800 mt-1 font-medium">{partnerMissingMsg}</p>
+                          <p className="text-xs text-amber-800 mt-1 font-medium">
+                            {partnerMissingMsg} — activation possible ; docs exigibles ensuite pour les
+                            notifications de commandes.
+                          </p>
                         )}
                         {!r.phoneVerified && !r.email?.trim() && (
                           <p className="text-xs text-amber-700 mt-1">
@@ -902,17 +898,11 @@ export default function KycPage() {
                       {canWrite("kyc") && r.userId && r.kycStatus !== "APPROVED" && (
                         <div className="flex flex-col items-end gap-1">
                           <div className="flex gap-2">
-                            <BtnSuccess
-                              disabled={!docsOk}
-                              onClick={() => reviewPartner("RESTAURANT", r.userId!, true)}
-                            >
+                            <BtnSuccess onClick={() => reviewPartner("RESTAURANT", r.userId!, true)}>
                               {docsOk ? "Documents OK — Approuver le dossier" : "Approuver le dossier"}
                             </BtnSuccess>
                             <BtnDanger onClick={() => reviewPartner("RESTAURANT", r.userId!, false)}>Rejeter le dossier</BtnDanger>
                           </div>
-                          {!docsOk && partnerMissingMsg && (
-                            <p className="text-xs text-amber-800 max-w-sm text-right">{partnerMissingMsg}</p>
-                          )}
                         </div>
                       )}
                       {canWrite("kyc") && r.userId && r.kycStatus === "APPROVED" && (
@@ -977,7 +967,10 @@ export default function KycPage() {
                           <p className="text-xs text-amber-800 mt-1">{partnerAccountLabel(r)}</p>
                         )}
                         {!docsOk && partnerMissingMsg && (
-                          <p className="text-xs text-amber-800 mt-1 font-medium">{partnerMissingMsg}</p>
+                          <p className="text-xs text-amber-800 mt-1 font-medium">
+                            {partnerMissingMsg} — activation possible ; docs exigibles ensuite pour les
+                            notifications de commandes.
+                          </p>
                         )}
                         {!r.phoneVerified && !r.email?.trim() && (
                           <p className="text-xs text-amber-700 mt-1">
@@ -993,17 +986,11 @@ export default function KycPage() {
                       {canWrite("kyc") && r.userId && r.kycStatus !== "APPROVED" && (
                         <div className="flex flex-col items-end gap-1">
                           <div className="flex gap-2">
-                            <BtnSuccess
-                              disabled={!docsOk}
-                              onClick={() => reviewPartner("RENTAL_PARTNER", r.userId!, true)}
-                            >
+                            <BtnSuccess onClick={() => reviewPartner("RENTAL_PARTNER", r.userId!, true)}>
                               {docsOk ? "Documents OK — Approuver le dossier" : "Approuver le dossier"}
                             </BtnSuccess>
                             <BtnDanger onClick={() => reviewPartner("RENTAL_PARTNER", r.userId!, false)}>Rejeter le dossier</BtnDanger>
                           </div>
-                          {!docsOk && partnerMissingMsg && (
-                            <p className="text-xs text-amber-800 max-w-sm text-right">{partnerMissingMsg}</p>
-                          )}
                         </div>
                       )}
                       {canWrite("kyc") && r.userId && r.kycStatus === "APPROVED" && (

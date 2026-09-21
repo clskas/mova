@@ -2,6 +2,12 @@
 
 import { useCallback, useEffect, useState } from "react";
 import {
+  detectTarifsCityFromGps,
+  initialTarifsCity,
+  readStoredTarifsCity,
+  storeTarifsCity,
+} from "@/lib/default-city";
+import {
   createPricingRule,
   createPromoCode,
   createErrandCategoryEstimate,
@@ -542,7 +548,7 @@ export default function TarifsPage() {
   const { canWrite, role, user } = useAdmin();
   const readOnly = !canWrite("tarifs");
   const lockedCity = role === "CITY_ADMIN" ? (user?.managedCity?.trim() || MOVA_CITIES[0]) : null;
-  const [city, setCity] = useState<string>(lockedCity ?? MOVA_CITIES[0]);
+  const [city, setCity] = useState<string>(() => initialTarifsCity(lockedCity));
   const [vehicleRules, setVehicleRules] = useState<PricingRule[]>([]);
   const [deliveryRules, setDeliveryRules] = useState<DeliveryPricingRule[]>([]);
   const [otherSurcharges, setOtherSurcharges] = useState<ServiceSurcharge[]>([]);
@@ -711,6 +717,26 @@ export default function TarifsPage() {
     }
   }, [city]);
 
+  useEffect(() => {
+    if (lockedCity) {
+      setCity(lockedCity);
+      storeTarifsCity(lockedCity);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      if (readStoredTarifsCity()) return;
+      const detected = await detectTarifsCityFromGps();
+      if (!cancelled && detected) {
+        setCity(detected);
+        storeTarifsCity(detected);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [lockedCity]);
+
   function openPromoCreate() {
     setPromoCode("");
     setPromoPercent("");
@@ -789,7 +815,11 @@ export default function TarifsPage() {
         <select
           id="city-select"
           value={city}
-          onChange={(e) => setCity(e.target.value)}
+          onChange={(e) => {
+            const next = e.target.value;
+            setCity(next);
+            storeTarifsCity(next);
+          }}
           disabled={!!lockedCity}
           className="rounded-lg border border-gray-200 px-3 py-2 text-sm bg-white disabled:bg-gray-50 disabled:text-gray-600"
         >

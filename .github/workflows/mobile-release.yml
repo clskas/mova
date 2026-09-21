@@ -133,11 +133,11 @@ jobs:
         id: playver
         run: |
           set -euo pipefail
-          # Play production floor: 86 already uploaded; next AAB must be ≥87.
+          # Play production floor: 87 already uploaded; next AAB must be ≥88.
           CODE="${{ github.run_number }}"
-          if [ "$CODE" -lt 87 ]; then CODE=87; fi
+          if [ "$CODE" -lt 88 ]; then CODE=88; fi
           echo "code=$CODE" >> "$GITHUB_OUTPUT"
-          echo "Play versionCode=$CODE (pubspec 1.0.9+87; run_number=${{ github.run_number }})"
+          echo "Play versionCode=$CODE (pubspec 1.0.10+88; run_number=${{ github.run_number }})"
 
       - name: Build passenger AAB
         working-directory: mobile
@@ -147,7 +147,7 @@ jobs:
           flutter build appbundle --release \
             --flavor passenger \
             -t lib/main_passenger.dart \
-            --build-name=1.0.9 \
+            --build-name=1.0.10 \
             --build-number=${{ steps.playver.outputs.code }} \
             --dart-define=API_URL=${{ steps.urls.outputs.api }} \
             --dart-define=WS_URL=${{ steps.urls.outputs.ws }} \
@@ -176,7 +176,7 @@ jobs:
           flutter build appbundle --release \
             --flavor driver \
             -t lib/main_driver.dart \
-            --build-name=1.0.9 \
+            --build-name=1.0.10 \
             --build-number=${{ steps.playver.outputs.code }} \
             --dart-define=API_URL=${{ steps.urls.outputs.api }} \
             --dart-define=WS_URL=${{ steps.urls.outputs.ws }} \
@@ -199,7 +199,7 @@ jobs:
           flutter build apk --release \
             --flavor passenger \
             -t lib/main_passenger.dart \
-            --build-name=1.0.9 \
+            --build-name=1.0.10 \
             --build-number=${{ steps.playver.outputs.code }} \
             --dart-define=API_URL=${{ steps.urls.outputs.api }} \
             --dart-define=WS_URL=${{ steps.urls.outputs.ws }} \
@@ -215,7 +215,7 @@ jobs:
           flutter build apk --release \
             --flavor driver \
             -t lib/main_driver.dart \
-            --build-name=1.0.9 \
+            --build-name=1.0.10 \
             --build-number=${{ steps.playver.outputs.code }} \
             --dart-define=API_URL=${{ steps.urls.outputs.api }} \
             --dart-define=WS_URL=${{ steps.urls.outputs.ws }} \

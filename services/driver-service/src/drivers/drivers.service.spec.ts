@@ -34,14 +34,27 @@ describe('DriversService KYC dossier', () => {
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
-  it('refuse Approuver le dossier tant qu\'un justificatif n\'est pas APPROVED', async () => {
+  it('autorise Approuver le dossier même si un justificatif n\'est pas encore APPROVED', async () => {
     prisma.kycDocument.findMany.mockResolvedValue([
       { type: 'ID_PHOTO', status: 'APPROVED', notes: null, url: '/a', id: 'd1', createdAt: new Date() },
       { type: 'SELFIE', status: 'PENDING', notes: null, url: '/b', id: 'd2', createdAt: new Date() },
     ]);
-    await expect(service.setDriverKycStatus('u1', true)).rejects.toBeInstanceOf(MovaHttpException);
-    expect(prisma.driverProfile.upsert).not.toHaveBeenCalled();
-    expect(global.fetch).not.toHaveBeenCalled();
+    prisma.kycDocument.updateMany.mockResolvedValue({ count: 2 });
+    prisma.driverProfile.findUnique.mockResolvedValue({
+      id: 'p1',
+      userId: 'u1',
+      kycStatus: 'APPROVED',
+      vehicles: [],
+    });
+    prisma.driverProfile.upsert.mockResolvedValue({ id: 'p1', userId: 'u1', kycStatus: 'APPROVED' });
+    prisma.driverProfile.update.mockResolvedValue({ id: 'p1', userId: 'u1' });
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({ smsSent: true, emailSent: false, hasPhone: true, hasEmail: false }),
+    });
+    const result = await service.setDriverKycStatus('u1', true);
+    expect(result.activationPin).toBeTruthy();
+    expect(prisma.driverProfile.upsert).toHaveBeenCalled();
   });
 
   it('PENDING inclut les docs APPROVED des dossiers encore en attente (Approuver le dossier)', async () => {

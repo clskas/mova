@@ -1180,16 +1180,8 @@ export class DriversService {
       throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, (e as Error).message);
     }
     const status = approved ? KycStatus.APPROVED : KycStatus.REJECTED;
-    if (approved) {
-      const kyc = await this.getKycStatus(userId);
-      if (!allDriverJustificatifsApproved(kyc.checklist)) {
-        throw new MovaHttpException(
-          MovaErrorCode.VALIDATION_ERROR,
-          undefined,
-          'Tous les justificatifs doivent être approuvés individuellement avant d\'approuver le dossier.',
-        );
-      }
-    }
+    // Activation possible sans tous les justificatifs : la grâce / requireDocumentsForJobs
+    // coupe les notifications plus tard si les docs manquent encore.
     await this.prisma.kycDocument.updateMany({
       where: { userId },
       data: { status, ...(reason ? { notes: reason } : {}) },

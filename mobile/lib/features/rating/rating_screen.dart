@@ -29,6 +29,7 @@ class _RatingScreenState extends ConsumerState<RatingScreen> {
   int _score = 5;
   bool _loading = false;
   bool _loadingContext = true;
+  bool _closing = false;
   String? _error;
   String? _driverId;
   String? _peerName;
@@ -47,36 +48,60 @@ class _RatingScreenState extends ConsumerState<RatingScreen> {
     super.dispose();
   }
 
+  void _closeDone({String message = 'Merci pour votre notation !'}) {
+    if (!mounted || _closing) return;
+    _closing = true;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    Navigator.of(context).popUntil((r) => r.isFirst);
+  }
+
+  bool _isAlreadyRatedMessage(String message) {
+    final m = message.toLowerCase();
+    return m.contains('déjà noté') ||
+        m.contains('deja note') ||
+        m.contains('already rated') ||
+        m.contains('mova_ride_010');
+  }
+
   Future<void> _loadContext() async {
-    if (_driverId != null) {
-      setState(() => _loadingContext = false);
-      return;
-    }
     final api = ref.read(apiClientProvider);
     if (widget.isErrand) {
       final result = await api.get('/errands/${widget.errandId}');
       if (!mounted) return;
-      setState(() {
-        _loadingContext = false;
-        if (result case Success(:final data)) {
-          final order = data['errand'] as Map<String, dynamic>? ?? data;
-          _driverId = order['driverId']?.toString();
+      if (result case Success(:final data)) {
+        final order = data['errand'] as Map<String, dynamic>? ?? data;
+        if (order['rated'] == true || order['hasRated'] == true) {
+          _closeDone(message: 'Vous avez déjà noté cette commande.');
+          return;
+        }
+        setState(() {
+          _loadingContext = false;
+          _driverId = order['driverId']?.toString() ?? _driverId;
           final courier = order['courier'] as Map<String, dynamic>?;
           _peerName = courier?['name']?.toString() ?? widget.peerLabel;
-        }
+        });
+        return;
+      }
+      setState(() => _loadingContext = false);
+      return;
+    }
+
+    final result = await api.getRide(widget.rideId!);
+    if (!mounted) return;
+    if (result case Success(:final data)) {
+      if (data['rated'] == true || data['hasRated'] == true || data['passengerRated'] == true) {
+        _closeDone(message: 'Vous avez déjà noté cette course.');
+        return;
+      }
+      setState(() {
+        _loadingContext = false;
+        _driverId = data['driverId']?.toString() ?? _driverId;
+        final driver = data['driver'] as Map<String, dynamic>?;
+        _peerName = driver?['name']?.toString();
       });
       return;
     }
-    final result = await api.getRide(widget.rideId!);
-    if (!mounted) return;
-    setState(() {
-      _loadingContext = false;
-      if (result case Success(:final data)) {
-        _driverId = data['driverId']?.toString();
-        final driver = data['driver'] as Map<String, dynamic>?;
-        _peerName = driver?['name']?.toString();
-      }
-    });
+    setState(() => _loadingContext = false);
   }
 
   Future<void> _submit() async {
@@ -116,11 +141,12 @@ class _RatingScreenState extends ConsumerState<RatingScreen> {
 
     switch (result) {
       case Success():
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Merci pour votre notation !')),
-        );
-        Navigator.of(context).popUntil((r) => r.isFirst);
+        _closeDone();
       case Failure(:final error):
+        if (_isAlreadyRatedMessage(error.message)) {
+          _closeDone(message: 'Vous avez déjà noté.');
+          return;
+        }
         setState(() => _error = error.message);
     }
   }

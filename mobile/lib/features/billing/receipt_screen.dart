@@ -272,6 +272,11 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
   }
 
   void _continue() {
+    // Pendant le cash pending, ne pas ouvrir la notation (sinon elle se rouvre en boucle).
+    if (_cashStillPending) {
+      Navigator.of(context).popUntil((r) => r.isFirst);
+      return;
+    }
     if (widget.showRatingAfter && widget.rideId != null) {
       Navigator.pushReplacement(
         context,
@@ -339,7 +344,7 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
                     ),
                     const SizedBox(height: 16),
                     MovaButton(label: 'Retour à l\'accueil', onPressed: _continue),
-                    if (widget.showRatingAfter && widget.rideId != null) ...[
+                    if (!_cashStillPending && widget.showRatingAfter && widget.rideId != null) ...[
                       const SizedBox(height: 8),
                       MovaButton(
                         label: 'Noter le chauffeur',

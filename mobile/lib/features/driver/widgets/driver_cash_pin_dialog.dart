@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/config/market_config.dart';
+import '../../../core/theme/mova_colors.dart';
+
 /// Résultat de validation du PIN côté API.
 typedef PinValidationResult = ({bool ok, String? message});
 
@@ -10,17 +13,25 @@ class DriverCashPinDialog extends StatefulWidget {
     super.key,
     this.title = 'Confirmer espèces',
     this.label = 'Code PIN passager',
+    this.passengerTotalCdf,
+    this.driverNetCdf,
     this.validate,
   });
 
   final String title;
   final String label;
+  /// Total que le passager doit remettre (brut course / livraison).
+  final int? passengerTotalCdf;
+  /// Part nette chauffeur (info secondaire).
+  final int? driverNetCdf;
   final Future<PinValidationResult> Function(String pin)? validate;
 
   static Future<String?> show(
     BuildContext context, {
     String title = 'Confirmer espèces',
     String label = 'Code PIN passager',
+    int? passengerTotalCdf,
+    int? driverNetCdf,
     Future<PinValidationResult> Function(String pin)? validate,
   }) {
     return showDialog<String>(
@@ -29,6 +40,8 @@ class DriverCashPinDialog extends StatefulWidget {
       builder: (_) => DriverCashPinDialog(
         title: title,
         label: label,
+        passengerTotalCdf: passengerTotalCdf,
+        driverNetCdf: driverNetCdf,
         validate: validate,
       ),
     );
@@ -91,6 +104,8 @@ class _DriverCashPinDialogState extends State<DriverCashPinDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final total = widget.passengerTotalCdf;
+    final net = widget.driverNetCdf;
     return AlertDialog(
       scrollable: true,
       title: Text(widget.title),
@@ -98,6 +113,47 @@ class _DriverCashPinDialogState extends State<DriverCashPinDialog> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (total != null && total > 0) ...[
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: MovaColors.orange.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: MovaColors.orange.withValues(alpha: 0.35)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'À encaisser auprès du passager',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: MovaColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    MarketConfig.formatCdf(total),
+                    style: const TextStyle(
+                      fontSize: 26,
+                      fontWeight: FontWeight.bold,
+                      color: MovaColors.orange,
+                    ),
+                  ),
+                  if (net != null && net > 0 && net != total) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      'Dont votre part nette ~${MarketConfig.formatCdf(net)} '
+                      '(le reste = commission SENGA à reverser)',
+                      style: const TextStyle(fontSize: 12, color: MovaColors.textSecondary),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+          ],
           TextField(
             controller: _controller,
             keyboardType: TextInputType.number,

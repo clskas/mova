@@ -42,6 +42,17 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
   String get _status => _ride['status']?.toString() ?? 'DRIVER_ASSIGNED';
   bool get _isPaid => _ride['isPaid'] == true;
 
+  int? get _passengerCashTotalCdf {
+    final v = _ride['finalFareCdf'] ?? _ride['estimatedFareCdf'] ?? _ride['amountCdf'];
+    if (v is num) return v.round();
+    return int.tryParse(v?.toString() ?? '');
+  }
+
+  int? get _driverNetCdf {
+    final v = DriverEarningsDisplay.netFromMap(_ride);
+    return v;
+  }
+
   /// Le passager a initié un paiement espèces (statut backend PENDING) :
   /// le chauffeur doit confirmer le PIN.
   bool get _cashPending =>
@@ -492,13 +503,46 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
               },
             ),
             const SizedBox(height: 12),
-            if (!_isPaid)
+            if (!_isPaid) ...[
+              if (_passengerCashTotalCdf != null && _passengerCashTotalCdf! > 0) ...[
+                MovaCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Total à encaisser (passager)',
+                        style: TextStyle(color: MovaColors.textSecondary, fontSize: 13),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        MarketConfig.formatCdf(_passengerCashTotalCdf!),
+                        style: const TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
+                          color: MovaColors.orange,
+                        ),
+                      ),
+                      if (_driverNetCdf != null &&
+                          _driverNetCdf! > 0 &&
+                          _driverNetCdf != _passengerCashTotalCdf) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          'Votre part nette ~${MarketConfig.formatCdf(_driverNetCdf!)}',
+                          style: const TextStyle(fontSize: 13, color: MovaColors.textSecondary),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
               MovaButton(
                 label: 'Confirmer paiement espèces',
                 isSecondary: true,
                 icon: Icons.payments_outlined,
                 onPressed: _confirmCash,
               ),
+            ],
             const SizedBox(height: 12),
             MovaButton(
               label: 'Retour au tableau de bord',
@@ -520,6 +564,8 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
     final pin = await DriverCashPinDialog.show(
       context,
       title: auto ? 'Le passager paie en espèces' : 'Confirmer espèces',
+      passengerTotalCdf: _passengerCashTotalCdf,
+      driverNetCdf: _driverNetCdf,
       validate: (enteredPin) async {
         final result = await api.confirmCashRide(_rideId, enteredPin);
         return switch (result) {

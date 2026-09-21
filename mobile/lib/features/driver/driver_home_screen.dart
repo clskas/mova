@@ -1798,6 +1798,13 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
+                        if ((_pendingCashRide!['finalFareCdf'] ?? _pendingCashRide!['estimatedFareCdf'] ?? _pendingCashRide!['amountCdf']) != null) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            'À encaisser : ${MarketConfig.formatCdf(((_pendingCashRide!['finalFareCdf'] ?? _pendingCashRide!['estimatedFareCdf'] ?? _pendingCashRide!['amountCdf']) as num).round())}',
+                            style: const TextStyle(fontWeight: FontWeight.w700, color: MovaColors.orange),
+                          ),
+                        ],
                         const SizedBox(height: 4),
                         const Text(
                           'Appuyez pour saisir le code PIN du passager',

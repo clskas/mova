@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   WORK_ACTIVATION_PIN_HEADING_FR,
   WORK_ACTIVATION_PIN_HINT_FR,
@@ -41,6 +41,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
   const [needsProfileSetup, setNeedsProfileSetup] = useState(false);
   const [needsActivation, setNeedsActivation] = useState(false);
+  const activationDoneRef = useRef(false);
   const [activateIdentity, setActivateIdentity] = useState("");
 
   useEffect(() => {
@@ -89,7 +90,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
           identity: fallback,
         });
         setActivateIdentity(fallback);
-        setNeedsActivation(needsPin);
+        if (!activationDoneRef.current) setNeedsActivation(needsPin);
         setReady(true);
       } catch (e) {
         const status =
@@ -160,6 +161,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
                 verifyPath="/api/rental-partner/kyc/activation-pin"
                 authToken={getToken()}
                 onActivated={() => {
+                  activationDoneRef.current = true;
                   setNeedsActivation(false);
                   setReady(true);
                 }}

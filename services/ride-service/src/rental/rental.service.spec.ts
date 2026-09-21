@@ -1,5 +1,23 @@
 import { RentalService } from './rental.service';
 import { MovaHttpException } from '@mova/shared';
+import { fetchServicePaymentStatus } from '../common/payment-status.util';
+
+jest.mock('../common/payment-status.util', () => ({
+  fetchServicePaymentStatus: jest.fn(),
+}));
+jest.mock('../common/escrow.util', () => ({
+  refundEscrow: jest.fn().mockResolvedValue({ success: true }),
+  releaseEscrowPayout: jest.fn().mockResolvedValue({ success: true }),
+}));
+jest.mock('../common/internal-lookup.util', () => ({
+  fetchAuthUserBrief: jest.fn().mockResolvedValue({ name: 'Passager', phone: '+243800000000' }),
+}));
+jest.mock('../common/driver-eligibility.util', () => ({
+  assertDriverCanReceiveJobs: jest.fn().mockResolvedValue(undefined),
+  assertDriverEligibleForRentalLogistics: jest.fn().mockResolvedValue(undefined),
+}));
+
+const fetchPayment = fetchServicePaymentStatus as jest.MockedFunction<typeof fetchServicePaymentStatus>;
 
 describe('RentalService', () => {
   const prisma = {
@@ -23,6 +41,19 @@ describe('RentalService', () => {
   const tripShare = { generateCompletionPin: jest.fn().mockReturnValue('1234') };
 
   const service = new RentalService(prisma as never, redis as never, promo as never, tripShare as never);
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    fetchPayment.mockResolvedValue({
+      referenceType: 'RENTAL',
+      referenceId: 'r1',
+      isPaid: false,
+      paymentStatus: null,
+      escrowHeld: false,
+      payoutReleased: false,
+      fundsFrozen: false,
+    });
+  });
 
   const baseVehicle = {
     id: 'v1',
@@ -234,8 +265,9 @@ describe('RentalService', () => {
     expect(result.timeline).toHaveLength(6);
     expect(result.timeline[2].label).toBe('Confirmée');
     expect(result.timeline[2].completed).toBe(true);
-    expect(result.nextStepHint).toContain('En cours');
-    expect(result.canConfirmHandover).toBe(true);
+    expect(result.nextStepHint).toContain('Prépayez');
+    expect(result.canConfirmHandover).toBe(false);
+    expect(result.paymentReady).toBe(true);
     expect(result.canCancel).toBe(true);
   });
 
@@ -286,6 +318,15 @@ describe('RentalService', () => {
       endDate: end,
       vehicle: { name: 'RAV4', ownerName: 'Marie', ownerContactPhone: '+243898765432', ownerBadge: 'PRO' },
     };
+    fetchPayment.mockResolvedValue({
+      referenceType: 'RENTAL',
+      referenceId: 'r1',
+      isPaid: true,
+      paymentStatus: 'COMPLETED',
+      escrowHeld: true,
+      payoutReleased: false,
+      fundsFrozen: false,
+    });
     prisma.rentalInquiry.findUnique.mockResolvedValue(inquiry);
     prisma.rentalInquiry.update.mockResolvedValue({ ...inquiry, status: 'IN_PROGRESS' });
 
@@ -296,6 +337,20 @@ describe('RentalService', () => {
     );
     expect(result.status).toBe('IN_PROGRESS');
     expect(result.canConfirmHandover).toBe(false);
+  });
+
+  it('refuse la remise sans séquestre', async () => {
+    const { start, end } = futureDates(2);
+    prisma.rentalInquiry.findUnique.mockResolvedValue({
+      id: 'r1',
+      userId: 'user-1',
+      status: 'CONFIRMED',
+      startDate: start,
+      endDate: end,
+      vehicle: { name: 'RAV4' },
+    });
+    await expect(service.passengerConfirmHandover('r1', 'user-1')).rejects.toBeInstanceOf(MovaHttpException);
+    expect(prisma.rentalInquiry.update).not.toHaveBeenCalled();
   });
 
   it('démarre automatiquement à la date de début sur lecture', async () => {
@@ -332,6 +387,15 @@ describe('RentalService', () => {
       driverId: null,
       vehicle: { name: 'RAV4', ownerName: 'Marie', ownerContactPhone: '+243898765432', ownerBadge: 'PRO' },
     };
+    fetchPayment.mockResolvedValue({
+      referenceType: 'RENTAL',
+      referenceId: 'r1',
+      isPaid: true,
+      paymentStatus: 'COMPLETED',
+      escrowHeld: true,
+      payoutReleased: false,
+      fundsFrozen: false,
+    });
     prisma.rentalInquiry.findUnique.mockResolvedValue(inquiry);
     prisma.rentalInquiry.update.mockResolvedValue({ ...inquiry, status: 'IN_PROGRESS' });
 
@@ -339,6 +403,49 @@ describe('RentalService', () => {
 
     expect(prisma.rentalInquiry.update).toHaveBeenCalled();
     expect(result.status).toBe('IN_PROGRESS');
+  });
+
+  it('ne démarre pas automatiquement sans séquestre', async () => {
+    const start = new Date();
+    start.setDate(start.getDate() - 1);
+    const end = new Date();
+    end.setDate(end.getDate() + 2);
+    const inquiry = {
+      id: 'r1',
+      userId: 'user-1',
+      status: 'CONFIRMED',
+      vehicleId: 'v1',
+      vehicleType: 'SUV',
+      startDate: start,
+      endDate: end,
+      pickupAddress: 'Gombe',
+      pickupCity: 'Kinshasa',
+      returnCity: 'Kinshasa',
+      rentalPeriod: 'DAILY',
+      mileageType: 'UNLIMITED',
+      insuranceTier: 'BASIC',
+      addOns: {},
+      contactPhone: '+243812345678',
+      notes: null,
+      estimatedPriceCdf: 300000,
+      totalCdf: 300000,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      logisticsMode: 'SELF_PASSENGER',
+      passengerDriverName: null,
+      passengerDriverPhone: null,
+      ownerDriverName: null,
+      ownerDriverPhone: null,
+      driverId: null,
+      vehicle: { name: 'RAV4', ownerName: 'Marie', ownerContactPhone: '+243898765432', ownerBadge: 'PRO' },
+    };
+    prisma.rentalInquiry.findUnique.mockResolvedValue(inquiry);
+
+    const result = await service.get('r1', 'user-1');
+
+    expect(prisma.rentalInquiry.update).not.toHaveBeenCalled();
+    expect(result.status).toBe('CONFIRMED');
+    expect(result.paymentReady).toBe(true);
   });
 
   it('bloque la publication d\'un véhicule tant que le loueur n\'est pas validé', async () => {

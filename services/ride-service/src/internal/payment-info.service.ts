@@ -10,6 +10,8 @@ import { MovaErrorCode, MovaHttpException, fromMobileRideStatus } from '@mova/sh
 import { PrismaService } from '../prisma/prisma.service';
 import { RentalService } from '../rental/rental.service';
 import { isDeliveryEscrowCollectible } from '../deliveries/delivery-guarantee.util';
+import { fetchServicePaymentStatus } from '../common/payment-status.util';
+import { computeRentalEscrowFlags } from '../rental/rental-escrow.util';
 
 export type ServiceReferenceType = 'RIDE' | 'DELIVERY' | 'ERRAND' | 'MOVING' | 'RENTAL' | 'CARPOOL' | 'SCHEDULED';
 
@@ -153,17 +155,28 @@ export class PaymentInfoService {
     let inquiry = await this.prisma.rentalInquiry.findUnique({ where: { id: bookingId }, include: { vehicle: true } });
     if (!inquiry) throw new MovaHttpException(MovaErrorCode.RENTAL_INQUIRY_NOT_FOUND, HttpStatus.NOT_FOUND);
     inquiry = await this.rental.ensureCompletionPinForPayment(inquiry);
+    const payment = await fetchServicePaymentStatus('RENTAL', bookingId);
+    const flags = computeRentalEscrowFlags({
+      status: inquiry.status,
+      isPaid: payment.isPaid || inquiry.status === RentalInquiryStatus.PAID,
+      escrowHeld: payment.escrowHeld,
+      payoutReleased: payment.payoutReleased,
+      fundsFrozen: payment.fundsFrozen,
+    });
     return {
       referenceType: 'RENTAL',
       referenceId: bookingId,
       userId: inquiry.userId,
       amountCdf: inquiry.totalCdf ?? inquiry.estimatedPriceCdf ?? 0,
       status: inquiry.status,
-      paymentReady: inquiry.status === RentalInquiryStatus.RETURNED,
+      paymentReady: flags.paymentReady,
       driverId: inquiry.driverId ?? inquiry.vehicle?.ownerUserId ?? null,
       ownerUserId: inquiry.vehicle?.ownerUserId ?? null,
-      cashPin: inquiry.completionPin,
+      cashPin: flags.cashAllowed ? inquiry.completionPin : null,
       title: inquiry.vehicle?.name ?? inquiry.vehicleType,
+      guaranteed: true,
+      escrowCollect: flags.escrowCollect,
+      cashAllowed: flags.cashAllowed,
     };
   }
 

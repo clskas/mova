@@ -591,10 +591,20 @@ export class PaymentsService {
     }
   }
 
+  private escrowCollectSuccessMessage(type: string): string {
+    if (type === 'RENTAL') {
+      return 'Montant séquestré. La remise du véhicule est débloquée — le loueur est payé après le retour.';
+    }
+    return 'Montant séquestré. Le livreur part dès confirmation du séquestre — il n\'est payé qu\'après votre code PIN.';
+  }
+
   private servicePaymentNotReadyMessage(type: string, status?: string): string {
     if (type === 'RENTAL') {
+      if (status === 'CONFIRMED') {
+        return 'Prépayez la location pour séquestrer le montant avant la remise du véhicule.';
+      }
       if (status && status !== 'RETURNED' && status !== 'PAID') {
-        return 'Le paiement sera disponible après le retour du véhicule. Demandez au partenaire de cliquer « Véhicule rendu » dans le portail location.';
+        return 'Le paiement sera disponible après confirmation de la réservation par le propriétaire.';
       }
       return 'La location n\'est pas encore prête pour le paiement.';
     }
@@ -801,7 +811,7 @@ export class PaymentsService {
         payment,
         escrowHeld: escrowCollect,
         message: escrowCollect
-          ? 'Montant séquestré. Le livreur part dès confirmation du séquestre — il n\'est payé qu\'après votre code PIN.'
+          ? this.escrowCollectSuccessMessage(type)
           : 'Paiement portefeuille effectué',
         amountCdf,
         currency: 'CDF',

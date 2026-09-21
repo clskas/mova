@@ -4,6 +4,7 @@ import { MARKET_RDC, MOVA_EVENTS, MovaErrorCode, MovaHttpException, canCancelRen
 import { RedisService } from '@mova/shared';
 import { fetchAuthUserBrief } from '../common/internal-lookup.util';
 import { fetchServicePaymentStatus } from '../common/payment-status.util';
+import { refundEscrow, releaseEscrowPayout } from '../common/escrow.util';
 import { assertDriverCanReceiveJobs, assertDriverEligibleForRentalLogistics } from '../common/driver-eligibility.util';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -15,6 +16,7 @@ import {
 import { applyPromoCode } from '../common/promo-apply.util';
 import { PromoService } from '../rides/surcharge.service';
 import { TripShareService } from '../share/trip-share.service';
+import { computeRentalEscrowFlags } from './rental-escrow.util';
 
 type RentalAddOns = { childSeat?: boolean; gps?: boolean; extraDriver?: boolean };
 import { computeRentalPartnerDisplay } from '../billing/partner-display.util';
@@ -96,6 +98,41 @@ export class RentalService {
       status: RentalInquiryStatus.RETURNED,
       completionPin: inquiry.completionPin ?? this.tripShare.generateCompletionPin(),
     };
+  }
+
+  private async rentalPaymentFlags(inquiryId: string, status: RentalInquiryStatus) {
+    const payment = await fetchServicePaymentStatus('RENTAL', inquiryId);
+    return {
+      payment,
+      flags: computeRentalEscrowFlags({
+        status,
+        isPaid: payment.isPaid || status === RentalInquiryStatus.PAID,
+        escrowHeld: payment.escrowHeld,
+        payoutReleased: payment.payoutReleased,
+        fundsFrozen: payment.fundsFrozen,
+      }),
+    };
+  }
+
+  private async assertRentalEscrowHeldForHandover(inquiryId: string) {
+    const { flags } = await this.rentalPaymentFlags(inquiryId, RentalInquiryStatus.CONFIRMED);
+    if (!flags.escrowHeld) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        undefined,
+        'Le passager doit prépayer la location (séquestre) avant la remise du véhicule.',
+      );
+    }
+  }
+
+  private async releaseRentalEscrowOnReturn(inquiryId: string) {
+    await releaseEscrowPayout('RENTAL', inquiryId).catch(() => undefined);
+  }
+
+  private async refundRentalEscrowOnCancel(inquiryId: string) {
+    await refundEscrow('RENTAL', inquiryId, 'Annulation location — remboursement du séquestre.').catch(
+      () => undefined,
+    );
   }
 
   /** Génère le PIN espèces si la location est retournée sans PIN (réservations antérieures à la migration). */
@@ -347,6 +384,7 @@ export class RentalService {
     vehicle?: { name: string } | null;
   }) {
     const passenger = await fetchAuthUserBrief(inquiry.userId);
+    const { flags } = await this.rentalPaymentFlags(inquiry.id, inquiry.status);
     const grossCdf = inquiry.totalCdf ?? inquiry.estimatedPriceCdf;
     const depositCdf = (inquiry as { vehicle?: { depositCdf?: number } | null }).vehicle?.depositCdf ?? 0;
     const partnerDiscountCdf = inquiry.discountCdf ?? 0;
@@ -369,7 +407,7 @@ export class RentalService {
       id: inquiry.id,
       status: inquiry.status,
       statusLabel: RENTAL_STATUS_LABELS[inquiry.status],
-      nextStepHint: this.getNextStepHint(inquiry, 'owner'),
+      nextStepHint: this.getNextStepHint(inquiry, 'owner', flags),
       vehicleName: inquiry.vehicle?.name ?? inquiry.vehicleType,
       vehicleId: inquiry.vehicleId,
       passengerName: passenger?.name,
@@ -391,9 +429,10 @@ export class RentalService {
       notes: inquiry.notes,
       createdAt: inquiry.createdAt.toISOString(),
       driverId: inquiry.driverId,
-      paymentReady: inquiry.status === RentalInquiryStatus.RETURNED,
-      canConfirmCash: inquiry.status === RentalInquiryStatus.RETURNED,
-      isPaid: inquiry.status === RentalInquiryStatus.PAID,
+      paymentReady: false,
+      canConfirmCash: flags.cashAllowed,
+      escrowHeld: flags.escrowHeld,
+      isPaid: flags.fullyPaid || inquiry.status === RentalInquiryStatus.PAID,
       remainingLabel: remaining?.remainingLabel ?? null,
       remainingActive: remaining?.isActive ?? false,
       ...this.mapLogisticsFields(inquiry),
@@ -895,6 +934,7 @@ export class RentalService {
     } | null;
   },
     audience: 'passenger' | 'owner' | 'admin' | 'driver' = 'passenger',
+    escrowFlags?: ReturnType<typeof computeRentalEscrowFlags>,
   ) {
     const ownerContact =
       inquiry.status === RentalInquiryStatus.CONFIRMED ||
@@ -971,8 +1011,8 @@ export class RentalService {
       ownerBadge: inquiry.vehicle?.ownerBadge,
       statusLabel: RENTAL_STATUS_LABELS[inquiry.status],
       timeline: this.buildTimeline(inquiry.status),
-      nextStepHint: this.getNextStepHint(inquiry, audience),
-      canConfirmHandover: inquiry.status === RentalInquiryStatus.CONFIRMED,
+      nextStepHint: this.getNextStepHint(inquiry, audience, escrowFlags),
+      canConfirmHandover: false,
       ...cancelEligibility,
       rentalDurationDays,
       rentalDurationHours,
@@ -981,7 +1021,8 @@ export class RentalService {
       remainingHours: remaining?.remainingHours ?? 0,
       remainingLabel: remaining?.remainingLabel ?? null,
       remainingActive: remaining?.isActive ?? false,
-      paymentReady: inquiry.status === RentalInquiryStatus.RETURNED,
+      paymentReady: false,
+      escrowHeld: false,
       isPaid: inquiry.status === RentalInquiryStatus.PAID,
       paymentReferenceId: inquiry.id,
       completionPin:
@@ -1004,19 +1045,18 @@ export class RentalService {
       inquiry.status === RentalInquiryStatus.RETURNED || inquiry.status === RentalInquiryStatus.PAID
         ? await this.ensureCompletionPinForPayment(inquiry)
         : inquiry;
+    const { flags } = await this.rentalPaymentFlags(inquiry.id, inquiry.status);
     const enriched = this.enrichInquiry(
       withPin as Parameters<RentalService['enrichInquiry']>[0],
       audience,
+      flags,
     ) as Record<string, unknown>;
-    if (
-      inquiry.status === RentalInquiryStatus.RETURNED ||
-      inquiry.status === RentalInquiryStatus.PAID
-    ) {
-      const payment = await fetchServicePaymentStatus('RENTAL', inquiry.id);
-      const isPaid = payment.isPaid || inquiry.status === RentalInquiryStatus.PAID;
-      enriched.isPaid = isPaid;
-      enriched.paymentReady = inquiry.status === RentalInquiryStatus.RETURNED && !isPaid;
-    }
+    enriched.escrowHeld = flags.escrowHeld;
+    enriched.isPaid = flags.fullyPaid;
+    enriched.paymentReady = flags.paymentReady;
+    enriched.escrowCollect = flags.escrowCollect;
+    enriched.canConfirmHandover = inquiry.status === RentalInquiryStatus.CONFIRMED && flags.escrowHeld;
+    enriched.canConfirmCash = flags.cashAllowed;
     return enriched;
   }
 
@@ -1043,6 +1083,7 @@ export class RentalService {
       driverId?: string | null;
     },
     audience: 'passenger' | 'owner' | 'admin' | 'driver',
+    escrowFlags?: ReturnType<typeof computeRentalEscrowFlags>,
   ): string | null {
     const mode = inquiry.logisticsMode ?? RentalLogisticsMode.SELF_PASSENGER;
     switch (inquiry.status) {
@@ -1057,6 +1098,15 @@ export class RentalService {
         }
         return 'En attente de confirmation de disponibilité par le propriétaire.';
       case RentalInquiryStatus.CONFIRMED:
+        if (escrowFlags && !escrowFlags.escrowHeld) {
+          if (audience === 'passenger') {
+            return 'Prépayez la location (portefeuille ou Mobile Money) : le montant est séquestré jusqu\'au retour du véhicule.';
+          }
+          if (audience === 'owner' || audience === 'driver') {
+            return 'En attente du prépaiement passager (séquestre) avant la remise du véhicule.';
+          }
+          return 'En attente du prépaiement / séquestre passager avant remise.';
+        }
         if (audience === 'owner') {
           return 'À la remise du véhicule au passager, cliquez « Remise effectuée » : le statut passera à En cours.';
         }
@@ -1078,13 +1128,24 @@ export class RentalService {
         if (audience === 'driver') {
           return 'À la récupération du véhicule, appuyez sur « Véhicule rendu » pour clôturer la mission.';
         }
-        return 'Location active — le retour sera confirmé par le propriétaire à la fin de la période.';
+        return escrowFlags?.escrowHeld
+          ? 'Location active — le montant reste séquestré jusqu\'au retour du véhicule.'
+          : 'Location active — le retour sera confirmé par le propriétaire à la fin de la période.';
       case RentalInquiryStatus.RETURNED:
-        return audience === 'passenger'
-          ? 'Réglez la location pour obtenir votre reçu.'
-          : audience === 'owner'
-            ? 'Demandez le code PIN au passager et saisissez-le pour confirmer le paiement espèces.'
-            : 'Location terminée — en attente du paiement passager.';
+        if (escrowFlags?.fullyPaid || audience === 'passenger') {
+          return audience === 'passenger'
+            ? escrowFlags?.fullyPaid
+              ? 'Location payée — reçu disponible dans l\'application SENGA.'
+              : 'Réglez la location pour obtenir votre reçu.'
+            : audience === 'owner'
+              ? escrowFlags?.fullyPaid
+                ? 'Séquestre libéré — votre part sera versée selon les règles plateforme.'
+                : 'Demandez le code PIN au passager et saisissez-le pour confirmer le paiement espèces.'
+              : 'Location terminée — en attente du paiement passager.';
+        }
+        return audience === 'owner'
+          ? 'Demandez le code PIN au passager et saisissez-le pour confirmer le paiement espèces.'
+          : 'Location terminée — en attente du paiement passager.';
       case RentalInquiryStatus.PAID:
         return 'Location payée — reçu disponible dans l\'application SENGA.';
       case RentalInquiryStatus.CLOSED:
@@ -1116,6 +1177,7 @@ export class RentalService {
         'La location doit être confirmée avant de passer en cours.',
       );
     }
+    await this.assertRentalEscrowHeldForHandover(inquiry.id);
     const updated = await this.prisma.rentalInquiry.update({
       where: { id: inquiry.id },
       data: { status: RentalInquiryStatus.IN_PROGRESS },
@@ -1134,7 +1196,11 @@ export class RentalService {
     T extends { id: string; status: RentalInquiryStatus; startDate: Date; userId: string },
   >(inquiry: T): Promise<T> {
     if (!this.isRentalStartDue(inquiry)) return inquiry;
-    return (await this.transitionToInProgress(inquiry)) as unknown as T;
+    try {
+      return (await this.transitionToInProgress(inquiry)) as unknown as T;
+    } catch {
+      return inquiry;
+    }
   }
 
   async autoStartDueBookings(limit = 50): Promise<number> {
@@ -1153,7 +1219,7 @@ export class RentalService {
         await this.transitionToInProgress(inquiry);
         count += 1;
       } catch {
-        // ignore race / invalid row
+        // ignore race / missing escrow / invalid row
       }
     }
     return count;
@@ -1217,6 +1283,7 @@ export class RentalService {
       data: { status: RentalInquiryStatus.CLOSED },
       include: { vehicle: true },
     });
+    await this.refundRentalEscrowOnCancel(id);
     await this.publishRentalBooking(updated, updated.vehicle, 'CANCELLED');
     await this.redis.publish(MOVA_EVENTS.SERVICE_STATUS_UPDATED, {
       serviceType: 'RENTAL',
@@ -1332,6 +1399,7 @@ export class RentalService {
         data: this.returnUpdateData(inquiry),
         include: { vehicle: true },
       });
+      await this.releaseRentalEscrowOnReturn(id);
       await this.redis.publish(MOVA_EVENTS.SERVICE_STATUS_UPDATED, {
         serviceType: 'RENTAL',
         referenceId: updated.id,
@@ -1364,7 +1432,8 @@ export class RentalService {
         userId: updated.userId,
         status: updated.status,
       });
-      if (action === 'decline') {
+      if (action === 'decline' || newStatus === RentalInquiryStatus.CLOSED) {
+        await this.refundRentalEscrowOnCancel(id);
         await this.publishRentalBooking(updated, updated.vehicle, 'CANCELLED');
       }
     }
@@ -1498,6 +1567,9 @@ export class RentalService {
           : { status },
       include: { vehicle: true },
     });
+    if (status === RentalInquiryStatus.RETURNED) {
+      await this.releaseRentalEscrowOnReturn(id);
+    }
     await this.redis.publish(MOVA_EVENTS.SERVICE_STATUS_UPDATED, {
       serviceType: 'RENTAL',
       referenceId: updated.id,
@@ -1663,6 +1735,7 @@ export class RentalService {
       data: { status: RentalInquiryStatus.CLOSED },
       include: { vehicle: true },
     });
+    await this.refundRentalEscrowOnCancel(id);
     await this.publishRentalBooking(updated, updated.vehicle, 'CANCELLED');
     await this.redis.publish(MOVA_EVENTS.SERVICE_STATUS_UPDATED, {
       serviceType: 'RENTAL',
@@ -1686,6 +1759,10 @@ export class RentalService {
       );
     }
     this.assertAdminRentalStatusChange(inquiry, status, forceOverride);
+    if (status === RentalInquiryStatus.IN_PROGRESS) {
+      const updated = await this.transitionToInProgress(inquiry);
+      return this.enrichInquiryWithPayment(updated, 'admin');
+    }
     const updateData =
       status === RentalInquiryStatus.RETURNED ? this.returnUpdateData(inquiry) : { status };
     const updated = await this.prisma.rentalInquiry.update({
@@ -1704,7 +1781,11 @@ export class RentalService {
         await this.publishRentalBooking(updated, updated.vehicle, 'CONFIRMED');
       }
       if (updated.status === RentalInquiryStatus.CLOSED) {
+        await this.refundRentalEscrowOnCancel(id);
         await this.publishRentalBooking(updated, updated.vehicle, 'CANCELLED');
+      }
+      if (updated.status === RentalInquiryStatus.RETURNED) {
+        await this.releaseRentalEscrowOnReturn(id);
       }
     }
     return this.enrichInquiry(updated);

@@ -213,10 +213,10 @@ class _RentalBookingDetailScreenState extends ConsumerState<RentalBookingDetailS
     final statusLabel = b['statusLabel']?.toString() ?? b['status']?.toString() ?? 'En attente';
     final status = b['status']?.toString().toUpperCase();
     final isPaid = b['isPaid'] == true || status == 'PAID';
-    final canConfirmHandover = b['canConfirmHandover'] == true || status == 'CONFIRMED';
+    final escrowHeld = b['escrowHeld'] == true;
+    final canConfirmHandover = b['canConfirmHandover'] == true;
     final canCancel = CancelEligibility.rental(b);
-    final paymentReady =
-        !isPaid && (b['paymentReady'] == true || status == 'RETURNED');
+    final paymentReady = !isPaid && b['paymentReady'] == true;
     final statusColor = switch (status) {
       'CONFIRMED' || 'IN_PROGRESS' || 'RETURNED' || 'PAID' => MovaColors.green,
       'CONTACTED' => MovaColors.violet,
@@ -355,6 +355,30 @@ class _RentalBookingDetailScreenState extends ConsumerState<RentalBookingDetailS
               label: const Text('Contacter le loueur'),
             ),
           ],
+          if (escrowHeld && !isPaid && status != 'PAID') ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: MovaColors.green.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: MovaColors.green.withValues(alpha: 0.25)),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.lock_outline, size: 18, color: MovaColors.green),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Prépayé — montant séquestré jusqu\'au retour du véhicule.',
+                      style: theme.textTheme.bodySmall,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           if (canConfirmHandover) ...[
             const SizedBox(height: 16),
             MovaButton(
@@ -366,7 +390,7 @@ class _RentalBookingDetailScreenState extends ConsumerState<RentalBookingDetailS
           if (paymentReady && total > 0) ...[
             const SizedBox(height: 16),
             MovaButton(
-              label: 'Payer la location',
+              label: status == 'CONFIRMED' ? 'Prépayer la location' : 'Payer la location',
               icon: Icons.payment_outlined,
               onPressed: () {
                 Navigator.push(

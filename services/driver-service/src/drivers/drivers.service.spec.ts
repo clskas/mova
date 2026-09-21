@@ -14,6 +14,11 @@ describe('DriversService KYC dossier', () => {
       upsert: jest.fn(),
       update: jest.fn(),
     },
+    vehicle: {
+      findFirst: jest.fn(),
+      create: jest.fn(),
+      updateMany: jest.fn(),
+    },
   };
   const service = new DriversService(prisma as never, {} as never, {} as never);
 
@@ -48,6 +53,8 @@ describe('DriversService KYC dossier', () => {
     });
     prisma.driverProfile.upsert.mockResolvedValue({ id: 'p1', userId: 'u1', kycStatus: 'APPROVED' });
     prisma.driverProfile.update.mockResolvedValue({ id: 'p1', userId: 'u1' });
+    prisma.vehicle.findFirst.mockResolvedValue({ id: 'v1', driverProfileId: 'p1' });
+    prisma.vehicle.updateMany.mockResolvedValue({ count: 1 });
     (global.fetch as jest.Mock).mockResolvedValue({
       ok: true,
       json: async () => ({ smsSent: true, emailSent: false, hasPhone: true, hasEmail: false }),

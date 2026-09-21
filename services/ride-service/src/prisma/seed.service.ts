@@ -187,7 +187,7 @@ const PLATFORM_COMMISSIONS = [
     serviceType: CommissionServiceType.FOOD,
     platformPercent: 12,
     driverPercent: 88,
-    description: 'Ventes repas — restaurants partenaires',
+    description: 'Markup catalogue repas — ajouté au prix partenaire (client paie)',
   },
 ];
 

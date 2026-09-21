@@ -27,7 +27,10 @@ const DEFAULTS: Record<
     perItemFeeCdf: 1500,
     description: 'Courses & commissions',
   },
-  [CommissionServiceType.FOOD]: { platformPercent: 12, description: 'Ventes repas — restaurants partenaires' },
+  [CommissionServiceType.FOOD]: {
+    platformPercent: 12,
+    description: 'Markup catalogue repas — ajouté au prix partenaire (client paie)',
+  },
 };
 
 @Injectable()

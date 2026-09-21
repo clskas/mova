@@ -4,13 +4,22 @@ import {
 } from './partner-display.util';
 
 describe('partner-display.util', () => {
-  it('computeRestaurantPartnerDisplay — panier et part nette', () => {
+  it('computeRestaurantPartnerDisplay — partenaire reçoit 100 % catalogue (markup séparé)', () => {
     const display = computeRestaurantPartnerDisplay({
-      items: [{ name: 'Poulet', unitPriceCdf: 10000, quantity: 2 }],
+      items: [
+        { name: 'Poulet', partnerUnitPriceCdf: 10000, unitPriceCdf: 11200, quantity: 2 },
+      ],
       events: [
         {
           event: 'ORDER_PLACED',
-          metadata: { itemsSubtotalCdf: 20000, partnerDiscountCdf: 2000, absorbedBy: 'PARTNER' },
+          metadata: {
+            itemsPartnerSubtotalCdf: 20000,
+            itemsMarkupCdf: 2400,
+            itemsSubtotalCdf: 22400,
+            foodMarkupPercent: 12,
+            partnerDiscountCdf: 2000,
+            absorbedBy: 'PARTNER',
+          },
         },
       ],
       deliveryPromoCode: 'RESTO10',
@@ -18,7 +27,8 @@ describe('partner-display.util', () => {
     expect(display.itemsSubtotalCdf).toBe(20000);
     expect(display.platformFeeCdf).toBe(2400);
     expect(display.partnerDiscountCdf).toBe(2000);
-    expect(display.partnerNetCdf).toBe(15600);
+    expect(display.partnerNetCdf).toBe(18000);
+    expect(display.foodMarkupPercent).toBe(12);
     expect(display.promoCode).toBe('RESTO10');
   });
 

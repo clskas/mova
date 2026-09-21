@@ -43,6 +43,10 @@ import { MatchingService } from '../matching/matching.service';
 import { CommissionService } from '../rides/commission.service';
 import { deliveryDriverGross } from './delivery-driver-gross.util';
 import { parseFoodItemShares, parseOrderPlacedMetadata } from './food-delivery-settlement.util';
+import {
+  applyMarkupToMenuCatalog,
+  customerPriceFromPartner,
+} from '../billing/food-catalog-markup.util';
 import { applyPromoCode, formatPromoValidation } from '../common/promo-apply.util';
 import {
   creditRestaurantEscrow,
@@ -392,6 +396,39 @@ export class DeliveriesService {
     return { subtotalCdf: subtotal, normalizedItems: normalized };
   }
 
+  /** Prix catalogue → prix client (markup FOOD) + totaux. */
+  private async resolveFoodItemsWithMarkup(
+    restaurantMenu: unknown,
+    items: CreateFoodDeliveryDto['items'],
+  ) {
+    const { subtotalCdf: itemsPartnerSubtotalCdf, normalizedItems: partnerItems } =
+      this.resolveFoodItemsSubtotalCdf(restaurantMenu, items);
+    const foodRule = await this.commission.get(CommissionServiceType.FOOD);
+    const foodMarkupPercent = foodRule.platformPercent;
+    const normalizedItems = partnerItems.map((it) => {
+      const partnerUnitPriceCdf = it.unitPriceCdf;
+      const unitPriceCdf = customerPriceFromPartner(partnerUnitPriceCdf, foodMarkupPercent);
+      return { ...it, partnerUnitPriceCdf, unitPriceCdf };
+    });
+    const itemsSubtotalCdf = normalizedItems.reduce(
+      (sum, it) => sum + it.unitPriceCdf * it.quantity,
+      0,
+    );
+    const itemsMarkupCdf = Math.max(0, itemsSubtotalCdf - itemsPartnerSubtotalCdf);
+    return {
+      itemsPartnerSubtotalCdf,
+      itemsMarkupCdf,
+      itemsSubtotalCdf,
+      foodMarkupPercent,
+      normalizedItems,
+    };
+  }
+
+  private async foodMarkupPercent(): Promise<number> {
+    const rule = await this.commission.get(CommissionServiceType.FOOD);
+    return rule.platformPercent;
+  }
+
   private assertFoodCatalogConstraints(restaurantMenu: unknown, items: CreateFoodDeliveryDto['items']) {
     try {
       assertOrderCatalogConstraints(
@@ -468,19 +505,26 @@ export class DeliveriesService {
     const restaurant = await this.prisma.restaurant.findUnique({ where: { id: dto.restaurantId } });
     if (!restaurant || !restaurant.isActive) throw new MovaHttpException(MovaErrorCode.RESTAURANT_NOT_FOUND, HttpStatus.NOT_FOUND);
     this.assertRestaurantCanOperate(restaurant);
-    const foodSurcharge = await this.surcharges.get(SurchargeType.DELIVERY_FOOD);
-    const { subtotalCdf: itemsSubtotal } = this.resolveFoodItemsSubtotalCdf(restaurant.menuItems, dto.items);
+    const priced = await this.resolveFoodItemsWithMarkup(restaurant.menuItems, dto.items);
     const { distanceKm, durationMin, deliveryFeeCdf } = await this.computeFoodDeliveryQuote(
       restaurant.lat,
       restaurant.lng,
       dto.deliveryLat,
       dto.deliveryLng,
     );
-    const subtotalWithDelivery = itemsSubtotal + deliveryFeeCdf;
-    const promoApplied = await this.applyFoodPromo(itemsSubtotal, deliveryFeeCdf, dto.promoCode, false, dto.restaurantId);
+    const promoApplied = await this.applyFoodPromo(
+      priced.itemsSubtotalCdf,
+      deliveryFeeCdf,
+      dto.promoCode,
+      false,
+      dto.restaurantId,
+    );
     return {
       restaurant: { id: restaurant.id, name: restaurant.name },
-      itemsSubtotalCdf: itemsSubtotal,
+      itemsPartnerSubtotalCdf: priced.itemsPartnerSubtotalCdf,
+      itemsMarkupCdf: priced.itemsMarkupCdf,
+      foodMarkupPercent: priced.foodMarkupPercent,
+      itemsSubtotalCdf: priced.itemsSubtotalCdf,
       deliveryFeeCdf,
       discountCdf: promoApplied.discountCdf,
       promoCode: promoApplied.promoCode,
@@ -498,9 +542,15 @@ export class DeliveriesService {
     this.assertRestaurantCanOperate(restaurant);
     if (!dto.items.length) throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR);
     this.assertFoodCatalogConstraints(restaurant.menuItems, dto.items);
-    const { subtotalCdf, normalizedItems } = this.resolveFoodItemsSubtotalCdf(restaurant.menuItems, dto.items);
-    const estimate = await this.estimateFood({ ...dto, items: normalizedItems });
-    const promoApplied = await this.applyFoodPromo(subtotalCdf, estimate.deliveryFeeCdf, dto.promoCode, true, dto.restaurantId);
+    const priced = await this.resolveFoodItemsWithMarkup(restaurant.menuItems, dto.items);
+    const estimate = await this.estimateFood({ ...dto, items: priced.normalizedItems });
+    const promoApplied = await this.applyFoodPromo(
+      priced.itemsSubtotalCdf,
+      estimate.deliveryFeeCdf,
+      dto.promoCode,
+      true,
+      dto.restaurantId,
+    );
     const flags = this.guaranteeFlags(dto.paymentMethod);
     const delivery = await this.prisma.delivery.create({
       data: {
@@ -512,7 +562,7 @@ export class DeliveriesService {
         escrowReady: flags.escrowReady,
         escrowAmountCdf: promoApplied.estimatedPriceCdf,
         restaurantId: dto.restaurantId,
-        items: normalizedItems as unknown as Prisma.InputJsonValue,
+        items: priced.normalizedItems as unknown as Prisma.InputJsonValue,
         deliveryAddress: dto.deliveryAddress,
         deliveryLat: dto.deliveryLat,
         deliveryLng: dto.deliveryLng,
@@ -527,14 +577,17 @@ export class DeliveriesService {
       },
       include: { restaurant: true, events: true },
     });
-    await this.persistMenuStockDecrement(restaurant.id, restaurant.menuItems, normalizedItems);
+    await this.persistMenuStockDecrement(restaurant.id, restaurant.menuItems, priced.normalizedItems);
     await this.prisma.deliveryEvent.create({
       data: {
         deliveryId: delivery.id,
         event: 'ORDER_PLACED',
         metadata: {
-          items: normalizedItems,
+          items: priced.normalizedItems,
           itemsSubtotalCdf: estimate.itemsSubtotalCdf,
+          itemsPartnerSubtotalCdf: estimate.itemsPartnerSubtotalCdf,
+          itemsMarkupCdf: estimate.itemsMarkupCdf,
+          foodMarkupPercent: estimate.foodMarkupPercent,
           deliveryFeeCdf: estimate.deliveryFeeCdf,
           promoCode: promoApplied.promoCode,
           discountCdf: promoApplied.discountCdf,
@@ -575,26 +628,37 @@ export class DeliveriesService {
     for (const r of restaurants) this.assertRestaurantCanOperate(r);
 
     const foodSurcharge = await this.surcharges.get(SurchargeType.DELIVERY_FOOD);
+    let itemsPartnerSubtotalCdf = 0;
     let itemsSubtotalCdf = 0;
+    let itemsMarkupCdf = 0;
+    let foodMarkupPercent = 12;
     let maxDistanceKm = 0;
     let maxDurationMin = 0;
     let deliveryFeeCdf = foodSurcharge.baseFeeCdf || 3000;
 
     for (const order of dto.orders) {
       const r = restaurants.find((x) => x.id === order.restaurantId)!;
-      const { subtotalCdf } = this.resolveFoodItemsSubtotalCdf(r.menuItems, order.items as CreateFoodDeliveryDto['items']);
-      itemsSubtotalCdf += subtotalCdf;
+      const priced = await this.resolveFoodItemsWithMarkup(
+        r.menuItems,
+        order.items as CreateFoodDeliveryDto['items'],
+      );
+      itemsPartnerSubtotalCdf += priced.itemsPartnerSubtotalCdf;
+      itemsSubtotalCdf += priced.itemsSubtotalCdf;
+      itemsMarkupCdf += priced.itemsMarkupCdf;
+      foodMarkupPercent = priced.foodMarkupPercent;
       const quote = await this.computeFoodDeliveryQuote(r.lat, r.lng, dto.deliveryLat, dto.deliveryLng);
       if (quote.distanceKm > maxDistanceKm) maxDistanceKm = quote.distanceKm;
       if (quote.durationMin > maxDurationMin) maxDurationMin = quote.durationMin;
       deliveryFeeCdf = Math.max(deliveryFeeCdf, quote.deliveryFeeCdf);
     }
 
-    const subtotalWithDelivery = itemsSubtotalCdf + deliveryFeeCdf;
     const promoApplied = await this.applyFoodPromo(itemsSubtotalCdf, deliveryFeeCdf, dto.promoCode, false);
 
     return {
       restaurants: restaurants.map((r) => ({ id: r.id, name: r.name })),
+      itemsPartnerSubtotalCdf,
+      itemsMarkupCdf,
+      foodMarkupPercent,
       itemsSubtotalCdf,
       deliveryFeeCdf,
       discountCdf: promoApplied.discountCdf,
@@ -618,15 +682,32 @@ export class DeliveriesService {
     }
     for (const r of restaurants) this.assertRestaurantCanOperate(r);
 
-    // Normalize items and compute subtotal
-    const normalizedOrders = dto.orders.map((o) => {
-      const r = restaurants.find((x) => x.id === o.restaurantId)!;
-      this.assertFoodCatalogConstraints(r.menuItems, o.items as CreateFoodDeliveryDto['items']);
-      const { subtotalCdf, normalizedItems } = this.resolveFoodItemsSubtotalCdf(r.menuItems, o.items as CreateFoodDeliveryDto['items']);
-      return { restaurant: r, items: normalizedItems, subtotalCdf };
+    const normalizedOrders = await Promise.all(
+      dto.orders.map(async (o) => {
+        const r = restaurants.find((x) => x.id === o.restaurantId)!;
+        this.assertFoodCatalogConstraints(r.menuItems, o.items as CreateFoodDeliveryDto['items']);
+        const priced = await this.resolveFoodItemsWithMarkup(
+          r.menuItems,
+          o.items as CreateFoodDeliveryDto['items'],
+        );
+        return {
+          restaurant: r,
+          items: priced.normalizedItems,
+          itemsPartnerSubtotalCdf: priced.itemsPartnerSubtotalCdf,
+          itemsSubtotalCdf: priced.itemsSubtotalCdf,
+          itemsMarkupCdf: priced.itemsMarkupCdf,
+          foodMarkupPercent: priced.foodMarkupPercent,
+        };
+      }),
+    );
+    const itemsSubtotalCdf = normalizedOrders.reduce((sum, o) => sum + o.itemsSubtotalCdf, 0);
+    const itemsPartnerSubtotalCdf = normalizedOrders.reduce((sum, o) => sum + o.itemsPartnerSubtotalCdf, 0);
+    const itemsMarkupCdf = normalizedOrders.reduce((sum, o) => sum + o.itemsMarkupCdf, 0);
+    const foodMarkupPercent = normalizedOrders[0]?.foodMarkupPercent ?? 12;
+    const estimate = await this.estimateFoodMulti({
+      ...dto,
+      orders: normalizedOrders.map((o) => ({ restaurantId: o.restaurant.id, items: o.items })),
     });
-    const itemsSubtotalCdf = normalizedOrders.reduce((sum, o) => sum + o.subtotalCdf, 0);
-    const estimate = await this.estimateFoodMulti({ ...dto, orders: normalizedOrders.map((o) => ({ restaurantId: o.restaurant.id, items: o.items })) });
     const promoApplied = await this.applyFoodPromo(itemsSubtotalCdf, estimate.deliveryFeeCdf, dto.promoCode, true);
 
     // Pickup uses first restaurant for now (single delivery entity)
@@ -642,7 +723,11 @@ export class DeliveriesService {
         escrowReady: flags.escrowReady,
         escrowAmountCdf: promoApplied.estimatedPriceCdf,
         restaurantId: null,
-        items: normalizedOrders.map((o) => ({ restaurantId: o.restaurant.id, restaurantName: o.restaurant.name, items: o.items })) as unknown as Prisma.InputJsonValue,
+        items: normalizedOrders.map((o) => ({
+          restaurantId: o.restaurant.id,
+          restaurantName: o.restaurant.name,
+          items: o.items,
+        })) as unknown as Prisma.InputJsonValue,
         deliveryAddress: dto.deliveryAddress,
         deliveryLat: dto.deliveryLat,
         deliveryLng: dto.deliveryLng,
@@ -667,8 +752,15 @@ export class DeliveriesService {
         deliveryId: delivery.id,
         event: 'ORDER_PLACED',
         metadata: {
-          orders: normalizedOrders.map((o) => ({ restaurantId: o.restaurant.id, restaurantName: o.restaurant.name, items: o.items })),
-          itemsSubtotalCdf: estimate.itemsSubtotalCdf,
+          orders: normalizedOrders.map((o) => ({
+            restaurantId: o.restaurant.id,
+            restaurantName: o.restaurant.name,
+            items: o.items,
+          })),
+          itemsSubtotalCdf,
+          itemsPartnerSubtotalCdf,
+          itemsMarkupCdf,
+          foodMarkupPercent,
           deliveryFeeCdf: estimate.deliveryFeeCdf,
           promoCode: promoApplied.promoCode,
           discountCdf: promoApplied.discountCdf,
@@ -690,7 +782,15 @@ export class DeliveriesService {
     const withEvents = { ...delivery, events: [{ id: '1', deliveryId: delivery.id, event: 'ORDER_PLACED', metadata: null, createdAt: new Date() }] };
     return {
       delivery: formatParcelDelivery(withEvents),
-      estimate: { ...estimate, estimatedPriceCdf: promoApplied.estimatedPriceCdf, discountCdf: promoApplied.discountCdf },
+      estimate: {
+        ...estimate,
+        itemsSubtotalCdf,
+        itemsPartnerSubtotalCdf,
+        itemsMarkupCdf,
+        foodMarkupPercent,
+        estimatedPriceCdf: promoApplied.estimatedPriceCdf,
+        discountCdf: promoApplied.discountCdf,
+      },
       needsEscrow: flags.guaranteed,
       payAfterAccept: flags.guaranteed,
     };
@@ -905,16 +1005,23 @@ export class DeliveriesService {
     const restaurant = await this.prisma.restaurant.findUnique({ where: { id } });
     if (!restaurant || !restaurant.isActive) throw new MovaHttpException(MovaErrorCode.RESTAURANT_NOT_FOUND, HttpStatus.NOT_FOUND);
     this.assertRestaurantCanOperate(restaurant);
-    const menu = this.publicMenuItems(restaurant.menuItems);
+    const menu = await this.publicMenuItemsMarkedUp(restaurant.menuItems);
+    const foodMarkupPercent = await this.foodMarkupPercent();
     return {
       ...restaurant,
       menuItems: menu,
       menu,
+      foodMarkupPercent,
     };
   }
 
   private publicMenuItems(raw: unknown) {
     return publicCatalogItems(raw);
+  }
+
+  private async publicMenuItemsMarkedUp(raw: unknown) {
+    const pct = await this.foodMarkupPercent();
+    return applyMarkupToMenuCatalog(this.publicMenuItems(raw) as unknown[], pct);
   }
 
   async getDelivery(id: string, userId: string) {
@@ -1110,14 +1217,18 @@ export class DeliveriesService {
       });
     }
 
+    const foodMarkupPercent = await this.foodMarkupPercent();
     const data = (await Promise.all(
       scoped.map(async (r) => {
         let deliveryEtaMin: number | null = null;
         let distanceKm: number | null = null;
         let minMenuPriceCdf = 0;
-        const menu = flattenMenuItems(r.menuItems);
-        if (menu.length > 0) {
-          minMenuPriceCdf = menu.reduce((min, item) => {
+        const menuItems = applyMarkupToMenuCatalog(
+          this.publicMenuItems(r.menuItems) as unknown[],
+          foodMarkupPercent,
+        ) as Array<{ unitPriceCdf?: number }>;
+        if (menuItems.length > 0) {
+          minMenuPriceCdf = menuItems.reduce((min, item) => {
             const p = item.unitPriceCdf ?? 0;
             return min === 0 ? p : Math.min(min, p);
           }, 0);
@@ -1127,7 +1238,14 @@ export class DeliveriesService {
           const travelMin = estimateTripDurationMin(distanceKm, this.tripSpeedDelivery());
           deliveryEtaMin = Math.max(20, travelMin + 15);
         }
-        return { ...r, menuItems: this.publicMenuItems(r.menuItems), deliveryEtaMin, distanceKm, minMenuPriceCdf };
+        return {
+          ...r,
+          menuItems,
+          foodMarkupPercent,
+          deliveryEtaMin,
+          distanceKm,
+          minMenuPriceCdf,
+        };
       }),
     ))
       .filter((r) => (maxEtaMin != null ? (r.deliveryEtaMin ?? 999) <= maxEtaMin : true))

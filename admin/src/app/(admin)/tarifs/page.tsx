@@ -66,7 +66,7 @@ const VEHICLE_LABELS: Record<string, string> = {
 
 const DELIVERY_LABELS: Record<string, string> = {
   PARCEL: "Colis",
-  FOOD: "Repas",
+  FOOD: "Repas (markup catalogue)",
   EXPRESS: "Express",
 };
 
@@ -1124,7 +1124,9 @@ export default function TarifsPage() {
           <section>
             <h2 className="font-semibold text-[#1A1A2E] mb-1">Commissions plateforme SENGA</h2>
             <p className="text-sm text-gray-500 mb-3">
-              Part prélevée par SENGA sur chaque service. Le reste revient au chauffeur / partenaire. Les revenus chauffeur affichés dans l&apos;app sont nets de commission.
+              Courses / livraisons / etc. : part prélevée sur le montant (reste au chauffeur).{' '}
+              <strong>Repas (FOOD)</strong> : pourcentage <em>ajouté</em> au prix catalogue affiché au
+              passager ; le partenaire reçoit 100&nbsp;% de son prix (markup SENGA payé par le client).
             </p>
             <Card className="overflow-x-auto">
               <table className="w-full text-sm min-w-[720px]">

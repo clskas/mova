@@ -1139,20 +1139,46 @@ export class RidesService {
     // la promo. On part des montants bruts (sans mise à l'échelle proportionnelle) et la commission
     // plateforme est le résidu, garantissant : restaurants + livreur + plateforme = montant payé.
     const partnerDiscount = metadata.partnerDiscountCdf ?? 0;
+    const useCatalogMarkupModel =
+      metadata.itemsPartnerSubtotalCdf != null ||
+      metadata.itemsMarkupCdf != null ||
+      (Array.isArray(d.items) &&
+        d.items.some(
+          (entry) =>
+            entry &&
+            typeof entry === 'object' &&
+            ('partnerUnitPriceCdf' in entry ||
+              (Array.isArray((entry as { items?: unknown }).items) &&
+                (entry as { items: unknown[] }).items.some(
+                  (it) => it && typeof it === 'object' && 'partnerUnitPriceCdf' in it,
+                ))),
+        ));
 
     for (const share of pools.shares) {
       const restaurantId = share.restaurantId ?? d.restaurantId;
       if (!restaurantId || share.itemsGrossCdf <= 0) continue;
       const row = restaurantRows.find((r) => r.id === restaurantId);
       const gross = share.itemsGrossCdf;
-      const split = this.commission.splitGross(gross, foodRule.platformPercent);
-      restaurants.push({
-        restaurantId,
-        ownerUserId: row?.ownerUserId ?? null,
-        grossCdf: Math.round(gross),
-        netCdf: Math.round(split.driverNetCdf),
-        platformFeeCdf: split.platformFeeCdf,
-      });
+      if (useCatalogMarkupModel) {
+        // Modèle A : le resto reçoit 100 % du catalogue ; le markup est dans le résidu plateforme.
+        restaurants.push({
+          restaurantId,
+          ownerUserId: row?.ownerUserId ?? null,
+          grossCdf: Math.round(gross),
+          netCdf: Math.round(gross),
+          platformFeeCdf: 0,
+        });
+      } else {
+        // Commandes legacy : commission FOOD prélevée sur le prix catalogue.
+        const split = this.commission.splitGross(gross, foodRule.platformPercent);
+        restaurants.push({
+          restaurantId,
+          ownerUserId: row?.ownerUserId ?? null,
+          grossCdf: Math.round(gross),
+          netCdf: Math.round(split.driverNetCdf),
+          platformFeeCdf: split.platformFeeCdf,
+        });
+      }
     }
 
     // La remise partenaire réduit le net du restaurant concerné (imputée au 1er si multi-restaurants).

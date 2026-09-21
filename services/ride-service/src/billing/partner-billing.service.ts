@@ -14,7 +14,6 @@ import { receiptNumberFrom, SERVICE_TYPE_LABELS } from './billing-labels.util';
 import {
   computeRestaurantPartnerDisplay,
   computeRentalPartnerDisplay,
-  RESTAURANT_PLATFORM_PERCENT,
   RENTAL_PLATFORM_PERCENT,
 } from './partner-display.util';
 import { buildReceiptPdf } from './billing-pdf.util';
@@ -93,7 +92,7 @@ export class PartnerBillingService {
     const lines: ReceiptLine[] = [
       { label: `Panier repas #${delivery.id.slice(0, 8)}`, amountCdf: amounts.itemsSubtotalCdf, kind: 'item' },
       {
-        label: `Commission SENGA (${RESTAURANT_PLATFORM_PERCENT} %)`,
+        label: `Markup SENGA (${amounts.foodMarkupPercent} %) — payé par le client`,
         amountCdf: amounts.platformFeeCdf,
         kind: 'fee',
       },

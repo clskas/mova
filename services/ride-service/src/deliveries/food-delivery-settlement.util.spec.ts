@@ -25,6 +25,13 @@ describe('food-delivery-settlement.util', () => {
     ]);
   });
 
+  it('parseFoodItemShares — préfère partnerUnitPriceCdf (hors markup client)', () => {
+    const shares = parseFoodItemShares([
+      { name: 'Poulet', partnerUnitPriceCdf: 10000, unitPriceCdf: 11200, quantity: 2 },
+    ]);
+    expect(shares).toEqual([{ itemsGrossCdf: 20000 }]);
+  });
+
   it('computeFoodSettlementPools — promo proportionnelle', () => {
     const pools = computeFoodSettlementPools({
       totalPaidCdf: 27000,
@@ -52,8 +59,23 @@ describe('food-delivery-settlement.util', () => {
 
   it('parseOrderPlacedMetadata', () => {
     const meta = parseOrderPlacedMetadata([
-      { event: 'ORDER_PLACED', metadata: { itemsSubtotalCdf: 15000, deliveryFeeCdf: 5000, discountCdf: 1000 } },
+      {
+        event: 'ORDER_PLACED',
+        metadata: {
+          itemsSubtotalCdf: 15000,
+          itemsPartnerSubtotalCdf: 13400,
+          itemsMarkupCdf: 1600,
+          foodMarkupPercent: 12,
+          deliveryFeeCdf: 5000,
+          discountCdf: 1000,
+        },
+      },
     ]);
-    expect(meta).toEqual({ itemsSubtotalCdf: 15000, deliveryFeeCdf: 5000, discountCdf: 1000 });
+    expect(meta.itemsSubtotalCdf).toBe(15000);
+    expect(meta.itemsPartnerSubtotalCdf).toBe(13400);
+    expect(meta.itemsMarkupCdf).toBe(1600);
+    expect(meta.foodMarkupPercent).toBe(12);
+    expect(meta.deliveryFeeCdf).toBe(5000);
+    expect(meta.discountCdf).toBe(1000);
   });
 });

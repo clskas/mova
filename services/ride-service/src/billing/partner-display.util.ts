@@ -2,8 +2,12 @@ import {
   parseFoodItemShares,
   parseOrderPlacedMetadata,
 } from '../deliveries/food-delivery-settlement.util';
+import { markupFeeFromPartner } from './food-catalog-markup.util';
 
-/** Commission SENGA sur ventes repas (alignée CommissionServiceType.FOOD). */
+/**
+ * % markup FOOD par défaut (affichage / fallback).
+ * Le règlement utilise metadata.itemsMarkupCdf / foodMarkupPercent quand présents.
+ */
 export const RESTAURANT_PLATFORM_PERCENT = 12;
 
 /** Commission SENGA sur location partenaire. */
@@ -15,6 +19,7 @@ export type RestaurantPartnerDisplay = {
   partnerDiscountCdf: number;
   platformFeeCdf: number;
   promoCode: string | null;
+  foodMarkupPercent: number;
 };
 
 export type RentalPartnerDisplay = {
@@ -30,7 +35,10 @@ function platformFeeFromGross(grossCdf: number, platformPercent: number): number
   return Math.ceil(Math.max(0, grossCdf) * (platformPercent / 100));
 }
 
-/** Panier repas + part nette restaurant (commission SENGA déduite, remise partenaire incluse). */
+/**
+ * Panier repas côté partenaire : 100 % du catalogue (hors markup client).
+ * La commission SENGA affichée = markup déjà payé par le passager (pas un prélèvement sur le resto).
+ */
 export function computeRestaurantPartnerDisplay(input: {
   items: unknown;
   restaurantId?: string;
@@ -51,15 +59,34 @@ export function computeRestaurantPartnerDisplay(input: {
     itemsGrossCdf = shares.reduce((sum, s) => sum + s.itemsGrossCdf, 0);
   }
 
+  if (
+    metadata.itemsPartnerSubtotalCdf != null &&
+    Number.isFinite(metadata.itemsPartnerSubtotalCdf) &&
+    !input.restaurantId
+  ) {
+    itemsGrossCdf = metadata.itemsPartnerSubtotalCdf;
+  }
+
   const partnerDiscountCdf = Math.max(
     0,
     metadata.partnerDiscountCdf ?? input.deliveryDiscountCdf ?? metadata.discountCdf ?? 0,
   );
-  const platformFeeCdf = platformFeeFromGross(itemsGrossCdf, RESTAURANT_PLATFORM_PERCENT);
-  const partnerNetCdf = Math.max(0, itemsGrossCdf - platformFeeCdf - partnerDiscountCdf);
-  const promoCode = metadata.absorbedBy === 'PARTNER' || partnerDiscountCdf > 0
-    ? input.deliveryPromoCode ?? null
-    : input.deliveryPromoCode ?? null;
+
+  const foodMarkupPercent =
+    metadata.foodMarkupPercent != null && Number.isFinite(metadata.foodMarkupPercent)
+      ? metadata.foodMarkupPercent
+      : RESTAURANT_PLATFORM_PERCENT;
+
+  const platformFeeCdf =
+    metadata.itemsMarkupCdf != null && Number.isFinite(metadata.itemsMarkupCdf) && !input.restaurantId
+      ? Math.max(0, Math.round(metadata.itemsMarkupCdf))
+      : markupFeeFromPartner(itemsGrossCdf, foodMarkupPercent);
+
+  const partnerNetCdf = Math.max(0, itemsGrossCdf - partnerDiscountCdf);
+  const promoCode =
+    metadata.absorbedBy === 'PARTNER' || partnerDiscountCdf > 0
+      ? input.deliveryPromoCode ?? null
+      : input.deliveryPromoCode ?? null;
 
   return {
     itemsSubtotalCdf: Math.round(itemsGrossCdf),
@@ -67,6 +94,7 @@ export function computeRestaurantPartnerDisplay(input: {
     partnerDiscountCdf: Math.round(partnerDiscountCdf),
     platformFeeCdf,
     promoCode,
+    foodMarkupPercent,
   };
 }
 

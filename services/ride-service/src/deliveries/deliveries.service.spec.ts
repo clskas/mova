@@ -164,7 +164,8 @@ describe('DeliveriesService', () => {
     expect(result.estimatedPriceCdf).toBeGreaterThan(20000);
   });
 
-  it('calcule le total repas = articles + frais livraison', async () => {
+  it('calcule le total repas = articles (avec markup FOOD) + frais livraison', async () => {
+    commission.get.mockResolvedValue({ platformPercent: 12 });
     prisma.restaurant.findUnique.mockResolvedValue({
       id: 'r1',
       name: 'Chez Flore',
@@ -182,8 +183,12 @@ describe('DeliveriesService', () => {
       deliveryLat: -4.32,
       deliveryLng: 15.31,
     });
-    expect(result.itemsSubtotalCdf).toBe(10000);
-    expect(result.estimatedPriceCdf).toBeGreaterThan(10000);
+    // 2 × 5000 catalogue + 12 % markup = 2 × 5600 = 11200
+    expect(result.itemsPartnerSubtotalCdf).toBe(10000);
+    expect(result.itemsMarkupCdf).toBe(1200);
+    expect(result.itemsSubtotalCdf).toBe(11200);
+    expect(result.foodMarkupPercent).toBe(12);
+    expect(result.estimatedPriceCdf).toBeGreaterThan(11200);
   });
 
   it('refuse un restaurant non validé par SENGA', async () => {

@@ -37,7 +37,7 @@ function haversineKm(aLat: number, aLng: number, bLat: number, bLng: number): nu
 }
 
 export function nearestMovaCity(lat: number, lng: number): string {
-  let best = MOVA_CITIES[0];
+  let best: string = MOVA_CITIES[0];
   let bestKm = Number.POSITIVE_INFINITY;
   for (const name of MOVA_CITIES) {
     const c = CITY_CENTERS[name];

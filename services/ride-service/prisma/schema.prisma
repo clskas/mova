@@ -1121,3 +1121,17 @@ model PlatformVendor {
   @@index([nextPaymentAt])
   @@map("platform_vendors")
 }
+
+/// Photos uploadées (menu, véhicules, colis…) — persiste hors disque éphémère Render.
+model UploadedMedia {
+  id        String   @id @default(uuid())
+  category  String
+  filename  String
+  mimeType  String
+  data      Bytes
+  createdAt DateTime @default(now())
+
+  @@unique([category, filename])
+  @@index([category])
+  @@map("uploaded_media")
+}

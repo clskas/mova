@@ -30,7 +30,7 @@ export class UploadsController {
   }
 
   @Post('menu-photo')
-  @ApiOperation({ summary: 'Téléverser photo plat (stockage local / mock Cloudinary)' })
+  @ApiOperation({ summary: 'Téléverser photo plat (PostgreSQL + Supabase si configuré)' })
   uploadMenuPhoto(@Body() dto: UploadParcelPhotoDto) {
     return this.uploadsService.uploadMenuPhoto(dto.imageBase64, dto.mimeType);
   }

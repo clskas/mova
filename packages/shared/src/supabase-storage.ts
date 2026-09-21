@@ -152,29 +152,32 @@ export async function supabaseDownloadObject(
     return { success: false, message: 'Supabase Storage non configuré.' };
   }
   const objectPath = params.objectPath.replace(/^\/+/, '');
+  // Service role uses /object/{bucket}/… — /object/authenticated/ expects an end-user JWT and 404s after redeploy.
+  const paths = [
+    `${url}/storage/v1/object/${encodeURIComponent(params.bucket)}/${encodeObjectPath(objectPath)}`,
+    `${url}/storage/v1/object/authenticated/${encodeURIComponent(params.bucket)}/${encodeObjectPath(objectPath)}`,
+  ];
   try {
-    const res = await fetch(
-      `${url}/storage/v1/object/authenticated/${encodeURIComponent(params.bucket)}/${encodeObjectPath(objectPath)}`,
-      {
+    let lastMessage = 'Objet introuvable';
+    for (const downloadUrl of paths) {
+      const res = await fetch(downloadUrl, {
         headers: {
           Authorization: `Bearer ${key}`,
           apikey: key,
         },
-      },
-    );
-    if (!res.ok) {
+      });
+      if (res.ok) {
+        const ab = await res.arrayBuffer();
+        return {
+          success: true,
+          body: Buffer.from(ab),
+          contentType: res.headers.get('content-type') ?? undefined,
+        };
+      }
       const text = await res.text().catch(() => '');
-      return {
-        success: false,
-        message: `Objet introuvable (${res.status}): ${text.slice(0, 120)}`,
-      };
+      lastMessage = `Objet introuvable (${res.status}): ${text.slice(0, 120)}`;
     }
-    const ab = await res.arrayBuffer();
-    return {
-      success: true,
-      body: Buffer.from(ab),
-      contentType: res.headers.get('content-type') ?? undefined,
-    };
+    return { success: false, message: lastMessage };
   } catch {
     return { success: false, message: 'Téléchargement Supabase indisponible.' };
   }

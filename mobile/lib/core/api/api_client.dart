@@ -1242,8 +1242,8 @@ class ApiClient {
   /// Uber Pool — créer / rejoindre une course partagée.
   Future<Result<Map<String, dynamic>>> requestSharedRide(Map<String, dynamic> body) async {
     final result = await post('/rides/shared', body);
-    return switch (result) {
-      Success(:final data) {
+    switch (result) {
+      case Success(:final data):
         final ride = data['ride'];
         if (ride is Map<String, dynamic>) {
           return Success({...data, 'id': ride['id'], 'ride': ride});
@@ -1253,9 +1253,9 @@ class ApiClient {
           return Success({...data, 'id': m['id'], 'ride': m});
         }
         return Success(data);
-      }
-      Failure(:final error) => Failure(error),
-    };
+      case Failure(:final error):
+        return Failure(error);
+    }
   }
 
   Future<Result<Map<String, dynamic>>> pickupSharePassenger(String rideId, String bookingId) async {

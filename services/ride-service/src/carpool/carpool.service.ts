@@ -786,6 +786,8 @@ export class CarpoolService {
           toAddress: t.dropoffAddress,
           fromCity: t.fromCity,
           toCity: t.toCity,
+          pickupLat: t.pickupLat,
+          pickupLng: t.pickupLng,
           status: t.status,
           seatsAvailable: t.seatsAvailable,
           passengerCount: t.passengers.length,

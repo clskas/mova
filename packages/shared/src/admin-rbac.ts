@@ -24,6 +24,21 @@ export enum AdminPermission {
   RESTAURANTS_WRITE = 'restaurants:write',
   PRICING_READ = 'pricing:read',
   PRICING_WRITE = 'pricing:write',
+  /** Zones géographiques / POI (séparé des tarifs). */
+  ZONES_READ = 'zones:read',
+  ZONES_WRITE = 'zones:write',
+  /** Règles plateforme (config, annulations, docs requis). */
+  RULES_READ = 'rules:read',
+  RULES_WRITE = 'rules:write',
+  /** Locations véhicules. */
+  RENTALS_READ = 'rentals:read',
+  RENTALS_WRITE = 'rentals:write',
+  /** Déménagements. */
+  MOVING_READ = 'moving:read',
+  MOVING_WRITE = 'moving:write',
+  /** Covoiturage. */
+  CARPOOL_READ = 'carpool:read',
+  CARPOOL_WRITE = 'carpool:write',
   PROMO_READ = 'promo:read',
   PROMO_WRITE = 'promo:write',
   SUBSCRIPTIONS_READ = 'subscriptions:read',
@@ -83,6 +98,16 @@ export const ADMIN_ROLE_PERMISSIONS: Record<UserRole, AdminPermission[]> = {
     AdminPermission.RESTAURANTS_WRITE,
     AdminPermission.PRICING_READ,
     AdminPermission.PRICING_WRITE,
+    AdminPermission.ZONES_READ,
+    AdminPermission.ZONES_WRITE,
+    AdminPermission.RULES_READ,
+    AdminPermission.RULES_WRITE,
+    AdminPermission.RENTALS_READ,
+    AdminPermission.RENTALS_WRITE,
+    AdminPermission.MOVING_READ,
+    AdminPermission.MOVING_WRITE,
+    AdminPermission.CARPOOL_READ,
+    AdminPermission.CARPOOL_WRITE,
     AdminPermission.PROMO_READ,
     AdminPermission.PROMO_WRITE,
     AdminPermission.SUBSCRIPTIONS_READ,
@@ -110,6 +135,12 @@ export const ADMIN_ROLE_PERMISSIONS: Record<UserRole, AdminPermission[]> = {
     AdminPermission.DELIVERIES_WRITE,
     AdminPermission.SCHEDULED_READ,
     AdminPermission.SCHEDULED_WRITE,
+    AdminPermission.RENTALS_READ,
+    AdminPermission.RENTALS_WRITE,
+    AdminPermission.MOVING_READ,
+    AdminPermission.MOVING_WRITE,
+    AdminPermission.CARPOOL_READ,
+    AdminPermission.CARPOOL_WRITE,
     AdminPermission.PRICING_READ,
   ],
   [UserRole.FINANCE]: [
@@ -117,6 +148,7 @@ export const ADMIN_ROLE_PERMISSIONS: Record<UserRole, AdminPermission[]> = {
     AdminPermission.RIDES_READ,
     AdminPermission.PRICING_READ,
     AdminPermission.PRICING_WRITE,
+    AdminPermission.RULES_READ,
     AdminPermission.PROMO_READ,
     AdminPermission.PROMO_WRITE,
     AdminPermission.SUBSCRIPTIONS_READ,
@@ -128,8 +160,11 @@ export const ADMIN_ROLE_PERMISSIONS: Record<UserRole, AdminPermission[]> = {
     AdminPermission.RESTAURANTS_READ,
     AdminPermission.RESTAURANTS_WRITE,
     AdminPermission.PRICING_READ,
+    AdminPermission.ZONES_READ,
     AdminPermission.SCHEDULED_READ,
     AdminPermission.SCHEDULED_WRITE,
+    AdminPermission.RENTALS_READ,
+    AdminPermission.RENTALS_WRITE,
     AdminPermission.PUBLICITES_READ,
     AdminPermission.PUBLICITES_WRITE,
   ],
@@ -150,8 +185,15 @@ export const ADMIN_ROLE_PERMISSIONS: Record<UserRole, AdminPermission[]> = {
     AdminPermission.RESTAURANTS_READ,
     AdminPermission.RESTAURANTS_WRITE,
     AdminPermission.SCHEDULED_READ,
+    AdminPermission.RENTALS_READ,
+    AdminPermission.MOVING_READ,
+    AdminPermission.CARPOOL_READ,
     AdminPermission.PRICING_READ,
     AdminPermission.PRICING_WRITE,
+    AdminPermission.ZONES_READ,
+    AdminPermission.ZONES_WRITE,
+    AdminPermission.RULES_READ,
+    AdminPermission.RULES_WRITE,
   ],
 };
 
@@ -188,8 +230,18 @@ export const ADMIN_ACCESS_LEVELS: AdminAccessLevel[] = [
   },
   {
     id: 'tarifs',
-    label: 'Tarifs & règles',
+    label: 'Tarifs',
     permissions: [AdminPermission.PRICING_READ, AdminPermission.PRICING_WRITE],
+  },
+  {
+    id: 'regles',
+    label: 'Règles plateforme',
+    permissions: [AdminPermission.RULES_READ, AdminPermission.RULES_WRITE],
+  },
+  {
+    id: 'zones',
+    label: 'Zones géographiques',
+    permissions: [AdminPermission.ZONES_READ, AdminPermission.ZONES_WRITE],
   },
   {
     id: 'litiges',
@@ -199,18 +251,33 @@ export const ADMIN_ACCESS_LEVELS: AdminAccessLevel[] = [
   { id: 'fraude', label: 'Fraude', permissions: [AdminPermission.FRAUD_READ, AdminPermission.FRAUD_WRITE] },
   {
     id: 'planifiees',
-    label: 'Planifiées / locations / covoiturage',
+    label: 'Courses planifiées',
     permissions: [AdminPermission.SCHEDULED_READ, AdminPermission.SCHEDULED_WRITE],
   },
   {
+    id: 'locations',
+    label: 'Locations',
+    permissions: [AdminPermission.RENTALS_READ, AdminPermission.RENTALS_WRITE],
+  },
+  {
+    id: 'demenagements',
+    label: 'Déménagements',
+    permissions: [AdminPermission.MOVING_READ, AdminPermission.MOVING_WRITE],
+  },
+  {
+    id: 'covoiturage',
+    label: 'Covoiturage',
+    permissions: [AdminPermission.CARPOOL_READ, AdminPermission.CARPOOL_WRITE],
+  },
+  {
     id: 'abonnements',
-    label: 'Abonnements & promos',
-    permissions: [
-      AdminPermission.SUBSCRIPTIONS_READ,
-      AdminPermission.SUBSCRIPTIONS_WRITE,
-      AdminPermission.PROMO_READ,
-      AdminPermission.PROMO_WRITE,
-    ],
+    label: 'Abonnements',
+    permissions: [AdminPermission.SUBSCRIPTIONS_READ, AdminPermission.SUBSCRIPTIONS_WRITE],
+  },
+  {
+    id: 'promos',
+    label: 'Codes promo',
+    permissions: [AdminPermission.PROMO_READ, AdminPermission.PROMO_WRITE],
   },
   {
     id: 'portefeuille',
@@ -250,6 +317,50 @@ export function sanitizeAdminPermissions(raw?: string[] | null): AdminPermission
   return out;
 }
 
+/**
+ * Anciens overrides custom n’avaient que pricing:read/write pour « Tarifs & règles / zones »
+ * et scheduled pour « Planifiées / locations / … ». On élargit pour ne pas retirer l’accès.
+ */
+export function expandLegacyAccessPermissions(perms: AdminPermission[]): AdminPermission[] {
+  const set = new Set(perms);
+  const hasPricing = set.has(AdminPermission.PRICING_READ) || set.has(AdminPermission.PRICING_WRITE);
+  const hasZones = set.has(AdminPermission.ZONES_READ) || set.has(AdminPermission.ZONES_WRITE);
+  const hasRules = set.has(AdminPermission.RULES_READ) || set.has(AdminPermission.RULES_WRITE);
+  if (hasPricing && !hasZones && !hasRules) {
+    if (set.has(AdminPermission.PRICING_READ)) {
+      set.add(AdminPermission.ZONES_READ);
+      set.add(AdminPermission.RULES_READ);
+    }
+    if (set.has(AdminPermission.PRICING_WRITE)) {
+      set.add(AdminPermission.ZONES_WRITE);
+      set.add(AdminPermission.RULES_WRITE);
+    }
+  }
+  const hasScheduled = set.has(AdminPermission.SCHEDULED_READ) || set.has(AdminPermission.SCHEDULED_WRITE);
+  const hasRentals = set.has(AdminPermission.RENTALS_READ) || set.has(AdminPermission.RENTALS_WRITE);
+  const hasMoving = set.has(AdminPermission.MOVING_READ) || set.has(AdminPermission.MOVING_WRITE);
+  const hasCarpool = set.has(AdminPermission.CARPOOL_READ) || set.has(AdminPermission.CARPOOL_WRITE);
+  if (hasScheduled && !hasRentals && !hasMoving && !hasCarpool) {
+    if (set.has(AdminPermission.SCHEDULED_READ)) {
+      set.add(AdminPermission.RENTALS_READ);
+      set.add(AdminPermission.MOVING_READ);
+      set.add(AdminPermission.CARPOOL_READ);
+    }
+    if (set.has(AdminPermission.SCHEDULED_WRITE)) {
+      set.add(AdminPermission.RENTALS_WRITE);
+      set.add(AdminPermission.MOVING_WRITE);
+      set.add(AdminPermission.CARPOOL_WRITE);
+    }
+  }
+  const hasSubs = set.has(AdminPermission.SUBSCRIPTIONS_READ) || set.has(AdminPermission.SUBSCRIPTIONS_WRITE);
+  const hasPromo = set.has(AdminPermission.PROMO_READ) || set.has(AdminPermission.PROMO_WRITE);
+  if (hasSubs && !hasPromo) {
+    if (set.has(AdminPermission.SUBSCRIPTIONS_READ)) set.add(AdminPermission.PROMO_READ);
+    if (set.has(AdminPermission.SUBSCRIPTIONS_WRITE)) set.add(AdminPermission.PROMO_WRITE);
+  }
+  return [...set];
+}
+
 /** Permissions effectives : override explicite, sinon matrice du rôle. */
 export function resolveAdminPermissions(
   role: string,
@@ -257,7 +368,7 @@ export function resolveAdminPermissions(
 ): AdminPermission[] {
   if (!isAdminPanelRole(role)) return [];
   const custom = sanitizeAdminPermissions(overrides);
-  if (custom.length > 0) return custom;
+  if (custom.length > 0) return expandLegacyAccessPermissions(custom);
   return [...(ADMIN_ROLE_PERMISSIONS[role as UserRole] ?? [])];
 }
 
@@ -304,7 +415,7 @@ export function permissionsMatchRoleDefaults(role: string, permissions: string[]
 
 /** Sections menu admin dérivées des permissions effectives. */
 export function accessLevelIdsFromPermissions(permissions: string[]): string[] {
-  const perms = new Set(sanitizeAdminPermissions(permissions));
+  const perms = new Set(expandLegacyAccessPermissions(sanitizeAdminPermissions(permissions)));
   return ADMIN_ACCESS_LEVELS.filter((level) => level.permissions.some((p) => perms.has(p))).map(
     (level) => level.id,
   );

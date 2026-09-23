@@ -334,6 +334,9 @@ export class MovingService {
           vehicleCategory: r.vehicleCategory,
           pickupAddress: r.pickupAddress,
           dropoffAddress: r.dropoffAddress,
+          pickupLat: r.pickupLat,
+          pickupLng: r.pickupLng,
+          city: resolveCityFromCoords(Number(r.pickupLat), Number(r.pickupLng)),
           priceCdf: r.estimatedPriceCdf,
           createdAt: r.createdAt.toISOString(),
         };

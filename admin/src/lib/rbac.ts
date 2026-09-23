@@ -10,10 +10,12 @@ export type AdminSection =
   | "livraisons"
   | "restaurants"
   | "tarifs"
+  | "regles"
   | "litiges"
   | "fraude"
   | "planifiees"
   | "abonnements"
+  | "promos"
   | "portefeuille"
   | "parametres"
   | "locations"
@@ -44,15 +46,18 @@ export const ACCESS_LEVEL_OPTIONS: { id: string; label: string; sections: AdminS
   { id: "courses", label: "Courses", sections: ["courses"] },
   { id: "livraisons", label: "Livraisons", sections: ["livraisons"] },
   { id: "restaurants", label: "Restaurants / partenaires", sections: ["restaurants"] },
-  { id: "tarifs", label: "Tarifs & règles / zones", sections: ["tarifs", "parametres"] },
+  { id: "tarifs", label: "Tarifs", sections: ["tarifs"] },
+  { id: "regles", label: "Règles plateforme", sections: ["regles"] },
+  { id: "zones", label: "Zones géographiques", sections: ["parametres"] },
   { id: "litiges", label: "Litiges / SOS", sections: ["litiges"] },
   { id: "fraude", label: "Fraude", sections: ["fraude"] },
-  {
-    id: "planifiees",
-    label: "Planifiées / locations / covoiturage",
-    sections: ["planifiees", "locations", "demenagements", "covoiturage"],
-  },
-  { id: "abonnements", label: "Abonnements & promos", sections: ["abonnements"] },
+  { id: "planifiees", label: "Courses planifiées", sections: ["planifiees"] },
+  { id: "locations", label: "Locations", sections: ["locations"] },
+  { id: "demenagements", label: "Déménagements", sections: ["demenagements"] },
+  { id: "covoiturage", label: "Covoiturage", sections: ["covoiturage"] },
+  { id: "abonnements", label: "Abonnements", sections: ["abonnements"] },
+  /** Affiche /tarifs (bloc codes promo) ; l’API reste gated par promo:read/write. */
+  { id: "promos", label: "Codes promo", sections: ["tarifs"] },
   { id: "portefeuille", label: "Portefeuille", sections: ["portefeuille"] },
   { id: "publicites", label: "Publicités", sections: ["publicites"] },
   { id: "contacts", label: "Contacts", sections: ["contacts"] },
@@ -69,10 +74,12 @@ const ALL_SECTIONS: AdminSection[] = [
   "livraisons",
   "restaurants",
   "tarifs",
+  "regles",
   "litiges",
   "fraude",
   "planifiees",
   "abonnements",
+  "promos",
   "portefeuille",
   "parametres",
   "locations",
@@ -88,8 +95,20 @@ const ALL_SECTIONS: AdminSection[] = [
 const ROLE_SECTIONS: Record<AdminRole, AdminSection[]> = {
   SUPER_ADMIN: ALL_SECTIONS,
   ADMIN: ALL_SECTIONS.filter((s) => s !== "systeme"),
-  SUPPORT: ["utilisateurs", "chauffeurs", "kyc", "litiges", "fraude", "courses", "livraisons", "planifiees", "locations", "demenagements", "covoiturage"],
-  FINANCE: ["dashboard", "portefeuille", "tarifs", "abonnements"],
+  SUPPORT: [
+    "utilisateurs",
+    "chauffeurs",
+    "kyc",
+    "litiges",
+    "fraude",
+    "courses",
+    "livraisons",
+    "planifiees",
+    "locations",
+    "demenagements",
+    "covoiturage",
+  ],
+  FINANCE: ["dashboard", "portefeuille", "tarifs", "regles", "abonnements", "promos"],
   CONTENT: ["restaurants", "tarifs", "parametres", "locations", "publicites"],
   CITY_ADMIN: [
     "dashboard",
@@ -100,7 +119,11 @@ const ROLE_SECTIONS: Record<AdminRole, AdminSection[]> = {
     "restaurants",
     "litiges",
     "planifiees",
+    "locations",
+    "demenagements",
+    "covoiturage",
     "tarifs",
+    "regles",
     "parametres",
   ],
 };
@@ -110,9 +133,20 @@ const ROLE_WRITE: Record<AdminRole, AdminSection[]> = {
   SUPER_ADMIN: ALL_SECTIONS,
   ADMIN: ALL_SECTIONS.filter((s) => s !== "portefeuille" && s !== "systeme"),
   SUPPORT: ["kyc", "litiges", "courses", "livraisons", "planifiees", "locations", "demenagements", "covoiturage"],
-  FINANCE: ["tarifs", "abonnements", "portefeuille"],
+  FINANCE: ["tarifs", "regles", "abonnements", "promos", "portefeuille"],
   CONTENT: ["restaurants", "locations", "publicites"],
-  CITY_ADMIN: ["dashboard", "chauffeurs", "kyc", "courses", "livraisons", "restaurants", "litiges", "tarifs", "parametres"],
+  CITY_ADMIN: [
+    "dashboard",
+    "chauffeurs",
+    "kyc",
+    "courses",
+    "livraisons",
+    "restaurants",
+    "litiges",
+    "tarifs",
+    "regles",
+    "parametres",
+  ],
 };
 
 export type NavItem = {
@@ -139,7 +173,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/restaurants", label: "Restaurants", short: "Restos", section: "restaurants" },
   { href: "/publicites", label: "Publicités", short: "Pubs", section: "publicites" },
   { href: "/tarifs", label: "Tarifs", short: "Tarifs", section: "tarifs" },
-  { href: "/regles-plateforme", label: "Règles plateforme", short: "Règles", section: "tarifs" },
+  { href: "/regles-plateforme", label: "Règles plateforme", short: "Règles", section: "regles" },
   { href: "/abonnements", label: "Abonnements", short: "Abos", section: "abonnements" },
   { href: "/portefeuille", label: "Portefeuille", short: "Portef.", section: "portefeuille" },
   { href: "/litiges", label: "Litiges", short: "Litiges", section: "litiges" },

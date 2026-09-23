@@ -1636,6 +1636,7 @@ export class RentalService {
           notes: r.notes,
           pickupCity: r.pickupCity,
           returnCity: r.returnCity,
+          city: r.pickupCity ?? r.vehicle?.city ?? null,
           insuranceTier: r.insuranceTier,
           startDate: r.startDate.toISOString(),
           endDate: r.endDate.toISOString(),

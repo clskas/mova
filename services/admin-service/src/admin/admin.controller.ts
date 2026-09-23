@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Request, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiProperty, ApiTags } from '@nestjs/swagger';
 import { AdminPermission, VehicleType, normalizeVehicleType } from '@mova/shared';
-import { IsBoolean, IsEnum, IsIn, IsOptional, IsString } from 'class-validator';
+import { IsArray, IsBoolean, IsEnum, IsIn, IsOptional, IsString, ValidateIf } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RequirePermissions } from '../auth/permissions.decorator';
@@ -35,8 +35,20 @@ class UpdateUserDto {
   @ApiProperty({ required: false }) @IsOptional() @IsString() lastName?: string;
   @ApiProperty({ required: false, description: 'CITY_ADMIN only: service-area city name' })
   @IsOptional()
+  @Transform(({ value }) => (value === null || value === '' ? null : value))
+  @ValidateIf((_, v) => v !== null && v !== undefined)
   @IsString()
-  managedCity?: string;
+  managedCity?: string | null;
+  @ApiProperty({ required: false, type: [String], description: 'Niveaux d\'accès UI (SUPER_ADMIN)' })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  accessLevelIds?: string[];
+  @ApiProperty({ required: false, type: [String], description: 'Permissions API override (SUPER_ADMIN)' })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  adminPermissions?: string[];
 }
 
 class CreateUserDto {
@@ -103,6 +115,7 @@ export class AdminController {
   @RequirePermissions(AdminPermission.USERS_READ)
   @ApiOperation({ summary: 'Liste utilisateurs' })
   users(
+    @Request() req: { user: AdminJwtUser },
     @Query('skip') skip?: string,
     @Query('take') take?: string,
     @Query('search') search?: string,
@@ -113,6 +126,7 @@ export class AdminController {
       Number(take ?? 50),
       search,
       includePlayPrelaunch === 'true' || includePlayPrelaunch === '1',
+      resolveManagedCityScope(req.user),
     );
   }
 
@@ -357,8 +371,8 @@ export class AdminController {
   @Get('incidents')
   @RequirePermissions(AdminPermission.INCIDENTS_READ)
   @ApiOperation({ summary: 'Liste incidents' })
-  incidents() {
-    return this.adminService.listIncidents();
+  incidents(@Request() req: { user: AdminJwtUser }) {
+    return this.adminService.listIncidents(resolveManagedCityScope(req.user));
   }
 
   @Post('incidents/:id/resolve')
@@ -454,8 +468,8 @@ export class AdminController {
   @Get('scheduled-rides')
   @RequirePermissions(AdminPermission.SCHEDULED_READ)
   @ApiOperation({ summary: 'Réservations planifiées' })
-  scheduledRides() {
-    return this.adminService.listScheduledRides();
+  scheduledRides(@Request() req: { user: AdminJwtUser }, @Query('take') take?: string) {
+    return this.adminService.listScheduledRides(Number(take ?? 50), resolveManagedCityScope(req.user));
   }
 
   @Post('scheduled-rides/:id/cancel')
@@ -801,119 +815,119 @@ export class AdminController {
   }
 
   @Get('communes')
-  @RequirePermissions(AdminPermission.PRICING_READ)
+  @RequirePermissions(AdminPermission.ZONES_READ)
   @ApiOperation({ summary: 'Quartiers/communes par ville' })
   communes(@Request() req: { user: AdminJwtUser }, @Query('city') city?: string) {
     return this.adminService.listCommunes(resolveManagedCityScope(req.user) ?? city);
   }
 
   @Patch('communes/:id')
-  @RequirePermissions(AdminPermission.PRICING_WRITE)
+  @RequirePermissions(AdminPermission.ZONES_WRITE)
   @ApiOperation({ summary: 'Modifier commune' })
   updateCommune(@Param('id') id: string, @Body() body: Record<string, unknown>) {
     return this.adminService.updateCommune(id, body);
   }
 
   @Post('communes')
-  @RequirePermissions(AdminPermission.PRICING_WRITE)
+  @RequirePermissions(AdminPermission.ZONES_WRITE)
   @ApiOperation({ summary: 'Créer une commune' })
   createCommune(@Body() body: Record<string, unknown>) {
     return this.adminService.createCommune(body);
   }
 
   @Delete('communes/:id')
-  @RequirePermissions(AdminPermission.PRICING_WRITE)
+  @RequirePermissions(AdminPermission.ZONES_WRITE)
   @ApiOperation({ summary: 'Supprimer une commune' })
   deleteCommune(@Param('id') id: string) {
     return this.adminService.deleteCommune(id);
   }
 
   @Get('provinces')
-  @RequirePermissions(AdminPermission.PRICING_READ)
+  @RequirePermissions(AdminPermission.ZONES_READ)
   @ApiOperation({ summary: 'Provinces RDC' })
   provinces() {
     return this.adminService.listProvinces();
   }
 
   @Post('provinces')
-  @RequirePermissions(AdminPermission.PRICING_WRITE)
+  @RequirePermissions(AdminPermission.ZONES_WRITE)
   @ApiOperation({ summary: 'Créer une province' })
   createProvince(@Body('name') name: string) {
     return this.adminService.createProvince(name);
   }
 
   @Patch('provinces/:id')
-  @RequirePermissions(AdminPermission.PRICING_WRITE)
+  @RequirePermissions(AdminPermission.ZONES_WRITE)
   @ApiOperation({ summary: 'Modifier une province' })
   updateProvince(@Param('id') id: string, @Body() body: { name?: string; isActive?: boolean }) {
     return this.adminService.updateProvince(id, body);
   }
 
   @Delete('provinces/:id')
-  @RequirePermissions(AdminPermission.PRICING_WRITE)
+  @RequirePermissions(AdminPermission.ZONES_WRITE)
   @ApiOperation({ summary: 'Supprimer une province' })
   deleteProvince(@Param('id') id: string) {
     return this.adminService.deleteProvince(id);
   }
 
   @Post('provinces/bulk-active')
-  @RequirePermissions(AdminPermission.PRICING_WRITE)
+  @RequirePermissions(AdminPermission.ZONES_WRITE)
   @ApiOperation({ summary: 'Activer ou désactiver toutes les provinces SENGA' })
   setAllProvincesActive(@Body() body: { isActive: boolean }) {
     return this.adminService.setAllProvincesActive(body.isActive === true);
   }
 
   @Post('poi/seed')
-  @RequirePermissions(AdminPermission.PRICING_WRITE)
+  @RequirePermissions(AdminPermission.ZONES_WRITE)
   @ApiOperation({ summary: 'Synchroniser le catalogue POI (toutes les villes SENGA)' })
   seedPois(@Query('city') city?: string) {
     return this.adminService.seedPois(city);
   }
 
   @Get('cities')
-  @RequirePermissions(AdminPermission.PRICING_READ)
+  @RequirePermissions(AdminPermission.ZONES_READ)
   @ApiOperation({ summary: 'Villes SENGA' })
   cities(@Query('provinceId') provinceId?: string) {
     return this.adminService.listCities(provinceId);
   }
 
   @Get('cities/catalog')
-  @RequirePermissions(AdminPermission.PRICING_READ)
+  @RequirePermissions(AdminPermission.ZONES_READ)
   @ApiOperation({ summary: 'Catalogue villes (DB + statique)' })
   citiesCatalog() {
     return this.adminService.listCitiesCatalog();
   }
 
   @Post('cities')
-  @RequirePermissions(AdminPermission.PRICING_WRITE)
+  @RequirePermissions(AdminPermission.ZONES_WRITE)
   @ApiOperation({ summary: 'Créer une ville' })
   createCity(@Body() body: Record<string, unknown>) {
     return this.adminService.createCity(body);
   }
 
   @Patch('cities/:id')
-  @RequirePermissions(AdminPermission.PRICING_WRITE)
+  @RequirePermissions(AdminPermission.ZONES_WRITE)
   @ApiOperation({ summary: 'Modifier une ville' })
   updateCity(@Param('id') id: string, @Body() body: Record<string, unknown>) {
     return this.adminService.updateCity(id, body);
   }
 
   @Delete('cities/:id')
-  @RequirePermissions(AdminPermission.PRICING_WRITE)
+  @RequirePermissions(AdminPermission.ZONES_WRITE)
   @ApiOperation({ summary: 'Supprimer une ville' })
   deleteCity(@Param('id') id: string) {
     return this.adminService.deleteCity(id);
   }
 
   @Post('cities/bulk-active')
-  @RequirePermissions(AdminPermission.PRICING_WRITE)
+  @RequirePermissions(AdminPermission.ZONES_WRITE)
   @ApiOperation({ summary: 'Activer ou désactiver toutes les villes SENGA' })
   setAllCitiesActive(@Body() body: { isActive: boolean }) {
     return this.adminService.setAllCitiesActive(body.isActive === true);
   }
 
   @Get('poi-suggestions')
-  @RequirePermissions(AdminPermission.PRICING_READ)
+  @RequirePermissions(AdminPermission.ZONES_READ)
   @ApiOperation({ summary: 'Suggestions de lieux (POI) en attente' })
   poiSuggestions(
     @Query('status') status?: string,
@@ -924,84 +938,84 @@ export class AdminController {
   }
 
   @Post('poi-suggestions/:id/approve')
-  @RequirePermissions(AdminPermission.PRICING_WRITE)
+  @RequirePermissions(AdminPermission.ZONES_WRITE)
   @ApiOperation({ summary: 'Publier une suggestion POI' })
   approvePoiSuggestion(@Param('id') id: string, @Body() body: Record<string, unknown>) {
     return this.adminService.approvePoiSuggestion(id, body);
   }
 
   @Post('poi-suggestions/:id/reject')
-  @RequirePermissions(AdminPermission.PRICING_WRITE)
+  @RequirePermissions(AdminPermission.ZONES_WRITE)
   @ApiOperation({ summary: 'Refuser une suggestion POI' })
   rejectPoiSuggestion(@Param('id') id: string, @Body() body: Record<string, unknown>) {
     return this.adminService.rejectPoiSuggestion(id, body);
   }
 
   @Get('carpool')
-  @RequirePermissions(AdminPermission.RIDES_READ)
+  @RequirePermissions(AdminPermission.CARPOOL_READ)
   @ApiOperation({ summary: 'Trajets covoiturage' })
-  carpool(@Query('take') take?: string) {
-    return this.adminService.listCarpool(Number(take ?? 50));
+  carpool(@Request() req: { user: AdminJwtUser }, @Query('take') take?: string) {
+    return this.adminService.listCarpool(Number(take ?? 50), resolveManagedCityScope(req.user));
   }
 
   @Post('carpool/:id/cancel')
-  @RequirePermissions(AdminPermission.RIDES_WRITE)
+  @RequirePermissions(AdminPermission.CARPOOL_WRITE)
   @ApiOperation({ summary: 'Annuler trajet covoiturage' })
   cancelCarpool(@Param('id') id: string) {
     return this.adminService.cancelCarpool(id);
   }
 
   @Patch('carpool/:id/status')
-  @RequirePermissions(AdminPermission.RIDES_WRITE)
+  @RequirePermissions(AdminPermission.CARPOOL_WRITE)
   @ApiOperation({ summary: 'Statut covoiturage' })
   carpoolStatus(@Param('id') id: string, @Body('status') status: string) {
     return this.adminService.updateCarpoolStatus(id, status);
   }
 
   @Get('moving')
-  @RequirePermissions(AdminPermission.DELIVERIES_READ)
+  @RequirePermissions(AdminPermission.MOVING_READ)
   @ApiOperation({ summary: 'Demandes déménagement' })
-  moving(@Query('take') take?: string) {
-    return this.adminService.listMoving(Number(take ?? 50));
+  moving(@Request() req: { user: AdminJwtUser }, @Query('take') take?: string) {
+    return this.adminService.listMoving(Number(take ?? 50), resolveManagedCityScope(req.user));
   }
 
   @Post('moving/:id/cancel')
-  @RequirePermissions(AdminPermission.DELIVERIES_WRITE)
+  @RequirePermissions(AdminPermission.MOVING_WRITE)
   @ApiOperation({ summary: 'Annuler déménagement' })
   cancelMoving(@Param('id') id: string) {
     return this.adminService.cancelMoving(id);
   }
 
   @Patch('moving/:id/status')
-  @RequirePermissions(AdminPermission.DELIVERIES_WRITE)
+  @RequirePermissions(AdminPermission.MOVING_WRITE)
   @ApiOperation({ summary: 'Statut déménagement' })
   movingStatus(@Param('id') id: string, @Body('status') status: string) {
     return this.adminService.updateMovingStatus(id, status);
   }
 
   @Patch('moving/:id/assign')
-  @RequirePermissions(AdminPermission.DELIVERIES_WRITE)
+  @RequirePermissions(AdminPermission.MOVING_WRITE)
   @ApiOperation({ summary: 'Assigner un chauffeur au déménagement' })
   assignMoving(@Param('id') id: string, @Body('driverId') driverId: string) {
     return this.adminService.assignMovingDriver(id, driverId);
   }
 
   @Get('rental-inquiries')
-  @RequirePermissions(AdminPermission.SCHEDULED_READ)
+  @RequirePermissions(AdminPermission.RENTALS_READ)
   @ApiOperation({ summary: 'Demandes location' })
-  rentalInquiries(@Query('take') take?: string) {
-    return this.adminService.listRentalInquiries(Number(take ?? 50));
+  rentalInquiries(@Request() req: { user: AdminJwtUser }, @Query('take') take?: string) {
+    return this.adminService.listRentalInquiries(Number(take ?? 50), resolveManagedCityScope(req.user));
   }
 
   @Post('rental-inquiries/:id/cancel')
-  @RequirePermissions(AdminPermission.SCHEDULED_WRITE)
+  @RequirePermissions(AdminPermission.RENTALS_WRITE)
   @ApiOperation({ summary: 'Annuler demande location' })
   cancelRental(@Param('id') id: string) {
     return this.adminService.cancelRentalInquiry(id);
   }
 
   @Patch('rental-inquiries/:id/status')
-  @RequirePermissions(AdminPermission.SCHEDULED_WRITE)
+  @RequirePermissions(AdminPermission.RENTALS_WRITE)
   @ApiOperation({ summary: 'Statut demande location' })
   rentalStatus(
     @Param('id') id: string,
@@ -1012,35 +1026,35 @@ export class AdminController {
   }
 
   @Patch('rental-inquiries/:id/assign')
-  @RequirePermissions(AdminPermission.SCHEDULED_WRITE)
+  @RequirePermissions(AdminPermission.RENTALS_WRITE)
   @ApiOperation({ summary: 'Assigner chauffeur location (remise véhicule)' })
   assignRentalDriver(@Param('id') id: string, @Body('driverId') driverId: string) {
     return this.adminService.assignRentalDriver(id, driverId);
   }
 
   @Get('rental-vehicles')
-  @RequirePermissions(AdminPermission.RESTAURANTS_READ)
+  @RequirePermissions(AdminPermission.RENTALS_READ)
   @ApiOperation({ summary: 'Catalogue véhicules location' })
-  rentalVehicles() {
-    return this.adminService.listRentalVehicles();
+  rentalVehicles(@Request() req: { user: AdminJwtUser }) {
+    return this.adminService.listRentalVehicles(resolveManagedCityScope(req.user));
   }
 
   @Post('rental-vehicles')
-  @RequirePermissions(AdminPermission.RESTAURANTS_WRITE)
+  @RequirePermissions(AdminPermission.RENTALS_WRITE)
   @ApiOperation({ summary: 'Ajouter véhicule au catalogue location' })
   createRentalVehicle(@Body() body: Record<string, unknown>) {
     return this.adminService.createRentalVehicle(body);
   }
 
   @Patch('rental-vehicles/:id')
-  @RequirePermissions(AdminPermission.RESTAURANTS_WRITE)
+  @RequirePermissions(AdminPermission.RENTALS_WRITE)
   @ApiOperation({ summary: 'Modifier véhicule catalogue location' })
   updateRentalVehicle(@Param('id') id: string, @Body() body: Record<string, unknown>) {
     return this.adminService.updateRentalVehicle(id, body);
   }
 
   @Delete('rental-vehicles/:id')
-  @RequirePermissions(AdminPermission.RESTAURANTS_WRITE)
+  @RequirePermissions(AdminPermission.RENTALS_WRITE)
   @ApiOperation({ summary: 'Désactiver véhicule catalogue location' })
   deleteRentalVehicle(@Param('id') id: string) {
     return this.adminService.deleteRentalVehicle(id);
@@ -1191,14 +1205,14 @@ export class AdminController {
   }
 
   @Get('platform-config')
-  @RequirePermissions(AdminPermission.PRICING_READ)
+  @RequirePermissions(AdminPermission.RULES_READ)
   @ApiOperation({ summary: 'Configuration plateforme (dispatch, inter-ville, livraison, etc.)' })
   platformConfig() {
     return this.adminService.getPlatformConfig();
   }
 
   @Patch('platform-config')
-  @RequirePermissions(AdminPermission.PRICING_WRITE)
+  @RequirePermissions(AdminPermission.RULES_WRITE)
   @ApiOperation({ summary: 'Modifier configuration plateforme' })
   updatePlatformConfig(@Body() body: Record<string, unknown>) {
     return this.adminService.updatePlatformConfig(body);
@@ -1254,28 +1268,28 @@ export class AdminController {
   }
 
   @Get('cancellation-policies')
-  @RequirePermissions(AdminPermission.PRICING_READ)
+  @RequirePermissions(AdminPermission.RULES_READ)
   @ApiOperation({ summary: 'Politiques annulation courses par type véhicule' })
   cancellationPolicies() {
     return this.adminService.listCancellationPolicies();
   }
 
   @Patch('cancellation-policies/:vehicleType')
-  @RequirePermissions(AdminPermission.PRICING_WRITE)
+  @RequirePermissions(AdminPermission.RULES_WRITE)
   @ApiOperation({ summary: 'Modifier politique annulation' })
   updateCancellationPolicy(@Param('vehicleType') vehicleType: string, @Body() body: Record<string, unknown>) {
     return this.adminService.updateCancellationPolicy(vehicleType, body);
   }
 
   @Get('parcel-weight-bands')
-  @RequirePermissions(AdminPermission.PRICING_READ)
+  @RequirePermissions(AdminPermission.RULES_READ)
   @ApiOperation({ summary: 'Bandes de poids colis et multiplicateurs' })
   parcelWeightBands() {
     return this.adminService.listParcelWeightBands();
   }
 
   @Patch('parcel-weight-bands/:category')
-  @RequirePermissions(AdminPermission.PRICING_WRITE)
+  @RequirePermissions(AdminPermission.RULES_WRITE)
   @ApiOperation({ summary: 'Modifier bande de poids colis' })
   updateParcelWeightBand(@Param('category') category: string, @Body() body: Record<string, unknown>) {
     return this.adminService.updateParcelWeightBand(category, body);

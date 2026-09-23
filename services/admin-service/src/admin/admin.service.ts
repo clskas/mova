@@ -226,12 +226,18 @@ export class AdminService {
     return this.fetchJson('ride', `/internal/rides/reports?${params}`);
   }
 
-  async listUsers(skip = 0, take = 50, search?: string, includePlayPrelaunch = false) {
+  async listUsers(
+    skip = 0,
+    take = 50,
+    search?: string,
+    includePlayPrelaunch = false,
+    managedCity?: string | null,
+  ) {
     const params = new URLSearchParams({ skip: String(skip), take: String(take) });
     if (search) params.set('search', search);
     if (includePlayPrelaunch) params.set('includePlayPrelaunch', 'true');
     const result = await this.fetchJson<{
-      data?: Array<{ id: string; role?: string; status?: string; commerceType?: string; [key: string]: unknown }>;
+      data?: Array<{ id: string; role?: string; status?: string; commerceType?: string; managedCity?: string | null; [key: string]: unknown }>;
       total?: number;
       skip?: number;
       take?: number;
@@ -280,7 +286,38 @@ export class AdminService {
         }
       }
     }
-    return result;
+    if (!managedCity?.trim()) return result;
+    const cityKey = managedCity.trim().toLowerCase();
+    const [driversRes, restaurants, rentalVehicles] = await Promise.all([
+      this.listDrivers(0, 500, { includeHidden: true }, managedCity).catch(() => ({ data: [] as Array<{ userId?: string; id?: string }> })),
+      this.listRestaurants(managedCity).catch(() => [] as Array<{ ownerUserId?: string | null }>),
+      this.listRentalVehicles(managedCity).catch(() => [] as Array<{ ownerUserId?: string | null }>),
+    ]);
+    const driverRows = Array.isArray(driversRes) ? driversRes : (driversRes as { data?: Array<{ userId?: string; id?: string }> }).data ?? [];
+    const driverIds = new Set(
+      driverRows.map((d) => String(d.userId ?? d.id ?? '')).filter(Boolean),
+    );
+    const partnerOwnerIds = new Set(
+      [
+        ...(Array.isArray(restaurants) ? restaurants : []),
+        ...(Array.isArray(rentalVehicles) ? rentalVehicles : []),
+      ]
+        .map((r) => (r.ownerUserId ? String(r.ownerUserId) : ''))
+        .filter(Boolean),
+    );
+    const scoped = (result.data ?? []).filter((u) => {
+      const role = String(u.role ?? '');
+      if (role === UserRole.CITY_ADMIN) {
+        return String(u.managedCity ?? '').trim().toLowerCase() === cityKey;
+      }
+      if (STAFF_ROLES.has(role)) return false;
+      if (role === UserRole.DRIVER) return driverIds.has(u.id);
+      if (role === UserRole.RESTAURANT || role === UserRole.RENTAL_PARTNER) {
+        return partnerOwnerIds.has(u.id);
+      }
+      return false;
+    });
+    return { ...result, data: scoped, total: scoped.length };
   }
   listPlayPrelaunchUsers() {
     return this.fetchJson('auth', '/internal/users/play-prelaunch');
@@ -552,8 +589,14 @@ export class AdminService {
       body: JSON.stringify({}),
     });
   }
-  listIncidents() {
-    return this.fetchJson('driver', '/internal/incidents');
+  listIncidents(managedCity?: string | null) {
+    return this.fetchJson<{ lat?: number; lng?: number; [key: string]: unknown }[]>(
+      'driver',
+      '/internal/incidents',
+    ).then((data) => {
+      const rows = Array.isArray(data) ? data : [];
+      return filterRowsByManagedCity(rows, managedCity ?? null, (r) => ({ lat: r.lat, lng: r.lng }));
+    });
   }
   resolveIncident(id: string, status: string) {
     return this.proxy('driver', `/internal/incidents/${id}/resolve`, { method: 'POST', body: JSON.stringify({ status }) });
@@ -644,8 +687,17 @@ export class AdminService {
     return this.proxy('ride', `/internal/deliveries/${id}/assign`, { method: 'PATCH', body: JSON.stringify({ driverId }) });
   }
 
-  listScheduledRides(take = 50) {
-    return this.fetchJson('ride', `/internal/scheduled-rides?take=${take}`);
+  listScheduledRides(take = 50, managedCity?: string | null) {
+    return this.fetchJson<{ pickupLat?: number; pickupLng?: number; [key: string]: unknown }[]>(
+      'ride',
+      `/internal/scheduled-rides?take=${take}`,
+    ).then((data) => {
+      const rows = Array.isArray(data) ? data : [];
+      return filterRowsByManagedCity(rows, managedCity ?? null, (r) => ({
+        lat: r.pickupLat,
+        lng: r.pickupLng,
+      }));
+    });
   }
   cancelScheduledRide(id: string, reason?: string) {
     return this.proxy('ride', `/internal/scheduled-rides/${id}/cancel`, { method: 'POST', body: JSON.stringify({ reason }) });
@@ -942,8 +994,20 @@ export class AdminService {
     return this.proxy('ride', `/internal/poi/seed${q}`, { method: 'POST' });
   }
 
-  listCarpool(take = 50) {
-    return this.fetchJson('ride', `/internal/carpool?take=${take}`);
+  listCarpool(take = 50, managedCity?: string | null) {
+    return this.fetchJson<{ fromCity?: string; pickupLat?: number; pickupLng?: number; [key: string]: unknown }[]>(
+      'ride',
+      `/internal/carpool?take=${take}`,
+    ).then((data) => {
+      const rows = Array.isArray(data) ? data : [];
+      if (!managedCity) return rows;
+      const byName = filterRowsByCityName(rows, managedCity, (r) => r.fromCity);
+      if (byName.length > 0 || rows.every((r) => r.fromCity != null)) return byName;
+      return filterRowsByManagedCity(rows, managedCity, (r) => ({
+        lat: r.pickupLat,
+        lng: r.pickupLng,
+      }));
+    });
   }
   cancelCarpool(id: string) {
     return this.proxy('ride', `/internal/carpool/${id}/cancel`, { method: 'POST', body: JSON.stringify({}) });
@@ -952,8 +1016,20 @@ export class AdminService {
     return this.proxy('ride', `/internal/carpool/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) });
   }
 
-  listMoving(take = 50) {
-    return this.fetchJson('ride', `/internal/moving?take=${take}`);
+  listMoving(take = 50, managedCity?: string | null) {
+    return this.fetchJson<{ city?: string; pickupLat?: number; pickupLng?: number; [key: string]: unknown }[]>(
+      'ride',
+      `/internal/moving?take=${take}`,
+    ).then((data) => {
+      const rows = Array.isArray(data) ? data : [];
+      if (!managedCity) return rows;
+      const byName = filterRowsByCityName(rows, managedCity, (r) => (typeof r.city === 'string' ? r.city : null));
+      if (byName.length > 0 || rows.every((r) => typeof r.city === 'string')) return byName;
+      return filterRowsByManagedCity(rows, managedCity, (r) => ({
+        lat: r.pickupLat,
+        lng: r.pickupLng,
+      }));
+    });
   }
   cancelMoving(id: string) {
     return this.proxy('ride', `/internal/moving/${id}/cancel`, { method: 'POST', body: JSON.stringify({}) });
@@ -965,8 +1041,22 @@ export class AdminService {
     return this.proxy('ride', `/internal/moving/${id}/assign`, { method: 'PATCH', body: JSON.stringify({ driverId }) });
   }
 
-  listRentalInquiries(take = 50) {
-    return this.fetchJson('ride', `/internal/rental-inquiries?take=${take}`);
+  listRentalInquiries(take = 50, managedCity?: string | null) {
+    return this.fetchJson<
+      Array<{
+        pickupCity?: string;
+        city?: string;
+        vehicle?: { city?: string } | null;
+        [key: string]: unknown;
+      }>
+    >('ride', `/internal/rental-inquiries?take=${take}`).then((data) => {
+      const rows = Array.isArray(data) ? data : [];
+      return filterRowsByCityName(
+        rows,
+        managedCity ?? null,
+        (r) => r.pickupCity ?? r.city ?? r.vehicle?.city,
+      );
+    });
   }
   cancelRentalInquiry(id: string) {
     return this.proxy('ride', `/internal/rental-inquiries/${id}/cancel`, { method: 'POST', body: JSON.stringify({}) });
@@ -981,8 +1071,13 @@ export class AdminService {
     return this.proxy('ride', `/internal/rental-inquiries/${id}/assign`, { method: 'PATCH', body: JSON.stringify({ driverId }) });
   }
 
-  listRentalVehicles() {
-    return this.fetchJson('ride', '/internal/rental-vehicles');
+  listRentalVehicles(managedCity?: string | null) {
+    return this.fetchJson<{ city?: string; [key: string]: unknown }[]>('ride', '/internal/rental-vehicles').then(
+      (data) => {
+        const rows = Array.isArray(data) ? data : [];
+        return filterRowsByCityName(rows, managedCity ?? null, (r) => r.city);
+      },
+    );
   }
   createRentalVehicle(body: Record<string, unknown>) {
     return this.proxy('ride', '/internal/rental-vehicles', { method: 'POST', body: JSON.stringify(body) });

@@ -114,7 +114,7 @@ function NumField({
 
 export default function ReglesPlateformePage() {
   const { canWrite, role } = useAdmin();
-  const readOnly = !canWrite("tarifs");
+  const readOnly = !canWrite("regles");
   /** Admin ville : uniquement la règle documents (jobs), pas les paramètres nationaux. */
   const cityAdminDocsOnly = role === "CITY_ADMIN";
   const [config, setConfig] = useState<PlatformConfigData | null>(null);

@@ -201,6 +201,7 @@ export default function UtilisateursPage() {
       return;
     }
     setSaving(true);
+    setError(null);
     try {
       const staffRole = normalizeAdminRole(editRole);
       const payload: Partial<AdminUser> & { accessLevelIds?: string[] } = {
@@ -640,7 +641,11 @@ export default function UtilisateursPage() {
               </div>
             )}
             {!readOnly && (
-              <div className="flex flex-wrap gap-2 pt-2">
+              <div className="flex flex-col gap-2 pt-2">
+                {error && (
+                  <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>
+                )}
+                <div className="flex flex-wrap gap-2">
                 <BtnPrimary onClick={saveUser} disabled={saving}>{saving ? "Enregistrement…" : "Enregistrer"}</BtnPrimary>
                 {editStatus !== "SUSPENDED" && (
                   <BtnDanger onClick={() => setDeactivateTarget(selected)} disabled={saving}>Désactiver</BtnDanger>
@@ -648,6 +653,7 @@ export default function UtilisateursPage() {
                 {canPurge && selected.id !== user?.id && (
                   <BtnDanger onClick={() => setPurgeTarget(selected)} disabled={saving}>Supprimer cet utilisateur</BtnDanger>
                 )}
+                </div>
               </div>
             )}
           </div>

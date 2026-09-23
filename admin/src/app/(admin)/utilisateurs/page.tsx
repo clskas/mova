@@ -54,6 +54,7 @@ export default function UtilisateursPage() {
   const { canWrite, role, user } = useAdmin();
   const readOnly = !canWrite("utilisateurs");
   const canPurge = role === "SUPER_ADMIN";
+  const canFilterCities = role === "SUPER_ADMIN" || role === "ADMIN";
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [driverUserIds, setDriverUserIds] = useState<Set<string>>(new Set());
   const [total, setTotal] = useState(0);
@@ -86,6 +87,7 @@ export default function UtilisateursPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [showPlayPrelaunch, setShowPlayPrelaunch] = useState(false);
   const [purgePlayOpen, setPurgePlayOpen] = useState(false);
+  const [cityFilter, setCityFilter] = useState<string[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -97,6 +99,7 @@ export default function UtilisateursPage() {
           pageSize,
           searchQuery.trim() || undefined,
           showPlayPrelaunch,
+          canFilterCities && cityFilter.length > 0 ? cityFilter : undefined,
         ),
         fetchDrivers(true).catch(() => []),
       ]);
@@ -108,16 +111,23 @@ export default function UtilisateursPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, searchQuery, showPlayPrelaunch]);
+  }, [page, searchQuery, showPlayPrelaunch, cityFilter, canFilterCities]);
 
   useEffect(() => { load(); }, [load]);
 
   useEffect(() => {
-    if (!canPurge) return;
+    if (!canFilterCities && !canPurge) return;
     fetchCities()
       .then((cities) => setCityOptions(cities.filter((c) => c.isActive !== false)))
       .catch(() => setCityOptions([]));
-  }, [canPurge]);
+  }, [canFilterCities, canPurge]);
+
+  function toggleCityFilter(name: string) {
+    setPage(0);
+    setCityFilter((prev) =>
+      prev.includes(name) ? prev.filter((c) => c !== name) : [...prev, name],
+    );
+  }
 
   function applySearch() {
     setPage(0);
@@ -353,6 +363,47 @@ export default function UtilisateursPage() {
             </BtnDanger>
           )}
         </div>
+        {canFilterCities && (
+          <div className="rounded-xl border border-gray-200 bg-white p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+              <p className="text-sm font-medium text-[#1A1A2E]">Filtrer par villes</p>
+              {cityFilter.length > 0 && (
+                <button
+                  type="button"
+                  className="text-xs text-[#6C63FF]"
+                  onClick={() => {
+                    setPage(0);
+                    setCityFilter([]);
+                  }}
+                >
+                  Toutes les villes
+                </button>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-2 max-h-28 overflow-y-auto">
+              {(cityOptions.length > 0 ? cityOptions.map((c) => c.name) : []).map((name) => {
+                const on = cityFilter.includes(name);
+                return (
+                  <button
+                    key={name}
+                    type="button"
+                    onClick={() => toggleCityFilter(name)}
+                    className={`text-xs rounded-full px-2.5 py-1 border ${
+                      on
+                        ? "bg-[#6C63FF] text-white border-[#6C63FF]"
+                        : "bg-gray-50 text-gray-700 border-gray-200"
+                    }`}
+                  >
+                    {name}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-xs text-gray-500 mt-2">
+              Affiche chauffeurs, partenaires et admins ville rattachés aux villes choisies.
+            </p>
+          </div>
+        )}
         {!showPlayPrelaunch && (
           <p className="text-xs text-gray-500">
             Les comptes robots Google Play / Firebase Test Lab (sans téléphone) sont masqués — ce ne sont pas des clients SENGA.

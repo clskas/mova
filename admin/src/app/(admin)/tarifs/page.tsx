@@ -547,6 +547,7 @@ function TimeWindowRow({
 export default function TarifsPage() {
   const { canWrite, role, user } = useAdmin();
   const readOnly = !canWrite("tarifs");
+  const canAssignPromoCities = role === "SUPER_ADMIN" || role === "ADMIN";
   const lockedCity = role === "CITY_ADMIN" ? (user?.managedCity?.trim() || MOVA_CITIES[0]) : null;
   const [city, setCity] = useState<string>(() => initialTarifsCity(lockedCity));
   const [vehicleRules, setVehicleRules] = useState<PricingRule[]>([]);
@@ -575,6 +576,7 @@ export default function TarifsPage() {
   const [promoCdf, setPromoCdf] = useState("");
   const [promoMaxUses, setPromoMaxUses] = useState("");
   const [promoValidUntil, setPromoValidUntil] = useState("");
+  const [promoCities, setPromoCities] = useState<string[]>([]);
   const [promoSaving, setPromoSaving] = useState(false);
 
   const existingTypes = new Set(vehicleRules.map((r) => r.vehicleType));
@@ -743,6 +745,7 @@ export default function TarifsPage() {
     setPromoCdf("");
     setPromoMaxUses("");
     setPromoValidUntil("");
+    setPromoCities([]);
     setPromoModal("create");
   }
 
@@ -752,7 +755,14 @@ export default function TarifsPage() {
     setPromoCdf(p.discountCdf != null ? String(p.discountCdf) : "");
     setPromoMaxUses(p.maxUses != null ? String(p.maxUses) : "");
     setPromoValidUntil(p.validUntil ? p.validUntil.slice(0, 10) : "");
+    setPromoCities(Array.isArray(p.cityNames) ? [...p.cityNames] : []);
     setPromoModal(p);
+  }
+
+  function togglePromoCity(name: string) {
+    setPromoCities((prev) =>
+      prev.includes(name) ? prev.filter((c) => c !== name) : [...prev, name],
+    );
   }
 
   async function savePromo() {
@@ -765,6 +775,7 @@ export default function TarifsPage() {
         discountCdf: promoCdf.trim() ? Number(promoCdf) : undefined,
         maxUses: promoMaxUses.trim() ? Number(promoMaxUses) : undefined,
         validUntil: promoValidUntil.trim() ? new Date(promoValidUntil).toISOString() : undefined,
+        ...(canAssignPromoCities ? { cityNames: promoCities } : {}),
       };
       if (promoModal === "create") {
         await createPromoCode(payload);
@@ -774,6 +785,7 @@ export default function TarifsPage() {
           discountCdf: payload.discountCdf,
           maxUses: payload.maxUses,
           validUntil: payload.validUntil ?? null,
+          ...(canAssignPromoCities ? { cityNames: promoCities } : {}),
         });
       }
       setPromoModal(null);
@@ -1163,17 +1175,20 @@ export default function TarifsPage() {
           <section>
             <div className="flex items-center justify-between mb-3">
               <div>
-                <h2 className="font-semibold text-[#1A1A2E]">Codes promo</h2>
-                <p className="text-sm text-gray-500">Réduction en % ou montant fixe CDF ; désactivation sans suppression.</p>
+                <h2 className="font-semibold text-[#1A1A2E]">Codes promo SENGA</h2>
+                <p className="text-sm text-gray-500">
+                  Réduction plateforme (% ou CDF). Superadmin/Admin peuvent limiter aux villes choisies (vide = tout le pays).
+                </p>
               </div>
               {!readOnly && <BtnPrimary onClick={openPromoCreate}>Nouveau code</BtnPrimary>}
             </div>
             <Card className="overflow-x-auto">
-              <table className="w-full text-sm min-w-[640px]">
+              <table className="w-full text-sm min-w-[720px]">
                 <thead>
                   <tr className="border-b text-left text-gray-500">
                     <th className="p-3">Code</th>
                     <th className="p-3">Réduction</th>
+                    <th className="p-3">Villes</th>
                     <th className="p-3">Utilisations</th>
                     <th className="p-3">Expire</th>
                     <th className="p-3">Statut</th>
@@ -1182,12 +1197,17 @@ export default function TarifsPage() {
                 </thead>
                 <tbody>
                   {promos.length === 0 ? (
-                    <tr><td colSpan={6} className="p-6 text-center text-gray-400">Aucun code promo</td></tr>
+                    <tr><td colSpan={7} className="p-6 text-center text-gray-400">Aucun code promo</td></tr>
                   ) : promos.map((p) => (
                     <tr key={p.id} className="border-b">
                       <td className="p-3 font-mono font-medium">{p.code}</td>
                       <td className="p-3">
                         {p.discountPercent != null ? `${p.discountPercent} %` : p.discountCdf != null ? formatCdf(p.discountCdf) : "—"}
+                      </td>
+                      <td className="p-3 text-xs text-gray-600 max-w-[180px]">
+                        {(p.cityNames?.length ?? 0) === 0
+                          ? "Toutes"
+                          : (p.cityNames ?? []).join(", ")}
                       </td>
                       <td className="p-3">{p.usedCount ?? 0}{p.maxUses != null ? ` / ${p.maxUses}` : ""}</td>
                       <td className="p-3">{p.validUntil ? new Date(p.validUntil).toLocaleDateString("fr-FR") : "—"}</td>
@@ -1254,6 +1274,43 @@ export default function TarifsPage() {
             <FieldLabel>Date d&apos;expiration</FieldLabel>
             <TextInput value={promoValidUntil} onChange={setPromoValidUntil} type="date" disabled={readOnly} />
           </label>
+          {canAssignPromoCities && (
+            <div>
+              <FieldLabel>Villes bénéficiaires (SENGA)</FieldLabel>
+              <p className="text-xs text-gray-500 mb-2">
+                Aucune sélection = valable dans toutes les villes. Codes partenaires restaurant/location non concernés.
+              </p>
+              <div className="flex flex-wrap gap-2 max-h-36 overflow-y-auto rounded-lg border border-gray-200 p-2">
+                {MOVA_CITIES.map((name) => {
+                  const on = promoCities.includes(name);
+                  return (
+                    <button
+                      key={name}
+                      type="button"
+                      disabled={readOnly}
+                      onClick={() => togglePromoCity(name)}
+                      className={`text-xs rounded-full px-2.5 py-1 border ${
+                        on
+                          ? "bg-[#6C63FF] text-white border-[#6C63FF]"
+                          : "bg-gray-50 text-gray-700 border-gray-200"
+                      }`}
+                    >
+                      {name}
+                    </button>
+                  );
+                })}
+              </div>
+              {promoCities.length > 0 && (
+                <button
+                  type="button"
+                  className="text-xs text-[#6C63FF] mt-2"
+                  onClick={() => setPromoCities([])}
+                >
+                  Effacer (toutes les villes)
+                </button>
+              )}
+            </div>
+          )}
           <div className="flex gap-2">
             {!readOnly && <BtnPrimary onClick={savePromo} disabled={promoSaving}>{promoSaving ? "Enregistrement…" : "Enregistrer"}</BtnPrimary>}
             <BtnDanger onClick={() => setPromoModal(null)}>Fermer</BtnDanger>

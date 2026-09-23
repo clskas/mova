@@ -262,7 +262,7 @@ export class DeliveriesService {
     const multiplier = await this.weightMultiplier(weightCategory, dto.weightKg);
     const beforePromo = Math.ceil(withInterCity.estimatedFareCdf * multiplier);
     const promoApplied = await applyPromoCode(this.promo, beforePromo, dto.promoCode, redeemPromo, {
-      context: { serviceType: 'PARCEL' },
+      context: { serviceType: 'PARCEL', city: pickupArea.name },
     });
     const estimatedPriceCdf = promoApplied.estimatedPriceCdf;
     const pickupCommune = detectCommune(dto.pickupLat, dto.pickupLng, dto.pickupAddress);
@@ -341,9 +341,10 @@ export class DeliveriesService {
     promoCode?: string,
     redeem = false,
     restaurantId?: string,
+    city?: string,
   ) {
     return applyPromoCode(this.promo, itemsSubtotalCdf + deliveryFeeCdf, promoCode, redeem, {
-      context: { serviceType: 'FOOD', restaurantId },
+      context: { serviceType: 'FOOD', restaurantId, city },
       parts: { itemsSubtotalCdf, deliveryFeeCdf },
     });
   }
@@ -518,6 +519,7 @@ export class DeliveriesService {
       dto.promoCode,
       false,
       dto.restaurantId,
+      restaurant.city,
     );
     return {
       restaurant: { id: restaurant.id, name: restaurant.name },
@@ -550,6 +552,7 @@ export class DeliveriesService {
       dto.promoCode,
       true,
       dto.restaurantId,
+      restaurant.city,
     );
     const flags = this.guaranteeFlags(dto.paymentMethod);
     const delivery = await this.prisma.delivery.create({
@@ -652,7 +655,14 @@ export class DeliveriesService {
       deliveryFeeCdf = Math.max(deliveryFeeCdf, quote.deliveryFeeCdf);
     }
 
-    const promoApplied = await this.applyFoodPromo(itemsSubtotalCdf, deliveryFeeCdf, dto.promoCode, false);
+    const promoApplied = await this.applyFoodPromo(
+      itemsSubtotalCdf,
+      deliveryFeeCdf,
+      dto.promoCode,
+      false,
+      undefined,
+      restaurants[0]?.city,
+    );
 
     return {
       restaurants: restaurants.map((r) => ({ id: r.id, name: r.name })),
@@ -708,7 +718,14 @@ export class DeliveriesService {
       ...dto,
       orders: normalizedOrders.map((o) => ({ restaurantId: o.restaurant.id, items: o.items })),
     });
-    const promoApplied = await this.applyFoodPromo(itemsSubtotalCdf, estimate.deliveryFeeCdf, dto.promoCode, true);
+    const promoApplied = await this.applyFoodPromo(
+      itemsSubtotalCdf,
+      estimate.deliveryFeeCdf,
+      dto.promoCode,
+      true,
+      undefined,
+      first.city,
+    );
 
     // Pickup uses first restaurant for now (single delivery entity)
     const first = normalizedOrders[0].restaurant;
@@ -801,7 +818,7 @@ export class DeliveriesService {
     const express = await this.surcharges.get(SurchargeType.DELIVERY_EXPRESS);
     const beforePromo = Math.ceil(parcel.estimatedPriceCdf * express.multiplier + express.baseFeeCdf);
     const promoApplied = await applyPromoCode(this.promo, beforePromo, dto.promoCode, redeemPromo, {
-      context: { serviceType: 'EXPRESS' },
+      context: { serviceType: 'EXPRESS', city: parcel.pickupCity ?? parcel.city },
     });
     const estimatedPriceCdf = promoApplied.estimatedPriceCdf;
     return {

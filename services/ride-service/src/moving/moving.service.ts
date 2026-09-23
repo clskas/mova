@@ -66,7 +66,7 @@ export class MovingService {
       (withInterCity.estimatedFareCdf * moving.multiplier + moving.baseFeeCdf + volumeFee) * vehicleMultiplier,
     );
     const promoApplied = await applyPromoCode(this.promo, beforePromo, dto.promoCode, redeemPromo, {
-      context: { serviceType: 'MOVING' },
+      context: { serviceType: 'MOVING', city: pickupArea.name },
     });
     const estimatedPriceCdf = promoApplied.estimatedPriceCdf;
     const transportBeforeVehicle = Math.ceil(

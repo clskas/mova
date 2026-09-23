@@ -90,8 +90,12 @@ export class ErrandsService {
       category ?? (await this.errandCategories.inferCategory(dto.pickupAddress, dto.description.split(', ')));
     const estimatedPurchaseCdf = await this.errandCategories.estimatePurchase(resolvedCategory, itemCount);
     const serviceFeeCdf = Math.ceil(fare.estimatedFareCdf + baseCdf + itemsFee);
+    const city =
+      dto.pickupLat != null && dto.pickupLng != null
+        ? resolveCityFromCoords(dto.pickupLat, dto.pickupLng)
+        : undefined;
     const promoApplied = await applyPromoCode(this.promo, serviceFeeCdf, dto.promoCode, redeemPromo, {
-      context: { serviceType: 'ERRAND' },
+      context: { serviceType: 'ERRAND', city: city ?? undefined },
     });
     return {
       estimatedPriceCdf: promoApplied.estimatedPriceCdf,

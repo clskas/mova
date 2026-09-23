@@ -795,7 +795,11 @@ export class RentalService {
       return { ...base, promoCode: null as string | null, discountCdf: 0 };
     }
     const promoApplied = await applyPromoCode(this.promo, base.breakdown.subtotalCdf, dto.promoCode, redeemPromo, {
-      context: { serviceType: 'RENTAL', rentalOwnerUserId: vehicle.ownerUserId ?? undefined },
+      context: {
+        serviceType: 'RENTAL',
+        rentalOwnerUserId: vehicle.ownerUserId ?? undefined,
+        city: vehicle.city,
+      },
       parts: { rentalSubtotalCdf: base.breakdown.subtotalCdf },
     });
     const totalCdf = promoApplied.estimatedPriceCdf + base.depositCdf;

@@ -6,7 +6,7 @@ import { Transform } from 'class-transformer';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RequirePermissions } from '../auth/permissions.decorator';
 import { RolesGuard } from '../auth/roles.guard';
-import { resolveManagedCityScope, type AdminJwtUser } from '../common/city-scope.util';
+import { resolveManagedCityScope, resolveCityFilterList, type AdminJwtUser } from '../common/city-scope.util';
 import { AdminService } from './admin.service';
 import { FraudService } from './fraud.service';
 
@@ -120,13 +120,14 @@ export class AdminController {
     @Query('take') take?: string,
     @Query('search') search?: string,
     @Query('includePlayPrelaunch') includePlayPrelaunch?: string,
+    @Query('city') city?: string,
   ) {
     return this.adminService.listUsers(
       Number(skip ?? 0),
       Number(take ?? 50),
       search,
       includePlayPrelaunch === 'true' || includePlayPrelaunch === '1',
-      resolveManagedCityScope(req.user),
+      resolveCityFilterList(req.user, city),
     );
   }
 

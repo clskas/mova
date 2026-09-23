@@ -117,7 +117,7 @@ export class RidesService {
       };
     }
     const promoApplied = await applyPromoCode(this.promo, base.totalCdf, promoCode, redeemPromo, {
-      context: { serviceType: 'RIDE' },
+      context: { serviceType: 'RIDE', city: pickupArea.name },
     });
     return {
       ...base,

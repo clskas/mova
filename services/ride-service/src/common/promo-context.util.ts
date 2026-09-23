@@ -7,6 +7,8 @@ export type PromoApplyContext = {
   serviceType: 'RIDE' | 'FOOD' | 'PARCEL' | 'EXPRESS' | 'ERRAND' | 'SCHEDULED' | 'MOVING' | 'RENTAL';
   restaurantId?: string;
   rentalOwnerUserId?: string;
+  /** Ville SENGA (nom service area, ex. Kinshasa). Requis si le code PLATFORM est restreint. */
+  city?: string;
 };
 
 export type PromoSettlementSplit = {
@@ -27,6 +29,23 @@ const PLATFORM_SERVICES: PromoApplyContext['serviceType'][] = [
   'RENTAL',
 ];
 
+function normalizeCityName(value?: string | null): string {
+  return String(value ?? '').trim().toLowerCase();
+}
+
+function assertPlatformCity(promo: PromoCode, context?: PromoApplyContext) {
+  const allowed = (promo.cityNames ?? []).map((c) => normalizeCityName(c)).filter(Boolean);
+  if (allowed.length === 0) return;
+  const city = normalizeCityName(context?.city);
+  if (!city || !allowed.includes(city)) {
+    throw new MovaHttpException(
+      MovaErrorCode.PROMO_INVALID,
+      HttpStatus.BAD_REQUEST,
+      'Ce code promo SENGA n’est pas valable dans cette ville.',
+    );
+  }
+}
+
 export function assertPromoApplicable(promo: PromoCode, context?: PromoApplyContext) {
   if (!context) {
     if (promo.ownerType !== PromoOwnerType.PLATFORM) {
@@ -36,6 +55,7 @@ export function assertPromoApplicable(promo: PromoCode, context?: PromoApplyCont
         'Ce code est réservé à un partenaire — indiquez le restaurant ou le véhicule concerné.',
       );
     }
+    assertPlatformCity(promo, context);
     return;
   }
 
@@ -46,6 +66,7 @@ export function assertPromoApplicable(promo: PromoCode, context?: PromoApplyCont
     if (!PLATFORM_SERVICES.includes(context.serviceType)) {
       throw new MovaHttpException(MovaErrorCode.PROMO_INVALID, HttpStatus.BAD_REQUEST, 'Code promo invalide pour ce service.');
     }
+    assertPlatformCity(promo, context);
     return;
   }
 

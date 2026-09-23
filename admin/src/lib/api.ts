@@ -584,6 +584,9 @@ export type PromoCode = {
   usedCount?: number;
   validUntil?: string | null;
   isActive?: boolean;
+  ownerType?: string;
+  /** Villes SENGA (vide = toutes). Codes plateforme uniquement. */
+  cityNames?: string[];
 };
 
 /** Villes SENGA couvertes (aligné DRC_SERVICE_AREAS / seed ride-service). */
@@ -2023,10 +2026,12 @@ export async function fetchUsers(
   take = 100,
   search?: string,
   includePlayPrelaunch = false,
+  cities?: string[],
 ): Promise<{ data: AdminUser[]; total: number }> {
   const params = new URLSearchParams({ skip: String(skip), take: String(take) });
   if (search?.trim()) params.set("search", search.trim());
   if (includePlayPrelaunch) params.set("includePlayPrelaunch", "true");
+  if (cities?.length) params.set("city", cities.join(","));
   const raw = await apiFetch<AdminUser[] | { data?: AdminUser[]; total?: number }>(`/api/admin/users?${params}`);
   if (Array.isArray(raw)) return { data: raw, total: raw.length };
   return { data: raw.data ?? [], total: raw.total ?? raw.data?.length ?? 0 };
@@ -2713,6 +2718,7 @@ export async function createPromoCode(data: {
   discountCdf?: number;
   maxUses?: number;
   validUntil?: string;
+  cityNames?: string[];
 }) {
   return apiFetch<PromoCode>("/api/admin/promo-codes", { method: "POST", body: JSON.stringify(data) });
 }

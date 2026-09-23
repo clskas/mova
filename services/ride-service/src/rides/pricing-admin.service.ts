@@ -152,12 +152,16 @@ export class PricingAdminService {
     discountCdf?: number;
     maxUses?: number;
     validUntil?: Date;
+    cityNames?: string[];
   }) {
     const code = data.code.trim().toUpperCase();
     if (!code) throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Le code promo est obligatoire.');
     if (data.discountPercent == null && data.discountCdf == null) {
       throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Indiquez une réduction en pourcentage ou en CDF.');
     }
+    const cityNames = Array.isArray(data.cityNames)
+      ? [...new Set(data.cityNames.map((c) => String(c).trim()).filter(Boolean))]
+      : [];
     return this.prisma.promoCode.create({
       data: {
         code,
@@ -165,16 +169,28 @@ export class PricingAdminService {
         discountCdf: data.discountCdf,
         maxUses: data.maxUses,
         validUntil: data.validUntil,
+        cityNames,
       },
     });
   }
 
   async updatePromoCode(
     id: string,
-    data: Partial<{ discountPercent: number; discountCdf: number; maxUses: number; validUntil: Date | null; isActive: boolean }>,
+    data: Partial<{
+      discountPercent: number;
+      discountCdf: number;
+      maxUses: number;
+      validUntil: Date | null;
+      isActive: boolean;
+      cityNames: string[];
+    }>,
   ) {
     await this.getPromoCode(id);
-    return this.prisma.promoCode.update({ where: { id }, data });
+    const patch: Record<string, unknown> = { ...data };
+    if (data.cityNames !== undefined) {
+      patch.cityNames = [...new Set(data.cityNames.map((c) => String(c).trim()).filter(Boolean))];
+    }
+    return this.prisma.promoCode.update({ where: { id }, data: patch });
   }
 
   async getPromoCode(id: string) {

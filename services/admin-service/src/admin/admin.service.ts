@@ -231,7 +231,7 @@ export class AdminService {
     take = 50,
     search?: string,
     includePlayPrelaunch = false,
-    managedCity?: string | null,
+    cities?: string | string[] | null,
   ) {
     const params = new URLSearchParams({ skip: String(skip), take: String(take) });
     if (search) params.set('search', search);
@@ -286,29 +286,56 @@ export class AdminService {
         }
       }
     }
-    if (!managedCity?.trim()) return result;
-    const cityKey = managedCity.trim().toLowerCase();
-    const [driversRes, restaurants, rentalVehicles] = await Promise.all([
-      this.listDrivers(0, 500, { includeHidden: true }, managedCity).catch(() => ({ data: [] as Array<{ userId?: string; id?: string }> })),
-      this.listRestaurants(managedCity).catch(() => [] as Array<{ ownerUserId?: string | null }>),
-      this.listRentalVehicles(managedCity).catch(() => [] as Array<{ ownerUserId?: string | null }>),
+    const cityList = (Array.isArray(cities) ? cities : cities ? [cities] : [])
+      .map((c) => c.trim())
+      .filter(Boolean);
+    if (cityList.length === 0) return result;
+
+    const cityKeys = new Set(cityList.map((c) => c.toLowerCase()));
+    const [driversBundles, restaurantsBundles, rentalBundles] = await Promise.all([
+      Promise.all(
+        cityList.map((city) =>
+          this.listDrivers(0, 500, { includeHidden: true }, city).catch(() => ({
+            data: [] as Array<{ userId?: string; id?: string }>,
+          })),
+        ),
+      ),
+      Promise.all(
+        cityList.map((city) =>
+          this.listRestaurants(city).catch(() => [] as Array<{ ownerUserId?: string | null }>),
+        ),
+      ),
+      Promise.all(
+        cityList.map((city) =>
+          this.listRentalVehicles(city).catch(() => [] as Array<{ ownerUserId?: string | null }>),
+        ),
+      ),
     ]);
-    const driverRows = Array.isArray(driversRes) ? driversRes : (driversRes as { data?: Array<{ userId?: string; id?: string }> }).data ?? [];
-    const driverIds = new Set(
-      driverRows.map((d) => String(d.userId ?? d.id ?? '')).filter(Boolean),
-    );
-    const partnerOwnerIds = new Set(
-      [
-        ...(Array.isArray(restaurants) ? restaurants : []),
-        ...(Array.isArray(rentalVehicles) ? rentalVehicles : []),
-      ]
-        .map((r) => (r.ownerUserId ? String(r.ownerUserId) : ''))
-        .filter(Boolean),
-    );
+    const driverIds = new Set<string>();
+    for (const driversRes of driversBundles) {
+      const driverRows = Array.isArray(driversRes)
+        ? driversRes
+        : (driversRes as { data?: Array<{ userId?: string; id?: string }> }).data ?? [];
+      for (const d of driverRows) {
+        const id = String(d.userId ?? d.id ?? '');
+        if (id) driverIds.add(id);
+      }
+    }
+    const partnerOwnerIds = new Set<string>();
+    for (const restaurants of restaurantsBundles) {
+      for (const r of Array.isArray(restaurants) ? restaurants : []) {
+        if (r.ownerUserId) partnerOwnerIds.add(String(r.ownerUserId));
+      }
+    }
+    for (const rentalVehicles of rentalBundles) {
+      for (const r of Array.isArray(rentalVehicles) ? rentalVehicles : []) {
+        if (r.ownerUserId) partnerOwnerIds.add(String(r.ownerUserId));
+      }
+    }
     const scoped = (result.data ?? []).filter((u) => {
       const role = String(u.role ?? '');
       if (role === UserRole.CITY_ADMIN) {
-        return String(u.managedCity ?? '').trim().toLowerCase() === cityKey;
+        return cityKeys.has(String(u.managedCity ?? '').trim().toLowerCase());
       }
       if (STAFF_ROLES.has(role)) return false;
       if (role === UserRole.DRIVER) return driverIds.has(u.id);

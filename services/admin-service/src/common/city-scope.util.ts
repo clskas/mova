@@ -30,6 +30,27 @@ export function resolveManagedCityScope(user?: AdminJwtUser | null): string | nu
   return city;
 }
 
+/** Parse `city=Kinshasa,Beni` or repeated values into a unique trimmed list. */
+export function parseCityFilterQuery(city?: string | string[] | null): string[] {
+  if (city == null) return [];
+  const raw = Array.isArray(city) ? city.join(',') : city;
+  return [...new Set(raw.split(',').map((c) => c.trim()).filter(Boolean))];
+}
+
+/**
+ * Effective city filter for list endpoints.
+ * CITY_ADMIN → always JWT city (client cannot widen).
+ * SUPER_ADMIN / ADMIN → optional query cities (empty = nationwide).
+ */
+export function resolveCityFilterList(
+  user?: AdminJwtUser | null,
+  cityQuery?: string | string[] | null,
+): string[] {
+  const scoped = resolveManagedCityScope(user);
+  if (scoped) return [scoped];
+  return parseCityFilterQuery(cityQuery);
+}
+
 type Coords = { lat?: number | null; lng?: number | null };
 
 /**

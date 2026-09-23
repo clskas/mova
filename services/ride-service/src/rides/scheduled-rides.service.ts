@@ -104,7 +104,7 @@ export class ScheduledRidesService {
     const fare = await this.pricing.estimateFare(vehicleType, distanceKm, durationMin, city);
     const estimate = this.pricing.withInterCitySurcharge(fare, isInterCity, distanceKm);
     const promoApplied = await applyPromoCode(this.promo, estimate.estimatedFareCdf, dto.promoCode, true, {
-      context: { serviceType: 'SCHEDULED' },
+      context: { serviceType: 'SCHEDULED', city },
     });
     const ride = await this.prisma.scheduledRide.create({
       data: {
@@ -663,7 +663,7 @@ export class ScheduledRidesService {
     const fare = await this.pricing.estimateFare(vehicleType, distanceKm, durationMin, city);
     const estimate = this.pricing.withInterCitySurcharge(fare, isInterCity, distanceKm);
     const promoApplied = await applyPromoCode(this.promo, estimate.estimatedFareCdf, dto.promoCode, false, {
-      context: { serviceType: 'SCHEDULED' },
+      context: { serviceType: 'SCHEDULED', city },
     });
     return {
       estimatedPriceCdf: promoApplied.estimatedPriceCdf,

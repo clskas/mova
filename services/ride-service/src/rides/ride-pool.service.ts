@@ -57,7 +57,7 @@ export class RidePoolService {
     const fare = await this.pricing.estimateFare(vehicleType, distanceKm, etaMinutes, pickupArea.name);
     const base = this.pricing.withInterCitySurcharge(fare, isInterCity, distanceKm);
     const promoApplied = await applyPromoCode(this.promo, base.totalCdf, promoCode, false, {
-      context: { serviceType: 'RIDE' },
+      context: { serviceType: 'RIDE', city: pickupArea.name },
     });
     const exclusive = promoApplied.estimatedPriceCdf;
     const mult = this.poolCfg().fareMultiplier ?? 0.65;

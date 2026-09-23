@@ -634,20 +634,36 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
             ? Map<String, dynamic>.from(data['ride'] as Map)
             : data;
         final rideId = (ride['id'] ?? data['id'])?.toString();
+        final fare = (_selectedEstimate?['estimatedFareCdf'] ??
+                _selectedEstimate?['estimatedPriceCdf']) as int? ??
+            0;
         if (rideId != null) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (_) => MatchingScreen(
-                rideId: rideId,
-                pickupAddress: _pickupController.text.trim(),
-                dropoffAddress: _destinationController.text.trim(),
-                estimatedFareCdf: (_selectedEstimate?['estimatedFareCdf'] ??
-                        _selectedEstimate?['estimatedPriceCdf']) as int? ??
-                    0,
+          final joined = data['joined'] == true;
+          final hasDriver = (ride['driverId'] ?? data['driverId'])?.toString().isNotEmpty == true;
+          // Pool déjà rattaché à un chauffeur → suivi direct (pas de nouvelle recherche).
+          if (joined && hasDriver) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (_) => TrackingScreen(
+                  rideId: rideId,
+                  estimatedFareCdf: fare,
+                ),
               ),
-            ),
-          );
+            );
+          } else {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (_) => MatchingScreen(
+                  rideId: rideId,
+                  pickupAddress: _pickupController.text.trim(),
+                  dropoffAddress: _destinationController.text.trim(),
+                  estimatedFareCdf: fare,
+                ),
+              ),
+            );
+          }
         }
       case Failure(:final error):
         setState(() => _error = error.message);

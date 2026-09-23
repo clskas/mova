@@ -32,7 +32,12 @@
 
 Voir [Admin — Niveaux d'accès par rôle](user-manual/admin.md#niveaux-daccès-par-rôle) pour le détail des menus et permissions.
 
-## Nouveautés récentes (juillet 2026)
+## Nouveautés récentes (septembre 2026)
+
+- **Course Partagée (Pool)** : taxi à la demande multi-passagers (équivalent Uber Pool), distinct du **Covoiturage** planifié (BlaBlaCar). Voir [passager §2.1](user-manual/passager.md) et [chauffeur — Course Pool](user-manual/chauffeur.md).
+- **Retraits** : seul le solde retirable (hors gains cash, hors fonds bloqués) est versable en Mobile Money.
+
+## Nouveautés (juillet 2026)
 
 - **Seuil dette espèces chauffeurs** (admin → Portefeuille) : blocage des notifications de courses si la dette cash dépasse le seuil ; règlement depuis Revenus chauffeur.
 - **Rapports financiers partenaires** : historique portefeuille complet (filtres date, recherche, export CSV/PDF).

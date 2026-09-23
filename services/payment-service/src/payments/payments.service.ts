@@ -464,6 +464,13 @@ export class PaymentsService {
   async payRide(rideId: string, userId: string, method: PaymentMethod, phone?: string, _amountOverride?: number) {
     const ride = await this.fetchRide(rideId);
     if (ride.passengerId !== userId) throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
+    if (ride.isShared === true || ride.shared === true || ride.type === 'RIDE_SHARE') {
+      throw new MovaHttpException(
+        MovaErrorCode.RIDE_INVALID_STATUS,
+        undefined,
+        'Course partagée (Pool) : payez votre place via le paiement booking, pas la course entière.',
+      );
+    }
     if (this.resolveRideStatus(ride) !== 'COMPLETED') {
       throw new MovaHttpException(MovaErrorCode.RIDE_INVALID_STATUS);
     }
@@ -1019,6 +1026,13 @@ export class PaymentsService {
   async confirmCashRide(rideId: string, driverUserId: string, pin: string) {
     await this.assertCashPinNotLocked('RIDE', rideId);
     const ride = await this.fetchRide(rideId);
+    if (ride.isShared === true || ride.shared === true || ride.type === 'RIDE_SHARE') {
+      throw new MovaHttpException(
+        MovaErrorCode.RIDE_INVALID_STATUS,
+        undefined,
+        'Course Pool : confirmez le cash passager via le paiement booking (RIDE_SHARE).',
+      );
+    }
     if (ride.driverId !== driverUserId) {
       throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
     }

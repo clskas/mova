@@ -1,5 +1,5 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { CommissionServiceType, CarpoolStatus, DeliveryStatus, DeliveryType, ErrandOrderStatus, MovingRequestStatus, RentalInquiryStatus, RideStatus, RoundTripLeg, ScheduledRideStatus, TrackingReferenceType, VehicleType } from '@prisma/client';
+import { CommissionServiceType, CarpoolStatus, DeliveryStatus, DeliveryType, ErrandOrderStatus, MovingRequestStatus, RentalInquiryStatus, RideSharePassengerStatus, RideStatus, RoundTripLeg, ScheduledRideStatus, TrackingReferenceType, VehicleType } from '@prisma/client';
 import {
   formatCdf,
   fromMobileRideStatus,
@@ -1336,6 +1336,10 @@ export class RidesService {
     if (!ride || ride.status !== RideStatus.COMPLETED || !ride.driverId) {
       return { rideId, driverId: ride?.driverId ?? null, driverNetCdf: 0, grossCdf: 0 };
     }
+    // Course Pool : payouts par booking RIDE_SHARE uniquement (évite double crédit).
+    if (ride.isShared) {
+      return { rideId, driverId: ride.driverId, driverNetCdf: 0, grossCdf: 0, isShared: true };
+    }
     const rule = await this.commission.get(CommissionServiceType.RIDE);
     const gross = ride.finalFareCdf ?? ride.estimatedFareCdf ?? 0;
     const { driverNetCdf } = this.commission.splitGross(gross, rule.platformPercent);
@@ -1495,9 +1499,18 @@ export class RidesService {
     driverUserId: string,
     opts?: { from?: Date; to?: Date; referenceType?: string; q?: string; skip?: number; take?: number },
   ) {
-    const [rides, deliveries, movings, errands, rentals, carpools, scheduled, rideRule, deliveryRule, movingRule, errandRule, rentalRule, carpoolRule] =
+    const [rides, poolBookings, deliveries, movings, errands, rentals, carpools, scheduled, rideRule, deliveryRule, movingRule, errandRule, rentalRule, carpoolRule] =
       await Promise.all([
-      this.prisma.ride.findMany({ where: { driverId: driverUserId, status: RideStatus.COMPLETED } }),
+      this.prisma.ride.findMany({
+        where: { driverId: driverUserId, status: RideStatus.COMPLETED, isShared: false },
+      }),
+      this.prisma.rideSharePassenger.findMany({
+        where: {
+          status: RideSharePassengerStatus.DROPPED_OFF,
+          ride: { driverId: driverUserId, isShared: true, status: RideStatus.COMPLETED },
+        },
+        include: { ride: true },
+      }),
       this.prisma.delivery.findMany({ where: { driverId: driverUserId, status: DeliveryStatus.DELIVERED } }),
       this.prisma.movingRequest.findMany({ where: { driverId: driverUserId, status: MovingRequestStatus.COMPLETED } }),
       this.prisma.errandOrder.findMany({ where: { driverId: driverUserId, status: ErrandOrderStatus.COMPLETED } }),
@@ -1526,6 +1539,13 @@ export class RidesService {
         label: `${r.pickupAddress ?? 'Départ'} → ${r.dropoffAddress ?? 'Arrivée'}`,
         driverNetCdf: Math.round(rideNet(r.finalFareCdf ?? r.estimatedFareCdf ?? 0, rideRule.platformPercent)),
         completedAt: r.completedAt?.toISOString() ?? null,
+      })),
+      ...poolBookings.map((b) => ({
+        referenceType: 'RIDE_SHARE',
+        referenceId: b.id,
+        label: `Pool · ${b.pickupAddress ?? 'Départ'} → ${b.dropoffAddress ?? 'Arrivée'}`,
+        driverNetCdf: Math.round(rideNet(b.fareCdf ?? 0, rideRule.platformPercent)),
+        completedAt: (b.droppedOffAt ?? b.ride.completedAt)?.toISOString() ?? null,
       })),
       ...deliveries.map((d) => ({
         referenceType: 'DELIVERY',
@@ -1590,7 +1610,7 @@ export class RidesService {
         }
         if (opts?.referenceType && opts.referenceType !== 'ALL') {
           const t = opts.referenceType.toUpperCase();
-          if (t === 'RIDE' && item.referenceType !== 'RIDE' && item.referenceType !== 'SCHEDULED') return false;
+          if (t === 'RIDE' && item.referenceType !== 'RIDE' && item.referenceType !== 'SCHEDULED' && item.referenceType !== 'RIDE_SHARE') return false;
           if (t === 'DELIVERY' && item.referenceType !== 'DELIVERY' && item.referenceType !== 'ERRAND') return false;
           if (t === 'MISSION') {
             const missionTypes = new Set(['MOVING', 'RENTAL', 'CARPOOL']);

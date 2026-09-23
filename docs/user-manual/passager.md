@@ -5,7 +5,7 @@
 
 ## Bienvenue sur SENGA
 
-SENGA est votre application de mobilité urbaine en RDC. Commandez un taxi ou moto-taxi, envoyez un colis, réservez un trajet à l'avance, commandez un repas, faites vos courses ou partagez un covoiturage — le tout en francs congolais (CDF).
+SENGA est votre application de mobilité urbaine en RDC. Commandez un taxi ou moto-taxi (y compris **course partagée Pool**), envoyez un colis, réservez un trajet à l'avance, commandez un repas, faites vos courses ou partagez un **covoiturage planifié** — le tout en francs congolais (CDF).
 
 ## 1. Créer un compte
 
@@ -38,6 +38,18 @@ Les services **Wallet SENGA** et **Historique** sont en bas de la grille. Vous y
 6. Une **ligne bleue** sur la carte représente le trajet déjà parcouru (trace GPS), en plus de la position actuelle du chauffeur.
 7. Sous la carte, utilisez les **filtres POI** (Marchés, Hôpitaux, Universités, Pharmacies) pour afficher les points d'intérêt à proximité.
 8. L'autocomplétion de destination inclut les **lieux SENGA** (marchés, hôpitaux, etc.) en plus des communes.
+
+## 2.1 Course Partagée (Pool)
+
+Sur **Taxi** (voiture uniquement, pas moto), activez le bascule **Partagé (Pool)** avant de confirmer.
+
+1. Estimez le prix : le tarif Pool est **réduit** par rapport à une course exclusive (ordre de grandeur −35 %).
+2. Confirmez : SENGA cherche un véhicule qui peut accepter plusieurs passagers sur des trajets compatibles.
+3. Vous pouvez **rejoindre** une course déjà en cours si un siège est libre — le suivi s’ouvre directement si un chauffeur est déjà assigné.
+4. Après votre dépose, payez **votre place** (portefeuille, Mobile Money ou espèces) — pas le total de tous les passagers.
+5. Des détours sont possibles pour prendre / déposer d’autres passagers.
+
+> **Différence avec le Covoiturage** : le Pool est une course taxi **à la demande**. Le **Covoiturage** (menu dédié) reste un trajet **planifié** type BlaBlaCar (places sur un trajet publié à l’avance).
 
 ## 3. Livraison colis
 
@@ -81,7 +93,7 @@ Les services **Wallet SENGA** et **Historique** sont en bas de la grille. Vous y
 8. Une fois le livreur assigné, utilisez le **chat** pour préciser un article indisponible.
 9. À la fin, payez les frais de service et le montant réel des achats.
 
-## 7. Covoiturage
+## 7. Covoiturage (planifié)
 
 1. Appuyez sur **Covoiturage**.
 2. **Rechercher** : indiquez ville de départ, destination et date. Triez par prix, heure ou note conducteur. Chaque résultat affiche la distance, l'ETA et le badge KYC si le conducteur est vérifié.
@@ -89,7 +101,7 @@ Les services **Wallet SENGA** et **Historique** sont en bas de la grille. Vous y
 4. **Mes réservations** : consultez vos trajets réservés. Annulez avant le départ si besoin.
 5. **Détail trajet** : carte du parcours, timeline (Publié → Places réservées → En route → Terminé).
 
-> La publication de trajets est réservée aux **chauffeurs SENGA** (app Chauffeur, KYC approuvé).
+> La publication de trajets est réservée aux **chauffeurs SENGA** (app Chauffeur, KYC approuvé). Ce n’est **pas** le Pool taxi (section 2.1).
 
 ## 8. Livraison express
 
@@ -113,7 +125,11 @@ Les services **Wallet SENGA** et **Historique** sont en bas de la grille. Vous y
 
 ## 11. Wallet SENGA
 
-Carte en **dernière ligne** de l'accueil (ou icône portefeuille dans la barre du bas). Consultez votre solde, rechargez via Orange Money, M-Pesa ou Airtel Money, et payez vos courses directement depuis le portefeuille.
+Carte en **dernière ligne** de l'accueil (ou icône portefeuille dans la barre du bas). Consultez votre **solde retirable**, rechargez via M-Pesa ou Airtel Money (Orange Money selon disponibilité), et payez vos courses depuis le portefeuille.
+
+- **Recharge** : minimum **2 300 FC** ; confirmez le push opérateur sur le téléphone de la SIM.
+- **Retrait** vers Mobile Money : même plancher **2 300 FC**, code OTP SMS obligatoire. Seul le **solde retirable** (portefeuille − fonds bloqués) peut être retiré.
+- Les paiements **espèces** sur une course ne créditent **pas** votre wallet (ni celui du chauffeur en tant que montant retirable).
 
 ## 12. Historique
 

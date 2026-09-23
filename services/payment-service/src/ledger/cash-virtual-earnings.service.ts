@@ -76,9 +76,13 @@ export class CashVirtualEarningsService {
       }
     }
 
-    const withdrawableCdf = wallet?.balanceCdf ?? 0;
+    // Retirable = solde wallet − fonds bloqués. Les gains CASH ne sont jamais crédités ici.
+    const balance = wallet?.balanceCdf ?? 0;
+    const held = wallet?.heldBalanceCdf ?? 0;
     return {
-      withdrawableCdf,
+      withdrawableCdf: Math.max(0, balance - held),
+      balanceCdf: balance,
+      heldBalanceCdf: held,
       cashEarningsCdf,
       prepaidEarningsCdf,
       currency: 'CDF',
@@ -105,9 +109,13 @@ export class CashVirtualEarningsService {
 
     const cashEarningsCdf = openDebts.reduce((s, d) => s + d.amountCdf, 0);
     const lifetimeCashShareCdf = allShareDebts.reduce((s, d) => s + d.amountCdf, 0);
+    const balance = wallet?.balanceCdf ?? 0;
+    const held = wallet?.heldBalanceCdf ?? 0;
 
     return {
-      withdrawableCdf: wallet?.balanceCdf ?? 0,
+      withdrawableCdf: Math.max(0, balance - held),
+      balanceCdf: balance,
+      heldBalanceCdf: held,
       cashEarningsCdf,
       lifetimeCashShareCdf,
       currency: 'CDF',

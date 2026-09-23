@@ -11,6 +11,8 @@ type Props = { onBack: () => void; mock: boolean };
 
 type WalletData = {
   balanceCdf?: number;
+  availableBalanceCdf?: number;
+  heldBalanceCdf?: number;
   transactions?: { type?: string; amountCdf?: number; description?: string; createdAt?: string }[];
 };
 
@@ -170,6 +172,8 @@ export function WalletView({ onBack, mock }: Props) {
     }
   }
 
+  const availableCdf = wallet?.availableBalanceCdf ?? wallet?.balanceCdf ?? 0;
+
   async function requestWithdrawOtp() {
     if (withdrawInFlight.current) return;
     const value = parseInt(withdrawAmount, 10);
@@ -177,7 +181,7 @@ export function WalletView({ onBack, mock }: Props) {
       setError("Montant minimum : 2 300 FC");
       return;
     }
-    if (value > (wallet?.balanceCdf ?? 0)) {
+    if (value > availableCdf) {
       setError("Solde insuffisant");
       return;
     }
@@ -302,10 +306,15 @@ export function WalletView({ onBack, mock }: Props) {
       {info && <p className="text-sm text-emerald-800 bg-emerald-50 rounded-lg p-3">{info}</p>}
 
       <div className="bg-white rounded-xl p-6 shadow-sm text-center">
-        <p className="text-sm text-gray-500">Solde disponible</p>
+        <p className="text-sm text-gray-500">Solde retirable</p>
         <p className="text-3xl font-bold text-[#00D4A1] mt-1">
-          {loading ? "…" : formatCdf(wallet?.balanceCdf ?? 0)}
+          {loading ? "…" : formatCdf(availableCdf)}
         </p>
+        {(wallet?.heldBalanceCdf ?? 0) > 0 && (
+          <p className="text-xs text-gray-500 mt-2">
+            Dont {formatCdf(wallet?.heldBalanceCdf ?? 0)} bloqués — non retirables
+          </p>
+        )}
       </div>
 
       <div className="bg-white rounded-xl p-4 shadow-sm space-y-3">
@@ -390,7 +399,7 @@ export function WalletView({ onBack, mock }: Props) {
         <button
           type="button"
           onClick={withdraw}
-          disabled={withdrawLoading || (wallet?.balanceCdf ?? 0) < 2300}
+          disabled={withdrawLoading || availableCdf < 2300}
           className="w-full border border-[#6C63FF] text-[#6C63FF] rounded-xl py-3 font-medium disabled:opacity-50"
         >
           {withdrawLoading ? "Retrait…" : withdrawOtpSent ? "Confirmer le retrait" : "Envoyer le code"}

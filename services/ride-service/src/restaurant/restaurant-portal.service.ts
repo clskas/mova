@@ -481,7 +481,7 @@ export class RestaurantPortalService {
       formattedBalance: wallet.formattedBalance,
       walletAvailable: wallet.available,
       walletMessage: wallet.unavailableReason,
-      withdrawableCdf: cashVirtual.withdrawableCdf || wallet.balanceCdf,
+      withdrawableCdf: cashVirtual.withdrawableCdf ?? wallet.balanceCdf,
       cashEarningsCdf: cashVirtual.cashEarningsCdf,
       salesNetCdf,
       deliveryFeeCdf,

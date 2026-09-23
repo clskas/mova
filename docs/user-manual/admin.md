@@ -90,8 +90,10 @@ Dans **Règles plateforme** (SUPER_ADMIN, ADMIN, **CITY_ADMIN** — section docu
 
 ### Wallet chauffeur et cash
 
+- **Retrait** = uniquement le **solde retirable** (wallet − holds). Les montants encaissés **cash** chez le client **ne** sont **pas** retirables via l’app.
 - Commission sur course **espèces** → **dette** plateforme (le wallet peut rester à 0).
 - Dette au-delà du seuil / règle solde positif → offres bloquées jusqu’à recharge ou règlement guichet.
+- Les courses **Pool** apparaissent dans **Courses** (badge / type partagé) ; le covoiturage planifié reste dans **Covoiturage**.
 
 ### Validation du type d'engin
 

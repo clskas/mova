@@ -439,6 +439,30 @@ class ApiClient {
     if (path == '/rides' && method == 'POST') {
       return Success({'ride': MockData.createRide(body ?? {})});
     }
+    if (path == '/rides/shared/estimate' && method == 'POST') {
+      final solo = MockData.estimate(body ?? {});
+      final fare = ((solo['estimatedFareCdf'] as int? ?? 5000) * 0.65).round();
+      return Success({
+        ...solo,
+        'estimatedFareCdf': fare,
+        'estimatedPriceCdf': fare,
+        'shared': true,
+        'fareMultiplier': 0.65,
+      });
+    }
+    if (path == '/rides/shared' && method == 'POST') {
+      final ride = MockData.createRide({...body ?? {}, 'isShared': true, 'type': 'RIDE_SHARE'});
+      return Success({
+        'joined': false,
+        'ride': {...ride, 'isShared': true, 'shared': true, 'type': 'RIDE_SHARE'},
+        'booking': {'id': 'mock-share-booking', 'fareCdf': ride['estimatedFareCdf'], 'status': 'WAITING'},
+      });
+    }
+    if (RegExp(r'^/rides/[^/]+/share-passengers/[^/]+/(pickup|dropoff)$').hasMatch(path) &&
+        method == 'POST') {
+      final rideId = path.split('/')[2];
+      return Success({'ride': MockData.rideDetail(rideId)});
+    }
     if (path.contains('/rides/history') || (path == '/rides' && method == 'GET')) {
       return Success({'data': MockData.rideHistory()});
     }

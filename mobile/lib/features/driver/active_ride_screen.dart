@@ -188,7 +188,40 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
             _ride['roundTripPhase']?.toString() == 'RETURN');
     num? lat;
     num? lng;
-    if (toPickup) {
+    if (_isSharedPool) {
+      final waypoints = (_ride['waypoints'] is List)
+          ? (_ride['waypoints'] as List)
+              .whereType<Map>()
+              .map((e) => Map<String, dynamic>.from(e))
+              .toList()
+          : const <Map<String, dynamic>>[];
+      Map<String, dynamic>? next;
+      if (waypoints.isNotEmpty) {
+        next = waypoints.first;
+      } else {
+        final waiting = _sharePassengers.where((p) => p['status']?.toString() == 'WAITING');
+        final picked = _sharePassengers.where((p) => p['status']?.toString() == 'PICKED_UP');
+        if (waiting.isNotEmpty) {
+          final p = waiting.first;
+          next = {
+            'type': 'pickup',
+            'lat': p['pickupLat'],
+            'lng': p['pickupLng'],
+          };
+        } else if (picked.isNotEmpty) {
+          final p = picked.first;
+          next = {
+            'type': 'dropoff',
+            'lat': p['dropoffLat'],
+            'lng': p['dropoffLng'],
+          };
+        }
+      }
+      if (next != null) {
+        lat = next['lat'] as num?;
+        lng = next['lng'] as num?;
+      }
+    } else if (toPickup) {
       lat = _ride['pickupLat'] as num?;
       lng = _ride['pickupLng'] as num?;
     } else if (onReturn) {
@@ -517,6 +550,13 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
             Text(
               'Passagers Pool (${_sharePassengers.length})',
               style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 8),
+            MovaButton(
+              label: 'Navigation prochain arrêt',
+              isSecondary: true,
+              icon: Icons.navigation_outlined,
+              onPressed: () => _openNavigation(toPickup: true),
             ),
             const SizedBox(height: 8),
             ..._sharePassengers.map((p) {

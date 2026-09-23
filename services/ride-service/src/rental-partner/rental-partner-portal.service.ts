@@ -91,7 +91,7 @@ export class RentalPartnerPortalService {
       formattedBalance: wallet.formattedBalance,
       walletAvailable: wallet.available,
       walletMessage: wallet.unavailableReason,
-      withdrawableCdf: cashVirtual.withdrawableCdf || wallet.balanceCdf,
+      withdrawableCdf: cashVirtual.withdrawableCdf ?? wallet.balanceCdf,
       cashEarningsCdf: cashVirtual.cashEarningsCdf,
       recentRentalSales: rentalCredits.slice(0, 20).map((tx) => ({
         id: tx.id,

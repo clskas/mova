@@ -37,6 +37,16 @@ const kFaqItems = <FaqItem>[
         'Portefeuille SENGA → Recharger avec → M-Pesa ou Airtel Money (ces push fonctionnent). Orange Money : numéro 80 / 84 / 85 / 89, au moins 2 300 FC. Si aucune confirmation n’apparaît, utilisez M-Pesa ou Airtel.',
   ),
   FaqItem(
+    question: 'Puis-je retirer l’argent d’une course payée en espèces ?',
+    answer:
+        'Non. Les espèces restent en main (gains non retirables). Seul le solde wallet (recharges / paiements prepaid) est retirable vers Mobile Money, après OTP, minimum 2 300 FC.',
+  ),
+  FaqItem(
+    question: 'Quelle différence entre Pool et Covoiturage ?',
+    answer:
+        'Pool = course taxi partagée à la demande (bascule Partagé sur Taxi). Covoiturage = trajet planifié publié à l’avance (menu Covoiturage), type BlaBlaCar.',
+  ),
+  FaqItem(
     question: 'Le prix affiché est-il définitif ?',
     answer:
         'Oui. Le prix que vous voyez avant de confirmer est le prix facturé. Ce n\'est pas un compteur qui augmente pendant le trajet.',
@@ -159,7 +169,18 @@ const kManualChapters = <ManualChapter>[
       'Regardez le prix, puis confirmez.',
       'Suivez le chauffeur et payez le prix affiché (portefeuille, Mobile Money ou espèces).',
     ],
-    tip: 'Le prix vu avant confirmation est le prix facturé. Il n\'y a pas de compteur qui augmente pendant le trajet.',
+    tip: 'Le prix vu avant confirmation est le prix facturé. Option voiture : Partagé (Pool) pour un tarif réduit multi-passagers.',
+  ),
+  ManualChapter(
+    id: 'pool',
+    title: 'Course Partagée (Pool)',
+    icon: '👥',
+    steps: [
+      'Sur Taxi (voiture), activez Partagé (Pool) avant de confirmer.',
+      'Le tarif est réduit ; le véhicule peut prendre d\'autres passagers sur le trajet.',
+      'Payez votre place après votre dépose (pas le total de tous les passagers).',
+    ],
+    tip: 'Pool = course à la demande. Covoiturage (menu dédié) = trajet planifié type BlaBlaCar.',
   ),
   ManualChapter(
     id: 'price',
@@ -169,6 +190,7 @@ const kManualChapters = <ManualChapter>[
       'SENGA calcule le prix avant que vous confirmiez.',
       'Ce prix est bloqué : c\'est celui que vous payez.',
       'Ce n\'est pas un taxi à compteur qui change en route.',
+      'En Pool, chaque passager paie sa propre place.',
     ],
   ),
   ManualChapter(
@@ -184,14 +206,13 @@ const kManualChapters = <ManualChapter>[
   ),
   ManualChapter(
     id: 'wallet',
-    title: 'Recharger le portefeuille',
+    title: 'Recharger et retirer',
     icon: '💳',
     steps: [
-      'Ouvrez Wallet SENGA.',
-      'Appuyez sur Recharger avec → Orange Money (ou M-Pesa / Airtel).',
-      'Saisissez le numéro de CETTE SIM et au moins 2 300 FC.',
-      'M-Pesa et Airtel : confirmez le push sur le téléphone. Orange : si rien n’apparaît, rechargez avec M-Pesa ou Airtel.',
-      'Le solde apparaît en CDF après confirmation opérateur.',
+      'Ouvrez Wallet SENGA — le solde affiché est le montant retirable.',
+      'Rechargez via M-Pesa ou Airtel (min. 2 300 FC) ; confirmez le push opérateur.',
+      'Pour retirer : saisissez le montant (min. 2 300 FC), le numéro Mobile Money, puis le code OTP SMS.',
+      'Les paiements espèces sur une course ne s\'ajoutent pas au solde retirable.',
     ],
   ),
   ManualChapter(
@@ -245,12 +266,12 @@ const kManualChapters = <ManualChapter>[
     title: 'Covoiturage',
     icon: '🚗',
     steps: [
-      'Appuyez sur Covoiturage.',
-      'Onglet Rechercher : trouvez un trajet partagé et le prix par passager.',
-      'Onglet Proposer : publiez votre trajet (départ, arrivée, places, horaire).',
-      'Confirmez votre place ou attendez des passagers.',
+      'Appuyez sur Covoiturage (trajet planifié, distinct du Pool taxi).',
+      'Onglet Rechercher : trouvez un trajet partagé et le prix par place.',
+      'Réservez vos places et confirmez.',
+      'Consultez Mes réservations pour suivre ou annuler avant le départ.',
     ],
-    tip: 'Partagez le coût du carburant entre passagers — économies garanties.',
+    tip: 'La publication de trajets se fait dans l\'app Chauffeur (KYC approuvé).',
   ),
   ManualChapter(
     id: 'rental',
@@ -341,8 +362,8 @@ const kDriverManualChapters = <ManualChapter>[
     icon: '🚕',
     steps: [
       'Une demande arrive : acceptez ou refusez.',
-      'Allez au point de départ indiqué.',
-      'Suivez les étapes jusqu\'à la fin de la course.',
+      'Course Pool : utilisez Navigation prochain arrêt, puis Prendre / Déposer chaque passager.',
+      'Course classique : allez au point de départ puis suivez les étapes jusqu\'à la fin.',
     ],
   ),
   ManualChapter(
@@ -358,12 +379,13 @@ const kDriverManualChapters = <ManualChapter>[
   ),
   ManualChapter(
     id: 'earnings',
-    title: 'Revenus',
+    title: 'Revenus et retraits',
     icon: '💰',
     steps: [
-      'Ouvrez Revenus pour voir vos gains du jour en CDF.',
-      'Consultez l\'historique des courses et livraisons.',
-      'Vous pouvez demander un retrait quand le minimum est atteint.',
+      'Ouvrez Revenus : solde retirable vs gains espèces (non retirables).',
+      'Retrait Mobile Money : minimum 2 300 FC, uniquement sur le solde retirable.',
+      'Les courses payées cash restent en main — elles ne grossissent pas le wallet retirable.',
+      'Réglez les dettes espèces (commissions) via wallet ou guichet pour rester éligible aux offres.',
     ],
   ),
   ManualChapter(

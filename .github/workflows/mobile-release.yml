@@ -133,10 +133,10 @@ jobs:
         id: playver
         run: |
           set -euo pipefail
-          # Floor: next must be >=93 (pubspec 1.0.12+93; driver icon from Downloads).
+          # Floor: next must be >=94 (pubspec 1.0.12+94; AAB flavor guard).
           PUBSPEC_CODE=$(grep -E '^version:' mobile/pubspec.yaml | head -1 | sed -E 's/.*\+([0-9]+).*/\1/')
           CODE="${{ github.run_number }}"
-          if [ "$CODE" -lt 93 ]; then CODE=93; fi
+          if [ "$CODE" -lt 94 ]; then CODE=94; fi
           if [ -n "$PUBSPEC_CODE" ] && [ "$PUBSPEC_CODE" -gt "$CODE" ]; then CODE="$PUBSPEC_CODE"; fi
           echo "code=$CODE" >> "$GITHUB_OUTPUT"
           echo "Play versionCode=$CODE (pubspec +${PUBSPEC_CODE:-?}; run_number=${{ github.run_number }})"
@@ -156,6 +156,9 @@ jobs:
             --dart-define=APP_BUILD=${{ steps.playver.outputs.code }} \
             --dart-define=GOOGLE_SERVER_CLIENT_ID=$WEB_CLIENT
 
+      - name: Verify passenger AAB flavor
+        run: bash mobile/tool/verify_aab_flavor.sh passenger mobile/build/app/outputs/bundle/passengerRelease/app-passenger-release.aab
+
       # Save passenger AAB before the driver build so a later cancel still leaves an artifact.
       - name: Upload passenger AAB artifact
         uses: actions/upload-artifact@v4
@@ -164,10 +167,12 @@ jobs:
           path: mobile/build/app/outputs/bundle/passengerRelease/app-passenger-release.aab
           retention-days: 30
 
-      - name: Stop Gradle before driver AAB
+      - name: Stop Gradle + clean before driver AAB
         run: |
           set -euo pipefail
           (cd mobile/android && ./gradlew --stop) || true
+          # Avoid rare Flutter kernel reuse across sequential flavor builds.
+          (cd mobile && flutter clean && flutter pub get)
           df -h /
           free -h
 
@@ -184,6 +189,9 @@ jobs:
             --dart-define=WS_URL=${{ steps.urls.outputs.ws }} \
             --dart-define=APP_BUILD=${{ steps.playver.outputs.code }} \
             --dart-define=GOOGLE_SERVER_CLIENT_ID=$WEB_CLIENT
+
+      - name: Verify driver AAB flavor
+        run: bash mobile/tool/verify_aab_flavor.sh driver mobile/build/app/outputs/bundle/driverRelease/app-driver-release.aab
 
       - name: Upload driver AAB artifact
         uses: actions/upload-artifact@v4
@@ -282,6 +290,8 @@ jobs:
           ls -la "$PASSENGER_AAB" "$DRIVER_AAB"
           test -s "$PASSENGER_AAB"
           test -s "$DRIVER_AAB"
+          bash mobile/tool/verify_aab_flavor.sh passenger "$PASSENGER_AAB"
+          bash mobile/tool/verify_aab_flavor.sh driver "$DRIVER_AAB"
 
       - name: Upload to Play Console internal track (Fastlane)
         working-directory: mobile/android

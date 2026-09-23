@@ -59,6 +59,16 @@ class DriverOtpScreen extends ConsumerWidget {
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
           ),
+          const SizedBox(height: 6),
+          Text(
+            'Connexion chauffeurs uniquement',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: MovaColors.green,
+            ),
+          ),
           if (kDebugMode) ...[
             const SizedBox(height: 10),
             Text(

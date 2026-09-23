@@ -43,6 +43,7 @@ import { fetchRidePaymentStatus, fetchRidePaymentStatuses } from '../common/paym
 import { applyPromoCode } from '../common/promo-apply.util';
 import { PromoService } from './surcharge.service';
 import { PlatformConfigService } from '../platform/platform-config.service';
+import { RidePoolService } from './ride-pool.service';
 
 const ACTIVE_STATUSES: RideStatus[] = [
   RideStatus.REQUESTED,
@@ -76,6 +77,7 @@ export class RidesService {
     private promo: PromoService,
     private routing: RoutingService,
     private platformConfig: PlatformConfigService,
+    private ridePool: RidePoolService,
   ) {}
 
   private emitStatusChange(rideId: string, status: RideStatus) {
@@ -751,25 +753,72 @@ export class RidesService {
   /** Course active du passager (REQUESTED → IN_PROGRESS) pour reprise après fermeture de l'app. */
   async getActiveRide(passengerId: string) {
     const ride = await this.prisma.ride.findFirst({
-      where: { passengerId, status: { in: ACTIVE_STATUSES } },
+      where: {
+        status: { in: ACTIVE_STATUSES },
+        OR: [
+          { passengerId },
+          {
+            isShared: true,
+            sharePassengers: {
+              some: {
+                userId: passengerId,
+                status: { in: ['WAITING', 'PICKED_UP'] },
+              },
+            },
+          },
+        ],
+      },
       orderBy: { createdAt: 'desc' },
     });
     if (!ride) return { ride: null };
-    return { ride: await this.getRide(ride.id) };
+    return { ride: await this.getRide(ride.id, passengerId) };
   }
 
   async getRide(rideId: string, participantUserId?: string) {
     const ride = await this.prisma.ride.findUnique({
       where: { id: rideId },
-      include: { events: { orderBy: { createdAt: 'asc' } }, ratings: true },
+      include: {
+        events: { orderBy: { createdAt: 'asc' } },
+        ratings: true,
+        sharePassengers: true,
+      },
     });
     if (!ride) throw new MovaHttpException(MovaErrorCode.RIDE_NOT_FOUND, HttpStatus.NOT_FOUND);
+    const isSharePassenger =
+      ride.isShared &&
+      ride.sharePassengers.some(
+        (p) => p.userId === participantUserId && p.status !== 'CANCELLED',
+      );
     if (
       participantUserId &&
       ride.passengerId !== participantUserId &&
-      ride.driverId !== participantUserId
+      ride.driverId !== participantUserId &&
+      !isSharePassenger
     ) {
       throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
+    }
+    if (ride.isShared) {
+      const shared = this.ridePool.formatSharedRide(ride);
+      const driver = ride.driverId ? await this.fetchDriverInfo(ride.driverId) : null;
+      const myBooking = participantUserId
+        ? ride.sharePassengers.find((p) => p.userId === participantUserId && p.status !== 'CANCELLED')
+        : null;
+      const payment = myBooking
+        ? await fetchRidePaymentStatus(myBooking.id).catch(() => ({ isPaid: false, paymentStatus: null }))
+        : await fetchRidePaymentStatus(rideId).catch(() => ({ isPaid: false, paymentStatus: null }));
+      return {
+        ...shared,
+        type: 'RIDE_SHARE',
+        driver,
+        isPaid: payment.isPaid,
+        paymentStatus: payment.paymentStatus,
+        paymentReady: myBooking
+          ? (myBooking.status === 'DROPPED_OFF' || ride.status === RideStatus.COMPLETED) && !payment.isPaid
+          : shared.passengers.some((p) => p.paymentReady) && !payment.isPaid,
+        paymentReferenceId: myBooking?.id ?? rideId,
+        events: ride.events.map((e) => ({ ...e, status: e.event })),
+        ratings: ride.ratings,
+      };
     }
     const driver = ride.driverId ? await this.fetchDriverInfo(ride.driverId) : null;
     const detail = this.formatRideDetail(ride);
@@ -1298,6 +1347,32 @@ export class RidesService {
     switch (type) {
       case 'RIDE':
         return this.getRidePayout(referenceId);
+      case 'RIDE_SHARE': {
+        const booking = await this.prisma.rideSharePassenger.findUnique({
+          where: { id: referenceId },
+          include: { ride: true },
+        });
+        if (
+          !booking?.ride?.driverId ||
+          (booking.status !== 'DROPPED_OFF' && booking.ride.status !== RideStatus.COMPLETED)
+        ) {
+          return {
+            referenceType: type,
+            referenceId,
+            driverId: booking?.ride?.driverId ?? null,
+            driverNetCdf: 0,
+          };
+        }
+        const rule = await this.commission.get(CommissionServiceType.RIDE);
+        const gross = booking.fareCdf;
+        return {
+          referenceType: type,
+          referenceId,
+          driverId: booking.ride.driverId,
+          driverNetCdf: this.commission.splitGross(gross, rule.platformPercent).driverNetCdf,
+          grossCdf: gross,
+        };
+      }
       case 'DELIVERY': {
         const d = await this.prisma.delivery.findUnique({ where: { id: referenceId } });
         if (!d || d.status !== DeliveryStatus.DELIVERED || !d.driverId) {

@@ -59,3 +59,27 @@ export class NearbyVehiclesQueryDto {
   @IsEnum(VehicleType)
   vehicleType: VehicleType;
 }
+
+/** Uber Pool — estimation tarif partagé. */
+export class EstimateSharedRideDto {
+  @ApiProperty() @IsNumber() pickupLat: number;
+  @ApiProperty() @IsNumber() pickupLng: number;
+  @ApiProperty() @IsNumber() dropoffLat: number;
+  @ApiProperty() @IsNumber() dropoffLng: number;
+  @ApiProperty({ required: false, enum: ['STANDARD', 'TAXI', 'CONFORT', 'COMFORT', 'VIP'] })
+  @IsOptional()
+  @Transform(({ value }) => (value == null || value === '' ? VehicleType.STANDARD : toVehicleType(value)))
+  @IsEnum(VehicleType)
+  vehicleType?: VehicleType;
+  @ApiProperty({ required: false }) @IsOptional() @IsString() promoCode?: string;
+}
+
+export class RequestSharedRideDto extends EstimateSharedRideDto {
+  @ApiProperty({ required: false }) @IsOptional() @IsString() pickupAddress?: string;
+  @ApiProperty({ required: false }) @IsOptional() @IsString() dropoffAddress?: string;
+  @ApiProperty({ required: false, description: 'Places demandées (1–3)' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  seats?: number;
+}

@@ -1230,6 +1230,50 @@ class ApiClient {
     };
   }
 
+  /// Uber Pool — estimation tarif partagé.
+  Future<Result<Map<String, dynamic>>> estimateSharedRide(Map<String, dynamic> body) async {
+    final result = await post('/rides/shared/estimate', body);
+    return switch (result) {
+      Success(:final data) => Success(data),
+      Failure(:final error) => Failure(error),
+    };
+  }
+
+  /// Uber Pool — créer / rejoindre une course partagée.
+  Future<Result<Map<String, dynamic>>> requestSharedRide(Map<String, dynamic> body) async {
+    final result = await post('/rides/shared', body);
+    return switch (result) {
+      Success(:final data) {
+        final ride = data['ride'];
+        if (ride is Map<String, dynamic>) {
+          return Success({...data, 'id': ride['id'], 'ride': ride});
+        }
+        if (ride is Map) {
+          final m = Map<String, dynamic>.from(ride);
+          return Success({...data, 'id': m['id'], 'ride': m});
+        }
+        return Success(data);
+      }
+      Failure(:final error) => Failure(error),
+    };
+  }
+
+  Future<Result<Map<String, dynamic>>> pickupSharePassenger(String rideId, String bookingId) async {
+    final result = await post('/rides/$rideId/share-passengers/$bookingId/pickup', {});
+    return switch (result) {
+      Success(:final data) => Success(data),
+      Failure(:final error) => Failure(error),
+    };
+  }
+
+  Future<Result<Map<String, dynamic>>> dropoffSharePassenger(String rideId, String bookingId) async {
+    final result = await post('/rides/$rideId/share-passengers/$bookingId/dropoff', {});
+    return switch (result) {
+      Success(:final data) => Success(data),
+      Failure(:final error) => Failure(error),
+    };
+  }
+
   Future<Result<Map<String, dynamic>>> getRide(String rideId) async {
     final result = await get('/rides/$rideId');
     return switch (result) {

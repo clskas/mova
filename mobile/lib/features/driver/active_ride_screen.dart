@@ -273,21 +273,73 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
 
   bool get _isRoundTrip => _ride['roundTrip'] == true;
 
-  String? _nextActionLabel() => switch (_status) {
-        'DRIVER_ASSIGNED' => 'Je suis arrivé',
-        'ARRIVING' => 'Démarrer la course',
-        'IN_PROGRESS' => _isRoundTripReturn
-            ? 'Terminer le retour'
-            : (_isRoundTrip ? 'Arrivé à destination (aller)' : 'Terminer la course'),
-        _ => null,
-      };
+  bool get _isSharedPool =>
+      _ride['isShared'] == true || _ride['shared'] == true || _ride['type'] == 'RIDE_SHARE';
 
-  String? _nextStatus() => switch (_status) {
-        'DRIVER_ASSIGNED' => 'ARRIVING',
-        'ARRIVING' => 'IN_PROGRESS',
-        'IN_PROGRESS' => 'COMPLETED',
-        _ => null,
-      };
+  List<Map<String, dynamic>> get _sharePassengers {
+    final raw = _ride['passengers'] ?? _ride['sharePassengers'];
+    if (raw is! List) return const [];
+    return raw
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .where((p) => (p['status']?.toString() ?? '') != 'CANCELLED')
+        .toList();
+  }
+
+  String? _nextActionLabel() => _isSharedPool
+      ? null
+      : switch (_status) {
+          'DRIVER_ASSIGNED' => 'Je suis arrivé',
+          'ARRIVING' => 'Démarrer la course',
+          'IN_PROGRESS' => _isRoundTripReturn
+              ? 'Terminer le retour'
+              : (_isRoundTrip ? 'Arrivé à destination (aller)' : 'Terminer la course'),
+          _ => null,
+        };
+
+  String? _nextStatus() => _isSharedPool
+      ? null
+      : switch (_status) {
+          'DRIVER_ASSIGNED' => 'ARRIVING',
+          'ARRIVING' => 'IN_PROGRESS',
+          'IN_PROGRESS' => 'COMPLETED',
+          _ => null,
+        };
+
+  Future<void> _pickupShare(String bookingId) async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    final api = ref.read(apiClientProvider);
+    final result = await api.pickupSharePassenger(_rideId, bookingId);
+    if (!mounted) return;
+    setState(() => _loading = false);
+    switch (result) {
+      case Success(:final data):
+        setState(() => _ride = Map<String, dynamic>.from(data));
+      case Failure(:final error):
+        setState(() => _error = error.message);
+    }
+  }
+
+  Future<void> _dropoffShare(String bookingId) async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    final api = ref.read(apiClientProvider);
+    final result = await api.dropoffSharePassenger(_rideId, bookingId);
+    if (!mounted) return;
+    setState(() => _loading = false);
+    switch (result) {
+      case Success(:final data):
+        setState(() => _ride = Map<String, dynamic>.from(data));
+        _syncPaymentPolling();
+      case Failure(:final error):
+        setState(() => _error = error.message);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -297,7 +349,9 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
     final headingToPickup = _status == 'DRIVER_ASSIGNED' || _status == 'ACCEPTED';
 
     return MovaScreen(
-      title: _status == 'COMPLETED' ? 'Course terminée' : 'Course en cours',
+      title: _status == 'COMPLETED'
+          ? 'Course terminée'
+          : (_isSharedPool ? 'Course Pool' : 'Course en cours'),
       scrollable: false,
       actions: [
         sosAppBarButton(
@@ -459,6 +513,61 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
               onPressed: _openDropoff,
             ),
           if (!headingToPickup) const SizedBox(height: 12),
+          if (_isSharedPool) ...[
+            Text(
+              'Passagers Pool (${_sharePassengers.length})',
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 8),
+            ..._sharePassengers.map((p) {
+              final status = p['status']?.toString() ?? 'WAITING';
+              final bookingId = (p['bookingId'] ?? p['id'])?.toString() ?? '';
+              final fare = (p['fareCdf'] as num?)?.round();
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: MovaCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${p['pickupAddress'] ?? 'Prise'} → ${p['dropoffAddress'] ?? 'Dépose'}',
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '$status${fare != null ? ' · ${MarketConfig.formatCdf(fare)}' : ''}',
+                        style: const TextStyle(fontSize: 12, color: MovaColors.textSecondary),
+                      ),
+                      const SizedBox(height: 8),
+                      if (status == 'WAITING')
+                        MovaButton(
+                          label: 'Prendre ce passager',
+                          icon: Icons.person_add_alt_1,
+                          isLoading: _loading,
+                          onPressed: _loading || bookingId.isEmpty ? null : () => _pickupShare(bookingId),
+                        ),
+                      if (status == 'PICKED_UP')
+                        MovaButton(
+                          label: 'Déposer ce passager',
+                          icon: Icons.flag,
+                          isLoading: _loading,
+                          onPressed: _loading || bookingId.isEmpty ? null : () => _dropoffShare(bookingId),
+                        ),
+                    ],
+                  ),
+                ),
+              );
+            }),
+            if (_status == 'DRIVER_ASSIGNED' || _status == 'ACCEPTED') ...[
+              MovaButton(
+                label: 'Je suis arrivé (point de rencontre)',
+                icon: Icons.place,
+                isLoading: _loading,
+                onPressed: _loading ? null : () => _advanceStatus('ARRIVING'),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ],
           if (nextLabel != null && nextStatus != null) ...[
             const SizedBox(height: 12),
             MovaButton(

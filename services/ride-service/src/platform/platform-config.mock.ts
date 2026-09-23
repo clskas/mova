@@ -19,7 +19,13 @@ export function mockPlatformConfig(
       averageSpeedKmh: { ...MARKET_RDC.trip.averageSpeedKmh },
     },
     pricing: { ...MARKET_RDC.pricing },
-    carpool: { matchRadiusKm: 5, relaxedRadiusMultiplier: 3 },
+    carpool: {
+      matchRadiusKm: 5,
+      relaxedRadiusMultiplier: 3,
+      fareMultiplier: 0.65,
+      maxPassengers: 3,
+      maxDetourKm: 2.5,
+    },
     driverOps: {
       requireDocumentsForJobs: false,
       documentsGracePeriodDays: 7,

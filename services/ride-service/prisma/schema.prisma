@@ -219,16 +219,53 @@ model Ride {
   completionPin    String?
   roundTrip        Boolean       @default(false)
   roundTripLeg     RoundTripLeg?
+  // Uber Pool: shared on-demand ride (not BlaBlaCar scheduled carpool).
+  isShared         Boolean    @default(false)
+  shareSeatsTotal  Int?
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
 
-  events  RideEvent[]
-  ratings Rating[]
+  events          RideEvent[]
+  ratings         Rating[]
+  sharePassengers RideSharePassenger[]
 
   @@index([status])
   @@index([passengerId])
   @@index([driverId])
+  @@index([isShared, status])
   @@map("rides")
+}
+
+enum RideSharePassengerStatus {
+  WAITING
+  PICKED_UP
+  DROPPED_OFF
+  CANCELLED
+}
+
+model RideSharePassenger {
+  id             String                   @id @default(uuid())
+  rideId         String
+  ride           Ride                     @relation(fields: [rideId], references: [id], onDelete: Cascade)
+  userId         String
+  seats          Int                      @default(1)
+  pickupLat      Float
+  pickupLng      Float
+  pickupAddress  String?
+  dropoffLat     Float
+  dropoffLng     Float
+  dropoffAddress String?
+  fareCdf        Int
+  status         RideSharePassengerStatus @default(WAITING)
+  joinedAt       DateTime                 @default(now())
+  pickedUpAt     DateTime?
+  droppedOffAt   DateTime?
+  cancelledAt    DateTime?
+
+  @@unique([rideId, userId])
+  @@index([rideId])
+  @@index([userId])
+  @@map("ride_share_passengers")
 }
 
 model RideEvent {

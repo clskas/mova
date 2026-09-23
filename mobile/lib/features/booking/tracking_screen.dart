@@ -529,23 +529,40 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
     var price = (_ride?['finalFareCdf'] ??
             _ride?['estimatedFareCdf'] ??
             widget.estimatedFareCdf) as int;
+    Map<String, dynamic>? rideData = _ride;
     if (!api.isMockMode) {
       final result = await api.getRide(widget.rideId);
       if (result case Success(:final data)) {
         if (mounted) setState(() => _ride = data);
+        rideData = data;
         pin = data['completionPin']?.toString() ?? pin;
         price = (data['finalFareCdf'] ?? data['estimatedFareCdf'] ?? price) as int;
+        final myFare = data['paymentReferenceId'] != null
+            ? (data['passengers'] is List
+                ? (data['passengers'] as List).cast<dynamic>().whereType<Map>().cast<Map>().where((p) => p['id']?.toString() == data['paymentReferenceId']?.toString()).map((p) => p['fareCdf']).firstOrNull
+                : null)
+            : null;
+        if (myFare is num) price = myFare.round();
       }
     }
     if (!mounted) return;
+    final isShared = rideData?['isShared'] == true || rideData?['shared'] == true || rideData?['type'] == 'RIDE_SHARE';
+    final bookingId = rideData?['paymentReferenceId']?.toString();
     await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => PaymentScreen(
-          rideId: widget.rideId,
-          amountCdf: price,
-          completionPin: pin,
-        ),
+        builder: (_) => isShared && bookingId != null && bookingId != widget.rideId
+            ? PaymentScreen(
+                serviceType: 'RIDE_SHARE',
+                serviceId: bookingId,
+                amountCdf: price,
+                completionPin: pin,
+              )
+            : PaymentScreen(
+                rideId: widget.rideId,
+                amountCdf: price,
+                completionPin: pin,
+              ),
       ),
     );
     if (mounted) await _loadRide();

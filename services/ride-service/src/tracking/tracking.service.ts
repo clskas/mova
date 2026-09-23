@@ -57,10 +57,17 @@ export class TrackingService {
   async isRideParticipant(rideId: string, userId: string): Promise<boolean> {
     const ride = await this.prisma.ride.findUnique({
       where: { id: rideId },
-      select: { passengerId: true, driverId: true },
+      select: {
+        passengerId: true,
+        driverId: true,
+        sharePassengers: { select: { userId: true, status: true } },
+      },
     });
     if (!ride) return false;
-    return ride.passengerId === userId || ride.driverId === userId;
+    if (ride.passengerId === userId || ride.driverId === userId) return true;
+    return ride.sharePassengers.some(
+      (p) => p.userId === userId && p.status !== 'CANCELLED',
+    );
   }
 
   async isDeliveryParticipant(deliveryId: string, userId: string): Promise<boolean> {

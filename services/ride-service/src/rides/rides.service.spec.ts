@@ -76,6 +76,9 @@ describe('RidesService', () => {
     { peek: jest.fn(), redeem: jest.fn(), applyDiscount: jest.fn((p: number) => p) } as never,
     routing as never,
     mockPlatformConfig(),
+    {
+      formatSharedRide: jest.fn((r: unknown) => r),
+    } as never,
   );
 
   beforeEach(() => jest.clearAllMocks());

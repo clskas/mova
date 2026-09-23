@@ -2,11 +2,20 @@ import { Body, Controller, Get, Param, Patch, Post, Query, Request, UseGuards } 
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ScheduledRideStatus, VehicleType } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { CancelRideDto, CreateRideDto, EstimateRideDto, NearbyVehiclesQueryDto, UpdateRideStatusDto } from './rides.dto';
+import {
+  CancelRideDto,
+  CreateRideDto,
+  EstimateRideDto,
+  EstimateSharedRideDto,
+  NearbyVehiclesQueryDto,
+  RequestSharedRideDto,
+  UpdateRideStatusDto,
+} from './rides.dto';
 import { CancelScheduledRideDto, CreateScheduledRideDto } from './scheduled-rides.dto';
 import { MobileScheduledEstimateDto } from '../deliveries/deliveries-mobile.dto';
 import { ScheduledRidesService } from './scheduled-rides.service';
 import { RidesService } from './rides.service';
+import { RidePoolService } from './ride-pool.service';
 import { RideChatService } from '../chat/ride-chat.service';
 import { SendRideChatDto } from '../chat/ride-chat.dto';
 
@@ -19,6 +28,7 @@ export class RidesController {
     private ridesService: RidesService,
     private scheduledRidesService: ScheduledRidesService,
     private rideChatService: RideChatService,
+    private ridePoolService: RidePoolService,
   ) {}
 
   @Post('estimate')
@@ -34,6 +44,35 @@ export class RidesController {
       false,
       dto.roundTrip === true,
     );
+  }
+
+  @Post('shared/estimate')
+  @ApiOperation({ summary: 'Uber Pool — estimer tarif partagé (−~35 % vs course seule)' })
+  estimateShared(@Body() dto: EstimateSharedRideDto) {
+    return this.ridePoolService.estimateShared(
+      dto.pickupLat,
+      dto.pickupLng,
+      dto.dropoffLat,
+      dto.dropoffLng,
+      dto.vehicleType ?? VehicleType.STANDARD,
+      dto.promoCode,
+    );
+  }
+
+  @Post('shared')
+  @ApiOperation({ summary: 'Uber Pool — demander une course partagée (matching passagers + chauffeur)' })
+  requestShared(@Request() req: { user: { id: string } }, @Body() dto: RequestSharedRideDto) {
+    return this.ridePoolService.requestShared(req.user.id, {
+      pickupLat: dto.pickupLat,
+      pickupLng: dto.pickupLng,
+      dropoffLat: dto.dropoffLat,
+      dropoffLng: dto.dropoffLng,
+      vehicleType: dto.vehicleType,
+      pickupAddress: dto.pickupAddress,
+      dropoffAddress: dto.dropoffAddress,
+      promoCode: dto.promoCode,
+      seats: dto.seats,
+    });
   }
 
   @Post('scheduled/estimate')
@@ -170,6 +209,26 @@ export class RidesController {
   @ApiOperation({ summary: 'Refuser course (chauffeur)' })
   reject(@Request() req: { user: { id: string } }, @Param('id') id: string) {
     return this.ridesService.rejectRide(id, req.user.id);
+  }
+
+  @Post(':id/share-passengers/:bookingId/pickup')
+  @ApiOperation({ summary: 'Uber Pool — chauffeur prend en charge un passager partagé' })
+  pickupSharePassenger(
+    @Request() req: { user: { id: string } },
+    @Param('id') id: string,
+    @Param('bookingId') bookingId: string,
+  ) {
+    return this.ridePoolService.pickupSharePassenger(id, bookingId, req.user.id);
+  }
+
+  @Post(':id/share-passengers/:bookingId/dropoff')
+  @ApiOperation({ summary: 'Uber Pool — chauffeur dépose un passager partagé' })
+  dropoffSharePassenger(
+    @Request() req: { user: { id: string } },
+    @Param('id') id: string,
+    @Param('bookingId') bookingId: string,
+  ) {
+    return this.ridePoolService.dropoffSharePassenger(id, bookingId, req.user.id);
   }
 
   @Patch(':id/status')

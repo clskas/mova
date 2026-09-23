@@ -67,6 +67,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   bool _pickupFromGps = true;
   bool _pickupFromSuggestion = false;
   bool _roundTrip = false;
+  bool _sharedPool = false;
   List<Map<String, dynamic>> _poiPlaces = [];
   String? _poiCategoryFilter;
   int _poiLoadGeneration = 0;
@@ -514,7 +515,10 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
       final results = await Future.wait(
         MarketConfig.vehicleTypes.map((v) async {
           final payload = _estimatePayload(v.id);
-          final result = await api.post('/rides/estimate', payload);
+          final usePool = _sharedPool && MarketConfig.vehicleCategory(v.id) == 'TAXI';
+          final result = usePool
+              ? await api.estimateSharedRide(payload)
+              : await api.post('/rides/estimate', payload);
           return (v.id, result);
         }),
       );
@@ -605,19 +609,31 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
     });
 
     final api = ref.read(apiClientProvider);
-    final result = await api.createRide({
-      ..._estimatePayload(_vehicleType),
-      'vehicleType': MarketConfig.apiVehicleType(_vehicleType),
-      'pickupAddress': _pickupController.text.trim(),
-      'dropoffAddress': _destinationController.text.trim(),
-    });
+    final usePool = _sharedPool && MarketConfig.vehicleCategory(_vehicleType) == 'TAXI';
+    final result = usePool
+        ? await api.requestSharedRide({
+            ..._estimatePayload(_vehicleType),
+            'vehicleType': MarketConfig.apiVehicleType(_vehicleType),
+            'pickupAddress': _pickupController.text.trim(),
+            'dropoffAddress': _destinationController.text.trim(),
+            'seats': 1,
+          })
+        : await api.createRide({
+            ..._estimatePayload(_vehicleType),
+            'vehicleType': MarketConfig.apiVehicleType(_vehicleType),
+            'pickupAddress': _pickupController.text.trim(),
+            'dropoffAddress': _destinationController.text.trim(),
+          });
 
     if (!mounted) return;
     setState(() => _loadingConfirm = false);
 
     switch (result) {
       case Success(:final data):
-        final rideId = data['id'] as String?;
+        final ride = data['ride'] is Map
+            ? Map<String, dynamic>.from(data['ride'] as Map)
+            : data;
+        final rideId = (ride['id'] ?? data['id'])?.toString();
         if (rideId != null) {
           Navigator.pushReplacement(
             context,
@@ -785,13 +801,38 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                       style: TextStyle(fontSize: 12, color: MovaColors.textSecondary),
                     ),
                     value: _roundTrip,
-                    onChanged: (v) {
-                      setState(() => _roundTrip = v);
-                      if (_dropoff != null || _destinationController.text.trim().isNotEmpty) {
-                        unawaited(_fetchAllEstimates());
-                      }
-                    },
+                    onChanged: _sharedPool
+                        ? null
+                        : (v) {
+                            setState(() => _roundTrip = v);
+                            if (_dropoff != null || _destinationController.text.trim().isNotEmpty) {
+                              unawaited(_fetchAllEstimates());
+                            }
+                          },
                   ),
+                  if (_vehicleCategory == 'TAXI')
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text(
+                        'Partagé (Pool)',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      subtitle: const Text(
+                        'Comme Uber Pool : tarif réduit, trajet partagé avec d\'autres passagers. '
+                        'Le covoiturage planifié reste dans le menu Covoiturage.',
+                        style: TextStyle(fontSize: 12, color: MovaColors.textSecondary),
+                      ),
+                      value: _sharedPool,
+                      onChanged: (v) {
+                        setState(() {
+                          _sharedPool = v;
+                          if (v) _roundTrip = false;
+                        });
+                        if (_dropoff != null || _destinationController.text.trim().isNotEmpty) {
+                          unawaited(_fetchAllEstimates());
+                        }
+                      },
+                    ),
                   const SizedBox(height: 8),
                   Text('Taxi ou moto', style: theme.textTheme.titleSmall),
                   const SizedBox(height: 8),
@@ -856,6 +897,16 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                             const Text(
                               'Aller + retour (même chauffeur)',
                               style: TextStyle(fontSize: 12, color: MovaColors.textSecondary),
+                            ),
+                          ],
+                          if (_sharedPool) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              (_selectedEstimate!['savingsCdf'] is num &&
+                                      (_selectedEstimate!['savingsCdf'] as num) > 0)
+                                  ? 'Pool · économie ${MarketConfig.formatCdf((_selectedEstimate!['savingsCdf'] as num).round())} vs course seule'
+                                  : 'Pool · tarif partagé',
+                              style: const TextStyle(fontSize: 12, color: MovaColors.green),
                             ),
                           ],
                           const SizedBox(height: 8),

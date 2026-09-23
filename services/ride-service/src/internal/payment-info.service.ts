@@ -13,7 +13,15 @@ import { isDeliveryEscrowCollectible } from '../deliveries/delivery-guarantee.ut
 import { fetchServicePaymentStatus } from '../common/payment-status.util';
 import { computeRentalEscrowFlags } from '../rental/rental-escrow.util';
 
-export type ServiceReferenceType = 'RIDE' | 'DELIVERY' | 'ERRAND' | 'MOVING' | 'RENTAL' | 'CARPOOL' | 'SCHEDULED';
+export type ServiceReferenceType =
+  | 'RIDE'
+  | 'RIDE_SHARE'
+  | 'DELIVERY'
+  | 'ERRAND'
+  | 'MOVING'
+  | 'RENTAL'
+  | 'CARPOOL'
+  | 'SCHEDULED';
 
 export interface ServicePaymentInfo {
   referenceType: ServiceReferenceType;
@@ -43,6 +51,8 @@ export class PaymentInfoService {
     switch (type) {
       case 'RIDE':
         return this.rideInfo(referenceId);
+      case 'RIDE_SHARE':
+        return this.rideShareInfo(referenceId);
       case 'DELIVERY':
         return this.deliveryInfo(referenceId);
       case 'ERRAND':
@@ -62,7 +72,21 @@ export class PaymentInfoService {
 
   private async rideInfo(rideId: string): Promise<ServicePaymentInfo> {
     const ride = await this.prisma.ride.findUnique({ where: { id: rideId } });
-    if (!ride) throw new MovaHttpException(MovaErrorCode.RIDE_NOT_FOUND, HttpStatus.NOT_FOUND);
+    if (!ride) {
+      // Uber Pool : paiement par booking passager (id ride_share_passengers).
+      const share = await this.prisma.rideSharePassenger.findUnique({
+        where: { id: rideId },
+        include: { ride: true },
+      });
+      if (share) return this.rideShareInfo(share.id);
+      throw new MovaHttpException(MovaErrorCode.RIDE_NOT_FOUND, HttpStatus.NOT_FOUND);
+    }
+    if (ride.isShared) {
+      const booking = await this.prisma.rideSharePassenger.findFirst({
+        where: { rideId, userId: ride.passengerId, status: { not: 'CANCELLED' } },
+      });
+      if (booking) return this.rideShareInfo(booking.id);
+    }
     const status = fromMobileRideStatus(ride.status);
     const amountCdf = ride.finalFareCdf ?? ride.estimatedFareCdf ?? 0;
     return {
@@ -75,6 +99,29 @@ export class PaymentInfoService {
       driverId: ride.driverId,
       cashPin: ride.completionPin,
       title: `${ride.pickupAddress ?? 'Départ'} → ${ride.dropoffAddress ?? 'Arrivée'}`,
+    };
+  }
+
+  private async rideShareInfo(bookingId: string): Promise<ServicePaymentInfo> {
+    const booking = await this.prisma.rideSharePassenger.findUnique({
+      where: { id: bookingId },
+      include: { ride: true },
+    });
+    if (!booking?.ride) {
+      throw new MovaHttpException(MovaErrorCode.RIDE_NOT_FOUND, HttpStatus.NOT_FOUND);
+    }
+    const ready =
+      booking.status === 'DROPPED_OFF' || booking.ride.status === 'COMPLETED';
+    return {
+      referenceType: 'RIDE_SHARE',
+      referenceId: bookingId,
+      userId: booking.userId,
+      amountCdf: booking.fareCdf,
+      status: booking.status,
+      paymentReady: ready,
+      driverId: booking.ride.driverId,
+      cashPin: booking.ride.completionPin,
+      title: `Pool · ${booking.pickupAddress ?? 'Départ'} → ${booking.dropoffAddress ?? 'Arrivée'}`,
     };
   }
 

@@ -1254,7 +1254,7 @@ class ApiClient {
     };
   }
 
-  /// Uber Pool — estimation tarif partagé.
+  /// SENGA Pool — estimation tarif partagé.
   Future<Result<Map<String, dynamic>>> estimateSharedRide(Map<String, dynamic> body) async {
     final result = await post('/rides/shared/estimate', body);
     return switch (result) {
@@ -1263,7 +1263,7 @@ class ApiClient {
     };
   }
 
-  /// Uber Pool — créer / rejoindre une course partagée.
+  /// SENGA Pool — créer / rejoindre une course partagée.
   Future<Result<Map<String, dynamic>>> requestSharedRide(Map<String, dynamic> body) async {
     final result = await post('/rides/shared', body);
     switch (result) {

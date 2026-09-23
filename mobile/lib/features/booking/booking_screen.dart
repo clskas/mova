@@ -834,7 +834,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                         style: TextStyle(fontWeight: FontWeight.w600),
                       ),
                       subtitle: const Text(
-                        'Comme Uber Pool : tarif réduit, trajet partagé avec d\'autres passagers. '
+                        'Tarif réduit SENGA : trajet partagé avec d\'autres passagers. '
                         'Le covoiturage planifié reste dans le menu Covoiturage.',
                         style: TextStyle(fontSize: 12, color: MovaColors.textSecondary),
                       ),

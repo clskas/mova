@@ -20,6 +20,7 @@ function isPublicPath(path: string, method?: string): boolean {
   if (pathOnly.startsWith('/api/geo') && (m === 'GET' || m === 'HEAD' || m === 'OPTIONS')) return true;
 
   if (pathOnly.startsWith('/api/rides/estimate')) return true;
+  if (pathOnly.startsWith('/api/rides/shared/estimate')) return true;
   if (pathOnly.startsWith('/api/rental/vehicles') && (m === 'GET' || m === 'HEAD' || m === 'OPTIONS')) return true;
   if (m === 'GET' && pathOnly.startsWith('/api/publicites')) return true;
   if (m === 'GET' && pathOnly.startsWith('/api/company-contacts')) return true;

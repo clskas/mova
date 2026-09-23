@@ -133,10 +133,10 @@ jobs:
         id: playver
         run: |
           set -euo pipefail
-          # Floor: last successful Play uploads used 90; next must be ≥91 (also matches pubspec +91).
+          # Floor: next must be ≥92 (pubspec 1.0.12+93; distinct driver icon restored).
           PUBSPEC_CODE=$(grep -E '^version:' mobile/pubspec.yaml | head -1 | sed -E 's/.*\+([0-9]+).*/\1/')
           CODE="${{ github.run_number }}"
-          if [ \"$CODE\" -lt 92 ]; then CODE=92; fi
+          if [ "$CODE" -lt 93 ]; then CODE=93; fi
           if [ -n "$PUBSPEC_CODE" ] && [ "$PUBSPEC_CODE" -gt "$CODE" ]; then CODE="$PUBSPEC_CODE"; fi
           echo "code=$CODE" >> "$GITHUB_OUTPUT"
           echo "Play versionCode=$CODE (pubspec +${PUBSPEC_CODE:-?}; run_number=${{ github.run_number }})"

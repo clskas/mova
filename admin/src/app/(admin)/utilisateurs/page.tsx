@@ -7,6 +7,7 @@ import {
   deactivateUser as deactivateUserApi,
   fetchCities,
   fetchDrivers,
+  fetchUser,
   fetchUsers,
   formatUserName,
   purgePlayPrelaunchUsers,
@@ -136,7 +137,7 @@ export default function UtilisateursPage() {
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
-  function openDetail(u: AdminUser) {
+  async function openDetail(u: AdminUser) {
     setSelected(u);
     const nextRole = u.role ?? "PASSENGER";
     setEditRole(nextRole);
@@ -147,7 +148,6 @@ export default function UtilisateursPage() {
     setEditManagedCity(u.managedCity ?? "");
     const staffRole = normalizeAdminRole(nextRole);
     if (staffRole) {
-      // Toujours préférer les niveaux renvoyés par l’API (y compris défauts du rôle).
       setEditAccessLevels(
         u.accessLevelIds?.length
           ? u.accessLevelIds
@@ -158,6 +158,28 @@ export default function UtilisateursPage() {
     }
     setLoginPin(null);
     setPinNotice(null);
+    // Recharge le détail (liste enrichie + source de vérité après Enregistrer).
+    try {
+      const fresh = await fetchUser(u.id);
+      if (!fresh) return;
+      setSelected(fresh);
+      setEditRole(fresh.role ?? nextRole);
+      setEditPhone(fresh.phone ?? "");
+      setEditStatus(fresh.status ?? "ACTIVE");
+      setEditFirst(fresh.firstName ?? "");
+      setEditLast(fresh.lastName ?? "");
+      setEditManagedCity(fresh.managedCity ?? "");
+      const fr = normalizeAdminRole(fresh.role ?? nextRole);
+      if (fr) {
+        setEditAccessLevels(
+          fresh.accessLevelIds?.length
+            ? fresh.accessLevelIds
+            : defaultAccessLevelIdsForRole(fr),
+        );
+      }
+    } catch {
+      /* garde les données liste déjà affichées */
+    }
   }
 
   function onEditRoleChange(next: string) {

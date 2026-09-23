@@ -192,24 +192,18 @@ export class UsersService {
     ]);
     const repaired = await Promise.all(
       data.map(async (u) => {
-        let email = u.email;
-        if (u.googleId && !String(email ?? '').trim()) {
+        let row = u;
+        if (u.googleId && !String(u.email ?? '').trim()) {
           const recovered = await this.inferGoogleEmailFromOtp(u.createdAt);
           if (recovered) {
             try {
-              await this.prisma.user.update({ where: { id: u.id }, data: { email: recovered } });
-              email = recovered;
+              row = await this.prisma.user.update({ where: { id: u.id }, data: { email: recovered } });
             } catch {
               /* unique collision — next Google login still fills it */
             }
           }
         }
-        const { googleId: _g, localPinHash, ...safe } = { ...u, email };
-        return {
-          ...safe,
-          playPrelaunch: isPlayPrelaunchAccount({ ...u, email }),
-          pinConfigured: Boolean(localPinHash),
-        };
+        return this.enrichUser(row);
       }),
     );
     return {

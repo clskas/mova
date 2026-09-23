@@ -15,7 +15,7 @@ function isPublicPath(path: string, method?: string): boolean {
   ) {
     return true;
   }
-  if (pathOnly.includes('/rides/estimate')) return true;
+  if (pathOnly.includes('/rides/estimate') || pathOnly.includes('/rides/shared/estimate')) return true;
   // Geo reads are public; POST import (and other mutations) require JWT.
   if (pathOnly.includes('/geo') && (m === 'GET' || m === 'HEAD' || m === 'OPTIONS')) return true;
   if (pathOnly.includes('/rental/vehicles') && (m === 'GET' || m === 'HEAD' || m === 'OPTIONS')) return true;

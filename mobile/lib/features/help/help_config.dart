@@ -44,7 +44,7 @@ const kFaqItems = <FaqItem>[
   FaqItem(
     question: 'Quelle différence entre Pool et Covoiturage ?',
     answer:
-        'Pool = course taxi partagée à la demande (bascule Partagé sur Taxi). Covoiturage = trajet planifié publié à l’avance (menu Covoiturage), type BlaBlaCar.',
+        'Pool = course taxi partagée à la demande (bascule Partagé sur Taxi). Covoiturage = trajet planifié publié à l’avance (menu Covoiturage).',
   ),
   FaqItem(
     question: 'Le prix affiché est-il définitif ?',
@@ -180,7 +180,7 @@ const kManualChapters = <ManualChapter>[
       'Le tarif est réduit ; le véhicule peut prendre d\'autres passagers sur le trajet.',
       'Payez votre place après votre dépose (pas le total de tous les passagers).',
     ],
-    tip: 'Pool = course à la demande. Covoiturage (menu dédié) = trajet planifié type BlaBlaCar.',
+    tip: 'Pool = course à la demande. Covoiturage (menu dédié) = trajet planifié à l’avance.',
   ),
   ManualChapter(
     id: 'price',

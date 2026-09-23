@@ -51,7 +51,7 @@ Sur **Taxi** (voiture uniquement, pas moto), activez le bascule **Partagé (Pool
 4. Après votre dépose, payez **votre place** (portefeuille, Mobile Money ou espèces) — pas le total de tous les passagers.
 5. Des détours sont possibles pour prendre / déposer d’autres passagers.
 
-> **Différence avec le Covoiturage** : le Pool est une course taxi **à la demande**. Le **Covoiturage** (menu dédié) reste un trajet **planifié** type BlaBlaCar (places sur un trajet publié à l’avance).
+> **Différence avec le Covoiturage** : le Pool est une course taxi **à la demande**. Le **Covoiturage** (menu dédié) reste un trajet **planifié** (places sur un trajet publié à l’avance).
 
 ## 3. Livraison colis
 

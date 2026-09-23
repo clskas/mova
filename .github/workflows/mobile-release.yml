@@ -133,7 +133,7 @@ jobs:
         id: playver
         run: |
           set -euo pipefail
-          # Floor: next must be ≥92 (pubspec 1.0.12+93; distinct driver icon restored).
+          # Floor: next must be >=93 (pubspec 1.0.12+93; driver icon from Downloads).
           PUBSPEC_CODE=$(grep -E '^version:' mobile/pubspec.yaml | head -1 | sed -E 's/.*\+([0-9]+).*/\1/')
           CODE="${{ github.run_number }}"
           if [ "$CODE" -lt 93 ]; then CODE=93; fi

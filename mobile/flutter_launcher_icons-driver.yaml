@@ -2,7 +2,7 @@
   android: true
   ios: false
   image_path: assets/icon/movaicone_driver.png
-  adaptive_icon_background: "#000000"
+  adaptive_icon_background: "#0A3201"
   adaptive_icon_foreground: assets/icon/movaicone_driver_fg.png
-  adaptive_icon_foreground_inset: 16
+  adaptive_icon_foreground_inset: 0
   min_sdk_android: 21

@@ -172,7 +172,19 @@ describe('UsersService owner lock', () => {
       ];
     });
     prisma.otpCode.findMany.mockResolvedValue([{ phone: 'kise.ndiki@gmail.com' }]);
-    prisma.user.update.mockResolvedValue({});
+    prisma.user.update.mockResolvedValue({
+      id: 'kise-1',
+      googleId: 'gid-kise',
+      email: 'kise.ndiki@gmail.com',
+      firstName: 'Kise',
+      lastName: 'Ndiki',
+      role: UserRole.DRIVER,
+      phone: null,
+      status: UserStatus.PENDING_KYC,
+      createdAt,
+      updatedAt: createdAt,
+      adminPermissions: [],
+    });
     prisma.user.count.mockResolvedValue(1);
     const result = await service.listUsers(0, 50);
     expect(prisma.user.update).toHaveBeenCalledWith({

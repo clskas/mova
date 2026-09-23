@@ -191,6 +191,8 @@ describe('RidesService', () => {
       vehicleId: 'v1',
       status: RideStatus.ACCEPTED,
       vehicleType: VehicleType.MOTO_TAXI,
+      isShared: false,
+      sharePassengers: [],
       pickupLat: -4.32,
       pickupLng: 15.31,
       dropoffLat: -4.34,
@@ -232,7 +234,11 @@ describe('RidesService', () => {
       });
     }) as never;
 
-    const result = await service.getRide('ride-1');
+    const result = (await service.getRide('ride-1')) as {
+      etaMinutes?: number | null;
+      driverDistanceKm?: number | null;
+      driver: { name?: string; plateNumber?: string } | null;
+    };
     expect(result.etaMinutes).toBeGreaterThanOrEqual(1);
     expect(result.driverDistanceKm).toBeGreaterThan(0);
     expect(result.driver).not.toBeNull();

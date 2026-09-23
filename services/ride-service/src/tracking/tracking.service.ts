@@ -65,7 +65,7 @@ export class TrackingService {
     });
     if (!ride) return false;
     if (ride.passengerId === userId || ride.driverId === userId) return true;
-    return ride.sharePassengers.some(
+    return (ride.sharePassengers ?? []).some(
       (p) => p.userId === userId && p.status !== 'CANCELLED',
     );
   }

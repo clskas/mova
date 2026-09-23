@@ -413,9 +413,9 @@ export function permissionsMatchRoleDefaults(role: string, permissions: string[]
   return true;
 }
 
-/** Sections menu admin dérivées des permissions effectives. */
+/** Sections menu admin dérivées des permissions (sans élargissement legacy). */
 export function accessLevelIdsFromPermissions(permissions: string[]): string[] {
-  const perms = new Set(expandLegacyAccessPermissions(sanitizeAdminPermissions(permissions)));
+  const perms = new Set(sanitizeAdminPermissions(permissions));
   return ADMIN_ACCESS_LEVELS.filter((level) => level.permissions.some((p) => perms.has(p))).map(
     (level) => level.id,
   );

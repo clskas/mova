@@ -693,7 +693,7 @@ export default function TarifsPage() {
     setLoading(true);
     setError(null);
     try {
-      const [v, d, s, mvc, c, ec, tw, p] = await Promise.all([
+      const results = await Promise.allSettled([
         fetchPricingRules(city),
         fetchDeliveryPricingRules(),
         fetchSurcharges(),
@@ -703,6 +703,21 @@ export default function TarifsPage() {
         fetchPricingTimeWindows(city),
         fetchPromoCodes(),
       ]);
+      const value = <T,>(i: number, fallback: T): T => {
+        const r = results[i];
+        return r.status === "fulfilled" ? (r.value as T) : fallback;
+      };
+      const softErrors = results
+        .map((r, i) => (r.status === "rejected" ? (r.reason instanceof Error ? r.reason.message : `Erreur #${i}`) : null))
+        .filter(Boolean) as string[];
+      const v = value(0, [] as Awaited<ReturnType<typeof fetchPricingRules>>);
+      const d = value(1, [] as Awaited<ReturnType<typeof fetchDeliveryPricingRules>>);
+      const s = value(2, [] as Awaited<ReturnType<typeof fetchSurcharges>>);
+      const mvc = value(3, [] as Awaited<ReturnType<typeof fetchMovingVehicleCategories>>);
+      const c = value(4, [] as Awaited<ReturnType<typeof fetchCommissions>>);
+      const ec = value(5, [] as Awaited<ReturnType<typeof fetchErrandCategoryEstimates>>);
+      const tw = value(6, { windows: [], timezone: "Africa/Kinshasa" } as Awaited<ReturnType<typeof fetchPricingTimeWindows>>);
+      const p = value(7, [] as Awaited<ReturnType<typeof fetchPromoCodes>>);
       setVehicleRules(Array.isArray(v) ? v : []);
       setDeliveryRules(Array.isArray(d) ? d : []);
       setOtherSurcharges((Array.isArray(s) ? s : []).filter((x) => x.type === "MOVING"));
@@ -712,6 +727,9 @@ export default function TarifsPage() {
       setTimeWindows(Array.isArray(tw.windows) ? tw.windows : []);
       setCityTimezone(tw.timezone ?? "Africa/Kinshasa");
       setPromos(Array.isArray(p) ? p : []);
+      if (softErrors.length) {
+        setError(softErrors[0]);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur de chargement");
     } finally {

@@ -519,7 +519,7 @@ export class DeliveriesService {
       dto.promoCode,
       false,
       dto.restaurantId,
-      restaurant.city,
+      resolveCityFromCoords(restaurant.lat, restaurant.lng),
     );
     return {
       restaurant: { id: restaurant.id, name: restaurant.name },
@@ -552,7 +552,7 @@ export class DeliveriesService {
       dto.promoCode,
       true,
       dto.restaurantId,
-      restaurant.city,
+      resolveCityFromCoords(restaurant.lat, restaurant.lng),
     );
     const flags = this.guaranteeFlags(dto.paymentMethod);
     const delivery = await this.prisma.delivery.create({
@@ -655,13 +655,16 @@ export class DeliveriesService {
       deliveryFeeCdf = Math.max(deliveryFeeCdf, quote.deliveryFeeCdf);
     }
 
+    const firstRestaurant = restaurants[0];
     const promoApplied = await this.applyFoodPromo(
       itemsSubtotalCdf,
       deliveryFeeCdf,
       dto.promoCode,
       false,
       undefined,
-      restaurants[0]?.city,
+      firstRestaurant
+        ? resolveCityFromCoords(firstRestaurant.lat, firstRestaurant.lng)
+        : undefined,
     );
 
     return {
@@ -718,17 +721,16 @@ export class DeliveriesService {
       ...dto,
       orders: normalizedOrders.map((o) => ({ restaurantId: o.restaurant.id, items: o.items })),
     });
+    // Pickup uses first restaurant for now (single delivery entity)
+    const first = normalizedOrders[0].restaurant;
     const promoApplied = await this.applyFoodPromo(
       itemsSubtotalCdf,
       estimate.deliveryFeeCdf,
       dto.promoCode,
       true,
       undefined,
-      first.city,
+      resolveCityFromCoords(first.lat, first.lng),
     );
-
-    // Pickup uses first restaurant for now (single delivery entity)
-    const first = normalizedOrders[0].restaurant;
     const flags = this.guaranteeFlags(dto.paymentMethod);
     const delivery = await this.prisma.delivery.create({
       data: {

@@ -10,7 +10,14 @@ type ModalProps = {
   wide?: boolean;
 };
 
-export function Modal({ open, onClose, title, children, wide }: ModalProps) {
+export function Modal({
+  open,
+  onClose,
+  title,
+  children,
+  wide,
+  footer,
+}: ModalProps & { footer?: React.ReactNode }) {
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -30,9 +37,14 @@ export function Modal({ open, onClose, title, children, wide }: ModalProps) {
           <h2 className="text-lg font-semibold text-[#1A1A2E]">{title}</h2>
           <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none" aria-label="Fermer">×</button>
         </div>
-        <div className="p-6 overflow-y-auto flex-1 min-h-0 overscroll-contain pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+        <div className="p-6 overflow-y-auto flex-1 min-h-0 overscroll-contain">
           {children}
         </div>
+        {footer ? (
+          <div className="shrink-0 border-t bg-white px-6 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+            {footer}
+          </div>
+        ) : null}
       </div>
     </div>
   );

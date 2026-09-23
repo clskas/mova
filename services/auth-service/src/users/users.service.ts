@@ -57,7 +57,13 @@ export class UsersService {
       ...safe,
       adminPermissions: stored,
       effectivePermissions,
-      accessLevelIds: accessLevelIdsFromPermissions(effectivePermissions),
+      // Cases UI : permissions stockées (pas l’élargissement legacy), sinon défauts du rôle.
+      accessLevelIds:
+        stored.length > 0
+          ? accessLevelIdsFromPermissions(stored)
+          : isAdminPanelRole(user.role)
+            ? accessLevelIdsFromPermissions(effectivePermissions)
+            : [],
       permissionsCustomized: stored.length > 0,
       publicId: formatMovaPublicId(user.id, user.role),
       phoneMasked: maskPhoneRdc(user.phone),

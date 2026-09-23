@@ -1309,7 +1309,7 @@ export class AdminService {
   }
 
   listMovingVehicleCategories() {
-    return this.fetchJson('ride', '/internal/moving-vehicle-categories');
+    return this.fetchJson('ride', '/internal/moving-vehicle-categories').catch(() => []);
   }
 
   updateMovingVehicleCategory(category: string, body: Record<string, unknown>) {

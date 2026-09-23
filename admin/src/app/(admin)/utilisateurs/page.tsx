@@ -147,8 +147,9 @@ export default function UtilisateursPage() {
     setEditManagedCity(u.managedCity ?? "");
     const staffRole = normalizeAdminRole(nextRole);
     if (staffRole) {
+      // Toujours préférer les niveaux renvoyés par l’API (y compris défauts du rôle).
       setEditAccessLevels(
-        u.permissionsCustomized && u.accessLevelIds?.length
+        u.accessLevelIds?.length
           ? u.accessLevelIds
           : defaultAccessLevelIdsForRole(staffRole),
       );
@@ -223,11 +224,12 @@ export default function UtilisateursPage() {
         managedCity: editRole === "CITY_ADMIN" ? editManagedCity.trim() : null,
       };
       if (canPurge && staffRole) {
-        payload.accessLevelIds = editAccessLevels;
+        // Toujours envoyer la liste (même vide) pour forcer la persistance côté auth.
+        payload.accessLevelIds = [...editAccessLevels];
       }
       await updateUser(selected.id, payload);
       setSelected(null);
-      load();
+      await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Échec de la mise à jour");
     } finally {
@@ -559,7 +561,36 @@ export default function UtilisateursPage() {
         </div>
       </Modal>
 
-      <Modal open={!!selected} onClose={() => setSelected(null)} title={readOnly ? "Détail utilisateur" : "Modifier utilisateur"} wide>
+      <Modal
+        open={!!selected}
+        onClose={() => setSelected(null)}
+        title={readOnly ? "Détail utilisateur" : "Modifier utilisateur"}
+        wide
+        footer={
+          selected && !readOnly ? (
+            <div className="flex flex-col gap-2">
+              {error && (
+                <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>
+              )}
+              <div className="flex flex-wrap gap-2">
+                <BtnPrimary onClick={saveUser} disabled={saving}>
+                  {saving ? "Enregistrement…" : "Enregistrer"}
+                </BtnPrimary>
+                {editStatus !== "SUSPENDED" && (
+                  <BtnDanger onClick={() => setDeactivateTarget(selected)} disabled={saving}>
+                    Désactiver
+                  </BtnDanger>
+                )}
+                {canPurge && selected.id !== user?.id && (
+                  <BtnDanger onClick={() => setPurgeTarget(selected)} disabled={saving}>
+                    Supprimer cet utilisateur
+                  </BtnDanger>
+                )}
+              </div>
+            </div>
+          ) : undefined
+        }
+      >
         {selected && (
           <div className="space-y-4">
             <p className="text-xs text-gray-400">ID: {selected.id}</p>
@@ -689,22 +720,6 @@ export default function UtilisateursPage() {
                     {selected.pinConfigured ? "Renvoyer un nouveau PIN" : "Générer et afficher le PIN"}
                   </button>
                 )}
-              </div>
-            )}
-            {!readOnly && (
-              <div className="flex flex-col gap-2 pt-2">
-                {error && (
-                  <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>
-                )}
-                <div className="flex flex-wrap gap-2">
-                <BtnPrimary onClick={saveUser} disabled={saving}>{saving ? "Enregistrement…" : "Enregistrer"}</BtnPrimary>
-                {editStatus !== "SUSPENDED" && (
-                  <BtnDanger onClick={() => setDeactivateTarget(selected)} disabled={saving}>Désactiver</BtnDanger>
-                )}
-                {canPurge && selected.id !== user?.id && (
-                  <BtnDanger onClick={() => setPurgeTarget(selected)} disabled={saving}>Supprimer cet utilisateur</BtnDanger>
-                )}
-                </div>
               </div>
             )}
           </div>

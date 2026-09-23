@@ -1,8 +1,8 @@
-flutter_launcher_icons:
+﻿flutter_launcher_icons:
   android: true
   ios: false
   image_path: assets/icon/movaicone_driver.png
-  adaptive_icon_background: "#3C15A6"
+  adaptive_icon_background: "#000000"
   adaptive_icon_foreground: assets/icon/movaicone_driver_fg.png
   adaptive_icon_foreground_inset: 16
   min_sdk_android: 21

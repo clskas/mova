@@ -23,6 +23,7 @@ export * from './redis.module';
 export * from './request-id.middleware';
 export * from './kyc-documents';
 export * from './kyc-ocr';
+export * from './selfie-verify';
 export * from './driver-documents';
 export * from './commerce-type';
 export * from './public-id';

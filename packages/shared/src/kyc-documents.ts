@@ -14,7 +14,7 @@ export type KycDocumentType = (typeof KYC_DOCUMENT_TYPES)[keyof typeof KYC_DOCUM
 
 export const KYC_DOCUMENT_LABELS: Record<KycDocumentType, string> = {
   ID_PHOTO: 'Carte d\'identité / passeport',
-  SELFIE: 'Photo récente (profil)',
+  SELFIE: 'Selfie (photo de profil)',
   DRIVERS_LICENSE: 'Permis de conduire',
   VEHICLE_REGISTRATION: 'Carte rose',
   VEHICLE_INSURANCE: 'Assurance véhicule',
@@ -25,16 +25,15 @@ export const KYC_DOCUMENT_LABELS: Record<KycDocumentType, string> = {
 
 /**
  * Documents obligatoires pour le dossier chauffeur.
- * Vide par défaut : tous les justificatifs sont optionnels.
- * Quand l'admin active « documents requis pour les courses », l'ops gate
- * (dates d'expiration / canOperate) s'applique via PlatformConfig — pas cette liste.
+ * Selfie obligatoire : photo de profil prise en direct (vérification anti-fraude).
  */
-export const REQUIRED_DRIVER_KYC_TYPES: KycDocumentType[] = [];
+export const REQUIRED_DRIVER_KYC_TYPES: KycDocumentType[] = [
+  KYC_DOCUMENT_TYPES.SELFIE,
+];
 
-/** Tous les justificatifs chauffeur sont déposables librement (aucun obligatoire). */
+/** Justificatifs optionnels (en plus du selfie obligatoire). */
 export const OPTIONAL_DRIVER_KYC_TYPES: KycDocumentType[] = [
   KYC_DOCUMENT_TYPES.ID_PHOTO,
-  KYC_DOCUMENT_TYPES.SELFIE,
   KYC_DOCUMENT_TYPES.DRIVERS_LICENSE,
   KYC_DOCUMENT_TYPES.VEHICLE_REGISTRATION,
   KYC_DOCUMENT_TYPES.VEHICLE_INSURANCE,

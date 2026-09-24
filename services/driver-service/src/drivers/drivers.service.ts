@@ -303,8 +303,25 @@ export class DriversService {
     } catch {
       throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Type de document KYC invalide.');
     }
+
+    if (docType === 'SELFIE') {
+      const gate = await this.ocrService.verifySelfieUpload(userId, url);
+      if (!gate.ok) {
+        throw new MovaHttpException(
+          MovaErrorCode.VALIDATION_ERROR,
+          undefined,
+          gate.message ?? 'Selfie refusée — reprenez une photo claire de votre visage avec la caméra avant.',
+        );
+      }
+    }
+
     const doc = await this.prisma.kycDocument.create({ data: { userId, type: docType, url } });
-    this.ocrService.scheduleAnalysis(doc.id);
+    if (docType === 'SELFIE') {
+      this.ocrService.scheduleSelfieAnalysis(doc.id);
+      void this.syncAuthAvatar(userId, url);
+    } else {
+      this.ocrService.scheduleAnalysis(doc.id);
+    }
     const profile = await this.getOrCreateProfile(userId);
     if (profile) await this.ensureDefaultVehicle(profile.id);
     const renewalDocTypes = new Set([
@@ -328,6 +345,21 @@ export class DriversService {
       where: { userId },
       data: { kycStatus: KycStatus.PENDING },
     });
+  }
+
+  private async syncAuthAvatar(userId: string, avatarUrl: string) {
+    try {
+      await fetch(serviceUrl('auth', `/internal/users/${userId}`), {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-internal-api-key': resolveInternalApiKey(),
+        },
+        body: JSON.stringify({ avatarUrl }),
+      });
+    } catch (err) {
+      this.logger.warn(`Avatar sync failed for ${userId}: ${err instanceof Error ? err.message : err}`);
+    }
   }
 
   private async lookupAuthUser(userId: string): Promise<{

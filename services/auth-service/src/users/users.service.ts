@@ -469,11 +469,12 @@ export class UsersService {
     id: string,
     data: {
       role?: UserRole;
-      phone?: string;
+      phone?: string | null;
       status?: UserStatus;
       firstName?: string;
       lastName?: string;
-      managedCity?: string;
+      managedCity?: string | null;
+      avatarUrl?: string | null;
       adminPermissions?: string[];
       accessLevelIds?: string[];
     },
@@ -489,7 +490,26 @@ export class UsersService {
       data.managedCity,
       existing.managedCity,
     );
-    const { managedCity: _mc, adminPermissions: rawPerms, accessLevelIds, ...rest } = data;
+    const {
+      managedCity: _mc,
+      adminPermissions: rawPerms,
+      accessLevelIds,
+      phone: rawPhone,
+      avatarUrl: rawAvatar,
+      ...rest
+    } = data;
+    // Empty string "" is not a valid unique phone (Google-only accounts) — coerce to null / omit.
+    let phone: string | null | undefined = undefined;
+    if (rawPhone !== undefined) {
+      const trimmed = typeof rawPhone === 'string' ? rawPhone.trim() : '';
+      phone = trimmed.length > 0 ? trimmed : null;
+    }
+    const avatarUrl =
+      rawAvatar === undefined
+        ? undefined
+        : typeof rawAvatar === 'string' && rawAvatar.trim()
+          ? rawAvatar.trim()
+          : null;
     let adminPermissions: string[] | undefined;
     if (accessLevelIds !== undefined || rawPerms !== undefined) {
       if (!isAdminPanelRole(nextRole)) {
@@ -504,18 +524,32 @@ export class UsersService {
         }
       }
     }
-    const updated = await this.prisma.user.update({
-      where: { id },
-      data: {
-        ...rest,
-        managedCity,
-        ...(adminPermissions !== undefined ? { adminPermissions } : {}),
-      },
-    });
-    if (data.status === UserStatus.SUSPENDED) {
-      await this.denySuspendedUser(updated.id);
+    try {
+      const updated = await this.prisma.user.update({
+        where: { id },
+        data: {
+          ...rest,
+          managedCity,
+          ...(phone !== undefined ? { phone } : {}),
+          ...(avatarUrl !== undefined ? { avatarUrl } : {}),
+          ...(adminPermissions !== undefined ? { adminPermissions } : {}),
+        },
+      });
+      if (data.status === UserStatus.SUSPENDED) {
+        await this.denySuspendedUser(updated.id);
+      }
+      return this.enrichUser(updated);
+    } catch (err) {
+      const code = (err as { code?: string })?.code;
+      if (code === 'P2002') {
+        throw new MovaHttpException(
+          MovaErrorCode.VALIDATION_ERROR,
+          HttpStatus.CONFLICT,
+          'Ce numéro de téléphone est déjà utilisé par un autre compte.',
+        );
+      }
+      throw err;
     }
-    return this.enrichUser(updated);
   }
 
   async deactivateUser(id: string) {

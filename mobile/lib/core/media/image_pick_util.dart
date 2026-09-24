@@ -36,11 +36,14 @@ Future<XFile?> pickMovaImage(
   }
 }
 
-void showImagePickError(BuildContext context) {
+void showImagePickError(BuildContext context, {String? message}) {
   if (!context.mounted) return;
   ScaffoldMessenger.of(context).showSnackBar(
-    const SnackBar(
-      content: Text('Impossible d\'accéder à la caméra ou à la galerie. Réessayez.'),
+    SnackBar(
+      content: Text(
+        message ??
+            'Impossible d\'accéder à la caméra ou à la galerie. Réessayez.',
+      ),
     ),
   );
 }

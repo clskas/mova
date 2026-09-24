@@ -468,11 +468,25 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
 
   Future<void> _uploadDoc(String type, String label) async {
     await _persistOnboardingStep();
-    final source = await _pickDocSource();
+    final isSelfie = type == 'SELFIE';
+    // Selfie = caméra avant uniquement (pas de galerie) pour forcer une prise de vue live.
+    final ImageSource? source =
+        isSelfie ? ImageSource.camera : await _pickDocSource();
     if (source == null || !mounted) return;
-    final file = await pickMovaImage(_picker, source);
+    final file = await pickMovaImage(
+      _picker,
+      source,
+      preferredCameraDevice: isSelfie ? CameraDevice.front : CameraDevice.rear,
+    );
     if (file == null) {
-      if (mounted) showImagePickError(context);
+      if (mounted) {
+        showImagePickError(
+          context,
+          message: isSelfie
+              ? 'Selfie annulée — activez la caméra avant et cadrage visage.'
+              : null,
+        );
+      }
       return;
     }
     if (!mounted) return;

@@ -83,7 +83,7 @@ describe('partner KYC checklists', () => {
     });
     expect(reminder.active).toBe(true);
     expect(reminder.blocked).toBe(false);
-    expect(reminder.message).toContain('Photo récente');
+    expect(reminder.message).toContain('Selfie');
     expect(reminder.message).toMatch(/jour/);
   });
 

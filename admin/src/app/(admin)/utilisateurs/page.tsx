@@ -258,14 +258,20 @@ export default function UtilisateursPage() {
     setError(null);
     try {
       const staffRole = normalizeAdminRole(editRole);
-      const payload: Partial<AdminUser> & { accessLevelIds?: string[] } = {
+      const payload: Partial<AdminUser> & { accessLevelIds?: string[]; phone?: string | null } = {
         role: editRole,
-        phone: editPhone,
         status: editStatus,
         firstName: editFirst,
         lastName: editLast,
         managedCity: editRole === "CITY_ADMIN" ? editManagedCity.trim() : null,
       };
+      // Never send phone:"" — unique constraint / Prisma 500 on Google-only accounts.
+      const phoneTrim = editPhone.trim();
+      if (phoneTrim) {
+        payload.phone = phoneTrim;
+      } else if (selected.phone) {
+        payload.phone = null;
+      }
       if (canPurge && staffRole) {
         // Toujours envoyer la liste (même vide) pour forcer la persistance côté auth.
         payload.accessLevelIds = [...editAccessLevels];

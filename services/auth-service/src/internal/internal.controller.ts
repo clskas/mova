@@ -20,8 +20,10 @@ class UpdateUserAdminDto {
   @IsOptional() @IsEnum(UserStatus) status?: UserStatus;
   @IsOptional() @IsString() firstName?: string;
   @IsOptional() @IsString() lastName?: string;
-  @IsOptional() @IsString() phone?: string;
-  @IsOptional() @IsString() managedCity?: string;
+  /** Empty string is accepted then coerced to null (Google-only users). */
+  @IsOptional() @IsString() phone?: string | null;
+  @IsOptional() managedCity?: string | null;
+  @IsOptional() @IsString() avatarUrl?: string | null;
   @IsOptional() @IsArray() @IsString({ each: true }) adminPermissions?: string[];
   @IsOptional() @IsArray() @IsString({ each: true }) accessLevelIds?: string[];
 }

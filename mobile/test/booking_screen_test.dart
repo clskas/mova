@@ -80,7 +80,7 @@ void main() {
   );
 
   testWidgets('Taxi / Moto filter switches types and keeps MOTO alias selected', (tester) async {
-    tester.view.physicalSize = const Size(400, 900);
+    tester.view.physicalSize = const Size(400, 1100);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
 
@@ -91,6 +91,7 @@ void main() {
     expect(find.text('Moto'), findsOneWidget);
     expect(find.text('Standard'), findsNothing);
 
+    await tester.ensureVisible(find.text('Taxi'));
     await tester.tap(find.text('Taxi'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 200));
@@ -100,8 +101,10 @@ void main() {
     expect(find.text('VIP'), findsOneWidget);
     expect(find.text('Gamme'), findsOneWidget);
 
+    await tester.ensureVisible(find.text('Moto'));
     await tester.tap(find.text('Moto'));
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
     expect(find.text('Standard'), findsNothing);
   });
 

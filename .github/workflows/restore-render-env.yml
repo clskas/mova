@@ -143,9 +143,15 @@ jobs:
             JWT_SECRET "${JWT_SECRET:-}" \
             INTERNAL_API_KEY "${INTERNAL_API_KEY:-}"
 
+          # Render Starter ≈20 env-var hard cap. MOBILE_*/PLAY_STORE_* intentionally
+          # omitted — ride-service code floor (app-version.ts) advertises Play 1.0.12+95.
+          # Adding banner env previously evicted JWT_SECRET/DATABASE_URL and every
+          # ride deploy since 2026-09-21 failed with update_failed on boot.
           upsert_many "$RIDE_ID" \
             DATABASE_URL "$DATABASE_URL_RIDES" \
             REDIS_URL "$REDIS_URL" \
+            JWT_SECRET "${JWT_SECRET:-}" \
+            INTERNAL_API_KEY "${INTERNAL_API_KEY:-}" \
             AUTH_SERVICE_URL "https://mova-auth.onrender.com" \
             DRIVER_SERVICE_URL "https://mova-driver.onrender.com" \
             PAYMENT_SERVICE_URL "https://mova-payment.onrender.com" \
@@ -154,23 +160,10 @@ jobs:
             APP_ENV "production" \
             RUN_SEED "false" \
             SKIP_DEMO_SEED "true" \
-            SEED_DEMO_CATALOG "false" \
-            SMS_PROVIDER "africastalking" \
-            MOBILE_MONEY_GATEWAY "serdipay" \
-            SERDIPAY_BASE_URL "https://apis.serdipay.com" \
             SUPABASE_URL "https://furttqrltkwirdhiktdl.supabase.co" \
             SUPABASE_UPLOADS_BUCKET "uploads" \
             SUPABASE_KYC_BUCKET "kyc-docs" \
-            SUPABASE_SERVICE_ROLE_KEY "${SUPABASE_SERVICE_ROLE_KEY:-}" \
-            MOBILE_PASSENGER_VERSION "1.0.12" \
-            MOBILE_DRIVER_VERSION "1.0.12" \
-            MOBILE_MIN_VERSION "1.0.0" \
-            MOBILE_PASSENGER_VERSION_CODE "95" \
-            MOBILE_DRIVER_VERSION_CODE "95" \
-            MOBILE_MIN_VERSION_CODE "0" \
-            PLAY_STORE_PASSENGER_URL "https://play.google.com/store/apps/details?id=cd.mova.mova.passenger" \
-            PLAY_STORE_DRIVER_URL "https://play.google.com/store/apps/details?id=cd.mova.mova.driver" \
-            JWT_SECRET "${JWT_SECRET:-}"
+            SUPABASE_SERVICE_ROLE_KEY "${SUPABASE_SERVICE_ROLE_KEY:-}"
 
           upsert_many "$PAY_ID" \
             DATABASE_URL "$DATABASE_URL_PAYMENTS" \

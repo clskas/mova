@@ -133,10 +133,10 @@ jobs:
         id: playver
         run: |
           set -euo pipefail
-          # Floor: next must be >=95 (pubspec 1.0.12+95; update banners + cash/rating/contact).
+          # Floor: next must be >=96 (pubspec 1.0.12+96; selfie KYC + role-edit fix).
           PUBSPEC_CODE=$(grep -E '^version:' mobile/pubspec.yaml | head -1 | sed -E 's/.*\+([0-9]+).*/\1/')
           CODE="${{ github.run_number }}"
-          if [ "$CODE" -lt 95 ]; then CODE=95; fi
+          if [ "$CODE" -lt 96 ]; then CODE=96; fi
           if [ -n "$PUBSPEC_CODE" ] && [ "$PUBSPEC_CODE" -gt "$CODE" ]; then CODE="$PUBSPEC_CODE"; fi
           echo "code=$CODE" >> "$GITHUB_OUTPUT"
           echo "Play versionCode=$CODE (pubspec +${PUBSPEC_CODE:-?}; run_number=${{ github.run_number }})"

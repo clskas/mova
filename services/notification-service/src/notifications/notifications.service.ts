@@ -126,9 +126,21 @@ export class NotificationsService implements OnModuleInit {
   }
 
   async onPaymentCompleted(payload: PaymentCompletedPayload) {
-    const label = payload.rideId ? `course ${payload.rideId}` : `${payload.referenceType} ${payload.referenceId}`;
-    await this.create(payload.userId, 'Paiement confirmé', `Paiement de ${payload.amountCdf} FC effectué (${label})`, 'PAYMENT_COMPLETED', payload);
-    this.logger.log(`payment.completed notification for ${payload.rideId ?? payload.referenceId}`);
+    const method = (payload.method ?? '').toUpperCase();
+    const isCash = method === 'CASH';
+    const title = isCash ? 'Paiement espèces confirmé' : 'Paiement confirmé';
+    const body = isCash
+      ? `Le chauffeur a confirmé votre paiement de ${payload.amountCdf} FC. Vous pouvez noter la course.`
+      : `Paiement de ${payload.amountCdf} FC effectué. Merci d'utiliser SENGA.`;
+    await this.create(payload.userId, title, body, 'PAYMENT_COMPLETED', payload);
+    await this.pushToDrivers([payload.userId], title, body, {
+      type: 'PAYMENT_COMPLETED',
+      method,
+      rideId: payload.rideId ?? '',
+      referenceType: payload.referenceType ?? '',
+      referenceId: payload.referenceId ?? '',
+    });
+    this.logger.log(`payment.completed notification for ${payload.rideId ?? payload.referenceId} (${method || 'n/a'})`);
   }
 
   private chatSenderLabel(role: string): string {

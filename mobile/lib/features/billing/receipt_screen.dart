@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -16,6 +17,7 @@ import '../../core/widgets/mova_widgets.dart';
 import '../../core/billing/bluetooth_print_service.dart';
 import '../rating/rating_screen.dart';
 import '../delivery/delivery_payment_state.dart';
+import '../passenger/passenger_alert_service.dart';
 import 'billing_util.dart';
 
 class ReceiptScreen extends ConsumerStatefulWidget {
@@ -97,16 +99,42 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
   void _onCashConfirmed(Map<String, dynamic> payload) {
     if (!mounted || !_cashStillPending) return;
     setState(() => _cashStillPending = false);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          paymentConfirmedMessage(
-            method: payload['method']?.toString() ?? 'CASH',
-            isDelivery: widget.referenceType == 'DELIVERY',
-          ),
-        ),
+    final method = payload['method']?.toString() ?? 'CASH';
+    final message = paymentConfirmedMessage(
+      method: method,
+      isDelivery: widget.referenceType == 'DELIVERY',
+    );
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    unawaited(
+      PassengerAlertService.notify(
+        title: method.toUpperCase() == 'CASH'
+            ? 'Paiement espèces confirmé'
+            : 'Paiement confirmé',
+        body: message,
       ),
     );
+    if (widget.showRatingAfter && widget.rideId != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => RatingScreen(rideId: widget.rideId!)),
+        );
+      });
+      return;
+    }
+    if (widget.showRatingAfter &&
+        widget.serviceType?.toUpperCase() == 'ERRAND' &&
+        widget.serviceId != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => RatingScreen(errandId: widget.serviceId!)),
+        );
+      });
+      return;
+    }
     _load();
   }
 

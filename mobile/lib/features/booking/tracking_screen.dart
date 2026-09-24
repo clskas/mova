@@ -5,11 +5,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../core/api/api_client.dart';
 import '../../core/api/ride_socket.dart';
 import '../../core/billing/service_price_display.dart';
 import '../../core/config/market_config.dart';
+import '../../core/contact/contact_actions.dart';
 import '../../core/error/result.dart';
 import '../../core/services/cancel_eligibility.dart';
 import '../../core/geo/geo_utils.dart';
@@ -20,6 +20,7 @@ import '../chat/ride_chat_screen.dart';
 import '../chat/chat_alert_service.dart';
 import '../passenger/passenger_alert_service.dart';
 import '../geo/suggest_place_screen.dart';
+import '../rating/rating_screen.dart';
 import 'payment_screen.dart';
 import 'widgets/mova_ride_map.dart';
 
@@ -467,15 +468,28 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
           };
         });
         if (!wasPaid) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                method?.toUpperCase() == 'CASH'
-                    ? 'Paiement espèces confirmé par le chauffeur'
-                    : 'Paiement confirmé',
-              ),
+          final isCash = method?.toUpperCase() == 'CASH';
+          final msg = isCash
+              ? 'Paiement espèces confirmé par le chauffeur'
+              : 'Paiement confirmé';
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+          unawaited(
+            PassengerAlertService.notify(
+              title: isCash ? 'Paiement espèces confirmé' : 'Paiement confirmé',
+              body: isCash
+                  ? 'Le chauffeur a validé votre paiement. Merci de noter la course.'
+                  : msg,
             ),
           );
+          if (_status == 'COMPLETED') {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!mounted) return;
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => RatingScreen(rideId: widget.rideId)),
+              );
+            });
+          }
         }
       },
     );
@@ -569,23 +583,12 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
   }
 
   Future<void> _callDriver() async {
-    final phone = _driver?['phone']?.toString() ?? '+243812345678';
-    if (phone.isEmpty) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Numéro chauffeur indisponible')),
-        );
-      }
-      return;
-    }
-    final uri = Uri.parse('tel:$phone');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri);
-    } else if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Appel : $phone')),
-      );
-    }
+    final phone = _driver?['phone']?.toString();
+    await showCallWhatsAppSheet(
+      context,
+      phone: phone,
+      peerLabel: 'le chauffeur',
+    );
   }
 
   Future<void> _shareTrip() async {
@@ -888,7 +891,13 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
                                   ),
                                   IconButton(
                                     icon: const Icon(Icons.phone, color: MovaColors.green),
+                                    tooltip: 'Appeler / WhatsApp',
                                     onPressed: _callDriver,
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.chat, color: Color(0xFF25D366)),
+                                    tooltip: 'WhatsApp',
+                                    onPressed: () => launchWhatsApp(_driver?['phone']?.toString()),
                                   ),
                                 ],
                               ),

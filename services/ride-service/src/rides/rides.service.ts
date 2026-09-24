@@ -821,6 +821,10 @@ export class RidesService {
       };
     }
     const driver = ride.driverId ? await this.fetchDriverInfo(ride.driverId) : null;
+    const passenger =
+      participantUserId && ride.driverId === participantUserId
+        ? await this.fetchUserBrief(ride.passengerId)
+        : null;
     const detail = this.formatRideDetail(ride);
     const rideRule = await this.commission.get(CommissionServiceType.RIDE);
     const gross = ride.finalFareCdf ?? ride.estimatedFareCdf ?? 0;
@@ -844,6 +848,12 @@ export class RidesService {
       gpsTrace,
       ratings: ride.ratings,
       driver,
+      passenger: passenger
+        ? {
+            name: passenger.name ?? 'Passager',
+            phone: passenger.phone ?? '',
+          }
+        : undefined,
     };
   }
 

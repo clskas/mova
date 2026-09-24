@@ -34,6 +34,7 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
   bool _walletTxLoadingMore = false;
   final _amountController = TextEditingController(text: '5000');
   final _searchController = TextEditingController();
+  final _payoutPhoneController = TextEditingController();
   String? _error;
   bool _loading = true;
   bool _loadingActivity = false;
@@ -55,6 +56,11 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
   int get _minWithdraw => _asInt(_data?['minWithdrawCdf']).clamp(2300, 999999999);
 
   bool get _payoutConfigured => _data?['payoutConfigured'] == true;
+
+  bool get _canWithdraw {
+    final phone = MarketConfig.normalizePhone(_payoutPhoneController.text.trim());
+    return _payoutConfigured || phone.isNotEmpty;
+  }
 
   String get _payoutLabel {
     final provider = _data?['payoutProvider']?.toString() ?? 'Mobile Money';
@@ -113,6 +119,7 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
   void dispose() {
     _amountController.dispose();
     _searchController.dispose();
+    _payoutPhoneController.dispose();
     super.dispose();
   }
 
@@ -412,8 +419,9 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
 
   Future<void> _withdraw() async {
     if (_withdrawing) return;
-    if (!_payoutConfigured) {
-      setState(() => _error = 'Configurez votre numéro Mobile Money dans Mon dossier.');
+    final phone = MarketConfig.normalizePhone(_payoutPhoneController.text.trim());
+    if (!_payoutConfigured && phone.isEmpty) {
+      setState(() => _error = 'Indiquez le numéro Mobile Money de retrait.');
       return;
     }
     final amount = int.tryParse(_amountController.text.trim());
@@ -434,6 +442,7 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
     final result = await api.post('/drivers/withdraw', {
       'amountCdf': amount,
       'provider': _withdrawProviderId,
+      if (phone.isNotEmpty) 'phone': phone,
     });
     if (!mounted) return;
     setState(() => _withdrawing = false);
@@ -817,14 +826,14 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
                 const Text('Retrait Mobile Money', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                 const SizedBox(height: 8),
                 if (_payoutConfigured)
-                  Text('Vers $_payoutLabel', style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13))
+                  Text('Dossier : $_payoutLabel', style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13))
                 else
                   const Text(
-                    'Configurez votre numéro dans Mon dossier pour activer le retrait.',
-                    style: TextStyle(color: MovaColors.error, fontSize: 13),
+                    'Indiquez ci-dessous le numéro Mobile Money qui recevra le retrait.',
+                    style: TextStyle(color: MovaColors.textSecondary, fontSize: 13),
                   ),
                 const SizedBox(height: 12),
-                if (_payoutConfigured && _mmChoices.isNotEmpty) ...[
+                if (_mmChoices.isNotEmpty) ...[
                   DropdownButtonFormField<String>(
                     value: _mmChoices.any((c) => c.id == _withdrawProviderId)
                         ? _withdrawProviderId
@@ -845,8 +854,23 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
                   const SizedBox(height: 12),
                 ],
                 TextField(
+                  controller: _payoutPhoneController,
+                  enabled: !_withdrawing,
+                  keyboardType: TextInputType.phone,
+                  decoration: InputDecoration(
+                    labelText: 'Numéro de retrait',
+                    hintText: '08X XXX XXXX',
+                    helperText: _payoutConfigured
+                        ? 'Laissez vide pour utiliser le numéro du dossier ($_payoutLabel)'
+                        : 'Numéro qui recevra le Mobile Money',
+                    prefixIcon: const Icon(Icons.phone_iphone),
+                  ),
+                  onChanged: (_) => setState(() {}),
+                ),
+                const SizedBox(height: 12),
+                TextField(
                   controller: _amountController,
-                  enabled: !_withdrawing && _payoutConfigured,
+                  enabled: !_withdrawing && _canWithdraw,
                   keyboardType: TextInputType.number,
                   decoration: InputDecoration(
                     labelText: 'Montant retrait (FC)',
@@ -856,10 +880,10 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
                 ),
                 const SizedBox(height: 12),
                 MovaButton(
-                  label: _payoutConfigured ? 'Retirer vers Mobile Money' : 'Configurer Mobile Money',
-                  icon: _payoutConfigured ? Icons.account_balance : Icons.settings,
+                  label: _canWithdraw ? 'Retirer vers Mobile Money' : 'Indiquez un numéro de retrait',
+                  icon: Icons.account_balance,
                   isLoading: _withdrawing,
-                  onPressed: _withdrawing ? null : (_payoutConfigured ? _withdraw : _openDossier),
+                  onPressed: _withdrawing ? null : (_canWithdraw ? _withdraw : null),
                 ),
                 const SizedBox(height: 24),
                 const Text(

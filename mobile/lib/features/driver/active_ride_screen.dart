@@ -6,6 +6,7 @@ import 'package:geolocator/geolocator.dart';
 import '../../core/api/api_client.dart';
 import '../../core/api/ride_socket.dart';
 import '../../core/config/market_config.dart';
+import '../../core/contact/contact_actions.dart';
 import '../../core/error/result.dart';
 import '../../core/geo/maps_launcher.dart';
 import '../../core/billing/driver_earnings_display.dart';
@@ -536,6 +537,44 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
             MovaErrorBanner(message: _error!),
           ],
           const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: MovaButton(
+                  label: 'Appeler',
+                  isSecondary: true,
+                  icon: Icons.phone,
+                  onPressed: () {
+                    final passenger = _ride['passenger'];
+                    final phone = passenger is Map
+                        ? passenger['phone']?.toString()
+                        : _ride['passengerPhone']?.toString();
+                    showCallWhatsAppSheet(
+                      context,
+                      phone: phone,
+                      peerLabel: 'le passager',
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: MovaButton(
+                  label: 'WhatsApp',
+                  isSecondary: true,
+                  icon: Icons.chat,
+                  onPressed: () {
+                    final passenger = _ride['passenger'];
+                    final phone = passenger is Map
+                        ? passenger['phone']?.toString()
+                        : _ride['passengerPhone']?.toString();
+                    launchWhatsApp(phone);
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
           if (!headingToPickup)
             MovaButton(
               label: _isRoundTripReturn

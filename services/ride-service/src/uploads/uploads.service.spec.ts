@@ -1,4 +1,8 @@
 import { UploadsService } from './uploads.service';
+import {
+  isSupabaseStorageConfigured,
+  supabaseUploadObject,
+} from '@mova/shared';
 
 jest.mock('@mova/shared', () => {
   const actual = jest.requireActual('@mova/shared');
@@ -17,6 +21,7 @@ describe('UploadsService', () => {
     uploadedMedia: {
       upsert: jest.fn().mockResolvedValue({}),
       findUnique: jest.fn(),
+      findMany: jest.fn().mockResolvedValue([]),
     },
   };
   const config = {
@@ -30,7 +35,9 @@ describe('UploadsService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    (isSupabaseStorageConfigured as jest.Mock).mockReturnValue(false);
     prisma.uploadedMedia.upsert.mockResolvedValue({});
+    prisma.uploadedMedia.findMany.mockResolvedValue([]);
   });
 
   it('persiste les photos menu en PostgreSQL (pas seulement disque)', async () => {
@@ -48,5 +55,33 @@ describe('UploadsService', () => {
         }),
       }),
     );
+  });
+
+  it('écrit aussi sur Supabase quand configuré', async () => {
+    (isSupabaseStorageConfigured as jest.Mock).mockReturnValue(true);
+    (supabaseUploadObject as jest.Mock).mockResolvedValue({
+      success: true,
+      signedUrl: 'https://example.test/signed',
+      publicUrl: 'https://example.test/public',
+    });
+    const tinyPng =
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+    const result = await service.uploadMenuPhoto(tinyPng, 'image/png');
+    expect(result.storage).toBe('supabase+db');
+    expect(supabaseUploadObject).toHaveBeenCalled();
+    expect(prisma.uploadedMedia.upsert).toHaveBeenCalled();
+  });
+
+  it('refuse en production si Supabase configuré mais upload échoue', async () => {
+    (isSupabaseStorageConfigured as jest.Mock).mockReturnValue(true);
+    (supabaseUploadObject as jest.Mock).mockResolvedValue({
+      success: false,
+      message: 'bucket missing',
+    });
+    const tinyPng =
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+    await expect(service.uploadMenuPhoto(tinyPng, 'image/png')).rejects.toMatchObject({
+      message: expect.stringMatching(/Supabase|bucket/i),
+    });
   });
 });

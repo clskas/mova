@@ -381,6 +381,13 @@ export class AdminService {
   }
   async createUser(body: Record<string, unknown>, actorRole: string) {
     const nextRole = typeof body.role === 'string' ? body.role : undefined;
+    if (nextRole === UserRole.SUPER_ADMIN && actorRole !== UserRole.SUPER_ADMIN) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.FORBIDDEN,
+        'Seul un SUPER_ADMIN peut attribuer le rôle Super admin.',
+      );
+    }
     if (nextRole && STAFF_ROLES.has(nextRole) && actorRole !== UserRole.SUPER_ADMIN) {
       throw new MovaHttpException(
         MovaErrorCode.AUTH_FORBIDDEN,
@@ -399,6 +406,14 @@ export class AdminService {
   }
   async updateUser(id: string, body: Record<string, unknown>, actorRole: string) {
     const nextRole = typeof body.role === 'string' ? body.role : undefined;
+    // Explicit: never let ADMIN / CITY_ADMIN self-escalate to SUPER_ADMIN via UI or API.
+    if (nextRole === UserRole.SUPER_ADMIN && actorRole !== UserRole.SUPER_ADMIN) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.FORBIDDEN,
+        'Seul un SUPER_ADMIN peut attribuer le rôle Super admin.',
+      );
+    }
     // Only SUPER_ADMIN may grant staff/admin-panel roles (blocks ADMIN→FINANCE escalation).
     if (nextRole && STAFF_ROLES.has(nextRole) && actorRole !== UserRole.SUPER_ADMIN) {
       throw new MovaHttpException(

@@ -41,6 +41,7 @@ import { PublicitesService } from '../publicites/publicites.service';
 import { PartnerKycService } from '../partner-kyc/partner-kyc.service';
 import { CompanyContactsService } from '../company-contacts/company-contacts.service';
 import { LegalDocumentsService } from '../legal-documents/legal-documents.service';
+import { UploadsService } from '../uploads/uploads.service';
 import { ClientAppsConfig } from '@mova/shared';
 
 @ApiTags('internal')
@@ -49,6 +50,7 @@ import { ClientAppsConfig } from '@mova/shared';
 export class InternalController {
   constructor(
     private rides: RidesService,
+    private uploads: UploadsService,
     private deliveries: DeliveriesService,
     private errands: ErrandsService,
     private errandCategoryEstimates: ErrandCategoryEstimateService,
@@ -883,5 +885,16 @@ export class InternalController {
   @Delete('rental-vehicles/:id')
   deleteRentalVehicle(@Param('id') id: string) {
     return this.rental.deleteVehicleAdmin(id);
+  }
+
+  /** Push existing Postgres uploaded_media blobs to Supabase Storage (idempotent). */
+  @Post('uploads/sync-supabase')
+  syncUploadsToSupabase(
+    @Body() body?: { limit?: number; category?: 'parcels' | 'menu' | 'vehicles' | 'moving' | 'kyc' },
+  ) {
+    return this.uploads.syncPostgresMediaToSupabase({
+      limit: body?.limit,
+      category: body?.category,
+    });
   }
 }

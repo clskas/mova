@@ -22,6 +22,7 @@ type UploadCategory = 'parcels' | 'menu' | 'vehicles' | 'moving' | 'kyc';
 @Injectable()
 export class UploadsService implements OnModuleInit {
   private readonly logger = new Logger(UploadsService.name);
+  private syncRunning = false;
 
   constructor(
     private config: ConfigService,
@@ -36,11 +37,20 @@ export class UploadsService implements OnModuleInit {
   }
 
   onModuleInit() {
-    if (this.isProduction && !isSupabaseStorageConfigured(this.get)) {
-      this.logger.warn(
-        'SUPABASE_SERVICE_ROLE_KEY absent — photos persistées en PostgreSQL (uploaded_media). Ajoutez la clé Supabase sur Render pour le stockage objet.',
-      );
+    if (!isSupabaseStorageConfigured(this.get)) {
+      if (this.isProduction) {
+        this.logger.warn(
+          'SUPABASE_SERVICE_ROLE_KEY absent — photos seulement en PostgreSQL. Configurez Supabase sur Render.',
+        );
+      }
+      return;
     }
+    // Background: push legacy Postgres blobs to Supabase after boot (non-blocking).
+    setTimeout(() => {
+      void this.syncPostgresMediaToSupabase({ limit: 200 }).catch((err) => {
+        this.logger.warn(`Supabase media sync skipped: ${err instanceof Error ? err.message : String(err)}`);
+      });
+    }, 15_000);
   }
 
   async uploadParcelPhoto(base64: string, mimeType = 'image/jpeg') {
@@ -90,6 +100,8 @@ export class UploadsService implements OnModuleInit {
     });
     if (fromDb) {
       await this.recacheLocal(category, safe, fromDb.data).catch(() => undefined);
+      // Best-effort: if this row never made it to Supabase, push it now.
+      void this.pushOneToSupabase(category as UploadCategory, safe, Buffer.from(fromDb.data), fromDb.mimeType);
       res.setHeader('Content-Type', fromDb.mimeType || this.mimeForFilename(safe));
       res.setHeader('Cache-Control', 'private, max-age=300');
       return res.send(Buffer.from(fromDb.data));
@@ -152,17 +164,20 @@ export class UploadsService implements OnModuleInit {
         cloudinaryMockUrl = result.signedUrl ?? result.publicUrl ?? photoUrl;
       } else {
         this.logger.error(`Supabase upload failed (${category}): ${result.message}`);
-        if (category === 'kyc' && this.isProduction) {
+        // Production: require object storage when configured — do not silently stay Postgres-only.
+        if (this.isProduction) {
           throw new MovaHttpException(
             MovaErrorCode.INTERNAL_ERROR,
             HttpStatus.BAD_GATEWAY,
-            result.message ?? 'Échec stockage document KYC.',
+            result.message ?? 'Échec stockage image sur Supabase.',
           );
         }
       }
+    } else if (this.isProduction) {
+      this.logger.error(`Upload ${category} without Supabase — persisting Postgres only`);
     }
 
-    // Always persist to Postgres so redeploys do not wipe partner photos.
+    // Always persist to Postgres so redeploys do not wipe partner photos (dual-write).
     await this.persistDurable(category, filename, buffer, contentType);
 
     return {
@@ -171,6 +186,66 @@ export class UploadsService implements OnModuleInit {
       storage,
       ...(bucket ? { bucket, path: objectPath } : {}),
     };
+  }
+
+  /**
+   * Push rows from `uploaded_media` (Postgres) to Supabase Storage.
+   * Idempotent (x-upsert). Safe to re-run.
+   */
+  async syncPostgresMediaToSupabase(opts?: { limit?: number; category?: UploadCategory }) {
+    if (!isSupabaseStorageConfigured(this.get)) {
+      return { ok: false as const, reason: 'supabase_not_configured', synced: 0, failed: 0, scanned: 0 };
+    }
+    if (this.syncRunning) {
+      return { ok: false as const, reason: 'already_running', synced: 0, failed: 0, scanned: 0 };
+    }
+    this.syncRunning = true;
+    const limit = Math.min(Math.max(opts?.limit ?? 100, 1), 500);
+    let synced = 0;
+    let failed = 0;
+    let scanned = 0;
+    try {
+      const rows = await this.prisma.uploadedMedia.findMany({
+        where: opts?.category ? { category: opts.category } : undefined,
+        orderBy: { createdAt: 'asc' },
+        take: limit,
+        select: { category: true, filename: true, mimeType: true, data: true },
+      });
+      scanned = rows.length;
+      for (const row of rows) {
+        const category = row.category as UploadCategory;
+        const ok = await this.pushOneToSupabase(category, row.filename, Buffer.from(row.data), row.mimeType);
+        if (ok) synced += 1;
+        else failed += 1;
+      }
+      this.logger.log(`Supabase media sync: scanned=${scanned} synced=${synced} failed=${failed}`);
+      return { ok: true as const, synced, failed, scanned };
+    } finally {
+      this.syncRunning = false;
+    }
+  }
+
+  private async pushOneToSupabase(
+    category: UploadCategory,
+    filename: string,
+    buffer: Buffer,
+    mimeType: string,
+  ): Promise<boolean> {
+    if (!isSupabaseStorageConfigured(this.get)) return false;
+    const bucket = category === 'kyc' ? supabaseKycBucket(this.get) : supabaseUploadsBucket(this.get);
+    const objectPath = `${category}/${filename}`;
+    const result = await supabaseUploadObject(this.get, {
+      bucket,
+      objectPath,
+      body: buffer,
+      contentType: mimeType || this.mimeForFilename(filename),
+      signedUrlExpiresIn: 7 * 24 * 3600,
+    });
+    if (!result.success) {
+      this.logger.warn(`Supabase sync miss ${objectPath}: ${result.message}`);
+      return false;
+    }
+    return true;
   }
 
   private async persistDurable(category: UploadCategory, filename: string, buffer: Buffer, mimeType: string) {

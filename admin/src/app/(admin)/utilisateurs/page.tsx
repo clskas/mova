@@ -51,11 +51,32 @@ const STAFF_EDIT_ROLES = new Set([
   "CITY_ADMIN",
 ]);
 
+/** Roles assignable in create/edit. SUPER_ADMIN never appears unless the actor is SUPER_ADMIN. */
+function roleSelectOptions(actorIsSuperAdmin: boolean): { value: string; label: string }[] {
+  const base: { value: string; label: string }[] = [
+    { value: "PASSENGER", label: "Passager" },
+    { value: "DRIVER", label: "Chauffeur" },
+    { value: "RESTAURANT", label: "Partenaire commerce (resto / boutique / …)" },
+    { value: "RENTAL_PARTNER", label: "Partenaire location" },
+  ];
+  if (!actorIsSuperAdmin) return base;
+  return [
+    ...base,
+    { value: "ADMIN", label: "Administrateur" },
+    { value: "SUPER_ADMIN", label: "Super admin" },
+    { value: "SUPPORT", label: "Support" },
+    { value: "FINANCE", label: "Finance" },
+    { value: "CONTENT", label: "Contenu" },
+    { value: "CITY_ADMIN", label: "Admin ville" },
+  ];
+}
+
 export default function UtilisateursPage() {
   const { canWrite, role, user } = useAdmin();
   const readOnly = !canWrite("utilisateurs");
   const canPurge = role === "SUPER_ADMIN";
   const canFilterCities = role === "SUPER_ADMIN" || role === "ADMIN";
+  const editableRoles = roleSelectOptions(canPurge);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [driverUserIds, setDriverUserIds] = useState<Set<string>>(new Set());
   const [total, setTotal] = useState(0);
@@ -536,13 +557,13 @@ export default function UtilisateursPage() {
             <SelectInput
               value={createRole}
               onChange={setCreateRole}
-              options={[
-                { value: "RESTAURANT", label: "Partenaire commerce" },
-                { value: "RENTAL_PARTNER", label: "Partenaire location" },
-                { value: "PASSENGER", label: "Passager" },
-                { value: "DRIVER", label: "Chauffeur" },
-                ...(canPurge
+              options={
+                canPurge
                   ? [
+                      { value: "RESTAURANT", label: "Partenaire commerce" },
+                      { value: "RENTAL_PARTNER", label: "Partenaire location" },
+                      { value: "PASSENGER", label: "Passager" },
+                      { value: "DRIVER", label: "Chauffeur" },
                       { value: "ADMIN", label: "Administrateur" },
                       { value: "SUPPORT", label: "Support" },
                       { value: "FINANCE", label: "Finance" },
@@ -550,8 +571,13 @@ export default function UtilisateursPage() {
                       { value: "CITY_ADMIN", label: "Admin ville" },
                       { value: "SUPER_ADMIN", label: "Super admin" },
                     ]
-                  : []),
-              ]}
+                  : [
+                      { value: "RESTAURANT", label: "Partenaire commerce" },
+                      { value: "RENTAL_PARTNER", label: "Partenaire location" },
+                      { value: "PASSENGER", label: "Passager" },
+                      { value: "DRIVER", label: "Chauffeur" },
+                    ]
+              }
             />
           </label>
           {canPurge && createRole === "CITY_ADMIN" && (
@@ -638,18 +664,12 @@ export default function UtilisateursPage() {
                     </p>
                   </div>
                 ) : (
-                  <SelectInput value={editRole} onChange={onEditRoleChange} disabled={readOnly} options={[
-                    { value: "PASSENGER", label: "Passager" },
-                    { value: "DRIVER", label: "Chauffeur" },
-                    { value: "RESTAURANT", label: "Partenaire commerce (resto / boutique / …)" },
-                    { value: "RENTAL_PARTNER", label: "Partenaire location" },
-                    { value: "ADMIN", label: "Administrateur" },
-                    { value: "SUPER_ADMIN", label: "Super admin" },
-                    { value: "SUPPORT", label: "Support" },
-                    { value: "FINANCE", label: "Finance" },
-                    { value: "CONTENT", label: "Contenu" },
-                    { value: "CITY_ADMIN", label: "Admin ville" },
-                  ]} />
+                  <SelectInput
+                    value={editRole}
+                    onChange={onEditRoleChange}
+                    disabled={readOnly}
+                    options={editableRoles}
+                  />
                 )}
               </label>
               {canPurge && STAFF_EDIT_ROLES.has(editRole) && (

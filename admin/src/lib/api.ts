@@ -84,7 +84,8 @@ export type AdminReports = {
 
 export type AdminUser = {
   id: string;
-  phone?: string;
+  /** null clears phone on Google-only accounts (PATCH). */
+  phone?: string | null;
   role?: string;
   status?: string;
   name?: string;

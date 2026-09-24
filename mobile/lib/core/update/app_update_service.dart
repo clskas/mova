@@ -285,6 +285,9 @@ class AppUpdateService extends Notifier<AppUpdateState> {
     String? fallbackStoreUrl,
     int advertisedCode = 0,
   }) {
+    // Installed build already at/above store advertisement → hide.
+    // Do not use playCode==localBuild alone: Play often echoes the installed
+    // code when no update is probed, which must not wipe an API "ahead" banner.
     if (advertisedCode > 0 && localBuild > 0 && localBuild >= advertisedCode) {
       return next.copyWith(updateAvailable: false, flexibleDownloaded: false);
     }

@@ -102,9 +102,9 @@ class MovaMapFormLayout extends StatelessWidget {
     required this.mapBuilder,
     required this.child,
     this.padding = const EdgeInsets.all(16),
-    this.mapFraction = 0.30,
-    this.minMapHeight = 120,
-    this.maxMapHeight = 200,
+    this.mapFraction = 0.42,
+    this.minMapHeight = 180,
+    this.maxMapHeight = 320,
   });
 
   final Widget Function(double height) mapBuilder;
@@ -123,12 +123,12 @@ class MovaMapFormLayout extends StatelessWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final effectiveMin = veryCompact ? 64.0 : (compact ? 80.0 : minMapHeight);
-        final effectiveMax = veryCompact ? 96.0 : (compact ? 132.0 : maxMapHeight);
-        final fraction = compact ? 0.18 : mapFraction;
+        final effectiveMin = veryCompact ? 120.0 : (compact ? 160.0 : minMapHeight);
+        final effectiveMax = veryCompact ? 180.0 : (compact ? 240.0 : maxMapHeight);
+        final fraction = compact ? 0.34 : mapFraction;
 
         final mapHeight = keyboardOpen
-            ? (veryCompact ? 0.0 : (compact ? 64.0 : minMapHeight))
+            ? (veryCompact ? 80.0 : (compact ? 120.0 : minMapHeight))
             : (constraints.maxHeight * fraction).clamp(effectiveMin, effectiveMax);
 
         final effectivePadding = MovaLayout.formPadding(context, normal: padding);

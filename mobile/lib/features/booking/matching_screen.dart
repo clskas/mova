@@ -31,7 +31,7 @@ class MatchingScreen extends ConsumerStatefulWidget {
 }
 
 class _MatchingScreenState extends ConsumerState<MatchingScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late final AnimationController _pulseController;
   bool _searching = true;
   bool _cancelling = false;
@@ -47,6 +47,7 @@ class _MatchingScreenState extends ConsumerState<MatchingScreen>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1500),
@@ -69,7 +70,15 @@ class _MatchingScreenState extends ConsumerState<MatchingScreen>
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted && _searching) {
+      unawaited(_pollRide());
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _pollTimer?.cancel();
     _rescanTimer?.cancel();
     _pulseController.dispose();

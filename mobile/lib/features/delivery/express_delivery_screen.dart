@@ -514,7 +514,7 @@ class _ExpressDeliveryScreenState extends ConsumerState<ExpressDeliveryScreen> {
       scrollable: false,
       padding: EdgeInsets.zero,
       child: MovaMapFormLayout(
-        maxMapHeight: 160,
+        maxMapHeight: 300,
         mapBuilder: (height) => MovaRideMap(
           pickup: _pickup,
           dropoff: _dropoff,
@@ -606,16 +606,28 @@ class _ExpressDeliveryScreenState extends ConsumerState<ExpressDeliveryScreen> {
                     MovaCard(
                       margin: const EdgeInsets.only(top: 4),
                       padding: EdgeInsets.zero,
-                      child: Column(
-                        children: _suggestions.map((s) {
-                          final label = s['label']?.toString() ?? s['address']?.toString() ?? '';
-                          return ListTile(
-                            dense: true,
-                            leading: const Icon(Icons.location_on_outlined, size: 20),
-                            title: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
-                            onTap: () => _selectSuggestion(s),
-                          );
-                        }).toList(),
+                      child: NotificationListener<ScrollNotification>(
+                        onNotification: (_) => true,
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxHeight: 220),
+                          child: ListView.separated(
+                            shrinkWrap: true,
+                            padding: EdgeInsets.zero,
+                            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.manual,
+                            itemCount: _suggestions.length,
+                            separatorBuilder: (_, __) => const Divider(height: 1),
+                            itemBuilder: (context, i) {
+                              final s = _suggestions[i];
+                              final label = s['label']?.toString() ?? s['address']?.toString() ?? '';
+                              return ListTile(
+                                dense: true,
+                                leading: const Icon(Icons.location_on_outlined, size: 20),
+                                title: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
+                                onTap: () => _selectSuggestion(s),
+                              );
+                            },
+                          ),
+                        ),
                       ),
                     ),
                   DestinationCoordPanel(

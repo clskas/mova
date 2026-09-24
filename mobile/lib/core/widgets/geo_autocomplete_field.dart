@@ -68,15 +68,17 @@ class _GeoAutocompleteFieldState extends State<GeoAutocompleteField> {
     _focusNode.addListener(_onFocusChange);
   }
 
+  bool _pointerOnSuggestions = false;
+
   void _onFocusChange() {
     if (!_focusNode.hasFocus) {
       _debounce?.cancel();
       _pendingQuery = null;
-      _fetchGeneration++;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && !_focusNode.hasFocus) {
-          _clearSuggestions();
-        }
+      // Delay clear so a tap/scroll on the suggestions list is not wiped by blur.
+      Future<void>.delayed(const Duration(milliseconds: 220), () {
+        if (!mounted || _focusNode.hasFocus || _pointerOnSuggestions) return;
+        _fetchGeneration++;
+        _clearSuggestions();
       });
     }
   }
@@ -248,7 +250,8 @@ class _GeoAutocompleteFieldState extends State<GeoAutocompleteField> {
       return const SizedBox.shrink();
     }
 
-    final items = _suggestions.take(10).toList();
+    final items = _suggestions.take(12).toList();
+    final maxH = compact ? 200.0 : 260.0;
 
     return Padding(
       padding: const EdgeInsets.only(top: 4),
@@ -257,29 +260,44 @@ class _GeoAutocompleteFieldState extends State<GeoAutocompleteField> {
         borderRadius: BorderRadius.circular(12),
         color: Colors.white,
         clipBehavior: Clip.antiAlias,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            for (var i = 0; i < items.length; i++) ...[
-              if (i > 0) const Divider(height: 1),
-              ListTile(
-                dense: true,
-                visualDensity: VisualDensity.compact,
-                leading: Icon(
-                  widget.prefixIcon ?? Icons.location_on_outlined,
-                  size: compact ? 18 : 20,
-                  color: MovaColors.violet,
-                ),
-                title: Text(
-                  items[i]['label']?.toString() ?? items[i]['address']?.toString() ?? '',
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: compact ? 13 : 14),
-                ),
-                onTap: () => _select(items[i]),
+        child: Listener(
+          onPointerDown: (_) => _pointerOnSuggestions = true,
+          onPointerUp: (_) => _pointerOnSuggestions = false,
+          onPointerCancel: (_) => _pointerOnSuggestions = false,
+          child: NotificationListener<ScrollNotification>(
+            onNotification: (notification) {
+              // Keep parent MovaMapFormLayout from stealing the drag / dismissing keyboard.
+              return true;
+            },
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: maxH),
+              child: ListView.separated(
+                shrinkWrap: true,
+                padding: EdgeInsets.zero,
+                keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.manual,
+                itemCount: items.length,
+                separatorBuilder: (_, __) => const Divider(height: 1),
+                itemBuilder: (context, i) {
+                  return ListTile(
+                    dense: true,
+                    visualDensity: VisualDensity.compact,
+                    leading: Icon(
+                      widget.prefixIcon ?? Icons.location_on_outlined,
+                      size: compact ? 18 : 20,
+                      color: MovaColors.violet,
+                    ),
+                    title: Text(
+                      items[i]['label']?.toString() ?? items[i]['address']?.toString() ?? '',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: compact ? 13 : 14),
+                    ),
+                    onTap: () => _select(items[i]),
+                  );
+                },
               ),
-            ],
-          ],
+            ),
+          ),
         ),
       ),
     );

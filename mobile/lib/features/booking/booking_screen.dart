@@ -706,7 +706,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
         ),
       ],
       child: MovaMapFormLayout(
-        maxMapHeight: 190,
+        maxMapHeight: 320,
         mapBuilder: (height) => MovaRideMap(
           pickup: _pickup,
           dropoff: _dropoff,

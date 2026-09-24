@@ -395,7 +395,7 @@ export default function UtilisateursPage() {
       {error && <div className="mb-4"><ErrorBanner message={error} onRetry={load} /></div>}
       <div className="space-y-4">
         <div className="flex flex-wrap gap-2 items-end">
-          <SearchInput value={search} onChange={setSearch} placeholder="Rechercher par nom, téléphone, e-mail ou rôle…" />
+          <SearchInput value={search} onChange={setSearch} placeholder="Rechercher par nom, téléphone, e-mail, rôle ou type (Pharmacie, Boutique…)…" />
           <BtnPrimary onClick={applySearch}>Rechercher</BtnPrimary>
           <label className="flex items-center gap-2 text-sm text-gray-600 pb-1">
             <input

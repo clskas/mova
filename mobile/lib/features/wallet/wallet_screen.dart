@@ -476,6 +476,15 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                     color: MovaColors.green,
                   ),
                 ),
+                const SizedBox(height: 8),
+                Text(
+                  MarketConfig.minWalletAmountLabel,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: MovaColors.textSecondary,
+                    fontSize: 12,
+                  ),
+                ),
                 if (_lastSync != null) ...[
                   const SizedBox(height: 8),
                   Text(
@@ -492,7 +501,10 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                   icon: Icons.arrow_upward,
                   isSecondary: true,
                   isLoading: _withdrawLoading,
-                  onPressed: _withdrawLoading || _topUpLoading || _loading || _balance < 2300
+                  onPressed: _withdrawLoading ||
+                          _topUpLoading ||
+                          _loading ||
+                          _balance < MarketConfig.minWalletAmountCdf
                       ? null
                       : _showWithdrawSheet,
                 ),
@@ -1101,9 +1113,10 @@ class _WalletTopUpSheetState extends State<_WalletTopUpSheet> {
             TextField(
               controller: _amountController,
               keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'Montant (FC)',
-                prefixIcon: Icon(Icons.payments_outlined),
+                helperText: MarketConfig.minWalletAmountLabel,
+                prefixIcon: const Icon(Icons.payments_outlined),
               ),
             ),
             const SizedBox(height: 12),

@@ -304,7 +304,8 @@ export class UsersService {
       resto: UserRole.RESTAURANT,
       location: UserRole.RENTAL_PARTNER,
       loueur: UserRole.RENTAL_PARTNER,
-      partenaire: UserRole.RENTAL_PARTNER,
+      partenaire: UserRole.RESTAURANT,
+      'partenaire location': UserRole.RENTAL_PARTNER,
       rental: UserRole.RENTAL_PARTNER,
       admin: UserRole.ADMIN,
     };

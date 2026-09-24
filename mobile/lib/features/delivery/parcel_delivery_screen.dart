@@ -548,7 +548,7 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
       scrollable: false,
       padding: EdgeInsets.zero,
       child: MovaMapFormLayout(
-        maxMapHeight: 170,
+        maxMapHeight: 300,
         mapBuilder: (height) => MovaRideMap(
           pickup: _pickup,
           dropoff: _dropoff,

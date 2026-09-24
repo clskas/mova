@@ -874,9 +874,14 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
                   keyboardType: TextInputType.number,
                   decoration: InputDecoration(
                     labelText: 'Montant retrait (FC)',
-                    helperText: 'Minimum ${MarketConfig.formatCdf(_minWithdraw)}',
+                    helperText: MarketConfig.minWalletAmountLabel,
                     prefixIcon: const Icon(Icons.payments_outlined),
                   ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Recharge et retrait : minimum ${MarketConfig.formatCdf(MarketConfig.minWalletAmountCdf)}.',
+                  style: const TextStyle(fontSize: 12, color: MovaColors.textSecondary),
                 ),
                 const SizedBox(height: 12),
                 MovaButton(

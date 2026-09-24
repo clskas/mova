@@ -1299,7 +1299,7 @@ class ApiClient {
   }
 
   Future<Result<Map<String, dynamic>>> getRide(String rideId) async {
-    final result = await get('/rides/$rideId');
+    final result = await get('/rides/$rideId', skipCache: true);
     return switch (result) {
       Success(:final data) => Success(
           data['ride'] as Map<String, dynamic>? ?? data,
@@ -1311,7 +1311,7 @@ class ApiClient {
   /// Course active du passager (null si aucune) — permet de reprendre après fermeture de l'app.
   Future<Result<Map<String, dynamic>?>> getActiveRide() async {
     if (isMockMode) return const Success(null);
-    final result = await get('/rides/active');
+    final result = await get('/rides/active', skipCache: true);
     switch (result) {
       case Success(:final data):
         final ride = data['ride'];
@@ -1326,7 +1326,7 @@ class ApiClient {
   /// Livraison ou course active du passager (null si aucune).
   Future<Result<Map<String, dynamic>>> getActiveShipments() async {
     if (isMockMode) return const Success({});
-    final result = await get('/deliveries/active');
+    final result = await get('/deliveries/active', skipCache: true);
     switch (result) {
       case Success(:final data):
         return Success(Map<String, dynamic>.from(data));

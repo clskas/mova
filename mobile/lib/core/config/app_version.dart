@@ -4,7 +4,7 @@
 /// the in-app update banner stuck after a Play install.
 class AppVersion {
   static const name = '1.0.12';
-  static const build = int.fromEnvironment('APP_BUILD', defaultValue: 96);
+  static const build = int.fromEnvironment('APP_BUILD', defaultValue: 97);
 
   static int compare(String a, String b) {
     List<int> parts(String raw) => raw

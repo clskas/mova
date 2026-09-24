@@ -4,6 +4,8 @@ import {
   MovaErrorCode,
   MovaHttpException,
   UserRole,
+  commerceTypeFromSearch,
+  parseCommerceType,
   resolveCityFromCoords,
   serviceUrl,
 } from '@mova/shared';
@@ -233,6 +235,11 @@ export class AdminService {
     includePlayPrelaunch = false,
     cities?: string | string[] | null,
   ) {
+    const commerceType = commerceTypeFromSearch(search);
+    if (commerceType) {
+      return this.listUsersByCommerceType(commerceType, skip, take, includePlayPrelaunch, cities);
+    }
+
     const params = new URLSearchParams({ skip: String(skip), take: String(take) });
     if (search) params.set('search', search);
     if (includePlayPrelaunch) params.set('includePlayPrelaunch', 'true');
@@ -345,6 +352,65 @@ export class AdminService {
       return false;
     });
     return { ...result, data: scoped, total: scoped.length };
+  }
+
+  /** Search by partner business type (Pharmacie / Boutique / …) — auth role is always RESTAURANT. */
+  private async listUsersByCommerceType(
+    commerceType: string,
+    skip: number,
+    take: number,
+    includePlayPrelaunch: boolean,
+    cities?: string | string[] | null,
+  ) {
+    const restaurants = await this.fetchJson<
+      Array<{ ownerUserId?: string | null; commerceType?: string | null; lat?: number | null; lng?: number | null }>
+    >('ride', '/internal/restaurants').catch(() => []);
+    const rows = Array.isArray(restaurants) ? restaurants : [];
+    const ownerIds = [
+      ...new Set(
+        rows
+          .filter((r) => parseCommerceType(r.commerceType) === commerceType && r.ownerUserId)
+          .map((r) => String(r.ownerUserId)),
+      ),
+    ];
+    if (ownerIds.length === 0) {
+      return { data: [], total: 0, skip, take };
+    }
+
+    const params = new URLSearchParams({
+      skip: '0',
+      take: '500',
+      search: 'restaurant',
+    });
+    if (includePlayPrelaunch) params.set('includePlayPrelaunch', 'true');
+    const authResult = await this.fetchJson<{
+      data?: Array<{ id: string; role?: string; commerceType?: string; managedCity?: string | null; [key: string]: unknown }>;
+    }>('auth', `/internal/users?${params}`);
+    const ownerSet = new Set(ownerIds);
+    let data = (authResult.data ?? [])
+      .filter((u) => ownerSet.has(u.id) && u.role === 'RESTAURANT')
+      .map((u) => ({ ...u, commerceType }));
+
+    const cityList = (Array.isArray(cities) ? cities : cities ? [cities] : [])
+      .map((c) => c.trim())
+      .filter(Boolean);
+    if (cityList.length > 0) {
+      const cityPartnerIds = new Set<string>();
+      const restaurantsBundles = await Promise.all(
+        cityList.map((city) =>
+          this.listRestaurants(city).catch(() => [] as Array<{ ownerUserId?: string | null }>),
+        ),
+      );
+      for (const restaurants of restaurantsBundles) {
+        for (const r of Array.isArray(restaurants) ? restaurants : []) {
+          if (r.ownerUserId) cityPartnerIds.add(String(r.ownerUserId));
+        }
+      }
+      data = data.filter((u) => cityPartnerIds.has(u.id));
+    }
+
+    const total = data.length;
+    return { data: data.slice(skip, skip + take), total, skip, take };
   }
   listPlayPrelaunchUsers() {
     return this.fetchJson('auth', '/internal/users/play-prelaunch');

@@ -31,6 +31,11 @@ class MarketConfig {
   static const defaultLat = mapCenterLat;
   static const defaultLng = mapCenterLng;
 
+  /// Minimum SerdiPay pour recharge et retrait portefeuille (passager + chauffeur).
+  static const minWalletAmountCdf = 2300;
+  static String get minWalletAmountLabel =>
+      'Minimum ${formatCdf(minWalletAmountCdf)} pour recharge et retrait';
+
   /// Web OAuth client ID (Google Cloud). Required as `serverClientId` so Android
   /// returns an ID token the backend can verify. Same value as `GOOGLE_CLIENT_ID`.
   ///

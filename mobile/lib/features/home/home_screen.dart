@@ -230,6 +230,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     };
   }
 
+  /// Course active du passager — toujours frais (pas de cache) pour le retour app.
   Future<void> _loadActiveRide() async {
     final api = ref.read(apiClientProvider);
     final result = await api.getActiveRide();

@@ -7,7 +7,8 @@ import { AuthService } from '../auth/auth.service';
 import { InternalApiGuard } from '../common/internal-api.guard';
 
 class CreateUserAdminDto {
-  @IsString() phone: string;
+  @IsOptional() @IsString() phone?: string;
+  @IsOptional() @IsString() email?: string;
   @IsEnum(UserRole) role: UserRole;
   @IsOptional() @IsEnum(UserStatus) status?: UserStatus;
   @IsOptional() @IsString() firstName?: string;

@@ -420,67 +420,149 @@ export class UsersService {
   }
 
   async createAdmin(data: {
-    phone: string;
+    phone?: string;
+    email?: string;
     role: UserRole;
     firstName?: string;
     lastName?: string;
     status?: UserStatus;
     managedCity?: string;
   }) {
-    const phone = normalizePhoneRdc(data.phone);
-    if (!validatePhoneRdc(phone)) {
-      throw new MovaHttpException(MovaErrorCode.AUTH_INVALID_PHONE, HttpStatus.BAD_REQUEST);
-    }
-    if (isDemoUserInsertForbidden(phone)) {
-      throw new MovaHttpException(
-        MovaErrorCode.AUTH_FORBIDDEN,
-        HttpStatus.FORBIDDEN,
-        'Les comptes démo (+2439000000xx) ne peuvent pas être créés en production.',
-      );
-    }
-    this.assertAssignableRole(data.role);
-    const managedCity = this.resolveManagedCityForRole(data.role, data.managedCity);
-    const existing = await this.prisma.user.findUnique({ where: { phone } });
-    if (existing) {
-      const promotePassengerToPartner =
-        existing.role === UserRole.PASSENGER &&
-        (data.role === UserRole.RESTAURANT || data.role === UserRole.RENTAL_PARTNER);
-      if (existing.role === data.role) {
-        return this.enrichUser(
-          await this.prisma.user.update({
-            where: { id: existing.id },
-            data: {
-              status: data.status ?? existing.status,
-              managedCity,
-              ...(data.firstName !== undefined ? { firstName: data.firstName } : {}),
-              ...(data.lastName !== undefined ? { lastName: data.lastName } : {}),
-            },
-          }),
-        );
-      }
-      if (promotePassengerToPartner) {
-        return this.enrichUser(
-          await this.prisma.user.update({
-            where: { id: existing.id },
-            data: {
-              role: data.role,
-              status: data.status ?? UserStatus.ACTIVE,
-              managedCity: null,
-              ...(data.firstName !== undefined ? { firstName: data.firstName } : {}),
-              ...(data.lastName !== undefined ? { lastName: data.lastName } : {}),
-            },
-          }),
-        );
-      }
+    const rawPhone = data.phone?.trim() ?? '';
+    const rawEmail = data.email?.trim().toLowerCase() ?? '';
+    const hasPhone = rawPhone.length > 0;
+    const hasEmail = rawEmail.length > 0;
+
+    if (!hasPhone && !hasEmail) {
       throw new MovaHttpException(
         MovaErrorCode.VALIDATION_ERROR,
-        HttpStatus.CONFLICT,
-        `Ce numéro existe déjà (rôle: ${existing.role}). Modifiez le rôle depuis la fiche utilisateur.`,
+        HttpStatus.BAD_REQUEST,
+        'Indiquez un téléphone ou un e-mail Google.',
       );
     }
+
+    let phone: string | null = null;
+    if (hasPhone) {
+      phone = normalizePhoneRdc(rawPhone);
+      if (!validatePhoneRdc(phone)) {
+        throw new MovaHttpException(MovaErrorCode.AUTH_INVALID_PHONE, HttpStatus.BAD_REQUEST);
+      }
+      if (isDemoUserInsertForbidden(phone)) {
+        throw new MovaHttpException(
+          MovaErrorCode.AUTH_FORBIDDEN,
+          HttpStatus.FORBIDDEN,
+          'Les comptes démo (+2439000000xx) ne peuvent pas être créés en production.',
+        );
+      }
+    }
+
+    let email: string | null = null;
+    if (hasEmail) {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rawEmail)) {
+        throw new MovaHttpException(
+          MovaErrorCode.VALIDATION_ERROR,
+          HttpStatus.BAD_REQUEST,
+          'E-mail Google invalide.',
+        );
+      }
+      email = rawEmail;
+    }
+
+    // Compte Google-only (sans téléphone) : réservé aux rôles staff / admin ville.
+    if (!phone && email) {
+      const staffOnly = [
+        UserRole.SUPER_ADMIN,
+        UserRole.ADMIN,
+        UserRole.SUPPORT,
+        UserRole.FINANCE,
+        UserRole.CONTENT,
+        UserRole.CITY_ADMIN,
+      ];
+      if (!staffOnly.includes(data.role)) {
+        throw new MovaHttpException(
+          MovaErrorCode.VALIDATION_ERROR,
+          HttpStatus.BAD_REQUEST,
+          'La création par e-mail Google sans téléphone est réservée aux comptes staff (ex. Admin ville).',
+        );
+      }
+    }
+
+    this.assertAssignableRole(data.role);
+    const managedCity = this.resolveManagedCityForRole(data.role, data.managedCity);
+
+    if (phone) {
+      const existing = await this.prisma.user.findUnique({ where: { phone } });
+      if (existing) {
+        const promotePassengerToPartner =
+          existing.role === UserRole.PASSENGER &&
+          (data.role === UserRole.RESTAURANT || data.role === UserRole.RENTAL_PARTNER);
+        if (existing.role === data.role) {
+          return this.enrichUser(
+            await this.prisma.user.update({
+              where: { id: existing.id },
+              data: {
+                status: data.status ?? existing.status,
+                managedCity,
+                ...(email && !existing.email ? { email } : {}),
+                ...(data.firstName !== undefined ? { firstName: data.firstName } : {}),
+                ...(data.lastName !== undefined ? { lastName: data.lastName } : {}),
+              },
+            }),
+          );
+        }
+        if (promotePassengerToPartner) {
+          return this.enrichUser(
+            await this.prisma.user.update({
+              where: { id: existing.id },
+              data: {
+                role: data.role,
+                status: data.status ?? UserStatus.ACTIVE,
+                managedCity: null,
+                ...(data.firstName !== undefined ? { firstName: data.firstName } : {}),
+                ...(data.lastName !== undefined ? { lastName: data.lastName } : {}),
+              },
+            }),
+          );
+        }
+        throw new MovaHttpException(
+          MovaErrorCode.VALIDATION_ERROR,
+          HttpStatus.CONFLICT,
+          `Ce numéro existe déjà (rôle: ${existing.role}). Modifiez le rôle depuis la fiche utilisateur.`,
+        );
+      }
+    }
+
+    if (email) {
+      const existingByEmail = await this.prisma.user.findFirst({
+        where: { email: { equals: email, mode: 'insensitive' } },
+      });
+      if (existingByEmail) {
+        if (existingByEmail.role === data.role && !phone) {
+          return this.enrichUser(
+            await this.prisma.user.update({
+              where: { id: existingByEmail.id },
+              data: {
+                status: data.status ?? existingByEmail.status,
+                managedCity,
+                email,
+                ...(data.firstName !== undefined ? { firstName: data.firstName } : {}),
+                ...(data.lastName !== undefined ? { lastName: data.lastName } : {}),
+              },
+            }),
+          );
+        }
+        throw new MovaHttpException(
+          MovaErrorCode.VALIDATION_ERROR,
+          HttpStatus.CONFLICT,
+          `Cet e-mail existe déjà (rôle: ${existingByEmail.role}). Modifiez le rôle depuis la fiche utilisateur.`,
+        );
+      }
+    }
+
     const user = await this.prisma.user.create({
       data: {
         phone,
+        email,
         role: data.role,
         status: data.status ?? (data.role === UserRole.DRIVER ? UserStatus.PENDING_KYC : UserStatus.ACTIVE),
         firstName: data.firstName,

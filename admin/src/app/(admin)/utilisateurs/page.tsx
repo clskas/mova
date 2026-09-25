@@ -95,6 +95,9 @@ export default function UtilisateursPage() {
   const [purgeTarget, setPurgeTarget] = useState<AdminUser | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [createPhone, setCreatePhone] = useState("");
+  const [createEmail, setCreateEmail] = useState("");
+  /** Admin ville : téléphone (OTP) ou e-mail Google. */
+  const [createIdentityMode, setCreateIdentityMode] = useState<"phone" | "google">("phone");
   const [createRole, setCreateRole] = useState("RESTAURANT");
   const [createFirst, setCreateFirst] = useState("");
   const [createLast, setCreateLast] = useState("");
@@ -216,11 +219,18 @@ export default function UtilisateursPage() {
   }
 
   async function saveNewUser() {
-    if (!createPhone.trim()) {
+    const isCityAdmin = createRole === "CITY_ADMIN";
+    const useGoogle = isCityAdmin && createIdentityMode === "google";
+    if (useGoogle) {
+      if (!createEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(createEmail.trim())) {
+        setError("Indiquez un e-mail Google valide.");
+        return;
+      }
+    } else if (!createPhone.trim()) {
       setError("Le téléphone est obligatoire.");
       return;
     }
-    if (createRole === "CITY_ADMIN" && !createManagedCity.trim()) {
+    if (isCityAdmin && !createManagedCity.trim()) {
       setError("Choisissez la ville gérée pour un Admin ville.");
       return;
     }
@@ -228,14 +238,18 @@ export default function UtilisateursPage() {
     setError(null);
     try {
       await createUser({
-        phone: createPhone.trim(),
+        ...(useGoogle
+          ? { email: createEmail.trim().toLowerCase() }
+          : { phone: createPhone.trim() }),
         role: createRole,
         firstName: createFirst.trim() || undefined,
         lastName: createLast.trim() || undefined,
-        ...(createRole === "CITY_ADMIN" ? { managedCity: createManagedCity.trim() } : {}),
+        ...(isCityAdmin ? { managedCity: createManagedCity.trim() } : {}),
       });
       setCreateOpen(false);
       setCreatePhone("");
+      setCreateEmail("");
+      setCreateIdentityMode("phone");
       setCreateFirst("");
       setCreateLast("");
       setCreateRole("RESTAURANT");
@@ -375,6 +389,9 @@ export default function UtilisateursPage() {
                   onClick={() => {
                     setCreateRole("CITY_ADMIN");
                     setCreateManagedCity("");
+                    setCreateIdentityMode("phone");
+                    setCreateEmail("");
+                    setCreatePhone("");
                     setCreateOpen(true);
                   }}
                 >
@@ -545,8 +562,8 @@ export default function UtilisateursPage() {
         <div className="space-y-4">
           {createRole === "CITY_ADMIN" ? (
             <p className="text-sm text-gray-600">
-              L’admin ville ne voit que les données de sa ville (courses, livraisons, restos…).
-              Il ne peut pas modifier les tarifs ni la trésorerie. Réservé au SUPER_ADMIN.
+              L’admin ville ne voit que les données de sa ville (courses, livraisons, restos, tarifs…).
+              Pas d’accès trésorerie / système. Connexion par téléphone (SMS) ou Google. Réservé SUPER_ADMIN.
             </p>
           ) : (
             <p className="text-sm text-gray-600">
@@ -554,10 +571,49 @@ export default function UtilisateursPage() {
               (Admin ville, Support…). Le partenaire peut aussi s’inscrire seul via OTP.
             </p>
           )}
-          <label>
-            <FieldLabel>Téléphone *</FieldLabel>
-            <TextInput value={createPhone} onChange={setCreatePhone} placeholder="+243900000030" />
-          </label>
+          {createRole === "CITY_ADMIN" && (
+            <fieldset className="space-y-2">
+              <legend className="text-sm font-medium text-gray-700">Identifiant de connexion *</legend>
+              <div className="flex flex-wrap gap-4 text-sm text-gray-700">
+                <label className="inline-flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="city-admin-identity"
+                    checked={createIdentityMode === "phone"}
+                    onChange={() => setCreateIdentityMode("phone")}
+                  />
+                  Téléphone (SMS)
+                </label>
+                <label className="inline-flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="city-admin-identity"
+                    checked={createIdentityMode === "google"}
+                    onChange={() => setCreateIdentityMode("google")}
+                  />
+                  Compte Google (e-mail)
+                </label>
+              </div>
+            </fieldset>
+          )}
+          {createRole === "CITY_ADMIN" && createIdentityMode === "google" ? (
+            <label>
+              <FieldLabel>E-mail Google *</FieldLabel>
+              <TextInput
+                value={createEmail}
+                onChange={setCreateEmail}
+                placeholder="admin.beni@gmail.com"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                La personne se connectera à la console admin avec ce compte Google (même e-mail).
+              </p>
+            </label>
+          ) : (
+            <label>
+              <FieldLabel>Téléphone *</FieldLabel>
+              <TextInput value={createPhone} onChange={setCreatePhone} placeholder="+243900000030" />
+            </label>
+          )}
           <label>
             <FieldLabel>Rôle *</FieldLabel>
             <SelectInput

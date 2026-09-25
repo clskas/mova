@@ -52,7 +52,14 @@ class UpdateUserDto {
 }
 
 class CreateUserDto {
-  @ApiProperty({ example: '+243900000030' }) @IsString() phone: string;
+  @ApiProperty({ example: '+243900000030', required: false })
+  @IsOptional()
+  @IsString()
+  phone?: string;
+  @ApiProperty({ example: 'admin.beni@gmail.com', required: false, description: 'E-mail Google (admin ville sans téléphone)' })
+  @IsOptional()
+  @IsString()
+  email?: string;
   @ApiProperty({ example: 'RESTAURANT' }) @IsString() role: string;
   @ApiProperty({ required: false }) @IsOptional() @IsString() firstName?: string;
   @ApiProperty({ required: false }) @IsOptional() @IsString() lastName?: string;

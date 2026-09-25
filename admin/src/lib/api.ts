@@ -2012,7 +2012,8 @@ export async function updateDebtPolicy(data: {
 }
 
 export async function createUser(data: {
-  phone: string;
+  phone?: string;
+  email?: string;
   role: string;
   firstName?: string;
   lastName?: string;

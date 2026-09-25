@@ -545,8 +545,9 @@ function TimeWindowRow({
 }
 
 export default function TarifsPage() {
-  const { canWrite, role, user } = useAdmin();
+  const { canWrite, canAccess, role, user } = useAdmin();
   const readOnly = !canWrite("tarifs");
+  const canManagePromos = canAccess("promos");
   const canAssignPromoCities = role === "SUPER_ADMIN" || role === "ADMIN";
   const lockedCity = role === "CITY_ADMIN" ? (user?.managedCity?.trim() || MOVA_CITIES[0]) : null;
   const [city, setCity] = useState<string>(() => initialTarifsCity(lockedCity));
@@ -701,14 +702,20 @@ export default function TarifsPage() {
         fetchCommissions(),
         fetchErrandCategoryEstimates(),
         fetchPricingTimeWindows(city),
-        fetchPromoCodes(),
+        // CITY_ADMIN n'a pas PROMO_READ — ne pas appeler (évite le faux bandeau « Accès refusé »).
+        canManagePromos ? fetchPromoCodes() : Promise.resolve([] as Awaited<ReturnType<typeof fetchPromoCodes>>),
       ]);
       const value = <T,>(i: number, fallback: T): T => {
         const r = results[i];
         return r.status === "fulfilled" ? (r.value as T) : fallback;
       };
       const softErrors = results
-        .map((r, i) => (r.status === "rejected" ? (r.reason instanceof Error ? r.reason.message : `Erreur #${i}`) : null))
+        .map((r, i) => {
+          if (r.status !== "rejected") return null;
+          // Index 7 = promos optionnelles
+          if (i === 7 && !canManagePromos) return null;
+          return r.reason instanceof Error ? r.reason.message : `Erreur #${i}`;
+        })
         .filter(Boolean) as string[];
       const v = value(0, [] as Awaited<ReturnType<typeof fetchPricingRules>>);
       const d = value(1, [] as Awaited<ReturnType<typeof fetchDeliveryPricingRules>>);
@@ -735,7 +742,7 @@ export default function TarifsPage() {
     } finally {
       setLoading(false);
     }
-  }, [city]);
+  }, [city, canManagePromos]);
 
   useEffect(() => {
     if (lockedCity) {
@@ -1190,6 +1197,7 @@ export default function TarifsPage() {
             </Card>
           </section>
 
+          {canManagePromos && (
           <section>
             <div className="flex items-center justify-between mb-3">
               <div>
@@ -1246,6 +1254,7 @@ export default function TarifsPage() {
               </table>
             </Card>
           </section>
+          )}
         </>
       )}
 

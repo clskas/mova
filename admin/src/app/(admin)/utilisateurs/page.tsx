@@ -434,19 +434,25 @@ export default function UtilisateursPage() {
         {canFilterCities && (
           <div className="rounded-xl border border-gray-200 bg-white p-3">
             <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-              <p className="text-sm font-medium text-[#1A1A2E]">Filtrer par villes</p>
-              {cityFilter.length > 0 && (
-                <button
-                  type="button"
-                  className="text-xs text-[#6C63FF]"
-                  onClick={() => {
-                    setPage(0);
-                    setCityFilter([]);
-                  }}
-                >
-                  Toutes les villes
-                </button>
-              )}
+              <p className="text-sm font-medium text-[#1A1A2E]">
+                Filtrer par villes
+                {cityFilter.length > 0 && (
+                  <span className="ml-2 text-xs font-normal text-[#6C63FF]">
+                    ({cityFilter.length} sélectionnée{cityFilter.length > 1 ? "s" : ""})
+                  </span>
+                )}
+              </p>
+              <button
+                type="button"
+                disabled={cityFilter.length === 0}
+                className="text-xs px-2.5 py-1 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                onClick={() => {
+                  setPage(0);
+                  setCityFilter([]);
+                }}
+              >
+                Annuler le filtre
+              </button>
             </div>
             <div className="flex flex-wrap gap-2 max-h-28 overflow-y-auto">
               {(cityOptions.length > 0 ? cityOptions.map((c) => c.name) : []).map((name) => {
@@ -469,6 +475,9 @@ export default function UtilisateursPage() {
             </div>
             <p className="text-xs text-gray-500 mt-2">
               Affiche chauffeurs, partenaires et admins ville rattachés aux villes choisies.
+              {cityFilter.length > 0 && (
+                <> Filtre actif : {cityFilter.join(", ")}.</>
+              )}
             </p>
           </div>
         )}

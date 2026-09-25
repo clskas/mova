@@ -228,6 +228,23 @@ export class InternalController {
     return this.payments.getRidePaymentStatuses(body.rideIds ?? []);
   }
 
+  @Post('rides/:rideId/mark-paid')
+  adminMarkRidePaid(
+    @Param('rideId') rideId: string,
+    @Body() body: { confirmedBy?: string },
+  ) {
+    return this.payments.adminMarkRidePaid(rideId, body?.confirmedBy);
+  }
+
+  @Post('services/:referenceType/:referenceId/mark-paid')
+  adminMarkServicePaid(
+    @Param('referenceType') referenceType: string,
+    @Param('referenceId') referenceId: string,
+    @Body() body: { confirmedBy?: string },
+  ) {
+    return this.payments.adminMarkServicePaid(referenceType, referenceId, body?.confirmedBy);
+  }
+
   @Get('services/:referenceType/:referenceId/payment-status')
   getServicePaymentStatus(
     @Param('referenceType') referenceType: string,

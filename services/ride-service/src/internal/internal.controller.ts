@@ -209,6 +209,11 @@ export class InternalController {
     return this.rides.adminUpdateStatus(id, status, reason);
   }
 
+  @Patch('rides/:id/assign')
+  assignRideDriver(@Param('id') id: string, @Body('driverId') driverId: string) {
+    return this.rides.adminAssignDriver(id, driverId);
+  }
+
   @Get('deliveries')
   async listDeliveries(
     @Query('status') status?: string,

@@ -323,6 +323,8 @@ export type DeliveryOverview = {
   gpsTrace?: GpsPoint[];
   events?: { event: string; createdAt: string }[];
   timeline?: { label: string; done: boolean; at?: string }[];
+  isPaid?: boolean;
+  paymentStatus?: string | null;
 };
 
 export type ScheduledOverview = {
@@ -356,6 +358,8 @@ export type RideOverview = {
   priceCdf?: number;
   createdAt?: string;
   gpsTrace?: GpsPoint[];
+  isPaid?: boolean;
+  paymentStatus?: string | null;
 };
 
 export type GpsPoint = { lat: number; lng: number; recordedAt?: string };
@@ -2329,6 +2333,14 @@ export async function updateRideStatus(id: string, status: string, reason?: stri
   return apiFetch(`/api/admin/rides/${id}/status`, { method: "PATCH", body: JSON.stringify({ status, reason }) });
 }
 
+export async function assignRideDriver(id: string, driverId: string) {
+  return apiFetch(`/api/admin/rides/${id}/assign`, { method: "PATCH", body: JSON.stringify({ driverId }) });
+}
+
+export async function markRidePaid(id: string) {
+  return apiFetch(`/api/admin/rides/${id}/mark-paid`, { method: "POST", body: JSON.stringify({}) });
+}
+
 export async function cancelScheduledRide(id: string, reason?: string) {
   return apiFetch(`/api/admin/scheduled-rides/${id}/cancel`, { method: "POST", body: JSON.stringify({ reason }) });
 }
@@ -2347,6 +2359,13 @@ export async function updateDeliveryStatus(id: string, status: string) {
 
 export async function assignDeliveryDriver(id: string, driverId: string) {
   return apiFetch(`/api/admin/deliveries/${id}/assign`, { method: "PATCH", body: JSON.stringify({ driverId }) });
+}
+
+export async function markDeliveryPaid(id: string, type?: string) {
+  return apiFetch(`/api/admin/deliveries/${id}/mark-paid`, {
+    method: "POST",
+    body: JSON.stringify({ type }),
+  });
 }
 
 export async function cancelDelivery(id: string, reason?: string) {

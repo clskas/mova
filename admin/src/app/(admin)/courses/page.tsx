@@ -1,8 +1,24 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { apiFetch, cancelRide, fetchGpsTrace, fetchRide, formatCdf, formatDate, updateRideStatus, type GpsPoint, type RideOverview } from "@/lib/api";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  apiFetch,
+  assignRideDriver,
+  cancelRide,
+  fetchDriversForAssignment,
+  fetchGpsTrace,
+  fetchRide,
+  formatCdf,
+  formatDate,
+  markRidePaid,
+  updateRideStatus,
+  type AdminDriver,
+  type GpsPoint,
+  type RideOverview,
+} from "@/lib/api";
 import { useAdmin } from "@/components/AdminProvider";
+import { AssignDriverPanel } from "@/components/AssignDriverPanel";
+import { sortDriversByDuty } from "@/lib/driver-assignment";
 import { GpsTraceMap } from "@/components/GpsTraceMap";
 import { useLiveGpsTrace } from "@/hooks/useLiveGpsTrace";
 import {
@@ -42,9 +58,11 @@ const RIDE_STATUS_OPTIONS = [
 ];
 
 export default function CoursesPage() {
-  const { canWrite } = useAdmin();
+  const { canWrite, role } = useAdmin();
   const readOnly = !canWrite("courses");
+  const isOpsAdmin = role === "SUPER_ADMIN" || role === "ADMIN";
   const [rides, setRides] = useState<RideOverview[]>([]);
+  const [drivers, setDrivers] = useState<AdminDriver[]>([]);
   const [status, setStatus] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -53,6 +71,7 @@ export default function CoursesPage() {
   const [selected, setSelected] = useState<RideOverview | null>(null);
   const [cancelTarget, setCancelTarget] = useState<RideOverview | null>(null);
   const [newStatus, setNewStatus] = useState("");
+  const [assignDriverId, setAssignDriverId] = useState("");
   const [saving, setSaving] = useState(false);
   const [rideDetail, setRideDetail] = useState<RideOverview | null>(null);
   const [gpsTrace, setGpsTrace] = useState<GpsPoint[]>([]);
@@ -64,6 +83,11 @@ export default function CoursesPage() {
     active: rideActive,
     seed: gpsTrace,
   });
+
+  const statusOptions = useMemo(() => {
+    if (!isOpsAdmin) return RIDE_STATUS_OPTIONS;
+    return [...RIDE_STATUS_OPTIONS, { value: "PAID", label: "Payé" }];
+  }, [isOpsAdmin]);
 
   useEffect(() => {
     if (!selected?.id) {
@@ -80,6 +104,7 @@ export default function CoursesPage() {
         ]);
         if (!cancelled) {
           setRideDetail(detail);
+          setSelected((prev) => (prev ? { ...prev, ...detail, id: prev.id } : prev));
           const tracePoints = trace.points ?? (Array.isArray(detail.gpsTrace) ? detail.gpsTrace : []);
           setGpsTrace(tracePoints);
         }
@@ -96,7 +121,7 @@ export default function CoursesPage() {
       cancelled = true;
       if (timer) clearInterval(timer);
     };
-  }, [selected, rideActive]);
+  }, [selected?.id, rideActive]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -106,14 +131,18 @@ export default function CoursesPage() {
       if (status) params.set("status", status);
       if (dateFrom) params.set("from", dateFrom);
       if (dateTo) params.set("to", dateTo);
-      const data = await apiFetch<RideOverview[]>(`/api/admin/rides?${params}`);
+      const [data, driverList] = await Promise.all([
+        apiFetch<RideOverview[]>(`/api/admin/rides?${params}`),
+        isOpsAdmin ? fetchDriversForAssignment().catch(() => [] as AdminDriver[]) : Promise.resolve([] as AdminDriver[]),
+      ]);
       setRides(Array.isArray(data) ? data : []);
+      setDrivers(driverList);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur de chargement");
     } finally {
       setLoading(false);
     }
-  }, [status, dateFrom, dateTo]);
+  }, [status, dateFrom, dateTo, isOpsAdmin]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -125,7 +154,26 @@ export default function CoursesPage() {
   }, [load, loading, saving]);
 
   async function saveStatus() {
-    if (!selected || !newStatus || newStatus === selected.status) return;
+    if (!selected || !newStatus) return;
+    if (newStatus === "PAID") {
+      if (!isOpsAdmin) return;
+      setSaving(true);
+      setError(null);
+      try {
+        if (selected.status !== "COMPLETED") {
+          await updateRideStatus(selected.id, "COMPLETED");
+        }
+        await markRidePaid(selected.id);
+        setSelected(null);
+        load();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Échec du marquage payé");
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
+    if (newStatus === selected.status) return;
     setSaving(true);
     setError(null);
     try {
@@ -134,6 +182,21 @@ export default function CoursesPage() {
       load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Échec de la mise à jour");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function saveAssignment() {
+    if (!selected || !assignDriverId || !isOpsAdmin) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await assignRideDriver(selected.id, assignDriverId);
+      setSelected(null);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Échec de l'assignation");
     } finally {
       setSaving(false);
     }
@@ -155,6 +218,11 @@ export default function CoursesPage() {
   }
 
   const canCancel = (s?: string) => s && !["COMPLETED", "CANCELLED"].includes(s);
+  const canAssignRide = (r: RideOverview) =>
+    isOpsAdmin && !!r.status && !["COMPLETED", "CANCELLED"].includes(r.status);
+  const assignableDrivers = sortDriversByDuty(drivers);
+  const detail = rideDetail ?? selected;
+  const paid = detail?.isPaid === true || newStatus === "PAID";
 
   return (
     <div className="max-w-6xl mx-auto">
@@ -200,7 +268,17 @@ export default function CoursesPage() {
                   <td className="p-3 text-[#6C63FF]">{formatCdf(r.priceCdf)}</td>
                   <td className="p-3 text-gray-500">{formatDate(r.createdAt)}</td>
                   <td className="p-3">
-                    <button type="button" onClick={() => { setSelected(r); setNewStatus(r.status ?? ""); }} className="text-[#6C63FF] hover:underline">Détail</button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelected(r);
+                        setNewStatus(r.isPaid ? "PAID" : (r.status ?? ""));
+                        setAssignDriverId(r.driverId ?? "");
+                      }}
+                      className="text-[#6C63FF] hover:underline"
+                    >
+                      Détail
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -215,7 +293,15 @@ export default function CoursesPage() {
             <p><span className="text-gray-500">ID:</span> {selected.id}</p>
             <p><span className="text-gray-500">Passager:</span> {selected.passengerId}</p>
             <p><span className="text-gray-500">Chauffeur:</span> {selected.driverId ?? "Non assigné"}</p>
-            <p><span className="text-gray-500">Statut:</span> <StatusBadge status={selected.status} /></p>
+            <p>
+              <span className="text-gray-500">Statut:</span>{" "}
+              <StatusBadge status={selected.status} />
+              {paid && (
+                <span className="ml-2">
+                  <StatusBadge status="PAID" />
+                </span>
+              )}
+            </p>
             <p><span className="text-gray-500">Départ:</span> {selected.pickupAddress}</p>
             <p><span className="text-gray-500">Arrivée:</span> {selected.dropoffAddress}</p>
             <p><span className="text-gray-500">Prix:</span> {formatCdf(selected.priceCdf)}</p>
@@ -224,13 +310,13 @@ export default function CoursesPage() {
               points={rideActive ? liveTrace : gpsTrace}
               livePosition={rideActive ? livePosition : null}
               pickup={
-                rideDetail?.pickupLat != null && rideDetail?.pickupLng != null
-                  ? { lat: rideDetail.pickupLat, lng: rideDetail.pickupLng }
+                detail?.pickupLat != null && detail?.pickupLng != null
+                  ? { lat: detail.pickupLat, lng: detail.pickupLng }
                   : null
               }
               dropoff={
-                rideDetail?.dropoffLat != null && rideDetail?.dropoffLng != null
-                  ? { lat: rideDetail.dropoffLat, lng: rideDetail.dropoffLng }
+                detail?.dropoffLat != null && detail?.dropoffLng != null
+                  ? { lat: detail.dropoffLat, lng: detail.dropoffLng }
                   : null
               }
               pickupLabel={selected.pickupAddress}
@@ -244,15 +330,43 @@ export default function CoursesPage() {
                   : "Connexion temps réel en cours… actualisation HTTP toutes les 15 s."}
               </p>
             )}
+            {canAssignRide(selected) && (
+              <AssignDriverPanel
+                drivers={assignableDrivers}
+                value={assignDriverId}
+                onChange={setAssignDriverId}
+                onAssign={saveAssignment}
+                disabled={!isOpsAdmin}
+                saving={saving}
+                currentDriverId={selected.driverId ?? undefined}
+                title="Assigner un livreur / chauffeur"
+                fieldLabel="Livreur SENGA (KYC approuvé)"
+                hint="L'assignation enregistre le chauffeur et passe la course en « Acceptée » si elle était en recherche."
+              />
+            )}
             {!readOnly && (
               <>
                 <FieldLabel>Changer le statut</FieldLabel>
                 <SelectInput
                   value={newStatus}
                   onChange={setNewStatus}
-                  options={RIDE_STATUS_OPTIONS}
+                  options={statusOptions}
                 />
-                <BtnPrimary onClick={saveStatus} disabled={saving || newStatus === selected.status}>
+                {newStatus === "PAID" && (
+                  <p className="text-xs text-gray-500">
+                    « Payé » confirme le paiement côté caisse (Admin / Super admin uniquement). Si la course n&apos;est
+                    pas encore terminée, elle sera d&apos;abord passée en Terminée.
+                  </p>
+                )}
+                <BtnPrimary
+                  onClick={saveStatus}
+                  disabled={
+                    saving ||
+                    (newStatus === "PAID"
+                      ? paid
+                      : !newStatus || newStatus === selected.status)
+                  }
+                >
                   {saving ? "Enregistrement…" : "Mettre à jour le statut"}
                 </BtnPrimary>
               </>

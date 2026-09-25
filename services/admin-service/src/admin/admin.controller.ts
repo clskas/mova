@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Request, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, ForbiddenException, Get, Param, Patch, Post, Query, Request, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiProperty, ApiTags } from '@nestjs/swagger';
 import { AdminPermission, VehicleType, normalizeVehicleType } from '@mova/shared';
 import { IsArray, IsBoolean, IsEnum, IsIn, IsOptional, IsString, ValidateIf } from 'class-validator';
@@ -91,6 +91,14 @@ class DriverDeliveryModeDto {
 @ApiBearerAuth()
 export class AdminController {
   constructor(private adminService: AdminService, private fraudService: FraudService) {}
+
+  /** Assign / mark-paid reserved for platform operators (not SUPPORT / CITY_ADMIN). */
+  private assertOpsAdmin(user: AdminJwtUser) {
+    const role = String(user?.role ?? '').toUpperCase();
+    if (role !== 'SUPER_ADMIN' && role !== 'ADMIN') {
+      throw new ForbiddenException('Réservé aux rôles Administrateur et Super admin.');
+    }
+  }
 
   @Get('metrics')
   @RequirePermissions(AdminPermission.METRICS_READ)
@@ -369,6 +377,26 @@ export class AdminController {
     return this.adminService.updateRideStatus(id, status, reason);
   }
 
+  @Patch('rides/:id/assign')
+  @RequirePermissions(AdminPermission.RIDES_WRITE)
+  @ApiOperation({ summary: 'Assigner un chauffeur à une course (ADMIN / SUPER_ADMIN)' })
+  assignRide(
+    @Request() req: { user: AdminJwtUser },
+    @Param('id') id: string,
+    @Body('driverId') driverId: string,
+  ) {
+    this.assertOpsAdmin(req.user);
+    return this.adminService.assignRideDriver(id, driverId);
+  }
+
+  @Post('rides/:id/mark-paid')
+  @RequirePermissions(AdminPermission.RIDES_WRITE)
+  @ApiOperation({ summary: 'Marquer une course comme payée (ADMIN / SUPER_ADMIN)' })
+  markRidePaid(@Request() req: { user: AdminJwtUser }, @Param('id') id: string) {
+    this.assertOpsAdmin(req.user);
+    return this.adminService.markRidePaid(id, req.user.id);
+  }
+
   @Get('incidents')
   @RequirePermissions(AdminPermission.INCIDENTS_READ)
   @ApiOperation({ summary: 'Liste incidents' })
@@ -461,9 +489,26 @@ export class AdminController {
 
   @Patch('deliveries/:id/assign')
   @RequirePermissions(AdminPermission.DELIVERIES_WRITE)
-  @ApiOperation({ summary: 'Assigner un chauffeur à une livraison ou course/commission' })
-  assignDelivery(@Param('id') id: string, @Body('driverId') driverId: string) {
+  @ApiOperation({ summary: 'Assigner un livreur à une livraison (ADMIN / SUPER_ADMIN)' })
+  assignDelivery(
+    @Request() req: { user: AdminJwtUser },
+    @Param('id') id: string,
+    @Body('driverId') driverId: string,
+  ) {
+    this.assertOpsAdmin(req.user);
     return this.adminService.assignDeliveryDriver(id, driverId);
+  }
+
+  @Post('deliveries/:id/mark-paid')
+  @RequirePermissions(AdminPermission.DELIVERIES_WRITE)
+  @ApiOperation({ summary: 'Marquer une livraison comme payée (ADMIN / SUPER_ADMIN)' })
+  markDeliveryPaid(
+    @Request() req: { user: AdminJwtUser },
+    @Param('id') id: string,
+    @Body('type') type?: string,
+  ) {
+    this.assertOpsAdmin(req.user);
+    return this.adminService.markDeliveryPaid(id, req.user.id, type);
   }
 
   @Get('scheduled-rides')

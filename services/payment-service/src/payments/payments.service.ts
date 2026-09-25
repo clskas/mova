@@ -1062,6 +1062,99 @@ export class PaymentsService {
     return { success: true, payment, message: 'Paiement espèces confirmé' };
   }
 
+  /**
+   * Admin / SuperAdmin: mark a ride as paid without driver PIN
+   * (cash confirmation or force-complete pending MM).
+   */
+  async adminMarkRidePaid(rideId: string, confirmedBy?: string) {
+    const ride = await this.fetchRide(rideId);
+    if (ride.isShared === true || ride.shared === true || ride.type === 'RIDE_SHARE') {
+      throw new MovaHttpException(
+        MovaErrorCode.RIDE_INVALID_STATUS,
+        undefined,
+        'Course Pool : marquez le paiement de chaque booking séparément.',
+      );
+    }
+    const amountCdf = Number(ride.finalFareCdf ?? ride.estimatedFareCdf ?? ride.priceCdf ?? 0);
+    if (!Number.isFinite(amountCdf) || amountCdf <= 0) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Montant de course invalide.');
+    }
+    const userId = String(ride.passengerId ?? '');
+    if (!userId) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Passager manquant sur la course.');
+    }
+    const existing = await this.prisma.payment.findUnique({ where: { rideId } });
+    if (existing?.status === PaymentStatus.COMPLETED) {
+      return { success: true, payment: existing, isPaid: true, message: 'Paiement déjà confirmé' };
+    }
+    const payment = await this.prisma.payment.upsert({
+      where: { rideId },
+      create: {
+        rideId,
+        userId,
+        amountCdf,
+        method: PaymentMethod.CASH,
+        status: PaymentStatus.COMPLETED,
+        providerRef: `admin_mark_paid_${rideId}`,
+      },
+      update: {
+        status: PaymentStatus.COMPLETED,
+        amountCdf: existing?.amountCdf ?? amountCdf,
+        providerRef: `admin_mark_paid_${rideId}${confirmedBy ? `_${confirmedBy}` : ''}`,
+      },
+    });
+    await this.publishPaymentCompleted({
+      rideId,
+      userId: payment.userId,
+      amountCdf: payment.amountCdf,
+      method: payment.method.toString(),
+    });
+    await this.creditDriverAfterRidePayment(rideId);
+    return { success: true, payment, isPaid: true, message: 'Course marquée payée par l\'administration.' };
+  }
+
+  /** Admin / SuperAdmin: mark a service (livraison / course) as paid. */
+  async adminMarkServicePaid(referenceType: string, referenceId: string, confirmedBy?: string) {
+    const type = referenceType.toUpperCase();
+    const info = await this.fetchServicePaymentInfo(type, referenceId);
+    const existing = await this.prisma.servicePayment.findUnique({
+      where: { referenceType_referenceId: { referenceType: type, referenceId } },
+    });
+    if (existing?.status === PaymentStatus.COMPLETED) {
+      return { success: true, payment: existing, isPaid: true, message: 'Paiement déjà confirmé' };
+    }
+    const amountCdf = existing?.amountCdf ?? info.amountCdf;
+    if (!Number.isFinite(amountCdf) || amountCdf <= 0) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Montant invalide.');
+    }
+    const payment = await this.prisma.servicePayment.upsert({
+      where: { referenceType_referenceId: { referenceType: type, referenceId } },
+      create: {
+        referenceType: type,
+        referenceId,
+        userId: info.userId,
+        amountCdf,
+        method: PaymentMethod.CASH,
+        status: PaymentStatus.COMPLETED,
+        providerRef: `admin_mark_paid_${type}:${referenceId}`,
+      },
+      update: {
+        status: PaymentStatus.COMPLETED,
+        amountCdf,
+        providerRef: `admin_mark_paid_${type}:${referenceId}${confirmedBy ? `_${confirmedBy}` : ''}`,
+      },
+    });
+    await this.publishPaymentCompleted({
+      referenceType: type,
+      referenceId,
+      userId: payment.userId,
+      amountCdf: payment.amountCdf,
+      method: payment.method.toString(),
+    });
+    await this.creditDriverAfterServicePayment(type, referenceId, { releaseEscrow: true });
+    return { success: true, payment, isPaid: true, message: 'Livraison marquée payée par l\'administration.' };
+  }
+
   async getRidePaymentStatus(rideId: string) {
     const payment = await this.prisma.payment.findUnique({ where: { rideId } });
     const isPaid = payment?.status === PaymentStatus.COMPLETED;

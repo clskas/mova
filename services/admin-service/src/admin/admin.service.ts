@@ -745,6 +745,22 @@ export class AdminService {
   updateRideStatus(id: string, status: string, reason?: string) {
     return this.proxy('ride', `/internal/rides/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status, reason }) });
   }
+  assignRideDriver(id: string, driverId: string) {
+    return this.proxy('ride', `/internal/rides/${id}/assign`, { method: 'PATCH', body: JSON.stringify({ driverId }) });
+  }
+  markRidePaid(id: string, confirmedBy?: string) {
+    return this.proxy('payment', `/internal/rides/${id}/mark-paid`, {
+      method: 'POST',
+      body: JSON.stringify({ confirmedBy }),
+    });
+  }
+  markDeliveryPaid(id: string, confirmedBy?: string, type = 'DELIVERY') {
+    const referenceType = type === 'ERRAND' ? 'ERRAND' : 'DELIVERY';
+    return this.proxy('payment', `/internal/services/${referenceType}/${id}/mark-paid`, {
+      method: 'POST',
+      body: JSON.stringify({ confirmedBy }),
+    });
+  }
 
   async listDeliveries(
     query: {

@@ -10,6 +10,7 @@ import {
   fetchGpsTrace,
   formatCdf,
   formatDate,
+  markDeliveryPaid,
   updateDeliveryStatus,
   type AdminDriver,
   type DeliveryOverview,
@@ -64,6 +65,8 @@ const ERRAND_STATUSES = [
   { value: "CANCELLED", label: "Annulé" },
 ];
 
+const PAID_OPTION = { value: "PAID", label: "Payé" };
+
 const FILTER_STATUSES = [
   { value: "", label: "Tous les statuts" },
   ...DELIVERY_STATUSES,
@@ -75,9 +78,10 @@ function deliveryTypeLabel(type?: string) {
 }
 
 export default function LivraisonsPage() {
-  const { canWrite } = useAdmin();
+  const { canWrite, role } = useAdmin();
   const readOnly = !canWrite("livraisons");
-  const canAssign = canWrite("livraisons");
+  const isOpsAdmin = role === "SUPER_ADMIN" || role === "ADMIN";
+  const canAssign = isOpsAdmin && canWrite("livraisons");
   const [deliveries, setDeliveries] = useState<DeliveryOverview[]>([]);
   const [drivers, setDrivers] = useState<AdminDriver[]>([]);
   const [status, setStatus] = useState("");
@@ -206,6 +210,25 @@ export default function LivraisonsPage() {
 
   async function saveStatus() {
     if (!selected || !newStatus) return;
+    if (newStatus === "PAID") {
+      if (!isOpsAdmin) return;
+      setSaving(true);
+      setError(null);
+      try {
+        const terminal = selected.type === "ERRAND" ? "COMPLETED" : "DELIVERED";
+        if (selected.status !== terminal) {
+          await updateDeliveryStatus(selected.id, terminal);
+        }
+        await markDeliveryPaid(selected.id, selected.type);
+        setSelected(null);
+        await load();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Échec du marquage payé");
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
@@ -398,6 +421,9 @@ export default function LivraisonsPage() {
                 disabled={readOnly}
                 saving={saving || assigningId === selected.id}
                 currentDriverId={selected.driverId ?? undefined}
+                title="Assigner un livreur"
+                fieldLabel="Livreur SENGA (KYC approuvé)"
+                hint="L'assignation enregistre le livreur sur cette livraison (Admin / Super admin uniquement)."
               />
             )}
             {canAssignRecord(selected) && (
@@ -413,15 +439,29 @@ export default function LivraisonsPage() {
                 <SelectInput
                   value={newStatus}
                   onChange={setNewStatus}
-                  options={(selected.type === "ERRAND" ? ERRAND_STATUSES : DELIVERY_STATUSES).map((s) => ({
-                    value: s.value,
-                    label: s.label,
-                  }))}
+                  options={[
+                    ...(selected.type === "ERRAND" ? ERRAND_STATUSES : DELIVERY_STATUSES).map((s) => ({
+                      value: s.value,
+                      label: s.label,
+                    })),
+                    ...(isOpsAdmin ? [PAID_OPTION] : []),
+                  ]}
                 />
+                {newStatus === "PAID" && (
+                  <p className="text-xs text-gray-500">
+                    « Payé » confirme le paiement (Admin / Super admin uniquement). La livraison sera d&apos;abord
+                    passée en terminé / livré si besoin.
+                  </p>
+                )}
                 <button
                   type="button"
                   onClick={saveStatus}
-                  disabled={saving || newStatus === selected.status}
+                  disabled={
+                    saving ||
+                    (newStatus === "PAID"
+                      ? selected.isPaid === true
+                      : newStatus === selected.status)
+                  }
                   className="w-full bg-[#6C63FF] text-white rounded-xl py-2 font-medium disabled:opacity-50"
                 >
                   {saving ? "Enregistrement…" : "Mettre à jour le statut"}

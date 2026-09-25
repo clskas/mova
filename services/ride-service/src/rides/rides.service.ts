@@ -2030,6 +2030,55 @@ export class RidesService {
     return { ride: this.formatRideDetail(updated), message: 'Statut mis à jour par l\'administration.' };
   }
 
+  /** Admin / SuperAdmin: assign or reassign a driver on an open ride. */
+  async adminAssignDriver(rideId: string, driverId: string) {
+    if (!driverId?.trim()) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Chauffeur requis.');
+    }
+    const ride = await this.prisma.ride.findUnique({ where: { id: rideId } });
+    if (!ride) throw new MovaHttpException(MovaErrorCode.RIDE_NOT_FOUND, HttpStatus.NOT_FOUND);
+    if (ride.status === RideStatus.COMPLETED || ride.status === RideStatus.CANCELLED) {
+      throw new MovaHttpException(MovaErrorCode.RIDE_INVALID_STATUS);
+    }
+    await assertDriverEligibleForRide(driverId.trim(), ride.vehicleType);
+    const completionPin = ride.completionPin || this.tripShare.generateCompletionPin();
+    const nextStatus =
+      ride.status === RideStatus.REQUESTED || ride.status === RideStatus.SEARCHING
+        ? RideStatus.ACCEPTED
+        : ride.status;
+    const updated = await this.prisma.ride.update({
+      where: { id: rideId },
+      data: {
+        driverId: driverId.trim(),
+        status: nextStatus,
+        completionPin,
+        ...(nextStatus === RideStatus.ACCEPTED && !ride.acceptedAt ? { acceptedAt: new Date() } : {}),
+      },
+    });
+    await this.prisma.rideEvent.create({
+      data: {
+        rideId,
+        event: nextStatus === RideStatus.ACCEPTED && ride.status !== RideStatus.ACCEPTED ? RideStatus.ACCEPTED : 'ASSIGNED',
+        metadata: { driverUserId: driverId.trim(), by: 'ADMIN' },
+      },
+    });
+    this.emitStatusChange(rideId, updated.status);
+    if (nextStatus === RideStatus.ACCEPTED) {
+      this.trackingGateway.broadcastOfferTaken('ride:taken', { rideId, driverId: driverId.trim() });
+      await this.notifyRideStatusSms(rideId, ride.passengerId, RideStatus.ACCEPTED);
+    }
+    await this.redis.publish(MOVA_EVENTS.SERVICE_ASSIGNED, {
+      serviceType: 'RIDE',
+      referenceId: rideId,
+      driverId: driverId.trim(),
+      passengerId: ride.passengerId,
+      summary: 'Course taxi assignée',
+      pickupAddress: ride.pickupAddress ?? undefined,
+      dropoffAddress: ride.dropoffAddress ?? undefined,
+    });
+    return { ride: this.formatRideDetail(updated), driverId: updated.driverId, status: updated.status };
+  }
+
   async purgeUserData(userId: string) {
     const now = new Date();
     const cancelReason = 'Compte utilisateur supprimé';

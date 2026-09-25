@@ -470,15 +470,15 @@ export class UsersService {
 
     // Compte Google-only (sans téléphone) : réservé aux rôles staff / admin ville.
     if (!phone && email) {
-      const staffOnly = [
+      const staffOnly = new Set<UserRole>([
         UserRole.SUPER_ADMIN,
         UserRole.ADMIN,
         UserRole.SUPPORT,
         UserRole.FINANCE,
         UserRole.CONTENT,
         UserRole.CITY_ADMIN,
-      ];
-      if (!staffOnly.includes(data.role)) {
+      ]);
+      if (!staffOnly.has(data.role)) {
         throw new MovaHttpException(
           MovaErrorCode.VALIDATION_ERROR,
           HttpStatus.BAD_REQUEST,

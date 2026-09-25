@@ -20,6 +20,7 @@ const STAFF_ROLES: ReadonlySet<string> = new Set([
   'SUPPORT',
   'FINANCE',
   'CONTENT',
+  'CITY_ADMIN',
 ]);
 
 const PARTNER_PORTAL_ROLES: ReadonlySet<string> = new Set(['RESTAURANT', 'RENTAL_PARTNER']);

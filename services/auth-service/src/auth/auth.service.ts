@@ -1215,6 +1215,7 @@ export class AuthService {
       UserRole.SUPPORT,
       UserRole.FINANCE,
       UserRole.CONTENT,
+      UserRole.CITY_ADMIN,
     ];
     if (role && isStaffAuthRole(role)) {
       if (!staffRoles.includes(user.role)) {

@@ -96,6 +96,10 @@ describe('partner-auth.util', () => {
   it('treats all admin console roles as staff', () => {
     expect(isStaffAuthRole('ADMIN')).toBe(true);
     expect(isStaffAuthRole('SUPER_ADMIN')).toBe(true);
+    expect(isStaffAuthRole('CITY_ADMIN')).toBe(true);
+    expect(isStaffAuthRole('SUPPORT')).toBe(true);
+    expect(isStaffAuthRole('FINANCE')).toBe(true);
+    expect(isStaffAuthRole('CONTENT')).toBe(true);
     expect(isStaffAuthRole('RENTAL_PARTNER')).toBe(false);
     expect(isPartnerPortalRole('RESTAURANT')).toBe(true);
     expect(isPartnerPortalRole('RENTAL_PARTNER')).toBe(true);

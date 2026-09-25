@@ -156,8 +156,9 @@ export class AdminController {
   @Get('users/:id')
   @RequirePermissions(AdminPermission.USERS_READ)
   @ApiOperation({ summary: 'Détail utilisateur' })
-  user(@Param('id') id: string) {
-    return this.adminService.getUser(id);
+  async user(@Request() req: { user: AdminJwtUser }, @Param('id') id: string) {
+    const managedCity = resolveManagedCityScope(req.user);
+    return this.adminService.getUser(id, managedCity);
   }
 
   @Post('users')
@@ -352,8 +353,8 @@ export class AdminController {
   @Get('rides/:id')
   @RequirePermissions(AdminPermission.RIDES_READ)
   @ApiOperation({ summary: 'Détail course' })
-  getRide(@Param('id') id: string) {
-    return this.adminService.getRide(id);
+  getRide(@Request() req: { user: AdminJwtUser }, @Param('id') id: string) {
+    return this.adminService.getRide(id, resolveManagedCityScope(req.user));
   }
 
   @Get('tracking/:type/:id/trace')
@@ -366,15 +367,24 @@ export class AdminController {
   @Post('rides/:id/cancel')
   @RequirePermissions(AdminPermission.RIDES_WRITE)
   @ApiOperation({ summary: 'Annuler course' })
-  cancelRide(@Param('id') id: string, @Body('reason') reason?: string) {
-    return this.adminService.cancelRide(id, reason);
+  cancelRide(
+    @Request() req: { user: AdminJwtUser },
+    @Param('id') id: string,
+    @Body('reason') reason?: string,
+  ) {
+    return this.adminService.cancelRide(id, reason, resolveManagedCityScope(req.user));
   }
 
   @Patch('rides/:id/status')
   @RequirePermissions(AdminPermission.RIDES_WRITE)
   @ApiOperation({ summary: 'Résolution litige / statut course' })
-  rideStatus(@Param('id') id: string, @Body('status') status: string, @Body('reason') reason?: string) {
-    return this.adminService.updateRideStatus(id, status, reason);
+  rideStatus(
+    @Request() req: { user: AdminJwtUser },
+    @Param('id') id: string,
+    @Body('status') status: string,
+    @Body('reason') reason?: string,
+  ) {
+    return this.adminService.updateRideStatus(id, status, reason, resolveManagedCityScope(req.user));
   }
 
   @Patch('rides/:id/assign')
@@ -386,7 +396,7 @@ export class AdminController {
     @Body('driverId') driverId: string,
   ) {
     this.assertOpsAdmin(req.user);
-    return this.adminService.assignRideDriver(id, driverId);
+    return this.adminService.assignRideDriver(id, driverId, resolveManagedCityScope(req.user));
   }
 
   @Post('rides/:id/mark-paid')
@@ -394,7 +404,7 @@ export class AdminController {
   @ApiOperation({ summary: 'Marquer une course comme payée (ADMIN / SUPER_ADMIN)' })
   markRidePaid(@Request() req: { user: AdminJwtUser }, @Param('id') id: string) {
     this.assertOpsAdmin(req.user);
-    return this.adminService.markRidePaid(id, req.user.id);
+    return this.adminService.markRidePaid(id, req.user.id, resolveManagedCityScope(req.user));
   }
 
   @Get('incidents')
@@ -469,22 +479,30 @@ export class AdminController {
   @Get('deliveries/:id')
   @RequirePermissions(AdminPermission.DELIVERIES_READ)
   @ApiOperation({ summary: 'Détail livraison' })
-  delivery(@Param('id') id: string) {
-    return this.adminService.getDelivery(id);
+  delivery(@Request() req: { user: AdminJwtUser }, @Param('id') id: string) {
+    return this.adminService.getDelivery(id, resolveManagedCityScope(req.user));
   }
 
   @Patch('deliveries/:id/status')
   @RequirePermissions(AdminPermission.DELIVERIES_WRITE)
   @ApiOperation({ summary: 'Mettre à jour statut livraison' })
-  deliveryStatus(@Param('id') id: string, @Body('status') status: string) {
-    return this.adminService.updateDeliveryStatus(id, status);
+  deliveryStatus(
+    @Request() req: { user: AdminJwtUser },
+    @Param('id') id: string,
+    @Body('status') status: string,
+  ) {
+    return this.adminService.updateDeliveryStatus(id, status, resolveManagedCityScope(req.user));
   }
 
   @Post('deliveries/:id/cancel')
   @RequirePermissions(AdminPermission.DELIVERIES_WRITE)
   @ApiOperation({ summary: 'Annuler livraison' })
-  cancelDelivery(@Param('id') id: string, @Body('reason') reason?: string) {
-    return this.adminService.cancelDelivery(id, reason);
+  cancelDelivery(
+    @Request() req: { user: AdminJwtUser },
+    @Param('id') id: string,
+    @Body('reason') reason?: string,
+  ) {
+    return this.adminService.cancelDelivery(id, reason, resolveManagedCityScope(req.user));
   }
 
   @Patch('deliveries/:id/assign')
@@ -496,7 +514,7 @@ export class AdminController {
     @Body('driverId') driverId: string,
   ) {
     this.assertOpsAdmin(req.user);
-    return this.adminService.assignDeliveryDriver(id, driverId);
+    return this.adminService.assignDeliveryDriver(id, driverId, resolveManagedCityScope(req.user));
   }
 
   @Post('deliveries/:id/mark-paid')
@@ -508,7 +526,7 @@ export class AdminController {
     @Body('type') type?: string,
   ) {
     this.assertOpsAdmin(req.user);
-    return this.adminService.markDeliveryPaid(id, req.user.id, type);
+    return this.adminService.markDeliveryPaid(id, req.user.id, type, resolveManagedCityScope(req.user));
   }
 
   @Get('scheduled-rides')

@@ -9,7 +9,7 @@ import {
   resolveCityFromCoords,
   serviceUrl,
 } from '@mova/shared';
-import { filterRowsByManagedCity, filterRowsByCityName, assertCityMatch, forceCityOnBody } from '../common/city-scope.util';
+import { filterRowsByManagedCity, filterRowsByCityName, assertCityMatch, forceCityOnBody, assertCoordsInManagedCity } from '../common/city-scope.util';
 
 type MovaService = 'auth' | 'ride' | 'driver' | 'payment' | 'notification';
 
@@ -442,8 +442,56 @@ export class AdminService {
     }
     return { deleted: deleted.length, ids: deleted, skipped };
   }
-  getUser(id: string) {
-    return this.fetchJson('auth', `/internal/users/${id}`);
+  async getUser(id: string, managedCity?: string | null) {
+    const user = await this.fetchJson<{
+      id: string;
+      role?: string;
+      managedCity?: string | null;
+      [key: string]: unknown;
+    }>('auth', `/internal/users/${id}`);
+    if (!managedCity) return user;
+    const role = String(user.role ?? '');
+    if (role === UserRole.CITY_ADMIN) {
+      assertCityMatch(managedCity, user.managedCity, 'Admin ville hors de votre périmètre.');
+      return user;
+    }
+    if (STAFF_ROLES.has(role)) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.FORBIDDEN,
+        'Compte staff hors de votre périmètre ville.',
+      );
+    }
+    if (role === UserRole.DRIVER) {
+      await this.getDriver(id, managedCity);
+      return user;
+    }
+    if (role === UserRole.RESTAURANT || role === UserRole.RENTAL_PARTNER) {
+      const [restaurants, rentals] = await Promise.all([
+        this.listRestaurants(managedCity).catch(() => [] as Array<{ ownerUserId?: string | null }>),
+        this.listRentalVehicles(managedCity).catch(() => [] as Array<{ ownerUserId?: string | null }>),
+      ]);
+      const owners = new Set<string>();
+      for (const r of Array.isArray(restaurants) ? restaurants : []) {
+        if (r.ownerUserId) owners.add(String(r.ownerUserId));
+      }
+      for (const r of Array.isArray(rentals) ? rentals : []) {
+        if (r.ownerUserId) owners.add(String(r.ownerUserId));
+      }
+      if (!owners.has(id)) {
+        throw new MovaHttpException(
+          MovaErrorCode.AUTH_FORBIDDEN,
+          HttpStatus.FORBIDDEN,
+          'Partenaire hors de votre ville gérée.',
+        );
+      }
+      return user;
+    }
+    throw new MovaHttpException(
+      MovaErrorCode.AUTH_FORBIDDEN,
+      HttpStatus.FORBIDDEN,
+      'Utilisateur hors de votre ville gérée.',
+    );
   }
   async createUser(body: Record<string, unknown>, actorRole: string) {
     const nextRole = typeof body.role === 'string' ? body.role : undefined;
@@ -710,7 +758,7 @@ export class AdminService {
     return this.proxy('driver', `/internal/incidents/${id}/resolve`, { method: 'POST', body: JSON.stringify({ status }) });
   }
 
-  listRides(
+  async listRides(
     query: { status?: string; from?: string; to?: string; skip?: number; take?: number },
     managedCity?: string | null,
   ) {
@@ -718,43 +766,69 @@ export class AdminService {
     if (query.status) params.set('status', query.status);
     if (query.from) params.set('from', query.from);
     if (query.to) params.set('to', query.to);
-    const skip = Number.isFinite(query.skip) ? Number(query.skip) : 0;
+    const skip = Number.isFinite(query.skip) ? Math.max(0, Number(query.skip)) : 0;
     const take = Number.isFinite(query.take) && Number(query.take) > 0 ? Number(query.take) : 50;
-    params.set('skip', String(Math.max(0, skip)));
-    params.set('take', String(Math.min(200, take)));
-    return this.fetchJson<
+    // CITY_ADMIN: over-fetch then filter by pickup GPS (downstream has no city column).
+    const fetchTake = managedCity ? Math.min(500, Math.max(take * 10, 200)) : Math.min(200, take);
+    const fetchSkip = managedCity ? 0 : skip;
+    params.set('skip', String(fetchSkip));
+    params.set('take', String(fetchTake));
+    const data = await this.fetchJson<
       { pickupLat?: number; pickupLng?: number; [key: string]: unknown }[]
-    >('ride', `/internal/rides?${params}`).then((data) => {
-      const rows = Array.isArray(data) ? data : [];
-      // CITY_ADMIN: filter page in-memory via pickup GPS → resolveCityFromCoords (see city-scope.util).
-      return filterRowsByManagedCity(rows, managedCity ?? null, (r) => ({
-        lat: r.pickupLat,
-        lng: r.pickupLng,
-      }));
-    });
+    >('ride', `/internal/rides?${params}`);
+    const rows = Array.isArray(data) ? data : [];
+    const scoped = filterRowsByManagedCity(rows, managedCity ?? null, (r) => ({
+      lat: r.pickupLat,
+      lng: r.pickupLng,
+    }));
+    if (!managedCity) return scoped;
+    return scoped.slice(skip, skip + Math.min(200, take));
   }
-  getRide(id: string) {
-    return this.fetchJson('ride', `/internal/rides/${id}`);
+
+  async getRide(id: string, managedCity?: string | null) {
+    const ride = await this.fetchJson<{
+      pickupLat?: number | null;
+      pickupLng?: number | null;
+      [key: string]: unknown;
+    }>('ride', `/internal/rides/${id}`);
+    assertCoordsInManagedCity(
+      managedCity ?? null,
+      ride?.pickupLat,
+      ride?.pickupLng,
+      'Course hors de votre ville gérée.',
+    );
+    return ride;
   }
+
   getGpsTrace(type: string, id: string) {
     return this.fetchJson('ride', `/internal/tracking/${type}/${id}/trace`);
   }
-  cancelRide(id: string, reason?: string) {
+
+  async cancelRide(id: string, reason?: string, managedCity?: string | null) {
+    await this.getRide(id, managedCity);
     return this.proxy('ride', `/internal/rides/${id}/cancel`, { method: 'POST', body: JSON.stringify({ reason }) });
   }
-  updateRideStatus(id: string, status: string, reason?: string) {
+
+  async updateRideStatus(id: string, status: string, reason?: string, managedCity?: string | null) {
+    await this.getRide(id, managedCity);
     return this.proxy('ride', `/internal/rides/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status, reason }) });
   }
-  assignRideDriver(id: string, driverId: string) {
+
+  async assignRideDriver(id: string, driverId: string, managedCity?: string | null) {
+    await this.getRide(id, managedCity);
     return this.proxy('ride', `/internal/rides/${id}/assign`, { method: 'PATCH', body: JSON.stringify({ driverId }) });
   }
-  markRidePaid(id: string, confirmedBy?: string) {
+
+  async markRidePaid(id: string, confirmedBy?: string, managedCity?: string | null) {
+    await this.getRide(id, managedCity);
     return this.proxy('payment', `/internal/rides/${id}/mark-paid`, {
       method: 'POST',
       body: JSON.stringify({ confirmedBy }),
     });
   }
-  markDeliveryPaid(id: string, confirmedBy?: string, type = 'DELIVERY') {
+
+  async markDeliveryPaid(id: string, confirmedBy?: string, type = 'DELIVERY', managedCity?: string | null) {
+    await this.getDelivery(id, managedCity);
     const referenceType = type === 'ERRAND' ? 'ERRAND' : 'DELIVERY';
     return this.proxy('payment', `/internal/services/${referenceType}/${id}/mark-paid`, {
       method: 'POST',
@@ -780,8 +854,12 @@ export class AdminService {
     if (query.from) params.set('from', query.from);
     if (query.to) params.set('to', query.to);
     if (query.search?.trim()) params.set('search', query.search.trim());
-    params.set('skip', String(query.skip ?? 0));
-    params.set('take', String(query.take ?? 50));
+    const skip = Number(query.skip ?? 0);
+    const take = Number(query.take ?? 50);
+    const fetchTake = managedCity ? Math.min(500, Math.max(take * 10, 200)) : take;
+    const fetchSkip = managedCity ? 0 : skip;
+    params.set('skip', String(fetchSkip));
+    params.set('take', String(fetchTake));
     const data = await this.fetchJson<
       {
         pickupLat?: number | null;
@@ -792,22 +870,42 @@ export class AdminService {
       }[]
     >('ride', `/internal/deliveries?${params}`);
     const rows = Array.isArray(data) ? data : [];
-    // CITY_ADMIN: in-memory filter by pickup (fallback delivery) GPS — see city-scope.util.
-    return filterRowsByManagedCity(rows, managedCity ?? null, (r) => ({
+    const scoped = filterRowsByManagedCity(rows, managedCity ?? null, (r) => ({
       lat: r.pickupLat ?? r.deliveryLat,
       lng: r.pickupLng ?? r.deliveryLng,
     }));
+    if (!managedCity) return scoped;
+    return scoped.slice(skip, skip + take);
   }
-  getDelivery(id: string) {
-    return this.fetchJson('ride', `/internal/deliveries/${id}`);
+  async getDelivery(id: string, managedCity?: string | null) {
+    const delivery = await this.fetchJson<{
+      pickupLat?: number | null;
+      pickupLng?: number | null;
+      deliveryLat?: number | null;
+      deliveryLng?: number | null;
+      [key: string]: unknown;
+    }>('ride', `/internal/deliveries/${id}`);
+    assertCoordsInManagedCity(
+      managedCity ?? null,
+      delivery?.pickupLat ?? delivery?.deliveryLat,
+      delivery?.pickupLng ?? delivery?.deliveryLng,
+      'Livraison hors de votre ville gérée.',
+    );
+    return delivery;
   }
-  updateDeliveryStatus(id: string, status: string) {
+
+  async updateDeliveryStatus(id: string, status: string, managedCity?: string | null) {
+    await this.getDelivery(id, managedCity);
     return this.proxy('ride', `/internal/deliveries/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) });
   }
-  cancelDelivery(id: string, reason?: string) {
+
+  async cancelDelivery(id: string, reason?: string, managedCity?: string | null) {
+    await this.getDelivery(id, managedCity);
     return this.proxy('ride', `/internal/deliveries/${id}/cancel`, { method: 'POST', body: JSON.stringify({ reason }) });
   }
-  assignDeliveryDriver(id: string, driverId: string) {
+
+  async assignDeliveryDriver(id: string, driverId: string, managedCity?: string | null) {
+    await this.getDelivery(id, managedCity);
     return this.proxy('ride', `/internal/deliveries/${id}/assign`, { method: 'PATCH', body: JSON.stringify({ driverId }) });
   }
 

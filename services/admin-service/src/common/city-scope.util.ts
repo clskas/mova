@@ -114,3 +114,20 @@ export function forceCityOnBody(
   }
   return { ...body, [field]: managedCity };
 }
+
+/** Forbid CITY_ADMIN access when GPS resolves outside managedCity (or GPS missing). */
+export function assertCoordsInManagedCity(
+  managedCity: string | null,
+  lat?: number | null,
+  lng?: number | null,
+  message = 'Ressource hors de votre ville gérée.',
+): void {
+  if (!managedCity) return;
+  if (lat == null || lng == null || !Number.isFinite(Number(lat)) || !Number.isFinite(Number(lng))) {
+    throw new MovaHttpException(MovaErrorCode.AUTH_FORBIDDEN, HttpStatus.FORBIDDEN, message);
+  }
+  const resolved = resolveCityFromCoords(Number(lat), Number(lng));
+  if (resolved.trim().toLowerCase() !== managedCity.trim().toLowerCase()) {
+    throw new MovaHttpException(MovaErrorCode.AUTH_FORBIDDEN, HttpStatus.FORBIDDEN, message);
+  }
+}

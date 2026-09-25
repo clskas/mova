@@ -18,7 +18,7 @@ export class PaymentsController {
   }
 
   @Get('rides/pending-cash')
-  @ApiOperation({ summary: 'Course terminée — espèces en attente de PIN (chauffeur)' })
+  @ApiOperation({ summary: 'Course terminée — espèces en attente de confirmation (chauffeur)' })
   getDriverPendingCash(@Request() req: { user: { id: string } }) {
     return this.paymentsService.findDriverPendingCashRide(req.user.id);
   }
@@ -36,24 +36,22 @@ export class PaymentsController {
   }
 
   @Post('rides/:rideId/cash/confirm')
-  @ApiOperation({ summary: 'Confirmer paiement espèces (chauffeur + PIN)' })
+  @ApiOperation({ summary: 'Confirmer paiement espèces (chauffeur — Cash reçu)' })
   confirmCashRide(
     @Request() req: { user: { id: string } },
     @Param('rideId') rideId: string,
-    @Body('pin') pin: string,
   ) {
-    return this.paymentsService.confirmCashRide(rideId, req.user.id, pin);
+    return this.paymentsService.confirmCashRide(rideId, req.user.id);
   }
 
   @Post('services/:referenceType/:referenceId/cash/confirm')
-  @ApiOperation({ summary: 'Confirmer paiement espèces service (chauffeur + PIN)' })
+  @ApiOperation({ summary: 'Confirmer paiement espèces service (chauffeur — Cash reçu)' })
   confirmCashService(
     @Request() req: { user: { id: string } },
     @Param('referenceType') referenceType: string,
     @Param('referenceId') referenceId: string,
-    @Body('pin') pin: string,
   ) {
-    return this.paymentsService.confirmCashService(referenceType, referenceId, req.user.id, pin);
+    return this.paymentsService.confirmCashService(referenceType, referenceId, req.user.id);
   }
 
   @Get('services/:referenceType/:referenceId/status')

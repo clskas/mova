@@ -5,7 +5,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PartnerPromoDto } from '../promo/partner-promo.dto';
 import { PartnerPromoService } from '../promo/partner-promo.service';
 import { PartnerBillingService } from '../billing/partner-billing.service';
-import { CreatePartnerVehicleDto, PartnerBookingActionDto, PartnerConfirmCashDto, PartnerLogisticsDto, UploadPartnerVehiclePhotoDto, UpdateRentalBusinessDto } from './rental-partner-portal.dto';
+import { CreatePartnerVehicleDto, PartnerBookingActionDto, PartnerLogisticsDto, UploadPartnerVehiclePhotoDto, UpdateRentalBusinessDto } from './rental-partner-portal.dto';
 import { RentalPartnerPortalService } from './rental-partner-portal.service';
 import { RentalPartnerRoleGuard } from './rental-partner-role.guard';
 import { PartnerKycService } from '../partner-kyc/partner-kyc.service';
@@ -234,13 +234,12 @@ export class RentalPartnerPortalController {
   }
 
   @Post('bookings/:id/cash/confirm')
-  @ApiOperation({ summary: 'Confirmer paiement espèces avec le PIN passager' })
+  @ApiOperation({ summary: 'Confirmer paiement espèces (Cash reçu)' })
   confirmCash(
     @Request() req: { user: { id: string }; headers: { authorization?: string } },
     @Param('id') id: string,
-    @Body() dto: PartnerConfirmCashDto,
   ) {
-    return this.portal.confirmCashPayment(req.user.id, id, dto.pin);
+    return this.portal.confirmCashPayment(req.user.id, id);
   }
 
   @Get('promos')

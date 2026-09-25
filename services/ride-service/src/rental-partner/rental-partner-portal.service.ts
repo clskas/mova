@@ -313,7 +313,7 @@ export class RentalPartnerPortalService {
     return this.rental.ownerUpdateLogistics(ownerUserId, id, dto);
   }
 
-  async confirmCashPayment(ownerUserId: string, bookingId: string, pin: string) {
+  async confirmCashPayment(ownerUserId: string, bookingId: string) {
     const booking = await this.rental.ownerGetBooking(ownerUserId, bookingId);
     if (booking.status !== RentalInquiryStatus.RETURNED) {
       throw new MovaHttpException(
@@ -330,7 +330,7 @@ export class RentalPartnerPortalService {
           'Content-Type': 'application/json',
           'x-internal-api-key': INTERNAL_API_KEY,
         },
-        body: JSON.stringify({ ownerUserId, pin }),
+        body: JSON.stringify({ ownerUserId }),
       },
     );
     const data = (await res.json().catch(() => ({}))) as { error?: { message?: string }; message?: string };

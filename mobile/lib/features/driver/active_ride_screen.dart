@@ -17,7 +17,7 @@ import '../chat/chat_alert_service.dart';
 import '../chat/ride_chat_screen.dart';
 import '../geo/suggest_place_screen.dart';
 import '../../core/safety/sos_helper.dart';
-import 'widgets/driver_cash_pin_dialog.dart';
+import 'widgets/driver_cash_received_dialog.dart';
 
 class ActiveRideScreen extends ConsumerStatefulWidget {
   const ActiveRideScreen({super.key, required this.ride});
@@ -55,7 +55,7 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
   }
 
   /// Le passager a initié un paiement espèces (statut backend PENDING) :
-  /// le chauffeur doit confirmer le PIN.
+  /// le chauffeur doit confirmer « Cash reçu ».
   bool get _cashPending =>
       _status == 'COMPLETED' &&
       !_isPaid &&
@@ -725,7 +725,7 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
                 const SizedBox(height: 12),
               ],
               MovaButton(
-                label: 'Confirmer paiement espèces',
+                label: 'Cash reçu',
                 isSecondary: true,
                 icon: Icons.payments_outlined,
                 onPressed: _confirmCash,
@@ -749,13 +749,13 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
     if (_cashDialogOpen) return;
     _cashDialogOpen = true;
     final api = ref.read(apiClientProvider);
-    final pin = await DriverCashPinDialog.show(
+    final ok = await DriverCashReceivedDialog.show(
       context,
-      title: auto ? 'Le passager paie en espèces' : 'Confirmer espèces',
+      title: auto ? 'Le passager paie en espèces' : 'Cash reçu ?',
       passengerTotalCdf: _passengerCashTotalCdf,
       driverNetCdf: _driverNetCdf,
-      validate: (enteredPin) async {
-        final result = await api.confirmCashRide(_rideId, enteredPin);
+      confirm: () async {
+        final result = await api.confirmCashRide(_rideId);
         return switch (result) {
           Success() => (ok: true, message: null),
           Failure(:final error) => (ok: false, message: error.message),
@@ -763,7 +763,7 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
       },
     );
     _cashDialogOpen = false;
-    if (pin == null || pin.isEmpty || !mounted) return;
+    if (!ok || !mounted) return;
     await _refreshRide();
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(

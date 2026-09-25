@@ -390,10 +390,10 @@ export function updateBookingStatus(id: string, action: "acknowledge" | "confirm
   });
 }
 
-export function confirmBookingCash(id: string, pin: string) {
+export function confirmBookingCash(id: string) {
   return apiFetch<PartnerBooking>(`/api/rental-partner/bookings/${id}/cash/confirm`, {
     method: "POST",
-    body: JSON.stringify({ pin }),
+    body: JSON.stringify({}),
   });
 }
 

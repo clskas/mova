@@ -107,9 +107,13 @@ export class PartnerBookingActionDto {
 }
 
 export class PartnerConfirmCashDto {
-  @ApiProperty({ example: '123456', description: 'Code PIN communiqué par le passager' })
+  @ApiPropertyOptional({
+    example: '123456',
+    description: 'Deprecated — confirmation cash sans PIN (conservé pour compat clients anciens)',
+  })
+  @IsOptional()
   @IsString()
-  pin!: string;
+  pin?: string;
 }
 
 export class PartnerLogisticsDto {

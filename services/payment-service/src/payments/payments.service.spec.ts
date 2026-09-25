@@ -186,19 +186,41 @@ describe('PaymentsService', () => {
     expect(prisma.servicePayment.upsert).toHaveBeenCalled();
   });
 
-  it('verrouille le PIN espèces après 5 échecs', async () => {
-    redis.client.get.mockResolvedValue('5');
-    await expect(service.confirmCashRide('ride-1', 'driver-1', '0000')).rejects.toMatchObject({
-      response: { code: MovaErrorCode.AUTH_PIN_LOCKED },
+  it('confirme le cash course sans PIN (Cash reçu chauffeur)', async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        passengerId: 'user-1',
+        driverId: 'driver-1',
+        status: 'COMPLETED',
+        internalStatus: 'COMPLETED',
+        finalFareCdf: 8500,
+      }),
     });
-    expect(global.fetch).not.toHaveBeenCalled();
-  });
+    prisma.payment.findUnique.mockResolvedValueOnce({
+      id: 'pay-cash',
+      rideId: 'ride-1',
+      userId: 'user-1',
+      amountCdf: 8500,
+      method: PaymentMethod.CASH,
+      status: 'PENDING',
+    });
+    prisma.payment.update.mockResolvedValueOnce({
+      id: 'pay-cash',
+      rideId: 'ride-1',
+      status: 'COMPLETED',
+      method: PaymentMethod.CASH,
+    });
 
-  it('refuse le PIN espèces si Redis est down (fail-closed)', async () => {
-    redis.client.get.mockRejectedValue(new Error('redis down'));
-    await expect(service.confirmCashRide('ride-1', 'driver-1', '1234')).rejects.toMatchObject({
-      response: { code: MovaErrorCode.INTERNAL_ERROR },
-    });
+    const result = await service.confirmCashRide('ride-1', 'driver-1');
+    expect(result.success).toBe(true);
+    expect(prisma.payment.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { rideId: 'ride-1' },
+        data: expect.objectContaining({ status: 'COMPLETED' }),
+      }),
+    );
   });
 
   it('rejette le paiement service si non terminé', async () => {

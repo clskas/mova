@@ -261,9 +261,9 @@ export class InternalController {
   @Post('services/RENTAL/:referenceId/cash/confirm-partner')
   confirmRentalCashByPartner(
     @Param('referenceId') referenceId: string,
-    @Body() body: { ownerUserId: string; pin: string },
+    @Body() body: { ownerUserId: string },
   ) {
-    return this.payments.confirmRentalCashByPartner(referenceId, body.ownerUserId, body.pin);
+    return this.payments.confirmRentalCashByPartner(referenceId, body.ownerUserId);
   }
 
   @Get('subscription-plans')

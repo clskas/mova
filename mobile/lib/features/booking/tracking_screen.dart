@@ -179,7 +179,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
   bool get _canCancel => CancelEligibility.ride(_ride ?? {'status': _status});
 
   /// Paiement espèces déjà initié par le passager, en attente de la
-  /// confirmation du PIN par le chauffeur (statut backend PENDING).
+  /// confirmation « Cash reçu » par le chauffeur (statut backend PENDING).
   /// Dans ce cas on ne redemande plus au client de payer.
   bool get _cashPaymentPending {
     if (_status.toUpperCase() != 'COMPLETED') return false;
@@ -1063,7 +1063,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
                                     const SizedBox(width: 10),
                                     Expanded(
                                       child: Text(
-                                        'Paiement espèces en attente — communiquez le code PIN au chauffeur pour finaliser.',
+                                        'Paiement espèces en attente — remettez l\'argent au chauffeur ; il confirmera « Cash reçu ».',
                                         style: const TextStyle(
                                           color: MovaColors.orange,
                                           fontWeight: FontWeight.w600,

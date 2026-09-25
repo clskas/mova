@@ -9,7 +9,7 @@ import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import '../history/history_detail_dialog.dart';
 import '../../core/safety/sos_helper.dart';
-import 'widgets/driver_cash_pin_dialog.dart';
+import 'widgets/driver_cash_received_dialog.dart';
 
 class DriverScheduledMissionScreen extends ConsumerStatefulWidget {
   const DriverScheduledMissionScreen({
@@ -114,19 +114,19 @@ class _DriverScheduledMissionScreenState extends ConsumerState<DriverScheduledMi
     final api = ref.read(apiClientProvider);
     final total = (_ride?['finalFareCdf'] ?? _ride?['estimatedFareCdf'] ?? _ride?['amountCdf']) as num?;
     final net = (_ride?['driverNetCdf'] ?? _ride?['driverEarningsCdf']) as num?;
-    final pin = await DriverCashPinDialog.show(
+    final ok = await DriverCashReceivedDialog.show(
       context,
       passengerTotalCdf: total?.round(),
       driverNetCdf: net?.round(),
-      validate: (enteredPin) async {
-        final result = await api.confirmCashService('SCHEDULED', widget.rideId, enteredPin);
+      confirm: () async {
+        final result = await api.confirmCashService('SCHEDULED', widget.rideId);
         return switch (result) {
           Success() => (ok: true, message: null),
           Failure(:final error) => (ok: false, message: error.message),
         };
       },
     );
-    if (pin == null || pin.isEmpty || !mounted) return;
+    if (!ok || !mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Paiement espèces confirmé')),
     );
@@ -311,7 +311,7 @@ class _DriverScheduledMissionScreenState extends ConsumerState<DriverScheduledMi
             if (_status == 'COMPLETED') ...[
               const SizedBox(height: 8),
               MovaButton(
-                label: 'Confirmer paiement espèces',
+                label: 'Cash reçu',
                 isSecondary: true,
                 icon: Icons.payments_outlined,
                 onPressed: _saving ? null : _confirmCash,

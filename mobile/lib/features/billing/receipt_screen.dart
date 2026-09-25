@@ -355,18 +355,11 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
                           ),
                           const SizedBox(height: 8),
                           const Text(
-                            'Remettez l\'argent au chauffeur, puis communiquez-lui le code ci-dessous. '
+                            'Remettez l\'argent au chauffeur. Il confirmera « Cash reçu » dans son application. '
                             'Le reçu sera disponible après confirmation.',
                             textAlign: TextAlign.center,
                             style: TextStyle(color: MovaColors.textSecondary, fontSize: 13),
                           ),
-                          if (widget.completionPin != null && widget.completionPin!.isNotEmpty) ...[
-                            const SizedBox(height: 16),
-                            Text(
-                              widget.completionPin!,
-                              style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, letterSpacing: 8),
-                            ),
-                          ],
                         ],
                       ),
                     ),

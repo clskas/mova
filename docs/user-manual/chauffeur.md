@@ -27,7 +27,7 @@ La **ville SENGA** sur l'accueil est détectée via GPS à l'ouverture (modifiab
 - Les courses / livraisons payées en **espèces** : vous gardez l’argent en main. Ces gains s’affichent comme **gains espèces (non retirables)** et **ne** s’ajoutent **pas** au solde retirable.
 - Les commissions sur courses **espèces** créent une **dette** plateforme (pas un débit forcé du wallet).
 - Si la dette dépasse le seuil, ou si un solde positif est exigé, les **offres sont bloquées** jusqu’à recharge ou règlement au guichet.
-- Après une **livraison COD**, le client paie en espèces à la remise ; vous confirmez avec le **PIN** affiché côté passager.
+- Après une **livraison COD**, le client paie en espèces à la remise ; vous confirmez **Cash reçu** dans l’app (sans code PIN).
 
 ## Position GPS pendant les missions
 

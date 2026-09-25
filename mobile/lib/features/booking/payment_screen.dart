@@ -13,7 +13,6 @@ import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import '../billing/receipt_screen.dart';
 import '../../core/wallet/mobile_money_prompt.dart';
-import 'widgets/cash_pin_confirm_dialog.dart';
 
 const _allPaymentMethods = [
   ('WALLET', 'Portefeuille SENGA', Icons.account_balance_wallet, MovaColors.violet),
@@ -57,14 +56,12 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   final _phoneController = TextEditingController(text: '+243');
   String _method = 'WALLET';
   bool _loading = false;
-  bool _loadingPin = true;
+  bool _loadingDetails = true;
   bool _paymentReady = true;
   bool _escrowCollect = false;
   bool _cashAllowed = true;
   String? _error;
-  String? _cashPin;
   late int _amountCdf;
-  bool _cashPinDialogShown = false;
   bool _awaitingMobileMoney = false;
   Timer? _mmPollTimer;
   int _mmPollAttempts = 0;
@@ -74,20 +71,10 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       .where((m) => !_mobileMoneyMethods.contains(m.$1) || _enabledMm.contains(m.$1))
       .toList();
 
-  bool get _shouldPromptCashPin =>
-      widget.promptCashPinOnSelect ?? widget.serviceType != null;
-
-  String get _cashPeerLabel {
-    final type = widget.serviceType?.toUpperCase();
-    if (type == 'RIDE') return 'chauffeur';
-    return 'livreur';
-  }
-
   @override
   void initState() {
     super.initState();
     _amountCdf = widget.amountCdf;
-    _cashPin = widget.completionPin;
     _loadPhone();
     _loadPaymentDetails();
     _loadMmVisibility();
@@ -137,13 +124,11 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     if (widget.serviceType != null && widget.serviceId != null) {
       final preview = await api.getServicePaymentInfo(widget.serviceType!, widget.serviceId!);
       if (preview case Success(:final data)) {
-        final pin = data['cashPin']?.toString();
         final amount = data['amountCdf'] as int?;
         final ready = data['paymentReady'] != false;
         if (mounted) {
           setState(() {
             if (amount != null && amount > 0) _amountCdf = amount;
-            if (pin != null && pin.isNotEmpty) _cashPin = pin;
             _paymentReady = ready;
             _escrowCollect = data['escrowCollect'] == true;
             _cashAllowed = data['cashAllowed'] != false;
@@ -162,62 +147,26 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
         }
       }
     }
-    final pin = await api.resolveCashPin(
-      rideId: widget.rideId,
-      serviceType: widget.serviceType,
-      serviceId: widget.serviceId,
-    );
     if (widget.rideId != null) {
       final result = await api.getRide(widget.rideId!);
       if (result case Success(:final data)) {
         if (!mounted) return;
         setState(() {
           _amountCdf = (data['finalFareCdf'] ?? data['estimatedFareCdf'] ?? _amountCdf) as int;
-          _cashPin = pin ?? data['completionPin']?.toString() ?? _cashPin;
-          _loadingPin = false;
+          _loadingDetails = false;
         });
         return;
       }
     }
     if (!mounted) return;
-    setState(() {
-      _cashPin = pin ?? _cashPin;
-      _loadingPin = false;
-    });
-    await _maybePromptCashPin();
+    setState(() => _loadingDetails = false);
   }
 
   void _onMethodSelected(String method) {
     setState(() => _method = method);
-    if (method == 'CASH') {
-      unawaited(_maybePromptCashPin());
-    }
-  }
-
-  Future<void> _maybePromptCashPin() async {
-    if (!_shouldPromptCashPin || _method != 'CASH' || _cashPinDialogShown || _loadingPin) return;
-    final pin = _cashPin;
-    if (pin == null || pin.isEmpty) return;
-    _cashPinDialogShown = true;
-    if (!mounted) return;
-    final confirmed = await showCashPinConfirmDialog(
-      context,
-      pin: pin,
-      amountCdf: _amountCdf,
-      peerLabel: _cashPeerLabel,
-    );
-    if (!mounted) return;
-    if (confirmed) {
-      await _pay(skipCashPrompt: true);
-    } else {
-      setState(() => _cashPinDialogShown = false);
-    }
   }
 
   bool get _needsPhone => _mobileMoneyMethods.contains(_method);
-
-  bool get _showCashPin =>
-      _method == 'CASH' && _cashPin != null && _cashPin!.isNotEmpty;
 
   bool get _showQrPayment => _needsPhone && widget.rideId != null;
 
@@ -249,7 +198,6 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
             rideId: widget.rideId,
             showRatingAfter: true,
             pendingCash: pendingCash,
-            completionPin: pendingCash ? (_cashPin ?? widget.completionPin) : null,
             amountCdf: pendingCash ? _amountCdf : null,
           ),
         ),
@@ -278,7 +226,6 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
           serviceType: widget.serviceType,
           serviceId: widget.serviceId,
           pendingCash: pendingCash,
-          completionPin: pendingCash ? (_cashPin ?? widget.completionPin) : null,
           amountCdf: pendingCash ? _amountCdf : null,
           showRatingAfter: isErrand,
         ),
@@ -347,12 +294,8 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     }
   }
 
-  Future<void> _pay({bool skipCashPrompt = false}) async {
+  Future<void> _pay() async {
     if (_loading || _awaitingMobileMoney) return;
-    if (!skipCashPrompt && _method == 'CASH' && _shouldPromptCashPin) {
-      await _maybePromptCashPin();
-      return;
-    }
     if (!_paymentReady) {
       final msg = switch (widget.serviceType) {
         'DELIVERY' =>
@@ -364,11 +307,6 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
         _ => 'Le paiement n\'est pas encore disponible pour cette course.',
       };
       setState(() => _error = msg);
-      return;
-    }
-    if (_method == 'CASH' && (_cashPin == null || _cashPin!.isEmpty)) {
-      setState(() => _error = 'Code PIN espèces indisponible. Réessayez dans un instant.');
-      await _loadPaymentDetails();
       return;
     }
     if (_needsPhone) {
@@ -407,7 +345,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
         if (_method == 'CASH' && data['pendingCash'] == true) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Paiement espèces en attente — communiquez le code PIN au livreur.'),
+              content: Text('Paiement espèces en attente — remettez l\'argent au livreur.'),
             ),
           );
           await _goToReceipt(pendingCash: true);
@@ -433,7 +371,6 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       case Failure(:final error):
         setState(() {
           _error = error.message;
-          _cashPinDialogShown = false;
         });
     }
   }
@@ -466,7 +403,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                     style: TextStyle(color: MovaColors.textSecondary.withValues(alpha: 0.95), fontSize: 12),
                   ),
                 ],
-                if (_loadingPin)
+                if (_loadingDetails)
                   const Padding(
                     padding: EdgeInsets.only(top: 12),
                     child: SizedBox(
@@ -475,29 +412,12 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     ),
                   )
-                else if (_showCashPin) ...[
+                else if (_method == 'CASH') ...[
                   const SizedBox(height: 12),
                   const Text(
-                    'Code de confirmation espèces',
-                    style: TextStyle(color: MovaColors.textSecondary, fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'Remettez l\'argent au livreur, puis communiquez-lui ce code. '
-                    'Il le saisit dans son app pour confirmer le paiement.',
+                    'Remettez l\'argent au chauffeur ou livreur. Il confirmera « Cash reçu » dans son app — aucun code à communiquer.',
                     textAlign: TextAlign.center,
                     style: TextStyle(color: MovaColors.textSecondary, fontSize: 12),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    _cashPin!,
-                    style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, letterSpacing: 8),
-                  ),
-                ] else if (_method == 'CASH' && (_cashPin == null || _cashPin!.isEmpty)) ...[
-                  const SizedBox(height: 12),
-                  Text(
-                    'Code PIN en cours de chargement…',
-                    style: TextStyle(color: MovaColors.textSecondary.withValues(alpha: 0.9), fontSize: 12),
                   ),
                 ],
               ],

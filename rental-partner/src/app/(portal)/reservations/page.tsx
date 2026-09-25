@@ -111,7 +111,7 @@ function LogisticsEditor({ booking, busy, onSave }: { booking: PartnerBooking; b
   );
 }
 
-function CashPinConfirm({
+function CashReceivedConfirm({
   booking,
   busy,
   onDone,
@@ -120,7 +120,6 @@ function CashPinConfirm({
   busy: boolean;
   onDone: () => void;
 }) {
-  const [pin, setPin] = useState("");
   const [saving, setSaving] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
 
@@ -128,18 +127,13 @@ function CashPinConfirm({
   if (booking.isPaid || booking.status === "PAID") return null;
 
   async function submit() {
-    if (pin.trim().length < 4) {
-      setLocalError("Saisissez le code PIN communiqué par le passager.");
-      return;
-    }
     setSaving(true);
     setLocalError(null);
     try {
-      await confirmBookingCash(booking.id, pin.trim());
-      setPin("");
+      await confirmBookingCash(booking.id);
       onDone();
     } catch (e) {
-      setLocalError(toUserErrorMessage(e, "Code PIN incorrect."));
+      setLocalError(toUserErrorMessage(e, "Confirmation impossible."));
     } finally {
       setSaving(false);
     }
@@ -149,27 +143,16 @@ function CashPinConfirm({
     <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 space-y-2 text-sm">
       <p className="font-medium text-emerald-900">Paiement espèces</p>
       <p className="text-xs text-emerald-800">
-        Après réception des espèces, demandez au passager son code PIN SENGA (écran « Ma location ») et saisissez-le ici.
-        Le véhicule doit être au statut « Retournée ».
+        Après réception des espèces, confirmez « Cash reçu ». Le véhicule doit être au statut « Retournée ».
       </p>
-      <div className="flex flex-wrap gap-2">
-        <input
-          className="rounded-lg border border-emerald-200 px-3 py-2 text-sm tracking-widest font-mono flex-1 min-w-[140px]"
-          placeholder="Code PIN"
-          inputMode="numeric"
-          maxLength={8}
-          value={pin}
-          onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
-        />
-        <button
-          type="button"
-          disabled={busy || saving}
-          onClick={submit}
-          className="px-4 py-2 rounded-lg text-sm bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
-        >
-          {saving ? "…" : "Confirmer paiement"}
-        </button>
-      </div>
+      <button
+        type="button"
+        disabled={busy || saving}
+        onClick={submit}
+        className="px-4 py-2 rounded-lg text-sm bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
+      >
+        {saving ? "…" : "Cash reçu"}
+      </button>
       {localError && <p className="text-xs text-red-600">{localError}</p>}
     </div>
   );
@@ -400,7 +383,7 @@ export default function ReservationsPage() {
 
                   <LogisticsEditor booking={b} busy={busyId === b.id} onSave={load} />
 
-                  <CashPinConfirm booking={b} busy={busyId === b.id} onDone={load} />
+                  <CashReceivedConfirm booking={b} busy={busyId === b.id} onDone={load} />
 
                   {b.nextStepHint && b.status !== "CLOSED" && !paid && (
                     <p className="text-xs text-indigo-800 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2">

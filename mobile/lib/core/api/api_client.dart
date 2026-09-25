@@ -1925,16 +1925,15 @@ class ApiClient {
     };
   }
 
-  Future<Result<Map<String, dynamic>>> confirmCashRide(String rideId, String pin) async {
-    return post('/payments/rides/$rideId/cash/confirm', {'pin': pin});
+  Future<Result<Map<String, dynamic>>> confirmCashRide(String rideId) async {
+    return post('/payments/rides/$rideId/cash/confirm', <String, dynamic>{});
   }
 
   Future<Result<Map<String, dynamic>>> confirmCashService(
     String referenceType,
     String referenceId,
-    String pin,
   ) async {
-    return post('/payments/services/$referenceType/$referenceId/cash/confirm', {'pin': pin});
+    return post('/payments/services/$referenceType/$referenceId/cash/confirm', <String, dynamic>{});
   }
 
   Future<Result<Map<String, dynamic>>> createRideShareLink(String rideId) async {

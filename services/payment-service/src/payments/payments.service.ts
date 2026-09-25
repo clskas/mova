@@ -38,9 +38,6 @@ const MOBILE_MONEY_METHODS = new Set<PaymentMethod>([
   PaymentMethod.AIRTEL_MONEY,
 ]);
 
-const CASH_PIN_FAIL_PREFIX = 'pay:cashpin:fail:';
-const CASH_PIN_FAIL_MAX = 5;
-const CASH_PIN_FAIL_TTL_SEC = 15 * 60;
 const PAY_LOCK_PREFIX = 'pay:intent:';
 const PAY_LOCK_TTL_SEC = 60;
 
@@ -104,10 +101,6 @@ export class PaymentsService {
     }
   }
 
-  private cashPinLockKey(kind: string, id: string) {
-    return `${CASH_PIN_FAIL_PREFIX}${kind}:${id}`;
-  }
-
   private payLockKey(kind: string, id: string) {
     return `${PAY_LOCK_PREFIX}${kind}:${id}`;
   }
@@ -143,62 +136,6 @@ export class PaymentsService {
     } catch (e) {
       this.logger.warn(`releasePayLock ${kind}/${id} failed: ${(e as Error).message}`);
     }
-  }
-
-  /** Money-changing PIN: fail-closed if Redis is down (unlike login OTP/PIN). */
-  private async assertCashPinNotLocked(kind: string, id: string) {
-    const client = this.redis?.client;
-    if (!client) return;
-    try {
-      const raw = await client.get(this.cashPinLockKey(kind, id));
-      const fails = raw ? Number.parseInt(raw, 10) : 0;
-      if (fails >= CASH_PIN_FAIL_MAX) {
-        throw new MovaHttpException(
-          MovaErrorCode.AUTH_PIN_LOCKED,
-          HttpStatus.TOO_MANY_REQUESTS,
-          'Trop de tentatives PIN. Réessayez dans 15 minutes.',
-        );
-      }
-    } catch (e) {
-      if (e instanceof MovaHttpException) throw e;
-      throw new MovaHttpException(
-        MovaErrorCode.INTERNAL_ERROR,
-        HttpStatus.SERVICE_UNAVAILABLE,
-        'Vérification PIN temporairement indisponible.',
-      );
-    }
-  }
-
-  private async registerCashPinFailure(kind: string, id: string) {
-    const client = this.redis?.client;
-    if (!client) return;
-    try {
-      const key = this.cashPinLockKey(kind, id);
-      const raw = await client.get(key);
-      const fails = (raw ? Number.parseInt(raw, 10) : 0) + 1;
-      await client.set(key, String(fails), 'EX', CASH_PIN_FAIL_TTL_SEC);
-    } catch (e) {
-      this.logger.warn(`registerCashPinFailure failed: ${(e as Error).message}`);
-    }
-  }
-
-  private async clearCashPinFailures(kind: string, id: string) {
-    const client = this.redis?.client;
-    if (!client) return;
-    try {
-      await client.del(this.cashPinLockKey(kind, id));
-    } catch (e) {
-      this.logger.warn(`clearCashPinFailures failed: ${(e as Error).message}`);
-    }
-  }
-
-  private async assertCashPinMatches(kind: string, id: string, expected: string, provided: string) {
-    await this.assertCashPinNotLocked(kind, id);
-    if (!expected || String(provided).trim() !== expected) {
-      await this.registerCashPinFailure(kind, id);
-      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Code PIN incorrect.');
-    }
-    await this.clearCashPinFailures(kind, id);
   }
 
   private resolvePaymentPhone(method: PaymentMethod, phone?: string): string {
@@ -551,7 +488,7 @@ export class PaymentsService {
           success: true,
           payment,
           pendingCash: true,
-          message: 'Paiement espèces en attente — communiquez le code PIN au chauffeur.',
+          message: 'Paiement espèces en attente — remettez l\'argent au chauffeur ; il confirmera « Cash reçu ».',
         };
       }
       const mm = await this.processPayment(rideId, userId, amountCdf, method, paymentPhone);
@@ -838,7 +775,15 @@ export class PaymentsService {
         amountCdf,
       });
       await this.releasePayLock(type, referenceId);
-      return { success: true, payment, pendingCash: true, message: 'Paiement espèces en attente — communiquez le code PIN au livreur.', amountCdf, currency: 'CDF' };
+      return {
+        success: true,
+        payment,
+        pendingCash: true,
+        message:
+          'Paiement espèces en attente — remettez l\'argent au livreur ; il confirmera « Cash reçu ».',
+        amountCdf,
+        currency: 'CDF',
+      };
     }
 
     const provider = this.getProvider(method);
@@ -921,10 +866,9 @@ export class PaymentsService {
     }
   }
 
-  async confirmCashService(referenceType: string, referenceId: string, driverUserId: string, pin: string) {
+  async confirmCashService(referenceType: string, referenceId: string, driverUserId: string) {
     const type = referenceType.toUpperCase();
-    if (type === 'RIDE') return this.confirmCashRide(referenceId, driverUserId, pin);
-    await this.assertCashPinNotLocked(type, referenceId);
+    if (type === 'RIDE') return this.confirmCashRide(referenceId, driverUserId);
 
     const info = await this.fetchServicePaymentInfo(type, referenceId);
     const actorAllowed =
@@ -941,8 +885,6 @@ export class PaymentsService {
         this.servicePaymentNotReadyMessage(type, info.status),
       );
     }
-    const expectedPin = String(info.cashPin ?? '').trim();
-    await this.assertCashPinMatches(type, referenceId, expectedPin, pin);
     const existing = await this.prisma.servicePayment.findUnique({
       where: { referenceType_referenceId: { referenceType: type, referenceId } },
     });
@@ -968,9 +910,8 @@ export class PaymentsService {
   }
 
   /** Confirmation espèces location par le loueur (sans paiement CASH préalable côté passager). */
-  async confirmRentalCashByPartner(referenceId: string, ownerUserId: string, pin: string) {
+  async confirmRentalCashByPartner(referenceId: string, ownerUserId: string) {
     const type = 'RENTAL';
-    await this.assertCashPinNotLocked(type, referenceId);
     const info = await this.fetchServicePaymentInfo(type, referenceId);
     const ownerId = info.ownerUserId ?? info.driverId;
     if (!ownerId || ownerId !== ownerUserId) {
@@ -983,8 +924,6 @@ export class PaymentsService {
         this.servicePaymentNotReadyMessage(type, info.status),
       );
     }
-    const expectedPin = String(info.cashPin ?? '').trim();
-    await this.assertCashPinMatches(type, referenceId, expectedPin, pin);
     const existing = await this.prisma.servicePayment.findUnique({
       where: { referenceType_referenceId: { referenceType: type, referenceId } },
     });
@@ -1023,8 +962,7 @@ export class PaymentsService {
     return { success: true, payment, message: 'Paiement espèces confirmé' };
   }
 
-  async confirmCashRide(rideId: string, driverUserId: string, pin: string) {
-    await this.assertCashPinNotLocked('RIDE', rideId);
+  async confirmCashRide(rideId: string, driverUserId: string) {
     const ride = await this.fetchRide(rideId);
     if (ride.isShared === true || ride.shared === true || ride.type === 'RIDE_SHARE') {
       throw new MovaHttpException(
@@ -1039,8 +977,6 @@ export class PaymentsService {
     if (this.resolveRideStatus(ride) !== 'COMPLETED') {
       throw new MovaHttpException(MovaErrorCode.RIDE_INVALID_STATUS);
     }
-    const expectedPin = String(ride.completionPin ?? '').trim();
-    await this.assertCashPinMatches('RIDE', rideId, expectedPin, pin);
     const existing = await this.prisma.payment.findUnique({ where: { rideId } });
     if (!existing || existing.method !== PaymentMethod.CASH) {
       throw new MovaHttpException(MovaErrorCode.PAYMENT_FAILED, undefined, 'Aucun paiement espèces en attente.');

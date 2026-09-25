@@ -20,6 +20,7 @@ import '../../core/billing/service_price_display.dart';
 import '../../core/safety/sos_helper.dart';
 import '../delivery/delivery_payment_state.dart';
 import 'widgets/driver_cash_pin_dialog.dart';
+import 'widgets/driver_cash_received_dialog.dart';
 
 class ActiveDeliveryScreen extends ConsumerStatefulWidget {
   const ActiveDeliveryScreen({
@@ -394,14 +395,13 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
             _delivery['amountCdf'] ??
             _delivery['totalCdf']) as num?;
     final net = (_delivery['driverNetCdf'] ?? _delivery['driverEarningsCdf'] ?? _delivery['courierFeeCdf']) as num?;
-    final pin = await DriverCashPinDialog.show(
+    final ok = await DriverCashReceivedDialog.show(
       context,
-      title: 'Confirmer paiement espèces',
-      label: 'Code PIN du client',
+      title: auto ? 'Le client paie en espèces' : 'Cash reçu ?',
       passengerTotalCdf: total?.round(),
       driverNetCdf: net?.round(),
-      validate: (enteredPin) async {
-        final result = await api.confirmCashService(refType, _deliveryId, enteredPin);
+      confirm: () async {
+        final result = await api.confirmCashService(refType, _deliveryId);
         return switch (result) {
           Success() => (ok: true, message: null),
           Failure(:final error) => (ok: false, message: error.message),
@@ -409,7 +409,7 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
       },
     );
     _cashDialogOpen = false;
-    if (pin == null || pin.isEmpty || !mounted) return;
+    if (!ok || !mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Paiement espèces confirmé')),
     );
@@ -633,7 +633,7 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
           if (_awaitingCashConfirm) ...[
             const SizedBox(height: 8),
             MovaButton(
-              label: 'Confirmer paiement espèces',
+              label: 'Cash reçu',
               isSecondary: true,
               icon: Icons.payments_outlined,
               onPressed: _loading ? null : () => _confirmCash(),

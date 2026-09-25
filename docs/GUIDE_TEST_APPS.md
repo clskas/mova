@@ -824,7 +824,7 @@ Voir [CAHIER_DES_CHARGES_V2.md](./CAHIER_DES_CHARGES_V2.md) pour le détail fonc
 | 1 | SOS passager | Course active → bouton SOS sur suivi | Incident `SOS` dans admin **Litiges** |
 | 2 | Partage trajet | Icône partager → lien copié | `GET /api/public/trips/:token` retourne statut + trace |
 | 3 | ERRAND v2 | Articles + budget → créer commande | `budgetCdf` et `items` en base ; carte sur suivi |
-| 4 | Cash course | Payer **Espèces** → chauffeur saisit PIN | Payment `COMPLETED` après `POST /payments/rides/:id/cash/confirm` |
+| 4 | Cash course | Payer **Espèces** → chauffeur **Cash reçu** | Payment `COMPLETED` après `POST /payments/rides/:id/cash/confirm` |
 | 5 | SMS statut | Accepter course (logs notification-service) | `[MOCK SMS]` dans logs Docker |
 
 ```powershell

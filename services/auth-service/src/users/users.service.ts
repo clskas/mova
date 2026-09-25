@@ -243,6 +243,31 @@ export class UsersService {
     }));
   }
 
+  /** Active users for SOS audience roles (passengers / drivers / partners). Cap avoids mass spam. */
+  async listUsersByRolesForAlerts(roles: UserRole[], take = 500) {
+    if (roles.length === 0) return [];
+    const users = await this.prisma.user.findMany({
+      where: { role: { in: roles }, status: UserStatus.ACTIVE },
+      select: {
+        id: true,
+        phone: true,
+        role: true,
+        managedCity: true,
+        firstName: true,
+        lastName: true,
+      },
+      take: Math.min(Math.max(take, 1), 1000),
+      orderBy: { createdAt: 'desc' },
+    });
+    return users.map((u) => ({
+      id: u.id,
+      phone: u.phone,
+      role: u.role,
+      managedCity: u.managedCity,
+      name: [u.firstName, u.lastName].filter(Boolean).join(' ').trim() || undefined,
+    }));
+  }
+
   /**
    * Google Driver / partner whose e-mail was wiped (onboarding PATCH null).
    * Recovers the address from the Google OTP row (`otp_codes.phone` = e-mail).

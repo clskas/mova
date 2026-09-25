@@ -62,6 +62,22 @@ export class InternalController {
     return this.users.listOpsStaffForAlerts();
   }
 
+  /** Active users for SOS audiences: roles=PASSENGER,DRIVER,RESTAURANT,RENTAL_PARTNER */
+  @Get('users/by-roles')
+  listByRoles(@Query('roles') roles?: string, @Query('take') take?: string) {
+    const allowed = new Set<UserRole>([
+      UserRole.PASSENGER,
+      UserRole.DRIVER,
+      UserRole.RESTAURANT,
+      UserRole.RENTAL_PARTNER,
+    ]);
+    const filtered = (roles ?? '')
+      .split(',')
+      .map((r) => r.trim().toUpperCase())
+      .filter((r): r is UserRole => allowed.has(r as UserRole));
+    return this.users.listUsersByRolesForAlerts(filtered, Number(take ?? 500));
+  }
+
   @Get('users')
   list(
     @Query('skip') skip?: string,

@@ -223,7 +223,8 @@ export class NotificationsService implements OnModuleInit {
         forOps: true,
       });
       staffIds.push(s.id);
-      if (isSos && s.phone) {
+      // SMS reserved for ops agents — never mass-SMS passengers/drivers/partners.
+      if (isSos && s.phone && !s.audienceOnly) {
         await this.sms.sendMessage(
           s.phone,
           `SENGA SOS — ${payload.type}${payload.rideId ? ` course ${payload.rideId.slice(0, 8)}` : ''}.${maps}`.slice(0, 160),

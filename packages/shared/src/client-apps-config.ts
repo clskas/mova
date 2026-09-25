@@ -35,6 +35,16 @@ export type ClientAppsFeatures = {
   sengaPlusVisible: boolean;
 };
 
+/** Extra SOS recipient audiences beyond ops staff (push / in-app; SMS stays ops-only). */
+export const SOS_ALERT_AUDIENCES = ['PASSENGER', 'DRIVER', 'PARTNER'] as const;
+export type SosAlertAudience = (typeof SOS_ALERT_AUDIENCES)[number];
+
+export const SOS_ALERT_AUDIENCE_LABELS_FR: Record<SosAlertAudience, string> = {
+  PASSENGER: 'Passagers',
+  DRIVER: 'Chauffeurs',
+  PARTNER: 'Partenaires',
+};
+
 export type ClientAppsConfig = {
   mobileMoney: MmVisibilityByApp;
   maintenance: MaintenanceConfig;
@@ -46,6 +56,11 @@ export type ClientAppsConfig = {
    * Empty = all ops roles (SUPER_ADMIN, ADMIN, SUPPORT, CITY_ADMIN).
    */
   sosAlertUserIds: string[];
+  /**
+   * Additional role audiences that also receive SOS (push / in-app).
+   * PARTNER = RESTAURANT + RENTAL_PARTNER.
+   */
+  sosAlertAudiences: SosAlertAudience[];
 };
 
 export const DEFAULT_MAINTENANCE_MESSAGE_FR =
@@ -94,6 +109,7 @@ export const DEFAULT_CLIENT_APPS_CONFIG: ClientAppsConfig = {
   passengerServices: defaultPassengerServices(),
   features: { sengaPlusVisible: true },
   sosAlertUserIds: [],
+  sosAlertAudiences: [],
 };
 
 export const CLIENT_APP_LABELS_FR: Record<ClientAppId, string> = {
@@ -201,6 +217,19 @@ export function mergeClientAppsConfig(raw: unknown): ClientAppsConfig {
       .filter((id): id is string => typeof id === 'string' && id.trim().length > 0)
       .map((id) => id.trim())
       .slice(0, 200);
+  }
+
+  const sosAudiences = (src as { sosAlertAudiences?: unknown }).sosAlertAudiences;
+  if (Array.isArray(sosAudiences)) {
+    const allow = new Set<string>(SOS_ALERT_AUDIENCES);
+    base.sosAlertAudiences = [
+      ...new Set(
+        sosAudiences
+          .filter((a): a is string => typeof a === 'string')
+          .map((a) => a.trim().toUpperCase())
+          .filter((a): a is SosAlertAudience => allow.has(a)),
+      ),
+    ];
   }
 
   return base;
@@ -316,4 +345,18 @@ export function resolveSosAlertUserIds(
   if (selected.length === 0) return allOpsStaffIds;
   const allow = new Set(selected);
   return allOpsStaffIds.filter((id) => allow.has(id));
+}
+
+/** Roles implied by SOS audience flags (PARTNER → commerce + location). */
+export function rolesForSosAudiences(audiences: SosAlertAudience[]): string[] {
+  const roles = new Set<string>();
+  for (const a of audiences ?? []) {
+    if (a === 'PASSENGER') roles.add('PASSENGER');
+    else if (a === 'DRIVER') roles.add('DRIVER');
+    else if (a === 'PARTNER') {
+      roles.add('RESTAURANT');
+      roles.add('RENTAL_PARTNER');
+    }
+  }
+  return [...roles];
 }

@@ -57,11 +57,12 @@ export class ClientAppsConfigService implements OnModuleInit {
     };
   }
 
-  /** Full config for admin (includes SOS recipient IDs). */
+  /** Full config for admin (includes SOS recipient IDs / audiences). */
   getAdmin() {
     return {
       ...this.getPublic(),
       sosAlertUserIds: this.config.sosAlertUserIds,
+      sosAlertAudiences: this.config.sosAlertAudiences,
     };
   }
 
@@ -85,6 +86,10 @@ export class ClientAppsConfigService implements OnModuleInit {
         : this.config.features,
       sosAlertUserIds:
         patch.sosAlertUserIds !== undefined ? patch.sosAlertUserIds : this.config.sosAlertUserIds,
+      sosAlertAudiences:
+        patch.sosAlertAudiences !== undefined
+          ? patch.sosAlertAudiences
+          : this.config.sosAlertAudiences,
     });
 
     this.validate(next);

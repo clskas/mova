@@ -2620,6 +2620,8 @@ export type ClientAppsConfig = {
   passengerServices: Record<PassengerServiceId, boolean>;
   features?: { sengaPlusVisible?: boolean };
   sosAlertUserIds?: string[];
+  /** PASSENGER | DRIVER | PARTNER — audiences supplémentaires (push / in-app). */
+  sosAlertAudiences?: Array<"PASSENGER" | "DRIVER" | "PARTNER">;
 };
 
 export async function fetchClientAppsConfig(): Promise<ClientAppsConfig> {

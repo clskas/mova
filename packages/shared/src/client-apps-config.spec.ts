@@ -54,4 +54,11 @@ describe('client-apps-config merge', () => {
     expect(enabledMmOperators(cfg, 'senga', 'withdraw')).toEqual(['AIRTEL_MONEY']);
     expect(isMmOperatorEnabled(cfg, 'senga', 'MPESA', 'withdraw')).toBe(false);
   });
+
+  it('merges sosAlertAudiences', () => {
+    const cfg = mergeClientAppsConfig({
+      sosAlertAudiences: ['PASSENGER', 'partner', 'NOPE', 'DRIVER'],
+    } as unknown as Partial<ClientAppsConfig>);
+    expect(cfg.sosAlertAudiences).toEqual(['PASSENGER', 'PARTNER', 'DRIVER']);
+  });
 });

@@ -136,27 +136,47 @@ backup_via_docker() {
   docker exec "$POSTGRES_CONTAINER" pg_dump -U "$POSTGRES_USER" -d "$db_name" --no-owner --no-acl >"$out"
 }
 
+# Transient Postgres startup after Render suspend/resume (minutes quota).
+pg_dump_is_transient() {
+  local err_file="$1"
+  grep -qiE \
+    'the database system is starting up|SSL connection has been closed unexpectedly|Connection refused|could not connect to server|timeout expired|server closed the connection unexpectedly' \
+    "$err_file"
+}
+
 # Returns 0 on success, 2 on server/client version mismatch (caller should skip), 1 otherwise.
 # Must be invoked from `if`/`||` so a non-zero return does not trip `set -e`.
 backup_via_pg_dump() {
   local url="$1"
   local out="$2"
-  local err
+  local err attempt=1 max_attempts="${BACKUP_PG_DUMP_RETRIES:-8}" delay=5
   if [ -z "${PG_DUMP_BIN:-}" ]; then
     echo "ERROR: pg_dump not found" >&2
     return 1
   fi
-  err="$(mktemp)"
-  if "$PG_DUMP_BIN" "$url" --no-owner --no-acl -f "$out" 2>"$err"; then
-    rm -f "$err"
-    return 0
-  fi
-  cat "$err" >&2
-  if grep -qiE 'server version mismatch|aborting because of server version' "$err"; then
+  while [ "$attempt" -le "$max_attempts" ]; do
+    err="$(mktemp)"
+    if "$PG_DUMP_BIN" "$url" --no-owner --no-acl -f "$out" 2>"$err"; then
+      rm -f "$err"
+      return 0
+    fi
+    cat "$err" >&2
+    if grep -qiE 'server version mismatch|aborting because of server version' "$err"; then
+      rm -f "$err" "$out"
+      return 2
+    fi
+    if pg_dump_is_transient "$err" && [ "$attempt" -lt "$max_attempts" ]; then
+      echo "WARN: pg_dump transient failure (attempt $attempt/$max_attempts) — Postgres may still be starting; retry in ${delay}s" >&2
+      rm -f "$err" "$out"
+      sleep "$delay"
+      delay=$((delay + 5))
+      if [ "$delay" -gt 30 ]; then delay=30; fi
+      attempt=$((attempt + 1))
+      continue
+    fi
     rm -f "$err" "$out"
-    return 2
-  fi
-  rm -f "$err" "$out"
+    return 1
+  done
   return 1
 }
 

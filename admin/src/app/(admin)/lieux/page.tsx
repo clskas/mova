@@ -101,8 +101,9 @@ function OsmLinksPanel({ item }: { item: PoiSuggestion }) {
 }
 
 export default function LieuxPage() {
-  const { canWrite } = useAdmin();
+  const { canWrite, role, user } = useAdmin();
   const readOnly = !canWrite("parametres");
+  const managedCity = role === "CITY_ADMIN" ? user?.managedCity?.trim() || null : null;
   const [status, setStatus] = useState("PENDING");
   const [items, setItems] = useState<PoiSuggestion[]>([]);
   const [loading, setLoading] = useState(true);
@@ -171,13 +172,20 @@ export default function LieuxPage() {
   }
 
   async function handleSeedCatalog() {
-    if (!confirm("Synchroniser tous les POI du catalogue SENGA (32 villes) ?")) return;
+    const cityLabel = managedCity ?? "toutes les villes SENGA";
+    const confirmMsg = managedCity
+      ? `Synchroniser le catalogue POI pour ${managedCity} uniquement ?`
+      : "Synchroniser tous les POI du catalogue SENGA (toutes villes) ?";
+    if (!confirm(confirmMsg)) return;
     setSeedingPoi(true);
     setSeedResult(null);
     setError(null);
     try {
-      const result = await seedPoiCatalog("RDC");
-      setSeedResult(`${result.imported} ajouté(s), ${result.skipped} déjà présent(s)`);
+      // CITY_ADMIN: backend force managedCity even if client sends RDC.
+      const result = await seedPoiCatalog(managedCity ?? "RDC");
+      setSeedResult(
+        `${result.imported} ajouté(s), ${result.skipped} déjà présent(s) — ${cityLabel}`,
+      );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Échec synchronisation POI");
     } finally {
@@ -189,8 +197,19 @@ export default function LieuxPage() {
     <div>
       <PageHeader
         title="Lieux & POI"
-        subtitle="Validation SENGA — publication dans l'autocomplétion de l'app (distinct d'OpenStreetMap)"
+        subtitle={
+          managedCity
+            ? `Validation SENGA — périmètre ${managedCity} (autocomplétion app, distinct d'OpenStreetMap)`
+            : "Validation SENGA — publication dans l'autocomplétion de l'app (distinct d'OpenStreetMap)"
+        }
       />
+
+      {managedCity && (
+        <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-950">
+          Périmètre admin ville : <strong>{managedCity}</strong> — seules les suggestions de cette ville
+          sont listées ; la synchronisation catalogue ne touche que {managedCity}.
+        </div>
+      )}
 
       <Card className="mb-4 bg-violet-50 border-violet-100">
         <p className="text-sm text-gray-800 leading-relaxed">
@@ -207,7 +226,11 @@ export default function LieuxPage() {
       {!readOnly && (
         <div className="mb-4 flex flex-wrap items-center gap-3">
           <BtnPrimary onClick={handleSeedCatalog} disabled={seedingPoi}>
-            {seedingPoi ? "Synchronisation…" : "Synchroniser catalogue POI (toutes villes)"}
+            {seedingPoi
+              ? "Synchronisation…"
+              : managedCity
+                ? `Synchroniser catalogue POI (${managedCity})`
+                : "Synchroniser catalogue POI (toutes villes)"}
           </BtnPrimary>
           {seedResult && <span className="text-sm text-green-700">{seedResult}</span>}
         </div>

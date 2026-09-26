@@ -96,13 +96,27 @@ class CancelEligibility {
     return fromMap(data, fallback: _rideFallback(data));
   }
 
+  /// Driver cancel button — prefers API [canDriverCancel], else local Uber-style rules.
+  static bool rideDriver(Map<String, dynamic>? data) {
+    if (data == null) return false;
+    if (data.containsKey('canDriverCancel')) return data['canDriverCancel'] == true;
+    final status = data['status']?.toString().toUpperCase();
+    return status == 'ACCEPTED' ||
+        status == 'DRIVER_ASSIGNED' ||
+        status == 'DRIVER_ARRIVED' ||
+        status == 'ARRIVING';
+  }
+
   static bool _rideFallback(Map<String, dynamic>? data) {
     if (data == null) return false;
     final status = data['status']?.toString().toUpperCase();
     return status == 'REQUESTED' ||
         status == 'SEARCHING' ||
+        status == 'MATCHING' ||
         status == 'ACCEPTED' ||
-        status == 'DRIVER_ARRIVED';
+        status == 'DRIVER_ASSIGNED' ||
+        status == 'DRIVER_ARRIVED' ||
+        status == 'ARRIVING';
   }
 
   static bool _statusOnlyFallback(Map<String, dynamic>? data, {required Set<String> blocked}) {

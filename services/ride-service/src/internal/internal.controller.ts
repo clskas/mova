@@ -790,12 +790,19 @@ export class InternalController {
     @Query('status') status?: string,
     @Query('skip') skip?: string,
     @Query('take') take?: string,
+    @Query('city') city?: string,
   ) {
     return this.poiSuggestions.listForAdmin({
       status: status as 'PENDING' | 'APPROVED' | 'REJECTED' | undefined,
       skip: Number(skip ?? 0),
       take: Number(take ?? 50),
+      city,
     });
+  }
+
+  @Get('poi-suggestions/:id')
+  getPoiSuggestion(@Param('id') id: string) {
+    return this.poiSuggestions.getSuggestion(id);
   }
 
   @Post('poi-suggestions/:id/approve')

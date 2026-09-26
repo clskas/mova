@@ -171,9 +171,18 @@ export class PoiSuggestionsService {
     return rows.map((r) => this.formatSuggestion(r));
   }
 
-  async listForAdmin(opts: { status?: PoiSuggestionStatus; skip?: number; take?: number }) {
+  async listForAdmin(opts: {
+    status?: PoiSuggestionStatus;
+    skip?: number;
+    take?: number;
+    city?: string | null;
+  }) {
     const where: Prisma.PoiSuggestionWhereInput = {};
     if (opts.status) where.status = opts.status;
+    const city = opts.city?.trim();
+    if (city) {
+      where.city = { equals: city, mode: 'insensitive' };
+    }
     const skip = opts.skip ?? 0;
     const take = Math.min(opts.take ?? 50, 100);
     const [rows, total] = await Promise.all([
@@ -191,6 +200,12 @@ export class PoiSuggestionsService {
       skip,
       take,
     };
+  }
+
+  async getSuggestion(id: string) {
+    const suggestion = await this.prisma.poiSuggestion.findUnique({ where: { id } });
+    if (!suggestion) throw new MovaHttpException(MovaErrorCode.NOT_FOUND, undefined, 'Suggestion introuvable.');
+    return this.formatSuggestion(suggestion);
   }
 
   async approve(id: string, dto: ApprovePoiSuggestionDto) {

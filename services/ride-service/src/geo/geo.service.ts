@@ -722,8 +722,8 @@ export class GeoService implements OnModuleInit {
     if (useOverpass && national) return this.poiImport.importAllServiceAreasFromOverpass();
     if (useOverpass) return this.poiImport.importFromOverpass(target);
     if (national) return this.poiImport.seedAllCities();
-    if (city && city.toLowerCase() !== 'kinshasa') return this.poiImport.seedCity(city);
-    return this.poiImport.seedAllCities();
+    // City-scoped seed (incl. Kinshasa) — do not expand to all cities.
+    return this.poiImport.seedCity(target || 'Kinshasa');
   }
 
   private normalizeSearchText(value: string) {

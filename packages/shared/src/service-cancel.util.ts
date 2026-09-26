@@ -116,8 +116,42 @@ export function canCancelErrand(params: { status: string }): CancelEligibility {
   return allowed();
 }
 
-export function canCancelRide(params: { status: string }): CancelEligibility {
-  const cancellable = new Set([
+export function canCancelRide(params: {
+  status: string;
+  /** Who is cancelling — defaults to passenger rules. */
+  actor?: 'passenger' | 'driver';
+}): CancelEligibility {
+  const status = params.status;
+  const actor = params.actor ?? 'passenger';
+
+  if (status === 'CANCELLED') {
+    return blocked('Cette course est déjà annulée.');
+  }
+  if (status === 'COMPLETED') {
+    return blocked('Cette course est terminée.');
+  }
+  if (status === 'IN_PROGRESS') {
+    return blocked(
+      actor === 'driver'
+        ? 'La course est en cours — annulation chauffeur impossible. Contactez le support SENGA en cas d\'urgence.'
+        : 'La course est en cours — annulation impossible.',
+    );
+  }
+
+  if (actor === 'driver') {
+    // Uber-style: driver may cancel only after accept and before trip start.
+    const driverCancellable = new Set([
+      'ACCEPTED',
+      'DRIVER_ASSIGNED',
+      'DRIVER_ARRIVED',
+      'ARRIVING',
+    ]);
+    if (driverCancellable.has(status)) return allowed();
+    return blocked('Vous ne pouvez annuler qu\'après avoir accepté et avant le démarrage de la course.');
+  }
+
+  // Passenger: free cancel while matching; cancel with possible fee until trip starts.
+  const passengerCancellable = new Set([
     'REQUESTED',
     'SEARCHING',
     'MATCHING',
@@ -126,14 +160,8 @@ export function canCancelRide(params: { status: string }): CancelEligibility {
     'DRIVER_ARRIVED',
     'ARRIVING',
   ]);
-  if (cancellable.has(params.status)) return allowed();
-  if (params.status === 'CANCELLED') {
-    return blocked('Cette course est déjà annulée.');
-  }
-  if (params.status === 'COMPLETED') {
-    return blocked('Cette course est terminée.');
-  }
-  return blocked('La course est en cours — annulation impossible.');
+  if (passengerCancellable.has(status)) return allowed();
+  return blocked('Cette course ne peut plus être annulée.');
 }
 
 export function withCancelEligibility<T extends Record<string, unknown>>(

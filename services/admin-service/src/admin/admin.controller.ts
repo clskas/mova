@@ -954,9 +954,10 @@ export class AdminController {
 
   @Post('poi/seed')
   @RequirePermissions(AdminPermission.ZONES_WRITE)
-  @ApiOperation({ summary: 'Synchroniser le catalogue POI (toutes les villes SENGA)' })
-  seedPois(@Query('city') city?: string) {
-    return this.adminService.seedPois(city);
+  @ApiOperation({ summary: 'Synchroniser le catalogue POI (ville gérée ou toutes pour SUPER_ADMIN)' })
+  seedPois(@Request() req: { user: AdminJwtUser }, @Query('city') city?: string) {
+    const managed = resolveManagedCityScope(req.user);
+    return this.adminService.seedPois(managed ?? city);
   }
 
   @Get('cities')
@@ -1005,25 +1006,39 @@ export class AdminController {
   @RequirePermissions(AdminPermission.ZONES_READ)
   @ApiOperation({ summary: 'Suggestions de lieux (POI) en attente' })
   poiSuggestions(
+    @Request() req: { user: AdminJwtUser },
     @Query('status') status?: string,
     @Query('skip') skip?: string,
     @Query('take') take?: string,
   ) {
-    return this.adminService.listPoiSuggestions(status, Number(skip ?? 0), Number(take ?? 50));
+    return this.adminService.listPoiSuggestions(
+      status,
+      Number(skip ?? 0),
+      Number(take ?? 50),
+      resolveManagedCityScope(req.user),
+    );
   }
 
   @Post('poi-suggestions/:id/approve')
   @RequirePermissions(AdminPermission.ZONES_WRITE)
   @ApiOperation({ summary: 'Publier une suggestion POI' })
-  approvePoiSuggestion(@Param('id') id: string, @Body() body: Record<string, unknown>) {
-    return this.adminService.approvePoiSuggestion(id, body);
+  approvePoiSuggestion(
+    @Request() req: { user: AdminJwtUser },
+    @Param('id') id: string,
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.adminService.approvePoiSuggestion(id, body, resolveManagedCityScope(req.user));
   }
 
   @Post('poi-suggestions/:id/reject')
   @RequirePermissions(AdminPermission.ZONES_WRITE)
   @ApiOperation({ summary: 'Refuser une suggestion POI' })
-  rejectPoiSuggestion(@Param('id') id: string, @Body() body: Record<string, unknown>) {
-    return this.adminService.rejectPoiSuggestion(id, body);
+  rejectPoiSuggestion(
+    @Request() req: { user: AdminJwtUser },
+    @Param('id') id: string,
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.adminService.rejectPoiSuggestion(id, body, resolveManagedCityScope(req.user));
   }
 
   @Get('carpool')

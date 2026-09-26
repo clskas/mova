@@ -1317,8 +1317,10 @@ export class AdminService {
     return this.proxy('ride', '/internal/provinces/bulk-active', { method: 'POST', body: JSON.stringify({ isActive }) });
   }
 
-  seedPois(city?: string) {
-    const q = city ? `?city=${encodeURIComponent(city)}` : '?city=RDC';
+  seedPois(city?: string | null) {
+    const q = city?.trim()
+      ? `?city=${encodeURIComponent(city.trim())}`
+      : '?city=RDC';
     return this.proxy('ride', `/internal/poi/seed${q}`, { method: 'POST' });
   }
 
@@ -1726,17 +1728,48 @@ export class AdminService {
     return this.fetchJson('payment', `/internal/subscriptions?${params}`);
   }
 
-  listPoiSuggestions(status?: string, skip = 0, take = 50) {
+  listPoiSuggestions(status?: string, skip = 0, take = 50, managedCity?: string | null) {
     const params = new URLSearchParams({ skip: String(skip), take: String(take) });
     if (status) params.set('status', status);
+    if (managedCity?.trim()) params.set('city', managedCity.trim());
     return this.fetchJson('ride', `/internal/poi-suggestions?${params.toString()}`);
   }
 
-  approvePoiSuggestion(id: string, body: Record<string, unknown> = {}) {
+  async approvePoiSuggestion(id: string, body: Record<string, unknown> = {}, managedCity?: string | null) {
+    if (managedCity) {
+      const suggestion = await this.fetchJson<{ city?: string; lat?: number; lng?: number }>(
+        'ride',
+        `/internal/poi-suggestions/${id}`,
+      );
+      const byName = (suggestion.city?.trim().toLowerCase() ?? '') === managedCity.trim().toLowerCase();
+      if (!byName) {
+        assertCoordsInManagedCity(
+          managedCity,
+          suggestion.lat,
+          suggestion.lng,
+          'Suggestion POI hors de votre ville gérée.',
+        );
+      }
+    }
     return this.proxy('ride', `/internal/poi-suggestions/${id}/approve`, { method: 'POST', body: JSON.stringify(body) });
   }
 
-  rejectPoiSuggestion(id: string, body: Record<string, unknown> = {}) {
+  async rejectPoiSuggestion(id: string, body: Record<string, unknown> = {}, managedCity?: string | null) {
+    if (managedCity) {
+      const suggestion = await this.fetchJson<{ city?: string; lat?: number; lng?: number }>(
+        'ride',
+        `/internal/poi-suggestions/${id}`,
+      );
+      const byName = (suggestion.city?.trim().toLowerCase() ?? '') === managedCity.trim().toLowerCase();
+      if (!byName) {
+        assertCoordsInManagedCity(
+          managedCity,
+          suggestion.lat,
+          suggestion.lng,
+          'Suggestion POI hors de votre ville gérée.',
+        );
+      }
+    }
     return this.proxy('ride', `/internal/poi-suggestions/${id}/reject`, { method: 'POST', body: JSON.stringify(body) });
   }
 }

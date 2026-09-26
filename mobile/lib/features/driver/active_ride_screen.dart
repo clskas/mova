@@ -17,6 +17,7 @@ import '../chat/chat_alert_service.dart';
 import '../chat/ride_chat_screen.dart';
 import '../geo/suggest_place_screen.dart';
 import '../../core/safety/sos_helper.dart';
+import '../../core/services/cancel_eligibility.dart';
 import 'widgets/driver_cash_received_dialog.dart';
 
 class ActiveRideScreen extends ConsumerStatefulWidget {
@@ -42,6 +43,7 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
   String get _rideId => _ride['id']?.toString() ?? '';
   String get _status => _ride['status']?.toString() ?? 'DRIVER_ASSIGNED';
   bool get _isPaid => _ride['isPaid'] == true;
+  bool get _canDriverCancel => CancelEligibility.rideDriver(_ride);
 
   int? get _passengerCashTotalCdf {
     final v = _ride['finalFareCdf'] ?? _ride['estimatedFareCdf'] ?? _ride['amountCdf'];
@@ -256,6 +258,49 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
   Future<void> _openPickup() => _openNavigation(toPickup: true);
 
   Future<void> _openDropoff() => _openNavigation(toPickup: false);
+
+  Future<void> _cancelByDriver() async {
+    if (_loading || !_canDriverCancel) return;
+    final arrived = _status == 'ARRIVING' || _status == 'DRIVER_ARRIVED';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(arrived ? 'Passager absent ?' : 'Annuler la course ?'),
+        content: Text(
+          arrived
+              ? 'Confirmez uniquement si le passager ne se présente pas après l\'attente. Des frais no-show peuvent s\'appliquer.'
+              : 'Le passager sera notifié. Annulez seulement en cas de problème (sécurité, véhicule, etc.).',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Non')),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(arrived ? 'Confirmer no-show' : 'Oui, annuler'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    final api = ref.read(apiClientProvider);
+    final result = await api.cancelRide(
+      _rideId,
+      reason: arrived ? 'No-show passager (chauffeur)' : 'Annulé par le chauffeur',
+    );
+    if (!mounted) return;
+    setState(() => _loading = false);
+    switch (result) {
+      case Success(:final data):
+        final msg = data['message']?.toString() ?? 'Course annulée';
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+        Navigator.popUntil(context, (r) => r.isFirst);
+      case Failure(:final error):
+        setState(() => _error = error.message);
+    }
+  }
 
   Future<void> _advanceStatus(String nextStatus) async {
     setState(() {
@@ -654,6 +699,18 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
               icon: Icons.arrow_forward,
               isLoading: _loading,
               onPressed: _loading ? null : () => _advanceStatus(nextStatus),
+            ),
+          ],
+          if (_canDriverCancel) ...[
+            const SizedBox(height: 12),
+            MovaButton(
+              label: (_status == 'ARRIVING' || _status == 'DRIVER_ARRIVED')
+                  ? 'Annuler — passager absent'
+                  : 'Annuler la course',
+              isSecondary: true,
+              icon: Icons.cancel_outlined,
+              isLoading: _loading,
+              onPressed: _loading ? null : _cancelByDriver,
             ),
           ],
           if (_status == 'COMPLETED') ...[

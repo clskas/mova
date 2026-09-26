@@ -686,7 +686,11 @@ export class RidesService {
     if (ride.status === RideStatus.COMPLETED || ride.status === RideStatus.CANCELLED) {
       throw new MovaHttpException(MovaErrorCode.RIDE_INVALID_STATUS);
     }
-    const cancelEligibility = canCancelRide({ status: toMobileRideStatus(ride.status) });
+
+    const actor: 'passenger' | 'driver' =
+      ride.driverId === userId && ride.passengerId !== userId ? 'driver' : 'passenger';
+    const mobileStatus = toMobileRideStatus(ride.status);
+    const cancelEligibility = canCancelRide({ status: mobileStatus, actor });
     if (!cancelEligibility.canCancel) {
       throw new MovaHttpException(
         MovaErrorCode.RIDE_INVALID_STATUS,
@@ -697,14 +701,31 @@ export class RidesService {
 
     const policy = await this.prisma.cancellationPolicy.findUnique({ where: { vehicleType: ride.vehicleType } });
     let feeCdf = 0;
-    let feeMessage = 'Annulation gratuite.';
-    if (ride.acceptedAt && policy) {
-      const minutesSinceAccept = (Date.now() - ride.acceptedAt.getTime()) / 60000;
-      if (minutesSinceAccept > policy.freeCancelMinutes) {
-        feeCdf = policy.passengerFeeCdf;
-        feeMessage = `Frais d'annulation : ${formatCdf(feeCdf)} (après ${policy.freeCancelMinutes} min).`;
+    let feeMessage =
+      actor === 'driver'
+        ? 'Course annulée par le chauffeur.'
+        : 'Annulation gratuite.';
+
+    if (actor === 'passenger') {
+      if (ride.acceptedAt && policy) {
+        const minutesSinceAccept = (Date.now() - ride.acceptedAt.getTime()) / 60000;
+        if (minutesSinceAccept > policy.freeCancelMinutes) {
+          feeCdf = policy.passengerFeeCdf;
+          feeMessage = `Frais d'annulation : ${formatCdf(feeCdf)} (après ${policy.freeCancelMinutes} min).`;
+        } else {
+          feeMessage = `Annulation gratuite dans les ${policy.freeCancelMinutes} premières minutes.`;
+        }
+      } else if (!ride.acceptedAt) {
+        feeMessage = 'Annulation gratuite — aucun chauffeur n\'avait encore accepté.';
+      }
+    } else if (actor === 'driver' && policy) {
+      const arrived =
+        ride.status === RideStatus.DRIVER_ARRIVED || mobileStatus === 'ARRIVING' || mobileStatus === 'DRIVER_ARRIVED';
+      if (arrived && policy.noShowFeeCdf > 0) {
+        feeCdf = policy.noShowFeeCdf;
+        feeMessage = `Annulation chauffeur (passager absent / no-show) — frais éventuels : ${formatCdf(feeCdf)}.`;
       } else {
-        feeMessage = `Annulation gratuite dans les ${policy.freeCancelMinutes} premières minutes.`;
+        feeMessage = 'Course annulée par le chauffeur — aucun frais passager.';
       }
     }
 
@@ -719,7 +740,13 @@ export class RidesService {
         cancelReason: reason,
       },
     });
-    await this.prisma.rideEvent.create({ data: { rideId, event: RideStatus.CANCELLED, metadata: { feeCdf, reason } } });
+    await this.prisma.rideEvent.create({
+      data: {
+        rideId,
+        event: RideStatus.CANCELLED,
+        metadata: { feeCdf, reason, cancelledByRole: actor },
+      },
+    });
     this.emitStatusChange(rideId, RideStatus.CANCELLED);
     if (notifiedDriverIds.length > 0) {
       this.trackingGateway.broadcastDriverJob(notifiedDriverIds, 'ride:cancelled', { rideId });
@@ -730,6 +757,7 @@ export class RidesService {
       cancellationFeeCdf: feeCdf,
       cancellationFeeFormatted: formatCdf(feeCdf),
       message: feeMessage,
+      cancelledByRole: actor,
     };
   }
 
@@ -1131,7 +1159,14 @@ export class RidesService {
       activeDestinationLat: activeDestLat,
       activeDestinationLng: activeDestLng,
       activeDestinationAddress: activeDestAddress,
-      ...canCancelRide({ status: mobileStatus }),
+      ...canCancelRide({ status: mobileStatus, actor: 'passenger' }),
+      ...(() => {
+        const driver = canCancelRide({ status: mobileStatus, actor: 'driver' });
+        return {
+          canDriverCancel: driver.canCancel,
+          driverCancelBlockReason: driver.cancelBlockReason,
+        };
+      })(),
     };
   }
 

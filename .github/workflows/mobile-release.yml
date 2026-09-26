@@ -133,10 +133,10 @@ jobs:
         id: playver
         run: |
           set -euo pipefail
-          # Floor: next must be >=97 (pubspec 1.0.12+97; places scroll + map + ride resume).
+          # Floor: next must be >=99 (pubspec 1.0.14+99; Uber-style cancel + POI city scope).
           PUBSPEC_CODE=$(grep -E '^version:' mobile/pubspec.yaml | head -1 | sed -E 's/.*\+([0-9]+).*/\1/')
           CODE="${{ github.run_number }}"
-          if [ "$CODE" -lt 97 ]; then CODE=97; fi
+          if [ "$CODE" -lt 99 ]; then CODE=99; fi
           if [ -n "$PUBSPEC_CODE" ] && [ "$PUBSPEC_CODE" -gt "$CODE" ]; then CODE="$PUBSPEC_CODE"; fi
           echo "code=$CODE" >> "$GITHUB_OUTPUT"
           echo "Play versionCode=$CODE (pubspec +${PUBSPEC_CODE:-?}; run_number=${{ github.run_number }})"
@@ -149,7 +149,7 @@ jobs:
           flutter build appbundle --release \
             --flavor passenger \
             -t lib/main_passenger.dart \
-            --build-name=1.0.12 \
+            --build-name=1.0.14 \
             --build-number=${{ steps.playver.outputs.code }} \
             --dart-define=API_URL=${{ steps.urls.outputs.api }} \
             --dart-define=WS_URL=${{ steps.urls.outputs.ws }} \
@@ -183,7 +183,7 @@ jobs:
           flutter build appbundle --release \
             --flavor driver \
             -t lib/main_driver.dart \
-            --build-name=1.0.12 \
+            --build-name=1.0.14 \
             --build-number=${{ steps.playver.outputs.code }} \
             --dart-define=API_URL=${{ steps.urls.outputs.api }} \
             --dart-define=WS_URL=${{ steps.urls.outputs.ws }} \
@@ -209,7 +209,7 @@ jobs:
           flutter build apk --release \
             --flavor passenger \
             -t lib/main_passenger.dart \
-            --build-name=1.0.12 \
+            --build-name=1.0.14 \
             --build-number=${{ steps.playver.outputs.code }} \
             --dart-define=API_URL=${{ steps.urls.outputs.api }} \
             --dart-define=WS_URL=${{ steps.urls.outputs.ws }} \
@@ -225,7 +225,7 @@ jobs:
           flutter build apk --release \
             --flavor driver \
             -t lib/main_driver.dart \
-            --build-name=1.0.12 \
+            --build-name=1.0.14 \
             --build-number=${{ steps.playver.outputs.code }} \
             --dart-define=API_URL=${{ steps.urls.outputs.api }} \
             --dart-define=WS_URL=${{ steps.urls.outputs.ws }} \

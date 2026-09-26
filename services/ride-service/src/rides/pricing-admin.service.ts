@@ -159,6 +159,13 @@ export class PricingAdminService {
     if (data.discountPercent == null && data.discountCdf == null) {
       throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Indiquez une réduction en pourcentage ou en CDF.');
     }
+    if (data.discountPercent != null && data.discountCdf != null) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        undefined,
+        'Choisissez soit un pourcentage, soit un montant fixe — pas les deux.',
+      );
+    }
     const cityNames = Array.isArray(data.cityNames)
       ? [...new Set(data.cityNames.map((c) => String(c).trim()).filter(Boolean))]
       : [];

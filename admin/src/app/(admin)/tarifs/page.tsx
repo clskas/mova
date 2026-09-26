@@ -803,14 +803,33 @@ export default function TarifsPage() {
     );
   }
 
+  /** % et montant fixe sont exclusifs : remplir l’un vide l’autre. */
+  function setPromoPercentExclusive(v: string) {
+    setPromoPercent(v);
+    if (v.trim()) setPromoCdf("");
+  }
+
+  function setPromoCdfExclusive(v: string) {
+    setPromoCdf(v);
+    if (v.trim()) setPromoPercent("");
+  }
+
   async function savePromo() {
     setPromoSaving(true);
     setError(null);
     try {
+      const usePercent = Boolean(promoPercent.trim());
+      const useCdf = Boolean(promoCdf.trim());
+      if (usePercent && useCdf) {
+        throw new Error("Choisissez soit un pourcentage, soit un montant fixe — pas les deux.");
+      }
+      if (!usePercent && !useCdf) {
+        throw new Error("Indiquez une réduction en % ou un montant fixe (CDF).");
+      }
       const payload = {
         code: promoCode.trim(),
-        discountPercent: promoPercent.trim() ? Number(promoPercent) : undefined,
-        discountCdf: promoCdf.trim() ? Number(promoCdf) : undefined,
+        discountPercent: usePercent ? Number(promoPercent) : undefined,
+        discountCdf: useCdf ? Number(promoCdf) : undefined,
         maxUses: promoMaxUses.trim() ? Number(promoMaxUses) : undefined,
         validUntil: promoValidUntil.trim() ? new Date(promoValidUntil).toISOString() : undefined,
         ...(canAssignPromoCities
@@ -826,8 +845,8 @@ export default function TarifsPage() {
           throw new Error(`Vous ne pouvez modifier que les codes limités à ${lockedCity}.`);
         }
         await updatePromoCode(promoModal.id, {
-          discountPercent: payload.discountPercent,
-          discountCdf: payload.discountCdf,
+          discountPercent: usePercent ? Number(promoPercent) : null,
+          discountCdf: useCdf ? Number(promoCdf) : null,
           maxUses: payload.maxUses,
           validUntil: payload.validUntil ?? null,
           ...(canAssignPromoCities
@@ -1317,14 +1336,28 @@ export default function TarifsPage() {
           <div className="grid grid-cols-2 gap-3">
             <label>
               <FieldLabel>Réduction (%)</FieldLabel>
-              <TextInput value={promoPercent} onChange={setPromoPercent} type="number" disabled={readOnly} placeholder="10" />
+              <TextInput
+                value={promoPercent}
+                onChange={setPromoPercentExclusive}
+                type="number"
+                disabled={readOnly || Boolean(promoCdf.trim())}
+                placeholder="10"
+              />
             </label>
             <label>
               <FieldLabel>Montant fixe (CDF)</FieldLabel>
-              <TextInput value={promoCdf} onChange={setPromoCdf} type="number" disabled={readOnly} placeholder="5000" />
+              <TextInput
+                value={promoCdf}
+                onChange={setPromoCdfExclusive}
+                type="number"
+                disabled={readOnly || Boolean(promoPercent.trim())}
+                placeholder="5000"
+              />
             </label>
           </div>
-          <p className="text-xs text-gray-500">Indiquez % ou montant fixe (pas les deux obligatoires).</p>
+          <p className="text-xs text-gray-500">
+            Remplissez <strong>un seul</strong> champ : soit le %, soit le montant fixe. L’autre se vide automatiquement.
+          </p>
           <label>
             <FieldLabel>Utilisations max</FieldLabel>
             <TextInput value={promoMaxUses} onChange={setPromoMaxUses} type="number" disabled={readOnly} placeholder="Illimité" />

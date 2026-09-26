@@ -32,6 +32,13 @@ export class PartnerPromoService {
     if (data.discountPercent == null && data.discountCdf == null) {
       throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Indiquez une réduction en % ou en CDF.');
     }
+    if (data.discountPercent != null && data.discountCdf != null) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        undefined,
+        'Choisissez soit un pourcentage, soit un montant fixe — pas les deux.',
+      );
+    }
     if (data.discountPercent != null && (data.discountPercent <= 0 || data.discountPercent > 100)) {
       throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Le pourcentage doit être entre 1 et 100.');
     }

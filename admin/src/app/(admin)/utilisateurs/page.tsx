@@ -414,6 +414,23 @@ export default function UtilisateursPage() {
         <div className="flex flex-wrap gap-2 items-end">
           <SearchInput value={search} onChange={setSearch} placeholder="Rechercher par nom, téléphone, e-mail, rôle ou type (Pharmacie, Boutique…)…" />
           <BtnPrimary onClick={applySearch}>Rechercher</BtnPrimary>
+          <BtnGhost
+            disabled={
+              !search.trim() &&
+              !searchQuery &&
+              cityFilter.length === 0 &&
+              !showPlayPrelaunch
+            }
+            onClick={() => {
+              setSearch("");
+              setSearchQuery("");
+              setCityFilter([]);
+              setShowPlayPrelaunch(false);
+              setPage(0);
+            }}
+          >
+            Réinitialiser le filtre
+          </BtnGhost>
           <label className="flex items-center gap-2 text-sm text-gray-600 pb-1">
             <input
               type="checkbox"

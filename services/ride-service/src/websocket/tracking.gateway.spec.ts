@@ -85,7 +85,7 @@ describe('TrackingGateway', () => {
     jwt.verify.mockReturnValue({ sub: 'u1', role: 'PASSENGER' });
     const client = mockSocket({ data: {}, handshake: { auth: { token: 'ok' }, headers: {} } });
     await gateway.handleConnection(client as never);
-    expect(client.data.user).toEqual({ id: 'u1', role: 'PASSENGER' });
+    expect(client.data.user).toEqual({ id: 'u1', role: 'PASSENGER', managedCity: null });
     expect(client.disconnect).not.toHaveBeenCalled();
   });
 

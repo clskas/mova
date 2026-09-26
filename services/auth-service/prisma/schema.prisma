@@ -41,11 +41,14 @@ model User {
   localPinSetAt DateTime?
   /// CITY_ADMIN: service-area city name matching DRC_SERVICE_AREAS (e.g. "Kinshasa", "Beni").
   managedCity String?
+  /// Passager (et autres) : dernière ville d'activité SENGA (course / livraison).
+  homeCity  String?
   /// Super-admin overrides of AdminPermission values. Empty = use role defaults.
   adminPermissions String[] @default([])
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
 
+  @@index([homeCity])
   @@map("users")
 }
 

@@ -331,6 +331,7 @@ export class DeliveriesService {
     if (!flags.guaranteed) {
       await this.alertDeliveryOffer(delivery);
     }
+    void this.touchPassengerHomeCity(userId, estimate.pickupCity);
     const formatted = formatParcelDelivery({ ...delivery, events: [{ id: '1', deliveryId: delivery.id, event: 'CREATED', metadata: null, createdAt: new Date() }] });
     return { delivery: formatted, estimate, needsEscrow: flags.guaranteed };
   }
@@ -609,6 +610,7 @@ export class DeliveriesService {
       restaurantOwnerUserId: restaurant.ownerUserId ?? undefined,
       estimatedPriceCdf: delivery.estimatedPriceCdf,
     });
+    void this.touchPassengerHomeCity(userId, resolveCityFromCoords(restaurant.lat, restaurant.lng));
     const withEvents = { ...delivery, events: [{ id: '1', deliveryId: delivery.id, event: 'ORDER_PLACED', metadata: null, createdAt: new Date() }] };
     return {
       delivery: formatParcelDelivery(withEvents),
@@ -871,6 +873,7 @@ export class DeliveriesService {
     if (!flags.guaranteed) {
       await this.alertDeliveryOffer(delivery);
     }
+    void this.touchPassengerHomeCity(userId, estimate.pickupCity);
     const formatted = formatParcelDelivery({ ...delivery, events: [{ id: '1', deliveryId: delivery.id, event: 'EXPRESS_CREATED', metadata: null, createdAt: new Date() }] });
     return { delivery: formatted, estimate, needsEscrow: flags.guaranteed };
   }
@@ -1128,6 +1131,23 @@ export class DeliveriesService {
       return { name: name || undefined, phone: user.phone };
     } catch {
       return null;
+    }
+  }
+
+  private async touchPassengerHomeCity(userId: string, city?: string | null) {
+    const trimmed = city?.trim();
+    if (!userId || !trimmed) return;
+    try {
+      await fetch(serviceUrl('auth', `/internal/users/${userId}/home-city`), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-internal-api-key': INTERNAL_API_KEY,
+        },
+        body: JSON.stringify({ city: trimmed }),
+      });
+    } catch {
+      /* ignore */
     }
   }
 

@@ -24,6 +24,7 @@ class UpdateUserAdminDto {
   /** Empty string is accepted then coerced to null (Google-only users). */
   @IsOptional() @IsString() phone?: string | null;
   @IsOptional() managedCity?: string | null;
+  @IsOptional() @IsString() homeCity?: string | null;
   @IsOptional() @IsString() avatarUrl?: string | null;
   @IsOptional() @IsArray() @IsString({ each: true }) adminPermissions?: string[];
   @IsOptional() @IsArray() @IsString({ each: true }) accessLevelIds?: string[];
@@ -97,6 +98,24 @@ export class InternalController {
   @Get('users/play-prelaunch')
   listPlayPrelaunch() {
     return this.users.listPlayPrelaunchUsers();
+  }
+
+  @Get('users/by-home-city')
+  listByHomeCity(@Query('cities') cities?: string, @Query('role') role?: string) {
+    const list = (cities ?? '')
+      .split(',')
+      .map((c) => c.trim())
+      .filter(Boolean);
+    const roleFilter =
+      role?.trim().toUpperCase() === 'PASSENGER' || !role?.trim()
+        ? UserRole.PASSENGER
+        : (role.trim().toUpperCase() as UserRole);
+    return this.users.listUsersByHomeCities(list, roleFilter);
+  }
+
+  @Post('users/:id/home-city')
+  touchHomeCity(@Param('id') id: string, @Body() body: { city?: string }) {
+    return this.users.touchHomeCity(id, body?.city ?? '');
   }
 
   @Post('users/purge-play-prelaunch')

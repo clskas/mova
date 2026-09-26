@@ -4,6 +4,7 @@ import {
   formatCdf,
   fromMobileRideStatus,
   canCancelRide,
+  DRC_SERVICE_AREAS,
   INTERNAL_API_KEY,
   MOVA_EVENTS,
   MovaErrorCode,
@@ -259,6 +260,8 @@ export class RidesService {
       estimatedFareCdf: estimate.totalCdf,
     };
     await this.redis.publish(MOVA_EVENTS.RIDE_CREATED, payload);
+
+    void this.touchPassengerHomeCity(passengerId, estimate.pickupCity);
 
     return {
       ...this.formatRideDetail(ride),
@@ -992,6 +995,57 @@ export class RidesService {
     } catch {
       return null;
     }
+  }
+
+  /** Stamp passenger homeCity from pickup (auth). Best-effort — never blocks the ride. */
+  private async touchPassengerHomeCity(passengerId: string, city?: string | null) {
+    const trimmed = city?.trim();
+    if (!passengerId || !trimmed) return;
+    try {
+      await fetch(serviceUrl('auth', `/internal/users/${passengerId}/home-city`), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-internal-api-key': INTERNAL_API_KEY,
+        },
+        body: JSON.stringify({ city: trimmed }),
+      });
+    } catch {
+      /* ignore */
+    }
+  }
+
+  /**
+   * Distinct passenger IDs who took a ride with pickup inside the named service city.
+   * Used by admin city filters (historical activity, even before homeCity was set).
+   */
+  async listPassengerIdsByCity(city: string, take = 2000): Promise<{ passengerIds: string[]; city: string }> {
+    const name = city.trim();
+    if (!name) return { passengerIds: [], city: name };
+    const area =
+      DRC_SERVICE_AREAS.find((a) => a.name.toLowerCase() === name.toLowerCase()) ??
+      DRC_SERVICE_AREAS.find((a) => a.id === name.toLowerCase());
+    if (!area) return { passengerIds: [], city: name };
+
+    const b = area.bounds;
+    const rows = await this.prisma.ride.findMany({
+      where: {
+        pickupLat: { gte: b.minLat, lte: b.maxLat },
+        pickupLng: { gte: b.minLng, lte: b.maxLng },
+      },
+      select: { passengerId: true, pickupLat: true, pickupLng: true },
+      orderBy: { createdAt: 'desc' },
+      take: Math.min(Math.max(take * 3, 100), 8000),
+    });
+
+    const cityKey = area.name.toLowerCase();
+    const ids = new Set<string>();
+    for (const r of rows) {
+      if (ids.size >= take) break;
+      const resolved = resolveCityFromCoords(r.pickupLat, r.pickupLng);
+      if (resolved.toLowerCase() === cityKey) ids.add(r.passengerId);
+    }
+    return { passengerIds: [...ids], city: area.name };
   }
 
   private async fetchDriverInfo(userId: string) {

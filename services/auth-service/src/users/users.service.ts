@@ -44,6 +44,7 @@ export class UsersService {
     status: UserStatus;
     avatarUrl?: string | null;
     managedCity?: string | null;
+    homeCity?: string | null;
     adminPermissions?: string[] | null;
     createdAt: Date;
     updatedAt: Date;
@@ -177,6 +178,8 @@ export class UsersService {
             { firstName: { contains: q, mode: 'insensitive' as const } },
             { lastName: { contains: q, mode: 'insensitive' as const } },
             { email: { contains: q, mode: 'insensitive' as const } },
+            { homeCity: { contains: q, mode: 'insensitive' as const } },
+            { managedCity: { contains: q, mode: 'insensitive' as const } },
             ...(roleFromSearch ? [{ role: roleFromSearch }] : []),
           ],
         }
@@ -212,6 +215,33 @@ export class UsersService {
       skip,
       take,
     };
+  }
+
+  /** Passengers (or any role) whose homeCity matches one of the given cities. */
+  async listUsersByHomeCities(cities: string[], role: UserRole = UserRole.PASSENGER) {
+    const keys = [...new Set(cities.map((c) => c.trim()).filter(Boolean))];
+    if (keys.length === 0) return [];
+    const users = await this.prisma.user.findMany({
+      where: {
+        role,
+        OR: keys.map((c) => ({ homeCity: { equals: c, mode: 'insensitive' as const } })),
+      },
+      select: { id: true, homeCity: true, role: true },
+      take: 3000,
+      orderBy: { updatedAt: 'desc' },
+    });
+    return users;
+  }
+
+  /** Best-effort: stamp last activity city on a passenger (ride / delivery pickup). */
+  async touchHomeCity(userId: string, city: string) {
+    const trimmed = city?.trim();
+    if (!userId || !trimmed) return { ok: false as const, reason: 'invalid' };
+    const result = await this.prisma.user.updateMany({
+      where: { id: userId, role: UserRole.PASSENGER },
+      data: { homeCity: trimmed },
+    });
+    return { ok: true as const, updated: result.count };
   }
 
   /** Staff ops alertés en cas de SOS (SUPER_ADMIN, ADMIN, SUPPORT + CITY_ADMIN). */
@@ -582,6 +612,7 @@ export class UsersService {
       firstName?: string;
       lastName?: string;
       managedCity?: string | null;
+      homeCity?: string | null;
       avatarUrl?: string | null;
       adminPermissions?: string[];
       accessLevelIds?: string[];
@@ -598,8 +629,15 @@ export class UsersService {
       data.managedCity,
       existing.managedCity,
     );
+    const homeCity =
+      data.homeCity !== undefined
+        ? typeof data.homeCity === 'string' && data.homeCity.trim()
+          ? data.homeCity.trim()
+          : null
+        : undefined;
     const {
       managedCity: _mc,
+      homeCity: _hc,
       adminPermissions: rawPerms,
       accessLevelIds,
       phone: rawPhone,
@@ -638,6 +676,7 @@ export class UsersService {
         data: {
           ...rest,
           managedCity,
+          ...(homeCity !== undefined ? { homeCity } : {}),
           ...(phone !== undefined ? { phone } : {}),
           ...(avatarUrl !== undefined ? { avatarUrl } : {}),
           ...(adminPermissions !== undefined ? { adminPermissions } : {}),

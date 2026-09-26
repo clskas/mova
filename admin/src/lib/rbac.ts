@@ -115,6 +115,7 @@ const ROLE_SECTIONS: Record<AdminRole, AdminSection[]> = {
   CONTENT: ["restaurants", "tarifs", "parametres", "lieux", "locations", "publicites"],
   CITY_ADMIN: [
     "dashboard",
+    "utilisateurs",
     "chauffeurs",
     "kyc",
     "courses",

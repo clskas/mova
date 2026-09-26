@@ -133,6 +133,11 @@ export class InternalController {
     return this.rides.getReportAnalytics(Number(days ?? 30), city);
   }
 
+  @Get('rides/passengers-by-city')
+  passengersByCity(@Query('city') city?: string, @Query('take') take?: string) {
+    return this.rides.listPassengerIdsByCity(city ?? '', Number(take ?? 2000));
+  }
+
   @Get('rides/driver/:userId/earnings')
   earnings(@Param('userId') userId: string) {
     return this.rides.getDriverEarnings(userId);

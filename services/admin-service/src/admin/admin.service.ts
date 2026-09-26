@@ -305,7 +305,8 @@ export class AdminService {
 
   /**
    * Users attached to one or more cities: drivers (operatingCity), partners (GPS/city),
-   * CITY_ADMIN (managedCity). Builds the allow-list first, then loads those accounts.
+   * passengers (homeCity + ride pickup history), CITY_ADMIN (managedCity).
+   * Builds the allow-list first, then loads those accounts.
    */
   private async listUsersInCities(
     cityList: string[],
@@ -315,28 +316,42 @@ export class AdminService {
     includePlayPrelaunch = false,
   ) {
     const cityKeys = new Set(cityList.map((c) => c.toLowerCase()));
-    const [driversBundles, restaurantsBundles, rentalBundles, opsStaff] = await Promise.all([
-      Promise.all(
-        cityList.map((city) =>
-          this.listDrivers(0, 500, { includeHidden: true }, city).catch(() => ({
-            data: [] as Array<{ userId?: string; id?: string }>,
-          })),
+    const citiesParam = encodeURIComponent(cityList.join(','));
+    const [driversBundles, restaurantsBundles, rentalBundles, opsStaff, homeCityPassengers, ridePassengerBundles] =
+      await Promise.all([
+        Promise.all(
+          cityList.map((city) =>
+            this.listDrivers(0, 500, { includeHidden: true }, city).catch(() => ({
+              data: [] as Array<{ userId?: string; id?: string }>,
+            })),
+          ),
         ),
-      ),
-      Promise.all(
-        cityList.map((city) =>
-          this.listRestaurants(city).catch(() => [] as Array<{ ownerUserId?: string | null }>),
+        Promise.all(
+          cityList.map((city) =>
+            this.listRestaurants(city).catch(() => [] as Array<{ ownerUserId?: string | null }>),
+          ),
         ),
-      ),
-      Promise.all(
-        cityList.map((city) =>
-          this.listRentalVehicles(city).catch(() => [] as Array<{ ownerUserId?: string | null }>),
+        Promise.all(
+          cityList.map((city) =>
+            this.listRentalVehicles(city).catch(() => [] as Array<{ ownerUserId?: string | null }>),
+          ),
         ),
-      ),
-      this.fetchJson<
-        Array<{ id: string; role?: string; managedCity?: string | null }>
-      >('auth', '/internal/users/ops-staff').catch(() => []),
-    ]);
+        this.fetchJson<
+          Array<{ id: string; role?: string; managedCity?: string | null }>
+        >('auth', '/internal/users/ops-staff').catch(() => []),
+        this.fetchJson<Array<{ id: string }>>(
+          'auth',
+          `/internal/users/by-home-city?cities=${citiesParam}&role=PASSENGER`,
+        ).catch(() => []),
+        Promise.all(
+          cityList.map((city) =>
+            this.fetchJson<{ passengerIds?: string[] }>(
+              'ride',
+              `/internal/rides/passengers-by-city?city=${encodeURIComponent(city)}&take=2000`,
+            ).catch(() => ({ passengerIds: [] as string[] })),
+          ),
+        ),
+      ]);
 
     const allowedIds = new Set<string>();
     for (const driversRes of driversBundles) {
@@ -366,6 +381,14 @@ export class AdminService {
         allowedIds.add(s.id);
       }
     }
+    for (const p of Array.isArray(homeCityPassengers) ? homeCityPassengers : []) {
+      if (p?.id) allowedIds.add(String(p.id));
+    }
+    for (const bundle of ridePassengerBundles) {
+      for (const id of bundle?.passengerIds ?? []) {
+        if (id) allowedIds.add(String(id));
+      }
+    }
 
     const ids = [...allowedIds];
     type Row = {
@@ -374,6 +397,7 @@ export class AdminService {
       status?: string;
       commerceType?: string;
       managedCity?: string | null;
+      homeCity?: string | null;
       phone?: string | null;
       email?: string | null;
       firstName?: string | null;
@@ -406,6 +430,7 @@ export class AdminService {
         u.email,
         u.role,
         u.managedCity,
+        u.homeCity,
         u.commerceType,
       ]
         .map((x) => String(x ?? '').toLowerCase())
@@ -534,6 +559,7 @@ export class AdminService {
       id: string;
       role?: string;
       managedCity?: string | null;
+      homeCity?: string | null;
       [key: string]: unknown;
     }>('auth', `/internal/users/${id}`);
     if (!managedCity) return user;
@@ -573,6 +599,20 @@ export class AdminService {
         );
       }
       return user;
+    }
+    if (role === UserRole.PASSENGER) {
+      const home = String(user.homeCity ?? '').trim().toLowerCase();
+      if (home && home === managedCity.trim().toLowerCase()) return user;
+      const ridePassengers = await this.fetchJson<{ passengerIds?: string[] }>(
+        'ride',
+        `/internal/rides/passengers-by-city?city=${encodeURIComponent(managedCity)}&take=3000`,
+      ).catch(() => ({ passengerIds: [] as string[] }));
+      if ((ridePassengers.passengerIds ?? []).includes(id)) return user;
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.FORBIDDEN,
+        'Passager hors de votre ville gérée.',
+      );
     }
     throw new MovaHttpException(
       MovaErrorCode.AUTH_FORBIDDEN,

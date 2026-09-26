@@ -97,6 +97,8 @@ export type AdminUser = {
   pinConfigured?: boolean;
   /** CITY_ADMIN: service-area city name. */
   managedCity?: string | null;
+  /** PASSENGER: last activity / home city (pickup). */
+  homeCity?: string | null;
   /** When role=RESTAURANT: RESTAURANT | SUPERMARKET | PHARMACY | BOUTIQUE */
   commerceType?: "RESTAURANT" | "SUPERMARKET" | "PHARMACY" | "BOUTIQUE" | string;
   /** Stored permission overrides (empty = role defaults). */

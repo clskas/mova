@@ -407,7 +407,11 @@ export default function UtilisateursPage() {
         — resto / boutique / pharmacie / supermarché —, Location, staff).
         <strong> Chauffeurs</strong> = profils véhicule / KYC. Un chauffeur réel a les deux : rôle Chauffeur ici, et une
         ligne dans Chauffeurs. Les partenaires restaurant / location apparaissent ici même sans +243 (connexion Google).
-        Les robots Google Play / Test Lab restent masqués.
+        Les robots Google Play / Test Lab restent masqués par défaut (case ci-dessous) —
+        ce sont des faux comptes créés lors des tests automatiques Google, pas des clients SENGA.
+        {role === "CITY_ADMIN" && user?.managedCity ? (
+          <> Liste limitée à <strong>{user.managedCity}</strong> (passagers actifs dans cette ville inclus).</>
+        ) : null}
       </p>
       {error && <div className="mb-4"><ErrorBanner message={error} onRetry={load} /></div>}
       <div className="space-y-4">
@@ -491,7 +495,7 @@ export default function UtilisateursPage() {
               })}
             </div>
             <p className="text-xs text-gray-500 mt-2">
-              Affiche chauffeurs, partenaires et admins ville rattachés aux villes choisies.
+              Affiche passagers, chauffeurs, partenaires et admins ville rattachés aux villes choisies.
               {cityFilter.length > 0 && (
                 <> Filtre actif : {cityFilter.join(", ")}.</>
               )}
@@ -526,6 +530,7 @@ export default function UtilisateursPage() {
                   <th className="p-3">Téléphone</th>
                   <th className="p-3">E-mail</th>
                   <th className="p-3">Rôle</th>
+                  <th className="p-3">Ville</th>
                   <th className="p-3">Statut</th>
                   <th className="p-3"></th>
                 </tr>
@@ -553,6 +558,9 @@ export default function UtilisateursPage() {
                         status={u.role === "RESTAURANT" ? (u.commerceType ?? "RESTAURANT") : u.role}
                         label={userRoleDisplayLabel(u.role, u.commerceType)}
                       />
+                    </td>
+                    <td className="p-3 text-gray-700">
+                      {u.homeCity?.trim() || u.managedCity?.trim() || "—"}
                     </td>
                     <td className="p-3"><StatusBadge status={u.status ?? "ACTIVE"} /></td>
                     <td className="p-3">

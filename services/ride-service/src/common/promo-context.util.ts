@@ -169,5 +169,7 @@ export function formatPromoRow(promo: PromoCode) {
     partnerAbsorbPercent: promo.partnerAbsorbPercent,
     restaurantId: promo.restaurantId,
     rentalOwnerUserId: promo.rentalOwnerUserId,
+    /** Vide = toutes les villes SENGA ; sinon liste des villes autorisées. */
+    cityNames: promo.cityNames ?? [],
   };
 }

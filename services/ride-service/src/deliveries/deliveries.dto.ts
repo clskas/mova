@@ -91,6 +91,8 @@ export class ValidatePromoDto {
   @ApiProperty({ required: false }) @IsOptional() @IsString() serviceType?: string;
   @ApiProperty({ required: false }) @IsOptional() @IsString() restaurantId?: string;
   @ApiProperty({ required: false }) @IsOptional() @IsString() vehicleId?: string;
+  /** Ville SENGA (ex. Kinshasa) — requis pour valider un code plateforme restreint par ville. */
+  @ApiProperty({ required: false, example: 'Kinshasa' }) @IsOptional() @IsString() city?: string;
 }
 
 export class RateDeliveryDto {

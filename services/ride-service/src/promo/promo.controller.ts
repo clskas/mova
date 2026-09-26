@@ -26,6 +26,7 @@ export class PromoController {
     if (dto.serviceType && SERVICE_TYPES.has(dto.serviceType.toUpperCase())) {
       context = { serviceType: dto.serviceType.toUpperCase() as PromoApplyContext['serviceType'] };
       if (dto.restaurantId) context.restaurantId = dto.restaurantId;
+      if (dto.city?.trim()) context.city = dto.city.trim();
       if (dto.vehicleId) {
         const vehicle = await this.prisma.rentalVehicle.findUnique({ where: { id: dto.vehicleId } });
         if (vehicle?.ownerUserId) context.rentalOwnerUserId = vehicle.ownerUserId;

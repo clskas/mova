@@ -1311,7 +1311,9 @@ export default function TarifsPage() {
             <div>
               <FieldLabel>Villes bénéficiaires (SENGA)</FieldLabel>
               <p className="text-xs text-gray-500 mb-2">
-                Aucune sélection = valable dans toutes les villes. Codes partenaires restaurant/location non concernés.
+                Code général : ne sélectionnez aucune ville (ou « Effacer ») — valable partout.
+                Code par ville : cochez une ou plusieurs villes ; hors de ces villes le code est refusé.
+                Les codes partenaires restaurant/location ne sont pas concernés.
               </p>
               <div className="flex flex-wrap gap-2 max-h-36 overflow-y-auto rounded-lg border border-gray-200 p-2">
                 {MOVA_CITIES.map((name) => {

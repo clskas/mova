@@ -19,8 +19,9 @@ jobs:
   playwright:
     name: Playwright (web + admin)
     if: >
-      github.event_name == 'workflow_dispatch' ||
-      github.event.workflow_run.conclusion == 'success'
+      github.repository != 'afri-soft-com/mova' &&
+      (github.event_name == 'workflow_dispatch' ||
+       github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-22.04
     timeout-minutes: 60
     continue-on-error: true

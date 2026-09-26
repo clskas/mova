@@ -350,8 +350,12 @@ export class DeliveriesService {
     });
   }
 
-  async validatePromoCode(code: string, restaurantId?: string) {
-    const promo = await this.promo.peek(code, { serviceType: 'FOOD', restaurantId });
+  async validatePromoCode(code: string, restaurantId?: string, city?: string) {
+    const promo = await this.promo.peek(code, {
+      serviceType: 'FOOD',
+      restaurantId,
+      city: city?.trim() || undefined,
+    });
     return formatPromoValidation(promo);
   }
 

@@ -30,9 +30,28 @@ describe('PricingAdminService', () => {
   });
 
   it('crée un code promo valide', async () => {
-    prisma.promoCode.create.mockResolvedValue({ code: 'MOVA10', discountPercent: 10 });
+    prisma.promoCode.create.mockResolvedValue({ code: 'MOVA10', discountPercent: 10, cityNames: [] });
     const result = await service.createPromoCode({ code: 'mova10', discountPercent: 10 });
     expect(result.code).toBe('MOVA10');
+    expect(prisma.promoCode.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ code: 'MOVA10', discountPercent: 10, cityNames: [] }),
+    });
+  });
+
+  it('crée un code promo restreint à des villes', async () => {
+    prisma.promoCode.create.mockResolvedValue({
+      code: 'KIN10',
+      discountPercent: 10,
+      cityNames: ['Kinshasa', 'Goma'],
+    });
+    await service.createPromoCode({
+      code: 'kin10',
+      discountPercent: 10,
+      cityNames: ['Kinshasa', ' Goma ', 'Kinshasa'],
+    });
+    expect(prisma.promoCode.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ code: 'KIN10', cityNames: ['Kinshasa', 'Goma'] }),
+    });
   });
 
   it('liste les majorations livraison', async () => {

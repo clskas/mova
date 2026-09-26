@@ -32,10 +32,12 @@ concurrency:
 
 jobs:
   deploy-render:
+    # Deploy from clskas/mova only (same commit SHA pushed to afri-soft for Render).
     if: >
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.workflow_run.conclusion == 'success' &&
-       github.event.workflow_run.head_branch == 'main')
+      github.repository != 'afri-soft-com/mova' &&
+      (github.event_name == 'workflow_dispatch' ||
+       (github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.head_branch == 'main'))
     runs-on: ubuntu-latest
     environment: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'production' }}
     steps:

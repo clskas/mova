@@ -127,7 +127,7 @@ export class DeliveriesController {
   @Post('promo/validate')
   @ApiOperation({ summary: 'Valider un code promo livraison repas' })
   validatePromo(@Body() dto: ValidatePromoDto) {
-    return this.deliveriesService.validatePromoCode(dto.code);
+    return this.deliveriesService.validatePromoCode(dto.code, dto.restaurantId, dto.city);
   }
 
   @Post('food')

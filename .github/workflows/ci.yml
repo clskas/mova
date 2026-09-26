@@ -16,7 +16,20 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # afri-soft-com/mova is the Render git source (autoDeploy: false). Full CI on
+  # both remotes doubles Actions usage and exhausts the Free plan, which fails
+  # jobs in ~2–4s with empty steps. Keep a green no-op here; real CI is on clskas/mova.
+  mirror-pass:
+    if: github.repository == 'afri-soft-com/mova'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mirror repo — full CI runs on clskas/mova
+        run: |
+          echo "afri-soft-com/mova is the Render source mirror."
+          echo "Full CI / Build / Deploy execute on clskas/mova to conserve Actions minutes."
+
   shared:
+    if: github.repository != 'afri-soft-com/mova'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -211,6 +224,7 @@ jobs:
           ./scripts/smoke-ci.sh
 
   security-audit:
+    if: github.repository != 'afri-soft-com/mova'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -302,7 +316,7 @@ jobs:
     runs-on: ubuntu-latest
     # GHAS / code scanning may be disabled on the org — do not block Deploy.
     # Skip on push to main to save Actions minutes for Deploy (still runs on PRs).
-    if: github.event_name == 'pull_request'
+    if: github.repository != 'afri-soft-com/mova' && github.event_name == 'pull_request'
     continue-on-error: true
     permissions:
       actions: read

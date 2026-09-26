@@ -50,10 +50,11 @@ jobs:
   build-android:
     name: Build Android (AAB)
     if: >
-      (github.event_name == 'workflow_dispatch' && inputs.promote_only != true) ||
-      startsWith(github.ref, 'refs/tags/v') ||
-      (github.event_name == 'workflow_run' &&
-       github.event.workflow_run.conclusion == 'success')
+      github.repository != 'afri-soft-com/mova' &&
+      ((github.event_name == 'workflow_dispatch' && inputs.promote_only != true) ||
+       startsWith(github.ref, 'refs/tags/v') ||
+       (github.event_name == 'workflow_run' &&
+        github.event.workflow_run.conclusion == 'success'))
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -334,6 +335,7 @@ jobs:
   promote-android-production:
     name: Promote Play internal → production
     if: >
+      github.repository != 'afri-soft-com/mova' &&
       github.event_name == 'workflow_dispatch' &&
       inputs.promote_only == true
     runs-on: ubuntu-latest
@@ -381,8 +383,9 @@ jobs:
   build-ios:
     name: Build iOS (IPA)
     if: >
-      startsWith(github.ref, 'refs/tags/v') ||
-      (github.event_name == 'workflow_dispatch' && inputs.build_ios == true)
+      github.repository != 'afri-soft-com/mova' &&
+      (startsWith(github.ref, 'refs/tags/v') ||
+       (github.event_name == 'workflow_dispatch' && inputs.build_ios == true))
     runs-on: macos-latest
     timeout-minutes: 60
     outputs:

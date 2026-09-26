@@ -15,6 +15,7 @@ import { RidesService } from './rides.service';
 import { CreateScheduledRideDto } from './scheduled-rides.dto';
 import { MobileScheduledEstimateDto } from '../deliveries/deliveries-mobile.dto';
 import { applyPromoCode } from '../common/promo-apply.util';
+import { rideDriverGrossCdf } from '../common/ride-driver-gross.util';
 import { PromoService } from './surcharge.service';
 import { GeoService } from '../geo/geo.service';
 import { RoutingService } from '../geo/routing.service';
@@ -194,14 +195,15 @@ export class ScheduledRidesService {
       throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
     }
     const formatted = this.formatScheduledForMobile(ride);
-    const gross = ride.estimatedPriceCdf ?? 0;
+    const passengerTotalCdf = ride.estimatedPriceCdf ?? 0;
     const enriched: Record<string, unknown> = {
       ...formatted,
       type: 'SCHEDULED',
-      passengerTotalCdf: gross,
+      passengerTotalCdf,
     };
     if (ride.driverId === userId) {
       const rule = await this.commission.get(CommissionServiceType.RIDE);
+      const gross = rideDriverGrossCdf(ride);
       enriched.driverGrossCdf = gross;
       enriched.driverNetCdf = Math.round(this.commission.splitGross(gross, rule.platformPercent).driverNetCdf);
     }
@@ -591,7 +593,7 @@ export class ScheduledRidesService {
     const rule = await this.commission.get(CommissionServiceType.RIDE);
     return {
       data: rows.map((r) => {
-        const gross = r.estimatedPriceCdf ?? 0;
+        const gross = rideDriverGrossCdf(r);
         return {
           id: r.id,
           type: 'SCHEDULED',
@@ -632,7 +634,7 @@ export class ScheduledRidesService {
       } catch {
         continue;
       }
-      const gross = r.estimatedPriceCdf ?? 0;
+      const gross = rideDriverGrossCdf(r);
       data.push({
         id: r.id,
         type: 'SCHEDULED',

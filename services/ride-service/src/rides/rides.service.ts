@@ -42,6 +42,7 @@ import { TripShareService } from '../share/trip-share.service';
 import { publishDriverJobAlert } from '../common/driver-job-alert.util';
 import { fetchRidePaymentStatus, fetchRidePaymentStatuses } from '../common/payment-status.util';
 import { applyPromoCode } from '../common/promo-apply.util';
+import { rideDriverGrossCdf, rideShareBookingDriverGrossCdf } from '../common/ride-driver-gross.util';
 import { PromoService } from './surcharge.service';
 import { PlatformConfigService } from '../platform/platform-config.service';
 import { RidePoolService } from './ride-pool.service';
@@ -575,7 +576,7 @@ export class RidesService {
           ride.pickupLat,
           ride.pickupLng,
         );
-        const fare = ride.estimatedFareCdf ?? 0;
+        const fare = rideDriverGrossCdf(ride);
         const driverNetCdf = this.commission.splitGross(fare, rideRule.platformPercent).driverNetCdf;
         return {
           ...this.formatRideDetail({ ...ride, distanceKm: tripKm }),
@@ -858,7 +859,7 @@ export class RidesService {
         : null;
     const detail = this.formatRideDetail(ride);
     const rideRule = await this.commission.get(CommissionServiceType.RIDE);
-    const gross = ride.finalFareCdf ?? ride.estimatedFareCdf ?? 0;
+    const gross = rideDriverGrossCdf(ride);
     const driverNetCdf = Math.round(this.commission.splitGross(gross, rideRule.platformPercent).driverNetCdf);
     const payment = await fetchRidePaymentStatus(rideId);
     const trackingEta = this.computeTrackingEta(ride, driver);
@@ -867,7 +868,8 @@ export class RidesService {
     return {
       ...detail,
       type: 'RIDE',
-      passengerTotalCdf: gross,
+      passengerTotalCdf: ride.finalFareCdf ?? ride.estimatedFareCdf ?? 0,
+      driverGrossCdf: gross,
       driverNetCdf,
       isPaid: payment.isPaid,
       paymentStatus: payment.paymentStatus,
@@ -939,7 +941,7 @@ export class RidesService {
           rideRule != null
             ? Math.round(
                 this.commission.splitGross(
-                  ride.finalFareCdf ?? ride.estimatedFareCdf ?? 0,
+                  rideDriverGrossCdf(ride),
                   rideRule.platformPercent,
                 ).driverNetCdf,
               )
@@ -1440,7 +1442,7 @@ export class RidesService {
       return { rideId, driverId: ride.driverId, driverNetCdf: 0, grossCdf: 0, isShared: true };
     }
     const rule = await this.commission.get(CommissionServiceType.RIDE);
-    const gross = ride.finalFareCdf ?? ride.estimatedFareCdf ?? 0;
+    const gross = rideDriverGrossCdf(ride);
     const { driverNetCdf } = this.commission.splitGross(gross, rule.platformPercent);
     return { rideId, driverId: ride.driverId, driverNetCdf, grossCdf: gross };
   }
@@ -1467,7 +1469,14 @@ export class RidesService {
           };
         }
         const rule = await this.commission.get(CommissionServiceType.RIDE);
-        const gross = booking.fareCdf;
+        const bookingCount = await this.prisma.rideSharePassenger.count({
+          where: { rideId: booking.rideId },
+        });
+        const gross = rideShareBookingDriverGrossCdf(
+          booking.fareCdf,
+          booking.ride.discountCdf,
+          bookingCount,
+        );
         return {
           referenceType: type,
           referenceId,
@@ -1507,7 +1516,12 @@ export class RidesService {
           return { referenceType: type, referenceId, driverId: o?.driverId ?? null, driverNetCdf: 0 };
         }
         const rule = await this.commission.get(CommissionServiceType.ERRAND);
-        const gross = (o.finalPriceCdf ?? o.estimatedPriceCdf) + (o.purchaseTotalCdf ?? 0);
+        const gross =
+          rideDriverGrossCdf({
+            finalPriceCdf: o.finalPriceCdf,
+            estimatedPriceCdf: o.estimatedPriceCdf,
+            discountCdf: o.discountCdf,
+          }) + (o.purchaseTotalCdf ?? 0);
         return {
           referenceType: type,
           referenceId,
@@ -1522,7 +1536,7 @@ export class RidesService {
           return { referenceType: type, referenceId, driverId: m?.driverId ?? null, driverNetCdf: 0 };
         }
         const rule = await this.commission.get(CommissionServiceType.MOVING);
-        const gross = m.estimatedPriceCdf;
+        const gross = rideDriverGrossCdf(m);
         return {
           referenceType: type,
           referenceId,
@@ -1580,7 +1594,7 @@ export class RidesService {
           return { referenceType: type, referenceId, driverId: s?.driverId ?? null, driverNetCdf: 0 };
         }
         const rule = await this.commission.get(CommissionServiceType.RIDE);
-        const gross = s.estimatedPriceCdf;
+        const gross = rideDriverGrossCdf(s);
         return {
           referenceType: type,
           referenceId,
@@ -1636,16 +1650,20 @@ export class RidesService {
         referenceType: 'RIDE',
         referenceId: r.id,
         label: `${r.pickupAddress ?? 'Départ'} → ${r.dropoffAddress ?? 'Arrivée'}`,
-        driverNetCdf: Math.round(rideNet(r.finalFareCdf ?? r.estimatedFareCdf ?? 0, rideRule.platformPercent)),
+        driverNetCdf: Math.round(rideNet(rideDriverGrossCdf(r), rideRule.platformPercent)),
         completedAt: r.completedAt?.toISOString() ?? null,
       })),
-      ...poolBookings.map((b) => ({
-        referenceType: 'RIDE_SHARE',
-        referenceId: b.id,
-        label: `Pool · ${b.pickupAddress ?? 'Départ'} → ${b.dropoffAddress ?? 'Arrivée'}`,
-        driverNetCdf: Math.round(rideNet(b.fareCdf ?? 0, rideRule.platformPercent)),
-        completedAt: (b.droppedOffAt ?? b.ride.completedAt)?.toISOString() ?? null,
-      })),
+      ...poolBookings.map((b) => {
+        const siblings = poolBookings.filter((x) => x.rideId === b.rideId).length;
+        const gross = rideShareBookingDriverGrossCdf(b.fareCdf ?? 0, b.ride.discountCdf, siblings);
+        return {
+          referenceType: 'RIDE_SHARE',
+          referenceId: b.id,
+          label: `Pool · ${b.pickupAddress ?? 'Départ'} → ${b.dropoffAddress ?? 'Arrivée'}`,
+          driverNetCdf: Math.round(rideNet(gross, rideRule.platformPercent)),
+          completedAt: (b.droppedOffAt ?? b.ride.completedAt)?.toISOString() ?? null,
+        };
+      }),
       ...deliveries.map((d) => ({
         referenceType: 'DELIVERY',
         referenceId: d.id,
@@ -1661,7 +1679,7 @@ export class RidesService {
         referenceType: 'MOVING',
         referenceId: m.id,
         label: `Déménagement · ${m.pickupAddress ?? m.dropoffAddress ?? ''}`,
-        driverNetCdf: Math.round(rideNet(m.estimatedPriceCdf, movingRule.platformPercent)),
+        driverNetCdf: Math.round(rideNet(rideDriverGrossCdf(m), movingRule.platformPercent)),
         completedAt: m.completedAt?.toISOString() ?? null,
       })),
       ...errands.map((e) => ({
@@ -1669,7 +1687,14 @@ export class RidesService {
         referenceId: e.id,
         label: e.description?.toString() ?? 'Courses & commissions',
         driverNetCdf: Math.round(
-          rideNet((e.finalPriceCdf ?? e.estimatedPriceCdf) + (e.purchaseTotalCdf ?? 0), errandRule.platformPercent),
+          rideNet(
+            rideDriverGrossCdf({
+              finalPriceCdf: e.finalPriceCdf,
+              estimatedPriceCdf: e.estimatedPriceCdf,
+              discountCdf: e.discountCdf,
+            }) + (e.purchaseTotalCdf ?? 0),
+            errandRule.platformPercent,
+          ),
         ),
         completedAt: e.completedAt?.toISOString() ?? null,
       })),
@@ -1694,7 +1719,7 @@ export class RidesService {
         referenceType: 'SCHEDULED',
         referenceId: s.id,
         label: `Planifiée · ${s.pickupAddress ?? ''} → ${s.dropoffAddress ?? ''}`,
-        driverNetCdf: Math.round(rideNet(s.estimatedPriceCdf, rideRule.platformPercent)),
+        driverNetCdf: Math.round(rideNet(rideDriverGrossCdf(s), rideRule.platformPercent)),
         completedAt: s.updatedAt.toISOString(),
       })),
     ]
@@ -1768,7 +1793,7 @@ export class RidesService {
     const sumRides = (from: Date) =>
       rides
         .filter((r) => r.completedAt && r.completedAt >= from)
-        .reduce((a, r) => a + net(r.finalFareCdf ?? r.estimatedFareCdf ?? 0, rideRule.platformPercent), 0);
+        .reduce((a, r) => a + net(rideDriverGrossCdf(r), rideRule.platformPercent), 0);
     const sumDeliveries = (from: Date) =>
       deliveries
         .filter((d) => d.deliveredAt && d.deliveredAt >= from)
@@ -1776,12 +1801,21 @@ export class RidesService {
     const sumMovings = (from: Date) =>
       movings
         .filter((m) => m.completedAt && m.completedAt >= from)
-        .reduce((a, m) => a + net(m.estimatedPriceCdf, movingRule.platformPercent), 0);
+        .reduce((a, m) => a + net(rideDriverGrossCdf(m), movingRule.platformPercent), 0);
     const sumErrands = (from: Date) =>
       errands
         .filter((e) => e.completedAt && e.completedAt >= from)
         .reduce(
-          (a, e) => a + net((e.finalPriceCdf ?? e.estimatedPriceCdf) + (e.purchaseTotalCdf ?? 0), errandRule.platformPercent),
+          (a, e) =>
+            a +
+            net(
+              rideDriverGrossCdf({
+                finalPriceCdf: e.finalPriceCdf,
+                estimatedPriceCdf: e.estimatedPriceCdf,
+                discountCdf: e.discountCdf,
+              }) + (e.purchaseTotalCdf ?? 0),
+              errandRule.platformPercent,
+            ),
           0,
         );
     const sumRentals = (from: Date) =>
@@ -1798,7 +1832,7 @@ export class RidesService {
     const sumScheduled = (from: Date) =>
       scheduled
         .filter((s) => s.updatedAt >= from)
-        .reduce((a, s) => a + net(s.estimatedPriceCdf, rideRule.platformPercent), 0);
+        .reduce((a, s) => a + net(rideDriverGrossCdf(s), rideRule.platformPercent), 0);
     const sumAll = (from: Date) =>
       sumRides(from) +
       sumDeliveries(from) +
@@ -1874,6 +1908,7 @@ export class RidesService {
             vehicleType: true,
             finalFareCdf: true,
             estimatedFareCdf: true,
+            discountCdf: true,
             pickupLat: true,
             pickupLng: true,
           },
@@ -1975,9 +2010,10 @@ export class RidesService {
         bucket.rides++;
         if (ride.status === RideStatus.COMPLETED) {
           bucket.completed++;
-          const fare = ride.finalFareCdf ?? ride.estimatedFareCdf ?? 0;
-          bucket.revenueCdf += fare;
-          totalRevenue += fare;
+          const passengerPaid = ride.finalFareCdf ?? ride.estimatedFareCdf ?? 0;
+          const fare = rideDriverGrossCdf(ride);
+          bucket.revenueCdf += passengerPaid;
+          totalRevenue += passengerPaid;
           completedCount++;
           bumpCommission(cityOf(ride.pickupLat, ride.pickupLng), 'rides', platformFee(fare, rideRule.platformPercent));
         }

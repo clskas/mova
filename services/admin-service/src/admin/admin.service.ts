@@ -826,7 +826,21 @@ export class AdminService {
     }
     return this.proxy('driver', `/internal/users/${userId}/data`, { method: 'DELETE' });
   }
-  issuePartnerLoginPin(subject: string, userId: string) {
+  async issuePartnerLoginPin(subject: string, userId: string, managedCity?: string | null) {
+    if (managedCity) {
+      const pending = await this.listPartnerKycPending('ALL', true, managedCity);
+      const key = `${userId}:${subject}`;
+      const inScope =
+        (pending.restaurants ?? []).some((r) => `${r.userId}:RESTAURANT` === key) ||
+        (pending.rentalPartners ?? []).some((r) => `${r.userId}:RENTAL_PARTNER` === key);
+      if (!inScope) {
+        throw new MovaHttpException(
+          MovaErrorCode.AUTH_FORBIDDEN,
+          HttpStatus.FORBIDDEN,
+          'Partenaire hors de votre ville gérée.',
+        );
+      }
+    }
     return this.proxy('ride', `/internal/partner-kyc/${subject}/${userId}/login-pin`, {
       method: 'POST',
       body: JSON.stringify({}),
@@ -1048,10 +1062,15 @@ export class AdminService {
       documents?: Array<{ id?: string; userId?: string; subject?: string; [k: string]: unknown }>;
     }>('ride', `/internal/partner-kyc/pending${q ? `?${q}` : ''}`);
     if (!managedCity) return raw;
-    const restaurants = filterRowsByManagedCity(raw.restaurants ?? [], managedCity, (r) => ({
+    const restaurantsGps = filterRowsByManagedCity(raw.restaurants ?? [], managedCity, (r) => ({
       lat: r.lat,
       lng: r.lng,
     }));
+    // Also keep restaurants that already expose a city name matching managedCity.
+    const restaurantsNamed = filterRowsByCityName(raw.restaurants ?? [], managedCity, (r) => r.city);
+    const restaurants = [
+      ...new Map([...restaurantsGps, ...restaurantsNamed].map((r) => [r.userId, r])).values(),
+    ];
     const rentalsGps = filterRowsByManagedCity(raw.rentalPartners ?? [], managedCity, (r) => ({
       lat: r.lat,
       lng: r.lng,

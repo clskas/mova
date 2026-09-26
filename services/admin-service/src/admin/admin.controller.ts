@@ -651,8 +651,12 @@ export class AdminController {
   @Post('partner-kyc/:subject/:userId/login-pin')
   @RequirePermissions(AdminPermission.KYC_WRITE)
   @ApiOperation({ summary: 'Générer ou renvoyer le PIN de connexion restaurant / loueur' })
-  issuePartnerLoginPin(@Param('subject') subject: string, @Param('userId') userId: string) {
-    return this.adminService.issuePartnerLoginPin(subject, userId);
+  issuePartnerLoginPin(
+    @Request() req: { user: AdminJwtUser },
+    @Param('subject') subject: string,
+    @Param('userId') userId: string,
+  ) {
+    return this.adminService.issuePartnerLoginPin(subject, userId, resolveManagedCityScope(req.user));
   }
 
   @Get('publicites')

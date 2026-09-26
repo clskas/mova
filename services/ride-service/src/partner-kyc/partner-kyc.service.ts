@@ -21,6 +21,7 @@ import {
   documentsGraceElapsed,
   commerceTypeLabel,
   parseCommerceType,
+  findGeographicServiceAreaByCoords,
   type AuthUserNotifyResult,
   type KycPartnerKind,
   type PartnerKycSubject as PartnerSubject,
@@ -147,6 +148,7 @@ export class PartnerKycService {
     const hasEmail = Boolean(user?.email?.trim());
     const partnerKind: KycPartnerKind = 'RESTAURANT';
     const commerceType = parseCommerceType(restaurant.commerceType);
+    const resolvedCity = findGeographicServiceAreaByCoords(restaurant.lat, restaurant.lng)?.name ?? null;
     return {
       subject: 'RESTAURANT' as const,
       userId: ownerUserId,
@@ -163,6 +165,7 @@ export class PartnerKycService {
       payoutProvider: restaurant.payoutProvider,
       payoutPhone: restaurant.payoutPhone,
       address: restaurant.address,
+      city: resolvedCity,
       lat: restaurant.lat,
       lng: restaurant.lng,
       phone: user?.phone ?? null,

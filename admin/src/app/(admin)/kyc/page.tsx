@@ -311,7 +311,8 @@ function partnerAccountLabel(r: PartnerKycDossier) {
 }
 
 export default function KycPage() {
-  const { canWrite, role } = useAdmin();
+  const { canWrite, role, user } = useAdmin();
+  const managedCity = role === "CITY_ADMIN" ? user?.managedCity?.trim() || null : null;
   const [items, setItems] = useState<KycItem[]>([]);
   const [pendingDrivers, setPendingDrivers] = useState<AdminDriver[]>([]);
   const [allDrivers, setAllDrivers] = useState<AdminDriver[]>([]);
@@ -344,25 +345,31 @@ export default function KycPage() {
         fetchDrivers(includeHidden, { take: 200, kycStatus: "REJECTED" }),
         fetchPartnerKycPending(statusFilter, includeHidden).catch(() => ({ restaurants: [], rentalPartners: [] })),
       ]);
-      const drivers = [...pendingOnly, ...rejectedOnly];
-      setItems(Array.isArray(data) ? data : []);
-      setAllDrivers(drivers);
+      const cityKey = managedCity?.toLowerCase() ?? null;
+      const inCity = (city?: string | null) =>
+        !cityKey || (city?.trim().toLowerCase() ?? "") === cityKey;
+      const driversRaw = [...pendingOnly, ...rejectedOnly].filter((d) => inCity(d.operatingCity));
+      const docsRaw = (Array.isArray(data) ? data : []).filter((d) =>
+        inCity((d as KycItem & { operatingCity?: string }).operatingCity),
+      );
+      setItems(docsRaw);
+      setAllDrivers(driversRaw);
       setPendingDrivers(
-        drivers.filter(
+        driversRaw.filter(
           (d) =>
             d.kycStatus === "PENDING" ||
             d.kycStatus === "REJECTED" ||
             (d.readyForReview && d.kycStatus === "PENDING"),
         ),
       );
-      setRestaurants(partners.restaurants ?? []);
-      setRentalPartners(partners.rentalPartners ?? []);
+      setRestaurants((partners.restaurants ?? []).filter((r) => inCity(r.city)));
+      setRentalPartners((partners.rentalPartners ?? []).filter((r) => inCity(r.city)));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur de chargement");
     } finally {
       setLoading(false);
     }
-  }, [statusFilter, includeHidden]);
+  }, [statusFilter, includeHidden, managedCity]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -623,6 +630,11 @@ export default function KycPage() {
   return (
     <div className="max-w-4xl mx-auto">
       <PageHeader title="KYC" subtitle="Validation des dossiers chauffeurs, restaurants et loueurs" />
+      {managedCity && (
+        <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-950">
+          Périmètre admin ville : <strong>{managedCity}</strong> — seuls les dossiers de cette ville sont listés.
+        </div>
+      )}
       <div className="mb-4 rounded-xl border border-violet-200 bg-violet-50 p-4 text-sm text-violet-950 space-y-1">
         <p className="font-semibold">Activation et justificatifs</p>
         <p>

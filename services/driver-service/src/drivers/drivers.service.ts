@@ -1107,22 +1107,45 @@ export class DriversService {
    */
   async pendingKyc(status?: string, city?: string) {
     const normalized = String(status ?? 'PENDING').trim().toUpperCase();
-    let docs: Awaited<ReturnType<typeof this.prisma.kycDocument.findMany>>;
-    if (normalized === 'PENDING') {
-      const openProfiles = await this.prisma.driverProfile.findMany({
+    const cityTrim = city?.trim() || '';
+    const cityKey = cityTrim.toLowerCase();
+
+    // CITY_ADMIN: resolve in-city drivers first, then only load their documents
+    // (never fetch nationwide PENDING docs then hope a post-filter catches leaks).
+    let scopedUserIds: string[] | null = null;
+    if (cityTrim) {
+      const cityProfiles = await this.prisma.driverProfile.findMany({
         where: {
-          kycStatus: { in: [KycStatus.PENDING, KycStatus.REJECTED] },
-          ...(city?.trim()
-            ? { operatingCity: { equals: city.trim(), mode: 'insensitive' as const } }
-            : {}),
+          operatingCity: { equals: cityTrim, mode: 'insensitive' as const },
+          ...(normalized === 'PENDING'
+            ? { kycStatus: { in: [KycStatus.PENDING, KycStatus.REJECTED] } }
+            : normalized === 'APPROVED' || normalized === 'REJECTED'
+              ? { kycStatus: normalized as KycStatus }
+              : {}),
         },
         select: { userId: true },
         orderBy: { updatedAt: 'desc' },
-        take: 1000,
+        take: 2000,
       });
-      const openUserIds = openProfiles.map((p) => p.userId);
+      scopedUserIds = cityProfiles.map((p) => p.userId);
+      if (scopedUserIds.length === 0) return [];
+    }
+
+    let docs: Awaited<ReturnType<typeof this.prisma.kycDocument.findMany>>;
+    if (normalized === 'PENDING') {
+      const openUserIds =
+        scopedUserIds ??
+        (
+          await this.prisma.driverProfile.findMany({
+            where: { kycStatus: { in: [KycStatus.PENDING, KycStatus.REJECTED] } },
+            select: { userId: true },
+            orderBy: { updatedAt: 'desc' },
+            take: 1000,
+          })
+        ).map((p) => p.userId);
       docs = await this.prisma.kycDocument.findMany({
         where: {
+          ...(scopedUserIds ? { userId: { in: scopedUserIds } } : {}),
           OR: [
             { status: { in: [KycStatus.PENDING, KycStatus.REJECTED] } },
             ...(openUserIds.length > 0 ? [{ userId: { in: openUserIds } }] : []),
@@ -1132,14 +1155,17 @@ export class DriversService {
         take: 2000,
       });
     } else {
-      const where =
+      const statusWhere =
         normalized === 'ALL'
           ? {}
           : normalized === 'APPROVED' || normalized === 'REJECTED'
             ? { status: normalized as KycStatus }
             : { status: KycStatus.PENDING };
       docs = await this.prisma.kycDocument.findMany({
-        where,
+        where: {
+          ...statusWhere,
+          ...(scopedUserIds ? { userId: { in: scopedUserIds } } : {}),
+        },
         orderBy: { createdAt: 'desc' },
         take: 2000,
       });
@@ -1156,7 +1182,6 @@ export class DriversService {
     ]);
     const userById = new Map(users.filter(Boolean).map((u) => [u!.id, u!]));
     const cityByUser = new Map(profiles.map((p) => [p.userId, p.operatingCity]));
-    const cityKey = city?.trim().toLowerCase();
     return docs
       .map((doc) => {
         const user = userById.get(doc.userId);

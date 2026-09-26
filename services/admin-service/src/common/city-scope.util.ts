@@ -3,7 +3,7 @@ import {
   MovaErrorCode,
   MovaHttpException,
   UserRole,
-  resolveCityFromCoords,
+  findGeographicServiceAreaByCoords,
 } from '@mova/shared';
 
 export type AdminJwtUser = {
@@ -56,9 +56,8 @@ type Coords = { lat?: number | null; lng?: number | null };
 /**
  * In-memory city filter for admin list endpoints.
  *
- * CITY_ADMIN lists often page at the ride-service (skip/take) before this filter runs,
- * so a page may contain fewer rows than `take` after scoping. Prefer forcing `city=`
- * query params when the downstream API supports it (pricing, communes).
+ * Uses strict geographic bounds (no « nearest city » fallback) so garbage GPS
+ * (0,0 etc.) never leaks dossiers into the wrong CITY_ADMIN queue.
  */
 export function filterRowsByManagedCity<T>(
   rows: T[],
@@ -72,7 +71,8 @@ export function filterRowsByManagedCity<T>(
     if (c?.lat == null || c?.lng == null || !Number.isFinite(Number(c.lat)) || !Number.isFinite(Number(c.lng))) {
       return false;
     }
-    return resolveCityFromCoords(Number(c.lat), Number(c.lng)).toLowerCase() === key;
+    const area = findGeographicServiceAreaByCoords(Number(c.lat), Number(c.lng));
+    return (area?.name ?? '').toLowerCase() === key;
   });
 }
 
@@ -115,7 +115,7 @@ export function forceCityOnBody(
   return { ...body, [field]: managedCity };
 }
 
-/** Forbid CITY_ADMIN access when GPS resolves outside managedCity (or GPS missing). */
+/** Forbid CITY_ADMIN access when GPS is outside managedCity bounds (or GPS missing). */
 export function assertCoordsInManagedCity(
   managedCity: string | null,
   lat?: number | null,
@@ -126,8 +126,8 @@ export function assertCoordsInManagedCity(
   if (lat == null || lng == null || !Number.isFinite(Number(lat)) || !Number.isFinite(Number(lng))) {
     throw new MovaHttpException(MovaErrorCode.AUTH_FORBIDDEN, HttpStatus.FORBIDDEN, message);
   }
-  const resolved = resolveCityFromCoords(Number(lat), Number(lng));
-  if (resolved.trim().toLowerCase() !== managedCity.trim().toLowerCase()) {
+  const area = findGeographicServiceAreaByCoords(Number(lat), Number(lng));
+  if ((area?.name ?? '').trim().toLowerCase() !== managedCity.trim().toLowerCase()) {
     throw new MovaHttpException(MovaErrorCode.AUTH_FORBIDDEN, HttpStatus.FORBIDDEN, message);
   }
 }

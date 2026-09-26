@@ -16,12 +16,19 @@ describe('city-scope.util', () => {
     const rows = [
       { id: 'kin', pickupLat: -4.325, pickupLng: 15.322 }, // Kinshasa approx
       { id: 'beni', pickupLat: 0.491, pickupLng: 29.465 }, // Beni approx
+      { id: 'junk', pickupLat: 0, pickupLng: 0 }, // hors zone — ne doit pas fuiter
     ];
     const beni = filterRowsByManagedCity(rows, 'Beni', (r) => ({
       lat: r.pickupLat,
       lng: r.pickupLng,
     }));
     expect(beni.map((r) => r.id)).toEqual(['beni']);
+  });
+
+  it('excludes coordinates outside all service-area bounds', () => {
+    const rows = [{ id: 'ocean', lat: 0, lng: 0 }];
+    expect(filterRowsByManagedCity(rows, 'Beni', (r) => r)).toEqual([]);
+    expect(filterRowsByManagedCity(rows, 'Kinshasa', (r) => r)).toEqual([]);
   });
 
   it('assertCoordsInManagedCity blocks other cities', () => {

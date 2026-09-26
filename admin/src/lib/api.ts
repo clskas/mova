@@ -130,6 +130,7 @@ export type AdminDriver = {
   ratingAvg?: number;
   totalRides?: number;
   kycStatus?: string;
+  operatingCity?: string | null;
   onboardingCompleted?: boolean;
   activationPinVerified?: boolean;
   kycDocumentsUploaded?: number;
@@ -246,6 +247,7 @@ export type KycItem = {
   publicId?: string;
   phone?: string | null;
   email?: string | null;
+  operatingCity?: string | null;
 };
 
 export type Incident = {
@@ -2264,6 +2266,9 @@ export type PartnerKycDossier = {
   phoneVerified?: boolean;
   canOperate?: boolean;
   requiredComplete?: boolean;
+  city?: string | null;
+  lat?: number | null;
+  lng?: number | null;
   checklist?: PartnerKycChecklistItem[];
   pinConfigured?: boolean;
   pinPending?: boolean;

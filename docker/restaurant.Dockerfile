@@ -12,7 +12,7 @@ ENV NEXT_PUBLIC_GOOGLE_CLIENT_ID=$NEXT_PUBLIC_GOOGLE_CLIENT_ID
 ENV NEXT_PUBLIC_BUILD_ID=$NEXT_PUBLIC_BUILD_ID
 ENV RENDER_GIT_COMMIT=$RENDER_GIT_COMMIT
 RUN npm run build \
- && node -e "const fs=require('fs');const id=process.env.NEXT_PUBLIC_BUILD_ID||process.env.RENDER_GIT_COMMIT||'unknown';fs.mkdirSync('public',{recursive:true});fs.writeFileSync('public/version.json',JSON.stringify({buildId:id,version:'0.1.0'}));console.log('wrote public/version.json',id);"
+ && node -e "const fs=require('fs');const id=process.env.NEXT_PUBLIC_BUILD_ID||process.env.RENDER_GIT_COMMIT||'unknown';fs.mkdirSync('public',{recursive:true});fs.writeFileSync('public/version.json',JSON.stringify({buildId:id,version:'0.1.0'}));try{let sw=fs.readFileSync('public/sw.js','utf8');sw=sw.replace(/\/\* BUILD_ID:[^*]*\*\//g,'/* BUILD_ID: __MOVA_BUILD_ID__ */');if(!sw.includes('__MOVA_BUILD_ID__'))sw='/* BUILD_ID: __MOVA_BUILD_ID__ */\n'+sw;fs.writeFileSync('public/sw.js',sw.replace(/__MOVA_BUILD_ID__/g,id));}catch(e){}console.log('wrote public/version.json + sw stamp',id);"
 
 FROM node:22-alpine AS production
 WORKDIR /app

@@ -26,8 +26,8 @@ const DEFAULT_DRIVER_STORE =
  * never see the banner when names already match (banner also fires when
  * store code > APP_BUILD). Stale Render env below this floor hid banners.
  */
-const CURRENT_VERSION_FLOOR = '1.0.15';
-const CURRENT_VERSION_CODE_FLOOR = 100;
+const CURRENT_VERSION_FLOOR = '1.0.16';
+const CURRENT_VERSION_CODE_FLOOR = 101;
 
 function parseVersionCode(raw: string | undefined, fallback: number): number {
   const n = Number.parseInt(raw?.trim() || '', 10);

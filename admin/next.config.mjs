@@ -23,6 +23,19 @@ try {
   writeFileSync(versionPath, versionBody);
 }
 
+const swPath = join(root, "public", "sw.js");
+try {
+  let sw = readFileSync(swPath, "utf8");
+  if (!sw.includes("__MOVA_BUILD_ID__") && !/BUILD_ID:/.test(sw)) {
+    sw = `/* BUILD_ID: __MOVA_BUILD_ID__ */\n` + sw;
+  }
+  sw = sw.replace(/\/\* BUILD_ID:[^*]*\*\//g, "/* BUILD_ID: __MOVA_BUILD_ID__ */");
+  const stamped = sw.replace(/__MOVA_BUILD_ID__/g, buildId);
+  if (stamped !== readFileSync(swPath, "utf8")) writeFileSync(swPath, stamped);
+} catch {
+  /* sw.js optional in some contexts */
+}
+
 const noStore = "no-store, no-cache, must-revalidate, max-age=0";
 
 /** @type {import('next').NextConfig} */

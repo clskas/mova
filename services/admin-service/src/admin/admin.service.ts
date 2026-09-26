@@ -931,6 +931,24 @@ export class AdminService {
         await this.getRide(id, managedCity);
       } else if (kind === 'delivery' || kind === 'deliveries') {
         await this.getDelivery(id, managedCity);
+      } else if (kind === 'moving' || kind === 'movings') {
+        const rows = await this.listMoving(200, managedCity);
+        if (!rows.some((r) => String((r as { id?: string }).id ?? '') === id)) {
+          throw new MovaHttpException(
+            MovaErrorCode.AUTH_FORBIDDEN,
+            HttpStatus.FORBIDDEN,
+            'Déménagement hors de votre ville gérée.',
+          );
+        }
+      } else if (kind === 'errand' || kind === 'errands') {
+        // Errands are delivery-shaped; reuse delivery city ACL when possible.
+        await this.getDelivery(id, managedCity).catch(() => {
+          throw new MovaHttpException(
+            MovaErrorCode.AUTH_FORBIDDEN,
+            HttpStatus.FORBIDDEN,
+            'Course courses hors de votre ville gérée.',
+          );
+        });
       } else {
         throw new MovaHttpException(
           MovaErrorCode.AUTH_FORBIDDEN,

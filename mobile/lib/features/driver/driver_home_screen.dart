@@ -606,8 +606,10 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
       }).toList();
       if (active.isNotEmpty) {
         setState(() => _activeRide = active.first);
+        _startLocationUpdates();
       } else {
         setState(() => _activeRide = null);
+        if (_available) _startLocationUpdates();
       }
     }
   }
@@ -758,7 +760,32 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
   Future<void> _pushLocation() async {
     if (!await _ensureGpsPosition()) return;
     final pos = await Geolocator.getCurrentPosition();
-    await ref.read(apiClientProvider).updateDriverLocation(pos.latitude, pos.longitude);
+    final api = ref.read(apiClientProvider);
+    await api.updateDriverLocation(pos.latitude, pos.longitude);
+    // Keep passenger + admin maps live even if the driver is still on home
+    // (active mission banner) rather than ActiveRideScreen.
+    final rideId = _activeRide?['id']?.toString();
+    final deliveryId = _activeDelivery?['id']?.toString();
+    final userId = _profile?['userId']?.toString();
+    if (userId != null && userId.isNotEmpty) {
+      final socket = ref.read(rideSocketProvider);
+      if (rideId != null && rideId.isNotEmpty) {
+        socket.emitDriverLocation(
+          userId: userId,
+          lat: pos.latitude,
+          lng: pos.longitude,
+          rideId: rideId,
+        );
+        await api.recordTrackingPoint('ride', rideId, pos.latitude, pos.longitude);
+      } else if (deliveryId != null && deliveryId.isNotEmpty) {
+        socket.emitDriverLocation(
+          userId: userId,
+          lat: pos.latitude,
+          lng: pos.longitude,
+        );
+        await api.recordTrackingPoint('delivery', deliveryId, pos.latitude, pos.longitude);
+      }
+    }
   }
 
   Future<bool> _pushLocationRequired() async {
@@ -770,7 +797,11 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
 
   void _startLocationUpdates() {
     _locationTimer?.cancel();
-    _locationTimer = Timer.periodic(const Duration(seconds: 20), (_) => _pushLocation());
+    // Faster while a mission is active so passenger/admin maps stay smooth.
+    final interval = (_activeRide != null || _activeDelivery != null)
+        ? const Duration(seconds: 8)
+        : const Duration(seconds: 20);
+    _locationTimer = Timer.periodic(interval, (_) => _pushLocation());
     _pushLocation();
   }
 

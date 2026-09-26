@@ -1,4 +1,5 @@
-const CACHE = "mova-business-v15";
+/* BUILD_ID: __MOVA_BUILD_ID__ */
+const CACHE = "mova-business-v16";
 const SHELL = [
   "/manifest.webmanifest",
   "/icon-192.png",
@@ -13,11 +14,11 @@ function isVersionRequest(url) {
 }
 
 self.addEventListener("install", (event) => {
+  // Do NOT skipWaiting — banner stays until user taps « Actualiser ».
   event.waitUntil(
     (async () => {
       const cache = await caches.open(CACHE);
       await cache.addAll(SHELL).catch(() => undefined);
-      await self.skipWaiting();
     })(),
   );
 });
@@ -27,10 +28,6 @@ self.addEventListener("activate", (event) => {
     (async () => {
       const keys = await caches.keys();
       await Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)));
-      const clients = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
-      for (const client of clients) {
-        client.postMessage({ type: "MOVA_UPDATE_AVAILABLE" });
-      }
     })(),
   );
   self.clients.claim();

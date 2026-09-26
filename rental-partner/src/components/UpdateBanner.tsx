@@ -24,6 +24,11 @@ async function readRemoteBuildId(): Promise<string | null> {
 
 async function reloadWithServiceWorker() {
   try {
+    sessionStorage.removeItem(DISMISS_KEY);
+  } catch {
+    /* ignore */
+  }
+  try {
     const reg = await navigator.serviceWorker?.getRegistration();
     reg?.waiting?.postMessage({ type: "SKIP_WAITING" });
   } catch {
@@ -34,33 +39,44 @@ async function reloadWithServiceWorker() {
 
 export function UpdateBanner({ accentClass = "bg-indigo-600" }: { accentClass?: string }) {
   const [available, setAvailable] = useState(false);
+  const [remoteId, setRemoteId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
 
-    function show() {
-      if (!cancelled) setAvailable(true);
+    function show(remote: string) {
+      if (cancelled) return;
+      setRemoteId(remote);
+      setAvailable(true);
     }
 
     async function check() {
       const remote = await readRemoteBuildId();
-      if (!remote || remote === LOCAL_BUILD) return;
+      if (!remote || remote === LOCAL_BUILD) {
+        if (!cancelled) {
+          setAvailable(false);
+          setRemoteId(null);
+        }
+        return;
+      }
       try {
         if (sessionStorage.getItem(DISMISS_KEY) === remote) return;
       } catch {
         /* Safari private mode — still show the banner */
       }
-      show();
+      show(remote);
     }
 
     const onSw = () => {
-      try {
-        const dismissed = sessionStorage.getItem(DISMISS_KEY);
-        if (dismissed && dismissed === LOCAL_BUILD) return;
-      } catch {
-        /* still show */
-      }
-      show();
+      void readRemoteBuildId().then((remote) => {
+        const id = remote || `sw-${LOCAL_BUILD}`;
+        try {
+          if (sessionStorage.getItem(DISMISS_KEY) === id) return;
+        } catch {
+          /* still show */
+        }
+        show(id);
+      });
     };
 
     void check();
@@ -99,13 +115,11 @@ export function UpdateBanner({ accentClass = "bg-indigo-600" }: { accentClass?: 
           type="button"
           className="px-2.5 py-1.5 min-h-10 text-sm text-amber-950 underline"
           onClick={() => {
-            void readRemoteBuildId().then((remote) => {
-              try {
-                sessionStorage.setItem(DISMISS_KEY, remote || LOCAL_BUILD);
-              } catch {
-                /* ignore */
-              }
-            });
+            try {
+              sessionStorage.setItem(DISMISS_KEY, remoteId || LOCAL_BUILD);
+            } catch {
+              /* ignore */
+            }
             setAvailable(false);
           }}
         >

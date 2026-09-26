@@ -70,6 +70,25 @@ export class TrackingService {
     );
   }
 
+  /** Pickup coords for CITY_ADMIN live-map ACL (fail closed if missing). */
+  async getRidePickupCoords(rideId: string): Promise<{ lat: number; lng: number } | null> {
+    const ride = await this.prisma.ride.findUnique({
+      where: { id: rideId },
+      select: { pickupLat: true, pickupLng: true },
+    });
+    if (ride?.pickupLat == null || ride?.pickupLng == null) return null;
+    return { lat: Number(ride.pickupLat), lng: Number(ride.pickupLng) };
+  }
+
+  async getDeliveryPickupCoords(deliveryId: string): Promise<{ lat: number; lng: number } | null> {
+    const delivery = await this.prisma.delivery.findUnique({
+      where: { id: deliveryId },
+      select: { pickupLat: true, pickupLng: true },
+    });
+    if (delivery?.pickupLat == null || delivery?.pickupLng == null) return null;
+    return { lat: Number(delivery.pickupLat), lng: Number(delivery.pickupLng) };
+  }
+
   async isDeliveryParticipant(deliveryId: string, userId: string): Promise<boolean> {
     const delivery = await this.prisma.delivery.findUnique({
       where: { id: deliveryId },

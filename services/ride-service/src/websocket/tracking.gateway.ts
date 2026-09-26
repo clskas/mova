@@ -3,7 +3,9 @@ import { ConnectedSocket, MessageBody, OnGatewayConnection, OnGatewayDisconnect,
 import { TrackingReferenceType } from '@prisma/client';
 import {
   AdminPermission,
+  UserRole,
   assertActiveUserStatus,
+  findGeographicServiceAreaByCoords,
   hasAdminPermission,
   INTERNAL_API_KEY,
   resolveCorsOrigin,
@@ -36,7 +38,7 @@ export type RestaurantLivePayload = {
   paymentStatus?: string | null;
 };
 
-export type SocketAuthUser = { id: string; role: string };
+export type SocketAuthUser = { id: string; role: string; managedCity?: string | null };
 
 export function trackingGatewayCorsOptions(): { origin: boolean | string | RegExp | Array<string | RegExp>; credentials?: boolean } {
   const origin = resolveCorsOrigin();
@@ -180,9 +182,13 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
   async handleRideSubscribe(@ConnectedSocket() client: Socket, @MessageBody() data: { rideId: string }) {
     const user = this.socketUser(client);
     if (!user || !data?.rideId) return { subscribed: false };
-    const allowed =
-      this.canObserveRide(user) || (await this.tracking.isRideParticipant(data.rideId, user.id));
-    if (!allowed) return { subscribed: false };
+    const isParticipant = await this.tracking.isRideParticipant(data.rideId, user.id);
+    const asAdmin = this.canObserveRide(user);
+    if (!asAdmin && !isParticipant) return { subscribed: false };
+    // CITY_ADMIN observers: only missions in managedCity (participants always allowed).
+    if (asAdmin && !isParticipant && !(await this.cityAdminMayObserveRide(user, data.rideId))) {
+      return { subscribed: false };
+    }
     client.join(`ride:${data.rideId}`);
     return { subscribed: data.rideId };
   }
@@ -191,9 +197,12 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
   async handleDeliverySubscribe(@ConnectedSocket() client: Socket, @MessageBody() data: { deliveryId: string; lat?: number; lng?: number }) {
     const user = this.socketUser(client);
     if (!user || !data?.deliveryId) return { subscribed: false };
-    const allowed =
-      this.canObserveCourier(user) || (await this.tracking.canJoinCourierRoom(data.deliveryId, user.id));
-    if (!allowed) return { subscribed: false };
+    const isParticipant = await this.tracking.canJoinCourierRoom(data.deliveryId, user.id);
+    const asAdmin = this.canObserveCourier(user);
+    if (!asAdmin && !isParticipant) return { subscribed: false };
+    if (asAdmin && !isParticipant && !(await this.cityAdminMayObserveDelivery(user, data.deliveryId))) {
+      return { subscribed: false };
+    }
     client.join(`delivery:${data.deliveryId}`);
     if (data.lat != null && data.lng != null) {
       const payload = { lat: data.lat, lng: data.lng, ts: Date.now() };
@@ -445,6 +454,33 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
     );
   }
 
+  /** CITY_ADMIN may only join live rooms for missions whose pickup is in managedCity. */
+  private async cityAdminMayObserveRide(user: SocketAuthUser, rideId: string): Promise<boolean> {
+    if (user.role !== UserRole.CITY_ADMIN) return true;
+    const coords = await this.tracking.getRidePickupCoords(rideId);
+    return this.coordsInManagedCity(user.managedCity, coords?.lat, coords?.lng);
+  }
+
+  private async cityAdminMayObserveDelivery(user: SocketAuthUser, deliveryId: string): Promise<boolean> {
+    if (user.role !== UserRole.CITY_ADMIN) return true;
+    const coords = await this.tracking.getDeliveryPickupCoords(deliveryId);
+    return this.coordsInManagedCity(user.managedCity, coords?.lat, coords?.lng);
+  }
+
+  private coordsInManagedCity(
+    managedCity: string | null | undefined,
+    lat?: number | null,
+    lng?: number | null,
+  ): boolean {
+    const city = managedCity?.trim();
+    if (!city) return false;
+    if (lat == null || lng == null || !Number.isFinite(Number(lat)) || !Number.isFinite(Number(lng))) {
+      return false;
+    }
+    const area = findGeographicServiceAreaByCoords(Number(lat), Number(lng));
+    return (area?.name ?? '').toLowerCase() === city.toLowerCase();
+  }
+
   private async authenticateSocket(client: Socket): Promise<SocketAuthUser | null> {
     const token = extractHandshakeToken(client);
     if (!token) return null;
@@ -455,9 +491,13 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
       const live = await this.fetchLiveSocketUser(decoded.sub);
       if (live) {
         assertActiveUserStatus(live.status);
-        return { id: live.id, role: live.role || decoded.role || '' };
+        return {
+          id: live.id,
+          role: live.role || decoded.role || '',
+          managedCity: live.managedCity ?? decoded.managedCity ?? null,
+        };
       }
-      return { id: decoded.sub, role: decoded.role ?? '' };
+      return { id: decoded.sub, role: decoded.role ?? '', managedCity: decoded.managedCity ?? null };
     } catch {
       return null;
     }
@@ -465,7 +505,7 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
 
   private async fetchLiveSocketUser(
     userId: string,
-  ): Promise<{ id: string; role?: string; status?: string } | null> {
+  ): Promise<{ id: string; role?: string; status?: string; managedCity?: string | null } | null> {
     try {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 1500);
@@ -475,9 +515,14 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
           signal: controller.signal,
         });
         if (!res.ok) return null;
-        const user = (await res.json()) as { id?: string; role?: string; status?: string };
+        const user = (await res.json()) as {
+          id?: string;
+          role?: string;
+          status?: string;
+          managedCity?: string | null;
+        };
         if (!user?.id) return null;
-        return { id: user.id, role: user.role, status: user.status };
+        return { id: user.id, role: user.role, status: user.status, managedCity: user.managedCity };
       } finally {
         clearTimeout(timer);
       }

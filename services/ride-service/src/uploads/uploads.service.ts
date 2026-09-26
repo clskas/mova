@@ -39,18 +39,55 @@ export class UploadsService implements OnModuleInit {
   onModuleInit() {
     if (!isSupabaseStorageConfigured(this.get)) {
       if (this.isProduction) {
-        this.logger.warn(
-          'SUPABASE_SERVICE_ROLE_KEY absent — photos seulement en PostgreSQL. Configurez Supabase sur Render.',
+        this.logger.error(
+          'SUPABASE_SERVICE_ROLE_KEY absent — les photos partenaires seront perdues au prochain redeploy si Postgres échoue aussi. Configurez Supabase sur Render.',
         );
       }
-      return;
+    } else {
+      // Background: push legacy Postgres blobs to Supabase after boot (non-blocking).
+      setTimeout(() => {
+        void this.syncPostgresMediaToSupabase({ limit: 200 }).catch((err) => {
+          this.logger.warn(`Supabase media sync skipped: ${err instanceof Error ? err.message : String(err)}`);
+        });
+      }, 15_000);
     }
-    // Background: push legacy Postgres blobs to Supabase after boot (non-blocking).
     setTimeout(() => {
-      void this.syncPostgresMediaToSupabase({ limit: 200 }).catch((err) => {
-        this.logger.warn(`Supabase media sync skipped: ${err instanceof Error ? err.message : String(err)}`);
+      void this.logOrphanedMenuImageRefs().catch(() => undefined);
+    }, 20_000);
+  }
+
+  /** Detect menu/vehicle image URLs that point at missing durable objects (pre-persist era). */
+  private async logOrphanedMenuImageRefs() {
+    try {
+      const restos = await this.prisma.restaurant.findMany({
+        where: { menuItems: { not: null } },
+        select: { id: true, name: true, menuItems: true },
+        take: 500,
       });
-    }, 15_000);
+      const refs = new Set<string>();
+      for (const r of restos) {
+        const text = typeof r.menuItems === 'string' ? r.menuItems : JSON.stringify(r.menuItems ?? '');
+        for (const m of text.matchAll(/\/api\/uploads\/menu\/([a-zA-Z0-9._-]+)/g)) {
+          if (m[1]) refs.add(m[1]);
+        }
+      }
+      if (refs.size === 0) return;
+      const present = await this.prisma.uploadedMedia.findMany({
+        where: { category: 'menu', filename: { in: [...refs] } },
+        select: { filename: true },
+      });
+      const ok = new Set(present.map((p) => p.filename));
+      const missing = [...refs].filter((f) => !ok.has(f));
+      if (missing.length > 0) {
+        this.logger.warn(
+          `Photos menu orphelines (URL en catalogue, fichier absent de Postgres/Supabase — re-upload partenaire requis): ${missing.length}/${refs.size}`,
+        );
+      }
+    } catch (err) {
+      this.logger.debug(
+        `Orphan media scan skipped: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
   }
 
   async uploadParcelPhoto(base64: string, mimeType = 'image/jpeg') {
@@ -174,11 +211,30 @@ export class UploadsService implements OnModuleInit {
         }
       }
     } else if (this.isProduction) {
-      this.logger.error(`Upload ${category} without Supabase — persisting Postgres only`);
+      // Production must not accept disk-only uploads (Render filesystem is wiped on deploy).
+      throw new MovaHttpException(
+        MovaErrorCode.INTERNAL_ERROR,
+        HttpStatus.SERVICE_UNAVAILABLE,
+        'Stockage images indisponible (Supabase non configuré). Réessayez plus tard.',
+      );
     }
 
     // Always persist to Postgres so redeploys do not wipe partner photos (dual-write).
     await this.persistDurable(category, filename, buffer, contentType);
+
+    // Hard verify: never return a URL that would 404 after the next Render deploy.
+    const verified = await this.prisma.uploadedMedia.findUnique({
+      where: { category_filename: { category, filename } },
+      select: { id: true },
+    });
+    if (!verified) {
+      this.logger.error(`Upload ${category}/${filename} missing from Postgres after upsert`);
+      throw new MovaHttpException(
+        MovaErrorCode.INTERNAL_ERROR,
+        HttpStatus.BAD_GATEWAY,
+        'Échec de persistance de la photo. Réessayez.',
+      );
+    }
 
     return {
       photoUrl,

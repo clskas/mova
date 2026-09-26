@@ -3,8 +3,8 @@
 /// defaultValue must match pubspec `+N` so a missing dart-define cannot leave
 /// the in-app update banner stuck after a Play install.
 class AppVersion {
-  static const name = '1.0.12';
-  static const build = int.fromEnvironment('APP_BUILD', defaultValue: 97);
+  static const name = '1.0.15';
+  static const build = int.fromEnvironment('APP_BUILD', defaultValue: 100);
 
   static int compare(String a, String b) {
     List<int> parts(String raw) => raw

@@ -307,7 +307,7 @@ export class AdminController {
   reviewVehicleType(
     @Param('userId') userId: string,
     @Body() dto: ApproveKycDto,
-    @Request() req: { user: { role: string } },
+    @Request() req: { user: AdminJwtUser },
   ) {
     return this.adminService.reviewVehicleTypeApproval(
       userId,
@@ -315,21 +315,22 @@ export class AdminController {
       dto.notes,
       dto.vehicleType,
       req.user.role,
+      resolveManagedCityScope(req.user),
     );
   }
 
   @Post('kyc/:id/ocr')
   @RequirePermissions(AdminPermission.KYC_WRITE)
   @ApiOperation({ summary: 'Lancer l\'analyse OCR sur un document KYC' })
-  runKycOcr(@Param('id') id: string) {
-    return this.adminService.runKycOcr(id);
+  runKycOcr(@Request() req: { user: AdminJwtUser }, @Param('id') id: string) {
+    return this.adminService.runKycOcr(id, resolveManagedCityScope(req.user));
   }
 
   @Post('drivers/:userId/activation-pin')
   @RequirePermissions(AdminPermission.KYC_WRITE)
   @ApiOperation({ summary: 'Générer ou régénérer le PIN d\'activation chauffeur' })
-  regenerateDriverPin(@Param('userId') userId: string) {
-    return this.adminService.regenerateDriverActivationPin(userId);
+  regenerateDriverPin(@Request() req: { user: AdminJwtUser }, @Param('userId') userId: string) {
+    return this.adminService.regenerateDriverActivationPin(userId, resolveManagedCityScope(req.user));
   }
 
   @Delete('drivers/:userId')
@@ -367,8 +368,12 @@ export class AdminController {
   @Get('tracking/:type/:id/trace')
   @RequirePermissions(AdminPermission.RIDES_READ)
   @ApiOperation({ summary: 'Trace GPS course / livraison / commission' })
-  getGpsTrace(@Param('type') type: string, @Param('id') id: string) {
-    return this.adminService.getGpsTrace(type, id);
+  getGpsTrace(
+    @Request() req: { user: AdminJwtUser },
+    @Param('type') type: string,
+    @Param('id') id: string,
+  ) {
+    return this.adminService.getGpsTrace(type, id, resolveManagedCityScope(req.user));
   }
 
   @Post('rides/:id/cancel')
@@ -424,8 +429,12 @@ export class AdminController {
   @Post('incidents/:id/resolve')
   @RequirePermissions(AdminPermission.INCIDENTS_WRITE)
   @ApiOperation({ summary: 'Résoudre incident' })
-  resolve(@Param('id') id: string, @Body('status') status: string) {
-    return this.adminService.resolveIncident(id, status ?? 'RESOLVED');
+  resolve(
+    @Request() req: { user: AdminJwtUser },
+    @Param('id') id: string,
+    @Body('status') status: string,
+  ) {
+    return this.adminService.resolveIncident(id, status ?? 'RESOLVED', resolveManagedCityScope(req.user));
   }
 
   @Get('fraud/alerts')
@@ -574,29 +583,37 @@ export class AdminController {
   @Post('restaurants')
   @RequirePermissions(AdminPermission.RESTAURANTS_WRITE)
   @ApiOperation({ summary: 'Créer restaurant' })
-  createRestaurant(@Body() body: Record<string, unknown>) {
-    return this.adminService.createRestaurant(body);
+  createRestaurant(@Request() req: { user: AdminJwtUser }, @Body() body: Record<string, unknown>) {
+    return this.adminService.createRestaurant(body, resolveManagedCityScope(req.user));
   }
 
   @Post('restaurants/:id')
   @RequirePermissions(AdminPermission.RESTAURANTS_WRITE)
   @ApiOperation({ summary: 'Modifier restaurant (legacy POST)' })
-  updateRestaurantPost(@Param('id') id: string, @Body() body: Record<string, unknown>) {
-    return this.adminService.updateRestaurant(id, body);
+  updateRestaurantPost(
+    @Request() req: { user: AdminJwtUser },
+    @Param('id') id: string,
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.adminService.updateRestaurant(id, body, resolveManagedCityScope(req.user));
   }
 
   @Patch('restaurants/:id')
   @RequirePermissions(AdminPermission.RESTAURANTS_WRITE)
   @ApiOperation({ summary: 'Modifier restaurant' })
-  updateRestaurant(@Param('id') id: string, @Body() body: Record<string, unknown>) {
-    return this.adminService.updateRestaurant(id, body);
+  updateRestaurant(
+    @Request() req: { user: AdminJwtUser },
+    @Param('id') id: string,
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.adminService.updateRestaurant(id, body, resolveManagedCityScope(req.user));
   }
 
   @Delete('restaurants/:id')
   @RequirePermissions(AdminPermission.RESTAURANTS_WRITE)
   @ApiOperation({ summary: 'Supprimer définitivement un restaurant' })
-  deleteRestaurant(@Param('id') id: string) {
-    return this.adminService.deleteRestaurant(id);
+  deleteRestaurant(@Request() req: { user: AdminJwtUser }, @Param('id') id: string) {
+    return this.adminService.deleteRestaurant(id, resolveManagedCityScope(req.user));
   }
 
   @Get('partner-kyc/pending')
@@ -885,8 +902,8 @@ export class AdminController {
   @Delete('pricing-time-windows/:id')
   @RequirePermissions(AdminPermission.PRICING_WRITE)
   @ApiOperation({ summary: 'Supprimer une plage horaire pointe / nuit' })
-  deletePricingTimeWindow(@Param('id') id: string) {
-    return this.adminService.deletePricingTimeWindow(id);
+  deletePricingTimeWindow(@Request() req: { user: AdminJwtUser }, @Param('id') id: string) {
+    return this.adminService.deletePricingTimeWindow(id, resolveManagedCityScope(req.user));
   }
 
   @Get('communes')
@@ -1276,8 +1293,12 @@ export class AdminController {
   @Patch('surcharges/:type')
   @RequirePermissions(AdminPermission.PRICING_WRITE)
   @ApiOperation({ summary: 'Modifier majoration service' })
-  updateSurcharge(@Param('type') type: string, @Body() body: Record<string, unknown>) {
-    return this.adminService.updateSurcharge(type, body);
+  updateSurcharge(
+    @Request() req: { user: AdminJwtUser },
+    @Param('type') type: string,
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.adminService.updateSurcharge(type, body, req.user.role);
   }
 
   @Get('moving-vehicle-categories')
@@ -1290,8 +1311,12 @@ export class AdminController {
   @Patch('moving-vehicle-categories/:category')
   @RequirePermissions(AdminPermission.PRICING_WRITE)
   @ApiOperation({ summary: 'Modifier coefficient engin déménagement' })
-  updateMovingVehicleCategory(@Param('category') category: string, @Body() body: Record<string, unknown>) {
-    return this.adminService.updateMovingVehicleCategory(category, body);
+  updateMovingVehicleCategory(
+    @Request() req: { user: AdminJwtUser },
+    @Param('category') category: string,
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.adminService.updateMovingVehicleCategory(category, body, req.user.role);
   }
 
   @Get('platform-config')
@@ -1304,8 +1329,8 @@ export class AdminController {
   @Patch('platform-config')
   @RequirePermissions(AdminPermission.RULES_WRITE)
   @ApiOperation({ summary: 'Modifier configuration plateforme' })
-  updatePlatformConfig(@Body() body: Record<string, unknown>) {
-    return this.adminService.updatePlatformConfig(body);
+  updatePlatformConfig(@Request() req: { user: AdminJwtUser }, @Body() body: Record<string, unknown>) {
+    return this.adminService.updatePlatformConfig(body, req.user.role);
   }
 
   @Get('client-apps-config')
@@ -1395,8 +1420,12 @@ export class AdminController {
   @Patch('commissions/:serviceType')
   @RequirePermissions(AdminPermission.PRICING_WRITE)
   @ApiOperation({ summary: 'Modifier commission plateforme' })
-  updateCommission(@Param('serviceType') serviceType: string, @Body() body: Record<string, unknown>) {
-    return this.adminService.updateCommission(serviceType, body);
+  updateCommission(
+    @Request() req: { user: AdminJwtUser },
+    @Param('serviceType') serviceType: string,
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.adminService.updateCommission(serviceType, body, req.user.role);
   }
 
   @Get('promo-codes')

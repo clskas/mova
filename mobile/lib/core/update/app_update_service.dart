@@ -140,11 +140,24 @@ class AppUpdateService extends Notifier<AppUpdateState> {
     return AppVersion.build;
   }
 
+  /// Installed marketing version from the APK/AAB, falling back to AppVersion.name.
+  static Future<String> resolveLocalVersion() async {
+    try {
+      final info = await PackageInfo.fromPlatform();
+      final fromPkg = info.version.trim();
+      if (fromPkg.isNotEmpty) return fromPkg;
+    } catch (_) {
+      /* ignore */
+    }
+    return AppVersion.name;
+  }
+
   Future<void> check() async {
     if (_checking) return;
     _checking = true;
     try {
       final localBuild = await resolveLocalBuild();
+      final localVersion = await resolveLocalVersion();
       final result = await ref.read(apiClientProvider).get(
             '/public/app-version',
             retries: 1,
@@ -156,7 +169,7 @@ class AppUpdateService extends Notifier<AppUpdateState> {
         final parsed = parseRemote(
           result.data,
           isDriver: AppFlavor.isDriver,
-          localVersion: AppVersion.name,
+          localVersion: localVersion,
           localBuild: localBuild,
         );
         if (parsed != null) {

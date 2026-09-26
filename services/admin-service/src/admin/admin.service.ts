@@ -791,13 +791,15 @@ export class AdminService {
       body: JSON.stringify({ approved, notes }),
     });
   }
-  reviewVehicleTypeApproval(
+  async reviewVehicleTypeApproval(
     userId: string,
     approved: boolean,
     notes?: string,
     vehicleType?: string,
     actorRole?: string,
+    managedCity?: string | null,
   ) {
+    await this.getDriver(userId, managedCity);
     if (vehicleType && actorRole !== UserRole.SUPER_ADMIN && actorRole !== UserRole.ADMIN) {
       throw new MovaHttpException(
         MovaErrorCode.AUTH_FORBIDDEN,
@@ -810,10 +812,21 @@ export class AdminService {
       body: JSON.stringify({ approved, notes, vehicleType }),
     });
   }
-  runKycOcr(documentId: string) {
+  async runKycOcr(documentId: string, managedCity?: string | null) {
+    if (managedCity) {
+      const pending = (await this.pendingKyc('ALL', managedCity)) as Array<{ id?: string }>;
+      if (!pending.some((d) => d.id === documentId)) {
+        throw new MovaHttpException(
+          MovaErrorCode.AUTH_FORBIDDEN,
+          HttpStatus.FORBIDDEN,
+          'Document KYC hors de votre ville gérée.',
+        );
+      }
+    }
     return this.proxy('driver', `/internal/kyc/${documentId}/ocr`, { method: 'POST', body: JSON.stringify({}) });
   }
-  regenerateDriverActivationPin(userId: string) {
+  async regenerateDriverActivationPin(userId: string, managedCity?: string | null) {
+    await this.getDriver(userId, managedCity);
     return this.proxy('driver', `/internal/drivers/${userId}/activation-pin`, { method: 'POST', body: JSON.stringify({}) });
   }
   purgeDriverProfile(userId: string, actorRole: string) {
@@ -855,7 +868,17 @@ export class AdminService {
       return filterRowsByManagedCity(rows, managedCity ?? null, (r) => ({ lat: r.lat, lng: r.lng }));
     });
   }
-  resolveIncident(id: string, status: string) {
+  async resolveIncident(id: string, status: string, managedCity?: string | null) {
+    if (managedCity) {
+      const scoped = await this.listIncidents(managedCity);
+      if (!scoped.some((row) => String(row.id ?? '') === id)) {
+        throw new MovaHttpException(
+          MovaErrorCode.AUTH_FORBIDDEN,
+          HttpStatus.FORBIDDEN,
+          'Incident hors de votre ville gérée.',
+        );
+      }
+    }
     return this.proxy('driver', `/internal/incidents/${id}/resolve`, { method: 'POST', body: JSON.stringify({ status }) });
   }
 
@@ -901,7 +924,21 @@ export class AdminService {
     return ride;
   }
 
-  getGpsTrace(type: string, id: string) {
+  async getGpsTrace(type: string, id: string, managedCity?: string | null) {
+    const kind = type.trim().toLowerCase();
+    if (managedCity) {
+      if (kind === 'ride' || kind === 'rides') {
+        await this.getRide(id, managedCity);
+      } else if (kind === 'delivery' || kind === 'deliveries') {
+        await this.getDelivery(id, managedCity);
+      } else {
+        throw new MovaHttpException(
+          MovaErrorCode.AUTH_FORBIDDEN,
+          HttpStatus.FORBIDDEN,
+          'Trace GPS hors périmètre admin ville.',
+        );
+      }
+    }
     return this.fetchJson('ride', `/internal/tracking/${type}/${id}/trace`);
   }
 
@@ -1041,13 +1078,43 @@ export class AdminService {
     // CITY_ADMIN: full restaurant list filtered in-memory by restaurant lat/lng.
     return filterRowsByManagedCity(rows, managedCity ?? null, (r) => ({ lat: r.lat, lng: r.lng }));
   }
-  createRestaurant(body: Record<string, unknown>) {
-    return this.proxy('ride', '/internal/restaurants', { method: 'POST', body: JSON.stringify(body) });
+  async createRestaurant(body: Record<string, unknown>, managedCity?: string | null) {
+    const lat = typeof body.lat === 'number' ? body.lat : Number(body.lat);
+    const lng = typeof body.lng === 'number' ? body.lng : Number(body.lng);
+    assertCoordsInManagedCity(managedCity ?? null, lat, lng, 'Restaurant hors de votre ville gérée.');
+    const payload = managedCity
+      ? forceCityOnBody(managedCity, { ...body, lat, lng })
+      : body;
+    return this.proxy('ride', '/internal/restaurants', { method: 'POST', body: JSON.stringify(payload) });
   }
-  updateRestaurant(id: string, body: Record<string, unknown>) {
+  async updateRestaurant(id: string, body: Record<string, unknown>, managedCity?: string | null) {
+    if (managedCity) {
+      const restaurants = await this.listRestaurants(managedCity);
+      const existing = restaurants.find((r) => String(r.id ?? '') === id);
+      if (!existing) {
+        throw new MovaHttpException(
+          MovaErrorCode.AUTH_FORBIDDEN,
+          HttpStatus.FORBIDDEN,
+          'Restaurant hors de votre ville gérée.',
+        );
+      }
+      const lat = body.lat != null ? Number(body.lat) : Number(existing.lat);
+      const lng = body.lng != null ? Number(body.lng) : Number(existing.lng);
+      assertCoordsInManagedCity(managedCity, lat, lng, 'Restaurant hors de votre ville gérée.');
+    }
     return this.proxy('ride', `/internal/restaurants/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
   }
-  deleteRestaurant(id: string) {
+  async deleteRestaurant(id: string, managedCity?: string | null) {
+    if (managedCity) {
+      const restaurants = await this.listRestaurants(managedCity);
+      if (!restaurants.some((r) => String(r.id ?? '') === id)) {
+        throw new MovaHttpException(
+          MovaErrorCode.AUTH_FORBIDDEN,
+          HttpStatus.FORBIDDEN,
+          'Restaurant hors de votre ville gérée.',
+        );
+      }
+    }
     return this.proxy('ride', `/internal/restaurants/${id}`, { method: 'DELETE' });
   }
 
@@ -1257,13 +1324,37 @@ export class AdminService {
       body: JSON.stringify(forceCityOnBody(managedCity ?? null, body)),
     });
   }
-  updatePricingTimeWindow(id: string, body: Record<string, unknown>, managedCity?: string | null) {
+  async updatePricingTimeWindow(id: string, body: Record<string, unknown>, managedCity?: string | null) {
+    if (managedCity) {
+      const windows = (await this.listPricingTimeWindows(managedCity)) as Array<{ id?: string; city?: string }>;
+      const existing = windows.find((w) => String(w.id ?? '') === id);
+      if (!existing) {
+        throw new MovaHttpException(
+          MovaErrorCode.AUTH_FORBIDDEN,
+          HttpStatus.FORBIDDEN,
+          `Plage horaire hors de ${managedCity}.`,
+        );
+      }
+      assertCityMatch(managedCity, existing.city, `Vous ne pouvez modifier que les plages de ${managedCity}.`);
+    }
     return this.proxy('ride', `/internal/pricing-time-windows/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(forceCityOnBody(managedCity ?? null, body)),
     });
   }
-  deletePricingTimeWindow(id: string) {
+  async deletePricingTimeWindow(id: string, managedCity?: string | null) {
+    if (managedCity) {
+      const windows = (await this.listPricingTimeWindows(managedCity)) as Array<{ id?: string; city?: string }>;
+      const existing = windows.find((w) => String(w.id ?? '') === id);
+      if (!existing) {
+        throw new MovaHttpException(
+          MovaErrorCode.AUTH_FORBIDDEN,
+          HttpStatus.FORBIDDEN,
+          `Plage horaire hors de ${managedCity}.`,
+        );
+      }
+      assertCityMatch(managedCity, existing.city, `Vous ne pouvez supprimer que les plages de ${managedCity}.`);
+    }
     return this.proxy('ride', `/internal/pricing-time-windows/${id}`, { method: 'DELETE' });
   }
 
@@ -1607,7 +1698,14 @@ export class AdminService {
   listSurcharges() {
     return this.fetchJson('ride', '/internal/surcharges');
   }
-  updateSurcharge(type: string, body: Record<string, unknown>) {
+  updateSurcharge(type: string, body: Record<string, unknown>, actorRole?: string) {
+    if (actorRole === UserRole.CITY_ADMIN) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.FORBIDDEN,
+        'Les majorations nationales sont réservées au staff central.',
+      );
+    }
     return this.proxy('ride', `/internal/surcharges/${type}`, { method: 'PATCH', body: JSON.stringify(body) });
   }
 
@@ -1615,7 +1713,14 @@ export class AdminService {
     return this.fetchJson('ride', '/internal/moving-vehicle-categories').catch(() => []);
   }
 
-  updateMovingVehicleCategory(category: string, body: Record<string, unknown>) {
+  updateMovingVehicleCategory(category: string, body: Record<string, unknown>, actorRole?: string) {
+    if (actorRole === UserRole.CITY_ADMIN) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.FORBIDDEN,
+        'Les coefficients déménagement nationaux sont réservés au staff central.',
+      );
+    }
     return this.proxy('ride', `/internal/moving-vehicle-categories/${category}`, {
       method: 'PATCH',
       body: JSON.stringify(body),
@@ -1626,7 +1731,14 @@ export class AdminService {
     return this.fetchJson('ride', '/internal/platform-config');
   }
 
-  updatePlatformConfig(body: Record<string, unknown>) {
+  updatePlatformConfig(body: Record<string, unknown>, actorRole?: string) {
+    if (actorRole === UserRole.CITY_ADMIN) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.FORBIDDEN,
+        'La configuration nationale de la plateforme est réservée au staff central. Utilisez « Documents » pour le KYC ville.',
+      );
+    }
     return this.proxy('ride', '/internal/platform-config', { method: 'PATCH', body: JSON.stringify(body) });
   }
 
@@ -1696,7 +1808,14 @@ export class AdminService {
     return this.fetchJson('ride', '/internal/commissions');
   }
 
-  updateCommission(serviceType: string, body: Record<string, unknown>) {
+  updateCommission(serviceType: string, body: Record<string, unknown>, actorRole?: string) {
+    if (actorRole === UserRole.CITY_ADMIN) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.FORBIDDEN,
+        'Les commissions plateforme nationales sont réservées au staff central.',
+      );
+    }
     return this.proxy('ride', `/internal/commissions/${serviceType}`, { method: 'PATCH', body: JSON.stringify(body) });
   }
 

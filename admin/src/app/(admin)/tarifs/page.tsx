@@ -1005,6 +1005,7 @@ export default function TarifsPage() {
             </Card>
           </section>
 
+          {!lockedCity && (
           <section>
             <h2 className="font-semibold text-[#1A1A2E] mb-1">Majorations livraison</h2>
             <p className="text-sm text-gray-500 mb-3">
@@ -1035,7 +1036,9 @@ export default function TarifsPage() {
               </table>
             </Card>
           </section>
+          )}
 
+          {!lockedCity && (
           <section>
             <div className="flex items-start justify-between gap-3 mb-3">
               <div>
@@ -1090,8 +1093,9 @@ export default function TarifsPage() {
               </table>
             </Card>
           </section>
+          )}
 
-          {otherSurcharges.length > 0 && (
+          {!lockedCity && otherSurcharges.length > 0 && (
             <section>
               <h2 className="font-semibold text-[#1A1A2E] mb-1">Majorations déménagement</h2>
               <p className="text-sm text-gray-500 mb-3">Frais de base, multiplicateur et tarif au m³ pour les courses déménagement.</p>
@@ -1124,7 +1128,7 @@ export default function TarifsPage() {
             </section>
           )}
 
-          {movingVehicleCategories.length > 0 && (
+          {!lockedCity && movingVehicleCategories.length > 0 && (
             <section>
               <h2 className="font-semibold text-[#1A1A2E] mb-1">Coefficients par engin déménagement</h2>
               <p className="text-sm text-gray-500 mb-3">
@@ -1158,6 +1162,7 @@ export default function TarifsPage() {
             </section>
           )}
 
+          {!lockedCity && (
           <section>
             <h2 className="font-semibold text-[#1A1A2E] mb-1">Commissions plateforme SENGA</h2>
             <p className="text-sm text-gray-500 mb-3">
@@ -1196,6 +1201,7 @@ export default function TarifsPage() {
               </table>
             </Card>
           </section>
+          )}
 
           {canManagePromos && (
           <section>

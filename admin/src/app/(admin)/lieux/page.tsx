@@ -102,7 +102,7 @@ function OsmLinksPanel({ item }: { item: PoiSuggestion }) {
 
 export default function LieuxPage() {
   const { canWrite, role, user } = useAdmin();
-  const readOnly = !canWrite("parametres");
+  const readOnly = !canWrite("lieux");
   const managedCity = role === "CITY_ADMIN" ? user?.managedCity?.trim() || null : null;
   const [status, setStatus] = useState("PENDING");
   const [items, setItems] = useState<PoiSuggestion[]>([]);

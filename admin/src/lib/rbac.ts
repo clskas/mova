@@ -18,6 +18,7 @@ export type AdminSection =
   | "promos"
   | "portefeuille"
   | "parametres"
+  | "lieux"
   | "locations"
   | "demenagements"
   | "covoiturage"
@@ -49,6 +50,7 @@ export const ACCESS_LEVEL_OPTIONS: { id: string; label: string; sections: AdminS
   { id: "tarifs", label: "Tarifs", sections: ["tarifs"] },
   { id: "regles", label: "Règles plateforme", sections: ["regles"] },
   { id: "zones", label: "Zones géographiques", sections: ["parametres"] },
+  { id: "lieux", label: "Lieux et POI", sections: ["lieux"] },
   { id: "litiges", label: "Litiges / SOS", sections: ["litiges"] },
   { id: "fraude", label: "Fraude", sections: ["fraude"] },
   { id: "planifiees", label: "Courses planifiées", sections: ["planifiees"] },
@@ -82,6 +84,7 @@ const ALL_SECTIONS: AdminSection[] = [
   "promos",
   "portefeuille",
   "parametres",
+  "lieux",
   "locations",
   "demenagements",
   "covoiturage",
@@ -109,7 +112,7 @@ const ROLE_SECTIONS: Record<AdminRole, AdminSection[]> = {
     "covoiturage",
   ],
   FINANCE: ["dashboard", "portefeuille", "tarifs", "regles", "abonnements", "promos"],
-  CONTENT: ["restaurants", "tarifs", "parametres", "locations", "publicites"],
+  CONTENT: ["restaurants", "tarifs", "parametres", "lieux", "locations", "publicites"],
   CITY_ADMIN: [
     "dashboard",
     "chauffeurs",
@@ -125,6 +128,7 @@ const ROLE_SECTIONS: Record<AdminRole, AdminSection[]> = {
     "tarifs",
     "regles",
     "parametres",
+    "lieux",
   ],
 };
 
@@ -143,9 +147,11 @@ const ROLE_WRITE: Record<AdminRole, AdminSection[]> = {
     "livraisons",
     "restaurants",
     "litiges",
+    "locations",
     "tarifs",
     "regles",
     "parametres",
+    "lieux",
   ],
 };
 
@@ -180,7 +186,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/fraude", label: "Fraude", short: "Fraude", section: "fraude" },
   { href: "/planifiees", label: "Planifiées", short: "Planif.", section: "planifiees" },
   { href: "/parametres", label: "Zones géographiques", short: "Zones", section: "parametres" },
-  { href: "/lieux", label: "Lieux & POI", short: "Lieux", section: "parametres" },
+  { href: "/lieux", label: "Lieux & POI", short: "Lieux", section: "lieux" },
   { href: "/locations", label: "Locations", short: "Loc.", section: "locations" },
   { href: "/catalogue-location", label: "Catalogue location", short: "Catal.", section: "locations" },
   { href: "/demenagements", label: "Déménagements", short: "Démén.", section: "demenagements" },

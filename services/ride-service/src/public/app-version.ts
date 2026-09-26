@@ -27,7 +27,7 @@ const DEFAULT_DRIVER_STORE =
  * store code > APP_BUILD). Stale Render env below this floor hid banners.
  */
 const CURRENT_VERSION_FLOOR = '1.0.16';
-const CURRENT_VERSION_CODE_FLOOR = 101;
+const CURRENT_VERSION_CODE_FLOOR = 102;
 
 function parseVersionCode(raw: string | undefined, fallback: number): number {
   const n = Number.parseInt(raw?.trim() || '', 10);

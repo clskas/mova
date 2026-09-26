@@ -24,9 +24,12 @@ export enum AdminPermission {
   RESTAURANTS_WRITE = 'restaurants:write',
   PRICING_READ = 'pricing:read',
   PRICING_WRITE = 'pricing:write',
-  /** Zones géographiques / POI (séparé des tarifs). */
+  /** Zones géographiques (provinces / villes / communes). */
   ZONES_READ = 'zones:read',
   ZONES_WRITE = 'zones:write',
+  /** Lieux & POI (suggestions, catalogue, seed) — séparé des zones. */
+  POI_READ = 'poi:read',
+  POI_WRITE = 'poi:write',
   /** Règles plateforme (config, annulations, docs requis). */
   RULES_READ = 'rules:read',
   RULES_WRITE = 'rules:write',
@@ -100,6 +103,8 @@ export const ADMIN_ROLE_PERMISSIONS: Record<UserRole, AdminPermission[]> = {
     AdminPermission.PRICING_WRITE,
     AdminPermission.ZONES_READ,
     AdminPermission.ZONES_WRITE,
+    AdminPermission.POI_READ,
+    AdminPermission.POI_WRITE,
     AdminPermission.RULES_READ,
     AdminPermission.RULES_WRITE,
     AdminPermission.RENTALS_READ,
@@ -161,6 +166,7 @@ export const ADMIN_ROLE_PERMISSIONS: Record<UserRole, AdminPermission[]> = {
     AdminPermission.RESTAURANTS_WRITE,
     AdminPermission.PRICING_READ,
     AdminPermission.ZONES_READ,
+    AdminPermission.POI_READ,
     AdminPermission.SCHEDULED_READ,
     AdminPermission.SCHEDULED_WRITE,
     AdminPermission.RENTALS_READ,
@@ -186,12 +192,15 @@ export const ADMIN_ROLE_PERMISSIONS: Record<UserRole, AdminPermission[]> = {
     AdminPermission.RESTAURANTS_WRITE,
     AdminPermission.SCHEDULED_READ,
     AdminPermission.RENTALS_READ,
+    AdminPermission.RENTALS_WRITE,
     AdminPermission.MOVING_READ,
     AdminPermission.CARPOOL_READ,
     AdminPermission.PRICING_READ,
     AdminPermission.PRICING_WRITE,
     AdminPermission.ZONES_READ,
     AdminPermission.ZONES_WRITE,
+    AdminPermission.POI_READ,
+    AdminPermission.POI_WRITE,
     AdminPermission.RULES_READ,
     AdminPermission.RULES_WRITE,
   ],
@@ -242,6 +251,11 @@ export const ADMIN_ACCESS_LEVELS: AdminAccessLevel[] = [
     id: 'zones',
     label: 'Zones géographiques',
     permissions: [AdminPermission.ZONES_READ, AdminPermission.ZONES_WRITE],
+  },
+  {
+    id: 'lieux',
+    label: 'Lieux et POI',
+    permissions: [AdminPermission.POI_READ, AdminPermission.POI_WRITE],
   },
   {
     id: 'litiges',

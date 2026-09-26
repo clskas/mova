@@ -774,6 +774,11 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
     final vehicle = _driver?['vehicleType']?.toString() ??
         _driver?['vehicleModel']?.toString() ??
         'Moto-taxi';
+    final vehicleTypeForIcon = _driver?['vehicleType']?.toString() ??
+        _ride?['vehicleType']?.toString() ??
+        vehicle;
+    final isMoto = MarketConfig.isMotoType(vehicleTypeForIcon);
+    final driverMapIcon = isMoto ? Icons.two_wheeler : Icons.local_taxi;
 
     return MovaScreen(
       title: 'Suivi de course',
@@ -815,6 +820,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
                       height: 240,
                       pickupLabel: _ride?['pickupAddress']?.toString(),
                       dropoffLabel: _ride?['dropoffAddress']?.toString(),
+                      driverIcon: driverMapIcon,
                     ),
                     Expanded(
                       child: SingleChildScrollView(
@@ -946,7 +952,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
                                   Icon(
                                     _status.toUpperCase() == 'IN_PROGRESS'
                                         ? Icons.flag_outlined
-                                        : Icons.directions_car,
+                                        : driverMapIcon,
                                     color: MovaColors.violet,
                                   ),
                                   const SizedBox(width: 8),

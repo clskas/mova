@@ -53,8 +53,11 @@ describe('admin-rbac', () => {
     expect(hasAdminPermission(UserRole.CITY_ADMIN, AdminPermission.PRICING_READ)).toBe(true);
     expect(hasAdminPermission(UserRole.CITY_ADMIN, AdminPermission.PRICING_WRITE)).toBe(true);
     expect(hasAdminPermission(UserRole.CITY_ADMIN, AdminPermission.ZONES_READ)).toBe(true);
+    expect(hasAdminPermission(UserRole.CITY_ADMIN, AdminPermission.POI_READ)).toBe(true);
+    expect(hasAdminPermission(UserRole.CITY_ADMIN, AdminPermission.POI_WRITE)).toBe(true);
     expect(hasAdminPermission(UserRole.CITY_ADMIN, AdminPermission.RULES_READ)).toBe(true);
     expect(hasAdminPermission(UserRole.CITY_ADMIN, AdminPermission.RENTALS_READ)).toBe(true);
+    expect(hasAdminPermission(UserRole.CITY_ADMIN, AdminPermission.RENTALS_WRITE)).toBe(true);
     expect(hasAdminPermission(UserRole.CITY_ADMIN, AdminPermission.WALLETS_WRITE)).toBe(false);
     expect(hasAdminPermission(UserRole.CITY_ADMIN, AdminPermission.SYSTEM_WRITE)).toBe(false);
     expect(hasAdminPermission(UserRole.CITY_ADMIN, AdminPermission.USERS_WRITE)).toBe(false);

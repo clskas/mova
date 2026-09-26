@@ -970,7 +970,7 @@ export class AdminController {
   }
 
   @Post('poi/seed')
-  @RequirePermissions(AdminPermission.ZONES_WRITE)
+  @RequirePermissions(AdminPermission.POI_WRITE)
   @ApiOperation({ summary: 'Synchroniser le catalogue POI (ville gérée ou toutes pour SUPER_ADMIN)' })
   seedPois(@Request() req: { user: AdminJwtUser }, @Query('city') city?: string) {
     const managed = resolveManagedCityScope(req.user);
@@ -1020,7 +1020,7 @@ export class AdminController {
   }
 
   @Get('poi-suggestions')
-  @RequirePermissions(AdminPermission.ZONES_READ)
+  @RequirePermissions(AdminPermission.POI_READ)
   @ApiOperation({ summary: 'Suggestions de lieux (POI) en attente' })
   poiSuggestions(
     @Request() req: { user: AdminJwtUser },
@@ -1037,7 +1037,7 @@ export class AdminController {
   }
 
   @Post('poi-suggestions/:id/approve')
-  @RequirePermissions(AdminPermission.ZONES_WRITE)
+  @RequirePermissions(AdminPermission.POI_WRITE)
   @ApiOperation({ summary: 'Publier une suggestion POI' })
   approvePoiSuggestion(
     @Request() req: { user: AdminJwtUser },
@@ -1048,7 +1048,7 @@ export class AdminController {
   }
 
   @Post('poi-suggestions/:id/reject')
-  @RequirePermissions(AdminPermission.ZONES_WRITE)
+  @RequirePermissions(AdminPermission.POI_WRITE)
   @ApiOperation({ summary: 'Refuser une suggestion POI' })
   rejectPoiSuggestion(
     @Request() req: { user: AdminJwtUser },

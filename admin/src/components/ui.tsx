@@ -121,10 +121,12 @@ export function LoadingState({ message, label }: { message?: string; label?: str
 
 export function ErrorBanner({ message, onRetry }: { message: string; onRetry?: () => void }) {
   return (
-    <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-4 flex items-center justify-between gap-4">
-      <span className="text-sm">{message}</span>
+    <div className="bg-red-50 border border-red-200/80 text-red-800 rounded-2xl p-3.5 sm:p-4 flex items-start sm:items-center justify-between gap-3 mb-4 shadow-[var(--mova-shadow-sm)]">
+      <span className="text-sm leading-snug">{message}</span>
       {onRetry && (
-        <button type="button" onClick={onRetry} className="text-sm underline shrink-0">Réessayer</button>
+        <button type="button" onClick={onRetry} className="text-sm font-semibold underline shrink-0 min-h-10 px-1">
+          Réessayer
+        </button>
       )}
     </div>
   );
@@ -201,24 +203,30 @@ export function StatusBadge({ status, label }: { status?: string; label?: string
 
 export function PageHeader({ title, subtitle, action }: { title: string; subtitle?: string; action?: React.ReactNode }) {
   return (
-    <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
-      <div>
-        <h1 className="text-2xl font-bold text-[#1A1A2E]">{title}</h1>
-        {subtitle && <p className="text-sm text-gray-500 mt-1">{subtitle}</p>}
+    <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-start sm:justify-between gap-3 sm:gap-4 mb-5 sm:mb-6">
+      <div className="min-w-0">
+        <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#0f1222]">{title}</h1>
+        {subtitle && <p className="text-sm text-[var(--mova-muted)] mt-1 leading-relaxed max-w-2xl">{subtitle}</p>}
       </div>
-      {action}
+      {action ? <div className="flex flex-wrap gap-2 shrink-0">{action}</div> : null}
     </div>
   );
 }
 
 export function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <div className={`bg-white rounded-xl shadow-sm ${className}`}>{children}</div>;
+  return (
+    <div
+      className={`bg-white rounded-2xl border border-[var(--mova-border)] shadow-[var(--mova-shadow-sm)] ${className}`}
+    >
+      {children}
+    </div>
+  );
 }
 
 export function SearchInput({ value, onChange, placeholder, className = "" }: { value: string; onChange: (v: string) => void; placeholder?: string; className?: string }) {
   return (
     <input
-      className={`w-full rounded-xl border-0 bg-white p-3 shadow-sm text-sm ${className || "max-w-sm"}`}
+      className={`w-full rounded-xl border border-[var(--mova-border)] bg-white p-3 shadow-[var(--mova-shadow-sm)] text-sm focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-300 ${className || "max-w-sm"}`}
       placeholder={placeholder ?? "Rechercher…"}
       value={value}
       onChange={(e) => onChange(e.target.value)}
@@ -228,7 +236,12 @@ export function SearchInput({ value, onChange, placeholder, className = "" }: { 
 
 export function BtnPrimary({ children, onClick, disabled, className = "" }: { children: React.ReactNode; onClick?: () => void; disabled?: boolean; className?: string }) {
   return (
-    <button type="button" onClick={onClick} disabled={disabled} className={`px-4 py-2 rounded-xl bg-[#6C63FF] text-white text-sm font-medium disabled:opacity-60 ${className}`}>
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={`inline-flex items-center justify-center min-h-11 px-4 py-2.5 rounded-xl bg-[#5b54e6] text-white text-sm font-semibold disabled:opacity-60 shadow-sm shadow-violet-500/20 hover:bg-[#4f49d4] transition-colors active:scale-[0.98] ${className}`}
+    >
       {children}
     </button>
   );

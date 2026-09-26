@@ -338,12 +338,12 @@ export function LoginClient({ forcePin = false }: { forcePin?: boolean }) {
   }
 
   return (
-    <div className="min-h-screen overflow-y-auto flex items-start justify-center px-4 py-8 bg-gradient-to-br from-orange-50 to-violet-50">
+    <div className="min-h-screen overflow-y-auto flex items-start justify-center px-4 py-8 sm:py-12">
       <p hidden data-senga-pin-copy>
         Connexion. Entrez le PIN pour +243 •••
       </p>
       <PwaInstallBanner accentClass="bg-[#FF6B35]" />
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-6 sm:p-8 space-y-5">
+      <div className="w-full max-w-md partner-card p-6 sm:p-8 space-y-5 ring-1 ring-orange-100/80">
         <div className="text-center">
           <img src="/icon-192.png" alt="SENGA Business" width={56} height={56} className="mx-auto mb-2 rounded-2xl" />
           <h1 className="text-2xl font-semibold text-[#1A1A2E]">SENGA Business</h1>

@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { PwaRegister } from "@/components/PwaRegister";
 import { UpdateBanner } from "@/components/UpdateBanner";
@@ -6,6 +7,11 @@ import { MaintenanceGate } from "@/components/MaintenanceGate";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+
+const plusJakarta = Plus_Jakarta_Sans({
+  subsets: ["latin"],
+  variable: "--font-plus-jakarta",
+});
 
 export const metadata: Metadata = {
   title: "SENGA Location Partenaire",
@@ -32,17 +38,17 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#6366f1",
+  themeColor: "#5b54e6",
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
+  maximumScale: 5,
   viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="fr">
-      <body className="min-h-screen antialiased overflow-x-hidden">
+    <html lang="fr" className={plusJakarta.variable}>
+      <body className={`${plusJakarta.className} min-h-screen antialiased overflow-x-hidden font-sans`}>
         <PwaRegister />
         <UpdateBanner />
         <MaintenanceGate appId="location">{children}</MaintenanceGate>

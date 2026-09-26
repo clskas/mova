@@ -336,15 +336,15 @@ export function LoginClient({ forcePin = false }: { forcePin?: boolean }) {
   }
 
   return (
-    <div className="min-h-screen overflow-y-auto flex items-start justify-center px-4 py-8 bg-gradient-to-br from-indigo-50 to-violet-50">
+    <div className="min-h-screen overflow-y-auto flex items-start justify-center px-4 py-8 sm:py-12">
       <p hidden data-senga-pin-copy>
         Connexion. Entrez le PIN pour +243 •••
       </p>
       <PwaInstallBanner accentClass="bg-indigo-600" />
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-6 sm:p-8 space-y-5">
+      <div className="w-full max-w-md partner-card p-6 sm:p-8 space-y-5 ring-1 ring-indigo-100/80">
         <div className="text-center">
           <div className="text-3xl mb-2">🚗</div>
-          <h1 className="text-2xl font-semibold text-[#1A1A2E]">SENGA Location</h1>
+          <h1 className="text-2xl font-semibold text-[#0f1222] tracking-tight">SENGA Location</h1>
           <p className="text-sm text-gray-600 mt-1">
             {setupToken || pinOnly
               ? PIN_SETUP_HINT_FR

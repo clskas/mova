@@ -24,8 +24,8 @@ const ACCENTS = {
 export function MetricCard({ label, value, hint, href, accent = "violet", sparkline, onClick, active }: MetricCardProps) {
   const inner = (
     <div
-      className={`mova-card p-4 h-full transition-all cursor-pointer hover:shadow-mova ${
-        active ? "ring-2 ring-[#6366f1]/40 shadow-mova" : ""
+      className={`mova-card p-4 h-full transition-all cursor-pointer hover:shadow-[var(--mova-shadow)] ${
+        active ? "ring-2 ring-[#5b54e6]/35 shadow-[var(--mova-shadow)]" : ""
       }`}
       onClick={onClick}
       role={onClick ? "button" : undefined}

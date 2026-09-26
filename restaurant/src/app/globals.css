@@ -2,6 +2,21 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --background: #fff8f3;
+  --foreground: #0f1222;
+  --brand: #e85d2c;
+  --brand-soft: #fff1ea;
+  --brand-ring: #fdba8c;
+  --mova-border: #f0e4dc;
+  --mova-muted: #6b7280;
+  --mova-card: #ffffff;
+  --mova-shadow-sm: 0 1px 2px rgba(15, 18, 34, 0.04), 0 6px 18px rgba(232, 93, 44, 0.06);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-top: env(safe-area-inset-top, 0px);
+  --phone-nav-h: 4.35rem;
+}
+
 html,
 body {
   overflow-x: clip;
@@ -9,8 +24,14 @@ body {
 }
 
 body {
-  color: #1a1a2e;
-  background: #fff8f3;
+  color: var(--foreground);
+  background:
+    radial-gradient(900px 420px at 0% -5%, rgba(232, 93, 44, 0.1), transparent 55%),
+    radial-gradient(700px 360px at 100% 0%, rgba(251, 191, 36, 0.08), transparent 50%),
+    var(--background);
+  font-family: var(--font-plus-jakarta), "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 input,
@@ -35,8 +56,6 @@ textarea {
   }
 }
 
-/* Phone: brand titles must stay centered even if Tailwind utilities are ignored
-   (PWA / missing viewport previously left them stuck to the left of the header card). */
 [data-brand] {
   display: flex !important;
   flex-direction: column !important;
@@ -57,36 +76,59 @@ textarea {
   margin-right: auto !important;
 }
 
-/* Top navigation: wrap so all items stay visible without horizontal scroll. */
+/* Desktop / tablet: wrap top nav */
 [data-portal-nav],
 .senga-portal-nav {
-  display: flex !important;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 0.2rem;
-  width: 100%;
-  max-width: 100%;
-  overflow-x: visible;
-  overflow-y: visible;
-  padding-bottom: 0.15rem;
+  display: none !important;
 }
-[data-portal-nav] > *,
-.senga-portal-nav > * {
-  flex: 1 1 auto;
-  min-width: 3.1rem;
-  max-width: 6.5rem;
-}
-@media (min-width: 640px) {
-  [data-portal-nav] > *,
-  .senga-portal-nav > * {
-    flex: 0 1 auto;
-    min-width: 0;
-    max-width: none;
+@media (min-width: 768px) {
+  [data-portal-nav],
+  .senga-portal-nav {
+    display: flex !important;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    width: 100%;
+    max-width: 100%;
   }
 }
+
+[data-portal-bottom-nav] {
+  display: grid !important;
+}
+@media (min-width: 768px) {
+  [data-portal-bottom-nav] {
+    display: none !important;
+  }
+}
+
 .senga-portal-main {
-  padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  padding-bottom: calc(var(--phone-nav-h) + var(--safe-bottom) + 0.75rem);
+}
+@media (min-width: 768px) {
+  .senga-portal-main {
+    padding-bottom: max(1.25rem, env(safe-area-inset-bottom));
+  }
+}
+
+.partner-card {
+  @apply bg-white rounded-2xl border border-[var(--mova-border)];
+  box-shadow: var(--mova-shadow-sm);
+}
+
+@keyframes senga-slide-up {
+  from {
+    transform: translateY(14%);
+    opacity: 0.88;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+.senga-sheet-enter {
+  animation: senga-slide-up 0.22s ease-out;
 }
 
 .google-gis-wrap {

@@ -549,7 +549,8 @@ export default function TarifsPage() {
   const readOnly = !canWrite("tarifs");
   const canManagePromos = canAccess("promos");
   const canAssignPromoCities = role === "SUPER_ADMIN" || role === "ADMIN";
-  const lockedCity = role === "CITY_ADMIN" ? (user?.managedCity?.trim() || MOVA_CITIES[0]) : null;
+  const isCityAdmin = role === "CITY_ADMIN";
+  const lockedCity = isCityAdmin ? (user?.managedCity?.trim() || MOVA_CITIES[0]) : null;
   const [city, setCity] = useState<string>(() => initialTarifsCity(lockedCity));
   const [vehicleRules, setVehicleRules] = useState<PricingRule[]>([]);
   const [deliveryRules, setDeliveryRules] = useState<DeliveryPricingRule[]>([]);
@@ -770,7 +771,7 @@ export default function TarifsPage() {
     setPromoCdf("");
     setPromoMaxUses("");
     setPromoValidUntil("");
-    setPromoCities([]);
+    setPromoCities(lockedCity ? [lockedCity] : []);
     setPromoModal("create");
   }
 
@@ -780,8 +781,20 @@ export default function TarifsPage() {
     setPromoCdf(p.discountCdf != null ? String(p.discountCdf) : "");
     setPromoMaxUses(p.maxUses != null ? String(p.maxUses) : "");
     setPromoValidUntil(p.validUntil ? p.validUntil.slice(0, 10) : "");
-    setPromoCities(Array.isArray(p.cityNames) ? [...p.cityNames] : []);
+    setPromoCities(
+      lockedCity
+        ? [lockedCity]
+        : Array.isArray(p.cityNames) ? [...p.cityNames] : [],
+    );
     setPromoModal(p);
+  }
+
+  /** CITY_ADMIN : éditer / désactiver seulement un code limité exactement à sa ville. */
+  function canEditPromo(p: PromoCode): boolean {
+    if (readOnly) return false;
+    if (!isCityAdmin || !lockedCity) return true;
+    const cities = p.cityNames ?? [];
+    return cities.length === 1 && cities[0].toLowerCase() === lockedCity.toLowerCase();
   }
 
   function togglePromoCity(name: string) {
@@ -800,17 +813,28 @@ export default function TarifsPage() {
         discountCdf: promoCdf.trim() ? Number(promoCdf) : undefined,
         maxUses: promoMaxUses.trim() ? Number(promoMaxUses) : undefined,
         validUntil: promoValidUntil.trim() ? new Date(promoValidUntil).toISOString() : undefined,
-        ...(canAssignPromoCities ? { cityNames: promoCities } : {}),
+        ...(canAssignPromoCities
+          ? { cityNames: promoCities }
+          : lockedCity
+            ? { cityNames: [lockedCity] }
+            : {}),
       };
       if (promoModal === "create") {
         await createPromoCode(payload);
       } else if (promoModal) {
+        if (isCityAdmin && !canEditPromo(promoModal)) {
+          throw new Error(`Vous ne pouvez modifier que les codes limités à ${lockedCity}.`);
+        }
         await updatePromoCode(promoModal.id, {
           discountPercent: payload.discountPercent,
           discountCdf: payload.discountCdf,
           maxUses: payload.maxUses,
           validUntil: payload.validUntil ?? null,
-          ...(canAssignPromoCities ? { cityNames: promoCities } : {}),
+          ...(canAssignPromoCities
+            ? { cityNames: promoCities }
+            : lockedCity
+              ? { cityNames: [lockedCity] }
+              : {}),
         });
       }
       setPromoModal(null);
@@ -1209,7 +1233,9 @@ export default function TarifsPage() {
               <div>
                 <h2 className="font-semibold text-[#1A1A2E]">Codes promo SENGA</h2>
                 <p className="text-sm text-gray-500">
-                  Réduction plateforme (% ou CDF). Superadmin/Admin peuvent limiter aux villes choisies (vide = tout le pays).
+                  {isCityAdmin && lockedCity
+                    ? `Admin ville : vos nouveaux codes sont limités à ${lockedCity}. Les codes nationaux sont visibles en lecture seule.`
+                    : "Réduction plateforme (% ou CDF). Superadmin/Admin peuvent limiter aux villes choisies (vide = tout le pays)."}
                 </p>
               </div>
               {!readOnly && <BtnPrimary onClick={openPromoCreate}>Nouveau code</BtnPrimary>}
@@ -1247,7 +1273,7 @@ export default function TarifsPage() {
                         <span className={p.isActive ? "text-green-600" : "text-gray-400"}>{p.isActive ? "Actif" : "Inactif"}</span>
                       </td>
                       <td className="p-3 flex gap-2">
-                        {!readOnly && (
+                        {canEditPromo(p) && (
                           <>
                             <BtnPrimary onClick={() => openPromoEdit(p)}>Modifier</BtnPrimary>
                             {p.isActive && <BtnDanger onClick={() => deactivatePromo(p.id)}>Désactiver</BtnDanger>}
@@ -1346,8 +1372,16 @@ export default function TarifsPage() {
               )}
             </div>
           )}
+          {isCityAdmin && lockedCity && (
+            <div className="rounded-lg border border-teal-200 bg-teal-50 px-3 py-2 text-xs text-teal-900">
+              Ce code sera valable uniquement à <strong>{lockedCity}</strong> (votre ville gérée).
+              Vous ne pouvez pas créer de code national.
+            </div>
+          )}
           <div className="flex gap-2">
-            {!readOnly && <BtnPrimary onClick={savePromo} disabled={promoSaving}>{promoSaving ? "Enregistrement…" : "Enregistrer"}</BtnPrimary>}
+            {!readOnly && !(isCityAdmin && promoModal !== "create" && promoModal && !canEditPromo(promoModal)) && (
+              <BtnPrimary onClick={savePromo} disabled={promoSaving}>{promoSaving ? "Enregistrement…" : "Enregistrer"}</BtnPrimary>
+            )}
             <BtnDanger onClick={() => setPromoModal(null)}>Fermer</BtnDanger>
           </div>
         </div>

@@ -1894,10 +1894,64 @@ export class AdminService {
   listPromoCodes() {
     return this.fetchJson('ride', '/internal/promo-codes');
   }
-  createPromoCode(body: Record<string, unknown>) {
-    return this.proxy('ride', '/internal/promo-codes', { method: 'POST', body: JSON.stringify(body) });
+
+  /**
+   * CITY_ADMIN: voit les codes nationaux (lecture) + ceux qui incluent sa ville.
+   * Staff central: liste complète.
+   */
+  async listPromoCodesScoped(managedCity?: string | null) {
+    const rows = (await this.listPromoCodes()) as Array<{ cityNames?: string[] | null }>;
+    if (!managedCity?.trim()) return rows;
+    const key = managedCity.trim().toLowerCase();
+    return rows.filter((p) => {
+      const cities = (p.cityNames ?? []).map((c) => String(c).trim().toLowerCase()).filter(Boolean);
+      if (cities.length === 0) return true; // national — visible en lecture
+      return cities.includes(key);
+    });
   }
-  updatePromoCode(id: string, body: Record<string, unknown>) {
+
+  /** Promo éditable par CITY_ADMIN uniquement si limité exactement à sa ville. */
+  private assertCityAdminOwnsPromo(
+    managedCity: string,
+    promo: { cityNames?: string[] | null },
+  ) {
+    const cities = (promo.cityNames ?? []).map((c) => String(c).trim()).filter(Boolean);
+    const key = managedCity.trim().toLowerCase();
+    const onlyOwn =
+      cities.length === 1 && cities[0].toLowerCase() === key;
+    if (!onlyOwn) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.FORBIDDEN,
+        `Vous ne pouvez modifier que les codes promo limités à ${managedCity} (pas les codes nationaux ni multi-villes).`,
+      );
+    }
+  }
+
+  async createPromoCode(body: Record<string, unknown>, managedCity?: string | null) {
+    const payload = { ...body };
+    if (managedCity?.trim()) {
+      // Force scope: CITY_ADMIN ne peut jamais créer un code national / multi-villes.
+      payload.cityNames = [managedCity.trim()];
+    }
+    return this.proxy('ride', '/internal/promo-codes', { method: 'POST', body: JSON.stringify(payload) });
+  }
+
+  async updatePromoCode(id: string, body: Record<string, unknown>, managedCity?: string | null) {
+    if (managedCity?.trim()) {
+      const rows = (await this.listPromoCodes()) as Array<{ id?: string; cityNames?: string[] | null }>;
+      const existing = rows.find((r) => r.id === id);
+      if (!existing) {
+        throw new MovaHttpException(MovaErrorCode.PROMO_NOT_FOUND, HttpStatus.NOT_FOUND);
+      }
+      this.assertCityAdminOwnsPromo(managedCity, existing);
+      // Empêche d'élargir le périmètre hors de sa ville.
+      const payload = { ...body, cityNames: [managedCity.trim()] };
+      return this.proxy('ride', `/internal/promo-codes/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(payload),
+      });
+    }
     return this.proxy('ride', `/internal/promo-codes/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
   }
 

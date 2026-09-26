@@ -204,6 +204,9 @@ export const ADMIN_ROLE_PERMISSIONS: Record<UserRole, AdminPermission[]> = {
     AdminPermission.POI_WRITE,
     AdminPermission.RULES_READ,
     AdminPermission.RULES_WRITE,
+    /** Codes promo limités à managedCity (forcé côté admin-service). */
+    AdminPermission.PROMO_READ,
+    AdminPermission.PROMO_WRITE,
   ],
 };
 

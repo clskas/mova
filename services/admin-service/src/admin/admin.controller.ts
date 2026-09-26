@@ -1442,22 +1442,29 @@ export class AdminController {
   @Get('promo-codes')
   @RequirePermissions(AdminPermission.PROMO_READ)
   @ApiOperation({ summary: 'Codes promo' })
-  promoCodes() {
-    return this.adminService.listPromoCodes();
+  promoCodes(@Request() req: { user: AdminJwtUser }) {
+    const managedCity = resolveManagedCityScope(req.user);
+    return this.adminService.listPromoCodesScoped(managedCity);
   }
 
   @Post('promo-codes')
   @RequirePermissions(AdminPermission.PROMO_WRITE)
   @ApiOperation({ summary: 'Créer code promo' })
-  createPromoCode(@Body() body: Record<string, unknown>) {
-    return this.adminService.createPromoCode(body);
+  createPromoCode(@Request() req: { user: AdminJwtUser }, @Body() body: Record<string, unknown>) {
+    const managedCity = resolveManagedCityScope(req.user);
+    return this.adminService.createPromoCode(body, managedCity);
   }
 
   @Patch('promo-codes/:id')
   @RequirePermissions(AdminPermission.PROMO_WRITE)
   @ApiOperation({ summary: 'Modifier code promo' })
-  updatePromoCode(@Param('id') id: string, @Body() body: Record<string, unknown>) {
-    return this.adminService.updatePromoCode(id, body);
+  updatePromoCode(
+    @Request() req: { user: AdminJwtUser },
+    @Param('id') id: string,
+    @Body() body: Record<string, unknown>,
+  ) {
+    const managedCity = resolveManagedCityScope(req.user);
+    return this.adminService.updatePromoCode(id, body, managedCity);
   }
 
   @Get('subscription-plans')

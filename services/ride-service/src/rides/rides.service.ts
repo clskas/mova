@@ -719,8 +719,8 @@ export class RidesService {
         feeMessage = 'Annulation gratuite — aucun chauffeur n\'avait encore accepté.';
       }
     } else if (actor === 'driver' && policy) {
-      const arrived =
-        ride.status === RideStatus.DRIVER_ARRIVED || mobileStatus === 'ARRIVING' || mobileStatus === 'DRIVER_ARRIVED';
+      // Mobile maps DRIVER_ARRIVED → ARRIVING (never keeps DRIVER_ARRIVED as mobile status).
+      const arrived = ride.status === RideStatus.DRIVER_ARRIVED || mobileStatus === 'ARRIVING';
       if (arrived && policy.noShowFeeCdf > 0) {
         feeCdf = policy.noShowFeeCdf;
         feeMessage = `Annulation chauffeur (passager absent / no-show) — frais éventuels : ${formatCdf(feeCdf)}.`;

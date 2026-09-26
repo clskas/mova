@@ -58,6 +58,8 @@ describe('admin-rbac', () => {
     expect(hasAdminPermission(UserRole.CITY_ADMIN, AdminPermission.RULES_READ)).toBe(true);
     expect(hasAdminPermission(UserRole.CITY_ADMIN, AdminPermission.RENTALS_READ)).toBe(true);
     expect(hasAdminPermission(UserRole.CITY_ADMIN, AdminPermission.RENTALS_WRITE)).toBe(true);
+    expect(hasAdminPermission(UserRole.CITY_ADMIN, AdminPermission.MOVING_READ)).toBe(true);
+    expect(hasAdminPermission(UserRole.CITY_ADMIN, AdminPermission.MOVING_WRITE)).toBe(true);
     expect(hasAdminPermission(UserRole.CITY_ADMIN, AdminPermission.WALLETS_WRITE)).toBe(false);
     expect(hasAdminPermission(UserRole.CITY_ADMIN, AdminPermission.SYSTEM_WRITE)).toBe(false);
     expect(hasAdminPermission(UserRole.CITY_ADMIN, AdminPermission.USERS_WRITE)).toBe(false);
@@ -93,5 +95,19 @@ describe('admin-rbac', () => {
       ]),
     ).toBe(true);
     expect(hasAdminPermission(UserRole.SUPPORT, AdminPermission.WALLETS_READ)).toBe(false);
+  });
+
+  it('legacy zones:write implique poi:write (avant séparation Lieux)', () => {
+    expect(
+      hasAdminPermission(UserRole.CITY_ADMIN, AdminPermission.POI_WRITE, [
+        AdminPermission.ZONES_READ,
+        AdminPermission.ZONES_WRITE,
+      ]),
+    ).toBe(true);
+    expect(
+      hasAdminPermission(UserRole.CITY_ADMIN, AdminPermission.POI_READ, [
+        AdminPermission.ZONES_READ,
+      ]),
+    ).toBe(true);
   });
 });

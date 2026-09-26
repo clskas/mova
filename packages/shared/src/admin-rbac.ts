@@ -194,6 +194,7 @@ export const ADMIN_ROLE_PERMISSIONS: Record<UserRole, AdminPermission[]> = {
     AdminPermission.RENTALS_READ,
     AdminPermission.RENTALS_WRITE,
     AdminPermission.MOVING_READ,
+    AdminPermission.MOVING_WRITE,
     AdminPermission.CARPOOL_READ,
     AdminPermission.PRICING_READ,
     AdminPermission.PRICING_WRITE,
@@ -234,7 +235,7 @@ export const ADMIN_ACCESS_LEVELS: AdminAccessLevel[] = [
   },
   {
     id: 'restaurants',
-    label: 'Restaurants / partenaires',
+    label: 'Partenaires',
     permissions: [AdminPermission.RESTAURANTS_READ, AdminPermission.RESTAURANTS_WRITE],
   },
   {
@@ -349,6 +350,12 @@ export function expandLegacyAccessPermissions(perms: AdminPermission[]): AdminPe
       set.add(AdminPermission.ZONES_WRITE);
       set.add(AdminPermission.RULES_WRITE);
     }
+  }
+  // Avant la séparation Lieux/POI, zones:read/write couvrait aussi les suggestions POI.
+  const hasPoi = set.has(AdminPermission.POI_READ) || set.has(AdminPermission.POI_WRITE);
+  if (hasZones && !hasPoi) {
+    if (set.has(AdminPermission.ZONES_READ)) set.add(AdminPermission.POI_READ);
+    if (set.has(AdminPermission.ZONES_WRITE)) set.add(AdminPermission.POI_WRITE);
   }
   const hasScheduled = set.has(AdminPermission.SCHEDULED_READ) || set.has(AdminPermission.SCHEDULED_WRITE);
   const hasRentals = set.has(AdminPermission.RENTALS_READ) || set.has(AdminPermission.RENTALS_WRITE);

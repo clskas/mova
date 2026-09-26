@@ -756,7 +756,7 @@ export default function UtilisateursPage() {
                     />
                     <p className="text-xs text-gray-500 mt-1">
                       Type de commerce du partenaire (restaurant, boutique, pharmacie ou supermarché).
-                      Modifiable dans la page Restaurants.
+                      Modifiable dans la page Partenaires.
                     </p>
                   </div>
                 ) : (
@@ -804,7 +804,7 @@ export default function UtilisateursPage() {
               {selected.role !== "RESTAURANT" && editRole === "RESTAURANT" && !readOnly && (
                 <p className="text-xs text-amber-800 sm:col-span-2">
                   Après passage en partenaire commerce, le type (resto / boutique / pharmacie / supermarché)
-                  se règle dans Restaurants.
+                  se règle dans Partenaires.
                 </p>
               )}
               {editRole === "CITY_ADMIN" && (

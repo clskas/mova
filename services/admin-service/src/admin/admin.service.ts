@@ -1510,6 +1510,20 @@ export class AdminService {
       }));
     });
   }
+
+  /** CITY_ADMIN: refuse write outside managedCity. */
+  async assertMovingInScope(id: string, managedCity?: string | null) {
+    if (!managedCity) return;
+    const scoped = await this.listMoving(200, managedCity);
+    if (!scoped.some((r) => String(r.id ?? '') === id)) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.FORBIDDEN,
+        'Déménagement hors de votre ville gérée.',
+      );
+    }
+  }
+
   cancelMoving(id: string) {
     return this.proxy('ride', `/internal/moving/${id}/cancel`, { method: 'POST', body: JSON.stringify({}) });
   }

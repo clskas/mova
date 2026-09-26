@@ -105,8 +105,8 @@ export default function DashboardPage() {
     { label: "Covoiturage", value: m.carpoolTrips, href: "/covoiturage", section: "covoiturage" as const, accent: "green" as const },
   ].filter((c) => {
     if (!canAccess(c.section)) return false;
-    // Admin ville : pas de KPIs portefeuille / démén / covoit nationaux.
-    if (role === "CITY_ADMIN" && (c.section === "portefeuille" || c.section === "demenagements" || c.section === "covoiturage")) {
+    // Admin ville : pas de KPI portefeuille national (wallets cross-ville).
+    if (role === "CITY_ADMIN" && c.section === "portefeuille") {
       return false;
     }
     return true;

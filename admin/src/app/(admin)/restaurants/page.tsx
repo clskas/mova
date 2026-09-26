@@ -237,8 +237,12 @@ export default function RestaurantsPage() {
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <PageHeader
-        title="Restaurants"
-        subtitle={readOnly ? "Consultation des restaurants partenaires" : "Créer, modifier et supprimer les restaurants"}
+        title="Partenaires"
+        subtitle={
+          readOnly
+            ? "Consultation des partenaires commerce (resto, boutique, pharmacie, supermarché)"
+            : "Créer, modifier et supprimer les partenaires commerce (resto, boutique, pharmacie, supermarché)"
+        }
       />
       {readOnly && (
         <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2">

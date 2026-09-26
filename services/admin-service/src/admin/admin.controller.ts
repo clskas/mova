@@ -970,7 +970,7 @@ export class AdminController {
   }
 
   @Post('poi/seed')
-  @RequirePermissions(AdminPermission.POI_WRITE)
+  @RequirePermissions(AdminPermission.POI_WRITE, AdminPermission.ZONES_WRITE)
   @ApiOperation({ summary: 'Synchroniser le catalogue POI (ville gérée ou toutes pour SUPER_ADMIN)' })
   seedPois(@Request() req: { user: AdminJwtUser }, @Query('city') city?: string) {
     const managed = resolveManagedCityScope(req.user);
@@ -1020,7 +1020,7 @@ export class AdminController {
   }
 
   @Get('poi-suggestions')
-  @RequirePermissions(AdminPermission.POI_READ)
+  @RequirePermissions(AdminPermission.POI_READ, AdminPermission.ZONES_READ)
   @ApiOperation({ summary: 'Suggestions de lieux (POI) en attente' })
   poiSuggestions(
     @Request() req: { user: AdminJwtUser },
@@ -1037,7 +1037,7 @@ export class AdminController {
   }
 
   @Post('poi-suggestions/:id/approve')
-  @RequirePermissions(AdminPermission.POI_WRITE)
+  @RequirePermissions(AdminPermission.POI_WRITE, AdminPermission.ZONES_WRITE)
   @ApiOperation({ summary: 'Publier une suggestion POI' })
   approvePoiSuggestion(
     @Request() req: { user: AdminJwtUser },
@@ -1048,7 +1048,7 @@ export class AdminController {
   }
 
   @Post('poi-suggestions/:id/reject')
-  @RequirePermissions(AdminPermission.POI_WRITE)
+  @RequirePermissions(AdminPermission.POI_WRITE, AdminPermission.ZONES_WRITE)
   @ApiOperation({ summary: 'Refuser une suggestion POI' })
   rejectPoiSuggestion(
     @Request() req: { user: AdminJwtUser },
@@ -1089,21 +1089,32 @@ export class AdminController {
   @Post('moving/:id/cancel')
   @RequirePermissions(AdminPermission.MOVING_WRITE)
   @ApiOperation({ summary: 'Annuler déménagement' })
-  cancelMoving(@Param('id') id: string) {
+  async cancelMoving(@Request() req: { user: AdminJwtUser }, @Param('id') id: string) {
+    await this.adminService.assertMovingInScope(id, resolveManagedCityScope(req.user));
     return this.adminService.cancelMoving(id);
   }
 
   @Patch('moving/:id/status')
   @RequirePermissions(AdminPermission.MOVING_WRITE)
   @ApiOperation({ summary: 'Statut déménagement' })
-  movingStatus(@Param('id') id: string, @Body('status') status: string) {
+  async movingStatus(
+    @Request() req: { user: AdminJwtUser },
+    @Param('id') id: string,
+    @Body('status') status: string,
+  ) {
+    await this.adminService.assertMovingInScope(id, resolveManagedCityScope(req.user));
     return this.adminService.updateMovingStatus(id, status);
   }
 
   @Patch('moving/:id/assign')
   @RequirePermissions(AdminPermission.MOVING_WRITE)
   @ApiOperation({ summary: 'Assigner un chauffeur au déménagement' })
-  assignMoving(@Param('id') id: string, @Body('driverId') driverId: string) {
+  async assignMoving(
+    @Request() req: { user: AdminJwtUser },
+    @Param('id') id: string,
+    @Body('driverId') driverId: string,
+  ) {
+    await this.adminService.assertMovingInScope(id, resolveManagedCityScope(req.user));
     return this.adminService.assignMovingDriver(id, driverId);
   }
 

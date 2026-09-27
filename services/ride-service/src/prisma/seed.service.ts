@@ -321,12 +321,13 @@ export class SeedService implements OnModuleInit {
     });
 
     await this.seedSection('pricing', async () => {
+      // Create-only : ne jamais réécrire les tarifs admin à chaque redémarrage / deploy.
       for (const city of SEED_CITIES) {
         for (const r of PRICING_RULES) {
           await this.prisma.pricingRule.upsert({
             where: { vehicleType_city: { vehicleType: r.vehicleType, city } },
             create: { ...r, city },
-            update: r,
+            update: {},
           });
         }
       }
@@ -334,34 +335,31 @@ export class SeedService implements OnModuleInit {
 
     await this.seedSection('surcharges', async () => {
       for (const s of SERVICE_SURCHARGES) {
-        await this.prisma.serviceSurcharge.upsert({ where: { type: s.type }, create: s, update: s });
+        await this.prisma.serviceSurcharge.upsert({
+          where: { type: s.type },
+          create: s,
+          update: {},
+        });
       }
       for (const p of CANCELLATION_POLICIES) {
-        await this.prisma.cancellationPolicy.upsert({ where: { vehicleType: p.vehicleType }, create: p, update: p });
+        await this.prisma.cancellationPolicy.upsert({
+          where: { vehicleType: p.vehicleType },
+          create: p,
+          update: {},
+        });
       }
       for (const c of PLATFORM_COMMISSIONS) {
         await this.prisma.platformCommission.upsert({
           where: { serviceType: c.serviceType },
           create: c,
-          update: {
-            platformPercent: c.platformPercent,
-            driverPercent: c.driverPercent,
-            description: c.description,
-            ...(c.fixedFeeCdf != null ? { fixedFeeCdf: c.fixedFeeCdf } : {}),
-            ...(c.perItemFeeCdf != null ? { perItemFeeCdf: c.perItemFeeCdf } : {}),
-          },
+          update: {},
         });
       }
       for (const row of ERRAND_CATEGORY_ESTIMATES) {
         await this.prisma.errandCategoryEstimate.upsert({
           where: { category: row.category },
           create: row,
-          update: {
-            label: row.label,
-            perItemCdf: row.perItemCdf,
-            keywordPattern: row.keywordPattern,
-            sortOrder: row.sortOrder,
-          },
+          update: {},
         });
       }
       const { PricingTimeWindowService } = await import('../rides/pricing-time-window.service');

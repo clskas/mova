@@ -555,7 +555,13 @@ export type PlatformConfigData = {
     defaultNightMultiplier: number;
     combinedPeakNightMultiplier: number;
   };
-  carpool: { matchRadiusKm: number; relaxedRadiusMultiplier: number };
+  carpool: {
+    matchRadiusKm: number;
+    relaxedRadiusMultiplier: number;
+    fareMultiplier: number;
+    maxPassengers: number;
+    maxDetourKm: number;
+  };
   driverOps?: {
     requireDocumentsForJobs: boolean;
     documentsGracePeriodDays?: number;

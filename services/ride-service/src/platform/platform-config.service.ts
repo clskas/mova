@@ -152,5 +152,26 @@ export class PlatformConfigService implements OnModuleInit {
     if (m.trip.roadDistanceFactor < 1 || m.trip.roadDistanceFactor > 3) {
       throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, HttpStatus.BAD_REQUEST, 'Facteur de détour entre 1 et 3.');
     }
+    if (m.carpool.fareMultiplier < 0.2 || m.carpool.fareMultiplier > 1) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        HttpStatus.BAD_REQUEST,
+        'Multiplicateur Pool (fareMultiplier) entre 0,20 et 1,00 (ex. 0,65 = −35 %).',
+      );
+    }
+    if (m.carpool.maxPassengers < 2 || m.carpool.maxPassengers > 6) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        HttpStatus.BAD_REQUEST,
+        'Places Pool : entre 2 et 6.',
+      );
+    }
+    if (m.carpool.maxDetourKm < 0.5 || m.carpool.maxDetourKm > 15) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        HttpStatus.BAD_REQUEST,
+        'Détour max Pool : entre 0,5 et 15 km.',
+      );
+    }
   }
 }

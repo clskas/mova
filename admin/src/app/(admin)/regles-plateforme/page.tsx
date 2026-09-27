@@ -150,6 +150,9 @@ export default function ReglesPlateformePage() {
   const [nightDefault, setNightDefault] = useState("");
   const [combinedPeakNight, setCombinedPeakNight] = useState("");
   const [carpoolRadius, setCarpoolRadius] = useState("");
+  const [poolFareMultiplier, setPoolFareMultiplier] = useState("");
+  const [poolMaxPassengers, setPoolMaxPassengers] = useState("");
+  const [poolMaxDetourKm, setPoolMaxDetourKm] = useState("");
   const [requireDocsForJobs, setRequireDocsForJobs] = useState(false);
   const [docsGraceDays, setDocsGraceDays] = useState("7");
   const [requiredDocs, setRequiredDocs] = useState<Record<(typeof DOCUMENT_CATALOG)[number]["field"], string[]>>({
@@ -187,6 +190,9 @@ export default function ReglesPlateformePage() {
     setNightDefault(String(c.pricing.defaultNightMultiplier));
     setCombinedPeakNight(String(c.pricing.combinedPeakNightMultiplier));
     setCarpoolRadius(String(c.carpool.matchRadiusKm));
+    setPoolFareMultiplier(String(c.carpool.fareMultiplier ?? 0.65));
+    setPoolMaxPassengers(String(c.carpool.maxPassengers ?? 3));
+    setPoolMaxDetourKm(String(c.carpool.maxDetourKm ?? 2.5));
     setRequireDocsForJobs(c.driverOps?.requireDocumentsForJobs === true);
     setDocsGraceDays(String(c.driverOps?.documentsGracePeriodDays ?? 7));
     setRequiredDocs({
@@ -472,7 +478,6 @@ export default function ReglesPlateformePage() {
               <NumField label="Majoration pointe défaut" value={peakDefault} onChange={setPeakDefault} step="0.01" disabled={readOnly} />
               <NumField label="Majoration nuit défaut" value={nightDefault} onChange={setNightDefault} step="0.01" disabled={readOnly} />
               <NumField label="Pointe + nuit combinées" value={combinedPeakNight} onChange={setCombinedPeakNight} step="0.01" disabled={readOnly} />
-              <NumField label="Rayon covoiturage (km)" value={carpoolRadius} onChange={setCarpoolRadius} disabled={readOnly} />
               {!readOnly && (
                 <div className="lg:col-span-3 flex gap-2 flex-wrap">
                   <BtnPrimary
@@ -501,11 +506,54 @@ export default function ReglesPlateformePage() {
                           defaultNightMultiplier: Number(nightDefault),
                           combinedPeakNightMultiplier: Number(combinedPeakNight),
                         },
-                        carpool: { matchRadiusKm: Number(carpoolRadius) },
                       })
                     }
                   >
-                    {savingSection === "pricing" ? "…" : "Enregistrer majorations & covoiturage"}
+                    {savingSection === "pricing" ? "…" : "Enregistrer majorations"}
+                  </BtnPrimary>
+                </div>
+              )}
+            </Card>
+          </section>
+
+          <section>
+            <h2 className="font-semibold text-[#1A1A2E] mb-1">Pool (trajet partagé)</h2>
+            <p className="text-sm text-gray-500 mb-3">
+              Prix Pool = tarif course exclusive × multiplicateur (ex. 0,65 = −35 %). Plancher 500 FC.
+            </p>
+            <Card className="p-4 grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <NumField
+                label="Multiplicateur prix (0,20–1)"
+                value={poolFareMultiplier}
+                onChange={setPoolFareMultiplier}
+                step="0.01"
+                disabled={readOnly}
+              />
+              <NumField label="Rayon matching (km)" value={carpoolRadius} onChange={setCarpoolRadius} disabled={readOnly} />
+              <NumField label="Places max" value={poolMaxPassengers} onChange={setPoolMaxPassengers} disabled={readOnly} />
+              <NumField
+                label="Détour max (km)"
+                value={poolMaxDetourKm}
+                onChange={setPoolMaxDetourKm}
+                step="0.1"
+                disabled={readOnly}
+              />
+              {!readOnly && (
+                <div className="lg:col-span-4">
+                  <BtnPrimary
+                    disabled={savingSection === "pool"}
+                    onClick={() =>
+                      savePlatform("pool", {
+                        carpool: {
+                          fareMultiplier: Number(poolFareMultiplier),
+                          matchRadiusKm: Number(carpoolRadius),
+                          maxPassengers: Number(poolMaxPassengers),
+                          maxDetourKm: Number(poolMaxDetourKm),
+                        },
+                      })
+                    }
+                  >
+                    {savingSection === "pool" ? "…" : "Enregistrer Pool"}
                   </BtnPrimary>
                 </div>
               )}

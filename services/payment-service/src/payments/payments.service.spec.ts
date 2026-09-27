@@ -46,6 +46,7 @@ describe('PaymentsService', () => {
   const driverPayouts = {
     fetchRidePayout: jest.fn().mockResolvedValue(null),
     creditRidePayoutFromPayment: jest.fn().mockResolvedValue({ credited: false }),
+    creditPayout: jest.fn().mockResolvedValue({ credited: false }),
   };
   const foodPayouts = {
     creditFromServicePayment: jest.fn().mockResolvedValue({ credited: false }),
@@ -57,6 +58,7 @@ describe('PaymentsService', () => {
   };
   const debtLedger = {
     recordCashDebt: jest.fn().mockResolvedValue(undefined),
+    recordDebt: jest.fn().mockResolvedValue({ recorded: true }),
   };
   const redis = {
     publish: jest.fn().mockResolvedValue(undefined),
@@ -220,6 +222,113 @@ describe('PaymentsService', () => {
         where: { rideId: 'ride-1' },
         data: expect.objectContaining({ status: 'COMPLETED' }),
       }),
+    );
+  });
+
+  it('cash + promo plateforme : dette commission = payé − net (SENGA absorbe)', async () => {
+    // Passager paie 9000 (promo −1000) ; net chauffeur 8000 sur tarif plein 10000 → dette 1000 (pas 2000).
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        passengerId: 'user-1',
+        driverId: 'driver-1',
+        status: 'COMPLETED',
+        internalStatus: 'COMPLETED',
+        finalFareCdf: 9000,
+      }),
+    });
+    prisma.payment.findUnique
+      .mockResolvedValueOnce({
+        id: 'pay-cash-promo',
+        rideId: 'ride-promo',
+        userId: 'user-1',
+        amountCdf: 9000,
+        method: PaymentMethod.CASH,
+        status: 'PENDING',
+      })
+      .mockResolvedValueOnce({
+        id: 'pay-cash-promo',
+        rideId: 'ride-promo',
+        userId: 'user-1',
+        amountCdf: 9000,
+        method: PaymentMethod.CASH,
+        status: 'COMPLETED',
+      });
+    prisma.payment.update.mockResolvedValueOnce({
+      id: 'pay-cash-promo',
+      rideId: 'ride-promo',
+      status: 'COMPLETED',
+      method: PaymentMethod.CASH,
+      amountCdf: 9000,
+    });
+    driverPayouts.fetchRidePayout.mockResolvedValueOnce({
+      driverId: 'driver-1',
+      driverNetCdf: 8000,
+      grossCdf: 10000,
+    });
+    driverPayouts.creditPayout.mockResolvedValueOnce({ credited: true });
+
+    const result = await service.confirmCashRide('ride-promo', 'driver-1');
+    expect(result.success).toBe(true);
+    expect(debtLedger.recordDebt).toHaveBeenCalledWith(
+      expect.objectContaining({
+        driverUserId: 'driver-1',
+        referenceType: 'RIDE',
+        referenceId: 'ride-promo',
+        amountCdf: 1000,
+      }),
+    );
+    expect(driverPayouts.creditPayout).not.toHaveBeenCalled();
+    expect(wallet.creditPlatformFee).not.toHaveBeenCalled();
+  });
+
+  it('cash + grosse promo : top-up wallet si net > cash reçu', async () => {
+    // Payé 5000, net 8000 → pas de dette, crédit wallet 3000 (SENGA finance le manque).
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        passengerId: 'user-1',
+        driverId: 'driver-1',
+        status: 'COMPLETED',
+        internalStatus: 'COMPLETED',
+        finalFareCdf: 5000,
+      }),
+    });
+    prisma.payment.findUnique
+      .mockResolvedValueOnce({
+        id: 'pay-cash-big',
+        rideId: 'ride-big',
+        userId: 'user-1',
+        amountCdf: 5000,
+        method: PaymentMethod.CASH,
+        status: 'PENDING',
+      })
+      .mockResolvedValueOnce({
+        id: 'pay-cash-big',
+        rideId: 'ride-big',
+        amountCdf: 5000,
+        method: PaymentMethod.CASH,
+        status: 'COMPLETED',
+      });
+    prisma.payment.update.mockResolvedValueOnce({
+      id: 'pay-cash-big',
+      status: 'COMPLETED',
+      method: PaymentMethod.CASH,
+    });
+    driverPayouts.fetchRidePayout.mockResolvedValueOnce({
+      driverId: 'driver-1',
+      driverNetCdf: 8000,
+      grossCdf: 10000,
+    });
+    driverPayouts.creditPayout.mockResolvedValueOnce({ credited: true, amountCdf: 3000 });
+
+    await service.confirmCashRide('ride-big', 'driver-1');
+    expect(debtLedger.recordDebt).not.toHaveBeenCalled();
+    expect(driverPayouts.creditPayout).toHaveBeenCalledWith(
+      'driver-1',
+      expect.objectContaining({ referenceType: 'RIDE', referenceId: 'ride-big', driverNetCdf: 3000 }),
     );
   });
 

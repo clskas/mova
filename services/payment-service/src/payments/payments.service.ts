@@ -205,6 +205,14 @@ export class PaymentsService {
     }
   }
 
+  /**
+   * Répartition chauffeur / SENGA.
+   * - Net chauffeur = calculé sur tarif plein (promo plateforme absorbée côté SENGA).
+   * - Commission = montant réellement encaissé du client − net chauffeur
+   *   (pas gross − net : sinon le cash promo ferait payer la remise au chauffeur).
+   * - Espèces : cash en main = encaissé ; dette = max(0, encaissé − net) ;
+   *   si promo > commission, top-up wallet du manque (SENGA finance).
+   */
   private async settleDriverPayout(
     referenceType: string,
     referenceId: string,
@@ -212,13 +220,28 @@ export class PaymentsService {
     driverNetCdf: number,
     grossCdf: number,
     paymentMethod: PaymentMethod,
+    passengerPaidCdf?: number | null,
   ) {
-    const platformFee = Math.max(0, Math.round((grossCdf ?? driverNetCdf) - driverNetCdf));
+    const net = Math.max(0, Math.round(driverNetCdf));
+    const collected =
+      passengerPaidCdf != null && Number.isFinite(passengerPaidCdf)
+        ? Math.max(0, Math.round(passengerPaidCdf))
+        : Math.max(0, Math.round(grossCdf ?? net));
+    const platformFee = Math.max(0, collected - net);
+    const cashPromoTopUp = paymentMethod === PaymentMethod.CASH ? Math.max(0, net - collected) : 0;
+
     if (paymentMethod !== PaymentMethod.CASH) {
       await this.driverPayouts.creditPayout(driverId, {
         referenceType: referenceType.toUpperCase(),
         referenceId,
-        driverNetCdf,
+        driverNetCdf: net,
+      });
+    } else if (cashPromoTopUp > 0) {
+      // Promo > marge commission : le cash reçu ne couvre pas le net — SENGA complète.
+      await this.driverPayouts.creditPayout(driverId, {
+        referenceType: referenceType.toUpperCase(),
+        referenceId,
+        driverNetCdf: cashPromoTopUp,
       });
     }
     if (paymentMethod === PaymentMethod.CASH && platformFee > 0) {
@@ -231,7 +254,7 @@ export class PaymentsService {
         amountCdf: platformFee,
         description: `Commission espèces à reverser — ${referenceType} ${referenceId.slice(0, 8)}`,
       });
-    } else if (platformFee > 0) {
+    } else if (paymentMethod !== PaymentMethod.CASH && platformFee > 0) {
       await this.walletService.creditPlatformFee(
         platformFee,
         `Commission SENGA ${referenceType} ${referenceId}`,
@@ -252,6 +275,7 @@ export class PaymentsService {
       payout.driverNetCdf,
       payout.grossCdf ?? payout.driverNetCdf,
       method,
+      payment?.amountCdf,
     );
   }
 
@@ -308,6 +332,7 @@ export class PaymentsService {
         payout.driverNetCdf ?? 0,
         payout.grossCdf ?? payout.driverNetCdf ?? 0,
         method,
+        payment?.amountCdf,
       );
     } catch (e) {
       this.logger.warn(`creditDriverAfterServicePayment ${referenceType}/${referenceId} failed`, e);

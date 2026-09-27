@@ -222,7 +222,9 @@ export default function CoursesPage() {
     isOpsAdmin && !!r.status && !["COMPLETED", "CANCELLED"].includes(r.status);
   const assignableDrivers = sortDriversByDuty(drivers);
   const detail = rideDetail ?? selected;
-  const paid = detail?.isPaid === true || newStatus === "PAID";
+  const alreadyPaid = detail?.isPaid === true;
+  /** Badge: déjà payé ou sélection « Payé » en cours (aperçu). */
+  const paid = alreadyPaid || newStatus === "PAID";
 
   return (
     <div className="max-w-6xl mx-auto">
@@ -363,7 +365,7 @@ export default function CoursesPage() {
                   disabled={
                     saving ||
                     (newStatus === "PAID"
-                      ? paid
+                      ? alreadyPaid
                       : !newStatus || newStatus === selected.status)
                   }
                 >

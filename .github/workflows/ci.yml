@@ -16,18 +16,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # afri-soft-com/mova is the Render git source (autoDeploy: false). Full CI on
-  # both remotes doubles Actions usage and exhausts the Free plan, which fails
-  # jobs in ~2–4s with empty steps. Keep a green no-op here; real CI is on clskas/mova.
-  mirror-pass:
-    if: github.repository == 'afri-soft-com/mova'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Mirror repo — full CI runs on clskas/mova
-        run: |
-          echo "afri-soft-com/mova is the Render source mirror."
-          echo "Full CI / Build / Deploy execute on clskas/mova to conserve Actions minutes."
-
+  # afri-soft-com/mova is the Render git source. Do not schedule any runners
+  # there: Free Actions minutes are exhausted and even a 1-step job fails in ~2s
+  # with empty steps (red CI). Full CI → Build → Deploy runs on clskas/mova.
+  # When every job is skipped, the workflow concludes without burning minutes.
   shared:
     if: github.repository != 'afri-soft-com/mova'
     runs-on: ubuntu-latest
